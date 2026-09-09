@@ -29,7 +29,7 @@ function draw(){
   s.renderer.setPixelRatio(Math.min(devicePixelRatio,2));s.renderer.setSize(s.container.clientWidth,s.container.clientHeight,false);
   s.renderer.render(s.scene,s.camera);
  });
- $('#status').textContent='已载入 · 两份模型相同视角 / 只改变内部几何和材质。装配模式沿用相同外壳。';
+ $('#status').textContent='已载入 · 两份模型相同视角。当前装配包含后续外壳修订；内构差异请使用仅内部结构模式。';
 }
 try{
  await Promise.all(scenes.map((s,i)=>s.load(i?'/assets/archive-cassette.glb':'/reference/internal-study/assembly-before.glb')));
