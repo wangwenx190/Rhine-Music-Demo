@@ -68,6 +68,7 @@
 - `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 创建统一 preset 名称：`qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。统一命令：`cmake --preset qt-debug`、`cmake --build --preset qt-debug`、`ctest --preset qt-debug --output-on-failure`。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
+- 原生构建入口、最新 Kit 覆盖/旧缓存处理、QML/qsb 别名、最小运行探针与证据重建命令见 `docs/contracts/native-bootstrap.md`；Windows 证据在 `verification/windows/native-bootstrap/`。macOS/Linux 的现有 R02 审计矩阵仅覆盖最小工程，后续轮次必须按新增实现扩展，不替代 R31/R32 的完整平台审计。
 
 ## 架构与数据契约
 
@@ -257,15 +258,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R02 · CMake工程、Kit探测与最小原生运行（0.5–1日）
-
-- 依赖：R01。交付根 CMake、presets、`cmake/` 模块、`src/app/main.cpp`、`qml/Yalahoo/Music/App.qml`、`tests/unit/` QtTest 目标和 `tools/build/` 脚本；目录按上述结构建立，不恢复 `qt/` 套层。
-- `qt_add_executable`/`qt_add_qml_module`注册`Yalahoo.Music`模块，资源别名及加载入口按目录契约固定；加载Qt Quick Controls Basic样式再创建引擎，避免平台主题改变自定义控件。从本轮起三平台 CMake 分支必须完整，系统特定链接和编译选项有条件隔离；Windows 实机运行，macOS/Linux 纳入静态审计矩阵。
-- 建立身份契约中的 CMake 项目/目标/输出名、Qt applicationName/applicationDisplayName、数据路径和 QML URI；首个窗口标题为 `yalahOO!!!`，品牌图形等 R03B 交付后接入，不能先用旧标识冒充新品牌。
-- 实现上述 C++23 强制设置、能力探针与最新 Qt Kit 自动选择；独立探测 Qt Quick 3D、ShaderTools、Multimedia 链接及插件加载，Debug/Release 使用同一 Kit。Kit 选择逻辑用合成安装清单覆盖版本数值排序、非桌面 Kit 排除、架构/ABI 匹配、最高版本缺模块报错与旧缓存失效；不得为测试安装另一版本 Qt 或写死本机 6.12 路径。
-- 首个窗口验证D3D11渲染、中文文本、QML模块和QMediaPlayer创建；运行失败保留实际诊断，不能仅靠CMake configure成功过关。
-- 退出：三个统一构建/测试命令在 Windows 实际运行；启动不创建浏览器、Node服务或联网请求。归档 Web 参照使用 `legacy-web/` 工作目录及原锁定依赖，原模块与资产内容不被新构建覆盖。
 
 ### R03 · 模型、字体、图标与音频资源接入（1–1.5日）
 

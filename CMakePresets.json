@@ -1,0 +1,28 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "qt-debug",
+      "displayName": "Native Qt Debug (latest installed Kit)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_EXPORT_COMPILE_COMMANDS": true }
+    },
+    {
+      "name": "qt-release",
+      "inherits": "qt-debug",
+      "displayName": "Native Qt Release (latest installed Kit)",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "qt-debug", "configurePreset": "qt-debug" },
+    { "name": "qt-release", "configurePreset": "qt-release" }
+  ],
+  "testPresets": [
+    { "name": "qt-debug", "configurePreset": "qt-debug", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "qt-release", "configurePreset": "qt-release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "round": "R02",
+  "checks": [
+    {
+      "checkId": "COMMON-01",
+      "requirement": "Native C++23, latest Qt discovery, complete target and test closure",
+      "platforms": ["macos", "linux"],
+      "sources": [
+        {"path": "CMakeLists.txt", "symbol": "find_package(Qt6 REQUIRED COMPONENTS"},
+        {"path": "cmake/Cxx23.cmake", "symbol": "std::optional<int>(3).transform"},
+        {"path": "cmake/QtKit.cmake", "symbol": "yalahoo_discover_qt"},
+        {"path": "src/core/CMakeLists.txt", "symbol": "YalahooCore"},
+        {"path": "src/app/CMakeLists.txt", "symbol": "qt_add_qml_module"},
+        {"path": "tests/unit/CMakeLists.txt", "symbol": "add_test(NAME runtime"},
+        {"path": "tools/build/build.sh", "symbol": "ctest --preset"}
+      ],
+      "evidence": "Top-level project sets required C++23 with extensions off and compiles optional::transform/to_underlying. Discovery enumerates local config files, excludes enabled cross_compile and non-desktop specs, checks qmake/config versions, selects numeric newest native architecture and ABI, fails on missing modules or stale caches. Core source list and application list are real. App links all required modules; moc/QML/qrc/qsb are Qt-generated. Native Unix shell forwards configure arguments then uses identical build/test presets. No Windows compiler flags leak into these branches; synthetic Darwin/Linux selection and shared Windows Debug/Release checks passed.",
+      "limitations": "Neither target compiler nor native Qt installation has been executed here. R02 implements a bootstrap application, not later product subsystems."
+    },
+    {
+      "checkId": "COMMON-02",
+      "requirement": "Stable identity and working-directory-independent Unicode resource paths",
+      "platforms": ["macos", "linux"],
+      "sources": [
+        {"path": "src/core/AppIdentity.cpp", "symbol": "setApplicationName"},
+        {"path": "src/app/main.cpp", "symbol": "engine.loadFromModule"},
+        {"path": "src/app/CMakeLists.txt", "symbol": "QT_RESOURCE_ALIAS App.qml"},
+        {"path": "qml/Yalahoo/Music/App.qml", "symbol": "qrc:/assets/shaders/probe.frag.qsb"},
+        {"path": "tests/unit/IdentityTest.cpp", "symbol": "Future display name"}
+      ],
+      "evidence": "initializeIdentity precedes QGuiApplication and all QStandardPaths calls. Technical organization/application names are yalahoo; display/title are yalahOO!!!. QML alias resolves /qt/qml/Yalahoo/Music/App.qml via loadFromModule, not cwd. Shader alias resolves /assets/shaders/probe.frag.qsb. No asset font import exists before R03; Chinese uses system fonts. Report output uses QFileInfo/QDir/QSaveFile and screenshot uses Qt Unicode paths. Identity test proves changing display name leaves AppDataLocation stable; runtime runs from a tests subdirectory.",
+      "limitations": "Native QStandardPaths locations and CJK fallback need target runtime verification. No user music or preference files are opened."
+    },
+    {
+      "checkId": "COMMON-03",
+      "requirement": "Backend-isolated Qt Quick 3D and portable shader closure",
+      "platforms": ["macos", "linux"],
+      "sources": [
+        {"path": "src/app/main.cpp", "symbol": "Q_OS_MACOS"},
+        {"path": "src/app/main.cpp", "symbol": "Q_OS_LINUX"},
+        {"path": "qml/Yalahoo/Music/App.qml", "symbol": "SceneEnvironment.MSAA"},
+        {"path": "resources/shaders/probe.frag", "symbol": "layout(std140, binding = 0)"},
+        {"path": "src/app/CMakeLists.txt", "symbol": "qt_add_shaders"}
+      ],
+      "evidence": "Windows alone selects D3D11, macOS selects Metal, Linux selects OpenGL before QGuiApplication. Qt Quick 3D owns primitive geometry/camera/clip-space/depth/MSAA handling; no private RHI/custom capture path exists. The 2D ShaderEffect has UV input location 0, fragment output location 0, std140 binding 0 with matrix at offset 0 and opacity at offset 64. qsb dump verifies SPIR-V, GLSL 100es/120/150, HLSL50 and MSL12; MSL buffer(0) and user(locn0), GLSL uniforms/varyings follow Qt-generated bindings. Actual Windows cube pixels and D3D11 frames passed.",
+      "limitations": "MSL/GLSL generation is static evidence; Metal compilation, OpenGL context creation, target GPU appearance and performance have not been run. Later material/atlas/RHI paths are out of R02 scope."
+    },
+    {
+      "checkId": "COMMON-04",
+      "requirement": "Real Qt media plugin and safe render/media lifecycle without network or external engines",
+      "platforms": ["macos", "linux"],
+      "sources": [
+        {"path": "src/app/main.cpp", "symbol": "media.setAudioOutput(&audio)"},
+        {"path": "src/app/main.cpp", "symbol": "Outlive the engine"},
+        {"path": "tests/unit/ModuleProbe.cpp", "symbol": "player.source().isEmpty()"},
+        {"path": "qml/Yalahoo/Music/App.qml", "symbol": "MediaPlayer {"}
+      ],
+      "evidence": "C++ creates QAudioOutput then QMediaPlayer and connects them through public API; QML separately instantiates MediaPlayer. ModuleProbe requires isAvailable, empty source and StoppedState. No setSource/play/network client/QProcess/manual PCM exists. Main declares render counters before engine so destruction stops rendering while captured atomics still exist; engine dies before media, media before audio. Timers use window context; report path is captured by value. Frame diagnostics serialize under a mutex. Playback, output switching and EndOfMedia handling are not yet applicable and remain explicit R24/R25 tasks.",
+      "limitations": "Target media plugin loading and devices are unexecuted. This round creates media objects only; it makes no playback or format-support claim."
+    },
+    {
+      "checkId": "MAC-01",
+      "requirement": "Real native bundle bootstrap, Metal and logical pixel window",
+      "platforms": ["macos"],
+      "sources": [
+        {"path": "src/app/CMakeLists.txt", "symbol": "MACOSX_BUNDLE_INFO_PLIST"},
+        {"path": "cmake/Info.plist.in", "symbol": "NSHighResolutionCapable"},
+        {"path": "cmake/Platform.cmake", "symbol": "elseif(APPLE)"},
+        {"path": "cmake/QtKit.cmake", "symbol": "macx-clang"}
+      ],
+      "evidence": "APPLE builds an actual MACOSX_BUNDLE target with executable output yalahoo, bundle display/name yalahOO!!!, identifier yalahoo.music, configured CFBundleExecutable and APPL package. install places bundle at prefix root. HighResolutionCapable enables Retina while QML sizes remain logical pixels. Darwin Kit selection requires native arch and clang, rejects non-native/universal overrides in bootstrap; tools come from selected Kit. Basic controls use native Qt window close. No menus/shortcuts/product background behavior exist in this minimal window. macdeployqt and ordinary launchers remain R31 deliveries and are not faked here.",
+      "limitations": "Bundle creation, Retina and Metal require user macOS execution. Deployment, menu shortcuts and full product lifecycle are future rounds."
+    },
+    {
+      "checkId": "LNX-01",
+      "requirement": "Native ELF bootstrap, OpenGL and shared test/resource closure",
+      "platforms": ["linux"],
+      "sources": [
+        {"path": "src/app/CMakeLists.txt", "symbol": "INSTALL_RPATH"},
+        {"path": "cmake/Platform.cmake", "symbol": "UNIX AND NOT APPLE"},
+        {"path": "cmake/QtKit.cmake", "symbol": "linux-(g"},
+        {"path": "tools/build/build.sh", "symbol": "CDPATH="}
+      ],
+      "evidence": "Linux target is an ELF executable installed in bin with relative $ORIGIN/../lib rpath; Unix compiler flags contain no MSVC/DWrite calls. Linux spec and actual architecture select a native Qt Kit; gcc-compatible ABI is explicit. Shell resolves its repository through its own location, quotes paths, validates presets and passes arguments unchanged. Public presets use relative build directories. Qt chooses xcb/Wayland through standard QPA; only graphics API is set to OpenGL. QStandardPaths owns XDG defaults. Deployment closure, platform-plugin package requirements and Vulkan option remain R32 tasks because no Linux package is delivered in R02.",
+      "limitations": "X11/Wayland, GL drivers, XDG runtime behavior, permissions and media are unexecuted. Downloaded Qt layout discovery is implemented; alternate distribution layouts require matching relocatable CMake/mkspec/qmake files."
+    },
+    {
+      "checkId": "COMMON-05",
+      "requirement": "Traceable per-source hashes, scoped evidence and explicit runtime limitations",
+      "platforms": ["macos", "linux"],
+      "sources": [
+        {"path": "tools/audit/audit-r02.ps1", "symbol": "Get-FileHash"},
+        {"path": "tools/build/verify-r02.ps1", "symbol": "Save-PublicText"},
+        {"path": "docs/contracts/native-bootstrap.md", "symbol": "R02"}
+      ],
+      "evidence": "Audit expands every R02 target/branch/resource entry above, records symbols and exact source hashes, and ties shared behavior to actual Windows Debug/Release tests, lint and qsb variants. Checklists separate future target execution from static review. Archived legacy source content is not modified. Public evidence redacts user profile/data-cache paths. All statically identified R02 defects were fixed before final evidence regeneration.",
+      "limitations": "Static audit applies only to the current R02 bootstrap. Future subsystem/platform rounds must extend it; Windows evidence is never treated as target runtime evidence."
+    }
+  ]
+}
