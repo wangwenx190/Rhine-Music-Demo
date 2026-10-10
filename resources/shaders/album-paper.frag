@@ -264,7 +264,9 @@ vec3 srgbToLinear(vec3 c) {
     return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));
 }
 vec3 printColor;
+float contactShadow;
 void MAIN() {
+    contactShadow=1.0;
     vec2 size=vec2(textureSize(coverMap,0));
     vec2 extent=vec2(1.0-2.0/64.0)*size/max(size.x,size.y);
     vec2 uv=(paperUv-vec2(0.5))/extent+vec2(0.5);
@@ -277,8 +279,11 @@ void MAIN() {
     METALNESS=0.0;
     ROUGHNESS=1.0;
 }
+// This light supplies only its public shadow multiplier; source radiometry stays in musicIrradiance.
+void DIRECTIONAL_LIGHT() { contactShadow=SHADOW_CONTRIB; }
 void POST_PROCESS() {
     vec3 irradiance=lightingEnabled?(musicIrradiance(printWorld,normalize(printNormal))+textureCubeUV(environmentMap,normalize(printNormal),1.0).rgb*environmentIntensity):paperIrradiance;
+    if(lightingEnabled)irradiance-=keyColor*lightIntensities.x*max(0.0,dot(normalize(printNormal),normalize(vec3(-6,14,-5))))*(1.0-contactShadow)/3.141592653589793;
     COLOR_SUM.rgb=min(printColor*max(irradiance,vec3(0.0)),printColor);
     if(lightingEnabled)COLOR_SUM.rgb*=musicPrintExposure(lightOrigin);
 }

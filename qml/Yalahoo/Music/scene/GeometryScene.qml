@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick3D
 import Yalahoo.Music
@@ -14,6 +15,19 @@ View3D {
     property string reviewLayer: "all"
     property url coverSource: "qrc:/assets/demo-covers/square.png"
     property vector3d paperIrradiance: Qt.vector3d(1,1,1)
+    property bool occlusionEnabled: !geometryOnly && !materialReview
+    property bool shadowsEnabled: occlusionEnabled
+    property int occlusionChannel: 0
+    property real renderNear: adapter.clipNear
+    property real renderFar: adapter.clipFar
+    property real aoRadius: .18
+    property bool shadowProbe: false
+    property var reviewNeighbors: []
+    readonly property real currentDpr: Screen.devicePixelRatio
+    onCurrentDprChanged: updateQuality()
+    readonly property vector3d entityOrigin: materialReview ? reviewCasePosition : adapter.casePosition
+    explicitTextureWidth: occlusionEnabled ? adapter.quality.targetSize.width : 0
+    explicitTextureHeight: occlusionEnabled ? adapter.quality.targetSize.height : 0
     objectName: "quick3DProbe"
     camera: sceneCamera
     environment: SceneEnvironment {
@@ -22,16 +36,68 @@ View3D {
         antialiasingMode: SceneEnvironment.MSAA
         antialiasingQuality: SceneEnvironment.High
         tonemapMode: SceneEnvironment.TonemapModeNone
-        effects: view.geometryOnly ? [] : [materialOutput]
+        effects: view.geometryOnly ? [] : view.occlusionEnabled ? [ssao, materialOutput] : [materialOutput]
     }
     Effect {
         id: materialOutput
+        property bool rawChannel: view.occlusionEnabled && view.occlusionChannel !== 0
         passes: Pass {
             shaders: Shader {
                 stage: Shader.Fragment
                 shader: "qrc:/assets/shaders/material-output.frag"
             }
         }
+    }
+    Loader {
+        id: normalLoader
+        active: view.occlusionEnabled && (view.adapter.quality.aoSamples > 0 || view.occlusionChannel === 3 || view.occlusionChannel === 4)
+        visible: false
+        sourceComponent: OcclusionPrepass {
+            adapter: view.adapter
+            origin: view.entityOrigin
+            neighbors: view.reviewNeighbors
+            cameraNear: view.renderNear
+            cameraFar: view.renderFar
+        }
+    }
+    SsaoEffect {
+        id: ssao
+        quality: view.adapter.quality
+        channel: view.occlusionChannel
+        cameraNear: view.renderNear
+        cameraFar: view.renderFar
+        kernelRadius: view.aoRadius
+        projectionPlane: Qt.vector3d(Math.tan(view.adapter.fieldOfView*Math.PI/360)*view.width/view.height,Math.tan(view.adapter.fieldOfView*Math.PI/360),0)
+        geometryTexture: Texture { sourceItem: normalLoader.item as Item; minFilter: Texture.Nearest; magFilter: Texture.Nearest }
+        depthTexture: Texture { sourceItem: depthLoader.item as Item; minFilter: Texture.Nearest; magFilter: Texture.Nearest }
+    }
+    Loader {
+        id: depthLoader
+        active: normalLoader.active
+        visible: false
+        sourceComponent: OcclusionPrepass {
+            adapter: view.adapter
+            origin: view.entityOrigin
+            neighbors: view.reviewNeighbors
+            cameraNear: view.renderNear
+            cameraFar: view.renderFar
+            packedDepth: true
+        }
+    }
+    DirectionalLight {
+        objectName: "contactShadowLight"
+        // Qt light emits along +Z. Rotate +Z towards the source key's target.
+        rotation: Quaternion.lookAt(Qt.vector3d(-6,14,-5),Qt.vector3d(0,0,0),Qt.vector3d(0,0,1),Qt.vector3d(0,1,0))
+        brightness: 1
+        castsShadow: view.shadowsEnabled && view.adapter.quality.shadows > 0
+        shadowFactor: 32
+        shadowBias: .035
+        shadowMapFar: 45
+        shadowMapQuality: view.adapter.quality.shadows <= 1024 ? Light.ShadowMapQualityHigh
+            : view.adapter.quality.shadows <= 2048 ? Light.ShadowMapQualityVeryHigh : Light.ShadowMapQualityUltra
+        softShadowQuality: Light.PCF16
+        pcfFactor: 4
+        use32BitShadowmap: true
     }
     Model {
         visible: !view.geometryOnly
@@ -55,14 +121,26 @@ View3D {
         rotation: view.adapter.cameraRotation
         fieldOfView: view.adapter.fieldOfView
         fieldOfViewOrientation: PerspectiveCamera.Vertical
-        clipNear: view.adapter.clipNear
-        clipFar: view.adapter.clipFar
+        clipNear: view.renderNear
+        clipFar: view.renderFar
     }
     PrincipledMaterial {
         id: geometryMaterial
         lighting: PrincipledMaterial.NoLighting
         baseColor: "#668674"
         cullMode: Material.NoCulling
+    }
+    Model {
+        visible: view.shadowProbe
+        source: "#Rectangle"
+        position: Qt.vector3d(0,-.05,0)
+        eulerRotation.x: -90
+        scale: Qt.vector3d(.12,.12,1)
+        castsShadows: false
+        materials: CustomMaterial {
+            shadingMode: CustomMaterial.Shaded
+            fragmentShader: "qrc:/assets/shaders/shadow-probe.frag"
+        }
     }
     CaseMaterials {
         id: caseMaterials
@@ -79,29 +157,47 @@ View3D {
         Model {
             objectName: "caseLidProbe"
             source: "qrc:/assets/models/meshes/meshes_0__mesh.mesh"
+            castsShadows: false
             visible: !view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "Frosted_Polymer"
             materials: view.geometryOnly ? geometryMaterial : caseMaterials.lid
         }
         Model {
             objectName: "caseSpineProbe"
             source: "qrc:/assets/models/meshes/meshes_1__mesh.mesh"
+            castsShadows: false
             visible: !view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "Ivory_Edges"
             materials: view.geometryOnly ? geometryMaterial : caseMaterials.spine
         }
         Model {
             objectName: "caseTrayProbe"
             source: "qrc:/assets/models/meshes/meshes_2__mesh.mesh"
+            castsShadows: true
             visible: !view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "Optical_Diffuser"
             materials: view.geometryOnly ? geometryMaterial : caseMaterials.tray
         }
     }
     Model {
         objectName: "albumPaper"
+        castsShadows: false
         visible: !view.geometryOnly && (!view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "paper")
         source: "#Rectangle"
         position: view.materialReview ? view.reviewCasePosition.plus(Qt.vector3d(0.17,1.85,0.027)) : view.adapter.casePosition.plus(Qt.vector3d(0.17,1.85,0.027))
         scale: Qt.vector3d(0.0306,0.0306,1)
         materials: caseMaterials.paper
     }
+    Repeater3D {
+        model: view.reviewNeighbors
+        delegate: CaseGeometry {
+            required property var modelData
+            position: Qt.vector3d(modelData[0],modelData[1],modelData[2])
+            lid: caseMaterials.lid; spine: caseMaterials.spine; tray: caseMaterials.tray; paper: caseMaterials.paper
+        }
+    }
+    function updateQuality(): void {
+        adapter.quality.resize(Math.max(1,width),Math.max(1,height),materialReview ? 1 : Math.min(width/1920,height/1080),currentDpr,4096)
+    }
+    onWidthChanged: updateQuality()
+    onHeightChanged: updateQuality()
+    Component.onCompleted: updateQuality()
     function qtProjection(point: vector3d): vector3d { return mapFrom3DScene(point) }
 }

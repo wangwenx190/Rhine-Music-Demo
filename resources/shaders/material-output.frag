@@ -3,5 +3,5 @@ vec3 linearToSrgb(vec3 c) {
 }
 void MAIN() {
     vec4 c=texture(INPUT,INPUT_UV);
-    FRAGCOLOR=vec4(linearToSrgb(c.rgb),c.a);
+    FRAGCOLOR=vec4(rawChannel?c.rgb:linearToSrgb(c.rgb),c.a);
 }

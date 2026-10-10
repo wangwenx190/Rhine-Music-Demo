@@ -9,7 +9,7 @@ block="""layout(std140,binding=0) uniform Params {
  vec3 CAMERA_POSITION; int surface; vec4 nightTint; vec4 dayTint; vec4 nightAttenuation; vec4 dayAttenuation;
  float warmth;float roughness;float coatRoughness;float environmentIntensity;float thickness;float attenuationDistance;
  float transmission;float clearcoat;float exposure;vec3 paperIrradiance;vec3 backgroundSrgb;
- bool lightingEnabled;vec3 backgroundLinear;vec3 rowColumn;vec4 rowSettings;float rowDetail;float rowFill;
+ bool lightingEnabled;bool rawChannel;vec3 backgroundLinear;vec3 rowColumn;vec4 rowSettings;float rowDetail;float rowFill;
  vec3 lightColumn;float printAmbient;vec3 scatterColor;float scatterStrength;
  vec3 spotPosition;vec3 spotTarget;vec3 spotColor;float spotIntensity;float areaIntensity;
  vec3 areaPosition;vec3 areaTarget;vec3 keyColor;vec3 skyColor;vec3 groundColor;vec3 lightIntensities;
@@ -32,7 +32,7 @@ for name in ['case-glass.vert','case-glass.frag','album-paper.vert','album-paper
   header+='layout(binding=1)uniform sampler2D environmentMap;layout(binding=2)uniform sampler2D dfgMap;layout(binding=3)uniform sampler2D SCREEN_MIP_TEXTURE;layout(binding=4)uniform sampler2D coverMap;layout(binding=5)uniform sampler2D INPUT;layout(binding=6)uniform sampler2D ltc1Map;layout(binding=7)uniform sampler2D ltc2Map;\n'
   if name=='material-output.frag':header+='layout(location=0)in vec2 INPUT_UV;\n'
   if name=='album-paper.frag':
-   header+='vec4 BASE_COLOR;float METALNESS;float ROUGHNESS;vec4 COLOR_SUM;\n'
+   header+='vec4 BASE_COLOR;float METALNESS;float ROUGHNESS;vec4 COLOR_SUM;float SHADOW_CONTRIB=1.0;\n'
    tail='\nvoid main(){materialMain();POST_PROCESS();fragmentColor=COLOR_SUM;}\n'
   else:tail='\nvoid main(){materialMain();}\n'
  input=work/name;input.write_text(header+source+tail,encoding='utf-8',newline='\n');output=work/(name+'.qsb')
@@ -43,5 +43,5 @@ for name in ['case-glass.vert','case-glass.frag','album-paper.vert','album-paper
  if not all(x in dump for x in ['MSL','HLSL','GLSL','SPIRV']):raise RuntimeError('Missing shader target')
  (work/(name+'.txt')).write_text(dump,encoding='utf-8',newline='\n')
  reports.append({'source':str(Path('resources/shaders')/name),'sha256':hashlib.sha256((root/'resources/shaders'/name).read_bytes()).hexdigest(),'targets':['SPIR-V','GLSL 330','GLSL ES 300','HLSL 50','MSL 12'],'passed':True,'diagnostics':r.stderr,'scope':'public-uniform wrapper of unchanged snippets; actual Qt generated D3D11 shaders also compiled by Windows runtime'})
-(root/('verification/windows/lighting/shader-variants.json' if '--lighting' in sys.argv else 'verification/windows/materials/shader-variants.json')).write_text(json.dumps({'qtKitVersion':json.loads((root/'build/release/toolchain.json').read_text())['qtVersion'],'shaders':reports},indent=2)+'\n',encoding='utf-8',newline='\n')
+(root/('verification/windows/occlusion/material-shader-variants.json' if '--occlusion' in sys.argv else 'verification/windows/lighting/shader-variants.json' if '--lighting' in sys.argv else 'verification/windows/materials/shader-variants.json')).write_text(json.dumps({'qtKitVersion':json.loads((root/'build/release/toolchain.json').read_text())['qtVersion'],'shaders':reports},indent=2)+'\n',encoding='utf-8',newline='\n')
 print('Six material shaders baked for five targets')

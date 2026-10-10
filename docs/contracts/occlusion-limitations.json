@@ -1,0 +1,46 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "inputs": [
+    {
+      "id": "R10-shadow-projection",
+      "round": "R10",
+      "source": "src/scene.ts constructor / softenMusicContactShadows; Three PCFSoftShadowMap",
+      "object": "DirectionalLight shadow projection, normalBias and filter",
+      "difference": "Public Qt directional map fits visible geometry rather than exposing source orthographic bounds (-16,16,-15,15,.1,45). Qt shadowBias approximates world offset; it does not expose separate .035 normalBias / -.0003 normalized bias. PCF16/pcfFactor is not Three PCFSoftShadowMap's bilinear 9-tap algorithm. The isolated raw shadow receiver changes 103255 native pixels versus 61178 source pixels, with peak on/off differences 20 versus 82/255; configuring factor 32 is not evidence of equal effective filtering or intensity.",
+      "input": [
+        "docs/media/occlusion/web/086.png",
+        "docs/media/occlusion/web/087.png",
+        "docs/media/occlusion/qt/086.png",
+        "docs/media/occlusion/qt/087.png"
+      ],
+      "acceptance": "Compare caster/receiver projection and shadow-only on/off images at 1024/2048/4096. Retain strength .32 and only Optical_Diffuser casters. If public controls cannot align bounds/bias/filter, include explicit shadow target and source filter in the fixed RHI decision."
+    },
+    {
+      "id": "R10-shell-shadow-and-overlap",
+      "round": "R10",
+      "object": "Unshaded transmission shell shadow reception and overlapping SCREEN_MIP_TEXTURE capture",
+      "difference": "The public SHADOW_CONTRIB hook is available to shaded paper but not the existing Unshaded glass algorithm. Low-angle three-case margins diverge while opaque depth/normal probes align. Main SCREEN_MIP_TEXTURE excludes other screen-sampling glass; the isolated single-case fixture cannot prove overlapping-shell parity.",
+      "input": [
+        "docs/media/occlusion/web/031.png",
+        "docs/media/occlusion/qt/031.png",
+        "docs/media/occlusion/web/071.png",
+        "docs/media/occlusion/qt/071.png",
+        "verification/windows/occlusion/release-runtime.json"
+      ],
+      "acceptance": "Run R10 overlap/low-spine/intermediate-extraction scenes and measure all five equal-weight ROIs with source cast/receive flags. Resolve capture, sorting and key shadow reception without removing transmission or changing theme/geometry/IOR; select RHI if public Quick3D has a structural limitation."
+    },
+    {
+      "id": "R09B-output-background",
+      "round": "R09B",
+      "object": "Background and raw linearColor OutputPass conversion",
+      "difference": "Source composer OutputPass applies ACES exposure then sRGB to the rendered background. Current R07 output preserves source background directly; raw linearColor also retains the previous material/output split. Geometry/normal/depth and material ROI comparisons are recorded independently.",
+      "input": [
+        "docs/media/occlusion/web/041.png",
+        "docs/media/occlusion/qt/041.png",
+        "docs/media/occlusion/web/007.png",
+        "docs/media/occlusion/qt/007.png"
+      ],
+      "acceptance": "In R09B trace opaque capture, toneMapped=false paper, shell ACES and final output exactly once. Compare background and linearColor ROIs before tuning lighting; no theme-color changes to compensate for output conversion."
+    }
+  ]
+}

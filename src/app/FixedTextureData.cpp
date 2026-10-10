@@ -9,6 +9,8 @@ void FixedTextureData::setAsset(const QString &asset) {
     if(asset=="room-pmrem")size={768,1024};
     else if(asset=="dfg")size={16,16};
     else if(asset=="ltc1"||asset=="ltc2")size={64,64};
+    else if(asset.startsWith("ssao-kernel-")&&(asset.endsWith("-16")||asset.endsWith("-32")||asset.endsWith("-64")))size={asset.section('-',-1).toInt(),1};
+    else if(asset.startsWith("ssao-noise-")&&(asset.endsWith("-16")||asset.endsWith("-32")||asset.endsWith("-64")))size={4,4};
     else { qWarning("Unknown fixed material texture"); return; }
     QFile file(":/assets/environment/"+asset+".rgba32f");
     if(!file.open(QIODevice::ReadOnly)){qWarning("Missing fixed material texture");return;}

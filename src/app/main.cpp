@@ -33,6 +33,7 @@
 #include <QStandardPaths>
 #include <QTimer>
 #include <atomic>
+#include <algorithm>
 #include <cstdio>
 
 namespace {
@@ -68,6 +69,7 @@ int main(int argc, char **argv)
     parser.addOption({QStringLiteral("verify-runtime"), QStringLiteral("Write runtime evidence and exit"), QStringLiteral("report")});
     parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
     parser.addOption({QStringLiteral("verify-motion"), QStringLiteral("Verify the production frame source, hide/restore and motion completion")});
+    parser.addOption({QStringLiteral("verify-shading"), QStringLiteral("Exercise production material/shadow/AO rendering with verify-runtime")});
 #ifdef YALAHOO_REVIEW
     parser.addOption({QStringLiteral("verify-materials"), QStringLiteral("Run source-based single-case material comparison"), QStringLiteral("fixture")});
     parser.addOption({QStringLiteral("material-report"), QStringLiteral("Material ROI report"), QStringLiteral("report")});
@@ -75,6 +77,7 @@ int main(int argc, char **argv)
     parser.addOption({QStringLiteral("scene-report"), QStringLiteral("Geometry review report"), QStringLiteral("report")});
 #endif
     parser.process(app);
+    if(parser.isSet(QStringLiteral("verify-shading"))&&!parser.isSet(QStringLiteral("verify-runtime")))return 7;
     if (parser.isSet(QStringLiteral("verify-runtime"))
 #ifdef YALAHOO_REVIEW
         || parser.isSet(QStringLiteral("verify-materials"))
@@ -122,7 +125,7 @@ int main(int argc, char **argv)
     QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)},
-        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}, {"geometryProbe", parser.isSet(QStringLiteral("verify-runtime"))}});
+        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}, {"geometryProbe", parser.isSet(QStringLiteral("verify-runtime"))&&!parser.isSet(QStringLiteral("verify-shading"))}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
@@ -239,7 +242,8 @@ int main(int argc, char **argv)
             for (int y = modelRegion.top(); !modelRegion.isEmpty() && y <= modelRegion.bottom(); ++y) {
                 for (int x = modelRegion.left(); x <= modelRegion.right(); ++x) {
                     const QColor color = image.pixelColor(x, y);
-                    if (color.green() > color.red() + 8 && color.green() < 165 && color.red() > 40)
+                    if (parser.isSet(QStringLiteral("verify-shading")) ? (color.red()>color.blue()+20&&color.red()>color.green()+8)
+                        : (color.green() > color.red() + 8 && color.green() < 165 && color.red() > 40))
                         ++modelPixels;
                 }
             }
@@ -255,7 +259,8 @@ int main(int argc, char **argv)
                     && !completionRevisions.isEmpty() && completionRevisions.last().toInteger() == qint64(motion.revision())
                     && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
                     && media.source().isEmpty());
-            const bool passed = motionPassed && frames > 0 && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
+            const bool shaderDiagnostics=std::any_of(recorded.cbegin(),recorded.cend(),[](const QString &s){return s.contains("Failed to compile")||s.contains("QSpirvCompiler")||s.contains("TypeError");});
+            const bool passed = !shaderDiagnostics && motionPassed && frames > 0 && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
                 && backend && interactions == 1 && mediaAvailable
                 && shaderAvailable && qmlAvailable && chineseSupported && saved
                 && quick3DAvailable && qmlMediaAvailable && modelPixels > 100 && libraryProbe
@@ -274,6 +279,7 @@ int main(int argc, char **argv)
                 {"chineseGlyphs", chineseSupported}, {"font", raw.familyName()},
                 {"qmlResource", qmlAvailable}, {"shaderResource", shaderAvailable},
                 {"quick3DObject", quick3DAvailable}, {"modelPixels", modelPixels},
+                {"shadingProbe",parser.isSet(QStringLiteral("verify-shading"))},
                 {"qmlMediaObject", qmlMediaAvailable}, {"diagnostics", QJsonArray::fromStringList(recorded)},
                 {"mediaAvailable", mediaAvailable}, {"audioOutputCount", QMediaDevices::audioOutputs().size()},
                 {"screenshotSaved", saved}, {"sourceOpened", false}

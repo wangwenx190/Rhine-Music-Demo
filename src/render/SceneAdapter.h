@@ -4,11 +4,13 @@
 #include "SceneFrame.h"
 #include "ScalarSpring.h"
 #include "SelectionLighting.h"
+#include "RenderQuality.h"
 #include <QVariantMap>
 namespace yalahoo {
 class SceneAdapter : public QObject {
     Q_OBJECT
     Q_PROPERTY(yalahoo::SelectionLighting* lighting READ lighting CONSTANT)
+    Q_PROPERTY(yalahoo::RenderQuality* quality READ quality CONSTANT)
     Q_PROPERTY(yalahoo::LayoutMetrics* layout READ layout CONSTANT)
     Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY frameChanged)
     Q_PROPERTY(QVector3D cameraAim READ cameraAim NOTIFY frameChanged)
@@ -23,6 +25,7 @@ class SceneAdapter : public QObject {
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
     SelectionLighting *lighting() { return &m_lighting; }
+    RenderQuality *quality() { return &m_quality; }
     LayoutMetrics *layout() { return &m_layout; }
     const SceneFrame &frame() const { return m_frame; }
     QVector3D cameraPosition() const { return m_frame.camera.position.qt(); }
@@ -57,6 +60,7 @@ private:
     void publish();
     LayoutMetrics m_layout;
     SelectionLighting m_lighting;
+    RenderQuality m_quality;
     RowLightingInput m_lightingInput;
     QQuaternion m_caseRotation;
     bool m_explicitLightingInput = false;

@@ -55,3 +55,9 @@ struct SelectionLightingQml {
     QML_NAMED_ELEMENT(SelectionLighting)
     QML_UNCREATABLE("Owned by SceneAdapter")
 };
+struct RenderQualityQml {
+    Q_GADGET
+    QML_FOREIGN(yalahoo::RenderQuality)
+    QML_NAMED_ELEMENT(RenderQuality)
+    QML_UNCREATABLE("Owned by SceneAdapter")
+};

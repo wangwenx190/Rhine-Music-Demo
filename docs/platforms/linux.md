@@ -131,3 +131,20 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 手动运行普通探针，反复点击暖昼/深夜按钮，再切浏览/详情目标；主题应从当前显示状态连续反向，650ms源时窗按动效倍率缩放一次，印刷只暗化不闪白，玻璃与纸面光带位置一致。隐藏/最小化暂停视觉，恢复不补跑整段主题。预期Metal/OpenGL无需修改灯光代码；实际GPU纹理方向/绑定必须检查，MSL/GLSL生成不替代实机。
 
 验证后关闭Review并重建：`cmake --preset qt-release -DYALAHOO_REVIEW=OFF`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`；普通产物拒绝 --verify-materials。本平台构建、GPU、图像、DPR、按钮交互实测结果：待用户填写。
+
+## R09 阴影与 SSAO 用户验证（未执行）
+
+静态审计见 `verification/linux-static/occlusion/`；结论为“静态审计通过，实机待用户验证”。使用本机最新原生 Qt Kit，执行 Release：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'render-quality|runtime-occlusion|occlusion-gpu-audit' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+输入 `tests/fixtures/occlusion/visual.json`：80个生产状态及8个单独诊断；核方向来自同一seed=417资源。按R07步骤取得真实DPR1，检查报告88状态、真实960×720 PNG、画质目标尺寸及8.3MP上限。检查raw depth/normal的行方向、纸面/壳体完整几何覆盖，尤其RGB24线性深度链接解码；080–085的AO应非全白，086/087的阴影开关必须有真实像素变化。逐项比较raw AO、blur、linearColor及邻盒，按 `docs/contracts/occlusion.md` 和限制清单区分后续输入；图像审计按本平台的Metal/OpenGL枚举检查，Windows的实际通过结论不替代本平台结果。
+
+公开Qt阴影投影/偏置/滤波和Unshaded壳体接收仍交R10；背景输出交R09B。应在本平台另外记录实际后端、DPR、目标格式/方向、差异和诊断，MSL/GLSL生成不能替代GPU验证。关闭Review并重建、运行普通回归后，用 `--verify-runtime <report.json> --verify-shading` 检查同一产品材质/AO链路；普通产品应拒绝 `--verify-materials`。性能/原始/高/极高切换不得改变相机或业务状态。
+
+本平台真实构建、GPU、图像、DPR、窗口交互结果：待用户填写。

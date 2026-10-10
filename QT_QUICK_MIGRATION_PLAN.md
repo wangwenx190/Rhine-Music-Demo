@@ -205,6 +205,7 @@
 - 材质标定固定用五个ROI：盖内纸面、盖外留白、侧脊、外框边缘、盒体后方背景；暖昼/深夜、正视/低角度同时计分，不能只优化单张图。损失为所有ROI等权的RGB平均绝对误差，加上轮廓平均距离/255；先通过几何门槛再开始标定。
 - 先校准光强单位：每类Qt灯相对源码确认的有效强度尝试10^-4至10^4的十倍间隔倍率，按固定ROI损失选单位换算因子，暖昼/深夜共用因子，不能分别作弊。随后采用确定性坐标搜索：按曝光/环境强度/灯强度/透射/粗糙度/厚度/衰减距离顺序，依次试当前值、±10%、±5%、±2%、±1%，选跨场景损失最低且不破坏硬门槛的值，相同损失取距基线最近值；完整扫描最多3遍。透射/粗糙度范围0–1、厚度为正，IOR固定1.46、几何/封面纹理/主题颜色不参与搜索。三遍后仍有结构误差按R10触发补救；只剩参数残差时新增具体ROI补修轮次，不无限随机调参。
 - 单盒材质的参数/线性捕获/局部 LOD/印刷限制、固定环境和重建命令以 `docs/contracts/materials.md` 为准，冻结源码与算法 hash 在 `materials.json`，资源清单在 `resources/manifests/materials.json`；同输入 fixture 为 `tests/fixtures/materials/single-case.json`。Windows 材质证据与残差在 `verification/windows/materials/`、成对图在 `docs/media/materials/`；平台矩阵在 `verification/macos-static/materials/` 和 `verification/linux-static/materials/`。后续灯光、图集与后处理接入保留纸面入射量、一次 ACES/一次 sRGB 输出和独立侧脊参数契约。
+- 阴影/SSAO/RenderQuality 的有效参数、seed=417 核、RGB24 线性深度/独立 view normal 预通道、四预设及 8.3MP 限制见 `docs/contracts/occlusion.md`；资源来源/hash 在 `resources/manifests/occlusion.json`，同输入为 `tests/fixtures/occlusion/`，Release 复建为 `tools/build/verify-r09.ps1`。Windows 证据和成对图在 `verification/windows/occlusion/`、`docs/media/occlusion/`，平台新增审计在各静态目录 `occlusion/`；公开阴影投影/偏置/滤波、Unshaded 壳体接收/邻盒透射与背景输出的具体后续输入以 `docs/contracts/occlusion-limitations.json` 为准。画质只改变渲染资源，不重建业务状态；后续实例池须向两个几何预通道供应同一实体 origin/位置。
 - R10 若出现无法通过公开 Qt Quick 3D 接口修复的透射捕获、逐实例排序、图集局部上传或通道控制问题，执行 R10A–R10D。不能直接删效果、自动降低默认画质或换成 WebEngine。
 - 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
 - 如果首选管线达到目标且无上述结构限制，删除条件轮次 R10A–R10D；不是把它们标记为完成。由实际对照决定是否触发，不由 agent 个人偏好决定。
@@ -266,26 +267,20 @@
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
 
-### R09 · 阴影与环境遮蔽通道（1–1.5日）
-
-- 依赖：R08。交付阴影配置、SSAO Effect、RenderQuality模型与分通道截图。
-- 依照冻结 `scene.ts`、SSAO pass 与 shader 源码移植有效算法，展开 `enableSelectionLighting`、`setQuality` 等最终覆盖路径；构造值 kernelRadius=0.38（refined为0.44）、minDistance=0.001、maxDistance=0.09 不能当作音乐 guided 路径的最终值。有效参数以源码定义为准，R01 导出仅辅助核对。阴影优先用Qt公开配置；核大小/偏置/投影无法对齐时把具体差异交R10判定。
-- 提供通道开关和原始depth/normal/linearColor探针；修复深度范围和FRAMEBUFFER_Y_UP差异，不用调色补偿倒置或非线性depth。基线随机核固定seed，Web与Qt使用相同采样方向。
-- 接入原始/性能/高/极高预设和8.3MP上限；此轮不加入景深/SMAA，隔离AO与软阴影误差。
-- 退出：单盒与少量邻盒的阴影/AO对照完成，纹理尺寸/格式/深度重建可重放；结构限制形成具体R10输入。
-
 ### R09B · 景深、抗锯齿与色彩输出（1.5–2日）
 
 - 依赖：R09。交付Bokeh/SMAA/Output Effect、最终合成顺序和画质开关。
 - 移植冻结基线Bokeh采样模式与焦距响应，初始focus=25/aperture=0.0018/maxblur=0.011，最终值按源码的逐帧焦距响应与有效参数确定，采样轨迹只作核对；前景/背景模糊、盒体锐边和纸面文字分别比较。
 - 高/极高开启SMAA，lookup纹理由项目已有Three开发依赖导出为资产，Qt运行不加载Three。原始画质必须具有实际生效的几何抗锯齿，结合真实合成目标与透明/透射路径检查 MSAA/resolve 或等效公开 Qt 抗锯齿方案；不能只凭画布/窗口 antialias 标志认定有效，也不能沿用基线缺陷保留锯齿。验证九尺寸、代表性 DPR、双主题的盒体斜边、玻璃轮廓、纸面与文字，提供局部放大图；改善边缘的差异按验收契约单列。
 - 纸面透明留白边界的具体输入为 `docs/media/materials/web/075.png` 与 `qt/075.png`（深夜/斜视/方封面）；原生 alphaTest/透射捕获边界存在阶梯。核对实际 capture mip/resolve 与抗锯齿作用范围，提供同一区域放大图，在不改 contain 留白、盖内局部 LOD 和封面锐度的前提下改善边缘；不能仅依赖 View3D MSAA 标志。
+- 背景/linearColor 输出差异输入为 `docs/contracts/occlusion-limitations.json` 的 `R09B-output-background`，使用其同输入截图及完整ROI指标收口。
 - 将盒体ACES/纸面toneMapped=false/最终sRGB合成路径与R01逐项对照；有内置色调映射时关闭重复自定义转换。QML文字和阅读遮罩最后叠加。
 - 退出：景深/边缘/颜色ROI达到目标或形成明确R10限制；四预设切换不重建业务状态。
 
 ### R10 · 渲染可行性门槛与固定实现选择（0.5–1日）
 
 - 依赖：R07–R09B。交付Qt/C++图像比较器、基线对照场景和RenderBackend合同字段。
+- 阴影投影/偏置/滤波与 Unshaded 壳体接收、邻盒透射的输入/修复对象/验收方法见 `docs/contracts/occlusion-limitations.json` 的两个 R10 条目；对照 086/087 阴影平面及 031/071 邻盒，不将仅配置 shadowFactor=32 当作有效阴影强度一致的证据。
 - 在同一场景检查单盒、前后重叠盒、低角度侧脊、抽取中间态和三种封面；增加小型实例池探测排序及图集更新，不能只测孤立盒。
 - 先按已规定参数顺序修正可调误差。若通道控制/透射捕获/实例排序/上传预算存在结构限制，固定选择RHI并保留R10A–R10D；若没有结构限制且达到门槛，固定Quick3D并移除条件轮次。
 - 将后端选择、输入接口及不能改变的参数写入contract；后续轮次不再次讨论框架，不用简化玻璃效果绕过本门槛。

@@ -1,4 +1,12 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(RenderQualityTest RenderQualityTest.cpp)
+target_link_libraries(RenderQualityTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(RenderQualityTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_platform(RenderQualityTest)
+add_test(NAME render-quality COMMAND RenderQualityTest -o "${CMAKE_BINARY_DIR}/verification/render-quality-test.xml,junitxml" -o -,txt)
+if(WIN32)
+    set_tests_properties(render-quality PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 qt_add_executable(SceneTest SceneTest.cpp)
 target_link_libraries(SceneTest PRIVATE YalahooScene Qt6::Test)
 target_compile_definitions(SceneTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
@@ -10,6 +18,24 @@ if(WIN32)
     set_tests_properties(scene PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME runtime-occlusion COMMAND Yalahoo --verify-materials
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/occlusion/visual.json"
+        --material-report "${CMAKE_BINARY_DIR}/verification/occlusion/runtime.json")
+    set_tests_properties(runtime-occlusion PROPERTIES TIMEOUT 180
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;TypeError;out of range"
+        ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+    if(WIN32)
+        set_tests_properties(runtime-occlusion PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
+    add_test(NAME occlusion-gpu-audit COMMAND occlusion-audit
+        "${CMAKE_BINARY_DIR}/verification/occlusion/runtime.json"
+        "${CMAKE_BINARY_DIR}/verification/occlusion"
+        "${PROJECT_SOURCE_DIR}/docs/media/occlusion/web"
+        "${CMAKE_BINARY_DIR}/verification/occlusion/gpu-checks.json")
+    set_tests_properties(occlusion-gpu-audit PROPERTIES DEPENDS runtime-occlusion TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(occlusion-gpu-audit PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     add_test(NAME runtime-materials COMMAND Yalahoo --verify-materials
         "${PROJECT_SOURCE_DIR}/tests/fixtures/materials/single-case.json"
         --material-report "${CMAKE_BINARY_DIR}/verification/materials/runtime.json")

@@ -22,7 +22,7 @@ set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
 set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
 set(material_qml_files)
-foreach(name CaseMaterials GlassMaterial LightingMaterial)
+foreach(name CaseMaterials GlassMaterial LightingMaterial CaseGeometry OcclusionPrepass SsaoEffect)
     set(file "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/${name}.qml")
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "scene/${name}.qml")
     list(APPEND material_qml_files "${file}")
@@ -41,6 +41,17 @@ qt_add_resources(Yalahoo material_assets PREFIX /assets BASE "${PROJECT_SOURCE_D
     "${PROJECT_SOURCE_DIR}/resources/licenses/three-LICENSE"
     "${PROJECT_SOURCE_DIR}/resources/licenses/materials-NOTICE.md"
     "${PROJECT_SOURCE_DIR}/resources/manifests/materials.json")
+set(occlusion_assets)
+list(APPEND occlusion_assets "${PROJECT_SOURCE_DIR}/resources/manifests/occlusion.json")
+foreach(name ao-prepass.frag ssao.frag ssao-blur.frag ssao-composite.frag shadow-probe.frag)
+    list(APPEND occlusion_assets "${PROJECT_SOURCE_DIR}/resources/shaders/${name}")
+endforeach()
+foreach(count 16 32 64)
+    foreach(kind kernel noise)
+        list(APPEND occlusion_assets "${PROJECT_SOURCE_DIR}/resources/environment/ssao-${kind}-${count}.rgba32f")
+    endforeach()
+endforeach()
+qt_add_resources(Yalahoo occlusion_assets PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources" FILES ${occlusion_assets})
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     DEPENDENCIES QtQuick3D
     RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" "${scene_qml}" ${material_qml_files} SOURCES QmlTypes.h FixedTextureData.h)
