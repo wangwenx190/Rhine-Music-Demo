@@ -1,7 +1,21 @@
 #pragma once
 #include "LibrarySession.h"
 #include "MotionController.h"
+#include "SceneAdapter.h"
 #include <QtQml/qqmlregistration.h>
+
+struct LayoutMetricsQml {
+    Q_GADGET
+    QML_FOREIGN(yalahoo::LayoutMetrics)
+    QML_NAMED_ELEMENT(LayoutMetrics)
+    QML_UNCREATABLE("Owned by SceneAdapter")
+};
+struct SceneAdapterQml {
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SceneAdapter)
+    QML_NAMED_ELEMENT(SceneAdapter)
+    QML_UNCREATABLE("Injected by the native application")
+};
 
 struct FrameClockQml {
     Q_GADGET

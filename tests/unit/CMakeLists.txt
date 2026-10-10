@@ -1,4 +1,26 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(SceneTest SceneTest.cpp)
+target_link_libraries(SceneTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(SceneTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    SCENE_REPORT="${CMAKE_BINARY_DIR}/verification/scene-errors.json")
+yalahoo_platform(SceneTest)
+add_test(NAME scene COMMAND SceneTest -o "${CMAKE_BINARY_DIR}/verification/scene-test.xml,junitxml" -o -,txt)
+set_tests_properties(scene PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(scene PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+if(YALAHOO_REVIEW)
+    foreach(dpr IN ITEMS 1 1.5 2)
+        add_test(NAME runtime-scene-dpr-${dpr} COMMAND Yalahoo --verify-scene
+            "${PROJECT_SOURCE_DIR}/tests/fixtures/scene/camera-golden.json"
+            --scene-report "${CMAKE_BINARY_DIR}/verification/scene-dpr-${dpr}/runtime.json")
+        set_tests_properties(runtime-scene-dpr-${dpr} PROPERTIES TIMEOUT 90
+            ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
+        if(WIN32)
+            set_tests_properties(runtime-scene-dpr-${dpr} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+        endif()
+    endforeach()
+endif()
 target_link_libraries(IdentityTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
 yalahoo_platform(IdentityTest)
 add_test(NAME identity COMMAND IdentityTest)

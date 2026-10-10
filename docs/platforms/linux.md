@@ -77,3 +77,28 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 预期：两个 694 帧冻结数值对照及运动边界检查通过，x/v/a 误差分别不超过 1e-6。`runtime-motion` 运行真实 OpenGL/QML 窗口，自动隐藏/最小化并恢复，两次后台期间帧数和视觉时间不增长，恢复首帧 dt=0，减少动态完成最后 revision，开场独立时间到 11.6，媒体来源为空；报告在 `build/release/verification/runtime-motion.json`，配套截图为同目录 `runtime-motion.png`。在实际 X11/Wayland 桌面环境复核隐藏、最小化和恢复；如果平台发出 ApplicationHidden/Suspended，也应停止唯一帧源。仅切换焦点为 Inactive 时允许继续视觉帧。
 
 若已有构建树新增 QObject 后保留旧 moc 列表，执行 `cmake --build --preset qt-release --clean-first` 再运行测试。以上没有在 Linux 执行；实际 GL 帧率、窗口管理器生命周期事件和产品场景仍待对应轮次/用户验证。
+
+## 几何、相机与布局实机验证（R06）
+
+静态审计通过，实机待用户验证。使用本机最新原生 Qt Kit，仅 Release：
+
+```sh
+sh tools/build/build.sh qt-release -DYALAHOO_REVIEW=ON
+ctest --preset qt-release -R '^scene$|runtime-scene' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+预期：48 个冻结相机/布局目标、528 顶点/锚点及 694 个 20/30/60/120fps 运动样本通过；双精度轨迹误差≤1e-6。真实 View3D 的逻辑像素投影误差≤2px；九内容尺寸、横竖屏比值 1.05 的两侧与等值、移动中 resize/反向/改速/减少动态同步更新布局和相机。三批次几何保留原物理尺寸，仅使用不透明无光调试材质，当前未验收玻璃/灯光/纸面。
+
+查看 `build/release/verification/scene-dpr-*/runtime.json` 及同目录截图，核对 actual dpr、client width/height、PNG imageWidth/imageHeight、case bindings、逐帧 projections 和 passed。`QT_SCALE_FACTOR` 会与平台原生 DPR 相乘，测试专用 `QT_ENABLE_HIGHDPI_SCALING=0` 在某些原生平台不能关闭 Retina/原生缩放；必须报告实际有效 DPR，不能将测试目录名当成实际 DPR。窗口管理器若限制超大 frameless 客户区，记录具体尺寸/实际值及失败项，不记为已通过。
+
+手动调整窗口经过 945×900 和 944×900，检查布局类别同时切换、相机沿原速度继续移动，无 Z 翻转或重复缩放。普通探针按钮可反向切换浏览/详情目标。运行 `runtime-motion` 时减少动态应同时让共用运动与相机落稳；隐藏/最小化暂停唯一生产帧源。
+
+关闭 Review 后继续普通构建：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=OFF
+cmake --build --preset qt-release
+```
+
+预期：普通构建不识别 `--verify-scene`/`--scene-report`。本平台编译、GPU/窗口系统、DPR 及交互实际结果：待用户填写；Windows 证据不替代上述执行结果。

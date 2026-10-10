@@ -3,6 +3,10 @@
 #include "LibrarySession.h"
 #include "MotionController.h"
 #include "OfflineMetadataProvider.h"
+#include "SceneAdapter.h"
+#ifdef YALAHOO_REVIEW
+#include "SceneReview.h"
+#endif
 
 #include <QAudioDevice>
 #include <QAudioOutput>
@@ -63,6 +67,10 @@ int main(int argc, char **argv)
     parser.addOption({QStringLiteral("verify-runtime"), QStringLiteral("Write runtime evidence and exit"), QStringLiteral("report")});
     parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
     parser.addOption({QStringLiteral("verify-motion"), QStringLiteral("Verify the production frame source, hide/restore and motion completion")});
+#ifdef YALAHOO_REVIEW
+    parser.addOption({QStringLiteral("verify-scene"), QStringLiteral("Run deterministic geometry fixtures"), QStringLiteral("fixture")});
+    parser.addOption({QStringLiteral("scene-report"), QStringLiteral("Geometry review report"), QStringLiteral("report")});
+#endif
     parser.process(app);
     if (parser.isSet(QStringLiteral("verify-runtime")))
         qInstallMessageHandler(recordDiagnostic);
@@ -91,6 +99,9 @@ int main(int argc, char **argv)
             library.requestMetadata(library.snapshot()->albums.first().id, QStringLiteral("introduction"));
     }
     yalahoo::MotionController motion;
+    yalahoo::SceneAdapter scene(motion.clock());
+    QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &scene,
+        [&] { scene.setReducedMotion(motion.reducedMotion()); });
     const auto updateApplicationVisibility = [&](Qt::ApplicationState state) {
         motion.clock()->setApplicationVisible(state != Qt::ApplicationHidden && state != Qt::ApplicationSuspended);
     };
@@ -105,7 +116,7 @@ int main(int argc, char **argv)
     QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)},
-        {"motionController", QVariant::fromValue(&motion)}});
+        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
@@ -114,6 +125,13 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+#ifdef YALAHOO_REVIEW
+    if (parser.isSet(QStringLiteral("verify-scene"))) {
+        if (!parser.isSet(QStringLiteral("scene-report"))) return 9;
+        return yalahoo::reviewScene(app, *window, scene, parser.value(QStringLiteral("verify-scene")),
+            parser.value(QStringLiteral("scene-report")));
+    }
+#endif
 
     if (parser.isSet(QStringLiteral("verify-motion"))) {
         if (!parser.isSet(QStringLiteral("verify-runtime"))) return 8;
@@ -225,6 +243,7 @@ int main(int argc, char **argv)
                     && resumeDiscarded && resumeSamples == 2 && !motion.moving()
                     && motion.rail() == -.62 && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
                     && !completionRevisions.isEmpty() && completionRevisions.last().toInteger() == qint64(motion.revision())
+                    && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
                     && media.source().isEmpty());
             const bool passed = motionPassed && frames > 0 && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
                 && backend && interactions == 1 && mediaAvailable
@@ -238,6 +257,7 @@ int main(int argc, char **argv)
                 {"passed", passed}, {"qtVersion", QString::fromLatin1(qVersion())},
                 {"platformPlugin", QGuiApplication::platformName()}, {"graphicsApi", api.load()},
                 {"renderedFrames", frames.load()}, {"windowTitle", window->title()},
+                {"devicePixelRatio",window->devicePixelRatio()},
                 {"applicationName", app.applicationName()}, {"displayName", app.applicationDisplayName()},
                 {"dataDirectory", QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)},
                 {"controlsStyle", QQuickStyle::name()}, {"interactionCount", interactions},

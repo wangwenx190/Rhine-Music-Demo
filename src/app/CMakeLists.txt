@@ -1,4 +1,8 @@
 qt_add_executable(Yalahoo main.cpp AssetCatalog.cpp AssetCatalog.h)
+if(YALAHOO_REVIEW)
+    target_sources(Yalahoo PRIVATE SceneReview.cpp SceneReview.h)
+    target_compile_definitions(Yalahoo PRIVATE YALAHOO_REVIEW)
+endif()
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(Yalahoo)
 set_target_properties(Yalahoo PROPERTIES OUTPUT_NAME yalahoo
@@ -15,11 +19,13 @@ elseif(UNIX)
 endif()
 set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
 set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
+set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
+set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
-    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" SOURCES QmlTypes.h)
+    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" "${scene_qml}" SOURCES QmlTypes.h)
 qt_add_shaders(Yalahoo r02_shader_probe PREFIX /assets/shaders BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag")
-target_link_libraries(Yalahoo PRIVATE YalahooCore Qt6::Gui Qt6::Qml Qt6::Quick
+target_link_libraries(Yalahoo PRIVATE YalahooCore YalahooScene Qt6::Gui Qt6::Qml Qt6::Quick
     Qt6::QuickControls2 Qt6::QuickDialogs2 Qt6::Quick3D Qt6::Multimedia
     Qt6::Concurrent Qt6::Svg Qt6::ShaderTools)
 yalahoo_platform(Yalahoo)

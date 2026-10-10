@@ -1,0 +1,69 @@
+{
+  "round": "R06",
+  "checks": [
+    {
+      "checkId": "COMMON-01",
+      "requirement": "Complete portable C++23 scene/moc/QML/test build closure with latest native Qt",
+      "sources": [
+        {"path":"CMakeLists.txt","symbol":"add_subdirectory(src/render)"},
+        {"path":"src/render/CMakeLists.txt","symbol":"target_compile_features(YalahooScene PUBLIC cxx_std_23)"},
+        {"path":"src/app/CMakeLists.txt","symbol":"QT_RESOURCE_ALIAS scene/GeometryScene.qml"},
+        {"path":"src/app/QmlTypes.h","symbol":"QML_FOREIGN(yalahoo::SceneAdapter)"},
+        {"path":"tests/unit/CMakeLists.txt","symbol":"target_link_libraries(SceneTest PRIVATE YalahooScene Qt6::Test)"}
+      ],
+      "evidence": "Top-level C++23 required/no extensions and actual probe cover the new static YalahooScene; Gui/Core and existing motion target are the only dependencies. All four cpp/header sources are explicitly listed and moc runs for both QObject classes. Yalahoo and SceneTest consume the same scene code; foreign uncreatable wrappers expose native owners. GeometryScene alias is module-relative under scene/, generated extra qmldir is included by the qml module, and App imports it from its qrc-relative directory. Review cpp/CLI/three runtime suites are guarded by one opt-in CMake option; default production does not compile the verifier. No platform conditional, undefined symbol, unavailable source or private Qt include in the added render target. Existing APPLE/UNIX compiler and platform branches remain valid; no Windows dependency leaks to this target.",
+      "limitations": "No macOS/Linux compiler or linker executed. Native Kit discovery and platform deployment continue through existing scripts and later platform rounds."
+    },
+    {
+      "checkId": "COMMON-02",
+      "requirement": "Qrc geometry/module resolution, logical-pixel measurements and no private library access",
+      "sources": [
+        {"path":"qml/Yalahoo/Music/scene/GeometryScene.qml","symbol":"qrc:/assets/models/meshes/meshes_0__mesh.mesh"},
+        {"path":"src/render/LayoutMetrics.cpp","symbol":"m_width/layoutScale()"},
+        {"path":"src/app/main.cpp","symbol":"yalahoo::SceneAdapter scene(motion.clock())"},
+        {"path":"src/render/SceneFrame.h","symbol":"struct SceneFrame"}
+      ],
+      "evidence": "Native scene lives after motion and before engine, so the engine/render teardown precedes native owner destruction. No render method opens a file or uses cwd/native paths. All three source-preserving meshes resolve the asset manifest qrc aliases, independent of case/Unicode cwd and packaging Resources lookup. Actual window content width/height flow to the single LayoutMetrics; camera aspect/span and QML layout label use the same object, never multiply by DPR. Empty/negative dimensions clamp to 1 and nonfinite inputs are rejected. Cinematic reference coordinates are isolated measurements; View3D fills physical logical content. Windows checked all client dimensions, image sizes and effective DPR rather than only requested environment variables. The only anonymous review fixture is explicit and build-gated, with no user data/index source.",
+      "limitations": "Bundle/XDG deployment not changed in R06; target native filesystem and live DPR migration between monitors await user tests."
+    },
+    {
+      "checkId": "COMMON-03",
+      "requirement": "Right-handed transforms, camera FOV, logical projection and render-backend closure",
+      "sources": [
+        {"path":"src/render/SceneAdapter.cpp","symbol":"m_frame.view.lookAt"},
+        {"path":"src/render/SceneAdapter.cpp","symbol":"m_frame.projection.perspective"},
+        {"path":"qml/Yalahoo/Music/scene/GeometryScene.qml","symbol":"fieldOfViewOrientation: PerspectiveCamera.Vertical"},
+        {"path":"src/app/main.cpp","symbol":"QSGRendererInterface::Metal"},
+        {"path":"src/app/main.cpp","symbol":"QSGRendererInterface::OpenGL"},
+        {"path":"docs/contracts/scene.md","symbol":"NDC z"}
+      ],
+      "evidence": "SceneFrame uses right-handed Y-up lookAt and perspective; quaternion is extracted from inverse view, with no Euler approximation or global Z flip. Case mesh vertices retain original asset scale, and the sole Node applies translation once. Near=5/far=300 and vertical FOV computed from current distance/span match Three. CPU helper maps GL NDC to top-left logical pixels and ray helper inverts that same matrix and caseTransform. Quick3D owns D3D/Metal/GL clip-space/depth/Y conversion; CPU NDC z is explicitly not a native backend depth value. Scene uses public no-light PrincipledMaterial and existing MSAA/no extra shader or texture capture, normal/depth/transparent sorting pipeline added. Platform API branches in main still select D3D11/Metal/OpenGL separately. Existing actual qsb test inspects MSL/GLSL variants. Windows independent frozen targets/trajectories plus real View3D.mapFrom3DScene and image mesh pixels validate the actual quaternion/camera/render bindings at nine sizes, fractional DPR and moving aspect boundary. No second QML camera constant table.",
+      "limitations": "MSL/GLSL generation is static only. Metal/OpenGL real projection/rasterization await target checks; no material/SSAO/DOF/output parity or GPU performance claim for this geometric debug scene."
+    },
+    {
+      "checkId": "COMMON-04",
+      "requirement": "Single-clock camera dynamics, safe owner lifetime and unchanged media independence",
+      "sources": [
+        {"path":"src/render/SceneAdapter.cpp","symbol":"connect(clock, &FrameClock::frame"},
+        {"path":"src/render/SceneAdapter.cpp","symbol":"m_span.update(goal.span,9,dt)"},
+        {"path":"src/app/main.cpp","symbol":"scene.setReducedMotion(motion.reducedMotion())"},
+        {"path":"qml/Yalahoo/Music/App.qml","symbol":"running: !window.sceneReview"},
+        {"path":"tests/unit/SceneTest.cpp","symbol":"atomicLayoutAndClock"}
+      ],
+      "evidence": "SceneAdapter connects to the existing owner-context FrameClock signal and consumes only motionDt, never a second speed multiplication. A resize publishes portrait/aspect in the same synchronous LayoutMetrics callback; prior position/aim/span and spring velocities survive until rate=9 updates. No product QTimer, elapsed clock, network/provider request, QProcess, media call or render-thread QObject mutation is introduced. Navigation uses source rate=6, real columns suppress row orbit, reduced motion snaps the current target and resets navigation orbit. Main routes MotionController::reducedMotionChanged to the same SceneAdapter; runtime-motion asserts equal reduced state and settled camera. Scene owner outlives engine and has QObject contextual signal disconnection. Review-only timer acquires already computed deterministic states after three GPU frames; it does not calculate pose from wall time and stops on final state/timeout. Render callback captures a shared atomic counter and disconnects its own connection before exit, preserving counter lifetime even for an in-flight invocation. Existing Windows motion/library/runtime regressions still verify hidden/minimized visual pause and empty media source. Actual playback/device lifecycle remains later R24/R25.",
+      "limitations": "Full presentation/selected-lease/scene rebuild lifecycle and actual playing audio are outside R06. Target native application visibility delivery is still unexecuted."
+    },
+    {
+      "checkId": "COMMON-05",
+      "requirement": "Reproducible frozen source provenance and real Release geometry evidence",
+      "sources": [
+        {"path":"tools/review/export-scene-golden.mjs","symbol":"const block = ts.transpileModule"},
+        {"path":"tests/unit/SceneTest.cpp","symbol":"frozenCameraInterruptions"},
+        {"path":"tools/build/verify-r06.ps1","symbol":"-DYALAHOO_REVIEW=ON"},
+        {"path":"qml/Yalahoo/Music/scene/GeometryScene.qml","symbol":"mapFrom3DScene(point)"}
+      ],
+      "evidence": "Oracle executes immutable Git functions and actual scene target statements, not a transcribed implementation or runtime screenshot. Source hashes cover viewport/motion/camera/scene/model/spacing; independent Three projects original corners and paper/center anchors. CPU checks 48 targets, 528 points and 694 nonzero/variable-rate interrupted states; Windows real RHI windows render all 48 and each of 361 120fps sampling states for each effective DPR 1/1.5/2. Every logical point must be <=2px from independent Web projection; double position/aim/FOV must be <=1e-6. Script verifies exact client size, real DPR, PNG size, mesh pixels, all cases passed, source/fixture hashes, warning-free qmllint and all 16 Release CTest suites including asset/qsb and old production regression. Each matrix entry records manual actual call/branch trace plus source hashes. No discovered static defect remains in R06.",
+      "limitations": "Numerical and unlit geometry verification do not establish material/light/UI parity. Windows reports and screenshots are explicitly not macOS/Linux execution evidence."
+    }
+  ]
+}
