@@ -1,11 +1,13 @@
-# Rhine Music · Qt Quick / QML
+# yalahOO!!! · Qt Quick / QML
 
-本项目按 [原生迁移计划](QT_QUICK_MIGRATION_PLAN.md) 改造为 C++23、Qt Quick/QML 跨平台音乐播放器，Qt 使用开发机安装的最新版本，构建与脚本不锁定具体版本或安装路径。GUI、动画与特效尽最大可能逼近原 Web 版本，音乐播放使用 QtMultimedia 公开 API；联网功能暂缓，保留接口与占位。
+**yalahOO!!!** 按 [原生迁移计划](QT_QUICK_MIGRATION_PLAN.md) 改造为 C++23、Qt Quick/QML 跨平台音乐播放器，Qt 使用开发机安装的最新版本，构建与脚本不锁定具体版本或安装路径。GUI、动画与特效尽最大可能逼近原 Web 版本，音乐播放使用 QtMultimedia 公开 API；联网功能暂缓，保留接口与占位。
+
+品牌图标与 Logo 将在计划 R03B 原创设计，以 SVG 为主素材，围绕音乐收藏、实体专辑盒与双 O 唱片圆环，提供适配暖昼/深夜和桌面系统的版本；品牌替换与其他界面的复刻分开验收。
 
 迁移轮次尚待执行；本页列出目标结构，不表示 Qt 应用已经具备可运行产物。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
 
 - `src/`：C++ 应用、模型、运动、渲染、媒体与平台代码。
-- `qml/Rhine/Music/`：界面与场景 QML 模块。
+- `qml/Yalahoo/Music/`：界面与场景 QML 模块。
 - `resources/`、`tests/`：原生资产和 Qt 测试。
 - `cmake/`、`tools/`：构建、部署、审阅和静态审计工具。
 - `docs/`、`verification/`：长期契约、平台说明和验收证据。

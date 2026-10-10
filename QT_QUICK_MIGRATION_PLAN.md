@@ -1,4 +1,4 @@
-# Qt Quick / QML 原生迁移执行计划
+# yalahOO!!! · Qt Quick / QML 原生迁移执行计划
 
 ## 项目文档优先级
 
@@ -30,6 +30,15 @@
 9. 不迁移旧档案终端 `?original=1`、PWA、浏览器专用菜单限制、在线播放器代理和旧拆解研究入口到产品主界面。原文件保留作为历史及参照；原生产品内的详情拖动查看、画质和光效调节保留。
 10. Windows、macOS、Linux 均必须正常实现，不能仅声明支持或保留空壳分支。Windows 必须严格实机构建、运行与验证；macOS/Linux 本阶段通过严格静态审计即可完成对应轮次，真实环境构建、GUI、图形和音频验证留待用户以后执行，不作为本计划收口前置条件。移动端不属于本计划。
 11. 本阶段只编写与执行本地改造，不自动发布、上传私人数据、改写发行标签或删除 Web 基线。
+12. 新项目正式名称为 **yalahOO!!!**，大小写及三个感叹号必须完整保留。新品牌图标和 Logo 原创设计，以 SVG 为主素材；品牌替换是用户指定的视觉差异，其余界面、动画和特效继续按原基线尽最大可能复刻。
+
+### 项目身份与品牌契约
+
+- 用户可见名称统一为 `yalahOO!!!`：窗口标题、关于界面、桌面入口显示名、安装包说明、开场和界面 Logo。文件名、CMake 标识、数据路径及脚本参数采用稳定的安全标识 `yalahoo`，不把感叹号写入可能启用延迟展开的脚本变量或技术标识。
+- CMake 项目名 `yalahoo`，目标 `Yalahoo`、`YalahooCore`，可执行输出名 `yalahoo`；QML URI `Yalahoo.Music`，源目录 `qml/Yalahoo/Music/`。在创建引擎和读取 QStandardPaths 之前设置 organizationName/applicationName 为 `yalahoo`，applicationDisplayName 为 `yalahOO!!!`；后续更改展示名称不能隐式改变用户数据目录。
+- macOS bundle 展示名称为 `yalahOO!!!`，技术 bundle 标识 `yalahoo.music`；Linux desktop 文件名与图标名 `yalahoo`、显示 Name 为 `yalahOO!!!`。Qt 工程文件、部署清单和原生文档统一使用新标识；`legacy-web/` 的原产品名、版权署名、基线提交与历史资产保留原貌。
+- 图标为精致的独立应用符号，Logo 为完整名称字标及图形组合。主题围绕本地音乐收藏、实体专辑盒、双 O 唱片圆环、暖昼/深夜光感；主资产必须是可编辑的真正 SVG 路径，不把 PNG 嵌入 SVG，也不直接复制上游标识或套用现成图标。
+- 品牌主素材在 `resources/branding/`，原稿与生产稿均保留；桌面衍生图标在 `resources/icons/`，设计规范在 `docs/contracts/branding.md`，预览和验收在 `docs/media/branding/`、`verification/windows/branding/`。R03B 负责设计和导出，R14/R20 接入页眉与开场，R30–R32 接入系统图标及平台元数据。
 
 ## 跨轮次基线与工具链
 
@@ -53,7 +62,7 @@
 - `qmake`、`balsam`、`qsb`、`qmllint`、部署工具及 Qt 插件均从同一已选 Kit 或其配套 host-tools 定位并校验版本一致，不从任意 PATH 混用其他 Qt 安装；记录实际 Qt/编译器/工具版本到验收产物。
 - 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
 - Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
-- `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Rhine/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
+- `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 创建统一 preset 名称：`qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。统一命令：`cmake --preset qt-debug`、`cmake --build --preset qt-debug`、`ctest --preset qt-debug --output-on-failure`。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
 
@@ -62,7 +71,7 @@
 ### 目录及职责
 
 ```text
-Rhine-Music-Demo/
+项目根（yalahOO!!!）/
   .git/                     当前仓库元数据；不归档、不复制
   QT_QUICK_MIGRATION_PLAN.md 剩余轮次与长期实施契约
   AGENTS.md                 Qt 项目开发约定
@@ -81,14 +90,14 @@ Rhine-Music-Demo/
     library/    扫描、Qt 元数据探测、缓存、旧数据导入
     services/   Provider 接口、OfflineProvider、资料缓存模型
     platform/   仅必要的平台差异；win / mac / linux 分支完整实现
-  qml/Rhine/Music/
+  qml/Yalahoo/Music/
     App.qml                 模块主入口
     components/             Header、字轮、滑尺和基础控件
     pages/                  Browse、Detail、Overview、Opening
     panels/                 搜索、设置、曲库、光照与动效面板
     scene/                  View3D、模型、材质与后处理声明
   resources/
-    fonts/ models/ icons/ audio/ shaders/ manifests/
+    fonts/ models/ icons/ branding/ audio/ shaders/ manifests/
   tests/
     unit/ qml/ integration/ visual/ fixtures/
   tools/
@@ -108,8 +117,8 @@ Rhine-Music-Demo/
 ```
 
 - 此结构是各轮次创建新文件时必须遵循的目标布局；不为未执行的轮次提前生成空 CMake、假入口或占位实现。归档文件不混入新的 `src/`、`qml/`、`resources/`、`tests/`。
-- `src/` 子目录各自维护 CMake 源清单；目标固定为 `RhineMusicCore`（模型/运动/存储）、`RhineMusic`（应用/渲染/媒体/QML）和独立测试目标。`src/platform/` 只放实际存在的平台差异，共用逻辑优先使用 Qt。
-- `qt_add_qml_module` 的 URI 固定 `Rhine.Music`；`qml/Rhine/Music/App.qml` 及子目录文件使用模块相对资源别名，以 `loadFromModule("Rhine.Music", "App")` 加载，不依赖工作目录或文件系统 import。非 QML 资产经 qrc `/assets/` 加载；shader 从 `resources/shaders/` 使用 `qt_add_shaders` 生成 qsb。
+- `src/` 子目录各自维护 CMake 源清单；目标固定为 `YalahooCore`（模型/运动/存储）、`Yalahoo`（应用/渲染/媒体/QML）和独立测试目标。`src/platform/` 只放实际存在的平台差异，共用逻辑优先使用 Qt。
+- `qt_add_qml_module` 的 URI 固定 `Yalahoo.Music`；`qml/Yalahoo/Music/App.qml` 及子目录文件使用模块相对资源别名，以 `loadFromModule("Yalahoo.Music", "App")` 加载，不依赖工作目录或文件系统 import。非 QML 资产经 qrc `/assets/` 加载；shader 从 `resources/shaders/` 使用 `qt_add_shaders` 生成 qsb。
 - 新文档中的源码/资产路径均从仓库根解析；Web 资料引用显式带 `legacy-web/`。保留 `legacy-web/LICENSE`、`legacy-web/NOTICE.md` 和原署名/素材说明，新应用资源清单记录复制来源。
 
 ### 数据流与线程边界
@@ -150,7 +159,7 @@ Rhine-Music-Demo/
 - 横屏专辑信息 x=68.633333% 屏宽、右边距=max(24px,2.2% 屏宽)；短屏内容自行滚动。竖屏品牌与控件两行，返回按钮固定品牌下方。
 - 横屏主页相机下移由 16:9 的 8% 连续过渡到 21:9 的 10%；向左偏移由 0 到 3.5%，更宽保持终值；详情和竖屏不套用此偏移。
 - 字体先用 Qt 加载现有 MiSans WOFF2 并逐个字重验证；若字体后端不支持，固定使用 Windows 系统 DirectWrite 的 `IDWriteFactory5::UnpackFontFile` 解包仓库四个 WOFF2 为原始 SFNT，再由 Qt 加载同一组可跨平台使用的字体。资产工具仅链接系统 Dwrite.lib，读取返回的 IDWriteFontFileStream，以 Qt QFile/QSaveFile 保存；根据 SFNT 签名选择 .ttf/.otf，保留字形/字重/字距数据及输入hash。转换只在准备资产时执行，不进入产品运行路径；禁止新增字体转换库、下载替代字体或用相近系统字体冒充。
-- 图标/品牌路径提取为 SVG 或 Qt Quick Shape，保留 viewBox、描边宽度、端点与颜色；不替换成系统主题图标。
+- 原功能按钮图标提取为 SVG 或 Qt Quick Shape，保留 viewBox、描边宽度、端点与颜色；不替换成系统主题图标。产品品牌标识按 R03B 原创 SVG 替换，保持原品牌容器锚点、留白、出现/退出时序与层级；不把旧品牌轮廓复制到新 Logo。
 - GLB 保留原资产，用 Kit 自带 balsam 导入或通过 Qt 自带导入器读取；若某 glTF 特性导入丢失，写窄用途 C++/Qt 解析器读取本项目 GLB 的 JSON/BIN、POSITION/NORMAL/TEXCOORD/indices，不引入 Assimp 等库。
 
 ### 连续运动
@@ -212,6 +221,7 @@ Rhine-Music-Demo/
 - Windows 实机必测内容尺寸：1920×1080、1280×720、995×858、960×900、930×900、390×844、320×720、2560×1080、3440×1440；DPR 1/1.5/2 在代表性尺寸覆盖。平台窗口装饰不进入比较。以下截图、运动、图像与性能门槛在本阶段以 Windows 真实 Qt 运行产物验收；macOS/Linux 按静态审计检查共用逻辑及平台差异实现，不要求伪造对应平台的图像。
 - 先验收结构：主锚点误差≤1逻辑像素、三维轮廓/投影锚点误差≤2逻辑像素；布局分界、文本断行、裁切、控件可点击范围必须一致。
 - 在同尺寸同输入的 sRGB PNG 上，UI ROI SSIM目标≥0.98；三维关键 ROI SSIM目标≥0.97，平均 RGB 绝对误差目标≤6/255；文字边缘仅允许固定 1px 抗锯齿带单列统计，不能大面积遮掉差异。
+- 原品牌改为 `yalahOO!!!` 的字形、图形以及系统应用图标不与旧品牌做像素相等比较；在固定场景清单中仅排除实际品牌绘制边界，仍比较容器锚点、留白、布局、动画进度和相邻控件。原名出现区域以具体矩形登记，不能屏蔽整条页眉或开场画面；新 SVG 另按 R03B 的精度、缩放与主题门槛验收。
 - SSIM用 Qt/C++实现11×11高斯窗口σ=1.5，C1=(0.01×255)²、C2=(0.03×255)²；另生成绝对差分图、边缘距离和分区误差。禁止新增 OpenCV/Pillow/scikit-image。
 - 数值门槛是验收目标，不是预先保证。图形算法仍有差异时，先按几何→取景→颜色空间→灯光→材质→后处理顺序修复；只允许记录具体、可复现、无法进一步缩小的残余差异，不用一句“肉眼差不多”放行。
 - 运动数学对照：double轨迹误差≤1e-6（位置/速度/加速度分别记录）；投影误差≤2逻辑像素；时序事件差≤1个60Hz帧。连续曲线按20/30/60/120fps与长帧输入测试。
@@ -254,19 +264,32 @@ Rhine-Music-Demo/
 
 ### R02 · CMake工程、Kit探测与最小原生运行（0.5–1日）
 
-- 依赖：R01。交付根 CMake、presets、`cmake/` 模块、`src/app/main.cpp`、`qml/Rhine/Music/App.qml`、`tests/unit/` QtTest 目标和 `tools/build/` 脚本；目录按上述结构建立，不恢复 `qt/` 套层。
-- `qt_add_executable`/`qt_add_qml_module`注册`Rhine.Music`模块，资源别名及加载入口按目录契约固定；加载Qt Quick Controls Basic样式再创建引擎，避免平台主题改变自定义控件。从本轮起三平台 CMake 分支必须完整，系统特定链接和编译选项有条件隔离；Windows 实机运行，macOS/Linux 纳入静态审计矩阵。
+- 依赖：R01。交付根 CMake、presets、`cmake/` 模块、`src/app/main.cpp`、`qml/Yalahoo/Music/App.qml`、`tests/unit/` QtTest 目标和 `tools/build/` 脚本；目录按上述结构建立，不恢复 `qt/` 套层。
+- `qt_add_executable`/`qt_add_qml_module`注册`Yalahoo.Music`模块，资源别名及加载入口按目录契约固定；加载Qt Quick Controls Basic样式再创建引擎，避免平台主题改变自定义控件。从本轮起三平台 CMake 分支必须完整，系统特定链接和编译选项有条件隔离；Windows 实机运行，macOS/Linux 纳入静态审计矩阵。
+- 建立身份契约中的 CMake 项目/目标/输出名、Qt applicationName/applicationDisplayName、数据路径和 QML URI；首个窗口标题为 `yalahOO!!!`，品牌图形等 R03B 交付后接入，不能先用旧标识冒充新品牌。
 - 实现上述 C++23 强制设置、能力探针与最新 Qt Kit 自动选择；独立探测 Qt Quick 3D、ShaderTools、Multimedia 链接及插件加载，Debug/Release 使用同一 Kit。Kit 选择逻辑用合成安装清单覆盖版本数值排序、非桌面 Kit 排除、架构/ABI 匹配、最高版本缺模块报错与旧缓存失效；不得为测试安装另一版本 Qt 或写死本机 6.12 路径。
 - 首个窗口验证D3D11渲染、中文文本、QML模块和QMediaPlayer创建；运行失败保留实际诊断，不能仅靠CMake configure成功过关。
 - 退出：三个统一构建/测试命令在 Windows 实际运行；启动不创建浏览器、Node服务或联网请求。归档 Web 参照使用 `legacy-web/` 工作目录及原锁定依赖，原模块与资产内容不被新构建覆盖。
 
 ### R03 · 模型、字体、图标与音频资源接入（1–1.5日）
 
-- 依赖：R02。交付 `resources/` 分类资产、`resources/manifests/` 来源/hash 清单、`tools/assets/prepare-assets` 和 `tests/integration/` 资产测试；所有输入来自 `legacy-web/public/` 或 `legacy-web/art/`。
+- 依赖：R02。交付 `resources/` 分类资产、`resources/manifests/` 来源/hash 清单、`tools/assets/prepare-assets` 和 `tests/integration/` 资产测试；复用输入来自 `legacy-web/public/` 或 `legacy-web/art/`，原创品牌由 R03B 独立交付，不从旧品牌拷贝。
 - 导入music-case-v040.glb，保留三壳体批次、顶点/法线/UV和纸面间隙；Qt导入输出与原几何包围盒/三角数对照。生成资产保留输入hash，禁止对模型做非均匀缩放。
-- 验证四个MiSans字重的Qt加载、glyph覆盖与文字宽度；按布局契约处理不支持的字体格式。品牌/按钮图标逐路径提取，不换图案。
+- 验证四个MiSans字重的Qt加载、glyph覆盖与文字宽度；按布局契约处理不支持的字体格式。原功能按钮图标逐路径提取，不换图案；旧品牌几何只作为时序与布局参照，不接入新产品主界面。
 - 复用atmosphere/motif/pulse等现有完整音频资源；界面音效仅接入可直接播放的既有短文件。没有独立短资产的合成音效保留事件映射并静音，不手工生成/裁切PCM，不播放整段typing-preview作为每次按键声。
 - 退出：资源均通过qrc加载，应用从任意工作目录启动仍可用；没有新第三方依赖及私人资源。
+
+### R03B · yalahOO!!! 原创应用图标与 Logo（1.5–2日）
+
+- 依赖 R02、R03。交付 `resources/branding/icon-master.svg`、`logo-master.svg`、生产用 `icon.svg`、`icon-small.svg`、`icon-mono.svg`、`logo-light.svg`、`logo-dark.svg`、`logo-mono.svg`、`lockup-light.svg`、`lockup-dark.svg`，以及品牌规范、图标导出工具、平台衍生文件和 Qt 渲染预览。母版含命名图层与分组，生产稿清理冗余但不破坏路径精度。
+- **固定设计方向：** 以 1024×1024 图标坐标建立偏转约 −8° 的薄玻璃专辑盒，主体控制在中心 832×832 区域内，保留至少 96 单位安全边；用两道有细密但克制的刻纹圆环对应 `OO` 与唱片，窄边高光、暖白纸面、低饱和琥珀点缀体现“收藏音乐、慢慢听”。主轮廓、纸面、圆环和高光最多四个视觉层级，保证形体完整，不依赖大面积光晕或杂乱装饰表现精致。主题映射原项目暖昼/深夜色板，同一几何分别检查浅/深背景，不额外引入一套冲突的界面主题。
+- **字标方案：** 完整绘制 `yalahOO!!!`，保持小写 `yalah`、大写双 `OO` 和三个感叹号；沿图标圆环构造 O 的字形细节，感叹号采取一致但渐进的节奏，光学校准字距、基线和重量。最终生产稿文字转为自绘路径，不依赖字体安装、SVG text 排版或上游品牌字形；完整名称放入 Logo，独立应用图标不塞入整段小字。
+- **执行步骤：** 先在同一 SVG 版面完成主轮廓/圆环/字标的三个细节方案（边框和圆环开口/刻纹密度/字距变化，主题与结构不另开方向）；按小尺寸识别 35%、主题契合 25%、细节与光学平衡 25%、Qt 渲染及主题适配 15% 比较并固定一个方案，比较图保存到 `docs/media/branding/`。随后只迭代选定稿的曲率、间距、圆环中心、描边和光感，不留三套可切换产品标识。
+- **SVG 技术要求：** 仅使用路径、基础几何、组变换和 Qt SVG 可正常渲染的渐变/裁切；尺寸由 viewBox 决定，背景透明。不包含脚本、远程资源、位图 image、foreignObject 或依赖外部文件的字体/filter。细小装饰在 `icon-small.svg` 中合并/删去，16–32px 使用专门光学简化稿，保持外轮廓和双圆环识别；不是把 1024 母版缩小后直接交付。单色稿用显式填充/描边并保留正负空间。
+- **动效资产：** Logo 路径分成稳定的 `word`、`rings`、`accents` 组，额外交付描边揭示所需的中心线路径及分段进度映射，写入品牌规范。R20 的轮廓出现/标语/交接时序照原契约，路径内容采用新品牌；减少动态时直接显示完整 Logo。不能为换 Logo 延长片头或移动播放器控件。
+- **衍生格式：** `tools/assets/export-branding` 使用 C++23/QtSvg 的 QSvgRenderer+QImage 生成透明 PNG（16、24、32、48、64、128、256、512、1024）与预览；Windows ICO 包含 16/24/32/48/64/128/256 尺寸，Linux 提供 SVG 与 PNG。macOS 交付 iconset PNG 及 ICNS；若 Qt 写入器不支持 ICNS，用窄用途 Qt 工具写 ICNS 的 `icns` 文件头和 big-endian 长度，PNG 块 `ic07`/`ic08`/`ic09`/`ic10` 分别为 128/256/512/1024，块长度含 8 字节头，总长度含文件头；验证容器与各 PNG 可读。以后 macOS 可用系统 iconutil 复核，不将其作为 Windows 本阶段生成的前置条件。不引入图形第三方库。
+- **精致度与验收：** Windows Qt 实际加载全部 SVG；生成 16/24/32/48/64/128/256/512/1024 尺寸、DPR1/1.5/2、浅/深/透明背景及单色稿预览。检查小尺寸外形/双 O 仍可辨、轮廓无断裂/毛刺、渐变无明显色带、光学校准无重心偏移、字标拼写/大小写/标点准确；与页眉和片头实尺寸预览比较，不能靠放大图遮掩缩小后的糊成一团。16px 简化稿的主要线条/间隙在 DPR1 至少 1px，圆环与盒体不得粘连，四边安全区不得被裁切。
+- 退出：选定原创 SVG 母版及全套生产稿/衍生格式存在、Qt 实际渲染与尺寸/主题预览通过、ICNS/ICO 内容清单正确、分组与开场路径映射可用；`docs/contracts/branding.md` 固定颜色、比例、安全区、最小尺寸、替换场景与导出命令，资源清单记录原创来源与 hash。没有嵌入位图伪 SVG，没有沿用原项目品牌作为最终产品标识；主界面接入留给 R14/R20，系统接入留给 R30–R32。
 
 ### R04 · C++数据模型、排序、搜索与离线Provider契约（1–1.5日）
 
@@ -384,8 +407,9 @@ Rhine-Music-Demo/
 
 ### R14 · 二维基础控件、页眉与浏览静态布局（1–1.5日）
 
-- 依赖R03、R04、R06、R13。交付DesignTokens、Header、BrowseInfo、Footer与自定义Basic控件。
+- 依赖R03、R03B、R04、R06、R13。交付DesignTokens、Header、BrowseInfo、Footer与自定义Basic控件。
 - 按基线计算样式实现字体、字距、线宽、颜色、留白和图标；品牌与返回锚点、主题双标签、当前歌名槽和播放按钮固定位置。
+- 页眉接入 R03B 的 `yalahOO!!!` 原创 Logo，按主题选择生产稿；品牌容器位置与相邻控件不变，窄屏按品牌规范切换紧凑组合或图形，不截掉感叹号，也不挤占播放按钮。关于/设置等产品名称统一走同一身份常量。
 - LayoutMetrics决定横/竖布局，窄屏保留主题文字和播放按钮；短屏信息可滚动，超宽屏相机/文字协同。
 - 阅读渐变与夜间遮罩分层，竖屏侧向遮罩650ms淡出；不以全屏半透明层错误影响顶栏。
 - 退出：九个尺寸静态截图通过结构/文本门槛，没有传统Qt默认外观混入产品。
@@ -432,9 +456,10 @@ Rhine-Music-Demo/
 
 ### R20 · 二维序章、三维开场和交互交接（1–1.5日）
 
-- 依赖R08、R12、R14、R17。交付OpeningController、Opening.qml、品牌轮廓/圆环路径动画。
+- 依赖R03B、R08、R12、R14、R17。交付OpeningController、Opening.qml、原创品牌轮廓/圆环路径动画。
 - 按musicOpeningFrame逐参数采样，不重写近似时间表：轮廓0.24–1.64s、标语2.72–3.58s进入/3.58–5.70s静读/5.70–6.32s退出，标语“一张一张，慢慢听”。
 - 二维底纸6.32s开始消退，三维6.40s从源时间21.92开始，11.60s落稳；主页错峰720ms完成后解锁。主品牌节点复用，不通过两份品牌交叉淡入。
+- 揭示 R03B 提供的新 Logo 中心线和分组，曲率/分段映射按品牌规范；原时间窗、位置、目标占位与交接节奏保持，旧品牌几何不进入生产资源。品牌区域另验收新 SVG，其余画面继续按 Web 成对对照。
 - View3D准备完成后才起片头；0–6.32s完全遮住时不提交三维帧，必要时显式暂停View3D/RHI更新而非只设opacity=0。
 - 退出：跳过/重播/后台恢复/中途减少动态有明确终态、正确焦点与一次交接；20–120fps时序golden通过。
 
@@ -517,6 +542,7 @@ Rhine-Music-Demo/
 
 - 依赖R29。交付Release目录、部署脚本、根目录Windows普通启动器及Qt使用说明。
 - `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，部署 Qt Quick 3D、Multimedia 及 Qt 随附媒体依赖；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
+- 接入 R03B 原创 ICO 到 Windows 可执行资源，Qt 窗口图标及关于页使用同源 SVG/PNG；显示名 `yalahOO!!!`、输出文件 `yalahoo.exe`。实机检查 Explorer、窗口/任务栏及大/小尺寸图标；macOS ICNS/bundle 和 Linux desktop 图标由 R31/R32 按同一品牌清单接入并静态审计。
 - 用无Qt开发PATH、无Node/FFmpeg路径的临时环境运行；验证离线启动、demo、unicode音乐路径、设备列表、可支持样本和字体加载。
 - 普通启动器只找合法安装/构建产物并启动Qt程序，不后台启动Web服务；演示/光照启动器继续在tools/launchers/。
 - 退出：Windows Release 实际脱离开发环境运行，GUI/动画/特效、真实本地音频播放、暂停/seek/换曲/音量/设备行为与代表性尺寸/DPR验证通过；记录 OS/GPU/Qt/后端及运行证据。数据路径符合QStandardPaths，部署包不含私人库/缓存/调试基线。静态检查不能代替本轮实机验收。

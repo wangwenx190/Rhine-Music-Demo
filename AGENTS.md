@@ -1,10 +1,12 @@
-# Rhine Music · Qt 原生项目开发约定
+# yalahOO!!! · Qt 原生项目开发约定
 
 - [QT_QUICK_MIGRATION_PLAN.md](QT_QUICK_MIGRATION_PLAN.md) 是项目内最高优先级的实施契约；新的用户明确要求优先于已有项目文档。其他约定仅补充未冲突内容。
+- 正式展示名称为 `yalahOO!!!`；技术标识使用 `yalahoo`，CMake 目标 `Yalahoo`/`YalahooCore`、QML 模块 `Yalahoo.Music`。完整身份与数据路径规则按计划执行，历史归档与作者署名保留原名。
 - 原项目所有文件位于 `legacy-web/`，用于冻结 Web 基线、资产来源与历史追溯。旧模块名从该目录解析；旧 npm/构建命令在该目录运行，使用隔离的数据目录。根 `.git/` 保留当前仓库历史。
-- 新项目采用 C++23、开发机已安装的最新 Qt 版本、Qt Quick/QML、Qt Quick 3D、QtMultimedia 与根 CMake。C++ 在 `src/`，QML 在 `qml/Rhine/Music/`，资产在 `resources/`，测试在 `tests/`，工具在 `tools/`；详细结构与模块契约以计划为准。
+- 新项目采用 C++23、开发机已安装的最新 Qt 版本、Qt Quick/QML、Qt Quick 3D、QtMultimedia 与根 CMake。C++ 在 `src/`，QML 在 `qml/Yalahoo/Music/`，资产在 `resources/`，测试在 `tests/`，工具在 `tools/`；详细结构与模块契约以计划为准。
 - CMake、公共 presets 与脚本不得锁定 Qt minor/patch 版本或安装目录；执行时按计划自动发现本机最新原生 Kit，模块、工具与插件使用同一 Kit。计划中的版本与路径只供定位；GuiPrivate 变化通过探测和适配处理，不退回旧 Qt。C++23 必须显式启用且不允许静默降级。
 - GUI、动画和特效尽最大可能逼近冻结基线；保留双主题、减少动态、速度、响应式、真实列/填充、列记忆及搜索不改变播放等既有行为。
+- R03B 设计精致、精美且契合音乐收藏主题的原创应用图标与 Logo，主素材必须为真正 SVG，按需导出 PNG/ICO/ICNS。新品牌替换旧标识，页眉/开场布局和动效时序仍遵循复刻契约；具体方案、格式与验收以计划为准。
 - 音乐按普通播放器实现，只用 QtMultimedia 公开 API；不实现无缝播放、交叉混音、手动 PCM、自建音频引擎、Swift/CoreAudio 桥接或外部 FFmpeg 命令。歌曲、BGM 与界面音效独立。
 - 联网暂缓但保留异步 Provider、来源/缓存字段、状态占位与配置扩展；本阶段不发送请求。原生运行不依赖 Node、浏览器、WebEngine 或本地 HTTP 服务，不新增第三方库，系统自带能力按计划允许使用。
 - Windows、macOS、Linux 均须完整实现。Windows 必须严格实机验证；macOS/Linux 通过计划规定的严格静态审计即可完成本阶段验收，结论标明“静态审计通过，实机待用户验证”。真实环境验证留待用户以后执行，不可记为已经运行通过。
