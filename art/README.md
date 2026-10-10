@@ -1,5 +1,7 @@
 # 模型源文件
 
+> **原生迁移约定：** 以 [Qt 迁移计划](../QT_QUICK_MIGRATION_PLAN.md) 的资产转换方案为最高优先级，复用并转换冻结基线模型至 `qt/assets/`。下文 Node/Three.js/Blender 脚本保留用于旧资产追溯，不成为 Qt 应用运行依赖，也不要求为迁移新增第三方建模工具。
+
 此目录保留 Blender 场景和对应建模脚本，用于维护与复现。正常运行播放器不需要安装 Blender；运行时资源位于 `public/assets/`。
 
 - `build-music-case.mjs` / `music-case-v040.json`：V0.4.0 新专辑盒的可复现 Three.js 几何源与结构清单。运行 `node art/build-music-case.mjs` 生成 `public/assets/music-case-v040.glb` 并同步带内容哈希的资源入口。本机没有可调用的 Blender 或 Blender MCP，因此本版使用原生几何脚本；没有把旧 `.blend` 冒充新模型源文件。

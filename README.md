@@ -1,5 +1,7 @@
 # Rhine Music Demo · V0.4.1
 
+> **原生迁移约定：** 本仓库按 [Qt Quick / QML 迁移计划](QT_QUICK_MIGRATION_PLAN.md) 改造为 C++/Qt 跨平台应用；该计划是项目内最高优先级的实施契约。下文安装、依赖和播放后端说明描述已发布的 V0.4.1 Web 版本，作为迁移基线保留，不是 Qt 应用的运行要求，也不表示原生迁移已经完成。
+
 **把本地音乐放进三维专辑架，一张一张，慢慢听。** 用玻璃 CD 盒浏览收藏，打开专辑、查找歌曲，在浏览器界面中播放自己的音乐。
 
 本版提供 **macOS 源码包**，由本机 Node.js 服务与浏览器共同运行。源码包不是 `.app` 安装包，不附带歌曲；普通使用无需 Blender。
@@ -8,7 +10,7 @@
 
 [**下载 V0.4.1 macOS 源码包**](https://github.com/RonaldDeng/Rhine-Music-Demo/releases/download/v0.4.1/Rhine-Music-Demo-v0.4.1-macOS.zip) · [V0.4.1 Release](https://github.com/RonaldDeng/Rhine-Music-Demo/releases/tag/v0.4.1) · [更新日志](CHANGELOG.md) · [版权与来源](NOTICE.md)
 
-**Windows 与其他开发方向：** 请看 [社区衍生版本](docs/COMMUNITY-VERSIONS.md)。各版本由对应作者独立维护，功能与支持范围以其文档为准。
+**平台与其他开发方向：** 已发布 V0.4.1 源码包面向 macOS；本仓库 Qt 迁移目标为 Windows、macOS、Linux，支持状态以迁移验收为准。现有独立版本请看 [社区衍生版本](docs/COMMUNITY-VERSIONS.md)，各版本的功能与支持范围以其文档为准。
 
 ![V0.4.1 真实专辑列：每列居中，当前列独立浏览](docs/media/v0.4.1/real-columns-centered.jpg)
 
@@ -166,7 +168,7 @@ RHINE_TEST_APE="/绝对路径/样本.ape" npm run check:v041
 
 ## 主线、社区版本与相关项目
 
-本仓库保留由 RonaldDeng 维护的 macOS 主线。欢迎其他开发者在 Fork 中扩展功能或支持其他平台，并通过 [登记 Issue](https://github.com/RonaldDeng/Rhine-Music-Demo/issues/new?template=community_fork.md) 申请加入社区目录。
+本仓库由 RonaldDeng 维护，已发布的 V0.4.1 为 macOS Web 版本，后续原生跨平台改造按 [Qt 迁移计划](QT_QUICK_MIGRATION_PLAN.md) 执行。欢迎其他开发者在 Fork 中扩展计划以外的功能，并通过 [登记 Issue](https://github.com/RonaldDeng/Rhine-Music-Demo/issues/new?template=community_fork.md) 申请加入社区目录。
 
 | 社区版本 | 作者 | 主要方向 |
 | --- | --- | --- |

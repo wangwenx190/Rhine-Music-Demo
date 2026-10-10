@@ -9,8 +9,10 @@ assignees: ""
 ### 环境
 
 - Rhine Music 主线版本：
-- macOS 版本：
-- 浏览器与版本：
+- 操作系统与版本（Windows / macOS / Linux）：
+- 运行入口（Qt 原生 / Web）：
+- Qt 版本、Kit 与构建配置（Qt 原生入口）：
+- 浏览器与版本（Web 入口）：
 - 音频输出方式（涉及播放时）：
 
 ### 复现步骤
