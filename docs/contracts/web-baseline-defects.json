@@ -1,0 +1,21 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "issues": [
+    {
+      "id": "WEB-AA-01",
+      "classification": "baseline-rendering-defect-not-reproduction-target",
+      "description": "Visible stair-step aliasing in several freshly captured Web reference images.",
+      "evidence": [
+        "docs/media/web-baseline/browse-day-filled-1920x1080.png",
+        "docs/media/web-baseline/browse-night-realistic-390x844.png"
+      ],
+      "observedParameters": {
+        "quality": "original",
+        "antialias": "off",
+        "SMAAEnabled": false
+      },
+      "nativeRequirement": "Improve edge smoothing; preserve geometry, projection, artwork sharpness, materials, lighting and motion. Do not reproduce jagged edges or conceal them with global blur/noise.",
+      "comparison": "Report confirmed edge ROIs separately with paired close-ups. Improved antialiasing is an allowed and required difference; unaffected image regions and geometric anchors retain their original gates."
+    }
+  ]
+}

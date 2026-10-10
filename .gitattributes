@@ -29,3 +29,6 @@
 *.zip binary
 *.exe binary
 *.dll binary
+
+# Frozen GPU environment readback
+*.rgba16f binary
