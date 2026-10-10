@@ -1,0 +1,112 @@
+{
+    "batches": [
+        {
+            "imported": {
+                "max": [
+                    2.2249999046325684,
+                    3.5249998569488525,
+                    0.07000000029802322
+                ],
+                "min": [
+                    -1.875,
+                    0.17500004172325134,
+                    0.052000001072883606
+                ],
+                "name": "Frosted_Polymer",
+                "triangles": 124,
+                "vertices": 272
+            },
+            "source": {
+                "max": [
+                    2.2249999046325684,
+                    3.5249998569488525,
+                    0.07000000029802322
+                ],
+                "min": [
+                    -1.875,
+                    0.17500004172325134,
+                    0.052000001072883606
+                ],
+                "name": "Frosted_Polymer",
+                "triangles": 124,
+                "vertices": 272
+            }
+        },
+        {
+            "imported": {
+                "max": [
+                    -1.871999979019165,
+                    3.5249998569488525,
+                    0.07000000029802322
+                ],
+                "min": [
+                    -2.2249999046325684,
+                    0.17500004172325134,
+                    -0.07000000029802322
+                ],
+                "name": "Ivory_Edges",
+                "triangles": 248,
+                "vertices": 548
+            },
+            "source": {
+                "max": [
+                    -1.871999979019165,
+                    3.5249998569488525,
+                    0.07000000029802322
+                ],
+                "min": [
+                    -2.2249999046325684,
+                    0.17500004172325134,
+                    -0.07000000029802322
+                ],
+                "name": "Ivory_Edges",
+                "triangles": 248,
+                "vertices": 548
+            }
+        },
+        {
+            "imported": {
+                "max": [
+                    2.2249999046325684,
+                    3.5249998569488525,
+                    0.04599999636411667
+                ],
+                "min": [
+                    -1.875,
+                    0.17500004172325134,
+                    -0.06800000369548798
+                ],
+                "name": "Optical_Diffuser",
+                "triangles": 628,
+                "vertices": 1264
+            },
+            "source": {
+                "max": [
+                    2.2249999046325684,
+                    3.5249998569488525,
+                    0.04599999636411667
+                ],
+                "min": [
+                    -1.875,
+                    0.17500004172325134,
+                    -0.06800000369548798
+                ],
+                "name": "Optical_Diffuser",
+                "triangles": 628,
+                "vertices": 1264
+            }
+        }
+    ],
+    "importLog": "",
+    "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+    "lidBackZ": 0.052,
+    "lidFrontZ": 0.07,
+    "maxAttributeError": 1.1920928955078125e-07,
+    "nodeTransforms": "identity; no scale or axis conversion",
+    "paperPlaneZ": 0.027,
+    "passed": true,
+    "qtVersion": "6.12.0",
+    "rearFrontZ": -0.032,
+    "triangles": 1000,
+    "uvConvention": "Qt V = 1 - glTF V; positions/normals unchanged"
+}

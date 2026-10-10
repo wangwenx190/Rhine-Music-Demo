@@ -1,4 +1,5 @@
 #include "AppIdentity.h"
+#include "AssetCatalog.h"
 
 #include <QAudioDevice>
 #include <QAudioOutput>
@@ -48,6 +49,10 @@ int main(int argc, char **argv)
 #endif
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    if (!yalahoo::initializeAssetFonts()) {
+        std::fprintf(stderr, "Embedded MiSans font registration failed\n");
+        return 6;
+    }
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native Qt runtime probe"));
@@ -94,7 +99,7 @@ int main(int argc, char **argv)
         });
         QTimer::singleShot(2500, window, [&, report] {
             const QImage image = window->grabWindow();
-            const QRawFont raw = QRawFont::fromFont(QFontDatabase::systemFont(QFontDatabase::GeneralFont));
+            const QRawFont raw = QRawFont::fromFont(QGuiApplication::font());
             const QString chinese = QStringLiteral("一张一张，慢慢听");
             bool chineseSupported = true;
             for (const QChar character : chinese)

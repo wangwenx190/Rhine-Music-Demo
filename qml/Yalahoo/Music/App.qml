@@ -23,8 +23,10 @@ ApplicationWindow {
         spacing: 18
         Label {
             text: "yalahOO!!!"
+            font.family: MusicFonts.bold.family
+            font.styleName: MusicFonts.bold.styleName
+            font.weight: MusicFonts.bold.weight
             font.pixelSize: 36
-            font.bold: true
             color: "#253e37"
             Layout.alignment: Qt.AlignHCenter
         }
@@ -45,13 +47,30 @@ ApplicationWindow {
             }
             PerspectiveCamera { position: Qt.vector3d(0, 0, 350) }
             DirectionalLight { eulerRotation: Qt.vector3d(-25, -25, 0) }
-            Model {
-                source: "#Cube"
-                scale: Qt.vector3d(1.25, 1.25, 0.28)
+            Node {
+                scale: Qt.vector3d(50, 50, 50)
                 eulerRotation: Qt.vector3d(-12, 28, 0)
-                materials: PrincipledMaterial {
-                    baseColor: "#668674"
-                    roughness: 0.38
+                Node {
+                    y: -1.85
+                    Model {
+                        objectName: "caseLidProbe"
+                        source: "qrc:/assets/models/meshes/meshes_0__mesh.mesh"
+                        materials: PrincipledMaterial {
+                            id: probeMaterial
+                            baseColor: "#668674"
+                            roughness: 0.38
+                        }
+                    }
+                    Model {
+                        objectName: "caseSpineProbe"
+                        source: "qrc:/assets/models/meshes/meshes_1__mesh.mesh"
+                        materials: probeMaterial
+                    }
+                    Model {
+                        objectName: "caseTrayProbe"
+                        source: "qrc:/assets/models/meshes/meshes_2__mesh.mesh"
+                        materials: probeMaterial
+                    }
                 }
             }
         }
@@ -66,6 +85,7 @@ ApplicationWindow {
             text: window.interactionCount === 0 ? "验证窗口交互" : "交互已响应 " + window.interactionCount
             Layout.alignment: Qt.AlignHCenter
             onClicked: window.interactionCount++
+            icon.source: "qrc:/assets/icons/play-day.svg"
         }
     }
     // Import and instantiate the public QML media types without opening a source.

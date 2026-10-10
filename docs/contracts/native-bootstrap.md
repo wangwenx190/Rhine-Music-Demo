@@ -1,6 +1,6 @@
 # R02 · 原生工程与工具链契约
 
-根工程为 C++23 / Qt Quick 原生工程。当前 `App.qml` 是最小运行探针：中文、Basic 控件、Qt Quick 3D 几何、qsb ShaderEffect 和无来源的 QtMultimedia 对象；音乐库、模型/字体、品牌与播放功能按后续轮次实现。
+根工程为 C++23 / Qt Quick 原生工程。当前 `App.qml` 是运行探针：同源 MiSans 中文、Basic 控件与功能 SVG、原专辑盒三壳体几何、qsb ShaderEffect 和无来源的 QtMultimedia 对象；R03 资产接入见 [assets.md](assets.md)，音乐库、实际材质、品牌与播放功能按后续轮次实现。
 
 - CMake project：`yalahoo`；目标：`YalahooCore`、`Yalahoo`；输出：`build/<configuration>/bin/yalahoo.exe`，macOS 为同位置的 `yalahoo.app`，Linux 为 `yalahoo`。
 - QML URI：`Yalahoo.Music`；入口：`loadFromModule("Yalahoo.Music", "App")`；资源：`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。

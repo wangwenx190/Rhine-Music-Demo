@@ -1,4 +1,6 @@
-qt_add_executable(Yalahoo main.cpp)
+qt_add_executable(Yalahoo main.cpp AssetCatalog.cpp AssetCatalog.h)
+include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
+yalahoo_add_assets(Yalahoo)
 set_target_properties(Yalahoo PROPERTIES OUTPUT_NAME yalahoo
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 if(WIN32)

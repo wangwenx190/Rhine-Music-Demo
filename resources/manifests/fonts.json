@@ -1,0 +1,45 @@
+{
+    "fonts": [
+        {
+            "cssWeight": 300,
+            "family": "MiSans Light",
+            "originalWoff2Loaded": false,
+            "path": "fonts/MiSans-Light.otf",
+            "preparedLoaded": true,
+            "sfntWeight": 250,
+            "styleName": "Regular",
+            "weight": "Light"
+        },
+        {
+            "cssWeight": 400,
+            "family": "MiSans",
+            "originalWoff2Loaded": false,
+            "path": "fonts/MiSans-Regular.otf",
+            "preparedLoaded": true,
+            "sfntWeight": 330,
+            "styleName": "Regular",
+            "weight": "Regular"
+        },
+        {
+            "cssWeight": 600,
+            "family": "MiSans Demibold",
+            "originalWoff2Loaded": false,
+            "path": "fonts/MiSans-Demibold.otf",
+            "preparedLoaded": true,
+            "sfntWeight": 450,
+            "styleName": "Regular",
+            "weight": "Demibold"
+        },
+        {
+            "cssWeight": 700,
+            "family": "MiSans",
+            "originalWoff2Loaded": false,
+            "path": "fonts/MiSans-Bold.otf",
+            "preparedLoaded": true,
+            "sfntWeight": 630,
+            "styleName": "Bold",
+            "weight": "Bold"
+        }
+    ],
+    "qtVersion": "6.12.0"
+}

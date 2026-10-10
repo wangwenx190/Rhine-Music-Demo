@@ -7,6 +7,12 @@ if (-not $vsInstall) { throw 'No Visual Studio native C++ toolchain found.' }
 $vsDev = Join-Path $vsInstall 'Common7/Tools/VsDevCmd.bat'
 if (-not (Test-Path -LiteralPath $vsDev)) { throw 'VsDevCmd.bat not found.' }
 $nativeArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+if ($env:YALAHOO_MSVC_ENV_READY -eq "$vsInstall|$nativeArch" -and (Get-Command cl -ErrorAction SilentlyContinue)) {
+    # Asset preparation + Debug/Release verification can call this helper more
+    # than once in one process. VsDevCmd prepends its paths on every call.
+    # Keep the initialized environment rather than growing beyond cmd's limit.
+    return
+}
 $start = [System.Diagnostics.ProcessStartInfo]::new()
 $start.FileName = $env:ComSpec
 $start.Arguments = '/d /s /c ""' + $vsDev + '" -no_logo -arch=' + $nativeArch + ' -host_arch=' + $nativeArch + ' >nul && set"'
@@ -35,3 +41,4 @@ if (-not $cmakeCommand) {
     $env:PATH = "$cmakeBin;$env:PATH"
 }
 if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { throw 'Ninja not found; provide it in PATH or beside CMake.' }
+$env:YALAHOO_MSVC_ENV_READY = "$vsInstall|$nativeArch"

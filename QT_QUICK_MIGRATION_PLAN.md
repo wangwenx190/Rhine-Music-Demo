@@ -164,6 +164,7 @@
 - 横屏主页相机下移由 16:9 的 8% 连续过渡到 21:9 的 10%；向左偏移由 0 到 3.5%，更宽保持终值；详情和竖屏不套用此偏移。
 - 字体先用 Qt 加载现有 MiSans WOFF2 并逐个字重验证；若字体后端不支持，固定使用 Windows 系统 DirectWrite 的 `IDWriteFactory5::UnpackFontFile` 解包仓库四个 WOFF2 为原始 SFNT，再由 Qt 加载同一组可跨平台使用的字体。资产工具仅链接系统 Dwrite.lib，读取返回的 IDWriteFontFileStream，以 Qt QFile/QSaveFile 保存；根据 SFNT 签名选择 .ttf/.otf，保留字形/字重/字距数据及输入hash。转换只在准备资产时执行，不进入产品运行路径；禁止新增字体转换库、下载替代字体或用相近系统字体冒充。
 - 原功能按钮图标提取为 SVG 或 Qt Quick Shape，保留 viewBox、描边宽度、端点与颜色；不替换成系统主题图标。产品品牌标识按 R03B 原创 SVG 替换，保持原品牌容器锚点、留白、出现/退出时序与层级；不把旧品牌轮廓复制到新 Logo。
+- 原生资产来源/hash、qrc 别名、模型批次/UV 约定、功能图标、音效静音事件映射与准备/验证命令见 `docs/contracts/assets.md`；生成清单在 `resources/manifests/`。原 MiSans 的 OS/2 权重与 Web CSS 权重不同，QML 使用 `MusicFonts.light/regular/demibold/bold` 的 family/styleName/weight 显式选择对应字形，C++ 使用 `assetFont(cssWeight)`，不按 CSS 数值让 Qt 自动匹配其他字体面。
 - GLB 保留原资产，用 Kit 自带 balsam 导入或通过 Qt 自带导入器读取；若某 glTF 特性导入丢失，写窄用途 C++/Qt 解析器读取本项目 GLB 的 JSON/BIN、POSITION/NORMAL/TEXCOORD/indices，不引入 Assimp 等库。
 
 ### 连续运动
@@ -258,14 +259,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R03 · 模型、字体、图标与音频资源接入（1–1.5日）
-
-- 依赖：R02。交付 `resources/` 分类资产、`resources/manifests/` 来源/hash 清单、`tools/assets/prepare-assets` 和 `tests/integration/` 资产测试；复用输入来自 `legacy-web/public/` 或 `legacy-web/art/`，原创品牌由 R03B 独立交付，不从旧品牌拷贝。
-- 导入music-case-v040.glb，保留三壳体批次、顶点/法线/UV和纸面间隙；Qt导入输出与原几何包围盒/三角数对照。生成资产保留输入hash，禁止对模型做非均匀缩放。
-- 验证四个MiSans字重的Qt加载、glyph覆盖与文字宽度；按布局契约处理不支持的字体格式。原功能按钮图标逐路径提取，不换图案；旧品牌几何只作为时序与布局参照，不接入新产品主界面。
-- 复用atmosphere/motif/pulse等现有完整音频资源；界面音效仅接入可直接播放的既有短文件。没有独立短资产的合成音效保留事件映射并静音，不手工生成/裁切PCM，不播放整段typing-preview作为每次按键声。
-- 退出：资源均通过qrc加载，应用从任意工作目录启动仍可用；没有新第三方依赖及私人资源。
 
 ### R03B · yalahOO!!! 原创应用图标与 Logo（1.5–2日）
 

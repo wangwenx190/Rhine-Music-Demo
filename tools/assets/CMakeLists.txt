@@ -1,0 +1,7 @@
+qt_add_executable(prepare-assets PrepareAssets.cpp GeometryAudit.cpp)
+target_link_libraries(prepare-assets PRIVATE Qt6::Gui)
+if(WIN32)
+    target_link_libraries(prepare-assets PRIVATE dwrite)
+endif()
+yalahoo_platform(prepare-assets)
+set_target_properties(prepare-assets PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")

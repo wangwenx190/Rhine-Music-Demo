@@ -4,7 +4,7 @@
 
 品牌图标与 Logo 将在计划 R03B 原创设计，以 SVG 为主素材，围绕音乐收藏、实体专辑盒与双 O 唱片圆环，提供适配暖昼/深夜和桌面系统的版本；品牌替换与其他界面的复刻分开验收。
 
-当前已有最小 Qt 原生窗口，验证中文、Basic 控件、Qt Quick 3D、跨后端 shader 与无声媒体对象创建。它是构建与运行探针，音乐播放器功能按后续轮次接入。[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现、命令和证据入口；可复建的匿名 Web 参照与运行参数见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
+当前已有 Qt 原生运行探针和完整 qrc 资产接入：原专辑盒三壳体、四字重 MiSans、八个功能图标双主题、现有完整音频与演示封面。探针使用临时材质，音乐播放器功能与实际材质按后续轮次接入。[资源契约](docs/contracts/assets.md)包含来源/hash、字体权重映射、准备与验证命令；[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现和构建入口。可复建的匿名 Web 参照见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
 
 - `src/`：C++ 应用、模型、运动、渲染、媒体与平台代码。
 - `qml/Yalahoo/Music/`：界面与场景 QML 模块。

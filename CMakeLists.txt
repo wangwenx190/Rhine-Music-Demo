@@ -23,9 +23,11 @@ qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 
 add_subdirectory(src/core)
+add_subdirectory(tools/assets)
 add_subdirectory(src/app)
 enable_testing()
 add_subdirectory(tests/unit)
+add_subdirectory(tests/integration)
 
 file(WRITE "${CMAKE_BINARY_DIR}/toolchain.json"
     "{\n  \"qtVersion\": \"${Qt6_VERSION}\",\n  \"qtKit\": \"${YALAHOO_SELECTED_QT}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"cxxStandard\": 23,\n  \"configuration\": \"${CMAKE_BUILD_TYPE}\"\n}\n")

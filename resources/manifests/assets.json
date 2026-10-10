@@ -1,0 +1,441 @@
+{
+    "additionalInputs": [
+        {
+            "sha256": "b12a65cfe1a6571ea7eacfe5cca6d0cd945abb1935423b639084764a38d5f2ba",
+            "source": "legacy-web/src/music.css"
+        },
+        {
+            "sha256": "0c09becc25cfedbe5b0d76ead8d57fe7780e760cb78af31e33712d809d40cbba",
+            "source": "legacy-web/src/style.css"
+        }
+    ],
+    "baselineCommit": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+    "brandAssets": "R03B; legacy brand excluded",
+    "entries": [
+        {
+            "bytes": 79180,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "unchanged copy",
+            "path": "models/music-case-v040.glb",
+            "qrc": ":/assets/models/music-case-v040.glb",
+            "sha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 2517,
+            "inputSha256": "9a6caaf6a16d2c95cddc38343b59cd5cbcc6a3e444ca6162f22edc684e339f8d",
+            "operation": "unchanged copy",
+            "path": "models/music-case-v040.json",
+            "qrc": ":/assets/models/music-case-v040.json",
+            "sha256": "9a6caaf6a16d2c95cddc38343b59cd5cbcc6a3e444ca6162f22edc684e339f8d",
+            "source": "legacy-web/art/music-case-v040.json"
+        },
+        {
+            "bytes": 10500,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "selected Kit balsam; preserve mesh topology and attributes",
+            "path": "models/meshes/meshes_0__mesh.mesh",
+            "qrc": ":/assets/models/meshes/meshes_0__mesh.mesh",
+            "sha256": "69a43b9a338fa69b9f124c1ebc0d3012cede1e0c5aac337bf0ae3fd58bb89f8e",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 20812,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "selected Kit balsam; preserve mesh topology and attributes",
+            "path": "models/meshes/meshes_1__mesh.mesh",
+            "qrc": ":/assets/models/meshes/meshes_1__mesh.mesh",
+            "sha256": "ac53955bb76de3b598108bf19d699eea37287db3d00353006132963e7fce45f0",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 48292,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "selected Kit balsam; preserve mesh topology and attributes",
+            "path": "models/meshes/meshes_2__mesh.mesh",
+            "qrc": ":/assets/models/meshes/meshes_2__mesh.mesh",
+            "sha256": "37202e7e6555a6e588b986dbc3e2e55e36a79b368c0fa3579a5e5deed4181fe0",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 2565,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "selected Kit balsam; original materials are import reference, R07 supplies production shading",
+            "path": "models/Music_case_v040.qml",
+            "qrc": ":/assets/models/Music_case_v040.qml",
+            "sha256": "258510e70768a579f597aa23d15fc2045b841e6e127a643b7d7366d76b75493f",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 3368,
+            "inputSha256": "7bbee4f485c58e0506e4ab53711c250a1e68bcd38f2a2ea81e6e68b4574b8a16",
+            "operation": "independent indexed-attribute comparison",
+            "path": "manifests/geometry.json",
+            "qrc": ":/assets/manifests/geometry.json",
+            "sha256": "a5aba1bc3f8afaac33f183ad502ce07a2547fae7649934a6b692601aa9047c77",
+            "source": "legacy-web/public/assets/music-case-v040.glb"
+        },
+        {
+            "bytes": 4810368,
+            "inputSha256": "2d1502a1cf0e41917844b512fb64be547cfb737e593d0da782c6b6762ea71c33",
+            "operation": "unchanged copy",
+            "path": "fonts/source/MiSans-Light.woff2",
+            "qrc": ":/assets/fonts/source/MiSans-Light.woff2",
+            "sha256": "2d1502a1cf0e41917844b512fb64be547cfb737e593d0da782c6b6762ea71c33",
+            "source": "legacy-web/public/fonts/MiSans-Light.woff2"
+        },
+        {
+            "bytes": 6641680,
+            "inputSha256": "2d1502a1cf0e41917844b512fb64be547cfb737e593d0da782c6b6762ea71c33",
+            "operation": "DirectWrite IDWriteFactory5::UnpackFontFile; lossless SFNT container unpack",
+            "path": "fonts/MiSans-Light.otf",
+            "qrc": ":/assets/fonts/MiSans-Light.otf",
+            "sha256": "ddcea8d65903d566ec8feff51a52733a7963fe88c9d3f05c3302eab56d7b866e",
+            "source": "legacy-web/public/fonts/MiSans-Light.woff2"
+        },
+        {
+            "bytes": 4858624,
+            "inputSha256": "d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d",
+            "operation": "unchanged copy",
+            "path": "fonts/source/MiSans-Regular.woff2",
+            "qrc": ":/assets/fonts/source/MiSans-Regular.woff2",
+            "sha256": "d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d",
+            "source": "legacy-web/public/fonts/MiSans-Regular.woff2"
+        },
+        {
+            "bytes": 6569312,
+            "inputSha256": "d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d",
+            "operation": "DirectWrite IDWriteFactory5::UnpackFontFile; lossless SFNT container unpack",
+            "path": "fonts/MiSans-Regular.otf",
+            "qrc": ":/assets/fonts/MiSans-Regular.otf",
+            "sha256": "87a095c7853a2fe86e4d3570feddb9d9100cf4dcdf5f987502396320c7849e3b",
+            "source": "legacy-web/public/fonts/MiSans-Regular.woff2"
+        },
+        {
+            "bytes": 4994364,
+            "inputSha256": "7afe3737efaf6a137db0ef4857fbe4033a8802756485ebc7f008e96a4bdedcf2",
+            "operation": "unchanged copy",
+            "path": "fonts/source/MiSans-Demibold.woff2",
+            "qrc": ":/assets/fonts/source/MiSans-Demibold.woff2",
+            "sha256": "7afe3737efaf6a137db0ef4857fbe4033a8802756485ebc7f008e96a4bdedcf2",
+            "source": "legacy-web/public/fonts/MiSans-Demibold.woff2"
+        },
+        {
+            "bytes": 6527896,
+            "inputSha256": "7afe3737efaf6a137db0ef4857fbe4033a8802756485ebc7f008e96a4bdedcf2",
+            "operation": "DirectWrite IDWriteFactory5::UnpackFontFile; lossless SFNT container unpack",
+            "path": "fonts/MiSans-Demibold.otf",
+            "qrc": ":/assets/fonts/MiSans-Demibold.otf",
+            "sha256": "1e77f94a34390fd62a03bbe6c2a898a4213ae3ca3d6727c5d61958d8b68ea60f",
+            "source": "legacy-web/public/fonts/MiSans-Demibold.woff2"
+        },
+        {
+            "bytes": 5081104,
+            "inputSha256": "1c5a7515b61bc82baaa2e2c2fdae2032479fb9a99e09d4d021dc17314fc5939b",
+            "operation": "unchanged copy",
+            "path": "fonts/source/MiSans-Bold.woff2",
+            "qrc": ":/assets/fonts/source/MiSans-Bold.woff2",
+            "sha256": "1c5a7515b61bc82baaa2e2c2fdae2032479fb9a99e09d4d021dc17314fc5939b",
+            "source": "legacy-web/public/fonts/MiSans-Bold.woff2"
+        },
+        {
+            "bytes": 6643568,
+            "inputSha256": "1c5a7515b61bc82baaa2e2c2fdae2032479fb9a99e09d4d021dc17314fc5939b",
+            "operation": "DirectWrite IDWriteFactory5::UnpackFontFile; lossless SFNT container unpack",
+            "path": "fonts/MiSans-Bold.otf",
+            "qrc": ":/assets/fonts/MiSans-Bold.otf",
+            "sha256": "38ac9070325453a84a3396f88e27a79fd70f489992546410259b83c7f59fef52",
+            "source": "legacy-web/public/fonts/MiSans-Bold.woff2"
+        },
+        {
+            "bytes": 325,
+            "inputSha256": "bab668563c9b8c26f7637bf90bb3288f1fa0f97327afb1d60142fd5f12d28c69",
+            "operation": "unchanged copy",
+            "path": "fonts/NOTICE.txt",
+            "qrc": ":/assets/fonts/NOTICE.txt",
+            "sha256": "bab668563c9b8c26f7637bf90bb3288f1fa0f97327afb1d60142fd5f12d28c69",
+            "source": "legacy-web/public/fonts/NOTICE.txt"
+        },
+        {
+            "bytes": 79535,
+            "inputSha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86",
+            "operation": "unchanged copy",
+            "path": "fonts/MiSans-license.pdf",
+            "qrc": ":/assets/fonts/MiSans-license.pdf",
+            "sha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86",
+            "source": "legacy-web/public/fonts/MiSans-license.pdf"
+        },
+        {
+            "bytes": 1287,
+            "inputSha256": "bab668563c9b8c26f7637bf90bb3288f1fa0f97327afb1d60142fd5f12d28c69",
+            "operation": "Qt load probe and portable font decisions",
+            "path": "manifests/fonts.json",
+            "qrc": ":/assets/manifests/fonts.json",
+            "sha256": "01de1a547aee66a6e8fab7f1fd28b8e06b5d919205bddd52132e24f9e3b49758",
+            "source": "legacy-web/public/fonts/NOTICE.txt"
+        },
+        {
+            "bytes": 195,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/folder-day.svg",
+            "qrc": ":/assets/icons/folder-day.svg",
+            "sha256": "8d74dd10a73d9d3f2d9f188f135a205208e1112e4d72ea75cae18d8dc4f73598",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 195,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/folder-night.svg",
+            "qrc": ":/assets/icons/folder-night.svg",
+            "sha256": "85b93451ce36d23bd6aa54ebf52676322aa1d31876b505ff96d395d17eb15f03",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 326,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/overview-day.svg",
+            "qrc": ":/assets/icons/overview-day.svg",
+            "sha256": "f81ab779fc9fbfbba7db33d62754c79ba9a5631427a2d4bbb4d14190b61f6c58",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 326,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/overview-night.svg",
+            "qrc": ":/assets/icons/overview-night.svg",
+            "sha256": "b3c7afdc8ef0b64d6777c7637176500d969ba0bddfe0b0f29015199dcf327159",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 188,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/overview-return-day.svg",
+            "qrc": ":/assets/icons/overview-return-day.svg",
+            "sha256": "5c98df9ffb78024f091b3bab0ade5358af88e1ae6535139882c3a79c9822536c",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 188,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/overview-return-night.svg",
+            "qrc": ":/assets/icons/overview-return-night.svg",
+            "sha256": "5650a629401567f1d500dbbd168a5988be730809cc8c314185331f0d4a33738f",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 229,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/pause-day.svg",
+            "qrc": ":/assets/icons/pause-day.svg",
+            "sha256": "0e673b5f1d3c4c2d23735923f173cbf00ce60c91461f815deeaa1c8b836693ec",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 229,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/pause-night.svg",
+            "qrc": ":/assets/icons/pause-night.svg",
+            "sha256": "5ee0f9eda448db35058bf58b0838d00582f67b8534e399a89ab94460b4dba3d8",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 218,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/play-day.svg",
+            "qrc": ":/assets/icons/play-day.svg",
+            "sha256": "b45f27ccb087168310fe7902777b32bb71158b2e0d4dcdb6c487da1e85d83d21",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 218,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/play-night.svg",
+            "qrc": ":/assets/icons/play-night.svg",
+            "sha256": "1016e8baac9dc6bff58581e1dd6f65b1cf97c3c78ca1b832c4788c50d954d4c5",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 225,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/search-day.svg",
+            "qrc": ":/assets/icons/search-day.svg",
+            "sha256": "b33888ba9f785de0beae32637566f5a33bdce4ac712d6bc2e3aa8346045b2f9d",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 225,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/search-night.svg",
+            "qrc": ":/assets/icons/search-night.svg",
+            "sha256": "a1f37448b3e25e07957abbe2355f109731fb33c86edda9402a5997d3e0e27a40",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 283,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/settings-day.svg",
+            "qrc": ":/assets/icons/settings-day.svg",
+            "sha256": "e9cd6ec7e6275deee1f7c981cf67b75eadb22e9533a765479630cf6cae437850",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 283,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/settings-night.svg",
+            "qrc": ":/assets/icons/settings-night.svg",
+            "sha256": "4d5c42e636cd990eb07d8e6840df1513541619e3a0c10f8d237dc071473acbe5",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 211,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/stop-day.svg",
+            "qrc": ":/assets/icons/stop-day.svg",
+            "sha256": "32870144df53127c828a3671b0fdf81780f998b29e78cf47b6ed9dcd2f28a7b5",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 211,
+            "inputSha256": "582195eda922d9ef4648e65ac9d0d644e4edfd6e59ecc38abef9d6ee2e26fb15",
+            "operation": "extract actual svg() path; resolve currentColor and --surface from music.css",
+            "path": "icons/stop-night.svg",
+            "qrc": ":/assets/icons/stop-night.svg",
+            "sha256": "966c59f3f2f6442cf737fe7c6aa1a14344cc95fe4c9a484d7e493232283c343c",
+            "source": "legacy-web/src/music-app.ts"
+        },
+        {
+            "bytes": 537407,
+            "inputSha256": "a7c18ef30f096cae6056ca2db284f820a925fc4e7383bd2bf57f78cd9401dbcf",
+            "operation": "unchanged copy",
+            "path": "audio/atmosphere.ogg",
+            "qrc": ":/assets/audio/atmosphere.ogg",
+            "sha256": "a7c18ef30f096cae6056ca2db284f820a925fc4e7383bd2bf57f78cd9401dbcf",
+            "source": "legacy-web/public/audio/atmosphere.ogg"
+        },
+        {
+            "bytes": 674580,
+            "inputSha256": "3503d692874e626112bcfb077d89239653eb28713182b6468b862d7f22572162",
+            "operation": "unchanged copy",
+            "path": "audio/motif.ogg",
+            "qrc": ":/assets/audio/motif.ogg",
+            "sha256": "3503d692874e626112bcfb077d89239653eb28713182b6468b862d7f22572162",
+            "source": "legacy-web/public/audio/motif.ogg"
+        },
+        {
+            "bytes": 371667,
+            "inputSha256": "fd8d82990d9eea07e83430042f1f3b772c6e07319f28561426122b49536fc012",
+            "operation": "unchanged copy",
+            "path": "audio/pulse.ogg",
+            "qrc": ":/assets/audio/pulse.ogg",
+            "sha256": "fd8d82990d9eea07e83430042f1f3b772c6e07319f28561426122b49536fc012",
+            "source": "legacy-web/public/audio/pulse.ogg"
+        },
+        {
+            "bytes": 1281645,
+            "inputSha256": "a4277399b284515bdfba03741b4a7d05c37e1a5650a3270c083496aa88eef3c3",
+            "operation": "unchanged copy",
+            "path": "audio/observatory-preview.mp3",
+            "qrc": ":/assets/audio/observatory-preview.mp3",
+            "sha256": "a4277399b284515bdfba03741b4a7d05c37e1a5650a3270c083496aa88eef3c3",
+            "source": "legacy-web/public/audio/observatory-preview.mp3"
+        },
+        {
+            "bytes": 533,
+            "inputSha256": "479860ea01240da7ea3053fc841b55f53cb4c259d61a9741676f68b4ebc4060c",
+            "operation": "unchanged copy",
+            "path": "audio/score.json",
+            "qrc": ":/assets/audio/score.json",
+            "sha256": "479860ea01240da7ea3053fc841b55f53cb4c259d61a9741676f68b4ebc4060c",
+            "source": "legacy-web/public/audio/score.json"
+        },
+        {
+            "bytes": 949,
+            "inputSha256": "21842877cb3b71649ec5b4def829dc52b216cf47bc66b9df9478a4b6608675cd",
+            "operation": "unchanged copy",
+            "path": "audio/README.md",
+            "qrc": ":/assets/audio/README.md",
+            "sha256": "21842877cb3b71649ec5b4def829dc52b216cf47bc66b9df9478a4b6608675cd",
+            "source": "legacy-web/public/audio/README.md"
+        },
+        {
+            "bytes": 4347,
+            "inputSha256": "75931d7194ec6cb8e7d09f85f4269e76c83b2c70b0e2bcd7a6652998a37fa3c8",
+            "operation": "retain event names; no synthesis, PCM extraction or preview-per-key playback",
+            "path": "audio/interface-events.json",
+            "qrc": ":/assets/audio/interface-events.json",
+            "sha256": "c5a74b1c11da0f942478822fa6cad1cb8730921229ee16628fbe879339fe3b80",
+            "source": "legacy-web/src/audio.ts"
+        },
+        {
+            "bytes": 2394415,
+            "inputSha256": "8380be908160ad090eb7d7a6a74c1e4893b8781228e6566c4a6a718526d79e62",
+            "operation": "unchanged copy",
+            "path": "demo-covers/square.png",
+            "qrc": ":/assets/demo-covers/square.png",
+            "sha256": "8380be908160ad090eb7d7a6a74c1e4893b8781228e6566c4a6a718526d79e62",
+            "source": "legacy-web/public/demo-covers/square.png"
+        },
+        {
+            "bytes": 2653624,
+            "inputSha256": "9fa43aa60f684f84714076dddb640db72c66629cedf9fdb1b11342c741d74c96",
+            "operation": "unchanged copy",
+            "path": "demo-covers/portrait.png",
+            "qrc": ":/assets/demo-covers/portrait.png",
+            "sha256": "9fa43aa60f684f84714076dddb640db72c66629cedf9fdb1b11342c741d74c96",
+            "source": "legacy-web/public/demo-covers/portrait.png"
+        },
+        {
+            "bytes": 2687593,
+            "inputSha256": "1f8a54ff348aaa1a6c08490617b95e7bd894137b5004636d6799187c710aa0a0",
+            "operation": "unchanged copy",
+            "path": "demo-covers/landscape.png",
+            "qrc": ":/assets/demo-covers/landscape.png",
+            "sha256": "1f8a54ff348aaa1a6c08490617b95e7bd894137b5004636d6799187c710aa0a0",
+            "source": "legacy-web/public/demo-covers/landscape.png"
+        },
+        {
+            "bytes": 797,
+            "inputSha256": "58c1aadad09f8fbd52664fe97d91ab28883f87f1677e47d216a8ba22591c1f58",
+            "operation": "unchanged copy",
+            "path": "demo-covers/README.md",
+            "qrc": ":/assets/demo-covers/README.md",
+            "sha256": "58c1aadad09f8fbd52664fe97d91ab28883f87f1677e47d216a8ba22591c1f58",
+            "source": "legacy-web/public/demo-covers/README.md"
+        },
+        {
+            "bytes": 1141,
+            "inputSha256": "b940fbfa02c0020c6169a02b633448603bcba38a08ed370aeef0c78042c0f16c",
+            "operation": "unchanged copy",
+            "path": "licenses/project-LICENSE",
+            "qrc": ":/assets/licenses/project-LICENSE",
+            "sha256": "b940fbfa02c0020c6169a02b633448603bcba38a08ed370aeef0c78042c0f16c",
+            "source": "legacy-web/LICENSE"
+        },
+        {
+            "bytes": 6910,
+            "inputSha256": "1bf1945211d2f4f17f00edb372d7c316529de617469ffb2acefca13f1c24faef",
+            "operation": "unchanged copy",
+            "path": "licenses/NOTICE.md",
+            "qrc": ":/assets/licenses/NOTICE.md",
+            "sha256": "1bf1945211d2f4f17f00edb372d7c316529de617469ffb2acefca13f1c24faef",
+            "source": "legacy-web/NOTICE.md"
+        }
+    ],
+    "qtVersion": "6.12.0",
+    "schemaVersion": 1
+}
