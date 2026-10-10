@@ -42,6 +42,8 @@ font.pixelSize: 24
 
 测试核对四个独立 CFF 表、原 OS/2 权重、QRawFont 实际选择的字形表、中文/拉丁/数字/括号 glyph 覆盖与 QTextLayout 整行 shaping 的字体来源及宽度。Windows 24px 测量在资产报告中，四字重预览在 `docs/media/assets/`。emoji 的通用回退/字轮行为留给 R16，不声称 MiSans 包含全部 emoji。
 
+原创品牌资产另见 [branding.md](branding.md) 和 `resources/manifests/branding.json`；其 SVG/平台图标及导出验证独立维护，页眉/开场与系统接入按后续轮次执行。
+
 ## 功能图标与音频
 
 八个生产功能图标从冻结 `music-app.ts` 的 `svg()` 调用逐路径提取：play、pause、stop、search、settings、folder、overview、overview-return。保留 `viewBox="0 0 24 24"`、1.5 描边、round 端点与连接。每个提供 day/night SVG，由实际 `music.css` 的 ink/surface 解析颜色；不复制旧品牌。相应 qrc 地址如 `qrc:/assets/icons/play-day.svg`。后续主题过渡由控件处理，图标模板几何不变。

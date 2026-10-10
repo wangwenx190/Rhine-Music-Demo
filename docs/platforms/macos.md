@@ -35,3 +35,16 @@ sh tools/build/build.sh qt-debug
 从带空格/中文的任意目录启动上述绝对 bundle 路径，确认所有资源仍显示；Metal 下确认三壳体没有缺失，四字重预览没有回退成系统字形。音频资源加载通过不代表实际播放验收，后者留给 R24/R25。
 
 实机结果：待用户验证。
+
+## R03B 品牌资产实机复核（结果待用户填写）
+
+本轮静态审计通过，实机待用户验证。配置本机最新 Qt Kit 后执行：
+
+```sh
+sh tools/assets/export-branding.sh qt-release --window-preview
+ctest --preset qt-release -R branding --output-on-failure
+```
+
+预期：工具能读取带空格/Unicode 的仓库路径，13 个 SVG 加载成功，16px 双环内孔和边框分离；浅/深/透明背景及反白稿清晰；导出资源 hash 可复现，branding 测试通过。检查 `docs/media/branding/` 的实尺寸和揭示进度图。预览标签可使用系统字体，品牌本身完全不依赖字体。
+
+macOS 额外使用系统 `iconutil -c icns resources/icons/yalahoo/yalahoo.iconset -o build/yalahoo-iconutil.icns`，复核 iconset 可接受及 Finder 预览；生成文件保留在 build。Windows 生成的 `resources/icons/yalahoo/yalahoo.icns` 已通过块结构/PNG验证，但本机 Finder 结果尚未执行。应用 bundle、页眉与开场品牌接入在后续轮次，本清单不假定已经接入。

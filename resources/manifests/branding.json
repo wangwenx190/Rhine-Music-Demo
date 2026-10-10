@@ -1,0 +1,224 @@
+{
+    "authoring": "Original vector geometry; no upstream brand glyphs, external fonts or bitmap tracing",
+    "displayName": "yalahOO!!!",
+    "entries": [
+        {
+            "bytes": 2606,
+            "path": "resources/branding/icon-master.svg",
+            "sha256": "5d5bf14d8ecd19bef801fa4ed50ab7939fe94f4599fbee6102c593a7689dd1e4",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 648,
+            "path": "resources/branding/icon-mono-light.svg",
+            "sha256": "b27cfdb36468a93dbe2f01538900c1f1812f32615b638e31e7aed85fe7476bfc",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 657,
+            "path": "resources/branding/icon-mono.svg",
+            "sha256": "024a76e208c8f0150bf6878606fb15e0c87166d4fe582dab2aab51a80aafe302",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 598,
+            "path": "resources/branding/icon-small.svg",
+            "sha256": "575d380b5bcb3510e6f6f6dcf128e948455f47beeecb741b3d0256a11cb85f22",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 2606,
+            "path": "resources/branding/icon.svg",
+            "sha256": "5d5bf14d8ecd19bef801fa4ed50ab7939fe94f4599fbee6102c593a7689dd1e4",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 4320,
+            "path": "resources/branding/lockup-dark.svg",
+            "sha256": "ad8c61bb964d1497fadcc741f53577eb64a38350ed7db89167e5d93fbd0377d3",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 4320,
+            "path": "resources/branding/lockup-light.svg",
+            "sha256": "e995fa4e842e945b6eefaa20e140578887ad9c35a2ea7d289401cb3038e73445",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1547,
+            "path": "resources/branding/logo-dark.svg",
+            "sha256": "43052153922d96363e0aff7fb432f6a4f1a226227b7277f4889a299e926fb727",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1547,
+            "path": "resources/branding/logo-light.svg",
+            "sha256": "4440dc5f9d33f6361714d27a15cb8515a286faba738e9051df496549072cfe41",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1580,
+            "path": "resources/branding/logo-master.svg",
+            "sha256": "f0150098a9a96079847cde0fba836ebb5e0433d377ac0d231d2eef00b94fb7ea",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1380,
+            "path": "resources/branding/logo-mono-light.svg",
+            "sha256": "b776f3c938e8ad7f33bbd263aee7398ecea38086b584d66befc7cf4c9c3ca860",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1357,
+            "path": "resources/branding/logo-mono.svg",
+            "sha256": "dda3b861d07ffbf6879bf75a61721634018cdea700053fa1a45fa52d6bb620d7",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 1380,
+            "path": "resources/branding/logo-reveal.svg",
+            "sha256": "78824c081fe9a95edb4446de68d78c0bd814170a222c6e21ae6ce49053ef48e3",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 5953,
+            "path": "resources/branding/reveal-map.json",
+            "sha256": "092185f89d4f897b5a76de9af558343e249c9cdd544563343d2b09031626fedd",
+            "source": "Original yalahOO!!! geometric path design, R03B"
+        },
+        {
+            "bytes": 172676,
+            "path": "resources/icons/yalahoo/png/yalahoo-1024.png",
+            "sha256": "a16242acdb7c92b8cad2d008705dab2239ef161b2a64c9e16f9cadb0c26ae214",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 10908,
+            "path": "resources/icons/yalahoo/png/yalahoo-128.png",
+            "sha256": "fd60cb71a71bcb2587f3ea0a544f37eb5308f8065a4f97e5abfb3d46e425370c",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 581,
+            "path": "resources/icons/yalahoo/png/yalahoo-16.png",
+            "sha256": "7b375e5fe4f384f2c63b74da91e4be3990de9acc63c9ba152df3fa8d16f26335",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 928,
+            "path": "resources/icons/yalahoo/png/yalahoo-24.png",
+            "sha256": "a44ca937871f782353fb783f5dd03bf63d2fb848ff54bf7b801545d5bc61a949",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 29233,
+            "path": "resources/icons/yalahoo/png/yalahoo-256.png",
+            "sha256": "4c7e4aad59905ca2ba379e4a8e5165829eedd00e496b9f04aedc4094e7cea23f",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 1058,
+            "path": "resources/icons/yalahoo/png/yalahoo-32.png",
+            "sha256": "912106373386b05f71679e72521d276b4ee21b028adee9f1de7e1a5258d0b760",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 2536,
+            "path": "resources/icons/yalahoo/png/yalahoo-48.png",
+            "sha256": "1ce0289307a02ef8d2fd0f65306ed8af9dc07dbd7be6692635bd062a46281112",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 71460,
+            "path": "resources/icons/yalahoo/png/yalahoo-512.png",
+            "sha256": "9b476476c6094423a3640c06d860140809d28140a5204616a643b50d7be2c264",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 3917,
+            "path": "resources/icons/yalahoo/png/yalahoo-64.png",
+            "sha256": "1306345aa57e5e25e7eb1b14b766634bf78d9bfd3d6575e097d7cab1df11605f",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 284317,
+            "path": "resources/icons/yalahoo/yalahoo.icns",
+            "sha256": "b9d264757f1ba9ad56a240916480be85e5ea446efacbc666fc54631f0fa2af25",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 49279,
+            "path": "resources/icons/yalahoo/yalahoo.ico",
+            "sha256": "d94f571899fe96adee34861ad1a5aa46efb2c5f1745e11f6906d4d139d9685a9",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 10908,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_128x128.png",
+            "sha256": "fd60cb71a71bcb2587f3ea0a544f37eb5308f8065a4f97e5abfb3d46e425370c",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 29233,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_128x128@2x.png",
+            "sha256": "4c7e4aad59905ca2ba379e4a8e5165829eedd00e496b9f04aedc4094e7cea23f",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 581,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_16x16.png",
+            "sha256": "7b375e5fe4f384f2c63b74da91e4be3990de9acc63c9ba152df3fa8d16f26335",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 1058,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_16x16@2x.png",
+            "sha256": "912106373386b05f71679e72521d276b4ee21b028adee9f1de7e1a5258d0b760",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 29233,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_256x256.png",
+            "sha256": "4c7e4aad59905ca2ba379e4a8e5165829eedd00e496b9f04aedc4094e7cea23f",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 71460,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_256x256@2x.png",
+            "sha256": "9b476476c6094423a3640c06d860140809d28140a5204616a643b50d7be2c264",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 1058,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_32x32.png",
+            "sha256": "912106373386b05f71679e72521d276b4ee21b028adee9f1de7e1a5258d0b760",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 3917,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_32x32@2x.png",
+            "sha256": "1306345aa57e5e25e7eb1b14b766634bf78d9bfd3d6575e097d7cab1df11605f",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 71460,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_512x512.png",
+            "sha256": "9b476476c6094423a3640c06d860140809d28140a5204616a643b50d7be2c264",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 172676,
+            "path": "resources/icons/yalahoo/yalahoo.iconset/icon_512x512@2x.png",
+            "sha256": "a16242acdb7c92b8cad2d008705dab2239ef161b2a64c9e16f9cadb0c26ae214",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        },
+        {
+            "bytes": 2606,
+            "path": "resources/icons/yalahoo/yalahoo.svg",
+            "sha256": "5d5bf14d8ecd19bef801fa4ed50ab7939fe94f4599fbee6102c593a7689dd1e4",
+            "source": "resources/branding/icon.svg or icon-small.svg; QSvgRenderer derivative"
+        }
+    ],
+    "qtVersion": "6.12.0",
+    "schemaVersion": 1
+}

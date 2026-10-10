@@ -10,7 +10,7 @@
         }
     ],
     "baselineCommit": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-    "brandAssets": "R03B; legacy brand excluded",
+    "brandAssets": "resources/manifests/branding.json; original vectors; UI integration R14/R20",
     "entries": [
         {
             "bytes": 79180,

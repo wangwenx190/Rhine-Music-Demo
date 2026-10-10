@@ -14,3 +14,11 @@ set_tests_properties(assets PROPERTIES TIMEOUT 90
 if(WIN32)
     set_tests_properties(assets PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+add_test(NAME branding COMMAND export-branding "${PROJECT_SOURCE_DIR}" --verify-only
+    --report "${CMAKE_BINARY_DIR}/verification/branding-report.json")
+set_tests_properties(branding PROPERTIES TIMEOUT 90
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+if(WIN32)
+    set_tests_properties(branding PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

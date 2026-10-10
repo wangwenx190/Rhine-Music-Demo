@@ -37,3 +37,16 @@ sh tools/build/build.sh qt-debug
 预期：47 项 qrc hash、三壳体/1,000 三角形/纸面间隙通过；四个 MiSans 字重的 CFF 表与实际字体选择一致，中文/拉丁覆盖与整行宽度检查通过；八个功能 SVG 双主题有效；四个完整音频资源进入 LoadedMedia，duration 有效，不创建 QAudioOutput、不播放。POSIX 准备脚本只调用该 Kit 工具，验证后复用可跨平台 SFNT，不链接 Dwrite。实际报告和字体/图标预览在 `build/debug/verification/`。
 
 在 X11/xcb 与真实 Wayland 会话中分别从带中文/空格的任意目录启动绝对程序路径，确认 qrc 资源、字体和三壳体均正常。媒体加载不代表歌曲播放/设备验收，R24/R25 再实现相应检查。
+
+## R03B 品牌资产实机复核（结果待用户填写）
+
+本轮静态审计通过，实机待用户验证。配置本机最新 Qt Kit 后执行：
+
+```sh
+sh tools/assets/export-branding.sh qt-release --window-preview
+ctest --preset qt-release -R branding --output-on-failure
+```
+
+预期：带空格/Unicode 的仓库路径可用；13 SVG 加载成功，243 个尺寸/DPR/主题样本和品牌清单可复现；16px 外框/双环/内孔分离，反白单色在深背景可见；原生预览窗口可打开且 branding 测试通过。SVG 和 PNG 路径区分大小写，生成目录不可写时工具明确失败。
+
+在系统图像查看器复核 `resources/icons/yalahoo/yalahoo.svg` 及九档 PNG，记录显示缩放和桌面环境。Qt 预览文字标签可以回退系统字体，生产品牌不依赖字体。desktop 文件/平台插件部署和主界面品牌接入属于后续轮次；本清单不宣称已有 Linux 桌面集成。

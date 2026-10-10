@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
             copy("legacy-web/public/demo-covers/" + cover, "demo-covers/" + cover);
         copy("legacy-web/LICENSE", "licenses/project-LICENSE"); copy("legacy-web/NOTICE.md", "licenses/NOTICE.md");
         const QJsonObject manifest{{"schemaVersion", 1}, {"baselineCommit", "57f4f845c20cce646a15dbf4008c2a162aaaf4e2"},
-            {"qtVersion", qVersion()}, {"entries", entries}, {"brandAssets", "R03B; legacy brand excluded"},
+            {"qtVersion", qVersion()}, {"entries", entries}, {"brandAssets", "resources/manifests/branding.json; original vectors; UI integration R14/R20"},
             {"additionalInputs", QJsonArray{QJsonObject{{"source", cssSource}, {"sha256", hash(readFile(root.filePath(cssSource)))}},
                 QJsonObject{{"source", fontCssSource}, {"sha256", hash(readFile(root.filePath(fontCssSource)))}}}}};
         saveFile(root.filePath("resources/manifests/assets.json"), QJsonDocument(manifest).toJson());

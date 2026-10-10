@@ -1,0 +1,114 @@
+{
+  "round": "R03B",
+  "checks": [
+    {
+      "checkId": "COMMON-01",
+      "requirement": "C++23 / public QtSvg tool and test build closure",
+      "sources": [
+        {
+          "path": "CMakeLists.txt",
+          "symbol": "set(CMAKE_CXX_STANDARD_REQUIRED ON)"
+        },
+        {
+          "path": "tools/assets/CMakeLists.txt",
+          "symbol": "target_link_libraries(export-branding PRIVATE Qt6::Gui Qt6::Svg)"
+        },
+        {
+          "path": "tests/integration/CMakeLists.txt",
+          "symbol": "add_test(NAME branding COMMAND export-branding"
+        }
+      ],
+      "evidence": "Root propagates explicit C++23 required/no extensions and the already selected latest native Kit into the new executable. yalahoo_platform supplies only compiler flags per OS; QtGui/QtSvg are imported from that Kit. WIN32_EXECUTABLE FALSE and MACOSX_BUNDLE FALSE keep this asset utility a console executable on all systems, at build/<configuration>/tools/export-branding. Windows-only dwrite linkage is confined to the other prepare-assets target. branding test resolves the CMake executable target, supplies an absolute repository and build-local report, and has selected-Kit Windows DLL paths only under WIN32. No platform-specific exporter stub, private Qt API or alternate library exists.",
+      "limitations": "macOS/Linux compile/link not executed; Windows Debug/Release verifies shared build and test closure.",
+      "result": "passed"
+    },
+    {
+      "checkId": "COMMON-02",
+      "requirement": "Unicode paths, transparent vectors, deterministic derivatives and no external SVG dependency",
+      "sources": [
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "void validateSvg"
+        },
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "void write"
+        },
+        {
+          "path": "resources/manifests/branding.json",
+          "symbol": "Original vector geometry"
+        },
+        {
+          "path": "tools/assets/export-branding.sh",
+          "symbol": "exec \"$repository/build/$configuration/tools/export-branding\""
+        }
+      ],
+      "evidence": "Repository comes from QDir(app.arguments()[1]).absolutePath; QFile/QSaveFile and QFileInfo use QString paths, create output parents and atomically commit bytes. SVG element/attribute allowlisting excludes text/image/script/foreignObject/filter and external href/URLs. Every source loads through public QSvgRenderer and every asset receives SHA-256. The actual PNG dimensions select full versus optical geometry. POSIX entry derives its own root, quotes paths/arguments, invokes CMake latest-Kit discovery and executes that exact linked tool without needing fonts, browser or node. Product qrc integration is deliberately R14/R20 and is not claimed here.",
+      "limitations": "Filesystem permission failures return nonzero; platform-native filesystem and eventual product resource integration remain user/later-round validation.",
+      "result": "passed"
+    },
+    {
+      "checkId": "COMMON-03",
+      "requirement": "QtSvg geometry/alpha, physical DPR samples, safe boundaries and public path length",
+      "sources": [
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "QImage render"
+        },
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "16px holes/ring separation lost"
+        },
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "QJsonObject revealMapping"
+        },
+        {
+          "path": "resources/branding/logo-reveal.svg",
+          "symbol": "id=\"accents\""
+        }
+      ],
+      "evidence": "Public QSvgRenderer paints into ARGB32 premultiplied QImage, explicitly transparent before painting, with QPainter antialiasing. Logical size times DPR is rounded into an actual physical QSize; all 243 outputs are rendered and checked for alpha boundaries. PNG comparisons convert both sides to straight ARGB32 to avoid a false storage-format mismatch. Main/small/mono alpha bounds fit the 96-unit safe margin. Reveal parser accepts only actual absolute M/L/Q/C/V/Z authoring commands and measures each QPainterPath length; preview uses percentAtLength rather than Bezier t. 16px checks the actual two holes, adjacent strokes and paper gap. No RHI/3D, shader, clip-space, resolve or screen-sampling change is introduced; those portions of COMMON-03 are N/A for these 2D asset tools.",
+      "limitations": "Windows raster/Qt window evidence is real; Metal/OpenGL product rendering is outside this asset round and was not executed here.",
+      "result": "passed"
+    },
+    {
+      "checkId": "COMMON-04",
+      "requirement": "No media or product lifecycle implementation in the branding tool",
+      "sources": [
+        {
+          "path": "tools/assets/CMakeLists.txt",
+          "symbol": "target_link_libraries(export-branding PRIVATE Qt6::Gui Qt6::Svg)"
+        },
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "class PreviewWindow"
+        }
+      ],
+      "evidence": "Only Core transitively, Gui and Svg are linked to the exporter. There are no media sources, audio output, player objects, device handlers or network providers. The temporary QWindow/QBackingStore is stack-owned, its QObject-bound single-shot timers run before destruction, and app.quit ends the preview event loop before cleanup. Existing shared native and asset tests are rerun on Windows; this audit makes no additional claim about future playback lifecycle, which belongs to R24/R25.",
+      "limitations": "Media source/device/EndOfMedia rules do not apply to newly introduced branding assets; unchanged probe regressions run on Windows only.",
+      "result": "N/A"
+    },
+    {
+      "checkId": "COMMON-05",
+      "requirement": "Manifest/container completeness and independent Windows runtime evidence",
+      "sources": [
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "QJsonArray verifyContainers"
+        },
+        {
+          "path": "tools/assets/ExportBranding.cpp",
+          "symbol": "Brand manifest hash differs:"
+        },
+        {
+          "path": "tools/build/verify-r03b.ps1",
+          "symbol": "Branding resource regeneration is not reproducible."
+        }
+      ],
+      "evidence": "ICO decoder checks seven directory entries, planes/bit depth, contiguous offsets, 256 encoding, sizes, alpha, PNG pixels and end of file. ICNS decoder checks big-endian total/block lengths, exact ic07/08/09/10 order, payload PNG sizes/alpha/pixels and no trailing bytes. iconset and Linux PNG/SVG are individually checked. verify-only checks 36 manifest entries and the generated 17-segment mapping. Windows evidence validates 13 SVGs, 243 cases, actual exposed/captured Qt window, Debug/Release seven tests and lint, plus repeat export resource-hash equality. Automated hash/symbol coverage is paired with these manual call-chain traces; no unavailable-platform runtime result is inferred.",
+      "limitations": "Finder, iconutil, Linux desktop loading and platform-native GUI remain user validation; Windows PNG/container checks prove format structure and shared geometry only.",
+      "result": "passed"
+    }
+  ]
+}

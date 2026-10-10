@@ -2,7 +2,7 @@
 
 **yalahOO!!!** 按 [原生迁移计划](QT_QUICK_MIGRATION_PLAN.md) 改造为 C++23、Qt Quick/QML 跨平台音乐播放器，Qt 使用开发机安装的最新版本，构建与脚本不锁定具体版本或安装路径。GUI、动画与特效尽最大可能逼近原 Web 版本，以冻结旧源码为准；截图和各类采集数据仅作参考，渲染缺陷（包括可见锯齿）应改善，音乐播放使用 QtMultimedia 公开 API；联网功能暂缓，保留接口与占位。
 
-品牌图标与 Logo 将在计划 R03B 原创设计，以 SVG 为主素材，围绕音乐收藏、实体专辑盒与双 O 唱片圆环，提供适配暖昼/深夜和桌面系统的版本；品牌替换与其他界面的复刻分开验收。
+原创品牌 SVG、双主题字标、小尺寸图标与平台衍生文件已保存，规范和预览见 [branding.md](docs/contracts/branding.md)。Qt 导出命令为 `./tools/assets/export-branding.ps1 -Preset qt-release -WindowPreview`；页眉/开场接入归 R14/R20，系统集成归 R30–R32。品牌替换与其他界面复刻分开验收。
 
 当前已有 Qt 原生运行探针和完整 qrc 资产接入：原专辑盒三壳体、四字重 MiSans、八个功能图标双主题、现有完整音频与演示封面。探针使用临时材质，音乐播放器功能与实际材质按后续轮次接入。[资源契约](docs/contracts/assets.md)包含来源/hash、字体权重映射、准备与验证命令；[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现和构建入口。可复建的匿名 Web 参照见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
 

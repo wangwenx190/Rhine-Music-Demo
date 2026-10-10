@@ -40,7 +40,7 @@
 - CMake 项目名 `yalahoo`，目标 `Yalahoo`、`YalahooCore`，可执行输出名 `yalahoo`；QML URI `Yalahoo.Music`，源目录 `qml/Yalahoo/Music/`。在创建引擎和读取 QStandardPaths 之前设置 organizationName/applicationName 为 `yalahoo`，applicationDisplayName 为 `yalahOO!!!`；后续更改展示名称不能隐式改变用户数据目录。
 - macOS bundle 展示名称为 `yalahOO!!!`，技术 bundle 标识 `yalahoo.music`；Linux desktop 文件名与图标名 `yalahoo`、显示 Name 为 `yalahOO!!!`。Qt 工程文件、部署清单和原生文档统一使用新标识；`legacy-web/` 的原产品名、版权署名、基线提交与历史资产保留原貌。
 - 图标为精致的独立应用符号，Logo 为完整名称字标及图形组合。主题围绕本地音乐收藏、实体专辑盒、双 O 唱片圆环、暖昼/深夜光感；主资产必须是可编辑的真正 SVG 路径，不把 PNG 嵌入 SVG，也不直接复制上游标识或套用现成图标。
-- 品牌主素材在 `resources/branding/`，原稿与生产稿均保留；桌面衍生图标在 `resources/icons/`，设计规范在 `docs/contracts/branding.md`，预览和验收在 `docs/media/branding/`、`verification/windows/branding/`。R03B 负责设计和导出，R14/R20 接入页眉与开场，R30–R32 接入系统图标及平台元数据。
+- 品牌主素材在 `resources/branding/`，原稿与生产稿均保留；桌面衍生图标在 `resources/icons/yalahoo/`，设计规范在 `docs/contracts/branding.md`，预览和验收在 `docs/media/branding/`、`verification/windows/branding/`。颜色、比例、安全区、16–32px 光学稿、稳定分组、开场中心线/弧长映射及导出命令按品牌规范执行；原创来源与 hash 在 `resources/manifests/branding.json`。R14/R20 接入页眉与开场，R30–R32 接入系统图标及平台元数据。
 
 ## 跨轮次基线与工具链
 
@@ -259,18 +259,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R03B · yalahOO!!! 原创应用图标与 Logo（1.5–2日）
-
-- 依赖 R02、R03。交付 `resources/branding/icon-master.svg`、`logo-master.svg`、生产用 `icon.svg`、`icon-small.svg`、`icon-mono.svg`、`logo-light.svg`、`logo-dark.svg`、`logo-mono.svg`、`lockup-light.svg`、`lockup-dark.svg`，以及品牌规范、图标导出工具、平台衍生文件和 Qt 渲染预览。母版含命名图层与分组，生产稿清理冗余但不破坏路径精度。
-- **固定设计方向：** 以 1024×1024 图标坐标建立偏转约 −8° 的薄玻璃专辑盒，主体控制在中心 832×832 区域内，保留至少 96 单位安全边；用两道有细密但克制的刻纹圆环对应 `OO` 与唱片，窄边高光、暖白纸面、低饱和琥珀点缀体现“收藏音乐、慢慢听”。主轮廓、纸面、圆环和高光最多四个视觉层级，保证形体完整，不依赖大面积光晕或杂乱装饰表现精致。主题映射原项目暖昼/深夜色板，同一几何分别检查浅/深背景，不额外引入一套冲突的界面主题。
-- **字标方案：** 完整绘制 `yalahOO!!!`，保持小写 `yalah`、大写双 `OO` 和三个感叹号；沿图标圆环构造 O 的字形细节，感叹号采取一致但渐进的节奏，光学校准字距、基线和重量。最终生产稿文字转为自绘路径，不依赖字体安装、SVG text 排版或上游品牌字形；完整名称放入 Logo，独立应用图标不塞入整段小字。
-- **执行步骤：** 先在同一 SVG 版面完成主轮廓/圆环/字标的三个细节方案（边框和圆环开口/刻纹密度/字距变化，主题与结构不另开方向）；按小尺寸识别 35%、主题契合 25%、细节与光学平衡 25%、Qt 渲染及主题适配 15% 比较并固定一个方案，比较图保存到 `docs/media/branding/`。随后只迭代选定稿的曲率、间距、圆环中心、描边和光感，不留三套可切换产品标识。
-- **SVG 技术要求：** 仅使用路径、基础几何、组变换和 Qt SVG 可正常渲染的渐变/裁切；尺寸由 viewBox 决定，背景透明。不包含脚本、远程资源、位图 image、foreignObject 或依赖外部文件的字体/filter。细小装饰在 `icon-small.svg` 中合并/删去，16–32px 使用专门光学简化稿，保持外轮廓和双圆环识别；不是把 1024 母版缩小后直接交付。单色稿用显式填充/描边并保留正负空间。
-- **动效资产：** Logo 路径分成稳定的 `word`、`rings`、`accents` 组，额外交付描边揭示所需的中心线路径及分段进度映射，写入品牌规范。R20 的轮廓出现/标语/交接时序照原契约，路径内容采用新品牌；减少动态时直接显示完整 Logo。不能为换 Logo 延长片头或移动播放器控件。
-- **衍生格式：** `tools/assets/export-branding` 使用 C++23/QtSvg 的 QSvgRenderer+QImage 生成透明 PNG（16、24、32、48、64、128、256、512、1024）与预览；Windows ICO 包含 16/24/32/48/64/128/256 尺寸，Linux 提供 SVG 与 PNG。macOS 交付 iconset PNG 及 ICNS；若 Qt 写入器不支持 ICNS，用窄用途 Qt 工具写 ICNS 的 `icns` 文件头和 big-endian 长度，PNG 块 `ic07`/`ic08`/`ic09`/`ic10` 分别为 128/256/512/1024，块长度含 8 字节头，总长度含文件头；验证容器与各 PNG 可读。以后 macOS 可用系统 iconutil 复核，不将其作为 Windows 本阶段生成的前置条件。不引入图形第三方库。
-- **精致度与验收：** Windows Qt 实际加载全部 SVG；生成 16/24/32/48/64/128/256/512/1024 尺寸、DPR1/1.5/2、浅/深/透明背景及单色稿预览。检查小尺寸外形/双 O 仍可辨、轮廓无断裂/毛刺、渐变无明显色带、光学校准无重心偏移、字标拼写/大小写/标点准确；与页眉和片头实尺寸预览比较，不能靠放大图遮掩缩小后的糊成一团。16px 简化稿的主要线条/间隙在 DPR1 至少 1px，圆环与盒体不得粘连，四边安全区不得被裁切。
-- 退出：选定原创 SVG 母版及全套生产稿/衍生格式存在、Qt 实际渲染与尺寸/主题预览通过、ICNS/ICO 内容清单正确、分组与开场路径映射可用；`docs/contracts/branding.md` 固定颜色、比例、安全区、最小尺寸、替换场景与导出命令，资源清单记录原创来源与 hash。没有嵌入位图伪 SVG，没有沿用原项目品牌作为最终产品标识；主界面接入留给 R14/R20，系统接入留给 R30–R32。
 
 ### R04 · C++数据模型、排序、搜索与离线Provider契约（1–1.5日）
 
