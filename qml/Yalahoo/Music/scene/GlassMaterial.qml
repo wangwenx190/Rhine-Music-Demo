@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick3D
 
-CustomMaterial {
+LightingMaterial {
     id: glass
     objectName: "caseMaterial"+surface
     property real exposureScale: 1
@@ -23,10 +23,14 @@ CustomMaterial {
     property real attenuationDistance: (surface === 0 ? 5-1.2*warmth : surface === 1 ? 4.5-1.3*warmth : 4.5-2.5*warmth)*attenuationScale
     property real clearcoat: surface === 1 ? 0.16 : 0.08
     property real coatRoughness: surface === 1 ? 0.2 : 0.38
-    property real environmentIntensity: (0.68-0.20*warmth)*environmentScale
-    property real exposure: (1.08-0.03*warmth)*exposureScale
+    property real environmentIntensity: (lightingEnabled ? lighting.environmentIntensity : 0.68-0.20*warmth)*environmentScale
+    property real exposure: (lightingEnabled ? lighting.exposure : 1.08-0.03*warmth)*exposureScale
     property vector3d paperIrradiance: Qt.vector3d(1,1,1)
     required property Texture roomTexture
+    required property Texture ltc1Texture
+    required property Texture ltc2Texture
+    property TextureInput ltc1Map: TextureInput { texture: glass.ltc1Texture }
+    property TextureInput ltc2Map: TextureInput { texture: glass.ltc2Texture }
     required property Texture integrationTexture
     property TextureInput environmentMap: TextureInput { texture: glass.roomTexture }
     property TextureInput dfgMap: TextureInput { texture: glass.integrationTexture }

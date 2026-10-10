@@ -48,3 +48,10 @@ struct SearchListModelQml {
     QML_NAMED_ELEMENT(SearchListModel)
     QML_UNCREATABLE("Owned by LibrarySession")
 };
+
+struct SelectionLightingQml {
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SelectionLighting)
+    QML_NAMED_ELEMENT(SelectionLighting)
+    QML_UNCREATABLE("Owned by SceneAdapter")
+};

@@ -15,10 +15,11 @@ SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
 {
     // The first responsive frame starts at its target. Opening can observe its authored pose.
     snapToTarget();
+    updateLighting(0);
     connect(&m_layout, &LayoutMetrics::changed, this, [this] {
         if (m_reduced) snapToTarget(); else publish();
     });
-    if (clock) connect(clock, &FrameClock::frame, this, [this](double, double motionDt) { advance(motionDt); });
+    if (clock) connect(clock, &FrameClock::frame, this, [this](double, double motionDt) { advance(motionDt); updateLighting(motionDt); });
 }
 CameraPose SceneAdapter::target() const
 {
@@ -61,7 +62,9 @@ void SceneAdapter::setReducedMotion(bool reduced)
 {
     if (reduced == m_reduced) return;
     m_reduced = reduced;
+    m_lighting.setReducedMotion(reduced);
     if (reduced) { m_yaw.finish(0); m_elevation.finish(0); snapToTarget(); }
+    updateLighting(0);
     emit reducedMotionChanged();
 }
 void SceneAdapter::setNavigation(double laneSpeed, double rowSpeed, bool realColumns)
@@ -129,6 +132,18 @@ void SceneAdapter::publish()
     m_frame.casePosition = {0,-4.6+settlingWave(0,26.56)+.9+(3.47-.9)*m_detail,-2.17};
     m_frame.caseTransform.setToIdentity(); m_frame.caseTransform.translate(casePosition());
     emit frameChanged();
+}
+void SceneAdapter::setLightingInput(RowLightingInput input,QQuaternion rotation) {
+    m_explicitLightingInput=true;m_lightingInput=input;m_caseRotation=rotation;
+}
+void SceneAdapter::updateLighting(double dt) {
+    auto input=m_lightingInput;
+    if(!m_explicitLightingInput){input.origin=m_frame.casePosition;input.row=input.origin.z/.62;input.lane=input.origin.x/5.2;}
+    input.reduced=m_reduced||input.reduced;
+    const auto localAim=m_caseRotation.rotatedVector({-2.085f,2.252f,0});
+    const auto offset=cameraRotation().rotatedVector({-48,-17.6f,36});
+    m_lighting.update(input,input.origin+SceneVector{localAim.x(),localAim.y(),localAim.z()},
+        {offset.x(),offset.y(),offset.z()},m_detail,dt);
 }
 QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
 {

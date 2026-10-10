@@ -61,9 +61,9 @@ QJsonObject compare(const QImage &actual,const QImage &expected,const QPolygonF 
 int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scene,const QString &fixture,const QString &report) {
     QFile input(fixture);if(!input.open(QIODevice::ReadOnly))return 12;
     const auto bytes=input.readAll();const auto oracle=QJsonDocument::fromJson(bytes).object();
-    const bool calibration=oracle["calibration"].toBool();
-    auto cases=oracle["cases"].toArray();if(cases.isEmpty()||(!calibration&&cases.size()!=90))return 12;
-    if(!calibration)for(int coverIndex:{1,6,11})for(double light:{0.0,0.25,2.0}) {
+    const bool calibration=oracle["calibration"].toBool(),lightingReview=oracle["lighting"].toBool();
+    auto cases=oracle["cases"].toArray();if(cases.isEmpty()||(!calibration&&!lightingReview&&cases.size()!=90))return 12;
+    if(!calibration&&!lightingReview)for(int coverIndex:{1,6,11})for(double light:{0.0,0.25,2.0}) {
         auto c=cases[coverIndex].toObject();c.insert("paperLight",light);c.insert("paperProbe",true);cases.append(c);
     }
     const auto root=QDir(QFileInfo(oracle.value("referenceFixture").toString(fixture)).absolutePath()+"/../../..").absolutePath();
@@ -78,8 +78,18 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
     const auto next=[&]{++index;const auto c=cases[index].toObject();
         view->setProperty("warmth",c["day"].toBool()?1.0:0.0);view->setProperty("clarity",c["clarity"].toDouble());
         view->setProperty("reviewLayer",c["layer"].toString());view->setProperty("coverSource",QUrl("qrc:/assets/demo-covers/"+c["cover"].toString()+".png"));
-        const auto p=c["position"].toArray();const SceneVector pos{p[0].toDouble(),p[1].toDouble(),p[2].toDouble()},aim{0,1.85,0};
+        const auto origin=c["origin"].toArray();const SceneVector caseOrigin{origin[0].toDouble(),origin[1].toDouble(),origin[2].toDouble()};
+        view->setProperty("reviewCasePosition",QVariant::fromValue(caseOrigin.qt()));
+        view->setProperty("lightingEnabled",lightingReview);
+        if(lightingReview){
+            scene.lighting()->setReducedMotion(true);scene.lighting()->setNight(!c["day"].toBool());
+            auto settings=scene.lighting()->ribbon.settings;
+            const auto mode=c["mode"].toString();settings.mode=mode=="baseline"?RowLightingMode::Baseline:mode=="area"?RowLightingMode::Area:mode=="hybrid"?RowLightingMode::Hybrid:RowLightingMode::Guided;scene.lighting()->setSettings(settings);
+        }
+        const auto p=c["position"].toArray();const SceneVector pos{p[0].toDouble(),p[1].toDouble(),p[2].toDouble()},aim=caseOrigin+SceneVector{0,1.85,0};
         scene.layout()->setViewport(960,720);scene.observe({pos,aim,2*(pos-aim).length()*std::tan(32*std::acos(-1.0)/360)},0);
+        if(lightingReview){const auto offset=scene.cameraRotation().rotatedVector({-48,-17.6f,36});
+            RowLightingInput i;i.reduced=true;scene.lighting()->update(i,{-2.085,2.252,0},{offset.x(),offset.y(),offset.z()},c["detail"].toDouble(),0);}
         double light=c.value("paperLight").toDouble(1.0);
         view->setProperty("paperIrradiance",QVariant::fromValue(QVector3D(float(light),float(light),float(light))));
         const auto factors=c["factors"].toObject();
@@ -95,7 +105,7 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
         const bool paperProbe=c["paperProbe"].toBool();
         const QString name=paperProbe?QString("paper-probe-%1.png").arg(index):referenceName;
         const auto actual=window.grabWindow().convertToFormat(QImage::Format_RGB32);
-        QImage expected(root+"/docs/media/materials/web/"+referenceName);
+        QImage expected(root+(lightingReview?"/docs/media/lighting/web/":"/docs/media/materials/web/")+referenceName);
         int paperProbeError=0;
         if(paperProbe) {
             const double light=c["paperLight"].toDouble();
@@ -135,13 +145,17 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
         valid=valid&&parameters;
         QJsonObject roi;
         for(const auto &region:regions){QPolygonF polygon;for(auto p:{region.local.topLeft(),region.local.topRight(),region.local.bottomRight(),region.local.bottomLeft()}){
-            const QVector3D world(float(p.x()),float(p.y()),region.name==QString("background")?-.14f:.07f);
+            const auto o=c["origin"].toArray();
+            const QVector3D world(float(p.x()+o[0].toDouble()),float(p.y()+o[1].toDouble()),float((region.name==QString("background")?-.14:.07)+o[2].toDouble()));
             const auto qt=project(view,world),cpu=scene.projectWorldPoint(world);const double err=std::hypot(qt.x()-cpu.x(),qt.y()-cpu.y());maxProjection=std::max(maxProjection,err);valid=valid&&err<=2;polygon<<QPointF(qt.x(),qt.y());
         }roi.insert(region.name,compare(actual,expected,polygon,!calibration));}
+        if(lightingReview)for(const auto &region:regions){const auto metric=roi[region.name].toObject();
+            valid=valid&&metric["pixels"].toInt()>0&&metric["meanAbsoluteRgb"].toDouble()<=6
+                &&(metric["ssimWindows"].toInt()==0||metric["ssim"].toDouble()>=.97);}
         QImage diff(actual.size(),QImage::Format_RGB32);
         if(valid&&!calibration)for(int y=0;y<actual.height();++y)for(int x=0;x<actual.width();++x){auto a=actual.pixelColor(x,y),b=expected.pixelColor(x,y);diff.setPixelColor(x,y,QColor(std::abs(a.red()-b.red()),std::abs(a.green()-b.green()),std::abs(a.blue()-b.blue())));}
         valid=valid&&(calibration||diff.save(output+"/diff-"+name));
-        pass=pass&&valid;results.append(QJsonObject{{"index",index},{"paperProbe",paperProbe},{"paperProbeError",paperProbeError},{"paperLight",c["paperLight"]},{"foregroundPixels",foreground},{"sourceParameterMatch",parameters},{"webProjectionPixels",webProjection},{"factors",c["factors"]},{"theme",c["day"].toBool()?"day":"night"},{"angle",c["angle"]},{"cover",c["cover"]},{"layer",c["layer"]},{"roi",roi},{"passed",valid},{"frames",frames->load()-start},{"screenshot",name}});
+        pass=pass&&valid;results.append(QJsonObject{{"index",index},{"paperProbe",paperProbe},{"paperProbeError",paperProbeError},{"paperLight",c["paperLight"]},{"foregroundPixels",foreground},{"sourceParameterMatch",parameters},{"webProjectionPixels",webProjection},{"factors",c["factors"]},{"theme",c["day"].toBool()?"day":"night"},{"angle",c["angle"]},{"cover",c["cover"]},{"layer",c["layer"]},{"mode",c["mode"]},{"origin",c["origin"]},{"roi",roi},{"passed",valid},{"frames",frames->load()-start},{"screenshot",name}});
         if(index+1<cases.size()){next();return;}
         poll.stop();QSaveFile file(report);bool saved=file.open(QIODevice::WriteOnly);if(saved){file.write(QJsonDocument(QJsonObject{{"passed",pass},{"qtVersion",qVersion()},{"graphicsApi",int(window.rendererInterface()->graphicsApi())},{"dpr",window.devicePixelRatio()},{"width",window.width()},{"height",window.height()},{"baseline",oracle["baseline"]},{"fixtureSha256",QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())},{"maxProjectionPixels",maxProjection},{"cases",results}}).toJson());saved=file.commit();}app.exit(pass&&saved?0:13);
     });

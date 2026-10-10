@@ -1,0 +1,25 @@
+{
+  "format": "RGBA32F little-endian; original Three LTC UV order",
+  "assets": [
+    {
+      "path": "environment/ltc1.rgba32f",
+      "qrc": ":/assets/environment/ltc1.rgba32f",
+      "width": 64,
+      "height": 64,
+      "bytes": 65536,
+      "sha256": "cf5cf21e5c112d2095c7e2418cb0a1ac54636e275d73e42f3453646c67f26814",
+      "source": "legacy-web/node_modules/three/examples/jsm/lights/RectAreaLightTexturesLib.js",
+      "license": "resources/licenses/three-LICENSE"
+    },
+    {
+      "path": "environment/ltc2.rgba32f",
+      "qrc": ":/assets/environment/ltc2.rgba32f",
+      "width": 64,
+      "height": 64,
+      "bytes": 65536,
+      "sha256": "3b1b09080b26104498db277c14fc1733786465c6958e7a8403d688b1e24c2ff5",
+      "source": "legacy-web/node_modules/three/examples/jsm/lights/RectAreaLightTexturesLib.js",
+      "license": "resources/licenses/three-LICENSE"
+    }
+  ]
+}

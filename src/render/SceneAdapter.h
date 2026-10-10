@@ -3,10 +3,12 @@
 #include "LayoutMetrics.h"
 #include "SceneFrame.h"
 #include "ScalarSpring.h"
+#include "SelectionLighting.h"
 #include <QVariantMap>
 namespace yalahoo {
 class SceneAdapter : public QObject {
     Q_OBJECT
+    Q_PROPERTY(yalahoo::SelectionLighting* lighting READ lighting CONSTANT)
     Q_PROPERTY(yalahoo::LayoutMetrics* layout READ layout CONSTANT)
     Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY frameChanged)
     Q_PROPERTY(QVector3D cameraAim READ cameraAim NOTIFY frameChanged)
@@ -20,6 +22,7 @@ class SceneAdapter : public QObject {
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
+    SelectionLighting *lighting() { return &m_lighting; }
     LayoutMetrics *layout() { return &m_layout; }
     const SceneFrame &frame() const { return m_frame; }
     QVector3D cameraPosition() const { return m_frame.camera.position.qt(); }
@@ -42,6 +45,8 @@ public:
     void setNavigation(double laneSpeed, double rowSpeed, bool realColumns = false);
     void setPointer(double x, double y);
     void snapToTarget();
+    void setLightingInput(RowLightingInput input, QQuaternion caseRotation = {});
+    void updateLighting(double motionDt);
     Q_INVOKABLE QVector3D projectWorldPoint(QVector3D world) const;
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
 signals:
@@ -51,6 +56,10 @@ signals:
 private:
     void publish();
     LayoutMetrics m_layout;
+    SelectionLighting m_lighting;
+    RowLightingInput m_lightingInput;
+    QQuaternion m_caseRotation;
+    bool m_explicitLightingInput = false;
     SceneFrame m_frame;
     std::array<ScalarSpring, 3> m_position, m_aim;
     ScalarSpring m_span, m_yaw, m_elevation;

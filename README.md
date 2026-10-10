@@ -19,6 +19,6 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 
-单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。单盒材质、双主题参数、局部纸面 LOD、线性透射捕获与精确 sRGB 输出已接入，90 个逐层对照和漫反射探针见 [材质契约](docs/contracts/materials.md)。动态光场、阴影、景深、阵列和完整产品动画按后续轮次接入。
+单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。单盒材质、双主题参数、局部纸面 LOD、线性透射捕获与精确 sRGB 输出已接入，90 个逐层对照和漫反射探针见 [材质契约](docs/contracts/materials.md)。世界空间光带、选中光场、原环境/半球/方向/面光及650ms可打断主题轨迹已接入，契约与复建见 [灯光契约](docs/contracts/lighting.md)。阴影、景深、阵列和完整产品动画按后续轮次接入。
 
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。

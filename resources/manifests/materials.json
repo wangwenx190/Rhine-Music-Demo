@@ -22,38 +22,38 @@
     },
     {
       "path": "licenses/materials-NOTICE.md",
-      "bytes": 396,
-      "sha256": "53d27fa276d50bb15f4e0adbb9ea043878a61ddfef33d6d1020ff3223f895e98",
+      "bytes": 848,
+      "sha256": "6e191e83f585e2bfce550dbf44ddaa58e835f345a4b61f8fe7f925d2e6f87387",
       "qrc": ":/assets/licenses/materials-NOTICE.md"
     },
     {
       "path": "shaders/case-glass.vert",
-      "bytes": 286,
-      "sha256": "32e8ff600eaea3bc33e249864783a2d18798bd3c67ee438d61e625792945e3a8",
+      "bytes": 362,
+      "sha256": "7b7b6f3c068c4df03b67541e8698302ada86ed968236fff534c4ff97d6e5ce76",
       "qrc": ":/assets/shaders/case-glass.vert"
     },
     {
       "path": "shaders/case-glass.frag",
-      "bytes": 10163,
-      "sha256": "65c624a2251975e06aa27e3ba4a72c5b405e05c4d9b8c5f278b2712852e7b424",
+      "bytes": 19308,
+      "sha256": "f78d39f6ae5764a9d4c867dd5f5b4abb57743a330f1d67a6fa2912c16bbaae1d",
       "qrc": ":/assets/shaders/case-glass.frag"
     },
     {
       "path": "shaders/album-paper.vert",
-      "bytes": 113,
-      "sha256": "e8a31b72f8b5745471a413674025d3924095dfd10bae660cc7f9841e0fa5c5b5",
+      "bytes": 366,
+      "sha256": "7aa68dd2b2a92b93a00e63e2a492a23a330821f986328d10b280463aca751ada",
       "qrc": ":/assets/shaders/album-paper.vert"
     },
     {
       "path": "shaders/album-paper.frag",
-      "bytes": 799,
-      "sha256": "52c1a1069478c614c53564751239a408ea23e7650a1d7a1fb7378b7095c98543",
+      "bytes": 8740,
+      "sha256": "3d027b8d650c70ccfbebe063b99534b5f9cf66d5f81d4581d6ef6f894bf9a25c",
       "qrc": ":/assets/shaders/album-paper.frag"
     },
     {
       "path": "shaders/material-background.frag",
-      "bytes": 158,
-      "sha256": "a0a5f6696f3559bf8b3cdc415f1916ad9847b290ee638daa6455d35d8345dc6f",
+      "bytes": 191,
+      "sha256": "7d8af721ccc0beb62d2faa2a1d0f371b3e428eedc0ffbe3cfff11d71a426dbef",
       "qrc": ":/assets/shaders/material-background.frag"
     },
     {

@@ -74,6 +74,11 @@ ApplicationWindow {
             Layout.alignment: Qt.AlignHCenter
         }
         Button {
+            objectName: "themeProbe"
+            text: window.sceneAdapter.lighting.night ? "暖昼" : "深夜"
+            onClicked: window.sceneAdapter.lighting.night = !window.sceneAdapter.lighting.night
+        }
+        Button {
             objectName: "interactionProbe"
             text: window.interactionCount === 0 ? "验证窗口交互" : "交互已响应 " + window.interactionCount
             Layout.alignment: Qt.AlignHCenter

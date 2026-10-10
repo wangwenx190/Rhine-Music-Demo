@@ -18,6 +18,14 @@ if(YALAHOO_REVIEW)
     if(WIN32)
         set_tests_properties(runtime-materials PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
+    add_test(NAME runtime-lighting COMMAND Yalahoo --verify-materials
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/lighting/visual.json"
+        --material-report "${CMAKE_BINARY_DIR}/verification/lighting/runtime.json")
+    set_tests_properties(runtime-lighting PROPERTIES TIMEOUT 150
+        ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+    if(WIN32)
+        set_tests_properties(runtime-lighting PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     foreach(dpr IN ITEMS 1 1.5 2)
         add_test(NAME runtime-scene-dpr-${dpr} COMMAND Yalahoo --verify-scene
             "${PROJECT_SOURCE_DIR}/tests/fixtures/scene/camera-golden.json"
@@ -78,4 +86,15 @@ set_tests_properties(runtime-library PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
 if(WIN32)
     set_tests_properties(runtime-library PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+
+qt_add_executable(LightingTest LightingTest.cpp)
+target_link_libraries(LightingTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(LightingTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    LIGHTING_REPORT="${CMAKE_BINARY_DIR}/verification/lighting-errors.json")
+yalahoo_platform(LightingTest)
+add_test(NAME lighting COMMAND LightingTest -o "${CMAKE_BINARY_DIR}/verification/lighting-test.xml,junitxml" -o -,txt)
+set_tests_properties(lighting PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(lighting PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()

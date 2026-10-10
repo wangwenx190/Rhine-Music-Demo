@@ -112,3 +112,20 @@ cmake --build --preset qt-release
 检查 `build/release/verification/materials/runtime.json`：90 同输入逐层状态、9 漫反射探针、非空前景、sourceParameterMatch、Web投影≤2px；所有 PNG 的真实像素尺寸应与报告DPR一致。分别检查正视/低角度、双主题和方/横/竖封面，人工确认 SCREEN_MIP_TEXTURE 的纸面区域/留白采样与折射 UV 方向，MSL/GLSL 生成成功不能替代这一实机步骤。结束后 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF` 并重新构建，普通产品应拒绝 --verify-materials，按钮改变 detail 时只有主盖柔化；隐藏/恢复与旧运动回归继续通过。
 
 本平台实际构建、shader/GPU、图像、DPR及窗口交互结果：待用户填写。完整平台部署、真实音频和全场灯光/后处理属于后续轮次。
+
+## R08 灯光用户验证（未执行）
+
+静态审计见对应 `verification/*-static/lighting/`，结论为“静态审计通过，实机待用户验证”。使用本机最新原生Qt Kit，在根目录执行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'lighting|runtime-lighting' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+输入为 `tests/fixtures/lighting/golden.json` 和 `visual.json`；读取 `build/release/verification/lighting-errors.json` 与 `lighting/runtime.json`。预期924轨迹/主题样本和392光场样本通过、48双主题/四模式场景非空、五ROI MAE≤6/255/有效SSIM≥.97、Web投影≤2px。确认实际有效DPR=1，原生Retina/Wayland缩放如不能关闭，按前述R07步骤为测试进程补偿或重采同DPR对照，不把环境变量值当作实际DPR。
+
+手动运行普通探针，反复点击暖昼/深夜按钮，再切浏览/详情目标；主题应从当前显示状态连续反向，650ms源时窗按动效倍率缩放一次，印刷只暗化不闪白，玻璃与纸面光带位置一致。隐藏/最小化暂停视觉，恢复不补跑整段主题。预期Metal/OpenGL无需修改灯光代码；实际GPU纹理方向/绑定必须检查，MSL/GLSL生成不替代实机。
+
+验证后关闭Review并重建：`cmake --preset qt-release -DYALAHOO_REVIEW=OFF`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`；普通产物拒绝 --verify-materials。本平台构建、GPU、图像、DPR、按钮交互实测结果：待用户填写。

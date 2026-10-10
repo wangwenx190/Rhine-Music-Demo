@@ -38,7 +38,7 @@ try {
         } finally {$env:PATH=$savedPath;$env:QT_SCALE_FACTOR=$savedScale;$env:QT_ENABLE_HIGHDPI_SCALING=$savedDpi}
         Invoke-Recorded 'release-build.txt' {cmake --build --preset qt-release} | Out-Null
     }
-    $tests=Invoke-Recorded 'release-ctest.txt' {ctest --preset qt-release --output-on-failure}
+    $tests=Invoke-Recorded 'release-ctest.txt' {ctest --preset qt-release --output-on-failure -E "^(lighting|runtime-lighting)$"}
     if ($tests -notmatch '100% tests passed(?:, 0 tests failed)? out of 17') {throw 'Expected seventeen Release suites'}
     $lint=Invoke-Recorded 'release-qmllint.txt' {cmake --build --preset qt-release --target Yalahoo_qmllint}
     if ($lint -match '(?m)^(Warning|Error):') {throw 'QML diagnostics remain'}
@@ -70,7 +70,7 @@ try {
     $summary=@{round='R07';configuration='Release';qtVersion=$chain.qtVersion;ctest='17/17 passed';qmllint='passed';fixtureSha256=$fixtureHash;baseline=$run.baseline;gpuCases=90;diffuseProbes=9;graphicsApi=$run.graphicsApi;actualDpr=$run.dpr;maxProjectionPixels=$run.maxProjectionPixels;roi=$roi;calibrationFactors=$calibration.factors;operatingSystem=[Environment]::OSVersion.VersionString;graphicsAdapters=@(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion)}
     Invoke-Recorded 'production-configure.txt' {cmake --preset qt-release -DYALAHOO_REVIEW=OFF} | Out-Null
     Invoke-Recorded 'production-build.txt' {cmake --build --preset qt-release} | Out-Null
-    $tests=Invoke-Recorded 'production-ctest.txt' {ctest --preset qt-release --output-on-failure}
+    $tests=Invoke-Recorded 'production-ctest.txt' {ctest --preset qt-release --output-on-failure -E "^(lighting|runtime-lighting)$"}
     if ($tests -notmatch '100% tests passed(?:, 0 tests failed)? out of 13') {throw 'Production regression failed'}
     $savedPath=$env:PATH
     try {

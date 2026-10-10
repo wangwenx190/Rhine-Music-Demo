@@ -1,7 +1,209 @@
+// BEGIN SHARED LIGHTING
+// Shared field, diffuse and shell transport from frozen music-lighting.ts (MIT).
+float musicRowField(vec3 origin) {
+    float row=(origin.z-rowColumn.z-rowSettings.w*.62)/(.5*rowSettings.z*.62);
+    float lane=(origin.x-rowColumn.x)/27.0;
+    float lane2=lane*lane;
+    return exp(-0.6931471805599453*row*row)*exp(-lane2*lane2*lane2);
+}
+float musicPrintExposure(vec3 origin) {
+    vec3 distance=(origin-lightColumn)/vec3(6.0,3.35,5.5);
+    float printLight=exp(-dot(distance,distance));
+    float baseline=mix(printAmbient,1.0,printLight);
+    if(rowSettings.x<.5)return baseline;
+    float ambient=max(.08,printAmbient*.5);
+    float fillAmount=rowSettings.x>1.5&&rowSettings.x<2.5?rowFill:0.0;
+    float fieldAmbient=mix(ambient,baseline,fillAmount);
+    float fieldExposure=mix(fieldAmbient,1.0,clamp(rowSettings.y*musicRowField(origin),0.0,1.0));
+    float areaExposure=mix(ambient,printAmbient,.25);
+    float shelf=rowSettings.x<1.5?areaExposure:fieldExposure;
+    return mix(shelf,baseline,rowDetail);
+}
+vec3 musicSpot(vec3 position) {
+    vec3 delta=spotPosition-position;
+    float distanceSquared=max(dot(delta,delta),.01);
+    float angle=dot(normalize(delta),normalize(spotPosition-spotTarget));
+    float attenuation=smoothstep(cos(.32),cos(.32*(1.0-.95)),angle)/distanceSquared;
+    return spotColor*spotIntensity*attenuation;
+}
+vec3 musicIrradiance(vec3 position,vec3 normal) {
+    vec3 hemi=mix(groundColor,skyColor,.5*normal.y+.5)*lightIntensities.y;
+    vec3 key=keyColor*lightIntensities.x*max(0.0,dot(normal,normalize(vec3(-6,14,-5))));
+    vec3 fill=vec3(lightIntensities.z*max(0.0,dot(normal,normalize(vec3(7,8,-10)))));
+    vec3 spot=musicSpot(position)*max(0.0,dot(normal,normalize(spotPosition-position)));
+    return (hemi+key+fill+spot)/3.141592653589793;
+}
+vec3 musicShell(vec3 original,vec3 origin,vec3 local,vec3 normal,vec3 view,int surface) {
+    float laneDistance=abs(origin.x-lightColumn.x);
+    float core=exp(-pow(laneDistance/3.2,4.0));
+    float spill=exp(-pow(laneDistance/7.2,4.0));
+    float laneLight=.58*core+.42*spill;
+    float rowLight=exp(-pow((origin.z-lightColumn.z)/5.5,2.0));
+    float hot=exp(-pow((origin.z-lightColumn.z)/1.1,2.0));
+    float neighbor=exp(-pow((origin.z-lightColumn.z)/2.4,2.0));
+    float guided=.58*core*mix(.12,1.0,rowLight)+.42*spill*neighbor;
+    float edgeTransport=exp(-max(0.0,local.x+2.225)*1.7);
+    float panelHeight=clamp((local.y-.175)/3.35,0.0,1.0);
+    float topRim=exp(-max(0.0,3.525-local.y)*24.0);
+    float grazing=1.0-clamp(abs(dot(normal,view)),0.0,1.0);
+    bool spine=surface==1;
+    vec3 selected=original*mix(.96,1.04,guided);
+    if(surface<2) {
+        float edgeScatter=(spine?.30:.14)*edgeTransport+(spine?.016:.003);
+        selected+=scatterColor*scatterStrength*guided*edgeScatter*mix(1.0,.62,panelHeight);
+        float ribbon=topRim*(.22+.78*edgeTransport)+(spine?.18:.035)*edgeTransport*grazing;
+        selected+=scatterColor*scatterStrength*laneLight*hot*ribbon*.8;
+    }
+    if(rowSettings.x<.5)return selected;
+    float gain=rowSettings.x>1.5?musicRowField(origin)*rowSettings.y:0.0;
+    float fillAmount=rowSettings.x>1.5&&rowSettings.x<2.5?rowFill:0.0;
+    vec3 shelf=original*mix(mix(.56,mix(.96,1.04,guided),fillAmount),1.08,clamp(gain,0.0,1.0));
+    if(surface<2) {
+        float panel=(spine?.30:.12)*edgeTransport+(spine?.05:.025);
+        float rim=topRim*(.55+.45*edgeTransport)+(spine?.24:.07)*edgeTransport*grazing;
+        float scatter=panel*mix(1.0,.78,panelHeight)+rim*1.25;
+        shelf+=scatterColor*scatterStrength*gain*scatter*(rowSettings.x>2.5?.86:1.0);
+    }
+    return mix(shelf,selected,rowDetail);
+}
+
+float LTC_ClippedSphereFormFactor( const in vec3 f ) {
+
+	// Real-Time Area Lighting: a Journey from Research to Production (p.102)
+	// An approximation of the form factor of a horizon-clipped rectangle.
+
+	float l = length( f );
+
+	return max( ( l * l + f.z ) / ( l + 1.0 ), 0.0 );
+
+}
+
+vec3 LTC_EdgeVectorFormFactor( const in vec3 v1, const in vec3 v2 ) {
+
+	float x = dot( v1, v2 );
+
+	float y = abs( x );
+
+	// rational polynomial approximation to theta / sin( theta ) / 2PI
+	float a = 0.8543985 + ( 0.4965155 + 0.0145206 * y ) * y;
+	float b = 3.4175940 + ( 4.1616724 + y ) * y;
+	float v = a / b;
+
+	float theta_sintheta = ( x > 0.0 ) ? v : 0.5 * inversesqrt( max( 1.0 - x * x, 1e-7 ) ) - v;
+
+	return cross( v1, v2 ) * theta_sintheta;
+
+}
+
+vec3 LTC_Evaluate( const in vec3 N, const in vec3 V, const in vec3 P, const in mat3 mInv, const in vec3 rectCoords[ 4 ] ) {
+
+	// bail if point is on back side of plane of light
+	// assumes ccw winding order of light vertices
+	vec3 v1 = rectCoords[ 1 ] - rectCoords[ 0 ];
+	vec3 v2 = rectCoords[ 3 ] - rectCoords[ 0 ];
+	vec3 lightNormal = cross( v1, v2 );
+
+	if( dot( lightNormal, P - rectCoords[ 0 ] ) < 0.0 ) return vec3( 0.0 );
+
+	// construct orthonormal basis around N
+	vec3 T1, T2;
+	T1 = normalize( V - N * dot( V, N ) );
+	T2 = - cross( N, T1 ); // negated from paper; possibly due to a different handedness of world coordinate system
+
+	// compute transform
+	mat3 mat = mInv * transpose( mat3( T1, T2, N ) );
+
+	// transform rect
+	vec3 coords[ 4 ];
+	coords[ 0 ] = mat * ( rectCoords[ 0 ] - P );
+	coords[ 1 ] = mat * ( rectCoords[ 1 ] - P );
+	coords[ 2 ] = mat * ( rectCoords[ 2 ] - P );
+	coords[ 3 ] = mat * ( rectCoords[ 3 ] - P );
+
+	// project rect onto sphere
+	coords[ 0 ] = normalize( coords[ 0 ] );
+	coords[ 1 ] = normalize( coords[ 1 ] );
+	coords[ 2 ] = normalize( coords[ 2 ] );
+	coords[ 3 ] = normalize( coords[ 3 ] );
+
+	// calculate vector form factor
+	vec3 vectorFormFactor = vec3( 0.0 );
+	vectorFormFactor += LTC_EdgeVectorFormFactor( coords[ 0 ], coords[ 1 ] );
+	vectorFormFactor += LTC_EdgeVectorFormFactor( coords[ 1 ], coords[ 2 ] );
+	vectorFormFactor += LTC_EdgeVectorFormFactor( coords[ 2 ], coords[ 3 ] );
+	vectorFormFactor += LTC_EdgeVectorFormFactor( coords[ 3 ], coords[ 0 ] );
+
+	// adjust for horizon clipping
+	float result = LTC_ClippedSphereFormFactor( vectorFormFactor );
+
+/*
+	// alternate method of adjusting for horizon clipping (see reference)
+	// refactoring required
+	float len = length( vectorFormFactor );
+	float z = vectorFormFactor.z / len;
+
+	const float LUT_SIZE = 64.0;
+	const float LUT_SCALE = ( LUT_SIZE - 1.0 ) / LUT_SIZE;
+	const float LUT_BIAS = 0.5 / LUT_SIZE;
+
+	// tabulated horizon-clipped sphere, apparently...
+	vec2 uv = vec2( z * 0.5 + 0.5, len );
+	uv = uv * LUT_SCALE + LUT_BIAS;
+
+	float scale = texture2D( ltc_2, uv ).w;
+
+	float result = len * scale;
+*/
+
+	return vec3( result );
+
+}
+
+
+void musicArea(vec3 n,vec3 v,vec3 position,float r,vec3 f0,out vec3 diffuse,out vec3 specular) {
+    vec3 z=normalize(areaPosition-areaTarget);
+    vec3 x=normalize(cross(vec3(0,1,0),z)), y=cross(z,x);
+    vec3 hw=x*19.5, hh=y*(.09*rowSettings.z);
+    vec3 rect[4];rect[0]=areaPosition+hw-hh;rect[1]=areaPosition-hw-hh;
+    rect[2]=areaPosition-hw+hh;rect[3]=areaPosition+hw+hh;
+    vec2 uv=vec2(r,sqrt(1.0-clamp(dot(n,v),0.0,1.0)))*(63.0/64.0)+.5/64.0;
+    vec4 t1=texture(ltc1Map,uv),t2=texture(ltc2Map,uv);
+    mat3 mInv=mat3(vec3(t1.x,0,t1.y),vec3(0,1,0),vec3(t1.z,0,t1.w));
+    vec3 energy=spotColor*areaIntensity;
+    diffuse=energy*LTC_Evaluate(n,v,position,mat3(1.0),rect);
+    specular=energy*(f0*t2.x+(1.0-f0)*t2.y)*LTC_Evaluate(n,v,position,mInv,rect);
+}
+
+
+vec3 musicBRDF(vec3 n,vec3 v,vec3 l,float r,vec3 f0,bool multiscatter) {
+    vec3 h=normalize(l+v);
+    float nl=max(dot(n,l),0.0),nv=max(dot(n,v),0.0),nh=max(dot(n,h),0.0),vh=max(dot(v,h),0.0);
+    float a=r*r,aa=a*a;
+    float gv=nl*sqrt(aa+(1.0-aa)*nv*nv),gl=nv*sqrt(aa+(1.0-aa)*nl*nl);
+    float visibility=.5/max(gv+gl,1e-6),d=nh*nh*(aa-1.0)+1.0;
+    float distribution=aa/(3.141592653589793*d*d);
+    vec3 fresnel=f0+(1.0-f0)*exp2((-5.55473*vh-6.98316)*vh);
+    vec3 result=fresnel*visibility*distribution;
+    if(multiscatter){
+        vec2 fv=texture(dfgMap,vec2(r,nv)).rg,fl=texture(dfgMap,vec2(r,nl)).rg;
+        vec3 sv=f0*fv.x+fv.y,sl=f0*fl.x+fl.y,average=f0+(1.0-f0)*.047619;
+        float compensation=(1.0-fv.x-fv.y)*(1.0-fl.x-fl.y);
+        result+=sv*sl*average/(1.0-compensation*average+1e-6)*compensation;
+    }
+    return result*nl;
+}
+vec3 musicSpecular(vec3 n,vec3 v,vec3 position,float r,vec3 f0,bool multiscatter) {
+    return keyColor*lightIntensities.x*musicBRDF(n,v,normalize(vec3(-6,14,-5)),r,f0,multiscatter)
+        +vec3(lightIntensities.z)*musicBRDF(n,v,normalize(vec3(7,8,-10)),r,f0,multiscatter)
+        +musicSpot(position)*musicBRDF(n,v,normalize(spotPosition-position),r,f0,multiscatter);
+}
+
+// END SHARED LIGHTING
 // Three.js ShaderChunk derivation (MIT; resources/licenses/three-LICENSE).
 VARYING vec3 localPosition;
 VARYING vec3 worldPosition;
 VARYING vec3 worldNormal;
+VARYING vec3 lightOrigin;
 #define CUBEUV_MAX_MIP 8.0
 #define CUBEUV_TEXEL_WIDTH (1.0/768.0)
 #define CUBEUV_TEXEL_HEIGHT (1.0/1024.0)
@@ -342,9 +544,12 @@ void MAIN() {
     vec3 favg=f0+(1.0-f0)*0.047619;
     vec3 multiScatter=singleScatter*favg/(1.0-ems*favg)*ems;
     vec3 diffuse=tint*(1.0-singleScatter-multiScatter)*irradiance;
-    // Fixed diffuse input; the world-space light field is integrated in R08.
-    diffuse+=tint*paperIrradiance;
+    vec3 direct=lightingEnabled?musicIrradiance(worldPosition,n):paperIrradiance;
+    vec3 areaDiffuse=vec3(0),areaSpecular=vec3(0);
+    if(lightingEnabled&&areaIntensity>0.0)musicArea(n,v,worldPosition,r,f0,areaDiffuse,areaSpecular);
+    diffuse+=tint*(direct+areaDiffuse);
     vec3 specular=radiance*singleScatter+multiScatter*irradiance;
+    if(lightingEnabled)specular+=musicSpecular(n,v,worldPosition,r,f0,true)+areaSpecular;
     vec3 ray=normalize(refract(-v,n,1.0/1.46))*thickness;
     vec4 projected=VIEWPROJECTION_MATRIX*vec4(worldPosition+ray,1.0);
     vec4 here=VIEWPROJECTION_MATRIX*vec4(worldPosition,1.0);
@@ -362,7 +567,12 @@ void MAIN() {
     vec3 outgoing=mix(diffuse,transmitted,transmission)+specular;
     vec3 coatDir=normalize(mix(reflect(-v,n),n,pow(cr,4.0)));
     vec3 coat=textureCubeUV(environmentMap,coatDir,cr).rgb*environmentIntensity*environmentBRDF(nv,cr,vec3(0.04));
+    if(lightingEnabled){
+        coat+=musicSpecular(n,v,worldPosition,cr,vec3(.04),false);
+        if(areaIntensity>0.0){vec3 unused,areaCoat;musicArea(n,v,worldPosition,cr,vec3(.04),unused,areaCoat);coat+=areaCoat;}
+    }
     float fresnel=0.04+0.96*exp2((-5.55473*nv-6.98316)*nv);
     outgoing=outgoing*(1.0-clearcoat*fresnel)+clearcoat*coat;
+    if(lightingEnabled)outgoing=musicShell(outgoing,lightOrigin,localPosition,n,v,surface);
     FRAGCOLOR=vec4(ACESFilmicToneMapping(outgoing),1.0);
 }

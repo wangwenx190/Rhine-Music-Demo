@@ -7,7 +7,9 @@ View3D {
     required property SceneAdapter adapter
     property bool geometryOnly: false
     property bool materialReview: false
-    property real warmth: 1
+    property vector3d reviewCasePosition: Qt.vector3d(0,0,0)
+    property bool lightingEnabled: !materialReview
+    property real warmth: adapter.lighting.warmth
     property real clarity: adapter.detail
     property string reviewLayer: "all"
     property url coverSource: "qrc:/assets/demo-covers/square.png"
@@ -16,7 +18,7 @@ View3D {
     camera: sceneCamera
     environment: SceneEnvironment {
         backgroundMode: view.geometryOnly ? SceneEnvironment.Transparent : SceneEnvironment.Color
-        clearColor: view.warmth >= 0.5 ? "#eae5e1" : "#07111f"
+        clearColor: view.adapter.lighting.backgroundColor
         antialiasingMode: SceneEnvironment.MSAA
         antialiasingQuality: SceneEnvironment.High
         tonemapMode: SceneEnvironment.TonemapModeNone
@@ -34,9 +36,11 @@ View3D {
     Model {
         visible: !view.geometryOnly
         source: "#Rectangle"
-        position: view.materialReview ? Qt.vector3d(0,1.85,-0.25) : view.adapter.casePosition.plus(Qt.vector3d(0,1.85,-0.25))
+        position: view.materialReview ? view.reviewCasePosition.plus(Qt.vector3d(0,1.85,-0.25)) : view.adapter.casePosition.plus(Qt.vector3d(0,1.85,-0.25))
         scale: Qt.vector3d(10,10,1)
         materials: CustomMaterial {
+            property bool lightingEnabled: view.lightingEnabled
+            property vector3d backgroundLinear: view.adapter.lighting.backgroundLinear
             property vector3d backgroundSrgb: Qt.vector3d((7+227*view.warmth)/255,(17+212*view.warmth)/255,(31+194*view.warmth)/255)
             shadingMode: CustomMaterial.Unshaded
             cullMode: Material.NoCulling
@@ -62,6 +66,8 @@ View3D {
     }
     CaseMaterials {
         id: caseMaterials
+        lighting: view.adapter.lighting
+        lightingEnabled: view.lightingEnabled
         warmth: view.warmth
         clarity: view.clarity
         coverSource: view.coverSource
@@ -69,7 +75,7 @@ View3D {
     }
     Node {
         objectName: "inspectionCase"
-        position: view.materialReview ? Qt.vector3d(0,0,0) : view.adapter.casePosition
+        position: view.materialReview ? view.reviewCasePosition : view.adapter.casePosition
         Model {
             objectName: "caseLidProbe"
             source: "qrc:/assets/models/meshes/meshes_0__mesh.mesh"
@@ -93,7 +99,7 @@ View3D {
         objectName: "albumPaper"
         visible: !view.geometryOnly && (!view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "paper")
         source: "#Rectangle"
-        position: view.materialReview ? Qt.vector3d(0.17,1.85,0.027) : view.adapter.casePosition.plus(Qt.vector3d(0.17,1.85,0.027))
+        position: view.materialReview ? view.reviewCasePosition.plus(Qt.vector3d(0.17,1.85,0.027)) : view.adapter.casePosition.plus(Qt.vector3d(0.17,1.85,0.027))
         scale: Qt.vector3d(0.0306,0.0306,1)
         materials: caseMaterials.paper
     }

@@ -193,6 +193,8 @@
 - light follow rate=`4.743864518390578/duration`，同向速度限幅后接续；跨列换算旧世界原点，真实列使用独立列原点。详情把行光按原轨迹收退，不新增不受主题控制的白色高光。
 - 环境取基线 RoomEnvironment 的方向性与颜色，R01 从现有 Web 渲染路径导出无私人资源的环境输入/样本。Qt 内置 PBR 的强度单位不与 Three 直接等同，按固定环境和 ROI 进行限定标定。
 
+- 灯光、世界空间光带、独立列/rebase 跟随、650ms 连续主题及纸面/壳体共享世界原点函数见 `docs/contracts/lighting.md`，冻结源码/算法 hash 在 `lighting.json`。音乐生产环境/半球/方向/spot/area 使用原源单位的自定义 GLSL；不得与 Qt 内置灯重复叠加。LTC 资源与来源在 `resources/manifests/lighting.json`，Windows Release 复建为 `tools/build/verify-r08.ps1`，对应证据在 `verification/windows/lighting/`、`docs/media/lighting/`；平台新增审计在各静态目录 `lighting/`。R12 实例与 R18 抽取/归位继续消费同一实体 origin、绝对 row/lane 和 palette，不重建灯光或重新滤波整列平移。
+
 ### 首选管线与确定的补救路径
 
 - SceneAdapter 的产品接口固定，不因渲染实现变化修改 QML/导航。首选 Qt Quick 3D View3D + 自定义实例表 + CustomMaterial + Effect；不依赖 Qt 内部渲染类。
@@ -263,14 +265,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R08 · 灯光、世界空间光带与主题连续过渡（1–1.5日）
-
-- 依赖：R07。交付SelectionLighting、RowLightController、主题参数轨迹和光场shader。
-- 移植music-lighting.ts/music-row-lighting.ts最终运行值，包含环境、半球/方向光、选中光场与guided默认；Qt光强先按冻结源码确认灯型、颜色、强度与算法，再用R01样本辅助标定单位，不照抄不同单位的数值或渲染缺陷。
-- 光场以实例世界原点计算，抽取和归位纸面使用同一函数；跨列/rebase恢复旧原点后再跟随，普通真实列纵向导航不带动整阵列相机俯仰。
-- 昼夜主题650ms从当前颜色/数值继续；阅读层与三维参数共享目标和普通视觉时钟。
-- 退出：光带golden通过，重复输入/跨长短列不瞬移，封面交接不闪白，改速只影响一次。
 
 ### R09 · 阴影与环境遮蔽通道（1–1.5日）
 
