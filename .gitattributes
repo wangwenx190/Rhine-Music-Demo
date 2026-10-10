@@ -1,8 +1,7 @@
-# Source files are LF everywhere so a Windows checkout fingerprints, builds and
-# runs exactly like the macOS original. Windows scripts must stay CRLF.
+# Cross-platform source files; Windows launcher scripts require CRLF
 * text=auto eol=lf
-*.bat text eol=crlf
 *.cmd text eol=crlf
+*.bat text eol=crlf
 *.ps1 text eol=crlf
 *.command text eol=lf
 *.sh text eol=lf
@@ -15,8 +14,12 @@
 *.ico binary
 *.icns binary
 *.glb binary
+*.mesh binary
 *.blend binary
 *.woff2 binary
+*.ttf binary
+*.otf binary
+*.qsb binary
 *.pdf binary
 *.mp3 binary
 *.wav binary
@@ -26,6 +29,3 @@
 *.zip binary
 *.exe binary
 *.dll binary
-
-# Shipped with the Windows package; Notepad on Windows 10 shows LF-only text poorly.
-windows/*.txt text eol=crlf

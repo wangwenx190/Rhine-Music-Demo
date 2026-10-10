@@ -1,6 +1,6 @@
 # 社区衍生版本与相关项目
 
-官方主线：[RonaldDeng / Rhine-Music-Demo](https://github.com/RonaldDeng/Rhine-Music-Demo)。已发布 V0.4.1 为 macOS Web 版本；本仓库后续实施以 [Qt Quick / QML 迁移计划](../QT_QUICK_MIGRATION_PLAN.md) 为最高优先级，目标为 Windows、macOS、Linux 原生应用，目标不代表已经完成的平台支持。
+官方主线：[RonaldDeng / Rhine-Music-Demo](https://github.com/RonaldDeng/Rhine-Music-Demo)。已发布 V0.4.1 为 macOS Web 版本；本仓库后续实施以 [Qt Quick / QML 迁移计划](../../QT_QUICK_MIGRATION_PLAN.md) 为最高优先级，目标为 Windows、macOS、Linux 原生应用，目标不代表已经完成的平台支持。
 
 这里提供其他开发方向的入口，同时收录本项目的衍生版本和采用相近视觉方向或同一上游基础的相关项目；不把所有项目都视为本仓库的直接 Fork。**各版本独立开发、独立发布、独立提供支持；链接收录不代表主线已审查全部代码、完成安全审计或验证其兼容性。** 功能描述依据对应仓库的公开说明，实际支持范围请以作者文档为准。
 

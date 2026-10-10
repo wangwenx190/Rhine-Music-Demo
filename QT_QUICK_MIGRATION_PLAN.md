@@ -2,7 +2,7 @@
 
 ## 项目文档优先级
 
-- 本计划是项目内最高优先级的实施契约；`AGENTS.md`、`DESIGN.md`、README、贡献指南及其他计划、版本文档与其冲突时，以本计划为准。未冲突的约定继续适用。
+- 本计划是项目内最高优先级的实施契约；根 `AGENTS.md`、`README.md` 和 `legacy-web/` 内的开发约定、设计说明、贡献指南及其他计划、版本文档与其冲突时，以本计划为准。未冲突的约定继续适用。
 - 新的用户明确要求优先于已有项目文档；长期范围、技术路线或验收要求发生变化时，同步修订本计划及相关约定。
 - 历史 Web 实施和验收文档提供设计、参数与验证参照，其中的旧任务、旧授权、音频路线和发布检查不自动适用于本次原生迁移。
 
@@ -12,15 +12,15 @@
 
 - 本文件是剩余任务清单与跨轮次实施契约，不是开发日志。禁止加入“本轮完成了”“正在处理”“检查通过”、完成勾选、流水账、聊天记录和历史进度表。
 - 一个轮次的交付物及退出条件全部满足后，删除该轮次整个小节。编号保持不变，不重新编号；依赖编号指向代码、测试和验收资产，不要求被依赖的小节仍存在。
-- 完成轮次涉及的接口、参数、资产路径、构建命令及固定限制，合并到本文件对应的长期契约，或保存到代码和 `docs/qt/contracts/`；不得用保留已完成轮次代替交接。
+- 完成轮次涉及的接口、参数、资产路径、构建命令及固定限制，合并到本文件对应的长期契约，或保存到代码和 `docs/contracts/`；不得用保留已完成轮次代替交接。
 - 未通过的验收项保留为具体任务：写清输入、修复对象、预期结果、验收方法和依赖。禁止用“继续优化”“自行研究”“视情况调整”作为任务。
-- 测试输出、截图、性能样本和差异报告分别放到 `verification/qt/`、`docs/media/qt/`，只在本文件保存必要引用。不能将私人曲库、个人配置或绝对音乐路径放入版本控制。
-- 依次执行剩余且依赖已满足的轮次。一次执行以一个轮次为边界；不得为赶进度跳过视觉门槛或把跨平台未运行的检查写成通过。
+- Windows 测试输出、性能样本和差异报告放到 `verification/windows/`，视觉对照放到 `docs/media/`；macOS/Linux 静态审计放到 `verification/macos-static/`、`verification/linux-static/`。本文件仅保存必要引用，不保存过程日志。不能将私人曲库、个人配置或绝对音乐路径放入版本控制。
+- 依次执行剩余且依赖已满足的轮次。一次执行以一个轮次为边界；不得为赶进度跳过 Windows 实机与视觉门槛。macOS/Linux 满足下述严格静态审计即可视为本阶段验收通过，结果必须标明“静态审计通过，实机待用户验证”，不能记为实机通过。
 
 ## 目标、范围与固定取舍
 
 1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
-2. 原生应用使用 C++20、Qt 6.12、Qt Quick/QML、Qt Quick Controls 和 Qt Quick 3D；CMake 构建。QML 承担界面，C++ 承担模型、状态机、运动算法、文件扫描与控制器。
+2. 原生应用使用 C++23、开发机已安装的最新 Qt 版本、Qt Quick/QML、Qt Quick Controls 和 Qt Quick 3D；CMake 构建。QML 承担界面，C++ 承担模型、状态机、运动算法、文件扫描与控制器。计划中的当前版本与路径仅作为定位参考，不作为 CMake、脚本或产品的版本锁定。
 3. 最终运行不依赖 Node、浏览器、WebEngine、本地 HTTP 服务、Swift 桥接、外部 FFmpeg 命令或其他第三方库。Qt 自带的插件及其内部依赖由 Qt 部署工具部署，不自行链接其内部 FFmpeg 库。
 4. 音乐定位为普通播放器：播放、暂停、停止、上一首、下一首、专辑队列、进度、音量、输出设备和错误提示。全部使用 QtMultimedia 公开 API。
 5. **不实现无缝播放、交叉混音、手动 PCM、重采样、音频回调、音频环形缓冲、自建音频引擎或专业输出。** 不引入 `QAudioSink`、`QAudioDecoder`、`QAudioBufferOutput`、AVAudioEngine/CoreAudio 自建路线。
@@ -28,7 +28,7 @@
 7. 联网能力本阶段不执行，但保留异步接口、来源模型、状态占位、配置扩展和可替换 Provider。禁止删掉以后接入联网功能所需的数据字段；不实现外部服务协议，不发送请求。
 8. 暖昼/深夜、减少动态效果、0.25×–3× 动效速度、横竖屏/短屏/超宽屏、填充与真实列、列记忆、搜索不改变播放等行为保留。
 9. 不迁移旧档案终端 `?original=1`、PWA、浏览器专用菜单限制、在线播放器代理和旧拆解研究入口到产品主界面。原文件保留作为历史及参照；原生产品内的详情拖动查看、画质和光效调节保留。
-10. Windows 为本机开发与首轮验收平台；macOS、Linux 为必须支持的平台，分别构建和验收。移动端不属于本计划。
+10. Windows、macOS、Linux 均必须正常实现，不能仅声明支持或保留空壳分支。Windows 必须严格实机构建、运行与验证；macOS/Linux 本阶段通过严格静态审计即可完成对应轮次，真实环境构建、GUI、图形和音频验证留待用户以后执行，不作为本计划收口前置条件。移动端不属于本计划。
 11. 本阶段只编写与执行本地改造，不自动发布、上传私人数据、改写发行标签或删除 Web 基线。
 
 ## 跨轮次基线与工具链
@@ -36,16 +36,24 @@
 ### 基线与参数优先级
 
 - Web 基线提交：`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，产品版本 V0.4.1。后续工作树中的新改动不能自动改变基线。
-- 产品语义首先以本计划的固定取舍为准；AGENTS.md、DESIGN.md 顶部和 V0.4.1 专项文档仅补充未冲突的约定。渲染与时序数值取冻结提交实际执行路径的最终值。
-- 依据文件：`DESIGN.md`、`docs/MODEL-V0.4.0.md`、`docs/MOTION-V0.4.0.md`、`docs/MOTION-REVIEW-2026-10-07.md`、`docs/REAL-COLUMNS-V0.4.1.md`、`docs/COLUMN-POSITION-V0.4.1.md`、`docs/OVERVIEW-V0.4.0.md`、`docs/STARTUP-V0.4.0.md`、`docs/TITLE-CLIP-V0.4.1.md`。
+- 原项目所有工作文件和目录统一位于 `legacy-web/`，包括原 `.github/`、`.gitignore`、`.gitattributes`、AGENTS、源码、文档、启动器和资源；根 `.git/` 是当前仓库元数据，保留原位，不嵌套另一个仓库。本计划保留根目录；根 AGENTS、README 和 Git 规则是面向 Qt 项目重新建立的文件。
+- 冻结提交中的旧路径 `src/...`、`public/...`、`scripts/...`、`art/...` 在当前工作树对应 `legacy-web/src/...` 等。除明确给出根路径外，轮次中未带目录的旧模块名均指 `legacy-web/src/` 下的同名模块；旧资源均从 `legacy-web/public/`、`legacy-web/art/` 读取，新实现不得写回该基线。
+- 读取冻结提交时使用 Git 中的原路径，运行工作树 Web 参照时以 `legacy-web/` 为工作目录；不能对根目录运行 npm 或把新 `src/` 当作 Web 源码。基线工具把仓库根与 Web 根作为独立参数，输出只能写到新工具/资产/验收目录。
+- 产品语义首先以本计划的固定取舍为准；根 AGENTS 与 `legacy-web/DESIGN.md` 顶部、V0.4.1 专项文档仅补充未冲突的约定。渲染与时序数值取冻结提交实际执行路径的最终值。
+- 依据文件：`legacy-web/DESIGN.md`、`legacy-web/docs/MODEL-V0.4.0.md`、`legacy-web/docs/MOTION-V0.4.0.md`、`legacy-web/docs/MOTION-REVIEW-2026-10-07.md`、`legacy-web/docs/REAL-COLUMNS-V0.4.1.md`、`legacy-web/docs/COLUMN-POSITION-V0.4.1.md`、`legacy-web/docs/OVERVIEW-V0.4.0.md`、`legacy-web/docs/STARTUP-V0.4.0.md`、`legacy-web/docs/TITLE-CLIP-V0.4.1.md`。
 - 不能用历史截图代替当前运行基线。文档与运行值冲突时，保留文档设计意图，导出最终运行参数作数值依据。例如当前 `music-model.ts` 中侧脊基础/暖昼粗糙度为 0.25/0.30、厚度为 0.06/0.08，不直接照搬模型日志中的旧表格。
 
 ### 工具链契约
 
-- Windows Qt Kit：`C:/Qt/6.12.0/msvc2022_64`，qmake 报告 6.12.0；本机 VS C++ 工具路径为 `C:/Program Files/Microsoft Visual Studio/18/Community`。以 Kit 配套 ABI 和实际编译探测为准，不因为目录名 msvc2022 就切换到不存在的 VS 安装。
+- 当前开发机参考：Qt 安装根 `C:/Qt/`，已安装版本包括 6.11.1、6.12.0，目前最新 Kit 为 `C:/Qt/6.12.0/msvc2022_64`，qmake 报告 6.12.0；VS C++ 工具路径为 `C:/Program Files/Microsoft Visual Studio/18/Community`。这些值仅供 agent 定位，执行时重新枚举安装并选最新版本，升级 Qt 不要求修改仓库中的版本常量或路径。以 Kit 配套 ABI 和实际编译探测为准，不因为目录名 msvc2022 就切换到不存在的 VS 安装。
+- 全部原生 C++ 目标与资产/审计工具采用 C++23：CMake 设置 `CMAKE_CXX_STANDARD 23`、`CMAKE_CXX_STANDARD_REQUIRED ON`、`CMAKE_CXX_EXTENSIONS OFF`，公共目标按需声明 `cxx_std_23`。必须编译实际 C++23 能力探针；编译器不满足时明确报错，不静默退回 C++20 或依赖编译器默认标准。
+- Qt 自动选择由 `tools/build/` 的公共 Kit 定位逻辑负责：安装根从本机 UserPresets/环境配置读取，缺省枚举平台标准安装位置（Windows 当前参考 `C:/Qt/`）；枚举包含 Qt CMake 配置的本机原生 Kit，读取配置中的实际版本，并用 Kit 的 `qmake -query QT_VERSION` 交叉核对。按版本数值而非目录字符串排序，选择最高版本中匹配目标系统、CPU 架构与当前编译器 ABI 的 Kit；不将 Android、交叉编译 Kit 或 Qt 安装器的 Tools 目录当作桌面 Qt。
+- 不在 CMake、公共 presets 或脚本中写 `6.12`/`6.12.0` 版本条件、固定版本安装目录、`EXACT` 版本要求或只允许某版本的白名单。Qt 模块用 `find_package(Qt6 REQUIRED COMPONENTS ...)` 查找，不传固定版本参数；定位出的前缀传给 CMake，具体路径只保存在本机 UserPresets/环境或构建目录。Qt6 是本项目框架系列，minor/patch 版本随本机最新安装变化。
+- 本机 Qt 更新后构建入口重新检测最高版本与选中 Kit；原构建目录指向旧 Kit 时清除旧配置引用或要求重新配置，不能继续缓存旧路径。最高版本缺少必需模块、编译器 ABI 不匹配或 API/GuiPrivate 探针失败时给出明确诊断并修复，不自动降到较旧 Qt。用户显式提供 Kit 时也核对本机最高版本，过期覆盖不能绕过最新版本规则。
+- `qmake`、`balsam`、`qsb`、`qmllint`、部署工具及 Qt 插件均从同一已选 Kit 或其配套 host-tools 定位并校验版本一致，不从任意 PATH 混用其他 Qt 安装；记录实际 Qt/编译器/工具版本到验收产物。
 - 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
 - Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
-- `CMakeLists.txt` 在根目录；应用源放 `qt/`，构建目录 `build/qt/`，部署目录 `out/qt/`。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
+- `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Rhine/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 创建统一 preset 名称：`qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。统一命令：`cmake --preset qt-debug`、`cmake --build --preset qt-debug`、`ctest --preset qt-debug --output-on-failure`。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
 
@@ -54,22 +62,55 @@
 ### 目录及职责
 
 ```text
-qt/
-  app/          main、命令行、应用生命周期
-  core/         LibrarySnapshot、Album、Track、排序/搜索、偏好、选择控制
-  motion/       FrameClock、阻尼、五次轨迹、相机与阵列运动
-  render/       SceneAdapter、实例表、模型、材质、图集、后处理
-  media/        PlaybackController、BackgroundMusicController、InterfaceSoundController
-  library/      扫描、Qt 元数据探测、缓存、旧数据导入
-  services/     Provider 接口、OfflineProvider、资料缓存模型
-  qml/          App、Header、Browse、Detail、Overview、Opening、面板和基础控件
-  assets/       转换后的字体、模型、图标、音频和 shader
-  tests/        QtTest、QuickTest、GUI 场景重放与图像比较
-tools/qt/       构建、资产导出、验证、部署脚本
-docs/qt/contracts/  参数、接口、源模块映射和固定平台差异
-verification/qt/    自动化输出及机器可读对照结果
-docs/media/qt/      非私人视觉基线与对照图
+Rhine-Music-Demo/
+  .git/                     当前仓库元数据；不归档、不复制
+  QT_QUICK_MIGRATION_PLAN.md 剩余轮次与长期实施契约
+  AGENTS.md                 Qt 项目开发约定
+  README.md                 Qt 项目入口与构建/平台说明
+  .gitignore / .gitattributes 原生构建忽略规则与文本/二进制属性
+  CMakeLists.txt            顶层 Qt/C++23 目标、模块、测试与安装入口
+  CMakePresets.json         qt-debug / qt-release 的公共 configure/build/test presets
+  CMakeUserPresets.json     本机 Kit/编译器覆盖；不提交
+  cmake/                    可复用的资源、部署和平台 CMake 模块
+  src/
+    app/        main、命令行、应用生命周期
+    core/       LibrarySnapshot、Album、Track、排序/搜索、偏好、选择控制
+    motion/     FrameClock、阻尼、五次轨迹、相机与阵列运动
+    render/     SceneAdapter、实例表、模型、材质、图集、后处理
+    media/      PlaybackController、BackgroundMusicController、InterfaceSoundController
+    library/    扫描、Qt 元数据探测、缓存、旧数据导入
+    services/   Provider 接口、OfflineProvider、资料缓存模型
+    platform/   仅必要的平台差异；win / mac / linux 分支完整实现
+  qml/Rhine/Music/
+    App.qml                 模块主入口
+    components/             Header、字轮、滑尺和基础控件
+    pages/                  Browse、Detail、Overview、Opening
+    panels/                 搜索、设置、曲库、光照与动效面板
+    scene/                  View3D、模型、材质与后处理声明
+  resources/
+    fonts/ models/ icons/ audio/ shaders/ manifests/
+  tests/
+    unit/ qml/ integration/ visual/ fixtures/
+  tools/
+    build/ assets/ review/ deploy/ audit/ launchers/
+  docs/
+    contracts/              参数、接口、源模块映射与固定差异
+    platforms/              Windows 使用说明；macOS/Linux 用户实机验证清单
+    media/                  非私人视觉基线与成对对照图
+  verification/
+    windows/                Windows 实机、自动化、视觉与性能证据
+    macos-static/           macOS 严格静态审计矩阵与证据
+    linux-static/           Linux 严格静态审计矩阵与证据
+  build/debug/ build/release/ 本机构建输出；不提交
+  out/windows/ out/macos/ out/linux/ 部署输出；不提交
+  启动音乐播放器.cmd / .command / .sh 普通 Qt 音乐启动器
+  legacy-web/               全部原项目文件与目录；Web 基线及历史资料
 ```
+
+- 此结构是各轮次创建新文件时必须遵循的目标布局；不为未执行的轮次提前生成空 CMake、假入口或占位实现。归档文件不混入新的 `src/`、`qml/`、`resources/`、`tests/`。
+- `src/` 子目录各自维护 CMake 源清单；目标固定为 `RhineMusicCore`（模型/运动/存储）、`RhineMusic`（应用/渲染/媒体/QML）和独立测试目标。`src/platform/` 只放实际存在的平台差异，共用逻辑优先使用 Qt。
+- `qt_add_qml_module` 的 URI 固定 `Rhine.Music`；`qml/Rhine/Music/App.qml` 及子目录文件使用模块相对资源别名，以 `loadFromModule("Rhine.Music", "App")` 加载，不依赖工作目录或文件系统 import。非 QML 资产经 qrc `/assets/` 加载；shader 从 `resources/shaders/` 使用 `qt_add_shaders` 生成 qsb。
+- 新文档中的源码/资产路径均从仓库根解析；Web 资料引用显式带 `legacy-web/`。保留 `legacy-web/LICENSE`、`legacy-web/NOTICE.md` 和原署名/素材说明，新应用资源清单记录复制来源。
 
 ### 数据流与线程边界
 
@@ -94,7 +135,7 @@ docs/media/qt/      非私人视觉基线与对照图
 ### 存储与本地资料
 
 - 默认数据根为 `QStandardPaths::AppLocalDataLocation`；`--data-dir` 可显式覆盖。配置、索引、封面、偏好各自分文件；偏好存 `preferences.json`，列位置仅存在会话内存。
-- 原 `../music-data-v3` 只作为显式导入来源，不自动与 Web 共写。导入配置/索引/封面/本地备注/来源信息到新的数据根，原目录只读；不导入旧 PCM 缓存。
+- 旧音乐数据目录只作为用户显式选择的导入来源，不按新的 `legacy-web/` 相对路径自动推断。原根目录旁的 `../music-data-v3` 不随源码归档移动；归档后直接运行旧服务可能改变默认相对位置，参照工具必须显式配置隔离的 `MUSIC_DATA_DIR`。导入配置/索引/封面/本地备注/来源信息到新的数据根，原目录只读；不导入旧 PCM 缓存。
 - JSON 使用 QJsonDocument、QSaveFile 原子提交；异步保存串行化。损坏文件保持原件并显示错误，不默默覆盖。源歌曲永不写回标签。
 - ID 保留原规则：专辑 `album-` + SHA256(原生绝对目录或直属单曲路径 UTF-8) 前 24 位；曲目 `track-` + SHA256(原生绝对文件路径 UTF-8) 前 24 位。同机导入保留原 ID；跨系统路径不能自动猜测映射。
 - 排序使用 Qt QCollator，zh_CN、numericMode=true、CaseInsensitive；NFKC、trim、合并空白，等价时按规范化字符串和 ID 稳定排序。不同系统的排序器可能与浏览器 ICU 有差别；固定视觉 fixture 使用冻结的列顺序，不引入 ICU/OpenCC/TagLib 弥补差异。
@@ -145,7 +186,7 @@ docs/media/qt/      非私人视觉基线与对照图
 - 材质标定固定用五个ROI：盖内纸面、盖外留白、侧脊、外框边缘、盒体后方背景；暖昼/深夜、正视/低角度同时计分，不能只优化单张图。损失为所有ROI等权的RGB平均绝对误差，加上轮廓平均距离/255；先通过几何门槛再开始标定。
 - 先校准光强单位：每类Qt灯相对导出强度尝试10^-4至10^4的十倍间隔倍率，按固定ROI损失选单位换算因子，暖昼/深夜共用因子，不能分别作弊。随后采用确定性坐标搜索：按曝光/环境强度/灯强度/透射/粗糙度/厚度/衰减距离顺序，依次试当前值、±10%、±5%、±2%、±1%，选跨场景损失最低且不破坏硬门槛的值，相同损失取距基线最近值；完整扫描最多3遍。透射/粗糙度范围0–1、厚度为正，IOR固定1.46、几何/封面纹理/主题颜色不参与搜索。三遍后仍有结构误差按R10触发补救；只剩参数残差时新增具体ROI补修轮次，不无限随机调参。
 - R10 若出现无法通过公开 Qt Quick 3D 接口修复的透射捕获、逐实例排序、图集局部上传或通道控制问题，执行 R10A–R10D。不能直接删效果、自动降低默认画质或换成 WebEngine。
-- 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用 GuiPrivate，版本固定 6.12；不引入第三方渲染引擎，不改 QML 业务接口。只隔离在 `qt/render/rhi/`，不让私有类型泄漏到 core/media。
+- 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
 - 如果首选管线达到目标且无上述结构限制，删除条件轮次 R10A–R10D；不是把它们标记为完成。由实际对照决定是否触发，不由 agent 个人偏好决定。
 
 ### 纹理与实例预算
@@ -168,7 +209,7 @@ docs/media/qt/      非私人视觉基线与对照图
 
 ### 尺寸、图像和运动门槛
 
-- 必测内容尺寸：1920×1080、1280×720、995×858、960×900、930×900、390×844、320×720、2560×1080、3440×1440；DPR 1/1.5/2 在代表性尺寸覆盖。平台窗口装饰不进入比较。
+- Windows 实机必测内容尺寸：1920×1080、1280×720、995×858、960×900、930×900、390×844、320×720、2560×1080、3440×1440；DPR 1/1.5/2 在代表性尺寸覆盖。平台窗口装饰不进入比较。以下截图、运动、图像与性能门槛在本阶段以 Windows 真实 Qt 运行产物验收；macOS/Linux 按静态审计检查共用逻辑及平台差异实现，不要求伪造对应平台的图像。
 - 先验收结构：主锚点误差≤1逻辑像素、三维轮廓/投影锚点误差≤2逻辑像素；布局分界、文本断行、裁切、控件可点击范围必须一致。
 - 在同尺寸同输入的 sRGB PNG 上，UI ROI SSIM目标≥0.98；三维关键 ROI SSIM目标≥0.97，平均 RGB 绝对误差目标≤6/255；文字边缘仅允许固定 1px 抗锯齿带单列统计，不能大面积遮掉差异。
 - SSIM用 Qt/C++实现11×11高斯窗口σ=1.5，C1=(0.01×255)²、C2=(0.03×255)²；另生成绝对差分图、边缘距离和分区误差。禁止新增 OpenCV/Pillow/scikit-image。
@@ -182,7 +223,21 @@ docs/media/qt/      非私人视觉基线与对照图
 - Windows参考机60Hz下，原始画质/1920×1080内容窗口，预热后120秒混合交互目标p95帧间隔≤20ms；无资源准备时不得重复出现>50ms卡顿。高刷新率额外记录，不将VSYNC限制误报为性能不足。
 - 记录冷启动、稳定、重载、恢复各自分布；CPU提交时间不得称作GPU耗时。资源计数、上传字节、解码并发与帧率分别采集。
 - 连续10次界面重建和30次详情切换后，资源回落且无单调增长；隐藏/最小化暂停视觉更新，歌曲继续播放。
-- 没有macOS/Linux执行环境时，相关轮次保留；CI配置成功不等于真实图形、字体和音频验收通过。
+- Windows 必须有真实 Debug/Release 构建、Qt 窗口交互、实际 GPU 视觉/资源/性能证据、QtMultimedia 播放与输出设备检查，以及部署产物脱离开发路径的实际运行。静态审计、模拟媒体、CI 配置或仅 configure 成功均不能替代；失败项以具体补修任务保留。
+- macOS/Linux 代码、CMake、QML/资源、shader 和部署脚本必须完整实现；严格静态审计通过即可完成本阶段对应轮次，不因缺少真实平台环境保留轮次。真实环境验证由用户以后执行，清单放 `docs/platforms/`，不作为本阶段未完成任务重新塞回计划。
+
+### macOS / Linux 严格静态审计契约
+
+- 每个平台形成独立 `audit-matrix.json`、`audit-report.md` 和用户实机验证清单。矩阵逐项包含 checkId、requirement、platform、sourcePath、lineOrSymbol、evidence、result、limitations；每条结论必须指向实际代码分支、CMake 条件、资源清单、脚本行或所选最新 Qt 版本的官方 API 依据。审计同时核对 C++23、Qt 自动选版、无固定版本路径及完整平台分支。只写“跨平台 Qt 已支持”、只列文件名或只靠字符串搜索不算证据。
+- 审计工具放 `tools/audit/`，使用 C++/Qt 或系统现有脚本能力，输入为当前源码与规则清单，输出机器可读覆盖/发现报告；自动检查之后逐项人工推演实际调用链、平台预处理分支、资源解析与错误路径。审计修复要同步检查共享代码在 Windows 的受影响运行行为。
+- **COMMON-01 构建闭包：** 从顶层 CMake 展开 WIN32/APPLE/UNIX 分支，核对每个目标、源清单、链接模块、moc/qrc/qsb、安装路径和测试注册。Windows API、Dwrite/MSVC 选项必须仅存在 Windows 分支；Apple 与 Linux 分支引用的文件/符号必须真实存在，不得 `#error`、空实现、无条件提前返回或 silently disable 产品功能。禁止把运行时后端强制写死 D3D11 到所有系统。
+- **COMMON-02 路径与资源：** 检查所有文件通过 QFile/QDir/QUrl/QStandardPaths 正确处理 Unicode、大小写、空格、路径分隔符和可写目录；不依赖盘符、当前目录或硬编码 Kit。QML 模块别名、qrc 字体/图标/模型/音频、插件相对路径、打包后读取位置必须形成完整解析链；DirectWrite 字体转换只作为 Windows 资产工具，转换产物供三平台共用。
+- **COMMON-03 渲染闭包：** 检查相机矩阵、clip-space 修正、纹理 Y 方向、深度范围、MSAA resolve、透明排序、屏幕采样和 shader binding/location；Qt Quick 3D 自定义片段按 Qt 跨后端生成规则审计，独立 shader 与条件 QRhi 路径检查 Metal/GL 所需代码和 qsb 变体。Windows 上可执行的 qsb 跨目标生成与产物清单核对必须运行；生成 MSL/GLSL 只作为静态证据，不能宣称目标 GPU 已验证。无法在 Windows 执行的目标编译器检查逐项写明限制，不要求安装第三方交叉工具链。
+- **COMMON-04 媒体与生命周期：** 从命令到 QMediaPlayer/QAudioOutput/QSoundEffect 的调用链逐项检查 source/设备/错误/EndOfMedia/取消/销毁；保留真实公开 API 实现，不用模拟播放器作为非 Windows 产品后端。默认设备及设备消失回退、不可 seek、未知格式、资源错误、后台与恢复都有可执行逻辑；不引用 Swift、外部 FFmpeg 命令或手动 PCM。
+- **MAC-01 平台集成：** 审核 bundle 目标、Info.plist、可执行文件与 Resources/Frameworks/PlugIns/qml 安装位置、macdeployqt 调用与输入存在性；确认 Metal 选择/默认行为、Retina 逻辑像素、Command 快捷键、菜单/关闭语义与可写数据目录实现。普通 `.command` 从自身路径解析产物并正确引用带空格路径，不依赖 Node、开发 Kit 路径或系统音频改造。
+- **LNX-01 平台集成：** 审核 Linux 的 Qt 平台插件及依赖清单、xcb/Wayland 选择、OpenGL 默认和可选 Vulkan 的探测/回退；核对共享库搜索路径、插件/QML/媒体部署位置、`.sh` 文件的 LF/可执行位/参数透传/带空格路径及 XDG 数据路径。媒体依赖以所部署 Qt 插件的真实要求为依据，不把 Windows DLL 名称照搬成 Linux 库；权限/设备错误有提示，不静默安装软件或修改系统配置。
+- **COMMON-05 证据与缺陷门槛：** 全部适用项均有可追溯证据，所有发现的功能缺失、构建/链接/资源错误、平台不兼容、部署缺陷与未实现路径必须修复；N/A 必须说明代码不适用的具体原因。Windows 共享测试、qmllint 和能在本机运行的资产/qsb 检查提供真实结果，但不充作 macOS/Linux 编译或运行结果。单纯缺少对应系统实机不构成缺陷，平台实现或审计证据缺失构成阻塞。
+- 审计报告结论固定写“静态审计通过，实机待用户验证”；报告记录审计提交/内容 hash、Qt 版本、检查覆盖及无法静态证明的运行风险。用户验证清单给出从配置、构建、部署到启动、GUI、播放和设备检查的准确命令与预期结果。后续用户实机发现问题时再开具体修复任务；本阶段不承诺未运行平台的实际性能、编码支持或像素结果。
 
 ## 待执行轮次
 
@@ -190,8 +245,8 @@ docs/media/qt/      非私人视觉基线与对照图
 
 ### R01 · 冻结可执行Web基线与视觉/行为数据（1–2日）
 
-- 依赖：无。交付 `tools/qt/export-web-baseline.mjs`、`docs/qt/contracts/source-map.json`、`scene-parameters.json`、`motion-golden.json`、匿名fixture和基线截图清单。
-- 读取冻结提交的实际music入口；建立所有生产模块到Qt职责的映射，明确哪些旧档案模块仅为参照。导出最终相机、灯光、材质、CSS变量/计算样式、可见性和时序，不只导出构造默认值。渲染参数必须等待music主题/光照初始化及目标状态落稳后读取。
+- 依赖：无。交付 `tools/review/export-web-baseline.mjs`、`docs/contracts/source-map.json`、`scene-parameters.json`、`motion-golden.json`、匿名fixture和基线截图清单。
+- 读取冻结提交的实际music入口；导出器显式区分仓库根与 `legacy-web/` Web 根，旧依赖/构建命令在 Web 根运行，使用隔离的数据目录，不触碰用户曲库。建立所有生产模块到新 `src/`、`qml/`、`resources/` 职责的映射，明确哪些旧档案模块仅为参照。导出最终相机、灯光、材质、CSS变量/计算样式、可见性和时序，不只导出构造默认值。渲染参数必须等待music主题/光照初始化及目标状态落稳后读取。
 - 场景对照至少导出位置/方向/FOV/near/far/投影矩阵、各灯世界变换/颜色/强度、环境纹理及曝光、每个表面最终材质、AO/DOF/AA有效参数、实例矩阵和纸面UV；UI导出字体/字重/字号/lineHeight/letterSpacing、边距、宽高、颜色及全部cubic-bezier。缺字段使导出失败，不让后续agent补猜默认值。
 - 为阻尼、五次轨迹、光带、阵列rebase、总览、字轮和片头生成带输入事件的数值golden；用已有检查脚本验证导出器调用真实函数。
 - 以既有Web环境生成各主题的浏览、详情、总览、片头关键节点及换片序列；缺少浏览器时保留基线采集任务，不用历史图填充。整理RoomEnvironment输入和可复现环境样本。
@@ -199,15 +254,15 @@ docs/media/qt/      非私人视觉基线与对照图
 
 ### R02 · CMake工程、Kit探测与最小原生运行（0.5–1日）
 
-- 依赖：R01。交付根CMake、presets、`qt/app/main.cpp`、最小App.qml、QtTest目标和构建脚本。
-- `qt_add_executable`/`qt_add_qml_module`注册`Rhine.Music`模块；加载Qt Quick Controls Basic样式再创建引擎，避免平台主题改变自定义控件。
-- 独立探测Qt Quick 3D、ShaderTools、Multimedia链接及插件加载；为Debug/Release配置一致的模块路径，Qt前缀可覆盖。
+- 依赖：R01。交付根 CMake、presets、`cmake/` 模块、`src/app/main.cpp`、`qml/Rhine/Music/App.qml`、`tests/unit/` QtTest 目标和 `tools/build/` 脚本；目录按上述结构建立，不恢复 `qt/` 套层。
+- `qt_add_executable`/`qt_add_qml_module`注册`Rhine.Music`模块，资源别名及加载入口按目录契约固定；加载Qt Quick Controls Basic样式再创建引擎，避免平台主题改变自定义控件。从本轮起三平台 CMake 分支必须完整，系统特定链接和编译选项有条件隔离；Windows 实机运行，macOS/Linux 纳入静态审计矩阵。
+- 实现上述 C++23 强制设置、能力探针与最新 Qt Kit 自动选择；独立探测 Qt Quick 3D、ShaderTools、Multimedia 链接及插件加载，Debug/Release 使用同一 Kit。Kit 选择逻辑用合成安装清单覆盖版本数值排序、非桌面 Kit 排除、架构/ABI 匹配、最高版本缺模块报错与旧缓存失效；不得为测试安装另一版本 Qt 或写死本机 6.12 路径。
 - 首个窗口验证D3D11渲染、中文文本、QML模块和QMediaPlayer创建；运行失败保留实际诊断，不能仅靠CMake configure成功过关。
-- 退出：三个统一构建/测试命令运行；启动不创建浏览器、Node服务或联网请求。现有Web构建不被破坏。
+- 退出：三个统一构建/测试命令在 Windows 实际运行；启动不创建浏览器、Node服务或联网请求。归档 Web 参照使用 `legacy-web/` 工作目录及原锁定依赖，原模块与资产内容不被新构建覆盖。
 
 ### R03 · 模型、字体、图标与音频资源接入（1–1.5日）
 
-- 依赖：R02。交付 `qt/assets/`、资源清单、`tools/qt/prepare-assets`和资产测试。
+- 依赖：R02。交付 `resources/` 分类资产、`resources/manifests/` 来源/hash 清单、`tools/assets/prepare-assets` 和 `tests/integration/` 资产测试；所有输入来自 `legacy-web/public/` 或 `legacy-web/art/`。
 - 导入music-case-v040.glb，保留三壳体批次、顶点/法线/UV和纸面间隙；Qt导入输出与原几何包围盒/三角数对照。生成资产保留输入hash，禁止对模型做非均匀缩放。
 - 验证四个MiSans字重的Qt加载、glyph覆盖与文字宽度；按布局契约处理不支持的字体格式。品牌/按钮图标逐路径提取，不换图案。
 - 复用atmosphere/motif/pulse等现有完整音频资源；界面音效仅接入可直接播放的既有短文件。没有独立短资产的合成音效保留事件映射并静音，不手工生成/裁切PCM，不播放整段typing-preview作为每次按键声。
@@ -215,7 +270,7 @@ docs/media/qt/      非私人视觉基线与对照图
 
 ### R04 · C++数据模型、排序、搜索与离线Provider契约（1–1.5日）
 
-- 依赖：R02。交付 `qt/core/`值类型和列表模型、`qt/services/`接口/离线实现。
+- 依赖：R02。交付 `src/core/`值类型和列表模型、`src/services/`接口/离线实现。
 - 按music-types.ts保留Album/Track/来源/查询状态；路径作为本地QUrl，媒体可播放性采用Unknown/Supported/Unsupported，不沿用browserPlayable的扩展名猜测。
 - 实现独立导航/播放ID、QCollator稳定排序、原搜索字段与空查询规则；用冻结fixture证明排序列分组、搜索结果与模型通知正确。
 - 实现OfflineMetadataProvider，异步读取缓存或返回Deferred；缓存命中不会触发重查，无缓存不会写成not-found。
@@ -280,7 +335,7 @@ docs/media/qt/      非私人视觉基线与对照图
 ### R10A · 条件轮次：Qt RHI骨架与不透明通道（1–1.5日）
 
 - 触发：R10固定RHI；依赖R06及R10。交付QQuickRhiItem/Renderer、qsb构建、阴影/不透明目标及shader接口。
-- 使用Qt GuiPrivate的QRhi，Windows D3D11；synchronize阶段拷贝SceneFrame，render阶段无GUI访问。标准uniform block、显式binding/location和QSB跨后端编译。
+- 使用所选最新 Qt Kit 的 GuiPrivate/QRhi，建立实际所用接口的 CMake 编译探针，差异集中在 RHI 适配层；Qt 更新导致接口变化时修复并重跑探针，不锁版本。Windows D3D11；synchronize阶段拷贝SceneFrame，render阶段无GUI访问。标准uniform block、显式binding/location和QSB跨后端编译。
 - RenderGraph固定shadow→opaqueColor/normal/depth→capture/mips→shell→AO/DOF/AA→output；不透明封面沿用R07的UV/光场，目标按RenderQuality限制。设备clip-space通过QRhi修正矩阵处理，QSB不依赖OpenGL默认深度范围。
 - 退出：已知顶点、深度、法线、单盒不透明投影与Quick3D基线一致，动态resize无资源竞态。
 
@@ -300,7 +355,7 @@ docs/media/qt/      非私人视觉基线与对照图
 ### R10D · 条件轮次：渲染替换集成与跨后端探测（0.5–1日）
 
 - 依赖R10C。SceneAdapter接入RHI，保留projectWorldPoint/hitTest/SceneFrame合同，产品只打包选定后端。
-- 用同一fixture重新跑R06–R10（含R09B）检查；至少本机D3D11与可用OpenGL探测，Metal/Linux实际检查留给各平台轮次。
+- 用同一fixture在 Windows 实机重新跑R06–R10（含R09B）检查；至少本机D3D11与可用OpenGL探测。Metal/Linux 代码及 qsb 变体纳入 R31/R32 严格静态审计，真实后端验证留待用户执行。
 - 退出：QML/导航无后端判断，图形私有接口集中隔离；原Quick3D研究代码不成为第二套生产状态。
 
 ### R11 · 封面解码、缓存、图集与所有权（1–1.5日）
@@ -395,7 +450,7 @@ docs/media/qt/      非私人视觉基线与对照图
 
 - 依赖R11、R21。交付MediaMetadataProbe、LegacyImporter及兼容性测试。
 - 最多2个探测QMediaPlayer，每个任务独立generation、无QAudioOutput、不调用play；等待LoadedMedia/metadata/duration事件，8秒超时或InvalidMedia结束。不可探测保留文件名/未知艺术家，不删曲目。
-- 映射QMediaMetaData中的Title/AlbumTitle/AlbumArtist/ContributingArtist/TrackNumber/Date/Genre/Duration及CoverArtImage；不使用Qt6.12已弃用的ThumbnailImage。按实际公开字段保留，不访问Qt内部解码器。
+- 映射QMediaMetaData中的Title/AlbumTitle/AlbumArtist/ContributingArtist/TrackNumber/Date/Genre/Duration及CoverArtImage；不使用弃用的ThumbnailImage，按所选最新 Qt 的实际公开字段与弃用说明核对。不访问Qt内部解码器。
 - 目录封面cover/folder/front优先；直属单曲先嵌入封面再同名图；图片大小上限30MiB。现有字段/制作信息可从旧索引保留，Qt缺失字段不能覆盖为假值。
 - 导入只读music-data-v3到新dataDir，复制必要封面，保持本地备注/来源/未知JSON字段；浏览器偏好无法自动读时提供显式JSON导入入口，不读取用户浏览器数据库。
 - 退出：无声探测、损坏文件、超时、并发取消、索引v3/v4导入和unicode路径通过；播放能力与可索引能力分别显示。
@@ -461,38 +516,38 @@ docs/media/qt/      非私人视觉基线与对照图
 ### R30 · Windows部署、普通启动器与干净环境验证（1–1.5日）
 
 - 依赖R29。交付Release目录、部署脚本、根目录Windows普通启动器及Qt使用说明。
-- windeployqt指定qml目录部署Qt Quick 3D、Multimedia及Qt随附媒体依赖；打包qrc资产与MSVC运行库要求，不复制整个Qt安装目录。
+- `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，部署 Qt Quick 3D、Multimedia 及 Qt 随附媒体依赖；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
 - 用无Qt开发PATH、无Node/FFmpeg路径的临时环境运行；验证离线启动、demo、unicode音乐路径、设备列表、可支持样本和字体加载。
 - 普通启动器只找合法安装/构建产物并启动Qt程序，不后台启动Web服务；演示/光照启动器继续在tools/launchers/。
-- 退出：Release脱离开发环境能运行，数据路径符合QStandardPaths，部署包不含私人库/缓存/调试基线。
+- 退出：Windows Release 实际脱离开发环境运行，GUI/动画/特效、真实本地音频播放、暂停/seek/换曲/音量/设备行为与代表性尺寸/DPR验证通过；记录 OS/GPU/Qt/后端及运行证据。数据路径符合QStandardPaths，部署包不含私人库/缓存/调试基线。静态检查不能代替本轮实机验收。
 
-### R31 · macOS构建、Metal与平台集成（1–1.5日）
+### R31 · macOS完整实现与严格静态审计（1–1.5日）
 
-- 依赖R30。交付macOS构建/部署脚本和平台视觉/播放验收产物；需要实际macOS执行环境。
-- 同一Qt6.12源码构建，macdeployqt部署QML/媒体插件；处理应用bundle资源路径、Retina逻辑像素、菜单/快捷键和关闭行为，运行时不依赖Swift桥接。
-- 使用Metal执行代表性浏览/详情/总览/片头/玻璃ROI；修复shader坐标和字体加载差异，不以Windows截图替代。已有.command普通入口切换到Qt产物，Web参照入口移到tools/launchers/。
-- 验证本地播放、暂停、seek和默认设备/设备变化；Qt不支持的编码按公开错误处理。
-- 退出：实际构建、bundle运行、Metal GUI和QtMultimedia设备测试完成；缺设备时保留此轮，不发布跨平台已完成声明。
+- 依赖R30。交付同一 C++23/Qt 源码的 macOS CMake 分支、`tools/build/` 与 `tools/deploy/` macOS 脚本、根普通 `.command`、`verification/macos-static/` 审计产物及 `docs/platforms/macos.md`。使用该开发机安装的最新原生 Qt Kit，不固定版本；不要求当前具备 macOS 实机。
+- 完整实现 bundle/Info.plist、资源路径、macdeployqt QML/媒体插件部署、Retina 逻辑像素、Command 菜单/快捷键、关闭与后台语义；产物放 `out/macos/`，不引用 Swift 桥接。根普通 `.command` 新建为 Qt 启动器；原脚本继续在 `legacy-web/` 保留，Qt 演示/研究入口在根 `tools/launchers/`。
+- 按 COMMON-01–05 与 MAC-01 逐项展开实际源码/构建/部署链，审核 Metal/字体/qsb 资源与媒体设备逻辑；共享功能在 Windows 运行回归。修复所有可确定缺陷，禁止空分支、直接禁用功能或用 Windows 截图作为 macOS 图像证据。
+- 用户验证清单列出 Qt Kit 设置、configure/build/test、macdeployqt、bundle 启动，以及代表性浏览/详情/总览/片头/玻璃 ROI、本地播放/暂停/seek/设备变化的命令或步骤及预期结果；其中真实执行结果留待用户填写。
+- 退出：平台实现与脚本完整，严格静态审计所有适用项通过，缺陷清零，结论为“静态审计通过，实机待用户验证”；满足后删除本轮。缺实机环境不阻止本阶段验收，不宣称实际 macOS 构建、Metal 或音频已通过。
 
-### R32 · Linux构建、图形后端与平台集成（1–1.5日）
+### R32 · Linux完整实现与严格静态审计（1–1.5日）
 
-- 依赖R30。交付Linux构建/部署脚本、普通.sh启动器和平台验收产物；需要实际Linux执行环境。
-- Qt6.12+CMake/Ninja，使用Qt支持的系统图形/媒体依赖；QML/插件部署路径明确，优先OpenGL并对可用Vulkan探测，不要求系统安装第三方应用引擎。
-- X11/Wayland至少可用环境实际验证，固定DPR/内容尺寸对照；检查FONT加载、触摸板pixelDelta、文件路径大小写、默认音频设备和权限错误。
-- 若需要单独系统包，在平台说明写具体Qt部署依赖；不让安装脚本静默修改系统音频/驱动配置。
-- 退出：干净环境启动、代表性GUI/音频实际检查完成；缺环境保留本轮。
+- 依赖R30。交付 Linux CMake 分支、`tools/build/` 与 `tools/deploy/` Linux 脚本、根普通 `.sh`、`verification/linux-static/` 审计产物及 `docs/platforms/linux.md`。不要求当前具备 Linux 实机。
+- 完整实现 C++23、该开发机安装的最新原生 Qt Kit 与 CMake/Ninja 构建及 `out/linux/` 部署，不固定 Qt 版本；明确 QML/平台/媒体插件、共享库搜索位置与 Qt 所需系统依赖。优先 OpenGL，可选 Vulkan 经探测可回退，X11/xcb 与 Wayland 所需路径和配置均实现。普通 `.sh` 从自身路径解析产物，保留参数，设置正确 Git 可执行位。
+- 按 COMMON-01–05 与 LNX-01 检查大小写/Unicode/XDG/权限路径、字体与 shader、触摸板 pixelDelta、默认设备及错误处理；展开所有非 Windows 分支而非只审阅入口文件，修复每项静态可确定缺陷。系统包要求按实际 Qt 插件写明，脚本不静默修改系统音频/驱动配置。
+- 用户验证清单列出 configure/build/test/部署/启动命令、X11 与 Wayland、DPR/窗口尺寸、浏览/详情/总览/片头、默认设备与播放/seek/设备变化检查及预期结果；真实环境检查以后由用户执行。
+- 退出：平台实现与部署闭包完整，严格静态审计所有适用项通过，缺陷清零，结论为“静态审计通过，实机待用户验证”；满足后删除本轮。缺实机环境不阻止本阶段验收，不宣称实际 Linux 构建、图形或音频已通过。
 
 ### R33 · 原生主入口收口与最终文档（0.5–1日）
 
 - 依赖R30–R32及所有视觉补修任务。交付根启动器、README/开发说明、源模块映射和最终离线功能清单。
-- 默认产品入口指向Qt；保留Web源码/基线/研究资产可供回归，但普通用户流程不再要求Node、浏览器、Swift或外部FFmpeg。
+- 默认产品入口指向Qt；全部 Web 源码/基线/研究资产继续隔离在 `legacy-web/`，Qt 源码、QML、资源与测试遵循根目录结构，普通用户流程不再要求Node、浏览器、Swift或外部FFmpeg。
 - 文档明确普通播放、Qt支持格式边界、联网接口暂未启用、导入旧数据方式、Qt构建/平台部署命令和仍可复现的视觉残差；不恢复本计划已排除的能力。
-- 对Qt原生构建、资源、GUI重放、离线Provider、普通播放和三平台结果做最终核对；未运行检查继续保留任务，不能仅凭CI文件存在或自动测试模拟通过收口。
-- 退出：所有必需轮次有真实交付与验收资产，主入口可用；本文件删除已完成轮次，只保留未来联网接入合同和必要的长期约束。
+- 最终核对 Windows 实机构建/资源/GUI重放/离线Provider/普通播放/部署证据，以及 macOS/Linux 完整实现、严格静态审计矩阵和用户实机验证清单。Windows 未运行或未通过的必需检查保留具体任务；macOS/Linux 静态审计通过即满足本阶段要求，不因用户未来实机验证尚未执行而阻止收口。
+- 退出：所有必需轮次有真实交付及对应平台要求的验收资产，Windows 主入口严格实机可用，macOS/Linux 标明“静态审计通过，实机待用户验证”；本文件删除已完成轮次，只保留未来联网接入合同和必要的长期约束。
 
 ## Qt官方实施参考
 
-以下仅作为公开接口语义依据；执行时优先读取本机Qt6.12随附文档，不因查阅文档而在产品中启用联网功能。
+以下仅作为公开接口语义依据；执行时优先读取所选最新 Qt Kit 配套文档并核对实际 API，计划中的本机版本参考不构成版本要求。不因查阅文档而在产品中启用联网功能。
 
 - [QML与C++集成](https://doc.qt.io/qt-6/qtqml-cppintegration-overview.html)
 - [Qt Quick帧动画](https://doc.qt.io/qt-6/qml-qtquick-frameanimation.html)

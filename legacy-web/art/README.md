@@ -1,6 +1,6 @@
 # 模型源文件
 
-> **原生迁移约定：** 以 [Qt 迁移计划](../QT_QUICK_MIGRATION_PLAN.md) 的资产转换方案为最高优先级，复用并转换冻结基线模型至 `qt/assets/`。下文 Node/Three.js/Blender 脚本保留用于旧资产追溯，不成为 Qt 应用运行依赖，也不要求为迁移新增第三方建模工具。
+> **原生迁移约定：** 以 [Qt 迁移计划](../../QT_QUICK_MIGRATION_PLAN.md) 的资产转换方案为最高优先级，复用并转换冻结基线模型至仓库根 `resources/`。下文 Node/Three.js/Blender 脚本保留用于旧资产追溯，不成为 Qt 应用运行依赖，也不要求为迁移新增第三方建模工具。
 
 此目录保留 Blender 场景和对应建模脚本，用于维护与复现。正常运行播放器不需要安装 Blender；运行时资源位于 `public/assets/`。
 

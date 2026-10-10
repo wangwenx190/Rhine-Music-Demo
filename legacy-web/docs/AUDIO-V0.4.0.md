@@ -1,6 +1,6 @@
 # V0.4.0 音频路线、实现与验证
 
-> **原生迁移适用范围：** 本文及下述 V0.4.1 更新描述旧 Web/Swift 音频路线与历史验证。当前改造以 [Qt 迁移计划](../QT_QUICK_MIGRATION_PLAN.md) 为最高优先级，仅用 QtMultimedia 公开 API 实现普通播放；不迁移无缝排程、手动 PCM、DSD 转换、外部 FFmpeg 命令或 CoreAudio 桥接。格式支持按 Qt 实际能力及新验收结果说明，旧测试不能替代 Qt 验收。
+> **原生迁移适用范围：** 本文及下述 V0.4.1 更新描述旧 Web/Swift 音频路线与历史验证。当前改造以 [Qt 迁移计划](../../QT_QUICK_MIGRATION_PLAN.md) 为最高优先级，仅用 QtMultimedia 公开 API 实现普通播放；不迁移无缝排程、手动 PCM、DSD 转换、外部 FFmpeg 命令或 CoreAudio 桥接。格式支持按 Qt 实际能力及新验收结果说明，旧测试不能替代 Qt 验收。
 
 > V0.4.1 更新：本页保留 V0.4.0 的实现与验证历史。V0.4.1 已增加真正的预排无缝接续，当前行为以 [歌曲衔接说明](SONG-TRANSITIONS-V0.4.1.md) 和 [发行检查](RELEASE-V0.4.1.md) 为准。下述 DSD 的 24 位 / 176.4 kHz 适用于普通解码；CoreAudio 无缝预备的下一首另行归一为当前引擎采样率的 Float32 PCM。4 GiB 是当前磁盘缓存回收目标，正在使用和受保护的文件可能暂时超过目标。
 

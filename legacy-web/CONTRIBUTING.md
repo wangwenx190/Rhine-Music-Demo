@@ -1,6 +1,6 @@
 # 主线、社区版本与反馈
 
-> 项目内开发与技术路线以 [Qt Quick / QML 原生迁移执行计划](QT_QUICK_MIGRATION_PLAN.md) 为最高优先级。本指南中未冲突的贡献与反馈约定继续适用。
+> 项目内开发与技术路线以 [Qt Quick / QML 原生迁移执行计划](../QT_QUICK_MIGRATION_PLAN.md) 为最高优先级。本指南中未冲突的贡献与反馈约定继续适用。
 
 感谢你愿意改进 Rhine Music。本仓库由 RonaldDeng 维护。已发布 V0.4.1 为 macOS Web 版本；本仓库的原生迁移目标为 C++/Qt 与 Windows、macOS、Linux，按迁移计划逐轮实现和验收，目标不代表已经完成的平台支持。维护精力有限，目前**不接收 Pull Request，PR 入口已关闭**，也不承诺逐个审查、移植或合并社区改动。
 
