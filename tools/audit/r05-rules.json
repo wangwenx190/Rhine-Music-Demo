@@ -1,0 +1,69 @@
+{
+  "round": "R05",
+  "checks": [
+    {
+      "checkId": "COMMON-01",
+      "requirement": "Portable C++23 motion target, latest native Kit and complete moc/QML/test closure",
+      "sources": [
+        {"path":"CMakeLists.txt","symbol":"add_subdirectory(src/motion)"},
+        {"path":"src/motion/CMakeLists.txt","symbol":"target_sources(YalahooCore PRIVATE"},
+        {"path":"src/app/QmlTypes.h","symbol":"QML_FOREIGN(yalahoo::FrameClock)"},
+        {"path":"tests/unit/CMakeLists.txt","symbol":"NAME runtime-motion"},
+        {"path":"cmake/Platform.cmake","symbol":"elseif(UNIX AND NOT APPLE)"},
+        {"path":"tools/build/build.sh","symbol":"preset=${1:-qt-release}"}
+      ],
+      "evidence":"All motion cpp/headers extend the same YalahooCore with public include directories; top-level required C++23 and actual capability probe apply to this target and MotionTest. No compiler/OS branch, assembler, private Qt API or fixed minor/patch is added. QObject moc is compiled in the core; foreign uncreatable registrations in the executable reference that same code, with native owners injected before module load. Qt-generated foreign wrappers require non-final QObject classes and now compile. The shared test and runtime commands use selected Kit DLL/plugins and inherited C++23 on every platform. Actual Windows clean Release build regenerates all moc artifacts; ordinary incremental build subsequently passes. macOS/Linux share the identical source list and existing Unix warning/compiler branches.",
+      "limitations":"No target compiler/linker was run on macOS/Linux. Their host must rediscover its own latest native Kit; existing build trees may require -Clean when adding new QObject sources."
+    },
+    {
+      "checkId":"COMMON-02",
+      "requirement":"No cwd, native path, data or resource regression from clock injection",
+      "sources":[
+        {"path":"src/app/main.cpp","symbol":"engine.setInitialProperties"},
+        {"path":"qml/Yalahoo/Music/App.qml","symbol":"required property MotionController motionController"},
+        {"path":"src/app/CMakeLists.txt","symbol":"QT_RESOURCE_ALIAS App.qml"},
+        {"path":"src/motion/QuinticTrack.h","symbol":"std::array<double, 6>"}
+      ],
+      "evidence":"The mathematical kernels consume only double values and fixed arrays; the QObject frame bridge accesses no files, paths, music IDs, user preferences or filesystem. The native main injects the motion pointer alongside LibrarySession; loadFromModule and existing qrc aliases still resolve App/fonts/shaders/models independently of cwd on all OS branches. No platform resource path or bundle metadata changes. Test fixtures use the CMake absolute repository definition and QSaveFile writes reports to the build verification directory, outside product data. Full asset/library/identity/runtime regression on Windows passes.",
+      "limitations":"No target filesystem, Unicode cwd or packaged bundle was run on macOS/Linux; existing platform packaging is outside R05."
+    },
+    {
+      "checkId":"COMMON-03",
+      "requirement":"One production frame source, background gating and unchanged render backend/resource closure",
+      "sources":[
+        {"path":"qml/Yalahoo/Music/App.qml","symbol":"FrameAnimation {"},
+        {"path":"src/motion/FrameClock.cpp","symbol":"m_discardNext = true"},
+        {"path":"src/app/main.cpp","symbol":"QGuiApplication::applicationStateChanged"},
+        {"path":"src/app/main.cpp","symbol":"QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal)"},
+        {"path":"src/app/main.cpp","symbol":"QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL)"}
+      ],
+      "evidence":"The only QML FrameAnimation gates on window visible/non-minimized plus native applicationVisible. QGuiApplication public applicationStateChanged maps Hidden/Suspended to false in common main, preserving ticking while merely Inactive; QML running writes clock.active, and each trigger calls advance(frameTime). Activation discards one sample and advance clamps before speed multiplication; no backlog/wall timestamp/second visual timer exists. This introduces no camera, clip-space, depth, Y orientation, transparency, MSAA, shader binding or render-thread write. Existing platform D3D11/Metal/OpenGL branches and qsb resource chain remain complete. Windows production runtime verifies D3D11/model pixels, mouse, active tick, hide/minimize pause and two zero-delta resumptions; shader-tools still executes and inspects generated MSL/GLSL variants.",
+      "limitations":"MSL/GLSL generation and source traces are static evidence only. Metal/GL frame pacing and OS-specific Hidden/Suspended delivery await target runtime checks. Production scene/geometry parity belongs to R06 onward."
+    },
+    {
+      "checkId":"COMMON-04",
+      "requirement":"Independent visual/opening/media time and revision-safe completion/lifecycle",
+      "sources":[
+        {"path":"src/motion/FrameClock.cpp","symbol":"const double motionDt = dt * m_speed"},
+        {"path":"src/motion/MotionController.cpp","symbol":"emit completed(revision)"},
+        {"path":"src/app/main.cpp","symbol":"QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion"},
+        {"path":"tests/unit/MotionTest.cpp","symbol":"controllerCompletionAndRevisions"}
+      ],
+      "evidence":"Motion connects to one FrameClock::frame and consumes only motionDt; opening increments the raw capped dt independently and saturates at 11.6 with one terminal notification. Media state is neither input nor output of any motion API. Reduced motion immediately finishes active archive and opening, leaving no 1ms workaround; normal/reduced finish captures revision before notifications and emits once for the completed request. Same destination does not increment/restart; replacement preserves x/v/a and only the last request completes. Reentrant completion starts a new revision while the old signal still identifies its own revision. QObject receiver contexts disconnect clock/controller/application connections on destruction; native motion/library/media owners outlive the QML engine, with no render-thread motion reader. No network, process, PCM, private multimedia, polling or audio clock in motion. Actual hide/minimize/reverse/reduced runtime leaves the media source empty; numerical tests cover opening speed independence and negative/nonfinite input.",
+      "limitations":"Actual playing audio, device removal, seek/error and full application reload/exit remain R24/R25/R28; R05 does not claim those behaviors. Platform lifecycle notification behavior and QML object disposal require future target runtime validation."
+    },
+    {
+      "checkId":"COMMON-05",
+      "requirement":"Frozen source provenance and separate x/v/a mathematical gate, real Release evidence",
+      "sources":[
+        {"path":"tools/review/export-motion-golden.mjs","symbol":"ts.transpileModule(frozen(name)"},
+        {"path":"tests/fixtures/motion/kernel-golden.json","symbol":"r01GoldenSha256"},
+        {"path":"tests/unit/MotionTest.cpp","symbol":"frozenNonzeroAndVariableFrames"},
+        {"path":"tools/build/verify-r05.ps1","symbol":"Preset = 'qt-release'"},
+        {"path":"docs/contracts/motion.md","symbol":"常规验证只使用 Release"}
+      ],
+      "evidence":"R01 golden remains unmodified and contains 694 source-defined 20/30/60/120fps frames. Additional 694 frames execute immutable Git function bodies using only existing frozen TS dev dependency, with nonzero observed acceleration, spring-to-guided transitions, reverse, speed .25/3, capped long/negative dt, translation and reduced finish; 13 additional whole-motion.ts vectors compare pure formulas. Source SHA-256 and R01 hash are checked. C++ separately records max position/velocity/acceleration errors below 1e-6, and unit checks prove analytic spring partition invariance, C2 joins, exact end derivatives, same-target and revision/completion semantics. Actual Release 12/12 CTest, warning-free qmllint, real production GPU/lifecycle window and qsb tests provide local evidence. Audit performs source/hash/one-frame-source/forbidden-API checks and stores each manual call/branch trace with content hashes. No unresolved static defect found in this round.",
+      "limitations":"Numerical parity does not establish scene or animation visual parity; later visual rounds remain. Windows evidence is not target-platform runtime or performance evidence; no macOS/Linux real run is claimed."
+    }
+  ]
+}

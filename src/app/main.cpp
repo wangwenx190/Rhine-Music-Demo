@@ -1,6 +1,7 @@
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
+#include "MotionController.h"
 #include "OfflineMetadataProvider.h"
 
 #include <QAudioDevice>
@@ -61,6 +62,7 @@ int main(int argc, char **argv)
     parser.addHelpOption();
     parser.addOption({QStringLiteral("verify-runtime"), QStringLiteral("Write runtime evidence and exit"), QStringLiteral("report")});
     parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
+    parser.addOption({QStringLiteral("verify-motion"), QStringLiteral("Verify the production frame source, hide/restore and motion completion")});
     parser.process(app);
     if (parser.isSet(QStringLiteral("verify-runtime")))
         qInstallMessageHandler(recordDiagnostic);
@@ -88,8 +90,22 @@ int main(int argc, char **argv)
         if (!library.snapshot()->albums.isEmpty())
             library.requestMetadata(library.snapshot()->albums.first().id, QStringLiteral("introduction"));
     }
+    yalahoo::MotionController motion;
+    const auto updateApplicationVisibility = [&](Qt::ApplicationState state) {
+        motion.clock()->setApplicationVisible(state != Qt::ApplicationHidden && state != Qt::ApplicationSuspended);
+    };
+    updateApplicationVisibility(app.applicationState());
+    QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion, updateApplicationVisibility);
+    QJsonObject motionEvidence;
+    double pausedTime = 0;
+    quint64 pausedFrames = 0;
+    bool awaitingResume = false;
+    bool resumeDiscarded = true;
+    int resumeSamples = 0;
+    QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
-    engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)}});
+    engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)},
+        {"motionController", QVariant::fromValue(&motion)}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
@@ -98,6 +114,47 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+
+    if (parser.isSet(QStringLiteral("verify-motion"))) {
+        if (!parser.isSet(QStringLiteral("verify-runtime"))) return 8;
+        QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, &app, [&](double dt, double) {
+            if (awaitingResume) {
+                resumeDiscarded = resumeDiscarded && dt == 0;
+                ++resumeSamples;
+                awaitingResume = false;
+            }
+        });
+        QObject::connect(&motion, &yalahoo::MotionController::completed, &app, [&](quint64 revision) {
+            completionRevisions.append(qint64(revision));
+        });
+        motion.clock()->startOpening();
+        motion.travel(7.44, 15.6, 12, 3);
+        QTimer::singleShot(400, window, [&] {
+            window->hide();
+            pausedTime = motion.clock()->visualTime();
+            pausedFrames = motion.clock()->frameCount();
+        });
+        QTimer::singleShot(700, window, [&] {
+            motionEvidence.insert("hiddenPaused", !motion.clock()->active()
+                && pausedTime == motion.clock()->visualTime() && pausedFrames == motion.clock()->frameCount());
+            awaitingResume = true;
+            window->show();
+        });
+        QTimer::singleShot(1100, window, [&] { motion.clock()->setSpeed(2); });
+        QTimer::singleShot(1200, window, [&] {
+            window->showMinimized();
+            pausedTime = motion.clock()->visualTime();
+            pausedFrames = motion.clock()->frameCount();
+        });
+        QTimer::singleShot(1500, window, [&] {
+            motionEvidence.insert("minimizedPaused", !motion.clock()->active()
+                && pausedTime == motion.clock()->visualTime() && pausedFrames == motion.clock()->frameCount());
+            awaitingResume = true;
+            window->showNormal();
+        });
+        QTimer::singleShot(1700, window, [&] { motion.travel(-.62, -5.2, -1, -1); });
+        QTimer::singleShot(2000, window, [&] { motion.setReducedMotion(true); });
+    }
 
     QObject::connect(window, &QQuickWindow::afterRendering, window, [&] {
         ++frames;
@@ -134,7 +191,8 @@ int main(int argc, char **argv)
             backend = api == QSGRendererInterface::Direct3D11;
 #endif
             QDir().mkpath(QFileInfo(report).absolutePath());
-            const QString screenshot = QFileInfo(report).absolutePath() + QStringLiteral("/runtime.png");
+            const QString screenshot = QFileInfo(report).absolutePath() + (parser.isSet(QStringLiteral("verify-motion"))
+                ? QStringLiteral("/runtime-motion.png") : QStringLiteral("/runtime.png"));
             const bool saved = !image.isNull() && image.save(screenshot);
             const auto *view3D = window->findChild<QQuickItem *>(QStringLiteral("quick3DProbe"));
             const bool quick3DAvailable = view3D != nullptr;
@@ -162,7 +220,14 @@ int main(int argc, char **argv)
                 const QMutexLocker lock(&diagnosticsMutex);
                 recorded = diagnostics;
             }
-            const bool passed = frames > 0 && backend && interactions == 1 && mediaAvailable
+            const bool motionPassed = !parser.isSet(QStringLiteral("verify-motion"))
+                || (motionEvidence.value("hiddenPaused").toBool() && motionEvidence.value("minimizedPaused").toBool()
+                    && resumeDiscarded && resumeSamples == 2 && !motion.moving()
+                    && motion.rail() == -.62 && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
+                    && !completionRevisions.isEmpty() && completionRevisions.last().toInteger() == qint64(motion.revision())
+                    && media.source().isEmpty());
+            const bool passed = motionPassed && frames > 0 && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
+                && backend && interactions == 1 && mediaAvailable
                 && shaderAvailable && qmlAvailable && chineseSupported && saved
                 && quick3DAvailable && qmlMediaAvailable && modelPixels > 100 && libraryProbe
                 && (!parser.isSet(QStringLiteral("verify-library")) || (library.albums()->rowCount() == 21
@@ -184,6 +249,18 @@ int main(int argc, char **argv)
                 {"screenshotSaved", saved}, {"sourceOpened", false}
             };
             QJsonObject reportData = evidence;
+            reportData.insert("visualFrameCount", qint64(motion.clock()->frameCount()));
+            reportData.insert("visualTime", motion.clock()->visualTime());
+            if (parser.isSet(QStringLiteral("verify-motion"))) {
+                motionEvidence.insert("passed", motionPassed);
+                motionEvidence.insert("resumeDiscarded", resumeDiscarded);
+                motionEvidence.insert("resumeSamples", resumeSamples);
+                motionEvidence.insert("completionRevisions", completionRevisions);
+                motionEvidence.insert("finalRevision", qint64(motion.revision()));
+                motionEvidence.insert("openingTime", motion.clock()->openingTime());
+                motionEvidence.insert("mediaSourceEmpty", media.source().isEmpty());
+                reportData.insert("motion", motionEvidence);
+            }
             reportData.insert("libraryAlbums", library.albums()->rowCount());
             reportData.insert("searchResults", library.searchResults()->rowCount());
             reportData.insert("metadataResults", library.metadata().size());

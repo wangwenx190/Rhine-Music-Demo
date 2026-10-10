@@ -7,6 +7,7 @@ import QtMultimedia
 ApplicationWindow {
     id: window
     required property LibrarySession librarySession
+    required property MotionController motionController
     width: 960
     height: 640
     minimumWidth: 560
@@ -14,6 +15,15 @@ ApplicationWindow {
     visible: true
     title: "yalahOO!!!"
     property int interactionCount: 0
+
+    FrameAnimation {
+        id: visualFrames
+        running: window.visible && window.visibility !== Window.Minimized
+            && window.motionController.clock.applicationVisible
+        onRunningChanged: window.motionController.clock.active = running
+        Component.onCompleted: window.motionController.clock.active = running
+        onTriggered: window.motionController.clock.advance(frameTime)
+    }
 
     ShaderEffect {
         anchors.fill: parent

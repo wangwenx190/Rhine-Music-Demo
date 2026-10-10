@@ -63,3 +63,17 @@ ctest --preset qt-release -R 'library-data|library-qml|runtime-library' --output
 预期：所有冻结匿名库列、216 个冻结搜索用例、排序/分组、JSON 未知字段与 Unicode 本地 QUrl、模型通知、独立导航/播放 ID、异步缓存/Deferred/取消/过期结果/销毁通过；同一 QML 组件读到稳定专辑/曲目角色，离线和测试 Provider 的 Matched/Uncertain/Error 均可读取。实际 runtime-library 窗口显示 21 张匿名专辑，Typography 得到 28 条结果，资料缓存返回一次，鼠标交互正常，歌曲来源保持空；报告在 build/release/verification/runtime-library.json。没有扫描或播放用户音乐，零网络请求的源码审计见对应 library-data/audit-matrix.json。
 
 实机结果：待用户填写。此清单不代表本平台已经编译、运行或验证媒体播放。
+
+## 运动内核与生命周期实机验证（R05）
+
+静态审计通过，实机待用户验证。使用本机最新 Qt Kit 执行：
+
+```sh
+sh tools/build/build.sh qt-release
+ctest --preset qt-release -R 'motion|runtime-motion' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+预期：两个 694 帧冻结数值对照及运动边界检查通过，x/v/a 误差分别不超过 1e-6。`runtime-motion` 运行真实 OpenGL/QML 窗口，自动隐藏/最小化并恢复，两次后台期间帧数和视觉时间不增长，恢复首帧 dt=0，减少动态完成最后 revision，开场独立时间到 11.6，媒体来源为空；报告在 `build/release/verification/runtime-motion.json`，配套截图为同目录 `runtime-motion.png`。在实际 X11/Wayland 桌面环境复核隐藏、最小化和恢复；如果平台发出 ApplicationHidden/Suspended，也应停止唯一帧源。仅切换焦点为 Inactive 时允许继续视觉帧。
+
+若已有构建树新增 QObject 后保留旧 moc 列表，执行 `cmake --build --preset qt-release --clean-first` 再运行测试。以上没有在 Linux 执行；实际 GL 帧率、窗口管理器生命周期事件和产品场景仍待对应轮次/用户验证。

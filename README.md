@@ -19,4 +19,6 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 
+单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)，实际场景和产品动画按后续轮次接入。
+
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。

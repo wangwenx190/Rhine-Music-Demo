@@ -15,6 +15,21 @@ if(WIN32)
     set_tests_properties(identity module-link-and-plugins shader-tools runtime PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+qt_add_executable(MotionTest MotionTest.cpp)
+target_link_libraries(MotionTest PRIVATE YalahooCore Qt6::Test)
+target_compile_definitions(MotionTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    MOTION_REPORT="${CMAKE_BINARY_DIR}/verification/motion-errors.json")
+yalahoo_platform(MotionTest)
+add_test(NAME motion COMMAND MotionTest
+    -o "${CMAKE_BINARY_DIR}/verification/motion-test.xml,junitxml" -o -,txt)
+set_tests_properties(motion PROPERTIES TIMEOUT 60)
+add_test(NAME runtime-motion COMMAND Yalahoo --verify-runtime "${CMAKE_BINARY_DIR}/verification/runtime-motion.json" --verify-motion)
+set_tests_properties(runtime-motion PROPERTIES TIMEOUT 30
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
+if(WIN32)
+    set_tests_properties(motion PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    set_tests_properties(runtime-motion PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 set_tests_properties(identity module-link-and-plugins shader-tools runtime PROPERTIES ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
 qt_add_executable(LibraryDataTest LibraryDataTest.cpp)

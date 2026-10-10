@@ -174,6 +174,7 @@
 - 临界阻尼原样移植：`d=x-target`，`j=v+r*d`，`e=exp(-r*dt)`；`x=target+(d+j*dt)*e`，`v=(v-r*j*dt)*e`。普通真实列 rate=3.7，详情换片 rate=9，总览 rate=6.5。
 - 搜索/跨列远记忆/归中按现有五次多项式接续 x/v/a，终点 v=a=0；时长 `1.4+clamp((hypot(lanes,rows/8)-1)/7,0,1)` 秒。系数直接移植 `music-archive-motion.ts`、`music-real-columns.ts`，不能用 Qt SpringAnimation 默认参数替换。
 - 同目标不重启轨迹；坐标 rebase 只平移位置与多项式常数项，时间、速度、加速度不变。减少动态效果直接完成目标并处理回调/焦点，不能只把 duration 设成 1ms。
+- 运动内核、唯一 QML 帧源、时钟/轨迹 API、revision 完成语义及冻结数值对照见 `docs/contracts/motion.md`；Windows 证据在 `verification/windows/motion/`，新增 oracle 在 `tests/fixtures/motion/kernel-golden.json`，macOS/Linux 对应审计在各平台 `motion/` 子目录。后续视觉模块只消费同一 FrameClock 的 dt/motionDt，不重复缩放速度；实际列布局和开场界面分别由 R13/R20 接入。
 - UI 曲线采用原 cubic-bezier，通过求解横坐标获取 progress，不把 CSS 控制点直接解释为均匀参数 t。改速从当前进度继续，不重新设置起点。
 - 表面进入/退出采样当前 opacity/transform；被打断时基础时长 `max(72ms,baseDuration*sqrt(opacityDistance))`。右侧进入 24px/退出 32px，上下进入 10px/退出 6px；有独立图层的面板分别过渡。
 - PresentationPhase 保留 archive/opening/detail/switch-hiding/switching/hiding/returning/selecting；退浏览文字后才能抽取，盒体和相机落稳后才能进详情字。退场中只保留最后目标，旧完成事件按 revision 丢弃。
@@ -260,14 +261,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R05 · 单时钟、阻尼与五次运动内核（1–1.5日）
-
-- 依赖：R01、R04。交付FrameClock、ScalarSpring、QuinticTrack、MotionController及数值对照测试。
-- 逐式移植motion.ts/music-archive-motion.ts/music-real-columns.ts；实现observe/retarget/translate/finish，保留x/v/a，同目标不重启。
-- 独立维护开场时钟、普通视觉时钟和媒体状态；改速不重算起点，隐藏恢复丢弃后台间隔，减少动态直接执行完成语义。
-- 用20/30/60/120fps、反向/改速/长帧/rebase对照golden，不用近似Euler积分。
-- 退出：满足数学门槛，只有一个生产视觉tick源，没有音频时钟或PCM代码。
 
 ### R06 · 几何场景、相机投影与LayoutMetrics（1–1.5日）
 
