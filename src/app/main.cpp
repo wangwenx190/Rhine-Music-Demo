@@ -6,6 +6,7 @@
 #include "SceneAdapter.h"
 #ifdef YALAHOO_REVIEW
 #include "SceneReview.h"
+#include "MaterialReview.h"
 #endif
 
 #include <QAudioDevice>
@@ -68,12 +69,17 @@ int main(int argc, char **argv)
     parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
     parser.addOption({QStringLiteral("verify-motion"), QStringLiteral("Verify the production frame source, hide/restore and motion completion")});
 #ifdef YALAHOO_REVIEW
+    parser.addOption({QStringLiteral("verify-materials"), QStringLiteral("Run source-based single-case material comparison"), QStringLiteral("fixture")});
+    parser.addOption({QStringLiteral("material-report"), QStringLiteral("Material ROI report"), QStringLiteral("report")});
     parser.addOption({QStringLiteral("verify-scene"), QStringLiteral("Run deterministic geometry fixtures"), QStringLiteral("fixture")});
     parser.addOption({QStringLiteral("scene-report"), QStringLiteral("Geometry review report"), QStringLiteral("report")});
 #endif
     parser.process(app);
-    if (parser.isSet(QStringLiteral("verify-runtime")))
-        qInstallMessageHandler(recordDiagnostic);
+    if (parser.isSet(QStringLiteral("verify-runtime"))
+#ifdef YALAHOO_REVIEW
+        || parser.isSet(QStringLiteral("verify-materials"))
+#endif
+    ) qInstallMessageHandler(recordDiagnostic);
 
     // Outlive the engine and its render-thread callbacks during teardown.
     std::atomic<int> frames{0};
@@ -116,7 +122,7 @@ int main(int argc, char **argv)
     QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)},
-        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}});
+        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}, {"geometryProbe", parser.isSet(QStringLiteral("verify-runtime"))}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
@@ -126,6 +132,10 @@ int main(int argc, char **argv)
     if (!window)
         return 3;
 #ifdef YALAHOO_REVIEW
+    if (parser.isSet(QStringLiteral("verify-materials"))) {
+        if (!parser.isSet(QStringLiteral("material-report"))) return 12;
+        return yalahoo::reviewMaterials(app,*window,scene,parser.value(QStringLiteral("verify-materials")),parser.value(QStringLiteral("material-report")));
+    }
     if (parser.isSet(QStringLiteral("verify-scene"))) {
         if (!parser.isSet(QStringLiteral("scene-report"))) return 9;
         return yalahoo::reviewScene(app, *window, scene, parser.value(QStringLiteral("verify-scene")),

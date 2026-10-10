@@ -1,0 +1,5 @@
+VARYING vec2 paperUv;
+void MAIN() {
+    paperUv=UV0;
+    POSITION=MODELVIEWPROJECTION_MATRIX*vec4(VERTEX,1.0);
+}

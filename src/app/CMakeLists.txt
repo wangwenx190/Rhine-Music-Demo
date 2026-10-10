@@ -1,6 +1,6 @@
-qt_add_executable(Yalahoo main.cpp AssetCatalog.cpp AssetCatalog.h)
+qt_add_executable(Yalahoo main.cpp AssetCatalog.cpp AssetCatalog.h FixedTextureData.cpp FixedTextureData.h)
 if(YALAHOO_REVIEW)
-    target_sources(Yalahoo PRIVATE SceneReview.cpp SceneReview.h)
+    target_sources(Yalahoo PRIVATE SceneReview.cpp SceneReview.h MaterialReview.cpp MaterialReview.h)
     target_compile_definitions(Yalahoo PRIVATE YALAHOO_REVIEW)
 endif()
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
@@ -21,8 +21,27 @@ set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
 set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
 set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
+set(material_qml_files)
+foreach(name CaseMaterials GlassMaterial)
+    set(file "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/${name}.qml")
+    set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "scene/${name}.qml")
+    list(APPEND material_qml_files "${file}")
+endforeach()
+qt_add_resources(Yalahoo material_assets PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
+    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/case-glass.vert"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/case-glass.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/album-paper.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/album-paper.vert"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/material-output.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/material-background.frag"
+    "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/dfg.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/licenses/three-LICENSE"
+    "${PROJECT_SOURCE_DIR}/resources/licenses/materials-NOTICE.md"
+    "${PROJECT_SOURCE_DIR}/resources/manifests/materials.json")
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
-    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" "${scene_qml}" SOURCES QmlTypes.h)
+    DEPENDENCIES QtQuick3D
+    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" "${scene_qml}" ${material_qml_files} SOURCES QmlTypes.h FixedTextureData.h)
 qt_add_shaders(Yalahoo r02_shader_probe PREFIX /assets/shaders BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag")
 target_link_libraries(Yalahoo PRIVATE YalahooCore YalahooScene Qt6::Gui Qt6::Qml Qt6::Quick

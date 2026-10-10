@@ -32,3 +32,4 @@
 
 # Frozen GPU environment readback
 *.rgba16f binary
+*.rgba32f binary

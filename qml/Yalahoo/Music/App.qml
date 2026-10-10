@@ -10,6 +10,7 @@ ApplicationWindow {
     required property MotionController motionController
     required property SceneAdapter sceneAdapter
     property bool sceneReview: false
+    property bool geometryProbe: false
     width: 960
     height: 640
     minimumWidth: 1
@@ -34,6 +35,7 @@ ApplicationWindow {
     GeometryScene {
         anchors.fill: parent
         adapter: window.sceneAdapter
+        geometryOnly: window.sceneReview || window.geometryProbe
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)
     onHeightChanged: sceneAdapter.layout.setViewport(width, height)

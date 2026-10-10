@@ -4,7 +4,7 @@
 
 原创品牌 SVG、双主题字标、小尺寸图标与平台衍生文件已保存，规范和预览见 [branding.md](docs/contracts/branding.md)。Qt 导出命令为 `./tools/assets/export-branding.ps1 -Preset qt-release -WindowPreview`；页眉/开场接入归 R14/R20，系统集成归 R30–R32。品牌替换与其他界面复刻分开验收。
 
-当前已有 Qt 原生运行探针和完整 qrc 资产接入：原专辑盒三壳体、四字重 MiSans、八个功能图标双主题、现有完整音频与演示封面。探针使用临时材质，音乐播放器功能与实际材质按后续轮次接入。[资源契约](docs/contracts/assets.md)包含来源/hash、字体权重映射、准备与验证命令；[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现和构建入口。可复建的匿名 Web 参照见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
+当前已有 Qt 原生运行探针和完整 qrc 资产接入：原专辑盒三壳体、四字重 MiSans、八个功能图标双主题、现有完整音频与演示封面。单盒已接入主盖、侧脊、后托自定义材质与独立漫反射纸面，音乐播放器功能按后续轮次接入。[资源契约](docs/contracts/assets.md)包含来源/hash、字体权重映射、准备与验证命令；[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现和构建入口。可复建的匿名 Web 参照见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
 
 - `src/`：C++ 应用、模型、运动、渲染、媒体与平台代码。
 - `qml/Yalahoo/Music/`：界面与场景 QML 模块。
@@ -19,6 +19,6 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 
-单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。玻璃、灯光、阵列和完整产品动画按后续轮次接入。
+单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。单盒材质、双主题参数、局部纸面 LOD、线性透射捕获与精确 sRGB 输出已接入，90 个逐层对照和漫反射探针见 [材质契约](docs/contracts/materials.md)。动态光场、阴影、景深、阵列和完整产品动画按后续轮次接入。
 
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。

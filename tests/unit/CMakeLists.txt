@@ -10,6 +10,14 @@ if(WIN32)
     set_tests_properties(scene PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME runtime-materials COMMAND Yalahoo --verify-materials
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/materials/single-case.json"
+        --material-report "${CMAKE_BINARY_DIR}/verification/materials/runtime.json")
+    set_tests_properties(runtime-materials PROPERTIES TIMEOUT 150
+        ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+    if(WIN32)
+        set_tests_properties(runtime-materials PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     foreach(dpr IN ITEMS 1 1.5 2)
         add_test(NAME runtime-scene-dpr-${dpr} COMMAND Yalahoo --verify-scene
             "${PROJECT_SOURCE_DIR}/tests/fixtures/scene/camera-golden.json"

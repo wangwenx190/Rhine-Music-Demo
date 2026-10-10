@@ -1,0 +1,25 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "frozenSources": {
+    "src/music-model.ts": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a",
+    "src/appearance.ts": "8ad730b12e7b71f61c8ca055728f09b9b6133511431efa554580db319ed359fb",
+    "src/cover-atlas.ts": "db618e47e44f9e3a4197e26d297345b3693ce5ff7067608f9966be3bc5b75910",
+    "src/scene.ts": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541",
+    "src/music-cd-asset.ts": "eb072d8c9843a24aaf62f2ef0b09bd25a730314e501035b0b2c4492672054b56"
+  },
+  "environment": {
+    "width": 768,
+    "height": 1024,
+    "sha256": "5693c5a0eb2ea0d2d89b1a982818d6b9c8d234c6bfba6fbcdcfcc9b753634d02",
+    "format": "RGBA32F little-endian; original WebGL bottom row first"
+  },
+  "upstreamAlgorithms": {
+    "legacy-web/node_modules/three/src/renderers/shaders/ShaderChunk/cube_uv_reflection_fragment.glsl.js": "8610f2598b998c8443c89c24f712ca8c36197f5d7152811c7176f9e0e255553c",
+    "legacy-web/node_modules/three/src/renderers/shaders/ShaderChunk/transmission_pars_fragment.glsl.js": "586f774384f3442bdca1270d203b19f4cc318fd56ee522cdecc4a8b1cb9fc8fc",
+    "legacy-web/node_modules/three/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js": "37b7b7e1c51203344ba0e3feae48a5b116e571c008f5b8c684dc41bec46e58cd",
+    "legacy-web/node_modules/three/src/renderers/shaders/ShaderChunk/tonemapping_pars_fragment.glsl.js": "447958b93d07616c83d9273829ed810eb734d02ebbe60f12fc9bdda4f7928f44",
+    "legacy-web/node_modules/three/src/renderers/shaders/DFGLUTData.js": "4a6e5e13121a71227524272d63e38adc9f6b3ecad9265f7bb001a0cd8b8990c4"
+  },
+  "license": "resources/licenses/three-LICENSE",
+  "runtimeLibrariesAdded": []
+}

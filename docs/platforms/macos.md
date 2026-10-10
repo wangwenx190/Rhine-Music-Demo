@@ -100,3 +100,15 @@ cmake --build --preset qt-release
 ```
 
 预期：普通构建不识别 `--verify-scene`/`--scene-report`。本平台编译、GPU/窗口系统、DPR 及交互实际结果：待用户填写；Windows 证据不替代上述执行结果。
+
+## R07 单盒材质用户验证（未执行）
+
+本轮静态审计见 `verification/macos-static/materials/`；结论为“静态审计通过，实机待用户验证”。它不表示本平台 shader、窗口或图像已经运行通过。
+
+使用本机最新原生 Kit，执行 Release configure/build/test 与 qmllint，开启 `-DYALAHOO_REVIEW=ON` 后运行 `runtime-materials`。输入为 `tests/fixtures/materials/single-case.json`，源相机/匿名封面与 Windows 对照一致。确认三个壳体分别可见、纸面真实位于盖后，无 Z 翻转、UV 倒置、发光或重复 gamma；夜间留白不能多出蓝色高光，主盖详情柔化不能改变侧脊。
+
+该固定图像 fixture 要求实际 DPR1；先读取本机原生 DPR，必要时只为测试进程设置 QT_SCALE_FACTOR 的补偿倍率，使报告的 actual dpr 真正为1。Retina/Wayland 原生缩放可能不响应 QT_ENABLE_HIGHDPI_SCALING=0，不能仅根据环境变量宣称 DPR 满足。若无法获得相同 DPR/真实客户区，应另采该平台同尺寸同 DPR 的 Web 对照，按材质契约核对，记录这一差异；产品不设置上述测试环境变量。
+
+检查 `build/release/verification/materials/runtime.json`：90 同输入逐层状态、9 漫反射探针、非空前景、sourceParameterMatch、Web投影≤2px；所有 PNG 的真实像素尺寸应与报告DPR一致。分别检查正视/低角度、双主题和方/横/竖封面，人工确认 SCREEN_MIP_TEXTURE 的纸面区域/留白采样与折射 UV 方向，MSL/GLSL 生成成功不能替代这一实机步骤。结束后 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF` 并重新构建，普通产品应拒绝 --verify-materials，按钮改变 detail 时只有主盖柔化；隐藏/恢复与旧运动回归继续通过。
+
+本平台实际构建、shader/GPU、图像、DPR及窗口交互结果：待用户填写。完整平台部署、真实音频和全场灯光/后处理属于后续轮次。
