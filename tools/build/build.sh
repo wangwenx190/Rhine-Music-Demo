@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 repository=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-preset=${1:-qt-debug}
+preset=${1:-qt-release}
 case "$preset" in qt-debug|qt-release) ;; *) echo 'Use qt-debug or qt-release' >&2; exit 2 ;; esac
 cd "$repository"
 # Native compiler, CMake and Ninja must already be installed. Kit discovery is

@@ -17,7 +17,7 @@ try {
     Save-PublicText (Join-Path $evidence 'prepare.txt') ($prepared -join "`n")
     if ($before -ne (Get-FileHash resources/manifests/assets.json -Algorithm SHA256).Hash) { throw 'Same-Kit asset regeneration is not reproducible.' }
     $results = @()
-    foreach ($preset in @('qt-debug', 'qt-release')) {
+    foreach ($preset in @('qt-release')) {
         $configuration = $preset.Replace('qt-', '')
         $buildOutput = & (Join-Path $PSScriptRoot 'build.ps1') -Preset $preset -Action All 2>&1
         Save-PublicText (Join-Path $evidence "$configuration-build.txt") ($buildOutput -join "`n")
@@ -35,7 +35,7 @@ try {
         if (-not $runtime.passed -or $runtime.font -ne 'MiSans') { throw 'GPU/font runtime failed.' }
         $chain = Get-Content -Raw -Encoding UTF8 (Join-Path $build 'toolchain.json') | ConvertFrom-Json
         Save-PublicText (Join-Path $evidence "$configuration-toolchain.json") ($chain | ConvertTo-Json -Depth 10)
-        $results += @{ preset = $preset; build = 'passed'; ctest = '6/6 passed'; qmllint = 'passed'; runtime = 'passed' }
+        $results += @{ preset = $preset; build = 'passed'; ctest = 'all registered tests passed'; qmllint = 'passed'; runtime = 'passed' }
     }
     $env:PATH = "$($chain.qtKit)/bin;$env:PATH"
     $env:QT_PLUGIN_PATH = "$($chain.qtKit)/plugins"

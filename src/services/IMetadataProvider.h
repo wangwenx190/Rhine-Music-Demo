@@ -1,0 +1,48 @@
+#pragma once
+#include "MusicTypes.h"
+#include <QObject>
+
+namespace yalahoo {
+enum class MetadataKind { Introduction, Credits, Enrichment };
+enum class ProviderStatus { Deferred, Matched, Partial, NotFound, Uncertain, Error, Cancelled };
+QString kindName(MetadataKind kind);
+QString statusName(ProviderStatus status);
+struct RequestToken {
+    quint64 requestId = 0, generation = 0;
+    QString albumId;
+    bool operator==(const RequestToken &) const = default;
+};
+inline size_t qHash(const RequestToken &token, size_t seed = 0)
+{ return qHashMulti(seed, token.requestId, token.generation, token.albumId); }
+struct AlbumQuery {
+    QString albumId, title, artist, contact;
+    QStringList albumIds, trackIds;
+    bool enabled = false, force = false;
+    QJsonObject configuration;
+};
+struct ProviderCapabilities {
+    bool networkEnabled = false;
+    bool introductions = true, credits = true, enrichment = true, batch = false;
+};
+struct ProviderResult {
+    quint64 requestId = 0, generation = 0;
+    QString albumId;
+    MetadataKind kind = MetadataKind::Introduction;
+    ProviderStatus status = ProviderStatus::Deferred;
+    QJsonObject payload, source;
+    QString checkedAt, retryAt, error;
+};
+class IMetadataProvider : public QObject {
+    Q_OBJECT
+public:
+    using QObject::QObject;
+    virtual ProviderCapabilities capabilities() const = 0;
+    virtual void requestIntroduction(AlbumQuery query, RequestToken token) = 0;
+    virtual void requestCredits(AlbumQuery query, RequestToken token) = 0;
+    virtual void requestEnrichment(AlbumQuery query, RequestToken token) = 0;
+    virtual void cancel(RequestToken token) = 0;
+signals:
+    void resultReady(const yalahoo::ProviderResult &result);
+};
+}
+Q_DECLARE_METATYPE(yalahoo::ProviderResult)

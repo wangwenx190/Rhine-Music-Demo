@@ -6,6 +6,7 @@ import QtMultimedia
 
 ApplicationWindow {
     id: window
+    required property LibrarySession librarySession
     width: 960
     height: 640
     minimumWidth: 560
@@ -77,6 +78,12 @@ ApplicationWindow {
         Label {
             text: "Qt 原生运行探针 · QML / 3D / ShaderTools / Multimedia"
             font.pixelSize: 14
+            color: "#526259"
+            Layout.alignment: Qt.AlignHCenter
+        }
+        Label {
+            objectName: "libraryDataProbe"
+            text: "匿名库模型 · " + window.librarySession.albums.count + " 张专辑"
             color: "#526259"
             Layout.alignment: Qt.AlignHCenter
         }

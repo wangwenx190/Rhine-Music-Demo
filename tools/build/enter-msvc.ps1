@@ -8,7 +8,7 @@ $vsDev = Join-Path $vsInstall 'Common7/Tools/VsDevCmd.bat'
 if (-not (Test-Path -LiteralPath $vsDev)) { throw 'VsDevCmd.bat not found.' }
 $nativeArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
 if ($env:YALAHOO_MSVC_ENV_READY -eq "$vsInstall|$nativeArch" -and (Get-Command cl -ErrorAction SilentlyContinue)) {
-    # Asset preparation + Debug/Release verification can call this helper more
+    # Asset preparation and Release verification can call this helper more
     # than once in one process. VsDevCmd prepends its paths on every call.
     # Keep the initialized environment rather than growing beyond cmd's limit.
     return

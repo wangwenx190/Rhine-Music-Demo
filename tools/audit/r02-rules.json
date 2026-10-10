@@ -14,7 +14,7 @@
         {"path": "tests/unit/CMakeLists.txt", "symbol": "add_test(NAME runtime"},
         {"path": "tools/build/build.sh", "symbol": "ctest --preset"}
       ],
-      "evidence": "Top-level project sets required C++23 with extensions off and compiles optional::transform/to_underlying. Discovery enumerates local config files, excludes enabled cross_compile and non-desktop specs, checks qmake/config versions, selects numeric newest native architecture and ABI, fails on missing modules or stale caches. Core source list and application list are real. App links all required modules; moc/QML/qrc/qsb are Qt-generated. Native Unix shell forwards configure arguments then uses identical build/test presets. No Windows compiler flags leak into these branches; synthetic Darwin/Linux selection and shared Windows Debug/Release checks passed.",
+      "evidence": "Top-level project sets required C++23 with extensions off and compiles optional::transform/to_underlying. Discovery enumerates local config files, excludes enabled cross_compile and non-desktop specs, checks qmake/config versions, selects numeric newest native architecture and ABI, fails on missing modules or stale caches. Core source list and application list are real. App links all required modules; moc/QML/qrc/qsb are Qt-generated. Native Unix shell forwards configure arguments then uses identical build/test presets. No Windows compiler flags leak into these branches; synthetic Darwin/Linux selection and shared Windows Release checks passed.",
       "limitations": "Neither target compiler nor native Qt installation has been executed here. R02 implements a bootstrap application, not later product subsystems."
     },
     {
@@ -93,7 +93,7 @@
         {"path": "tools/build/verify-r02.ps1", "symbol": "Save-PublicText"},
         {"path": "docs/contracts/native-bootstrap.md", "symbol": "R02"}
       ],
-      "evidence": "Audit expands every R02 target/branch/resource entry above, records symbols and exact source hashes, and ties shared behavior to actual Windows Debug/Release tests, lint and qsb variants. Checklists separate future target execution from static review. Archived legacy source content is not modified. Public evidence redacts user profile/data-cache paths. All statically identified R02 defects were fixed before final evidence regeneration.",
+      "evidence": "Audit expands every R02 target/branch/resource entry above, records symbols and exact source hashes, and ties shared behavior to actual Windows Release tests, lint and qsb variants. Checklists separate future target execution from static review. Archived legacy source content is not modified. Public evidence redacts user profile/data-cache paths. All statically identified R02 defects were fixed before final evidence regeneration.",
       "limitations": "Static audit applies only to the current R02 bootstrap. Future subsystem/platform rounds must extend it; Windows evidence is never treated as target runtime evidence."
     }
   ]

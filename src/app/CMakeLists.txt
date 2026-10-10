@@ -16,7 +16,7 @@ endif()
 set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
 set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
-    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}")
+    RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" SOURCES QmlTypes.h)
 qt_add_shaders(Yalahoo r02_shader_probe PREFIX /assets/shaders BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag")
 target_link_libraries(Yalahoo PRIVATE YalahooCore Qt6::Gui Qt6::Qml Qt6::Quick

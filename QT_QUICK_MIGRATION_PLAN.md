@@ -66,7 +66,7 @@
 - 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
 - Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
 - `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
-- 创建统一 preset 名称：`qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。统一命令：`cmake --preset qt-debug`、`cmake --build --preset qt-debug`、`ctest --preset qt-debug --output-on-failure`。
+- 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
 - 原生构建入口、最新 Kit 覆盖/旧缓存处理、QML/qsb 别名、最小运行探针与证据重建命令见 `docs/contracts/native-bootstrap.md`；Windows 证据在 `verification/windows/native-bootstrap/`。macOS/Linux 的现有 R02 审计矩阵仅覆盖最小工程，后续轮次必须按新增实现扩展，不替代 R31/R32 的完整平台审计。
 
@@ -144,6 +144,7 @@
 - 本阶段唯一实现是 `OfflineMetadataProvider`：从本地缓存读取已有内容；无缓存返回 Deferred，并显示“联网资料功能暂未启用”。这不等同于 NotFound，不写入失败重试时间。
 - Provider 通过构造注入或注册工厂接入，不通过 QML 判断平台/服务名称。设置保留“专辑介绍”“制作信息”“MusicBrainz”入口及状态占位；联网执行按钮禁用，来源链接显示文本且本阶段不自动打开。
 - 未来 Provider 能接收联系人、开关、批量 albumIds、force 和取消令牌；预留 ProviderCapabilities，但本阶段 capabilities 统一 networkEnabled=false。全应用不创建联网请求，离线测试断言零请求。
+- 值类型/未知 JSON 字段、本地 QUrl、稳定模型角色、排序列/搜索规则、导航与播放 ID、Provider 构造注入和过期结果路由见 `docs/contracts/library-data.md`；实现分别在 `src/core/` 与 `src/services/`。匿名数据与 Release 验证入口为 `tools/build/verify-r04.ps1`，跨平台新增调用链审计入口为 `tools/audit/audit-r04.ps1`。
 
 ### 存储与本地资料
 
@@ -240,7 +241,7 @@
 - Windows参考机60Hz下，原始画质/1920×1080内容窗口，预热后120秒混合交互目标p95帧间隔≤20ms；无资源准备时不得重复出现>50ms卡顿。高刷新率额外记录，不将VSYNC限制误报为性能不足。
 - 记录冷启动、稳定、重载、恢复各自分布；CPU提交时间不得称作GPU耗时。资源计数、上传字节、解码并发与帧率分别采集。
 - 连续10次界面重建和30次详情切换后，资源回落且无单调增长；隐藏/最小化暂停视觉更新，歌曲继续播放。
-- Windows 必须有真实 Debug/Release 构建、Qt 窗口交互、实际 GPU 视觉/资源/性能证据、QtMultimedia 播放与输出设备检查，以及部署产物脱离开发路径的实际运行。静态审计、模拟媒体、CI 配置或仅 configure 成功均不能替代；失败项以具体补修任务保留。
+- Windows 必须有真实 Release 构建、Qt 窗口交互、实际 GPU 视觉/资源/性能证据、QtMultimedia 播放与输出设备检查，以及部署产物脱离开发路径的实际运行。Debug 仅在明确需要获取堆栈时使用，不作为常规验收前置条件。静态审计、模拟媒体、CI 配置或仅 configure 成功均不能替代；失败项以具体补修任务保留。
 - macOS/Linux 代码、CMake、QML/资源、shader 和部署脚本必须完整实现；严格静态审计通过即可完成本阶段对应轮次，不因缺少真实平台环境保留轮次。真实环境验证由用户以后执行，清单放 `docs/platforms/`，不作为本阶段未完成任务重新塞回计划。
 
 ### macOS / Linux 严格静态审计契约
@@ -259,14 +260,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R04 · C++数据模型、排序、搜索与离线Provider契约（1–1.5日）
-
-- 依赖：R02。交付 `src/core/`值类型和列表模型、`src/services/`接口/离线实现。
-- 按music-types.ts保留Album/Track/来源/查询状态；路径作为本地QUrl，媒体可播放性采用Unknown/Supported/Unsupported，不沿用browserPlayable的扩展名猜测。
-- 实现独立导航/播放ID、QCollator稳定排序、原搜索字段与空查询规则；用冻结fixture证明排序列分组、搜索结果与模型通知正确。
-- 实现OfflineMetadataProvider，异步读取缓存或返回Deferred；缓存命中不会触发重查，无缓存不会写成not-found。
-- 退出：QML可读取匿名库，模型角色稳定；搜索/资料请求不调用播放，Provider替换无需修改QML组件。
 
 ### R05 · 单时钟、阻尼与五次运动内核（1–1.5日）
 

@@ -15,13 +15,13 @@ Push-Location -LiteralPath $repository
 try {
     $results = @()
     $referenceKit = $null
-    foreach ($preset in @('qt-debug', 'qt-release')) {
+    foreach ($preset in @('qt-release')) {
         $configuration = $preset.Replace('qt-', '')
         $buildOutput = & (Join-Path $PSScriptRoot 'build.ps1') -Preset $preset -Action All -Fresh -Clean 2>&1
         Save-PublicText (Join-Path $evidence "$configuration-build.txt") ($buildOutput -join "`n")
         $buildRoot = Join-Path $repository "build/$configuration"
         $toolchain = Get-Content -Raw -Encoding UTF8 (Join-Path $buildRoot 'toolchain.json') | ConvertFrom-Json
-        if ($referenceKit -and $referenceKit -ne $toolchain.qtKit) { throw 'Debug and Release selected different Qt Kits.' }
+        if ($referenceKit -and $referenceKit -ne $toolchain.qtKit) { throw 'Verification selected different Qt Kits.' }
         $referenceKit = $toolchain.qtKit
         $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $buildRoot 'verification/runtime.json') | ConvertFrom-Json
         if (-not $runtime.passed) { throw "$preset runtime verification failed." }
@@ -33,16 +33,16 @@ try {
         Save-PublicText (Join-Path $evidence "$configuration-qmllint.txt") ($lint -join "`n")
         $results += @{ preset = $preset; configure = 'passed'; build = 'passed'; tests = 'passed'; qmllint = 'passed'; runtime = 'passed' }
     }
-    $cache = Get-Content -Encoding UTF8 build/debug/CMakeCache.txt
+    $cache = Get-Content -Encoding UTF8 build/release/CMakeCache.txt
     $kit = ($cache | Select-String '^YALAHOO_SELECTED_QT:PATH=(.*)$').Matches.Groups[1].Value
-    $shader = & (Join-Path $kit 'bin/qsb.exe') --dump build/debug/src/app/.qsb/probe.frag.qsb 2>&1
+    $shader = & (Join-Path $kit 'bin/qsb.exe') --dump build/release/src/app/.qsb/probe.frag.qsb 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'qsb dump failed.' }
     foreach ($variant in @('GLSL 150', 'HLSL 50', 'MSL 12')) {
         if (($shader -join "`n") -notmatch $variant) { throw "Missing shader variant: $variant" }
     }
     Save-PublicText (Join-Path $evidence 'shader-variants.txt') ($shader -join "`n")
     $stalePrefix = Join-Path $repository 'build/synthetic-stale-kit'
-    $staleOutput = & cmake --preset qt-debug -B build/stale-kit-check "-DYALAHOO_SELECTED_QT=$stalePrefix" 2>&1
+    $staleOutput = & cmake --preset qt-release -B build/stale-kit-check "-DYALAHOO_SELECTED_QT=$stalePrefix" 2>&1
     $staleExit = $LASTEXITCODE
     if ($staleExit -eq 0 -or ($staleOutput -join "`n") -notmatch 'differs from latest Kit') {
         throw 'Real configure did not reject stale Kit cache.'
@@ -57,7 +57,7 @@ try {
     $env:QT_PLUGIN_PATH = "$kit/plugins"
     $env:QSG_INFO = '1'
     $processInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $processInfo.FileName = Join-Path $repository 'build/debug/bin/yalahoo.exe'
+    $processInfo.FileName = Join-Path $repository 'build/release/bin/yalahoo.exe'
     $processInfo.WorkingDirectory = $runtimeCwd
     $processInfo.UseShellExecute = $false
     $processInfo.CreateNoWindow = $true

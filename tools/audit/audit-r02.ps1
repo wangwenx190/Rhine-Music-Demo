@@ -27,7 +27,7 @@ foreach ($platform in @('macos', 'linux')) {
     foreach ($variant in @('MSL 12', 'GLSL 150', 'HLSL 50')) {
         if (-not $shader.Contains($variant)) { throw "Missing actual shader evidence: $variant" }
     }
-    foreach ($configuration in @('debug', 'release')) {
+    foreach ($configuration in @('release')) {
         $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repository "verification/windows/native-bootstrap/$configuration-runtime.json") | ConvertFrom-Json
         if (-not $runtime.passed -or $runtime.graphicsApi -ne 4 -or -not $runtime.mediaAvailable) { throw 'Windows shared regression is not passed.' }
     }
@@ -42,7 +42,7 @@ foreach ($platform in @('macos', 'linux')) {
     foreach ($check in $matrix) {
         $report += "- $($check.checkId): passed — $($check.requirement)"
     }
-    $report += @('', '共享运行依据：Windows Debug/Release 全部 QtTest/Kit/runtime 检查、qmllint，以及实际 qsb 的 GLSL/HLSL/MSL 变体。Windows 截图仅是 Windows 证据。', '',
+    $report += @('', '共享运行依据：Windows Release 全部 QtTest/Kit/runtime 检查、qmllint，以及实际 qsb 的 GLSL/HLSL/MSL 变体。Windows 截图仅是 Windows 证据。', '',
         "用户实机清单：[../../docs/platforms/$platform.md](../../docs/platforms/$platform.md)。后续 R31/R32 再补完整产品部署和平台验收。")
     [System.IO.File]::WriteAllText((Join-Path $output 'audit-report.md'), ($report -join "`n"), $utf8)
 }

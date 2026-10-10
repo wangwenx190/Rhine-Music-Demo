@@ -1,5 +1,7 @@
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
+#include "LibrarySession.h"
+#include "OfflineMetadataProvider.h"
 
 #include <QAudioDevice>
 #include <QAudioOutput>
@@ -58,6 +60,7 @@ int main(int argc, char **argv)
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native Qt runtime probe"));
     parser.addHelpOption();
     parser.addOption({QStringLiteral("verify-runtime"), QStringLiteral("Write runtime evidence and exit"), QStringLiteral("report")});
+    parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
     parser.process(app);
     if (parser.isSet(QStringLiteral("verify-runtime")))
         qInstallMessageHandler(recordDiagnostic);
@@ -68,7 +71,25 @@ int main(int argc, char **argv)
     QAudioOutput audio;
     QMediaPlayer media;
     media.setAudioOutput(&audio);
+    yalahoo::OfflineMetadataProvider provider;
+    yalahoo::LibrarySession library(&provider);
+    if (parser.isSet(QStringLiteral("verify-library"))) {
+        if (!parser.isSet(QStringLiteral("verify-runtime"))) return 7;
+        QFile input(parser.value(QStringLiteral("verify-library")));
+        if (!input.open(QIODevice::ReadOnly)) return 7;
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(input.readAll(), &parseError);
+        yalahoo::LibrarySnapshot snapshot;
+        QString error;
+        if (parseError.error != QJsonParseError::NoError || !yalahoo::readLibrary(
+            document.object().value("libraries").toObject().value("mixed").toObject(), snapshot, &error)) return 7;
+        library.setSnapshot(std::move(snapshot));
+        library.search(QStringLiteral("Typography"));
+        if (!library.snapshot()->albums.isEmpty())
+            library.requestMetadata(library.snapshot()->albums.first().id, QStringLiteral("introduction"));
+    }
     QQmlApplicationEngine engine;
+    engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
@@ -118,6 +139,8 @@ int main(int argc, char **argv)
             const auto *view3D = window->findChild<QQuickItem *>(QStringLiteral("quick3DProbe"));
             const bool quick3DAvailable = view3D != nullptr;
             const bool qmlMediaAvailable = window->findChild<QObject *>(QStringLiteral("qmlMediaProbe")) != nullptr;
+            const auto *libraryProbe = window->findChild<QObject *>(QStringLiteral("libraryDataProbe"));
+            const QString libraryText = libraryProbe ? libraryProbe->property("text").toString() : QString{};
             int modelPixels = 0;
             QRect modelRegion;
             if (view3D && !image.isNull()) {
@@ -141,13 +164,17 @@ int main(int argc, char **argv)
             }
             const bool passed = frames > 0 && backend && interactions == 1 && mediaAvailable
                 && shaderAvailable && qmlAvailable && chineseSupported && saved
-                && quick3DAvailable && qmlMediaAvailable && modelPixels > 100;
+                && quick3DAvailable && qmlMediaAvailable && modelPixels > 100 && libraryProbe
+                && (!parser.isSet(QStringLiteral("verify-library")) || (library.albums()->rowCount() == 21
+                    && library.searchResults()->rowCount() == 28 && library.metadata().size() == 1
+                    && library.playbackTrackId().isEmpty() && media.source().isEmpty()
+                    && libraryText == QStringLiteral("匿名库模型 · 21 张专辑")));
             const QJsonObject evidence{
                 {"passed", passed}, {"qtVersion", QString::fromLatin1(qVersion())},
                 {"platformPlugin", QGuiApplication::platformName()}, {"graphicsApi", api.load()},
                 {"renderedFrames", frames.load()}, {"windowTitle", window->title()},
                 {"applicationName", app.applicationName()}, {"displayName", app.applicationDisplayName()},
-                {"dataDirectory", QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)},
+                {"dataDirectory", QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)},
                 {"controlsStyle", QQuickStyle::name()}, {"interactionCount", interactions},
                 {"chineseGlyphs", chineseSupported}, {"font", raw.familyName()},
                 {"qmlResource", qmlAvailable}, {"shaderResource", shaderAvailable},
@@ -156,12 +183,18 @@ int main(int argc, char **argv)
                 {"mediaAvailable", mediaAvailable}, {"audioOutputCount", QMediaDevices::audioOutputs().size()},
                 {"screenshotSaved", saved}, {"sourceOpened", false}
             };
+            QJsonObject reportData = evidence;
+            reportData.insert("libraryAlbums", library.albums()->rowCount());
+            reportData.insert("searchResults", library.searchResults()->rowCount());
+            reportData.insert("metadataResults", library.metadata().size());
+            reportData.insert("playbackTrackId", library.playbackTrackId());
+            reportData.insert("libraryQmlText", libraryText);
             QSaveFile output(report);
             if (!output.open(QIODevice::WriteOnly)) {
                 app.exit(4);
                 return;
             }
-            output.write(QJsonDocument(evidence).toJson());
+            output.write(QJsonDocument(reportData).toJson());
             const bool committed = output.commit();
             app.exit(passed && committed ? 0 : 5);
         });

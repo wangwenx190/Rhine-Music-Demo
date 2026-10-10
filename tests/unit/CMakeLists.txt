@@ -17,3 +17,20 @@ if(WIN32)
 endif()
 set_tests_properties(identity module-link-and-plugins shader-tools runtime PROPERTIES ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
+qt_add_executable(LibraryDataTest LibraryDataTest.cpp)
+target_link_libraries(LibraryDataTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
+target_compile_definitions(LibraryDataTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_platform(LibraryDataTest)
+add_test(NAME library-data COMMAND LibraryDataTest
+    -o "${CMAKE_BINARY_DIR}/verification/library-data-test.xml,junitxml" -o -,txt)
+set_tests_properties(library-data PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+if(WIN32)
+    set_tests_properties(library-data PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+add_test(NAME runtime-library COMMAND Yalahoo --verify-runtime "${CMAKE_BINARY_DIR}/verification/runtime-library.json"
+    --verify-library "${PROJECT_SOURCE_DIR}/tests/fixtures/web-baseline/anonymous.json")
+set_tests_properties(runtime-library PROPERTIES TIMEOUT 30
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1")
+if(WIN32)
+    set_tests_properties(runtime-library PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

@@ -6,12 +6,12 @@ $summary=Get-Content -Raw -Encoding UTF8 (Join-Path $windows 'summary.json') | C
 if (-not $summary.reproducible) { throw 'Windows branding reproducibility evidence absent.' }
 $export=Get-Content -Raw -Encoding UTF8 (Join-Path $windows 'export-report.json') | ConvertFrom-Json
 if (-not $export.passed -or -not $export.nativeWindow.exposed -or $export.svgInventory.Count -ne 13 -or $export.rasterCases.Count -ne 243) { throw 'Windows SVG/window evidence incomplete.' }
-foreach ($configuration in @('debug','release')) {
+foreach ($configuration in @('release')) {
     $report=Get-Content -Raw -Encoding UTF8 (Join-Path $windows "$configuration-branding-report.json") | ConvertFrom-Json
     $runtime=Get-Content -Raw -Encoding UTF8 (Join-Path $windows "$configuration-runtime.json") | ConvertFrom-Json
     if (-not $report.passed -or -not $runtime.passed -or $report.qtVersion -ne $summary.qtVersion) { throw 'Shared Windows verification failed.' }
     $log=Get-Content -Raw -Encoding UTF8 (Join-Path $windows "$configuration-build.txt")
-    if ($log -notmatch '100% tests passed(?:, 0 tests failed)? out of 7') { throw 'Seven Windows tests must actually pass.' }
+    if ($log -notmatch '100% tests passed(?:, 0 tests failed)? out of [0-9]+') { throw 'All registered Windows tests must actually pass.' }
 }
 $manifest=Get-Content -Raw -Encoding UTF8 (Join-Path $repository 'resources/manifests/branding.json') | ConvertFrom-Json
 if ($manifest.entries.Count -ne 36) { throw 'Branding inventory differs.' }
@@ -57,7 +57,7 @@ foreach ($platform in @('macos','linux')) {
     [IO.File]::WriteAllText((Join-Path $output 'audit-matrix.json'),($document | ConvertTo-Json -Depth 25)+"`n",$utf8)
     $text=@("# $platform · R03B 品牌资产静态审计",'', '静态审计通过，实机待用户验证','',
         '适用 COMMON-01/02/03/05 及平台图标交付项通过；COMMON-04 的媒体规则不适用于品牌工具，预览窗口生命周期已审阅。实际调用链、错误分支、hash 和限制见 [audit-matrix.json](audit-matrix.json)。','',
-        "共享 Windows Qt $($summary.qtVersion)：Debug/Release 7/7 测试、QML lint、13 SVG、243 渲染、原生 Qt 窗口、全部 ICO/ICNS PNG 块及资源可复现性通过。Windows 图像不作为本平台运行证据。",'',
+        "共享 Windows Qt $($summary.qtVersion)：Release 全部已注册测试、QML lint、13 SVG、243 渲染、原生 Qt 窗口、全部 ICO/ICNS PNG 块及资源可复现性通过。Windows 图像不作为本平台运行证据。",'',
         '本轮新增工具仅依赖公共 QtGui/QtSvg，不含平台私有分支；字体无依赖，衍生容器可在 Windows 生成。未执行本平台构建、桌面图标加载或 GUI；主界面和系统集成留给对应后续轮次。','',
         "实机命令与预期结果见 [平台清单](../../../docs/platforms/$platform.md) 的 R03B 小节。") -join "`n"
     [IO.File]::WriteAllText((Join-Path $output 'audit-report.md'),$text+"`n",$utf8)

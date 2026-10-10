@@ -11,7 +11,7 @@
         {"path": "tests/integration/CMakeLists.txt", "symbol": "yalahoo_add_assets(AssetTest)"},
         {"path": "cmake/Assets.cmake", "symbol": "BASE \"${PROJECT_SOURCE_DIR}/resources\""}
       ],
-      "evidence": "Root inherits required C++23 and latest-Kit selection. prepare-assets links public Gui and adds dwrite only under WIN32. Neither application nor AssetTest links Dwrite. Common qrc generator uses explicit manifest file list and root-relative BASE; moc/qml registration compiles AssetFonts into Yalahoo, while tests compile the same font initialization without a second module. No platform branch bypasses resources or tests. Windows Debug/Release proves shared target/resource closure.",
+      "evidence": "Root inherits required C++23 and latest-Kit selection. prepare-assets links public Gui and adds dwrite only under WIN32. Neither application nor AssetTest links Dwrite. Common qrc generator uses explicit manifest file list and root-relative BASE; moc/qml registration compiles AssetFonts into Yalahoo, while tests compile the same font initialization without a second module. No platform branch bypasses resources or tests. Windows Release proves shared target/resource closure.",
       "limitations": "No actual macOS/Linux compile/link; later platform deployment remains R31/R32 scope."
     },
     {
@@ -62,7 +62,7 @@
         {"path": "tests/integration/AssetTest.cpp", "symbol": "embeddedHashes"},
         {"path": "docs/contracts/assets.md", "symbol": "静态审计通过，实机待用户验证"}
       ],
-      "evidence": "Asset preparation records source/input/output hashes and verifies all 24 different inputs against frozen Git blobs, including icon/font CSS. The verification script requires repeat generation to retain the manifest SHA-256, runs all six Windows CTest suites plus qmllint in Debug/Release, copies sanitized reports and actual screenshots, and launches Release from a Unicode/space cwd. Audit checks every resource file and manifest list against hashes before concluding; source paths/symbols/hashes and explicit branch traces accompany every check. License, authorship and font notices remain. Existing R02 matrices are preserved separately.",
+      "evidence": "Asset preparation records source/input/output hashes and verifies all 24 different inputs against frozen Git blobs, including icon/font CSS. The verification script requires repeat generation to retain the manifest SHA-256, runs all registered Windows CTest suites plus qmllint in Release, copies sanitized reports and actual screenshots, and launches Release from a Unicode/space cwd. Audit checks every resource file and manifest list against hashes before concluding; source paths/symbols/hashes and explicit branch traces accompany every check. License, authorship and font notices remain. Existing R02 matrices are preserved separately.",
       "limitations": "Static evidence does not claim macOS/Linux execution, full GUI recreation, audio playback or deployment acceptance."
     }
   ]

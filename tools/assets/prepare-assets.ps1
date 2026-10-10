@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('qt-debug', 'qt-release')][string]$Preset = 'qt-debug')
+param([ValidateSet('qt-debug', 'qt-release')][string]$Preset = 'qt-release')
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repository 'tools/build/enter-msvc.ps1')

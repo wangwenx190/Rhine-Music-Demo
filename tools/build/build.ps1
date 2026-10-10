@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('qt-debug', 'qt-release')][string]$Preset = 'qt-debug',
+    [ValidateSet('qt-debug', 'qt-release')][string]$Preset = 'qt-release',
     [ValidateSet('Configure', 'Build', 'Test', 'All')][string]$Action = 'All',
     [switch]$Fresh,
     [switch]$Clean

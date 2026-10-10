@@ -23,6 +23,7 @@ qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 
 add_subdirectory(src/core)
+add_subdirectory(src/services)
 add_subdirectory(tools/assets)
 add_subdirectory(src/app)
 enable_testing()

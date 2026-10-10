@@ -6,7 +6,7 @@
 
 Windows 运行 `./tools/assets/prepare-assets.ps1`。脚本通过根 CMake 发现最新 Kit，构建 C++23 `prepare-assets`，核对同 Kit balsam 的 Windows 版本资源；C++ 工具再核对该 Kit 的 qmake 版本与运行 Qt。不使用任意 PATH 中的导入器，不固定 Qt minor/patch。脚本核对 24 个不同输入的 Git blob 与冻结提交。
 
-macOS/Linux 可运行 `sh tools/assets/prepare-assets.sh qt-debug` 重新导入模型、提取图标并校验字体。系统 DirectWrite 解包只在 Windows 资产工具中编译、链接和执行；其他平台复用已入库的 SFNT，并核对 WOFF2 输入与 SFNT 输出的 hash，不链接 Dwrite。不需要在产品启动时转换字体或导入 GLB。平台实机执行尚未验证。
+macOS/Linux 可运行 `sh tools/assets/prepare-assets.sh qt-release` 重新导入模型、提取图标并校验字体。系统 DirectWrite 解包只在 Windows 资产工具中编译、链接和执行；其他平台复用已入库的 SFNT，并核对 WOFF2 输入与 SFNT 输出的 hash，不链接 Dwrite。不需要在产品启动时转换字体或导入 GLB。平台实机执行尚未验证。
 
 `resources/manifests/assets.cmake` 是生成的明确文件清单，由 `cmake/Assets.cmake::yalahoo_add_assets` 同时接入应用和资产测试。统一前缀 `:/assets/`，QML 使用 `qrc:/assets/`。独立 `qsb` 资源仍由原构建链生成。应用先注册字体，再创建 QML 引擎，不依赖工作目录。
 
@@ -56,6 +56,6 @@ font.pixelSize: 24
 
 ## 验证入口与范围
 
-`./tools/build/verify-r03.ps1` 重建同 Kit 可复现资源，运行 Windows Debug/Release 的全部 CTest、qmllint、真实 D3D11 窗口、中文/空格工作目录启动与无声媒体加载。证据在 `verification/windows/assets/`，预览在 `docs/media/assets/`。`./tools/audit/audit-r03.ps1` 检查逐分支资源闭包，报告在 `verification/{macos,linux}-static/assets/`；结论为“静态审计通过，实机待用户验证”。本轮不覆盖后续完整播放器、材质/动画复刻和独立部署。
+`./tools/build/verify-r03.ps1` 重建同 Kit 可复现资源，运行 Windows Release 的全部 CTest、qmllint、真实 D3D11 窗口、中文/空格工作目录启动与无声媒体加载。证据在 `verification/windows/assets/`，预览在 `docs/media/assets/`。`./tools/audit/audit-r03.ps1` 检查逐分支资源闭包，报告在 `verification/{macos,linux}-static/assets/`；结论为“静态审计通过，实机待用户验证”。本轮不覆盖后续完整播放器、材质/动画复刻和独立部署。
 
 接口依据：[Qt balsam/glTF 导入](https://doc.qt.io/qt-6/quick3d-asset-intro.html)、[DirectWrite UnpackFontFile](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_3/nf-dwrite_3-idwritefactory5-unpackfontfile)。实际 API 与格式同时按已选 Kit 的头文件和执行结果核对。

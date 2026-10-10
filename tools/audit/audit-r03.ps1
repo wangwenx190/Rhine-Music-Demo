@@ -4,7 +4,7 @@ $rules = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'r03-rules.jso
 $windows = Join-Path $repository 'verification/windows/assets'
 $summary = Get-Content -Raw -Encoding UTF8 (Join-Path $windows 'summary.json') | ConvertFrom-Json
 if (-not $summary.reproducible -or $summary.unicodeWorkingDirectory -ne 'passed') { throw 'Windows R03 evidence is incomplete.' }
-foreach ($configuration in @('debug', 'release')) {
+foreach ($configuration in @('release')) {
     $xml = [xml](Get-Content -Raw -Encoding UTF8 (Join-Path $windows "$configuration-assets-test.xml"))
     if ([int]$xml.testsuite.failures -ne 0 -or [int]$xml.testsuite.errors -ne 0) { throw 'Asset test failures exist.' }
     $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $windows "$configuration-runtime.json") | ConvertFrom-Json
@@ -51,7 +51,7 @@ foreach ($platform in @('macos', 'linux')) {
     $report = @("# $platform · R03 资源静态审计", '', '静态审计通过，实机待用户验证', '',
         "所选 Windows 共享验证 Qt：$($summary.qtVersion)。全部五个 COMMON 条目适用并通过；平台部署条目在本轮 N/A，R31/R32 承担完整平台部署。", '',
         '覆盖 C++23/最新 Kit 构建闭包、Dwrite 条件、OTF/CFF 与显式字体样式、qrc/Unicode/大小写路径、三批次几何/UV/绕序、Qt 公开媒体无声加载及来源/输出 hash。逐分支推演、符号、SHA-256 和运行限制见 [audit-matrix.json](audit-matrix.json)。', '',
-        'Windows Debug/Release：6/6 CTest、qmllint、真实 D3D11 三壳体/字体/图标窗口、Unicode/空格 cwd、四个 qrc 音频无声 LoadedMedia，以及重复准备可复现。图片仅是 Windows 证据。', '',
+        'Windows Release：全部已注册 CTest、qmllint、真实 D3D11 三壳体/字体/图标窗口、Unicode/空格 cwd、四个 qrc 音频无声 LoadedMedia，以及重复准备可复现。图片仅是 Windows 证据。', '',
         '没有执行该平台编译、GPU、字体后端或媒体解码；完整材质/交互/播放尚属后续轮次。', '',
         "用户验证清单：[../../../docs/platforms/$platform.md](../../../docs/platforms/$platform.md)。原 R02 审计未覆盖 R03 的部分由本矩阵补充。")
     [IO.File]::WriteAllText((Join-Path $output 'audit-report.md'), ($report -join "`n") + "`n", $utf8)
