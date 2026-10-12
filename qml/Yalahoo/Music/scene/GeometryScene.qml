@@ -23,29 +23,87 @@ View3D {
     property real aoRadius: .18
     property bool shadowProbe: false
     property var reviewNeighbors: []
+    property bool postprocessEnabled: !geometryOnly && !materialReview
+    property bool reviewDisableBokeh: false
+    property bool reviewDisableSmaa: false
+    property int reviewAntialiasing: 1 // 0 off, 1 production MSAA, 2 SSAA diagnostic
+    property real reviewDpr: 0
+    readonly property bool colorPipeline: postprocessEnabled || occlusionEnabled
+    readonly property bool bokehActive: postprocessEnabled && !reviewDisableBokeh && occlusionChannel === 0 && adapter.quality.values.depthOfField > 0
+    readonly property bool smaaActive: postprocessEnabled && !reviewDisableSmaa && occlusionChannel === 0 && adapter.quality.values.antialias === "smaa"
     readonly property real currentDpr: Screen.devicePixelRatio
     onCurrentDprChanged: updateQuality()
     readonly property vector3d entityOrigin: materialReview ? reviewCasePosition : adapter.casePosition
-    explicitTextureWidth: occlusionEnabled ? adapter.quality.targetSize.width : 0
-    explicitTextureHeight: occlusionEnabled ? adapter.quality.targetSize.height : 0
+    explicitTextureWidth: colorPipeline ? adapter.quality.targetSize.width : 0
+    explicitTextureHeight: colorPipeline ? adapter.quality.targetSize.height : 0
     objectName: "quick3DProbe"
     camera: sceneCamera
     environment: SceneEnvironment {
         backgroundMode: view.geometryOnly ? SceneEnvironment.Transparent : SceneEnvironment.Color
         clearColor: view.adapter.lighting.backgroundColor
-        antialiasingMode: SceneEnvironment.MSAA
+        antialiasingMode: view.reviewAntialiasing === 0 ? SceneEnvironment.NoAA : view.reviewAntialiasing === 2 ? SceneEnvironment.SSAA : SceneEnvironment.MSAA
         antialiasingQuality: SceneEnvironment.High
         tonemapMode: SceneEnvironment.TonemapModeNone
-        effects: view.geometryOnly ? [] : view.occlusionEnabled ? [ssao, materialOutput] : [materialOutput]
+        effects: view.geometryOnly ? [] : view.compositionEffects()
+    }
+    function compositionEffects(): list<Effect> {
+        let result = []
+        if (occlusionEnabled) result.push(ssao)
+        if (bokehActive || smaaActive) result.push(bokehActive ? smaaActive ? combined : bokeh : smaa)
+        result.push(materialOutput)
+        return result
     }
     Effect {
         id: materialOutput
         property bool rawChannel: view.occlusionEnabled && view.occlusionChannel !== 0
+        property bool outputAces: view.colorPipeline
+        property real exposure: view.adapter.lighting.exposure
         passes: Pass {
             shaders: Shader {
                 stage: Shader.Fragment
                 shader: "qrc:/assets/shaders/material-output.frag"
             }
+        }
+    }
+    PostprocessEffect {
+        id: bokeh
+        objectName: "bokehEffect"
+        bokehEnabled: true
+        smaaEnabled: false
+        bufferPrefix: "bokeh"
+        cameraNear: view.renderNear
+        cameraFar: view.renderFar
+        focus: view.entityOrigin.plus(Qt.vector3d(0,2,0)).minus(view.adapter.cameraPosition).dotProduct(view.adapter.cameraAim.minus(view.adapter.cameraPosition).normalized())
+        aperture: (.0003+.0005*view.clarity)*view.adapter.quality.values.depthOfField/100
+        aspect: view.width/view.height
+        depthTexture: Texture { sourceItem: bokehDepthLoader.item as Item; minFilter: Texture.Nearest; magFilter: Texture.Nearest }
+    }
+    // Immutable command layouts: preset changes select a prepared Effect rather
+    // than retargeting a live Pass/BufferInput while GPU commands are in flight.
+    PostprocessEffect {
+        id: smaa
+        bokehEnabled: false; smaaEnabled: true; bufferPrefix: "smaa"
+        depthTexture: bokeh.depthTexture
+    }
+    PostprocessEffect {
+        id: combined
+        bokehEnabled: true; smaaEnabled: true; bufferPrefix: "combined"
+        cameraNear: bokeh.cameraNear; cameraFar: bokeh.cameraFar
+        focus: bokeh.focus; aperture: bokeh.aperture; aspect: bokeh.aspect
+        depthTexture: bokeh.depthTexture
+    }
+    Loader {
+        id: bokehDepthLoader
+        active: view.postprocessEnabled
+        visible: false
+        sourceComponent: OcclusionPrepass {
+            adapter: view.adapter
+            origin: view.entityOrigin
+            neighbors: view.reviewNeighbors
+            cameraNear: view.renderNear
+            cameraFar: view.renderFar
+            targetSize: view.adapter.quality.targetSize
+            packedDepth: true
         }
     }
     Loader {
@@ -148,6 +206,7 @@ View3D {
         lightingEnabled: view.lightingEnabled
         warmth: view.warmth
         clarity: view.clarity
+        compositorOutput: view.colorPipeline
         coverSource: view.coverSource
         paperIrradiance: view.paperIrradiance
     }
@@ -194,7 +253,7 @@ View3D {
         }
     }
     function updateQuality(): void {
-        adapter.quality.resize(Math.max(1,width),Math.max(1,height),materialReview ? 1 : Math.min(width/1920,height/1080),currentDpr,4096)
+        adapter.quality.resize(Math.max(1,width),Math.max(1,height),materialReview ? 1 : Math.min(width/1920,height/1080),reviewDpr>0 ? reviewDpr : currentDpr,4096)
     }
     onWidthChanged: updateQuality()
     onHeightChanged: updateQuality()

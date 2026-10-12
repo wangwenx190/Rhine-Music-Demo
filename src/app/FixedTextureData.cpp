@@ -2,9 +2,19 @@
 #include <QFile>
 #include <QtEndian>
 #include <QSize>
+#include <QImage>
 #include <cstring>
 void FixedTextureData::setAsset(const QString &asset) {
     if(asset==m_asset)return;
+    if(asset=="smaa-area"||asset=="smaa-search") {
+        QImage image(":/assets/postprocess/"+asset+".png");
+        const QSize expected=asset=="smaa-area"?QSize(160,560):QSize(66,33);
+        if(image.size()!=expected){qWarning("Invalid SMAA lookup texture");return;}
+        // SMAAPass sets flipY=false: decoded PNG row zero is lookup UV.y=0.
+        image=image.convertToFormat(QImage::Format_RGBA8888);
+        m_asset=asset;setSize(expected);setFormat(QQuick3DTextureData::RGBA8);setHasTransparency(false);
+        setTextureData(QByteArray(reinterpret_cast<const char *>(image.constBits()),image.sizeInBytes()));emit assetChanged();return;
+    }
     QSize size;
     if(asset=="room-pmrem")size={768,1024};
     else if(asset=="dfg")size={16,16};

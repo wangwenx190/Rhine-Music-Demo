@@ -574,5 +574,6 @@ void MAIN() {
     float fresnel=0.04+0.96*exp2((-5.55473*nv-6.98316)*nv);
     outgoing=outgoing*(1.0-clearcoat*fresnel)+clearcoat*coat;
     if(lightingEnabled)outgoing=musicShell(outgoing,lightOrigin,localPosition,n,v,surface);
-    FRAGCOLOR=vec4(ACESFilmicToneMapping(outgoing),1.0);
+    // RenderPass into a linear target does not tone-map individual materials.
+    FRAGCOLOR=vec4(compositorOutput?outgoing:ACESFilmicToneMapping(outgoing),1.0);
 }

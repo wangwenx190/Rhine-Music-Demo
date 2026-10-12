@@ -22,7 +22,7 @@ set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
 set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
 set(material_qml_files)
-foreach(name CaseMaterials GlassMaterial LightingMaterial CaseGeometry OcclusionPrepass SsaoEffect)
+foreach(name CaseMaterials GlassMaterial LightingMaterial CaseGeometry OcclusionPrepass SsaoEffect PostprocessEffect)
     set(file "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/${name}.qml")
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "scene/${name}.qml")
     list(APPEND material_qml_files "${file}")
@@ -52,6 +52,14 @@ foreach(count 16 32 64)
     endforeach()
 endforeach()
 qt_add_resources(Yalahoo occlusion_assets PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources" FILES ${occlusion_assets})
+qt_add_resources(Yalahoo postprocess_assets PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
+    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/bokeh.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-edges.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-weights.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-blend.frag"
+    "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-area.png"
+    "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-search.png"
+    "${PROJECT_SOURCE_DIR}/resources/manifests/postprocess.json")
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     DEPENDENCIES QtQuick3D
     RESOURCE_PREFIX /qt/qml QML_FILES "${app_qml}" "${scene_qml}" ${material_qml_files} SOURCES QmlTypes.h FixedTextureData.h)

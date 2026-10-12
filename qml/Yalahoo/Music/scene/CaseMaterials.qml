@@ -8,6 +8,7 @@ Node {
     property bool lightingEnabled: true
     property real warmth: lighting.warmth
     property real clarity: 0
+    property bool compositorOutput: false
     property url coverSource: "qrc:/assets/demo-covers/square.png"
     property vector3d paperIrradiance: Qt.vector3d(1,1,1)
     readonly property Texture room: Texture {
@@ -50,12 +51,14 @@ Node {
         ltc2Texture: materials.ltc2
         warmth: materials.warmth
         clarity: Math.max(0,Math.min(1,materials.clarity))
+        compositorOutput: materials.compositorOutput
         paperIrradiance: materials.paperIrradiance
     }
     readonly property GlassMaterial spine: GlassMaterial {
         lighting: materials.lighting
         lightingEnabled: materials.lightingEnabled
         surface: 1
+        compositorOutput: materials.compositorOutput
         roomTexture: materials.room
         integrationTexture: materials.integration
         ltc1Texture: materials.ltc1
@@ -67,6 +70,7 @@ Node {
         lighting: materials.lighting
         lightingEnabled: materials.lightingEnabled
         surface: 2
+        compositorOutput: materials.compositorOutput
         roomTexture: materials.room
         integrationTexture: materials.integration
         ltc1Texture: materials.ltc1

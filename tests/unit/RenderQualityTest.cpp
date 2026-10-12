@@ -55,6 +55,21 @@ private slots:
             QCOMPARE(scene.cameraPosition(),position);QCOMPARE(scene.detail(),1.0);QCOMPARE(scene.lighting(),lighting);
         }
     }
+    void focalPlaneFollowsCamera() {
+        SceneAdapter scene;
+        scene.layout()->setViewport(960,720);
+        scene.observe({{0,1.85,12},{0,1.85,0},7.33},0);
+        QCOMPARE(scene.focalDepth({0,0,0}),12.0);
+        QCOMPARE(scene.focalDepth({0,0,4}),8.0);
+        QCOMPARE(scene.focalDepth({0,0,-4}),16.0);
+        scene.observe({{6,3.8,6},{0,1.85,0},7.33},0);
+        const auto direction=QVector3D(-6,-1.95f,-6).normalized();
+        QVERIFY(std::abs(scene.focalDepth({0,0,0})-QVector3D::dotProduct(QVector3D(-6,-1.8f,-6),direction))<1e-5);
+        // Rebase both entity and camera: optical depth is translation invariant.
+        const auto before=scene.focalDepth({0,0,0});
+        scene.observe({{106,23.8,36},{100,21.85,30},7.33},0);
+        QVERIFY(std::abs(scene.focalDepth({100,20,30})-before)<1e-4);
+    }
 };
 QTEST_GUILESS_MAIN(RenderQualityTest)
 #include "RenderQualityTest.moc"

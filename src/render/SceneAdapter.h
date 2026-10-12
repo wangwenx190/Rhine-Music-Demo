@@ -51,6 +51,7 @@ public:
     void setLightingInput(RowLightingInput input, QQuaternion caseRotation = {});
     void updateLighting(double motionDt);
     Q_INVOKABLE QVector3D projectWorldPoint(QVector3D world) const;
+    Q_INVOKABLE double focalDepth(QVector3D origin) const;
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
 signals:
     void frameChanged();

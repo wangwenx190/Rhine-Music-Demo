@@ -145,6 +145,11 @@ void SceneAdapter::updateLighting(double dt) {
     m_lighting.update(input,input.origin+SceneVector{localAim.x(),localAim.y(),localAim.z()},
         {offset.x(),offset.y(),offset.z()},m_detail,dt);
 }
+double SceneAdapter::focalDepth(QVector3D origin) const
+{
+    // Frozen scene.ts: (model.position + (0,2,0)) in camera view space.
+    return -(m_frame.view*QVector4D(origin+QVector3D(0,2,0),1)).z();
+}
 QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
 {
     const auto clip = m_frame.projection*m_frame.view*QVector4D(world,1);

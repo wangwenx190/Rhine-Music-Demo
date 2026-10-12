@@ -13,6 +13,7 @@ LightingMaterial {
     property int surface: 0
     property real warmth: 1
     property real clarity: 0
+    property bool compositorOutput: false
     property color nightTint: surface === 2 ? "#c6d6e5" : "#f6fbff"
     property color dayTint: surface === 0 ? "#fffdf8" : surface === 1 ? "#e7e1d8" : "#ece6dc"
     property color nightAttenuation: surface === 2 ? "#f3e9db" : "#dceafd"

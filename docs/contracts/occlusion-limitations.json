@@ -30,17 +30,39 @@
       "acceptance": "Run R10 overlap/low-spine/intermediate-extraction scenes and measure all five equal-weight ROIs with source cast/receive flags. Resolve capture, sorting and key shadow reception without removing transmission or changing theme/geometry/IOR; select RHI if public Quick3D has a structural limitation."
     },
     {
-      "id": "R09B-output-background",
-      "round": "R09B",
-      "object": "Background and raw linearColor OutputPass conversion",
-      "difference": "Source composer OutputPass applies ACES exposure then sRGB to the rendered background. Current R07 output preserves source background directly; raw linearColor also retains the previous material/output split. Geometry/normal/depth and material ROI comparisons are recorded independently.",
+      "id": "R10-capture-alpha-boundary",
+      "round": "R10",
+      "object": "Opaque alphaTest paper border inside SCREEN_MIP_TEXTURE and geometric MSAA resolve",
+      "difference": "Production offscreen MSAA improves shell edge coverage (18 of 23 measured pairs), but the 075 contained print border is still stair-stepped in the screen-space transmission capture. SSAA only partially smooths that capture boundary and expands internal targets; it is a diagnostic, not a production workaround. Keep contain, 1/64 inset, local cover LOD, and print sharpness. The diagnostic 390x844/night SSAA margin ROI (case 047) has MAE 6.101333/255 and no 11x11 SSIM window; other ROI gates must remain strict.",
       "input": [
-        "docs/media/occlusion/web/041.png",
-        "docs/media/occlusion/qt/041.png",
-        "docs/media/occlusion/web/007.png",
-        "docs/media/occlusion/qt/007.png"
+        "docs/media/materials/web/075.png",
+        "docs/media/materials/qt/075.png",
+        "docs/media/postprocess/web/090.png",
+        "docs/media/postprocess/qt/090.png",
+        "docs/media/postprocess/qt/091.png",
+        "docs/media/postprocess/qt/092.png",
+        "docs/media/postprocess/qt/paper-boundary.png",
+        "docs/media/postprocess/web/047.png",
+        "docs/media/postprocess/qt/047.png",
+        "verification/windows/postprocess/release-gpu-checks.json"
       ],
-      "acceptance": "In R09B trace opaque capture, toneMapped=false paper, shell ACES and final output exactly once. Compare background and linearColor ROIs before tuning lighting; no theme-color changes to compensate for output conversion."
+      "acceptance": "Trace the actual public Quick3D opaque capture and resolve, not just environment MSAA flags. Compare the exact R07 075 direct-material fixture and the nine-size/DPR production pairs. Smooth the print alpha boundary without changing authored geometry, contain or cover contrast/sharpness. Validate hardware/8.3MP limits for any public remedy; if capture sampling cannot be controlled, include multisampled opaque capture plus explicit resolve in the fixed RHI decision. Keep the case-047 diagnostic residual separate from production presets."
+    },
+    {
+      "id": "R10-postprocess-neighbor-background",
+      "round": "R10",
+      "object": "Near/far neighboring shells through transmission followed by source Bokeh",
+      "difference": "With front camera (0,1.85,12), selected origin (0,0,0), neighboring origins (0,0,4)/(0,0,-4), day/original/guided, the projected background ROI includes the front neighboring shell. Its MAE is 3.448131/255 without Bokeh (078), 3.442029 with Bokeh (079), and SSIM .873666648/.893622447, below .97. Isolated final/raw background ROI is exactly equal (MAE 0), so do not compensate by recoloring or retuning output exposure. Focal/aperture/projection, 41 taps and actual DOF pixel response are independently verified.",
+      "input": [
+        "tests/fixtures/postprocess/visual.json",
+        "docs/media/postprocess/web/078.png",
+        "docs/media/postprocess/qt/078.png",
+        "docs/media/postprocess/web/079.png",
+        "docs/media/postprocess/qt/079.png",
+        "verification/windows/postprocess/release-dpr-1.json",
+        "verification/windows/postprocess/release-gpu-checks.json"
+      ],
+      "acceptance": "Extend the existing R10 overlap/shell-capture probe with these exact near/far origins and camera. Compare opaque capture, glass ordering/capture, scalar depth and pre/post Bokeh separately, retaining all five equal-weight ROI metrics. Resolve neighboring-shell capture differences via public controls or include explicit sorted capture in the RHI decision; preserve geometry/themes/IOR/source optical parameters and the source Bokeh kernel."
     }
   ]
 }

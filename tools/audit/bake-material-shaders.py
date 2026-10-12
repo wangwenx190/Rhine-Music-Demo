@@ -9,7 +9,7 @@ block="""layout(std140,binding=0) uniform Params {
  vec3 CAMERA_POSITION; int surface; vec4 nightTint; vec4 dayTint; vec4 nightAttenuation; vec4 dayAttenuation;
  float warmth;float roughness;float coatRoughness;float environmentIntensity;float thickness;float attenuationDistance;
  float transmission;float clearcoat;float exposure;vec3 paperIrradiance;vec3 backgroundSrgb;
- bool lightingEnabled;bool rawChannel;vec3 backgroundLinear;vec3 rowColumn;vec4 rowSettings;float rowDetail;float rowFill;
+ bool lightingEnabled;bool rawChannel;bool outputAces;bool compositorOutput;vec3 backgroundLinear;vec3 rowColumn;vec4 rowSettings;float rowDetail;float rowFill;
  vec3 lightColumn;float printAmbient;vec3 scatterColor;float scatterStrength;
  vec3 spotPosition;vec3 spotTarget;vec3 spotColor;float spotIntensity;float areaIntensity;
  vec3 areaPosition;vec3 areaTarget;vec3 keyColor;vec3 skyColor;vec3 groundColor;vec3 lightIntensities;

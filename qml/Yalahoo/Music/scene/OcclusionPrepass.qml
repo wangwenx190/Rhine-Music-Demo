@@ -11,8 +11,9 @@ View3D {
     property real cameraFar: adapter.clipFar
     property bool packedDepth: false
     property var neighbors: []
-    width: adapter.quality.aoSize.width
-    height: adapter.quality.aoSize.height
+    property size targetSize: adapter.quality.aoSize
+    width: targetSize.width
+    height: targetSize.height
     explicitTextureWidth: width
     explicitTextureHeight: height
     environment: SceneEnvironment {

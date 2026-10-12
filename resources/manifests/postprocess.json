@@ -1,0 +1,58 @@
+{
+  "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
+  "sources": {
+    "src/scene.ts": "cd212bd9a40ea2323e21ad3008a025dd5a5874cb5d095f53375986122743d541",
+    "src/render-quality.ts": "862758c9e4c1c272ba10f44c2c58746b53b62ac42d2d7d8776eca0fc349118de",
+    "src/music-model.ts": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a"
+  },
+  "algorithms": {
+    "legacy-web/node_modules/three/examples/jsm/postprocessing/BokehPass.js": "5b9b0bc5cee6e24b2417da95f40eb2d178943c2ffbacbc4c2993a89d0597bfb3",
+    "legacy-web/node_modules/three/examples/jsm/postprocessing/SMAAPass.js": "1a96804b8cb33ba76a67f9a8e77f2d5e2bf47b1a5c9a8476901aa75e24acb85c",
+    "legacy-web/node_modules/three/examples/jsm/postprocessing/OutputPass.js": "02e4a261af34de71338185e9e87f0cbe5cba9115608d984363e1269dec1d2272",
+    "legacy-web/node_modules/three/examples/jsm/shaders/BokehShader.js": "bd8525158e3574a803f2e2ce5d5e263349a80ee41bf789e71446b9caa256aa9a",
+    "legacy-web/node_modules/three/examples/jsm/shaders/SMAAShader.js": "48ce320a6bf5c33806c4fa13ade7e3ab199f7856838d36b05ae82204db8a1c15",
+    "legacy-web/node_modules/three/examples/jsm/shaders/OutputShader.js": "353479f77a8d7e2629d49ccac9fc2f5dbfdda5442e0adf867b00377a2fcb0cb2"
+  },
+  "assets": [
+    {
+      "path": "postprocess/smaa-area.png",
+      "width": 160,
+      "height": 560,
+      "sha256": "b5a8e3bb3fbf11136d1411c6b7454f4469358559352987a074e22047582c0625",
+      "bytes": 33203,
+      "format": "PNG; numeric lookup, not sRGB; source flipY=false, decoded row zero stays at lookup UV.y=0"
+    },
+    {
+      "path": "postprocess/smaa-search.png",
+      "width": 66,
+      "height": 33,
+      "sha256": "025eb54fb8c4c2858a7d6d9743b88919fe5f9c661329c447a8f1e28971ae7403",
+      "bytes": 113,
+      "format": "PNG; numeric lookup, not sRGB; source flipY=false, decoded row zero stays at lookup UV.y=0"
+    }
+  ],
+  "license": "Three MIT; resources/licenses/three-LICENSE",
+  "order": [
+    "opaque linear capture",
+    "glass linear composition",
+    "SSAO",
+    "Bokeh 41 taps",
+    "SMAA 1x Medium when requested",
+    "ACES exposure",
+    "sRGB"
+  ],
+  "focusPoint": [
+    0,
+    2,
+    0
+  ],
+  "aperture": [
+    0.0003,
+    0.0008
+  ],
+  "maxblur": 0.011,
+  "initial": {
+    "focus": 25,
+    "aperture": 0.0018
+  }
+}

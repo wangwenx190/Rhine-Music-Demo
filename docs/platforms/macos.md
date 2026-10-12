@@ -143,6 +143,21 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 
 输入 `tests/fixtures/occlusion/visual.json`：80个生产状态及8个单独诊断；核方向来自同一seed=417资源。按R07步骤取得真实DPR1，检查报告88状态、真实960×720 PNG、画质目标尺寸及8.3MP上限。检查raw depth/normal的行方向、纸面/壳体完整几何覆盖，尤其RGB24线性深度链接解码；080–085的AO应非全白，086/087的阴影开关必须有真实像素变化。逐项比较raw AO、blur、linearColor及邻盒，按 `docs/contracts/occlusion.md` 和限制清单区分后续输入；图像审计按本平台的Metal/OpenGL枚举检查，Windows的实际通过结论不替代本平台结果。
 
-公开Qt阴影投影/偏置/滤波和Unshaded壳体接收仍交R10；背景输出交R09B。应在本平台另外记录实际后端、DPR、目标格式/方向、差异和诊断，MSL/GLSL生成不能替代GPU验证。关闭Review并重建、运行普通回归后，用 `--verify-runtime <report.json> --verify-shading` 检查同一产品材质/AO链路；普通产品应拒绝 `--verify-materials`。性能/原始/高/极高切换不得改变相机或业务状态。
+公开Qt阴影投影/偏置/滤波和Unshaded壳体接收仍交R10；背景/linearColor 输出契约及真实线性诊断见 R09B 清单。应在本平台另外记录实际后端、DPR、目标格式/方向、差异和诊断，MSL/GLSL生成不能替代GPU验证。关闭Review并重建、运行普通回归后，用 `--verify-runtime <report.json> --verify-shading` 检查同一产品材质/AO链路；普通产品应拒绝 `--verify-materials`。性能/原始/高/极高切换不得改变相机或业务状态。
 
 本平台真实构建、GPU、图像、DPR、窗口交互结果：待用户填写。
+
+## R09B 景深、抗锯齿与色彩用户验证（未执行）
+
+新增严格静态审计在 `verification/macos-static/postprocess/`，结论为“静态审计通过，实机待用户验证”。使用本机最新原生 Kit，Release Review 执行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'render-quality|runtime-postprocess|postprocess-gpu-audit' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+按前述 Retina 步骤核对报告的真实 DPR，必要时重采同 DPR Web 参照；不把环境变量值冒充实际比例。检查 `build/release/verification/postprocess/` 三个 DPR 报告共 105 状态与汇总；后端应为 Metal。检查九尺寸双主题盒体外斜边、盖内纸面留白和封面文字，比较 NoAA/MSAA/SSAA 局部图（SSAA 仅诊断）；确认原始 MSAA 实际产生边缘覆盖，高/极高启用 SMAA、性能关闭 DOF，Bokeh 前/后景模糊开关产生真实像素变化，焦距随相机/抽取位置变化。检查原始/高/极高/性能往返以及先关景深再启用 SMAA，无崩溃/黑帧/相机和导航重置。查验背景 final/raw ROI、RGB24 深度方向/精度、area/search 数值纹理行序和单次 ACES/sRGB，不拿旧 R09 channel=5 当真实线性图。具体未达图像目标项按 `docs/contracts/postprocess.md` 与限制清单逐项对照，Windows 图不能替代 Metal 实测。
+
+关闭 Review：`cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建并执行普通 CTest；运行 `--verify-runtime <report.json> --verify-shading` 检查生产图，普通程序应拒绝 `--verify-materials`。本平台构建、Metal、DPR、图像和交互实测结果：待用户填写。

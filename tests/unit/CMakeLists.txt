@@ -18,6 +18,26 @@ if(WIN32)
     set_tests_properties(scene PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 if(YALAHOO_REVIEW)
+    foreach(dpr IN ITEMS 1 1.5 2)
+        add_test(NAME runtime-postprocess-dpr-${dpr} COMMAND Yalahoo --verify-materials
+            "${PROJECT_SOURCE_DIR}/tests/fixtures/postprocess/visual-dpr-${dpr}.json"
+            --material-report "${CMAKE_BINARY_DIR}/verification/postprocess/dpr-${dpr}/runtime.json")
+        set_tests_properties(runtime-postprocess-dpr-${dpr} PROPERTIES TIMEOUT 420
+            FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;TypeError;out of range"
+            ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+        if(WIN32)
+            set_tests_properties(runtime-postprocess-dpr-${dpr} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+        endif()
+    endforeach()
+    add_test(NAME postprocess-gpu-audit COMMAND postprocess-audit
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/postprocess/visual.json"
+        "${CMAKE_BINARY_DIR}/verification/postprocess"
+        "${PROJECT_SOURCE_DIR}/docs/media/postprocess/web"
+        "${CMAKE_BINARY_DIR}/verification/postprocess/gpu-checks.json")
+    set_tests_properties(postprocess-gpu-audit PROPERTIES DEPENDS "runtime-postprocess-dpr-1;runtime-postprocess-dpr-1.5;runtime-postprocess-dpr-2" TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(postprocess-gpu-audit PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     add_test(NAME runtime-occlusion COMMAND Yalahoo --verify-materials
         "${PROJECT_SOURCE_DIR}/tests/fixtures/occlusion/visual.json"
         --material-report "${CMAKE_BINARY_DIR}/verification/occlusion/runtime.json")
