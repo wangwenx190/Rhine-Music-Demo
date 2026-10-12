@@ -208,6 +208,7 @@
 - 阴影/SSAO/RenderQuality 的有效参数、seed=417 核、RGB24 线性深度/独立 view normal 预通道、四预设及 8.3MP 限制见 `docs/contracts/occlusion.md`；资源来源/hash 在 `resources/manifests/occlusion.json`，同输入为 `tests/fixtures/occlusion/`，Release 复建为 `tools/build/verify-r09.ps1`。Windows 证据和成对图在 `verification/windows/occlusion/`、`docs/media/occlusion/`，平台新增审计在各静态目录 `occlusion/`；公开阴影投影/偏置/滤波、Unshaded 壳体接收/邻盒透射与背景输出的具体后续输入以 `docs/contracts/occlusion-limitations.json` 为准。画质只改变渲染资源，不重建业务状态；后续实例池须向两个几何预通道供应同一实体 origin/位置。
 - 景深 41 点 Bokeh、SMAA 1x Medium/lookup、最终 ACES/sRGB 与三个固定公开 Effect 通道布局见 `docs/contracts/postprocess.md`；资源来源/hash 在 `resources/manifests/postprocess.json`，Release 复建为 `tools/build/verify-r09b.ps1`。Windows 九尺寸/双主题及真实 DPR 1/1.5/2 的 105 状态证据在 `verification/windows/postprocess/`、成对图和局部放大图在 `docs/media/postprocess/`；新增平台静态审计在各静态目录 `postprocess/`。原始画质开启实际几何 MSAA，高/极高追加 SMAA；纸面透射捕获边界及邻盒背景 ROI 的 R10 输入见 `docs/contracts/occlusion-limitations.json`，不能以 SSAA 诊断或整体模糊替代生产修复。
 - 渲染目的后端固定为 QQuickRhiItem + QRhi/qsb，实施边界为 R10A–R10D；接口、固定参数、源捕获语义及各项补修输入/验收见 `docs/contracts/render-backend.json`、`render-backend.md`。Windows 70 状态证据在 `verification/windows/render-backend/`、成对图在 `docs/media/render-backend/`。当前唯一运行实现仍为 Quick3D bootstrap，`SceneAdapter.renderBackendContract` 的 implementationReady=false，R10D 替换后更新；不把后端选择当作 RHI 已实现。图集实际 GPU 传输字节未知，R10C 必须按具体 tile 实测，不把 CPU payload/调用次数当预算证据。不能直接删效果、自动降低默认画质或换成 WebEngine。
+- RHI 不透明基础、不可变 SceneFrame 同步、阴影实际 PCF/Vogel 算法、std140/qsb 和目标/读回所有权以 `docs/contracts/rhi-opaque.md` 为准，代码在 `src/render/rhi/`；Windows Release 重建入口为 `tools/build/verify-r10a.ps1`，证据在 `verification/windows/rhi-opaque/`、`docs/media/rhi-opaque/`，平台新增静态矩阵在对应 `rhi-opaque/`。该单采样 Review 基础不表示产品替换、MSAA capture/resolve、壳体或 tile/后处理已接入；R10B–D 按既定 graph 扩展，SceneAdapter 产品 implementationReady 仍为 false。
 - 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
 - R10A–R10D 的触发已由实际对照固定；后续轮次按合同执行，不再讨论框架选择。保持源屏幕空间透射近似：Three 音乐壳体为 FrontSide，不透明捕获同样不含透射壳体，不能误增递归玻璃捕获；修复对象为 shadow/resolve/排序/深度写入及各 ROI 残差。
 
@@ -267,13 +268,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R10A · 条件轮次：Qt RHI骨架与不透明通道（1–1.5日）
-
-- 触发：R10固定RHI；依赖R06及R10。交付QQuickRhiItem/Renderer、qsb构建、阴影/不透明目标及shader接口。
-- 使用所选最新 Qt Kit 的 GuiPrivate/QRhi，建立实际所用接口的 CMake 编译探针，差异集中在 RHI 适配层；Qt 更新导致接口变化时修复并重跑探针，不锁版本。Windows D3D11；synchronize阶段拷贝SceneFrame，render阶段无GUI访问。标准uniform block、显式binding/location和QSB跨后端编译。
-- RenderGraph固定shadow→opaqueColor/normal/depth→capture/mips→shell→AO/DOF/AA→output；不透明封面沿用R07的UV/光场，目标按RenderQuality限制。设备clip-space通过QRhi修正矩阵处理，QSB不依赖OpenGL默认深度范围。
-- 退出：已知顶点、深度、法线、单盒不透明投影与Quick3D基线一致，动态resize无资源竞态。
 
 ### R10B · 条件轮次：RHI磨砂捕获、材质和排序（1.5–2日）
 

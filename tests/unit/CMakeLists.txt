@@ -1,4 +1,12 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+if(YALAHOO_REVIEW)
+    add_test(NAME rhi-opaque-gpu COMMAND rhi-audit "${CMAKE_BINARY_DIR}/verification/rhi")
+    set_tests_properties(rhi-opaque-gpu PROPERTIES TIMEOUT 180
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded")
+    if(WIN32)
+        set_tests_properties(rhi-opaque-gpu PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
+endif()
 qt_add_executable(ImageComparisonTest ImageComparisonTest.cpp)
 target_link_libraries(ImageComparisonTest PRIVATE YalahooImageComparison Qt6::Test)
 yalahoo_platform(ImageComparisonTest)

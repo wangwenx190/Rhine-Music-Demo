@@ -21,6 +21,7 @@ yalahoo_check_tool(qmllint "--version")
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
+include(cmake/RhiProbe.cmake)
 
 add_subdirectory(src/core)
 add_subdirectory(src/motion)

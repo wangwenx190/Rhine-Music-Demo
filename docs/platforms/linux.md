@@ -176,3 +176,15 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 ```
 
 先核对实际 DPR1 和 fixture 的 960×720/320×720 内容尺寸，必要时重采同 DPR Web 参照。报告的 graphicsApi 应为 OpenGL (3)；核对全部 70 状态、源参数、投影、三档阴影 on/off、邻盒 pre/post Bokeh 与独立深度/法线，检查 9 实例、图集变色/稳定/还原的实际像素。audit passed 代表探测有效，parityPassed=false 保留 Quick3D 的渲染残差；不得将此视为 RHI 或全应用图像通过。实际 GPU 上传字节仍为 null；R10C 的子区域/预算验证须实测，不从 CPU payload 推断。完成后关闭 Review、重建并执行普通 CTest；产品拒绝 --verify-materials。本平台构建、OpenGL、图像及性能执行结果：待用户填写。
+
+## R10A RHI 不透明 GPU 用户验证（未执行）
+
+新增审计在本平台 `verification/*-static/rhi-opaque/`，结论为“静态审计通过，实机待用户验证”。本轮实现位于 `src/render/rhi/`，产品替换仍由 R10D 执行。在目标机最新原生 Kit 的 Release Review 环境中运行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R '^rhi-opaque-gpu$' --output-on-failure
+```
+
+此测试使用同机当前 Quick3D 和 RHI 真实窗口/读回，核对报告中的实际后端、36 组双主题/三种封面/前低视角纸面和法线/深度、已知平面深度误差、四角投影 <=2px，以及九尺寸/恢复/30 次连续 resize。报告输出 `build/release/verification/rhi/runtime.json` 与成对 PNG。测试指定 DPR1；若桌面仍得到其他实际 DPR，按真实比例调整 oracle 和目标大小后重新采集，不冒充 DPR1 已通过。阴影六对对应冻结 R10 的 1024/2048/4096 双主题 receiver；查看 `.32` 阴影强度与目标图，不能将白色 receiver 掩码用于全壳体材质验收。MSAA capture/resolve、壳体和后处理分别由 R10B/C/D 的对应检查完成。结束后关闭 Review、重新构建并执行普通 Release CTest。目标平台的实际编译、GPU、图像、尺寸/DPR 检查结果：待用户填写。
