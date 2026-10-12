@@ -1,7 +1,12 @@
 qt_add_executable(Yalahoo main.cpp AssetCatalog.cpp AssetCatalog.h FixedTextureData.cpp FixedTextureData.h)
 if(YALAHOO_REVIEW)
-    target_sources(Yalahoo PRIVATE SceneReview.cpp SceneReview.h MaterialReview.cpp MaterialReview.h)
+    target_sources(Yalahoo PRIVATE SceneReview.cpp SceneReview.h MaterialReview.cpp MaterialReview.h RenderProbe.cpp RenderProbe.h)
+    qt_add_resources(Yalahoo render_probe PREFIX /review BASE "${PROJECT_SOURCE_DIR}/tools/review"
+        FILES "${PROJECT_SOURCE_DIR}/tools/review/InstanceProbe.qml"
+        "${PROJECT_SOURCE_DIR}/tools/review/probe-atlas.vert" "${PROJECT_SOURCE_DIR}/tools/review/probe-atlas.frag"
+        "${PROJECT_SOURCE_DIR}/tools/review/instanced-glass.vert" "${PROJECT_SOURCE_DIR}/tools/review/instanced-paper.vert")
     target_compile_definitions(Yalahoo PRIVATE YALAHOO_REVIEW)
+    target_link_libraries(Yalahoo PRIVATE YalahooImageComparison)
 endif()
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(Yalahoo)

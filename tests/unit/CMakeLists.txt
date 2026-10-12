@@ -1,4 +1,11 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(ImageComparisonTest ImageComparisonTest.cpp)
+target_link_libraries(ImageComparisonTest PRIVATE YalahooImageComparison Qt6::Test)
+yalahoo_platform(ImageComparisonTest)
+add_test(NAME image-comparison COMMAND ImageComparisonTest)
+if(WIN32)
+    set_tests_properties(image-comparison PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 qt_add_executable(RenderQualityTest RenderQualityTest.cpp)
 target_link_libraries(RenderQualityTest PRIVATE YalahooScene Qt6::Test)
 target_compile_definitions(RenderQualityTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
@@ -18,6 +25,20 @@ if(WIN32)
     set_tests_properties(scene PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME runtime-render-backend COMMAND Yalahoo --verify-materials
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/render-backend/visual.json"
+        --material-report "${CMAKE_BINARY_DIR}/verification/render-backend/runtime.json")
+    set_tests_properties(runtime-render-backend PROPERTIES TIMEOUT 240
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;TypeError;out of range"
+        ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+    add_test(NAME render-backend-gpu-audit COMMAND render-backend-audit
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/render-backend/visual.json"
+        "${CMAKE_BINARY_DIR}/verification/render-backend" "${PROJECT_SOURCE_DIR}/docs/media/render-backend/web"
+        "${CMAKE_BINARY_DIR}/verification/render-backend/gpu-checks.json")
+    set_tests_properties(render-backend-gpu-audit PROPERTIES DEPENDS runtime-render-backend TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(runtime-render-backend render-backend-gpu-audit PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     foreach(dpr IN ITEMS 1 1.5 2)
         add_test(NAME runtime-postprocess-dpr-${dpr} COMMAND Yalahoo --verify-materials
             "${PROJECT_SOURCE_DIR}/tests/fixtures/postprocess/visual-dpr-${dpr}.json"

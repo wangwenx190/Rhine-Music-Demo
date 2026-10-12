@@ -249,6 +249,8 @@ View3D {
         delegate: CaseGeometry {
             required property var modelData
             position: Qt.vector3d(modelData[0],modelData[1],modelData[2])
+            layer: view.materialReview ? view.reviewLayer : "all"
+            showPaper: !view.materialReview || view.reviewLayer === "all" || view.reviewLayer === "paper"
             lid: caseMaterials.lid; spine: caseMaterials.spine; tray: caseMaterials.tray; paper: caseMaterials.paper
         }
     }

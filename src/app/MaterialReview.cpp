@@ -1,4 +1,9 @@
 #include "MaterialReview.h"
+#include "ImageComparison.h"
+#include "RenderProbe.h"
+#include <QQmlComponent>
+#include <QQmlEngine>
+#include <QQuick3DObject>
 #include "SceneAdapter.h"
 #include <QCryptographicHash>
 #include <QDir>
@@ -30,37 +35,12 @@ QVector3D project(QQuickItem *view,QVector3D world) {
     QMetaObject::invokeMethod(view,"qtProjection",Q_RETURN_ARG(QVector3D,result),Q_ARG(QVector3D,world));
     return result;
 }
-QJsonObject compare(const QImage &actual,const QImage &expected,const QPolygonF &polygon,bool full=true) {
-    const auto bounds=polygon.boundingRect().toAlignedRect().intersected(actual.rect()).intersected(expected.rect());
-    double error=0,delta[3]={0,0,0},ssim=0;int count=0,windows=0;
-    // 11x11 Gaussian sigma=1.5, channels independently, source contract constants.
-    double weights[11][11],total=0;
-    for(int y=-5;y<=5;++y)for(int x=-5;x<=5;++x){double w=std::exp(-(x*x+y*y)/4.5);weights[y+5][x+5]=w;total+=w;}
-    for(int y=bounds.top();y<=bounds.bottom();++y)for(int x=bounds.left();x<=bounds.right();++x){
-        if(!polygon.containsPoint({x+.5,y+.5},Qt::OddEvenFill))continue;
-        const auto a=actual.pixelColor(x,y),b=expected.pixelColor(x,y);
-        double av[3]={double(a.red()),double(a.green()),double(a.blue())},bv[3]={double(b.red()),double(b.green()),double(b.blue())};
-        for(int c=0;c<3;++c){error+=std::abs(av[c]-bv[c]);delta[c]+=av[c]-bv[c];}++count;
-        if(!full)continue;
-        if(x<5||y<5||x+5>=actual.width()||y+5>=actual.height())continue;
-        // A window crossing a ROI boundary is not included in the region's SSIM.
-        bool contained=true;
-        for(int dy:{-5,5})for(int dx:{-5,5})
-            contained=contained&&polygon.containsPoint({x+dx+.5,y+dy+.5},Qt::OddEvenFill);
-        if(!contained)continue;
-        for(int c=0;c<3;++c){double ma=0,mb=0,va=0,vb=0,cov=0;
-            for(int dy=-5;dy<=5;++dy)for(int dx=-5;dx<=5;++dx){auto aa=actual.pixelColor(x+dx,y+dy),bb=expected.pixelColor(x+dx,y+dy);double a0=c==0?aa.red():c==1?aa.green():aa.blue(),b0=c==0?bb.red():c==1?bb.green():bb.blue();double w=weights[dy+5][dx+5]/total;ma+=w*a0;mb+=w*b0;va+=w*a0*a0;vb+=w*b0*b0;cov+=w*a0*b0;}
-            va=std::max(0.0,va-ma*ma);vb=std::max(0.0,vb-mb*mb);cov-=ma*mb;
-            ssim+=((2*ma*mb+6.5025)*(2*cov+58.5225))/((ma*ma+mb*mb+6.5025)*(va+vb+58.5225));
-        }++windows;
-    }
-    QJsonArray polygonJson;for(auto p:polygon)polygonJson.append(QJsonArray{p.x(),p.y()});
-    return {{"pixels",count},{"meanAbsoluteRgb",count?error/(3*count):0},{"meanSignedRgb",QJsonArray{count?delta[0]/count:0,count?delta[1]/count:0,count?delta[2]/count:0}},{"ssim",windows?QJsonValue(ssim/(3*windows)):QJsonValue(QJsonValue::Null)},{"ssimWindows",windows},{"polygon",polygonJson}};
-}
+
 }
 int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scene,const QString &fixture,const QString &report) {
     QFile input(fixture);if(!input.open(QIODevice::ReadOnly))return 12;
     const auto bytes=input.readAll();const auto oracle=QJsonDocument::fromJson(bytes).object();
+    const bool backendReview=oracle["renderBackend"].toBool();
     const bool postprocessReview=oracle["postprocess"].toBool();
     const bool calibration=oracle["calibration"].toBool(),occlusionReview=oracle["occlusion"].toBool(),lightingReview=oracle["lighting"].toBool()||occlusionReview||postprocessReview;
     auto cases=oracle["cases"].toArray();if(cases.isEmpty()||(!calibration&&!lightingReview&&cases.size()!=90))return 12;
@@ -75,10 +55,34 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
     window.setFlags(Qt::Window|Qt::FramelessWindowHint);window.resize(960,720);window.setPosition(0,0);window.show();
     const auto frames=std::make_shared<std::atomic<int>>(0);
     const auto connection=QObject::connect(&window,&QQuickWindow::afterRendering,&window,[frames]{++*frames;},Qt::DirectConnection);
+    RenderProbeInstances table;RenderProbeAtlas atlas;
+    std::unique_ptr<QObject> pool;
+    if(backendReview){
+        qInfo()<<"R10: creating instance probe";
+        QQmlComponent component(qmlEngine(&window),QUrl("qrc:/review/InstanceProbe.qml"));
+        pool.reset(component.createWithInitialProperties({{"adapter",QVariant::fromValue(&scene)},
+            {"table",QVariant::fromValue(static_cast<QQuick3DInstancing *>(&table))},
+            {"atlas",QVariant::fromValue(static_cast<QQuick3DTextureData *>(&atlas))}}));
+        if(!pool){qWarning()<<component.errors();return 12;}
+        auto *node=qobject_cast<QQuick3DObject *>(pool.get());
+        node->setParentItem(window.findChild<QQuick3DObject *>("inspectionCase")->parentItem());
+        node->setProperty("visible",false);
+        qInfo()<<"R10: instance probe ready";
+    }
     int index=-1,start=0;QJsonArray results;bool pass=true;double maxProjection=0;
     const auto next=[&]{++index;const auto c=cases[index].toObject();
+        if(backendReview)qInfo()<<"R10 GPU case"<<index;
         view->setProperty("warmth",c["day"].toBool()?1.0:0.0);view->setProperty("clarity",c["clarity"].toDouble());
-        view->setProperty("reviewLayer",c["layer"].toString());view->setProperty("coverSource",QUrl("qrc:/assets/demo-covers/"+c["cover"].toString()+".png"));
+        if(pool){
+            const bool enabled=c["instancePool"].toBool();
+            pool->setProperty("visible",enabled);
+            table.setPositions(c["instances"].toArray().toVariantList());
+            table.setDepthSortingEnabled(c["depthSort"].toBool());
+            pool->setProperty("atlasEnabled",c["atlas"].toBool());
+            pool->setProperty("coverSource",QUrl("qrc:/assets/demo-covers/"+c["cover"].toString()+".png"));
+            if(c["atlas"].toBool())atlas.setPhase(c["atlasPhase"].toInt());
+        }
+        view->setProperty("reviewLayer",c["instancePool"].toBool()?QString("none"):c["layer"].toString());view->setProperty("coverSource",QUrl("qrc:/assets/demo-covers/"+c["cover"].toString()+".png"));
         const auto origin=c["origin"].toArray();const SceneVector caseOrigin{origin[0].toDouble(),origin[1].toDouble(),origin[2].toDouble()};
         view->setProperty("reviewCasePosition",QVariant::fromValue(caseOrigin.qt()));
         view->setProperty("lightingEnabled",lightingReview&&!c["materialBaseline"].toBool());
@@ -89,14 +93,15 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
         view->setProperty("reviewAntialiasing",c.value("aaMode").toInt(1));
         const int w=c.value("width").toInt(960),h=c.value("height").toInt(720);
         window.resize(w,h);
-        view->setProperty("shadowsEnabled",occlusionReview&&c.value("shadows").toBool());
+        view->setProperty("shadowsEnabled",(occlusionReview||backendReview)&&c.value("shadows").toBool());
         view->setProperty("occlusionChannel",c.value("channel").toInt());
         view->setProperty("renderNear",c.value("clipNear").toDouble(scene.clipNear()));
         view->setProperty("renderFar",c.value("clipFar").toDouble(scene.clipFar()));
         view->setProperty("aoRadius",c.value("kernelRadius").toDouble(.18));
         view->setProperty("shadowProbe",c.value("shadowProbe").toBool());
-        view->setProperty("reviewNeighbors",c.value("neighbors").toArray().toVariantList());
+        view->setProperty("reviewNeighbors",c["instancePool"].toBool()?QVariantList{}:c.value("neighbors").toArray().toVariantList());
         if(occlusionReview||postprocessReview)scene.quality()->setPreset(c["quality"].toString());
+        if(c.contains("shadowSize")){auto settings=scene.quality()->values();settings.insert("shadows",c["shadowSize"].toInt());scene.quality()->configure(settings);}
         if(lightingReview){
             scene.lighting()->setReducedMotion(true);scene.lighting()->setNight(!c["day"].toBool());
             auto settings=scene.lighting()->ribbon.settings;
@@ -122,8 +127,10 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
         const bool paperProbe=c["paperProbe"].toBool();
         const QString name=paperProbe?QString("paper-probe-%1.png").arg(index):referenceName;
         const auto actual=window.grabWindow().convertToFormat(QImage::Format_RGB32);
-        QImage expected(root+(postprocessReview?"/docs/media/postprocess/web/":occlusionReview?"/docs/media/occlusion/web/":lightingReview?"/docs/media/lighting/web/":"/docs/media/materials/web/")+referenceName);
-        if(expected.isNull()||actual.isNull()||expected.size()!=actual.size()){app.exit(15);return;}
+        QImage expected(root+(backendReview?"/docs/media/render-backend/web/":postprocessReview?"/docs/media/postprocess/web/":occlusionReview?"/docs/media/occlusion/web/":lightingReview?"/docs/media/lighting/web/":"/docs/media/materials/web/")+referenceName);
+        if(expected.isNull()||actual.isNull()||expected.size()!=actual.size()){
+            qWarning()<<"Image input/readback mismatch"<<root<<referenceName<<expected.size()<<actual.size();app.exit(15);return;
+        }
         int paperProbeError=0;
         if(paperProbe) {
             const double light=c["paperLight"].toDouble();
@@ -166,23 +173,25 @@ int reviewMaterials(QGuiApplication &app,QQuickWindow &window,SceneAdapter &scen
             const auto o=c["origin"].toArray();
             const QVector3D world(float(p.x()+o[0].toDouble()),float(p.y()+o[1].toDouble()),float((region.name==QString("background")?-.14:.07)+o[2].toDouble()));
             const auto qt=project(view,world),cpu=scene.projectWorldPoint(world);const double err=std::hypot(qt.x()-cpu.x(),qt.y()-cpu.y());maxProjection=std::max(maxProjection,err);valid=valid&&err<=2;polygon<<QPointF(qt.x()*window.devicePixelRatio(),qt.y()*window.devicePixelRatio());
-        }roi.insert(region.name,compare(actual,expected,polygon,!calibration));}
+        }auto metric=compareImages(actual,expected,polygon,!calibration);
+        if(backendReview)metric.insert("edgeDistancePixels",edgeDistance(actual,expected,polygon));
+        roi.insert(region.name,metric);}
         if(lightingReview&&!occlusionReview&&!postprocessReview)for(const auto &region:regions){const auto metric=roi[region.name].toObject();
             valid=valid&&metric["pixels"].toInt()>0&&metric["meanAbsoluteRgb"].toDouble()<=6
                 &&(metric["ssimWindows"].toInt()==0||metric["ssim"].toDouble()>=.97);}
-        QImage diff(actual.size(),QImage::Format_RGB32);
-        if(valid&&!calibration)for(int y=0;y<actual.height();++y)for(int x=0;x<actual.width();++x){auto a=actual.pixelColor(x,y),b=expected.pixelColor(x,y);diff.setPixelColor(x,y,QColor(std::abs(a.red()-b.red()),std::abs(a.green()-b.green()),std::abs(a.blue()-b.blue())));}
+        QImage diff;
+        if(valid&&!calibration)diff=absoluteDifference(actual,expected);
         valid=valid&&(calibration||diff.save(output+"/diff-"+name));
-        if(occlusionReview||postprocessReview){roi.insert("full",compare(actual,expected,QPolygonF(QRectF(actual.rect())),false));
+        if(occlusionReview||postprocessReview){roi.insert("full",compareImages(actual,expected,QPolygonF(QRectF(actual.rect())),false));
             const auto dimensions=scene.quality()->targetSize();
             valid=valid&&view->property("effectiveTextureSize").toSize()==dimensions;
         }
         const auto *bokeh=window.findChild<QObject *>("bokehEffect");
         const double focus=bokeh->property("focus").toDouble(),aperture=bokeh->property("aperture").toDouble();
         if(postprocessReview)valid=valid&&std::abs(focus-c["focus"].toDouble())<1e-4&&std::abs(aperture-c["aperture"].toDouble())<1e-10;
-        pass=pass&&valid;results.append(QJsonObject{{"index",postprocessReview?c["index"].toInt():index},{"focus",focus},{"aperture",aperture},{"bokehActive",view->property("bokehActive").toBool()},{"smaaActive",view->property("smaaActive").toBool()},{"aaMode",c.value("aaMode").toInt(1)},{"width",window.width()},{"height",window.height()},{"channel",c["channel"]},{"shadows",c["shadows"]},{"quality",c["quality"]},{"targetWidth",view->property("effectiveTextureSize").toSize().width()},{"targetHeight",view->property("effectiveTextureSize").toSize().height()},{"aoWidth",scene.quality()->aoSize().width()},{"aoHeight",scene.quality()->aoSize().height()},{"paperProbe",paperProbe},{"paperProbeError",paperProbeError},{"paperLight",c["paperLight"]},{"foregroundPixels",foreground},{"sourceParameterMatch",parameters},{"webProjectionPixels",webProjection},{"factors",c["factors"]},{"theme",c["day"].toBool()?"day":"night"},{"angle",c["angle"]},{"cover",c["cover"]},{"layer",c["layer"]},{"mode",c["mode"]},{"origin",c["origin"]},{"roi",roi},{"passed",valid},{"frames",frames->load()-start},{"screenshot",name}});
+        pass=pass&&valid;results.append(QJsonObject{{"instancePool",c["instancePool"]},{"depthSort",c["depthSort"]},{"atlas",c["atlas"]},{"atlasPhase",atlas.phase()},{"atlasSubmissions",atlas.submissions()},{"atlasCpuPayloadBytes",RenderProbeAtlas::pageBytes},{"atlasModifiedTileBytes",RenderProbeAtlas::tileBytes},{"atlasGpuUploadBytes",QJsonValue(QJsonValue::Null)},{"index",postprocessReview?c["index"].toInt():index},{"focus",focus},{"aperture",aperture},{"bokehActive",view->property("bokehActive").toBool()},{"smaaActive",view->property("smaaActive").toBool()},{"aaMode",c.value("aaMode").toInt(1)},{"width",window.width()},{"height",window.height()},{"channel",c["channel"]},{"shadows",c["shadows"]},{"quality",c["quality"]},{"targetWidth",view->property("effectiveTextureSize").toSize().width()},{"targetHeight",view->property("effectiveTextureSize").toSize().height()},{"aoWidth",scene.quality()->aoSize().width()},{"aoHeight",scene.quality()->aoSize().height()},{"paperProbe",paperProbe},{"paperProbeError",paperProbeError},{"paperLight",c["paperLight"]},{"foregroundPixels",foreground},{"sourceParameterMatch",parameters},{"webProjectionPixels",webProjection},{"factors",c["factors"]},{"theme",c["day"].toBool()?"day":"night"},{"angle",c["angle"]},{"cover",c["cover"]},{"layer",c["layer"]},{"mode",c["mode"]},{"origin",c["origin"]},{"roi",roi},{"passed",valid},{"frames",frames->load()-start},{"screenshot",name}});
         if(index+1<cases.size()){next();return;}
-        poll.stop();QSaveFile file(report);bool saved=file.open(QIODevice::WriteOnly);if(saved){file.write(QJsonDocument(QJsonObject{{"passed",pass},{"qtVersion",qVersion()},{"graphicsApi",int(window.rendererInterface()->graphicsApi())},{"dpr",window.devicePixelRatio()},{"width",window.width()},{"height",window.height()},{"baseline",oracle["baseline"]},{"fixtureSha256",QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())},{"maxProjectionPixels",maxProjection},{"cases",results}}).toJson());saved=file.commit();}app.exit(pass&&saved?0:13);
+        poll.stop();QSaveFile file(report);bool saved=file.open(QIODevice::WriteOnly);if(saved){file.write(QJsonDocument(QJsonObject{{"renderBackendContract",QJsonObject::fromVariantMap(scene.renderBackendContract())},{"passed",pass},{"qtVersion",qVersion()},{"graphicsApi",int(window.rendererInterface()->graphicsApi())},{"dpr",window.devicePixelRatio()},{"width",window.width()},{"height",window.height()},{"baseline",oracle["baseline"]},{"fixtureSha256",QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())},{"maxProjectionPixels",maxProjection},{"cases",results}}).toJson());saved=file.commit();}app.exit(pass&&saved?0:13);
     });
     QTimer timeout;timeout.setSingleShot(true);QObject::connect(&timeout,&QTimer::timeout,&app,[&]{app.exit(14);});
     next();poll.start(10);timeout.start(calibration?1200000:postprocessReview?600000:120000);const int code=app.exec();QObject::disconnect(connection);return code;

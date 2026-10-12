@@ -161,3 +161,16 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 按前述 Retina 步骤核对报告的真实 DPR，必要时重采同 DPR Web 参照；不把环境变量值冒充实际比例。检查 `build/release/verification/postprocess/` 三个 DPR 报告共 105 状态与汇总；后端应为 Metal。检查九尺寸双主题盒体外斜边、盖内纸面留白和封面文字，比较 NoAA/MSAA/SSAA 局部图（SSAA 仅诊断）；确认原始 MSAA 实际产生边缘覆盖，高/极高启用 SMAA、性能关闭 DOF，Bokeh 前/后景模糊开关产生真实像素变化，焦距随相机/抽取位置变化。检查原始/高/极高/性能往返以及先关景深再启用 SMAA，无崩溃/黑帧/相机和导航重置。查验背景 final/raw ROI、RGB24 深度方向/精度、area/search 数值纹理行序和单次 ACES/sRGB，不拿旧 R09 channel=5 当真实线性图。具体未达图像目标项按 `docs/contracts/postprocess.md` 与限制清单逐项对照，Windows 图不能替代 Metal 实测。
 
 关闭 Review：`cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建并执行普通 CTest；运行 `--verify-runtime <report.json> --verify-shading` 检查生产图，普通程序应拒绝 `--verify-materials`。本平台构建、Metal、DPR、图像和交互实测结果：待用户填写。
+
+## R10 渲染选择与探测用户验证（未执行）
+
+新增审计在 verification/macos-static/render-backend/，结论为“静态审计通过，实机待用户验证”。R10 选择 RHI，当前程序仍为 Quick3D bootstrap；RHI 实现按 R10A–D 执行。目标机使用最新原生 Kit 的 Release Review：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'image-comparison|runtime-render-backend|render-backend-gpu-audit' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+先核对实际 DPR1 和 fixture 的 960×720/320×720 内容尺寸，必要时重采同 DPR Web 参照。报告的 graphicsApi 应为 Metal (6)；核对全部 70 状态、源参数、投影、三档阴影 on/off、邻盒 pre/post Bokeh 与独立深度/法线，检查 9 实例、图集变色/稳定/还原的实际像素。audit passed 代表探测有效，parityPassed=false 保留 Quick3D 的渲染残差；不得将此视为 RHI 或全应用图像通过。实际 GPU 上传字节仍为 null；R10C 的子区域/预算验证须实测，不从 CPU payload 推断。完成后关闭 Review、重建并执行普通 CTest；产品拒绝 --verify-materials。本平台构建、Metal、图像及性能执行结果：待用户填写。

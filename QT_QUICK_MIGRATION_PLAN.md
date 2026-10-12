@@ -207,9 +207,9 @@
 - 单盒材质的参数/线性捕获/局部 LOD/印刷限制、固定环境和重建命令以 `docs/contracts/materials.md` 为准，冻结源码与算法 hash 在 `materials.json`，资源清单在 `resources/manifests/materials.json`；同输入 fixture 为 `tests/fixtures/materials/single-case.json`。Windows 材质证据与残差在 `verification/windows/materials/`、成对图在 `docs/media/materials/`；平台矩阵在 `verification/macos-static/materials/` 和 `verification/linux-static/materials/`。后续灯光、图集与后处理接入保留纸面入射量、一次 ACES/一次 sRGB 输出和独立侧脊参数契约。
 - 阴影/SSAO/RenderQuality 的有效参数、seed=417 核、RGB24 线性深度/独立 view normal 预通道、四预设及 8.3MP 限制见 `docs/contracts/occlusion.md`；资源来源/hash 在 `resources/manifests/occlusion.json`，同输入为 `tests/fixtures/occlusion/`，Release 复建为 `tools/build/verify-r09.ps1`。Windows 证据和成对图在 `verification/windows/occlusion/`、`docs/media/occlusion/`，平台新增审计在各静态目录 `occlusion/`；公开阴影投影/偏置/滤波、Unshaded 壳体接收/邻盒透射与背景输出的具体后续输入以 `docs/contracts/occlusion-limitations.json` 为准。画质只改变渲染资源，不重建业务状态；后续实例池须向两个几何预通道供应同一实体 origin/位置。
 - 景深 41 点 Bokeh、SMAA 1x Medium/lookup、最终 ACES/sRGB 与三个固定公开 Effect 通道布局见 `docs/contracts/postprocess.md`；资源来源/hash 在 `resources/manifests/postprocess.json`，Release 复建为 `tools/build/verify-r09b.ps1`。Windows 九尺寸/双主题及真实 DPR 1/1.5/2 的 105 状态证据在 `verification/windows/postprocess/`、成对图和局部放大图在 `docs/media/postprocess/`；新增平台静态审计在各静态目录 `postprocess/`。原始画质开启实际几何 MSAA，高/极高追加 SMAA；纸面透射捕获边界及邻盒背景 ROI 的 R10 输入见 `docs/contracts/occlusion-limitations.json`，不能以 SSAA 诊断或整体模糊替代生产修复。
-- R10 若出现无法通过公开 Qt Quick 3D 接口修复的透射捕获、逐实例排序、图集局部上传或通道控制问题，执行 R10A–R10D。不能直接删效果、自动降低默认画质或换成 WebEngine。
+- 渲染目的后端固定为 QQuickRhiItem + QRhi/qsb，实施边界为 R10A–R10D；接口、固定参数、源捕获语义及各项补修输入/验收见 `docs/contracts/render-backend.json`、`render-backend.md`。Windows 70 状态证据在 `verification/windows/render-backend/`、成对图在 `docs/media/render-backend/`。当前唯一运行实现仍为 Quick3D bootstrap，`SceneAdapter.renderBackendContract` 的 implementationReady=false，R10D 替换后更新；不把后端选择当作 RHI 已实现。图集实际 GPU 传输字节未知，R10C 必须按具体 tile 实测，不把 CPU payload/调用次数当预算证据。不能直接删效果、自动降低默认画质或换成 WebEngine。
 - 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
-- 如果首选管线达到目标且无上述结构限制，删除条件轮次 R10A–R10D；不是把它们标记为完成。由实际对照决定是否触发，不由 agent 个人偏好决定。
+- R10A–R10D 的触发已由实际对照固定；后续轮次按合同执行，不再讨论框架选择。保持源屏幕空间透射近似：Three 音乐壳体为 FrontSide，不透明捕获同样不含透射壳体，不能误增递归玻璃捕获；修复对象为 shadow/resolve/排序/深度写入及各 ROI 残差。
 
 ### 纹理与实例预算
 
@@ -267,16 +267,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R10 · 渲染可行性门槛与固定实现选择（0.5–1日）
-
-- 依赖：R07–R09B。交付Qt/C++图像比较器、基线对照场景和RenderBackend合同字段。
-- 阴影投影/偏置/滤波与 Unshaded 壳体接收、邻盒透射的输入/修复对象/验收方法见 `docs/contracts/occlusion-limitations.json` 的两个 R10 条目；对照 086/087 阴影平面及 031/071 邻盒，不将仅配置 shadowFactor=32 当作有效阴影强度一致的证据。
-- 后处理补修输入按 `docs/contracts/occlusion-limitations.json` 的 `R10-capture-alpha-boundary`、`R10-postprocess-neighbor-background`：对照精确 075 的透射纸面 alpha 边界、047 诊断 SSAA margin，以及 078/079 前后邻盒背景 ROI；逐项核对 capture/resolve、排序和 pre/post Bokeh，不修改 contain、印刷锐度、主题或曝光掩盖差异。
-- 在同一场景检查单盒、前后重叠盒、低角度侧脊、抽取中间态和三种封面；增加小型实例池探测排序及图集更新，不能只测孤立盒。
-- 先按已规定参数顺序修正可调误差。若通道控制/透射捕获/实例排序/上传预算存在结构限制，固定选择RHI并保留R10A–R10D；若没有结构限制且达到门槛，固定Quick3D并移除条件轮次。
-- 将后端选择、输入接口及不能改变的参数写入contract；后续轮次不再次讨论框架，不用简化玻璃效果绕过本门槛。
-- 退出：主渲染路径唯一，具备可重放对照和真实GPU证据。无法达到门槛时留下具体修复任务，不能提前实施后续全部UI。
 
 ### R10A · 条件轮次：Qt RHI骨架与不透明通道（1–1.5日）
 

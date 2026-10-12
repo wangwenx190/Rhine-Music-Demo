@@ -1,0 +1,16 @@
+qt_add_library(YalahooImageComparison STATIC ImageComparison.cpp ImageComparison.h)
+target_link_libraries(YalahooImageComparison PUBLIC Qt6::Gui)
+target_include_directories(YalahooImageComparison PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+yalahoo_platform(YalahooImageComparison)
+qt_add_executable(compare-images CompareImages.cpp)
+target_link_libraries(compare-images PRIVATE YalahooImageComparison)
+set_target_properties(compare-images PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
+    WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+yalahoo_platform(compare-images)
+if(YALAHOO_REVIEW)
+    qt_add_executable(render-backend-audit RenderBackendAudit.cpp)
+    target_link_libraries(render-backend-audit PRIVATE YalahooImageComparison Qt6::Quick)
+    set_target_properties(render-backend-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
+        WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(render-backend-audit)
+endif()

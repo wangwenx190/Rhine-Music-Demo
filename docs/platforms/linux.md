@@ -163,3 +163,16 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 核对 `build/release/verification/postprocess/` 三个 DPR 报告共 105 状态的实际 DPR 与 OpenGL 后端，缩放无法按请求取得时重采同输入参照。检查九尺寸双主题的 NoAA/MSAA 几何边缘覆盖和 SSAA 诊断图、纸面留白/字体清晰度、原始 MSAA 与高/极高 SMAA 的实际作用范围；Bokeh 前/后景开关应改变像素，焦距随相机/实体位置变化。反复切四预设以及关闭 DOF 再启用 SMAA，不能崩溃/黑帧/重置导航。检查 RGB24 全分辨率深度方向、FRAMEBUFFER_Y_UP 帧缓冲变换与数值 lookup 行序，final/raw 背景差异和一次 ACES/sRGB；旧 R09 channel=5 不能用作真实线性图。残差逐项按 `docs/contracts/postprocess.md` 和限制清单检查，不把 Windows 图片当 Linux 图。
 
 关闭 Review 后重建、执行普通 CTest，并用 `--verify-runtime <report.json> --verify-shading` 检查生产图；普通程序应拒绝 `--verify-materials`。本平台编译、OpenGL、X11/Wayland、DPR、图像、交互实测结果：待用户填写。
+
+## R10 渲染选择与探测用户验证（未执行）
+
+新增审计在 verification/linux-static/render-backend/，结论为“静态审计通过，实机待用户验证”。R10 选择 RHI，当前程序仍为 Quick3D bootstrap；RHI 实现按 R10A–D 执行。目标机使用最新原生 Kit 的 Release Review：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'image-comparison|runtime-render-backend|render-backend-gpu-audit' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+先核对实际 DPR1 和 fixture 的 960×720/320×720 内容尺寸，必要时重采同 DPR Web 参照。报告的 graphicsApi 应为 OpenGL (3)；核对全部 70 状态、源参数、投影、三档阴影 on/off、邻盒 pre/post Bokeh 与独立深度/法线，检查 9 实例、图集变色/稳定/还原的实际像素。audit passed 代表探测有效，parityPassed=false 保留 Quick3D 的渲染残差；不得将此视为 RHI 或全应用图像通过。实际 GPU 上传字节仍为 null；R10C 的子区域/预算验证须实测，不从 CPU payload 推断。完成后关闭 Review、重建并执行普通 CTest；产品拒绝 --verify-materials。本平台构建、OpenGL、图像及性能执行结果：待用户填写。
