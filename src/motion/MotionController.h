@@ -7,26 +7,39 @@ namespace yalahoo {
 // rail, column, shoulder, lane in frozen ARCHIVE_TRACK_KEYS order.
 using ArchiveValues = std::array<double, 4>;
 using ArchiveSprings = std::array<ScalarSpring, 4>;
-class ArchiveMotion {
+class ArchiveMotion
+{
 public:
-    bool active() const { return m_active; }
-    double progress() const { return m_tracks[0].progress(); }
-    double duration() const { return m_tracks[0].duration(); }
+    bool active() const
+    {
+        return m_active;
+    }
+    double progress() const
+    {
+        return m_tracks[0].progress();
+    }
+    double duration() const
+    {
+        return m_tracks[0].duration();
+    }
     std::array<Kinematics, 4> state() const;
-    void observe(const ArchiveSprings &springs, const ArchiveValues &targets, const ArchiveValues &rates);
+    void observe(const ArchiveSprings &springs, const ArchiveValues &targets,
+                 const ArchiveValues &rates);
     bool retarget(const ArchiveSprings &springs, const ArchiveValues &targets);
     void update(ArchiveSprings &springs, double dt, bool reduced = false);
     void translate(const ArchiveValues &offset);
     void finish(ArchiveSprings &springs);
     void reset();
+
 private:
     std::array<QuinticTrack, 4> m_tracks;
-    ArchiveValues m_targets{};
+    ArchiveValues m_targets{ };
     bool m_hasTarget = false;
     bool m_active = false;
 };
 
-class MotionController : public QObject {
+class MotionController : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(yalahoo::FrameClock* clock READ clock CONSTANT)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
@@ -36,16 +49,41 @@ class MotionController : public QObject {
     Q_PROPERTY(quint64 revision READ revision NOTIFY stateChanged)
 public:
     explicit MotionController(QObject *parent = nullptr);
-    FrameClock *clock() { return &m_clock; }
-    bool reducedMotion() const { return m_reduced; }
+    FrameClock *clock()
+    {
+        return &m_clock;
+    }
+    bool reducedMotion() const
+    {
+        return m_reduced;
+    }
     void setReducedMotion(bool reduced);
-    bool moving() const { return m_archive.active(); }
-    double rail() const { return m_springs[0].value; }
-    double column() const { return m_springs[1].value; }
-    quint64 revision() const { return m_revision; }
-    const ArchiveSprings &springs() const { return m_springs; }
-    const ArchiveMotion &archive() const { return m_archive; }
-    void observe(const ArchiveSprings &springs, const ArchiveValues &targets, const ArchiveValues &rates);
+    bool moving() const
+    {
+        return m_archive.active();
+    }
+    double rail() const
+    {
+        return m_springs[0].value;
+    }
+    double column() const
+    {
+        return m_springs[1].value;
+    }
+    quint64 revision() const
+    {
+        return m_revision;
+    }
+    const ArchiveSprings &springs() const
+    {
+        return m_springs;
+    }
+    const ArchiveMotion &archive() const
+    {
+        return m_archive;
+    }
+    void observe(const ArchiveSprings &springs, const ArchiveValues &targets,
+                 const ArchiveValues &rates);
     bool retarget(const ArchiveValues &targets);
     void translate(const ArchiveValues &offset);
     Q_INVOKABLE void travel(double rail, double column, double shoulder, double lane);
@@ -54,11 +92,12 @@ signals:
     void stateChanged();
     void reducedMotionChanged();
     void completed(quint64 revision);
+
 private:
     void step(double dt);
     FrameClock m_clock;
     ArchiveMotion m_archive;
-    ArchiveSprings m_springs{};
+    ArchiveSprings m_springs{ };
     bool m_reduced = false;
     quint64 m_revision = 0;
 };

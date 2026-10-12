@@ -3,7 +3,8 @@
 #include <QStandardPaths>
 #include <QtTest>
 
-class IdentityTest : public QObject {
+class IdentityTest : public QObject
+{
     Q_OBJECT
 private slots:
     void stableIdentity()

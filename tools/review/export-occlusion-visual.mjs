@@ -1,19 +1,50 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync, spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import crypto from 'node:crypto';
 import {CDP} from './cdp.mjs';
-const root=path.resolve(import.meta.dirname,'../..'), baseline='57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
-const work=path.join(root,'build/occlusion-baseline'), frozen=path.join(work,'web');
-const media=path.join(root,'docs/media/occlusion/web'), fixtures=path.join(root,'tests/fixtures/occlusion');
-for(const d of [frozen,media,fixtures,path.join(root,'resources/environment')]) await fs.mkdir(d,{recursive:true});
-execFileSync('git',['archive','--format=tar','--output='+path.join(work,'source.tar'),baseline,'src','public','package.json','package-lock.json'],{cwd:root});
-execFileSync('tar',['-xf',path.join(work,'source.tar'),'-C',frozen]);
-try {await fs.symlink(path.join(root,'legacy-web/node_modules'),path.join(frozen,'node_modules'),'junction');} catch(e) {if(e.code!=='EEXIST') throw e;}
-if(! (await fs.readFile(path.join(root,'legacy-web/package-lock.json'))).equals(await fs.readFile(path.join(frozen,'package-lock.json')))) throw Error('Frozen dependency lock differs');
-const {createServer}=await import(pathToFileURL(path.join(root,'legacy-web/node_modules/vite/dist/node/index.js')));
-const html=`<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
+const root = path.resolve(import.meta.dirname, '../..'),
+      baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const work = path.join(root, 'build/occlusion-baseline'), frozen = path.join(work, 'web');
+const media = path.join(root, 'docs/media/occlusion/web'),
+      fixtures = path.join(root, 'tests/fixtures/occlusion');
+for (const d of [frozen, media, fixtures, path.join(root, 'resources/environment')])
+    await fs.mkdir(d, {recursive: true});
+execFileSync(
+    'git',
+    [
+        'archive',
+        '--format=tar',
+        '--output=' + path.join(work, 'source.tar'),
+        baseline,
+        'src',
+        'public',
+        'package.json',
+        'package-lock.json',
+    ],
+    {cwd: root},
+);
+execFileSync('tar', ['-xf', path.join(work, 'source.tar'), '-C', frozen]);
+try {
+    await fs.symlink(
+        path.join(root, 'legacy-web/node_modules'),
+        path.join(frozen, 'node_modules'),
+        'junction',
+    );
+} catch (e) {
+    if (e.code !== 'EEXIST')
+        throw e;
+}
+if (!(await fs.readFile(path.join(root, 'legacy-web/package-lock.json')))
+         .equals(
+             await fs.readFile(path.join(frozen, 'package-lock.json')),
+             ))
+    throw Error('Frozen dependency lock differs');
+const {createServer} =
+    await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
+const html =
+    `<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
 import * as T from '/node_modules/three/build/three.module.js';
 import {GLTFLoader} from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import {RoomEnvironment} from '/node_modules/three/examples/jsm/environments/RoomEnvironment.js';
@@ -91,52 +122,318 @@ lighting.setTheme(c.day?'day':'night',key);lighting.setExperiment({mode:c.mode,s
 };window.ready=true;
 </script></body></html>`;
 // Resolve asset URL from frozen source rather than guessing the old model filename.
-const assetSource=await fs.readFile(path.join(frozen,'src/music-cd-asset.ts'),'utf8');
-const modelUrl=assetSource.match(/MUSIC_CD_ASSET\s*=\s*["']([^"']+)/)?.[1];
-if(!modelUrl)throw Error('Frozen model URL missing');
-const server=await createServer({root:frozen,configFile:false,logLevel:'error',server:{host:'127.0.0.1',port:0},plugins:[{name:'single-case',configureServer(s){s.middlewares.use('/material-review',(_,res)=>{res.setHeader('Content-Type','text/html');res.end(html.replace("'/public/assets/music-case-v040.glb'","'/"+modelUrl+"'"));});}}]});await server.listen();
-const origin='http://127.0.0.1:'+server.httpServer.address().port;
-const candidates=[process.env.REVIEW_BROWSER,path.join(process.env.PROGRAMFILES,'Google/Chrome/Application/chrome.exe'),path.join(process.env['PROGRAMFILES(X86)'],'Microsoft/Edge/Application/msedge.exe')].filter(Boolean);
-let executable;for(const p of candidates){try{await fs.access(p);executable=p;break;}catch{}}
-if(!executable)throw Error('Installed browser required');
-const profile=path.join(work,'browser-profile-'+process.pid);await fs.mkdir(profile,{recursive:true});await fs.rm(path.join(profile,'DevToolsActivePort'),{force:true});
-const proc=spawn(executable,['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-extensions','--enable-gpu','--use-angle=d3d11','about:blank'],{windowsHide:true,stdio:'ignore'});
-const wait=async probe=>{const end=Date.now()+60000;while(Date.now()<end){try{const x=await probe();if(x)return x;}catch{}await new Promise(r=>setTimeout(r,100));}throw Error('Capture timeout');};
-let browser,page;const errors=[];
-try{
- const port=(await wait(()=>fs.readFile(path.join(profile,'DevToolsActivePort'),'utf8'))).split('\n');browser=await CDP.connect('ws://127.0.0.1:'+port[0]+port[1]);
- const version=await browser.send('Browser.getVersion'),gpu=await browser.send('SystemInfo.getInfo');
- const {targetId}=await browser.send('Target.createTarget',{url:'about:blank'});const targets=await(await fetch('http://127.0.0.1:'+port[0]+'/json/list')).json();page=await CDP.connect(targets.find(t=>t.id===targetId).webSocketDebuggerUrl);
- page.on('Runtime.exceptionThrown',e=>{errors.push(e.exceptionDetails);console.error(JSON.stringify(e.exceptionDetails));});page.on('Runtime.consoleAPICalled',e=>{if(e.type==='error')console.error(JSON.stringify(e.args));});await page.send('Runtime.enable');await page.send('Page.enable');await page.send('Fetch.enable',{patterns:[{urlPattern:'*'}]});
- page.on('Fetch.requestPaused',e=>{void page.send(e.request.url.startsWith(origin+'/')||/^(data|blob):/.test(e.request.url)?'Fetch.continueRequest':'Fetch.failRequest',{requestId:e.requestId,...(e.request.url.startsWith(origin+'/')||/^(data|blob):/.test(e.request.url)?{}:{errorReason:'BlockedByClient'})});});
- await page.send('Page.navigate',{url:origin+'/material-review'});await wait(()=>page.evaluate('window.ready'));
- const env=await page.evaluate('window.environment');const data=Buffer.alloc(env.pixels.length*4);
- function half(h){const sign=(h&32768)?-1:1,e=(h>>10)&31,m=h&1023;return sign*(e===0?Math.pow(2,-14)*m/1024:e===31?NaN:Math.pow(2,e-15)*(1+m/1024));}
- env.pixels.forEach((h,i)=>{const v=half(h);if(!Number.isFinite(v))throw Error('Nonfinite environment');data.writeFloatLE(v,i*4);});
- if(!data.equals(await fs.readFile(path.join(root,'resources/environment/room-pmrem.rgba32f'))))throw Error('Room capture changed');
- const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
- const sources={};for(const f of ['src/music-model.ts','src/music-lighting.ts','src/music-row-lighting.ts','src/theme-transition.ts','src/archive-lighting.ts','src/cover-atlas.ts','src/scene.ts','src/music-cd-asset.ts'])sources[f]=sha(execFileSync('git',['show',baseline+':'+f],{cwd:root}));
- const cases=[];
- for(const day of [true,false])for(const count of [1,3])for(const [angle,base]of [['front',[0,1.85,9]],['low',[6,.3,6]]]) {
- for(const quality of ['performance','original','high','ultra'])for(const channel of [0,1,2,3,4,5]) {
- if(quality!=='original'&&channel!==0)continue;
- for(const shadows of (channel===0&&quality==='original'?[false,true]:[false])) {
- const origin=[0,0,0],position=base,mode='guided';
- const neighbors=count===1?[]:[[0,0,.62],[0,0,-.62]];
- const c={index:cases.length,width:960,height:720,day,mode,angle,position,origin,neighbors,count,quality,channel,shadows,cover:'square',layer:'all',clarity:0,detail:0};
- const result=await page.evaluate('window.renderCase('+JSON.stringify(c)+')');
- c.parameters=result.parameters;c.projections=result.projections;c.screenshot=String(c.index).padStart(3,'0')+'.png';await fs.writeFile(path.join(media,c.screenshot),Buffer.from(result.png,'base64'));cases.push(c);
- }}}
- for(const channel of [0,1,2,3,4,5]) {
- const c={index:cases.length,width:960,height:720,day:true,mode:'guided',angle:'low',position:[6,.3,6],origin:[0,0,0],neighbors:[[1.5,0,.12],[-1.5,0,-.12]],count:3,quality:'original',channel,shadows:false,cover:'square',layer:'all',clarity:0,detail:0,clipNear:.1,clipFar:100,kernelRadius:.38,diagnostic:true};
- const result=await page.evaluate('window.renderCase('+JSON.stringify(c)+')');c.parameters=result.parameters;c.projections=result.projections;c.screenshot=String(c.index).padStart(3,'0')+'.png';await fs.writeFile(path.join(media,c.screenshot),Buffer.from(result.png,'base64'));cases.push(c);
- }
- for(const shadows of [false,true]) {
- const c={index:cases.length,width:960,height:720,day:true,mode:'guided',angle:'low',position:[6,4,6],origin:[0,0,0],neighbors:[[0,0,.62],[0,0,-.62]],count:3,quality:'original',channel:5,shadows,shadowProbe:true,cover:'square',layer:'all',clarity:0,detail:0,diagnostic:true};
- const result=await page.evaluate('window.renderCase('+JSON.stringify(c)+')');c.parameters=result.parameters;c.projections=result.projections;c.screenshot=String(c.index).padStart(3,'0')+'.png';await fs.writeFile(path.join(media,c.screenshot),Buffer.from(result.png,'base64'));cases.push(c);
- }
- if(errors.length)throw Error(JSON.stringify(errors));
- await fs.writeFile(path.join(fixtures,'visual.json'),JSON.stringify({occlusion:true,baseline,sources,environment:{width:env.width,height:env.height,sha256:sha(data),format:'RGBA32F little-endian; original WebGL bottom row first'},width:960,height:720,dpr:1,fov:32,cases},null,2)+'\n');
- await fs.mkdir(path.join(root,'verification/windows/occlusion'),{recursive:true});await fs.writeFile(path.join(root,'verification/windows/occlusion/web-capture.json'),JSON.stringify({baseline,browser:version,gpu:gpu.gpu,cases:cases.length,errors,environmentSha256:sha(data)},null,2)+'\n');
- console.log('Occlusion source capture passed: '+cases.length+' states; environment '+env.width+'x'+env.height);
-}finally{page?.close();if(browser){try{await browser.send('Browser.close');}catch{}browser.close();}proc.kill();await server.close();}
+const assetSource = await fs.readFile(path.join(frozen, 'src/music-cd-asset.ts'), 'utf8');
+const modelUrl = assetSource.match(/MUSIC_CD_ASSET\s*=\s*["']([^"']+)/)?.[1];
+if (!modelUrl)
+    throw Error('Frozen model URL missing');
+const server = await createServer({
+    root: frozen,
+    configFile: false,
+    logLevel: 'error',
+    server: {host: '127.0.0.1', port: 0},
+    plugins: [
+        {
+            name: 'single-case',
+            configureServer(s) {
+                s.middlewares.use('/material-review', (_, res) => {
+                    res.setHeader('Content-Type', 'text/html');
+                    res.end(
+                        html.replace('\'/public/assets/music-case-v040.glb\'',
+                                     '\'/' + modelUrl + '\''),
+                    );
+                });
+            },
+        },
+    ],
+});
+await server.listen();
+const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+const candidates = [
+    process.env.REVIEW_BROWSER,
+    path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'),
+].filter(Boolean);
+let executable;
+for (const p of candidates) {
+    try {
+        await fs.access(p);
+        executable = p;
+        break;
+    } catch {
+    }
+}
+if (!executable)
+    throw Error('Installed browser required');
+const profile = path.join(work, 'browser-profile-' + process.pid);
+await fs.mkdir(profile, {recursive: true});
+await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
+const proc = spawn(
+    executable,
+    [
+        '--headless=new',
+        '--remote-debugging-port=0',
+        '--user-data-dir=' + profile,
+        '--no-first-run',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-extensions',
+        '--enable-gpu',
+        '--use-angle=d3d11',
+        'about:blank',
+    ],
+    {windowsHide: true, stdio: 'ignore'},
+);
+const wait = async (probe) => {
+    const end = Date.now() + 60000;
+    while (Date.now() < end) {
+        try {
+            const x = await probe();
+            if (x)
+                return x;
+        } catch {
+        }
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    throw Error('Capture timeout');
+};
+let browser, page;
+const errors = [];
+try {
+    const port = (await wait(() => fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')))
+                     .split('\n');
+    browser = await CDP.connect('ws://127.0.0.1:' + port[0] + port[1]);
+    const version = await browser.send('Browser.getVersion'),
+          gpu = await browser.send('SystemInfo.getInfo');
+    const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
+    const targets = await (await fetch('http://127.0.0.1:' + port[0] + '/json/list')).json();
+    page = await CDP.connect(targets.find((t) => t.id === targetId).webSocketDebuggerUrl);
+    page.on('Runtime.exceptionThrown', (e) => {
+        errors.push(e.exceptionDetails);
+        console.error(JSON.stringify(e.exceptionDetails));
+    });
+    page.on('Runtime.consoleAPICalled', (e) => {
+        if (e.type === 'error')
+            console.error(JSON.stringify(e.args));
+    });
+    await page.send('Runtime.enable');
+    await page.send('Page.enable');
+    await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
+    page.on('Fetch.requestPaused', (e) => {
+        void page.send(
+            e.request.url.startsWith(origin + '/') || /^(data|blob):/.test(e.request.url)
+                ? 'Fetch.continueRequest'
+                : 'Fetch.failRequest',
+            {
+                requestId: e.requestId,
+                ...(e.request.url.startsWith(origin + '/') || /^(data|blob):/.test(e.request.url)
+                        ? {}
+                        : {errorReason: 'BlockedByClient'}),
+            },
+        );
+    });
+    await page.send('Page.navigate', {url: origin + '/material-review'});
+    await wait(() => page.evaluate('window.ready'));
+    const env = await page.evaluate('window.environment');
+    const data = Buffer.alloc(env.pixels.length * 4);
+    function half(h) {
+        const sign = h & 32768 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023;
+        return (sign
+                * (e === 0    ? (Math.pow(2, -14) * m) / 1024
+                   : e === 31 ? NaN
+                              : Math.pow(2, e - 15) * (1 + m / 1024)));
+    }
+    env.pixels.forEach((h, i) => {
+        const v = half(h);
+        if (!Number.isFinite(v))
+            throw Error('Nonfinite environment');
+        data.writeFloatLE(v, i * 4);
+    });
+    if (!data.equals(
+            await fs.readFile(path.join(root, 'resources/environment/room-pmrem.rgba32f'))))
+        throw Error('Room capture changed');
+    const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+    const sources = {};
+    for (const f of ['src/music-model.ts',
+                     'src/music-lighting.ts',
+                     'src/music-row-lighting.ts',
+                     'src/theme-transition.ts',
+                     'src/archive-lighting.ts',
+                     'src/cover-atlas.ts',
+                     'src/scene.ts',
+                     'src/music-cd-asset.ts',
+    ])
+        sources[f] = sha(execFileSync('git', ['show', baseline + ':' + f], {cwd: root}));
+    const cases = [];
+    for (const day of [true, false])
+        for (const count of [1, 3])
+            for (const [angle, base] of [['front', [0, 1.85, 9]], ['low', [6, 0.3, 6]], ]) {
+                for (const quality of ['performance', 'original', 'high', 'ultra'])
+                    for (const channel of [0, 1, 2, 3, 4, 5]) {
+                        if (quality !== 'original' && channel !== 0)
+                            continue;
+                        for (const shadows of channel === 0 && quality === 'original'
+                                 ? [false, true]
+                                 : [false]) {
+                            const origin = [0, 0, 0], position = base, mode = 'guided';
+                            const neighbors = count === 1 ? [] : [
+                                [0, 0, 0.62],
+                                [0, 0, -0.62],
+                            ];
+                            const c = {
+                                index: cases.length,
+                                width: 960,
+                                height: 720,
+                                day,
+                                mode,
+                                angle,
+                                position,
+                                origin,
+                                neighbors,
+                                count,
+                                quality,
+                                channel,
+                                shadows,
+                                cover: 'square',
+                                layer: 'all',
+                                clarity: 0,
+                                detail: 0,
+                            };
+                            const result = await page.evaluate(
+                                'window.renderCase(' + JSON.stringify(c) + ')',
+                            );
+                            c.parameters = result.parameters;
+                            c.projections = result.projections;
+                            c.screenshot = String(c.index).padStart(3, '0') + '.png';
+                            await fs.writeFile(
+                                path.join(media, c.screenshot),
+                                Buffer.from(result.png, 'base64'),
+                            );
+                            cases.push(c);
+                        }
+                    }
+            }
+    for (const channel of [0, 1, 2, 3, 4, 5]) {
+        const c = {
+            index: cases.length,
+            width: 960,
+            height: 720,
+            day: true,
+            mode: 'guided',
+            angle: 'low',
+            position: [6, 0.3, 6],
+            origin: [0, 0, 0],
+            neighbors: [
+                [1.5, 0, 0.12],
+                [-1.5, 0, -0.12],
+            ],
+            count: 3,
+            quality: 'original',
+            channel,
+            shadows: false,
+            cover: 'square',
+            layer: 'all',
+            clarity: 0,
+            detail: 0,
+            clipNear: 0.1,
+            clipFar: 100,
+            kernelRadius: 0.38,
+            diagnostic: true,
+        };
+        const result = await page.evaluate('window.renderCase(' + JSON.stringify(c) + ')');
+        c.parameters = result.parameters;
+        c.projections = result.projections;
+        c.screenshot = String(c.index).padStart(3, '0') + '.png';
+        await fs.writeFile(path.join(media, c.screenshot), Buffer.from(result.png, 'base64'));
+        cases.push(c);
+    }
+    for (const shadows of [false, true]) {
+        const c = {
+            index: cases.length,
+            width: 960,
+            height: 720,
+            day: true,
+            mode: 'guided',
+            angle: 'low',
+            position: [6, 4, 6],
+            origin: [0, 0, 0],
+            neighbors: [
+                [0, 0, 0.62],
+                [0, 0, -0.62],
+            ],
+            count: 3,
+            quality: 'original',
+            channel: 5,
+            shadows,
+            shadowProbe: true,
+            cover: 'square',
+            layer: 'all',
+            clarity: 0,
+            detail: 0,
+            diagnostic: true,
+        };
+        const result = await page.evaluate('window.renderCase(' + JSON.stringify(c) + ')');
+        c.parameters = result.parameters;
+        c.projections = result.projections;
+        c.screenshot = String(c.index).padStart(3, '0') + '.png';
+        await fs.writeFile(path.join(media, c.screenshot), Buffer.from(result.png, 'base64'));
+        cases.push(c);
+    }
+    if (errors.length)
+        throw Error(JSON.stringify(errors));
+    await fs.writeFile(
+        path.join(fixtures, 'visual.json'),
+        JSON.stringify(
+            {
+                occlusion: true,
+                baseline,
+                sources,
+                environment: {
+                    width: env.width,
+                    height: env.height,
+                    sha256: sha(data),
+                    format: 'RGBA32F little-endian; original WebGL bottom row first',
+                },
+                width: 960,
+                height: 720,
+                dpr: 1,
+                fov: 32,
+                cases,
+            },
+            null,
+            2,
+            )
+            + '\n',
+    );
+    await fs.mkdir(path.join(root, 'verification/windows/occlusion'), {recursive: true});
+    await fs.writeFile(
+        path.join(root, 'verification/windows/occlusion/web-capture.json'),
+        JSON.stringify(
+            {
+                baseline,
+                browser: version,
+                gpu: gpu.gpu,
+                cases: cases.length,
+                errors,
+                environmentSha256: sha(data),
+            },
+            null,
+            2,
+            )
+            + '\n',
+    );
+    console.log(
+        'Occlusion source capture passed: ' + cases.length + ' states; environment ' + env.width
+            + 'x' + env.height,
+    );
+} finally {
+    page?.close();
+    if (browser) {
+        try {
+            await browser.send('Browser.close');
+        } catch {
+        }
+        browser.close();
+    }
+    proc.kill();
+    await server.close();
+}

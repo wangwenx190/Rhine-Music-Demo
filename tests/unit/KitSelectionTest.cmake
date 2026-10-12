@@ -13,12 +13,47 @@ endfunction()
 set(old "/old|6.9.9|Windows|x86_64|msvc|none")
 set(new "/new|6.10.2|Windows|x86_64|msvc|none")
 expect("${new};${old}" Windows x86_64 msvc /new "")
-expect("${old};/android|9.0.0|Android|arm64|clang|none;/wasm|9.0.0|Wasm|wasm32|clang|none" Windows x86_64 msvc /old "")
+expect(
+    "${old};/android|9.0.0|Android|arm64|clang|none;/wasm|9.0.0|Wasm|wasm32|clang|none"
+    Windows
+    x86_64
+    msvc
+    /old
+    ""
+)
 expect("${old};/arm|8.0.0|Windows|arm64|msvc|none" Windows x86_64 msvc /old "")
-expect("${old};/mingw|7.0.0|Windows|x86_64|mingw|none" Windows x86_64 msvc "" "ABI.*no older fallback")
-expect("${old};/broken|7.0.0|Windows|x86_64|msvc|Quick3D,Multimedia" Windows x86_64 msvc "" "missing modules.*no older fallback")
-expect("/mac|7.1.0|Darwin|arm64|clang|none;/linux|7.2.0|Linux|x86_64|gcc|none" Darwin arm64 clang /mac "")
-expect("/mac|7.1.0|Darwin|arm64|clang|none;/linux|7.2.0|Linux|x86_64|gcc|none" Linux x86_64 gcc /linux "")
+expect(
+    "${old};/mingw|7.0.0|Windows|x86_64|mingw|none"
+    Windows
+    x86_64
+    msvc
+    ""
+    "ABI.*no older fallback"
+)
+expect(
+    "${old};/broken|7.0.0|Windows|x86_64|msvc|Quick3D,Multimedia"
+    Windows
+    x86_64
+    msvc
+    ""
+    "missing modules.*no older fallback"
+)
+expect(
+    "/mac|7.1.0|Darwin|arm64|clang|none;/linux|7.2.0|Linux|x86_64|gcc|none"
+    Darwin
+    arm64
+    clang
+    /mac
+    ""
+)
+expect(
+    "/mac|7.1.0|Darwin|arm64|clang|none;/linux|7.2.0|Linux|x86_64|gcc|none"
+    Linux
+    x86_64
+    gcc
+    /linux
+    ""
+)
 expect("${old}" Linux x86_64 gcc "" "No native desktop")
 yalahoo_validate_override(/new /old error)
 if(NOT error MATCHES "--fresh")
@@ -28,4 +63,7 @@ yalahoo_validate_override(/new /new error)
 if(error)
     message(FATAL_ERROR "Current override rejected")
 endif()
-message(STATUS "Kit selection: numeric versions, native system/arch/ABI, missing modules, overrides/cache passed")
+message(
+    STATUS
+    "Kit selection: numeric versions, native system/arch/ABI, missing modules, overrides/cache passed"
+)

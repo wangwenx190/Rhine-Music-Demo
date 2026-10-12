@@ -1,7 +1,21 @@
 include_guard(GLOBAL)
 
-set(YALAHOO_QT_COMPONENTS Core Gui Qml Quick QuickControls2 QuickDialogs2
-    Quick3D Multimedia Concurrent Svg ShaderTools Test QuickTest)
+set(
+    YALAHOO_QT_COMPONENTS
+    Core
+    Gui
+    Qml
+    Quick
+    QuickControls2
+    QuickDialogs2
+    Quick3D
+    Multimedia
+    Concurrent
+    Svg
+    ShaderTools
+    Test
+    QuickTest
+)
 
 # Records: prefix|version|system|architecture|ABI|missing modules. Kept independent
 # of discovery so selection and failure paths can be tested without installing Qt.
@@ -38,7 +52,10 @@ function(yalahoo_choose_kit records system architecture abi out error)
                 break()
             endif()
         elseif(chosen STREQUAL "")
-            set(problem "Latest Qt ${latest} ABI ${kit_abi} does not match ${abi}; no older fallback")
+            set(
+                problem
+                "Latest Qt ${latest} ABI ${kit_abi} does not match ${abi}; no older fallback"
+            )
         endif()
     endforeach()
     set(${out} "${chosen}" PARENT_SCOPE)
@@ -48,7 +65,10 @@ endfunction()
 function(yalahoo_validate_override selected override error)
     set(problem "")
     if(override AND NOT override STREQUAL selected)
-        set(problem "Qt override/cache '${override}' differs from latest Kit '${selected}'. Reconfigure with --fresh and remove stale overrides.")
+        set(
+            problem
+            "Qt override/cache '${override}' differs from latest Kit '${selected}'. Reconfigure with --fresh and remove stale overrides."
+        )
     endif()
     set(${error} "${problem}" PARENT_SCOPE)
 endfunction()
@@ -87,7 +107,10 @@ function(yalahoo_discover_qt)
         message(FATAL_ERROR "Unsupported native architecture: ${arch}")
     endif()
     if(APPLE AND CMAKE_OSX_ARCHITECTURES AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL arch)
-        message(FATAL_ERROR "R02 requires a single native macOS architecture; use the host architecture ${arch}")
+        message(
+            FATAL_ERROR
+            "R02 requires a single native macOS architecture; use the host architecture ${arch}"
+        )
     endif()
     set(roots ${YALAHOO_QT_ROOTS} $ENV{YALAHOO_QT_ROOTS} ${default_roots})
     if(YALAHOO_QT_KIT)
@@ -98,10 +121,14 @@ function(yalahoo_discover_qt)
     endif()
     set(configs)
     foreach(root IN LISTS roots)
-        file(GLOB found "${root}/lib/cmake/Qt6/Qt6Config.cmake"
+        file(
+            GLOB
+            found
+            "${root}/lib/cmake/Qt6/Qt6Config.cmake"
             "${root}/*/lib/cmake/Qt6/Qt6Config.cmake"
             "${root}/*/*/lib/cmake/Qt6/Qt6Config.cmake"
-            "${root}/lib/*/cmake/Qt6/Qt6Config.cmake")
+            "${root}/lib/*/cmake/Qt6/Qt6Config.cmake"
+        )
         list(APPEND configs ${found})
     endforeach()
     list(REMOVE_DUPLICATES configs)
@@ -139,8 +166,17 @@ function(yalahoo_discover_qt)
         if(NOT qmake)
             message(FATAL_ERROR "Kit has no matching qmake: ${prefix}")
         endif()
-        execute_process(COMMAND "${qmake}" -query QMAKE_XSPEC OUTPUT_VARIABLE spec
-            OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE query_result)
+        execute_process(
+            COMMAND
+            "${qmake}"
+            -query
+            QMAKE_XSPEC
+            OUTPUT_VARIABLE
+            spec
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE
+            query_result
+        )
         if(NOT query_result EQUAL 0)
             message(FATAL_ERROR "qmake Kit probe failed: ${prefix}")
         endif()
@@ -156,8 +192,17 @@ function(yalahoo_discover_qt)
         else()
             continue()
         endif()
-        execute_process(COMMAND "${qmake}" -query QT_VERSION OUTPUT_VARIABLE qmake_version
-            OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE query_result)
+        execute_process(
+            COMMAND
+            "${qmake}"
+            -query
+            QT_VERSION
+            OUTPUT_VARIABLE
+            qmake_version
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE
+            query_result
+        )
         if(NOT query_result EQUAL 0 OR NOT qmake_version STREQUAL version)
             message(FATAL_ERROR "Qt CMake/qmake version mismatch in ${prefix}")
         endif()
@@ -195,7 +240,14 @@ function(yalahoo_discover_qt)
             break()
         endif()
     endforeach()
-    set(YALAHOO_SELECTED_QT "${selected}" CACHE PATH "Automatically discovered latest native Kit" FORCE)
+    set(
+        YALAHOO_SELECTED_QT
+        "${selected}"
+        CACHE
+        PATH
+        "Automatically discovered latest native Kit"
+        FORCE
+    )
     set(YALAHOO_QT_VERSION "${version}" CACHE INTERNAL "Actual Kit version" FORCE)
     # Reject cached module directories, including a stale manually supplied Qt6_DIR.
     get_cmake_property(cache_variables CACHE_VARIABLES)
@@ -215,13 +267,34 @@ function(yalahoo_discover_qt)
 endfunction()
 
 function(yalahoo_check_tool name arguments)
-    find_program(tool NAMES "${name}" PATHS "${YALAHOO_SELECTED_QT}/bin"
-        "${YALAHOO_SELECTED_QT}/libexec" NO_DEFAULT_PATH NO_CACHE REQUIRED)
-    execute_process(COMMAND "${tool}" ${arguments} OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr
-        RESULT_VARIABLE result)
+    find_program(
+        tool
+        NAMES
+        "${name}"
+        PATHS
+        "${YALAHOO_SELECTED_QT}/bin"
+        "${YALAHOO_SELECTED_QT}/libexec"
+        NO_DEFAULT_PATH
+        NO_CACHE
+        REQUIRED
+    )
+    execute_process(
+        COMMAND
+        "${tool}"
+        ${arguments}
+        OUTPUT_VARIABLE
+        stdout
+        ERROR_VARIABLE
+        stderr
+        RESULT_VARIABLE
+        result
+    )
     string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" tool_version "${stdout}${stderr}")
     if(NOT result EQUAL 0 OR NOT tool_version STREQUAL YALAHOO_QT_VERSION)
-        message(FATAL_ERROR "${name} must match selected Qt ${YALAHOO_QT_VERSION}: ${stdout}${stderr}")
+        message(
+            FATAL_ERROR
+            "${name} must match selected Qt ${YALAHOO_QT_VERSION}: ${stdout}${stderr}"
+        )
     endif()
     set(YALAHOO_${name} "${tool}" CACHE INTERNAL "Selected Kit tool" FORCE)
 endfunction()

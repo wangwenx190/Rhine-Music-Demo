@@ -22,7 +22,7 @@ ApplicationWindow {
     FrameAnimation {
         id: visualFrames
         running: !window.sceneReview && window.visible && window.visibility !== Window.Minimized
-            && window.motionController.clock.applicationVisible
+                 && window.motionController.clock.applicationVisible
         onRunningChanged: window.motionController.clock.active = running
         Component.onCompleted: window.motionController.clock.active = running
         onTriggered: window.motionController.clock.advance(frameTime)
@@ -83,8 +83,8 @@ ApplicationWindow {
             text: window.interactionCount === 0 ? "验证窗口交互" : "交互已响应 " + window.interactionCount
             Layout.alignment: Qt.AlignHCenter
             onClicked: {
-                window.interactionCount++
-                window.sceneAdapter.detail = window.sceneAdapter.detail === 0 ? 1 : 0
+                window.interactionCount++;
+                window.sceneAdapter.detail = window.sceneAdapter.detail === 0 ? 1 : 0;
             }
             icon.source: "qrc:/assets/icons/play-day.svg"
         }
@@ -99,5 +99,7 @@ ApplicationWindow {
         color: "#253e37"
     }
     // Import and instantiate the public QML media types without opening a source.
-    MediaPlayer { objectName: "qmlMediaProbe" }
+    MediaPlayer {
+        objectName: "qmlMediaProbe"
+    }
 }

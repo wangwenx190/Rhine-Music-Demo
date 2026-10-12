@@ -5,20 +5,29 @@
 #include <QFile>
 #include <stdexcept>
 namespace yalahoo::rhi {
-inline void require(bool ok, const char *reason) {
-    if (!ok) throw std::runtime_error(reason);
+inline void require(bool ok, const char *reason)
+{
+    if (!ok)
+        throw std::runtime_error(reason);
 }
-inline QShader shader(const char *path) {
+inline QShader shader(const char *path)
+{
     QFile f(QString::fromLatin1(path));
     require(f.open(QIODevice::ReadOnly), "Missing RHI qsb resource");
-    auto s=QShader::fromSerialized(f.readAll());
+    auto s = QShader::fromSerialized(f.readAll());
     require(s.isValid(), "Invalid RHI qsb resource");
     return s;
 }
-inline QMatrix4x4 lightView() {
-    QMatrix4x4 m; m.lookAt({-6,14,-5},{0,0,0},{0,1,0}); return m;
+inline QMatrix4x4 lightView()
+{
+    QMatrix4x4 m;
+    m.lookAt({ -6, 14, -5 }, { 0, 0, 0 }, { 0, 1, 0 });
+    return m;
 }
-inline QMatrix4x4 lightProjection() {
-    QMatrix4x4 m; m.ortho(-16,16,-15,15,.1f,45); return m;
+inline QMatrix4x4 lightProjection()
+{
+    QMatrix4x4 m;
+    m.ortho(-16, 16, -15, 15, .1f, 45);
+    return m;
 }
 }

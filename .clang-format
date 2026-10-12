@@ -1,0 +1,71 @@
+# Qt Coding Style: https://wiki.qt.io/Qt_Coding_Style
+# Qt's WebKit-based configuration, with expanded short bodies for this project.
+BasedOnStyle: WebKit
+Standard: Latest
+IndentWidth: 4
+ContinuationIndentWidth: 8
+UseTab: Never
+ColumnLimit: 100
+PointerAlignment: Right
+ReferenceAlignment: Pointer
+SpaceAfterTemplateKeyword: true
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterClass: true
+    AfterControlStatement: Never
+    AfterEnum: false
+    AfterFunction: true
+    AfterNamespace: false
+    AfterStruct: true
+    AfterUnion: false
+    BeforeCatch: false
+    BeforeElse: false
+    IndentBraces: false
+    SplitEmptyFunction: true
+    SplitEmptyRecord: true
+    SplitEmptyNamespace: true
+ConstructorInitializerIndentWidth: 4
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: NextLine
+NamespaceIndentation: None
+IndentCaseLabels: false
+IndentPPDirectives: AfterHash
+PPIndentWidth: 2
+AlignAfterOpenBracket: true
+BreakTemplateDeclarations: Yes
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+SortIncludes: Never
+SortUsingDeclarations: Never
+FixNamespaceComments: false
+AlignEscapedNewlines: Left
+SpaceBeforeCpp11BracedList: false
+ReflowComments: Never
+ForEachMacros: [foreach, Q_FOREACH, forever, Q_FOREVER, QBENCHMARK, QBENCHMARK_ONCE]
+StatementMacros: [Q_OBJECT, Q_GADGET, Q_NAMESPACE, QML_ELEMENT, QML_NAMED_ELEMENT, QML_UNCREATABLE, QML_SINGLETON]
+WhitespaceSensitiveMacros: [Q_PROPERTY]
+BreakStringLiterals: false
+---
+Language: JavaScript
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+UseTab: Never
+ColumnLimit: 100
+BreakBeforeBinaryOperators: NonAssignment
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+JavaScriptQuotes: Single
+JavaScriptWrapImports: false
+SpacesInContainerLiterals: false
+ReflowComments: Never
+SortIncludes: Never

@@ -4,6 +4,7 @@
 - 正式展示名称为 `yalahOO!!!`；技术标识使用 `yalahoo`，CMake 目标 `Yalahoo`/`YalahooCore`、QML 模块 `Yalahoo.Music`。完整身份与数据路径规则按计划执行，历史归档与作者署名保留原名。
 - 原项目所有文件位于 `legacy-web/`，用于冻结 Web 基线、资产来源与历史追溯。旧模块名从该目录解析；旧 npm/构建命令在该目录运行，使用隔离的数据目录。根 `.git/` 保留当前仓库历史。
 - 新项目采用 C++23、开发机已安装的最新 Qt 版本、Qt Quick/QML、Qt Quick 3D、QtMultimedia 与根 CMake。C++ 在 `src/`，QML 在 `qml/Yalahoo/Music/`，资产在 `resources/`，测试在 `tests/`，工具在 `tools/`；详细结构与模块契约以计划为准。
+- 所有后续轮次强制遵守 [Qt 源码风格契约](docs/contracts/code-style.md) 及根 `.clang-format`、`.qmlformat.ini`、`.editorconfig`：四空格缩进，不使用 Tab，不把多个语句、短函数体、控制语句体或多个 QML 属性挤在一行。提交前运行 `cmake --build --preset qt-release --target check-format`；Release CTest 的 `source-format` 必须通过。维护工具同样使用四空格和展开的语句，冻结的 `legacy-web/`、历史证据及第三方资产保持原貌。
 - CMake、公共 presets 与脚本不得锁定 Qt minor/patch 版本或安装目录；执行时按计划自动发现本机最新原生 Kit，模块、工具与插件使用同一 Kit。计划中的版本与路径只供定位；GuiPrivate 变化通过探测和适配处理，不退回旧 Qt。C++23 必须显式启用且不允许静默降级。
 - GUI、动画和特效尽最大可能逼近冻结基线；保留双主题、减少动态、速度、响应式、真实列/填充、列记忆及搜索不改变播放等既有行为。
 - 所有外观、动画、特效以冻结旧项目源码及实际生产调用路径为准；截图、运行参数和各类采集数据只作参考，不把渲染/采集缺陷当成复刻目标。按用户要求改善可见锯齿，源码优先级和差异验收按迁移计划执行。

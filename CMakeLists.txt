@@ -4,6 +4,7 @@ project(yalahoo LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_TRY_COMPILE_CONFIGURATION "${CMAKE_BUILD_TYPE}")
 if(MSVC)
     add_compile_options(/Zc:__cplusplus /utf-8)
 endif()
@@ -32,8 +33,12 @@ add_subdirectory(tools/assets)
 add_subdirectory(tools/review)
 add_subdirectory(src/app)
 enable_testing()
+include(cmake/SourceFormat.cmake)
 add_subdirectory(tests/unit)
 add_subdirectory(tests/integration)
 
-file(WRITE "${CMAKE_BINARY_DIR}/toolchain.json"
-    "{\n  \"qtVersion\": \"${Qt6_VERSION}\",\n  \"qtKit\": \"${YALAHOO_SELECTED_QT}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"cxxStandard\": 23,\n  \"configuration\": \"${CMAKE_BUILD_TYPE}\"\n}\n")
+file(
+    WRITE
+    "${CMAKE_BINARY_DIR}/toolchain.json"
+    "{\n  \"qtVersion\": \"${Qt6_VERSION}\",\n  \"qtKit\": \"${YALAHOO_SELECTED_QT}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"cxxStandard\": 23,\n  \"configuration\": \"${CMAKE_BUILD_TYPE}\"\n}\n"
+)

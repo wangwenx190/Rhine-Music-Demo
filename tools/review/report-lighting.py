@@ -1,12 +1,12 @@
 from pathlib import Path
 import json
-root=Path(__file__).resolve().parents[2]
-evidence=root/'verification/windows/lighting'
-s=json.loads((evidence/'summary.json').read_text(encoding='utf-8'))
-rows=['| 区域 | 最大逐场景 RGB MAE /255 | 最低有效 SSIM |','|---|---:|---:|']
-for name,metric in s['roi'].items():
+root = Path(__file__).resolve().parents[2]
+evidence = root / 'verification/windows/lighting'
+s = json.loads((evidence / 'summary.json').read_text(encoding='utf-8'))
+rows = ['| 区域 | 最大逐场景 RGB MAE /255 | 最低有效 SSIM |', '|---|---:|---:|']
+for name, metric in s['roi'].items():
     rows.append(f"| {name} | {metric['maxMeanAbsoluteRgb']:.4f} | {metric['minSsim']:.6f} |")
-report=f"""# R08 Windows 灯光验收
+report = f"""# R08 Windows 灯光验收
 
 Qt {s['qtVersion']}，Release，真实 Windows D3D11 / DPR {s['actualDpr']}；OS/GPU/驱动见 summary.json。Review {s['ctest']}、普通构建 {s['production']['ctest']}，qmllint 通过，普通产物拒绝 Review 参数。六个实际材质片段的五类 qsb 目标生成通过，目标系统实机结果不在此结论内。
 
@@ -16,7 +16,7 @@ Qt {s['qtVersion']}，Release，真实 Windows D3D11 / DPR {s['actualDpr']}；OS
 
 48 个同输入 GPU 状态：双主题 × baseline/area/guided/hybrid × 正视/低角度 × 三个行位置（0/1/4）。光场为同一个世界原点函数，印刷不自发光；抽取/归位的纹理与阵列本体仍由后续对应轮次交付。五ROI图像门槛全部通过，最大投影误差 {s['maxProjectionPixels']:.6g} 逻辑像素。窄外框不够11×11时不编造SSIM，仍检查非空ROI、MAE与结构。
 
-"""+'\n'.join(rows)+"""
+""" + '\n'.join(rows) + """
 
 成对图为 docs/media/lighting/web/000–047.png 与 qt/000–047.png，差分为 qt/diff-000–047.png；完整逐场景ROI、Web投影、源参数一致性与真实前景/帧数在 release-runtime.json。正视/低角度、暖昼/深夜样本已人工查看，没有封面加白、UV翻转、错误原点或额外发光。局部差异主要是沿用R07的材质标定、近边纹理过滤/抗锯齿及极小PBR积分误差；不改变源码颜色、几何、IOR或封面以贴合采集缺陷。
 
@@ -24,5 +24,5 @@ Qt {s['qtVersion']}，Release，真实 Windows D3D11 / DPR {s['actualDpr']}；OS
 
 macOS/Linux本轮严格静态审计结论为“静态审计通过，实机待用户验证”，未声称已编译或已运行Metal/OpenGL/GUI/音频。后续阴影/AO/景深/阵列/完整应用验收不在本轮结论中。
 """
-(evidence/'report.md').write_text(report,encoding='utf-8',newline='\n')
+(evidence / 'report.md').write_text(report, encoding='utf-8', newline='\n')
 print('R08 lighting report written')

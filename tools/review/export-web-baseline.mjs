@@ -1,17 +1,20 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFileSync, spawn } from 'node:child_process';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {execFileSync, spawn} from 'node:child_process';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-import { CDP } from './cdp.mjs';
-import {writeSceneIndex,loadSceneIndex} from './scene-index.mjs';
+import {CDP} from './cdp.mjs';
+import {writeSceneIndex, loadSceneIndex} from './scene-index.mjs';
 import {exportLibraryOrder} from './library-order.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const argumentsMap = Object.fromEntries(process.argv.slice(2).map(arg => {
-  const [name, ...value] = arg.replace(/^--/, '').split('='); return [name, value.join('=') || true];
-}));
+const argumentsMap = Object.fromEntries(
+    process.argv.slice(2).map((arg) => {
+        const [name, ...value] = arg.replace(/^--/, '').split('=');
+        return [name, value.join('=') || true];
+    }),
+);
 const repo = path.resolve(argumentsMap['repo-root'] || path.join(here, '../..'));
 const web = path.resolve(argumentsMap['web-root'] || path.join(repo, 'legacy-web'));
 export const BASELINE = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
@@ -21,349 +24,1223 @@ const contracts = path.join(repo, 'docs/contracts');
 const output = path.join(repo, 'docs/media/web-baseline');
 const evidence = path.join(repo, 'verification/windows/web-baseline');
 const fixturesRoot = path.join(repo, 'tests/fixtures/web-baseline');
-const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const json = async (name, data) => { await fs.mkdir(path.dirname(name), {recursive:true}); await fs.writeFile(name, JSON.stringify(data, null, 2) + '\n'); };
-const git = args => execFileSync('git', args, {cwd:repo, encoding:'utf8'}).trim();
-const waitFor = async (probe, name) => {
-  const end = Date.now() + 60000;
-  while (Date.now() < end) {
-    try { const value = await probe(); if (value) return value; } catch {}
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  throw new Error('Timed out: ' + name);
+const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const json = async (name, data) => {
+    await fs.mkdir(path.dirname(name), {recursive: true});
+    await fs.writeFile(name, JSON.stringify(data, null, 2) + '\n');
 };
-await fs.mkdir(frozen, {recursive:true});
-await fs.mkdir(contracts, {recursive:true});
-await fs.mkdir(output, {recursive:true});
-await fs.mkdir(evidence, {recursive:true});
+const git = (args) => execFileSync('git', args, {cwd: repo, encoding: 'utf8'}).trim();
+const waitFor = async (probe, name) => {
+    const end = Date.now() + 60000;
+    while (Date.now() < end) {
+        try {
+            const value = await probe();
+            if (value)
+                return value;
+        } catch {
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error('Timed out: ' + name);
+};
+await fs.mkdir(frozen, {recursive: true});
+await fs.mkdir(contracts, {recursive: true});
+await fs.mkdir(output, {recursive: true});
+await fs.mkdir(evidence, {recursive: true});
 const archive = path.join(runRoot, 'source.tar');
-execFileSync('git', ['archive', '--format=tar', '--output='+archive, BASELINE,
-  'src', 'scripts', 'public', 'content', 'index.html', 'package.json', 'package-lock.json', 'tsconfig.json'], {cwd:repo});
+execFileSync(
+    'git',
+    [
+        'archive',
+        '--format=tar',
+        '--output=' + archive,
+        BASELINE,
+        'src',
+        'scripts',
+        'public',
+        'content',
+        'index.html',
+        'package.json',
+        'package-lock.json',
+        'tsconfig.json',
+    ],
+    {cwd: repo},
+);
 execFileSync('tar', ['-xf', archive, '-C', frozen]);
-assert.equal(sha(await fs.readFile(path.join(web, 'package-lock.json'))), sha(await fs.readFile(path.join(frozen, 'package-lock.json'))), 'Web dependencies must match frozen lockfile');
-try { await fs.symlink(path.join(web, 'node_modules'), path.join(frozen, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir'); }
-catch (error) { if (error.code !== 'EEXIST') throw error; }
-const {createServer} = await import(pathToFileURL(path.join(web, 'node_modules/vite/dist/node/index.js')).href);
+assert.equal(
+    sha(await fs.readFile(path.join(web, 'package-lock.json'))),
+    sha(await fs.readFile(path.join(frozen, 'package-lock.json'))),
+    'Web dependencies must match frozen lockfile',
+);
+try {
+    await fs.symlink(
+        path.join(web, 'node_modules'),
+        path.join(frozen, 'node_modules'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+    );
+} catch (error) {
+    if (error.code !== 'EEXIST')
+        throw error;
+}
+const {createServer} =
+    await import(pathToFileURL(path.join(web, 'node_modules/vite/dist/node/index.js')).href);
 const hook = await fs.readFile(path.join(here, 'review-hook.txt'), 'utf8');
 
 // One input document usable by both the future Qt review entry and this Web runner.
-const titles = ['收藏样本（长中文标题）一张一张，慢慢听', 'Typography gyjp (Descenders)', 'Emoji 👩🏽‍🚀 / é / 组合字'];
-const makeLibrary = counts => {
-  let next = 0;
-  const genres = counts.map((_, i) => ({id:`fixture-genre-${i}`, name:`匿名列 ${String(i+1).padStart(2,'0')}`}));
-  const albums = counts.flatMap((count, lane) => Array.from({length:count}, (_, row) => {
-    const i = next++, id = `fixture-album-${String(i).padStart(4,'0')}`;
-    return {id, title:titles[i%3]+` ${String(row+1).padStart(3,'0')}`, artist:`匿名歌手 ${lane+1}`, genreId:genres[lane].id,
-      year:2026, rawGenres:[], coverUrl:'/demo-covers/'+['square','portrait','landscape'][i%3]+'.png',
-      folder:'Generated fixture', description:'合成介绍：仅使用仓库演示封面，不读取本地音乐目录。', localNote:'Anonymous fixture',
-      tracks:Array.from({length:4}, (_, j) => ({id:`${id}-track-${j}`, albumId:id, title:titles[j%3]+` ${j+1}`, artist:`匿名歌手 ${lane+1}`,
-        trackNumber:j+1, duration:180+j, format:'fixture', browserPlayable:false, audioUrl:'', relativePath:`synthetic/${j}`})),
-      producers:[], offline:false};
-  }));
-  return {version:1, albums, genres, roots:[], scan:{running:false}, onlineEnabled:false};
+const titles = [
+    '收藏样本（长中文标题）一张一张，慢慢听',
+    'Typography gyjp (Descenders)',
+    'Emoji 👩🏽‍🚀 / é / 组合字',
+];
+const makeLibrary = (counts) => {
+    let next = 0;
+    const genres = counts.map((_, i) => ({
+                                  id: `fixture-genre-${i}`,
+                                  name: `匿名列 ${String(i + 1).padStart(2, '0')}`,
+                              }));
+    const albums = counts.flatMap(
+        (count, lane) => Array.from(
+            {length: count},
+            (_, row) => {
+                const i = next++, id = `fixture-album-${String(i).padStart(4, '0')}`;
+                return {
+                    id,
+                    title: titles[i % 3] + ` ${String(row + 1).padStart(3, '0')}`,
+                    artist: `匿名歌手 ${lane + 1}`,
+                    genreId: genres[lane].id,
+                    year: 2026,
+                    rawGenres: [],
+                    coverUrl: '/demo-covers/' + ['square', 'portrait', 'landscape'][i % 3] + '.png',
+                    folder: 'Generated fixture',
+                    description: '合成介绍：仅使用仓库演示封面，不读取本地音乐目录。',
+                    localNote: 'Anonymous fixture',
+                    tracks: Array.from({length: 4}, (_, j) => ({
+                                                        id: `${id}-track-${j}`,
+                                                        albumId: id,
+                                                        title: titles[j % 3] + ` ${j + 1}`,
+                                                        artist: `匿名歌手 ${lane + 1}`,
+                                                        trackNumber: j + 1,
+                                                        duration: 180 + j,
+                                                        format: 'fixture',
+                                                        browserPlayable: false,
+                                                        audioUrl: '',
+                                                        relativePath: `synthetic/${j}`,
+                                                    })),
+                    producers: [],
+                    offline: false,
+                };
+            }),
+    );
+    return {
+        version: 1,
+        albums,
+        genres,
+        roots: [],
+        scan: {running: false},
+        onlineEnabled: false,
+    };
 };
-const libraries = Object.fromEntries(Object.entries({empty:[], single:[1], even:[2], odd:[3], mixed:[2,3,16], large:[60,60,60,60,60,60,60,60]}).map(([name,counts])=>[name,makeLibrary(counts)]));
-const fixture = {schemaVersion:1, baseline:BASELINE, provenance:{titles:'Generated by export-web-baseline.mjs', covers:'Frozen public/demo-covers/{square,portrait,landscape}.png', musicFiles:'None'},
-  viewport:{width:1920,height:1080}, DPR:1, theme:'day', quality:'original', arrayMode:'filled', albumIds:libraries.mixed.albums.map(a=>a.id), selection:libraries.mixed.albums[0].id,
-  motionTime:0, events:[{at:0,type:'open'},{at:4,type:'select',index:1},{at:4.15,type:'select',index:2},{at:7,type:'select',index:1},{at:10,type:'back'}], libraries};
-await json(path.join(fixturesRoot,'anonymous.json'),fixture);
-const fixtureHash = sha(await fs.readFile(path.join(fixturesRoot,'anonymous.json')));
-await exportLibraryOrder(repo,frozen,fixture,BASELINE,fixtureHash);
-await fs.rm(path.join(evidence,'capture-report.json'),{force:true});
+const libraries = Object.fromEntries(
+    Object
+        .entries({
+            empty: [],
+            single: [1],
+            even: [2],
+            odd: [3],
+            mixed: [2, 3, 16],
+            large: [60, 60, 60, 60, 60, 60, 60, 60],
+        })
+        .map(([name, counts]) => [name, makeLibrary(counts)]),
+);
+const fixture = {
+    schemaVersion: 1,
+    baseline: BASELINE,
+    provenance: {
+        titles: 'Generated by export-web-baseline.mjs',
+        covers: 'Frozen public/demo-covers/{square,portrait,landscape}.png',
+        musicFiles: 'None',
+    },
+    viewport: {width: 1920, height: 1080},
+    DPR: 1,
+    theme: 'day',
+    quality: 'original',
+    arrayMode: 'filled',
+    albumIds: libraries.mixed.albums.map((a) => a.id),
+    selection: libraries.mixed.albums[0].id,
+    motionTime: 0,
+    events: [
+        {at: 0, type: 'open'},
+        {at: 4, type: 'select', index: 1},
+        {at: 4.15, type: 'select', index: 2},
+        {at: 7, type: 'select', index: 1},
+        {at: 10, type: 'back'},
+    ],
+    libraries,
+};
+await json(path.join(fixturesRoot, 'anonymous.json'), fixture);
+const fixtureHash = sha(await fs.readFile(path.join(fixturesRoot, 'anonymous.json')));
+await exportLibraryOrder(repo, frozen, fixture, BASELINE, fixtureHash);
+await fs.rm(path.join(evidence, 'capture-report.json'), {force: true});
 
-const sourceNames = git(['ls-tree','-r','--name-only',BASELINE,'src']).split('\n');
-const contents = Object.fromEntries(await Promise.all(sourceNames.map(async name => [name, await fs.readFile(path.join(frozen,name),'utf8')])));
-const imports = name => [...contents[name].matchAll(/(?:from\s*|import\s*\(?\s*)['"](\.[^'"]+)['"]/g)].map(m => {
-  const normalized = path.posix.normalize(path.posix.join(path.posix.dirname(name),m[1]));
-  return [normalized, normalized+'.ts', normalized+'.css'].find(n => sourceNames.includes(n));
-}).filter(Boolean);
+const sourceNames = git(['ls-tree', '-r', '--name-only', BASELINE, 'src']).split('\n');
+const contents = Object.fromEntries(
+    await Promise.all(
+        sourceNames.map(async (name) => [name, await fs.readFile(path.join(frozen, name), 'utf8')]),
+        ),
+);
+const imports =
+    (name) => [...contents[name].matchAll(/(?:from\s*|import\s*\(?\s*)['"](\.[^'"]+)['"]/g)]
+                  .map((m) => {
+                      const normalized = path.posix.normalize(
+                          path.posix.join(path.posix.dirname(name), m[1]),
+                      );
+                      return [normalized, normalized + '.ts', normalized + '.css'].find(
+                          (n) => sourceNames.includes(n),
+                      );
+                  })
+                  .filter(Boolean);
 const reachable = new Set();
-const visit = name => { if (reachable.has(name)) return; reachable.add(name); imports(name).forEach(visit); };
+const visit = (name) => {
+    if (reachable.has(name))
+        return;
+    reachable.add(name);
+    imports(name).forEach(visit);
+};
 visit('src/music-app.ts');
 function destination(name) {
-  const base = path.posix.basename(name);
-  if (/music-(browser-gapless|song-transition|player)|audio/.test(base)) return ['src/media/','Ordinary public QtMultimedia playback; PCM/gapless/native bridge omitted'];
-  if (/^pwa|^archive-main|^document-|^decryption|^boot-(tracks|orbit|logo|motion)|^boot\.ts|^glass-reveal|^inspection|^typing|^archive-lighting|^internal-optics/.test(base)) return [null,'Archive/reference only; shared rendering facts extracted where music uses them'];
-  if (/^music-types|^music-order|^music-search|^data/.test(base)) return ['src/core/','Stable IDs, immutable library/model, ordering/search'];
-  if (/motion|camera|real-columns|overview-edge|archive-loop|boot-timing|^music-opening/.test(base) && !/css$/.test(base)) return ['src/motion/','Analytical frame-driven motion and shared coordinates'];
-  if (/scene|model|cover-atlas|quality-renderer|render-quality|music-lighting|row-lighting|cd-asset|viewer-theme/.test(base) && !/css$/.test(base)) return ['src/render/','Shared geometry, materials, light field, texture and postprocessing'];
-  if (/^music-app|^main\.ts/.test(base)) return ['src/app/ + qml/Yalahoo/Music/App.qml','Composition/lifecycle only; split controllers and view'];
-  if (/demo-library/.test(base)) return ['tests/fixtures/','Anonymous review input only'];
-  if (/brand|asset-url/.test(base)) return ['resources/ + src/render/','Functional assets retained; original brand replaced by R03B'];
-  if (/music-(presentation|track-focus)/.test(base)) return ['src/core/ + qml/Yalahoo/Music/pages/','Navigation independent of playback'];
-  if (/settings|lab|theme/.test(base)) return ['qml/Yalahoo/Music/panels/ + src/core/','Settings/state, disabled offline metadata slots'];
-  return ['qml/Yalahoo/Music/components/ + pages/','Layout, typography, controls and Qt text shaping'];
+    const base = path.posix.basename(name);
+    if (/music-(browser-gapless|song-transition|player)|audio/.test(base))
+        return [
+            'src/media/',
+            'Ordinary public QtMultimedia playback; PCM/gapless/native bridge omitted',
+        ];
+    if (/^pwa|^archive-main|^document-|^decryption|^boot-(tracks|orbit|logo|motion)|^boot\.ts|^glass-reveal|^inspection|^typing|^archive-lighting|^internal-optics/
+            .test(
+                base,
+                ))
+        return [
+            null,
+            'Archive/reference only; shared rendering facts extracted where music uses them',
+        ];
+    if (/^music-types|^music-order|^music-search|^data/.test(base))
+        return ['src/core/', 'Stable IDs, immutable library/model, ordering/search'];
+    if (/motion|camera|real-columns|overview-edge|archive-loop|boot-timing|^music-opening/.test(
+            base,
+            )
+        && !/css$/.test(base))
+        return ['src/motion/', 'Analytical frame-driven motion and shared coordinates'];
+    if (/scene|model|cover-atlas|quality-renderer|render-quality|music-lighting|row-lighting|cd-asset|viewer-theme/
+            .test(
+                base,
+                )
+        && !/css$/.test(base))
+        return [
+            'src/render/',
+            'Shared geometry, materials, light field, texture and postprocessing',
+        ];
+    if (/^music-app|^main\.ts/.test(base))
+        return [
+            'src/app/ + qml/Yalahoo/Music/App.qml',
+            'Composition/lifecycle only; split controllers and view',
+        ];
+    if (/demo-library/.test(base))
+        return ['tests/fixtures/', 'Anonymous review input only'];
+    if (/brand|asset-url/.test(base))
+        return [
+            'resources/ + src/render/',
+            'Functional assets retained; original brand replaced by R03B',
+        ];
+    if (/music-(presentation|track-focus)/.test(base))
+        return ['src/core/ + qml/Yalahoo/Music/pages/', 'Navigation independent of playback'];
+    if (/settings|lab|theme/.test(base))
+        return [
+            'qml/Yalahoo/Music/panels/ + src/core/',
+            'Settings/state, disabled offline metadata slots',
+        ];
+    return [
+        'qml/Yalahoo/Music/components/ + pages/',
+        'Layout, typography, controls and Qt text shaping',
+    ];
 }
-await json(path.join(contracts,'source-map.json'), {baseline:BASELINE, entry:'src/main.ts → src/music-app.ts (without original=1)', paths:{repository:'.',web:'legacy-web/'}, modules:sourceNames.map(name => {
-  const [target, responsibility] = destination(name);
-  return {baselinePath:name, sourcePath:'legacy-web/'+name, sha256:sha(contents[name]), musicReachable:reachable.has(name), role:!reachable.has(name)||!target?'reference-only':'migrate', target:!reachable.has(name)?null:target, responsibility, imports:imports(name)};
-}), services:git(['ls-tree','-r','--name-only',BASELINE,'scripts']).split('\n').filter(n=>!/(check-|capture-|build-|export-|serve-|render-|analyze-|fixtures\/|sanitize_|extract-)/.test(n)).map(name => ({sourcePath:'legacy-web/'+name, target:/introductions|credits/.test(name)?'src/services/':'src/library/ + src/media/', policy:/audio|launch/.test(name)?'No external PCM/native/Web server in product':'Scanner/cache fields retained; network execution deferred'}))});
+await json(path.join(contracts, 'source-map.json'), {
+    baseline: BASELINE,
+    entry: 'src/main.ts → src/music-app.ts (without original=1)',
+    paths: {repository: '.', web: 'legacy-web/'},
+    modules: sourceNames.map((name) => {
+        const [target, responsibility] = destination(name);
+        return {
+            baselinePath: name,
+            sourcePath: 'legacy-web/' + name,
+            sha256: sha(contents[name]),
+            musicReachable: reachable.has(name),
+            role: !reachable.has(name) || !target ? 'reference-only' : 'migrate',
+            target: !reachable.has(name) ? null : target,
+            responsibility,
+            imports: imports(name),
+        };
+    }),
+    services:
+        git(['ls-tree', '-r', '--name-only', BASELINE, 'scripts'])
+            .split('\n')
+            .filter(
+                (n) =>
+                    !/(check-|capture-|build-|export-|serve-|render-|analyze-|fixtures\/|sanitize_|extract-)/
+                         .test(
+                             n,
+                             ),
+                )
+            .map((name) => ({
+                     sourcePath: 'legacy-web/' + name,
+                     target: /introductions|credits/.test(name) ? 'src/services/'
+                                                                : 'src/library/ + src/media/',
+                     policy: /audio|launch/.test(name)
+                                 ? 'No external PCM/native/Web server in product'
+                                 : 'Scanner/cache fields retained; network execution deferred',
+                 })),
+});
 
-const checks = ['check-music-motion','check-music-archive-motion','check-music-real-columns','check-music-column-position','check-music-row-lighting','check-music-row-motion','check-music-overview','check-music-motion-speed','check-music-ui-motion','check-music-camera','check-music-presentation','check-music-model','check-music-boot-timing'];
+const checks = [
+    'check-music-motion',
+    'check-music-archive-motion',
+    'check-music-real-columns',
+    'check-music-column-position',
+    'check-music-row-lighting',
+    'check-music-row-motion',
+    'check-music-overview',
+    'check-music-motion-speed',
+    'check-music-ui-motion',
+    'check-music-camera',
+    'check-music-presentation',
+    'check-music-model',
+    'check-music-boot-timing',
+];
 const checkResults = [];
 for (const check of checks) {
-  console.log('Check '+check);
-  const text = execFileSync(process.execPath, ['scripts/'+check+'.mjs'], {cwd:frozen, encoding:'utf8', env:{...process.env,MUSIC_DATA_DIR:path.join(runRoot,'isolated-data')}});
-  checkResults.push({script:'legacy-web/scripts/'+check+'.mjs', result:'passed', output:text.trim()});
-}
-await json(path.join(evidence,'production-checks.json'),{baseline:BASELINE,node:process.version,checks:checkResults});
-let activeLibrary = libraries.mixed;
-const server = await createServer({root:frozen,configFile:false,logLevel:'error',server:{host:'127.0.0.1',port:0}, plugins:[{
-  name:'frozen-review-only', enforce:'pre',
-  transform(code,id) {
-    const normalized = id.replaceAll('\\','/').split('?')[0];
-    if (normalized.endsWith('/src/music-app.ts')) return code+'\n'+hook;
-    if (normalized.endsWith('/src/music-title-reels.ts')) return code+'\nexport { TitleTrack };';
-    if (normalized.endsWith('/src/archive-lighting.ts')) return code.replace('scene.environment = pmrem.fromScene(room, 0.04).texture;',
-      '(window as any).__reviewEnvironment = { room: room.toJSON(), target: pmrem.fromScene(room, 0.04) }; scene.environment = (window as any).__reviewEnvironment.target.texture;');
-  },
-  configureServer(vite) {
-    vite.middlewares.use((req,res,next) => {
-      if (!req.url.startsWith('/api/')) return next();
-      res.setHeader('Content-Type','application/json'); res.setHeader('Cache-Control','no-store');
-      if (req.url === '/api/library') res.end(JSON.stringify(activeLibrary));
-      else if (req.url.startsWith('/api/audio/capabilities')) res.end(JSON.stringify({decoderAvailable:false,nativeAvailable:false,devices:[]}));
-      else if (req.url.startsWith('/api/genre-rules')) res.end(JSON.stringify({version:1,genres:activeLibrary.genres,albumOverrides:{}}));
-      else { res.statusCode=403; res.end(JSON.stringify({error:'Fixture review forbids service mutation/network/audio'})); }
+    console.log('Check ' + check);
+    const text = execFileSync(process.execPath, ['scripts/' + check + '.mjs'], {
+        cwd: frozen,
+        encoding: 'utf8',
+        env: {...process.env, MUSIC_DATA_DIR: path.join(runRoot, 'isolated-data')},
     });
-  }
-}]});
+    checkResults.push({
+        script: 'legacy-web/scripts/' + check + '.mjs',
+        result: 'passed',
+        output: text.trim(),
+    });
+}
+await json(path.join(evidence, 'production-checks.json'), {
+    baseline: BASELINE,
+    node: process.version,
+    checks: checkResults,
+});
+let activeLibrary = libraries.mixed;
+const server = await createServer({
+    root: frozen,
+    configFile: false,
+    logLevel: 'error',
+    server: {host: '127.0.0.1', port: 0},
+    plugins: [
+        {
+            name: 'frozen-review-only',
+            enforce: 'pre',
+            transform(code, id) {
+                const normalized = id.replaceAll('\\', '/').split('?')[0];
+                if (normalized.endsWith('/src/music-app.ts'))
+                    return code + '\n' + hook;
+                if (normalized.endsWith('/src/music-title-reels.ts'))
+                    return code + '\nexport { TitleTrack };';
+                if (normalized.endsWith('/src/archive-lighting.ts'))
+                    return code.replace(
+                        'scene.environment = pmrem.fromScene(room, 0.04).texture;',
+                        '(window as any).__reviewEnvironment = { room: room.toJSON(), target: pmrem.fromScene(room, 0.04) }; scene.environment = (window as any).__reviewEnvironment.target.texture;',
+                    );
+            },
+            configureServer(vite) {
+                vite.middlewares.use((req, res, next) => {
+                    if (!req.url.startsWith('/api/'))
+                        return next();
+                    res.setHeader('Content-Type', 'application/json');
+                    res.setHeader('Cache-Control', 'no-store');
+                    if (req.url === '/api/library')
+                        res.end(JSON.stringify(activeLibrary));
+                    else if (req.url.startsWith('/api/audio/capabilities'))
+                        res.end(
+                            JSON.stringify({
+                                decoderAvailable: false,
+                                nativeAvailable: false,
+                                devices: [],
+                            }),
+                        );
+                    else if (req.url.startsWith('/api/genre-rules'))
+                        res.end(
+                            JSON.stringify({
+                                version: 1,
+                                genres: activeLibrary.genres,
+                                albumOverrides: {},
+                            }),
+                        );
+                    else {
+                        res.statusCode = 403;
+                        res.end(
+                            JSON.stringify({
+                                error: 'Fixture review forbids service mutation/network/audio',
+                            }),
+                        );
+                    }
+                });
+            },
+        },
+    ],
+});
 await server.listen();
-const origin = 'http://127.0.0.1:'+server.httpServer.address().port;
-const executableCandidates = [argumentsMap.browser, process.env.REVIEW_BROWSER,
-  process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES,'Google/Chrome/Application/chrome.exe'),
-  process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'],'Microsoft/Edge/Application/msedge.exe'),
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
+const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+const executableCandidates = [
+    argumentsMap.browser,
+    process.env.REVIEW_BROWSER,
+    process.env.PROGRAMFILES
+        && path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'),
+    process.env['PROGRAMFILES(X86)']
+        && path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'),
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome',
+].filter(Boolean);
 let executable;
-for (const candidate of executableCandidates) { try { await fs.access(candidate); executable=candidate; break; } catch {} }
-if (!executable) { await server.close(); throw new Error('No installed browser; baseline capture remains required. Set --browser=PATH.'); }
-const profile = path.join(runRoot,'browser-profile');
-await fs.mkdir(profile,{recursive:true});
-await fs.rm(path.join(profile,'DevToolsActivePort'),{force:true});
-const browserProcess = spawn(executable,['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,
-  '--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-component-update','--disable-extensions',
-  '--autoplay-policy=user-gesture-required','--enable-gpu',...(process.platform==='win32'?['--use-angle=d3d11']:[]),'about:blank'],{windowsHide:true,stdio:'ignore'});
+for (const candidate of executableCandidates) {
+    try {
+        await fs.access(candidate);
+        executable = candidate;
+        break;
+    } catch {
+    }
+}
+if (!executable) {
+    await server.close();
+    throw new Error('No installed browser; baseline capture remains required. Set --browser=PATH.');
+}
+const profile = path.join(runRoot, 'browser-profile');
+await fs.mkdir(profile, {recursive: true});
+await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
+const browserProcess = spawn(
+    executable,
+    [
+        '--headless=new',
+        '--remote-debugging-port=0',
+        '--user-data-dir=' + profile,
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-extensions',
+        '--autoplay-policy=user-gesture-required',
+        '--enable-gpu',
+        ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : []),
+        'about:blank',
+    ],
+    {windowsHide: true, stdio: 'ignore'},
+);
 let browser;
 let page;
 const errors = [], blocked = [], captures = [], states = [];
-if(argumentsMap['refresh-contracts']) {
-  const previous=JSON.parse(await fs.readFile(path.join(output,'screenshots.json'),'utf8'));
-  const previousStates=await loadSceneIndex(repo,JSON.parse(await fs.readFile(path.join(contracts,'scene-parameters.json'),'utf8')));
-  assert.equal(previous.fixtureHash,fixtureHash); assert.equal(previous.baseline,BASELINE);
-  captures.push(...previous.captures);states.push(...previousStates.states);
+if (argumentsMap['refresh-contracts']) {
+    const previous = JSON.parse(await fs.readFile(path.join(output, 'screenshots.json'), 'utf8'));
+    const previousStates = await loadSceneIndex(
+        repo,
+        JSON.parse(await fs.readFile(path.join(contracts, 'scene-parameters.json'), 'utf8')),
+    );
+    assert.equal(previous.fixtureHash, fixtureHash);
+    assert.equal(previous.baseline, BASELINE);
+    captures.push(...previous.captures);
+    states.push(...previousStates.states);
 }
 try {
-  const devtools = await waitFor(async () => (await fs.readFile(path.join(profile,'DevToolsActivePort'),'utf8')).split('\n'),'browser debugging port');
-  browser = await CDP.connect(`ws://127.0.0.1:${devtools[0]}${devtools[1]}`);
-  const version = await browser.send('Browser.getVersion');
-  const system = await browser.send('SystemInfo.getInfo');
-  async function openPage(width,height,theme,arrayMode,library='mixed',dpr=1) {
-    if (page) { page.close(); await browser.send('Target.closeTarget',{targetId:page.targetId}); }
-    activeLibrary=libraries[library];
-    const {targetId}=await browser.send('Target.createTarget',{url:'about:blank'});
-    const targets=await (await fetch(`http://127.0.0.1:${devtools[0]}/json/list`)).json();
-    page=await CDP.connect(targets.find(t=>t.id===targetId).webSocketDebuggerUrl); page.targetId=targetId;
-    page.on('Runtime.exceptionThrown', e=>errors.push(e.exceptionDetails.exception?.description||e.exceptionDetails.text));
-    await page.send('Runtime.enable'); await page.send('Page.enable');
-    await page.send('Fetch.enable',{patterns:[{urlPattern:'*'}]});
-    page.on('Fetch.requestPaused', e=> {
-      const url=e.request.url;
-      if (url.startsWith(origin+'/') || /^(data|blob):/.test(url)) void page.send('Fetch.continueRequest',{requestId:e.requestId});
-      else { blocked.push(url); void page.send('Fetch.failRequest',{requestId:e.requestId,errorReason:'BlockedByClient'}); }
+    const devtools = await waitFor(
+        async () =>
+            (await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n'),
+        'browser debugging port',
+    );
+    browser = await CDP.connect(`ws://127.0.0.1:${devtools[0]}${devtools[1]}`);
+    const version = await browser.send('Browser.getVersion');
+    const system = await browser.send('SystemInfo.getInfo');
+    async function openPage(width, height, theme, arrayMode, library = 'mixed', dpr = 1) {
+        if (page) {
+            page.close();
+            await browser.send('Target.closeTarget', {targetId: page.targetId});
+        }
+        activeLibrary = libraries[library];
+        const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
+        const targets = await (await fetch(`http://127.0.0.1:${devtools[0]}/json/list`)).json();
+        page = await CDP.connect(targets.find((t) => t.id === targetId).webSocketDebuggerUrl);
+        page.targetId = targetId;
+        page.on(
+            'Runtime.exceptionThrown',
+            (e) =>
+                errors.push(e.exceptionDetails.exception?.description || e.exceptionDetails.text),
+        );
+        await page.send('Runtime.enable');
+        await page.send('Page.enable');
+        await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
+        page.on('Fetch.requestPaused', (e) => {
+            const url = e.request.url;
+            if (url.startsWith(origin + '/') || /^(data|blob):/.test(url))
+                void page.send('Fetch.continueRequest', {requestId: e.requestId});
+            else {
+                blocked.push(url);
+                void page.send('Fetch.failRequest', {
+                    requestId: e.requestId,
+                    errorReason: 'BlockedByClient',
+                });
+            }
+        });
+        await page.send('Emulation.setDeviceMetricsOverride', {
+            width,
+            height,
+            deviceScaleFactor: dpr,
+            mobile: false,
+        });
+        await page.send('Page.addScriptToEvaluateOnNewDocument', {
+            source:
+                `let seed=123456789; Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}; localStorage.clear(); localStorage.setItem('rhine-music-preferences', ${
+                    JSON.stringify(JSON.stringify({
+                        theme,
+                        arrayMode,
+                        quality: 'original',
+                        bgm: false,
+                        sound: false,
+                        reduced: false,
+                        sortMode: 'genre'
+                    }))});`,
+        });
+        await page.send('Page.navigate', {url: origin + '/?scene=archive'});
+        try {
+            await waitFor(
+                () => page.evaluate('Boolean(window.__baseline?.ready)'),
+                'frozen music renderer',
+            );
+        } catch (error) {
+            console.error(errors);
+            console.error(await page.evaluate('document.body.innerText.slice(0,2000)'));
+            throw error;
+        }
+        await page.evaluate('__baseline.pause()');
+        await advance(6);
+        return {width, height, theme, arrayMode, dpr, library};
+    }
+    async function advance(seconds) {
+        // Keep each browser task short enough for real finished-event/layout dispatch.
+        for (let remaining = seconds; remaining > 1e-9; remaining -= Math.min(0.05, remaining))
+            await page.evaluate(`__baseline.advance(${Math.min(0.05, remaining)})`);
+    }
+    async function command(event) {
+        await page.evaluate(`__baseline.command(${JSON.stringify(event)})`);
+    }
+    async function shot(name, input, events = [], expectedPhase) {
+        await page.evaluate('__baseline.render()');
+        const state = await page.evaluate('__baseline.state');
+        if (expectedPhase)
+            assert.equal(state.phase, expectedPhase, name + ' phase');
+        const {data} = await page.send('Page.captureScreenshot', {
+            format: 'png',
+            fromSurface: true,
+            captureBeyondViewport: false,
+        });
+        const bytes = Buffer.from(data, 'base64');
+        await fs.writeFile(path.join(output, name + '.png'), bytes);
+        const detail = await page.evaluate('(' + snapshot.toString() + ')()');
+        validateSnapshot(detail);
+        const record = {
+            name,
+            file: 'docs/media/web-baseline/' + name + '.png',
+            sha256: sha(bytes),
+            baseline: BASELINE,
+            fixtureHash,
+            browser: version.product,
+            graphics: system.gpu.devices,
+            Qt: null,
+            quality: 'original',
+            viewport: {width: input.width, height: input.height},
+            DPR: input.dpr,
+            theme: input.theme,
+            arrayMode: input.arrayMode,
+            library: input.library,
+            time: state.time,
+            events,
+            state,
+            ROI: detail.brandBounds,
+        };
+        const ci = captures.findIndex((c) => c.name === name),
+              si = states.findIndex((s) => s.name === name);
+        if (ci >= 0)
+            captures.splice(ci, 1);
+        if (si >= 0)
+            states.splice(si, 1);
+        captures.push(record);
+        states.push({name, input: record, parameters: detail});
+        console.log('Captured ' + name + ' @ ' + state.time.toFixed(3) + ' / ' + state.phase);
+    }
+    if (!argumentsMap['refresh-contracts']) {
+        const sizes = [
+            [1920, 1080],
+            [1280, 720],
+            [995, 858],
+            [960, 900],
+            [930, 900],
+            [390, 844],
+            [320, 720],
+            [2560, 1080],
+            [3440, 1440],
+        ];
+        for (const theme of ['day', 'night'])
+            for (const arrayMode of ['filled', 'realistic']) {
+                for (const [width, height] of sizes) {
+                    const input = await openPage(width, height, theme, arrayMode);
+                    await shot(
+                        `browse-${theme}-${arrayMode}-${width}x${height}`,
+                        input,
+                        [],
+                        'archive',
+                    );
+                    if (width === 1920) {
+                        await command({type: 'open'});
+                        await advance(4);
+                        await shot(
+                            `detail-${theme}-${arrayMode}`,
+                            input,
+                            [{at: 6, type: 'open'}],
+                            'detail',
+                        );
+                        await command({type: 'back'});
+                        await advance(4);
+                        await command({type: 'overview', active: true});
+                        await advance(4);
+                        await shot(
+                            `overview-${theme}-${arrayMode}`,
+                            input,
+                            [
+                                {at: 10, type: 'back'},
+                                {at: 14, type: 'overview', active: true},
+                            ],
+                            'archive',
+                        );
+                    }
+                }
+            }
+        for (const [width, height, dpr] of [[1280, 720, 1.5], [390, 844, 2], ]) {
+            const input = await openPage(width, height, 'day', 'realistic', 'mixed', dpr);
+            await shot(`browse-dpr-${dpr}`, input, [], 'archive');
+        }
+        for (const library of ['empty', 'single', 'even', 'odd', 'large']) {
+            const input = await openPage(1280, 720, 'day', 'realistic', library);
+            await shot(`fixture-${library}`, input, [], 'archive');
+        }
+    }
+    for (const theme of ['day', 'night']) {
+        const input = await openPage(1280, 720, theme, 'filled');
+        await command({type: 'opening'});
+        let previous = 0;
+        for (const time of [0.24, 1.64, 3.58, 6.32, 6.4, 8, 11.6]) {
+            await advance(time - previous);
+            previous = time;
+            await shot(`opening-${theme}-${time}`, input, [{at: 6, type: 'opening'}]);
+            const sampled = Number(captures.at(-1).state.opening);
+            assert.ok(
+                Math.abs(sampled - time) < 1e-8,
+                'Opening clock must match requested exact time',
+            );
+        }
+    }
+    const input = await openPage(1920, 1080, 'night', 'filled');
+    const replay = [];
+    await command({type: 'open'});
+    await advance(4);
+    const sequence = [
+        {at: 0, type: 'select', index: 1},
+        {at: 0.15, type: 'select', index: 2},
+        {at: 3, type: 'select', index: 1},
+        {at: 6, type: 'back'},
+    ];
+    let nextEvent = 0;
+    for (let frame = 0; frame <= 120 * 9; frame++) {
+        const t = frame / 120;
+        while (nextEvent < sequence.length && sequence[nextEvent].at <= t + 1e-10)
+            await command(sequence[nextEvent++]);
+        if (frame)
+            await advance(1 / 120);
+        replay.push({
+            time: t,
+            ...(await page.evaluate(
+                '({state:__baseline.state,camera:__baseline.scene.camera.matrixWorld.toArray(), placement:{value:__baseline.scene.musicPlacement.value,velocity:__baseline.scene.musicPlacement.velocity,acceleration:__baseline.scene.musicPlacement.acceleration}, outgoing:__baseline.scene.outgoing.map(o=>({cell:o.cell,lift:o.lift}))})',
+                )),
+        });
+        if ([0, 18, 120, 240, 360, 480, 600, 720, 1080].includes(frame))
+            await shot('switch-' + frame, input, sequence);
+    }
+    await json(path.join(contracts, 'presentation-golden.json'), {
+        baseline: BASELINE,
+        fixtureHash,
+        authority: 'Frozen legacy source and effective production call paths',
+        role: 'reference-only; rendering/capture defects are not reproduction targets',
+        step: 1 / 120,
+        events: sequence,
+        samples: replay,
     });
-    await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:dpr,mobile:false});
-    await page.send('Page.addScriptToEvaluateOnNewDocument',{source:`let seed=123456789; Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}; localStorage.clear(); localStorage.setItem('rhine-music-preferences', ${JSON.stringify(JSON.stringify({theme,arrayMode,quality:'original',bgm:false,sound:false,reduced:false,sortMode:'genre'}))});`});
-    await page.send('Page.navigate',{url:origin+'/?scene=archive'});
-    try { await waitFor(()=>page.evaluate('Boolean(window.__baseline?.ready)'), 'frozen music renderer'); } catch(error) { console.error(errors); console.error(await page.evaluate('document.body.innerText.slice(0,2000)')); throw error; }
-    await page.evaluate('__baseline.pause()');
-    await advance(6);
-    return {width,height,theme,arrayMode,dpr,library};
-  }
-  async function advance(seconds) {
-    // Keep each browser task short enough for real finished-event/layout dispatch.
-    for(let remaining=seconds;remaining>1e-9;remaining-=Math.min(.05,remaining))
-      await page.evaluate(`__baseline.advance(${Math.min(.05,remaining)})`);
-  }
-  async function command(event) { await page.evaluate(`__baseline.command(${JSON.stringify(event)})`); }
-  async function shot(name,input,events=[],expectedPhase) {
-    await page.evaluate('__baseline.render()');
-    const state=await page.evaluate('__baseline.state');
-    if(expectedPhase) assert.equal(state.phase,expectedPhase,name+' phase');
-    const {data}=await page.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false});
-    const bytes=Buffer.from(data,'base64'); await fs.writeFile(path.join(output,name+'.png'),bytes);
-    const detail=await page.evaluate('('+snapshot.toString()+')()');
-    validateSnapshot(detail);
-    const record={name,file:'docs/media/web-baseline/'+name+'.png',sha256:sha(bytes),baseline:BASELINE,fixtureHash,
-      browser:version.product,graphics:system.gpu.devices,Qt:null,quality:'original',viewport:{width:input.width,height:input.height},DPR:input.dpr,
-      theme:input.theme,arrayMode:input.arrayMode,library:input.library,time:state.time,events,state,ROI:detail.brandBounds};
-    const ci=captures.findIndex(c=>c.name===name), si=states.findIndex(s=>s.name===name);
-    if(ci>=0)captures.splice(ci,1);if(si>=0)states.splice(si,1);
-    captures.push(record); states.push({name,input:record,parameters:detail});
-    console.log('Captured '+name+' @ '+state.time.toFixed(3)+' / '+state.phase);
-  }
-  if(!argumentsMap['refresh-contracts']) {
-  const sizes=[[1920,1080],[1280,720],[995,858],[960,900],[930,900],[390,844],[320,720],[2560,1080],[3440,1440]];
-  for(const theme of ['day','night']) for(const arrayMode of ['filled','realistic']) {
-    for(const [width,height] of sizes) {
-      const input=await openPage(width,height,theme,arrayMode);
-      await shot(`browse-${theme}-${arrayMode}-${width}x${height}`,input,[],'archive');
-      if(width===1920) {
-        await command({type:'open'}); await advance(4);
-        await shot(`detail-${theme}-${arrayMode}`,input,[{at:6,type:'open'}],'detail');
-        await command({type:'back'}); await advance(4);
-        await command({type:'overview',active:true}); await advance(4);
-        await shot(`overview-${theme}-${arrayMode}`,input,[{at:10,type:'back'},{at:14,type:'overview',active:true}],'archive');
-      }
+    const golden = await page.evaluate('(' + motionGolden.toString() + ')()');
+    golden.fixtureHash = fixtureHash;
+    golden.authority = 'Frozen legacy source and effective production call paths';
+    golden.role = 'reference-only; rendering/capture defects are not reproduction targets';
+    golden.inputs = {
+        frameOrder:
+            'Apply events at nominal sample time, then update by dt (zero for frame 0); timestamps label input frames.',
+        spring: {initial: {value: 0, velocity: 0.2}, target: 1, rate: 3.7},
+        ribbon: {
+            initial: {value: 0, velocity: 0},
+            targetBeforeHalfSecond: 8,
+            targetAfterHalfSecond: -2,
+            duration: 1.1,
+        },
+        quintic: {
+            initial: {rail: 0, column: 0, shoulder: 0, lane: 0},
+            target: {rail: 7.44, column: 15.6, shoulder: 12, lane: 3},
+            reverseTarget: {rail: -0.62, column: -5.2, shoulder: -1, lane: -1},
+            rebase: {rail: -0.62, column: -5.2, shoulder: -1, lane: -1},
+        },
+        realColumn: {
+            initial: 0,
+            target: 18,
+            duration: 1.8,
+            reverseTarget: -3,
+            reverseDuration: 1.4,
+        },
+        glyph: {start: [18], velocity: [3], target: [0], duration: 0.46},
+    };
+    for (const sample of golden.samples) {
+        sample.dt = sample.time === 0 ? 0 : 1 / sample.fps;
+        sample.appliedEvents = golden.events.filter((e) => Math.abs(e.at - sample.time) < 1e-10);
     }
-  }
-  for(const [width,height,dpr] of [[1280,720,1.5],[390,844,2]]) {
-    const input=await openPage(width,height,'day','realistic','mixed',dpr);
-    await shot(`browse-dpr-${dpr}`,input,[],'archive');
-  }
-  for(const library of ['empty','single','even','odd','large']) {
-    const input=await openPage(1280,720,'day','realistic',library);
-    await shot(`fixture-${library}`,input,[],'archive');
-  }
-  }
-  for(const theme of ['day','night']) {
-    const input=await openPage(1280,720,theme,'filled');
-    await command({type:'opening'});
-    let previous=0;
-    for(const time of [.24,1.64,3.58,6.32,6.4,8,11.6]) {
-      await advance(time-previous); previous=time;
-      await shot(`opening-${theme}-${time}`,input,[{at:6,type:'opening'}]);
-      const sampled=Number(captures.at(-1).state.opening);
-      assert.ok(Math.abs(sampled-time)<1e-8,'Opening clock must match requested exact time');
+    await json(path.join(contracts, 'motion-golden.json'), golden);
+    const shared = await page.evaluate('(' + snapshot.toString() + ')()');
+    await json(path.join(contracts, 'paper-layout.json'), {
+        baseline: BASELINE,
+        fixtureHash,
+        uv: shared.paper.uv,
+        positions: shared.paper.positions,
+        tileUV: shared.paper.tileUV,
+    });
+    for (const state of states) {
+        const p = state.parameters;
+        // Re-associate already exported actual materials, rather than substituting defaults.
+        p.paper.material = p.materials.filter((m) => m.kind === 'MeshLambertMaterial');
+        assert.deepEqual(p.paper.uv, shared.paper.uv);
+        assert.deepEqual(p.paper.positions, shared.paper.positions);
+        assert.equal(p.postprocessing.AA.quality.aoSamples, shared.postprocessing.AO.kernelSize);
+        p.paper.tileUV = shared.paper.tileUV;
+        p.paper.tileUVSource = 'docs/contracts/paper-layout.json';
+        p.postprocessing.AO.kernelSize = shared.postprocessing.AO.kernelSize;
+        assert.equal(p.instances.length, shared.instances.length);
+        p.instances.forEach((instance, i) => {
+            instance.surface = shared.instances[i].surface;
+        });
+        const arrayBindings =
+            shared.materials.filter((m) => m.kind === 'MeshPhysicalMaterial').slice(0, 3);
+        p.materials.filter((m) => m.kind === 'MeshPhysicalMaterial' && !m.surface)
+            .forEach((material, i) => {
+                assert.ok(arrayBindings[i]?.surface);
+                material.surface = arrayBindings[i].surface;
+            });
+        if (!state.name.startsWith('opening-') && !state.name.startsWith('switch-')) {
+            const index = p.UI.findIndex(
+                (e) => String(e.className).split(' ').includes('music-brand'),
+            );
+            assert.ok(index >= 0 && p.UI[index + 1].tag === 'STRONG');
+            p.brandBounds = [
+                {selector: '.music-brand strong', rect: p.UI[index + 1].rect},
+                {selector: '.music-brand > span', rect: p.UI[index + 2].rect},
+            ];
+            state.input.ROI = p.brandBounds;
+            captures.find((c) => c.name === state.name).ROI = p.brandBounds;
+        }
+        validateSnapshot(p);
     }
-  }
-  const input=await openPage(1920,1080,'night','filled');
-  const replay=[];
-  await command({type:'open'}); await advance(4);
-  const sequence=[{at:0,type:'select',index:1},{at:.15,type:'select',index:2},{at:3,type:'select',index:1},{at:6,type:'back'}];
-  let nextEvent=0;
-  for(let frame=0;frame<=120*9;frame++) {
-    const t=frame/120;
-    while(nextEvent<sequence.length && sequence[nextEvent].at<=t+1e-10) await command(sequence[nextEvent++]);
-    if(frame) await advance(1/120);
-    replay.push({time:t,...await page.evaluate('({state:__baseline.state,camera:__baseline.scene.camera.matrixWorld.toArray(), placement:{value:__baseline.scene.musicPlacement.value,velocity:__baseline.scene.musicPlacement.velocity,acceleration:__baseline.scene.musicPlacement.acceleration}, outgoing:__baseline.scene.outgoing.map(o=>({cell:o.cell,lift:o.lift}))})')});
-    if([0,18,120,240,360,480,600,720,1080].includes(frame)) await shot('switch-'+frame,input,sequence);
-  }
-  await json(path.join(contracts,'presentation-golden.json'),{baseline:BASELINE,fixtureHash,authority:'Frozen legacy source and effective production call paths',role:'reference-only; rendering/capture defects are not reproduction targets',step:1/120,events:sequence,samples:replay});
-  const golden=await page.evaluate('('+motionGolden.toString()+')()');
-  golden.fixtureHash=fixtureHash;golden.authority='Frozen legacy source and effective production call paths';golden.role='reference-only; rendering/capture defects are not reproduction targets';
-  golden.inputs={frameOrder:'Apply events at nominal sample time, then update by dt (zero for frame 0); timestamps label input frames.',spring:{initial:{value:0,velocity:.2},target:1,rate:3.7},ribbon:{initial:{value:0,velocity:0},targetBeforeHalfSecond:8,targetAfterHalfSecond:-2,duration:1.1},quintic:{initial:{rail:0,column:0,shoulder:0,lane:0},target:{rail:7.44,column:15.6,shoulder:12,lane:3},reverseTarget:{rail:-.62,column:-5.2,shoulder:-1,lane:-1},rebase:{rail:-.62,column:-5.2,shoulder:-1,lane:-1}},realColumn:{initial:0,target:18,duration:1.8,reverseTarget:-3,reverseDuration:1.4},glyph:{start:[18],velocity:[3],target:[0],duration:.46}};
-  for(const sample of golden.samples) {sample.dt=sample.time===0?0:1/sample.fps;sample.appliedEvents=golden.events.filter(e=>Math.abs(e.at-sample.time)<1e-10);}
-  await json(path.join(contracts,'motion-golden.json'),golden);
-  const shared=await page.evaluate('('+snapshot.toString()+')()');
-  await json(path.join(contracts,'paper-layout.json'),{baseline:BASELINE,fixtureHash,uv:shared.paper.uv,positions:shared.paper.positions,tileUV:shared.paper.tileUV});
-  for(const state of states) {
-    const p=state.parameters;
-    // Re-associate already exported actual materials, rather than substituting defaults.
-    p.paper.material=p.materials.filter(m=>m.kind==='MeshLambertMaterial');
-    assert.deepEqual(p.paper.uv,shared.paper.uv);assert.deepEqual(p.paper.positions,shared.paper.positions);
-    assert.equal(p.postprocessing.AA.quality.aoSamples,shared.postprocessing.AO.kernelSize);
-    p.paper.tileUV=shared.paper.tileUV;p.paper.tileUVSource='docs/contracts/paper-layout.json';
-    p.postprocessing.AO.kernelSize=shared.postprocessing.AO.kernelSize;
-    assert.equal(p.instances.length,shared.instances.length);
-    p.instances.forEach((instance,i)=> {instance.surface=shared.instances[i].surface;});
-    const arrayBindings=shared.materials.filter(m=>m.kind==='MeshPhysicalMaterial').slice(0,3);
-    p.materials.filter(m=>m.kind==='MeshPhysicalMaterial'&&!m.surface).forEach((material,i)=> {assert.ok(arrayBindings[i]?.surface);material.surface=arrayBindings[i].surface;});
-    if(!state.name.startsWith('opening-') && !state.name.startsWith('switch-')) {
-      const index=p.UI.findIndex(e=>String(e.className).split(' ').includes('music-brand'));
-      assert.ok(index>=0 && p.UI[index+1].tag==='STRONG');
-      p.brandBounds=[{selector:'.music-brand strong',rect:p.UI[index+1].rect},{selector:'.music-brand > span',rect:p.UI[index+2].rect}];
-      state.input.ROI=p.brandBounds;captures.find(c=>c.name===state.name).ROI=p.brandBounds;
-    }
-    validateSnapshot(p);
-  }
-  const environment=await page.evaluate(`(()=>{const e=window.__reviewEnvironment; const t=e.target; const pixels=new Uint16Array(t.width*t.height*4); __baseline.scene.renderer.readRenderTargetPixels(t,0,0,t.width,t.height,pixels); return {room:e.room,width:t.width,height:t.height,type:t.texture.type,format:t.texture.format,colorSpace:t.texture.colorSpace,mapping:t.texture.mapping,samples:Array.from(pixels)};})()`);
-  const envBytes=Buffer.alloc(environment.samples.length*2); environment.samples.forEach((v,i)=>envBytes.writeUInt16LE(v,i*2));
-  assert.ok(environment.samples.some(v=>v!==0),'Environment GPU readback cannot be empty');
-  delete environment.samples;
-  await fs.writeFile(path.join(output,'room-pmrem.rgba16f'),envBytes);
-  await json(path.join(contracts,'room-environment.json'),{baseline:BASELINE,source:'legacy-web/node_modules/three/examples/jsm/environments/RoomEnvironment.js',sigma:.04,...environment,sampleFile:'docs/media/web-baseline/room-pmrem.rgba16f',sha256:sha(envBytes)});
-  assert.equal(errors.length,0,errors.join('\n')); assert.equal(blocked.length,0,'External requests attempted: '+blocked.join('\n'));
-  await writeSceneIndex(repo,{baseline:BASELINE,fixtureHash,authority:'Frozen legacy source and effective production call paths',role:'reference-only; rendering/capture defects are not reproduction targets',sourceEasings:[...new Set(Object.values(contents).flatMap(text=>[...text.matchAll(/cubic-bezier\([^)]*\)/g)].map(m=>m[0])))],states});
-  await json(path.join(output,'screenshots.json'),{baseline:BASELINE,fixtureHash,authority:'Frozen legacy source and effective production call paths',role:'reference-only; rendering/capture defects are not reproduction targets',captures});
-  await json(path.join(evidence,'capture-report.json'),{result:'passed',baseline:BASELINE,fixtureHash,node:process.version,browser:version,gpu:system.gpu,platform:process.platform,captures:captures.length,errors,blockedExternalRequests:blocked,command:'node tools/review/export-web-baseline.mjs',refreshContracts:Boolean(argumentsMap['refresh-contracts']),reviewHookHash:sha(hook),sourceArchiveHash:sha(await fs.readFile(archive))});
-  console.log('R01 export passed: '+captures.length+' verified fresh-source GPU screenshots; numeric and presentation sequences.');
+    const environment = await page.evaluate(
+        `(()=>{const e=window.__reviewEnvironment; const t=e.target; const pixels=new Uint16Array(t.width*t.height*4); __baseline.scene.renderer.readRenderTargetPixels(t,0,0,t.width,t.height,pixels); return {room:e.room,width:t.width,height:t.height,type:t.texture.type,format:t.texture.format,colorSpace:t.texture.colorSpace,mapping:t.texture.mapping,samples:Array.from(pixels)};})()`,
+    );
+    const envBytes = Buffer.alloc(environment.samples.length * 2);
+    environment.samples.forEach((v, i) => envBytes.writeUInt16LE(v, i * 2));
+    assert.ok(
+        environment.samples.some((v) => v !== 0),
+        'Environment GPU readback cannot be empty',
+    );
+    delete environment.samples;
+    await fs.writeFile(path.join(output, 'room-pmrem.rgba16f'), envBytes);
+    await json(path.join(contracts, 'room-environment.json'), {
+        baseline: BASELINE,
+        source: 'legacy-web/node_modules/three/examples/jsm/environments/RoomEnvironment.js',
+        sigma: 0.04,
+        ...environment,
+        sampleFile: 'docs/media/web-baseline/room-pmrem.rgba16f',
+        sha256: sha(envBytes),
+    });
+    assert.equal(errors.length, 0, errors.join('\n'));
+    assert.equal(blocked.length, 0, 'External requests attempted: ' + blocked.join('\n'));
+    await writeSceneIndex(repo, {
+        baseline: BASELINE,
+        fixtureHash,
+        authority: 'Frozen legacy source and effective production call paths',
+        role: 'reference-only; rendering/capture defects are not reproduction targets',
+        sourceEasings: [
+            ...new Set(
+                Object.values(contents).flatMap(
+                    (text) => [...text.matchAll(/cubic-bezier\([^)]*\)/g)].map((m) => m[0]),
+                    ),
+                ),
+        ],
+        states,
+    });
+    await json(path.join(output, 'screenshots.json'), {
+        baseline: BASELINE,
+        fixtureHash,
+        authority: 'Frozen legacy source and effective production call paths',
+        role: 'reference-only; rendering/capture defects are not reproduction targets',
+        captures,
+    });
+    await json(path.join(evidence, 'capture-report.json'), {
+        result: 'passed',
+        baseline: BASELINE,
+        fixtureHash,
+        node: process.version,
+        browser: version,
+        gpu: system.gpu,
+        platform: process.platform,
+        captures: captures.length,
+        errors,
+        blockedExternalRequests: blocked,
+        command: 'node tools/review/export-web-baseline.mjs',
+        refreshContracts: Boolean(argumentsMap['refresh-contracts']),
+        reviewHookHash: sha(hook),
+        sourceArchiveHash: sha(await fs.readFile(archive)),
+    });
+    console.log(
+        'R01 export passed: ' + captures.length
+            + ' verified fresh-source GPU screenshots; numeric and presentation sequences.',
+    );
 } finally {
-  if(page) page.close();
-  if(browser) { try { await browser.send('Browser.close'); } catch {} browser.close(); }
-  browserProcess.kill(); await server.close();
+    if (page)
+        page.close();
+    if (browser) {
+        try {
+            await browser.send('Browser.close');
+        } catch {
+        }
+        browser.close();
+    }
+    browserProcess.kill();
+    await server.close();
 }
 
 function validateSnapshot(s) {
-  for(const key of ['camera','lights','environment','renderer','materials','postprocessing','instances','paper','UI','cssVariables','easings','brandBounds']) assert.ok(s[key], 'Missing final runtime field: '+key);
-  assert.equal(s.camera.projectionMatrix.length,16); assert.equal(s.camera.matrixWorld.length,16);
-  for(const key of ['focus','aspect','aperture','maxblur','nearClip','farClip']) assert.ok(Number.isFinite(s.postprocessing.DOF.uniforms[key]),'Missing DOF '+key);
-  for(const key of ['kernelRadius','kernelSize','minDistance','maxDistance']) assert.ok(Number.isFinite(s.postprocessing.AO[key]),'Missing AO '+key);
-  assert.ok(s.lights.length>=3); assert.ok(s.materials.length>=4); assert.ok(s.instances.length>=3);
-  assert.ok(s.paper.uv.length>0); assert.ok(s.paper.tileUV.length>0); assert.ok(s.postprocessing.AO.kernelSize>0); assert.ok(s.paper.material.some(m=>m.kind==='MeshLambertMaterial')); assert.ok(s.UI.length>20); assert.ok(s.easings.length>0);
-  assert.ok(s.environment.texture.width>0);
-  const finite=(v)=>{ if(typeof v==='number') assert.ok(Number.isFinite(v),'Nonfinite export value'); else if(v && typeof v==='object') Object.values(v).forEach(finite); }; finite(s);
+    for (const key of ['camera',
+                       'lights',
+                       'environment',
+                       'renderer',
+                       'materials',
+                       'postprocessing',
+                       'instances',
+                       'paper',
+                       'UI',
+                       'cssVariables',
+                       'easings',
+                       'brandBounds',
+    ])
+        assert.ok(s[key], 'Missing final runtime field: ' + key);
+    assert.equal(s.camera.projectionMatrix.length, 16);
+    assert.equal(s.camera.matrixWorld.length, 16);
+    for (const key of ['focus', 'aspect', 'aperture', 'maxblur', 'nearClip', 'farClip'])
+        assert.ok(Number.isFinite(s.postprocessing.DOF.uniforms[key]), 'Missing DOF ' + key);
+    for (const key of ['kernelRadius', 'kernelSize', 'minDistance', 'maxDistance'])
+        assert.ok(Number.isFinite(s.postprocessing.AO[key]), 'Missing AO ' + key);
+    assert.ok(s.lights.length >= 3);
+    assert.ok(s.materials.length >= 4);
+    assert.ok(s.instances.length >= 3);
+    assert.ok(s.paper.uv.length > 0);
+    assert.ok(s.paper.tileUV.length > 0);
+    assert.ok(s.postprocessing.AO.kernelSize > 0);
+    assert.ok(s.paper.material.some((m) => m.kind === 'MeshLambertMaterial'));
+    assert.ok(s.UI.length > 20);
+    assert.ok(s.easings.length > 0);
+    assert.ok(s.environment.texture.width > 0);
+    const finite = (v) => {
+        if (typeof v === 'number')
+            assert.ok(Number.isFinite(v), 'Nonfinite export value');
+        else if (v && typeof v === 'object')
+            Object.values(v).forEach(finite);
+    };
+    finite(s);
 }
 function snapshot() {
-  const s=__baseline.scene;
-  s.scene.updateMatrixWorld(true); s.camera.updateMatrixWorld(true);
-  const texture=t=>t?{width:t.image?.width||t.source?.data?.width||0,height:t.image?.height||t.source?.data?.height||0,type:t.type,format:t.format,mapping:t.mapping,colorSpace:t.colorSpace,wrapS:t.wrapS,wrapT:t.wrapT,minFilter:t.minFilter,magFilter:t.magFilter,anisotropy:t.anisotropy,generateMipmaps:t.generateMipmaps}:null;
-  const value=v=>v?.toArray?v.toArray():v;
-  const lights=[], materials=[], instances=[];
-  const surface=o=>o.userData.surface || s.model.children.find(c=>c.geometry && c.geometry===o.geometry)?.userData.surface || (o===s.covers.array || o===s.covers.selected ? 'AlbumPrint' : null);
-  const seen=new Set();
-  s.scene.traverse(o=>{
-    if(o.isLight) lights.push({kind:o.type,visible:o.visible,position:o.position.toArray(),worldMatrix:o.matrixWorld.toArray(),color:o.color.toArray(),intensity:o.intensity,
-      groundColor:value(o.groundColor),target:o.target?.matrixWorld.toArray(),angle:o.angle,penumbra:o.penumbra,decay:o.decay,distance:o.distance,width:o.width,height:o.height,castShadow:o.castShadow,shadow:o.shadow?{bias:o.shadow.bias,normalBias:o.shadow.normalBias,radius:o.shadow.radius,mapSize:o.shadow.mapSize.toArray(),camera:o.shadow.camera.projectionMatrix.toArray()}:null});
-    if(o.isInstancedMesh) instances.push({name:o.name,surface:surface(o),count:o.count,worldMatrix:o.matrixWorld.toArray(),matrix:Array.from(o.instanceMatrix.array),visible:o.visible});
-    for(const m of (Array.isArray(o.material)?o.material:[o.material]).filter(Boolean)) if(!seen.has(m)) {
-      seen.add(m); const properties={};
-      for(const key of ['color','emissive','emissiveIntensity','roughness','metalness','transmission','thickness','ior','clearcoat','clearcoatRoughness','attenuationDistance','attenuationColor','opacity','transparent','side','depthWrite','depthTest','toneMapped','envMapIntensity']) if(m[key]!==undefined) properties[key]=value(m[key]);
-      materials.push({name:m.name,surface:surface(o),kind:m.type,visible:o.visible,properties,map:texture(m.map),defines:m.defines,onBeforeCompile:m.onBeforeCompile.toString()});
+    const s = __baseline.scene;
+    s.scene.updateMatrixWorld(true);
+    s.camera.updateMatrixWorld(true);
+    const texture = (t) => t ? {
+        width: t.image?.width || t.source?.data?.width || 0,
+        height: t.image?.height || t.source?.data?.height || 0,
+        type: t.type,
+        format: t.format,
+        mapping: t.mapping,
+        colorSpace: t.colorSpace,
+        wrapS: t.wrapS,
+        wrapT: t.wrapT,
+        minFilter: t.minFilter,
+        magFilter: t.magFilter,
+        anisotropy: t.anisotropy,
+        generateMipmaps: t.generateMipmaps,
     }
-  });
-  const u=uniforms=>Object.fromEntries(Object.entries(uniforms||{}).filter(([,u])=>!u.value?.isTexture).map(([k,u])=>[k,value(u.value)]));
-  const rect=e=>{const b=e.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};};
-  const properties=['fontFamily','fontWeight','fontSize','lineHeight','letterSpacing','color','backgroundColor','opacity','display','visibility','width','height','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','borderRadius','transform','clipPath','overflow','textAlign','transitionDuration','transitionTimingFunction','animationDuration','animationTimingFunction'];
-  const UI=[...document.querySelectorAll('.music-app, .music-app *')].filter(e=>!(e instanceof SVGElement)).map(e=>{const c=getComputedStyle(e);return {tag:e.tagName,id:e.id,className:e.className,hidden:e.hidden,inert:e.inert,ariaHidden:e.getAttribute('aria-hidden'),rect:rect(e),styles:Object.fromEntries(properties.map(p=>[p,c[p]]))};});
-  const cssVariables={},easings=new Set();
-  const rules=rs=>{for(const rule of rs){if(rule.style)for(const p of rule.style){if(p.startsWith('--'))cssVariables[p]=getComputedStyle(document.querySelector('.music-app')).getPropertyValue(p).trim(); for(const m of rule.style.getPropertyValue(p).matchAll(/cubic-bezier\([^)]*\)/g))easings.add(m[0]);}if(rule.cssRules)rules(rule.cssRules);}};
-  for(const sheet of document.styleSheets) rules(sheet.cssRules);
-  for(const a of document.getAnimations()) {easings.add(a.effect.getTiming().easing);for(const k of a.effect.getKeyframes())if(k.easing)easings.add(k.easing);}
-  return {state:__baseline.state,camera:{position:s.camera.position.toArray(),quaternion:s.camera.quaternion.toArray(),direction:s.camera.getWorldDirection(s.cameraAim.clone()).toArray(),fov:s.camera.fov,near:s.camera.near,far:s.camera.far,aspect:s.camera.aspect,projectionMatrix:s.camera.projectionMatrix.toArray(),matrixWorld:s.camera.matrixWorld.toArray(),matrixWorldInverse:s.camera.matrixWorldInverse.toArray()},lights,
-    environment:{intensity:s.scene.environmentIntensity,texture:texture(s.scene.environment)},renderer:{toneMapping:s.renderer.toneMapping,exposure:s.renderer.toneMappingExposure,outputColorSpace:s.renderer.outputColorSpace,pixelRatio:s.renderer.getPixelRatio(),drawingBuffer:[s.renderer.domElement.width,s.renderer.domElement.height]},materials,
-    postprocessing:{passes:s.composer.passes.map(p=>({kind:p.constructor.name,enabled:p.enabled,renderToScreen:p.renderToScreen})),AO:{enabled:s.ao.enabled,kernelRadius:s.ao.kernelRadius,kernelSize:s.aoKernelSize,minDistance:s.ao.minDistance,maxDistance:s.ao.maxDistance,output:s.ao.output},DOF:{enabled:s.bokeh.enabled,uniforms:u(s.bokeh.uniforms)},AA:{enabled:s.smaa.enabled,quality:s.quality},shadowMap:{enabled:s.renderer.shadowMap.enabled,type:s.renderer.shadowMap.type}},
-    instances,paper:{tileUV:Array.from(s.covers.array.geometry.attributes.coverTile.array),uv:Array.from(s.covers.array.geometry.attributes.uv.array),positions:Array.from(s.covers.array.geometry.attributes.position.array),worldMatrix:s.covers.selected.matrixWorld.toArray(),material:materials.filter(m=>m.kind==='MeshLambertMaterial'),atlas:texture(s.covers.array.material.map)},
-    selectionLight:s.selectionLighting?{settings:s.selectionLighting.getExperiment(),rowMotion:s.selectionLighting.getRowMotion()}:null,
-    UI,cssVariables,easings:[...easings],brandBounds:[...document.querySelectorAll('.music-brand strong,.music-brand > span,.music-opening-mark svg,.music-opening-mark > span')].map(e=>({selector:e.tagName,rect:rect(e)}))};
+                             : null;
+    const value = (v) => (v?.toArray ? v.toArray() : v);
+    const lights = [], materials = [], instances = [];
+    const surface = (o) =>
+        o.userData.surface
+        || s.model.children.find((c) => c.geometry && c.geometry === o.geometry)?.userData.surface
+        || (o === s.covers.array || o === s.covers.selected ? 'AlbumPrint' : null);
+    const seen = new Set();
+    s.scene.traverse((o) => {
+        if (o.isLight)
+            lights.push({
+                kind: o.type,
+                visible: o.visible,
+                position: o.position.toArray(),
+                worldMatrix: o.matrixWorld.toArray(),
+                color: o.color.toArray(),
+                intensity: o.intensity,
+                groundColor: value(o.groundColor),
+                target: o.target?.matrixWorld.toArray(),
+                angle: o.angle,
+                penumbra: o.penumbra,
+                decay: o.decay,
+                distance: o.distance,
+                width: o.width,
+                height: o.height,
+                castShadow: o.castShadow,
+                shadow: o.shadow ? {
+                    bias: o.shadow.bias,
+                    normalBias: o.shadow.normalBias,
+                    radius: o.shadow.radius,
+                    mapSize: o.shadow.mapSize.toArray(),
+                    camera: o.shadow.camera.projectionMatrix.toArray(),
+                }
+                                 : null,
+            });
+        if (o.isInstancedMesh)
+            instances.push({
+                name: o.name,
+                surface: surface(o),
+                count: o.count,
+                worldMatrix: o.matrixWorld.toArray(),
+                matrix: Array.from(o.instanceMatrix.array),
+                visible: o.visible,
+            });
+        for (const m of (Array.isArray(o.material) ? o.material : [o.material]).filter(Boolean))
+            if (!seen.has(m)) {
+                seen.add(m);
+                const properties = {};
+                for (const key of ['color',
+                                   'emissive',
+                                   'emissiveIntensity',
+                                   'roughness',
+                                   'metalness',
+                                   'transmission',
+                                   'thickness',
+                                   'ior',
+                                   'clearcoat',
+                                   'clearcoatRoughness',
+                                   'attenuationDistance',
+                                   'attenuationColor',
+                                   'opacity',
+                                   'transparent',
+                                   'side',
+                                   'depthWrite',
+                                   'depthTest',
+                                   'toneMapped',
+                                   'envMapIntensity',
+                ])
+                    if (m[key] !== undefined)
+                        properties[key] = value(m[key]);
+                materials.push({
+                    name: m.name,
+                    surface: surface(o),
+                    kind: m.type,
+                    visible: o.visible,
+                    properties,
+                    map: texture(m.map),
+                    defines: m.defines,
+                    onBeforeCompile: m.onBeforeCompile.toString(),
+                });
+            }
+    });
+    const u = (uniforms) => Object.fromEntries(
+        Object.entries(uniforms || {})
+            .filter(([, u]) => !u.value?.isTexture)
+            .map(([k, u]) => [k, value(u.value)]),
+    );
+    const rect = (e) => {
+        const b = e.getBoundingClientRect();
+        return {x: b.x, y: b.y, width: b.width, height: b.height};
+    };
+    const properties = [
+        'fontFamily',
+        'fontWeight',
+        'fontSize',
+        'lineHeight',
+        'letterSpacing',
+        'color',
+        'backgroundColor',
+        'opacity',
+        'display',
+        'visibility',
+        'width',
+        'height',
+        'paddingTop',
+        'paddingRight',
+        'paddingBottom',
+        'paddingLeft',
+        'marginTop',
+        'marginRight',
+        'marginBottom',
+        'marginLeft',
+        'borderRadius',
+        'transform',
+        'clipPath',
+        'overflow',
+        'textAlign',
+        'transitionDuration',
+        'transitionTimingFunction',
+        'animationDuration',
+        'animationTimingFunction',
+    ];
+    const UI = [...document.querySelectorAll('.music-app, .music-app *')]
+                   .filter((e) => !(e instanceof SVGElement))
+                   .map((e) => {
+                       const c = getComputedStyle(e);
+                       return {
+                           tag: e.tagName,
+                           id: e.id,
+                           className: e.className,
+                           hidden: e.hidden,
+                           inert: e.inert,
+                           ariaHidden: e.getAttribute('aria-hidden'),
+                           rect: rect(e),
+                           styles: Object.fromEntries(properties.map((p) => [p, c[p]])),
+                       };
+                   });
+    const cssVariables = {}, easings = new Set();
+    const rules = (rs) => {
+        for (const rule of rs) {
+            if (rule.style)
+                for (const p of rule.style) {
+                    if (p.startsWith('--'))
+                        cssVariables[p] = getComputedStyle(document.querySelector('.music-app'))
+                                              .getPropertyValue(p)
+                                              .trim();
+                    for (const m of rule.style.getPropertyValue(p).matchAll(
+                             /cubic-bezier\([^)]*\)/g))
+                        easings.add(m[0]);
+                }
+            if (rule.cssRules)
+                rules(rule.cssRules);
+        }
+    };
+    for (const sheet of document.styleSheets)
+        rules(sheet.cssRules);
+    for (const a of document.getAnimations()) {
+        easings.add(a.effect.getTiming().easing);
+        for (const k of a.effect.getKeyframes())
+            if (k.easing)
+                easings.add(k.easing);
+    }
+    return {
+        state: __baseline.state,
+        camera: {
+            position: s.camera.position.toArray(),
+            quaternion: s.camera.quaternion.toArray(),
+            direction: s.camera.getWorldDirection(s.cameraAim.clone()).toArray(),
+            fov: s.camera.fov,
+            near: s.camera.near,
+            far: s.camera.far,
+            aspect: s.camera.aspect,
+            projectionMatrix: s.camera.projectionMatrix.toArray(),
+            matrixWorld: s.camera.matrixWorld.toArray(),
+            matrixWorldInverse: s.camera.matrixWorldInverse.toArray(),
+        },
+        lights,
+        environment: {
+            intensity: s.scene.environmentIntensity,
+            texture: texture(s.scene.environment),
+        },
+        renderer: {
+            toneMapping: s.renderer.toneMapping,
+            exposure: s.renderer.toneMappingExposure,
+            outputColorSpace: s.renderer.outputColorSpace,
+            pixelRatio: s.renderer.getPixelRatio(),
+            drawingBuffer: [s.renderer.domElement.width, s.renderer.domElement.height],
+        },
+        materials,
+        postprocessing: {
+            passes: s.composer.passes.map((p) => ({
+                                              kind: p.constructor.name,
+                                              enabled: p.enabled,
+                                              renderToScreen: p.renderToScreen,
+                                          })),
+            AO: {
+                enabled: s.ao.enabled,
+                kernelRadius: s.ao.kernelRadius,
+                kernelSize: s.aoKernelSize,
+                minDistance: s.ao.minDistance,
+                maxDistance: s.ao.maxDistance,
+                output: s.ao.output,
+            },
+            DOF: {enabled: s.bokeh.enabled, uniforms: u(s.bokeh.uniforms)},
+            AA: {enabled: s.smaa.enabled, quality: s.quality},
+            shadowMap: {enabled: s.renderer.shadowMap.enabled, type: s.renderer.shadowMap.type},
+        },
+        instances,
+        paper: {
+            tileUV: Array.from(s.covers.array.geometry.attributes.coverTile.array),
+            uv: Array.from(s.covers.array.geometry.attributes.uv.array),
+            positions: Array.from(s.covers.array.geometry.attributes.position.array),
+            worldMatrix: s.covers.selected.matrixWorld.toArray(),
+            material: materials.filter((m) => m.kind === 'MeshLambertMaterial'),
+            atlas: texture(s.covers.array.material.map),
+        },
+        selectionLight: s.selectionLighting ? {
+            settings: s.selectionLighting.getExperiment(),
+            rowMotion: s.selectionLighting.getRowMotion(),
+        }
+                                            : null,
+        UI,
+        cssVariables,
+        easings: [...easings],
+        brandBounds: [
+            ...document.querySelectorAll(
+                '.music-brand strong,.music-brand > span,.music-opening-mark svg,.music-opening-mark > span',
+                ),
+        ].map((e) => ({selector: e.tagName, rect: rect(e)})),
+    };
 }
 async function motionGolden() {
-  const motion=await import('/src/motion.ts'), archive=await import('/src/music-archive-motion.ts'), row=await import('/src/music-row-lighting.ts'), real=await import('/src/music-real-columns.ts'), overview=await import('/src/music-overview.ts'), edge=await import('/src/music-overview-edge.ts'), opening=await import('/src/music-opening.ts'), title=await import('/src/music-title-reels.ts'), timing=await import('/src/music-boot-timing.ts');
-  const samples=[];
-  for(const fps of [20,30,60,120]) {
-    const spring={value:0,velocity:.2}, ribbon={value:0,velocity:0};
-    const tracks=Object.fromEntries(archive.ARCHIVE_TRACK_KEYS.map(k=>[k,{value:0,velocity:0}]));
-    const path=new archive.MusicArchiveMotion(); path.retarget(tracks,{rail:12*.62,column:3*5.2,shoulder:12,lane:3});
-    const scalar=new real.MusicRealColumnScalar(0);scalar.retarget(18,{guided:true,duration:1.8});
-    const camera=new overview.MusicOverviewMotion();camera.active=true;
-    const clock=new timing.MusicBootFrameClock(); clock.reset(0);
-    const events=[{at:0,type:'target',value:18},{at:.5,type:'reverse',value:-3},{at:1,type:'rebase',offset:{rail:-.62,column:-5.2,shoulder:-1,lane:-1}},{at:1.5,type:'overview-back'}];
-    let ei=1;
-    for(let frame=0;frame<=fps*3;frame++) {
-      const t=frame/fps;
-      while(ei<events.length&&events[ei].at<=t+1e-10) {
-        const event=events[ei++];
-        if(event.type==='reverse'){scalar.retarget(event.value,{guided:true,duration:1.4});path.retarget(tracks,{rail:-.62,column:-5.2,shoulder:-1,lane:-1});}
-        if(event.type==='rebase'){path.translate(event.offset);for(const key of archive.ARCHIVE_TRACK_KEYS)tracks[key].value+=event.offset[key];}
-        if(event.type==='overview-back')camera.active=false;
-      }
-      if(frame){motion.damp(spring,1,3.7,1/fps);row.followRowLight(ribbon,t<.5?8:-2,1/fps,1.1);path.update(tracks,1/fps,false);scalar.update(1/fps,false);camera.update(1/fps,false);clock.update(t);}
-      samples.push({fps,time:t,spring:{...spring},quintic:path.state,realColumn:scalar.state,ribbon:{...ribbon},wave:motion.musicSelectionWave(2,t),field:row.sampleRowLighting(5.2,t,row.DEFAULT_LIGHTING_PRESET),introRow:row.introRowOffset(21.92+t),overview:camera.value,extent:edge.musicOverviewColumnExtent(4.25,0,camera.value),opening:opening.musicOpeningFrame(t),clock:clock.update(t)});
+    const motion = await import('/src/motion.ts'),
+          archive = await import('/src/music-archive-motion.ts'),
+          row = await import('/src/music-row-lighting.ts'),
+          real = await import('/src/music-real-columns.ts'),
+          overview = await import('/src/music-overview.ts'),
+          edge = await import('/src/music-overview-edge.ts'),
+          opening = await import('/src/music-opening.ts'),
+          title = await import('/src/music-title-reels.ts'),
+          timing = await import('/src/music-boot-timing.ts');
+    const samples = [];
+    for (const fps of [20, 30, 60, 120]) {
+        const spring = {value: 0, velocity: 0.2}, ribbon = {value: 0, velocity: 0};
+        const tracks = Object.fromEntries(
+            archive.ARCHIVE_TRACK_KEYS.map((k) => [k, {value: 0, velocity: 0}]),
+        );
+        const path = new archive.MusicArchiveMotion();
+        path.retarget(tracks, {rail: 12 * 0.62, column: 3 * 5.2, shoulder: 12, lane: 3});
+        const scalar = new real.MusicRealColumnScalar(0);
+        scalar.retarget(18, {guided: true, duration: 1.8});
+        const camera = new overview.MusicOverviewMotion();
+        camera.active = true;
+        const clock = new timing.MusicBootFrameClock();
+        clock.reset(0);
+        const events = [
+            {at: 0, type: 'target', value: 18},
+            {at: 0.5, type: 'reverse', value: -3},
+            {
+                at: 1,
+                type: 'rebase',
+                offset: {rail: -0.62, column: -5.2, shoulder: -1, lane: -1},
+            },
+            {at: 1.5, type: 'overview-back'},
+        ];
+        let ei = 1;
+        for (let frame = 0; frame <= fps * 3; frame++) {
+            const t = frame / fps;
+            while (ei < events.length && events[ei].at <= t + 1e-10) {
+                const event = events[ei++];
+                if (event.type === 'reverse') {
+                    scalar.retarget(event.value, {guided: true, duration: 1.4});
+                    path.retarget(tracks, {rail: -0.62, column: -5.2, shoulder: -1, lane: -1});
+                }
+                if (event.type === 'rebase') {
+                    path.translate(event.offset);
+                    for (const key of archive.ARCHIVE_TRACK_KEYS)
+                        tracks[key].value += event.offset[key];
+                }
+                if (event.type === 'overview-back')
+                    camera.active = false;
+            }
+            if (frame) {
+                motion.damp(spring, 1, 3.7, 1 / fps);
+                row.followRowLight(ribbon, t < 0.5 ? 8 : -2, 1 / fps, 1.1);
+                path.update(tracks, 1 / fps, false);
+                scalar.update(1 / fps, false);
+                camera.update(1 / fps, false);
+                clock.update(t);
+            }
+            samples.push({
+                fps,
+                time: t,
+                spring: {...spring},
+                quintic: path.state,
+                realColumn: scalar.state,
+                ribbon: {...ribbon},
+                wave: motion.musicSelectionWave(2, t),
+                field: row.sampleRowLighting(5.2, t, row.DEFAULT_LIGHTING_PRESET),
+                introRow: row.introRowOffset(21.92 + t),
+                overview: camera.value,
+                extent: edge.musicOverviewColumnExtent(4.25, 0, camera.value),
+                opening: opening.musicOpeningFrame(t),
+                clock: clock.update(t),
+            });
+        }
     }
-  }
-  const track=new title.TitleTrack(document.createElement('span'),'transform',v=>`translateY(${v[0]}px)`);
-  track.start=[18];track.velocity=[3];track.target=[0];
-  const glyphSamples=Array.from({length:121},(_,i)=>({time:i/120,state:track.at((i/120)/.46)}));
-  const longClock=new timing.MusicBootFrameClock();longClock.reset(0);
-  const longFrames=[.016,.216,.232,.332,.34].map(t=>({input:t,output:longClock.update(t)}));
-  return {schemaVersion:1,baseline:'57f4f845c20cce646a15dbf4008c2a162aaaf4e2',sources:['motion.ts:damp/musicSelectionWave','music-archive-motion.ts:MusicArchiveMotion','music-row-lighting.ts:followRowLight/sampleRowLighting','music-real-columns.ts:MusicRealColumnScalar','music-overview.ts:MusicOverviewMotion','music-overview-edge.ts:musicOverviewColumnExtent','music-title-reels.ts:TitleTrack.at','music-opening.ts:musicOpeningFrame','music-boot-timing.ts:MusicBootFrameClock'],events:[{at:0,type:'target'},{at:.5,type:'reverse'},{at:1,type:'rebase'},{at:1.5,type:'overview-back'}],samples,glyphSamples,longFrames};
+    const track = new title.TitleTrack(
+        document.createElement('span'),
+        'transform',
+        (v) => `translateY(${v[0]}px)`,
+    );
+    track.start = [18];
+    track.velocity = [3];
+    track.target = [0];
+    const glyphSamples = Array.from({length: 121}, (_, i) => ({
+                                                       time: i / 120,
+                                                       state: track.at(i / 120 / 0.46),
+                                                   }));
+    const longClock = new timing.MusicBootFrameClock();
+    longClock.reset(0);
+    const longFrames = [0.016, 0.216, 0.232, 0.332, 0.34].map((t) => ({
+                                                                  input: t,
+                                                                  output: longClock.update(t),
+                                                              }));
+    return {
+        schemaVersion: 1,
+        baseline: '57f4f845c20cce646a15dbf4008c2a162aaaf4e2',
+        sources: [
+            'motion.ts:damp/musicSelectionWave',
+            'music-archive-motion.ts:MusicArchiveMotion',
+            'music-row-lighting.ts:followRowLight/sampleRowLighting',
+            'music-real-columns.ts:MusicRealColumnScalar',
+            'music-overview.ts:MusicOverviewMotion',
+            'music-overview-edge.ts:musicOverviewColumnExtent',
+            'music-title-reels.ts:TitleTrack.at',
+            'music-opening.ts:musicOpeningFrame',
+            'music-boot-timing.ts:MusicBootFrameClock',
+        ],
+        events: [
+            {at: 0, type: 'target'},
+            {at: 0.5, type: 'reverse'},
+            {at: 1, type: 'rebase'},
+            {at: 1.5, type: 'overview-back'},
+        ],
+        samples,
+        glyphSamples,
+        longFrames,
+    };
 }

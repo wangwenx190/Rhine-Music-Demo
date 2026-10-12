@@ -1,19 +1,50 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync, spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import crypto from 'node:crypto';
 import {CDP} from './cdp.mjs';
-const root=path.resolve(import.meta.dirname,'../..'), baseline='57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
-const work=path.join(root,'build/postprocess-baseline'), frozen=path.join(work,'web');
-const media=path.join(root,'docs/media/postprocess/web'), fixtures=path.join(root,'tests/fixtures/postprocess');
-for(const d of [frozen,media,fixtures,path.join(root,'resources/environment')]) await fs.mkdir(d,{recursive:true});
-execFileSync('git',['archive','--format=tar','--output='+path.join(work,'source.tar'),baseline,'src','public','package.json','package-lock.json'],{cwd:root});
-execFileSync('tar',['-xf',path.join(work,'source.tar'),'-C',frozen]);
-try {await fs.symlink(path.join(root,'legacy-web/node_modules'),path.join(frozen,'node_modules'),'junction');} catch(e) {if(e.code!=='EEXIST') throw e;}
-if(! (await fs.readFile(path.join(root,'legacy-web/package-lock.json'))).equals(await fs.readFile(path.join(frozen,'package-lock.json')))) throw Error('Frozen dependency lock differs');
-const {createServer}=await import(pathToFileURL(path.join(root,'legacy-web/node_modules/vite/dist/node/index.js')));
-const html=`<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
+const root = path.resolve(import.meta.dirname, '../..'),
+      baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const work = path.join(root, 'build/postprocess-baseline'), frozen = path.join(work, 'web');
+const media = path.join(root, 'docs/media/postprocess/web'),
+      fixtures = path.join(root, 'tests/fixtures/postprocess');
+for (const d of [frozen, media, fixtures, path.join(root, 'resources/environment')])
+    await fs.mkdir(d, {recursive: true});
+execFileSync(
+    'git',
+    [
+        'archive',
+        '--format=tar',
+        '--output=' + path.join(work, 'source.tar'),
+        baseline,
+        'src',
+        'public',
+        'package.json',
+        'package-lock.json',
+    ],
+    {cwd: root},
+);
+execFileSync('tar', ['-xf', path.join(work, 'source.tar'), '-C', frozen]);
+try {
+    await fs.symlink(
+        path.join(root, 'legacy-web/node_modules'),
+        path.join(frozen, 'node_modules'),
+        'junction',
+    );
+} catch (e) {
+    if (e.code !== 'EEXIST')
+        throw e;
+}
+if (!(await fs.readFile(path.join(root, 'legacy-web/package-lock.json')))
+         .equals(
+             await fs.readFile(path.join(frozen, 'package-lock.json')),
+             ))
+    throw Error('Frozen dependency lock differs');
+const {createServer} =
+    await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
+const html =
+    `<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
 import * as T from '/node_modules/three/build/three.module.js';
 import {GLTFLoader} from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import {RoomEnvironment} from '/node_modules/three/examples/jsm/environments/RoomEnvironment.js';
@@ -102,10 +133,12 @@ lighting.setTheme(c.day?'day':'night',key);lighting.setExperiment({mode:c.mode,s
 };window.ready=true;
 </script></body></html>`;
 // Resolve asset URL from frozen source rather than guessing the old model filename.
-const assetSource=await fs.readFile(path.join(frozen,'src/music-cd-asset.ts'),'utf8');
-const modelUrl=assetSource.match(/MUSIC_CD_ASSET\s*=\s*["']([^"']+)/)?.[1];
-if(!modelUrl)throw Error('Frozen model URL missing');
-const legacyHtml=`<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
+const assetSource = await fs.readFile(path.join(frozen, 'src/music-cd-asset.ts'), 'utf8');
+const modelUrl = assetSource.match(/MUSIC_CD_ASSET\s*=\s*["']([^"']+)/)?.[1];
+if (!modelUrl)
+    throw Error('Frozen model URL missing');
+const legacyHtml =
+    `<html><body style="margin:0"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">
 import * as T from '/node_modules/three/build/three.module.js';
 import {GLTFLoader} from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import {RoomEnvironment} from '/node_modules/three/examples/jsm/environments/RoomEnvironment.js';
@@ -140,55 +173,363 @@ window.renderCase=async c=>{
  return {png:renderer.domElement.toDataURL('image/png').split(',')[1],projections:[[-2.225,.175,.07],[2.225,.175,.07],[2.225,3.525,.07],[-2.225,3.525,.07],[.17,1.85,.027]].map(p=>{const ndc=new T.Vector3(...p).project(camera);return {world:p,pixel:[(ndc.x+1)*480,(1-ndc.y)*360]};}),parameters:model.children.map(m=>({surface:m.userData.surface,color:m.material.color.toArray(),attenuation:m.material.attenuationColor.toArray(),transmission:m.material.transmission,roughness:m.material.roughness,thickness:m.material.thickness,attenuationDistance:m.material.attenuationDistance}))};
 };window.ready=true;
 </script></body></html>`;
-const server=await createServer({root:frozen,configFile:false,logLevel:'error',server:{host:'127.0.0.1',port:0},plugins:[{name:'single-case',configureServer(s){s.middlewares.use('/material-legacy',(_,res)=>{res.setHeader('Content-Type','text/html');res.end(legacyHtml.replace("'/public/assets/music-case-v040.glb'","'/"+modelUrl+"'"));});s.middlewares.use('/material-review',(_,res)=>{res.setHeader('Content-Type','text/html');res.end(html.replace("'/public/assets/music-case-v040.glb'","'/"+modelUrl+"'"));});}}]});await server.listen();
-const origin='http://127.0.0.1:'+server.httpServer.address().port;
-const candidates=[process.env.REVIEW_BROWSER,path.join(process.env.PROGRAMFILES,'Google/Chrome/Application/chrome.exe'),path.join(process.env['PROGRAMFILES(X86)'],'Microsoft/Edge/Application/msedge.exe')].filter(Boolean);
-let executable;for(const p of candidates){try{await fs.access(p);executable=p;break;}catch{}}
-if(!executable)throw Error('Installed browser required');
-const profile=path.join(work,'browser-profile-'+process.pid);await fs.mkdir(profile,{recursive:true});await fs.rm(path.join(profile,'DevToolsActivePort'),{force:true});
-const proc=spawn(executable,['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-extensions','--enable-gpu','--use-angle=d3d11','about:blank'],{windowsHide:true,stdio:'ignore'});
-const wait=async probe=>{const end=Date.now()+60000;while(Date.now()<end){try{const x=await probe();if(x)return x;}catch{}await new Promise(r=>setTimeout(r,100));}throw Error('Capture timeout');};
-let browser,page;const errors=[];
-try{
- const port=(await wait(()=>fs.readFile(path.join(profile,'DevToolsActivePort'),'utf8'))).split('\n');browser=await CDP.connect('ws://127.0.0.1:'+port[0]+port[1]);
- const version=await browser.send('Browser.getVersion'),gpu=await browser.send('SystemInfo.getInfo');
- const {targetId}=await browser.send('Target.createTarget',{url:'about:blank'});const targets=await(await fetch('http://127.0.0.1:'+port[0]+'/json/list')).json();page=await CDP.connect(targets.find(t=>t.id===targetId).webSocketDebuggerUrl);
- page.on('Runtime.exceptionThrown',e=>{errors.push(e.exceptionDetails);console.error(JSON.stringify(e.exceptionDetails));});page.on('Runtime.consoleAPICalled',e=>{if(e.type==='error')console.error(JSON.stringify(e.args));});await page.send('Runtime.enable');await page.send('Page.enable');await page.send('Fetch.enable',{patterns:[{urlPattern:'*'}]});
- page.on('Fetch.requestPaused',e=>{void page.send(e.request.url.startsWith(origin+'/')||/^(data|blob):/.test(e.request.url)?'Fetch.continueRequest':'Fetch.failRequest',{requestId:e.requestId,...(e.request.url.startsWith(origin+'/')||/^(data|blob):/.test(e.request.url)?{}:{errorReason:'BlockedByClient'})}).catch(()=>{});});
- console.log('Browser attached; navigating frozen harness');
- await page.send('Page.navigate',{url:origin+'/material-review'});await wait(()=>page.evaluate('window.ready'));
- console.log('Harness ready; exporting environment');
- const env=await page.evaluate('window.environment');const data=Buffer.alloc(env.pixels.length*4);
- function half(h){const sign=(h&32768)?-1:1,e=(h>>10)&31,m=h&1023;return sign*(e===0?Math.pow(2,-14)*m/1024:e===31?NaN:Math.pow(2,e-15)*(1+m/1024));}
- env.pixels.forEach((h,i)=>{const v=half(h);if(!Number.isFinite(v))throw Error('Nonfinite environment');data.writeFloatLE(v,i*4);});
- if(!data.equals(await fs.readFile(path.join(root,'resources/environment/room-pmrem.rgba32f'))))throw Error('Room capture changed');
- const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
- const sources={};for(const f of ['src/music-model.ts','src/music-lighting.ts','src/music-row-lighting.ts','src/theme-transition.ts','src/archive-lighting.ts','src/cover-atlas.ts','src/scene.ts','src/music-cd-asset.ts'])sources[f]=sha(execFileSync('git',['show',baseline+':'+f],{cwd:root}));
- const cases=[];
- const dims=[[1920,1080],[1280,720],[995,858],[960,900],[930,900],[390,844],[320,720],[2560,1080],[3440,1440]];
- async function capture(input){
- const c={index:cases.length,width:960,height:720,dpr:1,day:true,mode:'guided',angle:'low',position:[6,.3,6],origin:[0,0,0],neighbors:[],quality:'original',channel:0,shadows:false,cover:'square',layer:'all',clarity:0,detail:0,...input};
- if(c.group==='size-aa'){
- const scale=Math.max(1,(4/3)/(c.width/c.height));c.position=[6*scale,1.85+(.3-1.85)*scale,6*scale];
- }
- if(c.materialBaseline){await page.send('Page.navigate',{url:origin+'/material-legacy'});await wait(()=>page.evaluate('window.ready'));}
- console.log('Capturing '+c.index+' '+c.group+' '+c.width+'x'+c.height+' DPR '+c.dpr);
- const result=await page.evaluate('window.renderCase('+JSON.stringify(c)+')');
- if(c.materialBaseline){const v=c.position.map((x,i)=>[0,1.85,0][i]-x),length=Math.hypot(...v);result.focus=v.reduce((sum,x,i)=>sum+x*([0,2,0][i]-c.position[i])/length,0);result.aperture=.0008;result.targetWidth=960;result.targetHeight=720;await page.send('Page.navigate',{url:origin+'/material-review'});await wait(()=>page.evaluate('window.ready'));}
- Object.assign(c,{parameters:result.parameters,projections:result.projections,focus:result.focus,aperture:result.aperture,targetWidth:result.targetWidth,targetHeight:result.targetHeight});
- c.screenshot=String(c.index).padStart(3,'0')+'.png';await fs.writeFile(path.join(media,c.screenshot),Buffer.from(result.png,'base64'));cases.push(c);
- }
- for(const day of [true,false])for(const [width,height] of dims)for(const aaMode of [0,1,2])await capture({day,width,height,aaMode,disableBokeh:true,group:'size-aa'});
- for(const day of [true,false])for(const quality of ['performance','original','high','ultra'])for(const cover of ['square','portrait','landscape'])await capture({day,quality,cover,clarity:.65,detail:.65,group:'quality'});
- for(const day of [true,false])for(const disableBokeh of [true,false])await capture({day,neighbors:[[0,0,4],[0,0,-4]],position:[0,1.85,12],angle:'front',disableBokeh,group:'depth-response'});
- for(const day of [true,false])for(const disableSmaa of [true,false])await capture({day,quality:'high',disableSmaa,disableBokeh:true,group:'smaa-response'});
- for(const day of [true,false])for(const channel of [0,5])await capture({day,channel,disableBokeh:true,group:'output'});
- // Exact R07 075 input: night, oblique, square, isolated print/capture boundary.
- for(const aaMode of [0,1,2])await capture({day:false,position:[6,3.8,6],clarity:1,layer:'all',disableBokeh:true,aaMode,materialBaseline:true,clipNear:.1,clipFar:100,group:'paper-boundary-075'});
- for(const dpr of [1.5,2])for(const day of [true,false])for(const aaMode of [0,1,2])await capture({dpr,day,width:1280,height:720,aaMode,disableBokeh:true,group:'dpr-aa'});
- if(errors.length)throw Error(JSON.stringify(errors));
- await fs.writeFile(path.join(fixtures,'visual.json'),JSON.stringify({postprocess:true,baseline,sources,environment:{width:env.width,height:env.height,sha256:sha(data),format:'RGBA32F little-endian; original WebGL bottom row first'},width:960,height:720,dpr:1,fov:32,cases},null,2)+'\n');
- for(const dpr of [1,1.5,2])await fs.writeFile(path.join(fixtures,'visual-dpr-'+dpr+'.json'),JSON.stringify({postprocess:true,baseline,dpr,cases:cases.filter(c=>c.dpr===dpr)},null,2)+'\n');
- await fs.mkdir(path.join(root,'verification/windows/postprocess'),{recursive:true});await fs.writeFile(path.join(root,'verification/windows/postprocess/web-capture.json'),JSON.stringify({baseline,browser:version,gpu:gpu.gpu,cases:cases.length,errors,environmentSha256:sha(data)},null,2)+'\n');
- console.log('Postprocess source capture passed: '+cases.length+' states; environment '+env.width+'x'+env.height);
-}catch(e){console.error(e);throw e;}finally{page?.close();if(browser){try{await browser.send('Browser.close');}catch{}browser.close();}proc.kill();await server.close();}
+const server = await createServer({
+    root: frozen,
+    configFile: false,
+    logLevel: 'error',
+    server: {host: '127.0.0.1', port: 0},
+    plugins: [
+        {
+            name: 'single-case',
+            configureServer(s) {
+                s.middlewares.use('/material-legacy', (_, res) => {
+                    res.setHeader('Content-Type', 'text/html');
+                    res.end(
+                        legacyHtml.replace(
+                            '\'/public/assets/music-case-v040.glb\'',
+                            '\'/' + modelUrl + '\'',
+                            ),
+                    );
+                });
+                s.middlewares.use('/material-review', (_, res) => {
+                    res.setHeader('Content-Type', 'text/html');
+                    res.end(
+                        html.replace('\'/public/assets/music-case-v040.glb\'',
+                                     '\'/' + modelUrl + '\''),
+                    );
+                });
+            },
+        },
+    ],
+});
+await server.listen();
+const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+const candidates = [
+    process.env.REVIEW_BROWSER,
+    path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'),
+].filter(Boolean);
+let executable;
+for (const p of candidates) {
+    try {
+        await fs.access(p);
+        executable = p;
+        break;
+    } catch {
+    }
+}
+if (!executable)
+    throw Error('Installed browser required');
+const profile = path.join(work, 'browser-profile-' + process.pid);
+await fs.mkdir(profile, {recursive: true});
+await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
+const proc = spawn(
+    executable,
+    [
+        '--headless=new',
+        '--remote-debugging-port=0',
+        '--user-data-dir=' + profile,
+        '--no-first-run',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-extensions',
+        '--enable-gpu',
+        '--use-angle=d3d11',
+        'about:blank',
+    ],
+    {windowsHide: true, stdio: 'ignore'},
+);
+const wait = async (probe) => {
+    const end = Date.now() + 60000;
+    while (Date.now() < end) {
+        try {
+            const x = await probe();
+            if (x)
+                return x;
+        } catch {
+        }
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    throw Error('Capture timeout');
+};
+let browser, page;
+const errors = [];
+try {
+    const port = (await wait(() => fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')))
+                     .split('\n');
+    browser = await CDP.connect('ws://127.0.0.1:' + port[0] + port[1]);
+    const version = await browser.send('Browser.getVersion'),
+          gpu = await browser.send('SystemInfo.getInfo');
+    const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
+    const targets = await (await fetch('http://127.0.0.1:' + port[0] + '/json/list')).json();
+    page = await CDP.connect(targets.find((t) => t.id === targetId).webSocketDebuggerUrl);
+    page.on('Runtime.exceptionThrown', (e) => {
+        errors.push(e.exceptionDetails);
+        console.error(JSON.stringify(e.exceptionDetails));
+    });
+    page.on('Runtime.consoleAPICalled', (e) => {
+        if (e.type === 'error')
+            console.error(JSON.stringify(e.args));
+    });
+    await page.send('Runtime.enable');
+    await page.send('Page.enable');
+    await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
+    page.on('Fetch.requestPaused', (e) => {
+        void page
+            .send(
+                e.request.url.startsWith(origin + '/') || /^(data|blob):/.test(e.request.url)
+                    ? 'Fetch.continueRequest'
+                    : 'Fetch.failRequest',
+                {
+                    requestId: e.requestId,
+                    ...(e.request.url.startsWith(origin + '/')
+                                || /^(data|blob):/.test(e.request.url)
+                            ? {}
+                            : {errorReason: 'BlockedByClient'}),
+                },
+                )
+            .catch(() => {
+                   });
+    });
+    console.log('Browser attached; navigating frozen harness');
+    await page.send('Page.navigate', {url: origin + '/material-review'});
+    await wait(() => page.evaluate('window.ready'));
+    console.log('Harness ready; exporting environment');
+    const env = await page.evaluate('window.environment');
+    const data = Buffer.alloc(env.pixels.length * 4);
+    function half(h) {
+        const sign = h & 32768 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023;
+        return (sign
+                * (e === 0    ? (Math.pow(2, -14) * m) / 1024
+                   : e === 31 ? NaN
+                              : Math.pow(2, e - 15) * (1 + m / 1024)));
+    }
+    env.pixels.forEach((h, i) => {
+        const v = half(h);
+        if (!Number.isFinite(v))
+            throw Error('Nonfinite environment');
+        data.writeFloatLE(v, i * 4);
+    });
+    if (!data.equals(
+            await fs.readFile(path.join(root, 'resources/environment/room-pmrem.rgba32f'))))
+        throw Error('Room capture changed');
+    const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+    const sources = {};
+    for (const f of ['src/music-model.ts',
+                     'src/music-lighting.ts',
+                     'src/music-row-lighting.ts',
+                     'src/theme-transition.ts',
+                     'src/archive-lighting.ts',
+                     'src/cover-atlas.ts',
+                     'src/scene.ts',
+                     'src/music-cd-asset.ts',
+    ])
+        sources[f] = sha(execFileSync('git', ['show', baseline + ':' + f], {cwd: root}));
+    const cases = [];
+    const dims = [
+        [1920, 1080],
+        [1280, 720],
+        [995, 858],
+        [960, 900],
+        [930, 900],
+        [390, 844],
+        [320, 720],
+        [2560, 1080],
+        [3440, 1440],
+    ];
+    async function capture(input) {
+        const c = {
+            index: cases.length,
+            width: 960,
+            height: 720,
+            dpr: 1,
+            day: true,
+            mode: 'guided',
+            angle: 'low',
+            position: [6, 0.3, 6],
+            origin: [0, 0, 0],
+            neighbors: [],
+            quality: 'original',
+            channel: 0,
+            shadows: false,
+            cover: 'square',
+            layer: 'all',
+            clarity: 0,
+            detail: 0,
+            ...input,
+        };
+        if (c.group === 'size-aa') {
+            const scale = Math.max(1, 4 / 3 / (c.width / c.height));
+            c.position = [6 * scale, 1.85 + (0.3 - 1.85) * scale, 6 * scale];
+        }
+        if (c.materialBaseline) {
+            await page.send('Page.navigate', {url: origin + '/material-legacy'});
+            await wait(() => page.evaluate('window.ready'));
+        }
+        console.log(
+            'Capturing ' + c.index + ' ' + c.group + ' ' + c.width + 'x' + c.height + ' DPR '
+                + c.dpr,
+        );
+        const result = await page.evaluate('window.renderCase(' + JSON.stringify(c) + ')');
+        if (c.materialBaseline) {
+            const v = c.position.map((x, i) => [0, 1.85, 0][i] - x), length = Math.hypot(...v);
+            result.focus = v.reduce(
+                (sum, x, i) => sum + (x * ([0, 2, 0][i] - c.position[i])) / length,
+                0,
+            );
+            result.aperture = 0.0008;
+            result.targetWidth = 960;
+            result.targetHeight = 720;
+            await page.send('Page.navigate', {url: origin + '/material-review'});
+            await wait(() => page.evaluate('window.ready'));
+        }
+        Object.assign(c, {
+            parameters: result.parameters,
+            projections: result.projections,
+            focus: result.focus,
+            aperture: result.aperture,
+            targetWidth: result.targetWidth,
+            targetHeight: result.targetHeight,
+        });
+        c.screenshot = String(c.index).padStart(3, '0') + '.png';
+        await fs.writeFile(path.join(media, c.screenshot), Buffer.from(result.png, 'base64'));
+        cases.push(c);
+    }
+    for (const day of [true, false])
+        for (const [width, height] of dims)
+            for (const aaMode of [0, 1, 2])
+                await capture({day, width, height, aaMode, disableBokeh: true, group: 'size-aa'});
+    for (const day of [true, false])
+        for (const quality of ['performance', 'original', 'high', 'ultra'])
+            for (const cover of ['square', 'portrait', 'landscape'])
+                await capture({
+                    day,
+                    quality,
+                    cover,
+                    clarity: 0.65,
+                    detail: 0.65,
+                    group: 'quality',
+                });
+    for (const day of [true, false])
+        for (const disableBokeh of [true, false])
+            await capture({
+                day,
+                neighbors: [
+                    [0, 0, 4],
+                    [0, 0, -4],
+                ],
+                position: [0, 1.85, 12],
+                angle: 'front',
+                disableBokeh,
+                group: 'depth-response',
+            });
+    for (const day of [true, false])
+        for (const disableSmaa of [true, false])
+            await capture({
+                day,
+                quality: 'high',
+                disableSmaa,
+                disableBokeh: true,
+                group: 'smaa-response',
+            });
+    for (const day of [true, false])
+        for (const channel of [0, 5])
+            await capture({day, channel, disableBokeh: true, group: 'output'});
+    // Exact R07 075 input: night, oblique, square, isolated print/capture boundary.
+    for (const aaMode of [0, 1, 2])
+        await capture({
+            day: false,
+            position: [6, 3.8, 6],
+            clarity: 1,
+            layer: 'all',
+            disableBokeh: true,
+            aaMode,
+            materialBaseline: true,
+            clipNear: 0.1,
+            clipFar: 100,
+            group: 'paper-boundary-075',
+        });
+    for (const dpr of [1.5, 2])
+        for (const day of [true, false])
+            for (const aaMode of [0, 1, 2])
+                await capture({
+                    dpr,
+                    day,
+                    width: 1280,
+                    height: 720,
+                    aaMode,
+                    disableBokeh: true,
+                    group: 'dpr-aa',
+                });
+    if (errors.length)
+        throw Error(JSON.stringify(errors));
+    await fs.writeFile(
+        path.join(fixtures, 'visual.json'),
+        JSON.stringify(
+            {
+                postprocess: true,
+                baseline,
+                sources,
+                environment: {
+                    width: env.width,
+                    height: env.height,
+                    sha256: sha(data),
+                    format: 'RGBA32F little-endian; original WebGL bottom row first',
+                },
+                width: 960,
+                height: 720,
+                dpr: 1,
+                fov: 32,
+                cases,
+            },
+            null,
+            2,
+            )
+            + '\n',
+    );
+    for (const dpr of [1, 1.5, 2])
+        await fs.writeFile(
+            path.join(fixtures, 'visual-dpr-' + dpr + '.json'),
+            JSON.stringify(
+                {postprocess: true, baseline, dpr, cases: cases.filter((c) => c.dpr === dpr)},
+                null,
+                2,
+                )
+                + '\n',
+        );
+    await fs.mkdir(path.join(root, 'verification/windows/postprocess'), {recursive: true});
+    await fs.writeFile(
+        path.join(root, 'verification/windows/postprocess/web-capture.json'),
+        JSON.stringify(
+            {
+                baseline,
+                browser: version,
+                gpu: gpu.gpu,
+                cases: cases.length,
+                errors,
+                environmentSha256: sha(data),
+            },
+            null,
+            2,
+            )
+            + '\n',
+    );
+    console.log(
+        'Postprocess source capture passed: ' + cases.length + ' states; environment ' + env.width
+            + 'x' + env.height,
+    );
+} catch (e) {
+    console.error(e);
+    throw e;
+} finally {
+    page?.close();
+    if (browser) {
+        try {
+            await browser.send('Browser.close');
+        } catch {
+        }
+        browser.close();
+    }
+    proc.kill();
+    await server.close();
+}

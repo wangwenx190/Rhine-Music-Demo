@@ -7,7 +7,8 @@ namespace yalahoo {
 // Does not read the file system or mutate user data.
 bool initializeAssetFonts();
 QFont assetFont(int cssWeight);
-class AssetFonts : public QObject {
+class AssetFonts : public QObject
+{
     Q_OBJECT
     QML_NAMED_ELEMENT(MusicFonts)
     QML_SINGLETON
@@ -17,9 +18,21 @@ class AssetFonts : public QObject {
     Q_PROPERTY(QFont bold READ bold CONSTANT)
 public:
     using QObject::QObject;
-    QFont light() const { return assetFont(300); }
-    QFont regular() const { return assetFont(400); }
-    QFont demibold() const { return assetFont(600); }
-    QFont bold() const { return assetFont(700); }
+    QFont light() const
+    {
+        return assetFont(300);
+    }
+    QFont regular() const
+    {
+        return assetFont(400);
+    }
+    QFont demibold() const
+    {
+        return assetFont(600);
+    }
+    QFont bold() const
+    {
+        return assetFont(700);
+    }
 };
 }

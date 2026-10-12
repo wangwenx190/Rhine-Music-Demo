@@ -2,7 +2,8 @@
 #include <QObject>
 
 namespace yalahoo {
-class FrameClock : public QObject {
+class FrameClock : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(bool applicationVisible READ applicationVisible WRITE setApplicationVisible NOTIFY applicationVisibleChanged)
@@ -12,14 +13,37 @@ class FrameClock : public QObject {
     Q_PROPERTY(bool openingRunning READ openingRunning NOTIFY openingChanged)
     Q_PROPERTY(quint64 frameCount READ frameCount NOTIFY advanced)
 public:
-    explicit FrameClock(QObject *parent = nullptr) : QObject(parent) {}
-    bool active() const { return m_active; }
-    bool applicationVisible() const { return m_applicationVisible; }
-    double speed() const { return m_speed; }
-    double visualTime() const { return m_visualTime; }
-    double openingTime() const { return m_openingTime; }
-    bool openingRunning() const { return m_openingRunning; }
-    quint64 frameCount() const { return m_frameCount; }
+    explicit FrameClock(QObject *parent = nullptr) : QObject(parent)
+    {
+    }
+    bool active() const
+    {
+        return m_active;
+    }
+    bool applicationVisible() const
+    {
+        return m_applicationVisible;
+    }
+    double speed() const
+    {
+        return m_speed;
+    }
+    double visualTime() const
+    {
+        return m_visualTime;
+    }
+    double openingTime() const
+    {
+        return m_openingTime;
+    }
+    bool openingRunning() const
+    {
+        return m_openingRunning;
+    }
+    quint64 frameCount() const
+    {
+        return m_frameCount;
+    }
     void setActive(bool active);
     void setApplicationVisible(bool visible);
     void setSpeed(double speed);
@@ -34,6 +58,7 @@ signals:
     void speedChanged();
     void openingChanged();
     void openingFinished();
+
 private:
     bool m_active = false;
     bool m_applicationVisible = true;

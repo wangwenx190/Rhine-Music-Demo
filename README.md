@@ -18,6 +18,7 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；本阶段为“静态审计通过，实机待用户验证”，清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
+所有后续轮次强制使用 [Qt 源码风格](docs/contracts/code-style.md)：四空格缩进、展开短语句。提交前执行 `cmake --build --preset qt-release --target format` 与 `check-format`；Release CTest 包含 `source-format` 门槛。维护 PowerShell 的入口为 `./tools/format/FormatTools.ps1`（检查使用 `-Check`）。
 
 单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。单盒材质、双主题参数、局部纸面 LOD、线性透射捕获与精确 sRGB 输出已接入，90 个逐层对照和漫反射探针见 [材质契约](docs/contracts/materials.md)。世界空间光带、选中光场、原环境/半球/方向/面光及650ms可打断主题轨迹已接入，契约与复建见 [灯光契约](docs/contracts/lighting.md)。阴影/SSAO、41 点景深、实际几何 MSAA、高/极高 SMAA 和一次 ACES/sRGB 输出已接入，105 个 Windows 状态与局部边缘对照见 [后处理契约](docs/contracts/postprocess.md)。透射纸面边界及邻盒的具体残差保留为 R10 输入；阵列和完整产品动画按后续轮次接入。
 

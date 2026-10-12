@@ -5,8 +5,8 @@
 #include "OfflineMetadataProvider.h"
 #include "SceneAdapter.h"
 #ifdef YALAHOO_REVIEW
-#include "SceneReview.h"
-#include "MaterialReview.h"
+#  include "SceneReview.h"
+#  include "MaterialReview.h"
 #endif
 
 #include <QAudioDevice>
@@ -66,56 +66,84 @@ int main(int argc, char **argv)
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native Qt runtime probe"));
     parser.addHelpOption();
-    parser.addOption({QStringLiteral("verify-runtime"), QStringLiteral("Write runtime evidence and exit"), QStringLiteral("report")});
-    parser.addOption({QStringLiteral("verify-library"), QStringLiteral("Load anonymous mixed library for runtime verification only"), QStringLiteral("fixture")});
-    parser.addOption({QStringLiteral("verify-motion"), QStringLiteral("Verify the production frame source, hide/restore and motion completion")});
-    parser.addOption({QStringLiteral("verify-shading"), QStringLiteral("Exercise production material/shadow/AO rendering with verify-runtime")});
+    parser.addOption({ QStringLiteral("verify-runtime"),
+                       QStringLiteral("Write runtime evidence and exit"),
+                       QStringLiteral("report") });
+    parser.addOption({ QStringLiteral("verify-library"),
+                       QStringLiteral("Load anonymous mixed library for runtime verification only"),
+                       QStringLiteral("fixture") });
+    parser.addOption(
+            { QStringLiteral("verify-motion"),
+              QStringLiteral(
+                      "Verify the production frame source, hide/restore and motion completion") });
+    parser.addOption(
+            { QStringLiteral("verify-shading"),
+              QStringLiteral(
+                      "Exercise production material/shadow/AO rendering with verify-runtime") });
 #ifdef YALAHOO_REVIEW
-    parser.addOption({QStringLiteral("verify-materials"), QStringLiteral("Run source-based single-case material comparison"), QStringLiteral("fixture")});
-    parser.addOption({QStringLiteral("material-report"), QStringLiteral("Material ROI report"), QStringLiteral("report")});
-    parser.addOption({QStringLiteral("verify-scene"), QStringLiteral("Run deterministic geometry fixtures"), QStringLiteral("fixture")});
-    parser.addOption({QStringLiteral("scene-report"), QStringLiteral("Geometry review report"), QStringLiteral("report")});
+    parser.addOption({ QStringLiteral("verify-materials"),
+                       QStringLiteral("Run source-based single-case material comparison"),
+                       QStringLiteral("fixture") });
+    parser.addOption({ QStringLiteral("material-report"), QStringLiteral("Material ROI report"),
+                       QStringLiteral("report") });
+    parser.addOption({ QStringLiteral("verify-scene"),
+                       QStringLiteral("Run deterministic geometry fixtures"),
+                       QStringLiteral("fixture") });
+    parser.addOption({ QStringLiteral("scene-report"), QStringLiteral("Geometry review report"),
+                       QStringLiteral("report") });
 #endif
     parser.process(app);
-    if(parser.isSet(QStringLiteral("verify-shading"))&&!parser.isSet(QStringLiteral("verify-runtime")))return 7;
+    if (parser.isSet(QStringLiteral("verify-shading"))
+        && !parser.isSet(QStringLiteral("verify-runtime")))
+        return 7;
     if (parser.isSet(QStringLiteral("verify-runtime"))
 #ifdef YALAHOO_REVIEW
         || parser.isSet(QStringLiteral("verify-materials"))
 #endif
-    ) qInstallMessageHandler(recordDiagnostic);
+    )
+        qInstallMessageHandler(recordDiagnostic);
 
     // Outlive the engine and its render-thread callbacks during teardown.
-    std::atomic<int> frames{0};
-    std::atomic<int> api{QSGRendererInterface::Unknown};
+    std::atomic<int> frames{ 0 };
+    std::atomic<int> api{ QSGRendererInterface::Unknown };
     QAudioOutput audio;
     QMediaPlayer media;
     media.setAudioOutput(&audio);
     yalahoo::OfflineMetadataProvider provider;
     yalahoo::LibrarySession library(&provider);
     if (parser.isSet(QStringLiteral("verify-library"))) {
-        if (!parser.isSet(QStringLiteral("verify-runtime"))) return 7;
+        if (!parser.isSet(QStringLiteral("verify-runtime")))
+            return 7;
         QFile input(parser.value(QStringLiteral("verify-library")));
-        if (!input.open(QIODevice::ReadOnly)) return 7;
+        if (!input.open(QIODevice::ReadOnly))
+            return 7;
         QJsonParseError parseError;
         const auto document = QJsonDocument::fromJson(input.readAll(), &parseError);
         yalahoo::LibrarySnapshot snapshot;
         QString error;
-        if (parseError.error != QJsonParseError::NoError || !yalahoo::readLibrary(
-            document.object().value("libraries").toObject().value("mixed").toObject(), snapshot, &error)) return 7;
+        if (parseError.error != QJsonParseError::NoError
+            || !yalahoo::readLibrary(
+                    document.object().value("libraries").toObject().value("mixed").toObject(),
+                    snapshot, &error))
+            return 7;
         library.setSnapshot(std::move(snapshot));
         library.search(QStringLiteral("Typography"));
         if (!library.snapshot()->albums.isEmpty())
-            library.requestMetadata(library.snapshot()->albums.first().id, QStringLiteral("introduction"));
+            library.requestMetadata(library.snapshot()->albums.first().id,
+                                    QStringLiteral("introduction"));
     }
     yalahoo::MotionController motion;
     yalahoo::SceneAdapter scene(motion.clock());
-    QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &scene,
-        [&] { scene.setReducedMotion(motion.reducedMotion()); });
+    QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &scene, [&] {
+        scene.setReducedMotion(motion.reducedMotion());
+    });
     const auto updateApplicationVisibility = [&](Qt::ApplicationState state) {
-        motion.clock()->setApplicationVisible(state != Qt::ApplicationHidden && state != Qt::ApplicationSuspended);
+        motion.clock()->setApplicationVisible(state != Qt::ApplicationHidden
+                                              && state != Qt::ApplicationSuspended);
     };
     updateApplicationVisibility(app.applicationState());
-    QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion, updateApplicationVisibility);
+    QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion,
+                     updateApplicationVisibility);
     QJsonObject motionEvidence;
     double pausedTime = 0;
     quint64 pausedFrames = 0;
@@ -124,10 +152,18 @@ int main(int argc, char **argv)
     int resumeSamples = 0;
     QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
-    engine.setInitialProperties({{"librarySession", QVariant::fromValue(&library)},
-        {"motionController", QVariant::fromValue(&motion)}, {"sceneAdapter", QVariant::fromValue(&scene)}, {"geometryProbe", parser.isSet(QStringLiteral("verify-runtime"))&&!parser.isSet(QStringLiteral("verify-shading"))}});
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-        [] { QCoreApplication::exit(2); }, Qt::QueuedConnection);
+    engine.setInitialProperties({ { "librarySession", QVariant::fromValue(&library) },
+                                  { "motionController", QVariant::fromValue(&motion) },
+                                  { "sceneAdapter", QVariant::fromValue(&scene) },
+                                  { "geometryProbe",
+                                    parser.isSet(QStringLiteral("verify-runtime"))
+                                            && !parser.isSet(QStringLiteral("verify-shading")) } });
+    QObject::connect(
+            &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+            [] {
+                QCoreApplication::exit(2);
+            },
+            Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music", "App");
     if (engine.rootObjects().isEmpty())
         return 2;
@@ -136,18 +172,24 @@ int main(int argc, char **argv)
         return 3;
 #ifdef YALAHOO_REVIEW
     if (parser.isSet(QStringLiteral("verify-materials"))) {
-        if (!parser.isSet(QStringLiteral("material-report"))) return 12;
-        return yalahoo::reviewMaterials(app,*window,scene,parser.value(QStringLiteral("verify-materials")),parser.value(QStringLiteral("material-report")));
+        if (!parser.isSet(QStringLiteral("material-report")))
+            return 12;
+        return yalahoo::reviewMaterials(app, *window, scene,
+                                        parser.value(QStringLiteral("verify-materials")),
+                                        parser.value(QStringLiteral("material-report")));
     }
     if (parser.isSet(QStringLiteral("verify-scene"))) {
-        if (!parser.isSet(QStringLiteral("scene-report"))) return 9;
-        return yalahoo::reviewScene(app, *window, scene, parser.value(QStringLiteral("verify-scene")),
-            parser.value(QStringLiteral("scene-report")));
+        if (!parser.isSet(QStringLiteral("scene-report")))
+            return 9;
+        return yalahoo::reviewScene(app, *window, scene,
+                                    parser.value(QStringLiteral("verify-scene")),
+                                    parser.value(QStringLiteral("scene-report")));
     }
 #endif
 
     if (parser.isSet(QStringLiteral("verify-motion"))) {
-        if (!parser.isSet(QStringLiteral("verify-runtime"))) return 8;
+        if (!parser.isSet(QStringLiteral("verify-runtime")))
+            return 8;
         QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, &app, [&](double dt, double) {
             if (awaitingResume) {
                 resumeDiscarded = resumeDiscarded && dt == 0;
@@ -155,9 +197,10 @@ int main(int argc, char **argv)
                 awaitingResume = false;
             }
         });
-        QObject::connect(&motion, &yalahoo::MotionController::completed, &app, [&](quint64 revision) {
-            completionRevisions.append(qint64(revision));
-        });
+        QObject::connect(&motion, &yalahoo::MotionController::completed, &app,
+                         [&](quint64 revision) {
+                             completionRevisions.append(qint64(revision));
+                         });
         motion.clock()->startOpening();
         motion.travel(7.44, 15.6, 12, 3);
         QTimer::singleShot(400, window, [&] {
@@ -166,31 +209,44 @@ int main(int argc, char **argv)
             pausedFrames = motion.clock()->frameCount();
         });
         QTimer::singleShot(700, window, [&] {
-            motionEvidence.insert("hiddenPaused", !motion.clock()->active()
-                && pausedTime == motion.clock()->visualTime() && pausedFrames == motion.clock()->frameCount());
+            motionEvidence.insert("hiddenPaused",
+                                  !motion.clock()->active()
+                                          && pausedTime == motion.clock()->visualTime()
+                                          && pausedFrames == motion.clock()->frameCount());
             awaitingResume = true;
             window->show();
         });
-        QTimer::singleShot(1100, window, [&] { motion.clock()->setSpeed(2); });
+        QTimer::singleShot(1100, window, [&] {
+            motion.clock()->setSpeed(2);
+        });
         QTimer::singleShot(1200, window, [&] {
             window->showMinimized();
             pausedTime = motion.clock()->visualTime();
             pausedFrames = motion.clock()->frameCount();
         });
         QTimer::singleShot(1500, window, [&] {
-            motionEvidence.insert("minimizedPaused", !motion.clock()->active()
-                && pausedTime == motion.clock()->visualTime() && pausedFrames == motion.clock()->frameCount());
+            motionEvidence.insert("minimizedPaused",
+                                  !motion.clock()->active()
+                                          && pausedTime == motion.clock()->visualTime()
+                                          && pausedFrames == motion.clock()->frameCount());
             awaitingResume = true;
             window->showNormal();
         });
-        QTimer::singleShot(1700, window, [&] { motion.travel(-.62, -5.2, -1, -1); });
-        QTimer::singleShot(2000, window, [&] { motion.setReducedMotion(true); });
+        QTimer::singleShot(1700, window, [&] {
+            motion.travel(-.62, -5.2, -1, -1);
+        });
+        QTimer::singleShot(2000, window, [&] {
+            motion.setReducedMotion(true);
+        });
     }
 
-    QObject::connect(window, &QQuickWindow::afterRendering, window, [&] {
-        ++frames;
-        api = static_cast<int>(window->rendererInterface()->graphicsApi());
-    }, Qt::DirectConnection);
+    QObject::connect(
+            window, &QQuickWindow::afterRendering, window,
+            [&] {
+                ++frames;
+                api = static_cast<int>(window->rendererInterface()->graphicsApi());
+            },
+            Qt::DirectConnection);
 
     if (parser.isSet(QStringLiteral("verify-runtime"))) {
         const QString report = parser.value(QStringLiteral("verify-runtime"));
@@ -198,11 +254,12 @@ int main(int argc, char **argv)
             auto *button = window->findChild<QQuickItem *>(QStringLiteral("interactionProbe"));
             if (!button)
                 return;
-            const QPointF point = button->mapToScene(QPointF(button->width() / 2, button->height() / 2));
+            const QPointF point =
+                    button->mapToScene(QPointF(button->width() / 2, button->height() / 2));
             QMouseEvent press(QEvent::MouseButtonPress, point, window->mapToGlobal(point),
-                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
             QMouseEvent release(QEvent::MouseButtonRelease, point, window->mapToGlobal(point),
-                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
             QCoreApplication::sendEvent(window, &press);
             QCoreApplication::sendEvent(window, &release);
         });
@@ -213,37 +270,52 @@ int main(int argc, char **argv)
             bool chineseSupported = true;
             for (const QChar character : chinese)
                 chineseSupported = chineseSupported && raw.supportsCharacter(character);
-            const bool shaderAvailable = QFile::exists(QStringLiteral(":/assets/shaders/probe.frag.qsb"));
-            const bool qmlAvailable = QFile::exists(QStringLiteral(":/qt/qml/Yalahoo/Music/App.qml"));
+            const bool shaderAvailable =
+                    QFile::exists(QStringLiteral(":/assets/shaders/probe.frag.qsb"));
+            const bool qmlAvailable =
+                    QFile::exists(QStringLiteral(":/qt/qml/Yalahoo/Music/App.qml"));
             const int interactions = window->property("interactionCount").toInt();
             const bool mediaAvailable = media.isAvailable();
-            bool backend = QSGRendererInterface::isApiRhiBased(static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
+            bool backend = QSGRendererInterface::isApiRhiBased(
+                    static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
 #if defined(Q_OS_WIN)
             backend = api == QSGRendererInterface::Direct3D11;
 #endif
             QDir().mkpath(QFileInfo(report).absolutePath());
-            const QString screenshot = QFileInfo(report).absolutePath() + (parser.isSet(QStringLiteral("verify-motion"))
-                ? QStringLiteral("/runtime-motion.png") : QStringLiteral("/runtime.png"));
+            const QString screenshot = QFileInfo(report).absolutePath()
+                    + (parser.isSet(QStringLiteral("verify-motion"))
+                               ? QStringLiteral("/runtime-motion.png")
+                               : QStringLiteral("/runtime.png"));
             const bool saved = !image.isNull() && image.save(screenshot);
             const auto *view3D = window->findChild<QQuickItem *>(QStringLiteral("quick3DProbe"));
             const bool quick3DAvailable = view3D != nullptr;
-            const bool qmlMediaAvailable = window->findChild<QObject *>(QStringLiteral("qmlMediaProbe")) != nullptr;
-            const auto *libraryProbe = window->findChild<QObject *>(QStringLiteral("libraryDataProbe"));
-            const QString libraryText = libraryProbe ? libraryProbe->property("text").toString() : QString{};
+            const bool qmlMediaAvailable =
+                    window->findChild<QObject *>(QStringLiteral("qmlMediaProbe")) != nullptr;
+            const auto *libraryProbe =
+                    window->findChild<QObject *>(QStringLiteral("libraryDataProbe"));
+            const QString libraryText =
+                    libraryProbe ? libraryProbe->property("text").toString() : QString{ };
             int modelPixels = 0;
             QRect modelRegion;
             if (view3D && !image.isNull()) {
-                const QRectF sceneRegion = view3D->mapRectToScene(QRectF(0, 0, view3D->width(), view3D->height()));
+                const QRectF sceneRegion =
+                        view3D->mapRectToScene(QRectF(0, 0, view3D->width(), view3D->height()));
                 const qreal scaleX = qreal(image.width()) / window->width();
                 const qreal scaleY = qreal(image.height()) / window->height();
                 modelRegion = QRectF(sceneRegion.x() * scaleX, sceneRegion.y() * scaleY,
-                    sceneRegion.width() * scaleX, sceneRegion.height() * scaleY).toAlignedRect().intersected(image.rect());
+                                     sceneRegion.width() * scaleX, sceneRegion.height() * scaleY)
+                                      .toAlignedRect()
+                                      .intersected(image.rect());
             }
-            for (int y = modelRegion.top(); !modelRegion.isEmpty() && y <= modelRegion.bottom(); ++y) {
+            for (int y = modelRegion.top(); !modelRegion.isEmpty() && y <= modelRegion.bottom();
+                 ++y) {
                 for (int x = modelRegion.left(); x <= modelRegion.right(); ++x) {
                     const QColor color = image.pixelColor(x, y);
-                    if (parser.isSet(QStringLiteral("verify-shading")) ? (color.red()>color.blue()+20&&color.red()>color.green()+8)
-                        : (color.green() > color.red() + 8 && color.green() < 165 && color.red() > 40))
+                    if (parser.isSet(QStringLiteral("verify-shading"))
+                                ? (color.red() > color.blue() + 20
+                                   && color.red() > color.green() + 8)
+                                : (color.green() > color.red() + 8 && color.green() < 165
+                                   && color.red() > 40))
                         ++modelPixels;
                 }
             }
@@ -253,36 +325,57 @@ int main(int argc, char **argv)
                 recorded = diagnostics;
             }
             const bool motionPassed = !parser.isSet(QStringLiteral("verify-motion"))
-                || (motionEvidence.value("hiddenPaused").toBool() && motionEvidence.value("minimizedPaused").toBool()
-                    && resumeDiscarded && resumeSamples == 2 && !motion.moving()
-                    && motion.rail() == -.62 && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
-                    && !completionRevisions.isEmpty() && completionRevisions.last().toInteger() == qint64(motion.revision())
-                    && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
-                    && media.source().isEmpty());
-            const bool shaderDiagnostics=std::any_of(recorded.cbegin(),recorded.cend(),[](const QString &s){return s.contains("Failed to compile")||s.contains("QSpirvCompiler")||s.contains("TypeError");});
-            const bool passed = !shaderDiagnostics && motionPassed && frames > 0 && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
-                && backend && interactions == 1 && mediaAvailable
-                && shaderAvailable && qmlAvailable && chineseSupported && saved
-                && quick3DAvailable && qmlMediaAvailable && modelPixels > 100 && libraryProbe
-                && (!parser.isSet(QStringLiteral("verify-library")) || (library.albums()->rowCount() == 21
-                    && library.searchResults()->rowCount() == 28 && library.metadata().size() == 1
-                    && library.playbackTrackId().isEmpty() && media.source().isEmpty()
-                    && libraryText == QStringLiteral("匿名库模型 · 21 张专辑")));
+                    || (motionEvidence.value("hiddenPaused").toBool()
+                        && motionEvidence.value("minimizedPaused").toBool() && resumeDiscarded
+                        && resumeSamples == 2 && !motion.moving() && motion.rail() == -.62
+                        && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
+                        && !completionRevisions.isEmpty()
+                        && completionRevisions.last().toInteger() == qint64(motion.revision())
+                        && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
+                        && media.source().isEmpty());
+            const bool shaderDiagnostics =
+                    std::any_of(recorded.cbegin(), recorded.cend(), [](const QString &s) {
+                        return s.contains("Failed to compile") || s.contains("QSpirvCompiler")
+                                || s.contains("TypeError");
+                    });
+            const bool passed = !shaderDiagnostics && motionPassed && frames > 0
+                    && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
+                    && backend && interactions == 1 && mediaAvailable && shaderAvailable
+                    && qmlAvailable && chineseSupported && saved && quick3DAvailable
+                    && qmlMediaAvailable && modelPixels > 100 && libraryProbe
+                    && (!parser.isSet(QStringLiteral("verify-library"))
+                        || (library.albums()->rowCount() == 21
+                            && library.searchResults()->rowCount() == 28
+                            && library.metadata().size() == 1 && library.playbackTrackId().isEmpty()
+                            && media.source().isEmpty()
+                            && libraryText == QStringLiteral("匿名库模型 · 21 张专辑")));
             const QJsonObject evidence{
-                {"passed", passed}, {"qtVersion", QString::fromLatin1(qVersion())},
-                {"platformPlugin", QGuiApplication::platformName()}, {"graphicsApi", api.load()},
-                {"renderedFrames", frames.load()}, {"windowTitle", window->title()},
-                {"devicePixelRatio",window->devicePixelRatio()},
-                {"applicationName", app.applicationName()}, {"displayName", app.applicationDisplayName()},
-                {"dataDirectory", QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)},
-                {"controlsStyle", QQuickStyle::name()}, {"interactionCount", interactions},
-                {"chineseGlyphs", chineseSupported}, {"font", raw.familyName()},
-                {"qmlResource", qmlAvailable}, {"shaderResource", shaderAvailable},
-                {"quick3DObject", quick3DAvailable}, {"modelPixels", modelPixels},
-                {"shadingProbe",parser.isSet(QStringLiteral("verify-shading"))},
-                {"qmlMediaObject", qmlMediaAvailable}, {"diagnostics", QJsonArray::fromStringList(recorded)},
-                {"mediaAvailable", mediaAvailable}, {"audioOutputCount", QMediaDevices::audioOutputs().size()},
-                {"screenshotSaved", saved}, {"sourceOpened", false}
+                { "passed", passed },
+                { "qtVersion", QString::fromLatin1(qVersion()) },
+                { "platformPlugin", QGuiApplication::platformName() },
+                { "graphicsApi", api.load() },
+                { "renderedFrames", frames.load() },
+                { "windowTitle", window->title() },
+                { "devicePixelRatio", window->devicePixelRatio() },
+                { "applicationName", app.applicationName() },
+                { "displayName", app.applicationDisplayName() },
+                { "dataDirectory",
+                  QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) },
+                { "controlsStyle", QQuickStyle::name() },
+                { "interactionCount", interactions },
+                { "chineseGlyphs", chineseSupported },
+                { "font", raw.familyName() },
+                { "qmlResource", qmlAvailable },
+                { "shaderResource", shaderAvailable },
+                { "quick3DObject", quick3DAvailable },
+                { "modelPixels", modelPixels },
+                { "shadingProbe", parser.isSet(QStringLiteral("verify-shading")) },
+                { "qmlMediaObject", qmlMediaAvailable },
+                { "diagnostics", QJsonArray::fromStringList(recorded) },
+                { "mediaAvailable", mediaAvailable },
+                { "audioOutputCount", QMediaDevices::audioOutputs().size() },
+                { "screenshotSaved", saved },
+                { "sourceOpened", false }
             };
             QJsonObject reportData = evidence;
             reportData.insert("visualFrameCount", qint64(motion.clock()->frameCount()));

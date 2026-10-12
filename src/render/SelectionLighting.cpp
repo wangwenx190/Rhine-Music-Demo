@@ -3,80 +3,178 @@
 #include <algorithm>
 namespace yalahoo {
 namespace {
-SceneVector linear(const char *hex) {
+SceneVector linear(const char *hex)
+{
     const QColor c(QString::fromLatin1(hex));
-    auto decode=[](double s){return s<=.04045?s/12.92:std::pow((s+.055)/1.055,2.4);};
-    return {decode(c.redF()),decode(c.greenF()),decode(c.blueF())};
+    auto decode = [](double s) {
+        return s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
+    };
+    return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
 }
-void followVector(SceneVector &value,SceneVector &velocity,SceneVector target,double dt) {
-    const double decay=std::exp(-5*dt); const auto delta=value-target, impulse=velocity+delta*5;
-    value=target+(delta+impulse*dt)*decay;velocity=(velocity-impulse*(5*dt))*decay;
+void followVector(SceneVector &value, SceneVector &velocity, SceneVector target, double dt)
+{
+    const double decay = std::exp(-5 * dt);
+    const auto delta = value - target, impulse = velocity + delta * 5;
+    value = target + (delta + impulse * dt) * decay;
+    velocity = (velocity - impulse * (5 * dt)) * decay;
 }
 }
-LightingPalette LightingPalette::theme(bool night) {
+LightingPalette LightingPalette::theme(bool night)
+{
     LightingPalette p;
-    p.warmth=night?0:1;p.environment=night?.16:.25;p.key=night?.30:.45;p.hemisphere=night?.21:.32;
-    p.spot=(night?130:180)*64;p.area=night?24:34;p.scatter=night?.72:1;p.printAmbient=night?.12:.5;p.exposure=night?1.08:1.05;
-    p.keyColor=linear(night?"#e5f0ff":"#fff7ed");p.skyColor=linear(night?"#e2eeff":"#fffaf5");
-    p.groundColor=linear(night?"#56708c":"#b4a18c");p.spotColor=linear(night?"#dbe9ff":"#ffe3b2");
-    p.scatterColor=linear(night?"#cee5ff":"#ffdba3");p.background=linear(night?"#07111f":"#eae5e1");return p;
+    p.warmth = night ? 0 : 1;
+    p.environment = night ? .16 : .25;
+    p.key = night ? .30 : .45;
+    p.hemisphere = night ? .21 : .32;
+    p.spot = (night ? 130 : 180) * 64;
+    p.area = night ? 24 : 34;
+    p.scatter = night ? .72 : 1;
+    p.printAmbient = night ? .12 : .5;
+    p.exposure = night ? 1.08 : 1.05;
+    p.keyColor = linear(night ? "#e5f0ff" : "#fff7ed");
+    p.skyColor = linear(night ? "#e2eeff" : "#fffaf5");
+    p.groundColor = linear(night ? "#56708c" : "#b4a18c");
+    p.spotColor = linear(night ? "#dbe9ff" : "#ffe3b2");
+    p.scatterColor = linear(night ? "#cee5ff" : "#ffdba3");
+    p.background = linear(night ? "#07111f" : "#eae5e1");
+    return p;
 }
-SelectionLighting::SelectionLighting(QObject *parent):QObject(parent),m_palette(LightingPalette::theme(false)),m_from(m_palette),m_to(m_palette) {}
-double SelectionLighting::themeProgress(double t) {
-    t=std::clamp(t,0.0,1.0);double c=t;
-    for(int n=0;n<6;++n)c=std::clamp(c-(((1.6*c-1.8)*c+1.2)*c-t)/((4.8*c-3.6)*c+1.2),0.0,1.0);
-    return t==1?1:c*c*(3-2*c);
+SelectionLighting::SelectionLighting(QObject *parent)
+    : QObject(parent), m_palette(LightingPalette::theme(false)), m_from(m_palette), m_to(m_palette)
+{
 }
-void SelectionLighting::setNight(bool night) {
-    if (night==m_night) return;
-    m_night=night;m_from=m_palette;m_to=LightingPalette::theme(night);m_elapsed=0;
-    if(m_reduced) {m_palette=m_to;m_elapsed=.65;}
-    emit nightChanged();emit changed();
+double SelectionLighting::themeProgress(double t)
+{
+    t = std::clamp(t, 0.0, 1.0);
+    double c = t;
+    for (int n = 0; n < 6; ++n)
+        c = std::clamp(c - (((1.6 * c - 1.8) * c + 1.2) * c - t) / ((4.8 * c - 3.6) * c + 1.2), 0.0,
+                       1.0);
+    return t == 1 ? 1 : c * c * (3 - 2 * c);
 }
-void SelectionLighting::setReducedMotion(bool reduced) {
-    m_reduced=reduced;
-    if(reduced){m_palette=m_to;m_elapsed=.65;emit changed();}
+void SelectionLighting::setNight(bool night)
+{
+    if (night == m_night)
+        return;
+    m_night = night;
+    m_from = m_palette;
+    m_to = LightingPalette::theme(night);
+    m_elapsed = 0;
+    if (m_reduced) {
+        m_palette = m_to;
+        m_elapsed = .65;
+    }
+    emit nightChanged();
+    emit changed();
 }
-void SelectionLighting::setSettings(RowLightingSettings s) {
-    auto valid=[](double n,double previous,double lo,double hi){return std::isfinite(n)?std::clamp(n,lo,hi):previous;};
-    if(int(s.mode)<0||int(s.mode)>3)s.mode=ribbon.settings.mode;
-    s.strength=valid(s.strength,ribbon.settings.strength,0,2);s.width=valid(s.width,ribbon.settings.width,.6,2.5);
-    s.offset=valid(s.offset,ribbon.settings.offset,-6,6);s.fill=valid(s.fill,ribbon.settings.fill,0,1);
-    s.transitionDuration=valid(s.transitionDuration,ribbon.settings.transitionDuration,.4,2.4);
-    ribbon.settings=s;emit changed();
+void SelectionLighting::setReducedMotion(bool reduced)
+{
+    m_reduced = reduced;
+    if (reduced) {
+        m_palette = m_to;
+        m_elapsed = .65;
+        emit changed();
+    }
 }
-void SelectionLighting::advanceTheme(double dt) {
-    if(!std::isfinite(dt)||dt<0||m_elapsed>=.65)return;
-    m_elapsed=std::min(.65,m_elapsed+dt);const double t=themeProgress(m_elapsed/.65);
-#define NUMBER(name) m_palette.name=m_from.name+(m_to.name-m_from.name)*t
-#define COLOR(name) m_palette.name=m_from.name*(1-t)+m_to.name*t
-    NUMBER(warmth);NUMBER(environment);NUMBER(key);NUMBER(hemisphere);NUMBER(fill);NUMBER(spot);
-    NUMBER(area);NUMBER(scatter);NUMBER(printAmbient);NUMBER(exposure);
-    COLOR(keyColor);COLOR(skyColor);COLOR(groundColor);COLOR(spotColor);COLOR(scatterColor);COLOR(background);
+void SelectionLighting::setSettings(RowLightingSettings s)
+{
+    auto valid = [](double n, double previous, double lo, double hi) {
+        return std::isfinite(n) ? std::clamp(n, lo, hi) : previous;
+    };
+    if (int(s.mode) < 0 || int(s.mode) > 3)
+        s.mode = ribbon.settings.mode;
+    s.strength = valid(s.strength, ribbon.settings.strength, 0, 2);
+    s.width = valid(s.width, ribbon.settings.width, .6, 2.5);
+    s.offset = valid(s.offset, ribbon.settings.offset, -6, 6);
+    s.fill = valid(s.fill, ribbon.settings.fill, 0, 1);
+    s.transitionDuration = valid(s.transitionDuration, ribbon.settings.transitionDuration, .4, 2.4);
+    ribbon.settings = s;
+    emit changed();
+}
+void SelectionLighting::advanceTheme(double dt)
+{
+    if (!std::isfinite(dt) || dt < 0 || m_elapsed >= .65)
+        return;
+    m_elapsed = std::min(.65, m_elapsed + dt);
+    const double t = themeProgress(m_elapsed / .65);
+#define NUMBER(name) m_palette.name = m_from.name + (m_to.name - m_from.name) * t
+#define COLOR(name) m_palette.name = m_from.name * (1 - t) + m_to.name * t
+    NUMBER(warmth);
+    NUMBER(environment);
+    NUMBER(key);
+    NUMBER(hemisphere);
+    NUMBER(fill);
+    NUMBER(spot);
+    NUMBER(area);
+    NUMBER(scatter);
+    NUMBER(printAmbient);
+    NUMBER(exposure);
+    COLOR(keyColor);
+    COLOR(skyColor);
+    COLOR(groundColor);
+    COLOR(spotColor);
+    COLOR(scatterColor);
+    COLOR(background);
 #undef NUMBER
 #undef COLOR
 }
-void SelectionLighting::update(const RowLightingInput &i,SceneVector aim,SceneVector offset,double detail,double dt) {
-    if(!std::isfinite(dt)||dt<0)return;
-    advanceTheme(dt);m_visible=i.visible;m_detail=std::clamp(detail,0.0,1.0);m_detail=m_detail*m_detail*(3-2*m_detail);
-    if(!i.visible){m_initialized=false;ribbon.reset();emit changed();return;}
-    if(!m_initialized||i.reduced||i.cinematic){m_anchor=aim;m_column=i.origin;m_anchorVelocity=m_columnVelocity={};}
-    else{followVector(m_anchor,m_anchorVelocity,aim,dt);followVector(m_column,m_columnVelocity,i.origin,dt);}
-    m_offset=offset;m_initialized=true;ribbon.update(i,dt);emit changed();
+void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, SceneVector offset,
+                               double detail, double dt)
+{
+    if (!std::isfinite(dt) || dt < 0)
+        return;
+    advanceTheme(dt);
+    m_visible = i.visible;
+    m_detail = std::clamp(detail, 0.0, 1.0);
+    m_detail = m_detail * m_detail * (3 - 2 * m_detail);
+    if (!i.visible) {
+        m_initialized = false;
+        ribbon.reset();
+        emit changed();
+        return;
+    }
+    if (!m_initialized || i.reduced || i.cinematic) {
+        m_anchor = aim;
+        m_column = i.origin;
+        m_anchorVelocity = m_columnVelocity = { };
+    } else {
+        followVector(m_anchor, m_anchorVelocity, aim, dt);
+        followVector(m_column, m_columnVelocity, i.origin, dt);
+    }
+    m_offset = offset;
+    m_initialized = true;
+    ribbon.update(i, dt);
+    emit changed();
 }
-double SelectionLighting::areaIntensity() const {
-    const double gain=ribbon.settings.mode==RowLightingMode::Area?1:ribbon.settings.mode==RowLightingMode::Hybrid?.3:0;
-    return m_visible?m_palette.area*ribbon.settings.strength*gain*(1-m_detail):0;
+double SelectionLighting::areaIntensity() const
+{
+    const double gain = ribbon.settings.mode == RowLightingMode::Area ? 1
+            : ribbon.settings.mode == RowLightingMode::Hybrid         ? .3
+                                                                      : 0;
+    return m_visible ? m_palette.area * ribbon.settings.strength * gain * (1 - m_detail) : 0;
 }
-QVector4D SelectionLighting::rowSettings() const {const auto &s=ribbon.settings;return {float(int(s.mode)),float(s.strength),float(s.width),float(s.offset)};}
-QVector3D SelectionLighting::areaPosition() const {
-    const auto &p=ribbon.column;return SceneVector{p.x,p.y+1.85+3.35/2+.5,p.z+ribbon.settings.offset*.62+.44}.qt();
+QVector4D SelectionLighting::rowSettings() const
+{
+    const auto &s = ribbon.settings;
+    return { float(int(s.mode)), float(s.strength), float(s.width), float(s.offset) };
 }
-QVector3D SelectionLighting::areaTarget() const {
-    const auto &p=ribbon.column;return SceneVector{p.x,p.y+1.85+3.35/2-.25,p.z+ribbon.settings.offset*.62}.qt();
+QVector3D SelectionLighting::areaPosition() const
+{
+    const auto &p = ribbon.column;
+    return SceneVector{ p.x, p.y + 1.85 + 3.35 / 2 + .5, p.z + ribbon.settings.offset * .62 + .44 }
+            .qt();
 }
-QColor SelectionLighting::backgroundColor() const {
-    auto encode=[](double l){return l<=.0031308?12.92*l:1.055*std::pow(l,1/2.4)-.055;};
-    return QColor::fromRgbF(encode(m_palette.background.x),encode(m_palette.background.y),encode(m_palette.background.z));
+QVector3D SelectionLighting::areaTarget() const
+{
+    const auto &p = ribbon.column;
+    return SceneVector{ p.x, p.y + 1.85 + 3.35 / 2 - .25, p.z + ribbon.settings.offset * .62 }.qt();
+}
+QColor SelectionLighting::backgroundColor() const
+{
+    auto encode = [](double l) {
+        return l <= .0031308 ? 12.92 * l : 1.055 * std::pow(l, 1 / 2.4) - .055;
+    };
+    return QColor::fromRgbF(encode(m_palette.background.x), encode(m_palette.background.y),
+                            encode(m_palette.background.z));
 }
 }

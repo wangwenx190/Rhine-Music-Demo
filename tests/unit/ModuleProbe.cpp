@@ -4,7 +4,8 @@
 #include <QQuick3DGeometry>
 #include <QtTest>
 
-class ModuleProbe : public QObject {
+class ModuleProbe : public QObject
+{
     Q_OBJECT
 private slots:
     void quick3DLink()

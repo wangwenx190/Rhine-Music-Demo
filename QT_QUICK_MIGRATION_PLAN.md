@@ -44,6 +44,13 @@
 
 ## 跨轮次基线与工具链
 
+### Qt 源码风格契约
+
+- 所有剩余轮次及后续修改强制遵守 [docs/contracts/code-style.md](docs/contracts/code-style.md)；C++/shader 由根 `.clang-format` 约束，QML 由 `.qmlformat.ini` 及同一最新原生 Kit 的 `qmlformat` 约束，编辑器采用 `.editorconfig`。维护工具使用相同的四空格缩进和逐行语句规则。
+- 使用四个空格，禁止 Tab；C++ 函数、类和结构体的左花括号另起一行，控制流与命名空间的左花括号留在行尾。短函数、短分支、循环体与多个独立语句必须展开；QML 对象、属性和 JavaScript 语句分别换行。以 100 列为换行目标，字符串、URL、许可证行及语法约束可例外；不得为换行改变字面量、宏语义、声明/导入顺序或执行行为。
+- 每轮提交前先执行 `cmake --build --preset qt-release --target format`，再执行 `cmake --build --preset qt-release --target check-format` 及 Release 检查；`source-format` 纳入 CTest，未通过不得宣告轮次完成或提交。不得关闭检查、临时覆盖配置或为压缩代码添加格式化豁免。
+- 格式化范围为当前原生项目、测试、shader 与维护工具；`legacy-web/` 冻结源码、历史验收证据、第三方资产及构建/部署输出不格式化。仅格式整理不得修改算法、数值、资源内容或业务行为。
+
 ### 基线与参数优先级
 
 - Web 基线提交：`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，产品版本 V0.4.1。后续工作树中的新改动不能自动改变基线。

@@ -7,7 +7,8 @@
 #include <array>
 
 namespace yalahoo::assets {
-struct Batch {
+struct Batch
+{
     QString name;
     QVector<std::array<float, 8>> vertices; // position, normal, UV
     QVector<quint32> indices;

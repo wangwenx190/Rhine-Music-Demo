@@ -8,7 +8,8 @@
 #include "RenderBackend.h"
 #include <QVariantMap>
 namespace yalahoo {
-class SceneAdapter : public QObject {
+class SceneAdapter : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(yalahoo::SelectionLighting* lighting READ lighting CONSTANT)
     Q_PROPERTY(yalahoo::RenderQuality* quality READ quality CONSTANT)
@@ -26,21 +27,66 @@ class SceneAdapter : public QObject {
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
-    SelectionLighting *lighting() { return &m_lighting; }
-    RenderQuality *quality() { return &m_quality; }
-    QVariantMap renderBackendContract() const { return RenderBackendContract::fields(); }
-    LayoutMetrics *layout() { return &m_layout; }
-    const SceneFrame &frame() const { return m_frame; }
-    QVector3D cameraPosition() const { return m_frame.camera.position.qt(); }
-    QVector3D cameraAim() const { return m_frame.camera.aim.qt(); }
-    QQuaternion cameraRotation() const { return m_frame.cameraRotation; }
-    QVector3D casePosition() const { return m_frame.casePosition.qt(); }
-    double fieldOfView() const { return m_frame.fieldOfView; }
-    double clipNear() const { return m_frame.nearPlane; }
-    double clipFar() const { return m_frame.farPlane; }
-    quint64 frameRevision() const { return m_frame.revision; }
-    double detail() const { return m_detail; }
-    bool reducedMotion() const { return m_reduced; }
+    SelectionLighting *lighting()
+    {
+        return &m_lighting;
+    }
+    RenderQuality *quality()
+    {
+        return &m_quality;
+    }
+    QVariantMap renderBackendContract() const
+    {
+        return RenderBackendContract::fields();
+    }
+    LayoutMetrics *layout()
+    {
+        return &m_layout;
+    }
+    const SceneFrame &frame() const
+    {
+        return m_frame;
+    }
+    QVector3D cameraPosition() const
+    {
+        return m_frame.camera.position.qt();
+    }
+    QVector3D cameraAim() const
+    {
+        return m_frame.camera.aim.qt();
+    }
+    QQuaternion cameraRotation() const
+    {
+        return m_frame.cameraRotation;
+    }
+    QVector3D casePosition() const
+    {
+        return m_frame.casePosition.qt();
+    }
+    double fieldOfView() const
+    {
+        return m_frame.fieldOfView;
+    }
+    double clipNear() const
+    {
+        return m_frame.nearPlane;
+    }
+    double clipFar() const
+    {
+        return m_frame.farPlane;
+    }
+    quint64 frameRevision() const
+    {
+        return m_frame.revision;
+    }
+    double detail() const
+    {
+        return m_detail;
+    }
+    bool reducedMotion() const
+    {
+        return m_reduced;
+    }
     void setDetail(double detail);
     void setReducedMotion(bool reduced);
     // Called with the already speed-scaled motionDt from the single FrameClock.
@@ -51,7 +97,7 @@ public:
     void setNavigation(double laneSpeed, double rowSpeed, bool realColumns = false);
     void setPointer(double x, double y);
     void snapToTarget();
-    void setLightingInput(RowLightingInput input, QQuaternion caseRotation = {});
+    void setLightingInput(RowLightingInput input, QQuaternion caseRotation = { });
     void updateLighting(double motionDt);
     Q_INVOKABLE QVector3D projectWorldPoint(QVector3D world) const;
     Q_INVOKABLE double focalDepth(QVector3D origin) const;
@@ -60,6 +106,7 @@ signals:
     void frameChanged();
     void detailChanged();
     void reducedMotionChanged();
+
 private:
     void publish();
     LayoutMetrics m_layout;

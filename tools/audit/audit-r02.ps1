@@ -11,13 +11,29 @@ foreach ($platform in @('macos', 'linux')) {
         foreach ($source in $check.sources) {
             $path = Join-Path $repository $source.path
             $text = Get-Content -Raw -Encoding UTF8 -LiteralPath $path
-            if (-not $text.Contains($source.symbol)) { throw "Missing $($source.path): $($source.symbol)" }
-            $sourceEvidence += @{ sourcePath = $source.path; lineOrSymbol = $source.symbol;
-                sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+            if (-not $text.Contains($source.symbol)) {
+                throw "Missing $($source.path): $($source.symbol)"
+            }
+            $sourceEvidence += @{
+                sourcePath = $source.path
+                lineOrSymbol = $source.symbol
+
+                sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
         }
-        $matrix += @{ checkId = $check.checkId; requirement = $check.requirement; platform = $platform;
-            sourcePath = @($sourceEvidence.sourcePath); lineOrSymbol = @($sourceEvidence.lineOrSymbol);
-            evidence = $check.evidence; sources = $sourceEvidence; result = 'passed'; limitations = $check.limitations }
+        $matrix += @{
+            checkId = $check.checkId
+            requirement = $check.requirement
+            platform = $platform
+
+            sourcePath = @($sourceEvidence.sourcePath)
+            lineOrSymbol = @($sourceEvidence.lineOrSymbol)
+
+            evidence = $check.evidence
+            sources = $sourceEvidence
+            result = 'passed'
+            limitations = $check.limitations
+        }
     }
     $cpp = Get-Content -Raw -Encoding UTF8 (Join-Path $repository 'src/app/main.cpp')
     if ($cpp -match 'QNetworkAccessManager|QProcess|QAudioSink|QAudioDecoder|QAudioBufferOutput') {
@@ -25,15 +41,25 @@ foreach ($platform in @('macos', 'linux')) {
     }
     $shader = Get-Content -Raw -Encoding UTF8 (Join-Path $repository 'verification/windows/native-bootstrap/shader-variants.txt')
     foreach ($variant in @('MSL 12', 'GLSL 150', 'HLSL 50')) {
-        if (-not $shader.Contains($variant)) { throw "Missing actual shader evidence: $variant" }
+        if (-not $shader.Contains($variant)) {
+            throw "Missing actual shader evidence: $variant"
+        }
     }
     foreach ($configuration in @('release')) {
         $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repository "verification/windows/native-bootstrap/$configuration-runtime.json") | ConvertFrom-Json
-        if (-not $runtime.passed -or $runtime.graphicsApi -ne 4 -or -not $runtime.mediaAvailable) { throw 'Windows shared regression is not passed.' }
+        if (-not $runtime.passed -or $runtime.graphicsApi -ne 4 -or -not $runtime.mediaAvailable) {
+            throw 'Windows shared regression is not passed.'
+        }
     }
-    $document = @{ round = 'R02'; qtVersion = $runtime.qtVersion; conclusion = '静态审计通过，实机待用户验证';
-        method = 'Automated source/hash/evidence coverage plus manually traced branch and resource chains in each evidence field';
-        checks = $matrix }
+    $document = @{
+        round = 'R02'
+        qtVersion = $runtime.qtVersion
+        conclusion = '静态审计通过，实机待用户验证'
+
+        method = 'Automated source/hash/evidence coverage plus manually traced branch and resource chains in each evidence field'
+
+        checks = $matrix
+    }
     [System.IO.File]::WriteAllText((Join-Path $output 'audit-matrix.json'), ($document | ConvertTo-Json -Depth 20), $utf8)
     $report = @("# $platform · R02 静态审计", '', '静态审计通过，实机待用户验证', '',
         '范围仅为原生最小窗口、Kit/构建/测试与模块探针。没有执行该平台的编译、图形或音频；本结论不覆盖后续轮次。', '',

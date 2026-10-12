@@ -9,11 +9,13 @@ double archiveTravelDuration(double lanes, double rows)
 }
 void QuinticTrack::observe(Kinematics state)
 {
-    if (!m_active) m_state = state;
+    if (!m_active)
+        m_state = state;
 }
 bool QuinticTrack::retarget(double target, double duration)
 {
-    if (m_hasTarget && target == m_target) return false;
+    if (m_hasTarget && target == m_target)
+        return false;
     m_hasTarget = true;
     m_target = target;
     m_duration = std::max(.001, duration);
@@ -24,32 +26,44 @@ bool QuinticTrack::retarget(double target, double duration)
     const double distance = target - value - velocity * t - acceleration * t2 / 2;
     const double remainingVelocity = -velocity - acceleration * t;
     const double remainingAcceleration = -acceleration;
-    m_coefficients = {value, velocity, acceleration / 2,
-        (10 * distance - 4 * remainingVelocity * t + remainingAcceleration * t2 / 2) / std::pow(t, 3),
+    m_coefficients = {
+        value,
+        velocity,
+        acceleration / 2,
+        (10 * distance - 4 * remainingVelocity * t + remainingAcceleration * t2 / 2)
+                / std::pow(t, 3),
         (-15 * distance + 7 * remainingVelocity * t - remainingAcceleration * t2) / std::pow(t, 4),
-        (6 * distance - 3 * remainingVelocity * t + remainingAcceleration * t2 / 2) / std::pow(t, 5)};
+        (6 * distance - 3 * remainingVelocity * t + remainingAcceleration * t2 / 2) / std::pow(t, 5)
+    };
     return true;
 }
 void QuinticTrack::update(double dt, bool reduced)
 {
-    if (!m_active) return;
+    if (!m_active)
+        return;
     m_elapsed = reduced ? m_duration : std::min(m_duration, m_elapsed + std::max(0.0, dt));
-    if (m_elapsed >= m_duration) { finish(); return; }
+    if (m_elapsed >= m_duration) {
+        finish();
+        return;
+    }
     const auto [a, b, c, d, e, f] = m_coefficients;
     const double t = m_elapsed;
-    m_state.value = a + b*t + c*std::pow(t,2) + d*std::pow(t,3) + e*std::pow(t,4) + f*std::pow(t,5);
-    m_state.velocity = b + 2*c*t + 3*d*std::pow(t,2) + 4*e*std::pow(t,3) + 5*f*std::pow(t,4);
-    m_state.acceleration = 2*c + 6*d*t + 12*e*std::pow(t,2) + 20*f*std::pow(t,3);
+    m_state.value = a + b * t + c * std::pow(t, 2) + d * std::pow(t, 3) + e * std::pow(t, 4)
+            + f * std::pow(t, 5);
+    m_state.velocity = b + 2 * c * t + 3 * d * std::pow(t, 2) + 4 * e * std::pow(t, 3)
+            + 5 * f * std::pow(t, 4);
+    m_state.acceleration = 2 * c + 6 * d * t + 12 * e * std::pow(t, 2) + 20 * f * std::pow(t, 3);
 }
 void QuinticTrack::translate(double offset)
 {
     m_state.value += offset;
     m_coefficients[0] += offset;
-    if (m_hasTarget) m_target += offset;
+    if (m_hasTarget)
+        m_target += offset;
 }
 void QuinticTrack::finish()
 {
-    m_state = {m_target, 0, 0};
+    m_state = { m_target, 0, 0 };
     m_elapsed = m_duration;
     m_active = false;
 }
@@ -61,11 +75,13 @@ void QuinticTrack::reset()
 }
 bool ColumnScalar::settled() const
 {
-    return !guided() && std::abs(m_spring.value - m_target) < .008 && std::abs(m_spring.velocity) < .025;
+    return !guided() && std::abs(m_spring.value - m_target) < .008
+            && std::abs(m_spring.velocity) < .025;
 }
 bool ColumnScalar::retarget(double target, bool guided, double duration, double rate)
 {
-    if (target == m_target) return false;
+    if (target == m_target)
+        return false;
     m_target = target;
     m_rate = rate;
     // Reset only the polynomial, leaving the displayed derivatives intact.
@@ -80,13 +96,17 @@ bool ColumnScalar::retarget(double target, bool guided, double duration, double 
 }
 void ColumnScalar::update(double dt, bool reduced)
 {
-    if (reduced) { finish(); return; }
+    if (reduced) {
+        finish();
+        return;
+    }
     if (guided()) {
         m_track.update(dt);
         static_cast<Kinematics &>(m_spring) = m_track.state();
     } else {
         m_spring.update(m_target, m_rate, dt);
-        if (std::abs(m_spring.value - m_target) < 1e-8 && std::abs(m_spring.velocity) < 1e-8) finish();
+        if (std::abs(m_spring.value - m_target) < 1e-8 && std::abs(m_spring.velocity) < 1e-8)
+            finish();
     }
 }
 void ColumnScalar::translate(double offset)

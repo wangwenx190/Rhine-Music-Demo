@@ -9,21 +9,29 @@
 #include <optional>
 
 namespace yalahoo {
-enum class MediaSupport { Unknown, Supported, Unsupported };
-struct Track {
+enum class MediaSupport {
+    Unknown,
+    Supported,
+    Unsupported
+};
+struct Track
+{
     QString id, albumId, title, artist, format, codec, relativePath;
-    std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate, numberOfChannels;
+    std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate,
+            numberOfChannels;
     std::optional<bool> lossless;
     double duration = 0;
     MediaSupport mediaSupport = MediaSupport::Unknown;
     QUrl sourceUrl;
     QJsonObject fields;
 };
-struct Producer {
+struct Producer
+{
     QString name, role, source, trackId, trackTitle, url;
     QJsonObject fields;
 };
-struct Album {
+struct Album
+{
     QString id, title, artist, genreId, description, localNote, folderLabel;
     std::optional<int> year, discCount;
     QStringList rawGenres;
@@ -34,18 +42,21 @@ struct Album {
     bool offline = false;
     QJsonObject fields;
 };
-struct Genre {
+struct Genre
+{
     QString id, name;
     QStringList aliases;
     std::optional<int> albumCount;
     QJsonObject fields;
 };
-struct LibraryRoot {
+struct LibraryRoot
+{
     QUrl path;
     QString status, error;
     QJsonObject fields;
 };
-struct LibrarySnapshot {
+struct LibrarySnapshot
+{
     QList<Album> albums;
     QList<Genre> genres;
     QList<LibraryRoot> roots;

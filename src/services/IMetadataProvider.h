@@ -3,28 +3,46 @@
 #include <QObject>
 
 namespace yalahoo {
-enum class MetadataKind { Introduction, Credits, Enrichment };
-enum class ProviderStatus { Deferred, Matched, Partial, NotFound, Uncertain, Error, Cancelled };
+enum class MetadataKind {
+    Introduction,
+    Credits,
+    Enrichment
+};
+enum class ProviderStatus {
+    Deferred,
+    Matched,
+    Partial,
+    NotFound,
+    Uncertain,
+    Error,
+    Cancelled
+};
 QString kindName(MetadataKind kind);
 QString statusName(ProviderStatus status);
-struct RequestToken {
+struct RequestToken
+{
     quint64 requestId = 0, generation = 0;
     QString albumId;
     bool operator==(const RequestToken &) const = default;
 };
 inline size_t qHash(const RequestToken &token, size_t seed = 0)
-{ return qHashMulti(seed, token.requestId, token.generation, token.albumId); }
-struct AlbumQuery {
+{
+    return qHashMulti(seed, token.requestId, token.generation, token.albumId);
+}
+struct AlbumQuery
+{
     QString albumId, title, artist, contact;
     QStringList albumIds, trackIds;
     bool enabled = false, force = false;
     QJsonObject configuration;
 };
-struct ProviderCapabilities {
+struct ProviderCapabilities
+{
     bool networkEnabled = false;
     bool introductions = true, credits = true, enrichment = true, batch = false;
 };
-struct ProviderResult {
+struct ProviderResult
+{
     quint64 requestId = 0, generation = 0;
     QString albumId;
     MetadataKind kind = MetadataKind::Introduction;
@@ -32,7 +50,8 @@ struct ProviderResult {
     QJsonObject payload, source;
     QString checkedAt, retryAt, error;
 };
-class IMetadataProvider : public QObject {
+class IMetadataProvider : public QObject
+{
     Q_OBJECT
 public:
     using QObject::QObject;

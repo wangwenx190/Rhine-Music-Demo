@@ -1,18 +1,50 @@
-qt_add_library(YalahooRhi STATIC RhiItem.cpp RhiItem.h RhiApi.h
-    "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp")
-target_include_directories(YalahooRhi PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-    PRIVATE "${PROJECT_SOURCE_DIR}/tools/assets")
+qt_add_library(
+    YalahooRhi
+    STATIC
+    RhiItem.cpp
+    RhiItem.h
+    RhiApi.h
+    "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
+)
+target_include_directories(
+    YalahooRhi
+    PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE
+    "${PROJECT_SOURCE_DIR}/tools/assets"
+)
 target_link_libraries(YalahooRhi PUBLIC YalahooScene Qt6::Quick PRIVATE Qt6::GuiPrivate)
 target_compile_features(YalahooRhi PUBLIC cxx_std_23)
 yalahoo_platform(YalahooRhi)
-qt_add_shaders(YalahooRhi rhi_shaders PREFIX /rhi BASE "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"
-    GLSL "330,300 es" HLSL 50 MSL 12
-    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
+qt_add_shaders(
+    YalahooRhi
+    rhi_shaders
+    PREFIX
+    /rhi
+    BASE
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"
+    GLSL
+    "330,300 es"
+    HLSL
+    50
+    MSL
+    12
+    FILES
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/opaque.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag")
-qt_add_resources(YalahooRhi rhi_assets PREFIX /rhi BASE "${PROJECT_SOURCE_DIR}/resources"
-    FILES "${PROJECT_SOURCE_DIR}/resources/models/music-case-v040.glb"
-    "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f")
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag"
+)
+qt_add_resources(
+    YalahooRhi
+    rhi_assets
+    PREFIX
+    /rhi
+    BASE
+    "${PROJECT_SOURCE_DIR}/resources"
+    FILES
+    "${PROJECT_SOURCE_DIR}/resources/models/music-case-v040.glb"
+    "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f"
+)

@@ -26,8 +26,13 @@ View3D {
             property real cameraFar: prepass.cameraFar
             property bool packedDepth: prepass.packedDepth
             passes: Pass {
-                output: Buffer { format: Buffer.RGBA32F }
-                shaders: Shader { stage: Shader.Fragment; shader: "qrc:/assets/shaders/ao-prepass.frag" }
+                output: Buffer {
+                    format: Buffer.RGBA32F
+                }
+                shaders: Shader {
+                    stage: Shader.Fragment
+                    shader: "qrc:/assets/shaders/ao-prepass.frag"
+                }
             }
         }
     }
@@ -38,14 +43,27 @@ View3D {
         clipNear: prepass.cameraNear
         clipFar: prepass.cameraFar
     }
-    PrincipledMaterial { id: opaque; baseColor: "white"; cullMode: Material.BackFaceCulling }
-    CaseGeometry { position: prepass.origin; lid: opaque; spine: opaque; tray: opaque; paper: opaque }
+    PrincipledMaterial {
+        id: opaque
+        baseColor: "white"
+        cullMode: Material.BackFaceCulling
+    }
+    CaseGeometry {
+        position: prepass.origin
+        lid: opaque
+        spine: opaque
+        tray: opaque
+        paper: opaque
+    }
     Repeater3D {
         model: prepass.neighbors
         delegate: CaseGeometry {
             required property var modelData
-            position: Qt.vector3d(modelData[0],modelData[1],modelData[2])
-            lid: opaque; spine: opaque; tray: opaque; paper: opaque
+            position: Qt.vector3d(modelData[0], modelData[1], modelData[2])
+            lid: opaque
+            spine: opaque
+            tray: opaque
+            paper: opaque
         }
     }
 }

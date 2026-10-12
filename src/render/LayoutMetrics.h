@@ -4,7 +4,8 @@
 
 namespace yalahoo {
 // viewport-layout.ts, in actual window content logical pixels (never DPR pixels).
-class LayoutMetrics : public QObject {
+class LayoutMetrics : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(double width READ width NOTIFY changed)
     Q_PROPERTY(double height READ height NOTIFY changed)
@@ -17,20 +18,36 @@ class LayoutMetrics : public QObject {
     Q_PROPERTY(double informationX READ informationX NOTIFY changed)
     Q_PROPERTY(double informationRight READ informationRight NOTIFY changed)
 public:
-    explicit LayoutMetrics(QObject *parent = nullptr) : QObject(parent) {}
-    double width() const { return m_width; }
-    double height() const { return m_height; }
-    bool portrait() const { return m_width / m_height < 1.05; }
-    bool compact() const { return portrait() || m_width < 1100 || (m_coarse && m_height < 600); }
+    explicit LayoutMetrics(QObject *parent = nullptr) : QObject(parent)
+    {
+    }
+    double width() const
+    {
+        return m_width;
+    }
+    double height() const
+    {
+        return m_height;
+    }
+    bool portrait() const
+    {
+        return m_width / m_height < 1.05;
+    }
+    bool compact() const
+    {
+        return portrait() || m_width < 1100 || (m_coarse && m_height < 600);
+    }
     QString kind() const;
     double layoutScale() const;
     double referenceWidth() const;
     double referenceHeight() const;
     double informationX() const;
     double informationRight() const;
-    Q_INVOKABLE void setViewport(double width, double height, bool coarse = false, bool cinematic = false);
+    Q_INVOKABLE void setViewport(double width, double height, bool coarse = false,
+                                 bool cinematic = false);
 signals:
     void changed();
+
 private:
     double m_width = 960, m_height = 640;
     bool m_coarse = false, m_cinematic = false;

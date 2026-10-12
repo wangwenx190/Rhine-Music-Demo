@@ -10,9 +10,11 @@ Node {
     property real clarity: 0
     property bool compositorOutput: false
     property url coverSource: "qrc:/assets/demo-covers/square.png"
-    property vector3d paperIrradiance: Qt.vector3d(1,1,1)
+    property vector3d paperIrradiance: Qt.vector3d(1, 1, 1)
     readonly property Texture room: Texture {
-        textureData: FixedTextureData { asset: "room-pmrem" }
+        textureData: FixedTextureData {
+            asset: "room-pmrem"
+        }
         minFilter: Texture.Linear
         magFilter: Texture.Linear
         generateMipmaps: false
@@ -20,7 +22,9 @@ Node {
         tilingModeVertical: Texture.ClampToEdge
     }
     readonly property Texture integration: Texture {
-        textureData: FixedTextureData { asset: "dfg" }
+        textureData: FixedTextureData {
+            asset: "dfg"
+        }
         minFilter: Texture.Linear
         magFilter: Texture.Linear
         generateMipmaps: false
@@ -28,14 +32,18 @@ Node {
         tilingModeVertical: Texture.ClampToEdge
     }
     readonly property Texture ltc1: Texture {
-        textureData: FixedTextureData { asset: "ltc1" }
+        textureData: FixedTextureData {
+            asset: "ltc1"
+        }
         minFilter: Texture.Linear
         magFilter: Texture.Linear
         tilingModeHorizontal: Texture.ClampToEdge
         tilingModeVertical: Texture.ClampToEdge
     }
     readonly property Texture ltc2: Texture {
-        textureData: FixedTextureData { asset: "ltc2" }
+        textureData: FixedTextureData {
+            asset: "ltc2"
+        }
         minFilter: Texture.Linear
         magFilter: Texture.Linear
         tilingModeHorizontal: Texture.ClampToEdge
@@ -50,7 +58,7 @@ Node {
         ltc1Texture: materials.ltc1
         ltc2Texture: materials.ltc2
         warmth: materials.warmth
-        clarity: Math.max(0,Math.min(1,materials.clarity))
+        clarity: Math.max(0, Math.min(1, materials.clarity))
         compositorOutput: materials.compositorOutput
         paperIrradiance: materials.paperIrradiance
     }
@@ -80,7 +88,9 @@ Node {
     }
     readonly property LightingMaterial paper: LightingMaterial {
         property real environmentIntensity: lighting.environmentIntensity
-        property TextureInput environmentMap: TextureInput { texture: materials.room }
+        property TextureInput environmentMap: TextureInput {
+            texture: materials.room
+        }
         lighting: materials.lighting
         lightingEnabled: materials.lightingEnabled
         property TextureInput coverMap: TextureInput {

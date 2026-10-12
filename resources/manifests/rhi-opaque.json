@@ -2,35 +2,35 @@
   "license": "resources/licenses/three-LICENSE; resources/licenses/materials-NOTICE.md",
   "shaders": [
     {
-      "sha256": "63f458e5a59e99bf51d4dbeff168304628f48fdb009cff007371bf0afa9ce092",
+      "sha256": "56179300428d8c7181c421de826141c0853bdf52d56458647e3948b5e7b7534b",
       "path": "resources/shaders/rhi/frame.glsl"
     },
     {
-      "sha256": "28178ce630dc7e260466ca32a3cf5b37e5d781ef0991d2194a19a7f068b865f5",
+      "sha256": "3cca931c3044ac3d015247372bebb9610b7b78825aee57fd9c90dd6a88d44817",
       "path": "resources/shaders/rhi/geometry.vert"
     },
     {
-      "sha256": "45c4241b6dd146e91fee09c03588083039f40561663e3d530690ed79023157e2",
+      "sha256": "d779d49c2c72404aab6a1b7cec95a6ba8c07d99401cd02f24c476df1259e8948",
       "path": "resources/shaders/rhi/opaque.frag"
     },
     {
-      "sha256": "8d586a8b6c9635c68e05118901ef526ea7ad74513c205b241bde5f3723b281a7",
+      "sha256": "5f206ae225c0d975962241ded0fe367c1755c1b9f035bba94fa68a399f804cd8",
       "path": "resources/shaders/rhi/output.frag"
     },
     {
-      "sha256": "7137877c6a4bea9ebc45996a68ed1e36626b91ac64df74b80bad2b8d54843e83",
+      "sha256": "fab1bd7f5921bc1fb75d96e6b9e932d5da82edb1a89b33b4af6fdd9f325b0376",
       "path": "resources/shaders/rhi/output.vert"
     },
     {
-      "sha256": "bf571633caf4d6610b0acf5f8615070c5591d31fe5c3c0687ff0269850e30e28",
+      "sha256": "e4e285cc9f53e4cc8b76b86f93a2843431a925dbdc018a19b381a5b23b436a05",
       "path": "resources/shaders/rhi/paper-lighting.glsl"
     },
     {
-      "sha256": "6bc1e9482c4e3a6bcb12edc82e77ad2b75f6249e0c07f6a7a2e01f0e4af1634d",
+      "sha256": "7051be9ad7c8bbc13bc7f2d436a5eb4719848c15c56dc3067504a978b424dad2",
       "path": "resources/shaders/rhi/shadow.frag"
     },
     {
-      "sha256": "2f2ee12ab9128fee4895218b33e45d50d352145e9307df21dc800b9291a1c702",
+      "sha256": "a83c10dac7eb512b07a6f9c2a87cee7b954f486045cc225aca8c39d34474c63f",
       "path": "resources/shaders/rhi/shadow.vert"
     }
   ],
@@ -49,11 +49,11 @@
     },
     {
       "source": "resources/shaders/album-paper.frag",
-      "sha256": "e94fa91e0b1349adfae71a4cd58c01e9ec689b918bc07e6ca4eeaaafa29cc173"
+      "sha256": "1619de8d0926f82e99c985b5e35b4d581c1bd59fad4310e2579e1c2cd3dbf344"
     },
     {
       "source": "resources/shaders/album-paper.vert",
-      "sha256": "7aa68dd2b2a92b93a00e63e2a492a23a330821f986328d10b280463aca751ada"
+      "sha256": "c56cfc7a6901265b879ac016a1f9890f52f0b3fbfc5b9ae5c25d661b225c4d7e"
     },
     {
       "source": "legacy-web/src/scene.ts",
