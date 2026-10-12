@@ -1,3 +1,5 @@
+[CmdletBinding()]
+param([switch]$WindowPreview)
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $evidence = Join-Path $repository 'verification/windows/branding'
@@ -12,7 +14,7 @@ function Save-PublicText([string]$Path, [string]$Text) {
 Push-Location -LiteralPath $repository
 try {
     $before = (Get-FileHash resources/manifests/branding.json -Algorithm SHA256).Hash
-    $export = & ./tools/assets/export-branding.ps1 -Preset qt-release -WindowPreview 2>&1
+    $export = & ./tools/assets/export-branding.ps1 -Preset qt-release -WindowPreview:$WindowPreview 2>&1
     Save-PublicText (Join-Path $evidence 'export.txt') ($export -join "`n")
     if ($before -ne (Get-FileHash resources/manifests/branding.json -Algorithm SHA256).Hash) {
         throw 'Branding resource regeneration is not reproducible.'
@@ -56,6 +58,7 @@ try {
 
         configurations = $results
         reproducible = $true
+        nativeWindowRequested = $WindowPreview.IsPresent
         svgCount = 13
         rasterCases = 243
         logoCases = 54

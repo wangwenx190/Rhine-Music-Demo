@@ -4,6 +4,8 @@ qt_add_library(
     RhiItem.cpp
     RhiItem.h
     RhiApi.h
+    ShellMaterial.cpp
+    ShellMaterial.h
     "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
 )
 target_include_directories(
@@ -32,6 +34,7 @@ qt_add_shaders(
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/opaque.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
@@ -47,4 +50,7 @@ qt_add_resources(
     FILES
     "${PROJECT_SOURCE_DIR}/resources/models/music-case-v040.glb"
     "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/dfg.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ltc1.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ltc2.rgba32f"
 )

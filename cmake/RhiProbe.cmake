@@ -34,7 +34,7 @@ check_cxx_source_compiles(
             auto pass = target->newCompatibleRenderPassDescriptor();
             target->setRenderPassDescriptor(pass);
             auto u = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                  r->ubufAligned(560) * 2);
+                                  r->ubufAligned(752) * 2);
             auto vb = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, 32);
             auto ib = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, 12);
             auto sampler = r->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest, QRhiSampler::None,
@@ -43,7 +43,7 @@ check_cxx_source_compiles(
             auto stages =
                     QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage;
             bindings->setBindings(
-                    { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(0, stages, u, 560),
+                    { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(0, stages, u, 752),
                       QRhiShaderResourceBinding::sampledTexture(
                               1, QRhiShaderResourceBinding::FragmentStage, t, sampler) });
             auto pipeline = r->newGraphicsPipeline();
@@ -65,6 +65,14 @@ check_cxx_source_compiles(
             pipeline->setTargetBlends({ { }, { }, { } });
             pipeline->setSampleCount(renderTarget()->sampleCount());
             auto b = r->nextResourceUpdateBatch();
+            auto msaa = r->newTexture(QRhiTexture::RGBA32F, { 16, 16 }, 4, QRhiTexture::RenderTarget);
+            auto capture = r->newTexture(QRhiTexture::RGBA32F, { 16, 16 }, 1,
+                                        QRhiTexture::RenderTarget | QRhiTexture::MipMapped
+                                                | QRhiTexture::UsedWithGenerateMips);
+            QRhiColorAttachment attachment(msaa);
+            attachment.setResolveTexture(capture);
+            b->generateMips(capture);
+            (void)r->supportedSampleCounts();
             QRhiReadbackResult result;
             b->readBackTexture(QRhiReadbackDescription(t), &result);
             b->uploadTexture(t, QImage({ 16, 16 }, QImage::Format_RGBA8888));

@@ -4,6 +4,7 @@
 #include "MotionController.h"
 #include "OfflineMetadataProvider.h"
 #include "SceneAdapter.h"
+#include "VerificationWindow.h"
 #ifdef YALAHOO_REVIEW
 #  include "SceneReview.h"
 #  include "MaterialReview.h"
@@ -152,12 +153,21 @@ int main(int argc, char **argv)
     int resumeSamples = 0;
     QJsonArray completionRevisions;
     QQmlApplicationEngine engine;
-    engine.setInitialProperties({ { "librarySession", QVariant::fromValue(&library) },
-                                  { "motionController", QVariant::fromValue(&motion) },
-                                  { "sceneAdapter", QVariant::fromValue(&scene) },
-                                  { "geometryProbe",
-                                    parser.isSet(QStringLiteral("verify-runtime"))
-                                            && !parser.isSet(QStringLiteral("verify-shading")) } });
+    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime"))
+#ifdef YALAHOO_REVIEW
+            || parser.isSet(QStringLiteral("verify-materials"))
+            || parser.isSet(QStringLiteral("verify-scene"))
+#endif
+            ;
+    engine.setInitialProperties(
+            { { "verificationRun", verificationRun },
+              { "verificationFlags", int(yalahoo::verification::windowFlags()) },
+              { "librarySession", QVariant::fromValue(&library) },
+              { "motionController", QVariant::fromValue(&motion) },
+              { "sceneAdapter", QVariant::fromValue(&scene) },
+              { "geometryProbe",
+                parser.isSet(QStringLiteral("verify-runtime"))
+                        && !parser.isSet(QStringLiteral("verify-shading")) } });
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
             [] {
@@ -170,6 +180,9 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+    if (verificationRun
+        && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
+        return 7;
 #ifdef YALAHOO_REVIEW
     if (parser.isSet(QStringLiteral("verify-materials"))) {
         if (!parser.isSet(QStringLiteral("material-report")))
@@ -249,6 +262,7 @@ int main(int argc, char **argv)
             Qt::DirectConnection);
 
     if (parser.isSet(QStringLiteral("verify-runtime"))) {
+        window->show();
         const QString report = parser.value(QStringLiteral("verify-runtime"));
         QTimer::singleShot(1000, window, [window] {
             auto *button = window->findChild<QQuickItem *>(QStringLiteral("interactionProbe"));
@@ -338,7 +352,8 @@ int main(int argc, char **argv)
                         return s.contains("Failed to compile") || s.contains("QSpirvCompiler")
                                 || s.contains("TypeError");
                     });
-            const bool passed = !shaderDiagnostics && motionPassed && frames > 0
+            const bool passed = yalahoo::verification::windowPolicySatisfied(*window)
+                    && !shaderDiagnostics && motionPassed && frames > 0
                     && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
                     && backend && interactions == 1 && mediaAvailable && shaderAvailable
                     && qmlAvailable && chineseSupported && saved && quick3DAvailable
@@ -356,6 +371,7 @@ int main(int argc, char **argv)
                 { "graphicsApi", api.load() },
                 { "renderedFrames", frames.load() },
                 { "windowTitle", window->title() },
+                { "windowPolicy", yalahoo::verification::windowPolicy(*window) },
                 { "devicePixelRatio", window->devicePixelRatio() },
                 { "applicationName", app.applicationName() },
                 { "displayName", app.applicationDisplayName() },

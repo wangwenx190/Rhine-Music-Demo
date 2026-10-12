@@ -1,6 +1,7 @@
 #include "MaterialReview.h"
 #include "ImageComparison.h"
 #include "RenderProbe.h"
+#include "VerificationWindow.h"
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuick3DObject>
@@ -84,7 +85,7 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
     view->setProperty("materialReview", true);
     if (auto *label = window.findChild<QQuickItem *>("layoutProbe"))
         label->setVisible(false);
-    window.setFlags(Qt::Window | Qt::FramelessWindowHint);
+    verification::prepareWindow(window, true);
     window.resize(960, 720);
     window.setPosition(0, 0);
     window.show();
@@ -227,7 +228,9 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
         const QString name = paperProbe ? QString("paper-probe-%1.png").arg(index) : referenceName;
         const auto actual = window.grabWindow().convertToFormat(QImage::Format_RGB32);
         QImage expected(root
-                        + (backendReview               ? "/docs/media/render-backend/web/"
+                        + (oracle.contains("referenceMedia")
+                                   ? "/" + oracle["referenceMedia"].toString()
+                                   : backendReview     ? "/docs/media/render-backend/web/"
                                    : postprocessReview ? "/docs/media/postprocess/web/"
                                    : occlusionReview   ? "/docs/media/occlusion/web/"
                                    : lightingReview    ? "/docs/media/lighting/web/"
@@ -402,6 +405,7 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
             return;
         }
         poll.stop();
+        pass = pass && verification::windowPolicySatisfied(window);
         QSaveFile file(report);
         bool saved = file.open(QIODevice::WriteOnly);
         if (saved) {
@@ -411,6 +415,7 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
                                     { "renderBackendContract",
                                       QJsonObject::fromVariantMap(scene.renderBackendContract()) },
                                     { "passed", pass },
+                                    { "windowPolicy", verification::windowPolicy(window) },
                                     { "qtVersion", qVersion() },
                                     { "graphicsApi",
                                       int(window.rendererInterface()->graphicsApi()) },

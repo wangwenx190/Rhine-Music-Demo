@@ -67,7 +67,7 @@ try {
     $savedPath = $env:PATH
     try {
         $env:PATH = "$($chain.qtKit)/bin;$savedPath"
-        # Pipeline waits for a GUI executable without SW_HIDE, so the GPU window is exposed.
+        # Wait for the GPU executable; its verification flags keep exposed windows on bottom/no-focus.
         Invoke-Recorded 'production-shading.txt' { & ./build/release/bin/yalahoo.exe --verify-runtime build/release/verification/production-r10.json --verify-shading | Out-String } | Out-Null
         $shading = Get-Content -Raw build/release/verification/production-r10.json | ConvertFrom-Json
         if (-not $shading.passed) {

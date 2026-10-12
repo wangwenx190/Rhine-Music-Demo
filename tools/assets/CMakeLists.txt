@@ -12,6 +12,7 @@ set_target_properties(
 )
 
 qt_add_executable(export-branding ExportBranding.cpp)
+target_include_directories(export-branding PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(export-branding PRIVATE Qt6::Gui Qt6::Svg)
 yalahoo_platform(export-branding)
 set_target_properties(

@@ -2,7 +2,7 @@
 
 **yalahOO!!!** 按 [原生迁移计划](QT_QUICK_MIGRATION_PLAN.md) 改造为 C++23、Qt Quick/QML 跨平台音乐播放器，Qt 使用开发机安装的最新版本，构建与脚本不锁定具体版本或安装路径。GUI、动画与特效尽最大可能逼近原 Web 版本，以冻结旧源码为准；截图和各类采集数据仅作参考，渲染缺陷（包括可见锯齿）应改善，音乐播放使用 QtMultimedia 公开 API；联网功能暂缓，保留接口与占位。
 
-原创品牌 SVG、双主题字标、小尺寸图标与平台衍生文件已保存，规范和预览见 [branding.md](docs/contracts/branding.md)。Qt 导出命令为 `./tools/assets/export-branding.ps1 -Preset qt-release -WindowPreview`；页眉/开场接入归 R14/R20，系统集成归 R30–R32。品牌替换与其他界面复刻分开验收。
+原创品牌 SVG、双主题字标、小尺寸图标与平台衍生文件已保存，规范和预览见 [branding.md](docs/contracts/branding.md)。Qt 默认无窗口导出命令为 `./tools/assets/export-branding.ps1 -Preset qt-release`，原生 paint 检查才显式加 `-WindowPreview`，仍置底/不接受焦点；页眉/开场接入归 R14/R20，系统集成归 R30–R32。品牌替换与其他界面复刻分开验收。
 
 当前已有 Qt 原生运行探针和完整 qrc 资产接入：原专辑盒三壳体、四字重 MiSans、八个功能图标双主题、现有完整音频与演示封面。单盒已接入主盖、侧脊、后托自定义材质与独立漫反射纸面，音乐播放器功能按后续轮次接入。[资源契约](docs/contracts/assets.md)包含来源/hash、字体权重映射、准备与验证命令；[原生工程契约](docs/contracts/native-bootstrap.md)包含 Kit 发现和构建入口。可复建的匿名 Web 参照见 [冻结基线契约](docs/contracts/web-baseline.md)。计划是项目内最高优先级的实施契约，开发约定见 [AGENTS.md](AGENTS.md)。
 
@@ -20,6 +20,10 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 所有后续轮次强制使用 [Qt 源码风格](docs/contracts/code-style.md)：四空格缩进、展开短语句。提交前执行 `cmake --build --preset qt-release --target format` 与 `check-format`；Release CTest 包含 `source-format` 门槛。维护 PowerShell 的入口为 `./tools/format/FormatTools.ps1`（检查使用 `-Check`）。
 
+所有 session 的测试和采集遵守 [测试窗口契约](docs/contracts/test-window-policy.md)：无需显示的保持隐藏，必须显示的默认置底且不接受焦点，禁止自动置前或抢焦点。统一窗口 helper 和首次显示前的 QML 注入同时覆盖运行、运动、场景、材质、RHI 和品牌检查；采集自身渲染，不截取用户桌面。
+
 单一 QML 帧源、临界阻尼解析解、保留 x/v/a 的五次运动和独立开场计时已接入；改速、反向、坐标平移、减少动态与隐藏恢复通过冻结数值对照和 Windows 运行验证。接口与证据重建见 [运动契约](docs/contracts/motion.md)。单盒无光几何、共用布局指标与原长焦相机已接入，浏览/详情、横竖屏分界及九尺寸投影通过独立冻结源码和 Windows GPU 对照；接口与精确 Review 验证见 [场景契约](docs/contracts/scene.md)。单盒材质、双主题参数、局部纸面 LOD、线性透射捕获与精确 sRGB 输出已接入，90 个逐层对照和漫反射探针见 [材质契约](docs/contracts/materials.md)。世界空间光带、选中光场、原环境/半球/方向/面光及650ms可打断主题轨迹已接入，契约与复建见 [灯光契约](docs/contracts/lighting.md)。阴影/SSAO、41 点景深、实际几何 MSAA、高/极高 SMAA 和一次 ACES/sRGB 输出已接入，105 个 Windows 状态与局部边缘对照见 [后处理契约](docs/contracts/postprocess.md)。透射纸面边界及邻盒的具体残差保留为 R10 输入；阵列和完整产品动画按后续轮次接入。
 
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。
+
+RHI Review 已具备独立不透明捕获、4× MSAA resolve/mips、磨砂壳体与全局稳定深度排序，保持源屏幕空间透射和三层壳体深度规则；契约与 Windows/静态审计复建见 [RHI 材质契约](docs/contracts/rhi-shell.md)。五区域的全部残差与同输入对照保留，不能把平均误差降低表述为全部图像目标通过。原生图集局部上传和后处理按 R10C、产品后端替换按 R10D 执行，当前普通入口仍为 Quick3D bootstrap。

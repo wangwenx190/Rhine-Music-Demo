@@ -186,3 +186,16 @@ ctest --preset qt-release -R '^rhi-opaque-gpu$' --output-on-failure
 ```
 
 此测试使用同机当前 Quick3D 和 RHI 真实窗口/读回，核对报告中的实际后端、36 组双主题/三种封面/前低视角纸面和法线/深度、已知平面深度误差、四角投影 <=2px，以及九尺寸/恢复/30 次连续 resize。报告输出 `build/release/verification/rhi/runtime.json` 与成对 PNG。测试指定 DPR1；若桌面仍得到其他实际 DPR，按真实比例调整 oracle 和目标大小后重新采集，不冒充 DPR1 已通过。阴影六对对应冻结 R10 的 1024/2048/4096 双主题 receiver；查看 `.32` 阴影强度与目标图，不能将白色 receiver 掩码用于全壳体材质验收。MSAA capture/resolve、壳体和后处理分别由 R10B/C/D 的对应检查完成。结束后关闭 Review、重新构建并执行普通 Release CTest。目标平台的实际编译、GPU、图像、尺寸/DPR 检查结果：待用户填写。
+
+## R10B RHI 材质 GPU 用户验证（未执行）
+
+新增审计在 `verification/macos-static/rhi-shell/`，结论为“静态审计通过，实机待用户验证”。目标机最新原生 Kit 的 Release 环境运行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'rhi-material-parameters|runtime-rhi-shell-quick3d|rhi-shell-gpu|rhi-opaque-gpu' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+核对实际 Metal、DPR1、61 个 sourceIndex/同封面同相机的五 ROI、6 对壳体阴影、2 个邻盒法线/深度、倒序/同深度 ID、捕获隔离与 alpha-1x/4x 边缘。报告和 PNG 在 `build/release/verification/rhi-shell/`，材质残差与未接入的后处理按 [rhi-shell.md](../contracts/rhi-shell.md) 区分；passed 不表示全部 ROI 已达 .97/6，也不表示产品后端已替换。检查 4× float MRT 的真实创建/resolve/mips，缺能力应明确失败，不降级冒充通过。Retina 若需调整 DPR，必须重采同输入源图并调整实际像素目标，不能拿 Windows 图当 macOS 图像证据。结束后关闭 Review 重建普通 Release，运行全部 CTest。目标机真实构建、Metal、图像和部署结果：待用户填写。

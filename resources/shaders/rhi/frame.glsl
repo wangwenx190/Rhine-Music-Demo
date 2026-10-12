@@ -21,5 +21,14 @@ layout(std140, binding = 0) uniform Frame
     vec4 clip; // near, far, framebuffer Y up, clip depth zero to one
     vec4 draw; // kind (-1 background, 0 paper, 1 geometry, 2 receiver), shadow enabled, size, radius
     vec4 optics; // spotIntensity, shadow strength, normalBias, depth bias
+    mat4 nativeVP;
+    vec4 camera; // world position, exposure
+    vec4 tint;
+    vec4 attenuation;
+    vec4 material; // transmission, roughness, thickness, attenuation distance
+    vec4 coat; // clearcoat, roughness, surface, environment intensity
+    vec4 areaPosition; // intensity in w
+    vec4 areaTarget;
+    vec4 scatter; // strength in w
 }
 f;

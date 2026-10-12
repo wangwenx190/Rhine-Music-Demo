@@ -1,0 +1,46 @@
+{
+  "checks": [
+    {
+      "checkId": "COMMON-01",
+      "requirement": "Latest native Kit, C++23 and expanded private API build probe",
+      "sourcePath": ["CMakeLists.txt", "cmake/QtKit.cmake", "cmake/RhiProbe.cmake", "src/render/rhi/CMakeLists.txt", "tools/review/CMakeLists.txt", "tests/unit/CMakeLists.txt"],
+      "lineOrSymbol": "YALAHOO_RHI_API / setResolveTexture / generateMips / rhi-shell-gpu",
+      "evidence": "Root enforces C++23/latest native Kit. Private probe is invalidated at configure and now checks resolve/mip/sample APIs and 752-byte offsets; no minor/patch gate or platform-specific renderer ABI. Same selected qsb builds seven SPIR-V/GLSL/ES/HLSL/MSL programs. RHI remains a sibling library; Review GPU executables only exist when YALAHOO_REVIEW is ON; product replacement remains R10D."
+    },
+    {
+      "checkId": "COMMON-02",
+      "requirement": "Resource format, bounded target, alpha/contain and identity closure",
+      "sourcePath": ["src/render/rhi/RhiItem.h", "src/render/rhi/RhiItem.cpp", "src/render/rhi/ShellMaterial.cpp", "resources/shaders/rhi/opaque.frag", "resources/manifests/rhi-shell.json"],
+      "lineOrSymbol": "floatTextureBytes / makeTarget / submit / shellMaterial / textureSize",
+      "evidence": "All model, lookup, environment and shader aliases are qrc-backed. Qt APIs accept Unicode paths; no platform path separator or drive dependence. PMREM is 768x1024, DFG 16x16, LTC 64x64, all RGBA32F little-endian converted to host byte order. Target pixel/GPU dimension and real supported sample counts are checked; creation failure is explicit, not a hidden quality reduction. Contain, 1/64 inset, texel clamp and .025 alphaTest are retained. Unique stable IDs are validated before synchronization."
+    },
+    {
+      "checkId": "COMMON-03",
+      "requirement": "Clip-space, shadow reception, optical math and explicit read/write graph",
+      "sourcePath": ["src/render/rhi/RhiApi.h", "src/render/rhi/RhiItem.cpp", "resources/shaders/rhi/frame.glsl", "resources/shaders/rhi/geometry.vert", "resources/shaders/rhi/shadow-filter.glsl", "resources/shaders/rhi/shell.frag", "resources/shaders/rhi/output.frag", "tools/assets/prepare-rhi-shell.py"],
+      "lineOrSymbol": "Uniform / nativeVP / shadowFactor / generateMips / musicBRDF / musicShell / textureBicubic",
+      "evidence": "Native raster and refraction projection use QRhi correction; framebuffer sample UV and shadow IGN/Vogel offsets retain backend orientation. Inverse-transpose normals preserve authored geometry. 752-byte std140 offsets are compile-time asserted and reflected in qsb. MSAA attachments resolve before mip generation; shell destination is independent from opaque capture and cannot alias its sampler. Shells never recursively enter capture. Source FrontSide/depth-write/no-blend and canonical .32 shadow only attenuate key diffuse/specular/coat; PMREM/LTC/DFG and world-space source field are unchanged. ACES occurs once, with raw pre-output diagnostics and unlit direct-material exception explicit."
+    },
+    {
+      "checkId": "COMMON-04",
+      "requirement": "Snapshot ownership, deterministic global ordering and resource/readback lifetime",
+      "sourcePath": ["src/render/rhi/RhiItem.h", "src/render/rhi/RhiItem.cpp", "tools/review/RhiShellAudit.cpp", "tools/review/RhiAudit.cpp"],
+      "lineOrSymbol": "synchronize / opaqueOrder / ShellDraw / Target::reset / Pending / Renderer::~Renderer",
+      "evidence": "Input contains values and detached QImage only. Opaque paper sorts near-to-far, all three shell batches sort globally far-to-near at a fixed camera; stable identity/surface breaks equal-depth ties. GUI queues guarded delivery; renderer owns QRhi objects and never reads GUI objects during render. Rebuild releases bindings/pipelines before target/pass/MSAA/resolve attachments. Pending readbacks retain result storage until finish/completion; same ID, reverse input, same-depth and capture-isolation checks use real pixels. Existing nine-size/30 resize-burst ownership regression is rerun. No media lifecycle or Provider/network requests are introduced."
+    },
+    {
+      "checkId": "COMMON-05",
+      "requirement": "Independent source comparison, declared residuals and scope of actual execution",
+      "sourcePath": ["tools/review/export-rhi-shell.mjs", "tools/review/RhiShellAudit.cpp", "tests/unit/RhiMaterialTest.cpp", "src/app/MaterialReview.cpp", "tools/build/verify-r10b.ps1", "docs/contracts/rhi-shell.md"],
+      "lineOrSymbol": "sourceIndex / referenceMedia / losses / frozenParameters / alphaResolve / neighborChannels",
+      "evidence": "Frozen production modules and locked dependencies are loaded in an isolated Web harness with external requests blocked. All 61 inputs retain original R10 indices and same camera/cover/theme/parameters. Current Quick3D and RHI compare against same pre-AO/Bokeh/SMAA source; original direct-material inputs are unchanged. Five ROIs and edge losses are all retained; narrow SSIM windows are null, not excluded. Original neighbor normal/depth witnesses and source parameters are independently checked. New CPU parameter test runs in production; full Review/production Release CTest and QML lint are recorded. Residuals remain explicit; no tile-transfer-byte, full performance, product replacement or target-OS GPU pass is claimed."
+    },
+    {
+      "checkId": "WINDOW-01",
+      "requirement": "Tests stay hidden unless exposure is required; exposed windows are bottom/no-focus before first show",
+      "sourcePath": ["src/app/VerificationWindow.h", "src/app/main.cpp", "qml/Yalahoo/Music/App.qml", "src/app/SceneReview.cpp", "src/app/MaterialReview.cpp", "tools/review/RhiAudit.cpp", "tools/review/RhiShellAudit.cpp", "tools/assets/ExportBranding.cpp", "tools/assets/CMakeLists.txt", "tests/unit/VerificationWindowTest.cpp", "docs/contracts/test-window-policy.md", "AGENTS.md"],
+      "lineOrSymbol": "verificationRun / verificationFlags / prepareWindow / windowPolicySatisfied / renderedImage / WS_EX_NOACTIVATE",
+      "evidence": "QML starts verification roots hidden and receives bottom/no-focus flags before first exposure. All runtime, scene/material, RHI and brand windows share the same Qt public helper and preserve flags on hide/restore/recreation. No raise/requestActivate or desktop capture exists in test paths; headless Web harnesses have no visible window. CPU/unit/format/asset comparisons never show windows. Hidden native QWindow test checks create/recreate, plus Windows-only system no-activate/non-topmost HWND. Real GPU reports check flags and inactive state. Brand proof captures its own expose/paint image without sampling other apps. Native Windows branch is guarded, User32 links only on Windows; target WM/compositor behavior awaits user runtime validation."
+    }
+  ]
+}

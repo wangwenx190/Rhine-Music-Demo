@@ -4,7 +4,7 @@
   "selectedBackend": "rhi",
   "implementationReady": false,
   "activeImplementation": "quick3d-bootstrap",
-  "implementationRounds": ["R10B", "R10C", "R10D"],
+  "implementationRounds": ["R10C", "R10D"],
   "rhiFoundation": {
     "implementation": "src/render/rhi/RhiItem: immutable SceneFrame synchronization, explicit shadow and opaque color/normal/depth targets",
     "contract": "docs/contracts/rhi-opaque.md",
@@ -13,6 +13,16 @@
     "sourceShadowFilter": "Frozen PCFSoftShadowMap request aliases to PCFShadowMap in locked Three: IGN-rotated 5-point Vogel disk with bilinear depth compare",
     "evidence": "verification/windows/rhi-opaque/release-runtime.json",
     "rebuild": "tools/build/verify-r10a.ps1"
+  },
+  "rhiShell": {
+    "contract": "docs/contracts/rhi-shell.md",
+    "implementation": "src/render/rhi/RhiItem: opaque MSAA resolve/mips, independent composite MRT, source shell optics/shadow and global stable identity sort",
+    "productEnabled": false,
+    "captureSamples": 4,
+    "uniformBytes": 752,
+    "sourceStage": "61 original R10 inputs before AO/Bokeh/SMAA; original direct-material exceptions unchanged; neighbor depth/normal 58/59 checked separately",
+    "evidence": "verification/windows/rhi-shell/release-runtime.json",
+    "rebuild": "tools/build/verify-r10b.ps1"
   },
   "input": {
     "scene": "SceneAdapter::frame() -> immutable SceneFrame copied during synchronize",
@@ -41,9 +51,7 @@
   "passOrder": ["shadow", "opaque-color-normal-depth", "capture-resolve-mips", "sorted-shell", "SSAO", "Bokeh-41", "SMAA-by-quality", "ACES-sRGB-output"],
   "evidence": ["tests/fixtures/render-backend/visual.json", "verification/windows/render-backend/release-runtime.json", "verification/windows/render-backend/release-gpu-checks.json", "docs/media/render-backend/", "verification/windows/render-backend/evidence-index.json"],
   "tasks": [
-    {"id": "source-shadow", "round": "R10B", "input": "R10 cases 9-20; previous occlusion 086/087; R10A explicit shadow target and receiver witnesses", "object": "Unshaded shell reception from the shared RHI shadow target/projection/normal bias/depth bias/effective source filter", "acceptance": "all three map sizes and both themes: compare shell on/off masks and five ROIs, source strength .32 and caster flags; verify effective pixels, not shadowFactor configuration"},
-    {"id": "source-capture-order", "round": "R10B", "input": "R10 2/3 (postprocess 078/079), 7/8 (occlusion 031/071), 21-56 (all covers/themes/angles/intermediate origin), 57-65 (channels/instance order)", "object": "opaque capture plus sorted shell depth-write/cull/blend and shadow reception", "acceptance": "retain all five equal-weight MAE/SSIM/edge losses, source flags/optics. Depth/normal remain <.05 full-image MAE; geometry projection <=2px. Match source capture semantics before parameter search, then review every recorded residual"},
-    {"id": "capture-alpha-resolve", "round": "R10B", "input": "R10 4-6 (exact direct-material 075), 0 (postprocess 047 diagnostic)", "object": "multisampled opaque alpha boundary, explicit resolve/mips and local print LOD", "acceptance": "smooth boundary with contain/1/64 inset, alphaTest and print sharpness intact; SSAA remains diagnostic; keep 047 separate and re-run R09B nine sizes and real DPR in R10D"},
+    {"id": "material-residual-replay", "round": "R10C", "input": "verification/windows/rhi-shell/release-runtime.json residuals: R10 2/57/60 background; 7/9-20/25/37 spine; 22/28 rim; 32 background; 61 paper/margin/background; 62-65 margin", "object": "preserve source optics/capture/global identity ordering while adding independent AO/Bokeh/SMAA/output and expanded instance/atlas paths", "acceptance": "retain all five equal-weight MAE/SSIM/edge losses and explicit narrow-ROI null SSIM; compare same pre-stage to R10B and final stage to original R10. Keep source normal/depth <.05 full-image MAE, projection <=2px, real shell shadow/alpha/no-fringe/order witnesses. Do not use aggregate improvement to erase individual residuals. Re-run R10 0/1/3 final-output/quality/Bokeh inputs; R09B nine sizes and DPR remain R10D."},
     {"id": "tile-upload-and-output", "round": "R10C", "input": "R10 66-69: 9 shared instances, 2048 RGBA8 page, one 256 tile update, unchanged frame, revert", "object": "QRhi tile subresource uploads with generation/lease checks, independent postprocess targets", "acceptance": "measure actual GPU destination regions/bytes (R10 GPU transfer bytes are unknown, not zero or a budget pass); one tile <=262144 bytes, steady <=2097152, initialization batches <=16777216; stable frame zero upload and same pixels, revert exact; expand to 432 instances and target bounds"},
     {"id": "unique-product-backend", "round": "R10D", "input": "R06-R10 same-hash fixtures and SceneAdapter API", "object": "replace Quick3D bootstrap with selected RHI path and update implementationReady/activeImplementation", "acceptance": "Windows D3D11 plus available OpenGL replay; no second production state/path; Metal/Linux shader and resource audit, runtime pending user"}
   ]

@@ -12,6 +12,7 @@ struct Input
 {
     SceneFrame scene;
     QVector<QMatrix4x4> entities;
+    QVector<quint64> entityIds;
     QImage cover;
     QVector4D rowSettings;
     QVector3D rowColumn, lightColumn, spotPosition, spotTarget, spotColor;
@@ -19,6 +20,11 @@ struct Input
     float printAmbient = .5f, rowDetail = 0, rowFill = 1, spotIntensity = 0,
           environmentIntensity = .25f;
     int shadowSize = 2048;
+    int captureSamples = 1;
+    float warmth = 1, clarity = 0, exposure = 1.05f, scatterStrength = 1, areaIntensity = 0;
+    QVector3D scatterColor, areaPosition, areaTarget;
+    bool shells = false, showPaper = true, rawOutput = false;
+    bool lightingEnabled = true;
     bool shadows = true, geometryDiagnostic = false, shadowDiagnostic = false;
     quint64 request = 0;
 };
@@ -26,6 +32,7 @@ struct Capture
 {
     quint64 request = 0;
     QImage color, normal, depth, shadow;
+    QImage composite, compositeNormal, compositeDepth;
     QJsonObject metadata;
 };
 // Review/next-backend integration boundary; product replacement belongs to R10D.

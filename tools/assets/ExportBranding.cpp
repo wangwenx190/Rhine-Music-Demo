@@ -17,6 +17,7 @@
 #include <QMap>
 #include <functional>
 #include <QWindow>
+#include "VerificationWindow.h"
 #include <QExposeEvent>
 #include <QBackingStore>
 #include <QScreen>
@@ -385,21 +386,33 @@ class PreviewWindow : public QWindow
 {
     QBackingStore backing{ this };
     QImage board;
+    QImage rendered;
 
 public:
     explicit PreviewWindow(QImage image) : board(std::move(image))
     {
+        yalahoo::verification::prepareWindow(*this);
         setTitle("yalahOO!!! · R03B Qt brand proof");
         resize(board.size());
+    }
+    QImage renderedImage() const
+    {
+        return rendered;
     }
     void exposeEvent(QExposeEvent *) override
     {
         if (!isExposed())
             return;
+        rendered = QImage(size() * devicePixelRatio(), QImage::Format_ARGB32_Premultiplied);
+        rendered.setDevicePixelRatio(devicePixelRatio());
+        rendered.fill(Qt::transparent);
+        QPainter imagePainter(&rendered);
+        imagePainter.drawImage(QRect(QPoint(), size()), board);
+        imagePainter.end();
         backing.resize(size());
         backing.beginPaint(QRect(QPoint(), size()));
         QPainter p(backing.paintDevice());
-        p.drawImage(QRect(QPoint(), size()), board);
+        p.drawImage(QPoint(), rendered);
         p.end();
         backing.endPaint();
         backing.flush(QRect(QPoint(), size()));
@@ -714,16 +727,23 @@ int main(int argc, char **argv)
             QTimer::singleShot(750, &app, [&] {
                 try {
                     require(window.isExposed(), "Qt proof window not exposed");
-                    const QImage capture = window.screen()->grabWindow(window.winId()).toImage();
+                    require(yalahoo::verification::windowPolicySatisfied(window),
+                            "Brand proof window violated bottom/no-focus policy");
+                    // Bottom windows can be occluded by the user's work. Capture only our own
+                    // rendered board; never sample the desktop or raise a proof window.
+                    const QImage capture = window.renderedImage();
                     require(!capture.isNull(), "Native Qt window capture failed");
                     save(capture, media + "windows-window.png");
-                    result["nativeWindow"] =
-                            QJsonObject{ { "exposed", true },
-                                         { "capture", "docs/media/branding/windows-window.png" },
-                                         { "dpr", window.devicePixelRatio() },
-                                         { "width", capture.width() },
-                                         { "height", capture.height() },
-                                         { "platform", QGuiApplication::platformName() } };
+                    result["nativeWindow"] = QJsonObject{
+                        { "exposed", true },
+                        { "capture", "docs/media/branding/windows-window.png" },
+                        { "captureMethod", "own rendered board; no desktop capture" },
+                        { "windowPolicy", yalahoo::verification::windowPolicy(window) },
+                        { "dpr", window.devicePixelRatio() },
+                        { "width", capture.width() },
+                        { "height", capture.height() },
+                        { "platform", QGuiApplication::platformName() }
+                    };
                     grabbed = true;
                 } catch (const std::exception &e) {
                     qCritical("%s", e.what());

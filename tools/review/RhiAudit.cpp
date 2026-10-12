@@ -2,6 +2,7 @@
 #include "SceneAdapter.h"
 #include "FixedTextureData.h"
 #include "ImageComparison.h"
+#include "VerificationWindow.h"
 #include <QGuiApplication>
 #include <QQmlEngine>
 #include <QQmlComponent>
@@ -189,7 +190,7 @@ int main(int argc, char **argv)
         // Window outlives the engine/items and guarded queued readback deliveries.
         QQuickWindow window;
         window.setTitle("yalahOO!!! · R10A GPU review");
-        window.setFlags(Qt::Window | Qt::FramelessWindowHint);
+        verification::prepareWindow(window, true);
         QQmlEngine engine;
         QQmlComponent component(&engine, QUrl("qrc:/review/RhiOracle.qml"),
                                 QQmlComponent::PreferSynchronous);
@@ -460,6 +461,7 @@ int main(int argc, char **argv)
         window.hide();
         frames(window, 0);
         QJsonObject report{ { "round", "R10A" },
+                            { "windowPolicy", verification::windowPolicy(window) },
                             { "configuration", "Release" },
                             { "passed", true },
                             { "qt", qVersion() },
@@ -476,6 +478,8 @@ int main(int argc, char **argv)
                             { "materialAcceptanceRound", "R10B" },
                             { "postprocessAndTileBudgetRound", "R10C" } };
         QSaveFile file(output + "/runtime.json");
+        check(verification::windowPolicySatisfied(window),
+              "GPU review window violated bottom/no-focus policy");
         check(file.open(QIODevice::WriteOnly), "Cannot open report");
         file.write(QJsonDocument(report).toJson());
         check(file.commit(), "Cannot commit report");

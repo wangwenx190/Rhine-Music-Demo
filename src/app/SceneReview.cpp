@@ -1,5 +1,6 @@
 #include "SceneReview.h"
 #include "SceneAdapter.h"
+#include "VerificationWindow.h"
 #include <QDir>
 #include <QCryptographicHash>
 #include <QFile>
@@ -40,7 +41,7 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         }
     }
     window.setProperty("sceneReview", true);
-    window.setFlags(Qt::Window | Qt::FramelessWindowHint);
+    verification::prepareWindow(window, true);
     window.setPosition(0, 0);
     window.show();
     scene.setReducedMotion(
@@ -170,24 +171,27 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         poll.stop();
         const auto api = window.rendererInterface()->graphicsApi();
         pass = pass && QSGRendererInterface::isApiRhiBased(api);
+        pass = pass && verification::windowPolicySatisfied(window);
         QSaveFile output(report);
         bool committed = output.open(QIODevice::WriteOnly);
         if (committed) {
-            output.write(QJsonDocument(QJsonObject{ { "passed", pass },
-                                                    { "qtVersion", qVersion() },
-                                                    { "platform", QGuiApplication::platformName() },
-                                                    { "graphicsApi", int(api) },
-                                                    { "baseline", oracle["baseline"] },
-                                                    { "fixtureSha256",
-                                                      QString::fromLatin1(
-                                                              QCryptographicHash::hash(
-                                                                      fixtureBytes,
-                                                                      QCryptographicHash::Sha256)
-                                                                      .toHex()) },
-                                                    { "maxQtCpuPixels", maxQt },
-                                                    { "maxWebPixels", maxWeb },
-                                                    { "cases", results } })
-                                 .toJson());
+            output.write(
+                    QJsonDocument(
+                            QJsonObject{ { "passed", pass },
+                                         { "windowPolicy", verification::windowPolicy(window) },
+                                         { "qtVersion", qVersion() },
+                                         { "platform", QGuiApplication::platformName() },
+                                         { "graphicsApi", int(api) },
+                                         { "baseline", oracle["baseline"] },
+                                         { "fixtureSha256",
+                                           QString::fromLatin1(
+                                                   QCryptographicHash::hash(
+                                                           fixtureBytes, QCryptographicHash::Sha256)
+                                                           .toHex()) },
+                                         { "maxQtCpuPixels", maxQt },
+                                         { "maxWebPixels", maxWeb },
+                                         { "cases", results } })
+                            .toJson());
             committed = output.commit();
         }
         app.exit(pass && committed ? 0 : 10);

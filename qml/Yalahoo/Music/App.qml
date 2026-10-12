@@ -11,11 +11,14 @@ ApplicationWindow {
     required property SceneAdapter sceneAdapter
     property bool sceneReview: false
     property bool geometryProbe: false
+    property bool verificationRun: false
+    property int verificationFlags: Qt.Window
+    flags: verificationRun ? verificationFlags : Qt.Window
     width: 960
     height: 640
     minimumWidth: 1
     minimumHeight: 1
-    visible: true
+    visible: !verificationRun
     title: "yalahOO!!!"
     property int interactionCount: 0
 
