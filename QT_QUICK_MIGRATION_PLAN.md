@@ -74,6 +74,7 @@
 - `qmake`、`balsam`、`qsb`、`qmllint`、部署工具及 Qt 插件均从同一已选 Kit 或其配套 host-tools 定位并校验版本一致，不从任意 PATH 混用其他 Qt 安装；记录实际 Qt/编译器/工具版本到验收产物。
 - 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
 - Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
+- R14 增加 Qt Canvas Painter 的构建与运行闭包：CMake 通过 `find_package(Qt6 REQUIRED COMPONENTS CanvasPainter)` 和 `Qt6::CanvasPainter` 接入；QML API 使用 `import QtCanvas2D`，C++ API 使用 QCanvasPainter / QCanvasPainterItem / QCanvasPainterItemRenderer。同一最新原生 Kit 必须具备模块、QML 插件和配套工具，按实际 API 编译/导入探测，不锁定 minor/patch 或安装目录；缺模块时明确诊断，不降到旧 Kit。本机已安装信息只供定位，具体接入和探针由 R14 执行，不提前生成实现。
 - `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
@@ -85,7 +86,7 @@
 ### 性能设计与算法审计
 
 - 所有剩余轮次遵守 [docs/contracts/performance.md](docs/contracts/performance.md)：设计与算法审计是前置要求，benchmark是验证和定位工具。每轮按PERF-01–07展开复杂度、调用链、线程/背压、快照/增量、渲染图、缓存失效、QML/输入及生命周期；发现可确定的结构缺陷必须修复，数值通过不构成豁免。
-- 保留源码效果数学和产品行为，优化调度、索引、数据布局、缓存、局部上传、批处理与资源所有权，不要求移植冻结实现中的无效工作。成熟方案须有适用条件和等价性证据；减少采样、近似透明、降精度/分辨率或关闭效果不能冒充无损优化。临时解冻须用户按轮次明确授权，不向后续session延续；历史Web提交、来源资产与验收结果仍作为对照保留。
+- 保留源码效果数学和产品行为，优化调度、索引、数据布局、缓存、局部上传、批处理与资源所有权，不要求移植冻结实现中的无效工作。替代方案须有适用条件和等价性证据；减少采样、近似透明、降精度/分辨率或关闭效果不能冒充无损优化。临时解冻须用户按轮次明确授权，不向后续session延续；历史Web提交、来源资产与验收结果仍作为对照保留。
 - GUI/render热路径不读盘、不解码、不等待worker、不手动转事件循环，不执行常态GPU finish/readback。不可变快照按revision更新，有界队列合并稳定ID并淘汰过期结果；只复制新内容、只提交有效范围。每帧工作量与可见池/活动动画绑定，不能随曲库总量增长。
 - 资源与兼容性键分离：可见数量、相机、焦点、光照数值不能触发完整目标/PSO/SRB重建；buffer采用固定有界容量或独立容量增长策略。展开附件格式/MSAA/resolve/mips与最后使用位置，非重叠目标才可复用；阴影/实体光场/文本缓存记录完整依赖和失效规则。
 - 每轮输出适用检查的源码符号/hash、设计结论、修复与局部成本及验证限制；完整产品体验/资源收敛在R10D/R28/R30集成边界验收，不把所有性能工作推迟到R28，也不强制低风险文字修改重复整套GPU矩阵。
@@ -186,6 +187,15 @@
 - 原功能按钮图标提取为 SVG 或 Qt Quick Shape，保留 viewBox、描边宽度、端点与颜色；不替换成系统主题图标。产品品牌标识按 R03B 原创 SVG 替换，保持原品牌容器锚点、留白、出现/退出时序与层级；不把旧品牌轮廓复制到新 Logo。
 - 原生资产来源/hash、qrc 别名、模型批次/UV 约定、功能图标、音效静音事件映射与准备/验证命令见 `docs/contracts/assets.md`；生成清单在 `resources/manifests/`。原 MiSans 的 OS/2 权重与 Web CSS 权重不同，QML 使用 `MusicFonts.light/regular/demibold/bold` 的 family/styleName/weight 显式选择对应字形，C++ 使用 `assetFont(cssWeight)`，不按 CSS 数值让 Qt 自动匹配其他字体面。
 - GLB 保留原资产，用 Kit 自带 balsam 导入或通过 Qt 自带导入器读取；若某 glTF 特性导入丢失，写窄用途 C++/Qt 解析器读取本项目 GLB 的 JSON/BIN、POSITION/NORMAL/TEXCOORD/indices，不引入 Assimp 等库。
+
+### 二维绘制选型与 Qt Canvas Painter
+
+- Qt Canvas Painter 的 C++ API 与 QML Canvas2D 均纳入实际候选，模块许可证类别、技术预览标签及使用较新的 Qt API 不作为本项目的排除理由，也不据此固定优先 C++。保留必要署名与随附文件；选型依据为源码效果/行为等价性、实际 API 能力、CPU/GPU 与资源成本、实现和维护复杂度。继续使用最新 Kit，不能为兼容旧 Qt 而放弃更适合的能力；实际缺失功能或验证失败须指出具体输入、对象和技术原因。
+- R14 验证两种 API 并建立共用绘制契约；R15 将通过验收的 Canvas Painter 用于生产滑尺刻线/路径，R20 用于生产二维序章的原创品牌轮廓/圆环。R16 比较文字绘制路径后确定字轮实现，不因已引入绘制模块就强制替换全部文字。普通控件/输入/焦点/Accessible 与列表虚拟化继续由 Qt Quick 承担，三维 SceneItem 的 RHI 管线按既有契约执行。
+- 同组件的 C++/Canvas2D 及适用的 Qt Quick Text/Shape/ShaderEffect 对照使用同一内容、字体、路径、主题、逻辑/物理尺寸、DPR、时刻和抗锯齿目标；先满足结构、文本、运动与图像门槛，再比较成本。不能用 CPU QPainter/旧 Canvas 的测试成绩代替与实际 Qt Quick GPU 路径的比较，也不直接转抄官方 benchmark 宣称本项目提速。采用的具体组件、API、比较范围与理由写入 R14 建立的 `docs/contracts/canvas-painter.md`，原始产物只留本地忽略目录。
+- 验证描边宽度/端点/连接、曲线与路径缓存、透明背景/预乘及颜色空间、渐变/遮罩/裁切、文字基线/字重/字距/shaping/emoji 和 DPR 边缘。接口不支持的效果不得擅自近似：同组件可组合 Qt Quick 合成层保持等价，或依据明确对照保留更合适的原路径。R15/R20 的生产使用是具体交付；若目标组件存在可复现的不等价或结构/资源回归，须修复或保留针对该组件的具体补修任务，不能只完成演示探针就宣告接入完成。
+- 绘制只消费已有控制器/不可变状态和唯一 FrameClock，使用已缩放 dt，不新增独立 Timer/FrameAnimation/requestAnimationFrame 时钟。静态状态按内容/布局 revision 触发重绘，隐藏/遮挡后停止无效 tick；缓存按路径/样式/字体/尺寸/DPR 等实际依赖失效，动画只更新必要参数，不逐帧重建不变路径、字体布局、图像或绘制目标。C++ 同步与 QML JavaScript 成本分别记录，禁止在绘制/同步热路径读盘、解码、等待或 GPU 读回。
+- 展开 Canvas Painter 与 Qt Quick 的真实渲染/合成顺序、离屏附件、MSAA/resolve、纹理上传、缓存容量、资源所有者及 hide/restore/resize/重建/退出路径，新增资源纳入累计 ResourcePlan。Windows 使用 Release、置底/不接受焦点窗口和自身渲染读回验证 D3D11 及 OpenGL；macOS/Metal、Linux/OpenGL 按相同源码、qsb 和部署闭包严格静态审计，标明“静态审计通过，实机待用户验证”。局部绘制成绩不代替 R28 的完整产品验收。
 
 ### 连续运动
 
@@ -304,27 +314,30 @@
 ### R14 · 二维基础控件、页眉与浏览静态布局（1–1.5日）
 
 - 依赖R03、R03B、R04、R06、R13。交付DesignTokens、Header、BrowseInfo、Footer与自定义Basic控件。
+- 同轮交付 Canvas Painter 基础接入和 `docs/contracts/canvas-painter.md`：扩展最新 Kit 的模块发现、CMake 链接、QML 导入/qmllint 与资源清单；分别执行 QCanvasPainterItem 和 Canvas2D 的最小真实绘制探针，验证曲线/描边、透明/渐变、矩形裁切、SVG 路径、MiSans/中文/emoji、双主题和 DPR 1/1.5/2。对照适用的 Qt Quick 绘制路径，记录实际能力、GUI/同步/提交与可用 GPU 指标、缓存/附件/上传、静止及 hide/restore/resize/重建行为；Windows D3D11/OpenGL 实机与 macOS/Linux 静态审计按二维绘制契约执行，不将单个微基准当成全 GUI 提速结论。
 - 按基线计算样式实现字体、字距、线宽、颜色、留白和图标；品牌与返回锚点、主题双标签、当前歌名槽和播放按钮固定位置。
 - 页眉接入 R03B 的 `yalahOO!!!` 原创 Logo，按主题选择生产稿；品牌容器位置与相邻控件不变，窄屏按品牌规范切换紧凑组合或图形，不截掉感叹号，也不挤占播放按钮。关于/设置等产品名称统一走同一身份常量。
 - LayoutMetrics决定横/竖布局，窄屏保留主题文字和播放按钮；短屏信息可滚动，超宽屏相机/文字协同。
 - 阅读渐变与夜间遮罩分层，竖屏侧向遮罩650ms淡出；不以全屏半透明层错误影响顶栏。
 - 性能设计与验证：审计绑定传播、layer/offscreen目标和遮罩overdraw，复用控件与布局结果；静止状态不持续重算文字/样式，只保留源码效果所需合成层。
-- 退出：九个尺寸静态截图通过结构/文本门槛，没有传统Qt默认外观混入产品。
+- 退出：九个尺寸静态截图通过结构/文本门槛，没有传统Qt默认外观混入产品；Canvas Painter 两种 API 的基础能力/窗口/生命周期验证完成，R15/R16/R20 可复用的接口、差异和具体使用范围已写入绘制契约。
 
 ### R15 · 滑尺、数字字轮与导航输入（1–1.5日）
 
 - 依赖R05、R14。交付RulerController/Ruler.qml、OrdinalReel、InputRouter。
+- 生产滑尺的密集刻线、伸长/ripple 路径采用 R14 验证的 Canvas Painter 绘制；C++ 与 Canvas2D 按同输入对照确定实际 API，文字、点击区/焦点和边缘合成可与 Qt Quick 组合。保留 12+4 槽的真实几何、淡隐及物理 occurrence，缓存不变路径并只发布当前可见绘制状态，不把刻度绘制与输入语义合并成第二个控制器。
 - 滑尺12可见+两侧各2预留，anchor=5、弹簧rate=18、ripple=560ms；桌面3px/10/30/22/8间距，窄屏2px/8/21/16/6间距，边缘mask渐隐。
 - 刻度自身伸长；复用不可见槽，隐藏槽无焦点/点击。循环点击传可见occurrence相对行差，真实列传有限索引。
 - wheel：pixelDelta优先；angleDelta每120对应48px；48px一张、单事件最多3张、200ms手势分段、反向/切列清余量。输入框、面板、歌单和滑块保留滚动所有权。
 - 性能设计与验证：输入收到、导航revision、对应帧分别标记；快速输入仅合并可替换目标，保留方向/手势语义，不用任意延迟debounce掩盖阻塞。刻度/字轮节点数量与可见槽绑定。
-- 退出：键盘、触摸滑动（36px/1.3方向比/1400ms）与滑尺共用边界，快速反向连续，输入框不触发全局导航。
+- 退出：键盘、触摸滑动（36px/1.3方向比/1400ms）与滑尺共用边界，快速反向连续，输入框不触发全局导航；Canvas Painter 已走实际生产滑尺路径，双主题/DPR 的刻线、边缘渐隐和动画成对验证通过，局部绘制/合成/资源成本与 Qt Quick 对照分别记录。
 
 ### R16 · 多行标题字轮、歌名字轮与文字测量（1.5–2日）
 
 - 依赖R05、R14。交付TextLayoutAdapter、TitleReel、TransportTitle与字形测试。
 - 移植music-title-reels.ts的460ms/归一rate10解析轨迹、速度限幅和统一时间原点；采样当前glyph位置/速度重定向，不重建整个文本面板。
 - QTextLayout做整行断行/shaping，QTextBoundaryFinder做grapheme；glyph单元复用位置和裁切，高度覆盖下伸部及中英文括号；匿名长标题与emoji覆盖。
+- 以同一 TextLayoutAdapter/字轮轨迹比较 Qt Quick Text 与 Canvas Painter 文字绘制（C++/Canvas2D 均可选），核对整行 shaping 后的字形关联、基线/字距、grapheme、彩色 emoji、下伸部与裁切、宽度/DPR 失效及快速打断。测量 GUI 脚本/同步、文字绘制与缓存成本；选择同时满足源码文字/运动门槛且更适合的生产路径，保留 QTextLayout/QTextBoundaryFinder 的测量与边界语义，不因另一 API 便利而按字符重排导致连字/组合字错误。选择及具体差异写入共用绘制契约。
 - 播放歌名槽640ms展开、400ms淡入、内层18px归位，图标180ms透明度/缩放；宽度以实际测量省略，完整名称保留Tooltip/Accessible。
 - 性能设计与验证：整行shaping/断行按文本、字体/字重、宽度/DPR有界缓存；动画tick只更新位置/裁切，共享字符边界和测量，字体/宽度变化可失效，不逐帧重建QTextLayout/glyph对象。
 - 退出：换歌/换专辑/窗口resize/中途改速无残影、错字、括号裁切；歌名定位不调用播放。
@@ -359,12 +372,13 @@
 ### R20 · 二维序章、三维开场和交互交接（1–1.5日）
 
 - 依赖R03B、R08、R12、R14、R17。交付OpeningController、Opening.qml、原创品牌轮廓/圆环路径动画。
+- 二维序章的品牌轮廓/圆环路径采用 R14 绘制契约验证的 Canvas Painter，按该组件的状态归属与实际成本选择 C++ 或 Canvas2D。复用原创 SVG 主素材的中心线/弧长与稳定分组，缓存不变路径，只更新揭示/描边/透明度等必要状态；与适用的 Qt Quick Shape/ShaderEffect 路径同输入比较，保留准确轮廓、抗锯齿、合成层级和既定时序，不通过改写三维管线换取二维绘制收益。
 - 按musicOpeningFrame逐参数采样，不重写近似时间表：轮廓0.24–1.64s、标语2.72–3.58s进入/3.58–5.70s静读/5.70–6.32s退出，标语“一张一张，慢慢听”。
 - 二维底纸6.32s开始消退，三维6.40s从源时间21.92开始，11.60s落稳；主页错峰720ms完成后解锁。主品牌节点复用，不通过两份品牌交叉淡入。
 - 揭示 R03B 提供的新 Logo 中心线和分组，曲率/分段映射按品牌规范；原时间窗、位置、目标占位与交接节奏保持，旧品牌几何不进入生产资源。品牌区域另验收新 SVG，其余画面继续按 Web 成对对照。
 - View3D准备完成后才起片头；0–6.32s完全遮住时不提交三维帧，必要时显式暂停View3D/RHI更新而非只设opacity=0。
 - 性能设计与验证：资源准备/首帧/固定片头/可交互分段，事件就绪谓词启动；取消/跳过不创建第二套场景。核对完全遮挡时实际三维提交为零，不只凭opacity判断节省工作。
-- 退出：跳过/重播/后台恢复/中途减少动态有明确终态、正确焦点与一次交接；20–120fps时序golden通过。
+- 退出：跳过/重播/后台恢复/中途减少动态有明确终态、正确焦点与一次交接；20–120fps时序golden通过；Canvas Painter 已走实际二维序章路径，品牌描边/揭示、双主题/DPR、遮罩交接和重复播放资源回落通过成对验证，静止/退出后无持续重绘。
 
 ### R21 · 本地扫描、身份规则与缓存写入（1–1.5日）
 
@@ -437,6 +451,7 @@
 - 依赖R11–R27。交付StartupCoordinator、资源统计和生命周期/性能检查。
 - 加载提示期间准备模型、可见封面与真实渲染通道；提交两帧初始化目标后才启动开场时钟。扫描完成发生在准备中时，只应用一个一致快照，交接后再允许普通更新。
 - 隐藏暂停视觉tick/封面上传/非必要扫描通知，播放继续；恢复清统计时间而不清状态。重载/退出取消旧generation，资源释放幂等，QObject/GPU销毁顺序明确。
+- 将实际采用的 Canvas Painter 路径纳入产品测量：滑尺连输/反向、字轮（若采用）、序章跳过/重播、主题/DPR/resize、隐藏恢复和十次重建；分别记账脚本/同步/绘制/合成、路径/文字缓存、离屏目标与上传峰值。验证共用时钟、静止零无效重绘及资源回落，不以局部绘制 benchmark 推断完整产品性能。
 - 用96张合成大封面和超432匿名库验证预算；不以关景深/降低默认画质解决冷启动，必须消除重复解码、全图上传和重复实例创建。
 - 性能设计与验证：先收口已有子系统PERF-01–07及具体缺陷，不能集中到本轮才首次发现架构问题。 先用同 Kit/设备/fixture 和独立正常 VSYNC/吞吐样本解释 R10D 的 18.35/20.98ms 观测差异，记录并发 GPU 占用与测量噪声、确认预算依据；不得把 R10D 的记录项视为性能达标。交付R10D输入/呈现测量的实际基线、各阶段预算依据和累计资源清单；固定场景正常VSYNC/未限速串行分开采集，至少三次并保留失败/原始样本，临界不稳定项列具体补修任务。
 - 退出：性能契约、10次重建/30次换片资源回落通过；初始化耗时与稳定帧数据各自记录。
@@ -454,6 +469,7 @@
 
 - 依赖R29。交付Release目录、部署脚本、根目录Windows普通启动器及Qt使用说明。
 - `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，按生产导入与链接闭包部署 Qt Quick、Multimedia 及 Qt 随附媒体依赖，生产不打包 Quick3D 研究场景/插件；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
+- 纳入实际 Canvas Painter 生产闭包：部署 Qt6::CanvasPainter 运行库及 Canvas2D 被采用时的 QtCanvas2D QML 模块/插件与其真实依赖；即便主界面使用 C++ 注册绘制项，也要核对打包后资源/shader 与 RHI 初始化。脱离开发 Kit 运行滑尺及二维序章，检查无缺失模块/插件、正确透明合成和重建行为，不把 Review 探针或未采用的比较实现一起打包。
 - 接入 R03B 原创 ICO 到 Windows 可执行资源，Qt 窗口图标及关于页使用同源 SVG/PNG；显示名 `yalahOO!!!`、输出文件 `yalahoo.exe`。实机检查 Explorer、窗口/任务栏及大/小尺寸图标；macOS ICNS/bundle 和 Linux desktop 图标由 R31/R32 按同一品牌清单接入并静态审计。
 - 用无Qt开发PATH、无Node/FFmpeg路径的临时环境运行；验证离线启动、demo、unicode音乐路径、设备列表、可支持样本和字体加载。
 - 普通启动器只找合法安装/构建产物并启动Qt程序，不后台启动Web服务；演示/光照启动器继续在tools/launchers/。
@@ -465,6 +481,7 @@
 - 依赖R30。交付同一 C++23/Qt 源码的 macOS CMake 分支、`tools/build/` 与 `tools/deploy/` macOS 脚本、根普通 `.command`、`verification/macos-static/` 审计产物及 `docs/platforms/macos.md`。使用该开发机安装的最新原生 Qt Kit，不固定版本；不要求当前具备 macOS 实机。
 - 完整实现 bundle/Info.plist、资源路径、macdeployqt QML/媒体插件部署、Retina 逻辑像素、Command 菜单/快捷键、关闭与后台语义；产物放 `out/macos/`，不引用 Swift 桥接。根普通 `.command` 新建为 Qt 启动器；原脚本继续在 `legacy-web/` 保留，Qt 演示/研究入口在根 `tools/launchers/`。
 - 按 COMMON-01–05 与 MAC-01 逐项展开实际源码/构建/部署链，审核 Metal/字体/qsb 资源与媒体设备逻辑；共享功能在 Windows 运行回归。修复所有可确定缺陷，禁止空分支、直接禁用功能或用 Windows 截图作为 macOS 图像证据。
+- 补齐 Canvas Painter 的 Metal/Retina、绘制项与三维 SceneItem 合成次序、资源/shader 和实际 Canvas2D 导入（若采用）的 bundle/macdeployqt 闭包；审计同步/线程所有权、透明与裁切、DPR/cache 失效和重建释放。用户实机清单覆盖实际滑尺/序章及采用的文字路径，不能仅凭模块导入成功认定绘制通过。
 - 用户验证清单列出 Qt Kit 设置、configure/build/test、macdeployqt、bundle 启动，以及代表性浏览/详情/总览/片头/玻璃 ROI、本地播放/暂停/seek/设备变化的命令或步骤及预期结果；其中真实执行结果留待用户填写。
 - 性能设计与验证：补齐PERF-01–07在Metal/Retina上的尺寸/峰值、同步、缓存失效和生命周期推演；用户清单包括正常VSYNC/吞吐、输入和准备时延，不用Windows成绩填写目标结果。
 - 退出：平台实现与脚本完整，严格静态审计所有适用项通过，缺陷清零，结论为“静态审计通过，实机待用户验证”；满足后删除本轮。缺实机环境不阻止本阶段验收，不宣称实际 macOS 构建、Metal 或音频已通过。
@@ -474,6 +491,7 @@
 - 依赖R30。交付 Linux CMake 分支、`tools/build/` 与 `tools/deploy/` Linux 脚本、根普通 `.sh`、`verification/linux-static/` 审计产物及 `docs/platforms/linux.md`。不要求当前具备 Linux 实机。
 - 完整实现 C++23、该开发机安装的最新原生 Qt Kit 与 CMake/Ninja 构建及 `out/linux/` 部署，不固定 Qt 版本；明确 QML/平台/媒体插件、共享库搜索位置与 Qt 所需系统依赖。优先 OpenGL，可选 Vulkan 经探测可回退，X11/xcb 与 Wayland 所需路径和配置均实现。普通 `.sh` 从自身路径解析产物，保留参数，设置正确 Git 可执行位。
 - 按 COMMON-01–05 与 LNX-01 检查大小写/Unicode/XDG/权限路径、字体与 shader、触摸板 pixelDelta、默认设备及错误处理；展开所有非 Windows 分支而非只审阅入口文件，修复每项静态可确定缺陷。系统包要求按实际 Qt 插件写明，脚本不静默修改系统音频/驱动配置。
+- 补齐 Canvas Painter 的 OpenGL/所启用 Vulkan、X11/Wayland 合成、资源/shader 和实际 Canvas2D 导入（若采用）的库/插件闭包；审计同步/线程所有权、透明与裁切、DPR/cache 失效和重建释放。用户实机清单覆盖实际滑尺/序章及采用的文字路径，Windows OpenGL 结果不代替 Linux 实机绘制。
 - 用户验证清单列出 configure/build/test/部署/启动命令、X11 与 Wayland、DPR/窗口尺寸、浏览/详情/总览/片头、默认设备与播放/seek/设备变化检查及预期结果；真实环境检查以后由用户执行。
 - 性能设计与验证：补齐PERF-01–07在GL/可选Vulkan及X11/Wayland上的格式/尺寸/峰值、同步与节流推演；用户清单含正常VSYNC/吞吐与输入/准备时延，不从D3D11推断目标GPU效率。
 - 退出：平台实现与部署闭包完整，严格静态审计所有适用项通过，缺陷清零，结论为“静态审计通过，实机待用户验证”；满足后删除本轮。缺实机环境不阻止本阶段验收，不宣称实际 Linux 构建、图形或音频已通过。
@@ -494,6 +512,7 @@
 - [QML与C++集成](https://doc.qt.io/qt-6/qtqml-cppintegration-overview.html)
 - [Qt Quick性能建议](https://doc.qt.io/qt-6/qtquick-performance.html)、[Qt隐式共享](https://doc.qt.io/qt-6/implicit-sharing.html)和[QQuickRhiItemRenderer同步/资源边界](https://doc.qt.io/qt-6/qquickrhiitemrenderer.html)
 - [Qt Quick帧动画](https://doc.qt.io/qt-6/qml-qtquick-frameanimation.html)
+- [Qt Canvas Painter 模块](https://doc.qt.io/qt-6/qtcanvaspainter-index.html)、[QCanvasPainterItem](https://doc.qt.io/qt-6/qcanvaspainteritem.html)和[Canvas2D](https://doc.qt.io/qt-6/qml-qtcanvas2d-canvas2d.html)
 - [Qt Quick 3D自定义材质及屏幕纹理限制](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)
 - [Qt Quick 3D后处理Effect](https://doc.qt.io/qt-6/qml-qtquick3d-effect.html)
 - [Qt Quick 3D实例表](https://doc.qt.io/qt-6/qml-qtquick3d-instancing.html)
