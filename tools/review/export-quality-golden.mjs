@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -6,7 +7,7 @@ const root = path.resolve(import.meta.dirname, '../..'),
       baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const require = createRequire(path.join(root, 'legacy-web/package.json')),
       ts = require('typescript');
-const source = execFileSync('git', ['show', baseline + ':src/render-quality.ts'], {
+const source = execFrozenGit(['show', baseline + ':src/render-quality.ts'], {
                    cwd: root,
                }).toString();
 const code = ts.transpileModule(source, {

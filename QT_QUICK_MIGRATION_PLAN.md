@@ -15,7 +15,7 @@
 - 一个轮次的交付物及退出条件全部满足后，删除该轮次整个小节。编号保持不变，不重新编号；依赖编号指向代码、测试和验收资产，不要求被依赖的小节仍存在。
 - 完成轮次涉及的接口、参数、资产路径、构建命令及固定限制，合并到本文件对应的长期契约，或保存到代码和 `docs/contracts/`；不得用保留已完成轮次代替交接。
 - 未通过的验收项保留为具体任务：写清输入、修复对象、预期结果、验收方法和依赖。禁止用“继续优化”“自行研究”“视情况调整”作为任务。
-- Windows 测试输出、性能样本和差异报告放到 `verification/windows/`，视觉对照放到 `docs/media/`；macOS/Linux 静态审计放到 `verification/macos-static/`、`verification/linux-static/`。本文件仅保存必要引用，不保存过程日志。不能将私人曲库、个人配置或绝对音乐路径放入版本控制。
+- Windows 测试输出、性能样本和差异报告在本地 `verification/windows/` 生成，视觉对照在本地 `docs/media/` 生成；macOS/Linux 静态审计在本地 `verification/macos-static/`、`verification/linux-static/` 生成。这些目录及 `docs/contracts/web-scenes/` 的批量导出不进入 Git，原始产物单独归档；仓库只保留源码、产品资产、真正测试输入、必要契约和简明结论，按 `docs/contracts/verification-artifacts.md` 执行。本文件不保存过程日志。不能将私人曲库、个人配置或绝对音乐路径放入版本控制。
 - 依次执行剩余且依赖已满足的轮次。一次执行以一个轮次为边界；不得为赶进度跳过 Windows 实机与视觉门槛。macOS/Linux 满足下述严格静态审计即可视为本阶段验收通过，结果必须标明“静态审计通过，实机待用户验证”，不能记为实机通过。
 
 ## 目标、范围与固定取舍

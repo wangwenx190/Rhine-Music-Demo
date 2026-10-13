@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -36,7 +37,7 @@ for (const library of Object.values(fixture.libraries)) {
     }
 }
 const source = await read('docs/contracts/source-map.json');
-const names = execFileSync('git', ['ls-tree', '-r', '--name-only', expected, 'src'], {
+const names = execFrozenGit(['ls-tree', '-r', '--name-only', expected, 'src'], {
                   cwd: root,
                   encoding: 'utf8',
               })
@@ -47,7 +48,7 @@ assert.deepEqual(
     names,
 );
 for (const entry of source.modules) {
-    const bytes = execFileSync('git', ['show', expected + ':' + entry.baselinePath], {cwd: root});
+    const bytes = execFrozenGit(['show', expected + ':' + entry.baselinePath], {cwd: root});
     assert.equal(hash(bytes), entry.sha256, entry.baselinePath);
     assert.ok(entry.responsibility);
     if (entry.role === 'migrate')

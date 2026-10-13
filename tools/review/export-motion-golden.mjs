@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 // Verification-only: execute immutable Git blobs using the already frozen TS dependency.
 import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
@@ -10,7 +11,7 @@ const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modul
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const sources = [];
 const frozen = (name) => {
-    const source = execFileSync('git', ['show', `${baseline}:src/${name}.ts`], {
+    const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
         cwd: root,
         encoding: 'utf8',
     });

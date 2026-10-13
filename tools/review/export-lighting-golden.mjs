@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 // Frozen source oracle; development only, no product Node dependency.
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ const sources = {}, modules = {
     'three/addons/lights/RectAreaLightUniformsLib.js': {RectAreaLightUniformsLib},
 };
 for (const name of ['music-model', 'theme-transition', 'music-row-lighting', 'music-lighting']) {
-    const src = execFileSync('git', ['show', baseline + ':src/' + name + '.ts'], {
+    const src = execFrozenGit(['show', baseline + ':src/' + name + '.ts'], {
         cwd: root,
         encoding: 'utf8',
     });

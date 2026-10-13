@@ -1,3 +1,4 @@
+import {execFrozenGit} from '../review/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -55,7 +56,7 @@ for (const name of ['src/scene.ts',
                     'src/music-lighting.ts',
                     'src/cover-atlas.ts',
 ])
-    sources[name] = sha(execFileSync('git', ['show', baseline + ':' + name], {cwd: root}));
+    sources[name] = sha(execFrozenGit(['show', baseline + ':' + name], {cwd: root}));
 const algorithms = {};
 for (const name of ['postprocessing/SSAOPass.js',
                     'shaders/SSAOShader.js',

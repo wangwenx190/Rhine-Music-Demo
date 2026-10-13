@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 // Verification-only execution of immutable Git source, using existing Web dev dependencies.
 import {execFileSync} from 'node:child_process';
 import {mkdirSync, writeFileSync} from 'node:fs';
@@ -10,7 +11,7 @@ const req = createRequire(path.join(root, 'legacy-web/package.json'));
 const ts = req('typescript'), THREE = req('three');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2', sources = [];
 function frozen(name) {
-    const source = execFileSync('git', ['show', `${baseline}:src/${name}.ts`], {
+    const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
         cwd: root,
         encoding: 'utf8',
     });

@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $evidence = Join-Path $repository 'verification/windows/postprocess'
 $summary = Get-Content -Raw (Join-Path $evidence 'summary.json') | ConvertFrom-Json
 if ($summary.configuration -ne 'Release' -or -not $summary.gpuPassed -or $summary.gpuCases -ne 105 -or $summary.qmllint -ne 'passed' -or -not $summary.productionShadingPassed -or $summary.productionReviewCliExitCode -ne 1) {
@@ -21,7 +22,7 @@ foreach ($a in $manifest.assets) {
     }
 }
 foreach ($source in $manifest.sources.psobject.Properties) {
-    $frozen = & git -C $repository show "$($manifest.baseline):$($source.Name)"
+    $frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $manifest.baseline):$($source.Name)"
     if ($LASTEXITCODE -ne 0) {
         throw 'Missing frozen source'
     }

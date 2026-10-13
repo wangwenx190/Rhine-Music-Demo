@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $evidence = Join-Path $repository 'verification/windows/lighting'
 $summary = Get-Content -Raw (Join-Path $evidence 'summary.json') | ConvertFrom-Json
 if ($summary.configuration -ne 'Release' -or $summary.ctest -ne '19/19 passed' -or $summary.gpuCases -ne 48 -or $summary.qmllint -ne 'passed' -or $summary.production.reviewEnabled -or $summary.production.ctest -ne '14/14 passed') {
@@ -17,7 +18,7 @@ foreach ($region in @('paper', 'margin', 'spine', 'rim', 'background')) {
 }
 $contract = Get-Content -Raw (Join-Path $repository 'docs/contracts/lighting.json') | ConvertFrom-Json
 foreach ($source in $contract.sources.psobject.Properties) {
-    $frozen = & git -C $repository show "$($contract.baseline):$($source.Name)"
+    $frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $contract.baseline):$($source.Name)"
     if ($LASTEXITCODE -ne 0) {
         throw 'Frozen source unavailable'
     }

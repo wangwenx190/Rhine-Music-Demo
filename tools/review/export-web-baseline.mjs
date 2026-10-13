@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -29,7 +30,7 @@ const json = async (name, data) => {
     await fs.mkdir(path.dirname(name), {recursive: true});
     await fs.writeFile(name, JSON.stringify(data, null, 2) + '\n');
 };
-const git = (args) => execFileSync('git', args, {cwd: repo, encoding: 'utf8'}).trim();
+const git = (args) => execFrozenGit(args, {cwd: repo, encoding: 'utf8'}).trim();
 const waitFor = async (probe, name) => {
     const end = Date.now() + 60000;
     while (Date.now() < end) {
@@ -48,8 +49,7 @@ await fs.mkdir(contracts, {recursive: true});
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(evidence, {recursive: true});
 const archive = path.join(runRoot, 'source.tar');
-execFileSync(
-    'git',
+execFrozenGit(
     [
         'archive',
         '--format=tar',

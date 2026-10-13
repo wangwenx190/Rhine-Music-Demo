@@ -1,6 +1,11 @@
 # Native build and deployment output
 /build/
 /out/
+/verification/
+/docs/media/
+/docs/contracts/web-scenes/
+/legacy-web/verification/
+/legacy-web/docs/media/
 /CMakeUserPresets.json
 /CMakeFiles/
 /CMakeCache.txt

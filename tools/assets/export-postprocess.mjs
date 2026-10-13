@@ -1,3 +1,4 @@
+import {execFrozenGit} from '../review/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -41,7 +42,7 @@ for (const name of ['postprocessing/BokehPass.js',
 }
 const sources = {};
 for (const p of ['src/scene.ts', 'src/render-quality.ts', 'src/music-model.ts'])
-    sources[p] = sha(execFileSync('git', ['show', baseline + ':' + p], {cwd: root}));
+    sources[p] = sha(execFrozenGit(['show', baseline + ':' + p], {cwd: root}));
 await fs.writeFile(
     path.join(root, 'resources/manifests/postprocess.json'),
     JSON.stringify(

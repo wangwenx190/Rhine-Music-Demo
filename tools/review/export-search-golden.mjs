@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -5,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
-const source = execFileSync('git', ['show', `${baseline}:src/music-search.ts`], {
+const source = execFrozenGit(['show', `${baseline}:src/music-search.ts`], {
     cwd: root,
     encoding: 'utf8',
 });

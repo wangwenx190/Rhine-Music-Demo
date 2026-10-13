@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $rulesPath = Join-Path $PSScriptRoot 'r07-rules.json'
 $rules = Get-Content -Raw -Encoding UTF8 $rulesPath | ConvertFrom-Json
 $windows = Join-Path $repository 'verification/windows/materials'
@@ -19,7 +20,7 @@ if ((Get-FileHash (Join-Path $repository 'resources/environment/room-pmrem.rgba3
     throw 'Environment differs from frozen capture'
 }
 foreach ($source in $fixture.sources.psobject.Properties) {
-    $frozen = & git -C $repository show "$($fixture.baseline):$($source.Name)"
+    $frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $fixture.baseline):$($source.Name)"
     if ($LASTEXITCODE -ne 0) {
         throw 'Frozen source unavailable'
     }

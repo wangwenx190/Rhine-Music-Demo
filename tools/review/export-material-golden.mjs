@@ -1,3 +1,4 @@
+import {execFrozenGit} from './frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {execFileSync, spawn} from 'node:child_process';
@@ -11,8 +12,7 @@ const media = path.join(root, 'docs/media/materials/web'),
       fixtures = path.join(root, 'tests/fixtures/materials');
 for (const d of [frozen, media, fixtures, path.join(root, 'resources/environment')])
     await fs.mkdir(d, {recursive: true});
-execFileSync(
-    'git',
+execFrozenGit(
     [
         'archive',
         '--format=tar',
@@ -215,7 +215,7 @@ try {
                      'src/scene.ts',
                      'src/music-cd-asset.ts',
     ])
-        sources[f] = sha(execFileSync('git', ['show', baseline + ':' + f], {cwd: root}));
+        sources[f] = sha(execFrozenGit(['show', baseline + ':' + f], {cwd: root}));
     const cases = [];
     for (const day of [true, false])
         for (const [angle, position] of [['front', [0, 1.85, 9]],

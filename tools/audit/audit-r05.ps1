@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $rulesPath = Join-Path $PSScriptRoot 'r05-rules.json'
 $rules = Get-Content -Raw -Encoding UTF8 $rulesPath | ConvertFrom-Json
 $windows = Join-Path $repository 'verification/windows/motion'
@@ -23,7 +24,7 @@ if ((Get-FileHash (Join-Path $repository 'docs/contracts/motion-golden.json')).H
     throw 'R01 oracle changed.'
 }
 foreach ($source in $oracle.sources) {
-    $frozen = & git -C $repository show "$($oracle.baseline):$($source.path)"
+    $frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $oracle.baseline):$($source.path)"
     if ($LASTEXITCODE -ne 0) {
         throw 'Frozen source unavailable.'
     }

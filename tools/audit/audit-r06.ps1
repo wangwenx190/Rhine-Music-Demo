@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $rulesPath = Join-Path $PSScriptRoot 'r06-rules.json'
 $rules = Get-Content -Raw -Encoding UTF8 $rulesPath | ConvertFrom-Json
 $windows = Join-Path $repository 'verification/windows/scene'
@@ -16,7 +17,7 @@ if ((Get-FileHash $oraclePath).Hash.ToLowerInvariant() -ne $summary.fixtureSha25
 }
 $oracle = Get-Content -Raw -Encoding UTF8 $oraclePath | ConvertFrom-Json
 foreach ($source in $oracle.sources) {
-    $frozen = & git -C $repository show "$($oracle.baseline):$($source.path)"
+    $frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $oracle.baseline):$($source.path)"
     if ($LASTEXITCODE -ne 0) {
         throw 'Frozen source missing.'
     }

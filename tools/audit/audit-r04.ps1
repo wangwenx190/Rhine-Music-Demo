@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $rules = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'r04-rules.json') | ConvertFrom-Json
 $windows = Join-Path $repository 'verification/windows/library-data'
 $summary = Get-Content -Raw -Encoding UTF8 (Join-Path $windows 'summary.json') | ConvertFrom-Json
@@ -21,7 +22,7 @@ $oracle = Get-Content -Raw -Encoding UTF8 $oraclePath | ConvertFrom-Json
 if ((Get-FileHash (Join-Path $repository 'tests/fixtures/web-baseline/anonymous.json')).Hash.ToLowerInvariant() -ne $oracle.fixtureSha256) {
     throw 'Fixture content changed.'
 }
-$frozen = & git -C $repository show "$($oracle.baseline):$($oracle.sourcePath)"
+$frozen = & git -C $repository show "$(Resolve-FrozenRevision -Repository $repository -Revision $oracle.baseline):$($oracle.sourcePath)"
 if ($LASTEXITCODE -ne 0) {
     throw 'Frozen source unavailable.'
 }

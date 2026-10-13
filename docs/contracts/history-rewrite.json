@@ -1,0 +1,6 @@
+{
+  "reason": "Remove generated verification artifacts from Git history; source contents and original provenance identifiers remain unchanged.",
+  "revisions": {
+    "57f4f845c20cce646a15dbf4008c2a162aaaf4e2": "df251a2eb0406b1ccde11a0e9f8a5017c0293185"
+  }
+}

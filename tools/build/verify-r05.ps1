@@ -2,6 +2,7 @@
 param([switch]$Clean)
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot '../review/ResolveFrozenRevision.ps1')
 $evidence = Join-Path $repository 'verification/windows/motion'
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -56,7 +57,7 @@ try {
         throw 'R01 oracle changed.'
     }
     foreach ($source in $oracle.sources) {
-        $frozen = & git show "$($oracle.baseline):$($source.path)"
+        $frozen = & git show "$(Resolve-FrozenRevision -Repository $repository -Revision $oracle.baseline):$($source.path)"
         if ($LASTEXITCODE -ne 0) {
             throw 'Frozen source unavailable.'
         }
