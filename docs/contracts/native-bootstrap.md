@@ -1,6 +1,6 @@
 # R02 · 原生工程与工具链契约
 
-根工程为 C++23 / Qt Quick 原生工程。R02 的 `App.qml` 为运行探针：同源 MiSans 中文、Basic 控件与功能 SVG、原专辑盒三壳体几何、qsb ShaderEffect、无来源的 QtMultimedia 对象与可注入的库模型。R03 资产接入见 [assets.md](assets.md)，R04 数据/离线资料接口见 [library-data.md](library-data.md)；扫描、实际材质、产品界面与播放功能按后续轮次实现。
+根工程为 C++23 / Qt Quick 原生工程。R02 运行探针已移至 `BootstrapProbe.qml`，由原运行验证参数加载；当前生产 `App.qml` 为 R14 的二维浏览界面（见 [canvas-painter.md](canvas-painter.md)）。原探针内容：同源 MiSans 中文、Basic 控件与功能 SVG、原专辑盒三壳体几何、qsb ShaderEffect、无来源的 QtMultimedia 对象与可注入的库模型。R03 资产接入见 [assets.md](assets.md)，R04 数据/离线资料接口见 [library-data.md](library-data.md)；扫描、实际材质、其余产品界面与播放功能按后续轮次实现。
 
 唯一生产 `FrameAnimation` 已向原生运动时钟提交帧间隔；R05 内核、隐藏/恢复与数值验证接口见 [motion.md](motion.md)。生产场景现由 RHI SceneItem 实现，Quick3D 几何/材质 oracle 仅在 Review 构建加入；接口与隔离规则见 [rhi-integration.md](rhi-integration.md)。窗口运行报告包含 `visualFrameCount` / `visualTime`；`--verify-motion` 必须配合 `--verify-runtime` 使用，检查真实窗口的隐藏、最小化恢复和减少动态终点。
 

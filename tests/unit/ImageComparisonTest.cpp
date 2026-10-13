@@ -4,6 +4,58 @@ class ImageComparisonTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void highResolutionContourPreservesOpaqueInterior()
+    {
+        QImage expected(40, 40, QImage::Format_ARGB32);
+        expected.fill(Qt::white);
+        for (int y = 8; y < 32; ++y) {
+            for (int x = 8; x < 32; ++x) {
+                expected.setPixelColor(x, y, Qt::black);
+            }
+        }
+        const QPolygonF roi(QRectF(0, 0, 40, 40));
+        const auto outline =
+                expected.scaled(320, 320, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+        const auto same = yalahoo::compareAntialiasBand(expected, expected, outline, roi, 255, 8);
+        QVERIFY(same["valid"].toBool());
+        QCOMPARE(same["ssim"].toDouble(), 1.0);
+        QVERIFY(same["bandFraction"].toDouble() < 0.2);
+        QImage missing = expected;
+        missing.fill(Qt::white);
+        const auto changed = yalahoo::compareAntialiasBand(missing, expected, outline, roi, 255, 8);
+        QVERIFY(changed["nonBandMeanAbsoluteRgb"].toDouble() > 10);
+        QVERIFY(changed["ssim"].toDouble() < 0.98);
+        QVERIFY(!yalahoo::compareAntialiasBand(expected, expected, outline, roi, 255, 2)["valid"]
+                         .toBool());
+        QVERIFY(!yalahoo::compareAntialiasBand(expected, expected, outline, roi, 0, 8)["valid"]
+                         .toBool());
+    }
+    void fixedReferenceBandKeepsDisplacement()
+    {
+        QImage expected(40, 40, QImage::Format_ARGB32), alpha(40, 40, QImage::Format_ARGB32);
+        expected.fill(Qt::white);
+        alpha.fill(Qt::transparent);
+        for (int y = 8; y < 28; ++y) {
+            for (int x = 8; x < 20; ++x) {
+                expected.setPixelColor(x, y, Qt::black);
+                alpha.setPixelColor(x, y, Qt::black);
+            }
+        }
+        const QPolygonF roi(QRectF(0, 0, 40, 40));
+        auto same = yalahoo::compareAntialiasBand(expected, expected, alpha, roi);
+        QCOMPARE(same["ssim"].toDouble(), 1.0);
+        QVERIFY(same["bandFraction"].toDouble() < 0.2);
+        QImage displaced(40, 40, QImage::Format_ARGB32);
+        displaced.fill(Qt::white);
+        for (int y = 8; y < 28; ++y)
+            for (int x = 18; x < 30; ++x)
+                displaced.setPixelColor(x, y, Qt::black);
+        auto changed = yalahoo::compareAntialiasBand(displaced, expected, alpha, roi);
+        QVERIFY(changed["nonBandMeanAbsoluteRgb"].toDouble() > 10);
+        QVERIFY(changed["ssim"].toDouble() < 0.98);
+        QVERIFY(!yalahoo::compareAntialiasBand(displaced, expected, QImage{ }, roi)["valid"]
+                         .toBool());
+    }
     void metrics()
     {
         QImage a(24, 24, QImage::Format_RGB32);

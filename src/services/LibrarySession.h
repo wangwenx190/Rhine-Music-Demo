@@ -15,6 +15,7 @@ class LibrarySession final : public QObject
     Q_PROPERTY(QString playbackAlbumId READ playbackAlbumId NOTIFY playbackChanged)
     Q_PROPERTY(QString playbackTrackId READ playbackTrackId NOTIFY playbackChanged)
     Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged)
+    Q_PROPERTY(QVariantMap browseInfo READ browseInfo NOTIFY browseInfoChanged)
     Q_PROPERTY(QVariantMap providerCapabilities READ providerCapabilities NOTIFY providerCapabilitiesChanged)
 public:
     explicit LibrarySession(IMetadataProvider *provider, QObject *parent = nullptr);
@@ -60,8 +61,10 @@ public:
         return m_metadata;
     }
     QVariantMap providerCapabilities() const;
+    QVariantMap browseInfo() const;
 signals:
     void navigationChanged();
+    void browseInfoChanged();
     void playbackChanged();
     void metadataChanged();
     void providerCapabilitiesChanged();
@@ -74,6 +77,7 @@ private:
         MetadataKind kind;
     };
     void invalidate();
+    void rebuildBrowsePositions();
     void receive(const ProviderResult &result);
     const Album *album(const QString &id) const;
     const Track *track(const QString &albumId, const QString &trackId) const;
@@ -82,6 +86,13 @@ private:
     SearchListModel m_search;
     Snapshot m_snapshot;
     QHash<QString, qsizetype> m_albumIndices;
+    QHash<QString, QString> m_genreNames;
+    struct BrowsePosition
+    {
+        int code = 0, number = 0, total = 0, lane = 0;
+        QString label;
+    };
+    QHash<QString, BrowsePosition> m_browsePositions;
     QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
     QHash<quint64, Pending> m_pending;
     quint64 m_generation = 0, m_requestId = 0;

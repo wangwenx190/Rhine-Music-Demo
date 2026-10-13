@@ -104,6 +104,114 @@ QImage absoluteDifference(const QImage &a, const QImage &b)
         }
     return result;
 }
+QJsonObject compareAntialiasBand(const QImage &actual, const QImage &expected,
+                                 const QImage &referenceAlpha, const QPolygonF &region,
+                                 int opaqueAlpha, int referenceScale)
+{
+    if (actual.isNull() || actual.size() != expected.size() || opaqueAlpha < 1 || opaqueAlpha > 255
+        || referenceScale < 1 || referenceScale > 16
+        || (referenceScale == 1 && referenceAlpha.size() != expected.size())
+        || referenceAlpha.isNull() || !referenceAlpha.hasAlphaChannel())
+        return { { "valid", false } };
+    if (referenceScale > 1
+        && (std::abs(referenceAlpha.width() - region.boundingRect().width() * referenceScale) > 2
+            || std::abs(referenceAlpha.height() - region.boundingRect().height() * referenceScale)
+                    > 2))
+        return { { "valid", false } };
+    QImage normalized = actual;
+    const QRect bounds = region.boundingRect().toAlignedRect().intersected(actual.rect());
+    qint64 bandPixels = 0, otherPixels = 0;
+    double bandError = 0, otherError = 0;
+    double maxOtherError = 0;
+    QJsonObject worstPixel;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y) {
+        for (int x = bounds.left(); x <= bounds.right(); ++x) {
+            if (!region.containsPoint({ x + .5, y + .5 }, Qt::OddEvenFill))
+                continue;
+            const int alpha = referenceScale == 1 ? referenceAlpha.pixelColor(x, y).alpha() : 0;
+            const bool foreground = alpha >= (opaqueAlpha + 1) / 2;
+            bool band = alpha > 0 && alpha < opaqueAlpha;
+            // The 0.5-alpha contour is reference-only. Adjacent pixel centres are
+            // within one physical pixel of it; there is no extra dilation.
+            for (int dy = -1; dy <= 1 && referenceScale == 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    if (x + dx < 0 || y + dy < 0 || x + dx >= actual.width()
+                        || y + dy >= actual.height())
+                        continue;
+                    band |= (referenceAlpha.pixelColor(x + dx, y + dy).alpha()
+                             >= (opaqueAlpha + 1) / 2)
+                            != foreground;
+                }
+            }
+            if (referenceScale > 1) {
+                const auto origin = region.boundingRect().topLeft();
+                const int sx = int((x + .5 - origin.x()) * referenceScale);
+                const int sy = int((y + .5 - origin.y()) * referenceScale);
+                const auto inside = [&](int px, int py) {
+                    return referenceAlpha.rect().contains(px, py)
+                            && referenceAlpha.pixelColor(px, py).alpha() >= (opaqueAlpha + 1) / 2;
+                };
+                const bool centre = inside(sx, sy);
+                const QColor centreColor = referenceAlpha.rect().contains(sx, sy)
+                        ? referenceAlpha.pixelColor(sx, sy)
+                        : QColor(Qt::transparent);
+                band = false;
+                for (int dy = -referenceScale; dy <= referenceScale; ++dy) {
+                    for (int dx = -referenceScale; dx <= referenceScale; ++dx) {
+                        if (dx * dx + dy * dy <= referenceScale * referenceScale) {
+                            // A cropped reference has no evidence outside its bounds;
+                            // the crop boundary must not become a synthetic alpha edge.
+                            if (!referenceAlpha.rect().contains(sx + dx, sy + dy)) {
+                                continue;
+                            }
+                            band |= inside(sx + dx, sy + dy) != centre;
+                            if (centre && inside(sx + dx, sy + dy)) {
+                                const auto neighbor = referenceAlpha.pixelColor(sx + dx, sy + dy);
+                                // Text on the opaque selection pill has no alpha contour.
+                                // Its reference color boundary is sampled at the same 1px radius.
+                                band |= std::abs(neighbor.red() - centreColor.red())
+                                                + std::abs(neighbor.green() - centreColor.green())
+                                                + std::abs(neighbor.blue() - centreColor.blue())
+                                        > 80;
+                            }
+                        }
+                    }
+                }
+            }
+            const auto a = actual.pixelColor(x, y), b = expected.pixelColor(x, y);
+            const double error = (std::abs(a.red() - b.red()) + std::abs(a.green() - b.green())
+                                  + std::abs(a.blue() - b.blue()))
+                    / 3.0;
+            if (band) {
+                ++bandPixels;
+                bandError += error;
+                normalized.setPixelColor(x, y, b);
+            } else {
+                ++otherPixels;
+                otherError += error;
+                if (error > maxOtherError) {
+                    maxOtherError = error;
+                    worstPixel = {
+                        { "x", x }, { "y", y }, { "actual", a.name() }, { "expected", b.name() }
+                    };
+                }
+            }
+        }
+    }
+    auto result = compareImages(normalized, expected, region);
+    result.insert("bandPixels", bandPixels);
+    result.insert("nonBandPixels", otherPixels);
+    result.insert("bandFraction",
+                  bandPixels + otherPixels ? double(bandPixels) / (bandPixels + otherPixels) : 0);
+    result.insert("bandMeanAbsoluteRgb", bandPixels ? bandError / bandPixels : 0);
+    result.insert("nonBandMeanAbsoluteRgb", otherPixels ? otherError / otherPixels : 0);
+    result.insert("worstNonBandPixel", worstPixel);
+    result.insert("referenceScale", referenceScale);
+    result.insert(
+            "method",
+            "Unmodified 11x11 Gaussian SSIM after reference-only one-physical-pixel contour normalization (alpha and internal opaque-pill color boundaries); raw and band error are separate. Displaced/missing ink outside the reference band is never normalized.");
+    return result;
+}
 QJsonValue edgeDistance(const QImage &a, const QImage &b, const QPolygonF &region)
 {
     if (a.isNull() || a.size() != b.size())

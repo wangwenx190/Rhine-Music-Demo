@@ -66,6 +66,29 @@ class LibraryDataTest : public QObject
         return result;
     }
 private slots:
+    void browseSnapshotReplacementPreservesPlayback()
+    {
+        OfflineMetadataProvider provider;
+        LibrarySession session(&provider);
+        auto snapshot = library("mixed");
+        QVERIFY(!snapshot.albums.isEmpty());
+        const auto id = snapshot.albums.first().id;
+        session.setSnapshot(snapshot);
+        QVERIFY(session.navigate(id));
+        QSignalSpy changes(&session, &LibrarySession::browseInfoChanged);
+        snapshot.albums.first().title = QStringLiteral("替换后的收藏标题");
+        session.setSnapshot(snapshot);
+        QCOMPARE(changes.size(), 1);
+        QCOMPARE(session.browseInfo().value("title").toString(), snapshot.albums.first().title);
+        QCOMPARE(session.navigationAlbumId(), id);
+        QVERIFY(session.playbackTrackId().isEmpty());
+        session.search(QStringLiteral("其他歌曲"));
+        QCOMPARE(changes.size(), 1);
+        session.setSnapshot({ });
+        QVERIFY(session.browseInfo().isEmpty());
+        QVERIFY(session.navigationAlbumId().isEmpty());
+        QVERIFY(session.playbackTrackId().isEmpty());
+    }
     void initTestCase()
     {
         QFile input(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/web-baseline/anonymous.json"));

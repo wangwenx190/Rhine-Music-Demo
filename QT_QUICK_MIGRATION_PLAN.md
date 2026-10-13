@@ -74,7 +74,7 @@
 - `qmake`、`balsam`、`qsb`、`qmllint`、部署工具及 Qt 插件均从同一已选 Kit 或其配套 host-tools 定位并校验版本一致，不从任意 PATH 混用其他 Qt 安装；记录实际 Qt/编译器/工具版本到验收产物。
 - 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
 - Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
-- R14 增加 Qt Canvas Painter 的构建与运行闭包：CMake 通过 `find_package(Qt6 REQUIRED COMPONENTS CanvasPainter)` 和 `Qt6::CanvasPainter` 接入；QML API 使用 `import QtCanvas2D`，C++ API 使用 QCanvasPainter / QCanvasPainterItem / QCanvasPainterItemRenderer。同一最新原生 Kit 必须具备模块、QML 插件和配套工具，按实际 API 编译/导入探测，不锁定 minor/patch 或安装目录；缺模块时明确诊断，不降到旧 Kit。本机已安装信息只供定位，具体接入和探针由 R14 执行，不提前生成实现。
+- Qt Canvas Painter 的构建与运行闭包：CMake 通过 `find_package(Qt6 REQUIRED COMPONENTS CanvasPainter)` 和 `Qt6::CanvasPainter` 接入；QML API 使用 `import QtCanvas2D`，C++ API 使用 QCanvasPainter / QCanvasPainterItem / QCanvasPainterItemRenderer。同一最新原生 Kit 必须具备模块、QML 插件和配套工具，按实际 API 编译/导入探测，不锁定 minor/patch 或安装目录；缺模块时明确诊断，不降到旧 Kit。本机已安装信息只供定位；共用接口、失效策略、资源和验证范围见 `docs/contracts/canvas-painter.md`。
 - `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
@@ -191,7 +191,7 @@
 ### 二维绘制选型与 Qt Canvas Painter
 
 - Qt Canvas Painter 的 C++ API 与 QML Canvas2D 均纳入实际候选，模块许可证类别、技术预览标签及使用较新的 Qt API 不作为本项目的排除理由，也不据此固定优先 C++。保留必要署名与随附文件；选型依据为源码效果/行为等价性、实际 API 能力、CPU/GPU 与资源成本、实现和维护复杂度。继续使用最新 Kit，不能为兼容旧 Qt 而放弃更适合的能力；实际缺失功能或验证失败须指出具体输入、对象和技术原因。
-- R14 验证两种 API 并建立共用绘制契约；R15 将通过验收的 Canvas Painter 用于生产滑尺刻线/路径，R20 用于生产二维序章的原创品牌轮廓/圆环。R16 比较文字绘制路径后确定字轮实现，不因已引入绘制模块就强制替换全部文字。普通控件/输入/焦点/Accessible 与列表虚拟化继续由 Qt Quick 承担，三维 SceneItem 的 RHI 管线按既有契约执行。
+- 两种 API 的共用绘制契约见 `docs/contracts/canvas-painter.md`；R15 将通过验收的 Canvas Painter 用于生产滑尺刻线/路径，R20 用于生产二维序章的原创品牌轮廓/圆环。R16 比较文字绘制路径后确定字轮实现，不因已引入绘制模块就强制替换全部文字。普通控件/输入/焦点/Accessible 与列表虚拟化继续由 Qt Quick 承担，三维 SceneItem 的 RHI 管线按既有契约执行。
 - 同组件的 C++/Canvas2D 及适用的 Qt Quick Text/Shape/ShaderEffect 对照使用同一内容、字体、路径、主题、逻辑/物理尺寸、DPR、时刻和抗锯齿目标；先满足结构、文本、运动与图像门槛，再比较成本。不能用 CPU QPainter/旧 Canvas 的测试成绩代替与实际 Qt Quick GPU 路径的比较，也不直接转抄官方 benchmark 宣称本项目提速。采用的具体组件、API、比较范围与理由写入 R14 建立的 `docs/contracts/canvas-painter.md`，原始产物只留本地忽略目录。
 - 验证描边宽度/端点/连接、曲线与路径缓存、透明背景/预乘及颜色空间、渐变/遮罩/裁切、文字基线/字重/字距/shaping/emoji 和 DPR 边缘。接口不支持的效果不得擅自近似：同组件可组合 Qt Quick 合成层保持等价，或依据明确对照保留更合适的原路径。R15/R20 的生产使用是具体交付；若目标组件存在可复现的不等价或结构/资源回归，须修复或保留针对该组件的具体补修任务，不能只完成演示探针就宣告接入完成。
 - 绘制只消费已有控制器/不可变状态和唯一 FrameClock，使用已缩放 dt，不新增独立 Timer/FrameAnimation/requestAnimationFrame 时钟。静态状态按内容/布局 revision 触发重绘，隐藏/遮挡后停止无效 tick；缓存按路径/样式/字体/尺寸/DPR 等实际依赖失效，动画只更新必要参数，不逐帧重建不变路径、字体布局、图像或绘制目标。C++ 同步与 QML JavaScript 成本分别记录，禁止在绘制/同步热路径读盘、解码、等待或 GPU 读回。
@@ -310,17 +310,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R14 · 二维基础控件、页眉与浏览静态布局（1–1.5日）
-
-- 依赖R03、R03B、R04、R06、R13。交付DesignTokens、Header、BrowseInfo、Footer与自定义Basic控件。
-- 同轮交付 Canvas Painter 基础接入和 `docs/contracts/canvas-painter.md`：扩展最新 Kit 的模块发现、CMake 链接、QML 导入/qmllint 与资源清单；分别执行 QCanvasPainterItem 和 Canvas2D 的最小真实绘制探针，验证曲线/描边、透明/渐变、矩形裁切、SVG 路径、MiSans/中文/emoji、双主题和 DPR 1/1.5/2。对照适用的 Qt Quick 绘制路径，记录实际能力、GUI/同步/提交与可用 GPU 指标、缓存/附件/上传、静止及 hide/restore/resize/重建行为；Windows D3D11/OpenGL 实机与 macOS/Linux 静态审计按二维绘制契约执行，不将单个微基准当成全 GUI 提速结论。
-- 按基线计算样式实现字体、字距、线宽、颜色、留白和图标；品牌与返回锚点、主题双标签、当前歌名槽和播放按钮固定位置。
-- 页眉接入 R03B 的 `yalahOO!!!` 原创 Logo，按主题选择生产稿；品牌容器位置与相邻控件不变，窄屏按品牌规范切换紧凑组合或图形，不截掉感叹号，也不挤占播放按钮。关于/设置等产品名称统一走同一身份常量。
-- LayoutMetrics决定横/竖布局，窄屏保留主题文字和播放按钮；短屏信息可滚动，超宽屏相机/文字协同。
-- 阅读渐变与夜间遮罩分层，竖屏侧向遮罩650ms淡出；不以全屏半透明层错误影响顶栏。
-- 性能设计与验证：审计绑定传播、layer/offscreen目标和遮罩overdraw，复用控件与布局结果；静止状态不持续重算文字/样式，只保留源码效果所需合成层。
-- 退出：九个尺寸静态截图通过结构/文本门槛，没有传统Qt默认外观混入产品；Canvas Painter 两种 API 的基础能力/窗口/生命周期验证完成，R15/R16/R20 可复用的接口、差异和具体使用范围已写入绘制契约。
 
 ### R15 · 滑尺、数字字轮与导航输入（1–1.5日）
 

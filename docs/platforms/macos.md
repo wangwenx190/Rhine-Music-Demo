@@ -252,3 +252,18 @@ QSG_RHI_BACKEND=metal build/release/bin/yalahoo.app/Contents/MacOS/yalahoo --ver
 本阶段结论：静态审计通过，实机待用户验证。配置 `cmake --preset qt-release -DYALAHOO_REVIEW=ON`，构建 `cmake --build --preset qt-release` 后，执行 `ctest --preset qt-release -R '^(cover-cache|cover-gpu)$' --output-on-failure`。检查本地 `build/release/verification/covers/runtime.json`：windowPolicy 通过、实际后端正确、未上传/旧租约不显示、稳定帧零上传、scene graph 恢复成功；原生 D3D11 command introspection 在本平台不可用，不能伪报 destinationBytes 实测。用 Unicode/空格本地路径及当前 Qt 支持的 PNG/JPEG 验证 reader、ICC、缺图和展开保护，确认不存在其他专辑封面串用。详见 `docs/contracts/covers.md`。
 
 验证后恢复 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建并执行全部 Release CTest；不以 Windows 成绩代替目标机 codec、GPU、窗口管理器或性能验证。
+
+## R14 二维控件与 Canvas Painter 用户验证（未执行）
+
+本平台结论：**静态审计通过，实机待用户验证**。共同源码、插件闭包、渲染线程所有权和 PERF-01–07 矩阵在 `verification/macos-static/browse-ui/`；绘制范围与已知差异见 [二维绘制契约](../contracts/canvas-painter.md)。目标机自动发现最新原生 Kit 后执行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=OFF
+cmake --build --preset qt-release
+cmake --build --preset qt-release --target check-format Yalahoo_qmllint ui-audit_qmllint
+ctest --preset qt-release --output-on-failure
+QSG_RHI_BACKEND=metal build/release/tools/ui-audit build/release/verification/browse-ui/native
+QSG_RHI_BACKEND=metal build/release/bin/yalahoo.app/Contents/MacOS/yalahoo --verify-browse build/release/verification/browse-ui/production
+```
+
+对 DPR 1/1.5/2 应先查询 `ui-audit --native-dpr`，将 QT_SCALE_FACTOR 设为目标 DPR / 查询值，并核对报告的实际 DPR。检查九尺寸双主题、短屏滚动、SVG 与字体/emoji 回退、主题按钮输入、无焦点窗口策略，以及双 API 静止、hide/restore/resize/十次重建结果。PNG 只采集自身渲染或提交的 swapchain，禁止桌面截屏或激活窗口。窗口管理器不支持置底/拒绝焦点时须报告实际失败；目标平台的颜色、GPU 时间及呈现不能由 Windows 成绩代替。此处实际结果：待用户填写。

@@ -13,6 +13,7 @@ set(
     Concurrent
     Svg
     ShaderTools
+    CanvasPainter
     Test
     QuickTest
 )

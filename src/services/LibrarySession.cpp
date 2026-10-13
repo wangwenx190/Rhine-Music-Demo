@@ -12,6 +12,8 @@ LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
       m_snapshot(std::make_shared<const LibrarySnapshot>())
 {
     qRegisterMetaType<ProviderResult>();
+    connect(&m_albums, &AlbumListModel::columnsChanged, this,
+            &LibrarySession::rebuildBrowsePositions);
     if (provider) {
         connect(provider, &IMetadataProvider::resultReady, this, &LibrarySession::receive,
                 Qt::QueuedConnection);
@@ -39,6 +41,9 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     invalidate();
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     m_albumIndices.clear();
+    m_genreNames.clear();
+    for (const auto &genre : m_snapshot->genres)
+        m_genreNames.insert(genre.id, genre.name);
     m_trackIndices.clear();
     m_albumIndices.reserve(m_snapshot->albums.size());
     for (qsizetype index = 0; index < m_snapshot->albums.size(); ++index) {
@@ -67,6 +72,7 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     // Playback IDs survive a library replacement: playing media may outlive its index.
     m_metadata.clear();
     emit metadataChanged();
+    emit browseInfoChanged();
 }
 void LibrarySession::search(const QString &query, const QString &genreId)
 {
@@ -82,6 +88,25 @@ void LibrarySession::sort(const QString &mode)
         m_albums.setSortMode(SortMode::Artist);
     else if (mode == QLatin1String("album"))
         m_albums.setSortMode(SortMode::Album);
+    emit browseInfoChanged();
+}
+void LibrarySession::rebuildBrowsePositions()
+{
+    m_browsePositions.clear();
+    const auto &order = m_albums.order();
+    m_browsePositions.reserve(order.indices.size());
+    for (int i = 0; i < order.indices.size(); ++i)
+        m_browsePositions[m_snapshot->albums[order.indices[i]].id].code = i + 1;
+    for (int lane = 0; lane < order.columns.size(); ++lane) {
+        const auto &column = order.columns[lane];
+        for (int row = 0; row < column.albumIds.size(); ++row) {
+            auto &position = m_browsePositions[column.albumIds[row]];
+            position.number = row + 1;
+            position.total = column.albumIds.size();
+            position.lane = lane + 1;
+            position.label = column.label;
+        }
+    }
 }
 bool LibrarySession::navigate(const QString &albumId, const QString &trackId)
 {
@@ -94,7 +119,27 @@ bool LibrarySession::navigate(const QString &albumId, const QString &trackId)
     m_navigationAlbumId = albumId;
     m_navigationTrackId = trackId;
     emit navigationChanged();
+    emit browseInfoChanged();
     return true;
+}
+QVariantMap LibrarySession::browseInfo() const
+{
+    const auto *selected = album(m_navigationAlbumId);
+    if (!selected)
+        return { };
+    const QString genre = m_genreNames.value(selected->genreId);
+    const auto position = m_browsePositions.value(selected->id);
+    return { { "title", selected->title },
+             { "artist", selected->artist },
+             { "genre", genre },
+             { "year", selected->year ? QString::number(*selected->year) : QString{ } },
+             { "tracks", selected->tracks.size() },
+             { "albumId", selected->id },
+             { "code", position.code },
+             { "number", position.number },
+             { "columnCount", position.total },
+             { "columnNumber", position.lane },
+             { "columnLabel", position.label } };
 }
 bool LibrarySession::setPlaybackIds(const QString &albumId, const QString &trackId)
 {

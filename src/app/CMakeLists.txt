@@ -3,6 +3,8 @@ qt_add_executable(
     main.cpp
     AssetCatalog.cpp
     AssetCatalog.h
+    BrowseReview.cpp
+    BrowseReview.h
 )
 if(YALAHOO_REVIEW)
     target_sources(
@@ -66,6 +68,13 @@ elseif(UNIX)
 endif()
 set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
 set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
+include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
+yalahoo_browse_qml(browse_qml_files)
+set(bootstrap_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/BootstrapProbe.qml")
+set_source_files_properties("${bootstrap_qml}" PROPERTIES QT_RESOURCE_ALIAS BootstrapProbe.qml)
+qt_add_resources(Yalahoo branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
+    FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
+    "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
 set(review_qml_files)
 set(review_sources)
 set(review_dependencies)
@@ -156,10 +165,10 @@ if(YALAHOO_REVIEW)
     list(APPEND review_dependencies QtQuick3D)
 endif()
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
-    DEPENDENCIES ${review_dependencies}
+    DEPENDENCIES QtQuick ${review_dependencies}
     RESOURCE_PREFIX /qt/qml
-    QML_FILES "${app_qml}" ${review_qml_files}
-    SOURCES QmlTypes.h ${review_sources})
+    QML_FILES "${app_qml}" "${bootstrap_qml}" ${browse_qml_files} ${review_qml_files}
+    SOURCES QmlTypes.h ApplicationIdentity.h ${review_sources})
 qt_add_shaders(
     Yalahoo
     r02_shader_probe
@@ -185,6 +194,7 @@ target_link_libraries(
     Qt6::Concurrent
     Qt6::Svg
     Qt6::ShaderTools
+    Qt6::CanvasPainter
 )
 yalahoo_platform(Yalahoo)
 install(TARGETS Yalahoo BUNDLE DESTINATION . RUNTIME DESTINATION bin)
