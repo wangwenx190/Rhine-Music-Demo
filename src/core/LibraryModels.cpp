@@ -22,16 +22,24 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         const int locale = collator.compare(a, b);
         return locale ? locale : QString::compare(a, b, Qt::CaseSensitive);
     };
+    QStringList titles, artists;
     if (mode != SortMode::Genre) {
+        titles.reserve(snapshot.albums.size());
+        artists.reserve(snapshot.albums.size());
+        for (const auto &album : snapshot.albums) {
+            titles.append(normalizedKey(album.title));
+            if (mode == SortMode::Artist)
+                artists.append(normalizedKey(album.artist));
+        }
         std::stable_sort(result.indices.begin(), result.indices.end(), [&](int a, int b) {
             const auto &left = snapshot.albums[a];
             const auto &right = snapshot.albums[b];
             if (mode == SortMode::Artist) {
-                const int artist = compare(normalizedKey(left.artist), normalizedKey(right.artist));
+                const int artist = compare(artists[a], artists[b]);
                 if (artist)
                     return artist < 0;
             }
-            const int title = compare(normalizedKey(left.title), normalizedKey(right.title));
+            const int title = compare(titles[a], titles[b]);
             return title ? title < 0 : left.id < right.id;
         });
     }
@@ -60,21 +68,22 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
                 if (used.remove(album.genreId))
                     result.columns.append({ album.genreId, album.genreId, { } });
         }
+        QHash<QString, qsizetype> columnByKey;
+        columnByKey.reserve(result.columns.size());
+        for (qsizetype i = 0; i < result.columns.size(); ++i)
+            columnByKey.insert(result.columns[i].key, i);
         for (int index : result.indices) {
             const auto &album = snapshot.albums[index];
-            const QString key =
-                    mode == SortMode::Artist ? normalizedKey(album.artist) : album.genreId;
-            auto column =
-                    std::find_if(result.columns.begin(), result.columns.end(), [&](const auto &c) {
-                        return c.key == key;
-                    });
-            if (column == result.columns.end()) {
+            const QString key = mode == SortMode::Artist ? artists[index] : album.genreId;
+            const auto column = columnByKey.constFind(key);
+            if (column == columnByKey.cend()) {
                 const QString label = album.artist.simplified();
+                columnByKey.insert(key, result.columns.size());
                 result.columns.append({ key,
                                         label.isEmpty() ? QStringLiteral("未知歌手") : label,
                                         { album.id } });
             } else
-                column->albumIds.append(album.id);
+                result.columns[column.value()].albumIds.append(album.id);
         }
     }
     for (const auto &column : result.columns)
@@ -237,10 +246,14 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.column() != 0 || index.row() < 0 || index.row() >= rowCount())
         return { };
     const auto &result = m_results[index.row()];
-    const auto *album = m_snapshot->album(result.albumId);
-    const auto *track = m_snapshot->track(result.albumId, result.trackId);
-    if (!album)
+    const auto albumIndex = m_albumIndices.constFind(result.albumId);
+    if (albumIndex == m_albumIndices.cend())
         return { };
+    const auto &album = m_snapshot->albums[albumIndex.value()];
+    const auto tracks = m_trackIndices.constFind(result.albumId);
+    const auto trackIndex =
+            tracks == m_trackIndices.cend() ? -1 : tracks->value(result.trackId, -1);
+    const auto *track = trackIndex < 0 ? nullptr : &album.tracks[trackIndex];
     switch (role) {
     case Kind:
         return track ? QStringLiteral("track") : QStringLiteral("album");
@@ -249,9 +262,9 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     case TrackId:
         return result.trackId;
     case Title:
-        return track ? track->title : album->title;
+        return track ? track->title : album.title;
     case Artist:
-        return track ? track->artist : album->artist;
+        return track ? track->artist : album.artist;
     default:
         return { };
     }
@@ -259,7 +272,27 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
 void SearchListModel::update(Snapshot snapshot, const QString &query, const QString &genreId)
 {
     beginResetModel();
-    m_snapshot = snapshot ? std::move(snapshot) : std::make_shared<const LibrarySnapshot>();
+    if (!snapshot)
+        snapshot = std::make_shared<const LibrarySnapshot>();
+    if (m_snapshot != snapshot) {
+        m_snapshot = std::move(snapshot);
+        m_albumIndices.clear();
+        m_trackIndices.clear();
+        m_albumIndices.reserve(m_snapshot->albums.size());
+        m_trackIndices.reserve(m_snapshot->albums.size());
+        for (qsizetype i = 0; i < m_snapshot->albums.size(); ++i) {
+            const auto &album = m_snapshot->albums[i];
+            if (m_albumIndices.contains(album.id))
+                continue;
+            m_albumIndices.insert(album.id, i);
+            QHash<QString, qsizetype> tracks;
+            tracks.reserve(album.tracks.size());
+            for (qsizetype j = 0; j < album.tracks.size(); ++j)
+                if (!tracks.contains(album.tracks[j].id))
+                    tracks.insert(album.tracks[j].id, j);
+            m_trackIndices.insert(album.id, std::move(tracks));
+        }
+    }
     m_results = searchLibrary(*m_snapshot, query, genreId);
     endResetModel();
     emit countChanged();

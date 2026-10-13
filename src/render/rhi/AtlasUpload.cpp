@@ -31,7 +31,8 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
         m_serials[u.slot] = u.serial;
         m_leases[u.slot] = u.lease;
         auto detached = u;
-        detached.pixels = u.pixels.convertToFormat(QImage::Format_RGBA8888_Premultiplied).copy();
+        detached.pixels = u.pixels.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+        detached.pixels.detach();
         m_pending[u.slot] = std::move(detached);
     }
 }

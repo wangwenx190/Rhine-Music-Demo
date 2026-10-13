@@ -11,7 +11,7 @@
 #include <QSaveFile>
 #include <QDir>
 #include <QPainter>
-#include <QThread>
+#include <QTimer>
 #include <optional>
 #include <mutex>
 #include <chrono>
@@ -247,6 +247,19 @@ int main(int argc, char **argv)
         QJsonObject effects{ { "bokehPixels", changed(plain.postprocessed, bokeh.postprocessed) },
                              { "smaaPixels", changed(plain.postprocessed, smaa.postprocessed) },
                              { "aoStressPixels", changed(ao.postprocessed, noAo.postprocessed) } };
+        auto coverInput = fixture(cases[25].toObject());
+        const auto firstCover = capture(coverInput, { 960, 720 }, { 960, 720 });
+        const auto replayCover = capture(coverInput, { 960, 720 }, { 960, 720 });
+        check(firstCover.metadata["coverSnapshotCopies"]
+                              == replayCover.metadata["coverSnapshotCopies"]
+                      && firstCover.atlas == replayCover.atlas,
+              "Unchanged cover copied or changed on synchronization");
+        coverInput.cover.fill(Qt::blue);
+        const auto changedCover = capture(coverInput, { 960, 720 }, { 960, 720 });
+        check(changedCover.metadata["coverSnapshotCopies"].toInteger()
+                              == replayCover.metadata["coverSnapshotCopies"].toInteger() + 1
+                      && changedCover.atlas.pixelColor(0, 0) == QColor(Qt::blue),
+              "New cover revision was not copied/uploaded");
         auto atlas = fixture(cases[25].toObject());
         atlas.postprocess = true;
         atlas.aoSamples = 32;
@@ -298,6 +311,42 @@ int main(int argc, char **argv)
                       && stable.atlas == initial.atlas
                       && stable.postprocessed == initial.postprocessed,
               "Stable atlas frame uploaded or changed");
+        QJsonArray capacityCases;
+        for (int count : { 1, 7, 8, 31, 32, 33, 64, 432 }) {
+            auto bounded = atlas;
+            bounded.entities.resize(count);
+            bounded.entityIds.resize(count);
+            bounded.coverTiles.resize(count);
+            const auto result = capture(bounded, { 960, 720 }, { 960, 720 });
+            check(result.metadata["generation"] == stable.metadata["generation"],
+                  "Entity count/visibility recreated the render graph");
+            check(result.metadata["uniformUploadBytes"].toInteger()
+                          <= result.metadata["uniformCapacityBytes"].toInteger(),
+                  "Uniform prefix exceeds its fixed capacity");
+            check(result.atlas == stable.atlas, "Entity count changed atlas pixels");
+            capacityCases.append(
+                    QJsonObject{ { "instances", count },
+                                 { "generation", result.metadata["generation"] },
+                                 { "uploadBytes", result.metadata["uniformUploadBytes"] },
+                                 { "capacityBytes", result.metadata["uniformCapacityBytes"] } });
+        }
+        auto fullVisibility = atlas;
+        fullVisibility.scene.view.setToIdentity();
+        fullVisibility.scene.view.lookAt({ 0, 2, 100 }, { 0, 2, 0 }, { 0, 1, 0 });
+        fullVisibility.scene.projection.setToIdentity();
+        fullVisibility.scene.projection.ortho(-30, 30, -30, 30, .1f, 300);
+        const auto maximum = capture(fullVisibility, { 960, 720 }, { 960, 720 });
+        check(maximum.metadata["visibleEntities"].toInt() == 432
+                      && maximum.metadata["uniformUploadBytes"].toInteger()
+                              <= maximum.metadata["uniformCapacityBytes"].toInteger()
+                      && maximum.metadata["generation"] == stable.metadata["generation"],
+              "Fully visible pool exceeded capacity or rebuilt the render graph");
+        capacityCases.append(
+                QJsonObject{ { "instances", 432 },
+                             { "allVisible", true },
+                             { "generation", maximum.metadata["generation"] },
+                             { "uploadBytes", maximum.metadata["uniformUploadBytes"] },
+                             { "capacityBytes", maximum.metadata["uniformCapacityBytes"] } });
         QImage replacement(256, 256, QImage::Format_RGBA8888);
         replacement.fill(QColor(230, 30, 90));
         atlas.atlasUploads = { { 1, 2, 2, 0, replacement } };
@@ -382,6 +431,8 @@ int main(int argc, char **argv)
         report["steadyBudget"] = QJsonObject{ { "firstFrame", budget.metadata },
                                               { "drainedFrame", drained.metadata } };
         report["nativeTransferByteProof"] = nativeProof;
+        report["coverSnapshotReuse"] = true;
+        report["capacityCases"] = capacityCases;
         if (!results.isEmpty()) {
             report["meanEqualWeightLoss"] = totalLoss / results.size();
             report["quick3dMeanEqualWeightLoss"] = quickLoss / results.size();
@@ -398,6 +449,9 @@ int main(int argc, char **argv)
                 int stage = 0;
                 bool active = false;
                 qint64 uploadBytes = 0;
+                qint64 uniformBytes = 0;
+                qint64 generation = -1;
+                int resourceChanges = 0;
             };
             auto samples = std::make_shared<Samples>();
             const auto connection = QObject::connect(
@@ -425,6 +479,11 @@ int main(int argc, char **argv)
                 if (!sample["gpuFrameMs"].isNull())
                     samples->stageGpu[samples->stage].append(sample["gpuFrameMs"].toDouble());
                 samples->uploadBytes += sample["atlasUploadBytes"].toInteger();
+                samples->uniformBytes += sample["uniformUploadBytes"].toInteger();
+                const auto generation = sample["resourceGeneration"].toInteger();
+                if (samples->generation >= 0 && samples->generation != generation)
+                    ++samples->resourceChanges;
+                samples->generation = generation;
             };
             item->captured = { };
             atlas.profile = true;
@@ -443,7 +502,15 @@ int main(int argc, char **argv)
             QElapsedTimer elapsed;
             elapsed.start();
             const int warmup = shortProfile ? 2000 : 5000, duration = shortProfile ? 30000 : 120000;
-            while (elapsed.elapsed() < warmup + duration) {
+            QEventLoop presentationLoop;
+            QObject driveContext;
+            QTimer stopTimer;
+            stopTimer.setSingleShot(true);
+            stopTimer.setTimerType(Qt::PreciseTimer);
+            QObject::connect(&stopTimer, &QTimer::timeout, &presentationLoop, &QEventLoop::quit);
+            const auto advanceFrame = [&] {
+                if (elapsed.elapsed() >= warmup + duration)
+                    return;
                 const auto seconds = elapsed.elapsed() / 1000.0;
                 const int stage = shortProfile
                         ? std::clamp(int((elapsed.elapsed() - warmup) / 5000), 0, 5)
@@ -471,10 +538,16 @@ int main(int argc, char **argv)
                             && (!shortProfile || (elapsed.elapsed() - warmup) % 5000 >= 1000);
                 }
                 window.update();
-                QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-                // Leave the GUI event pump idle between updates; the render thread remains busy.
-                QThread::msleep(1);
-            }
+            };
+            // Submit once per completed presentation, through the normal GUI event loop.
+            // A polling/sleep driver adds unrelated GUI work and wake-up jitter to the gate.
+            const auto drivingConnection =
+                    QObject::connect(&window, &QQuickWindow::frameSwapped, &driveContext,
+                                     advanceFrame, Qt::QueuedConnection);
+            advanceFrame();
+            stopTimer.start(warmup + duration);
+            presentationLoop.exec();
+            QObject::disconnect(drivingConnection);
             {
                 std::scoped_lock lock(samples->mutex);
                 samples->active = false;
@@ -484,6 +557,16 @@ int main(int argc, char **argv)
                 QJsonObject result{ { "count", values.size() } };
                 if (values.isEmpty())
                     return result;
+                int consecutive = 0, longest = 0;
+                for (double interval : values) {
+                    consecutive = interval > 20 ? consecutive + 1 : 0;
+                    longest = std::max(longest, consecutive);
+                }
+                result["maxConsecutiveOver20Ms"] = longest;
+                result["overTwo60HzPeriods"] =
+                        int(std::count_if(values.begin(), values.end(), [](double v) {
+                            return v > 1000.0 / 30;
+                        }));
                 std::sort(values.begin(), values.end());
                 result["p50Ms"] = values[int((values.size() - 1) * .5)];
                 result["p95Ms"] = values[int((values.size() - 1) * .95)];
@@ -510,9 +593,22 @@ int main(int argc, char **argv)
                                 { "frameIntervals", distribution(samples->intervals) },
                                 { "cpuSubmission", distribution(samples->cpu) },
                                 { "gpuFrame", distribution(samples->gpu) },
-                                { "atlasUploadBytes", samples->uploadBytes } };
+                                { "atlasUploadBytes", samples->uploadBytes },
+                                { "uniformUploadBytes", samples->uniformBytes },
+                                { "resourceChanges", samples->resourceChanges } };
+                performance["scope"] =
+                        "Renderer-only camera motion; CPU submit excludes GUI/synchronize and GPU completion";
                 performance["camera"] =
                         "SceneAdapter production browse target, span 7.33, distance 140";
+                performance["driver"] =
+                        "frameSwapped queued GUI update; event loop deadline; no polling/sleep";
+                QJsonArray frameSamples, cpuSamples;
+                for (double value : samples->intervals)
+                    frameSamples.append(value);
+                for (double value : samples->cpu)
+                    cpuSamples.append(value);
+                performance["frameIntervalSamplesMs"] = frameSamples;
+                performance["cpuSubmissionSamplesMs"] = cpuSamples;
                 if (shortProfile) {
                     const QStringList names{ "full",     "no-shadow", "no-AO",
                                              "no-bokeh", "no-shell",  "paper-only" };

@@ -5,6 +5,22 @@ class AtlasUploadTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void ownedSnapshot()
+    {
+        AtlasUploadQueue queue;
+        queue.reset({ 256, 256 }, 1);
+        QByteArray backing(256 * 256 * 4, '\0');
+        QImage external(reinterpret_cast<uchar *>(backing.data()), 256, 256,
+                        QImage::Format_RGBA8888_Premultiplied);
+        external.fill(Qt::red);
+        queue.enqueue({ { 1, 1, 1, 0, external } });
+        // Modify the external storage without Qt's detach: the queued image must own its bytes.
+        backing.fill('\0');
+        const auto batch = queue.take(false);
+        QCOMPARE(batch.size(), 1);
+        QCOMPARE(batch[0].pixels.pixelColor(0, 0), QColor(Qt::red));
+        QCOMPARE(batch[0].pixels.format(), QImage::Format_RGBA8888_Premultiplied);
+    }
     void budgetsAndDedupe()
     {
         AtlasUploadQueue queue;

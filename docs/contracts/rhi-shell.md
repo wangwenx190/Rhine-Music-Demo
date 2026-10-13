@@ -18,7 +18,7 @@
 
 Frame std140 扩展到 752 bytes：前 560 bytes 保留原块，nativeVP 在 560，camera 在 624，scatter 在 736。C++ static_assert、设备动态 offset 与 qsb reflection 共同核对。capture / composite 的三个颜色附件独立，target reset 先释放 pipelines/bindings，再释放 RT/pass/depth/MSAA/resolve 纹理。读回拥有独立结果存储，销毁和 Kit/RHI 替换前 finish；GUI 回调 QPointer 排队，不保留 GUI 对象到 render。float 资产从小端转为本机字节序；所有资源经 qrc 解析，无系统盘或当前目录依赖。
 
-R10B 历史复建入口 `tools/build/verify-r10b.ps1 -Python <本机 Python>`，需对应验收提交。当前源树使用 `tools/build/verify-r10c.ps1`；默认可以使用 PATH 中可执行的 Python，开发依赖不进入产品运行路径。冻结源码捕获需要已有 Node、锁定 Web 开发依赖与本机浏览器；只访问隔离的本地 harness，并阻止外网请求。相同源/fixture/image hash 的重验可加 `-SkipWebCapture`。生成后先 format/check-format，再执行完整 Release Review CTest、qmllint，最后关闭 Review，执行生产 Release 构建与 CTest。
+R10B历史复建入口`tools/build/verify-r10b.ps1 -Python <本机Python>`，R10C为`tools/build/verify-r10c.ps1`，均需对应验收提交并在隔离checkout保存输出，不能用维护后源码覆盖历史证据。当前维护验证和来源索引按`performance.md`及`verification/windows/performance-review/`执行；开发依赖不进入产品运行路径。冻结源码捕获使用已有Node、锁定Web依赖与本机浏览器，只访问隔离本地harness并阻止外网请求；相同源/fixture/image hash可复用已有对照。先format/check-format，再执行受影响的Release Review CTest/qmllint，最后关闭Review执行生产Release构建和CTest。
 
 `tests/fixtures/rhi-shell/visual.json` 保留 R10 `sourceIndex`、源参数和独立投影；61 状态覆盖原 2、4–57、60–65，三种封面、双主题、前/低角度、邻盒、抽取中间位置、三档阴影与九实例。普通场景采集源码 pre-AO/Bokeh/SMAA 的线性输出，三个 direct-material 例外继续按原单盒路径采集；R10B Quick3D 与 RHI 使用完全相同输入和颜色域比较。原 R10 0/1/3 的画质、Bokeh 和 320px SSAA 诊断已纳入当前 R10C final-output 重放；R10B 历史证据仍只代表 pre-stage。原 58/59 另按真实 GPU 法线/深度和原 source 图检查，RGB24 线性深度还原为 canonical OpenGL depth 后对比；R10A 的已知平面、角点、九尺寸与读回生命周期也执行回归。
 

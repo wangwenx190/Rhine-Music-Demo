@@ -2,6 +2,14 @@
 
 `RhiItem::Input` 保持值快照边界；图集、实例缓冲、阴影和后处理资源只由 render 线程持有。产品接入仍属于 R10D，`implementationReady` 在本契约中不代表产品已替换。
 
+算法/架构审计与性能结论按 [performance.md](performance.md) 执行。封面按来源cacheKey保存一次拥有像素的快照，重复同步复用；调用者发布后不经外部指针改写图像，内容变化发布新revision。图集在generation/lease/serial校验后才转换并detach一次，转换已有独立存储时不追加无效copy；队列拥有像素，GUI对象不跨同步边界。
+
+uniform采用固定上界`uniformStride*(432*3+6)`，涵盖三个壳体逐draw、共享批次和小于8实体的普通路径；可见/实体数量变化不重建渲染图。CPU暂存复用，只上传已写入的aligned前缀，不逐帧清零/传输容量余量；容量与提交字节分别报告。深度键每实体预计算一次，保留原矩阵运算顺序和stable ID；112-byte实例记录直接填model/UV/origin light，不计算被丢弃的整份816-byte材质uniform。阴影绘制仍包含需要的非相机可见caster。
+
+`updateDynamicBuffer`的指针重载在返回前复制载荷，因此CPU暂存可以跨帧复用；后端buffer轮换仍由QRhi负责，不能保存或改写其内部native storage。接口依据：[QRhiResourceUpdateBatch](https://doc.qt.io/qt-6/qrhiresourceupdatebatch.html#updateDynamicBuffer)。
+
+性能Review通过frameSwapped的queued GUI回调提交一次下一帧状态，正常Qt事件循环与独立deadline timer控制时长，不用毫秒轮询、processEvents/msleep重复驱动呈现。原轮询协议证据保留原范围，新协议单列原始样本，不将采集驱动改善误记为渲染算法的FPS收益。
+
 图集为固定页面和 256×256 RGBA8 tile，不生成页面 mip，不做各向异性跨格采样。`AtlasUpload` 携带页面 generation、递增 lease、槽位内递增 serial；过期 generation/lease 被拒绝，重复 serial 不再次上传，新 serial 替换同槽待处理结果。稳态每帧最多八 tile（2 MiB），初始化每批最多 64 tile（16 MiB）；剩余队列跨帧提交。窗口/渲染目标 resize 保留图集，页面重建必须换 generation。CPU 像素载荷、QRhi 请求统计和实际 D3D11 目标传输字节分别记录。
 
 Review 的 `TransferAudit` 检查所选 Qt 的实际 D3D11 命令列表，按目标原生纹理筛选 `UpdateSubresource`，记录 destination box、row pitch 和 destination bytes。随后完成整页 GPU 读回，逐像素核对初始化、区域之外不变、稳定帧与还原。这是原生命令的目标写入量，不是物理总线流量；其他平台不伪造原生 D3D11 测量。
@@ -20,4 +28,4 @@ SMAA 使用既有 Medium/area/search 和 gamma 2.2；framebuffer 的后端行方
 
 所有窗口遵循 [测试窗口契约](test-window-policy.md)。本平台运行和跨平台静态审计结果以对应 `verification/` 产物为准；macOS/Linux 结论必须为“静态审计通过，实机待用户验证”。
 
-当前完整 Release 复建使用 `tools/build/verify-r10c.ps1`，执行 Review/production CTest、格式、qmllint 和 24 个同 Kit shader 变体，再生成静态矩阵与 evidence-index。Windows 产物在 `verification/windows/rhi-postprocess/`，当前 pre-stage/final 图片在 `docs/media/rhi-postprocess/`。资源来源与算法适配 hash 见 `resources/manifests/rhi-postprocess.json`；R10A/R10B 历史证据不回写。性能门槛使用 `QSG_NO_VSYNC=1` 的真实 frameSwapped 间隔，明确限定为未限速原生渲染吞吐；系统 compositor/vsync 节奏与最终产品交互仍需 R10D 和用户实际环境验证。
+R10C历史Release复建工具为`tools/build/verify-r10c.ps1`，只在对应验收版本的隔离checkout重建，不作为维护后源码覆盖历史目录的默认入口。原Windows产物在`verification/windows/rhi-postprocess/`，pre-stage/final图片在`docs/media/rhi-postprocess/`；来源与算法适配hash见`resources/manifests/rhi-postprocess.json`，历史证据不回写。维护后源码按`performance.md`执行Release格式/CTest/qmllint、`rhi-postprocess-gpu`及逐项静态审计，新证据在`verification/windows/performance-review/`及对应静态目录，后续维护继续使用独立目录。性能门槛使用`QSG_NO_VSYNC=1`的真实frameSwapped间隔，仅为未限速原生渲染吞吐；系统compositor/vsync节奏与完整产品交互仍需R10D/R28实际验证。

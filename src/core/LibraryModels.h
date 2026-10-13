@@ -1,6 +1,7 @@
 #pragma once
 #include "MusicTypes.h"
 #include <QAbstractListModel>
+#include <QHash>
 #include <QVariantList>
 
 namespace yalahoo {
@@ -104,5 +105,7 @@ signals:
 private:
     Snapshot m_snapshot;
     QList<SearchResult> m_results;
+    QHash<QString, qsizetype> m_albumIndices;
+    QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
 };
 }

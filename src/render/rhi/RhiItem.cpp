@@ -190,16 +190,20 @@ public:
     void synchronize(QQuickRhiItem *item) override
     {
         auto *source = static_cast<RhiItem *>(item);
-        coverDirty = coverDirty || coverSourceKey != source->input().cover.cacheKey();
-        coverSourceKey = source->input().cover.cacheKey();
+        const auto &sourceCover = source->input().cover;
+        if (coverSourceKey != sourceCover.cacheKey()) {
+            coverSourceKey = sourceCover.cacheKey();
+            detachedCover = sourceCover.copy();
+            ++coverSnapshotCopies;
+            coverDirty = true;
+        }
         input = source->input();
         deliver = source->captured;
         profile = source->profiled;
         distinctThread = QThread::currentThread() != source->thread();
-        // No GUI pointer retained; image pixels detach before rendering or resource updates.
-        input.cover = input.cover.copy();
-        for (auto &u : input.atlasUploads)
-            u.pixels = u.pixels.copy();
+        // Keep one owned cover snapshot per revision. The queue owns accepted tile pixels;
+        // rejected/replayed uploads need no deep copy while the GUI is blocked in synchronize.
+        input.cover = detachedCover;
         if (input.atlasGeneration && atlasGeneration == input.atlasGeneration)
             atlasQueue.enqueue(input.atlasUploads);
     }
@@ -251,6 +255,8 @@ private:
     std::array<Uniform, 7> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
     QVector<QMatrix4x4> lightEntities;
+    QByteArray uniformScratch;
+    QImage detachedCover;
     QVector4D cachedRowSettings, cachedPrintSettings;
     QVector3D cachedRowColumn, cachedLightColumn;
     QMatrix4x4 nativeVP, nativeLightVP, canonicalLightVP;
@@ -261,6 +267,7 @@ private:
     bool distinctThread = false;
     quint64 capturedRequest = 0, generation = 0;
     qint64 coverSourceKey = 0;
+    quint64 coverSnapshotCopies = 0;
     quint64 atlasGeneration = 0;
     qint64 frameUploadBytes = 0, totalUploadBytes = 0;
     QJsonArray uploadRegions;
@@ -303,6 +310,7 @@ void Renderer::reset()
     dofGeometry.reset();
     postTargets = false;
     uniforms.reset();
+    uniformScratch.clear();
     outputUniform.reset();
     vertices.reset();
     indices.reset();
@@ -515,8 +523,9 @@ void Renderer::initialize(QRhiCommandBuffer *)
         require(indices->create(), "RHI index buffer failed");
         uniformStride = api->ubufAligned(sizeof(Uniform));
         uniforms.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                      uniformStride * (432 * 6 + 6)));
+                                      uniformStride * (432 * 3 + 6)));
         require(uniforms->create(), "RHI uniform buffer failed");
+        uniformScratch = QByteArray(uniforms->size(), '\0');
         instanceBuffer.reset(
                 api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 432 * 112));
         require(instanceBuffer->create(), "RHI instance buffer failed");
@@ -546,18 +555,12 @@ void Renderer::initialize(QRhiCommandBuffer *)
         }
     }
     const auto coverSize = input.atlasGeneration ? input.atlasSize : input.cover.size();
-    const int count = std::max(1, int(input.entities.size()));
-    const auto visibility = count >= 8 ? visibleEntities(input, input.entities) : QVector<bool>();
-    const int active = int(std::count(visibility.begin(), visibility.end(), true));
-    const int bucket = std::max(32, ((active + 31) / 32) * 32);
-    const int uniformCount = count >= 8 ? bucket * 3 + 6 : count * 6 + 6;
-    const int uniformSize = uniformCount * uniformStride;
     const bool replaceCover =
             !cover || cover->pixelSize() != coverSize || atlasGeneration != input.atlasGeneration;
     if (targetSize != renderTarget()->pixelSize() || shadowSize != std::max(1, input.shadowSize)
         || !cover || cover->pixelSize() != coverSize || atlasGeneration != input.atlasGeneration
         || captureSamples != input.captureSamples || targetsHaveShells != input.shells
-        || diagnosticTargets != bool(deliver) || uniforms->size() != quint32(uniformSize)) {
+        || diagnosticTargets != bool(deliver)) {
         post.reset();
         prepassPipeline.reset();
         opaqueInstances.reset();
@@ -579,11 +582,6 @@ void Renderer::initialize(QRhiCommandBuffer *)
         outputBindings.reset();
         geometryBindings.reset();
         shadowBindings.reset();
-        if (uniforms->size() != quint32(uniformSize)) {
-            uniforms.reset(
-                    api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, uniformSize));
-            require(uniforms->create(), "Bounded uniform buffer recreation failed");
-        }
         targetSize = renderTarget()->pixelSize();
         shadowSize = std::max(1, input.shadowSize);
         captureSamples = input.captureSamples;
@@ -1036,7 +1034,7 @@ void Renderer::render(QRhiCommandBuffer *cb)
         cachedRowColumn = input.rowColumn;
         cachedLightColumn = input.lightColumn;
     }
-    QByteArray bytes(uniforms->size(), '\0');
+    auto &bytes = uniformScratch;
     quint32 cursor = 0;
     auto append = [&](const QMatrix4x4 &m, int kind, int entity = -1) {
         auto u = uniform(m, kind, entity);
@@ -1048,18 +1046,24 @@ void Renderer::render(QRhiCommandBuffer *cb)
     };
     QVector<quint32> shadowOffsets, opaqueOffsets, prepassOffsets;
     QVector<int> opaqueOrder;
+    opaqueOrder.reserve(entities.size());
     for (int i = 0; i < entities.size(); ++i)
         opaqueOrder.append(i);
-    if (input.shells)
+    if (input.shells) {
+        QVector<float> depths;
+        depths.reserve(entities.size());
+        for (const auto &model : entities)
+            depths.append(-(input.scene.view * model * QVector4D(paper.center, 1)).z());
         std::sort(opaqueOrder.begin(), opaqueOrder.end(), [&](int a, int b) {
-            const float da = -(input.scene.view * entities[a] * QVector4D(paper.center, 1)).z();
-            const float db = -(input.scene.view * entities[b] * QVector4D(paper.center, 1)).z();
+            const float da = depths[a];
+            const float db = depths[b];
             if (da != db)
                 return da < db;
             const auto ia = input.entityIds.isEmpty() ? quint64(a) : input.entityIds[a];
             const auto ib = input.entityIds.isEmpty() ? quint64(b) : input.entityIds[b];
             return ia < ib;
         });
+    }
     if (!batched)
         for (const auto &m : entities)
             shadowOffsets.append(append(m, 1));
@@ -1079,6 +1083,7 @@ void Renderer::render(QRhiCommandBuffer *cb)
     };
     QVector<ShellDraw> shells;
     if (input.shells) {
+        shells.reserve(entities.size() * 3);
         require(entities.size() == 1 || input.entityIds.size() == entities.size(),
                 "Shell instances require stable IDs");
         for (int i : opaqueOrder) {
@@ -1109,12 +1114,23 @@ void Renderer::render(QRhiCommandBuffer *cb)
         QByteArray instances(entities.size() * 112, '\0');
         int instanceCursor = 0;
         auto instance = [&](int i) {
-            auto u = uniform(entities[i], 0, i);
             auto *destination = instances.data() + instanceCursor++ * 112;
-            std::memcpy(destination, u.model, 64);
-            std::memcpy(destination + 64, u.coverUv, 16);
-            std::memcpy(destination + 80, u.originLight0, 16);
-            std::memcpy(destination + 96, u.originLight1, 16);
+            std::memcpy(destination, entities[i].constData(), 64);
+            float uv[4] = { 0, 0, 1, 1 };
+            if (input.atlasGeneration) {
+                const auto tile = input.coverTiles[i];
+                copy(uv,
+                     QVector4D(float(tile.x()) / input.atlasSize.width(),
+                               float(tile.y()) / input.atlasSize.height(),
+                               float(tile.width()) / input.atlasSize.width(),
+                               float(tile.height()) / input.atlasSize.height()));
+            }
+            std::memcpy(destination + 64, uv, 16);
+            float light[4];
+            copy(light, entityLight0[i]);
+            std::memcpy(destination + 80, light, 16);
+            copy(light, entityLight1[i]);
+            std::memcpy(destination + 96, light, 16);
         };
         for (int i : opaqueOrder)
             if (visible[i])
@@ -1125,7 +1141,7 @@ void Renderer::render(QRhiCommandBuffer *cb)
         updates->updateDynamicBuffer(instanceBuffer.get(), 0, instances.size(),
                                      instances.constData());
     }
-    updates->updateDynamicBuffer(uniforms.get(), 0, bytes.size(), bytes.constData());
+    updates->updateDynamicBuffer(uniforms.get(), 0, cursor, bytes.constData());
     const float out[4] = {
         api->isYUpInFramebuffer() ? 0.0f : 1.0f,
         input.geometryDiagnostic || input.shadowDiagnostic || input.rawOutput ? 1.0f : 0.0f,
@@ -1306,6 +1322,9 @@ void Renderer::render(QRhiCommandBuffer *cb)
         p->capture.metadata["geometryInstanced"] = batched;
         p->capture.metadata["visibleEntities"] = visibleCount;
         p->capture.metadata["uniformBytes"] = int(sizeof(Uniform));
+        p->capture.metadata["uniformUploadBytes"] = qint64(cursor);
+        p->capture.metadata["uniformCapacityBytes"] = qint64(uniforms->size());
+        p->capture.metadata["coverSnapshotCopies"] = qint64(coverSnapshotCopies);
         const std::array<QRhiTexture *, 13> textures{
             opaque.color.get(),
             opaque.normal.get(),
@@ -1370,11 +1389,12 @@ void Renderer::render(QRhiCommandBuffer *cb)
     }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
-        profile(QJsonObject{
-                { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
-                { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
-                { "atlasUploadBytes", frameUploadBytes },
-                { "visibleEntities", int(std::count(visible.begin(), visible.end(), true)) } });
+        profile(QJsonObject{ { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
+                             { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
+                             { "atlasUploadBytes", frameUploadBytes },
+                             { "uniformUploadBytes", qint64(cursor) },
+                             { "resourceGeneration", qint64(generation) },
+                             { "visibleEntities", visibleCount } });
     }
 }
 }
@@ -1402,6 +1422,7 @@ QJsonArray adapterInventory()
 }
 void RhiItem::submit(Input input, QSize target)
 {
+    require(input.entities.size() <= 432, "RHI visible pool capacity exceeded");
     require(!input.cover.isNull() || input.atlasGeneration,
             "Missing cover at RHI synchronization boundary");
     require(input.aoSamples == 0 || input.aoSamples == 16 || input.aoSamples == 32

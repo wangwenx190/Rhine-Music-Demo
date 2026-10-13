@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
+#include <QSet>
 #include <QTest>
 #include <algorithm>
 
@@ -129,6 +130,75 @@ private slots:
         snapshot.albums[1].artist = QStringLiteral("e");
         snapshot.albums[2].artist = QStringLiteral("é");
         QCOMPARE(orderLibrary(snapshot, SortMode::Artist).columns.size(), 2);
+    }
+    void largeDistinctColumns()
+    {
+        LibrarySnapshot snapshot;
+        for (int i = 1023; i >= 0; --i) {
+            Album album;
+            album.id = QStringLiteral("album-%1").arg(i);
+            album.title = QStringLiteral(" Album %1 ").arg(i);
+            album.artist = QStringLiteral(" Artist %1 ").arg(i);
+            album.genreId = QStringLiteral("genre-%1").arg(i % 128);
+            snapshot.albums.append(album);
+        }
+        snapshot.genres.append({ QStringLiteral("genre-7"), QStringLiteral("Known genre") });
+        for (const auto mode : { SortMode::Artist, SortMode::Album, SortMode::Genre }) {
+            const auto order = orderLibrary(snapshot, mode);
+            QCOMPARE(order.indices.size(), snapshot.albums.size());
+            QStringList members;
+            for (const auto &column : order.columns)
+                members.append(column.albumIds);
+            QCOMPARE(members.size(), snapshot.albums.size());
+            QCOMPARE(QSet<QString>(members.begin(), members.end()).size(), snapshot.albums.size());
+            if (mode == SortMode::Genre) {
+                QCOMPARE(order.columns.size(), 128);
+                QCOMPARE(order.columns.first().key, QStringLiteral("genre-7"));
+                QCOMPARE(order.columns.first().label, QStringLiteral("Known genre"));
+                QCOMPARE(order.columns[1].key, QStringLiteral("genre-127"));
+                QCOMPARE(order.indices.first(), 0);
+            } else {
+                QCOMPARE(snapshot.albums[order.indices.first()].id, QStringLiteral("album-0"));
+                QCOMPARE(snapshot.albums[order.indices.last()].id, QStringLiteral("album-1023"));
+                QCOMPARE(order.columns.size(), mode == SortMode::Artist ? 1024 : 86);
+            }
+        }
+    }
+    void searchRowsFollowSnapshot()
+    {
+        LibrarySnapshot snapshot;
+        for (int i = 0; i < 2; ++i) {
+            Album album;
+            album.id = QStringLiteral("album-%1").arg(i);
+            album.title = QStringLiteral("Collection %1").arg(i);
+            Track track;
+            track.id = QStringLiteral("same-local-id");
+            track.albumId = album.id;
+            track.title = QStringLiteral("Song %1").arg(i);
+            track.artist = QStringLiteral("Artist %1").arg(i);
+            album.tracks.append(track);
+            snapshot.albums.append(album);
+        }
+        SearchListModel model;
+        QAbstractItemModelTester tester(&model,
+                                        QAbstractItemModelTester::FailureReportingMode::QtTest);
+        const auto first = std::make_shared<const LibrarySnapshot>(snapshot);
+        model.update(first, QStringLiteral("song"), { });
+        QCOMPARE(model.rowCount(), 2);
+        QCOMPARE(model.data(model.index(0), SearchListModel::Title), QVariant("Song 0"));
+        QCOMPARE(model.data(model.index(1), SearchListModel::Title), QVariant("Song 1"));
+        QCOMPARE(model.data(model.index(1), SearchListModel::Artist), QVariant("Artist 1"));
+        QCOMPARE(model.data(model.index(1), SearchListModel::Kind), QVariant("track"));
+        model.update(first, QStringLiteral("collection"), { });
+        QCOMPARE(model.data(model.index(1), SearchListModel::Title), QVariant("Collection 1"));
+        QCOMPARE(model.data(model.index(1), SearchListModel::TrackId), QVariant(QString()));
+        snapshot.albums[1].tracks[0].title = QStringLiteral("Song replacement");
+        model.update(std::make_shared<const LibrarySnapshot>(snapshot), QStringLiteral("song"),
+                     { });
+        QCOMPARE(model.data(model.index(1), SearchListModel::Title), QVariant("Song replacement"));
+        model.update({ }, QString(), { });
+        QCOMPARE(model.rowCount(), 0);
+        QVERIFY(!model.data(model.index(0), SearchListModel::Title).isValid());
     }
     void frozenSearch()
     {
