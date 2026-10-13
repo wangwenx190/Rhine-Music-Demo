@@ -9,7 +9,8 @@
 namespace yalahoo::rhi {
 // Inspect the actual backend commands, not the caller's image payload or upload counters.
 // Completed readbacks in the Review tool prove these commands executed successfully.
-inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture *texture)
+inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture *texture,
+                                   bool tileOnly = true)
 {
     QJsonObject result{ { "available", false } };
 #if defined(Q_OS_WIN) && defined(YALAHOO_RHI_AUDIT)
@@ -24,14 +25,19 @@ inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture
                 || command.args.updateSubRes.dst != native)
                 continue;
             const auto &u = command.args.updateSubRes;
-            require(u.hasDstBox && u.dstSubRes == 0, "Atlas native upload lost destination region");
+            require((u.hasDstBox || !tileOnly) && u.dstSubRes == 0,
+                    "Atlas native upload lost destination region");
             const auto &box = u.dstBox;
-            const auto count = qint64(box.right - box.left) * (box.bottom - box.top) * 4;
+            const int left = u.hasDstBox ? int(box.left) : 0;
+            const int top = u.hasDstBox ? int(box.top) : 0;
+            const int right = u.hasDstBox ? int(box.right) : texture->pixelSize().width();
+            const int bottom = u.hasDstBox ? int(box.bottom) : texture->pixelSize().height();
+            const auto count = qint64(right - left) * (bottom - top) * 4;
             bytes += count;
-            regions.append(QJsonObject{ { "left", int(box.left) },
-                                        { "top", int(box.top) },
-                                        { "right", int(box.right) },
-                                        { "bottom", int(box.bottom) },
+            regions.append(QJsonObject{ { "left", left },
+                                        { "top", top },
+                                        { "right", right },
+                                        { "bottom", bottom },
                                         { "rowPitch", int(u.srcRowPitch) },
                                         { "bytes", count } });
         }
@@ -45,6 +51,7 @@ inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture
     Q_UNUSED(api);
     Q_UNUSED(cb);
     Q_UNUSED(texture);
+    Q_UNUSED(tileOnly);
 #endif
     return result;
 }

@@ -1,16 +1,16 @@
 # RHI 生产场景集成契约
 
-生产调用链为 `App.qml -> SceneItem -> SceneAdapter::frame()/SelectionLighting/RenderQuality -> RhiItem::submit -> Renderer::synchronize/renderFrame`。`SceneItem` 是 QML 中唯一的三维场景入口；相机、导航、`projectWorldPoint`、`hitTest`、`focalDepth` 和不可变 `SceneFrame` 仍归 SceneAdapter 所有。QML 不识别 D3D11/Metal/OpenGL，也不根据后端维护另一份相机或实体状态。当前实体仍为既有匿名单盒，阵列、波浪、完整详情和封面服务分别由后续轮次接入。
+生产调用链为 `App.qml -> SceneItem -> SceneAdapter::frame()/SelectionLighting/RenderQuality -> RhiItem::submit -> Renderer::synchronize/renderFrame`。`SceneItem` 是 QML 中唯一的三维场景入口；相机、导航、`projectWorldPoint`、`hitTest`、`focalDepth` 和不可变 `SceneFrame` 仍归 SceneAdapter 所有。QML 不识别 D3D11/Metal/OpenGL，也不根据后端维护另一份相机或实体状态。当前实体仍为既有匿名单盒，封面已通过 CoverCache 异步接入，见 covers.md；阵列、波浪和完整详情由后续轮次接入。
 
 生产 CMake 不链接 Quick3D，不注册 FixedTextureData，不打包 GeometryScene、Quick3D 材质/后处理 QML 或其 mesh/QML 资产。`YALAHOO_REVIEW=ON` 才加入 `ResearchApp.qml` 和历史 Quick3D oracle；仅 `--verify-materials` 加载它。`--verify-scene` 使用生产 SceneItem 的提交矩阵及真实 RHI 轮廓。旧研究源码和资产保留在原路径，历史报告不改写。
 
 ## 同步、失效与生命周期
 
-SceneAdapter 只在相机、布局或实体位置实际变化时重建矩阵和发布几何 revision；输入 revision 单独记录。SceneItem 用 Qt polish 合并同帧的相机、灯光和画质通知，发布与已提交内容相同时不重新提交。身份和矩阵的双精度计算顺序保持原样；一次内容变化只产生一次不可变值交接。Renderer 对相同 submission 不重复复制快照；封面仍按 cacheKey 拥有一次像素副本，后续复用，图集保持既有 generation/lease/serial 队列。
+SceneAdapter 只在相机、布局或实体位置实际变化时重建矩阵和发布几何 revision；输入 revision 单独记录。SceneItem 用 Qt polish 合并同帧的相机、灯光和画质通知，发布与已提交内容相同时不重新提交。身份和矩阵的双精度计算顺序保持原样；一次内容变化只产生一次不可变值交接。Renderer 对相同 submission 不重复复制快照；封面按 cacheKey 交接，生产 worker 的 owned immutable 像素共享，外部 Review 输入隔离一次后复用。coverSnapshotCopies 和 coverSnapshotShares 分别计数，图集保持 generation/lease/serial 队列。
 
 `PreparedAssets` 在首个 RhiItem 的 GUI 构造阶段、首次 show 前预载固定 qrc 资产，解析 GLB、反序列化 qsb、转换确切的 PMREM half 数据和解码 SMAA lookup。每个进程仅有一份有界不可变缓存，场景图重建不重新读盘/解码；render/synchronize 只引用 Qt 隐式共享值。这里仅处理固定内部资产，不是 R11 的异步用户封面实现。
 
-渲染资源由 render 线程独占。附件兼容性键为输出尺寸、阴影尺寸、封面页面尺寸/generation、MSAA、壳体/诊断布局；后处理另使用 AO 大小/核、景深/SMAA 和输入附件身份。相机、焦点、主题数值、实体数量不改变附件键，uniform 和实例容量固定为 `uniformStride*(432*3+6)` 与 `432*112`。阴影 caster/开关未变时复用；局部 upload 和有效前缀保持 R10C 契约。
+渲染资源由 render 线程独占。附件兼容性键为输出尺寸、阴影尺寸、MSAA、壳体/诊断布局；封面尺寸/generation 使用独立资源 revision，仅更新 cover texture 和布局兼容 bindings，不重建其他附件、pipeline 或 postprocess。后处理另使用 AO 大小/核、景深/SMAA 和输入附件身份。相机、焦点、主题数值、实体数量不改变附件键，uniform 和实例容量固定为 `uniformStride*(432*3+6)` 与 `432*112`。阴影 caster/开关未变时复用；局部 upload 和有效前缀保持 R10C 契约。selectedUploadBytes 与 atlasUploadBytes 分开报告；集成 Review 的初始资源基线等待 1024 封面，十次真实重建按 selected 的 4MiB 上传确认。
 
 GPU 不支持所请求格式、采样或尺寸时显式报错，SceneItem 的 `errorText` 在界面显示，设置不偷偷改为低画质。错误穿过 Qt renderer 虚函数前被捕获；已记录命令引用的资源不在错误回调中销毁，等待 Qt 正常场景图释放。隐藏时生产 FrameAnimation 停止；恢复继续遵守测试窗口标志，窗口/renderer 的销毁取消 QObject 回调。Review 在途读回最多两个，待采集目标保持最新 request，普通产品没有捕获回调。Review 读回只用于诊断；普通产品没有 readback 或 GPU finish 热路径。
 

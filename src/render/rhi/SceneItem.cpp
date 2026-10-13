@@ -8,10 +8,20 @@
 
 namespace yalahoo::rhi {
 SceneItem::SceneItem(QQuickItem *parent)
-    : RhiItem(parent), m_cover(":/assets/demo-covers/square.png")
+    : RhiItem(parent), m_cover(256, 256, QImage::Format_RGBA8888_Premultiplied)
 {
-    // R11 supplies asynchronous library covers. This one embedded bootstrap image is decoded
-    // before show, and subsequently shared; the frame and render paths perform no decoding.
+    m_cover.fill(Qt::transparent);
+    m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
+    connect(&m_covers, &CoverCache::ready, this, [this](CoverSnapshot pixels) {
+        if (m_coverPool.upgrade(m_selectedCover, pixels)) {
+            m_cover = pixels->image;
+            schedule();
+        }
+    });
+    m_covers.request(QStringLiteral("demo-square"),
+                     QStringLiteral(":/assets/demo-covers/square.png"), 256);
+    m_covers.request(QStringLiteral("demo-square"),
+                     QStringLiteral(":/assets/demo-covers/square.png"), 1024);
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::heightChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::schedule);
@@ -140,6 +150,8 @@ void SceneItem::updatePolish()
     Input in;
     in.scene = adapter.frame();
     in.cover = m_cover;
+    in.coverPainted = true;
+    in.immutableCover = true;
     in.geometryDiagnostic = m_geometryOnly;
     in.shells = !m_geometryOnly;
     in.showPaper = !m_geometryOnly;

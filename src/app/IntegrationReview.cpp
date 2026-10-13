@@ -154,7 +154,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &window, SceneAdapter &
             resources.append(entry);
             lastResources = inventory;
         }
-        if (!baseBytes && bytes > 0)
+        if (!baseBytes && bytes > 0 && sample["selectedCoverWidth"].toInt() == 1024)
             baseBytes = bytes;
         finalBytes = bytes;
         const bool acknowledged = awaiting && awaiting(sample);
@@ -243,7 +243,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &window, SceneAdapter &
             awaiting = [&, after](const QJsonObject &sample) {
                 const bool match = sample["submittedNs"].toInteger() >= after
                         && sample["resourceGeneration"].toInteger() == 1
-                        && sample["atlasUploadBytes"].toInteger() > 0
+                        && sample["selectedUploadBytes"].toInteger() == 1024 * 1024 * 4
                         && sample["resources"].toObject()["estimatedCurrentBytes"].toInteger()
                                 == baseBytes;
                 if (match)

@@ -214,8 +214,11 @@ public:
         const auto &sourceCover = source->input().cover;
         if (coverSourceKey != sourceCover.cacheKey()) {
             coverSourceKey = sourceCover.cacheKey();
-            detachedCover = sourceCover.copy();
-            ++coverSnapshotCopies;
+            detachedCover = source->input().immutableCover ? sourceCover : sourceCover.copy();
+            if (source->input().immutableCover)
+                ++coverSnapshotShares;
+            else
+                ++coverSnapshotCopies;
             coverDirty = true;
         }
         input = source->input();
@@ -237,7 +240,7 @@ public:
         // rejected/replayed uploads need no deep copy while the GUI is blocked in synchronize.
         input.cover = detachedCover;
         if (input.atlasGeneration && atlasGeneration == input.atlasGeneration)
-            atlasQueue.enqueue(input.atlasUploads);
+            enqueueAtlas();
         synchronizationMs = sync.nsecsElapsed() / 1e6;
     }
     void initialize(QRhiCommandBuffer *cb) override
@@ -275,7 +278,8 @@ private:
     std::function<void(QString)> failed;
     bool failedRenderer = false;
     qint64 previousResourceBytes = 0;
-    quint64 inventoryGeneration = 0, inventoryPostRevision = 0;
+    quint64 inventoryGeneration = 0, inventoryPostRevision = 0, inventoryCoverRevision = 0;
+    quint64 coverResourceRevision = 0;
     QJsonObject cachedInventory, allocationPlan;
     struct AllocationKey
     {
@@ -287,6 +291,7 @@ private:
     };
     AllocationKey allocationKey;
     void reset();
+    void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
                     QRhiTexture::Format format = QRhiTexture::RGBA16F,
                     std::shared_ptr<QRhiRenderBuffer> sharedDepth = { });
@@ -307,6 +312,9 @@ private:
     Target shadow, opaque, composite, aoGeometry, dofGeometry;
     Postprocess post;
     AtlasUploadQueue atlasQueue;
+    QVector<quint64> expectedCoverLeases;
+    QVector<QRect> expectedCoverTiles;
+    quint64 expectedAtlasGeneration = 0;
     Owned<QRhiBuffer> vertices, indices, uniforms, outputUniform;
     Owned<QRhiBuffer> instanceBuffer;
     Owned<QRhiTexture> cover, environment, dfg, ltc1, ltc2;
@@ -345,6 +353,8 @@ private:
     quint64 capturedRequest = 0, generation = 0;
     qint64 coverSourceKey = 0;
     quint64 coverSnapshotCopies = 0;
+    quint64 coverSnapshotShares = 0;
+    qint64 selectedUploadBytes = 0, selectedTotalUploadBytes = 0;
     quint64 atlasGeneration = 0;
     qint64 frameUploadBytes = 0, totalUploadBytes = 0;
     QJsonArray uploadRegions;
@@ -357,6 +367,21 @@ private:
     quint64 outputPostRevision = 0;
     std::vector<std::shared_ptr<Pending>> pending;
 };
+void Renderer::enqueueAtlas()
+{
+    if (expectedAtlasGeneration != atlasGeneration || expectedCoverLeases != input.coverLeases
+        || expectedCoverTiles != input.coverTiles) {
+        for (int i = 0; i < input.coverLeases.size(); ++i) {
+            const auto tile = input.coverTiles[i];
+            atlasQueue.expect((tile.y() / 256) * (input.atlasSize.width() / 256) + tile.x() / 256,
+                              input.coverLeases[i]);
+        }
+        expectedAtlasGeneration = atlasGeneration;
+        expectedCoverLeases = input.coverLeases;
+        expectedCoverTiles = input.coverTiles;
+    }
+    atlasQueue.enqueue(input.atlasUploads);
+}
 void Renderer::reset()
 {
     post.reset();
@@ -408,6 +433,9 @@ void Renderer::reset()
     shadowEntities.clear();
     coverDirty = true;
     atlasGeneration = 0;
+    expectedAtlasGeneration = 0;
+    expectedCoverLeases.clear();
+    expectedCoverTiles.clear();
 }
 void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, bool mips,
                           QRhiTexture::Format format, std::shared_ptr<QRhiRenderBuffer> sharedDepth)
@@ -659,10 +687,40 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     const auto coverSize = input.atlasGeneration ? input.atlasSize : input.cover.size();
     const bool replaceCover =
             !cover || cover->pixelSize() != coverSize || atlasGeneration != input.atlasGeneration;
-    if (targetSize != renderTarget()->pixelSize() || shadowSize != std::max(1, input.shadowSize)
-        || !cover || cover->pixelSize() != coverSize || atlasGeneration != input.atlasGeneration
-        || captureSamples != input.captureSamples || targetsHaveShells != input.shells
-        || diagnosticTargets != bool(deliver)) {
+    const bool replaceTargets = targetSize != renderTarget()->pixelSize()
+            || shadowSize != std::max(1, input.shadowSize) || captureSamples != input.captureSamples
+            || targetsHaveShells != input.shells || diagnosticTargets != bool(deliver)
+            || !opaque.rt;
+    if (replaceCover && !replaceTargets) {
+        require(std::max(coverSize.width(), coverSize.height())
+                        <= api->resourceLimit(QRhi::TextureSizeMax),
+                "Cover exceeds GPU dimensions");
+        auto previous = std::move(cover);
+        cover.reset(api->newTexture(QRhiTexture::RGBA8, coverSize, 1,
+                                    QRhiTexture::UsedAsTransferSource));
+        require(cover->create(), "Cover texture replacement failed");
+        for (auto *bindings : { geometryBindings.get(), shellBindings.get() }) {
+            if (!bindings)
+                continue;
+            QVector<QRhiShaderResourceBinding> values(bindings->cbeginBindings(),
+                                                      bindings->cendBindings());
+            values[1] = QRhiShaderResourceBinding::sampledTexture(
+                    1,
+                    QRhiShaderResourceBinding::VertexStage
+                            | QRhiShaderResourceBinding::FragmentStage,
+                    cover.get(), linear.get());
+            bindings->setBindings(values.cbegin(), values.cend());
+            require(bindings->create(), "Cover binding replacement failed");
+        }
+        ++coverResourceRevision;
+        coverDirty = true;
+        atlasGeneration = input.atlasGeneration;
+        if (atlasGeneration) {
+            atlasQueue.reset(coverSize, atlasGeneration);
+            enqueueAtlas();
+        }
+    }
+    if (replaceTargets) {
         post.reset();
         prepassPipeline.reset();
         opaqueInstances.reset();
@@ -711,6 +769,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "Atlas exceeds GPU dimensions");
         if (replaceCover) {
+            ++coverResourceRevision;
             cover.reset(api->newTexture(QRhiTexture::RGBA8, coverSize, 1,
                                         QRhiTexture::UsedAsTransferSource));
             require(cover->create(), "Cover texture failed");
@@ -718,7 +777,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             atlasGeneration = input.atlasGeneration;
             if (atlasGeneration) {
                 atlasQueue.reset(coverSize, atlasGeneration);
-                atlasQueue.enqueue(input.atlasUploads);
+                enqueueAtlas();
             }
         }
         geometryBindings.reset(api->newShaderResourceBindings());
@@ -951,7 +1010,8 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.scatter, input.scatterColor, input.scatterStrength);
     copy(u.coverUv, QVector4D(0, 0, 1, 1));
     const QSize pixels = input.atlasGeneration ? QSize(256, 256) : input.cover.size();
-    copy(u.paperSize, QVector4D(float(pixels.width()), float(pixels.height()), 0, 0));
+    copy(u.paperSize,
+         QVector4D(float(pixels.width()), float(pixels.height()), input.coverPainted ? 1 : 0, 0));
     return u;
 }
 Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
@@ -967,6 +1027,11 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
                        float(tile.y()) / input.atlasSize.height(),
                        float(tile.width()) / input.atlasSize.width(),
                        float(tile.height()) / input.atlasSize.height()));
+        if (!input.coverLeases.isEmpty()
+            && !atlasQueue.ready((tile.y() / 256) * (input.atlasSize.width() / 256)
+                                         + tile.x() / 256,
+                                 input.coverLeases[entity]))
+            copy(u.coverUv, QVector4D());
     }
     if (entity >= 0) {
         copy(u.originLight0, entityLight0[entity]);
@@ -1037,6 +1102,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         uploadGeometry = false;
     }
     frameUploadBytes = 0;
+    selectedUploadBytes = 0;
     uploadRegions = { };
     if (atlasGeneration) {
         for (const auto &u : atlasQueue.take(input.initializingAtlas)) {
@@ -1060,13 +1126,11 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         // Filter premultiplied texels, then unpremultiply in the paper shader. Straight
         // transparent black texels otherwise produce a dark line at the alpha-test edge.
         const auto image = input.cover.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
-        const QByteArray bytes(reinterpret_cast<const char *>(image.constBits()),
-                               image.sizeInBytes());
         updates->uploadTexture(cover.get(),
-                               QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
-                                       0, 0, QRhiTextureSubresourceUploadDescription(bytes)) }));
+                               { { 0, 0, QRhiTextureSubresourceUploadDescription(image) } });
         coverDirty = false;
-        frameUploadBytes = image.sizeInBytes();
+        selectedUploadBytes = image.sizeInBytes();
+        selectedTotalUploadBytes += selectedUploadBytes;
     }
     totalUploadBytes += frameUploadBytes;
     QVector<QMatrix4x4> entities = input.entities;
@@ -1218,6 +1282,11 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                float(tile.y()) / input.atlasSize.height(),
                                float(tile.width()) / input.atlasSize.width(),
                                float(tile.height()) / input.atlasSize.height()));
+                if (!input.coverLeases.isEmpty()
+                    && !atlasQueue.ready((tile.y() / 256) * (input.atlasSize.width() / 256)
+                                                 + tile.x() / 256,
+                                         input.coverLeases[i]))
+                    copy(uv, QVector4D());
             }
             std::memcpy(destination + 64, uv, 16);
             float light[4];
@@ -1406,10 +1475,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         }
         p->capture.metadata["atlasGeneration"] = qint64(atlasGeneration);
         p->capture.metadata["atlasUploadBytes"] = frameUploadBytes;
+        p->capture.metadata["selectedUploadBytes"] = selectedUploadBytes;
+        p->capture.metadata["selectedTotalUploadBytes"] = selectedTotalUploadBytes;
         p->capture.metadata["atlasTotalUploadBytes"] = totalUploadBytes;
         p->capture.metadata["atlasRegions"] = uploadRegions;
         if (atlasGeneration)
             p->capture.metadata["nativeAtlasTransfers"] = nativeTransfers(api, cb, cover.get());
+        else
+            p->capture.metadata["nativeSelectedTransfers"] =
+                    nativeTransfers(api, cb, cover.get(), false);
         p->capture.metadata["atlasPending"] = atlasQueue.pending();
         p->capture.metadata["atlasRejected"] = qint64(atlasQueue.rejected());
         p->capture.metadata["drawCount"] = entities.size();
@@ -1419,6 +1493,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["uniformUploadBytes"] = qint64(cursor);
         p->capture.metadata["uniformCapacityBytes"] = qint64(uniforms->size());
         p->capture.metadata["coverSnapshotCopies"] = qint64(coverSnapshotCopies);
+        p->capture.metadata["coverSnapshotShares"] = qint64(coverSnapshotShares);
+        p->capture.metadata["coverResourceRevision"] = qint64(coverResourceRevision);
         const std::array<QRhiTexture *, 13> textures{
             opaque.color.get(),
             opaque.normal.get(),
@@ -1501,9 +1577,13 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                               std::chrono::steady_clock::now().time_since_epoch())
                                               .count()) },
                              { "coverSnapshotCopies", qint64(coverSnapshotCopies) },
+                             { "coverSnapshotShares", qint64(coverSnapshotShares) },
                              { "postprocessRevision", qint64(post.revision()) },
                              { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
                              { "atlasUploadBytes", frameUploadBytes },
+                             { "selectedUploadBytes", selectedUploadBytes },
+                             { "selectedCoverWidth", input.cover.width() },
+                             { "selectedCoverHeight", input.cover.height() },
                              { "uniformUploadBytes", qint64(cursor) },
                              { "resourceGeneration", qint64(generation) },
                              { "visibleEntities", visibleCount },
@@ -1513,7 +1593,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
 QJsonObject Renderer::resourceInventory()
 {
     if (inventoryGeneration == generation && inventoryPostRevision == post.revision()
-        && !cachedInventory.isEmpty())
+        && inventoryCoverRevision == coverResourceRevision && !cachedInventory.isEmpty())
         return cachedInventory;
     ResourceInventory inventory;
     auto target = [&](const QString &name, const Target &t) {
@@ -1558,6 +1638,7 @@ QJsonObject Renderer::resourceInventory()
     previousResourceBytes = current;
     inventoryGeneration = generation;
     inventoryPostRevision = post.revision();
+    inventoryCoverRevision = coverResourceRevision;
     return cachedInventory;
 }
 
@@ -1600,13 +1681,16 @@ void RhiItem::submit(Input input, QSize target)
                         || m_input.atlasSize == input.atlasSize,
                 "Changing atlas dimensions requires a new generation");
         require(input.coverTiles.size() == input.entities.size(), "Atlas tile/entity mismatch");
+        require(input.coverLeases.isEmpty() || input.coverLeases.size() == input.entities.size(),
+                "Atlas lease/entity mismatch");
         require(input.atlasSize.width() > 0 && input.atlasSize.height() > 0
                         && input.atlasSize.width() % 256 == 0
                         && input.atlasSize.height() % 256 == 0,
                 "Atlas size must use whole tiles");
         for (const auto &tile : input.coverTiles)
             require(QRect(QPoint(), input.atlasSize).contains(tile)
-                            && tile.size() == QSize(256, 256),
+                            && tile.size() == QSize(256, 256) && tile.x() % 256 == 0
+                            && tile.y() % 256 == 0,
                     "Atlas tile outside page");
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");

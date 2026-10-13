@@ -41,7 +41,9 @@ void main()
         return;
     }
     vec2 size = f.paperSize.xy;
-    vec2 extent = (1.0 - 2.0 / 64.0) * size / max(size.x, size.y);
+    if (entityCoverUv.z <= 0.0 || entityCoverUv.w <= 0.0)
+        discard;
+    vec2 extent = f.paperSize.z > .5 ? vec2(1.0) : (1.0 - 2.0 / 64.0) * size / max(size.x, size.y);
     vec2 uv = (paperUv - .5) / extent + .5;
     if (any(lessThan(uv, vec2(0))) || any(greaterThan(uv, vec2(1))))
         discard;

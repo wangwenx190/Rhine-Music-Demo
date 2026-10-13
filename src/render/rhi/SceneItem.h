@@ -1,6 +1,7 @@
 #pragma once
 #include "RhiItem.h"
 #include "SceneAdapter.h"
+#include "AtlasAllocator.h"
 #include <QPointer>
 
 namespace yalahoo::rhi {
@@ -48,6 +49,9 @@ private:
     void schedule();
     QPointer<SceneAdapter> m_adapter;
     QImage m_cover;
+    CoverCache m_covers;
+    SelectedCoverPool m_coverPool;
+    std::shared_ptr<SelectedCoverLease> m_selectedCover;
     QString m_errorText;
     bool m_geometryOnly = false;
     bool m_telemetryEnabled = false;

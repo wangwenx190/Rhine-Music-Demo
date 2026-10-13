@@ -233,3 +233,9 @@ QSG_RHI_BACKEND=opengl build/release/bin/yalahoo --verify-integration build/rele
 核对 `runtime.json` 的实际后端、client 尺寸、DPR、四个输入 revision 对应提交、独立 frameSwapped 时间序列、九尺寸/四画质/十次真实场景图释放恢复。窗口全程置底、不接受焦点，PNG 只来自自身渲染；目标窗口管理器不支持策略时真实报告失败，不自动激活。资源清单是描述符估算，UnknownFormat 深度附件为明确上界，不冒充实测显存；正常 VSYNC 单盒数据不代表完整阵列/搜索/扫描产品或 input-to-photon。qsb 格式支持、颜色/深度/resolve 和驱动节奏均需实机检查。正式采样按三个独立目录串行执行并保留全部结果。
 
 结束后 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建、运行全部 Release CTest 和 qmllint。普通产品不得包含 ResearchApp/GeometryScene/FixedTextureData 或 Quick3D 链接依赖；共享资源文件保留在仓库。完整平台部署仍使用后续平台轮次入口。本清单的目标机运行结果：待用户填写。
+
+## 封面服务与图集实机验证
+
+本阶段结论：静态审计通过，实机待用户验证。配置 `cmake --preset qt-release -DYALAHOO_REVIEW=ON`，构建 `cmake --build --preset qt-release` 后，执行 `ctest --preset qt-release -R '^(cover-cache|cover-gpu)$' --output-on-failure`。检查本地 `build/release/verification/covers/runtime.json`：windowPolicy 通过、实际后端正确、未上传/旧租约不显示、稳定帧零上传、scene graph 恢复成功；原生 D3D11 command introspection 在本平台不可用，不能伪报 destinationBytes 实测。用 Unicode/空格本地路径及当前 Qt 支持的 PNG/JPEG 验证 reader、ICC、缺图和展开保护，确认不存在其他专辑封面串用。详见 `docs/contracts/covers.md`。
+
+验证后恢复 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建并执行全部 Release CTest；不以 Windows 成绩代替目标机 codec、GPU、窗口管理器或性能验证。

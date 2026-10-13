@@ -16,6 +16,12 @@ set_target_properties(
 )
 yalahoo_platform(compare-images)
 if(YALAHOO_REVIEW)
+    qt_add_executable(cover-audit CoverAudit.cpp)
+    target_link_libraries(cover-audit PRIVATE YalahooRhi YalahooImageComparison)
+    target_include_directories(cover-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+    set_target_properties(cover-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(cover-audit)
     qt_add_executable(rhi-postprocess-audit RhiPostprocessAudit.cpp RhiReviewInput.h)
     target_link_libraries(rhi-postprocess-audit PRIVATE YalahooRhi YalahooImageComparison)
     target_include_directories(rhi-postprocess-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

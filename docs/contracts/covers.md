@@ -1,0 +1,53 @@
+# 封面解码、图集与租约契约
+
+冻结来源为原始提交 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/cover-atlas.ts` 和 `src/viewer-album-cover.ts`，当前工作树位于 `legacy-web/src/`；历史 Git 读取继续使用既有清理映射。contain、1/64 留边、透明背景、选中/归位独立所有权和 tile 像素中心钳制按源码执行。
+
+生产调用链是 `SceneItem -> CoverCache::request -> decodePool/ QImageReader -> CoverSnapshot -> SelectedCoverPool -> SceneItem::schedule/updatePolish -> RhiItem::submit/synchronize/renderFrame`。当前既有单盒入口异步请求演示封面的 256/1024 两级图像，先采用较低清晰度，再升级；不在 GUI/render 热路径读盘、解码或绘图。阵列消费者在 R12 接入 AtlasAllocator 分页接口，详情归位实体在 R18 接入已有独立租约，不提前实现阵列或详情运动。
+
+## 请求、像素与失效
+
+CoverCache 仅在 GUI 线程调用。键为稳定 identity、完整本地/qrc path、resolution，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须 reset 缓存 generation，重新获取对应租约；不能仅用相同路径复用旧 revision。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
+
+QImageReader 在 worker 中读取尺寸、缩放能力和错误，设置 autoTransform，仅在原图超过目标最长边 256/1024 时设置 scaledSize，小图直接绘制到目标画布，避免先放大再缩小。插件不支持解码缩放时允许 Qt 有界的完整解码再缩放；带有效 ICC 配置的图像先在 worker 转换到 sRGB，与 shader 的颜色空间一致。未知尺寸或原图超过 4,194,304 像素时显式返回 error 与缺图画面，不尝试无界展开。该限制是本实现的输入资源保护，并非声称 Qt 不能读取更大的图像。PNG/JPEG 插件内部缓冲、字体及 Qt 分配器开销不冒充可测的 QImage 像素。
+
+worker 用统一方形逻辑画布绘制一次 contain+1/64 留边，生成拥有内存的 RGBA8888 premultiplied 图像。缺图保留中性唱片圆环和标题提示，不替代成别张专辑。ready 发布 `shared_ptr<const CoverPixels>`，消费者不得通过外部存储修改像素；标题/来源字符串同样有界。paint 只接受 256/1024。生产 trusted immutable 标志仅用于该所有权链；外部 Review 输入仍在同步/入队隔离一次。
+
+全局 QThreadPool 用 tryStart，不向 Qt 内部排队。每个 cache 的 active 同时包含正在解码与等待 GUI 消费的结果，直到 complete 才释放。generation/wanted 在读取前、绘图前、绘图后和发布前核对。销毁只锁住极短的回调投递区间、清空 receiver；不等待解码线程。已投递的 QObject 回调由 Qt 销毁规则取消，ready 接收者立即删除 cache 也有 guard。关闭后仍在解码的旧任务占用同一个全局三线程池，新 cache 不能叠加并发。
+
+## 分页、上传与独立租约
+
+AtlasAllocator 最多 432 个槽位，页面每边最多 2048、按设备上限向下取整到 256；典型设备是七张 2048² 页面，最后一页仅有 48 个有效槽。较小 GPU 使用更多固定页面，不缩小 tile 精度；小于 256 的设备显式失败。真实 RHI 分配前仍核对当前设备的尺寸、格式、采样和累计 ResourcePlan，不能仅相信调用者的上限。
+
+acquire 引用计数固定身份槽，release 后可复用；重用分配单调 lease，publish 核对 allocator generation、identity、lease 和 decode generation。每槽 serial 单调，重复快照不重新标脏。uploads 每页提供有界增量，replay 仅为实际 scene graph 重建提供该页已就绪的不可变像素；不能把完整 CPU 页面合成后上传。
+
+RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次。重建重新播放当前 retained tile，旧结果不能污染新资源。旧 Review 未提供 coverLeases 的原始 fixture 保持历史语义。
+
+SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三个 returning 的预算。fork 共享当前不可变像素，却取得独立 lease；selected 升级到 1024 不改变 returning 的图像。身份/source generation 不匹配及降清晰度升级拒绝；reset 后旧 lease 不能再更新，且仍占容量直到主人释放。对应独立 RhiItem cover texture 由 render 线程持有，每次只上传最新 revision；R18 使用这些租约时不得覆盖旧 returning 封面。
+
+atlas 无 mip 链、使用线性 clamp 采样，无跨格各向异性。当前 QRhi 共用线性采样为 1×，选中采样不得超过冻结契约的 8×上限；不使用跨 tile 的采样近似。opaque.frag 的 coverPainted 分支避免再应用一次 contain/留边；未绘制的历史 oracle 继续执行原数学。UV 钳制到外侧像素中心。封面尺寸/generation 变化仅替换 cover texture 和布局兼容的 bindings，保持其他附件、阴影、postprocess 和 pipeline；独立 coverResourceRevision 使资源清单失效。
+
+## 容量与资源清单
+
+| 所有者/阶段 | 上限和载荷 | 释放/失效 |
+| --- | --- | --- |
+| 待解码描述符 | 96；identity≤1024、path≤32768、title≤256 字符 | cancel/reset；入池后移除；满时拒绝 |
+| 全局解码与每 cache 未消费结果 | 3；每 worker 源像素按 32 bytes/pixel 保守展开/转向估算，加 12MiB conversion/paint scratch，合计 140MiB/worker、420MiB reservation 峰值 | generation/wanted 取消；GUI completion 释放 reservation；不是进程 RSS 实测 |
+| 完成 CPU LRU | 16MiB，即最多 64 个 256² 或四个 1024²；按实际 sizeInBytes 计费 | 有界 LRU 淘汰/reset；外部合法租约单独计费 |
+| AtlasAllocator retained tile | 432×256²×4=108MiB；dirty 引用共享 retained 图，不另复制 | release/reset |
+| 单页 render 待上传/GUI replay | 最多该页 64 tile=16MiB；生产共享 retained 图，外部输入的隔离副本另有相同上界 | take/替代/重建；稳定帧零上传 |
+| 单页上传批次 | 常态≤8 tile=2MiB；初始化≤64 tile=16MiB，剩余跨真实帧 | command buffer 消费；不把 QImage 调用次数当 GPU 流量 |
+| selected/returning CPU leases | 四个×1024²×4≤16MiB，低清晰度先复用，不与 LRU 共享载荷重复解释为实际占用 | lease owner 释放；reset 后仍计入四槽容量 |
+| GPU atlas pages | 典型七页×2048²×4=112MiB，无 mip；其他设备为 pages×实际 pageSize×4 | renderer/page owner 释放；每页各自预算，完整阵列由 R12 汇总调度 |
+| GPU selected/returning | 四个1024² RGBA8≤16MiB，无 mip；单个最新 selected 上传≤4MiB | 独立 renderer 释放；与 atlas tile 2MiB 统计分开 |
+
+RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、lookup、geometry/uniform/instance buffer 和 Qt item 输出仍由 ResourcePlan/ResourceInventory 按实际尺寸计算，见 rhi-integration.md；不再另建整页 CPU atlas 或 tile GPU staging texture。按保守独立所有者相加，新增 CPU reservation/完成缓存/retained/单页外部隔离/租约像素 reservation/载荷小计上界为 576MiB；生产隐式共享实际载荷通常更低。这些数值不包含库模型、固定资产、opaque codec scratch、驱动/PSO/SRB、Qt swapchain/compositor。旧/新封面或页面更换同时存活的 descriptor 上界为两套 cover 载荷，其他兼容资源不重建；现有报告的全场景 old+new 是更保守的 descriptor 对上界，非 VRAM 驻留峰值。measuredVramBytes 保持 null。
+
+## 验证与平台边界
+
+Windows 复建：`./tools/build/verify-r11.ps1`，随后 `./tools/audit/audit-r11.ps1`。格式、全部生产 Release CTest、qmllint 与受影响的 RHI 诊断/场景/集成检查都执行。工具只写忽略的 `verification/windows/covers/` 和 build 目录；图像来自自身 GPU readback，窗口首次 show 前置底、不接受焦点，hide/release/restore 保持。
+
+CoverCacheTest 覆盖横/竖/方、透明 alpha、缺图、过大展开、Unicode/空格路径、重复请求、队列拒绝、LRU、30 次取消、reset 和十次在途关闭以及发布时销毁。采集计数区分 reader 返回的图像字节与不可直接观测的插件展开 scratch，并记录解码缩放能力。96 个独立 2048² JPEG 的三次运行分别保存完整就绪时间、GUI 事件 timer 间隔和队列峰值；采用正常 QEventLoop，不把单元测试轮询成本当产品帧率。CoverAudit 检查真实八 tile/下一帧预算、旧槽隐藏、晚到拒绝、局部像素、selected 4MiB 独立上传、稳定零复制/上传、封面尺寸不重建其他目标及真实 scene graph 释放恢复。D3D11 native UpdateSubresource 的 destinationBytes 与 caller 像素载荷分别报告；OpenGL 使用实际 readback 和 QRhi 区域计数，native command introspection 不可用，不宣称物理总线流量。
+
+macOS/Linux 同一源码、CMake 链、Qt reader、generation/所有权和 QRhi/qsb 路径严格静态审计，矩阵含 source hash、symbol、具体调用链及限制。结论为“静态审计通过，实机待用户验证”；目标平台 codecs、GPU/Metal/GL、窗口管理器和性能并未运行。目标机配置 Review 后执行 `ctest --preset qt-release -R '^(cover-cache|cover-gpu)$' --output-on-failure`，检查 runtime.json 的 windowPolicy、实际后端、局部像素与恢复；再恢复生产配置运行全部 CTest。全曲库扫描/填充阵列/详情运动与完整产品 120 秒性能验收属于后续轮次。
+
+Windows 验收结论：Qt 6.12.0 Release 的 D3D11/OpenGL 封面、局部上传、稳定帧、重建和窗口策略检查通过；九项受影响 Review 回归、全部 21 项生产 CTest、qmllint 与 source-format 通过。实际 D3D11 tile destinationBytes=262144，selected=4194304；纸面 ROI 横/竖/方 SSIM≥0.992。96 个大图的三次记录为 36/38/42ms 就绪、并发峰值3、待解码峰值93、LRU 16MiB；这些是局部事件循环样本，非完整播放器性能验收，最终小图不预放大修正不改变这组 2048→256 输入路径，最终源码另通过全部生产测试。macOS/Linux：静态审计通过，实机待用户验证。

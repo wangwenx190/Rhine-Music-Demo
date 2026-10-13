@@ -16,10 +16,12 @@ struct Input
     QVector<QMatrix4x4> entities;
     QVector<quint64> entityIds;
     QImage cover;
+    bool coverPainted = false, immutableCover = false;
     QSize atlasSize;
     quint64 atlasGeneration = 0;
     QVector<AtlasUpload> atlasUploads;
     QVector<QRect> coverTiles;
+    QVector<quint64> coverLeases;
     bool initializingAtlas = false;
     bool profile = false;
     bool postprocess = false, bokeh = false, smaa = false;

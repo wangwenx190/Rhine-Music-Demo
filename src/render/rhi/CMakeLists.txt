@@ -9,6 +9,8 @@ qt_add_library(
     PreparedAssets.h
     AtlasUpload.cpp
     AtlasUpload.h
+    AtlasAllocator.h
+    AtlasAllocator.cpp
     Postprocess.cpp
     Postprocess.h
     TransferAudit.h
