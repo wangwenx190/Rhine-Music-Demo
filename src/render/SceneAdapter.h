@@ -6,6 +6,7 @@
 #include "SelectionLighting.h"
 #include "RenderQuality.h"
 #include "RenderBackend.h"
+#include "SelectionController.h"
 #include <QVariantMap>
 namespace yalahoo {
 class SceneAdapter : public QObject
@@ -25,8 +26,11 @@ class SceneAdapter : public QObject
     Q_PROPERTY(quint64 frameRevision READ frameRevision NOTIFY frameChanged)
     Q_PROPERTY(double detail READ detail WRITE setDetail NOTIFY detailChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
+    Q_PROPERTY(yalahoo::SelectionController* selection READ selection NOTIFY selectionControllerChanged)
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
+    void setSelection(SelectionController *selection);
+    SelectionController *selection() const;
     SelectionLighting *lighting()
     {
         return &m_lighting;
@@ -107,9 +111,12 @@ signals:
     void frameChanged();
     void detailChanged();
     void reducedMotionChanged();
+    void selectionControllerChanged();
 
 private:
     void publish();
+    QPointer<SelectionController> m_selection;
+    quint64 m_selectionRevision = 0;
     LayoutMetrics m_layout;
     SelectionLighting m_lighting;
     RenderQuality m_quality;

@@ -72,6 +72,10 @@ public:
     {
         return m_snapshot;
     }
+    const LibraryOrder &order() const
+    {
+        return m_order;
+    }
 signals:
     void countChanged();
     void columnsChanged();

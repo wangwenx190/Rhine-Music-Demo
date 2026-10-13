@@ -34,6 +34,7 @@ public:
         return m_errorText;
     }
     Q_INVOKABLE QVector3D qtProjection(QVector3D world) const;
+    QJsonObject coverStatistics() const;
 signals:
     void adapterChanged();
     void geometryOnlyChanged();
@@ -44,9 +45,30 @@ signals:
 protected:
     void updatePolish() override;
     bool event(QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
     void schedule();
+    void preparePool(Input &input);
+    void resetPool();
+    struct OwnedCover
+    {
+        quint64 objectId = 0, lease = 0;
+        std::shared_ptr<SelectedCoverLease> pixels;
+        CoverSnapshot tiledPixels;
+        QVector<AtlasUpload> uploads;
+    };
+    AtlasAllocator m_atlas{ 8192, 436, 22 };
+    QHash<QString, AtlasLease> m_poolLeases;
+    QSet<QString> m_readyCovers;
+    std::array<OwnedCover, 4> m_ownedCovers;
+    quint64 m_ownedSerial = 0;
+    quint64 m_activeObject = 0;
+    QPointer<SelectionController> m_poolSelection;
+    QMetaObject::Connection m_poolResetConnection;
+    bool m_poolMode = false;
+    quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;
     QImage m_cover;
     CoverCache m_covers;

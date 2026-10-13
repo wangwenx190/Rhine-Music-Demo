@@ -16,7 +16,7 @@ struct AtlasLease
 class AtlasAllocator
 {
 public:
-    explicit AtlasAllocator(int maximumTextureSize, int capacity = 432);
+    explicit AtlasAllocator(int maximumTextureSize, int capacity = 432, int pageTiles = 8);
     AtlasLease acquire(const QString &identity, quint64 coverGeneration = 1);
     void release(const AtlasLease &lease);
     bool publish(const AtlasLease &lease, CoverSnapshot pixels);

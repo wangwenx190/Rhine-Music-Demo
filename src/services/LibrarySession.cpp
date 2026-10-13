@@ -38,14 +38,31 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     Q_ASSERT(QThread::currentThread() == thread());
     invalidate();
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
+    m_albumIndices.clear();
+    m_trackIndices.clear();
+    m_albumIndices.reserve(m_snapshot->albums.size());
+    for (qsizetype index = 0; index < m_snapshot->albums.size(); ++index) {
+        const auto &entry = m_snapshot->albums[index];
+        if (m_albumIndices.contains(entry.id))
+            continue;
+        m_albumIndices.insert(entry.id, index);
+        if (!entry.tracks.isEmpty()) {
+            QHash<QString, qsizetype> tracks;
+            tracks.reserve(entry.tracks.size());
+            for (qsizetype row = 0; row < entry.tracks.size(); ++row)
+                if (!tracks.contains(entry.tracks[row].id))
+                    tracks.insert(entry.tracks[row].id, row);
+            m_trackIndices.insert(entry.id, std::move(tracks));
+        }
+    }
     if (auto *offline = qobject_cast<OfflineMetadataProvider *>(m_provider.data()))
         offline->setCache(m_snapshot);
     m_albums.setSnapshot(m_snapshot);
     m_search.update(m_snapshot, m_query, m_genre);
     if (!m_navigationAlbumId.isEmpty()
-        && (!m_snapshot->album(m_navigationAlbumId)
+        && (!album(m_navigationAlbumId)
             || (!m_navigationTrackId.isEmpty()
-                && !m_snapshot->track(m_navigationAlbumId, m_navigationTrackId))))
+                && !track(m_navigationAlbumId, m_navigationTrackId))))
         navigate({ }, { });
     // Playback IDs survive a library replacement: playing media may outlive its index.
     m_metadata.clear();
@@ -70,9 +87,7 @@ bool LibrarySession::navigate(const QString &albumId, const QString &trackId)
 {
     if (albumId.isEmpty() && !trackId.isEmpty())
         return false;
-    if (!albumId.isEmpty()
-        && (!m_snapshot->album(albumId)
-            || (!trackId.isEmpty() && !m_snapshot->track(albumId, trackId))))
+    if (!albumId.isEmpty() && (!album(albumId) || (!trackId.isEmpty() && !track(albumId, trackId))))
         return false;
     if (m_navigationAlbumId == albumId && m_navigationTrackId == trackId)
         return true;
@@ -83,7 +98,7 @@ bool LibrarySession::navigate(const QString &albumId, const QString &trackId)
 }
 bool LibrarySession::setPlaybackIds(const QString &albumId, const QString &trackId)
 {
-    if (!(albumId.isEmpty() && trackId.isEmpty()) && !m_snapshot->track(albumId, trackId))
+    if (!(albumId.isEmpty() && trackId.isEmpty()) && !track(albumId, trackId))
         return false;
     if (m_playbackAlbumId == albumId && m_playbackTrackId == trackId)
         return true;
@@ -105,7 +120,7 @@ QVariantMap LibrarySession::providerCapabilities() const
 }
 quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &name)
 {
-    const auto *album = m_snapshot->album(albumId);
+    const auto *album = this->album(albumId);
     if (!album || !m_provider)
         return 0;
     MetadataKind kind;
@@ -158,7 +173,7 @@ void LibrarySession::receive(const ProviderResult &result)
     const auto it = m_pending.find(result.requestId);
     if (it == m_pending.end() || result.generation != m_generation
         || result.generation != it->token.generation || result.albumId != it->token.albumId
-        || result.kind != it->kind || !m_snapshot->album(result.albumId))
+        || result.kind != it->kind || !album(result.albumId))
         return;
     m_pending.erase(it);
     m_metadata.insert(result.albumId + '/' + kindName(result.kind),
@@ -174,5 +189,19 @@ void LibrarySession::receive(const ProviderResult &result)
                                    { "error", result.error } });
     emit metadataChanged();
     emit metadataDelivered(result);
+}
+const Album *LibrarySession::album(const QString &id) const
+{
+    const auto index = m_albumIndices.constFind(id);
+    return index == m_albumIndices.cend() ? nullptr : &m_snapshot->albums[*index];
+}
+const Track *LibrarySession::track(const QString &albumId, const QString &trackId) const
+{
+    const auto index = m_albumIndices.constFind(albumId);
+    const auto tracks = m_trackIndices.constFind(albumId);
+    if (index == m_albumIndices.cend() || tracks == m_trackIndices.cend())
+        return nullptr;
+    const auto row = tracks->constFind(trackId);
+    return row == tracks->cend() ? nullptr : &m_snapshot->albums[*index].tracks[*row];
 }
 }

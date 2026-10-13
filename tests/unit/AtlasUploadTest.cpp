@@ -5,6 +5,29 @@ class AtlasUploadTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void highResolutionRegionReadiness()
+    {
+        AtlasUploadQueue queue;
+        queue.reset({ 5632, 6656 }, 7);
+        const QRect region(0, 5632, 1024, 1024);
+        QImage pixels(256, 256, QImage::Format_RGBA8888_Premultiplied);
+        pixels.fill(Qt::red);
+        QVector<AtlasUpload> chunks;
+        for (int y = 0; y < 4; ++y)
+            for (int x = 0; x < 4; ++x) {
+                const int slot = (22 + y) * 22 + x;
+                queue.expect(slot, 3);
+                chunks.append({ 7, 3, 1, slot, pixels, true });
+            }
+        queue.enqueue(chunks);
+        QCOMPARE(queue.take(false).size(), 8);
+        QVERIFY(!queue.ready(region, 3));
+        QCOMPARE(queue.take(false).size(), 8);
+        QVERIFY(queue.ready(region, 3));
+        QVERIFY(!queue.ready(region, 2));
+        queue.expect(22 * 22, 4);
+        QVERIFY(!queue.ready(region, 3));
+    }
     void ownedSnapshot()
     {
         AtlasUploadQueue queue;

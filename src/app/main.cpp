@@ -71,6 +71,9 @@ int main(int argc, char **argv)
                        QStringLiteral("Load anonymous mixed library for runtime verification only"),
                        QStringLiteral("fixture") });
     parser.addOption(
+            { QStringLiteral("verify-filled"),
+              QStringLiteral("Exercise the production filled demonstration with verify-runtime") });
+    parser.addOption(
             { QStringLiteral("verify-motion"),
               QStringLiteral(
                       "Verify the production frame source, hide/restore and motion completion") });
@@ -97,6 +100,11 @@ int main(int argc, char **argv)
                        QStringLiteral("report") });
 #endif
     parser.process(app);
+    if (parser.isSet(QStringLiteral("verify-filled"))
+        && (!parser.isSet(QStringLiteral("verify-runtime"))
+            || parser.isSet(QStringLiteral("verify-library"))
+            || parser.isSet(QStringLiteral("verify-motion"))))
+        return 7;
     if (parser.isSet(QStringLiteral("verify-shading"))
         && !parser.isSet(QStringLiteral("verify-runtime")))
         return 7;
@@ -137,6 +145,7 @@ int main(int argc, char **argv)
                                     QStringLiteral("introduction"));
     }
     yalahoo::MotionController motion;
+    yalahoo::SelectionController selection(&motion);
     yalahoo::SceneAdapter scene(motion.clock());
     QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &scene, [&] {
         scene.setReducedMotion(motion.reducedMotion());
@@ -163,6 +172,43 @@ int main(int argc, char **argv)
             || parser.isSet(QStringLiteral("verify-integration"))
 #endif
             ;
+    if (!verificationRun || parser.isSet(QStringLiteral("verify-filled"))) {
+        // Local resource-only demonstration until the scanner is delivered in R21.
+        yalahoo::LibrarySnapshot demo;
+        const QStringList covers{ "square", "portrait", "landscape" };
+        for (int lane = 0; lane < 9; ++lane) {
+            const auto genreId = QStringLiteral("demo-genre-%1").arg(lane);
+            yalahoo::Genre genre;
+            genre.id = genreId;
+            genre.name = QStringLiteral("演示收藏 %1").arg(lane + 1);
+            demo.genres.append(genre);
+            for (int row = 0; row < 3; ++row) {
+                yalahoo::Album album;
+                album.id = QStringLiteral("demo-album-%1-%2").arg(lane).arg(row);
+                album.title = QStringLiteral("演示专辑 %1").arg(row + 1);
+                album.genreId = genreId;
+                album.coverUrl =
+                        QUrl(QStringLiteral("qrc:/assets/demo-covers/%1.png").arg(covers[row]));
+                demo.albums.append(album);
+            }
+        }
+        library.setSnapshot(std::move(demo));
+        const auto updatePool = [&] {
+            selection.setColumns(library.albums()->order().columns, library.snapshot());
+        };
+        QObject::connect(library.albums(), &yalahoo::AlbumListModel::columnsChanged, &selection,
+                         updatePool);
+        QObject::connect(&selection, &yalahoo::SelectionController::selectionChanged, &library,
+                         [&] {
+                             library.navigate(selection.albumId());
+                         });
+        QObject::connect(&library, &yalahoo::LibrarySession::navigationChanged, &selection, [&] {
+            if (library.navigationAlbumId() != selection.albumId())
+                selection.select(library.navigationAlbumId());
+        });
+        updatePool();
+        scene.setSelection(&selection);
+    }
     engine.setInitialProperties(
             { { "verificationRun", verificationRun },
               { "verificationFlags", int(yalahoo::verification::windowFlags()) },
@@ -378,6 +424,10 @@ int main(int argc, char **argv)
                     && backend && interactions == 1 && mediaAvailable && shaderAvailable
                     && qmlAvailable && chineseSupported && saved && nativeSceneAvailable
                     && qmlMediaAvailable && modelPixels > 100 && libraryProbe
+                    && (!parser.isSet(QStringLiteral("verify-filled"))
+                        || (scene.selection() == &selection && scene.frame().instances.size() == 432
+                            && library.albums()->rowCount() == 27
+                            && library.playbackTrackId().isEmpty() && media.source().isEmpty()))
                     && (!parser.isSet(QStringLiteral("verify-library"))
                         || (library.albums()->rowCount() == 21
                             && library.searchResults()->rowCount() == 28
@@ -431,6 +481,9 @@ int main(int argc, char **argv)
             reportData.insert("metadataResults", library.metadata().size());
             reportData.insert("playbackTrackId", library.playbackTrackId());
             reportData.insert("libraryQmlText", libraryText);
+            reportData.insert("filledProbe", parser.isSet(QStringLiteral("verify-filled")));
+            if (scene.selection())
+                reportData.insert("poolInstances", scene.frame().instances.size());
             QSaveFile output(report);
             if (!output.open(QIODevice::WriteOnly)) {
                 app.exit(4);

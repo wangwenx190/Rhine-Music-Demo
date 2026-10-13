@@ -70,6 +70,14 @@ void AtlasUploadQueue::expect(int slot, quint64 lease)
 }
 bool AtlasUploadQueue::ready(int slot, quint64 lease) const
 {
-    return lease > 0 && m_uploadedLeases.value(slot) == lease;
+    return lease > 0 && m_uploadedLeases.value(slot) == lease && m_leases.value(slot) == lease;
+}
+bool AtlasUploadQueue::ready(QRect tile, quint64 lease) const
+{
+    for (int y = tile.y(); y < tile.y() + tile.height(); y += 256)
+        for (int x = tile.x(); x < tile.x() + tile.width(); x += 256)
+            if (!ready((y / 256) * (m_size.width() / 256) + x / 256, lease))
+                return false;
+    return true;
 }
 }

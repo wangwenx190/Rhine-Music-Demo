@@ -35,8 +35,8 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedTexture("ltc1", { 64, 64 }, QRhiTexture::RGBA32F);
     plan.plannedTexture("ltc2", { 64, 64 }, QRhiTexture::RGBA32F);
     plan.plannedBuffer("geometry", geometryBytes);
-    plan.plannedBuffer("draw-uniforms", qint64(stride) * (432 * 3 + 6));
-    plan.plannedBuffer("instances", 432 * 112);
+    plan.plannedBuffer("draw-uniforms", qint64(stride) * (436 * 3 + 6));
+    plan.plannedBuffer("instances", 436 * 112);
     plan.plannedBuffer("output-uniform", 16);
     plan.plannedTexture("qt-item-output", size, QRhiTexture::RGBA8);
     plan.plannedTexture("qt-item-depth-upper-bound", size, QRhiTexture::D32FS8);

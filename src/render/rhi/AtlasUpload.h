@@ -24,6 +24,7 @@ public:
     quint64 rejected() const;
     void expect(int slot, quint64 lease);
     bool ready(int slot, quint64 lease) const;
+    bool ready(QRect tile, quint64 lease) const;
     static constexpr qint64 tileBytes = 256 * 256 * 4;
     static constexpr qint64 steadyBudget = 2 * 1024 * 1024;
     static constexpr qint64 initialBudget = 16 * 1024 * 1024;

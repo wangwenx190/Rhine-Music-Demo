@@ -6,6 +6,10 @@ qt_add_library(
     SceneAdapter.cpp
     SceneAdapter.h
     SceneFrame.h
+    ArchivePool.cpp
+    ArchivePool.h
+    SelectionController.cpp
+    SelectionController.h
     RowLightController.cpp
     RowLightController.h
     SelectionLighting.cpp

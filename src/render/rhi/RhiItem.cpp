@@ -314,6 +314,8 @@ private:
     AtlasUploadQueue atlasQueue;
     QVector<quint64> expectedCoverLeases;
     QVector<QRect> expectedCoverTiles;
+    QVector<quint64> expectedFallbackLeases, effectiveCoverLeases;
+    QVector<QRect> expectedFallbackTiles, effectiveCoverTiles;
     quint64 expectedAtlasGeneration = 0;
     Owned<QRhiBuffer> vertices, indices, uniforms, outputUniform;
     Owned<QRhiBuffer> instanceBuffer;
@@ -370,15 +372,26 @@ private:
 void Renderer::enqueueAtlas()
 {
     if (expectedAtlasGeneration != atlasGeneration || expectedCoverLeases != input.coverLeases
-        || expectedCoverTiles != input.coverTiles) {
+        || expectedCoverTiles != input.coverTiles
+        || expectedFallbackTiles != input.fallbackCoverTiles
+        || expectedFallbackLeases != input.fallbackCoverLeases) {
         for (int i = 0; i < input.coverLeases.size(); ++i) {
             const auto tile = input.coverTiles[i];
-            atlasQueue.expect((tile.y() / 256) * (input.atlasSize.width() / 256) + tile.x() / 256,
-                              input.coverLeases[i]);
+            for (int y = tile.y(); y < tile.y() + tile.height(); y += 256)
+                for (int x = tile.x(); x < tile.x() + tile.width(); x += 256)
+                    atlasQueue.expect((y / 256) * (input.atlasSize.width() / 256) + x / 256,
+                                      input.coverLeases[i]);
         }
         expectedAtlasGeneration = atlasGeneration;
+        for (int i = 0; i < input.fallbackCoverTiles.size(); ++i) {
+            const auto tile = input.fallbackCoverTiles[i];
+            atlasQueue.expect((tile.y() / 256) * (input.atlasSize.width() / 256) + tile.x() / 256,
+                              input.fallbackCoverLeases[i]);
+        }
         expectedCoverLeases = input.coverLeases;
         expectedCoverTiles = input.coverTiles;
+        expectedFallbackTiles = input.fallbackCoverTiles;
+        expectedFallbackLeases = input.fallbackCoverLeases;
     }
     atlasQueue.enqueue(input.atlasUploads);
 }
@@ -653,11 +666,11 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         require(indices->create(), "RHI index buffer failed");
         uniformStride = api->ubufAligned(sizeof(Uniform));
         uniforms.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                      uniformStride * (432 * 3 + 6)));
+                                      uniformStride * (436 * 3 + 6)));
         require(uniforms->create(), "RHI uniform buffer failed");
         uniformScratch = QByteArray(uniforms->size(), '\0');
         instanceBuffer.reset(
-                api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 432 * 112));
+                api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 436 * 112));
         require(instanceBuffer->create(), "RHI instance buffer failed");
         outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16));
         require(outputUniform->create(), "Output uniform buffer failed");
@@ -1021,16 +1034,14 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
     copy(u.model, model);
     copy(u.lightMvp, nativeLightVP * model);
     if (input.atlasGeneration && entity >= 0) {
-        const auto tile = input.coverTiles[entity];
+        const auto tile = effectiveCoverTiles[entity];
         copy(u.coverUv,
              QVector4D(float(tile.x()) / input.atlasSize.width(),
                        float(tile.y()) / input.atlasSize.height(),
                        float(tile.width()) / input.atlasSize.width(),
                        float(tile.height()) / input.atlasSize.height()));
-        if (!input.coverLeases.isEmpty()
-            && !atlasQueue.ready((tile.y() / 256) * (input.atlasSize.width() / 256)
-                                         + tile.x() / 256,
-                                 input.coverLeases[entity]))
+        if (!effectiveCoverLeases.isEmpty()
+            && !atlasQueue.ready(tile, effectiveCoverLeases[entity]))
             copy(u.coverUv, QVector4D());
     }
     if (entity >= 0) {
@@ -1133,11 +1144,18 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         selectedTotalUploadBytes += selectedUploadBytes;
     }
     totalUploadBytes += frameUploadBytes;
+    effectiveCoverTiles = input.coverTiles;
+    effectiveCoverLeases = input.coverLeases;
+    for (int i = 0; i < input.fallbackCoverTiles.size(); ++i)
+        if (!atlasQueue.ready(effectiveCoverTiles[i], effectiveCoverLeases[i])) {
+            effectiveCoverTiles[i] = input.fallbackCoverTiles[i];
+            effectiveCoverLeases[i] = input.fallbackCoverLeases[i];
+        }
     QVector<QMatrix4x4> entities = input.entities;
-    if (entities.isEmpty())
+    if (entities.isEmpty() && !input.poolFrame)
         entities.append(input.scene.caseTransform);
     const auto visible = visibleEntities(input, entities);
-    require(entities.size() <= 432, "RHI visible pool capacity exceeded");
+    require(entities.size() <= 436, "RHI visible pool capacity exceeded");
     const bool batched = entities.size() >= 8;
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
@@ -1276,16 +1294,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             std::memcpy(destination, entities[i].constData(), 64);
             float uv[4] = { 0, 0, 1, 1 };
             if (input.atlasGeneration) {
-                const auto tile = input.coverTiles[i];
+                const auto tile = effectiveCoverTiles[i];
                 copy(uv,
                      QVector4D(float(tile.x()) / input.atlasSize.width(),
                                float(tile.y()) / input.atlasSize.height(),
                                float(tile.width()) / input.atlasSize.width(),
                                float(tile.height()) / input.atlasSize.height()));
-                if (!input.coverLeases.isEmpty()
-                    && !atlasQueue.ready((tile.y() / 256) * (input.atlasSize.width() / 256)
-                                                 + tile.x() / 256,
-                                         input.coverLeases[i]))
+                if (!effectiveCoverLeases.isEmpty()
+                    && !atlasQueue.ready(tile, effectiveCoverLeases[i]))
                     copy(uv, QVector4D());
             }
             std::memcpy(destination + 64, uv, 16);
@@ -1445,6 +1461,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             { "device", QString::fromUtf8(api->driverInfo().deviceName) },
             { "qt", qVersion() },
             { "generation", qint64(generation) },
+            { "resourceGeneration", qint64(generation) },
             { "width", targetSize.width() },
             { "height", targetSize.height() },
             { "shadowSize", shadowSize },
@@ -1518,6 +1535,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                        { "depth", draw.depth } });
         p->capture.metadata["sortedShells"] = sorted;
         for (int i = 0; i < 13; ++i) {
+            if (i == 8 && !input.captureAtlas) {
+                --p->remaining;
+                continue;
+            }
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
                     auto img = imageOf(state->results[i], state->yUp, i == 8);
@@ -1668,7 +1689,15 @@ QJsonArray adapterInventory()
 }
 void RhiItem::submit(Input input, QSize target)
 {
-    require(input.entities.size() <= 432, "RHI visible pool capacity exceeded");
+    require(input.fallbackCoverTiles.isEmpty()
+                    || (input.fallbackCoverTiles.size() == input.entities.size()
+                        && input.fallbackCoverLeases.size() == input.entities.size()),
+            "Atlas fallback/entity mismatch");
+    for (const auto &tile : input.fallbackCoverTiles)
+        require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.size() == QSize(256, 256)
+                        && tile.x() % 256 == 0 && tile.y() % 256 == 0,
+                "Atlas fallback outside page");
+    require(input.entities.size() <= 436, "RHI visible pool capacity exceeded");
     require(!input.cover.isNull() || input.atlasGeneration,
             "Missing cover at RHI synchronization boundary");
     require(input.aoSamples == 0 || input.aoSamples == 16 || input.aoSamples == 32
@@ -1689,8 +1718,8 @@ void RhiItem::submit(Input input, QSize target)
                 "Atlas size must use whole tiles");
         for (const auto &tile : input.coverTiles)
             require(QRect(QPoint(), input.atlasSize).contains(tile)
-                            && tile.size() == QSize(256, 256) && tile.x() % 256 == 0
-                            && tile.y() % 256 == 0,
+                            && (tile.size() == QSize(256, 256) || tile.size() == QSize(1024, 1024))
+                            && tile.x() % 256 == 0 && tile.y() % 256 == 0,
                     "Atlas tile outside page");
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");

@@ -5,11 +5,12 @@ namespace yalahoo::rhi {
 namespace {
 std::atomic<quint64> nextGeneration{ 0 };
 }
-AtlasAllocator::AtlasAllocator(int maximumTextureSize, int capacity)
+AtlasAllocator::AtlasAllocator(int maximumTextureSize, int capacity, int pageTiles)
 {
-    if (maximumTextureSize < 256 || capacity < 1 || capacity > 432)
+    if (maximumTextureSize < 256 || capacity < 1 || capacity > 436 || pageTiles < 1
+        || pageTiles > 22)
         throw std::invalid_argument("GPU cannot hold a cover tile or invalid atlas capacity");
-    const int side = qMin(2048, maximumTextureSize) / 256;
+    const int side = qMin(pageTiles * 256, maximumTextureSize) / 256;
     m_size = { side * 256, side * 256 };
     m_slotsPerPage = side * side;
     m_slots.resize(capacity);

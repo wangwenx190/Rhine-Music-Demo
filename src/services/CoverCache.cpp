@@ -74,16 +74,15 @@ bool CoverCache::request(QString identity, QString path, int resolution, QString
     if (running != m_running.cend() && running->generation == generation()
         && running->wanted->load())
         return true;
-    for (const auto &job : m_pending) {
-        if (job.key == cacheKey)
-            return true;
-    }
+    if (m_pendingKeys.contains(cacheKey))
+        return true;
     if (m_pending.size() >= pendingLimit) {
         ++m_rejected;
         return false;
     }
     m_pending.append({ cacheKey, std::move(identity), std::move(path), std::move(title), resolution,
                        generation(), std::make_shared<std::atomic_bool>(true) });
+    m_pendingKeys.insert(cacheKey);
     m_peakPending = qMax(m_peakPending, int(m_pending.size()));
     pump();
     return true;
@@ -92,6 +91,7 @@ void CoverCache::reset()
 {
     ++m_state->generation;
     m_pending.clear();
+    m_pendingKeys.clear();
     m_cache.clear();
     m_bytes = 0;
     // Running jobs retain their reservations until their completion is consumed.
@@ -99,7 +99,9 @@ void CoverCache::reset()
 }
 void CoverCache::cancel(const QString &identity)
 {
-    m_pending.removeIf([&identity](const Job &job) {
+    m_pending.removeIf([this, &identity](const Job &job) {
+        if (job.identity == identity)
+            m_pendingKeys.remove(job.key);
         return job.identity == identity;
     });
     for (const auto &job : m_running) {
@@ -130,6 +132,7 @@ void CoverCache::pump()
             return;
         }
         m_pending.removeFirst();
+        m_pendingKeys.remove(job.key);
         m_running.insert(job.key, job);
         ++m_active;
         ++m_decodes;
@@ -259,5 +262,9 @@ QJsonObject CoverCache::statistics() const
              { "decodeStarts", qint64(m_decodes) },
              { "rejected", qint64(m_rejected) },
              { "stale", qint64(m_stale) } };
+}
+bool CoverCache::hasPendingCapacity() const
+{
+    return m_pending.size() < pendingLimit;
 }
 }

@@ -240,7 +240,7 @@
 - 封面后台尺寸最长边 256、选中 1024；同时解码最多 3 张，已完成 CPU 图像 LRU 16MiB。图集使用固定容量分页面，单边不超过 GPU 上限；每格保留采样边界和透明留白。
 - 以上为有来源的工作集/突发上限，不是整体流畅保证。R11分别约束待解码、在途展开图、完成缓存、待上传及选中/归位纹理的容量和字节，按身份合并与generation取消；不能将16MiB完成缓存宣称为总内存预算。
 - 图集背景禁止跨格 mipmap/各向异性，选中纹理保留最多 8×；常态每帧最多上传 8×256² RGBA=2MiB，初始化每批最多 16MiB且让出一帧；稳定帧无重复上传。
-- CoverCache、AtlasAllocator、SelectedCoverLease 的请求/来源 generation、取消、分页、槽位就绪、不可变像素、独立租约和各阶段容量按 `docs/contracts/covers.md` 执行。Windows Release 复建入口为 `tools/build/verify-r11.ps1`、平台审计为 `tools/audit/audit-r11.ps1`；原图展开保护、selected 与 atlas 分开记账，不把 LRU 或 descriptor 估算当总内存/显存实测。R12 消费分页和增量上传，R18 消费独立归位租约。
+- CoverCache、AtlasAllocator、SelectedCoverLease 的请求/来源 generation、取消、分页、槽位就绪、不可变像素、独立租约和各阶段容量按 `docs/contracts/covers.md` 执行。Windows Release 复建入口为 `tools/build/verify-r11.ps1`、平台审计为 `tools/audit/audit-r11.ps1`；原图展开保护、selected 与 atlas 分开记账，不把 LRU 或 descriptor 估算当总内存/显存实测。生产填充池的合并页面、高清分块、增量上传、独立归位租约、统一实例/拾取/rebase 坐标和数值残差处理按 `docs/contracts/archive-pool.md` 执行，复建与平台审计入口为 `tools/build/verify-r12.ps1` / `tools/audit/audit-r12.ps1`。
 - Qt Quick 3D TextureData 更新可能导致整页上传；必须实测。若超过上述预算，触发 R10A–R10D 的局部上传实现，不把 setTextureData 次数当成实际 GPU 上传证据。
 - 全分辨率中间目标限制 8,294,400 像素及硬件尺寸；画质配置沿用 render-quality.ts 的范围和预设。限制发生时明确显示，不偷偷保存更低的用户设置。
 - R10D/R11给出附件、MSAA/resolve/mips、图集、buffer、lookup、Qt输出及resize同时存活峰值的资源清单，共享附件只计一次。估算与实测分开，像素上限不替代累计GPU资源预算；设备不支持时明确失败，不编造跨设备通用显存阈值。
@@ -299,15 +299,6 @@
 ## 待执行轮次
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
-
-### R12 · 填充实例池、波浪、拾取与坐标rebase（1–1.5日）
-
-- 依赖R05、R11。交付ArchivePool、实例表、SelectionController填充路径和ray hit测试。
-- 移植archive-loop.ts的9列48行池、POOL_LANES顺序、nearestOccurrence和方向语义；行/列循环保留物理方向，实例复用只在边界之外。
-- 逐式移植archiveWave/idleWave/musicSelectionWave/extraction/returnStep，并将实例、封面、投影/拾取和归位使用同一显示坐标。
-- 抽取对象从实例池接管时原实例隐藏；归位后恢复准确身份，不能同时绘制双份选中盒。rebase更新所有原点和光带。
-- 性能设计与验证：可见性每帧计算一次，排序预生成深度键，实体公共计算共享，实例记录直接生成并只写有效范围。可见池与全库数量分离，剔除不能影响世界空间阴影caster；跨可见数量分档不重建目标/管线，矩阵变化只使对应缓存失效。
-- 退出：大库只绘制固定可见池；连续首尾浏览、反向及拾取与golden一致，池边不瞬移。
 
 ### R13 · 真实列、首尾限制与会话记忆（1–1.5日）
 

@@ -22,8 +22,12 @@ struct Input
     QVector<AtlasUpload> atlasUploads;
     QVector<QRect> coverTiles;
     QVector<quint64> coverLeases;
+    QVector<QRect> fallbackCoverTiles;
+    QVector<quint64> fallbackCoverLeases;
     bool initializingAtlas = false;
     bool profile = false;
+    bool poolFrame = false;
+    bool captureAtlas = true;
     bool postprocess = false, bokeh = false, smaa = false;
     int aoSamples = 0;
     float aoResolution = 1, focus = 25, aperture = .0003f;

@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QTimer>
+#include <QSet>
 #include <atomic>
 #include <memory>
 
@@ -33,6 +34,7 @@ public:
     void cancel(const QString &identity);
     quint64 generation() const;
     QJsonObject statistics() const;
+    bool hasPendingCapacity() const;
     static QImage paint(const QImage &source, int resolution, const QString &title);
     static constexpr int concurrency = 3;
     static constexpr int pendingLimit = 96;
@@ -65,6 +67,7 @@ private:
     std::shared_ptr<State> m_state;
     QTimer m_retry;
     QList<Job> m_pending;
+    QSet<QString> m_pendingKeys;
     QHash<QString, Job> m_running;
     QHash<QString, Entry> m_cache;
     qint64 m_bytes = 0;

@@ -19,6 +19,13 @@ struct SceneAdapterQml
     QML_NAMED_ELEMENT(SceneAdapter)
     QML_UNCREATABLE("Injected by the native application")
 };
+struct SelectionControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SelectionController)
+    QML_NAMED_ELEMENT(SelectionController)
+    QML_UNCREATABLE("Injected by the native application")
+};
 
 struct FrameClockQml
 {

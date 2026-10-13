@@ -6,6 +6,37 @@
 #include <limits>
 #include <chrono>
 namespace yalahoo {
+SelectionController *SceneAdapter::selection() const
+{
+    return m_selection;
+}
+void SceneAdapter::setSelection(SelectionController *selection)
+{
+    if (m_selection == selection)
+        return;
+    if (m_selection)
+        disconnect(m_selection, nullptr, this, nullptr);
+    m_selection = selection;
+    if (!selection)
+        m_explicitLightingInput = false;
+    m_selectionRevision = 0;
+    if (selection) {
+        connect(selection, &SelectionController::frameChanged, this, &SceneAdapter::publish);
+        connect(selection, &SelectionController::coordinatesRebased, this,
+                [this](double lane, double row) {
+                    m_lighting.ribbon.row.translate(-row);
+                    m_lighting.ribbon.lane.translate(-lane);
+                });
+        connect(selection, &QObject::destroyed, this, [this] {
+            m_explicitLightingInput = false;
+            m_selectionRevision = 0;
+            publish();
+            emit selectionControllerChanged();
+        });
+    }
+    publish();
+    emit selectionControllerChanged();
+}
 void SceneAdapter::recordInput()
 {
     ++m_frame.inputRevision;
@@ -91,6 +122,8 @@ void SceneAdapter::setDetail(double detail)
     if (detail == m_detail)
         return;
     m_detail = detail;
+    if (m_selection)
+        m_selection->setDetail(detail);
     if (m_reduced)
         snapToTarget();
     else
@@ -180,12 +213,15 @@ bool SceneAdapter::settled() const
 void SceneAdapter::publish()
 {
     const SceneVector position = values(m_position), aim = values(m_aim);
-    const SceneVector caseOrigin{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail,
-                                  -2.17 };
+    const SceneVector caseOrigin = m_selection
+            ? m_selection->selectedPosition()
+            : SceneVector{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail, -2.17 };
     if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
         && m_frame.camera.position == position && m_frame.camera.aim == aim
-        && m_frame.camera.span == m_span.value && m_frame.casePosition == caseOrigin)
+        && m_frame.camera.span == m_span.value && m_frame.casePosition == caseOrigin
+        && m_selectionRevision == (m_selection ? m_selection->revision() : 0))
         return;
+    m_selectionRevision = m_selection ? m_selection->revision() : 0;
     ++m_frame.revision;
     m_frame.width = m_layout.width();
     m_frame.height = m_layout.height();
@@ -201,10 +237,16 @@ void SceneAdapter::publish()
     m_frame.projection.perspective(float(m_frame.fieldOfView),
                                    float(m_frame.width / m_frame.height), float(clipNear()),
                                    float(clipFar()));
-    // Fixed anonymous inspection slot only. Full wave/pool extraction is R12/R18.
     m_frame.casePosition = caseOrigin;
     m_frame.caseTransform.setToIdentity();
     m_frame.caseTransform.translate(casePosition());
+    m_frame.hasArchivePool = bool(m_selection);
+    m_frame.instances = m_selection ? m_selection->instances() : QVector<ArchiveInstance>{ };
+    if (m_selection) {
+        m_frame.caseTransform.rotate(m_selection->selectedRotation());
+        const auto cell = m_selection->cell();
+        setLightingInput({ caseOrigin, cell.row, cell.lane }, m_selection->selectedRotation());
+    }
     emit frameChanged();
 }
 void SceneAdapter::setLightingInput(RowLightingInput input, QQuaternion rotation)
@@ -244,6 +286,8 @@ QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
 }
 QVariantMap SceneAdapter::hitTest(double x, double y) const
 {
+    if (m_selection)
+        return m_selection->hitTest(m_frame, x, y);
     if (!std::isfinite(x) || !std::isfinite(y) || x < 0 || y < 0 || x >= m_frame.width
         || y >= m_frame.height)
         return { };

@@ -1,5 +1,7 @@
 # 封面解码、图集与租约契约
 
+R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量、准备中低清晰度回退、归位快照固定、资源峰值与窗口重建调度见 [archive-pool.md](archive-pool.md)。下述 2048² 分页/独立 selected texture 数值仍描述 R11 的通用 allocator 和独立 Review，不替代生产池汇总。
+
 冻结来源为原始提交 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/cover-atlas.ts` 和 `src/viewer-album-cover.ts`，当前工作树位于 `legacy-web/src/`；历史 Git 读取继续使用既有清理映射。contain、1/64 留边、透明背景、选中/归位独立所有权和 tile 像素中心钳制按源码执行。
 
 生产调用链是 `SceneItem -> CoverCache::request -> decodePool/ QImageReader -> CoverSnapshot -> SelectedCoverPool -> SceneItem::schedule/updatePolish -> RhiItem::submit/synchronize/renderFrame`。当前既有单盒入口异步请求演示封面的 256/1024 两级图像，先采用较低清晰度，再升级；不在 GUI/render 热路径读盘、解码或绘图。阵列消费者在 R12 接入 AtlasAllocator 分页接口，详情归位实体在 R18 接入已有独立租约，不提前实现阵列或详情运动。

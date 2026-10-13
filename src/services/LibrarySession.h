@@ -75,10 +75,14 @@ private:
     };
     void invalidate();
     void receive(const ProviderResult &result);
+    const Album *album(const QString &id) const;
+    const Track *track(const QString &albumId, const QString &trackId) const;
     QPointer<IMetadataProvider> m_provider;
     AlbumListModel m_albums;
     SearchListModel m_search;
     Snapshot m_snapshot;
+    QHash<QString, qsizetype> m_albumIndices;
+    QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
     QHash<quint64, Pending> m_pending;
     quint64 m_generation = 0, m_requestId = 0;
     QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,

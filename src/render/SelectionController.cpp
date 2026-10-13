@@ -1,0 +1,453 @@
+#include "SelectionController.h"
+#include "MotionFunctions.h"
+#include <QVector4D>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+namespace yalahoo {
+SelectionController::SelectionController(MotionController *motion, QObject *parent)
+    : QObject(parent), m_motion(motion)
+{
+    m_instances.reserve(ArchivePool::capacity + 4);
+    if (motion) {
+        connect(motion->clock(), &FrameClock::frame, this, [this](double, double dt) {
+            advance(dt);
+        });
+        connect(motion, &MotionController::reducedMotionChanged, this, [this] {
+            advance(0);
+        });
+    }
+}
+void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snapshot)
+{
+    const auto oldId = albumId();
+    QString firstId;
+    for (const auto &column : columns)
+        if (!column.albumIds.isEmpty()) {
+            firstId = column.albumIds.first();
+            break;
+        }
+    m_pool.setColumns(std::move(columns));
+    m_coverSources.clear();
+    if (snapshot)
+        for (const auto &album : snapshot->albums) {
+            const auto path = album.coverUrl.scheme() == QLatin1String("qrc")
+                    ? QStringLiteral(":") + album.coverUrl.path()
+                    : album.coverUrl.toLocalFile();
+            m_coverSources.insert(album.id, { path, album.title.left(256) });
+        }
+    m_returning.clear();
+    m_poolObjects.clear();
+    m_pulses.clear();
+    m_origin = { 0, 0 };
+    m_cell = m_pool.location(oldId).value_or(
+            m_pool.location(firstId).value_or(ArchiveCell{ 0, 12 }));
+    m_lift.finish(m_liftTarget);
+    m_rotation = 0;
+    m_returnY.reset();
+    m_selectedObject = ++m_objectSerial;
+    if (m_motion) {
+        m_motion->travel(-2.17 - (m_cell.row - 15.5) * .62, (m_cell.lane - 2) * 5.2, m_cell.row,
+                         m_cell.lane);
+        m_motion->finish();
+    }
+    emit libraryChanged();
+    publish();
+    emit selectionChanged();
+}
+QPair<QString, QString> SelectionController::coverSource(const QString &id) const
+{
+    return m_coverSources.value(id);
+}
+QString SelectionController::albumId() const
+{
+    return m_pool.albumAt(m_cell);
+}
+ArchiveCell SelectionController::cell() const
+{
+    return m_cell;
+}
+ArchiveCell SelectionController::coordinateOrigin() const
+{
+    return m_origin;
+}
+const ArchivePool &SelectionController::pool() const
+{
+    return m_pool;
+}
+const QVector<ArchiveInstance> &SelectionController::instances() const
+{
+    return m_instances;
+}
+quint64 SelectionController::revision() const
+{
+    return m_revision;
+}
+bool SelectionController::select(const QString &id)
+{
+    const auto location = m_pool.location(id);
+    if (!location)
+        return false;
+    // The period is the actual column length, never the display-pool row count.
+    const auto canonical = *location;
+    const auto count = m_pool.rowCount(canonical.lane);
+    return selectCell(
+            { ArchivePool::nearestOccurrence(canonical.lane, m_cell.lane, m_pool.columnCount()),
+              ArchivePool::nearestOccurrence(canonical.row, m_cell.row, count) },
+            true);
+}
+bool SelectionController::moveRow(int direction)
+{
+    if (direction != 1 && direction != -1)
+        return false;
+    return selectCell({ m_cell.lane, m_cell.row + direction });
+}
+bool SelectionController::moveLane(int direction)
+{
+    if (direction != 1 && direction != -1)
+        return false;
+    const double lane = m_cell.lane + direction;
+    const auto id = m_pool.albumAt({ lane, m_cell.row });
+    const auto canonical = m_pool.location(id);
+    if (!canonical)
+        return false;
+    return selectCell({ lane, m_cell.row });
+}
+bool SelectionController::selectCell(ArchiveCell cell, bool guided)
+{
+    if (!m_motion || !std::isfinite(cell.lane) || !std::isfinite(cell.row)
+        || std::abs(cell.lane) > 1e12 || std::abs(cell.row) > 1e12
+        || std::floor(cell.lane) != cell.lane || std::floor(cell.row) != cell.row
+        || m_pool.albumAt(cell).isEmpty())
+        return false;
+    if (cell == m_cell)
+        return true;
+    const auto reclaim =
+            std::find_if(m_returning.begin(), m_returning.end(), [&](const Copy &copy) {
+                return copy.cell == cell;
+            });
+    std::optional<Copy> previous;
+    if (reclaim != m_returning.end()) {
+        previous = *reclaim;
+        m_returning.erase(reclaim);
+    }
+    // Refuse before mutation: selected + returning cover ownership is strictly bounded.
+    if (m_lift.value > .0001 && m_returning.size() == 3)
+        return false;
+    if (m_lift.value > .0001)
+        m_returning.append(
+                { m_cell, albumId(), m_lift, m_rotation,
+                  m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt,
+                  m_selectedObject });
+    const auto old = m_cell;
+    m_cell = cell;
+    m_lastInteraction = m_time;
+    m_lift = previous ? previous->lift : ScalarSpring{ };
+    m_rotation = previous ? previous->rotation : 0;
+    m_returnY = previous ? previous->returnY : std::nullopt;
+    m_selectedObject = previous ? previous->objectId : ++m_objectSerial;
+    const ArchiveValues targets{ -2.17 - (cell.row - 15.5) * .62, (cell.lane - 2) * 5.2, cell.row,
+                                 cell.lane };
+    const bool distant = cell.lane != old.lane && std::abs(cell.row - old.row) > 1;
+    if (guided || distant || m_motion->moving())
+        m_motion->retarget(targets);
+    m_pulses.append({ cell, m_time });
+    if (m_pulses.size() > 6)
+        m_pulses.removeFirst();
+    publish();
+    emit selectionChanged();
+    return true;
+}
+void SelectionController::setLift(double lift)
+{
+    if (!std::isfinite(lift) || lift < 0 || lift > InspectionLift)
+        return;
+    m_liftTarget = lift;
+    m_lift.finish(lift);
+    publish();
+}
+void SelectionController::setRotation(double radians)
+{
+    if (!std::isfinite(radians))
+        return;
+    m_rotation = radians;
+    publish();
+}
+void SelectionController::setDetail(double detail)
+{
+    if (!std::isfinite(detail))
+        return;
+    m_detail = std::clamp(detail, 0.0, 1.0);
+    // Frozen music scene: MUSIC_MODEL.height + 0.12 clears the shelf.
+    setLift(.9 + (3.35 + .12 - .9) * m_detail);
+}
+void SelectionController::returnSelected()
+{
+    m_returnY = m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt;
+    m_liftTarget = 0;
+}
+double SelectionController::field(double row, double lane) const
+{
+    if (!m_motion)
+        return 0;
+    const bool reduced = m_motion->reducedMotion();
+    double height = 0;
+    if (m_scanBlend != 0)
+        height += archiveWave(row + m_origin.row, lane + m_origin.lane, m_scanTime) * m_scanBlend;
+    if (m_idleGain != 0)
+        height += idleWave(row + m_origin.row, lane + m_origin.lane, m_time) * m_idleGain;
+    if (!reduced && m_pulseGain != 0) {
+        double ripple = 0;
+        for (const auto &pulse : m_pulses)
+            ripple += musicSelectionWave(
+                    std::hypot(row - pulse.cell.row, (lane - pulse.cell.lane) * 2.2),
+                    m_time - pulse.time);
+        height += std::clamp(ripple, -.24, .24) * m_pulseGain;
+    }
+    const auto &springs = m_motion->springs();
+    return height
+            + settlingWave(row - springs[2].value, 26.56) * columnStrength(lane, springs[3].value);
+}
+QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation) const
+{
+    QMatrix4x4 matrix;
+    if (!m_motion)
+        return matrix;
+    const double slope = field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane);
+    const auto offset = displayOffset();
+    matrix.translate(float((cell.lane - m_cell.lane) * 5.2 - offset[1]),
+                     float(-4.6 + field(cell.row, cell.lane) + lift),
+                     float((cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
+    const double quality = smooth(lift / .4);
+    const double pitch = slope * .024 * (1 - m_detail) * (1 - quality);
+    // Evaluate Three's XYZ rotation in double, then round each matrix element once.
+    // A float quaternion product adds avoidable normal/depth error for optical shells.
+    const double cx = std::cos(pitch), sx = std::sin(pitch);
+    const double cy = std::cos(rotation), sy = std::sin(rotation);
+    QMatrix4x4 orientation;
+    orientation(0, 0) = float(cy);
+    orientation(0, 1) = 0;
+    orientation(0, 2) = float(sy);
+    orientation(1, 0) = float(sx * sy);
+    orientation(1, 1) = float(cx);
+    orientation(1, 2) = float(-sx * cy);
+    orientation(2, 0) = float(-cx * sy);
+    orientation(2, 1) = float(sx);
+    orientation(2, 2) = float(cx * cy);
+    matrix *= orientation;
+    return matrix;
+}
+std::array<double, 2> SelectionController::displayOffset() const
+{
+    const auto &s = m_motion->springs();
+    const std::array<double, 2> target{ -2.17 - (m_cell.row - 15.5) * .62,
+                                        (m_cell.lane - 2) * 5.2 };
+    std::array<double, 2> offset;
+    for (int i = 0; i < 2; ++i) {
+        offset[i] = s[i].value - target[i];
+        // Translate can accumulate a few ulps. Preserve exact integer recycle ties at rest.
+        const double roundoff = 8 * std::numeric_limits<double>::epsilon()
+                * std::max({ 1.0, std::abs(s[i].value), std::abs(target[i]),
+                             std::abs(target[i])
+                                     + (i == 0 ? std::abs(m_origin.row * .62)
+                                               : std::abs(m_origin.lane * 5.2)) });
+        if (!m_motion->moving() && std::abs(offset[i]) <= roundoff)
+            offset[i] = 0;
+    }
+    return offset;
+}
+SceneVector SelectionController::selectedPosition() const
+{
+    const auto p = transform(m_cell, m_lift.value, m_rotation).column(3);
+    return { p.x(), p.y(), p.z() };
+}
+QQuaternion SelectionController::selectedRotation() const
+{
+    return QQuaternion::fromRotationMatrix(
+            transform(m_cell, m_lift.value, m_rotation).normalMatrix());
+}
+ArchiveCell SelectionController::rebase()
+{
+    ArchiveCell shift{ 0, 0 };
+    if (!m_motion)
+        return shift;
+    const double period = m_pool.rowPeriod();
+    const int lanes = qMax(1, m_pool.columnCount());
+    if (std::abs(m_cell.lane) > 2048)
+        shift.lane = std::floor((m_cell.lane - 2) / lanes + .5) * lanes;
+    if (std::abs(m_cell.row) > std::max(2048.0, period * 2))
+        shift.row = std::floor((m_cell.row - 12) / period) * period;
+    if (shift == ArchiveCell{ 0, 0 })
+        return shift;
+    m_cell.lane -= shift.lane;
+    m_cell.row -= shift.row;
+    m_origin.lane += shift.lane;
+    m_origin.row += shift.row;
+    for (auto &copy : m_returning) {
+        copy.cell.lane -= shift.lane;
+        copy.cell.row -= shift.row;
+    }
+    for (auto &pulse : m_pulses) {
+        pulse.cell.lane -= shift.lane;
+        pulse.cell.row -= shift.row;
+    }
+    m_motion->translate({ shift.row * .62, -shift.lane * 5.2, -shift.row, -shift.lane });
+    emit coordinatesRebased(shift.lane, shift.row);
+    publish();
+    return shift;
+}
+void SelectionController::advance(double dt)
+{
+    if (!m_motion || m_pool.columnCount() == 0 || !std::isfinite(dt) || dt < 0)
+        return;
+    rebase();
+    const bool reduced = m_motion->reducedMotion();
+    const ArchiveValues targets{ -2.17 - (m_cell.row - 15.5) * .62, (m_cell.lane - 2) * 5.2,
+                                 m_cell.row, m_cell.lane };
+    const ArchiveValues rates{ reduced ? 35.0 : 3.7, reduced ? 35.0 : 3.7, reduced ? 35.0 : 5.0,
+                               reduced ? 35.0 : 4.0 };
+    if (!m_motion->moving()) {
+        auto springs = m_motion->springs();
+        for (int i = 0; i < 4; ++i) {
+            if (reduced)
+                springs[i].finish(targets[i]);
+            else
+                springs[i].update(targets[i], rates[i], dt);
+        }
+        m_motion->observe(springs, targets, rates);
+    }
+    m_time += dt;
+    m_scanTime += dt;
+    m_scanBlend *= std::exp(-dt * 3);
+    m_pulses.removeIf([&](const Pulse &p) {
+        return m_time - p.time >= 3.2;
+    });
+    const bool aligning =
+            std::any_of(m_returning.cbegin(), m_returning.cend(), [](const Copy &copy) {
+                return copy.returnY.has_value();
+            });
+    const bool idle = !reduced && m_liftTarget > 0 && m_detail < .01 && !m_returnY && !aligning
+            && m_time - m_lastInteraction > 2.5;
+    m_idleGain += ((idle ? 1 : 0) - m_idleGain) * (1 - std::exp(-dt * (idle ? .8 : 4)));
+    const bool mutePulse = m_detail > 0 || m_returnY || aligning;
+    m_pulseGain += ((mutePulse ? 0 : 1) - m_pulseGain) * (1 - std::exp(-dt * 8));
+    if (reduced)
+        m_idleGain = 0;
+    m_rotation = returnStep(m_rotation, dt, reduced);
+    const double base = -4.6 + field(m_cell.row, m_cell.lane);
+    if (m_returnY && m_rotation != 0)
+        m_lift.finish(*m_returnY - base);
+    else {
+        m_returnY.reset();
+        if (reduced)
+            m_lift.finish(m_liftTarget);
+        else
+            m_lift.update(m_liftTarget, 4.2, dt);
+    }
+    for (auto &copy : m_returning) {
+        copy.rotation = returnStep(copy.rotation, dt, reduced);
+        if (copy.returnY && copy.rotation != 0)
+            copy.lift.finish(*copy.returnY + 4.6 - field(copy.cell.row, copy.cell.lane));
+        else {
+            copy.returnY.reset();
+            if (reduced)
+                copy.lift.finish(0);
+            else
+                copy.lift.update(0, 4.5, dt);
+        }
+    }
+    m_returning.removeIf([](const Copy &copy) {
+        return copy.lift.value < .0001 && std::abs(copy.rotation) < .0001;
+    });
+    publish();
+}
+void SelectionController::publish()
+{
+    if (!m_motion)
+        return;
+    const auto offset = displayOffset();
+    m_pool.update({ m_cell.lane + offset[1] / 5.2, m_cell.row - offset[0] / .62 });
+    QVector<ArchiveInstance> next;
+    next.reserve(ArchivePool::capacity + 4);
+    QHash<QPair<qint64, qint64>, quint64> objects;
+    objects.reserve(ArchivePool::capacity);
+    for (auto instance : m_pool.instances()) {
+        // Optical depth ties use the physical identity, which survives logical rebase.
+        const auto physical = qMakePair(qint64(instance.cell.lane + m_origin.lane),
+                                        qint64(instance.cell.row + m_origin.row));
+        instance.objectId = m_poolObjects.value(physical, 0);
+        if (!instance.objectId)
+            instance.objectId = ++m_objectSerial;
+        objects.insert(physical, instance.objectId);
+        const bool hidden = instance.cell == m_cell
+                || std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
+                                return copy.cell == instance.cell;
+                            });
+        if (hidden || instance.albumId.isEmpty())
+            continue;
+        instance.transform = transform(instance.cell);
+        next.append(std::move(instance));
+    }
+    m_poolObjects = std::move(objects);
+    for (const auto &copy : m_returning)
+        next.append({ copy.cell, copy.albumId, copy.objectId,
+                      transform(copy.cell, copy.lift.value, copy.rotation), true });
+    if (!albumId().isEmpty())
+        next.append({ m_cell, albumId(), m_selectedObject,
+                      transform(m_cell, m_lift.value, m_rotation), true });
+    if (next == m_instances)
+        return;
+    m_instances = std::move(next);
+    ++m_revision;
+    emit frameChanged();
+}
+QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, double y) const
+{
+    if (!std::isfinite(x) || !std::isfinite(y) || x < 0 || y < 0 || x >= frame.width
+        || y >= frame.height)
+        return { };
+    bool valid = false;
+    const auto inverse = (frame.projection * frame.view).inverted(&valid);
+    if (!valid)
+        return { };
+    const float nx = float(2 * x / frame.width - 1), ny = float(1 - 2 * y / frame.height);
+    const auto start = (inverse * QVector4D(nx, ny, -1, 1)).toVector3DAffine();
+    const auto end = (inverse * QVector4D(nx, ny, 1, 1)).toVector3DAffine();
+    double nearest = 2;
+    QVariantMap hit;
+    for (const auto &instance : frame.instances) {
+        const auto localInverse = instance.transform.inverted(&valid);
+        if (!valid)
+            continue;
+        const auto localStart = localInverse.map(start), delta = localInverse.map(end) - localStart;
+        double enter = 0, exit = 1;
+        const std::array<double, 3> lo{ -2.225, .175, -.07 }, hi{ 2.225, 3.525, .07 };
+        for (int axis = 0; axis < 3; ++axis) {
+            if (std::abs(delta[axis]) < 1e-10) {
+                if (localStart[axis] < lo[axis] || localStart[axis] > hi[axis])
+                    exit = -1;
+            } else {
+                double a = (lo[axis] - localStart[axis]) / delta[axis];
+                double b = (hi[axis] - localStart[axis]) / delta[axis];
+                if (a > b)
+                    std::swap(a, b);
+                enter = std::max(enter, a);
+                exit = std::min(exit, b);
+            }
+        }
+        if (enter > exit || enter >= nearest)
+            continue;
+        nearest = enter;
+        const auto local = localStart + delta * float(enter);
+        hit = { { "albumId", instance.albumId },
+                { "objectId", QVariant::fromValue(instance.objectId) },
+                { "lane", instance.cell.lane },
+                { "row", instance.cell.row },
+                { "localPoint", QVariant::fromValue(local) },
+                { "worldPoint", QVariant::fromValue(instance.transform.map(local)) },
+                { "frameRevision", QVariant::fromValue(frame.revision) } };
+    }
+    return hit;
+}
+}

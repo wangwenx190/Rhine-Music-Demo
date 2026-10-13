@@ -1,5 +1,7 @@
 #include "CoverCache.h"
 #include "AtlasAllocator.h"
+#include "SceneItem.h"
+#include <QQuickWindow>
 #include <QElapsedTimer>
 #include <QColorSpace>
 #include <QEventLoop>
@@ -9,6 +11,16 @@
 #include <QtTest>
 using namespace yalahoo;
 using namespace yalahoo::rhi;
+
+class HiddenSceneItem : public SceneItem
+{
+public:
+    using SceneItem::SceneItem;
+    void publishNow()
+    {
+        updatePolish();
+    }
+};
 
 class CoverCacheTest : public QObject
 {
@@ -25,6 +37,28 @@ private:
         return p;
     }
 private slots:
+    void adapterDestroyedDuringDecode()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        LibraryColumn column;
+        column.albumIds = { "a", "b", "c" };
+        selection.setColumns({ column });
+        auto adapter = std::make_unique<SceneAdapter>();
+        adapter->setSelection(&selection);
+        QQuickWindow window;
+        HiddenSceneItem item(window.contentItem());
+        item.setSize({ 960, 640 });
+        item.setAdapter(adapter.get());
+        item.publishNow();
+        QVERIFY(item.input().poolFrame);
+        QVERIFY(item.coverStatistics()["cache"].toObject()["peakActive"].toInt() > 0);
+        adapter.reset();
+        QVERIFY(!item.adapter());
+        QTRY_COMPARE_WITH_TIMEOUT(item.coverStatistics()["cache"].toObject()["active"].toInt(), 0,
+                                  10000);
+        QVERIFY(!window.isVisible());
+    }
     void containAndTransparency()
     {
         for (const auto size : { QSize(100, 100), QSize(100, 200), QSize(200, 100) }) {

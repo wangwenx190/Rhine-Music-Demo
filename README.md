@@ -18,6 +18,8 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；本阶段为“静态审计通过，实机待用户验证”，清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
+
+生产场景已接入 9×48 填充池、波浪、鼠标拾取/滚轮导航、选中/归位接管和 rebase；普通入口使用 27 张内置资源演示专辑，不扫描私人曲库。固定池与 256/1024 封面、上传/资源预算、来源对照和平台审计见 [填充池契约](docs/contracts/archive-pool.md)，复建入口为 `./tools/build/verify-r12.ps1`。真实列、产品控件、详情状态机和扫描/播放依迁移计划后续轮次接入。
 所有后续轮次强制使用 [Qt 源码风格](docs/contracts/code-style.md)：四空格缩进、展开短语句。提交前执行 `cmake --build --preset qt-release --target format` 与 `check-format`；Release CTest 包含 `source-format` 门槛。维护 PowerShell 的入口为 `./tools/format/FormatTools.ps1`（检查使用 `-Check`）。
 
 所有 session 的测试和采集遵守 [测试窗口契约](docs/contracts/test-window-policy.md)：无需显示的保持隐藏，必须显示的默认置底且不接受焦点，禁止自动置前或抢焦点。统一窗口 helper 和首次显示前的 QML 注入同时覆盖运行、运动、场景、材质、RHI 和品牌检查；采集自身渲染，不截取用户桌面。

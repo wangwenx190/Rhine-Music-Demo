@@ -4,6 +4,7 @@
 #include <QVector3D>
 #include <array>
 #include <cmath>
+#include "ArchivePool.h"
 namespace yalahoo {
 struct SceneVector
 {
@@ -60,5 +61,7 @@ struct SceneFrame
     double width = 960, height = 640, fieldOfView = 0;
     double nearPlane = 5, farPlane = 300;
     bool portrait = false;
+    bool hasArchivePool = false;
+    QVector<ArchiveInstance> instances;
 };
 }

@@ -45,6 +45,15 @@ if(WIN32)
     )
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME archive-pool-gpu COMMAND archive-pool-audit
+        "${CMAKE_BINARY_DIR}/verification/archive-pool")
+    set_tests_properties(archive-pool-gpu PROPERTIES TIMEOUT 240
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+    if(WIN32)
+        set_tests_properties(archive-pool-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     add_test(NAME cover-gpu COMMAND cover-audit "${CMAKE_BINARY_DIR}/verification/covers")
     set_tests_properties(cover-gpu PROPERTIES TIMEOUT 180
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded")
@@ -625,4 +634,22 @@ if(YALAHOO_REVIEW)
         set_tests_properties(runtime-rhi-integration PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
+endif()
+qt_add_executable(ArchivePoolTest ArchivePoolTest.cpp)
+target_link_libraries(ArchivePoolTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(ArchivePoolTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_platform(ArchivePoolTest)
+add_test(NAME archive-pool COMMAND ArchivePoolTest)
+set_tests_properties(archive-pool PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(archive-pool PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+add_test(NAME runtime-filled COMMAND Yalahoo --verify-runtime
+    "${CMAKE_BINARY_DIR}/verification/runtime-filled/runtime.json" --verify-shading --verify-filled)
+set_tests_properties(runtime-filled PROPERTIES TIMEOUT 60
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0")
+if(WIN32)
+    set_tests_properties(runtime-filled PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
