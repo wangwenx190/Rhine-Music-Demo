@@ -1,6 +1,6 @@
 # RHI 场景快照、目标与不透明通道
 
-`YalahooRhi` 的 `src/render/rhi/RhiItem` 实现真实 QQuickRhiItem/Renderer；R10D 前由 Review 的 `rhi-audit` / `rhi-shell-audit` 使用，产品继续运行现有 Quick3D bootstrap。`implementationReady=false` 表示完整产品替换尚未完成。
+`YalahooRhi` 的 `src/render/rhi/RhiItem` 实现真实 QQuickRhiItem/Renderer；独立 Review 由 `rhi-audit` / `rhi-shell-audit` 使用，生产接入由 `SceneItem` 绑定同一 SceneAdapter，见 [rhi-integration.md](rhi-integration.md)。Quick3D oracle 只在 Review 构建提供，产品只打包 RHI。
 
 GUI 调用 `submit(Input, targetSize)`；Input 含 SceneAdapter 的不可变 SceneFrame、实体矩阵、纸面图像及 SelectionLighting 的值快照。targetSize 由调用者的 RenderQuality 有效尺寸提供；Review 明确使用 DPR1、100% 尺寸。Renderer 在 synchronize 拷贝值、独立持有图像，render 不访问 GUI 对象。Renderer 独占 QRhi 资源；读回按 request 标识，回调持有独立结果存储，GUI 使用受保护的排队投递和过期 request 检查。目标重建先释放 pipeline/binding，再释放 target/pass/attachments；读回存活到 QRhi 完成，销毁前 finish。30 次连续替换与恢复由实机检查覆盖。
 

@@ -1,4 +1,6 @@
 #include "Postprocess.h"
+#include "PreparedAssets.h"
+#include "ResourceInventory.h"
 #include <QImage>
 #include <QtEndian>
 #include <array>
@@ -123,8 +125,12 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
     const QSize aoSize(std::max(1, int(s.size.width() * s.resolution)),
                        std::max(1, int(s.size.height() * s.resolution)));
     if (s.samples) {
-        p.rawAo.create(api, aoSize, QRhiTexture::RGBA16F);
-        p.blur.create(api, aoSize, QRhiTexture::RGBA16F);
+        // Both shaders output (r,r,r,1), and every consumer reads .r only. Keep precisely
+        // the same half-float component and filtering; the other stored channels carry no data.
+        require(api->isTextureFormatSupported(QRhiTexture::R16F, QRhiTexture::RenderTarget),
+                "Selected GPU lacks the half-float scalar AO attachment");
+        p.rawAo.create(api, aoSize, QRhiTexture::R16F);
+        p.blur.create(api, aoSize, QRhiTexture::R16F);
     }
     if (s.smaa) {
         p.edges.create(api, s.size, QRhiTexture::RGBA16F);
@@ -179,18 +185,11 @@ void Postprocess::render(QRhiCommandBuffer *cb)
     auto *updates = p.api->nextResourceUpdateBatch();
     if (p.upload) {
         auto floats = [&](QRhiTexture *texture, const QString &name) {
-            QFile file(":/rhi/environment/" + name + ".rgba32f");
-            require(file.open(QIODevice::ReadOnly), "Missing AO lookup");
-            auto bytes = file.readAll();
+            const auto bytes =
+                    preparedAssets().bytes.value(":/rhi/environment/" + name + ".rgba32f");
             require(bytes.size()
                             == texture->pixelSize().width() * texture->pixelSize().height() * 16,
                     "Invalid AO lookup size");
-#if Q_BYTE_ORDER == Q_BIG_ENDIAN
-            for (qsizetype i = 0; i < bytes.size(); i += 4) {
-                const auto word = qFromLittleEndian<quint32>(bytes.constData() + i);
-                std::memcpy(bytes.data() + i, &word, 4);
-            }
-#endif
             updates->uploadTexture(texture,
                                    { { 0, 0, QRhiTextureSubresourceUploadDescription(bytes) } });
             if (name.startsWith("ssao-kernel-"))
@@ -204,7 +203,8 @@ void Postprocess::render(QRhiCommandBuffer *cb)
                                    std::pair{ p.search.get(), "smaa-search" } }) {
             if (!entry.first)
                 continue;
-            QImage image(":/rhi/postprocess/" + QString::fromLatin1(entry.second) + ".png");
+            const auto image = preparedAssets().images.value(
+                    ":/rhi/postprocess/" + QString::fromLatin1(entry.second) + ".png");
             require(image.size() == entry.first->pixelSize(), "Invalid SMAA lookup size");
             updates->uploadTexture(entry.first, image.convertToFormat(QImage::Format_RGBA8888));
         }
@@ -254,5 +254,23 @@ QJsonArray Postprocess::passes() const
 quint64 Postprocess::revision() const
 {
     return m_revision;
+}
+void Postprocess::inventory(ResourceInventory &inventory) const
+{
+    if (!m_state)
+        return;
+    const auto &p = *m_state;
+    for (int i = 0; i < 2; ++i)
+        inventory.texture(QString("post-ping-%1").arg(i), p.ping[i].texture.get());
+    inventory.texture("post-ao-raw", p.rawAo.texture.get());
+    inventory.texture("post-ao-blur", p.blur.texture.get());
+    inventory.texture("smaa-edges", p.edges.texture.get());
+    inventory.texture("smaa-weights", p.weights.texture.get());
+    inventory.texture("ao-kernel", p.kernel.get());
+    inventory.texture("ao-noise", p.noise.get());
+    inventory.texture("smaa-area", p.area.get());
+    inventory.texture("smaa-search", p.search.get());
+    for (const auto &pass : p.passes)
+        inventory.buffer("post-uniform-" + pass.name, pass.uniform.get());
 }
 }

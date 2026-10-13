@@ -1,5 +1,6 @@
 #include "SceneReview.h"
 #include "SceneAdapter.h"
+#include "SceneItem.h"
 #include "VerificationWindow.h"
 #include <QDir>
 #include <QCryptographicHash>
@@ -46,10 +47,9 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
     window.show();
     scene.setReducedMotion(
             true); // exact state; acquisition waits for rendered frames, never wall time pose
-    auto *view = window.findChild<QQuickItem *>(QStringLiteral("quick3DProbe"));
-    auto *camera = window.findChild<QObject *>(QStringLiteral("sceneCamera"));
+    auto *view = window.findChild<rhi::SceneItem *>(QStringLiteral("nativeScene"));
     auto *layoutLabel = window.findChild<QObject *>(QStringLiteral("layoutProbe"));
-    if (!view || !camera || !layoutLabel)
+    if (!view || !layoutLabel)
         return 9;
     const QString folder = QFileInfo(report).absolutePath();
     QDir().mkpath(folder);
@@ -103,11 +103,9 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 && window.height() == c["height"].toInt() && view->width() == window.width()
                 && view->height() == window.height()
                 && layoutLabel->property("text").toString().startsWith(scene.layout()->kind())
-                && (camera->property("position").value<QVector3D>() - scene.cameraPosition())
-                                .length()
+                && (view->input().scene.camera.position.qt() - scene.cameraPosition()).length()
                         < 1e-3
-                && std::abs(camera->property("fieldOfView").toDouble() - scene.fieldOfView())
-                        < 1e-4;
+                && std::abs(view->input().scene.fieldOfView - scene.fieldOfView()) < 1e-4;
         bool points = true;
         QJsonArray projections;
         for (auto value : c["projections"].toArray()) {
@@ -129,7 +127,7 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                                             { "qtCpuError", qtError },
                                             { "webError", webError } });
         }
-        // Actual no-light mesh pixels and client dimensions/DPR, in addition to public View3D mapping.
+        // Actual no-light mesh pixels and client dimensions/DPR, in addition to the submitted RHI snapshot mapping.
         int pixels = 0;
         const auto rgb = image.convertToFormat(QImage::Format_RGB32);
         for (int y = 0; y < rgb.height(); ++y)

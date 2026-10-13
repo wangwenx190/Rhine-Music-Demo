@@ -4,7 +4,16 @@
 #include <algorithm>
 #include <numbers>
 #include <limits>
+#include <chrono>
 namespace yalahoo {
+void SceneAdapter::recordInput()
+{
+    ++m_frame.inputRevision;
+    m_frame.inputReceivedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                      std::chrono::steady_clock::now().time_since_epoch())
+                                      .count();
+    emit frameChanged();
+}
 namespace {
 constexpr double radians = std::numbers::pi / 180;
 std::array<double, 3> components(SceneVector v)
@@ -170,6 +179,13 @@ bool SceneAdapter::settled() const
 }
 void SceneAdapter::publish()
 {
+    const SceneVector position = values(m_position), aim = values(m_aim);
+    const SceneVector caseOrigin{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail,
+                                  -2.17 };
+    if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
+        && m_frame.camera.position == position && m_frame.camera.aim == aim
+        && m_frame.camera.span == m_span.value && m_frame.casePosition == caseOrigin)
+        return;
     ++m_frame.revision;
     m_frame.width = m_layout.width();
     m_frame.height = m_layout.height();
@@ -186,8 +202,7 @@ void SceneAdapter::publish()
                                    float(m_frame.width / m_frame.height), float(clipNear()),
                                    float(clipFar()));
     // Fixed anonymous inspection slot only. Full wave/pool extraction is R12/R18.
-    m_frame.casePosition = { 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail,
-                             -2.17 };
+    m_frame.casePosition = caseOrigin;
     m_frame.caseTransform.setToIdentity();
     m_frame.caseTransform.translate(casePosition());
     emit frameChanged();

@@ -4,16 +4,16 @@ namespace yalahoo {
 enum class RenderBackend {
     Rhi
 };
-// R10 chooses the destination; R10A-D supply it. Do not claim it is running yet.
+// The product has one renderer; Review-only Quick3D is a source comparison oracle.
 struct RenderBackendContract
 {
     static constexpr RenderBackend selected = RenderBackend::Rhi;
     static QVariantMap fields()
     {
         return { { "selected", "rhi" },
-                 { "implementationReady", false },
-                 { "activeImplementation", "quick3d-bootstrap" },
-                 { "contractRevision", 1 },
+                 { "implementationReady", true },
+                 { "activeImplementation", "rhi" },
+                 { "contractRevision", 4 },
                  { "contract", "docs/contracts/render-backend.json" } };
     }
 };

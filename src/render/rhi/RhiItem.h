@@ -49,8 +49,8 @@ struct Capture
     QImage rawAo, blurredAo, aoNormal, aoDepth;
     QJsonObject metadata;
 };
-// Review/next-backend integration boundary; product replacement belongs to R10D.
-class RhiItem final : public QQuickRhiItem
+// Native render boundary, shared by production and isolated Review tools.
+class RhiItem : public QQuickRhiItem
 {
     Q_OBJECT
 public:
@@ -63,11 +63,20 @@ public:
     // The callable is copied during synchronize; callers use a guarded GUI receiver.
     std::function<void(Capture)> captured;
     std::function<void(QJsonObject)> profiled;
+signals:
+    void renderFailed(QString message);
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;
 
 private:
     Input m_input;
+    quint64 m_submission = 0;
+
+public:
+    quint64 submission() const
+    {
+        return m_submission;
+    }
 };
 }

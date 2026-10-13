@@ -5,8 +5,10 @@
 #include "OfflineMetadataProvider.h"
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
+#include "GraphicsBackend.h"
 #ifdef YALAHOO_REVIEW
 #  include "SceneReview.h"
+#  include "IntegrationReview.h"
 #  include "MaterialReview.h"
 #endif
 
@@ -50,13 +52,8 @@ void recordDiagnostic(QtMsgType, const QMessageLogContext &, const QString &mess
 
 int main(int argc, char **argv)
 {
-#if defined(Q_OS_WIN)
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
-#elif defined(Q_OS_MACOS)
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal);
-#elif defined(Q_OS_LINUX)
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-#endif
+    if (!yalahoo::selectGraphicsBackend())
+        return 22;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
     if (!yalahoo::initializeAssetFonts()) {
@@ -82,6 +79,12 @@ int main(int argc, char **argv)
               QStringLiteral(
                       "Exercise production material/shadow/AO rendering with verify-runtime") });
 #ifdef YALAHOO_REVIEW
+    parser.addOption({ QStringLiteral("verify-integration"),
+                       QStringLiteral("Measure RHI production integration and exit"),
+                       QStringLiteral("directory") });
+    parser.addOption({ QStringLiteral("integration-seconds"),
+                       QStringLiteral("Production sampling duration (12-120 seconds)"),
+                       QStringLiteral("seconds"), QStringLiteral("12") });
     parser.addOption({ QStringLiteral("verify-materials"),
                        QStringLiteral("Run source-based single-case material comparison"),
                        QStringLiteral("fixture") });
@@ -157,6 +160,7 @@ int main(int argc, char **argv)
 #ifdef YALAHOO_REVIEW
             || parser.isSet(QStringLiteral("verify-materials"))
             || parser.isSet(QStringLiteral("verify-scene"))
+            || parser.isSet(QStringLiteral("verify-integration"))
 #endif
             ;
     engine.setInitialProperties(
@@ -174,7 +178,12 @@ int main(int argc, char **argv)
                 QCoreApplication::exit(2);
             },
             Qt::QueuedConnection);
+#ifdef YALAHOO_REVIEW
+    engine.loadFromModule("Yalahoo.Music",
+                          parser.isSet(QStringLiteral("verify-materials")) ? "ResearchApp" : "App");
+#else
     engine.loadFromModule("Yalahoo.Music", "App");
+#endif
     if (engine.rootObjects().isEmpty())
         return 2;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
@@ -184,6 +193,14 @@ int main(int argc, char **argv)
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
 #ifdef YALAHOO_REVIEW
+    if (parser.isSet(QStringLiteral("verify-integration"))) {
+        bool ok = false;
+        const auto seconds = parser.value(QStringLiteral("integration-seconds")).toDouble(&ok);
+        if (!ok)
+            return 20;
+        return yalahoo::reviewIntegration(
+                app, *window, scene, parser.value(QStringLiteral("verify-integration")), seconds);
+    }
     if (parser.isSet(QStringLiteral("verify-materials"))) {
         if (!parser.isSet(QStringLiteral("material-report")))
             return 12;
@@ -293,7 +310,9 @@ int main(int argc, char **argv)
             bool backend = QSGRendererInterface::isApiRhiBased(
                     static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
 #if defined(Q_OS_WIN)
-            backend = api == QSGRendererInterface::Direct3D11;
+            backend = api
+                    == (qgetenv("QSG_RHI_BACKEND") == "opengl" ? QSGRendererInterface::OpenGL
+                                                               : QSGRendererInterface::Direct3D11);
 #endif
             QDir().mkpath(QFileInfo(report).absolutePath());
             const QString screenshot = QFileInfo(report).absolutePath()
@@ -301,8 +320,9 @@ int main(int argc, char **argv)
                                ? QStringLiteral("/runtime-motion.png")
                                : QStringLiteral("/runtime.png"));
             const bool saved = !image.isNull() && image.save(screenshot);
-            const auto *view3D = window->findChild<QQuickItem *>(QStringLiteral("quick3DProbe"));
-            const bool quick3DAvailable = view3D != nullptr;
+            const auto *nativeScene =
+                    window->findChild<QQuickItem *>(QStringLiteral("nativeScene"));
+            const bool nativeSceneAvailable = nativeScene != nullptr;
             const bool qmlMediaAvailable =
                     window->findChild<QObject *>(QStringLiteral("qmlMediaProbe")) != nullptr;
             const auto *libraryProbe =
@@ -311,9 +331,9 @@ int main(int argc, char **argv)
                     libraryProbe ? libraryProbe->property("text").toString() : QString{ };
             int modelPixels = 0;
             QRect modelRegion;
-            if (view3D && !image.isNull()) {
-                const QRectF sceneRegion =
-                        view3D->mapRectToScene(QRectF(0, 0, view3D->width(), view3D->height()));
+            if (nativeScene && !image.isNull()) {
+                const QRectF sceneRegion = nativeScene->mapRectToScene(
+                        QRectF(0, 0, nativeScene->width(), nativeScene->height()));
                 const qreal scaleX = qreal(image.width()) / window->width();
                 const qreal scaleY = qreal(image.height()) / window->height();
                 modelRegion = QRectF(sceneRegion.x() * scaleX, sceneRegion.y() * scaleY,
@@ -356,7 +376,7 @@ int main(int argc, char **argv)
                     && !shaderDiagnostics && motionPassed && frames > 0
                     && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
                     && backend && interactions == 1 && mediaAvailable && shaderAvailable
-                    && qmlAvailable && chineseSupported && saved && quick3DAvailable
+                    && qmlAvailable && chineseSupported && saved && nativeSceneAvailable
                     && qmlMediaAvailable && modelPixels > 100 && libraryProbe
                     && (!parser.isSet(QStringLiteral("verify-library"))
                         || (library.albums()->rowCount() == 21
@@ -383,7 +403,7 @@ int main(int argc, char **argv)
                 { "font", raw.familyName() },
                 { "qmlResource", qmlAvailable },
                 { "shaderResource", shaderAvailable },
-                { "quick3DObject", quick3DAvailable },
+                { "nativeSceneObject", nativeSceneAvailable },
                 { "modelPixels", modelPixels },
                 { "shadingProbe", parser.isSet(QStringLiteral("verify-shading")) },
                 { "qmlMediaObject", qmlMediaAvailable },

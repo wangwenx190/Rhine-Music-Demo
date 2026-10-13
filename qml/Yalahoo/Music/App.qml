@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
-import "scene"
+import Yalahoo.Music
 
 ApplicationWindow {
     id: window
@@ -35,10 +35,21 @@ ApplicationWindow {
         anchors.fill: parent
         fragmentShader: "qrc:/assets/shaders/probe.frag.qsb"
     }
-    GeometryScene {
+    SceneItem {
+        id: nativeScene
+        objectName: "nativeScene"
         anchors.fill: parent
         adapter: window.sceneAdapter
         geometryOnly: window.sceneReview || window.geometryProbe
+    }
+    Label {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.margins: 20
+        visible: nativeScene.errorText.length > 0 || window.sceneAdapter.quality.limited
+        text: nativeScene.errorText.length > 0 ? "图形配置不可用：" + nativeScene.errorText :
+                                                 "输出达到尺寸保护上限，画质设置保持原值。"
+        color: "#a13328"
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)
     onHeightChanged: sceneAdapter.layout.setViewport(width, height)
@@ -79,13 +90,17 @@ ApplicationWindow {
         Button {
             objectName: "themeProbe"
             text: window.sceneAdapter.lighting.night ? "暖昼" : "深夜"
-            onClicked: window.sceneAdapter.lighting.night = !window.sceneAdapter.lighting.night
+            onClicked: {
+                window.sceneAdapter.recordInput();
+                window.sceneAdapter.lighting.night = !window.sceneAdapter.lighting.night;
+            }
         }
         Button {
             objectName: "interactionProbe"
             text: window.interactionCount === 0 ? "验证窗口交互" : "交互已响应 " + window.interactionCount
             Layout.alignment: Qt.AlignHCenter
             onClicked: {
+                window.sceneAdapter.recordInput();
                 window.interactionCount++;
                 window.sceneAdapter.detail = window.sceneAdapter.detail === 0 ? 1 : 0;
             }

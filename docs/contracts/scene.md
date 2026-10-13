@@ -4,9 +4,9 @@
 
 ## 共用对象与坐标
 
-`src/render/` 的 C++23 `YalahooScene` 链接 Core/Gui 与已有运动内核；它不依赖 Quick3D 私有类型。`SceneAdapter` 在 `main` 中由唯一 `FrameClock` 注入，寿命覆盖 QML 引擎；QML 的 `GeometryScene` 只绑定其相机位置、四元数、视角、裁切面及盒体位置。物理单位不缩放，三个导入 mesh 的变换只应用一次，不翻转 Z。几何 Review/旧运行探针保留无光、不透明调试材质以隔离几何；普通场景使用 [单盒材质](materials.md)，几何和材质验收各自冻结相机与图层。动态灯光、阵列和后续后处理按对应轮次接入。
+`src/render/` 的 C++23 `YalahooScene` 链接 Core/Gui 与已有运动内核；它不依赖 Quick3D 私有类型。`SceneAdapter` 在 `main` 中由唯一 `FrameClock` 注入，寿命覆盖 QML 引擎；生产 QML 使用 `SceneItem`，它只读取 SceneAdapter 的不可变相机/实体快照及既有灯光/画质值；`GeometryScene` 仅是 Review 的 Quick3D oracle。接入边界见 [rhi-integration.md](rhi-integration.md)。物理单位不缩放，三个导入 mesh 的变换只应用一次，不翻转 Z。几何 Review/旧运行探针保留无光、不透明调试材质以隔离几何；普通场景使用 [单盒材质](materials.md)，几何和材质验收各自冻结相机与图层。动态灯光、阵列和后续后处理按对应轮次接入。
 
-`SceneFrame` 是按值复制的只读快照，含 revision、double 相机 position/aim/span、Qt view/projection、caseTransform、内容尺寸、布局类别与 clipNear=5/clipFar=300。以后渲染器在同步边界复制快照；本轮所有状态写入在 GUI 线程。`projectWorldPoint(world)` 返回内容逻辑像素 x/y 和 OpenGL 约定 NDC z；相机后方返回 NaN x/y、z=-1。不得将此 z 直接写入 D3D/Metal 深度：Quick3D 负责自身后端修正，条件 RHI 后端另用 QRhi 修正矩阵。
+`SceneFrame` 是按值复制的只读快照，含 revision、double 相机 position/aim/span、Qt view/projection、caseTransform、内容尺寸、布局类别与 clipNear=5/clipFar=300。RHI 在同步边界复制快照；所有状态写入在 GUI 线程，矩阵实际不变时不重新发布几何 revision。输入 revision/time 另按集成契约记录。`projectWorldPoint(world)` 返回内容逻辑像素 x/y 和 OpenGL 约定 NDC z；相机后方返回 NaN x/y、z=-1。不得将此 z 直接写入 D3D/Metal 深度：Quick3D 负责自身后端修正，生产 RHI 使用 QRhi 修正矩阵。
 
 `hitTest(x,y)` 使用同一 frame 的 inverse(projection·view·caseTransform) 做近/远射线与原盒体包围体相交，返回 `objectId`、localPoint、worldPoint、frameRevision；屏幕外/未命中为空。当前唯一调试对象 ID 是 `inspection-case`，不是专辑持久 ID。R12 扩展实体实例、稳定专辑身份及精细拾取；R18 扩展盒体旋转。不要把包围体命中当成每个镂空三角形的精确命中。
 

@@ -1,6 +1,6 @@
 # 渲染后端合同
 
-R10 固定选择 **QQuickRhiItem + QRhi/qsb**。机器合同见 [render-backend.json](render-backend.json)。RHI 不透明基础、快照/资源所有权、阴影有效算法与跨后端 shader 接口见 [rhi-opaque.md](rhi-opaque.md)，磨砂捕获、MSAA resolve/mips、显式壳体材质和稳定排序见 [rhi-shell.md](rhi-shell.md)。当前图集、实例与后处理实现见 [rhi-postprocess.md](rhi-postprocess.md)。真实实现位于 `src/render/rhi/`，Review GPU 入口为 `rhi-audit` / `rhi-shell-audit` / `rhi-postprocess-audit`；产品替换由 R10D 执行。`SceneAdapter.renderBackendContract` 明确区分已选择的目的后端与正在运行的实现，当前 `implementationReady=false`，产品仍为唯一 Quick3D bootstrap。
+R10 固定选择 **QQuickRhiItem + QRhi/qsb**。机器合同见 [render-backend.json](render-backend.json)。RHI 不透明基础、快照/资源所有权、阴影有效算法与跨后端 shader 接口见 [rhi-opaque.md](rhi-opaque.md)，磨砂捕获、MSAA resolve/mips、显式壳体材质和稳定排序见 [rhi-shell.md](rhi-shell.md)。当前图集、实例与后处理实现见 [rhi-postprocess.md](rhi-postprocess.md)。真实实现位于 `src/render/rhi/`，Review GPU 入口为 `rhi-audit` / `rhi-shell-audit` / `rhi-postprocess-audit`；生产集成见 [rhi-integration.md](rhi-integration.md)。`SceneAdapter.renderBackendContract` 的 `implementationReady=true` / `activeImplementation=rhi` 对应实际唯一生产 SceneItem；Quick3D 仅在 Review 构建提供历史 oracle。
 
 决定依据是实际 Windows D3D11 对照与公开接口的控制边界：阴影投影/法向偏置/源滤波无法由当前 DirectionalLight 参数表达，Unshaded 光学算法不接收生成的 shadow lighting；跨三个壳体模型与独立抽取盒的全局稳定排序不由 `depthSortingEnabled` 保证。近远邻盒背景在 pre/post Bokeh 均未达到 SSIM .97，独立深度/法线及不透明输入对照用于分别定位几何和捕获差异；不能以色彩补偿掩盖它们。所有五 ROI 均计分，不隐藏留白、侧脊、背景等残差。
 

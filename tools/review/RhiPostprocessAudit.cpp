@@ -4,6 +4,7 @@
 #include "VerificationWindow.h"
 #include <QGuiApplication>
 #include <QQuickWindow>
+#include <QQuickGraphicsConfiguration>
 #include <QSGRendererInterface>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -104,13 +105,22 @@ int main(int argc, char **argv)
         return 0;
     }
     const bool shortProfile = argc == 3 && QByteArray(argv[2]) == "--profile";
-    if (argc != 2 && (argc != 3 || (!shortProfile && QByteArray(argv[2]) != "--diagnostics")))
+    const bool recordPerformance = argc == 3 && QByteArray(argv[2]) == "--record-performance";
+    const bool fullReplay = argc == 2 || recordPerformance;
+    if (argc != 2
+        && (argc != 3
+            || (!shortProfile && !recordPerformance && QByteArray(argv[2]) != "--diagnostics")))
         return 2;
     try {
         const QString root = QString::fromUtf8(FIXTURE_ROOT),
                       output = QString::fromLocal8Bit(argv[1]);
         QDir().mkpath(output);
         QQuickWindow window;
+        if (shortProfile) {
+            auto configuration = window.graphicsConfiguration();
+            configuration.setTimestamps(true);
+            window.setGraphicsConfiguration(configuration);
+        }
         window.setTitle("yalahOO!!! · R10C GPU review");
         verification::prepareWindow(window, true);
         auto *item = new RhiItem(window.contentItem());
@@ -145,7 +155,7 @@ int main(int argc, char **argv)
         QJsonArray results, residuals;
         double totalLoss = 0, quickLoss = 0;
         const auto cases = original["cases"].toArray();
-        for (int i = 0; argc == 2 && i < 66; ++i) {
+        for (int i = 0; fullReplay && i < 66; ++i) {
             const auto c = cases[i].toObject();
             if (c["channel"].toInt() != 0)
                 continue;
@@ -437,7 +447,7 @@ int main(int argc, char **argv)
             report["meanEqualWeightLoss"] = totalLoss / results.size();
             report["quick3dMeanEqualWeightLoss"] = quickLoss / results.size();
         }
-        if (argc == 2 || shortProfile) {
+        if (fullReplay || shortProfile) {
             // Actual presentation cadence, independent from readback and CPU submission timing.
             struct Samples
             {
@@ -628,11 +638,20 @@ int main(int argc, char **argv)
             performance["gpuTimestampAvailable"] =
                     performance["gpuFrame"].toObject()["count"].toInt() > 0;
             const auto cadence = performance["frameIntervals"].toObject();
-            performance["passed"] = cadence["count"].toInt() > 100
-                    && cadence["p95Ms"].toDouble() <= 20 && cadence["over50Ms"].toInt() <= 1
+            const bool complete = cadence["count"].toInt() > 100
+                    && performance["atlasUploadBytes"].toInteger() == 0
+                    && performance["resourceChanges"].toInteger() == 0;
+            performance["samplingComplete"] = complete;
+            performance["gateEnforced"] = !recordPerformance;
+            performance["passed"] = complete && cadence["p95Ms"].toDouble() <= 20
+                    && cadence["over50Ms"].toInt() <= 1
                     && performance["atlasUploadBytes"].toInteger() == 0;
             report["performance"] = performance;
-            report["passed"] = performance["passed"];
+            report["functionalPassed"] = true;
+            report["passed"] = complete && (recordPerformance || performance["passed"].toBool());
+            report["acceptanceScope"] = recordPerformance
+                    ? "Functional/effect/upload/resource checks; performance recorded only by R10D user authorization, not accepted as meeting the numeric target"
+                    : "Functional checks and the historical renderer throughput gate";
             item->profiled = { };
             if (shortProfile) {
                 report["passed"] = false;
@@ -647,7 +666,7 @@ int main(int argc, char **argv)
         check(file.open(QIODevice::WriteOnly), "Cannot save R10C report");
         file.write(QJsonDocument(report).toJson());
         check(file.commit(), "Cannot commit R10C report");
-        check(argc != 2 || report["passed"].toBool(),
+        check(!fullReplay || report["passed"].toBool(),
               "R10C 120s performance gate failed; inspect runtime.json");
         item->captured = { };
         window.hide();

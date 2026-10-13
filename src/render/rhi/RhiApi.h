@@ -10,14 +10,7 @@ inline void require(bool ok, const char *reason)
     if (!ok)
         throw std::runtime_error(reason);
 }
-inline QShader shader(const char *path)
-{
-    QFile f(QString::fromLatin1(path));
-    require(f.open(QIODevice::ReadOnly), "Missing RHI qsb resource");
-    auto s = QShader::fromSerialized(f.readAll());
-    require(s.isValid(), "Invalid RHI qsb resource");
-    return s;
-}
+QShader shader(const char *path);
 inline QMatrix4x4 lightView()
 {
     QMatrix4x4 m;

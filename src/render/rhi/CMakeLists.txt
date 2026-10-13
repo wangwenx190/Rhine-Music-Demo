@@ -3,6 +3,10 @@ qt_add_library(
     STATIC
     RhiItem.cpp
     RhiItem.h
+    SceneItem.cpp
+    SceneItem.h
+    PreparedAssets.cpp
+    PreparedAssets.h
     AtlasUpload.cpp
     AtlasUpload.h
     Postprocess.cpp

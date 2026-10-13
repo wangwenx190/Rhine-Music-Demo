@@ -1,16 +1,14 @@
 {
-  "revision": 3,
+  "revision": 4,
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
   "selectedBackend": "rhi",
-  "implementationReady": false,
-  "activeImplementation": "quick3d-bootstrap",
-  "implementationRounds": [
-    "R10D"
-  ],
+  "implementationReady": true,
+  "activeImplementation": "rhi",
+  "implementationRounds": [],
   "rhiFoundation": {
     "implementation": "src/render/rhi/RhiItem: immutable SceneFrame synchronization, explicit shadow and opaque color/normal/depth targets",
     "contract": "docs/contracts/rhi-opaque.md",
-    "productEnabled": false,
+    "productEnabled": true,
     "samples": 1,
     "sourceShadowFilter": "Frozen PCFSoftShadowMap request aliases to PCFShadowMap in locked Three: IGN-rotated 5-point Vogel disk with bilinear depth compare",
     "evidence": "verification/windows/rhi-opaque/release-runtime.json",
@@ -19,7 +17,7 @@
   "rhiShell": {
     "contract": "docs/contracts/rhi-shell.md",
     "implementation": "src/render/rhi/RhiItem: opaque MSAA resolve/mips, independent color attachments/shared retained hardware depth, source shell optics/comparison shadow and global stable identity sort",
-    "productEnabled": false,
+    "productEnabled": true,
     "captureSamples": 4,
     "uniformBytes": 816,
     "sourceStage": "61 original R10 inputs before AO/Bokeh/SMAA; original direct-material exceptions unchanged; neighbor depth/normal 58/59 checked separately",
@@ -136,5 +134,12 @@
     "rebuild": "tools/build/verify-r10c.ps1",
     "macos": "静态审计通过，实机待用户验证",
     "linux": "静态审计通过，实机待用户验证"
+  },
+  "productIntegration": {
+    "contract": "docs/contracts/rhi-integration.md",
+    "implementation": "App.qml -> SceneItem -> SceneAdapter/SelectionLighting/RenderQuality -> RhiItem",
+    "evidence": "verification/windows/rhi-integration/",
+    "rebuild": "tools/build/verify-r10d.ps1",
+    "research": "Review-only ResearchApp/Quick3D oracle; not linked or packaged in production"
   }
 }

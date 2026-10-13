@@ -8,6 +8,7 @@ namespace yalahoo {
 struct SceneVector
 {
     double x = 0, y = 0, z = 0;
+    bool operator==(const SceneVector &) const = default;
     SceneVector operator+(SceneVector b) const
     {
         return { x + b.x, y + b.y, z + b.z };
@@ -50,6 +51,8 @@ struct CameraPose
 struct SceneFrame
 {
     quint64 revision = 0;
+    quint64 inputRevision = 0;
+    qint64 inputReceivedNs = 0;
     CameraPose camera;
     SceneVector casePosition;
     QQuaternion cameraRotation;

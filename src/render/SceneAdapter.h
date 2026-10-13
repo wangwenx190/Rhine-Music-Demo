@@ -102,6 +102,7 @@ public:
     Q_INVOKABLE QVector3D projectWorldPoint(QVector3D world) const;
     Q_INVOKABLE double focalDepth(QVector3D origin) const;
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
+    Q_INVOKABLE void recordInput();
 signals:
     void frameChanged();
     void detailChanged();

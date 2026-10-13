@@ -2,6 +2,7 @@
 #include "LibrarySession.h"
 #include "MotionController.h"
 #include "SceneAdapter.h"
+#include "SceneItem.h"
 #include <QtQml/qqmlregistration.h>
 
 struct LayoutMetricsQml
@@ -69,4 +70,11 @@ struct RenderQualityQml
     QML_FOREIGN(yalahoo::RenderQuality)
     QML_NAMED_ELEMENT(RenderQuality)
     QML_UNCREATABLE("Owned by SceneAdapter")
+};
+
+struct SceneItemQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::rhi::SceneItem)
+    QML_NAMED_ELEMENT(SceneItem)
 };

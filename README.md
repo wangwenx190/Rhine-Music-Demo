@@ -26,6 +26,6 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。
 
-RHI Review 已具备独立不透明捕获、4× MSAA resolve/mips、磨砂壳体与全局稳定深度排序，保持源屏幕空间透射和三层壳体深度规则；契约与 Windows/静态审计复建见 [RHI 材质契约](docs/contracts/rhi-shell.md)。五区域的全部残差与同输入对照保留，不能把平均误差降低表述为全部图像目标通过。RHI 图集局部上传、432 实例和 AO/景深/SMAA/输出见 [图集与后处理契约](docs/contracts/rhi-postprocess.md)，当前复建入口为 `tools/build/verify-r10c.ps1`。产品后端替换按 R10D 执行，当前普通入口仍为 Quick3D bootstrap。
+RHI Review 已具备独立不透明捕获、4× MSAA resolve/mips、磨砂壳体与全局稳定深度排序，保持源屏幕空间透射和三层壳体深度规则；契约与 Windows/静态审计复建见 [RHI 材质契约](docs/contracts/rhi-shell.md)。五区域的全部残差与同输入对照保留，不能把平均误差降低表述为全部图像目标通过。RHI 图集局部上传、432 实例和 AO/景深/SMAA/输出见 [图集与后处理契约](docs/contracts/rhi-postprocess.md)，当前复建入口为 `tools/build/verify-r10c.ps1`。普通入口现为唯一 RHI SceneItem，Quick3D oracle 只在 Review 构建打包。生产集成、资源清单、正常 VSYNC 的输入/帧样本及 D3D11/OpenGL 实机验证见 [RHI 集成契约](docs/contracts/rhi-integration.md)，本轮证据重建入口为 `tools/build/verify-r10d.ps1`。
 
 性能采用[设计、审计与验证契约](docs/contracts/performance.md)：先检查算法复杂度、线程/队列、快照/增量和渲染资源失效，再用分场景Release实测确认收益。RHI未限速Review、产品正常VSYNC节奏、输入响应和资源峰值分别报告，不能以单个benchmark宣称完整体验达标。

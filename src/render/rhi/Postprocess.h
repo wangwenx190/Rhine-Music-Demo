@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace yalahoo::rhi {
+class ResourceInventory;
 struct PostSettings
 {
     QSize size;
@@ -28,6 +29,7 @@ public:
     QRhiTexture *rawAo() const;
     QRhiTexture *blurredAo() const;
     quint64 revision() const;
+    void inventory(ResourceInventory &inventory) const;
 
 private:
     struct State;

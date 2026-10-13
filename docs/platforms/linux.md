@@ -216,3 +216,20 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 检查真实 OpenGL、DPR1、same-hash source fixture、全部 61 pre-stage 与 50 final sourceIndex/five ROI、raw AO/blur/normal，以及 432 实体初始化/变色/稳定/还原/倒序/resize/generation。目标格式、4× MSAA resolve、阴影 comparison、独立几何深度和 pass 次序见 [rhi-postprocess.md](../contracts/rhi-postprocess.md)。缺能力必须给出创建错误，不隐降画质。D3D11 原生命令字节在本平台不可用，报告必须保留 available=false，不把请求统计当作本平台原生传输测量；CPU 队列限额与真实整页 GPU 像素证明仍应执行。
 
 性能报告分别标注未限速吞吐、系统呈现节奏、CPU 提交和 timestamp（不可用时不能写零）。真实桌面 compositor/DPR/设备性能需本机验证，Windows 图像及帧时间不作为本平台结果。完成后关闭 Review，重建普通 Release 并执行 CTest。实际构建、GPU、图像、性能与部署结果：待用户填写。
+
+## R10D 生产 RHI 集成用户验证（未执行）
+
+本平台对应矩阵在 `verification/linux-static/rhi-integration/`：**静态审计通过，实机待用户验证**。在目标机最新原生 Kit 执行 Release：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release --target format
+cmake --build --preset qt-release
+cmake --build --preset qt-release --target check-format Yalahoo_qmllint
+ctest --preset qt-release --output-on-failure
+QSG_RHI_BACKEND=opengl build/release/bin/yalahoo --verify-integration build/release/verification/rhi-integration/native-run --integration-seconds 120
+```
+
+核对 `runtime.json` 的实际后端、client 尺寸、DPR、四个输入 revision 对应提交、独立 frameSwapped 时间序列、九尺寸/四画质/十次真实场景图释放恢复。窗口全程置底、不接受焦点，PNG 只来自自身渲染；目标窗口管理器不支持策略时真实报告失败，不自动激活。资源清单是描述符估算，UnknownFormat 深度附件为明确上界，不冒充实测显存；正常 VSYNC 单盒数据不代表完整阵列/搜索/扫描产品或 input-to-photon。qsb 格式支持、颜色/深度/resolve 和驱动节奏均需实机检查。正式采样按三个独立目录串行执行并保留全部结果。
+
+结束后 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF`，重建、运行全部 Release CTest 和 qmllint。普通产品不得包含 ResearchApp/GeometryScene/FixedTextureData 或 Quick3D 链接依赖；共享资源文件保留在仓库。完整平台部署仍使用后续平台轮次入口。本清单的目标机运行结果：待用户填写。

@@ -1,6 +1,6 @@
 # RHI 磨砂捕获、壳体与稳定排序
 
-`YalahooRhi` 的 `RhiItem` 在不可变 Input / SceneFrame 边界上实现 shadow → opaque MRT → resolve/mips → sorted-shell MRT → Review output。产品仍为 Quick3D bootstrap；产品替换由 R10D 执行。当前图集、AO、景深、SMAA、目标格式、共享硬件深度和 816-byte uniform 按 [rhi-postprocess.md](rhi-postprocess.md) 执行；以下 752-byte/RGBA32F 描述保留 R10B 历史验收边界。本契约补充 [rhi-opaque.md](rhi-opaque.md)，不把本轮 Review 窗口当作完整播放器。
+`YalahooRhi` 的 `RhiItem` 在不可变 Input / SceneFrame 边界上实现 shadow → opaque MRT → resolve/mips → sorted-shell MRT → Review output。生产场景已使用同一 RHI 实现，接入/测量和研究隔离见 [rhi-integration.md](rhi-integration.md)。当前图集、AO、景深、SMAA、目标格式、共享硬件深度和 816-byte uniform 按 [rhi-postprocess.md](rhi-postprocess.md) 执行；以下 752-byte/RGBA32F 描述保留 R10B 历史验收边界。本契约补充 [rhi-opaque.md](rhi-opaque.md)，不把本轮 Review 窗口当作完整播放器。
 
 所有 Review、运行与证据重建遵守 [测试窗口契约](test-window-policy.md)：非视觉检查隐藏，必须 exposed 的真实 GPU 窗口在首次 show 前置底且不接受焦点，不提高 Z 顺序、不激活用户桌面；报告包含实际 windowPolicy。普通播放器默认窗口不受测试策略影响。
 

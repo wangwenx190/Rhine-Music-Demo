@@ -35,8 +35,12 @@ if(WIN32)
     )
 endif()
 if(YALAHOO_REVIEW)
+    set(rhi_performance_arguments)
+    if(YALAHOO_PERFORMANCE_RECORD_ONLY)
+        list(APPEND rhi_performance_arguments --record-performance)
+    endif()
     add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
-        "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
+        "${CMAKE_BINARY_DIR}/verification/rhi-postprocess" ${rhi_performance_arguments})
     set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 420
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC=1"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
@@ -592,4 +596,16 @@ if(WIN32)
         ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
     )
+endif()
+
+if(YALAHOO_REVIEW)
+    add_test(NAME runtime-rhi-integration COMMAND Yalahoo --verify-integration
+        "${CMAKE_BINARY_DIR}/verification/rhi-integration/ctest")
+    set_tests_properties(runtime-rhi-integration PROPERTIES TIMEOUT 90
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC="
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+    if(WIN32)
+        set_tests_properties(runtime-rhi-integration PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
 endif()

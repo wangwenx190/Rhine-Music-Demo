@@ -23,6 +23,7 @@ qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 option(YALAHOO_REVIEW "Enable deterministic geometry review in the application" OFF)
+option(YALAHOO_PERFORMANCE_RECORD_ONLY "Record Review performance without enforcing numeric targets" OFF)
 include(cmake/RhiProbe.cmake)
 
 add_subdirectory(src/core)

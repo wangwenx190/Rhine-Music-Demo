@@ -1,4 +1,10 @@
 #include "RhiItem.h"
+#include "PreparedAssets.h"
+#include "ResourceInventory.h"
+#include "ResourcePlan.h"
+#include <QPointer>
+#include <chrono>
+#include <limits>
 #include "RhiApi.h"
 #include "ShellMaterial.h"
 #include "Postprocess.h"
@@ -94,18 +100,28 @@ struct Pending
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
 {
-    auto bytes = assets::readFile(QString::fromLatin1(path));
+    const auto bytes = preparedAssets().bytes.value(QString::fromLatin1(path));
     require(bytes.size() == expected, "Invalid RHI float lookup bytes");
-#if Q_BYTE_ORDER == Q_BIG_ENDIAN
-    for (qsizetype i = 0; i < bytes.size(); i += 4) {
-        const auto word = qFromLittleEndian<quint32>(bytes.constData() + i);
-        std::memcpy(bytes.data() + i, &word, 4);
-    }
-#endif
     return bytes;
 }
 QImage imageOf(const QRhiReadbackResult &r, bool yUp, bool uploaded = false)
 {
+    if (r.format == QRhiTexture::R16F) {
+        QImage image(r.pixelSize, QImage::Format_RGBA8888);
+        require(r.data.size() == image.width() * image.height() * 2, "Invalid R16F readback");
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x) {
+                qfloat16 half;
+                const int sourceY = yUp ? image.height() - 1 - y : y;
+                std::memcpy(&half, r.data.constData() + (sourceY * image.width() + x) * 2, 2);
+                const float value = float(half);
+                require(std::isfinite(value), "Nonfinite scalar AO pixel");
+                const int gray = std::clamp(int(std::lround(value * 255)), 0, 255);
+                // Expand the invariant channels for the same diagnostic PNG contract.
+                image.setPixelColor(x, y, QColor(gray, gray, gray, 255));
+            }
+        return image;
+    }
     if (r.format == QRhiTexture::R32F) {
         QImage image(r.pixelSize, QImage::Format_RGBA8888);
         require(r.data.size() == image.width() * image.height() * 4, "Invalid R32F readback");
@@ -189,7 +205,12 @@ public:
     }
     void synchronize(QQuickRhiItem *item) override
     {
+        QElapsedTimer sync;
+        sync.start();
         auto *source = static_cast<RhiItem *>(item);
+        if (source->submission() == synchronizedSubmission)
+            return;
+        synchronizedSubmission = source->submission();
         const auto &sourceCover = source->input().cover;
         if (coverSourceKey != sourceCover.cacheKey()) {
             coverSourceKey = sourceCover.cacheKey();
@@ -200,17 +221,71 @@ public:
         input = source->input();
         deliver = source->captured;
         profile = source->profiled;
+        QPointer<RhiItem> guard(source);
+        failed = [guard](QString message) {
+            if (guard)
+                QMetaObject::invokeMethod(
+                        guard,
+                        [guard, message] {
+                            if (guard)
+                                emit guard->renderFailed(message);
+                        },
+                        Qt::QueuedConnection);
+        };
         distinctThread = QThread::currentThread() != source->thread();
         // Keep one owned cover snapshot per revision. The queue owns accepted tile pixels;
         // rejected/replayed uploads need no deep copy while the GUI is blocked in synchronize.
         input.cover = detachedCover;
         if (input.atlasGeneration && atlasGeneration == input.atlasGeneration)
             atlasQueue.enqueue(input.atlasUploads);
+        synchronizationMs = sync.nsecsElapsed() / 1e6;
     }
-    void initialize(QRhiCommandBuffer *) override;
-    void render(QRhiCommandBuffer *cb) override;
+    void initialize(QRhiCommandBuffer *cb) override
+    {
+        if (failedRenderer)
+            return;
+        try {
+            prepareResources(cb);
+        } catch (const std::exception &error) {
+            reportFailure(error.what());
+        }
+    }
+    void render(QRhiCommandBuffer *cb) override
+    {
+        if (failedRenderer)
+            return;
+        try {
+            renderFrame(cb);
+        } catch (const std::exception &error) {
+            reportFailure(error.what());
+        }
+    }
 
 private:
+    void prepareResources(QRhiCommandBuffer *cb);
+    void renderFrame(QRhiCommandBuffer *cb);
+    QJsonObject resourceInventory();
+    void reportFailure(const char *message)
+    {
+        std::fprintf(stderr, "RHI rendering failed: %s\n", message);
+        failedRenderer = true;
+        if (failed)
+            failed(QString::fromUtf8(message));
+    }
+    std::function<void(QString)> failed;
+    bool failedRenderer = false;
+    qint64 previousResourceBytes = 0;
+    quint64 inventoryGeneration = 0, inventoryPostRevision = 0;
+    QJsonObject cachedInventory, allocationPlan;
+    struct AllocationKey
+    {
+        QSize size, cover;
+        int shadow = 0, samples = 0, aoSamples = 0;
+        float aoResolution = 0;
+        bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false;
+        bool operator==(const AllocationKey &) const = default;
+    };
+    AllocationKey allocationKey;
     void reset();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
                     QRhiTexture::Format format = QRhiTexture::RGBA16F,
@@ -225,6 +300,8 @@ private:
                        QRhiShaderResourceBindings *bindings, Mesh mesh, quint32 offset, int count);
     QRhi *api = nullptr;
     Input input;
+    quint64 synchronizedSubmission = 0;
+    double synchronizationMs = 0;
     std::function<void(Capture)> deliver;
     std::function<void(QJsonObject)> profile;
     Target shadow, opaque, composite, aoGeometry, dofGeometry;
@@ -456,7 +533,7 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
     require(p->create(), "RHI graphics pipeline creation failed");
     return p;
 }
-void Renderer::initialize(QRhiCommandBuffer *)
+void Renderer::prepareResources(QRhiCommandBuffer *)
 {
     if (api != rhi()) {
         if (api && !pending.empty())
@@ -467,12 +544,37 @@ void Renderer::initialize(QRhiCommandBuffer *)
     }
     if (input.cover.isNull() && !input.atlasGeneration)
         return;
-    for (const auto format :
-         { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
-        require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
-                "Selected GPU lacks a required RHI target format");
-    require(api->isTextureFormatSupported(QRhiTexture::RGBA32F),
-            "Selected GPU lacks required float lookup textures");
+    const auto requestedSize = renderTarget()->pixelSize();
+    const auto requestedCover = input.atlasGeneration ? input.atlasSize : input.cover.size();
+    const AllocationKey key{ requestedSize,        requestedCover,  input.shadowSize,
+                             input.captureSamples, input.aoSamples, input.aoResolution,
+                             input.shells,         bool(deliver),   input.postprocess,
+                             input.bokeh,          input.smaa };
+    if (key != allocationKey || !vertices) {
+        for (const auto format :
+             { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
+            require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
+                    "Selected GPU lacks a required RHI target format");
+        require(api->isTextureFormatSupported(QRhiTexture::RGBA32F),
+                "Selected GPU lacks required float lookup textures");
+        if (input.postprocess && input.aoSamples)
+            require(api->isTextureFormatSupported(QRhiTexture::R16F, QRhiTexture::RenderTarget),
+                    "Selected GPU lacks the half-float scalar AO attachment");
+        const int maximum = api->resourceLimit(QRhi::TextureSizeMax);
+        require(qint64(requestedSize.width()) * requestedSize.height() <= 8294400
+                        && qMax(requestedSize.width(), requestedSize.height()) <= maximum
+                        && qMax(requestedCover.width(), requestedCover.height()) <= maximum
+                        && qMax(1, input.shadowSize) <= maximum,
+                "Requested resource plan exceeds GPU dimensions or target pixel protection");
+        require(api->supportedSampleCounts().contains(input.captureSamples),
+                "Requested resource plan uses unsupported MSAA");
+        qint64 geometryBytes = 11 * 32 + 15 * 4;
+        for (const auto &batch : preparedAssets().geometry)
+            geometryBytes += batch.vertices.size() * 32 + batch.indices.size() * 4;
+        allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
+                                      api->ubufAligned(sizeof(Uniform)), geometryBytes);
+        allocationKey = key;
+    }
     if (!vertices) {
         vertexBytes.clear();
         indexBytes.clear();
@@ -494,7 +596,7 @@ void Renderer::initialize(QRhiCommandBuffer *)
             }
             return mesh;
         };
-        const auto batches = assets::readGlb(assets::readFile(":/rhi/models/music-case-v040.glb"));
+        const auto &batches = preparedAssets().geometry;
         lid = append(batches[0]);
         spine = append(batches[1]);
         tray = append(batches[2]);
@@ -897,14 +999,14 @@ void Renderer::drawInstances(QRhiCommandBuffer *cb, QRhiGraphicsPipeline *p,
     cb->setVertexInput(0, 2, inputs.data(), indices.get(), 0, QRhiCommandBuffer::IndexUInt32);
     cb->drawIndexed(mesh.count, count, mesh.start);
 }
-void Renderer::render(QRhiCommandBuffer *cb)
+void Renderer::renderFrame(QRhiCommandBuffer *cb)
 {
     QElapsedTimer cpu;
     cpu.start();
     // initialize may precede synchronize in Qt; defer resource-size changes to a fresh frame.
     if (!api || (input.cover.isNull() && !input.atlasGeneration))
         return;
-    initialize(cb);
+    prepareResources(cb);
     pending.erase(std::remove_if(pending.begin(), pending.end(),
                                  [](const auto &p) {
                                      return p->remaining == 0;
@@ -914,16 +1016,8 @@ void Renderer::render(QRhiCommandBuffer *cb)
     if (uploadGeometry) {
         updates->uploadStaticBuffer(vertices.get(), vertexBytes);
         updates->uploadStaticBuffer(indices.get(), indexBytes);
-        const auto room =
-                floatTextureBytes(":/rhi/environment/room-pmrem.rgba32f", 768 * 1024 * 16);
-        QByteArray roomHalf(room.size() / 2, '\0');
-        for (qsizetype i = 0; i < room.size() / 4; ++i) {
-            float value;
-            std::memcpy(&value, room.constData() + i * 4, 4);
-            const qfloat16 half(value);
-            require(float(half) == value, "PMREM conversion would change source half-float values");
-            std::memcpy(roomHalf.data() + i * 2, &half, 2);
-        }
+        const auto roomHalf =
+                floatTextureBytes(":/rhi/environment/room-pmrem.rgba16f", 768 * 1024 * 8);
         updates->uploadTexture(environment.get(),
                                QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
                                        0, 0, QRhiTextureSubresourceUploadDescription(roomHalf)) }));
@@ -1271,7 +1365,7 @@ void Renderer::render(QRhiCommandBuffer *cb)
     cb->setShaderResources();
     cb->draw(3);
     cb->endPass();
-    if (deliver && input.request != capturedRequest) {
+    if (deliver && input.request != capturedRequest && pending.size() < 2) {
         capturedRequest = input.request;
         auto p = std::make_shared<Pending>();
         p->capture.request = input.request;
@@ -1390,16 +1484,87 @@ void Renderer::render(QRhiCommandBuffer *cb)
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{ { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
+                             { "synchronizationMs", synchronizationMs },
+                             { "frameRevision", qint64(input.scene.revision) },
+                             { "submission", qint64(synchronizedSubmission) },
+                             { "aoSamples", input.aoSamples },
+                             { "bokeh", input.bokeh },
+                             { "smaa", input.smaa },
+                             { "logicalWidth", input.scene.width },
+                             { "logicalHeight", input.scene.height },
+                             { "targetWidth", targetSize.width() },
+                             { "targetHeight", targetSize.height() },
+                             { "inputRevision", qint64(input.scene.inputRevision) },
+                             { "inputReceivedNs", input.scene.inputReceivedNs },
+                             { "submittedNs",
+                               qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                              std::chrono::steady_clock::now().time_since_epoch())
+                                              .count()) },
+                             { "coverSnapshotCopies", qint64(coverSnapshotCopies) },
+                             { "postprocessRevision", qint64(post.revision()) },
                              { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
                              { "atlasUploadBytes", frameUploadBytes },
                              { "uniformUploadBytes", qint64(cursor) },
                              { "resourceGeneration", qint64(generation) },
-                             { "visibleEntities", visibleCount } });
+                             { "visibleEntities", visibleCount },
+                             { "resources", resourceInventory() } });
     }
 }
+QJsonObject Renderer::resourceInventory()
+{
+    if (inventoryGeneration == generation && inventoryPostRevision == post.revision()
+        && !cachedInventory.isEmpty())
+        return cachedInventory;
+    ResourceInventory inventory;
+    auto target = [&](const QString &name, const Target &t) {
+        inventory.texture(name + "-color-resolve", t.color.get());
+        inventory.texture(name + "-normal", t.normal.get());
+        inventory.texture(name + "-linear-depth", t.depth.get());
+        inventory.texture(name + "-hardware-depth", t.hardwareDepth.get());
+        inventory.renderBuffer(name + "-depth-stencil", t.z.get());
+        for (int i = 0; i < 3; ++i)
+            inventory.texture(name + QString("-msaa-%1").arg(i), t.multisample[i].get());
+    };
+    target("shadow", shadow);
+    target("opaque", opaque);
+    target("shell-composite", composite);
+    target("ao-geometry", aoGeometry);
+    target("dof-geometry", dofGeometry);
+    inventory.texture("cover-or-atlas", cover.get());
+    inventory.texture("environment", environment.get());
+    inventory.texture("dfg", dfg.get());
+    inventory.texture("ltc1", ltc1.get());
+    inventory.texture("ltc2", ltc2.get());
+    inventory.buffer("geometry-vertices", vertices.get());
+    inventory.buffer("geometry-indices", indices.get());
+    inventory.buffer("bounded-draw-uniforms", uniforms.get());
+    inventory.buffer("bounded-instances", instanceBuffer.get());
+    inventory.buffer("output-uniform", outputUniform.get());
+    post.inventory(inventory);
+    inventory.texture("qt-item-color", colorTexture());
+    inventory.texture("qt-item-resolve", resolveTexture());
+    inventory.renderBuffer("qt-item-msaa", msaaColorBuffer());
+    inventory.renderBuffer("qt-item-depth-stencil", depthStencilBuffer());
+    const qint64 current = inventory.bytes();
+    cachedInventory = {
+        { "preallocationPlan", allocationPlan },
+        { "entries", inventory.entries() },
+        { "estimatedCurrentBytes", current },
+        { "resizeOldPlusNewUpperBoundBytes", current + previousResourceBytes },
+        { "measuredVramBytes", QJsonValue() },
+        { "scope",
+          "Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency." }
+    };
+    previousResourceBytes = current;
+    inventoryGeneration = generation;
+    inventoryPostRevision = post.revision();
+    return cachedInventory;
+}
+
 }
 RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {
+    preparedAssets();
     setAlphaBlending(false);
 }
 QJsonArray adapterInventory()
@@ -1457,6 +1622,7 @@ void RhiItem::submit(Input input, QSize target)
             ids.insert(id);
         }
     }
+    ++m_submission;
     m_input = std::move(input);
     setFixedColorBufferWidth(target.width());
     setFixedColorBufferHeight(target.height());

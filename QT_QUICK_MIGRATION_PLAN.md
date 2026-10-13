@@ -116,7 +116,7 @@
     components/             Header、字轮、滑尺和基础控件
     pages/                  Browse、Detail、Overview、Opening
     panels/                 搜索、设置、曲库、光照与动效面板
-    scene/                  View3D、模型、材质与后处理声明
+    scene/                  Review 的 Quick3D 模型、材质与后处理声明；生产使用 SceneItem
   resources/
     fonts/ models/ icons/ branding/ audio/ shaders/ manifests/
   tests/
@@ -214,7 +214,7 @@
 
 ### 首选管线与确定的补救路径
 
-- SceneAdapter 的产品接口固定，不因渲染实现变化修改 QML/导航。首选 Qt Quick 3D View3D + 自定义实例表 + CustomMaterial + Effect；不依赖 Qt 内部渲染类。
+- SceneAdapter 的产品接口固定，不因渲染实现变化修改 QML/导航。生产使用 QQuickRhiItem + QRhi/qsb；Qt Quick 3D View3D/CustomMaterial/Effect 仅用于 Review 来源对照。图形私有接口集中在 RHI 边界与能力探测，不进入 QML/导航。
 - 正常管线：阴影目标 → 不透明背景/纸面/结构与供透射采样的捕获 → 磨砂壳体合成 → SSAO合成 → 景深 → 按画质SMAA → 色调映射/输出；以冻结基线的实际通道顺序和例外为准。QML文字与阅读遮罩在三维合成之后，不参与景深。
 - Qt 的 SCREEN_TEXTURE/SCREEN_MIP_TEXTURE 不包含透明材质和使用该屏幕采样的物体；不得假设它会递归捕获其他玻璃。先采用与当前 Web 一致的屏幕空间近似，不要求真实光线追踪。
 - CustomMaterial 显式实现局部纸面 LOD、侧脊密度/高光、印刷光场和按主题混合；不只填 PrincipledMaterial 参数就宣布完成。Effect 移植基线 SSAO/Bokeh/SMAA 的有效算法及参数，避免 Qt 默认后处理改变画面。
@@ -224,10 +224,10 @@
 - 单盒材质的参数/线性捕获/局部 LOD/印刷限制、固定环境和重建命令以 `docs/contracts/materials.md` 为准，冻结源码与算法 hash 在 `materials.json`，资源清单在 `resources/manifests/materials.json`；同输入 fixture 为 `tests/fixtures/materials/single-case.json`。Windows 材质证据与残差在 `verification/windows/materials/`、成对图在 `docs/media/materials/`；平台矩阵在 `verification/macos-static/materials/` 和 `verification/linux-static/materials/`。后续灯光、图集与后处理接入保留纸面入射量、一次 ACES/一次 sRGB 输出和独立侧脊参数契约。
 - 阴影/SSAO/RenderQuality 的有效参数、seed=417 核、RGB24 线性深度/独立 view normal 预通道、四预设及 8.3MP 限制见 `docs/contracts/occlusion.md`；资源来源/hash 在 `resources/manifests/occlusion.json`，同输入为 `tests/fixtures/occlusion/`，Release 复建为 `tools/build/verify-r09.ps1`。Windows 证据和成对图在 `verification/windows/occlusion/`、`docs/media/occlusion/`，平台新增审计在各静态目录 `occlusion/`；公开阴影投影/偏置/滤波、Unshaded 壳体接收/邻盒透射与背景输出的具体后续输入以 `docs/contracts/occlusion-limitations.json` 为准。画质只改变渲染资源，不重建业务状态；后续实例池须向两个几何预通道供应同一实体 origin/位置。
 - 景深 41 点 Bokeh、SMAA 1x Medium/lookup、最终 ACES/sRGB 与三个固定公开 Effect 通道布局见 `docs/contracts/postprocess.md`；资源来源/hash 在 `resources/manifests/postprocess.json`，Release 复建为 `tools/build/verify-r09b.ps1`。Windows 九尺寸/双主题及真实 DPR 1/1.5/2 的 105 状态证据在 `verification/windows/postprocess/`、成对图和局部放大图在 `docs/media/postprocess/`；新增平台静态审计在各静态目录 `postprocess/`。原始画质开启实际几何 MSAA，高/极高追加 SMAA；纸面透射捕获边界及邻盒背景 ROI 的 R10 输入见 `docs/contracts/occlusion-limitations.json`，不能以 SSAA 诊断或整体模糊替代生产修复。
-- 渲染目的后端固定为 QQuickRhiItem + QRhi/qsb，实施边界为 R10A–R10D；接口、固定参数、源捕获语义及各项补修输入/验收见 `docs/contracts/render-backend.json`、`render-backend.md`。Windows 70 状态证据在 `verification/windows/render-backend/`、成对图在 `docs/media/render-backend/`。当前唯一运行实现仍为 Quick3D bootstrap，`SceneAdapter.renderBackendContract` 的 implementationReady=false，R10D 替换后更新；不把后端选择当作 RHI 已实现。R10 的历史图集 GPU 传输字节保持未知；当前 RHI 的实际 tile 目标传输字节以 `verification/windows/rhi-postprocess/` 为准，不把 CPU payload/调用次数当预算证据。不能直接删效果、自动降低默认画质或换成 WebEngine。
-- RHI 不透明基础、不可变 SceneFrame 同步、阴影实际 PCF/Vogel 算法、std140/qsb 和目标/读回所有权以 `docs/contracts/rhi-opaque.md` 为准，代码在 `src/render/rhi/`；历史 R10A 六 shader 证据在 `verification/windows/rhi-opaque/`、`docs/media/rhi-opaque/`，历史重建使用对应验收提交的 `tools/build/verify-r10a.ps1`。R10B 七 shader 历史复建同样使用对应验收提交。当前源树由 `tools/build/verify-r10c.ps1` 复建 24 shader 并回归不透明基础、材质与后处理，历史证据 hash 不回写。单采样基础检查不代表产品替换或完整后处理，SceneAdapter 产品 implementationReady 仍为 false。
+- 渲染目的后端固定为 QQuickRhiItem + QRhi/qsb，实施边界为 R10A–R10D；接口、固定参数、源捕获语义及各项补修输入/验收见 `docs/contracts/render-backend.json`、`render-backend.md`。Windows 70 状态证据在 `verification/windows/render-backend/`、成对图在 `docs/media/render-backend/`。生产唯一运行实现为 RHI SceneItem，`SceneAdapter.renderBackendContract` 的 implementationReady=true / activeImplementation=rhi；集成、纯值资源键/预载缓存、累计资源和输入/正常VSYNC帧入口按 `docs/contracts/rhi-integration.md` 执行。Quick3D oracle 只在 Review 构建打包，普通产品不链接 Quick3D 或打包第二套场景。R10 的历史图集 GPU 传输字节保持未知；当前 RHI 的实际 tile 目标传输字节以 `verification/windows/rhi-postprocess/` 为准，不把 CPU payload/调用次数当预算证据。不能直接删效果、自动降低默认画质或换成 WebEngine。
+- RHI 不透明基础、不可变 SceneFrame 同步、阴影实际 PCF/Vogel 算法、std140/qsb 和目标/读回所有权以 `docs/contracts/rhi-opaque.md` 为准，代码在 `src/render/rhi/`；历史 R10A 六 shader 证据在 `verification/windows/rhi-opaque/`、`docs/media/rhi-opaque/`，历史重建使用对应验收提交的 `tools/build/verify-r10a.ps1`。R10B 七 shader 历史复建同样使用对应验收提交。当前源树由 `tools/build/verify-r10c.ps1` 复建 24 shader 并回归不透明基础、材质与后处理，历史证据 hash 不回写。单采样基础检查不代表产品替换或完整后处理，生产接入与测量边界以 `rhi-integration.md` 为准，基础 Review 不等于完整播放器。
 - RHI 磨砂捕获、4× MSAA resolve/mips、局部纸面 LOD、显式三壳体材质、近到远不透明/远到近全局壳体稳定 ID 排序按 `docs/contracts/rhi-shell.md` 执行；当前 816-byte std140 保留 R10B 的 752-byte 前缀，新增边界按 `rhi-postprocess.md` 执行；源参数/hash 在 `resources/manifests/rhi-shell.json`。独立捕获不含透射壳体，独立合成目标禁止反馈；contain 可见边界由 centroid 几何 MSAA 抗锯齿，预乘滤波避免透明黑 texel 形成黑边。Windows 61 状态、原 58/59 邻盒通道及五 ROI 残差在 `verification/windows/rhi-shell/`、`docs/media/rhi-shell/`，对应静态矩阵在各平台 `rhi-shell/`。当前 61 pre-stage 与 50 final-output 同输入重放、五 ROI/轮廓和逐项残差在 `verification/windows/rhi-postprocess/`、`docs/media/rhi-postprocess/`，R10D 按当前及历史 `sourceIndex` / ROI 逐项复验；平均误差降低不等于所有 ROI 通过。
-- RHI 图集 generation/lease/serial、256² tile 的 2MiB 稳态/16MiB 初始化队列、112-byte 几何实例、独立 AO/DOF 几何、RGBA16F 颜色、32/64 原始核及 Bokeh/SMAA/一次输出以 `docs/contracts/rhi-postprocess.md`、`resources/manifests/rhi-postprocess.json` 为准。Windows 实际 D3D11 destination box/row pitch 和已完成 GPU 整页读回证明单 tile 262144 bytes、稳定帧零、稳态批次 2097152 bytes、初始化批次 16777216 bytes；不是物理总线流量。432 实例的 120 秒未限速原生呈现与 CPU 提交分别记录，GPU timestamp 在验收运行中不可用；系统 compositor 和产品交互仍由 R10D 验证。平台静态审计见各 `rhi-postprocess/`，用户实机步骤见 `docs/platforms/`。
+- RHI 图集 generation/lease/serial、256² tile 的 2MiB 稳态/16MiB 初始化队列、112-byte 几何实例、独立 AO/DOF 几何、RGBA16F 颜色、保持相同 half 精度的 R16F 标量AO、32/64 原始核及 Bokeh/SMAA/一次输出以 `docs/contracts/rhi-postprocess.md`、`resources/manifests/rhi-postprocess.json` 为准。Windows 实际 D3D11 destination box/row pitch 和已完成 GPU 整页读回证明单 tile 262144 bytes、稳定帧零、稳态批次 2097152 bytes、初始化批次 16777216 bytes；不是物理总线流量。432 实例的 120 秒未限速原生呈现与 CPU 提交分别记录，GPU timestamp 在验收运行中不可用；系统 compositor 和产品交互仍由 R10D 验证。平台静态审计见各 `rhi-postprocess/`，用户实机步骤见 `docs/platforms/`。
 - 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
 - R10A–R10D 的触发已由实际对照固定；后续轮次按合同执行，不再讨论框架选择。保持源屏幕空间透射近似：Three 音乐壳体为 FrontSide，不透明捕获同样不含透射壳体，不能误增递归玻璃捕获；修复对象为 shadow/resolve/排序/深度写入及各 ROI 残差。
 
@@ -267,6 +267,9 @@
 
 ### 性能与平台边界
 
+- 按用户明确修订，R10D 集成边界的性能实测为记录项，20ms 保留为参考而不阻止本轮完成或提交；结构/算法、功能、视觉、上传、资源与生命周期要求仍须通过。保留全部超限和环境不确定样本，不宣称实际性能已达标。复建使用显式 record-only 模式，普通 Review 默认仍保留历史数值门槛；完整产品预算与噪声按 R28 建立。
+
+
 - 按性能契约分开执行静态/算法审计、局部诊断和实际产品验收。保留Windows参考机60Hz、原始画质/1920×1080、预热后120秒混合交互p95≤20ms及稳定阶段不重复出现>50ms的目标；20ms是工程容差，不是稳定60fps证明。RHI关闭VSYNC的Review仅验收吞吐，不能替代正常VSYNC产品节奏和系统compositor。
 - 完整产品增加p99≤两个目标刷新周期的尾部目标（60Hz为33.33ms），逐场景报告一/两/三周期长帧、连续卡顿、输入收到→状态提交→对应帧提交及可测漏帧/显示延迟；不能以混合总p95覆盖局部失败。缺少真实显示时刻时标明估算/输入到Qt提交，R10D建立测量入口，R28前交付实际基线、噪声与各预算依据。
 - 原始画质两主题为主要目标，高/极高、大尺寸和DPR2另列压力结果及资源峰值，不能直接套用1080p门槛，也不能省略检查。冷启动、封面就绪、扫描交接、稳定、重载、恢复分开采集，固定片头时长单列；准备期仍检查输入响应/队列，禁止扩大准备期排除卡顿或无限推迟就绪。
@@ -294,19 +297,12 @@
 
 以下量级为熟悉C++/Qt的开发者有效开发日估算，不等同于聊天轮次时长。每轮只处理一个主要子系统和一个明确集成边界；达不到退出条件时拆出具体补修轮次，不把额外系统一起塞入本轮。
 
-### R10D · 条件轮次：渲染替换集成与跨后端探测（0.5–1日）
-
-- 依赖R10C。SceneAdapter接入RHI，保留projectWorldPoint/hitTest/SceneFrame合同，产品只打包选定后端。
-- 用同一fixture在 Windows 实机重新跑R06–R10（含R09B）检查；至少本机D3D11与可用OpenGL探测。Metal/Linux 代码及 qsb 变体纳入 R31/R32 严格静态审计，真实后端验证留待用户执行。
-- 性能设计与验证：接入前审计现有RHI热路径和同步边界，消除重复快照/计算、可见数量导致的资源重建及无界暂存。交付累计GPU资源清单、正常VSYNC帧事件、输入revision对应帧与原始样本入口，区分Review吞吐和产品节奏；同输入验证受影响效果，完整GUI未实现的场景不能记为通过。
-- 退出：QML/导航无后端判断，图形私有接口集中隔离；原Quick3D研究代码不成为第二套生产状态。
-
 ### R11 · 封面解码、缓存、图集与所有权（1–1.5日）
 
 - 依赖R10或触发时R10D。交付CoverCache、AtlasAllocator、SelectedCoverLease与异步请求测试。
 - QImageReader优先在解码时缩放，固定3并发/16MiB完成缓存；按contain+1/64留边绘制，tile UV钳制到最外像素中心，透明留白保留。
 - 选中与归位各持独立租约；先复用已解码图，再补清晰度。新槽未上传不得显示旧专辑封面；重建后晚到结果不能发布。
-- 按选定后端落实上传预算；Quick3D整页上传若仍超限，补执行R10A–R10D，不允许临时全图重传留下长期卡顿。
+- 按当前 RHI 后端落实图集 generation/lease/serial 与实际 tile 上传预算，不允许以临时整页重传替代局部更新或留下长期卡顿。
 - 性能设计与验证：按目标ID/清晰度合并请求，在复制/解码前淘汰过期generation；待解码、在途像素、完成LRU和上传队列独立限制。发布一次不可变像素，检查展开峰值/缩放支持、96张合成大图的队列与就绪时间及输入响应；不能靠无限排队守上传限额。稳定帧不重复复制、解码或上传。
 - 退出：横/竖/方封面、连续换目标、缺图和关闭竞态通过；像素载荷与真实提交统计分开。
 
@@ -465,7 +461,7 @@
 - 加载提示期间准备模型、可见封面与真实渲染通道；提交两帧初始化目标后才启动开场时钟。扫描完成发生在准备中时，只应用一个一致快照，交接后再允许普通更新。
 - 隐藏暂停视觉tick/封面上传/非必要扫描通知，播放继续；恢复清统计时间而不清状态。重载/退出取消旧generation，资源释放幂等，QObject/GPU销毁顺序明确。
 - 用96张合成大封面和超432匿名库验证预算；不以关景深/降低默认画质解决冷启动，必须消除重复解码、全图上传和重复实例创建。
-- 性能设计与验证：先收口已有子系统PERF-01–07及具体缺陷，不能集中到本轮才首次发现架构问题。交付R10D输入/呈现测量的实际基线、各阶段预算依据和累计资源清单；固定场景正常VSYNC/未限速串行分开采集，至少三次并保留失败/原始样本，临界不稳定项列具体补修任务。
+- 性能设计与验证：先收口已有子系统PERF-01–07及具体缺陷，不能集中到本轮才首次发现架构问题。 先用同 Kit/设备/fixture 和独立正常 VSYNC/吞吐样本解释 R10D 的 18.35/20.98ms 观测差异，记录并发 GPU 占用与测量噪声、确认预算依据；不得把 R10D 的记录项视为性能达标。交付R10D输入/呈现测量的实际基线、各阶段预算依据和累计资源清单；固定场景正常VSYNC/未限速串行分开采集，至少三次并保留失败/原始样本，临界不稳定项列具体补修任务。
 - 退出：性能契约、10次重建/30次换片资源回落通过；初始化耗时与稳定帧数据各自记录。
 
 ### R29 · 全GUI成对重放与视觉差异修复（1.5–2日）
@@ -480,7 +476,7 @@
 ### R30 · Windows部署、普通启动器与干净环境验证（1–1.5日）
 
 - 依赖R29。交付Release目录、部署脚本、根目录Windows普通启动器及Qt使用说明。
-- `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，部署 Qt Quick 3D、Multimedia 及 Qt 随附媒体依赖；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
+- `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，按生产导入与链接闭包部署 Qt Quick、Multimedia 及 Qt 随附媒体依赖，生产不打包 Quick3D 研究场景/插件；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
 - 接入 R03B 原创 ICO 到 Windows 可执行资源，Qt 窗口图标及关于页使用同源 SVG/PNG；显示名 `yalahOO!!!`、输出文件 `yalahoo.exe`。实机检查 Explorer、窗口/任务栏及大/小尺寸图标；macOS ICNS/bundle 和 Linux desktop 图标由 R31/R32 按同一品牌清单接入并静态审计。
 - 用无Qt开发PATH、无Node/FFmpeg路径的临时环境运行；验证离线启动、demo、unicode音乐路径、设备列表、可支持样本和字体加载。
 - 普通启动器只找合法安装/构建产物并启动Qt程序，不后台启动Web服务；演示/光照启动器继续在tools/launchers/。
