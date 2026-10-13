@@ -47,6 +47,8 @@ protected:
     bool event(QEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void touchEvent(QTouchEvent *event) override;
 
 private:
     void schedule();
@@ -77,5 +79,7 @@ private:
     QString m_errorText;
     bool m_geometryOnly = false;
     bool m_telemetryEnabled = false;
+    std::optional<QPointF> m_touchStart;
+    quint64 m_touchTimestamp = 0;
 };
 }

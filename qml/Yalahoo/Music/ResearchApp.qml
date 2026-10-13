@@ -12,6 +12,7 @@ ApplicationWindow {
     property bool sceneReview: false
     property bool geometryProbe: false
     property bool verificationRun: false
+    property string preferencesError: ""
     property int verificationFlags: Qt.Window
     flags: verificationRun ? verificationFlags : Qt.Window
     width: 960

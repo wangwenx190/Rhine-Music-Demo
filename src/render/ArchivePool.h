@@ -33,7 +33,9 @@ public:
     int columnCount() const;
     int rowCount(double lane) const;
     double rowPeriod() const;
-    void update(ArchiveCell center);
+    const QList<LibraryColumn> &columns() const;
+    QString realAlbumAt(ArchiveCell cell) const;
+    void update(ArchiveCell center, const std::array<double, lanes> *columnRows = nullptr);
     const std::array<ArchiveInstance, capacity> &instances() const;
 
 private:

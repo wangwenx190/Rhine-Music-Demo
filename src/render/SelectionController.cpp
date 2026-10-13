@@ -35,7 +35,8 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
             const auto path = album.coverUrl.scheme() == QLatin1String("qrc")
                     ? QStringLiteral(":") + album.coverUrl.path()
                     : album.coverUrl.toLocalFile();
-            m_coverSources.insert(album.id, { path, album.title.left(256) });
+            if (!m_coverSources.contains(album.id))
+                m_coverSources.insert(album.id, { path, album.title.left(256) });
         }
     m_returning.clear();
     m_poolObjects.clear();
@@ -43,6 +44,11 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
     m_origin = { 0, 0 };
     m_cell = m_pool.location(oldId).value_or(
             m_pool.location(firstId).value_or(ArchiveCell{ 0, 12 }));
+    QList<int> counts;
+    for (const auto &column : m_pool.columns())
+        counts.append(int(column.albumIds.size()));
+    m_realColumns.reset(counts, m_cell);
+    m_memory.reset(m_pool.columns());
     m_lift.finish(m_liftTarget);
     m_rotation = 0;
     m_returnY.reset();
@@ -62,7 +68,75 @@ QPair<QString, QString> SelectionController::coverSource(const QString &id) cons
 }
 QString SelectionController::albumId() const
 {
-    return m_pool.albumAt(m_cell);
+    return m_realistic ? m_pool.realAlbumAt(m_cell) : m_pool.albumAt(m_cell);
+}
+bool SelectionController::realistic() const
+{
+    return m_realistic;
+}
+const RealColumns &SelectionController::realColumns() const
+{
+    return m_realColumns;
+}
+double SelectionController::browseRow(int lane) const
+{
+    return m_realistic ? m_realColumns.row(lane)
+            : m_motion ? (-m_motion->rail() - 2.17) / .62 + 15.5
+                       : m_cell.row;
+}
+bool SelectionController::rememberColumnPosition() const
+{
+    return m_memory.enabled;
+}
+void SelectionController::setRememberColumnPosition(bool enabled)
+{
+    if (enabled == m_memory.enabled)
+        return;
+    m_memory.enabled = enabled;
+    if (enabled && m_pool.columnCount())
+        m_memory.remember(
+                m_pool.columns()[ArchivePool::wrap(m_cell.lane, m_pool.columnCount())].key,
+                albumId());
+    emit memoryChanged();
+}
+NavigationAvailability SelectionController::navigationAvailability() const
+{
+    const auto location = m_pool.location(albumId());
+    return location
+            ? NavigationAvailability::at(m_pool.rowCount(location->lane), int(location->row - 12),
+                                         m_pool.columnCount(), m_realistic)
+            : NavigationAvailability{ };
+}
+bool SelectionController::canMovePrevious() const
+{
+    return navigationAvailability().previous;
+}
+bool SelectionController::canMoveNext() const
+{
+    return navigationAvailability().next;
+}
+void SelectionController::setRealistic(bool realistic)
+{
+    if (m_realistic == realistic || !m_motion)
+        return;
+    const auto canonical = m_pool.location(albumId());
+    const auto old = m_cell;
+    const double displayed = (-m_motion->rail() - 2.17) / .62 + 15.5;
+    m_realistic = realistic;
+    m_cell = canonical.value_or(ArchiveCell{ 0, 12 });
+    const ArchiveCell shift{ old.lane - m_cell.lane, old.row - m_cell.row };
+    m_motion->translate({ shift.row * .62, -shift.lane * 5.2, -shift.row, -shift.lane });
+    QList<int> counts;
+    for (const auto &column : m_pool.columns())
+        counts.append(int(column.albumIds.size()));
+    m_realColumns.reset(counts, m_cell, displayed - shift.row);
+    m_origin = { 0, 0 };
+    m_returning.clear();
+    m_poolObjects.clear();
+    m_pulses.clear();
+    emit arrayModeChanged();
+    publish();
+    emit selectionChanged();
 }
 ArchiveCell SelectionController::cell() const
 {
@@ -91,6 +165,8 @@ bool SelectionController::select(const QString &id)
         return false;
     // The period is the actual column length, never the display-pool row count.
     const auto canonical = *location;
+    if (m_realistic)
+        return selectCell(canonical, true);
     const auto count = m_pool.rowCount(canonical.lane);
     return selectCell(
             { ArchivePool::nearestOccurrence(canonical.lane, m_cell.lane, m_pool.columnCount()),
@@ -99,27 +175,56 @@ bool SelectionController::select(const QString &id)
 }
 bool SelectionController::moveRow(int direction)
 {
-    if (direction != 1 && direction != -1)
+    if (!navigationAvailability().allowsRow(direction))
         return false;
     return selectCell({ m_cell.lane, m_cell.row + direction });
 }
 bool SelectionController::moveLane(int direction)
 {
-    if (direction != 1 && direction != -1)
+    if ((direction != 1 && direction != -1) || !navigationAvailability().left)
         return false;
     const double lane = m_cell.lane + direction;
-    const auto id = m_pool.albumAt({ lane, m_cell.row });
-    const auto canonical = m_pool.location(id);
-    if (!canonical)
+    return enterColumn(int(lane), false);
+}
+bool SelectionController::enterColumn(int lane, bool guided)
+{
+    if (!m_motion || !m_pool.columnCount())
         return false;
-    return selectCell({ lane, m_cell.row });
+    const int canonicalLane = ArchivePool::wrap(lane, m_pool.columnCount());
+    const auto &column = m_pool.columns()[canonicalLane];
+    if (column.albumIds.isEmpty())
+        return false;
+    const auto remembered = m_pool.location(m_memory.recalled(column.key));
+    double row;
+    if (remembered && remembered->lane == canonicalLane)
+        row = m_realistic ? remembered->row
+                          : ArchivePool::nearestOccurrence(remembered->row, m_cell.row,
+                                                           m_pool.rowCount(canonicalLane));
+    else
+        row = std::floor(browseRow(canonicalLane) + .5);
+    if (m_realistic)
+        row = std::clamp(row, 12.0, double(11 + column.albumIds.size()));
+    const double physicalLane = m_realistic ? double(canonicalLane)
+            : guided ? ArchivePool::nearestOccurrence(canonicalLane, m_motion->column() / 5.2 + 2,
+                                                      m_pool.columnCount())
+                     : double(lane);
+    return selectCell({ physicalLane, row }, guided);
+}
+bool SelectionController::navigateRow(double row)
+{
+    if (!std::isfinite(row))
+        return false;
+    // Slider/touch/detail callers share the same finite boundary as directional input.
+    if (m_realistic && (row < 12 || row >= 12 + m_pool.rowCount(m_cell.lane)))
+        return false;
+    return selectCell({ m_cell.lane, row });
 }
 bool SelectionController::selectCell(ArchiveCell cell, bool guided)
 {
     if (!m_motion || !std::isfinite(cell.lane) || !std::isfinite(cell.row)
         || std::abs(cell.lane) > 1e12 || std::abs(cell.row) > 1e12
         || std::floor(cell.lane) != cell.lane || std::floor(cell.row) != cell.row
-        || m_pool.albumAt(cell).isEmpty())
+        || (m_realistic ? m_pool.realAlbumAt(cell) : m_pool.albumAt(cell)).isEmpty())
         return false;
     if (cell == m_cell)
         return true;
@@ -142,6 +247,10 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
                   m_selectedObject });
     const auto old = m_cell;
     m_cell = cell;
+    m_memory.remember(m_pool.columns()[ArchivePool::wrap(cell.lane, m_pool.columnCount())].key,
+                      albumId());
+    if (m_realistic)
+        m_realColumns.select(cell, guided, m_detail > .99);
     m_lastInteraction = m_time;
     m_lift = previous ? previous->lift : ScalarSpring{ };
     m_rotation = previous ? previous->rotation : 0;
@@ -192,6 +301,20 @@ double SelectionController::field(double row, double lane) const
     if (!m_motion)
         return 0;
     const bool reduced = m_motion->reducedMotion();
+    if (m_realistic) {
+        const double activity = m_realColumns.activity(int(lane));
+        double height =
+                reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
+        if (!reduced && activity > 0) {
+            double ripple = 0;
+            for (const auto &pulse : m_pulses)
+                if (pulse.cell.lane == lane)
+                    ripple +=
+                            musicSelectionWave(std::abs(row - pulse.cell.row), m_time - pulse.time);
+            height += std::clamp(ripple, -.24, .24) * m_pulseGain * activity;
+        }
+        return height + settlingWave(row - m_realColumns.row(int(lane)), 26.56) * activity;
+    }
     double height = 0;
     if (m_scanBlend != 0)
         height += archiveWave(row + m_origin.row, lane + m_origin.lane, m_scanTime) * m_scanBlend;
@@ -218,7 +341,8 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     const auto offset = displayOffset();
     matrix.translate(float((cell.lane - m_cell.lane) * 5.2 - offset[1]),
                      float(-4.6 + field(cell.row, cell.lane) + lift),
-                     float((cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
+                     float(m_realistic ? (cell.row - m_realColumns.row(int(cell.lane))) * .62 - 2.17
+                                       : (cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
     const double quality = smooth(lift / .4);
     const double pitch = slope * .024 * (1 - m_detail) * (1 - quality);
     // Evaluate Three's XYZ rotation in double, then round each matrix element once.
@@ -270,7 +394,7 @@ QQuaternion SelectionController::selectedRotation() const
 ArchiveCell SelectionController::rebase()
 {
     ArchiveCell shift{ 0, 0 };
-    if (!m_motion)
+    if (!m_motion || m_realistic)
         return shift;
     const double period = m_pool.rowPeriod();
     const int lanes = qMax(1, m_pool.columnCount());
@@ -318,6 +442,8 @@ void SelectionController::advance(double dt)
         m_motion->observe(springs, targets, rates);
     }
     m_time += dt;
+    if (m_realistic)
+        m_realColumns.update(dt, reduced);
     m_scanTime += dt;
     m_scanBlend *= std::exp(-dt * 3);
     m_pulses.removeIf([&](const Pulse &p) {
@@ -367,7 +493,13 @@ void SelectionController::publish()
     if (!m_motion)
         return;
     const auto offset = displayOffset();
-    m_pool.update({ m_cell.lane + offset[1] / 5.2, m_cell.row - offset[0] / .62 });
+    const ArchiveCell center{ m_cell.lane + offset[1] / 5.2, m_cell.row - offset[0] / .62 };
+    std::array<double, ArchivePool::lanes> rows;
+    if (m_realistic)
+        for (int index = 0; index < ArchivePool::lanes; ++index)
+            rows[index] = m_realColumns.row(
+                    int(ArchivePool::visibleCell(index * ArchivePool::rows, center).lane));
+    m_pool.update(center, m_realistic ? &rows : nullptr);
     QVector<ArchiveInstance> next;
     next.reserve(ArchivePool::capacity + 4);
     QHash<QPair<qint64, qint64>, quint64> objects;

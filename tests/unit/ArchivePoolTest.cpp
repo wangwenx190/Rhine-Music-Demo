@@ -111,7 +111,7 @@ private slots:
         QCOMPARE(selection.cell().lane, 3);
         QVERIFY(selection.select(QStringLiteral("1:0")));
         QCOMPARE(selection.cell().lane, 1);
-        QCOMPARE(selection.cell().row, 14);
+        QCOMPARE(selection.cell().row, 12);
     }
     void frozenWaveFormulae()
     {

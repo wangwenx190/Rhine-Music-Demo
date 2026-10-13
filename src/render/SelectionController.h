@@ -2,6 +2,8 @@
 #include "ArchivePool.h"
 #include "MotionController.h"
 #include "SceneFrame.h"
+#include "RealColumns.h"
+#include "ColumnMemory.h"
 #include <QPointer>
 
 namespace yalahoo {
@@ -9,6 +11,10 @@ class SelectionController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString albumId READ albumId NOTIFY selectionChanged)
+    Q_PROPERTY(bool realistic READ realistic WRITE setRealistic NOTIFY arrayModeChanged)
+    Q_PROPERTY(bool rememberColumnPosition READ rememberColumnPosition WRITE setRememberColumnPosition NOTIFY memoryChanged)
+    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY selectionChanged)
+    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY selectionChanged)
 public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
     void setColumns(QList<LibraryColumn> columns, Snapshot snapshot = { });
@@ -21,6 +27,17 @@ public:
     Q_INVOKABLE bool select(const QString &id);
     Q_INVOKABLE bool moveRow(int direction);
     Q_INVOKABLE bool moveLane(int direction);
+    Q_INVOKABLE bool enterColumn(int lane, bool guided = true);
+    Q_INVOKABLE bool navigateRow(double row);
+    bool realistic() const;
+    void setRealistic(bool realistic);
+    bool rememberColumnPosition() const;
+    void setRememberColumnPosition(bool enabled);
+    NavigationAvailability navigationAvailability() const;
+    bool canMovePrevious() const;
+    bool canMoveNext() const;
+    double browseRow(int lane) const;
+    const RealColumns &realColumns() const;
     bool selectCell(ArchiveCell cell, bool guided = false);
     void setLift(double lift);
     void setDetail(double detail);
@@ -38,6 +55,8 @@ signals:
     void frameChanged();
     void coordinatesRebased(double lane, double row);
     void libraryChanged();
+    void arrayModeChanged();
+    void memoryChanged();
 
 private:
     struct Copy
@@ -59,6 +78,9 @@ private:
     QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0) const;
     QPointer<MotionController> m_motion;
     ArchivePool m_pool;
+    RealColumns m_realColumns;
+    ColumnMemory m_memory;
+    bool m_realistic = false;
     QHash<QString, QPair<QString, QString>> m_coverSources;
     ArchiveCell m_cell, m_origin;
     QVector<ArchiveInstance> m_instances;

@@ -22,6 +22,9 @@ void SceneAdapter::setSelection(SelectionController *selection)
     m_selectionRevision = 0;
     if (selection) {
         connect(selection, &SelectionController::frameChanged, this, &SceneAdapter::publish);
+        connect(selection, &SelectionController::arrayModeChanged, this, [this] {
+            m_lighting.ribbon.reset();
+        });
         connect(selection, &SelectionController::coordinatesRebased, this,
                 [this](double lane, double row) {
                     m_lighting.ribbon.row.translate(-row);
@@ -245,7 +248,8 @@ void SceneAdapter::publish()
     if (m_selection) {
         m_frame.caseTransform.rotate(m_selection->selectedRotation());
         const auto cell = m_selection->cell();
-        setLightingInput({ caseOrigin, cell.row, cell.lane }, m_selection->selectedRotation());
+        setLightingInput({ caseOrigin, cell.row, cell.lane, m_selection->realistic() },
+                         m_selection->selectedRotation());
     }
     emit frameChanged();
 }

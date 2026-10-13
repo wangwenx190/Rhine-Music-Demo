@@ -12,6 +12,7 @@ ApplicationWindow {
     property bool sceneReview: false
     property bool geometryProbe: false
     property bool verificationRun: false
+    property string preferencesError: ""
     property int verificationFlags: Qt.Window
     flags: verificationRun ? verificationFlags : Qt.Window
     width: 960
@@ -46,9 +47,12 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 20
-        visible: nativeScene.errorText.length > 0 || window.sceneAdapter.quality.limited
-        text: nativeScene.errorText.length > 0 ? "图形配置不可用：" + nativeScene.errorText :
-                                                 "输出达到尺寸保护上限，画质设置保持原值。"
+        visible: window.preferencesError.length > 0 || nativeScene.errorText.length > 0
+                 || window.sceneAdapter.quality.limited
+        text: window.preferencesError.length > 0 ? window.preferencesError :
+                                                   nativeScene.errorText.length > 0 ? "图形配置不可用："
+                                                                                      + nativeScene.errorText :
+                                                                                      "输出达到尺寸保护上限，画质设置保持原值。"
         color: "#a13328"
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)
@@ -94,6 +98,23 @@ ApplicationWindow {
                 window.sceneAdapter.recordInput();
                 window.sceneAdapter.lighting.night = !window.sceneAdapter.lighting.night;
             }
+        }
+        CheckBox {
+            visible: window.sceneAdapter.selection !== null
+            text: "真实专辑列"
+            checked: window.sceneAdapter.selection ? window.sceneAdapter.selection.realistic : false
+            onToggled: if (window.sceneAdapter.selection) {
+                           window.sceneAdapter.selection.realistic = checked;
+                       }
+        }
+        CheckBox {
+            visible: window.sceneAdapter.selection !== null
+            text: "保留每列浏览位置"
+            checked: window.sceneAdapter.selection
+                     ? window.sceneAdapter.selection.rememberColumnPosition : true
+            onToggled: if (window.sceneAdapter.selection) {
+                           window.sceneAdapter.selection.rememberColumnPosition = checked;
+                       }
         }
         Button {
             objectName: "interactionProbe"

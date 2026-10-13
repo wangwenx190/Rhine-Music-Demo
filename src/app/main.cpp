@@ -3,6 +3,7 @@
 #include "LibrarySession.h"
 #include "MotionController.h"
 #include "OfflineMetadataProvider.h"
+#include "PreferencesStore.h"
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
@@ -64,6 +65,8 @@ int main(int argc, char **argv)
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native Qt runtime probe"));
     parser.addHelpOption();
+    parser.addOption({ QStringLiteral("data-dir"), QStringLiteral("Override the native data root"),
+                       QStringLiteral("directory") });
     parser.addOption({ QStringLiteral("verify-runtime"),
                        QStringLiteral("Write runtime evidence and exit"),
                        QStringLiteral("report") });
@@ -172,6 +175,22 @@ int main(int argc, char **argv)
             || parser.isSet(QStringLiteral("verify-integration"))
 #endif
             ;
+    std::unique_ptr<yalahoo::PreferencesStore> preferences;
+    if (!verificationRun) {
+        const QString dataRoot = parser.isSet(QStringLiteral("data-dir"))
+                ? parser.value(QStringLiteral("data-dir"))
+                : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
+        selection.setRememberColumnPosition(preferences->rememberColumnPosition());
+        selection.setRealistic(preferences->realistic());
+        const auto saveNavigation = [&] {
+            preferences->setNavigation(selection.rememberColumnPosition(), selection.realistic());
+        };
+        QObject::connect(&selection, &yalahoo::SelectionController::memoryChanged,
+                         preferences.get(), saveNavigation);
+        QObject::connect(&selection, &yalahoo::SelectionController::arrayModeChanged,
+                         preferences.get(), saveNavigation);
+    }
     if (!verificationRun || parser.isSet(QStringLiteral("verify-filled"))) {
         // Local resource-only demonstration until the scanner is delivered in R21.
         yalahoo::LibrarySnapshot demo;
@@ -215,6 +234,7 @@ int main(int argc, char **argv)
               { "librarySession", QVariant::fromValue(&library) },
               { "motionController", QVariant::fromValue(&motion) },
               { "sceneAdapter", QVariant::fromValue(&scene) },
+              { "preferencesError", preferences ? preferences->error() : QString() },
               { "geometryProbe",
                 parser.isSet(QStringLiteral("verify-runtime"))
                         && !parser.isSet(QStringLiteral("verify-shading")) } });
@@ -235,6 +255,11 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+    if (preferences)
+        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,
+                         [window](const QString &error) {
+                             window->setProperty("preferencesError", error);
+                         });
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;

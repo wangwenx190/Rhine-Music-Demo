@@ -1,5 +1,20 @@
 # macOS · 用户实机验证清单
 
+## 真实列、导航与偏好（R13 实机待验证）
+
+本阶段结论：**静态审计通过，实机待用户验证**。逐项调用链与内容 hash 在 `verification/macos-static/real-columns/`；实现契约见 [real-columns.md](../contracts/real-columns.md)。目标机使用最新原生 Kit 执行：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R '^(real-columns|archive-pool|lighting|motion|source-format)$' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+GPU 源码对照须先用已冻结 Web 开发依赖执行 `node tools/review/export-real-columns-golden.mjs`（仅生成匿名测试输入，应用运行不需要 Node），再执行 `QSG_RHI_BACKEND=metal ctest --preset qt-release -R '^real-columns-gpu$' --output-on-failure`。Review 工具保持置底/不接受焦点，PNG 仅来自自身 GPU 读回。核对真实 Metal 后端、sourceMatrixError≤1e-6、sourceSsim≥0.97、sourceMae≤6、稳定零上传、双主题资源复用与隐藏/重建；不能用 Windows 或 Windows OpenGL 报告填入目标机结果。
+
+完成后以 `cmake --preset qt-release -DYALAHOO_REVIEW=OFF` 恢复生产 Release，重建并执行全部 CTest。用户主动启动 `build/release/bin/yalahoo.app/Contents/MacOS/yalahoo --data-dir "$PWD/verification/manual-navigation"`：验证演示库真实/填充切换、首尾键盘/滚轮边界、独立列居中与记忆开关，关闭后重开只恢复开关，不恢复列位。若有触摸设备，再测逻辑像素阈值与首尾；检查本机 Unicode/空格路径和损坏 preferences.json 保留/报错。完整长列的 49/106 张输入由 Review 入口验证。实际编译、窗口管理器、DPR、GPU、偏好写入与触摸结果：待用户填写。
+
 R02 结论：**静态审计通过，实机待用户验证**。矩阵见 `verification/macos-static/audit-matrix.json`。以下均未在 macOS 执行，真实结果由用户填写；完整产品和 macdeployqt 部署在 R31 接入。
 
 安装本机最新原生 Qt Desktop Kit（包含 Core/Gui/Qml/Quick/QuickControls2/QuickDialogs2/Quick3D/Multimedia/Concurrent/Svg/ShaderTools/Test/QuickTest）、Xcode C++23 工具链、CMake 与 Ninja。默认枚举 `$HOME/Qt`、`/opt/Qt`、`/usr/local/Qt`；自定义安装根使用 `YALAHOO_QT_ROOTS`。仅使用当前主机的单一原生架构。

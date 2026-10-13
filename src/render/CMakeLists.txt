@@ -10,6 +10,10 @@ qt_add_library(
     ArchivePool.h
     SelectionController.cpp
     SelectionController.h
+    RealColumns.cpp
+    RealColumns.h
+    ColumnMemory.cpp
+    ColumnMemory.h
     RowLightController.cpp
     RowLightController.h
     SelectionLighting.cpp

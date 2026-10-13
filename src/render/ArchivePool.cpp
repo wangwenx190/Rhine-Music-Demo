@@ -2,6 +2,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <QSet>
 
 namespace yalahoo {
 int ArchivePool::wrap(double value, int count)
@@ -31,6 +32,18 @@ ArchiveCell ArchivePool::visibleCell(int index, ArchiveCell center)
 void ArchivePool::setColumns(QList<LibraryColumn> columns)
 {
     m_columns = std::move(columns);
+    QSet<QString> identities;
+    for (int lane = 0; lane < m_columns.size(); ++lane) {
+        auto &column = m_columns[lane];
+        if (column.key.isEmpty())
+            column.key = QStringLiteral("lane:%1").arg(lane);
+        column.albumIds.removeIf([&](const QString &id) {
+            if (id.isEmpty() || identities.contains(id))
+                return true;
+            identities.insert(id);
+            return false;
+        });
+    }
     m_locations.clear();
     m_rowPeriod = 1;
     for (int lane = 0; lane < m_columns.size(); ++lane) {
@@ -70,12 +83,27 @@ double ArchivePool::rowPeriod() const
 {
     return m_rowPeriod;
 }
-void ArchivePool::update(ArchiveCell center)
+const QList<LibraryColumn> &ArchivePool::columns() const
+{
+    return m_columns;
+}
+QString ArchivePool::realAlbumAt(ArchiveCell cell) const
+{
+    if (!std::isfinite(cell.lane) || !std::isfinite(cell.row) || cell.lane < 0
+        || cell.lane >= m_columns.size() || std::floor(cell.lane) != cell.lane
+        || std::floor(cell.row) != cell.row)
+        return { };
+    const auto &ids = m_columns[int(cell.lane)].albumIds;
+    return cell.row >= 12 && cell.row < 12 + ids.size() ? ids[int(cell.row - 12)] : QString();
+}
+void ArchivePool::update(ArchiveCell center, const std::array<double, lanes> *columnRows)
 {
     for (int i = 0; i < capacity; ++i) {
         auto &instance = m_instances[i];
         instance.cell = visibleCell(i, center);
-        instance.albumId = albumAt(instance.cell);
+        if (columnRows)
+            instance.cell.row = nearestOccurrence(poolCell(i).row, (*columnRows)[i / rows], rows);
+        instance.albumId = columnRows ? realAlbumAt(instance.cell) : albumAt(instance.cell);
         instance.objectId = quint64(i + 1);
         instance.owned = false;
     }

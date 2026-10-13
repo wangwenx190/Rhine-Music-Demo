@@ -5,6 +5,8 @@
 #include <QMutexLocker>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QKeyEvent>
+#include <QTouchEvent>
 #include <memory>
 #include <limits>
 
@@ -13,6 +15,9 @@ SceneItem::SceneItem(QQuickItem *parent)
     : RhiItem(parent), m_cover(256, 256, QImage::Format_RGBA8888_Premultiplied)
 {
     setAcceptedMouseButtons(Qt::LeftButton);
+    setAcceptTouchEvents(true);
+    setFlag(QQuickItem::ItemIsFocusScope, true);
+    setFocus(true);
     m_cover.fill(Qt::transparent);
     m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
     connect(&m_covers, &CoverCache::ready, this, [this](CoverSnapshot pixels) {
@@ -320,6 +325,7 @@ void SceneItem::mousePressEvent(QMouseEvent *event)
     }
     const auto hit = m_adapter->hitTest(event->position().x(), event->position().y());
     if (!hit.isEmpty()) {
+        forceActiveFocus(Qt::MouseFocusReason);
         m_adapter->recordInput();
         event->setAccepted(m_adapter->selection()->selectCell(
                 { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true));
@@ -337,6 +343,67 @@ void SceneItem::wheelEvent(QWheelEvent *event)
     event->setAccepted(std::abs(delta.x()) > std::abs(delta.y())
                                ? m_adapter->selection()->moveLane(delta.x() > 0 ? -1 : 1)
                                : m_adapter->selection()->moveRow(delta.y() > 0 ? -1 : 1));
+}
+void SceneItem::keyPressEvent(QKeyEvent *event)
+{
+    if (!m_adapter || !m_adapter->selection()) {
+        event->ignore();
+        return;
+    }
+    auto *selection = m_adapter->selection();
+    bool accepted = false;
+    switch (event->key()) {
+    case Qt::Key_Up:
+        accepted = selection->moveRow(-1);
+        break;
+    case Qt::Key_Down:
+        accepted = selection->moveRow(1);
+        break;
+    case Qt::Key_Left:
+        accepted = selection->moveLane(-1);
+        break;
+    case Qt::Key_Right:
+        accepted = selection->moveLane(1);
+        break;
+    default:
+        event->ignore();
+        return;
+    }
+    if (accepted)
+        m_adapter->recordInput();
+    event->setAccepted(accepted);
+}
+void SceneItem::touchEvent(QTouchEvent *event)
+{
+    if (event->type() == QEvent::TouchCancel) {
+        m_touchStart.reset();
+        event->accept();
+        return;
+    }
+    if (!m_adapter || !m_adapter->selection() || event->points().size() != 1) {
+        m_touchStart.reset();
+        event->ignore();
+        return;
+    }
+    const auto point = event->points().first().position();
+    if (event->type() == QEvent::TouchBegin) {
+        m_touchStart = point;
+        m_touchTimestamp = event->timestamp();
+    } else if (event->type() == QEvent::TouchEnd && m_touchStart) {
+        const auto delta = point - *m_touchStart;
+        m_touchStart.reset();
+        const double major = std::max(std::abs(delta.x()), std::abs(delta.y()));
+        const double minor = std::min(std::abs(delta.x()), std::abs(delta.y()));
+        if (major >= 36 && major >= minor * 1.3 && event->timestamp() - m_touchTimestamp <= 1400) {
+            auto *selection = m_adapter->selection();
+            const bool accepted = std::abs(delta.x()) > std::abs(delta.y())
+                    ? selection->moveLane(delta.x() > 0 ? -1 : 1)
+                    : selection->moveRow(delta.y() > 0 ? -1 : 1);
+            if (accepted)
+                m_adapter->recordInput();
+        }
+    }
+    event->accept();
 }
 void SceneItem::updatePolish()
 {

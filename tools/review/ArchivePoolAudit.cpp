@@ -13,6 +13,9 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QFile>
+#include <QKeyEvent>
+#include <QSet>
+#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <cstdio>
@@ -51,7 +54,11 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
+        return 2;
+    const bool real =
+            argc == 3 && QString::fromLocal8Bit(argv[2]) == QLatin1String("--real-columns");
+    if (argc == 3 && !real)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
@@ -60,7 +67,25 @@ int main(int argc, char **argv)
         SelectionController selection(&motion);
         SceneAdapter adapter(motion.clock());
         auto snapshot = library(10000);
-        selection.setColumns(orderLibrary(*snapshot, SortMode::Genre).columns, snapshot);
+        if (real) {
+            const QList<int> counts{ 0, 1, 2, 3, 49, 106 };
+            QList<LibraryColumn> columns;
+            LibrarySnapshot finite;
+            for (int lane = 0; lane < counts.size(); ++lane) {
+                LibraryColumn column;
+                column.key = QString::number(lane);
+                for (int row = 0; row < counts[lane]; ++row) {
+                    const auto album = snapshot->albums[lane * 10000 + row];
+                    column.albumIds.append(album.id);
+                    finite.albums.append(album);
+                }
+                columns.append(column);
+            }
+            snapshot = std::make_shared<const LibrarySnapshot>(std::move(finite));
+            selection.setRealistic(true);
+            selection.setColumns(columns, snapshot);
+        } else
+            selection.setColumns(orderLibrary(*snapshot, SortMode::Genre).columns, snapshot);
         adapter.setSelection(&selection);
         adapter.layout()->setViewport(960, 640);
         QQuickWindow window;
@@ -169,6 +194,126 @@ int main(int argc, char **argv)
         const auto stable = capture("stable");
         require(stable.metadata["atlasUploadBytes"].toInteger() == 0,
                 "Stable pool uploaded covers again");
+        if (real) {
+            QFile source(QStringLiteral(FIXTURE_ROOT
+                                        "/verification/windows/real-columns/frozen-fields.json"));
+            require(source.open(QIODevice::ReadOnly), "Rebuild frozen finite-column field input");
+            const auto fields =
+                    QJsonDocument::fromJson(source.readAll()).object()["fields"].toArray();
+            QHash<QString, QJsonObject> byCell;
+            for (auto value : fields) {
+                const auto field = value.toObject();
+                byCell.insert(QStringLiteral("%1:%2")
+                                      .arg(field["lane"].toInt())
+                                      .arg(field["row"].toInt()),
+                              field);
+            }
+            QSet<QString> identities;
+            auto sourceInput = item->input();
+            double matrixError = 0;
+            for (int index = 0; index < sourceInput.scene.instances.size(); ++index) {
+                const auto &instance = sourceInput.scene.instances[index];
+                require(!identities.contains(instance.albumId), "Finite album repeated");
+                identities.insert(instance.albumId);
+                const auto key = QStringLiteral("%1:%2")
+                                         .arg(int(instance.cell.lane))
+                                         .arg(int(instance.cell.row));
+                require(byCell.contains(key), "Nonexistent finite cell was drawn");
+                const auto field = byCell.value(key);
+                const double lift = instance.owned ? .9 : 0;
+                QMatrix4x4 pose;
+                pose.translate(float((instance.cell.lane - 1) * 5.2),
+                               float(-4.6 + field["height"].toDouble() + lift),
+                               float((instance.cell.row - field["depth"].toDouble()) * .62 - 2.17));
+                const double pitch = lift > 0 ? 0 : field["slope"].toDouble() * .024;
+                QMatrix4x4 rotation;
+                rotation(1, 1) = float(std::cos(pitch));
+                rotation(1, 2) = float(-std::sin(pitch));
+                rotation(2, 1) = float(std::sin(pitch));
+                rotation(2, 2) = float(std::cos(pitch));
+                pose *= rotation;
+                for (int component = 0; component < 16; ++component)
+                    matrixError = std::max(
+                            matrixError,
+                            std::abs(double(pose.constData()[component]
+                                            - sourceInput.entities[index].constData()[component])));
+                sourceInput.entities[index] = pose;
+            }
+            require(matrixError <= 1e-6, "Finite transform differs from frozen field");
+            const auto sourceCapture = capture("finite-frozen-source", sourceInput);
+            const auto image = compareImages(
+                    stable.postprocessed, sourceCapture.postprocessed,
+                    QPolygonF(QRectF(QPointF(), QSizeF(stable.postprocessed.size()))));
+            require(image["valid"].toBool() && image["ssim"].toDouble() >= .97
+                            && image["meanAbsoluteRgb"].toDouble() <= 6,
+                    "Frozen finite-column image differs");
+            const auto generation = stable.metadata["resourceGeneration"];
+            QKeyEvent boundary(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+            QCoreApplication::sendEvent(item, &boundary);
+            require(!boundary.isAccepted() && selection.albumId() == QLatin1String("1:0"),
+                    "Single-column keyboard boundary wrapped");
+            selection.setLift(0);
+            require(selection.select("5:105"), "Cannot select last finite album");
+            motion.finish();
+            selection.advance(2.4);
+            waitPrepared();
+            const auto last = settledCapture("finite-last");
+            require(last.metadata["resourceGeneration"] == generation,
+                    "Finite visibility rebuilt targets");
+            require(!selection.moveRow(1) && !selection.navigateRow(118),
+                    "Finite tail navigation wrapped");
+            QWheelEvent wheel({ 480, 320 }, { 480, 320 }, { }, { 0, -120 }, Qt::NoButton,
+                              Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(item, &wheel);
+            require(!wheel.isAccepted(), "Finite wheel boundary wrapped");
+            require(selection.moveLane(-1), "Finite column navigation failed");
+            selection.advance(.2);
+            const double unfinished = selection.browseRow(5);
+            selection.setRememberColumnPosition(false);
+            require(selection.moveLane(1), "Cannot return to finite recovering column");
+            require(selection.cell().row == std::floor(unfinished + .5),
+                    "Return ignored actual column depth");
+            motion.finish();
+            selection.advance(3);
+            waitPrepared();
+            const auto nightBefore = settledCapture("finite-return");
+            adapter.lighting()->setNight(true);
+            const auto night = settledCapture("finite-night");
+            require(night.metadata["resourceGeneration"] == generation,
+                    "Theme rebuilt finite targets");
+            window.hide();
+            window.releaseResources();
+            window.show();
+            waitPrepared();
+            const auto restored = settledCapture("finite-restored");
+            const auto rebuild =
+                    compareImages(night.postprocessed, restored.postprocessed,
+                                  QPolygonF(QRectF(QPointF(), QSizeF(night.postprocessed.size()))));
+            require(rebuild["valid"].toBool() && rebuild["ssim"].toDouble() >= .999,
+                    "Finite restore lost geometry or cover leases");
+            selection.setColumns({ });
+            const auto empty = settledCapture("finite-empty");
+            require(empty.metadata["drawCount"].toInt() == 0,
+                    "Finite empty library retained draws");
+            QJsonObject report{ { "passed", true },
+                                { "realColumns", true },
+                                { "sourceMatrixError", matrixError },
+                                { "sourceSsim", image["ssim"] },
+                                { "sourceMae", image["meanAbsoluteRgb"] },
+                                { "rebuildSsim", rebuild["ssim"] },
+                                { "stable", stable.metadata },
+                                { "last", last.metadata },
+                                { "night", night.metadata },
+                                { "empty", empty.metadata },
+                                { "covers", item->coverStatistics() },
+                                { "windowPolicy", verification::windowPolicy(window) },
+                                { "submissionSamples", submissionSamples } };
+            QSaveFile reportFile(output + "/runtime.json");
+            require(reportFile.open(QIODevice::WriteOnly), "Cannot write finite audit");
+            reportFile.write(QJsonDocument(report).toJson());
+            require(reportFile.commit(), "Cannot commit finite audit");
+            return 0;
+        }
         require(stable.metadata["drawCount"].toInt() == 432, "Large library changed pool capacity");
         require(stable.metadata["visibleEntities"].toInt() < 432, "Pool visibility was not culled");
         const auto generation = stable.metadata["resourceGeneration"];

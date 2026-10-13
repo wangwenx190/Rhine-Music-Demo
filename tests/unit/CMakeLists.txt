@@ -45,6 +45,15 @@ if(WIN32)
     )
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME real-columns-gpu COMMAND archive-pool-audit
+        "${CMAKE_BINARY_DIR}/verification/real-columns" --real-columns)
+    set_tests_properties(real-columns-gpu PROPERTIES TIMEOUT 240
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+    if(WIN32)
+        set_tests_properties(real-columns-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     add_test(NAME archive-pool-gpu COMMAND archive-pool-audit
         "${CMAKE_BINARY_DIR}/verification/archive-pool")
     set_tests_properties(archive-pool-gpu PROPERTIES TIMEOUT 240
@@ -636,6 +645,16 @@ if(YALAHOO_REVIEW)
     endif()
 endif()
 qt_add_executable(ArchivePoolTest ArchivePoolTest.cpp)
+qt_add_executable(RealColumnsTest RealColumnsTest.cpp)
+target_link_libraries(RealColumnsTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(RealColumnsTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_platform(RealColumnsTest)
+add_test(NAME real-columns COMMAND RealColumnsTest)
+set_tests_properties(real-columns PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(real-columns PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 target_link_libraries(ArchivePoolTest PRIVATE YalahooScene Qt6::Test)
 target_compile_definitions(ArchivePoolTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 yalahoo_platform(ArchivePoolTest)
