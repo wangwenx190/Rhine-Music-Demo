@@ -1,4 +1,12 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(AtlasUploadTest AtlasUploadTest.cpp)
+target_link_libraries(AtlasUploadTest PRIVATE YalahooRhi Qt6::Test)
+yalahoo_platform(AtlasUploadTest)
+add_test(NAME rhi-atlas-queue COMMAND AtlasUploadTest)
+if(WIN32)
+    set_tests_properties(rhi-atlas-queue PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 qt_add_executable(VerificationWindowTest VerificationWindowTest.cpp)
 target_include_directories(VerificationWindowTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(VerificationWindowTest PRIVATE Qt6::Gui Qt6::Test)
@@ -27,6 +35,15 @@ if(WIN32)
     )
 endif()
 if(YALAHOO_REVIEW)
+    add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
+        "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
+    set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 420
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC=1"
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+    if(WIN32)
+        set_tests_properties(rhi-postprocess-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    endif()
     add_test(
         NAME
         runtime-rhi-shell-quick3d

@@ -1,8 +1,11 @@
 #version 440
+#ifndef AREA_ENABLED
+#  define AREA_ENABLED 1
+#endif
 #extension GL_GOOGLE_include_directive : require
 #include "frame.glsl"
 layout(binding = 2) uniform sampler2D environmentMap;
-layout(binding = 3) uniform sampler2D shadowMap;
+layout(binding = 3) uniform sampler2DShadow shadowMap;
 layout(binding = 4) uniform sampler2D captureMap;
 layout(binding = 5) uniform sampler2D dfgMap;
 layout(binding = 6) uniform sampler2D ltc1Map;
@@ -17,31 +20,16 @@ layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normalOut;
 layout(location = 2) out vec4 depthOut;
 #include "shadow-filter.glsl"
+float keyShadow;
 // BEGIN SHARED LIGHTING
 // Shared field, diffuse and shell transport from frozen music-lighting.ts (MIT).
 float musicRowField(vec3 origin)
 {
-    float row =
-            (origin.z - f.rowColumn.xyz.z - f.rowSettings.w * .62) / (.5 * f.rowSettings.z * .62);
-    float lane = (origin.x - f.rowColumn.xyz.x) / 27.0;
-    float lane2 = lane * lane;
-    return exp(-0.6931471805599453 * row * row) * exp(-lane2 * lane2 * lane2);
+    return f.originLight0.x;
 }
 float musicPrintExposure(vec3 origin)
 {
-    vec3 distance = (origin - f.lightColumn.xyz) / vec3(6.0, 3.35, 5.5);
-    float printLight = exp(-dot(distance, distance));
-    float baseline = mix(f.settings.x, 1.0, printLight);
-    if (f.rowSettings.x < .5)
-        return baseline;
-    float ambient = max(.08, f.settings.x * .5);
-    float fillAmount = f.rowSettings.x > 1.5 && f.rowSettings.x < 2.5 ? f.settings.z : 0.0;
-    float fieldAmbient = mix(ambient, baseline, fillAmount);
-    float fieldExposure =
-            mix(fieldAmbient, 1.0, clamp(f.rowSettings.y * musicRowField(origin), 0.0, 1.0));
-    float areaExposure = mix(ambient, f.settings.x, .25);
-    float shelf = f.rowSettings.x < 1.5 ? areaExposure : fieldExposure;
-    return mix(shelf, baseline, f.settings.y);
+    return f.originLight0.y;
 }
 vec3 musicSpot(vec3 position)
 {
@@ -55,7 +43,7 @@ vec3 musicIrradiance(vec3 position, vec3 normal)
 {
     vec3 hemi =
             mix(f.groundColor.xyz, f.skyColor.xyz, .5 * normal.y + .5) * f.lightIntensities.xyz.y;
-    vec3 key = f.keyColor.xyz * f.lightIntensities.xyz.x * shadowFactor()
+    vec3 key = f.keyColor.xyz * f.lightIntensities.xyz.x * keyShadow
             * max(0.0, dot(normal, normalize(vec3(-6, 14, -5))));
     vec3 fill = vec3(f.lightIntensities.xyz.z * max(0.0, dot(normal, normalize(vec3(7, 8, -10)))));
     vec3 spot =
@@ -64,14 +52,9 @@ vec3 musicIrradiance(vec3 position, vec3 normal)
 }
 vec3 musicShell(vec3 original, vec3 origin, vec3 local, vec3 normal, vec3 view, int shellSurface)
 {
-    float laneDistance = abs(origin.x - f.lightColumn.xyz.x);
-    float core = exp(-pow(laneDistance / 3.2, 4.0));
-    float spill = exp(-pow(laneDistance / 7.2, 4.0));
-    float laneLight = .58 * core + .42 * spill;
-    float rowLight = exp(-pow((origin.z - f.lightColumn.xyz.z) / 5.5, 2.0));
-    float hot = exp(-pow((origin.z - f.lightColumn.xyz.z) / 1.1, 2.0));
-    float neighbor = exp(-pow((origin.z - f.lightColumn.xyz.z) / 2.4, 2.0));
-    float guided = .58 * core * mix(.12, 1.0, rowLight) + .42 * spill * neighbor;
+    float laneLight = f.originLight0.z;
+    float guided = f.originLight0.w;
+    float hot = f.originLight1.x;
     float edgeTransport = exp(-max(0.0, local.x + 2.225) * 1.7);
     float panelHeight = clamp((local.y - .175) / 3.35, 0.0, 1.0);
     float topRim = exp(-max(0.0, 3.525 - local.y) * 24.0);
@@ -220,6 +203,8 @@ vec3 musicBRDF(vec3 n, vec3 v, vec3 l, float r, vec3 f0, bool multiscatter)
     vec3 h = normalize(l + v);
     float nl = max(dot(n, l), 0.0), nv = max(dot(n, v), 0.0), nh = max(dot(n, h), 0.0),
           vh = max(dot(v, h), 0.0);
+    if (nl == 0.0)
+        return vec3(0);
     float a = r * r, aa = a * a;
     float gv = nl * sqrt(aa + (1.0 - aa) * nv * nv), gl = nv * sqrt(aa + (1.0 - aa) * nl * nl);
     float visibility = .5 / max(gv + gl, 1e-6), d = nh * nh * (aa - 1.0) + 1.0;
@@ -236,7 +221,7 @@ vec3 musicBRDF(vec3 n, vec3 v, vec3 l, float r, vec3 f0, bool multiscatter)
 }
 vec3 musicSpecular(vec3 n, vec3 v, vec3 position, float r, vec3 f0, bool multiscatter)
 {
-    return f.keyColor.xyz * f.lightIntensities.xyz.x * shadowFactor()
+    return f.keyColor.xyz * f.lightIntensities.xyz.x * keyShadow
             * musicBRDF(n, v, normalize(vec3(-6, 14, -5)), r, f0, multiscatter)
             + vec3(f.lightIntensities.xyz.z)
             * musicBRDF(n, v, normalize(vec3(7, 8, -10)), r, f0, multiscatter)
@@ -565,6 +550,8 @@ vec3 environmentBRDF(float dotNV, float r, vec3 f0)
 void main()
 {
     vec3 n = normalize(worldNormal);
+    keyShadow = (f.areaTarget.w > .5) && dot(n, normalize(vec3(-6, 14, -5))) > 0.0 ? shadowFactor()
+                                                                                   : 1.0;
     vec3 v = normalize(f.camera.xyz - world);
     float nv = max(0.0, dot(n, v));
     vec3 tint = f.tint.rgb;
@@ -585,8 +572,10 @@ void main()
     vec3 diffuse = tint * (1.0 - singleScatter - multiScatter) * irradiance;
     vec3 direct = (f.areaTarget.w > .5) ? musicIrradiance(world, n) : vec3(1);
     vec3 areaDiffuse = vec3(0), areaSpecular = vec3(0);
+#if AREA_ENABLED
     if ((f.areaTarget.w > .5) && f.areaPosition.w > 0.0)
         musicArea(n, v, world, r, f0, areaDiffuse, areaSpecular);
+#endif
     diffuse += tint * (direct + areaDiffuse);
     vec3 specular = radiance * singleScatter + multiScatter * irradiance;
     if ((f.areaTarget.w > .5))
@@ -613,11 +602,13 @@ void main()
             * environmentBRDF(nv, cr, vec3(0.04));
     if ((f.areaTarget.w > .5)) {
         coat += musicSpecular(n, v, world, cr, vec3(.04), false);
+#if AREA_ENABLED
         if (f.areaPosition.w > 0.0) {
             vec3 unused, areaCoat;
             musicArea(n, v, world, cr, vec3(.04), unused, areaCoat);
             coat += areaCoat;
         }
+#endif
     }
     float fresnel = 0.04 + 0.96 * exp2((-5.55473 * nv - 6.98316) * nv);
     outgoing = outgoing * (1.0 - f.coat.x * fresnel) + f.coat.x * coat;

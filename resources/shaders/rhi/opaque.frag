@@ -3,12 +3,16 @@
 #include "frame.glsl"
 layout(binding = 1) uniform sampler2D coverMap;
 layout(binding = 2) uniform sampler2D environmentMap;
-layout(binding = 3) uniform sampler2D shadowMap;
+layout(binding = 3) uniform sampler2DShadow shadowMap;
 layout(location = 0) centroid in vec2 paperUv;
 layout(location = 1) in vec3 world;
 layout(location = 2) in vec3 worldNormal;
 layout(location = 3) in vec3 viewNormal;
 layout(location = 4) in float viewDepth;
+layout(location = 5) in vec3 localPosition;
+layout(location = 6) flat in vec4 entityLight0;
+layout(location = 7) flat in vec4 entityLight1;
+layout(location = 8) flat in vec4 entityCoverUv;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normalOut;
 layout(location = 2) out vec4 depthOut;
@@ -36,12 +40,13 @@ void main()
         color = normalOut;
         return;
     }
-    vec2 size = vec2(textureSize(coverMap, 0));
+    vec2 size = f.paperSize.xy;
     vec2 extent = (1.0 - 2.0 / 64.0) * size / max(size.x, size.y);
     vec2 uv = (paperUv - .5) / extent + .5;
     if (any(lessThan(uv, vec2(0))) || any(greaterThan(uv, vec2(1))))
         discard;
-    vec4 ink = texture(coverMap, clamp(uv, .5 / size, 1.0 - .5 / size));
+    vec2 tileUv = entityCoverUv.xy + clamp(uv, .5 / size, 1.0 - .5 / size) * entityCoverUv.zw;
+    vec4 ink = texture(coverMap, tileUv);
     if (ink.a < .025)
         discard;
     ink.rgb /= ink.a;
@@ -52,9 +57,10 @@ void main()
     }
     vec3 irradiance =
             musicIrradiance(world, n) + textureCubeUV(environmentMap, n, 1.0).rgb * f.settings.w;
-    irradiance -= f.keyColor.rgb * f.lightIntensities.x
-            * max(0.0, dot(n, normalize(vec3(-6, 14, -5)))) * (1.0 - shadowFactor())
-            / 3.141592653589793;
+    float keyCosine = max(0.0, dot(n, normalize(vec3(-6, 14, -5))));
+    if (keyCosine > 0.0)
+        irradiance -= f.keyColor.rgb * f.lightIntensities.x * keyCosine * (1.0 - shadowFactor())
+                / 3.141592653589793;
     color = vec4(
             min(source * max(irradiance, vec3(0)), source) * musicPrintExposure(f.model[3].xyz), 1);
 }

@@ -30,5 +30,9 @@ layout(std140, binding = 0) uniform Frame
     vec4 areaPosition; // intensity in w
     vec4 areaTarget;
     vec4 scatter; // strength in w
+    vec4 coverUv; // normalized atlas rectangle; full image for standalone covers
+    vec4 paperSize; // logical cover pixel size, not atlas page dimensions
+    vec4 originLight0; // row field, print exposure, lane light, guided light (per entity)
+    vec4 originLight1; // hot ribbon; remaining components reserved
 }
 f;

@@ -6,7 +6,7 @@ GUI 调用 `submit(Input, targetSize)`；Input 含 SceneAdapter 的不可变 Sce
 
 RHI 私有头和所有 QRhi 类型仅在 `src/render/rhi/` 与 CMake 能力探针中使用。顶层从自动选出的最新 Kit 查找 GuiPrivate；每次配置重新编译探针，不缓存前一个 Kit 的通过状态，不固定 Qt minor/patch。平台选择在 Review 入口分别为 Windows D3D11、macOS Metal、Linux OpenGL；产品仍使用自己的现有平台入口。
 
-本契约的不透明基础为 shadow → opaque-color/normal/depth → Review output；当前磨砂扩展的 capture/resolve/mips → sorted-shell、稳定身份和真实 MSAA 边界按 [rhi-shell.md](rhi-shell.md) 执行。R10A 的独立通道对照仍是单采样，不把它当作完整后处理验收；AO/DOF/AA 与局部图集上传由 R10C 接入。
+本契约的不透明基础为 shadow → opaque-color/normal/depth → Review output；当前磨砂扩展的 capture/resolve/mips → sorted-shell、稳定身份和真实 MSAA 边界按 [rhi-shell.md](rhi-shell.md) 执行。R10A 的独立通道对照仍是单采样，不把它当作完整后处理验收；当前目标格式、816-byte uniform、112-byte 几何实例、图集和 AO/DOF/AA 按 [rhi-postprocess.md](rhi-postprocess.md) 执行；以下 R10A/R10B 的格式与大小描述保留对应历史验收边界。
 
 阴影目标为 RGBA32F canonical-depth + 独立硬件深度附件，颜色、法线、RGB24 线性深度为三个独立 RGBA32F MRT + 硬件深度附件。所有目标在硬件尺寸和 8,294,400 像素约束下创建，失败明确报错；阴影使用 RenderQuality 的 1024/2048/4096 选择，不悄悄改变用户设置。Renderer 为源 FrontSide 的 shadow pass 使用 Front cull，只有 Optical_Diffuser 投射阴影。阴影 bounds [-16,16,-15,15,.1,45]，光源 (-6,14,-5) 指向原点；接收侧世界法向偏移 .035、canonical-depth bias -.0003、strength .32、radius 4。
 
@@ -14,10 +14,10 @@ RHI 私有头和所有 QRhi 类型仅在 `src/render/rhi/` 与 CMake 能力探�
 
 三组壳体直接从已有 GLB 的 POSITION/NORMAL/TEXCOORD/indices 读取，复用 R03 有界解析器；没有重建模型或轴翻转。源节点变换为 identity，实体矩阵只应用一次。纸面 3.06 方形、(.17,1.85,.027)，contain + 1/64 透明留白、alphaTest .025、像素中心 clamp 保持 R07。源 RGBA8 是 sRGB，经一次解码后，沿 R07 的 musicPrintExposure、musicIrradiance 与固定 Room PMREM 输出线性 diffuse，不加白、不自发光、不做纸面 ACES。纸面透明处不写任何颜色/法线/深度。`tools/assets/prepare-rhi-shaders.ps1` 从 R07 准备共享 math，只有 uniform 名适配，不复制未接入的壳体算法。
 
-R10A 原始 frame.glsl std140 block 为 560 bytes；当前 R10B 保留其前缀并扩展为 752 bytes，C++ static_assert 核对大小与偏移，每 draw 采用设备对齐的动态 offset。vertex 属性为位置/法向/UV 的 32-byte stride，shader 的每个 binding/location 显式声明。原六个基础 qsb 与新增 shell qsb 均编译 SPIR-V、GLSL330、GLSL ES300、HLSL50、MSL12；变体生成来自同一已选 Kit，不表示 Metal/GL GPU 已执行。
+R10A 原始 frame.glsl std140 block 为 560 bytes；R10B 保留其前缀并扩展为 752 bytes，C++ static_assert 核对大小与偏移，每 draw 采用设备对齐的动态 offset。vertex 属性为位置/法向/UV 的 32-byte stride，shader 的每个 binding/location 显式声明。原六个基础 qsb 与新增 shell qsb 均编译 SPIR-V、GLSL330、GLSL ES300、HLSL50、MSL12；变体生成来自同一已选 Kit，不表示 Metal/GL GPU 已执行。
 
 `tools/build/verify-r10a.ps1` 只运行 Release，保存 Windows runtime、shader reflection/变体、源码/资产 hash、成对 PNG、完整 Review/production CTest 与 qmllint；`tools/audit/audit-r10a.ps1` 检查证据闭包并输出 macOS/Linux 逐项静态矩阵。Windows 36 组当前 Quick3D/RHI 对照，三种封面、双主题、前/低视角覆盖纸面/法线/深度；已知盒盖平面及四角位置独立验收。九种必测内容尺寸、恢复旧尺寸、30 次未等待读回的 resize 替换共同验收目标所有权。阴影使用 R10 的 9–20 同输入冻结 witness：只比较两者共有的白色 receiver，不将透射壳体掩码混入不透明轮次；全壳体五 ROI、shadow reception、捕获、MSAA 边界与排序仍由 R10B 验收。
 
-R10A 历史复建入口固定六个基础 shader，按对应验收提交重建；当前源树以 `verify-r10b.ps1` 复建七个 shader 并同时执行不透明基础回归，历史 hash 不回写。R10A 的 readback 数字与 RGBA32F/整图 cover 提交只用于通道验证，不作为图集传输字节或最终性能预算证据。后续 R10C 必须实测 tile destination regions/bytes；不得从 R10A 的 CPU 数据量推导 GPU 上传预算。
+R10A 历史复建入口固定六个基础 shader，按对应验收提交重建；R10B 历史入口固定七个，均按对应验收提交重建。当前源树以 `verify-r10c.ps1` 复建 24 个 shader 并同时执行不透明基础回归，历史 hash 不回写。R10A 的 readback 数字与 RGBA32F/整图 cover 提交只用于通道验证，不作为图集传输字节或最终性能预算证据。当前实际 tile destination regions/bytes 与性能各自证据见 `verification/windows/rhi-postprocess/`；不得从 R10A 的 CPU 数据量推导 GPU 上传预算。
 
 接口语义依据：[QQuickRhiItem](https://doc.qt.io/qt-6/qquickrhiitem.html)、[QRhi](https://doc.qt.io/qt-6/qrhi.html)、[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)。升级后以最新 Kit 头文件和实际探针为准。

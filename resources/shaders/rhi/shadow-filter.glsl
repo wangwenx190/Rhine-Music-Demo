@@ -1,15 +1,8 @@
 // Frozen Three .183.2: PCFSoftShadowMap is converted to PCFShadowMap.
-// Implement its bilinear depth comparisons explicitly for a portable float color target.
+// Use the same hardware bilinear depth comparison as the source sampler2DShadow.
 float compareShadow(vec2 uv, float depth)
 {
-    vec2 p = uv * f.draw.z - .5, a = floor(p), w = fract(p);
-    vec2 delta = vec2(1.0 / f.draw.z);
-    vec2 q = (a + .5) * delta;
-    float s00 = step(depth, texture(shadowMap, q).r);
-    float s10 = step(depth, texture(shadowMap, q + vec2(delta.x, 0)).r);
-    float s01 = step(depth, texture(shadowMap, q + vec2(0, delta.y)).r);
-    float s11 = step(depth, texture(shadowMap, q + delta).r);
-    return mix(mix(s00, s10, w.x), mix(s01, s11, w.x), w.y);
+    return texture(shadowMap, vec3(uv, depth));
 }
 float shadowFactor()
 {

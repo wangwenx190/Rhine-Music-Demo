@@ -34,7 +34,7 @@ check_cxx_source_compiles(
             auto pass = target->newCompatibleRenderPassDescriptor();
             target->setRenderPassDescriptor(pass);
             auto u = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                  r->ubufAligned(752) * 2);
+                                  r->ubufAligned(816) * 2);
             auto vb = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, 32);
             auto ib = r->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, 12);
             auto sampler = r->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest, QRhiSampler::None,
@@ -43,7 +43,7 @@ check_cxx_source_compiles(
             auto stages =
                     QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage;
             bindings->setBindings(
-                    { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(0, stages, u, 752),
+                    { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(0, stages, u, 816),
                       QRhiShaderResourceBinding::sampledTexture(
                               1, QRhiShaderResourceBinding::FragmentStage, t, sampler) });
             auto pipeline = r->newGraphicsPipeline();
@@ -76,6 +76,11 @@ check_cxx_source_compiles(
             QRhiReadbackResult result;
             b->readBackTexture(QRhiReadbackDescription(t), &result);
             b->uploadTexture(t, QImage({ 16, 16 }, QImage::Format_RGBA8888));
+            QRhiTextureSubresourceUploadDescription tile(QImage({ 8, 8 }, QImage::Format_RGBA8888));
+            tile.setSourceSize({ 8, 8 });
+            tile.setDestinationTopLeft({ 4, 4 });
+            b->uploadTexture(t, { { 0, 0, tile } });
+            (void)cb->lastCompletedGpuTime();
             cb->beginPass(target, Qt::black, { 1, 0 }, b);
             cb->setGraphicsPipeline(pipeline);
             cb->setViewport({ 0, 0, 16, 16 });
@@ -110,4 +115,20 @@ if(NOT YALAHOO_RHI_API)
         FATAL_ERROR
         "Selected latest Kit QRhi/QQuickRhiItem API probe failed. Adapt src/render/rhi; no older Qt fallback."
     )
+endif()
+if(WIN32 AND YALAHOO_REVIEW)
+    set(CMAKE_REQUIRED_LIBRARIES Qt6::Quick Qt6::GuiPrivate)
+    set(CMAKE_REQUIRED_INCLUDES "${PROJECT_SOURCE_DIR}/src/render/rhi")
+    set(CMAKE_REQUIRED_DEFINITIONS -DYALAHOO_RHI_AUDIT)
+    unset(YALAHOO_RHI_TRANSFER_AUDIT_API CACHE)
+    check_cxx_source_compiles(
+        "#include \"TransferAudit.h\"\nint main() { auto function = &yalahoo::rhi::nativeTransfers; (void)function; return 0; }"
+        YALAHOO_RHI_TRANSFER_AUDIT_API
+    )
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    unset(CMAKE_REQUIRED_DEFINITIONS)
+    if(NOT YALAHOO_RHI_TRANSFER_AUDIT_API)
+        message(FATAL_ERROR "Latest Qt D3D11 command audit API changed. Adapt the isolated Review probe; do not substitute CPU byte counters.")
+    endif()
 endif()

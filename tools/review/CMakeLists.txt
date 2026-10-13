@@ -16,6 +16,18 @@ set_target_properties(
 )
 yalahoo_platform(compare-images)
 if(YALAHOO_REVIEW)
+    qt_add_executable(rhi-postprocess-audit RhiPostprocessAudit.cpp RhiReviewInput.h)
+    target_link_libraries(rhi-postprocess-audit PRIVATE YalahooRhi YalahooImageComparison)
+    target_include_directories(rhi-postprocess-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+    target_compile_definitions(rhi-postprocess-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+    set_target_properties(rhi-postprocess-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(rhi-postprocess-audit)
+    qt_add_resources(rhi-postprocess-audit rhi_post_covers PREFIX /assets
+        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
     qt_add_executable(rhi-shell-audit RhiShellAudit.cpp)
     target_link_libraries(rhi-shell-audit PRIVATE YalahooRhi YalahooImageComparison)
     target_include_directories(rhi-shell-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

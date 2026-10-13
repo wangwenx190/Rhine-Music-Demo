@@ -201,3 +201,18 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 ```
 
 分别在 X11/xcb 与 Wayland 核对实际 OpenGL、DPR1、61 状态同输入五 ROI、六对阴影、邻盒法线/深度、倒序/同深度 ID、捕获隔离和 alpha-1x/4x 边缘。报告/PNG 在 `build/release/verification/rhi-shell/`；4× float MRT、resolve 和 mip 生成必须真实可用，能力不足应明确失败，不自动降低画质。检查 qsb GLSL330/ES300 的 centroid/vertex texture、framebuffer Y 和 OpenGL canonical depth；存在 fractional scaling 时重新匹配 source DPR/目标，不能把 Windows 图片记为本平台通过。[rhi-shell.md](../contracts/rhi-shell.md) 保留具体残差，passed 不表示完整后处理或产品替换通过。结束后关闭 Review，重建生产 Release 并运行全部 CTest。目标系统构建、X11/Wayland、GPU、图像及部署结果：待用户填写。
+
+## R10C 图集与后处理用户验证（未执行）
+
+本平台静态审计结论见 verification/linux-static/rhi-postprocess/，必须标为“静态审计通过，实机待用户验证”。使用最新原生 Kit：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'rhi-atlas-queue|rhi-material-parameters|rhi-opaque-gpu|runtime-rhi-shell-quick3d|rhi-shell-gpu|rhi-postprocess-gpu' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+检查真实 OpenGL、DPR1、same-hash source fixture、全部 61 pre-stage 与 50 final sourceIndex/five ROI、raw AO/blur/normal，以及 432 实体初始化/变色/稳定/还原/倒序/resize/generation。目标格式、4× MSAA resolve、阴影 comparison、独立几何深度和 pass 次序见 [rhi-postprocess.md](../contracts/rhi-postprocess.md)。缺能力必须给出创建错误，不隐降画质。D3D11 原生命令字节在本平台不可用，报告必须保留 available=false，不把请求统计当作本平台原生传输测量；CPU 队列限额与真实整页 GPU 像素证明仍应执行。
+
+性能报告分别标注未限速吞吐、系统呈现节奏、CPU 提交和 timestamp（不可用时不能写零）。真实桌面 compositor/DPR/设备性能需本机验证，Windows 图像及帧时间不作为本平台结果。完成后关闭 Review，重建普通 Release 并执行 CTest。实际构建、GPU、图像、性能与部署结果：待用户填写。

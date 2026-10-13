@@ -199,3 +199,18 @@ cmake --build --preset qt-release --target Yalahoo_qmllint
 ```
 
 核对实际 Metal、DPR1、61 个 sourceIndex/同封面同相机的五 ROI、6 对壳体阴影、2 个邻盒法线/深度、倒序/同深度 ID、捕获隔离与 alpha-1x/4x 边缘。报告和 PNG 在 `build/release/verification/rhi-shell/`，材质残差与未接入的后处理按 [rhi-shell.md](../contracts/rhi-shell.md) 区分；passed 不表示全部 ROI 已达 .97/6，也不表示产品后端已替换。检查 4× float MRT 的真实创建/resolve/mips，缺能力应明确失败，不降级冒充通过。Retina 若需调整 DPR，必须重采同输入源图并调整实际像素目标，不能拿 Windows 图当 macOS 图像证据。结束后关闭 Review 重建普通 Release，运行全部 CTest。目标机真实构建、Metal、图像和部署结果：待用户填写。
+
+## R10C 图集与后处理用户验证（未执行）
+
+本平台静态审计结论见 verification/macos-static/rhi-postprocess/，必须标为“静态审计通过，实机待用户验证”。使用最新原生 Kit：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON
+cmake --build --preset qt-release
+ctest --preset qt-release -R 'rhi-atlas-queue|rhi-material-parameters|rhi-opaque-gpu|runtime-rhi-shell-quick3d|rhi-shell-gpu|rhi-postprocess-gpu' --output-on-failure
+cmake --build --preset qt-release --target Yalahoo_qmllint
+```
+
+检查真实 Metal、DPR1、same-hash source fixture、全部 61 pre-stage 与 50 final sourceIndex/five ROI、raw AO/blur/normal，以及 432 实体初始化/变色/稳定/还原/倒序/resize/generation。目标格式、4× MSAA resolve、阴影 comparison、独立几何深度和 pass 次序见 [rhi-postprocess.md](../contracts/rhi-postprocess.md)。缺能力必须给出创建错误，不隐降画质。D3D11 原生命令字节在本平台不可用，报告必须保留 available=false，不把请求统计当作本平台原生传输测量；CPU 队列限额与真实整页 GPU 像素证明仍应执行。
+
+性能报告分别标注未限速吞吐、系统呈现节奏、CPU 提交和 timestamp（不可用时不能写零）。真实桌面 compositor/DPR/设备性能需本机验证，Windows 图像及帧时间不作为本平台结果。完成后关闭 Review，重建普通 Release 并执行 CTest。实际构建、GPU、图像、性能与部署结果：待用户填写。

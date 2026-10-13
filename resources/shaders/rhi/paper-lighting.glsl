@@ -2,27 +2,11 @@
 // Shared field and diffuse transport from frozen music-lighting.ts (MIT).
 float musicRowField(vec3 origin)
 {
-    float row =
-            (origin.z - f.rowColumn.xyz.z - f.rowSettings.w * .62) / (.5 * f.rowSettings.z * .62);
-    float lane = (origin.x - f.rowColumn.xyz.x) / 27.0;
-    float lane2 = lane * lane;
-    return exp(-0.6931471805599453 * row * row) * exp(-lane2 * lane2 * lane2);
+    return entityLight0.x;
 }
 float musicPrintExposure(vec3 origin)
 {
-    vec3 distance = (origin - f.lightColumn.xyz) / vec3(6.0, 3.35, 5.5);
-    float printLight = exp(-dot(distance, distance));
-    float baseline = mix(f.settings.x, 1.0, printLight);
-    if (f.rowSettings.x < .5)
-        return baseline;
-    float ambient = max(.08, f.settings.x * .5);
-    float fillAmount = f.rowSettings.x > 1.5 && f.rowSettings.x < 2.5 ? f.settings.z : 0.0;
-    float fieldAmbient = mix(ambient, baseline, fillAmount);
-    float fieldExposure =
-            mix(fieldAmbient, 1.0, clamp(f.rowSettings.y * musicRowField(origin), 0.0, 1.0));
-    float areaExposure = mix(ambient, f.settings.x, .25);
-    float shelf = f.rowSettings.x < 1.5 ? areaExposure : fieldExposure;
-    return mix(shelf, baseline, f.settings.y);
+    return entityLight0.y;
 }
 vec3 musicSpot(vec3 position)
 {

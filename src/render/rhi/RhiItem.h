@@ -1,5 +1,6 @@
 #pragma once
 #include "SceneFrame.h"
+#include "AtlasUpload.h"
 #include <QQuickRhiItem>
 #include <QImage>
 #include <QJsonObject>
@@ -7,6 +8,7 @@
 #include <memory>
 
 namespace yalahoo::rhi {
+QJsonArray adapterInventory();
 // Values only. No QObject or QRhi ownership crosses the synchronization boundary.
 struct Input
 {
@@ -14,6 +16,16 @@ struct Input
     QVector<QMatrix4x4> entities;
     QVector<quint64> entityIds;
     QImage cover;
+    QSize atlasSize;
+    quint64 atlasGeneration = 0;
+    QVector<AtlasUpload> atlasUploads;
+    QVector<QRect> coverTiles;
+    bool initializingAtlas = false;
+    bool profile = false;
+    bool postprocess = false, bokeh = false, smaa = false;
+    int aoSamples = 0;
+    float aoResolution = 1, focus = 25, aperture = .0003f;
+    float aoRadius = .18f;
     QVector4D rowSettings;
     QVector3D rowColumn, lightColumn, spotPosition, spotTarget, spotColor;
     QVector3D keyColor, skyColor, groundColor, lightIntensities, background;
@@ -33,6 +45,8 @@ struct Capture
     quint64 request = 0;
     QImage color, normal, depth, shadow;
     QImage composite, compositeNormal, compositeDepth;
+    QImage postprocessed, atlas;
+    QImage rawAo, blurredAo, aoNormal, aoDepth;
     QJsonObject metadata;
 };
 // Review/next-backend integration boundary; product replacement belongs to R10D.
@@ -48,6 +62,7 @@ public:
     }
     // The callable is copied during synchronize; callers use a guarded GUI receiver.
     std::function<void(Capture)> captured;
+    std::function<void(QJsonObject)> profiled;
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;

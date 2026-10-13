@@ -3,6 +3,11 @@ qt_add_library(
     STATIC
     RhiItem.cpp
     RhiItem.h
+    AtlasUpload.cpp
+    AtlasUpload.h
+    Postprocess.cpp
+    Postprocess.h
+    TransferAudit.h
     RhiApi.h
     ShellMaterial.cpp
     ShellMaterial.h
@@ -17,6 +22,9 @@ target_include_directories(
 )
 target_link_libraries(YalahooRhi PUBLIC YalahooScene Qt6::Quick PRIVATE Qt6::GuiPrivate)
 target_compile_features(YalahooRhi PUBLIC cxx_std_23)
+if(YALAHOO_REVIEW)
+    target_compile_definitions(YalahooRhi PRIVATE YALAHOO_RHI_AUDIT)
+endif()
 yalahoo_platform(YalahooRhi)
 qt_add_shaders(
     YalahooRhi
@@ -33,12 +41,29 @@ qt_add_shaders(
     12
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry-instanced.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/opaque.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/coverage.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/copy.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/prepass.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell-basic.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell-early.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell-basic-early.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.vert"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow-instanced.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao16.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao64.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao-composite.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/bokeh.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/smaa-edges.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/smaa-weights.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/smaa-blend.frag"
 )
 qt_add_resources(
     YalahooRhi
@@ -53,4 +78,12 @@ qt_add_resources(
     "${PROJECT_SOURCE_DIR}/resources/environment/dfg.rgba32f"
     "${PROJECT_SOURCE_DIR}/resources/environment/ltc1.rgba32f"
     "${PROJECT_SOURCE_DIR}/resources/environment/ltc2.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-16.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-32.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-64.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-noise-16.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-noise-32.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/environment/ssao-noise-64.rgba32f"
+    "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-area.png"
+    "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-search.png"
 )

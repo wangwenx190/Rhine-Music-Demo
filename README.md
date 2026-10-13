@@ -26,4 +26,4 @@ Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构�
 
 音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原有 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md) 与素材来源说明保留在归档目录。
 
-RHI Review 已具备独立不透明捕获、4× MSAA resolve/mips、磨砂壳体与全局稳定深度排序，保持源屏幕空间透射和三层壳体深度规则；契约与 Windows/静态审计复建见 [RHI 材质契约](docs/contracts/rhi-shell.md)。五区域的全部残差与同输入对照保留，不能把平均误差降低表述为全部图像目标通过。原生图集局部上传和后处理按 R10C、产品后端替换按 R10D 执行，当前普通入口仍为 Quick3D bootstrap。
+RHI Review 已具备独立不透明捕获、4× MSAA resolve/mips、磨砂壳体与全局稳定深度排序，保持源屏幕空间透射和三层壳体深度规则；契约与 Windows/静态审计复建见 [RHI 材质契约](docs/contracts/rhi-shell.md)。五区域的全部残差与同输入对照保留，不能把平均误差降低表述为全部图像目标通过。RHI 图集局部上传、432 实例和 AO/景深/SMAA/输出见 [图集与后处理契约](docs/contracts/rhi-postprocess.md)，当前复建入口为 `tools/build/verify-r10c.ps1`。产品后端替换按 R10D 执行，当前普通入口仍为 Quick3D bootstrap。

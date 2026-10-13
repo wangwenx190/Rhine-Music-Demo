@@ -1,10 +1,12 @@
 {
-  "revision": 2,
+  "revision": 3,
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
   "selectedBackend": "rhi",
   "implementationReady": false,
   "activeImplementation": "quick3d-bootstrap",
-  "implementationRounds": ["R10C", "R10D"],
+  "implementationRounds": [
+    "R10D"
+  ],
   "rhiFoundation": {
     "implementation": "src/render/rhi/RhiItem: immutable SceneFrame synchronization, explicit shadow and opaque color/normal/depth targets",
     "contract": "docs/contracts/rhi-opaque.md",
@@ -16,13 +18,14 @@
   },
   "rhiShell": {
     "contract": "docs/contracts/rhi-shell.md",
-    "implementation": "src/render/rhi/RhiItem: opaque MSAA resolve/mips, independent composite MRT, source shell optics/shadow and global stable identity sort",
+    "implementation": "src/render/rhi/RhiItem: opaque MSAA resolve/mips, independent color attachments/shared retained hardware depth, source shell optics/comparison shadow and global stable identity sort",
     "productEnabled": false,
     "captureSamples": 4,
-    "uniformBytes": 752,
+    "uniformBytes": 816,
     "sourceStage": "61 original R10 inputs before AO/Bokeh/SMAA; original direct-material exceptions unchanged; neighbor depth/normal 58/59 checked separately",
-    "evidence": "verification/windows/rhi-shell/release-runtime.json",
-    "rebuild": "tools/build/verify-r10b.ps1"
+    "evidence": "verification/windows/rhi-postprocess/release-prestage.json",
+    "rebuild": "tools/build/verify-r10c.ps1",
+    "historicalEvidence": "verification/windows/rhi-shell/release-runtime.json"
   },
   "input": {
     "scene": "SceneAdapter::frame() -> immutable SceneFrame copied during synchronize",
@@ -33,26 +36,105 @@
     "qml": "no backend branch in navigation, QML controls, motion or media"
   },
   "fixedParameters": {
-    "caseSize": [4.45, 3.35, 0.14],
-    "paperSize": [3.06, 3.06],
-    "paperCenter": [0.17, 1.85, 0.027],
+    "caseSize": [
+      4.45,
+      3.35,
+      0.14
+    ],
+    "paperSize": [
+      3.06,
+      3.06
+    ],
+    "paperCenter": [
+      0.17,
+      1.85,
+      0.027
+    ],
     "ior": 1.46,
     "containInset": 0.015625,
     "alphaTest": 0.025,
     "geometryThemesExposure": "source-authored; never fit overlap residuals by changing these",
-    "opticsLightingAndPostprocess": ["materials.md", "lighting.md", "occlusion.md", "postprocess.md"],
-    "shadow": {"bounds": [-16, 16, -15, 15, 0.1, 45], "normalBias": 0.035, "bias": -0.0003, "strength": 0.32, "filter": "Three PCFSoftShadowMap", "casters": "Optical_Diffuser only"},
+    "opticsLightingAndPostprocess": [
+      "materials.md",
+      "lighting.md",
+      "occlusion.md",
+      "postprocess.md"
+    ],
+    "shadow": {
+      "bounds": [
+        -16,
+        16,
+        -15,
+        15,
+        0.1,
+        45
+      ],
+      "normalBias": 0.035,
+      "bias": -0.0003,
+      "strength": 0.32,
+      "filter": "Three PCFSoftShadowMap",
+      "casters": "Optical_Diffuser only"
+    },
     "targetMaxPixels": 8294400,
     "tileSize": 256,
     "steadyUploadBudgetBytes": 2097152,
     "initialUploadBudgetBytes": 16777216
   },
   "captureSemantics": "Frozen Three renderTransmissionPass captures opaque objects, resolves MSAA and generates mips. Its extra back-face capture is for DoubleSide only; music shells are FrontSide and transparent=false. Both source and Quick3D exclude these transmission shells from the opaque capture. Do not introduce recursive glass capture as a supposed fix. Match source capture/resolve, depth writes and globally stable shell ordering.",
-  "passOrder": ["shadow", "opaque-color-normal-depth", "capture-resolve-mips", "sorted-shell", "SSAO", "Bokeh-41", "SMAA-by-quality", "ACES-sRGB-output"],
-  "evidence": ["tests/fixtures/render-backend/visual.json", "verification/windows/render-backend/release-runtime.json", "verification/windows/render-backend/release-gpu-checks.json", "docs/media/render-backend/", "verification/windows/render-backend/evidence-index.json"],
+  "passOrder": [
+    "shadow",
+    "opaque-color",
+    "capture-resolve-mips",
+    "sorted-shell",
+    "AO/DOF-geometry",
+    "SSAO",
+    "Bokeh-41",
+    "SMAA-by-quality",
+    "ACES-sRGB-output"
+  ],
+  "evidence": [
+    "tests/fixtures/render-backend/visual.json",
+    "verification/windows/render-backend/release-runtime.json",
+    "verification/windows/render-backend/release-gpu-checks.json",
+    "docs/media/render-backend/",
+    "verification/windows/render-backend/evidence-index.json"
+  ],
   "tasks": [
-    {"id": "material-residual-replay", "round": "R10C", "input": "verification/windows/rhi-shell/release-runtime.json residuals: R10 2/57/60 background; 7/9-20/25/37 spine; 22/28 rim; 32 background; 61 paper/margin/background; 62-65 margin", "object": "preserve source optics/capture/global identity ordering while adding independent AO/Bokeh/SMAA/output and expanded instance/atlas paths", "acceptance": "retain all five equal-weight MAE/SSIM/edge losses and explicit narrow-ROI null SSIM; compare same pre-stage to R10B and final stage to original R10. Keep source normal/depth <.05 full-image MAE, projection <=2px, real shell shadow/alpha/no-fringe/order witnesses. Do not use aggregate improvement to erase individual residuals. Re-run R10 0/1/3 final-output/quality/Bokeh inputs; R09B nine sizes and DPR remain R10D."},
-    {"id": "tile-upload-and-output", "round": "R10C", "input": "R10 66-69: 9 shared instances, 2048 RGBA8 page, one 256 tile update, unchanged frame, revert", "object": "QRhi tile subresource uploads with generation/lease checks, independent postprocess targets", "acceptance": "measure actual GPU destination regions/bytes (R10 GPU transfer bytes are unknown, not zero or a budget pass); one tile <=262144 bytes, steady <=2097152, initialization batches <=16777216; stable frame zero upload and same pixels, revert exact; expand to 432 instances and target bounds"},
-    {"id": "unique-product-backend", "round": "R10D", "input": "R06-R10 same-hash fixtures and SceneAdapter API", "object": "replace Quick3D bootstrap with selected RHI path and update implementationReady/activeImplementation", "acceptance": "Windows D3D11 plus available OpenGL replay; no second production state/path; Metal/Linux shader and resource audit, runtime pending user"}
-  ]
+    {
+      "id": "material-residual-replay",
+      "round": "R10D",
+      "input": "verification/windows/rhi-postprocess/release-prestage.json and release-runtime.json residuals: retain each sourceIndex/region or ROI, including final 2/3/32/57 background; 7/25/37 spine; 22/50 rim; 28/30/31/32/45/46/48/49/50 paper; 62-65 margin",
+      "object": "Preserve current source optics/capture/global identity ordering, tile isolation and independent postprocess while connecting the selected product backend",
+      "acceptance": "Retain all five equal-weight MAE/SSIM/edge metrics and explicit narrow-ROI null SSIM/absent-edge null. Compare same pre-stage to current R10C and final stage to original R10; never erase individual residuals with aggregate improvement. Keep source normal/depth <.05 full-image MAE, projection <=2px and real shadow/alpha/no-fringe/order witnesses. Re-run R10 0/1/3 final-output/quality/Bokeh and R09B nine sizes/DPR; validate product/compositor cadence separately from unthrottled renderer throughput."
+    },
+    {
+      "id": "unique-product-backend",
+      "round": "R10D",
+      "input": "R06-R10 same-hash fixtures and SceneAdapter API",
+      "object": "replace Quick3D bootstrap with selected RHI path and update implementationReady/activeImplementation",
+      "acceptance": "Windows D3D11 plus available OpenGL replay; no second production state/path; Metal/Linux shader and resource audit, runtime pending user"
+    }
+  ],
+  "rhiPostprocess": {
+    "contract": "docs/contracts/rhi-postprocess.md",
+    "implementation": "src/render/rhi/AtlasUpload + Postprocess: generation/lease/serial tile queue, 112-byte geometry instances, independent AO/DOF geometry, RGBA16F ping-pong color, source SSAO/Bokeh41/SMAA/ACES-sRGB",
+    "productEnabled": false,
+    "frameUniformBytes": 816,
+    "postUniformBytes": 1104,
+    "geometryInstanceBytes": 112,
+    "shaderPrograms": 24,
+    "aoSampleExecution": "Fixed 16/32/64 indices retain all seed=417 samples and accumulation order; radius is loop-invariant",
+    "nativeAtlasProof": "Actual D3D11 UpdateSubresource destination boxes/row pitch plus completed whole-page GPU reads; physical bus traffic not measured",
+    "performanceScope": "120s 432-instance 1920x1080 original-quality unthrottled native presentation; CPU submission separate, GPU timestamps unavailable in the accepted run; compositor/product interaction remains R10D",
+    "evidence": "verification/windows/rhi-postprocess/release-runtime.json",
+    "regressions": [
+      "verification/windows/rhi-postprocess/release-prestage.json",
+      "verification/windows/rhi-postprocess/release-opaque.json"
+    ],
+    "manifest": "resources/manifests/rhi-postprocess.json",
+    "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
+    "rebuild": "tools/build/verify-r10c.ps1",
+    "macos": "静态审计通过，实机待用户验证",
+    "linux": "静态审计通过，实机待用户验证"
+  }
 }
