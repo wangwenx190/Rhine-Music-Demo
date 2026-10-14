@@ -369,7 +369,7 @@ bool SceneItem::event(QEvent *event)
 }
 void SceneItem::mousePressEvent(QMouseEvent *event)
 {
-    if (!m_adapter || !m_adapter->selection()) {
+    if (!m_adapter || !m_adapter->selection() || (m_inputRouter && !m_inputRouter->enabled())) {
         event->ignore();
         return;
     }
@@ -413,7 +413,8 @@ void SceneItem::touchEvent(QTouchEvent *event)
         event->accept();
         return;
     }
-    if (!m_adapter || !m_adapter->selection() || event->points().size() != 1) {
+    if (!m_adapter || !m_adapter->selection() || (m_inputRouter && !m_inputRouter->enabled())
+        || event->points().size() != 1) {
         m_touchStart.reset();
         event->ignore();
         return;

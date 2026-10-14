@@ -1,4 +1,5 @@
 #include "TextLayoutAdapter.h"
+#include "MusicTypes.h"
 #include <QTextLayout>
 #include <QTextBoundaryFinder>
 #include <QFontMetricsF>
@@ -198,15 +199,7 @@ QList<int> TextLayoutAdapter::boundaries(const QString &text)
 }
 QPair<QString, QString> TextLayoutAdapter::titleParts(const QString &text)
 {
-    static const QRegularExpression pattern(QStringLiteral("^(.+?)[（(]([^（）()]+)[）)]\\s*$"));
-    static const QRegularExpression han(QStringLiteral("\\p{Han}"));
-    static const QRegularExpression latin(QStringLiteral("[a-z]"),
-                                          QRegularExpression::CaseInsensitiveOption);
-    const auto match = pattern.match(text.trimmed());
-    if (match.hasMatch() && match.captured(1).contains(han) && match.captured(2).contains(latin)
-        && !match.captured(2).contains(han))
-        return { match.captured(1).trimmed(), match.captured(2).trimmed() };
-    return { text, { } };
+    return albumTitleParts(text);
 }
 TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                                        const QFont &subtitle, double size, double width,

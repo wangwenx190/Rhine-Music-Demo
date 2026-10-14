@@ -73,4 +73,5 @@ QJsonObject toJson(const Track &track);
 QJsonObject toJson(const Album &album);
 QJsonObject toJson(const LibrarySnapshot &library);
 QString supportName(MediaSupport support);
+QPair<QString, QString> albumTitleParts(const QString &text);
 }

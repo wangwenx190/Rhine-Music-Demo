@@ -1,6 +1,8 @@
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
+#include "PresentationController.h"
+#include "DetailModel.h"
 #include "MotionController.h"
 #include "OfflineMetadataProvider.h"
 #include "PreferencesStore.h"
@@ -197,7 +199,6 @@ int main(int argc, char **argv)
     bool resumeDiscarded = true;
     int resumeSamples = 0;
     QJsonArray completionRevisions;
-    QQmlApplicationEngine engine;
     const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime"))
             || parser.isSet(QStringLiteral("verify-browse"))
             || parser.isSet(QStringLiteral("verify-navigation"))
@@ -262,7 +263,50 @@ int main(int argc, char **argv)
         updatePool();
         scene.setSelection(&selection);
     }
-    engine.setInitialProperties(
+    yalahoo::DetailModel detailModel;
+    yalahoo::PresentationPorts presentationPorts;
+    presentationPorts.archiveReady = [&] {
+        return !motion.moving() && scene.settled();
+    };
+    presentationPorts.archiveInteractive = presentationPorts.archiveReady;
+    presentationPorts.presentationReady = [&] {
+        return !motion.moving() && scene.settled();
+    };
+    // R17 uses the existing camera targets; R18 supplies synchronized extraction/readiness ports.
+    presentationPorts.enterCamera = [&] {
+        scene.setDetail(1);
+    };
+    presentationPorts.returnCamera = [&] {
+        scene.setDetail(0);
+    };
+    presentationPorts.select = [&](const yalahoo::PresentationSelection &request) {
+        selection.select(request.albumId);
+        library.navigate(request.albumId, request.trackId);
+    };
+    presentationPorts.switchDetail = presentationPorts.select;
+    yalahoo::PresentationController presentation(motion.clock(), std::move(presentationPorts));
+    QObject::connect(&presentation, &yalahoo::PresentationController::prepared, &detailModel, [&] {
+        detailModel.prepare(library);
+    });
+    QObject::connect(&presentation, &yalahoo::PresentationController::changed, &inputRouter, [&] {
+        inputRouter.setEnabled(presentation.archiveEnabled());
+    });
+    QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &presentation, [&] {
+        presentation.setReducedMotion(motion.reducedMotion());
+    });
+    QObject::connect(&selection, &yalahoo::SelectionController::libraryChanged, &presentation,
+                     &yalahoo::PresentationController::reset);
+    presentation.setReducedMotion(motion.reducedMotion());
+    QQmlApplicationEngine engine;
+    const bool usesApp = !verificationRun || parser.isSet(QStringLiteral("verify-browse"))
+            || parser.isSet(QStringLiteral("verify-navigation"));
+    QVariantMap presentationProperties;
+    if (usesApp) {
+        presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
+        presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
+    }
+    auto initialProperties = presentationProperties;
+    const QVariantMap commonProperties(
             { { "inputRouter", QVariant::fromValue(&inputRouter) },
               { "rulerController", QVariant::fromValue(&rulerController) },
               { "verificationRun", verificationRun },
@@ -277,6 +321,9 @@ int main(int argc, char **argv)
               { "geometryProbe",
                 parser.isSet(QStringLiteral("verify-runtime"))
                         && !parser.isSet(QStringLiteral("verify-shading")) } });
+    for (auto it = commonProperties.cbegin(); it != commonProperties.cend(); ++it)
+        initialProperties.insert(it.key(), it.value());
+    engine.setInitialProperties(initialProperties);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
             [] {

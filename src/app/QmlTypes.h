@@ -1,5 +1,7 @@
 #pragma once
 #include "LibrarySession.h"
+#include "PresentationController.h"
+#include "DetailModel.h"
 #include "MotionController.h"
 #include "SceneAdapter.h"
 #include "SceneItem.h"
@@ -150,4 +152,26 @@ struct TransportMotionQml
     Q_GADGET
     QML_FOREIGN(yalahoo::TransportMotion)
     QML_NAMED_ELEMENT(TransportMotion)
+};
+
+struct PresentationControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::PresentationController)
+    QML_NAMED_ELEMENT(PresentationController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct SurfaceTransitionQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SurfaceTransition)
+    QML_NAMED_ELEMENT(SurfaceTransition)
+    QML_UNCREATABLE("Owned by PresentationController")
+};
+struct DetailModelQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::DetailModel)
+    QML_NAMED_ELEMENT(DetailModel)
+    QML_UNCREATABLE("Owned by application")
 };

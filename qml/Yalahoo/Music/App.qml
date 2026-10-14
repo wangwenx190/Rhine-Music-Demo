@@ -12,6 +12,9 @@ ApplicationWindow {
     property InputRouter inputRouter: null
     property RulerController rulerController: null
     required property SceneAdapter sceneAdapter
+    property PresentationController presentationController: null
+    property DetailModel detailModel: null
+    property Item presentationReturnFocus: null
     property bool verificationRun: false
     property int verificationFlags: Qt.Window
     property bool geometryProbe: false
@@ -56,11 +59,58 @@ ApplicationWindow {
         rulerController: window.rulerController
         inputRouter: window.inputRouter
         clock: window.motionController.clock
+        surface: window.presentationController ? window.presentationController.browseSurface : null
+        contentEnabled: !window.presentationController
+                        || window.presentationController.archiveEnabled
         selection: window.sceneAdapter.selection
+        onActionRequested: action => {
+            if (action === "open" && window.presentationController)
+                window.presentationController.open();
+        }
         onThemeRequested: night => {
             window.sceneAdapter.recordInput();
             window.sceneAdapter.lighting.night = night;
         }
+    }
+    Loader {
+        anchors.fill: parent
+        active: window.presentationController !== null && window.detailModel !== null
+        sourceComponent: Detail {
+            metrics: window.sceneAdapter.layout
+            tokens: design
+            presentation: window.presentationController
+            detailModel: window.detailModel
+            playingTrackId: window.librarySession.playbackTrackId
+            onBackRequested: window.presentationController.back()
+        }
+    }
+    Connections {
+        target: window.presentationController
+        function onPrepared() {
+            if (window.presentationController.phase === "opening" &&
+                    !window.presentationReturnFocus)
+                window.presentationReturnFocus = window.activeFocusItem;
+        }
+        function onFocusRequested(detail) {
+            if (!detail) {
+                Qt.callLater(() => {
+                    if (window.presentationController.archiveEnabled) {
+                        const target = window.presentationReturnFocus;
+                        if (target && target.visible && target.enabled)
+                            target.forceActiveFocus(Qt.OtherFocusReason);
+                        else
+                            browse.forceActiveFocus(Qt.OtherFocusReason);
+                        window.presentationReturnFocus = null;
+                    }
+                });
+            }
+        }
+    }
+    Shortcut {
+        sequence: "Escape"
+        enabled: window.presentationController !== null &&
+                 !window.presentationController.archiveEnabled
+        onActivated: window.presentationController.back()
     }
     ArchiveText {
         tokens: design

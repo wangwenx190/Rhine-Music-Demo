@@ -15,11 +15,17 @@ Item {
     property int albumCount: 0
     property string playingTitle: ""
     property bool showNavigation: true
+    property bool contentEnabled: true
+    property SurfaceTransition surface: null
     readonly property TitleReelMotion titleController: info.titleController
     readonly property TitleReelMotion transportController: header.transportController
     signal actionRequested(string action)
     signal themeRequested(bool night)
     ReadingVeil {
+        opacity: root.surface ? root.surface.opacity : 1
+        enabled: root.contentEnabled
+        visible: !root.surface || root.surface.shown
+
         anchors.fill: parent
         metrics: root.metrics
         tokens: root.tokens
@@ -37,6 +43,9 @@ Item {
     }
     BrowseInfo {
         id: info
+        opacity: root.surface ? root.surface.opacity : 1
+        enabled: root.contentEnabled
+        visible: !root.surface || root.surface.shown
         metrics: root.metrics
         tokens: root.tokens
         album: root.album
@@ -47,12 +56,18 @@ Item {
         onOpenRequested: root.actionRequested("open")
     }
     Footer {
+        opacity: root.surface ? root.surface.opacity : 1
+        enabled: root.contentEnabled
+        visible: !root.surface || root.surface.shown
+
         metrics: root.metrics
         tokens: root.tokens
         albumCount: root.albumCount
     }
     NavigationFrame {
         id: navigation
+        opacity: root.surface ? root.surface.opacity : 1
+        enabled: root.contentEnabled
         metrics: root.metrics
         tokens: root.tokens
         albumCount: root.album.columnCount || root.albumCount
@@ -64,6 +79,6 @@ Item {
         columnLabel: root.album.columnLabel || ""
         columnNumber: root.album.columnNumber || 1
         columnCount: root.album.columnTotal || 1
-        visible: root.showNavigation
+        visible: root.showNavigation && (!root.surface || root.surface.shown)
     }
 }

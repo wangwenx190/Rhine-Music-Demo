@@ -115,3 +115,13 @@ if(WIN32)
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
     )
 endif()
+
+add_test(NAME presentation-qml COMMAND ui-audit --presentation
+    "${CMAKE_BINARY_DIR}/verification/presentation")
+set_tests_properties(presentation-qml PROPERTIES TIMEOUT 90
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(presentation-qml PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

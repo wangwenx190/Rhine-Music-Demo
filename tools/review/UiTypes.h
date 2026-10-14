@@ -1,4 +1,6 @@
 #pragma once
+#include "PresentationController.h"
+#include "DetailModel.h"
 #include "LayoutMetrics.h"
 #include "RulerController.h"
 #include "RulerInk.h"
@@ -88,4 +90,26 @@ struct UiSelectionController
     QML_FOREIGN(yalahoo::SelectionController)
     QML_NAMED_ELEMENT(SelectionController)
     QML_UNCREATABLE("Injected by review")
+};
+
+struct PresentationControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::PresentationController)
+    QML_NAMED_ELEMENT(PresentationController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct SurfaceTransitionQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SurfaceTransition)
+    QML_NAMED_ELEMENT(SurfaceTransition)
+    QML_UNCREATABLE("Owned by PresentationController")
+};
+struct DetailModelQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::DetailModel)
+    QML_NAMED_ELEMENT(DetailModel)
+    QML_UNCREATABLE("Owned by application")
 };

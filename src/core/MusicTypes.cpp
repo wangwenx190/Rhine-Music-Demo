@@ -3,8 +3,22 @@
 #include <QDir>
 #include <QJsonArray>
 #include <QSet>
+#include <QRegularExpression>
 
 namespace yalahoo {
+QPair<QString, QString> albumTitleParts(const QString &text)
+{
+    static const QRegularExpression pattern(QStringLiteral("^(.+?)[（(]([^（）()]+)[）)]\\s*$"));
+    static const QRegularExpression han(QStringLiteral("\\p{Han}"));
+    static const QRegularExpression latin(QStringLiteral("[a-z]"),
+                                          QRegularExpression::CaseInsensitiveOption);
+    const auto match = pattern.match(text.trimmed());
+    if (match.hasMatch() && match.captured(1).contains(han) && match.captured(2).contains(latin)
+        && !match.captured(2).contains(han))
+        return { match.captured(1).trimmed(), match.captured(2).trimmed() };
+    return { text, { } };
+}
+
 namespace {
 std::optional<int> integer(const QJsonObject &json, const char *key)
 {

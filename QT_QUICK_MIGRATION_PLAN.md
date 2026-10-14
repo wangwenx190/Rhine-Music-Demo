@@ -26,7 +26,7 @@
 - 能确实可靠验证的任务必须在当前轮真实执行并通过，例如本机Release构建/CTest、原生字体与资源、真实Metal离屏、公开媒体事件和本机部署检查中已具备可靠入口的部分。离屏是真实GPU运行，但其结果只证明对应画面/状态/资源，不证明窗口曝光、正常VSYNC、实际显示、输入到光子或输出设备听感。
 - 当前环境无法执行或不能可靠验证的部分暂用COMMON-01–05、目标平台集成项和PERF-01–07严格静态审计；必须在原轮删除前把实机任务移交最后R34，写明原轮/任务ID、目标平台/后端/设备、能力缺口及依据、输入与源码版本、修复对象、运行入口/预期结果、原门槛、实现依赖及受影响主线回归。不存在可靠样本不等于通过；已知失败不得改成未验证，也不得因审计通过丢掉补修对象。
 - 可安装的常规开发工具缺失先补齐；当前源码或可靠本机入口已经能够确定并修复的产品缺陷、当前可靠检查的失败、缺少应由本轮提供的验证入口不能作为跳过理由。确实依赖其他系统/后端/硬件或不可靠采集条件的诊断与修复，才允许后置；源码能确认的缺陷仍在当前轮修复。任务部分可执行时完成该部分，只移动不可执行子任务，不将整个轮次无故跳过。
-- 当前主线顺序为`R17 → R18 → … → R33 → R34`。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
+- 当前主线顺序为`R18 → R19 → … → R33 → R34`。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
 - R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务仍集中在专项阶段处理，不临时插队打断当前主线。
 - R34是计划最后的特殊轮次，承接全部未执行平台/后端问题修复及必需实机验证。执行前依据真实目标环境逐项评估、按依赖串行处理并遵守单轮规模上限，必要时拆成明确的小轮次；没有相应环境时保留未完成任务，不能删除R34或宣称全平台最终验收完成。主线阶段完成、静态审计通过与最终实机完成分别报告。
 
@@ -134,6 +134,13 @@
 - 资源估算陷阱：OffscreenSurface原按RGBA8+深度模板合计8bytes/物理像素记账，未覆盖8bytes的D32FS8深度模板格式。现采用RGBA8的4bytes加深度模板8bytes上界，共12bytes，并保留resize旧/新计划重叠；字段明确标记保守估算和实际driver allocation未知。Metal的memoryless附件不据此声称系统显存分配量；不改变真实附件、sampleCount或画质。最终六上下文重跑资源与释放门禁，历史8bytes结果保留但不当作完整上界。
 - 验证与限制：修正后的Release/arm64/真正隐藏Metal及macOS OpenGL，实际DPR1/1.5/2六个完整正常矩阵通过，无绑定环或pipeline失败；每项20文字/18页眉/三路径各三次120帧/十次恢复及最终释放。生产带外SSIM最低0.996912214，原固定1物理px带不变；23项启用CTest、格式、两组qmllint与文本qsb变体通过。四项可见runtime仍disabled；Windows/Linux共享隐藏通知回归及可见/present/VSYNC仍依R34，离屏成本不代表正常窗口或GPU性能。
 
+### R17：ListView 跨模型类型复用、header 起点与委托计数
+
+- 表现与定位：同一ListView启用reuseItems，歌单使用带required角色的QAbstractItemModel委托，切介绍时同时改为QVariantList制作人员与另一个委托。隐藏Metal已写出18项静态图后在切tab发生SIGSEGV，macOS栈落在QtQmlModels/QMetaProperty::read，经QQuickItemView::setModel进入；这证明故障发生在模型/角色交接，Qt内部哪个缓存指针失效尚未追踪，不能归因于Metal渲染或字体。
+- 处理与避免再犯：TrackList的Loader分别创建曲目/制作人员两个ListView组件，每个实例保持固定模型类型和delegate角色契约，保留可见/复用池与100px预留，不通过关闭虚拟化回避。Loader返回值显式转为ListView，使官方Yalahoo_qmllint/ui-audit_qmllint targets能验证forceLayout/定位接口；运行时warnings另查，不自行组装qmllint命令。
+- 布局与计数陷阱：有header的ListView起始contentY不一定为0；强设0让header位于可视区上方，锚点/标题字符串检查仍可能通过。改为布局完成后positionViewAtBeginning，并验收实际title的场景Y在内容顶端60px内。QObject::findChildren曾报告0个委托，但自身PNG已经绘出曲目；计数改走QQuickItem::childItems实际视觉树，不能把QObject父子树当成委托可见池。
+- 验证边界：相同Release/arm64隐藏Metal、实际DPR1入口的九尺寸双主题、10,000曲目跳转、介绍切换和快速重开通过，实际可见/复用池31个、QML warnings=0；失败栈/原图与正常报告只保留本地。十次离屏重建与完整Release回归由presentation-qml/CTest复现；离屏不证明真实焦点恢复、窗口呈现或其他系统，R34保留这些检查，R18仍须接入同步运动ports。
+
 ## 目标、范围与固定取舍
 
 1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
@@ -161,6 +168,8 @@
 ## 跨轮次基线与工具链
 
 ### Qt 源码风格契约
+
+- QML 静态诊断统一构建 Qt/CMake 自动生成的 `Yalahoo_qmllint`、`ui-audit_qmllint` 等对应 target；禁止自行组装命令行或直接调用 qmllint 程序。运行时 warnings/日志检查另行保留，不能替代官方 target。
 
 - 所有剩余轮次及后续修改强制遵守 [docs/contracts/code-style.md](docs/contracts/code-style.md)；C++/shader 由根 `.clang-format` 约束，QML 由 `.qmlformat.ini` 及同一最新原生 Kit 的 `qmlformat` 约束，编辑器采用 `.editorconfig`。维护工具使用相同的四空格缩进和逐行语句规则。
 - 使用四个空格，禁止 Tab；C++ 函数、类和结构体的左花括号另起一行，控制流与命名空间的左花括号留在行尾。短函数、短分支、循环体与多个独立语句必须展开；QML 对象、属性和 JavaScript 语句分别换行。以 100 列为换行目标，字符串、URL、许可证行及语法约束可例外；不得为换行改变字面量、宏语义、声明/导入顺序或执行行为。
@@ -431,15 +440,6 @@
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
 
-### R17 · Presentation状态机与详情静态界面
-
-- 依赖R14、R16M2P、R16M3所交付的当前平台R16实现与阶段验收；不依赖R34内后置检查。交付PresentationController、SurfaceTransition、Detail.qml/TrackList.qml。
-- 逐状态移植music-presentation.ts；open先退browse再enterCamera，detail就绪才进文字，close先退文字再归位；新请求覆盖pendingSelection，revision隔离完成信号。
-- 详情保留编号、曲目、时长、介绍/本地备注、制作人员与来源字段；歌单用ListView虚拟化，视图滚动不影响专辑架导航。
-- 异步准备布局完成后再开始文字动效，关闭浮层恢复焦点；隐藏层disabled，视觉退出期间防止底层误操作。
-- 性能设计与验证：歌单仅创建可见/预留委托；状态机一次应用目标快照和批量通知，过期布局/资料结果不重置界面，相同状态不重复发信号或重建详情层。
-- 退出：退字期间连选/取消只执行最后目标，快速open/back不误关闭新详情，减少动态完成路径一致。
-
 ### R18 · 详情抽取、直接换片、归位与拖动查看
 
 - 依赖R12、R17。交付DetailMotion、ReturningCasePool、PointerDragController。
@@ -628,6 +628,14 @@
 - 依赖R33交接及可靠Windows/D3D11、Linux/OpenGL目标环境；当前开发机为macOS/arm64，没有这两个系统的原生编译器/窗口管理器/GPU入口。当前六个macOS隐藏矩阵和COMMON/PERF严格审计不代替目标运行；原D3D11五项像素失败仍由R16B2V-P修复，不能把它们改成未验证。
 - 输入为冻结字轮/原字体、`tests/fixtures/text/titles.json`及R16M3交付的TitleReel自然宽度独立通知、active=false有界queued finish/恢复取消、TransportTitle标题/退出运动可见性。先运行目标Release的`title-reels`与完整CTest，确认十次hide合并、恢复取消、真实宽度单次通知；再从同机源参照运行正常`node tools/build/verify-title.mjs --backend d3d11|opengl --dpr 1|1.5|2 --source 对应源目录 --output 新目录`，保留原正常入口的20项生产文字、18项页眉、九组活动/缓存、隐藏零文字工作、十次恢复/最终释放及无绑定环/shader错误。
 - 当前没有目标运行失败数据，此项是共享回归未执行；macOS旧默认OpenGL失败、绑定中间失败和六个最终正常报告在`verification/macos/title-reels/r16m3/`保留。原结构≤1逻辑px、源码运动≤1e-6、固定1物理px带外SSIM≥0.98/RGB≤6、窗口/资源门槛不变。修改共享状态或通知链后回归当前平台六个受影响矩阵；真实可见hide/restore/minimize与正常VSYNC同时依下面窗口专项，不以离屏释放代替。
+
+#### R17-P · 详情展示的目标后端与可见输入/焦点回归
+
+- 依赖R33交接、R18同步运动ports，以及对应可靠目标Kit/窗口管理器/后端。当前macOS/arm64只具备可靠隐藏Metal入口；R17已真实覆盖实际DPR1的九尺寸双主题与十次离屏恢复，其他系统没有原生编译器/窗口管理器入口，当前macOS可见非激活显示/正常present仍不可靠。此项是尚未执行的目标检查，不是现存像素失败；先前ListView跨模型崩溃已在本机可靠入口修复，失败栈/图保留本地。
+- 输入为R17交付提交中的PresentationTest匿名状态序列、PresentationAudit生成的10,000匿名曲目/介绍/制作人员及冻结music-presentation/ui-transitions/music-title/music.css生产调用链；不读取私人曲库。目标包括Windows/D3D11、macOS/Metal及OpenGL、Linux/OpenGL/X11/Wayland与实际启用后端，实际DPR1/1.5/2、九尺寸双主题，不能把当前Metal图片作为其他后端证明。
+- 先运行目标Release configure/build、官方Yalahoo_qmllint/ui-audit_qmllint targets及完整CTest；使用`ui-audit --presentation 输出目录`验收18项结构、非零且<100的可见/复用委托、零QML warnings、十次恢复/释放与windowPolicy。源码审计入口为`python3 tools/audit/audit-presentation.py 对应report.json`，只能辅助实际运行，不代替窗口/设备事实；细节和三平台命令见`docs/contracts/presentation.md`。
+- 再在实际产品与R18运动接口中验证退browse后相机才进入、layoutRevision与场景双就绪门禁、退字连选/取消只提交最后目标、四种archiveRoute、快速open/back、改速/减少动态、介绍/歌单滚轮和鼠标/触摸/键盘。补修对象包括nativeScene输入守卫、退出期禁用、有效Item焦点恢复、hide/restore/minimize和surface/flags重建；R23/R24完成后补真实定位不改变播放。置底/拒绝焦点及无激活保持，遮挡样本不可用时保留任务，不抢焦点取样。
+- 原结构≤1逻辑px、时序≤1个60Hz帧、源码状态顺序/revision与PERF-01–07、既有UI像素门槛全部保留；R29先收口完整GUI同机源成对图，不能拿本轮没有执行的SSIM作通过。共享状态/模型/标题规则变更后回归当前主力平台presentation、presentation-qml、navigation、title-reels及完整Release CTest；离屏不证明present/VSYNC或最终焦点行为。
 
 #### 各平台最终实机矩阵与专项退出
 

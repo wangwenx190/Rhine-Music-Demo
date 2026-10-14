@@ -4,6 +4,7 @@
 #include "CanvasProbe.h"
 #include "RulerAudit.h"
 #include "TitleAudit.h"
+#include "PresentationAudit.h"
 #include "GraphicsBackend.h"
 #include "ImageComparison.h"
 #include "LayoutMetrics.h"
@@ -79,6 +80,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--presentation"))
+        return argc == 3 ? reviewPresentation(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--ruler"))
         return argc == 3 ? reviewRuler(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--titles")) {

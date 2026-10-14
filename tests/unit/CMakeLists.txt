@@ -694,3 +694,13 @@ if(WIN32)
     set_tests_properties(runtime-filled PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(PresentationTest PresentationTest.cpp)
+target_link_libraries(PresentationTest PRIVATE YalahooCore Qt6::Test)
+yalahoo_platform(PresentationTest)
+add_test(NAME presentation COMMAND PresentationTest)
+set_tests_properties(presentation PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(presentation PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

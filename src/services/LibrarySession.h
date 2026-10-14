@@ -33,6 +33,10 @@ public:
     {
         return m_snapshot;
     }
+    const Album *navigationAlbum() const
+    {
+        return album(m_navigationAlbumId);
+    }
     Q_INVOKABLE void search(const QString &query, const QString &genreId = { });
     Q_INVOKABLE void sort(const QString &mode);
     Q_INVOKABLE bool navigate(const QString &albumId, const QString &trackId = { });
