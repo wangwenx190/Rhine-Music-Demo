@@ -58,7 +58,9 @@ Item {
             height: slot ? slot.capacityHeight : 0
             visible: Boolean(slot) && slot.shown
             opacity: slot ? slot.opacity : 1
-            layer.enabled: visible
+            layer.enabled: visible && root.visible && (!root.Window.window
+                                                       || root.Window.window.visible)
+
             layer.smooth: true
             layer.textureSize: Qt.size(Math.ceil(width * root.controller.dpr * root.rasterScale),
                                        Math.ceil(height * root.controller.dpr * root.rasterScale))

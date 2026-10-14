@@ -5,6 +5,7 @@
 #include <QTest>
 #include <QFontMetricsF>
 #include <QAbstractItemModelTester>
+#include <QTextLayout>
 #include <cmath>
 
 class TitleTest : public QObject
@@ -71,6 +72,50 @@ private slots:
         QVERIFY(song.naturalWidth > 48);
         QVERIFY(song.fitted.endsWith(QStringLiteral("…")));
         QVERIFY(!song.fitted.contains(QChar::ReplacementCharacter));
+    }
+    void wholeLineGlyphAssociation()
+    {
+        yalahoo::TextLayoutAdapter adapter;
+        auto font = yalahoo::assetFont(700);
+        const QString text = QStringLiteral("AV office affinity é gyp");
+        const auto actual = adapter.measure(text, font, font, 28, 600, 150, false, 1);
+        font.setPixelSize(int(actual.size));
+        font.setHintingPreference(QFont::PreferNoHinting);
+        font.setLetterSpacing(QFont::AbsoluteSpacing, -.6);
+        QTextLayout layout(text, font);
+        layout.beginLayout();
+        auto line = layout.createLine();
+        line.setLineWidth(600);
+        layout.endLayout();
+        QList<QPair<quint32, double>> expectedInk, actualInk;
+        for (const auto &run : line.glyphRuns(0, text.size(), QTextLayout::RetrieveAll))
+            for (int i = 0; i < run.glyphIndexes().size(); ++i)
+                expectedInk.append({ run.glyphIndexes()[i], run.positions()[i].x() });
+        QString associated;
+        for (const auto &glyph : actual.glyphs) {
+            associated += glyph.text;
+            for (const auto &run : glyph.renderRuns)
+                for (int i = 0; i < run.indexes.size(); ++i)
+                    actualInk.append(
+                            { run.indexes[i], run.positions[i].x() * glyph.scale + glyph.x });
+        }
+        QCOMPARE(associated, text);
+        std::sort(expectedInk.begin(), expectedInk.end());
+        std::sort(actualInk.begin(), actualInk.end());
+        QCOMPARE(actualInk.size(), expectedInk.size());
+        for (int i = 0; i < actualInk.size(); ++i) {
+            QCOMPARE(actualInk[i].first, expectedInk[i].first);
+            QVERIFY(std::abs(actualInk[i].second - expectedInk[i].second) < 1e-6);
+        }
+        const auto wrapped = adapter.measure(QStringLiteral("AV gyp (Live) [2026]"), font, font, 28,
+                                             120, 150, false, 1);
+        for (int i = 0; i < wrapped.glyphs.size(); ++i)
+            if (i + 1 == wrapped.glyphs.size() || wrapped.glyphs[i + 1].y != wrapped.glyphs[i].y)
+                QVERIFY(!wrapped.glyphs[i].text.endsWith(u' '));
+        adapter.measure(text, font, font, 28, 600, 150, false, 1);
+        const auto misses = adapter.misses();
+        adapter.measure(text, font, font, 28, 600, 150, false, 2);
+        QCOMPARE(adapter.misses(), misses + 1);
     }
     void analyticAndInterruptions()
     {

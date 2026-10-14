@@ -10,6 +10,11 @@ const root = path.resolve(import.meta.dirname, '../..');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const frozen = path.join(root, 'build/title-web/legacy-web');
 const output = path.join(root, 'verification/windows/title-reels/web');
+const args = process.argv.slice(2);
+if (args.length
+    && (args.length !== 2 || args[0] !== '--dpr' || ![1, 1.5, 2].includes(Number(args[1]))))
+    throw Error('Usage: export-title.mjs [--dpr 1|1.5|2]');
+const dprs = args.length ? [Number(args[1])] : [1, 1.5, 2];
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
@@ -135,17 +140,9 @@ try {
     console.log('Browser connected');
     const version = await browser.send('Browser.getVersion');
     console.log('Browser version read');
+    const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
     const targets = await (await fetch('http://127.0.0.1:' + port[0] + '/json/list')).json();
-    const target = targets.find((entry) => entry.type === 'page');
-    const {sessionId} =
-        await browser.send('Target.attachToTarget', {targetId: target.id, flatten: true});
-    page = {
-        send: (method, params) => browser.send(method, params, sessionId),
-        on: (method, callback) => browser.on(method, callback),
-        evaluate: CDP.prototype.evaluate,
-        close: () => {
-        }
-    };
+    page = await CDP.connect(targets.find((entry) => entry.id === targetId).webSocketDebuggerUrl);
     console.log('Page connected');
     console.log('Enabling Runtime');
     await page.send('Runtime.enable');
@@ -165,7 +162,7 @@ try {
     const captures = [];
     const fixture =
         JSON.parse(await fs.readFile(path.join(root, 'tests/fixtures/text/titles.json'), 'utf8'));
-    for (const dpr of [1, 1.5, 2]) {
+    for (const dpr of dprs) {
         await page.send('Emulation.setDeviceMetricsOverride',
                         {width: 1280, height: 720, deviceScaleFactor: dpr, mobile: false});
         for (const input of fixture.cases) {

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "components"
 
@@ -16,6 +17,10 @@ Rectangle {
     property string song: ""
     property bool playing: false
     property string lastAction: ""
+    function fullTitleNames(control) {
+        return control.ToolTip.text === root.song && control.Accessible.name === "定位歌曲："
+                + root.song;
+    }
     color: titleDesign.page
     DesignTokens {
         id: titleDesign

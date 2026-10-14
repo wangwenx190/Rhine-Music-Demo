@@ -124,7 +124,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             glyph.text = text.mid(start, std::min(next, inkEnd) - start);
             glyph.translation = translation;
             const double a = line.cursorToX(start) * scale;
-            const double b = line.cursorToX(next) * scale;
+            const double b = line.cursorToX(std::min(next, inkEnd)) * scale;
             glyph.x = std::min(a, b);
             glyph.y = index * lineHeight;
             glyph.width = std::abs(b - a);

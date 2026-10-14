@@ -1,9 +1,18 @@
 [CmdletBinding()]
-param([switch]$FullMatrix)
+param(
+    [switch]$FullMatrix,
+    [switch]$TitleContext,
+    [ValidateSet('d3d11', 'opengl')][string]$Backend = 'd3d11',
+    [ValidateSet(1, 1.5, 2)][double]$Dpr = 1,
+    [string]$EvidenceDirectory = 'verification/windows/title-reels'
+)
 
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$evidence = Join-Path $repository 'verification/windows/title-reels'
+$evidence = Join-Path $repository $EvidenceDirectory
+if ($FullMatrix -and $TitleContext) {
+    throw 'Choose FullMatrix or TitleContext'
+}
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8 = [Text.UTF8Encoding]::new($false)
 function Run([string]$Name, [scriptblock]$Command) {
@@ -35,16 +44,20 @@ try {
     $env:QSG_NO_VSYNC = ''
     $env:QCPAINTER_DEBUG_COLLECT = '0'
     $env:QT_SCALE_FACTOR = '1'
-    $nativeDpr = [double](& ./build/release/tools/ui-audit.exe --native-dpr)
+    $nativeDpr = [double]((& ./build/release/tools/ui-audit.exe --native-dpr 2>&1 | Out-String).Trim())
     if ($LASTEXITCODE -ne 0 -or $nativeDpr -le 0) {
         throw 'Native DPR query failed'
     }
     if ($FullMatrix) {
         Run 'web-source.txt' { node tools/review/export-title.mjs }
+    } elseif ($TitleContext) {
+        Run 'web-source.txt' { node tools/review/export-title.mjs --dpr $Dpr }
     }
     $reports = @()
     $backends = if ($FullMatrix) {
         @('d3d11', 'opengl')
+    } elseif ($TitleContext) {
+        @($Backend)
     } else {
         @('d3d11')
     }
@@ -52,6 +65,8 @@ try {
         $env:QSG_RHI_BACKEND = $backend
         $dprs = if ($FullMatrix) {
             @(1, 1.5, 2)
+        } elseif ($TitleContext) {
+            @($Dpr)
         } else {
             @()
         }
@@ -60,7 +75,7 @@ try {
             $directory = Join-Path $evidence "$backend-dpr-$dpr"
             Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe --titles $directory }
             $report = Get-Content -Raw (Join-Path $directory 'report.json') | ConvertFrom-Json
-            if (-not $report.passed -or [Math]::Abs($report.dpr - $dpr) -gt 0.001 -or -not $report.released -or $report.animatedCosts.Count -ne 9 -or $report.headerChecks.Count -ne 18 -or $report.lifecycle.Count -ne 10) {
+            if (-not $report.passed -or $report.backend -ne $backend -or [Math]::Abs($report.dpr - $dpr) -gt 0.001 -or -not $report.released -or $report.animatedCosts.Count -ne 9 -or $report.headerChecks.Count -ne 18 -or $report.lifecycle.Count -ne 10) {
                 throw 'Title glyph, animation, transport, DPR or lifecycle verification failed'
             }
             $production = @($report.captures | Where-Object { $_.mode -eq 0 })
@@ -82,6 +97,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{
                 passed = $true
                 fullMatrixCompleted = [bool]$FullMatrix
+                titleContextCompleted = [bool]$TitleContext
                 qtVersion = $chain.qtVersion
                 compiler = $chain.compiler
                 configuration = 'Release'

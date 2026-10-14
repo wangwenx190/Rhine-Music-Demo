@@ -1,4 +1,12 @@
+[CmdletBinding()]
+param([ValidateSet('R16', 'R16B1')][string]$Round = 'R16')
+
 $ErrorActionPreference = 'Stop'
+$remaining = if ($Round -eq 'R16B1') {
+    'R16B2-B3'
+} else {
+    'R16B1-B3'
+}
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $chain = Get-Content -Raw (Join-Path $repository 'build/release/toolchain.json') | ConvertFrom-Json
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -21,6 +29,14 @@ $checks = @(
     @('LNX-01', 'src/app/GraphicsBackend.h', 'OpenGL', 'Linux selects OpenGL through the existing platform guard and the same shader/value pipeline. Resources are qrc and do not require drive letters; QRhi readback orientation is backend-derived in the tool. No Windows media DLL or input dependency is introduced. Native compiler/private ABI, xcb/Wayland fonts/color emoji, compositor and GPU pixels await real hardware; deployment stays R32.')
 )
 $paths = @('CMakeLists.txt', 'src/render/text/CMakeLists.txt', 'src/render/text/TextLayoutAdapter.cpp', 'src/render/text/TextLayoutAdapter.h', 'src/render/text/TitleReel.cpp', 'src/render/text/TitleReel.h', 'src/render/text/ReelInk.cpp', 'src/render/text/TransportMotion.cpp', 'src/render/rhi/ReelTextNode.cpp', 'src/render/rhi/SceneItem.cpp', 'src/render/rhi/ResourcePlan.h', 'src/render/rhi/RhiItem.cpp', 'src/app/GraphicsBackend.h', 'src/app/VerificationWindow.h', 'src/app/QmlTypes.h', 'qml/Yalahoo/Music/components/TitleReel.qml', 'qml/Yalahoo/Music/components/TransportTitle.qml', 'qml/Yalahoo/Music/components/Header.qml', 'qml/Yalahoo/Music/components/BrowseInfo.qml', 'resources/shaders/reel-slot.frag', 'cmake/BrowseQml.cmake', 'tools/review/TitleAudit.cpp', 'tools/review/CanvasTitleProbe.cpp', 'tools/review/export-title.mjs', 'tests/unit/TitleTest.cpp')
+if ($Round -eq 'R16B1') {
+    $checks = @($checks | Where-Object { $_[0] -notin @('COMMON-05', 'PERF-03', 'PERF-07') })
+    $checks += @(
+        @('COMMON-05', 'tools/build/verify-r16.ps1', 'TitleContext', 'The explicit single backend/DPR entry validates the actual renderer backend and calibrated DPR. Frozen source and one-physical-pixel edge-band gates are unchanged. R16B1 covers Windows D3D11/DPR1; DPR1.5/2, OpenGL and final drawing selection remain R16B2-B3.'),
+        @('PERF-03', 'src/render/text/ReelInk.cpp', 'sameGlyphInk', 'A slot content revision detaches its bounded face list and reuses identical font-head/glyph-ID/position descriptors. Only new faces create text geometry; unmatched geometry is deleted on the render thread. The current production font sizes and viewport bound the retained face list to eight; this bounds the local matching scan to O(f squared), without any library-size term. Positions, clip capacity and colors update independently; effective visibility prevents hidden node work.'),
+        @('PERF-07', 'tools/review/TitleAudit.cpp', 'liveCanvasRenderers', 'Ten hide/release/show cycles check live node/renderer ceilings, cache capacity and window policy; final teardown requires zero tracked nodes/renderers. All QSG resources stay on the Qt render thread. Shared macOS/Metal and Linux/OpenGL lifecycle code has no Windows-only branch; native font/cache/GPU behavior remains unmeasured on those systems.')
+    )
+}
 $records = foreach ($path in $paths) {
     @{
         path = $path
@@ -39,7 +55,7 @@ foreach ($platform in @('windows', 'macos', 'linux')) {
             lineOrSymbol = $check[2]
             evidence = $check[3]
             result = 'static-passed'
-            limitations = 'Implementation audit only. Full title visual/path/performance acceptance remains R16B1-B3. macOS/Linux compilation and runtime have not run.'
+            limitations = "Static implementation audit only. Remaining title visual/path/cost acceptance: $remaining. macOS/Linux compilation and runtime have not run."
         }
     }
     $directory = if ($platform -eq 'windows') {
@@ -48,23 +64,27 @@ foreach ($platform in @('windows', 'macos', 'linux')) {
         Join-Path $repository "verification/$platform-static/title-reels"
     }
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    if ($Round -eq 'R16B1') {
+        $directory = Join-Path $directory 'r16b1'
+        New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    }
     $conclusion = if ($platform -eq 'windows') {
-        'Windows实现源码审计通过；完整标题视觉与成本验收待R16B1-B3'
+        "Windows实现源码审计通过；剩余标题视觉与成本验收待$remaining"
     } else {
         '静态审计通过，实机待用户验证'
     }
     [IO.File]::WriteAllText((Join-Path $directory 'audit-matrix.json'), (@{
-                round = 'R16 implementation'
+                round = $Round
                 conclusion = $conclusion
                 qtVersion = $chain.qtVersion
                 sourceRecords = $records
                 checks = $matrix
             } | ConvertTo-Json -Depth 8), $utf8)
-    $paragraphs = @("# R16 / $platform", $conclusion)
+    $paragraphs = @("# $Round / $platform", $conclusion)
     foreach ($check in $checks) {
         $paragraphs += "$($check[0]) — $($check[1]):$($check[2])`n$($check[3])"
     }
     [IO.File]::WriteAllText((Join-Path $directory 'audit-report.md'), ($paragraphs -join "`n`n"), $utf8)
     [IO.File]::WriteAllText((Join-Path $directory 'user-validation.md'), ("$conclusion`n`n在目标平台使用最新原生Kit执行 cmake --preset qt-release、cmake --build --preset qt-release、ctest --preset qt-release --output-on-failure；普通产物入口按README启动。检查双主题/长标题/译名/连字/组合字/emoji/括号/下伸部、真实DPR1/1.5/2及跨屏resize，连续切换/反向、0.25到3倍途中改速、减少动态、隐藏恢复、歌名只定位与播放按钮固定。私有字形接口配置探测失败须适配本机最新Qt，不能选旧Kit。部署/媒体设备实机命令按R30-R32清单执行；本审计未运行目标平台编译器/GPU/compositor，未生成部署包。"), $utf8)
 }
-Write-Output 'R16 implementation static audits passed; full visual/cost acceptance remains R16B1-B3'
+Write-Output "$Round implementation static audits passed; remaining visual/cost acceptance: $remaining"

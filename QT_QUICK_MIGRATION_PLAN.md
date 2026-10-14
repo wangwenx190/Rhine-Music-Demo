@@ -49,14 +49,31 @@
 ### R16：整行glyph关联把行末空白并入前一个字面
 
 - 表现与触发：改用整行glyphRuns/stringIndexes提取、合并连字后，换行末尾的space可能没有独立glyph，前一个分组的text范围延伸到line end。原生可见位置与像素正确，但结构文本出现 `gyp (Live)` 对 `gyp(Live)`、`AV gyp` 对 `AVgyp` 的差别；三个输入的两主题共六项结构门槛失败。不能凭像素接近而忽略结构失败，也不能拆字符重新shaping来迎合源观察单元。
-- 处理：保留整行glyph ID/位置，非歌名单行模式按源CSS折叠并移除有效行末ASCII空白；字面text提取末端限制为 `min(nextGroupStart, inkEnd)`，而非只跳过起点已经在空白区的分组。上下文glyph变化用sameGlyphInk比较实际描述符，不能只比较文本/字体。
-- 验证与限制：最后修正通过title-reels及source-format测试；修正后的完整结构对照尚未重跑，原单上下文整体报告仍为失败，留给R16B1验证。以后先对齐可见行文本与whole-line关联语义，不能把结构统计问题当字体像素问题反复调参。
+- 处理：保留整行glyph ID/位置，非歌名单行模式按源CSS折叠并移除有效行末ASCII空白；字面text提取和宽度的cursorToX末端同时限制为 `min(nextGroupStart, inkEnd)`，而非只跳过起点已经在空白区的分组。只改text会保留约7.73–8.26逻辑px的行末空白advance，导致文本已经一致而结构宽度仍失败；不能凭正确像素放行。上下文glyph变化用sameGlyphInk比较实际描述符，不能只比较文本/字体。
+- 验证与限制：修正通过title-reels/source-format及Windows Release/D3D11/实际DPR1双主题20项结构/文字对照，最大结构误差0.24087逻辑px；原失败报告保留，其他DPR/后端待R16B2/B3。以后先对齐可见行文本与whole-line关联语义，不能把结构统计问题当字体像素问题反复调参。
 
 ### R16：PowerShell直接调用GUI程序不能可靠等待退出
 
 - 表现与触发：在PowerShell中 `& yalahoo.exe ... *> file` 可立即返回、LASTEXITCODE为空，实际GUI进程仍在采集；按这个空值继续执行会误报退出状态或启动并发GPU验证。本轮已观察到空退出值和仍存活的yalahoo进程，没有把空值当作通过。
 - 处理：用捕获管线 `$output = & ... 2>&1 | Out-String` 强制等待GUI完成后读取LASTEXITCODE，再写日志并核对JSON报告。若用Start-Process，则必须 `-Wait -PassThru -WindowStyle Hidden` 并读取ExitCode；保留VerificationWindow在第一次show前置底/拒绝焦点。正常采样严格串行，不和构建或另一个GPU程序并行。
 - 验证与限制：最后生产检查通过等待管线取得真实exit0，报告18项通过；所有后续GUI重建脚本必须沿用可靠等待方式，不依赖启动成功或空退出码推断采集结束。
+
+### R16B1：隐藏候选仍重建字形节点
+
+- 表现与触发：TitleReview切换到纯Text/Canvas候选时，生产ReelInk不可见，但其槽contentChanged仍会安排update；只核对slot.shown的updatePaintNode继续创建普通字形节点，三个候选的成本受隐藏生产工作污染。不能从父级visible=false推断所有layer/SG节点都没有工作。
+- 根因与处理：ReelInk的更新入口缺少自身有效可见性检查，QML槽层仅按槽visible启用。入口加入isVisible并在隐藏时删除自身节点；layer.enabled同时核对组件和窗口可见性。内容revision匹配完整sameGlyphInk描述符，保留仍滚动的旧字面，不整槽重建；颜色、clip容量与transform独立更新，旧节点归render thread删除。
+- 验证与限制：D3D11/DPR1三次生产活动诊断复用73/65/65次，纯Text/Canvas候选期间隐藏生产节点的新建计数均为零；十次恢复/释放和最终零tracked节点/renderer检查通过。该计数包含初始化/候选切换，不能宣称FPS或总显存改进；其他DPR/后端成本与生命周期仍归R16B2/B3。
+
+### R16B1：页眉测量初始布局与附加属性
+
+- 表现与触发：在frameSwapped回调中先改标题再立即测按钮位置，会读到尚未完成polish的中间绑定；把复用窗口resize后的第3帧当基线，又会记录1280×720暖昼的一次约0.30逻辑px准备期调整，第4帧已稳定且第8帧才发送首个换歌输入。C++ QQmlProperty读取ToolTip/Accessible附加属性还返回空值，不能把探针读取失败当作产品全名丢失。
+- 处理：在发布下一帧状态前读取已呈现帧的位置；先以减少动态准备初始标题终态，在第7帧建立输入前基线并开启动画，再执行第8/21帧换歌、第15/21帧改速及第25帧减少动态。保持0.01逻辑px的位置容差，正式窗口锚点/图像门槛不变。全名由工具QML直接读取控件的真实ToolTip.text/Accessible.name，退出禁用在width仍保留的视觉退出期检查。
+- 验证与限制：九尺寸×双主题18项位置、名称、定位、改速/减少动态及退出禁用全部通过；初始准备与输入阶段分开，不将准备期的复用窗口布局当成换歌位移。实际播放对象与定位执行仍依赖R24/R23，当前使用真实LibrarySession匿名ID状态，不宣称已播放音频。
+
+### R16B1：受限环境的无头浏览器页面无响应
+
+- 表现与边界：浏览器级CDP可连接并读版本，受限执行环境中的页面Runtime.enable不返回；换成独立页面WebSocket仍失败，相同源码/浏览器在原生权限环境成功导出20项。尚未确认Chromium内部根因，不能把超时归因于字体、源运动算法或flatten会话本身。
+- 处理与复现：export-title沿用其他导出器的独立页面连接，后台/headless及外部请求拦截不变；本机发生相同症状时在授权的原生验证环境运行 `node tools/review/export-title.mjs --dpr 1`，保留受限环境失败日志，不改字体或源算法去追连接问题。原生产物仍只写本地忽略目录；没有关闭窗口/网络/像素门槛。
 
 ## 目标、范围与固定取舍
 
@@ -348,15 +365,6 @@
 ## 待执行轮次
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
-
-### R16B1 · 标题字形关联与单上下文补验收
-
-- 依赖R16实现，接口、已验证范围和剩余限制见 [标题字轮契约](docs/contracts/title-reels.md)。原R16未全部验收；R17的R16依赖在R16B1–B3完成后满足。本轮预估代码≤500行、有效时间≤45分钟，开始前须重新评估。
-- 使用同一 TextLayoutAdapter、字轮轨迹与字体比较当前整行字形节点/彩色Qt Quick Text、纯Qt Quick Text、C++ Canvas Painter；核对连字/组合字关联、基线/字距、grapheme、彩色emoji、下伸部与括号裁切、宽度/DPR失效及快速打断。不能为绘制API便利按字符重新shaping。正式路径选择及差异写入共用绘制契约。
-- 只完成Windows Release/D3D11/实际DPR1双主题的字形与视觉对照，包含连字、组合字、行末空白、匿名长标题/emoji及括号裁切；原始结果与固定1px源字形边缘带分列，门槛不变。修复失败项，不无限重跑追分。采集探针刷新差异按WEB-TEXT-PROBE-01单列，旧原始数据留存。
-- 确认快速切换复用当前字形节点、隐藏/恢复/resize及十次释放不增长；必要时修复单槽几何过度重建，并按PERF-01–07审计受影响链。
-- 补齐真实换歌/换专辑、中途改速、减少动态、固定播放按钮、完整Tooltip/Accessible及歌名定位不调用播放的自动验收。核对归一rate10/460ms、速度限幅、共享时间原点、640/400/180ms与18px轨迹；macOS/Linux展开同一调用链并保留实机待验证结论。
-- 入口：`ui-audit --titles <output>`，先校准真实DPR1并显式选择D3D11；完善验证脚本的单上下文参数。退出：本上下文文字/运动/功能/释放门槛通过并交接具体差异后移除此轮，不提前实施R17。
 
 ### R16B2 · D3D11标题DPR与成本验收
 

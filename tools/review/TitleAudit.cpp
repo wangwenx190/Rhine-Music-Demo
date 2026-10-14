@@ -6,6 +6,7 @@
 #include "ImageComparison.h"
 #include "VerificationWindow.h"
 #include "LayoutMetrics.h"
+#include "LibrarySession.h"
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QQuickItem>
@@ -178,6 +179,35 @@ int reviewTitle(QGuiApplication &app, const QString &output)
         qWarning() << component.errors();
         return 3;
     }
+    yalahoo::LibrarySession session(nullptr);
+    yalahoo::LibrarySnapshot library;
+    for (int i = 0; i < 3; ++i) {
+        yalahoo::Album album;
+        album.id = QString("album-%1").arg(i);
+        album.title = i % 2 ? QStringLiteral("新的旅程（Music stories）")
+                            : QStringLiteral("收藏的声音（Archive gyp）");
+        yalahoo::Track track;
+        track.id = QString("track-%1").arg(i);
+        track.albumId = album.id;
+        track.title = i == 0 ? QStringLiteral("初始歌曲 gyp é")
+                : i == 1
+                ? QStringLiteral("新的歌曲（gyp）👨‍👩‍👧‍👦 é")
+                : QStringLiteral("最终歌曲 gyp（收藏）👨‍👩‍👧‍👦 é");
+        album.tracks.append(track);
+        library.albums.append(album);
+    }
+    session.setSnapshot(library);
+    int playbackChanges = 0;
+    QObject::connect(&session, &yalahoo::LibrarySession::playbackChanged, &app, [&] {
+        ++playbackChanges;
+        const auto *track =
+                session.snapshot()->track(session.playbackAlbumId(), session.playbackTrackId());
+        root->setProperty("song", track ? track->title : QString());
+    });
+    QObject::connect(&session, &yalahoo::LibrarySession::browseInfoChanged, &app, [&] {
+        controller.setText(session.browseInfo()["title"].toString());
+        controller.reconcile();
+    });
     QQuickWindow window;
     yalahoo::verification::prepareWindow(window, true);
     window.setPersistentSceneGraph(false);
@@ -231,10 +261,16 @@ int reviewTitle(QGuiApplication &app, const QString &output)
     bool animationRun = false, headerRun = false, noFrameShaping = true;
     qint64 tickNs = 0;
     QJsonArray frameRecords;
+    QPointF initialPlayPosition, initialStopPosition;
+    bool fixedButtons = true;
+    QJsonArray headerPositions;
+    quint64 lifecycleNodeLimit = 0;
+    int lifecycleRendererLimit = 0;
     const QList<QSize> productSizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                      { 960, 900 },   { 930, 900 },   { 390, 844 },
                                      { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
     qint64 guiNs = 0, beginSync = 0, beginRender = 0;
+    quint64 beginGeometry = 0, beginReuse = 0;
     std::function<void()> next;
     std::function<void(QImage)> completed;
     QObject::connect(
@@ -278,25 +314,44 @@ int reviewTitle(QGuiApplication &app, const QString &output)
         if (warmFrames > 0) {
             if (animationRun || headerRun) {
                 if (animationRun && animatedFrame % 40 == 0) {
-                    controller.setText(animatedFrame % 80 == 0
-                                               ? QStringLiteral("收藏的声音（Archive gyp）")
-                                               : QStringLiteral("新的旅程（Music stories）"));
-                    controller.reconcile();
+                    session.navigate(animatedFrame % 80 == 0 ? "album-0" : "album-1");
                 }
+                if (headerRun) {
+                    auto *play = root->findChild<QQuickItem *>("playButton");
+                    auto *stop = root->findChild<QQuickItem *>("stopButton");
+                    if (play && stop) {
+                        const auto playPosition = play->mapToScene({ 0, 0 });
+                        const auto stopPosition = stop->mapToScene({ 0, 0 });
+                        // Establish the prepared layout before the first playback change at 8.
+                        if (animatedFrame == 7) {
+                            initialPlayPosition = playPosition;
+                            initialStopPosition = stopPosition;
+                        }
+                        if (animatedFrame >= 7)
+                            fixedButtons &= QLineF(initialPlayPosition, playPosition).length() < .01
+                                    && QLineF(initialStopPosition, stopPosition).length() < .01;
+                        headerPositions.append(QJsonObject{ { "frame", animatedFrame },
+                                                            { "playX", playPosition.x() },
+                                                            { "playY", playPosition.y() },
+                                                            { "stopX", stopPosition.x() },
+                                                            { "stopY", stopPosition.y() } });
+                    } else {
+                        fixedButtons = false;
+                    }
+                }
+                const auto before = controller.diagnostics()["layoutMisses"];
+                if (headerRun && animatedFrame == 7)
+                    root->setProperty("testReduced", false);
                 if (headerRun && animatedFrame == 8)
-                    root->setProperty(
-                            "song",
-                            QStringLiteral("新的歌曲（gyp）👨‍👩‍👧‍👦 é"));
+                    session.setPlaybackIds("album-1", "track-1");
                 if (headerRun && animatedFrame == 15)
                     clock.setSpeed(.25);
                 if (headerRun && animatedFrame == 21) {
                     clock.setSpeed(3);
-                    root->setProperty(
-                            "song",
-                            QStringLiteral(
-                                    "最终歌曲 gyp（收藏）👨‍👩‍👧‍👦 é"));
+                    session.setPlaybackIds("album-2", "track-2");
                 }
-                const auto before = controller.diagnostics()["layoutMisses"];
+                if (headerRun && animatedFrame == 25)
+                    root->setProperty("testReduced", true);
                 QElapsedTimer tickTimer;
                 tickTimer.start();
                 clock.advance(animationRun ? 1.0 / 120 : 1.0 / 60);
@@ -366,7 +421,10 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                  { "renderSubmitCpuNs", double(renderNs.load() - beginRender) },
                                  { "gpuTime", QJsonValue::Null } });
         } else if (index < staticSteps + animationSteps) {
-            const bool valid = !image.isNull() && noFrameShaping
+            const bool nativeMode = (index - staticSteps) % 3 == 0;
+            const auto reused = yalahoo::ReelInk::geometryReuses() - beginReuse;
+            const bool valid = !image.isNull() && noFrameShaping && (!nativeMode || reused > 0)
+                    && (nativeMode || yalahoo::ReelInk::geometryUpdates() == beginGeometry)
                     && yalahoo::verification::windowPolicySatisfied(window);
             passed &= valid;
             animatedCosts.append(QJsonObject{
@@ -379,14 +437,27 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                     { "syncCpuNs", double(syncNs.load() - beginSync) },
                     { "renderSubmitCpuNs", double(renderNs.load() - beginRender) },
                     { "gpuTime", QJsonValue::Null },
+                    { "glyphNodesCreated",
+                      double(yalahoo::ReelInk::geometryUpdates() - beginGeometry) },
+                    { "glyphNodesReused", double(reused) },
                     { "resources", QJsonObject::fromVariantMap(controller.diagnostics()) } });
         } else if (index < staticSteps + animationSteps + headerSteps) {
             auto *song = root->findChild<QQuickItem *>("playingTitle");
             auto *play = root->findChild<QQuickItem *>("playButton");
             auto *stop = root->findChild<QQuickItem *>("stopButton");
-            bool valid = song && play && stop && !image.isNull()
+            bool valid = song && play && stop && !image.isNull() && fixedButtons
                     && yalahoo::verification::windowPolicySatisfied(window);
             const QString full = root->property("song").toString();
+            const int beforePlaybackChanges = playbackChanges;
+            const QString beforeAlbum = session.playbackAlbumId();
+            const QString beforeTrack = session.playbackTrackId();
+            QVariant namesResult;
+            const bool fullNames = song
+                    && QMetaObject::invokeMethod(root, "fullTitleNames",
+                                                 Q_RETURN_ARG(QVariant, namesResult),
+                                                 Q_ARG(QVariant, QVariant::fromValue(song)))
+                    && namesResult.toBool();
+            valid &= fullNames;
             if (valid && song->width() > 0) {
                 const QPointF point = song->mapToScene({ song->width() / 2, song->height() / 2 });
                 QMouseEvent press(QEvent::MouseButtonPress, point,
@@ -398,7 +469,24 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                 QCoreApplication::sendEvent(&window, &press);
                 QCoreApplication::sendEvent(&window, &release);
                 valid &= root->property("lastAction").toString() == "locate-song";
+                session.navigate(beforeAlbum, beforeTrack);
             }
+            const bool playbackUnchanged = beforePlaybackChanges == playbackChanges
+                    && beforeAlbum == session.playbackAlbumId()
+                    && beforeTrack == session.playbackTrackId();
+            valid &= playbackUnchanged;
+            auto *header = root->findChild<QQuickItem *>("archiveHeader");
+            auto *transportReel = header
+                    ? qvariant_cast<yalahoo::TitleReel *>(header->property("transportController"))
+                    : nullptr;
+            const bool reducedFinished = transportReel && !transportReel->moving();
+            valid &= reducedFinished;
+            const double songWidth = song ? song->width() : 0;
+            root->setProperty("testReduced", false);
+            root->setProperty("song", "");
+            const bool exitDisabled = song && !song->isEnabled() && song->width() == songWidth
+                    && song->property("retainedTitle").toString() == full;
+            valid &= exitDisabled;
             const auto playPosition = play ? play->mapToScene({ 0, 0 }) : QPointF();
             const auto stopPosition = stop ? stop->mapToScene({ 0, 0 }) : QPointF();
             if (play && stop)
@@ -414,16 +502,32 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                              { "file", filename },
                                              { "title", full },
                                              { "action", root->property("lastAction").toString() },
+                                             { "fixedButtons", fixedButtons },
+                                             { "positions", headerPositions },
+                                             { "fullNames", fullNames },
+                                             { "playbackUnchanged", playbackUnchanged },
+                                             { "reducedFinished", reducedFinished },
+                                             { "exitDisabled", exitDisabled },
                                              { "width", window.width() },
                                              { "height", window.height() },
-                                             { "songWidth", song ? song->width() : 0 } });
+                                             { "songWidth", songWidth } });
         } else {
-            const bool valid =
-                    !image.isNull() && yalahoo::verification::windowPolicySatisfied(window);
+            const auto nodes = yalahoo::ReelInk::liveNodes();
+            const auto renderers = canvasTitleStats().renderers.load();
+            // Each mode has a different owner; the bounded ceilings cover all ten restores.
+            lifecycleNodeLimit = std::max(lifecycleNodeLimit, quint64(controller.slotCount()));
+            lifecycleRendererLimit = 1;
+            const bool valid = nodes <= int(lifecycleNodeLimit)
+                    && renderers <= lifecycleRendererLimit
+                    && controller.diagnostics()["cacheBytes"].toInt()
+                            <= yalahoo::TextLayoutAdapter::CacheBytes
+                    && !image.isNull() && yalahoo::verification::windowPolicySatisfied(window);
             passed &= valid;
             lifecycle.append(QJsonObject{
                     { "cycle", index - staticSteps },
                     { "passed", valid },
+                    { "liveInkNodes", nodes },
+                    { "liveCanvasRenderers", renderers },
                     { "resources", QJsonObject::fromVariantMap(controller.diagnostics()) } });
         }
         QTimer::singleShot(0, &app, [&] {
@@ -445,32 +549,43 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                     app.exit(5);
                     return;
                 }
-                file.write(QJsonDocument(
-                                   QJsonObject{ { "passed", passed },
-                                                { "motionError", motionError },
-                                                { "dpr", window.devicePixelRatio() },
-                                                { "qtVersion", qVersion() },
-                                                { "captures", captures },
-                                                { "lifecycle", lifecycle },
-                                                { "animatedCosts", animatedCosts },
-                                                { "headerChecks", headerChecks },
-                                                { "costs", costs },
-                                                { "released", released },
-                                                { "canvasSyncCpuNs",
-                                                  double(canvasTitleStats().syncNs.load()) },
-                                                { "canvasPaintCpuNs",
-                                                  double(canvasTitleStats().paintNs.load()) },
-                                                { "canvasPaints",
-                                                  double(canvasTitleStats().paints.load()) },
-                                                { "windowPolicy",
-                                                  yalahoo::verification::windowPolicy(window) } })
-                                   .toJson());
+                file.write(
+                        QJsonDocument(
+                                QJsonObject{ { "passed", passed },
+                                             { "motionError", motionError },
+                                             { "dpr", window.devicePixelRatio() },
+                                             { "qtVersion", qVersion() },
+                                             { "backend",
+                                               window.rendererInterface()->graphicsApi()
+                                                               == QSGRendererInterface::Direct3D11
+                                                       ? "d3d11"
+                                                       : window.rendererInterface()->graphicsApi()
+                                                               == QSGRendererInterface::OpenGL
+                                                       ? "opengl"
+                                                       : "unsupported" },
+                                             { "captures", captures },
+                                             { "lifecycle", lifecycle },
+                                             { "animatedCosts", animatedCosts },
+                                             { "headerChecks", headerChecks },
+                                             { "costs", costs },
+                                             { "released", released },
+                                             { "canvasSyncCpuNs",
+                                               double(canvasTitleStats().syncNs.load()) },
+                                             { "canvasPaintCpuNs",
+                                               double(canvasTitleStats().paintNs.load()) },
+                                             { "canvasPaints",
+                                               double(canvasTitleStats().paints.load()) },
+                                             { "windowPolicy",
+                                               yalahoo::verification::windowPolicy(window) } })
+                                .toJson());
                 app.exit(file.commit() && passed ? 0 : 6);
             });
             return;
         }
         beginSync = syncNs;
         beginRender = renderNs;
+        beginGeometry = yalahoo::ReelInk::geometryUpdates();
+        beginReuse = yalahoo::ReelInk::geometryReuses();
         QElapsedTimer guiTimer;
         guiTimer.start();
         if (step < staticSteps) {
@@ -490,6 +605,7 @@ int reviewTitle(QGuiApplication &app, const QString &output)
             headerRun = false;
             animatedFrame = 0;
             tickNs = 0;
+            fixedButtons = true;
             noFrameShaping = true;
             frameRecords = { };
             root->setProperty("mode", (step - staticSteps) % 3);
@@ -507,6 +623,8 @@ int reviewTitle(QGuiApplication &app, const QString &output)
             controller.setActive(false);
             animatedFrame = 0;
             tickNs = 0;
+            fixedButtons = true;
+            headerPositions = { };
             clock.setSpeed(1);
             const int index = step - staticSteps - animationSteps;
             const auto size = productSizes[index / 2];
@@ -514,10 +632,11 @@ int reviewTitle(QGuiApplication &app, const QString &output)
             root->setSize(size);
             metrics.setViewport(size.width(), size.height());
             root->setProperty("headerMode", true);
-            root->setProperty("testReduced", false);
+            root->setProperty("testReduced", true);
             root->setProperty("night", index % 2 != 0);
             root->setProperty("lastAction", "");
-            root->setProperty("song", QStringLiteral("初始歌曲 gyp é"));
+            session.setPlaybackIds("album-0", "track-0");
+            root->setProperty("song", library.albums[0].tracks[0].title);
             root->setProperty("playing", index % 2 != 0);
         } else {
             animationRun = false;

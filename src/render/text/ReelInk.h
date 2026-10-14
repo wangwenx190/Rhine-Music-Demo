@@ -17,6 +17,7 @@ public:
     void setColor(const QColor &color);
     static int liveNodes();
     static quint64 geometryUpdates();
+    static quint64 geometryReuses();
 
 protected:
     QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *) override;

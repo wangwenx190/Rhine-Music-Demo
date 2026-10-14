@@ -4,16 +4,19 @@
 #include <QSGTextNode>
 #include <QSGTransformNode>
 #include <atomic>
+#include <algorithm>
 
 namespace yalahoo {
 namespace {
 std::atomic<int> nodes{ 0 };
 std::atomic<quint64> rebuilds{ 0 };
+std::atomic<quint64> reused{ 0 };
 struct FaceNode
 {
     QSGTransformNode *transform = nullptr;
+    QSGClipNode *clip = nullptr;
     QSGTextNode *text = nullptr;
-    double offset = 0;
+    TitleGlyph glyph;
 };
 class InkNode : public QSGNode
 {
@@ -73,39 +76,59 @@ quint64 ReelInk::geometryUpdates()
 {
     return rebuilds;
 }
+quint64 ReelInk::geometryReuses()
+{
+    return reused;
+}
 QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 {
     auto *node = static_cast<InkNode *>(old);
-    if (!m_slot || !m_slot->shown()) {
+    if (!isVisible() || !m_slot || !m_slot->shown()) {
         delete node;
         return nullptr;
     }
     if (!node)
         node = new InkNode;
     if (node->revision != m_slot->revision) {
-        while (auto *child = node->firstChild()) {
-            node->removeChildNode(child);
-            delete child;
-        }
+        auto previous = std::move(node->faces);
+        for (const auto &face : previous)
+            node->removeChildNode(face.transform);
         node->faces.clear();
         for (const auto &face : m_slot->faces) {
             if (face.glyph.text.isEmpty() || face.glyph.colorGlyph)
                 continue;
-            auto *transform = new QSGTransformNode;
-            auto *clip = new QSGClipNode;
-            clip->setIsRectangular(true);
-            clip->setClipRect({ -face.glyph.size * .15 / face.glyph.scale, 0,
-                                (m_slot->capacityWidth + face.glyph.size * .3) / face.glyph.scale,
-                                face.glyph.height / face.glyph.scale });
-            auto *text = createReelTextNode(window(), face.glyph, m_color);
-            transform->appendChildNode(clip);
-            clip->appendChildNode(text);
-            node->appendChildNode(transform);
-            node->faces.append({ transform, text, face.offset });
+            const auto found =
+                    std::find_if(previous.begin(), previous.end(), [&](const auto &oldFace) {
+                        return sameGlyphInk(oldFace.glyph, face.glyph);
+                    });
+            FaceNode target;
+            if (found != previous.end()) {
+                ++reused;
+                target = *found;
+                previous.erase(found);
+                if (node->color != m_color)
+                    recolorReelTextNode(target.text, m_color);
+            } else {
+                target.transform = new QSGTransformNode;
+                target.clip = new QSGClipNode;
+                target.clip->setIsRectangular(true);
+                target.text = createReelTextNode(window(), face.glyph, m_color);
+                target.glyph = face.glyph;
+                target.transform->appendChildNode(target.clip);
+                target.clip->appendChildNode(target.text);
+                ++rebuilds;
+            }
+            target.clip->setClipRect(
+                    { -face.glyph.size * .15 / face.glyph.scale, 0,
+                      (m_slot->capacityWidth + face.glyph.size * .3) / face.glyph.scale,
+                      face.glyph.height / face.glyph.scale });
+            node->appendChildNode(target.transform);
+            node->faces.append(target);
         }
+        for (const auto &face : previous)
+            delete face.transform;
         node->revision = m_slot->revision;
         node->color = m_color;
-        ++rebuilds;
     }
     int i = 0;
     for (const auto &face : m_slot->faces) {
