@@ -28,6 +28,7 @@ foreach(directory IN ITEMS src qml tests tools resources/shaders)
         "${SOURCE_ROOT}/${directory}/*.c"
         "${SOURCE_ROOT}/${directory}/*.cc"
         "${SOURCE_ROOT}/${directory}/*.cxx"
+        "${SOURCE_ROOT}/${directory}/*.mm"
         "${SOURCE_ROOT}/${directory}/*.vert"
         "${SOURCE_ROOT}/${directory}/*.frag"
         "${SOURCE_ROOT}/${directory}/*.glsl"

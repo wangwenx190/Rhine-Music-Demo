@@ -58,3 +58,5 @@ Windows 默认无可见窗口：`./tools/assets/export-branding.ps1 -Preset qt-r
 - 证据在 `verification/windows/branding/`；本轮 macOS/Linux 仅审核共用源码、shell入口和衍生容器，结论为“静态审计通过，实机待用户验证”。
 
 主界面接入归 R14/R20，系统资源及平台元数据接入归 R30–R32。这里的图标资产不改变现有 Qt 探针 UI，也不提前生成后续播放器功能。
+
+跨平台资产校验保留清单的全部精确 bytes/SHA-256、SVG 母版/生产稿逐像素一致及小稿光学断言。已有 Windows 衍生 PNG 与本机 arm64 QtSvg 重绘在 64/128/256/512/1024px 分别仅有 1/3/13/16/31 个 RGB 通道相差 1，alpha 全部相同；同机量化差异不能误报资源过期。衍生 PNG/ICO/ICNS/iconset 对当前 SVG 的比较只允许每个 RGB 通道一个 8-bit 量化单位，alpha 和尺寸仍须完全一致，任一通道超过 1 即失败；资源 hash 仍须完全一致。此规则只用于品牌衍生资产，不改变标题或三维图像门槛，不重新导出/覆盖入库资产。

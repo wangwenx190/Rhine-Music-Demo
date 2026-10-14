@@ -10,6 +10,7 @@ Item {
     property real scriptMilliseconds: 0
     property bool surfaceReady: true
     property bool rebuilding: false
+    property bool offscreenRendering: false
     function resumeSurface() {
         rebuilding = false;
     }
@@ -35,8 +36,8 @@ Item {
         anchors.fill: parent
         // The preview Canvas2D context cannot replay into a replaced surface.
         // Preserve business state here, and own one disposable drawing context.
-        active: root.visible && root.surfaceReady && !root.rebuilding && root.Window.window
-                && root.Window.window.visible
+        active: root.visible && root.surfaceReady && !root.rebuilding && root.Window.window && (
+                    root.offscreenRendering || root.Window.window.visible)
         sourceComponent: Component {
             Canvas2D {
                 id: canvas

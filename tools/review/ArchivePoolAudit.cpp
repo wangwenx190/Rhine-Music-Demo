@@ -51,6 +51,7 @@ Snapshot library(int count)
 }
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);

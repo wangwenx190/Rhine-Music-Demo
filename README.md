@@ -15,7 +15,7 @@
 
 Windows 必须严格实机验证。macOS、Linux 必须完整实现代码及构建/部署方案，本阶段通过严格静态审计即可验收；实际环境构建、GUI 和音频验证以后由用户执行，结果须明确区分。
 
-常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；本阶段为“静态审计通过，实机待用户验证”，清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
+常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；macOS优先离屏验证、性能暂以严格架构/算法审计验收，默认暂缓可见窗口CTest（`YALAHOO_MACOS_VISIBLE_TESTS=OFF`），实际可见窗口统一归最后R34；本机arm64 Release及Metal二维离屏已实测，完整平台/部署结论仍按计划验收。Linux本阶段为“静态审计通过，实机待用户验证”；清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 

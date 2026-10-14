@@ -57,6 +57,11 @@ void recordDiagnostic(QtMsgType, const QMessageLogContext &, const QString &mess
 
 int main(int argc, char **argv)
 {
+    for (int i = 1; i < argc; ++i) {
+        if (QByteArray(argv[i]).startsWith("--verify-")) {
+            yalahoo::verification::prepareApplication();
+        }
+    }
     if (!yalahoo::selectGraphicsBackend())
         return 22;
     yalahoo::initializeIdentity();
@@ -298,6 +303,11 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+    if (verificationRun)
+        yalahoo::verification::prepareWindow(
+                *window,
+                parser.isSet(QStringLiteral("verify-browse"))
+                        || parser.isSet(QStringLiteral("verify-navigation")));
     inputRouter.attach(window);
     if (preferences)
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,

@@ -16,6 +16,7 @@ Rectangle {
     property bool testReduced: true
     property string song: ""
     property bool playing: false
+    property bool offscreenRendering: false
     property string lastAction: ""
     function fullTitleNames(control) {
         return control.ToolTip.text === root.song && control.Accessible.name === "定位歌曲："
@@ -26,6 +27,7 @@ Rectangle {
         id: titleDesign
         night: root.night
         reducedMotion: root.testReduced
+        offscreenRendering: root.offscreenRendering
         motionSpeed: root.clock.speed
     }
     TitleReel {
@@ -38,6 +40,7 @@ Rectangle {
         quickTextCandidate: root.mode === 1
     }
     CanvasTitleProbe {
+        offscreenRendering: root.offscreenRendering
         controller: root.controller
         ink: titleDesign.ink
         muted: titleDesign.muted

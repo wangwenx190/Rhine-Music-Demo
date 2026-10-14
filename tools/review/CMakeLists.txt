@@ -15,7 +15,7 @@ set_target_properties(
     FALSE
 )
 yalahoo_platform(compare-images)
-qt_add_executable(ui-audit UiAudit.cpp RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h
+qt_add_executable(ui-audit UiAudit.cpp RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

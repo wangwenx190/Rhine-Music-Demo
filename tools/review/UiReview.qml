@@ -14,11 +14,13 @@ Rectangle {
     property string artistText: "本地音乐收藏"
     property string playingTitle: ""
     property int captureRevision: 0
+    property bool offscreenRendering: false
     color: design.page
     DesignTokens {
         id: design
         night: root.night
         reducedMotion: true
+        offscreenRendering: root.offscreenRendering
     }
     Browse {
         anchors.fill: parent
@@ -66,6 +68,7 @@ Rectangle {
     Component {
         id: js
         Canvas2DProbe {
+            offscreenRendering: root.offscreenRendering
             objectName: "canvasJs"
             night: root.night
         }

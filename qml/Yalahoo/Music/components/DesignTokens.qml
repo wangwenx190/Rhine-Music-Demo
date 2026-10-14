@@ -6,6 +6,7 @@ QtObject {
     id: root
     property bool night: false
     property bool reducedMotion: false
+    property bool offscreenRendering: false
     property real motionSpeed: 1
     readonly property string displayName: ApplicationIdentity.displayName
     property color ink: night ? "#e9eef2" : "#232722"

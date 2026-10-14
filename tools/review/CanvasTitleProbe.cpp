@@ -31,7 +31,8 @@ protected:
         QElapsedTimer timer;
         timer.start();
         auto *probe = static_cast<CanvasTitleProbe *>(item);
-        m_visible = probe->isVisible() && (!probe->window() || probe->window()->isVisible());
+        m_visible = probe->isVisible()
+                && (probe->offscreenRendering || !probe->window() || probe->window()->isVisible());
         ink = probe->ink;
         muted = probe->muted;
         m_slots.clear();

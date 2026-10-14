@@ -17,11 +17,13 @@ class CanvasTitleProbe : public QCanvasPainterItem
     Q_PROPERTY(yalahoo::TitleReel *controller READ controller WRITE setController NOTIFY changed)
     Q_PROPERTY(QColor ink MEMBER ink NOTIFY changed)
     Q_PROPERTY(QColor muted MEMBER muted NOTIFY changed)
+    Q_PROPERTY(bool offscreenRendering MEMBER offscreenRendering NOTIFY changed)
 public:
     explicit CanvasTitleProbe(QQuickItem *parent = nullptr);
     yalahoo::TitleReel *controller() const;
     void setController(yalahoo::TitleReel *controller);
     QColor ink = Qt::black, muted = Qt::gray;
+    bool offscreenRendering = false;
     QCanvasPainterItemRenderer *createItemRenderer() const override;
 signals:
     void changed();

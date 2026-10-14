@@ -1,3 +1,4 @@
+#include "OffscreenSurface.h"
 #include "TitleAudit.h"
 #include "TitleReel.h"
 #include "ReelInk.h"
@@ -219,7 +220,10 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         controller.setText(session.browseInfo()["title"].toString());
         controller.reconcile();
     });
-    QQuickWindow window;
+    QQuickRenderControl renderControl;
+    QQuickWindow window(OffscreenSurface::Enabled ? &renderControl : nullptr);
+    OffscreenSurface surface(window, renderControl);
+    root->setProperty("offscreenRendering", OffscreenSurface::Enabled);
     yalahoo::verification::prepareWindow(window, true);
     window.setPersistentSceneGraph(false);
     window.setPersistentGraphics(false);
@@ -294,9 +298,9 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                         [&] {
                             if (!restorePending.exchange(false))
                                 return;
-                            window.showNormal();
+                            surface.show();
                             root->setProperty("marker", ++marker);
-                            window.update();
+                            surface.requestFrame();
                         },
                         Qt::QueuedConnection);
             },
@@ -306,12 +310,9 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
             [&] {
                 if (!requested || inFlight)
                     return;
-                auto *ri = window.rendererInterface();
-                auto *rhi = static_cast<QRhi *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiResource));
-                auto *swapchain = static_cast<QRhiSwapChain *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiSwapchainResource));
-                if (!rhi || !swapchain)
+                auto *rhi = surface.rhi();
+                auto *commandBuffer = surface.commandBuffer();
+                if (!rhi || !commandBuffer)
                     return;
                 requested = false;
                 inFlight = true;
@@ -334,11 +335,11 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                             Qt::QueuedConnection);
                 };
                 auto *batch = rhi->nextResourceUpdateBatch();
-                batch->readBackTexture(QRhiReadbackDescription(), &readback);
-                swapchain->currentFrameCommandBuffer()->resourceUpdate(batch);
+                batch->readBackTexture(surface.readbackDescription(), &readback);
+                commandBuffer->resourceUpdate(batch);
             },
             Qt::DirectConnection);
-    QObject::connect(&window, &QQuickWindow::frameSwapped, &app, [&] {
+    surface.connectFrames(&app, [&] {
         if (warmFrames > 0) {
             if (animationRun || headerRun) {
                 if (animationRun && animatedFrame % 40 == 0) {
@@ -391,18 +392,20 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                             { "stateForNextSubmissionTickCpuNs", double(tick) },
                             { "synchronizationCpuCumulativeNs", double(syncNs.load()) },
                             { "renderSubmitCpuCumulativeNs", double(renderNs.load()) },
-                            { "presentEventNs", double(timer.nsecsElapsed()) } });
+                            { OffscreenSurface::Enabled ? "offscreenFrameCompletedNs"
+                                                        : "presentEventNs",
+                              double(timer.nsecsElapsed()) } });
                 noFrameShaping &= controller.diagnostics()["layoutMisses"] == before;
                 ++animatedFrame;
             }
             --warmFrames;
             requested = warmFrames == 0;
             root->setProperty("marker", ++marker);
-            window.update();
+            surface.requestFrame();
         } else if (inFlight && drain > 0) {
             --drain;
             root->setProperty("marker", ++marker);
-            window.update();
+            surface.requestFrame();
         }
     });
     const int staticSteps = cases.size() * 3;
@@ -580,7 +583,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         if (step >= staticSteps + animationSteps + headerSteps + 10) {
             root->setParentItem(nullptr);
             object.reset();
-            window.hide();
+            surface.hide();
             window.releaseResources();
             QTimer::singleShot(200, &app, [&] {
                 const bool released =
@@ -591,39 +594,44 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                     app.exit(5);
                     return;
                 }
-                file.write(
-                        QJsonDocument(
-                                QJsonObject{ { "passed", passed },
-                                             { "motionError", motionError },
-                                             { "dpr", window.devicePixelRatio() },
-                                             { "qtVersion", qVersion() },
-                                             { "backend",
-                                               window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::Direct3D11
-                                                       ? "d3d11"
-                                                       : window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::OpenGL
-                                                       ? "opengl"
-                                                       : window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::Metal
-                                                       ? "metal"
-                                                       : "unsupported" },
-                                             { "sourceDirectory", sourceDirectory },
-                                             { "captures", captures },
-                                             { "lifecycle", lifecycle },
-                                             { "animatedCosts", animatedCosts },
-                                             { "headerChecks", headerChecks },
-                                             { "costs", costs },
-                                             { "released", released },
-                                             { "canvasSyncCpuNs",
-                                               double(canvasTitleStats().syncNs.load()) },
-                                             { "canvasPaintCpuNs",
-                                               double(canvasTitleStats().paintNs.load()) },
-                                             { "canvasPaints",
-                                               double(canvasTitleStats().paints.load()) },
-                                             { "windowPolicy",
-                                               yalahoo::verification::windowPolicy(window) } })
-                                .toJson());
+                file.write(QJsonDocument(
+                                   QJsonObject{
+                                           { "passed", passed },
+                                           { "motionError", motionError },
+                                           { "dpr", window.devicePixelRatio() },
+                                           { "qtVersion", qVersion() },
+                                           { "offscreen", OffscreenSurface::Enabled },
+                                           { "renderProtocol",
+                                             OffscreenSurface::Enabled ? "render-control-gui-thread"
+                                                                       : "native-window" },
+                                           { "offscreenResourcePlan", surface.diagnostics() },
+                                           { "backend",
+                                             window.rendererInterface()->graphicsApi()
+                                                             == QSGRendererInterface::Direct3D11
+                                                     ? "d3d11"
+                                                     : window.rendererInterface()->graphicsApi()
+                                                             == QSGRendererInterface::OpenGL
+                                                     ? "opengl"
+                                                     : window.rendererInterface()->graphicsApi()
+                                                             == QSGRendererInterface::Metal
+                                                     ? "metal"
+                                                     : "unsupported" },
+                                           { "sourceDirectory", sourceDirectory },
+                                           { "captures", captures },
+                                           { "lifecycle", lifecycle },
+                                           { "animatedCosts", animatedCosts },
+                                           { "headerChecks", headerChecks },
+                                           { "costs", costs },
+                                           { "released", released },
+                                           { "canvasSyncCpuNs",
+                                             double(canvasTitleStats().syncNs.load()) },
+                                           { "canvasPaintCpuNs",
+                                             double(canvasTitleStats().paintNs.load()) },
+                                           { "canvasPaints",
+                                             double(canvasTitleStats().paints.load()) },
+                                           { "windowPolicy",
+                                             yalahoo::verification::windowPolicy(window) } })
+                                   .toJson());
                 app.exit(file.commit() && passed ? 0 : 6);
             });
             return;
@@ -695,7 +703,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
             root->setProperty("testReduced", true);
             controller.setReducedMotion(true);
             restorePending = true;
-            window.hide();
+            surface.hide();
             window.releaseResources();
             controller.setAvailableWidth(300 + (step % 2) * 20);
             window.resize(int(controller.availableWidth()) + 2, 152);
@@ -707,9 +715,9 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         ++step;
         warmFrames = animationRun ? 120 : headerRun ? 60 : 3;
         root->setProperty("marker", ++marker);
-        window.update();
+        surface.requestFrame();
     };
-    window.show();
+    surface.show();
     QTimer::singleShot(0, &app, [&] {
         next();
     });
@@ -740,7 +748,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
     });
     const int result = app.exec();
     QObject::disconnect(&window, nullptr, &window, nullptr);
-    window.hide();
+    surface.hide();
     window.releaseResources();
     // Destroy the graphics surface while the pending readback and callback state are alive.
     window.destroy();

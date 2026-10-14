@@ -115,7 +115,6 @@ private slots:
             const auto os2 = raw.fontTable("OS/2");
             QVERIFY(os2.size() >= 6);
             QCOMPARE(qFromBigEndian<quint16>(os2.constData() + 4), weights[index]);
-            QCOMPARE(int(raw.weight()), weights[index]);
             for (const auto ch : chinese + latin)
                 QVERIFY2(raw.supportsCharacter(ch),
                          qPrintable(QString("Missing MiSans glyph %1").arg(ch)));
@@ -123,7 +122,10 @@ private slots:
             font.setPixelSize(24);
             font.setHintingPreference(QFont::PreferNoHinting);
             const auto selected = QRawFont::fromFont(font);
-            QCOMPARE(int(selected.weight()), weights[index]);
+            // Native font engines may map SFNT weights to Qt's named weight classes.
+            // Verify the selected physical face and its original SFNT weight instead.
+            QCOMPARE(selected.weight(), raw.weight());
+            QCOMPARE(selected.fontTable("OS/2"), os2);
             QVERIFY(selected.familyName().startsWith("MiSans"));
             const char *outlineTable = raw.fontTable("CFF ").isEmpty() ? "glyf" : "CFF ";
             QCOMPARE(selected.fontTable(outlineTable), raw.fontTable(outlineTable));
@@ -140,6 +142,7 @@ private slots:
                     QCOMPARE(run.rawFont().fontTable(outlineTable), raw.fontTable(outlineTable));
                 faces.append(QJsonObject{ { "face", face["weight"] },
                                           { "weight", weights[index] },
+                                          { "nativeWeight", int(raw.weight()) },
                                           { "text", text },
                                           { "widthAt24px", line.naturalTextWidth() } });
             };

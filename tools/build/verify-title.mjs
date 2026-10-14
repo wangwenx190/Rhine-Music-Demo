@@ -121,6 +121,8 @@ const summary = {
     platform: process.platform,
     architecture: process.arch,
     configuration: 'Release',
+    offscreen: report.offscreen === true,
+    renderProtocol: report.renderProtocol || 'native-window',
     qtVersion: report.qtVersion,
     backend: report.backend,
     dpr: report.dpr,

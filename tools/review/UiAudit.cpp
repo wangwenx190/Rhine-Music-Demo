@@ -1,3 +1,4 @@
+#include "OffscreenSurface.h"
 #include "AssetCatalog.h"
 #include "AppIdentity.h"
 #include "CanvasProbe.h"
@@ -65,6 +66,7 @@ QJsonObject bounds(QQuickItem *root, const QString &name)
 }
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
     if (!yalahoo::selectGraphicsBackend())
         return 2;
     yalahoo::initializeIdentity();
@@ -106,7 +108,10 @@ int main(int argc, char **argv)
     QRhiReadbackResult readback;
     QMutex captureMutex;
     QImage capturedFrame;
-    QQuickWindow window;
+    QQuickRenderControl renderControl;
+    QQuickWindow window(OffscreenSurface::Enabled ? &renderControl : nullptr);
+    OffscreenSurface surface(window, renderControl);
+    root->setProperty("offscreenRendering", OffscreenSurface::Enabled);
     yalahoo::verification::prepareWindow(window, true);
     window.resize(1280, 720);
     root->setParentItem(window.contentItem());
@@ -142,12 +147,12 @@ int main(int argc, char **argv)
                 renderNs += elapsed.nsecsElapsed() - renderStart;
             },
             Qt::DirectConnection);
-    QObject::connect(&window, &QQuickWindow::frameSwapped, &app, [&] {
+    surface.connectFrames(&app, [&] {
         ++swapped;
         if (captureInFlight && drainFramesRemaining > 0) {
             --drainFramesRemaining;
             root->setProperty("captureRevision", root->property("captureRevision").toInt() + 1);
-            window.update();
+            surface.requestFrame();
         }
     });
     QObject::connect(
@@ -155,12 +160,9 @@ int main(int argc, char **argv)
             [&] {
                 if (!captureRequested.load() || captureInFlight.load())
                     return;
-                auto *ri = window.rendererInterface();
-                auto *rhi = static_cast<QRhi *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiResource));
-                auto *swapchain = static_cast<QRhiSwapChain *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiSwapchainResource));
-                if (!rhi || !swapchain)
+                auto *rhi = surface.rhi();
+                auto *commandBuffer = surface.commandBuffer();
+                if (!rhi || !commandBuffer)
                     return;
                 captureRequested = false;
                 captureInFlight = true;
@@ -179,8 +181,8 @@ int main(int argc, char **argv)
                     captureInFlight = false;
                 };
                 auto *batch = rhi->nextResourceUpdateBatch();
-                batch->readBackTexture(QRhiReadbackDescription(), &readback);
-                swapchain->currentFrameCommandBuffer()->resourceUpdate(batch);
+                batch->readBackTexture(surface.readbackDescription(), &readback);
+                commandBuffer->resourceUpdate(batch);
             },
             Qt::DirectConnection);
     bool passed = true;
@@ -202,7 +204,7 @@ int main(int argc, char **argv)
             root->setSize(size);
             root->setProperty("night", index % 2 == 1);
             QTimer::singleShot(150, &app, [&, index, size] {
-                const auto image = window.grabWindow();
+                const auto image = surface.grab();
                 const QString file = QString("browse-%1.png").arg(index, 2, 10, QChar('0'));
                 const auto info = bounds(root, "browseInfo");
                 const auto play = bounds(root, "playButton");
@@ -258,7 +260,7 @@ int main(int argc, char **argv)
             QTimer::singleShot(300, &app, [&] {
                 captureRequested = true;
                 root->setProperty("captureRevision", root->property("captureRevision").toInt() + 1);
-                window.update();
+                surface.requestFrame();
             });
             QTimer::singleShot(1200, &app, [&, index] {
                 QImage image;
@@ -368,7 +370,7 @@ int main(int argc, char **argv)
                             == stationaryPaints;
             passed &= stable;
             lifecycle.append(QJsonObject{ { "operation", "stationary" }, { "passed", stable } });
-            window.hide();
+            surface.hide();
             stationaryPaints = lifecycleMode == 0
                     ? canvasProbeStats().paints.load()
                     : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong();
@@ -383,7 +385,7 @@ int main(int argc, char **argv)
             passed &= stable;
             lifecycle.append(QJsonObject{ { "operation", "hidden" }, { "passed", stable } });
             window.releaseResources();
-            window.show();
+            surface.show();
             window.resize(420, 200);
             root->findChild<QQuickItem *>("probeLoader")->setSize({ 420, 200 });
             root->setSize({ 420, 200 });
@@ -391,7 +393,7 @@ int main(int argc, char **argv)
             QTimer::singleShot(150, &app, [&] {
                 captureRequested = true;
                 root->setProperty("captureRevision", root->property("captureRevision").toInt() + 1);
-                window.update();
+                surface.requestFrame();
             });
             wait(700);
             return;
@@ -471,10 +473,14 @@ int main(int argc, char **argv)
         QJsonObject report{
             { "passed", passed },
             { "qtVersion", qVersion() },
+            { "offscreen", OffscreenSurface::Enabled },
+            { "offscreenResourcePlan", surface.diagnostics() },
             { "graphicsApi", window.rendererInterface()->graphicsApi() },
             { "windowPolicy", yalahoo::verification::windowPolicy(window) },
             { "captureMethod",
-              "UI grabWindow; Canvas actual submitted swapchain QRhi readback, no forced Canvas redraw" },
+              OffscreenSurface::Enabled
+                      ? "QQuickRenderControl Metal texture QRhi readback; native window stays hidden"
+                      : "UI grabWindow; Canvas actual submitted swapchain QRhi readback, no forced Canvas redraw" },
             { "browse", captures },
             { "probes", probes },
             { "lifecycle", lifecycle },
@@ -507,7 +513,7 @@ int main(int argc, char **argv)
         const bool saved = file.commit();
         app.exit(passed && saved ? 0 : 6);
     };
-    window.show();
+    surface.show();
     QTimer::singleShot(0, &app, [&] {
         next();
     });

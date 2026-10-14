@@ -48,7 +48,8 @@ Button {
         targetWidth: Math.min(root.cap, Math.ceil(caption.naturalWidth + 4) + 14)
         shown: root.title.length > 0
         reducedMotion: root.tokens.reducedMotion
-        active: root.visible && (!root.Window.window || root.Window.window.visible)
+        active: root.visible && (root.tokens.offscreenRendering || !root.Window.window
+                                 || root.Window.window.visible)
     }
     onClicked: locateRequested()
     onTitleChanged: {

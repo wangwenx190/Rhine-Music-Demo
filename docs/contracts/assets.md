@@ -33,6 +33,8 @@ Qt 的数值权重匹配不能直接代替 Web 的 `@font-face` 映射。`src/ap
 
 启动时核对实际选中字体的 CFF/glyf 表；若 DirectWrite/CoreText/Fontconfig 暴露的字体别名不同，则从本次注册返回的 family/style 中找到同一字形表。无法选中原字形时明确失败并回滚注册，不静默使用系统替代字体。
 
+CoreText 的 `QRawFont::weight()` 可把原 OS/2 数值映射到 Qt 命名字重，例如原 Light 的 250 在本机报告为 300。资产测试分别检查原 OS/2 表/权重、选中与文件直接加载的 native weight 一致，以及完整 OS/2/CFF 表和整行 shaping 来源；不能用平台报告值替换 manifest 中的原始字重，也不能为此改字体资产。
+
 ```qml
 font.family: MusicFonts.demibold.family
 font.styleName: MusicFonts.demibold.styleName

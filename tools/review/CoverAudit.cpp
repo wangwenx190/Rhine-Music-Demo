@@ -34,6 +34,7 @@ CoverSnapshot pixels(const QString &id, QColor color)
 }
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);

@@ -13,6 +13,8 @@ uname -m
 
 不得使用浅克隆；冻结工具需要祖先提交，原始来源 SHA 经 `docs/contracts/history-rewrite.json` 解析。Apple Silicon 终端的 `uname -m` 应为 `arm64`，关闭终端的 Rosetta 模式。准备支持项目 C++23 探针的 Xcode/Command Line Tools、CMake（满足根最低版本）、Ninja、能读取根 `.clang-format` 的现代 clang-format，以及本机最新完整 Qt Desktop Kit（含 CanvasPainter 和下文全部模块、private headers）。Qt 的 Universal Kit 可用，其 `QT_ARCHS` 的 arm64 切片参与发现；应用仍构建单一原生架构。若 C++23、最新 Kit 模块或 formatter 检查失败，补齐本机工具，不能降级 Qt/标准或关闭门禁。自定义 Qt 安装根用 `YALAHOO_QT_ROOTS`，formatter 不在 PATH 时可向 configure 传 `-DYALAHOO_CLANG_FORMAT=/本机路径/clang-format`，不写入公共 presets。
 
+当前用户开发机定位提示：Qt 安装在 `/Users/zhaoyuhang/Qt/6.12.0/macos`，默认 `$HOME/Qt` 枚举可找到它；此处记录不锁定版本。Homebrew LLVM 的 formatter 可用 `/opt/homebrew/opt/llvm/bin/clang-format`，首次 configure 可追加 `-DYALAHOO_CLANG_FORMAT=/opt/homebrew/opt/llvm/bin/clang-format`。后续 session 先重新查询 Kit 和工具实际版本，不复用别台机器的 cache。
+
 ```sh
 sh tools/build/build.sh qt-release --fresh -DYALAHOO_REVIEW=OFF
 cmake --build --preset qt-release --target check-format
@@ -26,7 +28,7 @@ fi
 "$qsb" --dump build/release/src/app/.qsb/reel-slot.frag.qsb
 ```
 
-检查 qsb 输出含 MSL 变体。初次构建用 Review=OFF；这仍构建 `ui-audit` 和基础 CTest，不要求携带旧 GPU 采集产物。记录实际 Kit、编译器、arm64、CTest 和 Metal 结果；现有 Windows 27 项通过只证明 Windows。当前开发 bundle 可启动，但独立部署、根 `.command`、完整平台菜单与媒体验收仍属 R31/R24 等后续轮次，不把本入口当作完成的安装包。
+检查 qsb 输出含 MSL 变体。初次构建用 Review=OFF；这仍构建 `ui-audit` 和已启用基础 CTest，不要求携带旧 GPU 采集产物。记录实际 Kit、编译器、arm64、CTest 和 Metal 结果；现有 Windows 27 项通过只证明 Windows。当前开发 bundle 可启动，但独立部署、根 `.command`、完整平台菜单与媒体验收仍属 R31/R24 等后续轮次，不把本入口当作完成的安装包。
 
 用户主动查看应用时：
 
@@ -35,7 +37,7 @@ QT_PLUGIN_PATH="$kit/plugins" build/release/bin/yalahoo.app/Contents/MacOS/yalah
     --data-dir "$PWD/verification/macos/manual-data"
 ```
 
-R16M1 标题诊断另需符合 `legacy-web/package.json` engines 的原生 Node 和已安装 Chrome/Edge；它们仅供开发采集，播放器不依赖它们。以下只在冻结 Web 根安装已有 lockfile 的开发依赖，不改其源码；浏览器全程 headless，仅访问本机匿名测试服务，不下载浏览器。可用 `REVIEW_BROWSER` 指定已有浏览器可执行文件。
+同机标题诊断另需符合 `legacy-web/package.json` engines 的原生 Node 和已安装 Chrome/Edge；它们仅供开发采集，播放器不依赖它们。以下只在冻结 Web 根安装已有 lockfile 的开发依赖，不改其源码；浏览器全程 headless，仅访问本机匿名测试服务，不下载浏览器。可用 `REVIEW_BROWSER` 指定已有浏览器可执行文件。
 
 ```sh
 (cd legacy-web && npm ci --no-audit --no-fund)
@@ -46,7 +48,11 @@ node tools/build/verify-title.mjs --backend metal --dpr 2 \
 
 采集器记录本机来源平台/架构；原生入口支持 `ui-audit --titles 输出目录 源参照目录`，报告真实 `metal` 后端。包装工具自动查询 native screen DPR、按目标/原生 DPR 校准 scale，检查20项文字结构、18项页眉、每路径三组120帧、缓存/隐藏工作、十次恢复及最终释放，不放宽像素门槛。`--diagnostics` 只接受实际像素退出6且其余门禁通过，仍写 `passed=false` 和待修案例；正常像素验收须去掉该参数。每次使用新输出目录保留失败样本，原始生成物保持忽略。Qt 验证窗口使用既有置底/拒绝焦点契约，不采集用户桌面。
 
-接续顺序按计划顶部 R16M1。Mac 可以进行共用 C++/QML 开发、Metal 诊断和修复；R16B2V-P/W 的 D3D11 及 R16B3 的 Windows OpenGL 门禁仍需 Windows 实机，Mac 不替代这些结论。R17 继续等待 R16 收口。当前判断是源码链与工具入口可接续，**macOS 静态审计通过，实机待用户验证**；尚未在 Mac 编译或运行。
+本机 Apple Silicon 接续已实际执行：macOS 27.0.1、arm64、Qt 6.12.0、AppleClang 21.0.0、C++23 Release；C++23/QRhi/字形私有接口探针、构建、格式、两个qmllint及29份qsb的GLSL/HLSL/MSL变体检查通过。已安装Homebrew Node 26.11.1/npm并使用现有Edge 155.0.4283.45生成同机20项DPR2冻结参照；没有增加产品运行依赖。字体资产测试按原OS/2表和实际物理字形身份验证，品牌资产hash不变，仅适配跨平台一个RGB量化单位的栅格差异。
+
+按用户最新要求，macOS优先真正离屏验证，性能暂以严格架构/算法审计验收；全部可见窗口、呈现/VSYNC、交互和实机包验证集中到最后R34。默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，当前四项runtime CTest明确disabled/deferred；不计为通过。以下历史手工可见窗口清单均属于R34输入，不提前执行。普通产品由用户主动启动的行为不变。
+
+Release CTest的23项已启用测试全部通过，4项可见runtime入口明确暂缓，未算作通过。二维Metal离屏/隐藏窗口检查已实测；标题诊断完整执行20项生产文字、18项页眉、三路径各三次120帧、十次离屏资源恢复及最终释放。18项页眉、隐藏候选零文字绘制、有界缓存、十次恢复/最终释放和隐藏窗口策略通过；case10/11仍有16.078125逻辑px的emoji混排几何误差，八项生产像素失败，故native退出6、严格包装退出1，**未通过完整标题诊断**。失败摘要和下一轮R16M2见[title-reels.md](../contracts/title-reels.md)。离屏frame完成不是present，GUI线程sync/render成本不能当作正常VSYNC或产品render-thread性能；PERF-01–07严格源码审计通过，完整可见实机待R34。Windows D3D11/OpenGL门禁保留，R17继续等待R16收口。
 
 本次换机入口在 Windows Release 实测：Universal/单架构 Kit 元数据回归通过；自定义源目录与DPR校准后的D3D11/DPR1标题全通过，DPR1.5诊断仍准确保留case6/7、14/15、17的像素失败。普通CTest曾在Canvas读回阶段失败，原生权限或仅指定threaded重试仍失败；完整使用迁移验收的 `QSG_RENDER_LOOP=threaded` 与 `QT_SCALE_FACTOR=1` 后通过，已写入 ui-drawing 的 CTest 环境。factor1保留屏幕实际DPR1.5，不强制DPR1；Qt内部为何依赖显式factor尚未确认，未放宽图像/读回门槛。浏览器受限环境页面连接失败，原生 headless 环境成功生成20项；这两种失败原因不能混为一谈。最终27项Release CTest、check-format、两组qmllint及qsb的GLSL/HLSL/MSL变体检查通过。此记录不代表Metal实机通过。
 

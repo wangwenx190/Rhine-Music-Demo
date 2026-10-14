@@ -96,6 +96,13 @@
 
 - NativeRendering在20px普通字形的局部图更接近源，但分数拟合/译名字号仍失败；原生透明层试验出现彩色子像素边缘，显式GrayAntialiasing去除彩边后仍未满足全部门槛。重设分数QRawFont字号/补偿transform、将层改为实际DPR也没有全通过。统一按DPR取整度量使case6/7带外SSIM从约0.976下降到约0.941，不能将其作为普遍CSS度量规则。
 - CurveRendering四倍离屏层让case6/7、14/15改善，却使44px标题下19.8px译名的case16/17失败；分数度量取整、重设Curve字号与mipmap面积滤波也未全通过。原因仍需实际层/最终输出亚像素相位与源字体度量诊断；不能据某个局部通过保留新生产路径。所有这些试验已撤回，失败报告/成对图在本地r16b2v目录保留；不把采样门槛降低、1px带扩大或新增逐case偏移作为解决方案。
+### R16M1：macOS窗口激活、遮挡与离屏驱动
+
+- 表现与确认边界：仅设置Qt置底/拒绝焦点flags时，测试窗口仍干扰用户工作。Qt Cocoa的windowLevel不处理WindowStaysOnBottomHint，启动委托可主动激活进程。原生低层级后，窗口完全遮挡时isExposed=false，Canvas异步读回没有完成；静态grabWindow曾仍可得到自己的内容，因此不能从缺少frameSwapped推断应用被系统终止。Qt/compositor各自的停帧内部原因尚未确认。
+- 处理：测试在QGuiApplication之前关闭Qt foreground transform/启动激活，隐藏原生窗口使用Prohibited应用策略、NSNormalWindowLevel-1、拒绝key与忽略系统鼠标输入。NSView.window/NSWindow.level同步观察在Qt重设/重建时保持层级，销毁surface前撤销观察。Accessory试验虽保留低层级，却检测到applicationActive=true及前台变化，已撤回，不能作为安全显示方案。用户明确将所有macOS可见窗口测试集中到最后R34；默认CTest明确暂缓对应入口，不能写成已运行通过。
+- 离屏修正：Review用QQuickRenderControl与真实Metal RGBA8+depth/stencil单采样目标，不调用macOS原生show；有界事件请求驱动sync/render和自身texture读回，业务仍使用原FrameClock。离屏目标必须显式设置devicePixelRatio，否则DPR2图像尺寸虽正确，文字/背景却只占左上四分之一，像素失败来自验证投影而非字号。hidden窗口下TitleReel/Header/Transport与Canvas探针需要显式offscreenRendering消费状态，生产默认false；漏接Transport会让全部页眉退出期宽度不保留。修正后18项页眉通过，十次离屏恢复/最终释放和原生隐藏窗口策略通过。
+- 验证限制：离屏frame完成事件不叫present，GUI线程sync/render局部CPU与offscreen endFrame等待分开；不宣称正常VSYNC、跨线程渲染或产品性能。Metal/DPR2的两项emoji几何和八项像素失败仍在R16M2，未降低门槛。所有失败/原图保持本地忽略；后续先核对目标DPR、完整隐藏状态依赖和真实字体，再研究产品字形采样。
+
 ## 目标、范围与固定取舍
 
 1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
@@ -143,6 +150,7 @@
 ### 工具链契约
 
 - 当前开发机参考：Qt 安装根 `C:/Qt/`，已安装版本包括 6.11.1、6.12.0，目前最新 Kit 为 `C:/Qt/6.12.0/msvc2022_64`，qmake 报告 6.12.0；VS C++ 工具路径为 `C:/Program Files/Microsoft Visual Studio/18/Community`。这些值仅供 agent 定位，执行时重新枚举安装并选最新版本，升级 Qt 不要求修改仓库中的版本常量或路径。以 Kit 配套 ABI 和实际编译探测为准，不因为目录名 msvc2022 就切换到不存在的 VS 安装。
+- Apple Silicon 开发机定位参考：用户安装的 Qt Kit 为 `/Users/zhaoyuhang/Qt/6.12.0/macos`，安装根为 `$HOME/Qt`，已纳入默认自动发现。此路径只供后续 session 定位，不是版本要求；每次配置仍重新枚举最新原生 Kit。现有 LLVM 的 clang-format 位于 `/opt/homebrew/opt/llvm/bin/clang-format`，不在 PATH 时通过本机 cache 变量 `YALAHOO_CLANG_FORMAT` 指定，不写入公共 presets。
 - 全部原生 C++ 目标与资产/审计工具采用 C++23：CMake 设置 `CMAKE_CXX_STANDARD 23`、`CMAKE_CXX_STANDARD_REQUIRED ON`、`CMAKE_CXX_EXTENSIONS OFF`，公共目标按需声明 `cxx_std_23`。必须编译实际 C++23 能力探针；编译器不满足时明确报错，不静默退回 C++20 或依赖编译器默认标准。
 - Qt 自动选择由 `tools/build/` 的公共 Kit 定位逻辑负责：安装根从本机 UserPresets/环境配置读取，缺省枚举平台标准安装位置（Windows 当前参考 `C:/Qt/`）；枚举包含 Qt CMake 配置的本机原生 Kit，读取配置中的实际版本，并用 Kit 的 `qmake -query QT_VERSION` 交叉核对。按版本数值而非目录字符串排序，选择最高版本中匹配目标系统、CPU 架构与当前编译器 ABI 的 Kit；不将 Android、交叉编译 Kit 或 Qt 安装器的 Tools 目录当作桌面 Qt。
 - 不在 CMake、公共 presets 或脚本中写 `6.12`/`6.12.0` 版本条件、固定版本安装目录、`EXACT` 版本要求或只允许某版本的白名单。Qt 模块用 `find_package(Qt6 REQUIRED COMPONENTS ...)` 查找，不传固定版本参数；定位出的前缀传给 CMake，具体路径只保存在本机 UserPresets/环境或构建目录。Qt6 是本项目框架系列，minor/patch 版本随本机最新安装变化。
@@ -155,6 +163,7 @@
 - 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
 - 所有当前及后续 session 的测试、GUI/性能采集和证据重建强制遵守 `docs/contracts/test-window-policy.md`：无需真正显示的窗口保持隐藏；必须显示的 Qt 窗口在首次 show 前统一设置 `Qt::WindowStaysOnBottomHint`、`Qt::WindowDoesNotAcceptFocus`，恢复/重建后保留，禁止置顶、raise/requestActivate 或抢焦点。普通产品窗口不受测试策略影响。浏览器使用 headless，后台 helper 隐藏；采集自身渲染/读回，不采集被遮挡窗口所在的用户桌面。
+- macOS 按用户最新要求优先通过 Qt 真正离屏渲染验证画面、状态与资源生命周期；性能本阶段只以 PERF-01–07 严格架构/算法审计验收，离屏成本仅作局部诊断，不推断窗口呈现、VSYNC、GPU 完成或输入到显示的成绩。所有实际可见窗口、窗口管理器/呈现节奏、正常 VSYNC/吞吐、交互及可见媒体设备验证统一留到最后的 R34；不能提前执行。Release 默认 `YALAHOO_MACOS_VISIBLE_TESTS=OFF`，CTest 对相应窗口/GPU入口明确标记 deferred/disabled，完整离屏和无窗口测试仍须通过。R31 和其他平台审计不得把这些暂缓项记成实机通过；Windows 必需实机门禁保持不变。
 - 原生构建入口、最新 Kit 覆盖/旧缓存处理、QML/qsb 别名、最小运行探针与证据重建命令见 `docs/contracts/native-bootstrap.md`；Windows 证据在 `verification/windows/native-bootstrap/`。macOS/Linux 的现有 R02 审计矩阵仅覆盖最小工程，后续轮次必须按新增实现扩展，不替代 R31/R32 的完整平台审计。
 
 ## 架构与数据契约
@@ -387,11 +396,13 @@
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
 
-### R16M1 · Apple Silicon 开发机接续验证
+### R16M2 · Metal/DPR2离屏文字度量与像素补修
 
-- 用户已指定后续开发设备为 macOS Apple Silicon；依赖当前已入库的源码、资源、测试输入及冻结 Git 来源映射，不依赖 Windows 构建树或未入库采集目录。换机命令与边界见 `docs/platforms/macos.md` 顶部。预估代码≤300行、有效时间≤45分钟，开始前重新评估；先用原生 arm64 终端和最新完整 Qt Kit，以 Release 完成 C++23 探针、构建、全部 CTest、check-format、两个 qmllint 和 qsb/MSL 检查，修复真实平台构建问题。
-- 同机 headless 浏览器从冻结源码重新生成 DPR2 标题参照，以 Metal 执行完整标题诊断；记录实际 Qt/编译器/架构/后端/DPR，以及20项生产文字、18项页眉、九组成本、十次恢复与最终释放。像素退出6须保留 passed=false 和具体待修项；其他非零退出、结构/行为/成本/窗口策略缺陷必须修复或拆出明确补修。不能拿 Windows 的系统回退字体、图像、性能或成功报告充作 Mac 结果。
-- 退出：Apple Silicon 的 Release 开发入口和诊断能完整运行，有真实平台结论及具体缺陷任务。移除本轮，继续 R16B2V-P 的共用文字实现研究；其 D3D11/DPR1.5 最终验收、R16B2W 和 Windows OpenGL 验收仍须真实 Windows 环境，不可由 Metal 代替。没有 Windows 环境时保留这些门禁与 R17 依赖，不擅自解除。
+- 依赖R16M1的原生arm64 Release构建、隐藏窗口守卫与真正Metal离屏驱动。预估代码≤600行、有效时间≤45分钟，开始前重新评估。本轮只处理Metal/实际DPR2，所有可见窗口/呈现性能仍归最后R34；不替代Windows D3D11/OpenGL门禁。
+- 输入为`tests/fixtures/text/titles.json`、同机冻结源码/WOFF2/原生SFNT和`docs/contracts/title-reels.md`的最小失败结论。先通过`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/web`重建参照，再用`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/web --output 新目录 --diagnostics`重建完整诊断。原R16M1报告在本地`verification/macos/title-reels/r16m1/final/`；本地输出不是Git必备输入。
+- 修复case10/11的同机emoji混排几何差异：Qt的四个彩色grapheme每个advance约31.40625逻辑px，浏览器同一源码约27.40625，累积位置误差16.078125。追踪两条路径的实际fallback字体、字号/字体表、整行glyph ID/position与字体度量；根因尚未确认，不逐case改字号/基线、拆字符shaping或套用Windows回退字体。
+- 几何对齐后处理生产case6/7、10/11、14/15、16/17的固定1物理px带外像素失败：当前普通字形失败SSIM约0.93259–0.97497，emoji项约0.65111/0.67175。其余12项通过，18项页眉、九组有界活动/缓存诊断、隐藏Canvas零文字绘制、十次离屏恢复及最终释放通过；这些是局部诊断，不代表可见窗口性能或最终文字选型。
+- 退出：20项生产文字结构与原像素门槛全部通过，18项页眉和资源/生命周期保持通过，严格PERF-01–07审计、全部启用Release CTest、source-format、两个qmllint及qsb/MSL通过。正常像素验收去掉`--diagnostics`；该包装仍拒绝结构失败，不能把R16M1的native退出6/包装退出1当成diagnosticsPassed。完成后删除本轮，继续Windows依赖已满足的轮次；R17仍等待R16收口。
 
 ### R16B2V-P · D3D11/DPR1.5剩余普通字形像素补修
 
@@ -575,6 +586,14 @@
 - 最终核对 Windows 实机构建/资源/GUI重放/离线Provider/普通播放/部署证据，以及 macOS/Linux 完整实现、严格静态审计矩阵和用户实机验证清单。Windows 未运行或未通过的必需检查保留具体任务；macOS/Linux 静态审计通过即满足本阶段要求，不因用户未来实机验证尚未执行而阻止收口。
 - 性能设计与验证：收口核对性能设计审计、资源清单、逐场景多次原始样本、预算依据/测量范围与残余风险；不能以平均FPS、CPU提交或Review报告承诺所有设备完整体验。
 - 退出：所有必需轮次有真实交付及对应平台要求的验收资产，Windows 主入口严格实机可用，macOS/Linux 标明“静态审计通过，实机待用户验证”；本文件删除已完成轮次，只保留未来联网接入合同和必要的长期约束。
+
+### R34 · macOS可见窗口、呈现与实机验收
+
+- 依赖R33及macOS离屏/严格审计结果，必须作为最后一个专门轮次执行。输入为各轮同源匿名fixture、同机冻结参照、当前Release构建和前期明确暂缓/失败记录；不得提前启用`YALAHOO_MACOS_VISIBLE_TESTS`。开始前按实际范围评估并拆分具体后端/DPR或功能边界，不能把整个平台矩阵塞进一个超时轮次。
+- 先核对原生窗口生命周期：Qt首次show、hide/restore、minimize、flags/surface重建及退出，始终原生置底、拒绝key焦点、无应用自动激活/抢前台。前期Prohibited无前台副作用，但不构成exposed窗口能力证明；Accessory试验曾激活进程，禁止直接恢复该失败方案。须先完成可复现的原生非激活显示方案及真实窗口状态检查，再显式启用暂缓CTest；遮挡/节流无样本判为测量不可用，不提升Z顺序。
+- 核对Metal/Retina与代表性尺寸/DPR下浏览、详情、总览、片头、文字、滑尺、玻璃/纸面ROI、透明合成、键鼠/触摸板/快捷键与焦点；实机本地播放、暂停/seek/换曲、独立歌曲/BGM/音效、设备变化及macdeployqt包脱离开发Kit运行。采集仅用自身渲染/读回，不读取用户桌面，音乐只用匿名或用户指定测试输入。
+- 性能在同Kit/设备/fixture上补正常VSYNC与未限速吞吐各自至少三次串行样本，记录实际呈现事件、输入到Qt提交、冷启动/准备、资源峰值与十次重建回落；严格按PERF-01–07和既有预算/统计解释，不用离屏帧事件、Windows成绩或CPU提交冒充实际显示/GPU完成。
+- 退出：全部macOS适用暂缓项有真实运行结论；失败项拆为具体后续任务，不改门槛，不伪报通过。完成后更新平台与最终文档的实际范围，并删除本轮。Windows/Linux既有验收边界不因本轮改变。
 
 ## Qt官方实施参考
 

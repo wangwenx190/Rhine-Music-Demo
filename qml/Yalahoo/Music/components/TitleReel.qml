@@ -43,7 +43,8 @@ Item {
         transport: root.transport
         dpr: root.Window.window ? root.Window.window.devicePixelRatio : 1
         reducedMotion: root.tokens.reducedMotion
-        active: !root.sharedController && root.visible && (!root.Window.window
+        active: !root.sharedController && root.visible && (root.tokens.offscreenRendering ||
+                                                           !root.Window.window
                                                            || root.Window.window.visible)
     }
     Repeater {
@@ -58,7 +59,8 @@ Item {
             height: slot ? slot.capacityHeight : 0
             visible: Boolean(slot) && slot.shown
             opacity: slot ? slot.opacity : 1
-            layer.enabled: visible && root.visible && (!root.Window.window
+            layer.enabled: visible && root.visible && (root.tokens.offscreenRendering ||
+                                                       !root.Window.window
                                                        || root.Window.window.visible)
 
             layer.smooth: true

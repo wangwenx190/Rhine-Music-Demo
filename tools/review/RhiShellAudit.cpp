@@ -110,6 +110,7 @@ void strip(const QString &path, const QImage &source, const QImage &prior, const
 }
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
 #if defined(Q_OS_WIN)
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
 #elif defined(Q_OS_MACOS)

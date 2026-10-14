@@ -72,6 +72,27 @@ bool samePixels(const QImage &a, const QImage &b)
 {
     return a.convertToFormat(QImage::Format_ARGB32) == b.convertToFormat(QImage::Format_ARGB32);
 }
+bool sameDerivativePixels(const QImage &a, const QImage &b)
+{
+    if (a.isNull() || b.isNull() || a.size() != b.size())
+        return false;
+    const auto left = a.convertToFormat(QImage::Format_ARGB32);
+    const auto right = b.convertToFormat(QImage::Format_ARGB32);
+    // Native raster backends can differ by one RGB quantization unit. Alpha,
+    // geometry, and the manifest's exact source/derivative hashes stay strict.
+    for (int y = 0; y < left.height(); ++y) {
+        const auto *first = reinterpret_cast<const QRgb *>(left.constScanLine(y));
+        const auto *second = reinterpret_cast<const QRgb *>(right.constScanLine(y));
+        for (int x = 0; x < left.width(); ++x) {
+            if (qAlpha(first[x]) != qAlpha(second[x])
+                || std::abs(qRed(first[x]) - qRed(second[x])) > 1
+                || std::abs(qGreen(first[x]) - qGreen(second[x])) > 1
+                || std::abs(qBlue(first[x]) - qBlue(second[x])) > 1)
+                return false;
+        }
+    }
+    return true;
+}
 QRect alphaBounds(const QImage &image)
 {
     int left = image.width(), right = -1, top = image.height(), bottom = -1;
@@ -217,7 +238,7 @@ QJsonArray verifyContainers(const QString &directory)
                 "ICO entry invalid");
         const auto image = QImage::fromData(ico.mid(offset, length), "PNG");
         require(image.size() == QSize(size, size) && image.hasAlphaChannel(), "ICO PNG invalid");
-        require(samePixels(image, render(sourceForSize(size), { size, size })),
+        require(sameDerivativePixels(image, render(sourceForSize(size), { size, size })),
                 "ICO differs from current SVG");
         next += length;
         result.append(QJsonObject{ { "container", "ico" },
@@ -244,7 +265,7 @@ QJsonArray verifyContainers(const QString &directory)
                 "ICNS block invalid");
         const auto image = QImage::fromData(icns.mid(cursor + 8, length - 8), "PNG");
         require(image.size() == QSize(macSizes[i], macSizes[i]) && image.hasAlphaChannel()
-                        && samePixels(
+                        && sameDerivativePixels(
                                 image,
                                 render(sourceForSize(macSizes[i]), { macSizes[i], macSizes[i] })),
                 "ICNS PNG differs from current SVG");
@@ -422,6 +443,7 @@ public:
 
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
     QGuiApplication app(argc, argv);
     try {
         const auto args = app.arguments();
@@ -507,7 +529,7 @@ int main(int argc, char **argv)
             const auto output = icons + QString("/png/yalahoo-%1.png").arg(size);
             const auto image = render(sourceForSize(size), { size, size });
             if (verifyOnly)
-                require(samePixels(QImage(output), image), "PNG stale: " + output);
+                require(sameDerivativePixels(QImage(output), image), "PNG stale: " + output);
             else
                 save(image, output);
             for (double dpr : dprs) {
@@ -605,7 +627,7 @@ int main(int argc, char **argv)
             const auto image = render(sourceForSize(it.value()), { it.value(), it.value() });
             const QString path = icons + "/yalahoo.iconset/" + it.key();
             if (verifyOnly)
-                require(samePixels(QImage(path), image), "Iconset stale");
+                require(sameDerivativePixels(QImage(path), image), "Iconset stale");
             else
                 save(image, path);
         }

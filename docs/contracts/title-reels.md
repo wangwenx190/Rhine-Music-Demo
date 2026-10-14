@@ -103,3 +103,24 @@ Windows Qt 6.12.0/MSVC 19.51 Release：D3D11/实际DPR1.5的20项文字结构/�
 Canvas三次文字paint均96次，局部sync为0.2898/0.2770/0.2616ms、paint为7.6962/8.2193/7.6596ms；其他路径Canvas文字paint均零。共享控制器描述符缓存101156bytes、生产槽RGBA8层估算858552bytes；这不是Canvas/Text候选的实际显存，更不含字体图集/驱动或resize新旧峰值。GPU时长全部null，未测内存保持未知。PERF-01–07及共同字体值/窗口/qrc/Metal/GL静态链已审计，macOS/Linux为“静态审计通过，实机待用户验证”。
 
 复现诊断：`./tools/build/verify-r16.ps1 -TitleContext -TitleDiagnostics -Backend d3d11 -Dpr 1.5 -UseExistingWebSource -EvidenceDirectory verification/windows/title-reels/r16b2v/accepted`；完整DPR1回归使用相同入口去掉TitleDiagnostics、设Dpr 1及独立dpr1-regression目录。静态入口为`./tools/audit/audit-r16.ps1 -Round R16B2V`，要求声明的五个像素待修项和完整DPR1回归，不将诊断摘要冒充像素通过。
+
+## Apple Silicon 接续与真正离屏诊断（R16M1）
+
+本机Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release、Metal/实际DPR2；同机Edge 155.0.4283.45从冻结源码生成20项参照。QQuickRenderControl渲染同一QML/生产字轮到隐藏窗口的真实Metal目标，目标显式设置DPR2；没有原生show、swapchain呈现或正常VSYNC。FrameClock/源轨迹与像素门槛保持不变。
+
+20项生产文字中18项几何/文本通过，最大通过项误差0.240865逻辑px；case10/11的emoji混排累积advance误差16.078125逻辑px。18项页眉、定位不改变播放、三路径各三次120帧的有界活动/缓存检查、隐藏Canvas零文字绘制、十次离屏恢复、最终释放和隐藏原生窗口策略通过。全部GPU时长仍为null，离屏CPU诊断不代表产品threaded render-loop或窗口性能；性能本阶段仅严格架构/算法审计。
+
+完整诊断已运行，但结构与像素门槛未全部通过：native实际退出6，`verify-title.mjs --diagnostics`因几何失败严格退出1，不能写diagnosticsPassed=true。下一轮R16M2处理本机emoji度量及以下八项像素失败；Windows D3D11/OpenGL最终门禁保留，可见macOS实机验证归最后R34。
+
+| case | 带外SSIM | 带外RGB平均误差 /255 | 几何最大误差 /逻辑px |
+| --- | --- | --- | --- |
+| 6 | 0.974967633 | 1.733680556 | 0.046875000 |
+| 7 | 0.972839274 | 1.970763889 | 0.046875000 |
+| 10 | 0.651114111 | 26.940199430 | 16.078125000 |
+| 11 | 0.671753888 | 25.388133903 | 16.078125000 |
+| 14 | 0.939146410 | 2.470322145 | 0.117767500 |
+| 15 | 0.932594106 | 2.812596451 | 0.117767500 |
+| 16 | 0.942828136 | 1.897446667 | 0.202500000 |
+| 17 | 0.938856444 | 2.214410000 | 0.202500000 |
+
+复现：`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/web`，随后`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/web --output 新目录 --diagnostics`。原生报告/失败摘要在本地`verification/macos/title-reels/r16m1/final/`，均保持忽略。已有Windows结论不被本机数据替换。
