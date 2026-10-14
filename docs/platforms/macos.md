@@ -1,4 +1,6 @@
-# macOS · 用户实机验证清单
+# macOS · 开发、动态验证与实机清单
+
+当前主力开发与验证环境为macOS。以下历史“静态审计通过，实机待用户验证”只说明对应轮次当时的覆盖；后续逐项按实际系统/Kit/后端/设备/采集能力判断，可靠构建/字体/Metal离屏与可用部署检查必须真实执行。不可执行或不可靠的检查严格审计并完整移交最后R34，不能将整个macOS统称为只能静态，也不删除实机要求。
 
 ## Apple Silicon 换机接续入口
 
@@ -50,9 +52,9 @@ node tools/build/verify-title.mjs --backend metal --dpr 2 \
 
 本机 Apple Silicon 接续已实际执行：macOS 27.0.1、arm64、Qt 6.12.0、AppleClang 21.0.0、C++23 Release；C++23/QRhi/字形私有接口探针、构建、格式、两个qmllint及29份qsb的GLSL/HLSL/MSL变体检查通过。已安装Homebrew Node 26.11.1/npm并使用现有Edge 155.0.4283.45生成同机20项DPR2冻结参照；没有增加产品运行依赖。字体资产测试按原OS/2表和实际物理字形身份验证，品牌资产hash不变，仅适配跨平台一个RGB量化单位的栅格差异。
 
-按用户最新要求，macOS优先真正离屏验证，性能暂以严格架构/算法审计验收；全部可见窗口、呈现/VSYNC、交互和实机包验证集中到最后R34。默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，当前四项runtime CTest明确disabled/deferred；不计为通过。以下历史手工可见窗口清单均属于R34输入，不提前执行。普通产品由用户主动启动的行为不变。
+按用户最新要求，macOS优先真正离屏验证，验证方式逐项按可靠能力决定；当前尚无可靠入口的可见窗口、呈现/VSYNC、交互项目先严格审计并集中到最后R34，已有可靠本机入口及后续可可靠执行的部署检查须真实运行。默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，当前四项runtime CTest明确disabled/deferred；不计为通过。以下历史清单中当前不可靠的手工可见/呈现项目属于R34输入；可可靠执行的当前主线检查按轮次顺序执行。普通产品由用户主动启动的行为不变。
 
-Release CTest的23项已启用测试全部通过，4项可见runtime入口明确暂缓，未算作通过。R16M2用Qt公开emoji字体策略对齐同机浏览器的`Apple Color Emoji / AppleColorEmoji`，修复原case10/11的16.078125逻辑px累积误差；现在20项生产结构/文本、18项页眉、三路径各三次120帧有界诊断、隐藏候选零文字绘制、十次离屏恢复/最终释放及隐藏窗口策略通过。case10/11的固定1物理px带外像素也通过；完整诊断`diagnosticsPassed=true`，像素整体`passed=false`，剩余case6/7、14/15、16/17保留在R16M2P。字体证据、最小失败数值和复现入口见[title-reels.md](../contracts/title-reels.md)，静态源码/性能入口为`node tools/audit/audit-title.mjs 完整诊断目录`。离屏frame完成不是present，GUI线程sync/render成本不能当作正常VSYNC或产品render-thread性能；macOS/Linux本阶段结论为“静态审计通过，实机待用户验证”，完整可见实机待R34。Windows D3D11/OpenGL门禁保留，R17继续等待R16收口。
+Release CTest的23项已启用测试全部通过，4项可见runtime入口明确暂缓，未算作通过。R16M2用Qt公开emoji字体策略对齐同机浏览器的`Apple Color Emoji / AppleColorEmoji`，修复原case10/11的16.078125逻辑px累积误差；现在20项生产结构/文本、18项页眉、三路径各三次120帧有界诊断、隐藏候选零文字绘制、十次离屏恢复/最终释放及隐藏窗口策略通过。case10/11的固定1物理px带外像素也通过；完整诊断`diagnosticsPassed=true`，像素整体`passed=false`，剩余case6/7、14/15、16/17保留在R16M2P。字体证据、最小失败数值和复现入口见[title-reels.md](../contracts/title-reels.md)，静态源码/性能入口为`node tools/audit/audit-title.mjs 完整诊断目录`。离屏frame完成不是present，GUI线程sync/render成本不能当作正常VSYNC或产品render-thread性能；静态矩阵与macOS实际运行覆盖分别记录，尚不可靠的可见实机项目待R34。D3D11/其他不可执行的后端补修已移入R34，R17依赖当前主线R16M2P/M3阶段验收。
 
 本次换机入口在 Windows Release 实测：Universal/单架构 Kit 元数据回归通过；自定义源目录与DPR校准后的D3D11/DPR1标题全通过，DPR1.5诊断仍准确保留case6/7、14/15、17的像素失败。普通CTest曾在Canvas读回阶段失败，原生权限或仅指定threaded重试仍失败；完整使用迁移验收的 `QSG_RENDER_LOOP=threaded` 与 `QT_SCALE_FACTOR=1` 后通过，已写入 ui-drawing 的 CTest 环境。factor1保留屏幕实际DPR1.5，不强制DPR1；Qt内部为何依赖显式factor尚未确认，未放宽图像/读回门槛。浏览器受限环境页面连接失败，原生 headless 环境成功生成20项；这两种失败原因不能混为一谈。最终27项Release CTest、check-format、两组qmllint及qsb的GLSL/HLSL/MSL变体检查通过。此记录不代表Metal实机通过。
 

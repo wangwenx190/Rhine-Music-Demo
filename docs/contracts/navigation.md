@@ -56,7 +56,7 @@ Windows Release：`./tools/build/verify-r15.ps1`；平台/算法调用链审计�
 
 DPR1.5 的冻结浏览器合成在 2px 窄线两边产生 75% 覆盖，即使重新加载同 DPR 文档也保留；源码矩形并无这种额外透明度。覆盖区间保留这份原始差异，同时允许源码连续填充的正确墨色量，不将浏览器栅格损失复制进产品。Quick 对照显式开启几何抗锯齿；两种 Canvas 都绘制完整刻线后用相同 Quick clip 裁切；Canvas2D 使用显式 rect/fill 路径，并按实际 DPR 设置 antialias=1/DPR，保持一物理像素的抗锯齿范围，避免固定逻辑像素宽度在高 DPR 上侵蚀细线。
 
-原始图像、逐帧序列、报告和 hash 矩阵仅保存在忽略的 `verification/windows/navigation/` 及各平台静态审计目录。macOS/Linux 的本阶段结论只能是“静态审计通过，实机待用户验证”；目标 compositor、字体回退、Metal/GL 驱动、触控设备和部署由用户以后实机检查。
+原始图像、逐帧序列、报告和 hash 矩阵仅保存在忽略的 `verification/windows/navigation/` 及各平台静态审计目录。各平台后续按当前可靠能力验收，历史静态结论不限制macOS等当前平台的真实验证；未可靠执行的compositor、字体回退、Metal/GL、触控或部署项目严格审计并保留到R34。
 
 ## 本阶段结论
 

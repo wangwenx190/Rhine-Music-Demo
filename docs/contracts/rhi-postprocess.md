@@ -26,6 +26,6 @@ SMAA 使用既有 Medium/area/search 和 gamma 2.2；framebuffer 的后端行方
 
 验收输入来自现有 R10/R10B/R09 fixture，不读取用户曲库。R10B 的 61 组 pre-stage/five ROI/shadow/order/isolation/alpha/source normal/depth 回归与 R10 的 50 组最终输出分开；残差逐 sourceIndex/ROI 保存，不能用平均值消除残差。432 实体检查覆盖 tile 更新/还原、倒序、resize、generation、九 tile 队列跨帧及 1920×1080 原始画质 120 秒真实呈现。CPU 提交、GPU timestamp 和 frameSwapped 间隔分别记录；timestamp 诊断的开销不混入普通呈现门槛，无法取得 timestamp 时记为不可用。
 
-所有窗口遵循 [测试窗口契约](test-window-policy.md)。本平台运行和跨平台静态审计结果以对应 `verification/` 产物为准；macOS/Linux 结论必须为“静态审计通过，实机待用户验证”。
+所有窗口遵循 [测试窗口契约](test-window-policy.md)。本平台运行和跨平台静态审计结果以对应 `verification/` 产物为准；实际运行范围和纯静态待验证项分别记录，后者完整保留到R34；不按平台名称固定验证方式。
 
 R10C历史Release复建工具为`tools/build/verify-r10c.ps1`，只在对应验收版本的隔离checkout重建，不作为维护后源码覆盖历史目录的默认入口。原Windows产物在`verification/windows/rhi-postprocess/`，pre-stage/final图片在`docs/media/rhi-postprocess/`；来源与算法适配hash见`resources/manifests/rhi-postprocess.json`，历史证据不回写。维护后源码按`performance.md`执行Release格式/CTest/qmllint、`rhi-postprocess-gpu`及逐项静态审计，新证据在`verification/windows/performance-review/`及对应静态目录，后续维护继续使用独立目录。性能门槛使用`QSG_NO_VSYNC=1`的真实frameSwapped间隔，仅为未限速原生渲染吞吐；系统compositor/vsync节奏与完整产品交互仍需R10D/R28实际验证。

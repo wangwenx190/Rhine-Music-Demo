@@ -30,6 +30,6 @@ Windows 使用 `./tools/build/verify-r13.ps1`，随后 `./tools/audit/audit-r13.
 
 `tests/fixtures/real-columns/trajectories.json` 是稀疏独立源码数值输入，普通 CTest 不依赖本地采集输出。完整逐帧系列及冻结生产 field 由 `export-real-columns-golden.mjs` 生成到忽略的 verification/windows/real-columns；GPU audit 按冻结 field 生成独立变换，同输入比较真实生产 SceneItem 图像。涵盖空/单/奇偶/49/106列、长列尾部、未完成归中返回、首尾键盘/滚轮、低/高清封面、双主题、稳定零上传、资源复用和隐藏后重建。会话/偏好测试涵盖关开无图像副作用、真实深度与负填充周期、未知字段保留、快速保存合并和损坏原件保留。已有填充池/播放隔离/拾取、运动、光带、封面、几何及运行入口另执行受影响回归。
 
-macOS/Metal 与 Linux/OpenGL 使用相同 C++23 模型、运动、文件/事件 API 和 qsb shader。新增路径无 Windows API、网络或第三方依赖；平台后台、编译与部署按既有分支。结论必须标明“静态审计通过，实机待用户验证”，目标机步骤见 docs/platforms/；Windows OpenGL 不充作 Linux 实机结果。
+macOS/Metal 与 Linux/OpenGL 使用相同 C++23 模型、运动、文件/事件 API 和 qsb shader。新增路径无 Windows API、网络或第三方依赖；平台后台、编译与部署按既有分支。纯静态项标明“静态审计通过，实机待验证（R34）”，可靠本机检查真实执行并单列范围，目标机步骤见docs/platforms/；Windows OpenGL 不充作 Linux 实机结果。
 
 Windows 验收结论：Qt 6.12.0 / MSVC 19.51 / Release 的三次 D3D11 与一次 OpenGL 功能/资源/图像检查通过；完整冻结 x/v/a 系列最大误差约 1.13e-10，生产初态对冻结 field 的变换误差为 0，D3D11 SSIM=1、OpenGL SSIM≥0.99999994，稳定上传为 0，重建对照 SSIM≥0.99999997。18 项受影响回归、全部 24 项生产 CTest（含 source-format）、check-format、PowerShell 风格和 qmllint 通过。macOS/Linux：静态审计通过，实机待用户验证；未建立完整产品性能达标结论。

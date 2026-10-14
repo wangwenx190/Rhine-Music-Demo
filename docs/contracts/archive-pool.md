@@ -48,6 +48,6 @@ Windows：`./tools/build/verify-r12.ps1`，然后 `./tools/audit/audit-r12.ps1`�
 
 数值测试覆盖冻结池顺序/方向/半周期、生产 field 和 instance/model 变换、连续首尾/反向、隐藏接管/归位/重新接管、非零导数 rebase、拾取、空库、90,000 库容量、LCM 溢出和播放隔离。GPU 检查通过生产 SceneItem 使用 90,000 个匿名逻辑专辑，核对 432 池、低/高清封面准备、实际上传预算、稳定零上传、源码变换成对图、鼠标/wheel、四接管副本、双主题、光带 rebase、可见数量变化不重建目标和 hide/release/restore。
 
-三次独立 D3D11 与一次 Windows OpenGL 运行分开保存。submissionSamples 只用于局部 CPU 提交/同步诊断，包含 Review readback 命令提交成本，不包含 GPU 完成、实际显示、PNG 保存或 SSIM 计算，不是 120 秒产品帧率验收。macOS/Metal 和 Linux/OpenGL 共享源码、资源、qsb 及 CMake 路径严格静态审计；结论必须为“静态审计通过，实机待用户验证”。完整产品性能/平台部署按后续轮次执行。
+三次独立 D3D11 与一次 Windows OpenGL 运行分开保存。submissionSamples 只用于局部 CPU 提交/同步诊断，包含 Review readback 命令提交成本，不包含 GPU 完成、实际显示、PNG 保存或 SSIM 计算，不是 120 秒产品帧率验收。macOS/Metal 和 Linux/OpenGL 共享源码、资源、qsb 及 CMake 路径严格静态审计；这些是对应历史轮次的静态覆盖；后续按实际可靠能力真实验证可用项，未执行的完整产品/平台实机任务保留到R34，不固定平台验证方式。
 
 Windows 验收结论：Qt 6.12.0 / MSVC 19.51 / Release 的三次 D3D11 与一次 OpenGL 检查通过；90,000 库保持 432 池，实际源码变换最大误差小于 5e-10，源码/rebase/重建/高清未就绪回退成对图的 D3D11 SSIM 为 1、OpenGL SSIM≥0.9999996，稳定 atlas 上传为 0，worker/待解码峰值为 3/96，生产不再反复撞满队列。14 项受影响 Review 回归、全部 23 项生产 CTest、check-format、PowerShell 风格和 qmllint 通过。macOS/Linux：静态审计通过，实机待用户验证。

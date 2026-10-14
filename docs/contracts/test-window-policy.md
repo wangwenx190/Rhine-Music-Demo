@@ -2,7 +2,7 @@
 
 本契约由用户明确要求，适用于本轮、所有后续 session，以及原生单元/集成/GPU/视觉/性能测试、品牌验证、冻结 Web harness 和证据重建工具。普通用户主动启动的播放器窗口保持正常行为。
 
-用户已将macOS实际可见窗口测试/验证统一移到最后R34。默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，CTest明确标记对应runtime/GPU入口暂缓，不把disabled写成通过。当前二维Review优先使用`OffscreenSurface`：QQuickRenderControl在隐藏QQuickWindow上渲染真实Metal单采样RGBA8+depth/stencil目标，显式设置目标DPR，有界合并render请求；只读回自己的texture，不调用macOS原生show、不依赖exposure或swapchain呈现。offscreenRendering只由Review tokens启用，生产默认false。native窗口恢复与显示效果不由离屏生命周期推断，性能本阶段只做严格架构/算法审计。
+验证方式按迁移计划逐项核对实际可靠能力，不按平台名称固定为实机或静态。当前macOS尚未建立可靠的非激活可见验证入口，默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，对应runtime/GPU检查暂缓到最后R34，不把disabled写成通过；已有可靠隐藏/离屏入口必须真实运行。当前二维Review优先使用`OffscreenSurface`：QQuickRenderControl在隐藏QQuickWindow上渲染真实Metal单采样RGBA8+depth/stencil目标，显式设置目标DPR，有界合并render请求；只读回自己的texture，不调用macOS原生show、不依赖exposure或swapchain呈现。offscreenRendering只由Review tokens启用，生产默认false。native窗口恢复与显示效果不由离屏生命周期推断，离屏局部成本不代表呈现性能；当前无法可靠验证的窗口/VSYNC等项目严格审计并保留R34实机任务。
 
 macOS 必须落实原生窗口策略，不能只检查 Qt flags。Qt Cocoa 的 `windowLevel` 没有处理置底标志，应用启动委托还可能主动激活进程（[Qt Cocoa 窗口源码](https://github.com/qt/qtbase/blob/dev/src/plugins/platforms/cocoa/qcocoawindow.mm)、[启动委托源码](https://github.com/qt/qtbase/blob/dev/src/plugins/platforms/cocoa/qcocoaapplicationdelegate.mm)）。所有 CTest 在创建 QGuiApplication 前设置 `QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM=1`；独立图形验证工具及产品 `--verify-*` 入口调用 `prepareApplication()`。QML 验证 root 保持隐藏，取得对象后、首次 show 前调用 `prepareWindow()`。
 
@@ -28,4 +28,4 @@ ctest --preset qt-release --output-on-failure
 cmake --build --preset qt-release --target Yalahoo_qmllint
 ```
 
-Windows 完整 Review 与生产回归由 `tools/build/verify-r10b.ps1` 保存本轮证据，CPU 窗口标志检查和所有实际 GPU 报告均应 passed。macOS/Linux 检查同一 helper/QML 初始属性、平台分支与采集所有权；本阶段结论仍为“静态审计通过，实机待用户验证”，不能从 Windows 结果推断目标窗口管理器或 compositor 已实机验证。
+Windows既有完整Review/生产重建入口为`tools/build/verify-r10b.ps1`，只有具备对应可靠环境时执行。所有平台都检查同一helper/QML初始属性、原生分支及采集所有权；可靠本机检查必须实际通过，不可执行的目标窗口/呈现/重建验证严格审计并保留到R34。纯静态与实际运行结论分别记录，其他平台结果不证明目标窗口管理器或compositor已验证。

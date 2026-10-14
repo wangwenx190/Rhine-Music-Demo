@@ -1,6 +1,6 @@
 # 标题字轮实现与补验收边界
 
-R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见下文；完整绘制选择、其余 DPR/后端视觉和局部成本验收由迁移计划 R16B2V-P/W、R16B3 收尾，R17 的前置条件仍等待这些轮次。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
+R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见下文；当前平台文字/绘制阶段验收顺序为R16M2P → R16M3 → R17；本机无法执行的R16B2V-P/R16B2W/R16B3已移入最后R34，保留D3D11/OpenGL原补修和最终跨平台选型要求，阶段主线不等待这些后置任务。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
 
 ## 来源与接口
 
@@ -16,7 +16,7 @@ R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见�
 
 当前生产普通文字由 `ReelInk → ReelTextNode` 提交整行 shaping 后的 glyph ID/位置。GUI 只缓存字体描述、字体 head 身份与字形值；render thread 独立取得 QRawFont，并核对身份，GUI 的 QRawFont/QTextLayout 不跨线程。私有 Qt Quick glyph 接口隔离在 `src/render/rhi/`，配置时探测最新 Kit 的实际接口，不锁版本或回退旧 Qt。彩色 grapheme 使用 Qt Quick Text 的系统字体/彩色缓存；普通字形的隐藏 Text 不创建。整行上下文变化即使文本相同也失效。
 
-Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；其余 DPR/后端像素与成本差异仍需 R16B2V-P/W、R16B3 完整判定。目前普通字形节点加彩色 Text 是已集成方案，尚未宣称最终比较选型通过。
+Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；当前可靠后端/DPR由R16M2P/M3逐项验收，不可执行的R16B2V-P/W、R16B3在R34完成最终判定。目前普通字形节点加彩色 Text 是已集成方案，尚未宣称最终比较选型通过。
 
 测量缓存键包含文本、两种字体/字重、字号、宽度、预算、窄屏/DPR/歌名模式；96项 LRU与8MiB描述符计费上限并存，超限结果不缓存。8MiB是缓存计费而非完整进程内存。字体数据库变更清空缓存；同帧输入合并成一个 queued reconcile。布局为输入长度 n 的一次整行 shaping，拟合最多25次候选行框测量，字形提取只在选中候选执行；按 string index 分组为 O(n log n)。动画只访问活动槽，不逐帧创建 QTextLayout 或替换面板；静止入口 O(1)。当前生产字号/视口下，内容 revision 只匹配本槽至多八个字面，以 sameGlyphInk 核对字体身份、glyph ID/位置、缩放和行框，保留仍可见的 QSGTextNode/transform/clip，只创建新增字面并删除离开视口的节点；局部匹配最坏 O(f²)，f≤8，不随曲库增长。clip 容量、颜色和滚动变换独立更新，隐藏的 ReelInk 不创建几何。geometryUpdates 计新增字形节点，geometryReuses 计内容 revision 中的节点复用，均为累计诊断计数，不是逐帧 GPU 成本。
 
@@ -30,7 +30,7 @@ Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/c
 
 `WEB-TEXT-PROBE-01`：Chromium 对源测量 probe 的 fine 字号更新出现 inline style 与 computed style 不一致，导致采集沿用 coarse 字号。导出器以完全相同 inline CSS 克隆测量根，仅消除陈旧观测状态，原算法、常量和生产CSS不变；未刷新的原始数据单独保留。它是采集问题，不是复制到原生的字体尺寸目标，完整视觉矩阵仍需补验收。
 
-Windows通过范围以本轮实际实现检查结论为准。macOS/Linux对共享CMake、Qt事件/字体值交接、qrc、Metal/OpenGL与qsb变体作静态审计；结论为“静态审计通过，实机待用户验证”。目标平台字体回退/彩色emoji、编译器/私有接口、compositor与像素结果不能由Windows代替。部署仍按R30–R32的平台清单，未在本轮生成部署包。
+历史Windows通过范围以对应轮次实际报告为准。后续对所有平台按当前可靠能力执行构建/字体/后端/资源检查，并对不可执行项展开共享CMake、Qt值/事件、qrc、qsb及平台分支严格审计；纯静态项标明“静态审计通过，实机待验证（R34）”。目标字体/彩色emoji、编译器/私有接口、compositor与像素结果不能由另一平台代替。部署仍按R30–R32的平台清单，未在本轮生成部署包。
 
 ## R16B1 单上下文结论与交接
 
@@ -114,7 +114,7 @@ R16M1的case10/11曾累积advance误差16.078125逻辑px。实际CDP字体身份
 
 R16M2完整诊断：20项生产结构/文本与源码轨迹通过，最大结构误差0.240865逻辑px；case10/11误差0.078125逻辑px，固定1物理px带外SSIM为0.999285581/0.999253834，RGB平均误差为0.079922/0.079038（0–255单位）。原始ROI SSIM为0.962329861/0.943559874、RGB为2.439160/3.169872，原始与带外分别解释。18项页眉、定位不改变播放、三路径各三次120帧有界活动/缓存检查、隐藏Canvas零文字绘制、十次离屏恢复、最终零tracked节点/renderer及隐藏原生窗口策略通过。缓存计费99546bytes，生产槽RGBA8层描述符估算1524220bytes；字体图集/驱动内存未测，GPU时长仍为null，离屏CPU不代表产品threaded render-loop或窗口性能。
 
-完整诊断正常退出，明确`diagnosticsPassed=true`、`passed=false`及六项剩余像素失败；R16M2P处理以下固定1物理px带外分数，不能用诊断豁免像素收口。Windows D3D11/OpenGL门禁保留，macOS可见窗口验证归最后R34。
+完整诊断正常退出，明确`diagnosticsPassed=true`、`passed=false`及六项剩余像素失败；R16M2P处理以下固定1物理px带外分数，不能用诊断豁免像素收口。D3D11/OpenGL等当前不可执行的原门槛与macOS尚不可靠的可见窗口验证完整保留到最后R34。
 
 | case | 带外SSIM | 带外RGB平均误差 /255 | 几何最大误差 /逻辑px |
 | --- | --- | --- | --- |
@@ -127,4 +127,4 @@ R16M2完整诊断：20项生产结构/文本与源码轨迹通过，最大结构
 
 重建参照：`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/r16m2/source`。完整诊断：`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/r16m2/source --output 新目录 --diagnostics`。每次原生运行使用新目录，正常像素收口去掉`--diagnostics`。原R16M1报告和失败图仍在本地`verification/macos/title-reels/r16m1/final/`；R16M2参照、报告及成对图保持忽略，不提交机器输出。
 
-源码/性能审计：`node tools/audit/audit-title.mjs 完整诊断目录`。它要求完整隐藏Metal/DPR2诊断及同机字体证据，校验文本qsb的MSL/GLSL/HLSL，按已人工推演的COMMON/PERF-01–07调用链保存两个平台的源码hash矩阵。macOS/Linux本阶段结论为“静态审计通过，实机待用户验证”；本机真实arm64离屏结果单列，不外推可见窗口性能或Linux/Windows。Release全部23项启用CTest、source-format/check-format、两个qmllint与qsb变体通过；四项可见runtime测试disabled，按R34暂缓，未记为通过。R17仍等待R16最终选型收口。
+源码/性能审计：`node tools/audit/audit-title.mjs 完整诊断目录`。它要求完整隐藏Metal/DPR2诊断及同机字体证据，校验文本qsb的MSL/GLSL/HLSL，按已人工推演的COMMON/PERF-01–07调用链保存两个平台的源码hash矩阵。该入口输出的严格静态矩阵与本机真实arm64离屏结果分别记录；只对未实际执行的适用检查标注实机待验证，任务归R34，不外推可见窗口性能或Linux/Windows。Release全部23项启用CTest、source-format/check-format、两个qmllint与qsb变体通过；四项可见runtime测试disabled，按R34暂缓，未记为通过。R17等待当前主线R16M2P/M3阶段验收，跨平台最终选型留在R34。
