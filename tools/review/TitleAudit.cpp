@@ -22,6 +22,7 @@
 #include <QTimer>
 #include <QMouseEvent>
 #include <QFontMetricsF>
+#include <QCryptographicHash>
 #include <rhi/qrhi.h>
 #include <atomic>
 #include <functional>
@@ -79,7 +80,12 @@ QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
     for (const auto *slot : ordered) {
         const auto &actual = slot->glyph;
         QJsonArray rawFonts;
-        for (const auto &run : actual.renderRuns)
+        for (const auto &run : actual.renderRuns) {
+            QJsonArray indexes, positions;
+            for (const auto index : run.indexes)
+                indexes.append(int(index));
+            for (const auto &position : run.positions)
+                positions.append(QJsonArray{ position.x(), position.y() });
             rawFonts.append(QJsonObject{
                     { "family", run.font.family() },
                     { "size", run.font.pixelSize() },
@@ -87,7 +93,14 @@ QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
                     { "ascent", QFontMetricsF(run.font).ascent() },
                     { "descent", QFontMetricsF(run.font).descent() },
                     { "style", run.font.styleName() },
+                    { "headSha256",
+                      QString::fromLatin1(
+                              QCryptographicHash::hash(run.fontHead, QCryptographicHash::Sha256)
+                                      .toHex()) },
+                    { "glyphIndexes", indexes },
+                    { "glyphPositions", positions },
                     { "firstY", run.positions.isEmpty() ? 0 : run.positions.first().y() } });
+        }
         actualGlyphs.append(QJsonObject{ { "key", actual.key },
                                          { "text", actual.text },
                                          { "x", actual.x },

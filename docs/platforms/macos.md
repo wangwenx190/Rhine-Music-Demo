@@ -52,7 +52,7 @@ node tools/build/verify-title.mjs --backend metal --dpr 2 \
 
 按用户最新要求，macOS优先真正离屏验证，性能暂以严格架构/算法审计验收；全部可见窗口、呈现/VSYNC、交互和实机包验证集中到最后R34。默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，当前四项runtime CTest明确disabled/deferred；不计为通过。以下历史手工可见窗口清单均属于R34输入，不提前执行。普通产品由用户主动启动的行为不变。
 
-Release CTest的23项已启用测试全部通过，4项可见runtime入口明确暂缓，未算作通过。二维Metal离屏/隐藏窗口检查已实测；标题诊断完整执行20项生产文字、18项页眉、三路径各三次120帧、十次离屏资源恢复及最终释放。18项页眉、隐藏候选零文字绘制、有界缓存、十次恢复/最终释放和隐藏窗口策略通过；case10/11仍有16.078125逻辑px的emoji混排几何误差，八项生产像素失败，故native退出6、严格包装退出1，**未通过完整标题诊断**。失败摘要和下一轮R16M2见[title-reels.md](../contracts/title-reels.md)。离屏frame完成不是present，GUI线程sync/render成本不能当作正常VSYNC或产品render-thread性能；PERF-01–07严格源码审计通过，完整可见实机待R34。Windows D3D11/OpenGL门禁保留，R17继续等待R16收口。
+Release CTest的23项已启用测试全部通过，4项可见runtime入口明确暂缓，未算作通过。R16M2用Qt公开emoji字体策略对齐同机浏览器的`Apple Color Emoji / AppleColorEmoji`，修复原case10/11的16.078125逻辑px累积误差；现在20项生产结构/文本、18项页眉、三路径各三次120帧有界诊断、隐藏候选零文字绘制、十次离屏恢复/最终释放及隐藏窗口策略通过。case10/11的固定1物理px带外像素也通过；完整诊断`diagnosticsPassed=true`，像素整体`passed=false`，剩余case6/7、14/15、16/17保留在R16M2P。字体证据、最小失败数值和复现入口见[title-reels.md](../contracts/title-reels.md)，静态源码/性能入口为`node tools/audit/audit-title.mjs 完整诊断目录`。离屏frame完成不是present，GUI线程sync/render成本不能当作正常VSYNC或产品render-thread性能；macOS/Linux本阶段结论为“静态审计通过，实机待用户验证”，完整可见实机待R34。Windows D3D11/OpenGL门禁保留，R17继续等待R16收口。
 
 本次换机入口在 Windows Release 实测：Universal/单架构 Kit 元数据回归通过；自定义源目录与DPR校准后的D3D11/DPR1标题全通过，DPR1.5诊断仍准确保留case6/7、14/15、17的像素失败。普通CTest曾在Canvas读回阶段失败，原生权限或仅指定threaded重试仍失败；完整使用迁移验收的 `QSG_RENDER_LOOP=threaded` 与 `QT_SCALE_FACTOR=1` 后通过，已写入 ui-drawing 的 CTest 环境。factor1保留屏幕实际DPR1.5，不强制DPR1；Qt内部为何依赖显式factor尚未确认，未放宽图像/读回门槛。浏览器受限环境页面连接失败，原生 headless 环境成功生成20项；这两种失败原因不能混为一谈。最终27项Release CTest、check-format、两组qmllint及qsb的GLSL/HLSL/MSL变体检查通过。此记录不代表Metal实机通过。
 

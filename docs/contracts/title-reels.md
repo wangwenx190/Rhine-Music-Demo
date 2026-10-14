@@ -104,23 +104,27 @@ Canvas三次文字paint均96次，局部sync为0.2898/0.2770/0.2616ms、paint为
 
 复现诊断：`./tools/build/verify-r16.ps1 -TitleContext -TitleDiagnostics -Backend d3d11 -Dpr 1.5 -UseExistingWebSource -EvidenceDirectory verification/windows/title-reels/r16b2v/accepted`；完整DPR1回归使用相同入口去掉TitleDiagnostics、设Dpr 1及独立dpr1-regression目录。静态入口为`./tools/audit/audit-r16.ps1 -Round R16B2V`，要求声明的五个像素待修项和完整DPR1回归，不将诊断摘要冒充像素通过。
 
-## Apple Silicon 接续与真正离屏诊断（R16M1）
+## Apple Silicon 字体身份与真正离屏诊断（R16M1/M2）
 
-本机Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release、Metal/实际DPR2；同机Edge 155.0.4283.45从冻结源码生成20项参照。QQuickRenderControl渲染同一QML/生产字轮到隐藏窗口的真实Metal目标，目标显式设置DPR2；没有原生show、swapchain呈现或正常VSYNC。FrameClock/源轨迹与像素门槛保持不变。
+本机Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release、Metal/实际DPR2；同机Edge 155.0.4283.45从冻结源码生成20项参照。QQuickRenderControl渲染同一QML/生产字轮到隐藏Metal目标，显式DPR2，没有原生show、swapchain呈现或正常VSYNC。FrameClock/源轨迹、CurveRendering、两倍DPR层与原像素门槛不变。
 
-20项生产文字中18项几何/文本通过，最大通过项误差0.240865逻辑px；case10/11的emoji混排累积advance误差16.078125逻辑px。18项页眉、定位不改变播放、三路径各三次120帧的有界活动/缓存检查、隐藏Canvas零文字绘制、十次离屏恢复、最终释放和隐藏原生窗口策略通过。全部GPU时长仍为null，离屏CPU诊断不代表产品threaded render-loop或窗口性能；性能本阶段仅严格架构/算法审计。
+R16M1的case10/11曾累积advance误差16.078125逻辑px。实际CDP字体身份为`Apple Color Emoji / AppleColorEmoji`，Qt却选`.Apple Color Emoji UI`；28px下前者advance为28px，后者约32px，加上源-0.6px字距后差4px。macOS初始化用公开`QFontDatabase::setApplicationEmojiFontFamilies`指定原系统字体面，缺family显式回滚/失败，Windows/Linux策略不变。整行shaping及普通字形基线未改，彩色Text与测量共享应用字体策略。该API依据为[Qt字体数据库公开文档](https://doc.qt.io/qt-6/qfontdatabase.html#setApplicationEmojiFontFamilies)。
 
-完整诊断已运行，但结构与像素门槛未全部通过：native实际退出6，`verify-title.mjs --diagnostics`因几何失败严格退出1，不能写diagnosticsPassed=true。下一轮R16M2处理本机emoji度量及以下八项像素失败；Windows D3D11/OpenGL最终门禁保留，可见macOS实机验证归最后R34。
+原生诊断直接保留测量run的head hash、glyph ID/position，CDP记录真实字面与family/PostScript；不把从私有family描述符重新解析出的替代字体度量当作测量run。当前Apple面head SHA256为`bd2ad7ff0c0cff60a1ceff914f9fbb81a0197cf26472a35721912863f8501e13`，四个彩色grapheme的整行ID为3237/1139/423/822。这些标识用于本机诊断，不锁定以后系统字体版本。四种字号（12/28/29.75/44）与三个DPR输入的字体/advance回归在修复前失败、修复后通过；不等同于三个DPR的像素验收。
+
+R16M2完整诊断：20项生产结构/文本与源码轨迹通过，最大结构误差0.240865逻辑px；case10/11误差0.078125逻辑px，固定1物理px带外SSIM为0.999285581/0.999253834，RGB平均误差为0.079922/0.079038（0–255单位）。原始ROI SSIM为0.962329861/0.943559874、RGB为2.439160/3.169872，原始与带外分别解释。18项页眉、定位不改变播放、三路径各三次120帧有界活动/缓存检查、隐藏Canvas零文字绘制、十次离屏恢复、最终零tracked节点/renderer及隐藏原生窗口策略通过。缓存计费99546bytes，生产槽RGBA8层描述符估算1524220bytes；字体图集/驱动内存未测，GPU时长仍为null，离屏CPU不代表产品threaded render-loop或窗口性能。
+
+完整诊断正常退出，明确`diagnosticsPassed=true`、`passed=false`及六项剩余像素失败；R16M2P处理以下固定1物理px带外分数，不能用诊断豁免像素收口。Windows D3D11/OpenGL门禁保留，macOS可见窗口验证归最后R34。
 
 | case | 带外SSIM | 带外RGB平均误差 /255 | 几何最大误差 /逻辑px |
 | --- | --- | --- | --- |
 | 6 | 0.974967633 | 1.733680556 | 0.046875000 |
 | 7 | 0.972839274 | 1.970763889 | 0.046875000 |
-| 10 | 0.651114111 | 26.940199430 | 16.078125000 |
-| 11 | 0.671753888 | 25.388133903 | 16.078125000 |
-| 14 | 0.939146410 | 2.470322145 | 0.117767500 |
-| 15 | 0.932594106 | 2.812596451 | 0.117767500 |
+| 14 | 0.939155120 | 2.469695216 | 0.117767500 |
+| 15 | 0.932594943 | 2.812181713 | 0.117767500 |
 | 16 | 0.942828136 | 1.897446667 | 0.202500000 |
 | 17 | 0.938856444 | 2.214410000 | 0.202500000 |
 
-复现：`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/web`，随后`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/web --output 新目录 --diagnostics`。原生报告/失败摘要在本地`verification/macos/title-reels/r16m1/final/`，均保持忽略。已有Windows结论不被本机数据替换。
+重建参照：`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/r16m2/source`。完整诊断：`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/r16m2/source --output 新目录 --diagnostics`。每次原生运行使用新目录，正常像素收口去掉`--diagnostics`。原R16M1报告和失败图仍在本地`verification/macos/title-reels/r16m1/final/`；R16M2参照、报告及成对图保持忽略，不提交机器输出。
+
+源码/性能审计：`node tools/audit/audit-title.mjs 完整诊断目录`。它要求完整隐藏Metal/DPR2诊断及同机字体证据，校验文本qsb的MSL/GLSL/HLSL，按已人工推演的COMMON/PERF-01–07调用链保存两个平台的源码hash矩阵。macOS/Linux本阶段结论为“静态审计通过，实机待用户验证”；本机真实arm64离屏结果单列，不外推可见窗口性能或Linux/Windows。Release全部23项启用CTest、source-format/check-format、两个qmllint与qsb变体通过；四项可见runtime测试disabled，按R34暂缓，未记为通过。R17仍等待R16最终选型收口。

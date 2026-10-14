@@ -85,6 +85,10 @@ const result = run(['--titles', output, source], 'title-audit.txt');
 if (result.status !== 0 && !(diagnostics && result.status === 6))
     throw Error('Title audit exited ' + result.status + '; output retained in ' + output);
 const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
+if (process.platform === 'darwin'
+    && (!report.offscreen || report.renderProtocol !== 'render-control-gui-thread'
+        || report.offscreenResourcePlan?.nativeWindowVisible !== false))
+    throw Error('macOS title verification requires a hidden RenderControl target');
 const production = report.captures.filter((capture) => capture.mode === 0);
 if (report.backend !== options.backend || Math.abs(report.dpr - dpr) > 0.001 || !report.released
     || !report.windowPolicy.passed || report.motionError > 0.000001 || production.length !== 20

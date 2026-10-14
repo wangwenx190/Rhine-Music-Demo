@@ -6,6 +6,7 @@
 #include <QFontMetricsF>
 #include <QAbstractItemModelTester>
 #include <QTextLayout>
+#include <QRawFont>
 #include <algorithm>
 #include <cmath>
 
@@ -139,6 +140,46 @@ private slots:
                              - expected.renderRuns.first().positions.first().y())
                     <= 1.0 / 64);
         }
+    }
+    void macEmojiUsesSourceFace()
+    {
+#ifdef Q_OS_MACOS
+        yalahoo::TextLayoutAdapter adapter;
+        const auto primary = yalahoo::assetFont(700);
+        for (const double size : { 12.0, 28.0, 29.75, 44.0 }) {
+            QFont emoji(QStringLiteral("Apple Color Emoji"));
+            emoji.setStyleName(QStringLiteral("Regular"));
+            emoji.setWeight(QFont::Normal);
+            emoji.setPixelSize(int(std::round(size)));
+            emoji.setHintingPreference(QFont::PreferNoHinting);
+            const auto reference = QRawFont::fromFont(emoji);
+            QVERIFY(reference.isValid());
+            QVERIFY(!reference.fontTable("sbix").isEmpty());
+            for (const double dpr : { 1.0, 1.5, 2.0 }) {
+                const auto layout = adapter.measure(
+                        QStringLiteral(
+                                "👨‍👩‍👧‍👦 👍🏽 é 🇨🇳 🎵 收藏"),
+                        primary, primary, size, 1000, 150, false, dpr);
+                int colors = 0;
+                for (const auto &glyph : layout.glyphs) {
+                    if (!glyph.colorGlyph)
+                        continue;
+                    ++colors;
+                    QCOMPARE(glyph.renderRuns.size(), 1);
+                    const auto &run = glyph.renderRuns.first();
+                    QCOMPARE(run.font.family(), reference.familyName());
+                    QCOMPARE(run.fontHead, reference.fontTable("head"));
+                    QCOMPARE(run.indexes.size(), 1);
+                    const double advance =
+                            reference.advancesForGlyphIndexes(run.indexes).first().x();
+                    QVERIFY(std::abs(glyph.width - (advance * glyph.scale - .6)) <= 1.0 / 64);
+                }
+                QCOMPARE(colors, 4);
+            }
+        }
+#else
+        QSKIP("Source Apple emoji face policy is macOS-specific");
+#endif
     }
     void analyticAndInterruptions()
     {

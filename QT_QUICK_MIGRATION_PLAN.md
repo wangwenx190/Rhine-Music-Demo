@@ -101,7 +101,13 @@
 - 表现与确认边界：仅设置Qt置底/拒绝焦点flags时，测试窗口仍干扰用户工作。Qt Cocoa的windowLevel不处理WindowStaysOnBottomHint，启动委托可主动激活进程。原生低层级后，窗口完全遮挡时isExposed=false，Canvas异步读回没有完成；静态grabWindow曾仍可得到自己的内容，因此不能从缺少frameSwapped推断应用被系统终止。Qt/compositor各自的停帧内部原因尚未确认。
 - 处理：测试在QGuiApplication之前关闭Qt foreground transform/启动激活，隐藏原生窗口使用Prohibited应用策略、NSNormalWindowLevel-1、拒绝key与忽略系统鼠标输入。NSView.window/NSWindow.level同步观察在Qt重设/重建时保持层级，销毁surface前撤销观察。Accessory试验虽保留低层级，却检测到applicationActive=true及前台变化，已撤回，不能作为安全显示方案。用户明确将所有macOS可见窗口测试集中到最后R34；默认CTest明确暂缓对应入口，不能写成已运行通过。
 - 离屏修正：Review用QQuickRenderControl与真实Metal RGBA8+depth/stencil单采样目标，不调用macOS原生show；有界事件请求驱动sync/render和自身texture读回，业务仍使用原FrameClock。离屏目标必须显式设置devicePixelRatio，否则DPR2图像尺寸虽正确，文字/背景却只占左上四分之一，像素失败来自验证投影而非字号。hidden窗口下TitleReel/Header/Transport与Canvas探针需要显式offscreenRendering消费状态，生产默认false；漏接Transport会让全部页眉退出期宽度不保留。修正后18项页眉通过，十次离屏恢复/最终释放和原生隐藏窗口策略通过。
-- 验证限制：离屏frame完成事件不叫present，GUI线程sync/render局部CPU与offscreen endFrame等待分开；不宣称正常VSYNC、跨线程渲染或产品性能。Metal/DPR2的两项emoji几何和八项像素失败仍在R16M2，未降低门槛。所有失败/原图保持本地忽略；后续先核对目标DPR、完整隐藏状态依赖和真实字体，再研究产品字形采样。
+- 验证限制：离屏frame完成事件不叫present，GUI线程sync/render局部CPU与offscreen endFrame等待分开；不宣称正常VSYNC、跨线程渲染或产品性能。R16M1曾有Metal/DPR2两项emoji几何和八项像素失败；字体身份修正见下节，剩余六项像素收口依R16M2P，门槛不变。所有失败/原图保持本地忽略；后续先核对目标DPR、完整隐藏状态依赖和真实字体，再研究产品字形采样。
+
+### R16M2：macOS默认emoji回退选中不同的系统字体面
+
+- 表现与确认根因：同机冻结源码在28px、letter-spacing=-0.6px下，浏览器的四个彩色grapheme使用`Apple Color Emoji`，CDP实际PostScript身份为`AppleColorEmoji`；Qt整行glyph run却为`.Apple Color Emoji UI`，advance约31.40625而源约27.40625逻辑px，后续普通字形累积偏移16.078125。两个系统字体面的选择差异已由实际run与CDP证据确认；Qt/CoreText为什么默认选择私有UI面尚未追踪，不能归因于字号、DPR投影或字体资产损坏。私有family别名未必能通过QRawFont::fromFont重新取得，旧报告中用描述符重新查询的metrics不应冒充原始run的字体表证据。
+- 处理：`initializeAssetFonts`完成四个MiSans物理字形验证后，仅macOS通过公开`QFontDatabase::setApplicationEmojiFontFamilies`一次性指定系统`Apple Color Emoji`；缺少该family显式失败并回滚原字体注册。设置早于控制器/QML创建，使整行QTextLayout与彩色Qt Quick Text使用同一策略。保留粗搜/细搜、请求字号、整行glyph ID/position、普通字形CSS基线、grapheme关联和两倍DPR层；不按case挪位置、不拆字符shaping、不改其他平台的fallback。CDP导出实际字面/family/PostScript身份并及时释放远程对象，原生诊断保留测量run的head hash与glyph ID/position，后续先对齐实际字体身份再研究栅格。
+- 验证范围：arm64 Release/Metal/实际DPR2真正隐藏RenderControl，case10/11最大结构误差降至0.078125逻辑px，固定1物理px带外SSIM为0.999285581/0.999253834，原始ROI SSIM为0.962329861/0.943559874，不能混用两种统计。20项结构/文本、18项页眉、九组活动/缓存、隐藏Canvas零文字绘制、十次恢复/最终释放通过。字体身份/advance回归覆盖12、28、29.75、44px与DPR1/1.5/2输入，修复前失败、修复后通过；这不表示全部DPR像素已验收。case6/7、14/15、16/17仍失败，具体采样收口依R16M2P；普通CurveRendering和层采样未改变，Windows仍须后续实机门禁。离屏CPU诊断不代表present/VSYNC或产品性能；所有原图/报告保持本地忽略，重建与静态审计入口见`docs/contracts/title-reels.md`。
 
 ## 目标、范围与固定取舍
 
@@ -396,13 +402,12 @@
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
 
-### R16M2 · Metal/DPR2离屏文字度量与像素补修
+### R16M2P · Metal/DPR2离屏文字采样与像素收口
 
-- 依赖R16M1的原生arm64 Release构建、隐藏窗口守卫与真正Metal离屏驱动。预估代码≤600行、有效时间≤45分钟，开始前重新评估。本轮只处理Metal/实际DPR2，所有可见窗口/呈现性能仍归最后R34；不替代Windows D3D11/OpenGL门禁。
-- 输入为`tests/fixtures/text/titles.json`、同机冻结源码/WOFF2/原生SFNT和`docs/contracts/title-reels.md`的最小失败结论。先通过`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/web`重建参照，再用`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/web --output 新目录 --diagnostics`重建完整诊断。原R16M1报告在本地`verification/macos/title-reels/r16m1/final/`；本地输出不是Git必备输入。
-- 修复case10/11的同机emoji混排几何差异：Qt的四个彩色grapheme每个advance约31.40625逻辑px，浏览器同一源码约27.40625，累积位置误差16.078125。追踪两条路径的实际fallback字体、字号/字体表、整行glyph ID/position与字体度量；根因尚未确认，不逐case改字号/基线、拆字符shaping或套用Windows回退字体。
-- 几何对齐后处理生产case6/7、10/11、14/15、16/17的固定1物理px带外像素失败：当前普通字形失败SSIM约0.93259–0.97497，emoji项约0.65111/0.67175。其余12项通过，18项页眉、九组有界活动/缓存诊断、隐藏Canvas零文字绘制、十次离屏恢复及最终释放通过；这些是局部诊断，不代表可见窗口性能或最终文字选型。
-- 退出：20项生产文字结构与原像素门槛全部通过，18项页眉和资源/生命周期保持通过，严格PERF-01–07审计、全部启用Release CTest、source-format、两个qmllint及qsb/MSL通过。正常像素验收去掉`--diagnostics`；该包装仍拒绝结构失败，不能把R16M1的native退出6/包装退出1当成diagnosticsPassed。完成后删除本轮，继续Windows依赖已满足的轮次；R17仍等待R16收口。
+- 依赖R16M2的同机emoji字体/整行度量证据、20项结构通过及完整诊断。预估代码≤600行、有效时间≤50分钟，开始前重新评估。只处理Metal/实际DPR2；禁止将离屏结果充作可见窗口性能或Windows验证。
+- 读取`docs/contracts/title-reels.md`的最小失败结论；从冻结源码重建同机DPR2参照与独立完整诊断，不依赖旧机器PNG。处理R16M2完整诊断确认的生产case6/7、14/15、16/17；case10/11已通过，但字体/层/合成变化时仍必须回归。先核对请求字号、整行glyph ID/位置、CSS行框、层DPR与最终亚像素相位/采样；不能依据个别截图改变字号、基线或新增逐case偏移。
+- 固定1物理px边缘带外SSIM≥0.98/RGB≤6、结构≤1逻辑px和源运动门槛保持；普通字形/彩色字体分别解释。生产层、字号、字体或合成变化必须补受影响上下文回归，三路径各三次120帧、18项页眉、隐藏候选、十次恢复/最终释放不得豁免。
+- 退出：`verify-title.mjs`去掉`--diagnostics`正常退出，20项生产文字结构和像素全部通过；严格PERF-01–07、全部启用Release CTest、source-format、两个qmllint及qsb/MSL通过。完成后删除本轮，Windows依赖按原门禁推进；R17仍等待R16最终收口。
 
 ### R16B2V-P · D3D11/DPR1.5剩余普通字形像素补修
 

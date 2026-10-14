@@ -170,6 +170,8 @@ try {
     page.on('Runtime.exceptionThrown',
             (event) => console.error(JSON.stringify(event.exceptionDetails)));
     await page.send('Page.enable');
+    await page.send('DOM.enable');
+    await page.send('CSS.enable');
     await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
     page.on('Fetch.requestPaused', (e) => {
         const local = e.request.url.startsWith(origin + '/') || /^(data|blob):/.test(e.request.url);
@@ -190,13 +192,29 @@ try {
             for (const night of [false, true]) {
                 const state = await page.evaluate('window.renderCase('
                                                   + JSON.stringify({...input, night}) + ')');
+                const document = await page.send('DOM.getDocument');
+                const nodes = await page.send(
+                    'DOM.querySelectorAll',
+                    {nodeId: document.root.nodeId, selector: '#stage .music-title-face'});
+                const platformFonts = [];
+                for (const nodeId of nodes.nodeIds) {
+                    const {object} = await page.send('DOM.resolveNode', {nodeId});
+                    const description = await page.send('Runtime.callFunctionOn', {
+                        objectId: object.objectId,
+                        functionDeclaration: 'function() { return this.textContent; }',
+                        returnByValue: true
+                    });
+                    const fonts = await page.send('CSS.getPlatformFontsForNode', {nodeId});
+                    platformFonts.push({text: description.result.value, fonts: fonts.fonts});
+                    await page.send('Runtime.releaseObject', {objectId: object.objectId});
+                }
                 const file = 'title-' + captures.length + '.png';
                 const png = await page.send('Page.captureScreenshot', {
                     format: 'png',
                     clip: {x: 0, y: 0, width: input.width, height: input.budget, scale: 1}
                 });
                 await fs.writeFile(path.join(output, file), Buffer.from(png.data, 'base64'));
-                captures.push({...input, dpr, night, state, file});
+                captures.push({...input, dpr, night, state, file, platformFonts});
                 await page.send('Emulation.setDefaultBackgroundColorOverride',
                                 {color: {r: 0, g: 0, b: 0, a: 0}});
                 await page.evaluate('window.setAlpha(true)');

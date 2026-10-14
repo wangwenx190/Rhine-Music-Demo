@@ -86,6 +86,16 @@ bool yalahoo::initializeAssetFonts()
     }
     if (preparedFaces.keys() != QList<int>{ 300, 400, 600, 700 })
         return rollback();
+#ifdef Q_OS_MACOS
+    // Chromium's source path uses AppleColorEmoji, not CoreText's wider private UI face.
+    // Select it once through Qt's emoji policy so whole-line shaping and QML Text agree.
+    const QString emojiFamily = QStringLiteral("Apple Color Emoji");
+    if (!QFontDatabase::families().contains(emojiFamily)) {
+        qWarning("Required macOS source emoji font is unavailable");
+        return rollback();
+    }
+    QFontDatabase::setApplicationEmojiFontFamilies({ emojiFamily });
+#endif
     faceFonts = preparedFaces;
     QGuiApplication::setFont(assetFont(400));
     initialized = true;
