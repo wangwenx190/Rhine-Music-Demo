@@ -325,53 +325,36 @@ void SceneItem::mousePressEvent(QMouseEvent *event)
     }
     const auto hit = m_adapter->hitTest(event->position().x(), event->position().y());
     if (!hit.isEmpty()) {
-        forceActiveFocus(Qt::MouseFocusReason);
+        if (m_inputRouter)
+            m_inputRouter->reset();
+        if (!window() || !window()->flags().testFlag(Qt::WindowDoesNotAcceptFocus))
+            forceActiveFocus(Qt::MouseFocusReason);
         m_adapter->recordInput();
         event->setAccepted(m_adapter->selection()->selectCell(
                 { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true));
+        if (event->isAccepted())
+            m_adapter->recordNavigationCommit(m_adapter->selection()->revision());
     } else
         event->ignore();
 }
+InputRouter *SceneItem::inputRouter() const
+{
+    return m_inputRouter;
+}
+void SceneItem::setInputRouter(InputRouter *router)
+{
+    if (m_inputRouter == router)
+        return;
+    m_inputRouter = router;
+    emit inputRouterChanged();
+}
 void SceneItem::wheelEvent(QWheelEvent *event)
 {
-    if (!m_adapter || !m_adapter->selection() || event->angleDelta().isNull()) {
-        event->ignore();
-        return;
-    }
-    m_adapter->recordInput();
-    const auto delta = event->angleDelta();
-    event->setAccepted(std::abs(delta.x()) > std::abs(delta.y())
-                               ? m_adapter->selection()->moveLane(delta.x() > 0 ? -1 : 1)
-                               : m_adapter->selection()->moveRow(delta.y() > 0 ? -1 : 1));
+    event->setAccepted(m_inputRouter && m_inputRouter->wheel(event, window()));
 }
 void SceneItem::keyPressEvent(QKeyEvent *event)
 {
-    if (!m_adapter || !m_adapter->selection()) {
-        event->ignore();
-        return;
-    }
-    auto *selection = m_adapter->selection();
-    bool accepted = false;
-    switch (event->key()) {
-    case Qt::Key_Up:
-        accepted = selection->moveRow(-1);
-        break;
-    case Qt::Key_Down:
-        accepted = selection->moveRow(1);
-        break;
-    case Qt::Key_Left:
-        accepted = selection->moveLane(-1);
-        break;
-    case Qt::Key_Right:
-        accepted = selection->moveLane(1);
-        break;
-    default:
-        event->ignore();
-        return;
-    }
-    if (accepted)
-        m_adapter->recordInput();
-    event->setAccepted(accepted);
+    event->setAccepted(m_inputRouter && m_inputRouter->key(event, window()));
 }
 void SceneItem::touchEvent(QTouchEvent *event)
 {
@@ -392,16 +375,8 @@ void SceneItem::touchEvent(QTouchEvent *event)
     } else if (event->type() == QEvent::TouchEnd && m_touchStart) {
         const auto delta = point - *m_touchStart;
         m_touchStart.reset();
-        const double major = std::max(std::abs(delta.x()), std::abs(delta.y()));
-        const double minor = std::min(std::abs(delta.x()), std::abs(delta.y()));
-        if (major >= 36 && major >= minor * 1.3 && event->timestamp() - m_touchTimestamp <= 1400) {
-            auto *selection = m_adapter->selection();
-            const bool accepted = std::abs(delta.x()) > std::abs(delta.y())
-                    ? selection->moveLane(delta.x() > 0 ? -1 : 1)
-                    : selection->moveRow(delta.y() > 0 ? -1 : 1);
-            if (accepted)
-                m_adapter->recordInput();
-        }
+        if (m_inputRouter)
+            m_inputRouter->swipe(delta, double(event->timestamp() - m_touchTimestamp));
     }
     event->accept();
 }
@@ -434,6 +409,7 @@ void SceneItem::updatePolish()
     in.request = input().request;
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
+    in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
     in.cover = m_cover;
     in.coverPainted = true;
     in.immutableCover = true;
@@ -482,7 +458,9 @@ void SceneItem::updatePolish()
             : quality.targetSize();
     const auto &old = input();
     const bool unchanged = in.scene.revision == old.scene.revision
-            && m_coverRevision == m_publishedCoverRevision
+            && in.scene.navigationRevision == old.scene.navigationRevision
+            && in.scene.navigationCommittedNs == old.scene.navigationCommittedNs
+            && in.navigationDpr == old.navigationDpr && m_coverRevision == m_publishedCoverRevision
             && in.scene.inputRevision == old.scene.inputRevision
             && in.cover.cacheKey() == old.cover.cacheKey()
             && target == QSize(fixedColorBufferWidth(), fixedColorBufferHeight())

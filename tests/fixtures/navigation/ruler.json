@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "name": "loop-reverse",
+      "operations": [
+        { "count": 37, "row": 0, "physical": 0, "loop": true, "group": true },
+        { "count": 37, "row": 36, "physical": -1, "loop": true, "direction": -1 },
+        { "frames": 12 },
+        { "count": 37, "row": 2, "physical": 2, "loop": true, "direction": 3 },
+        { "frames": 5 },
+        { "count": 37, "row": 36, "physical": -1, "loop": true, "direction": -3 },
+        { "frames": 120 }
+      ]
+    },
+    {
+      "name": "finite-regroup",
+      "operations": [
+        { "count": 21, "row": 0, "physical": 0, "loop": false, "group": true },
+        { "count": 21, "row": 20, "physical": 20, "loop": false, "direction": 20 },
+        { "frames": 8 },
+        { "count": 3, "row": 1, "physical": 1, "loop": false, "group": true },
+        { "frames": 16 },
+        { "count": 41, "row": 20, "physical": 20, "loop": false, "group": true },
+        { "frames": 120 }
+      ]
+    },
+    {
+      "name": "empty-single-short",
+      "operations": [
+        { "count": 0, "row": 0, "physical": 0, "loop": true, "group": true },
+        { "count": 1, "row": 0, "physical": 0, "loop": true, "group": true },
+        { "frames": 12 },
+        { "count": 12, "row": 11, "physical": 11, "loop": true, "group": true },
+        { "frames": 120 },
+        { "count": 0, "row": 0, "physical": 0, "loop": true, "group": true },
+        { "frames": 120 }
+      ]
+    }
+  ]
+}

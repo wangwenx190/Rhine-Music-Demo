@@ -107,6 +107,7 @@ public:
     Q_INVOKABLE double focalDepth(QVector3D origin) const;
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
     Q_INVOKABLE void recordInput();
+    void recordNavigationCommit(quint64 revision);
 signals:
     void frameChanged();
     void detailChanged();

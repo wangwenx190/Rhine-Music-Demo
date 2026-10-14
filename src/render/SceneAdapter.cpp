@@ -48,6 +48,15 @@ void SceneAdapter::recordInput()
                                       .count();
     emit frameChanged();
 }
+void SceneAdapter::recordNavigationCommit(quint64 revision)
+{
+    m_frame.navigationRevision = revision;
+    m_frame.navigationInputRevision = m_frame.inputRevision;
+    m_frame.navigationCommittedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                            std::chrono::steady_clock::now().time_since_epoch())
+                                            .count();
+    emit frameChanged();
+}
 namespace {
 constexpr double radians = std::numbers::pi / 180;
 std::array<double, 3> components(SceneVector v)

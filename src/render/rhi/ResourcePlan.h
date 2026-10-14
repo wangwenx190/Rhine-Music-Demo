@@ -1,6 +1,7 @@
 #pragma once
 #include "RhiItem.h"
 #include "ResourceInventory.h"
+#include <cmath>
 
 namespace yalahoo::rhi {
 inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, int stride,
@@ -40,6 +41,22 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedBuffer("output-uniform", 16);
     plan.plannedTexture("qt-item-output", size, QRhiTexture::RGBA8);
     plan.plannedTexture("qt-item-depth-upper-bound", size, QRhiTexture::D32FS8);
+    if (in.navigationDpr > 0) {
+        const auto scaled = [&](int width, int height) {
+            return QSize(int(std::ceil(width * in.navigationDpr)),
+                         int(std::ceil(height * in.navigationDpr)));
+        };
+        // Qt owns these UI attachments. They join the cumulative descriptor plan, not RHI allocation.
+        plan.plannedTexture("navigation-ruler-color", scaled(130, 30), QRhiTexture::RGBA8);
+        plan.plannedTexture("navigation-ruler-depth-upper-bound", scaled(130, 30),
+                            QRhiTexture::D32FS8);
+        // Decimal wheels publish at most ten digits; widths include conservative glyph/spacing room.
+        plan.plannedTexture("navigation-ordinal-layer-upper-bound", scaled(700, 65),
+                            QRhiTexture::RGBA8);
+        for (int i = 0; i < 4; ++i)
+            plan.plannedTexture(QString("navigation-small-wheel-%1-upper-bound").arg(i),
+                                scaled(160, 12), QRhiTexture::RGBA8);
+    }
     if (in.postprocess) {
         const QSize ao(qMax(1, int(size.width() * in.aoResolution)),
                        qMax(1, int(size.height() * in.aoResolution)));

@@ -9,6 +9,8 @@ ApplicationWindow {
     id: window
     required property LibrarySession librarySession
     required property MotionController motionController
+    property InputRouter inputRouter: null
+    property RulerController rulerController: null
     required property SceneAdapter sceneAdapter
     property bool verificationRun: false
     property int verificationFlags: Qt.Window
@@ -40,6 +42,7 @@ ApplicationWindow {
         objectName: "nativeScene"
         anchors.fill: parent
         adapter: window.sceneAdapter
+        inputRouter: window.inputRouter
     }
     Browse {
         anchors.fill: parent
@@ -47,6 +50,10 @@ ApplicationWindow {
         tokens: design
         album: window.librarySession.browseInfo
         albumCount: window.librarySession.albums.count
+        rulerController: window.rulerController
+        inputRouter: window.inputRouter
+        clock: window.motionController.clock
+        selection: window.sceneAdapter.selection
         onThemeRequested: night => {
             window.sceneAdapter.recordInput();
             window.sceneAdapter.lighting.night = night;

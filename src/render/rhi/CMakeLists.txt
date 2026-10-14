@@ -26,7 +26,7 @@ target_include_directories(
     PRIVATE
     "${PROJECT_SOURCE_DIR}/tools/assets"
 )
-target_link_libraries(YalahooRhi PUBLIC YalahooScene Qt6::Quick PRIVATE Qt6::GuiPrivate)
+target_link_libraries(YalahooRhi PUBLIC YalahooScene YalahooNavigation Qt6::Quick PRIVATE Qt6::GuiPrivate)
 target_compile_features(YalahooRhi PUBLIC cxx_std_23)
 if(YALAHOO_REVIEW)
     target_compile_definitions(YalahooRhi PRIVATE YALAHOO_RHI_AUDIT)

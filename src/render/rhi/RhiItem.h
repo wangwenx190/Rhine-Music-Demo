@@ -13,6 +13,7 @@ QJsonArray adapterInventory();
 struct Input
 {
     SceneFrame scene;
+    double navigationDpr = 0;
     QVector<QMatrix4x4> entities;
     QVector<quint64> entityIds;
     QImage cover;

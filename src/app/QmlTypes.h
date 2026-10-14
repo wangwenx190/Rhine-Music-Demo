@@ -3,6 +3,11 @@
 #include "MotionController.h"
 #include "SceneAdapter.h"
 #include "SceneItem.h"
+#include "RulerController.h"
+#include "RulerInk.h"
+#include "InputRouter.h"
+#include "OrdinalMotion.h"
+#include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>
 
 struct LayoutMetricsQml
@@ -84,4 +89,37 @@ struct SceneItemQml
     Q_GADGET
     QML_FOREIGN(yalahoo::rhi::SceneItem)
     QML_NAMED_ELEMENT(SceneItem)
+};
+
+struct RulerControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::RulerController)
+    QML_NAMED_ELEMENT(RulerController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct InputRouterQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::InputRouter)
+    QML_NAMED_ELEMENT(InputRouter)
+    QML_UNCREATABLE("Owned by application")
+};
+struct RulerInkQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::RulerInk)
+    QML_NAMED_ELEMENT(RulerInk)
+};
+struct OrdinalMotionQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OrdinalMotion)
+    QML_NAMED_ELEMENT(OrdinalMotion)
+};
+struct CanvasPainterBase
+{
+    Q_GADGET
+    QML_FOREIGN(QCanvasPainterItem)
+    QML_ANONYMOUS
 };

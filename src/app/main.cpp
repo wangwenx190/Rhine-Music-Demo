@@ -8,6 +8,9 @@
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
 #include "BrowseReview.h"
+#include "NavigationReview.h"
+#include "InputRouter.h"
+#include "RulerController.h"
 #ifdef YALAHOO_REVIEW
 #  include "SceneReview.h"
 #  include "IntegrationReview.h"
@@ -66,6 +69,9 @@ int main(int argc, char **argv)
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native music archive"));
     parser.addHelpOption();
+    parser.addOption({ QStringLiteral("verify-navigation"),
+                       QStringLiteral("Verify production navigation and exit"),
+                       QStringLiteral("directory") });
     parser.addOption({ QStringLiteral("verify-browse"),
                        QStringLiteral("Verify production browse UI and exit"),
                        QStringLiteral("directory") });
@@ -117,6 +123,7 @@ int main(int argc, char **argv)
         return 7;
     if (parser.isSet(QStringLiteral("verify-runtime"))
         || parser.isSet(QStringLiteral("verify-browse"))
+        || parser.isSet(QStringLiteral("verify-navigation"))
 #ifdef YALAHOO_REVIEW
         || parser.isSet(QStringLiteral("verify-materials"))
 #endif
@@ -155,6 +162,19 @@ int main(int argc, char **argv)
     yalahoo::MotionController motion;
     yalahoo::SelectionController selection(&motion);
     yalahoo::SceneAdapter scene(motion.clock());
+    yalahoo::InputRouter inputRouter(&selection);
+    yalahoo::RulerController rulerController(&motion, &selection);
+    rulerController.setInputRouter(&inputRouter);
+    QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, &inputRouter,
+                     [&](double, double) {
+                         inputRouter.flush();
+                     });
+    QObject::connect(&inputRouter, &yalahoo::InputRouter::inputReceived, &scene,
+                     &yalahoo::SceneAdapter::recordInput);
+    QObject::connect(&inputRouter, &yalahoo::InputRouter::navigationCommitted, &scene,
+                     &yalahoo::SceneAdapter::recordNavigationCommit);
+    QObject::connect(&rulerController, &yalahoo::RulerController::inputReceived, &scene,
+                     &yalahoo::SceneAdapter::recordInput);
     QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &scene, [&] {
         scene.setReducedMotion(motion.reducedMotion());
     });
@@ -175,6 +195,7 @@ int main(int argc, char **argv)
     QQmlApplicationEngine engine;
     const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime"))
             || parser.isSet(QStringLiteral("verify-browse"))
+            || parser.isSet(QStringLiteral("verify-navigation"))
 #ifdef YALAHOO_REVIEW
             || parser.isSet(QStringLiteral("verify-materials"))
             || parser.isSet(QStringLiteral("verify-scene"))
@@ -198,7 +219,8 @@ int main(int argc, char **argv)
                          preferences.get(), saveNavigation);
     }
     if (!verificationRun || parser.isSet(QStringLiteral("verify-filled"))
-        || parser.isSet(QStringLiteral("verify-browse"))) {
+        || parser.isSet(QStringLiteral("verify-browse"))
+        || parser.isSet(QStringLiteral("verify-navigation"))) {
         // Local resource-only demonstration until the scanner is delivered in R21.
         yalahoo::LibrarySnapshot demo;
         const QStringList covers{ "square", "portrait", "landscape" };
@@ -236,10 +258,13 @@ int main(int argc, char **argv)
         scene.setSelection(&selection);
     }
     engine.setInitialProperties(
-            { { "verificationRun", verificationRun },
+            { { "inputRouter", QVariant::fromValue(&inputRouter) },
+              { "rulerController", QVariant::fromValue(&rulerController) },
+              { "verificationRun", verificationRun },
               { "verificationFlags",
                 int(yalahoo::verification::windowFlags(
-                        parser.isSet(QStringLiteral("verify-browse")))) },
+                        parser.isSet(QStringLiteral("verify-browse"))
+                        || parser.isSet(QStringLiteral("verify-navigation")))) },
               { "librarySession", QVariant::fromValue(&library) },
               { "motionController", QVariant::fromValue(&motion) },
               { "sceneAdapter", QVariant::fromValue(&scene) },
@@ -258,11 +283,13 @@ int main(int argc, char **argv)
                           parser.isSet(QStringLiteral("verify-materials")) ? "ResearchApp"
                                   : verificationRun
                                           && !parser.isSet(QStringLiteral("verify-browse"))
+                                          && !parser.isSet(QStringLiteral("verify-navigation"))
                                   ? "BootstrapProbe"
                                   : "App");
 #else
     engine.loadFromModule("Yalahoo.Music",
                           verificationRun && !parser.isSet(QStringLiteral("verify-browse"))
+                                          && !parser.isSet(QStringLiteral("verify-navigation"))
                                   ? "BootstrapProbe"
                                   : "App");
 #endif
@@ -271,6 +298,7 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+    inputRouter.attach(window);
     if (preferences)
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,
                          [window](const QString &error) {
@@ -279,6 +307,9 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
+    if (parser.isSet(QStringLiteral("verify-navigation")))
+        return yalahoo::reviewNavigation(app, *window, scene, library, inputRouter, rulerController,
+                                         parser.value(QStringLiteral("verify-navigation")));
     if (parser.isSet(QStringLiteral("verify-browse")))
         return yalahoo::reviewBrowse(app, *window, scene, library,
                                      parser.value(QStringLiteral("verify-browse")));

@@ -5,6 +5,8 @@ qt_add_executable(
     AssetCatalog.h
     BrowseReview.cpp
     BrowseReview.h
+    NavigationReview.cpp
+    NavigationReview.h
 )
 if(YALAHOO_REVIEW)
     target_sources(
@@ -178,6 +180,7 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
 )
 target_link_libraries(
     Yalahoo
@@ -185,6 +188,7 @@ target_link_libraries(
     YalahooCore
     YalahooScene
     YalahooRhi
+    YalahooNavigation
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick

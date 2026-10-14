@@ -28,6 +28,7 @@ public:
     Q_INVOKABLE bool moveRow(int direction);
     Q_INVOKABLE bool moveLane(int direction);
     Q_INVOKABLE bool enterColumn(int lane, bool guided = true);
+    std::optional<ArchiveCell> columnTarget(int lane, bool guided = false) const;
     Q_INVOKABLE bool navigateRow(double row);
     bool realistic() const;
     void setRealistic(bool realistic);

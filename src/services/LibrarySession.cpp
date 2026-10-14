@@ -139,6 +139,7 @@ QVariantMap LibrarySession::browseInfo() const
              { "number", position.number },
              { "columnCount", position.total },
              { "columnNumber", position.lane },
+             { "columnTotal", m_albums.order().columns.size() },
              { "columnLabel", position.label } };
 }
 bool LibrarySession::setPlaybackIds(const QString &albumId, const QString &trackId)

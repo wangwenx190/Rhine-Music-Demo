@@ -287,6 +287,7 @@ private:
         int shadow = 0, samples = 0, aoSamples = 0;
         float aoResolution = 0;
         bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false;
+        double navigationDpr = 0;
         bool operator==(const AllocationKey &) const = default;
     };
     AllocationKey allocationKey;
@@ -590,7 +591,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     const AllocationKey key{ requestedSize,        requestedCover,  input.shadowSize,
                              input.captureSamples, input.aoSamples, input.aoResolution,
                              input.shells,         bool(deliver),   input.postprocess,
-                             input.bokeh,          input.smaa };
+                             input.bokeh,          input.smaa,      input.navigationDpr };
     if (key != allocationKey || !vertices) {
         for (const auto format :
              { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
@@ -1580,35 +1581,39 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
-        profile(QJsonObject{ { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
-                             { "synchronizationMs", synchronizationMs },
-                             { "frameRevision", qint64(input.scene.revision) },
-                             { "submission", qint64(synchronizedSubmission) },
-                             { "aoSamples", input.aoSamples },
-                             { "bokeh", input.bokeh },
-                             { "smaa", input.smaa },
-                             { "logicalWidth", input.scene.width },
-                             { "logicalHeight", input.scene.height },
-                             { "targetWidth", targetSize.width() },
-                             { "targetHeight", targetSize.height() },
-                             { "inputRevision", qint64(input.scene.inputRevision) },
-                             { "inputReceivedNs", input.scene.inputReceivedNs },
-                             { "submittedNs",
-                               qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                              std::chrono::steady_clock::now().time_since_epoch())
-                                              .count()) },
-                             { "coverSnapshotCopies", qint64(coverSnapshotCopies) },
-                             { "coverSnapshotShares", qint64(coverSnapshotShares) },
-                             { "postprocessRevision", qint64(post.revision()) },
-                             { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
-                             { "atlasUploadBytes", frameUploadBytes },
-                             { "selectedUploadBytes", selectedUploadBytes },
-                             { "selectedCoverWidth", input.cover.width() },
-                             { "selectedCoverHeight", input.cover.height() },
-                             { "uniformUploadBytes", qint64(cursor) },
-                             { "resourceGeneration", qint64(generation) },
-                             { "visibleEntities", visibleCount },
-                             { "resources", resourceInventory() } });
+        profile(QJsonObject{
+                { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
+                { "synchronizationMs", synchronizationMs },
+                { "frameRevision", qint64(input.scene.revision) },
+                { "submission", qint64(synchronizedSubmission) },
+                { "aoSamples", input.aoSamples },
+                { "bokeh", input.bokeh },
+                { "smaa", input.smaa },
+                { "logicalWidth", input.scene.width },
+                { "logicalHeight", input.scene.height },
+                { "targetWidth", targetSize.width() },
+                { "targetHeight", targetSize.height() },
+                { "inputRevision", qint64(input.scene.inputRevision) },
+                { "inputReceivedNs", input.scene.inputReceivedNs },
+                { "navigationRevision", qint64(input.scene.navigationRevision) },
+                { "navigationInputRevision", qint64(input.scene.navigationInputRevision) },
+                { "navigationCommittedNs", input.scene.navigationCommittedNs },
+                { "submittedNs",
+                  qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::steady_clock::now().time_since_epoch())
+                                 .count()) },
+                { "coverSnapshotCopies", qint64(coverSnapshotCopies) },
+                { "coverSnapshotShares", qint64(coverSnapshotShares) },
+                { "postprocessRevision", qint64(post.revision()) },
+                { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
+                { "atlasUploadBytes", frameUploadBytes },
+                { "selectedUploadBytes", selectedUploadBytes },
+                { "selectedCoverWidth", input.cover.width() },
+                { "selectedCoverHeight", input.cover.height() },
+                { "uniformUploadBytes", qint64(cursor) },
+                { "resourceGeneration", qint64(generation) },
+                { "visibleEntities", visibleCount },
+                { "resources", resourceInventory() } });
     }
 }
 QJsonObject Renderer::resourceInventory()

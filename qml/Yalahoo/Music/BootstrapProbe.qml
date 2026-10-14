@@ -8,6 +8,8 @@ ApplicationWindow {
     id: window
     required property LibrarySession librarySession
     required property MotionController motionController
+    property InputRouter inputRouter: null
+    property RulerController rulerController: null
     required property SceneAdapter sceneAdapter
     property bool sceneReview: false
     property bool geometryProbe: false

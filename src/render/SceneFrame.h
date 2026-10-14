@@ -54,6 +54,8 @@ struct SceneFrame
     quint64 revision = 0;
     quint64 inputRevision = 0;
     qint64 inputReceivedNs = 0;
+    quint64 navigationRevision = 0, navigationInputRevision = 0;
+    qint64 navigationCommittedNs = 0;
     CameraPose camera;
     SceneVector casePosition;
     QQuaternion cameraRotation;

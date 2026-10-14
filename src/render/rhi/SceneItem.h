@@ -1,6 +1,7 @@
 #pragma once
 #include "RhiItem.h"
 #include "SceneAdapter.h"
+#include "InputRouter.h"
 #include "AtlasAllocator.h"
 #include <QPointer>
 
@@ -8,6 +9,7 @@ namespace yalahoo::rhi {
 class SceneItem : public RhiItem
 {
     Q_OBJECT
+    Q_PROPERTY(yalahoo::InputRouter *inputRouter READ inputRouter WRITE setInputRouter NOTIFY inputRouterChanged)
     Q_PROPERTY(yalahoo::SceneAdapter* adapter READ adapter WRITE setAdapter NOTIFY adapterChanged)
     Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged)
     Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged)
@@ -19,6 +21,8 @@ public:
         return m_adapter;
     }
     void setAdapter(SceneAdapter *adapter);
+    InputRouter *inputRouter() const;
+    void setInputRouter(InputRouter *router);
     bool geometryOnly() const
     {
         return m_geometryOnly;
@@ -37,6 +41,7 @@ public:
     QJsonObject coverStatistics() const;
 signals:
     void adapterChanged();
+    void inputRouterChanged();
     void geometryOnlyChanged();
     void telemetryEnabledChanged();
     void frameSubmitted(QJsonObject sample);
@@ -72,6 +77,7 @@ private:
     bool m_poolMode = false;
     quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;
+    QPointer<InputRouter> m_inputRouter;
     QImage m_cover;
     CoverCache m_covers;
     SelectedCoverPool m_coverPool;

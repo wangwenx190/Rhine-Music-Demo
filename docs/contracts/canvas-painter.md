@@ -1,6 +1,6 @@
 # 二维绘制与 R14 浏览界面契约
 
-生产入口 `App.qml` 使用 `DesignTokens`、`Header`、`BrowseInfo`、`Footer`、`NavigationFrame` 和 `ReadingVeil`，叠在已有三维 `SceneItem` 之上。旧运行探针移至 `BootstrapProbe.qml`，只由验证参数加载。导航、字轮、详情、面板和播放操作的实现分别归后续轮次；本轮只提供基础控件及其语义信号、真实静态计数和布局，未引入第二套导航或播放状态。
+生产入口 `App.qml` 使用 `DesignTokens`、`Header`、`BrowseInfo`、`Footer`、`NavigationFrame` 和 `ReadingVeil`，叠在已有三维 `SceneItem` 之上。旧运行探针移至 `BootstrapProbe.qml`，只由验证参数加载。导航输入、生产滑尺和数字字轮按 [navigation.md](navigation.md) 接入同一选择控制器及帧时钟；多行标题字轮、详情、面板和播放操作分别归后续轮次。
 
 ## 源码与接口
 
@@ -8,7 +8,7 @@
 
 - `LayoutMetrics` 是二维和相机共用的逻辑尺寸源，1.05 分界、信息区 x/right 不复制到第二个控制器。
 - `LibrarySession::browseInfo` 按稳定导航 ID 查询已有专辑索引和新建的类型名索引，交付标题/艺术家/类型/年份/曲数。快照替换即使 ID 不变也通知；搜索、排序和浏览不发出播放命令。类型索引仅在快照替换构建；全局/列内序号索引在快照或排序列变化时一次构建，读取不扫描集合。
-- `ArchiveText` 按同源字体度量提供 CSS 行框与上下留白：normal 行框使用分别取整的 ascent/descent，小数字号以相邻整数的未 hint 矢量文字加局部比例变换保持精确尺寸/字距，不扩大字形缓存，也不增加 layer/FBO。眉题的 1.7 行高、两个 span 的4px边距和空格 advance 分别建模；打开按钮按实际 CSS 级联继承16px，并显式清除 Basic 默认内边距；`NavigationFrame` 保留父级 16px 的 inline strut，并按 ascent/descent 和 inline span 的半行距计算字行盒。这解释浏览信息底边，不能用一张截图反推常量。R15 接管导航输入/刻线/序号，R16 接管测量缓存及字轮；目前无字轮动画。
+- `ArchiveText` 按同源字体度量提供 CSS 行框与上下留白：normal 行框使用分别取整的 ascent/descent，小数字号以相邻整数的未 hint 矢量文字加局部比例变换保持精确尺寸/字距，不扩大字形缓存，也不增加 layer/FBO。眉题的 1.7 行高、两个 span 的4px边距和空格 advance 分别建模；打开按钮按实际 CSS 级联继承16px，并显式清除 Basic 默认内边距；`NavigationFrame` 保留父级 16px 的 inline strut，并按 ascent/descent 和 inline span 的半行距计算字行盒。这解释浏览信息底边，不能用一张截图反推常量。导航输入/刻线/数字序号由 R15 的 InputRouter/RulerController/OrdinalReel 接管；R16 接管完整文字测量缓存及标题字轮。
 - 当前歌名为 `Header.playingTitle`，宽度上限按冻结 760/610/320px 规则；播放/停止按钮始终锚定最右侧。主题请求和其他按钮通过 `themeRequested` / `actionRequested` 交付，不修改音乐队列。减少动态与速度从已有 `MotionController` / `FrameClock` 注入。
 - 七种颜色和 nightMix 的过渡保持 650ms、源 cubic-bezier(.4,0,.2,1)；选择 pill 保持 380ms、(.22,1,.36,1)。夜间侧向遮罩横屏为 32/58/78%，竖屏在 650ms 内消退；阅读层位于页眉之前，不覆盖顶栏。
 
@@ -22,7 +22,7 @@
 
 三个路径用同一 360×160 内容、路径、渐变、透明度、裁切、MiSans/中文、下伸字符、组合字和 emoji 输入对照：C++ Canvas Painter、Canvas2D、实际 Qt Quick CurveRenderer/Text。图形区域和文字区域分别报告；文字差异不以大面积空白稀释。C++ 与 Canvas2D 文字独立执行 SSIM ≥0.98 / RGB ≤6，并要求可见文字像素数。Qt Quick Text 的高 DPR 字形栅格差异单独记录：当前 DPR2 原始文字 SSIM 约0.93，不把它表述为文字路径全部等价，R16 仍需针对字轮输入比较和选择。Windows emoji 通过系统字体回退进入同一 shaping 链，不能据此宣称 macOS/Linux 的彩色 emoji 已实机等价。
 
-R15 与 R20 都可使用已验证的曲线、SVG 路径、描边、渐变、alpha 和矩形裁切接口。具体生产实现按各轮次的输入/缓存/生命周期与两种 API 成本对照选择；R14 不提前创建滑尺或序章。R16 保留 Qt Quick Text 和 Canvas 的独立文字比较，包含整行 shaping、grapheme、彩色 emoji、DPR 与裁切；本探针不替代该验收。
+生产滑尺按 navigation.md 采用 C++ Canvas Painter 的有界状态同步、固定容量附件和实际尺寸路径缓存，Canvas2D/Qt Quick 保留同输入比较。R20 的序章可使用已验证的曲线、SVG 路径、描边、渐变、alpha 和矩形裁切接口，按其输入/缓存/生命周期与两种 API 成本对照选择。R16 保留 Qt Quick Text 和 Canvas 的独立文字比较，包含整行 shaping、grapheme、彩色 emoji、DPR 与裁切；本探针不替代该验收。
 
 ## 绘制顺序、资源与测量边界
 

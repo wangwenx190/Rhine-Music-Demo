@@ -6,6 +6,13 @@ Item {
     id: root
     required property LayoutMetrics metrics
     required property DesignTokens tokens
+    property RulerController rulerController: null
+    property InputRouter inputRouter: null
+    property FrameClock clock: null
+    property SelectionController selection: null
+    property string columnLabel: ""
+    property int columnNumber: 1
+    property int columnCount: 1
     property string ordinal: "01"
     property int albumCount: 0
     readonly property real bottomGap: metrics.width <= 700 ? 65 : metrics.width <= 1100 ? 57 :
@@ -29,7 +36,7 @@ Item {
     readonly property real labelRowHeight: labelRowAscent + labelRowDescent
     objectName: "navigationFrame"
     x: metrics.width <= 700 ? 23 : metrics.width <= 1100 ? 27 : metrics.width >= 1700 ? 62 : 42
-    width: metrics.width - x - metrics.width * 0.062
+    width: metrics.width - x - (metrics.width <= 700 ? 23 : metrics.width * 0.062)
     height: labelRowHeight + 6 + Math.max(numberSize, total.y + total.height)
     y: metrics.height - bottomGap - height
     FontMetrics {
@@ -59,6 +66,7 @@ Item {
         ArchiveText {
             id: number
             objectName: "staticOrdinal"
+            visible: !root.clock
             tokens: root.tokens
             text: root.ordinal
             font.family: MusicFonts.light.family
@@ -68,18 +76,161 @@ Item {
             font.letterSpacing: -3
             cssLineHeight: root.numberSize
         }
+        OrdinalReel {
+            id: reel
+            objectName: "selectionOrdinalReel"
+            tokens: root.tokens
+            visible: Boolean(root.clock)
+            clock: root.clock
+            value: parseInt(root.ordinal, 10)
+            direction: root.inputRouter ? root.inputRouter.rowDirection : 0
+            cssPixelSize: root.numberSize
+        }
         ArchiveText {
             id: total
             objectName: "staticTotal"
             tokens: root.tokens
-            x: number.width + 8
+            x: (root.clock ? reel.width : number.width) + 8
             y: number.y + number.baselineOffset - baselineOffset
-            text: "/  " + root.albumCount.toString().padStart(2, "0")
+            text: root.clock ? "/" : "/  " + root.albumCount.toString().padStart(2, "0")
             font.family: MusicFonts.light.family
             font.styleName: MusicFonts.light.styleName
             font.weight: MusicFonts.light.weight
             cssPixelSize: root.metrics.width <= 700 ? 9 : 12
             color: root.tokens.muted
         }
+        OrdinalReel {
+            tokens: root.tokens
+            visible: Boolean(root.clock)
+            clock: root.clock
+            value: root.albumCount
+            direction: root.inputRouter ? root.inputRouter.columnDirection : 0
+            x: total.x + total.width + (root.metrics.width <= 700 ? 0 : 8)
+            y: number.baselineOffset - baselineOffset
+            cssPixelSize: root.metrics.width <= 700 ? 9 : 12
+            letterSpacing: 1
+            color: root.tokens.muted
+        }
+    }
+    readonly property real firstColumnWidth: metrics.width <= 700 ? 74 : metrics.width <= 1100 ? 145 :
+                                                                                                 210
+    readonly property real gridGap: metrics.width <= 700 ? 12 : metrics.width <= 1100 ? 20 : 40
+    readonly property real middleWidth: (width - firstColumnWidth - 2 * gridGap) / (metrics.width
+                                                                                    <= 1100 ? 2 :
+                                                                                              2.1)
+    Row {
+        id: stepper
+        visible: Boolean(root.rulerController)
+        spacing: root.metrics.width <= 700 ? 14 : 21
+        x: root.firstColumnWidth + root.gridGap + (root.middleWidth - width) / 2
+        anchors.verticalCenter: parent.verticalCenter
+        ArchiveButton {
+            tokens: root.tokens
+            text: "↑"
+            cssPixelSize: root.metrics.width <= 700 ? 21 : 25
+            Accessible.name: "上一张专辑"
+            enabled: Boolean(root.selection && root.selection.canMovePrevious)
+            onClicked: root.inputRouter.row(-1)
+        }
+        Ruler {
+            controller: root.rulerController
+            tokens: root.tokens
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        ArchiveButton {
+            tokens: root.tokens
+            text: "↓"
+            cssPixelSize: root.metrics.width <= 700 ? 21 : 25
+            Accessible.name: "下一张专辑"
+            enabled: Boolean(root.selection && root.selection.canMoveNext)
+            onClicked: root.inputRouter.row(1)
+        }
+    }
+    Row {
+        visible: Boolean(root.inputRouter)
+        x: root.firstColumnWidth + root.gridGap * 2 + root.middleWidth + (root.width
+                                                                          - root.firstColumnWidth
+                                                                          - root.gridGap * 2
+                                                                          - root.middleWidth
+                                                                          - width) / 2
+        spacing: root.metrics.width <= 700 ? 10 : root.metrics.width <= 1100 ? 15 : 28
+        anchors.verticalCenter: parent.verticalCenter
+        ArchiveButton {
+            tokens: root.tokens
+            text: "←"
+            cssPixelSize: root.metrics.width <= 700 ? 20 : 25
+            Accessible.name: "上一列"
+            onClicked: root.inputRouter.lane(-1)
+        }
+        Column {
+            spacing: 5
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(root.metrics.width <= 700 ? 64 : 118, columnName.width, position.width)
+            Row {
+                id: position
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 3
+                readonly property real size: root.metrics.width <= 700 ? 6 : 8
+                ArchiveText {
+                    tokens: root.tokens
+                    text: "GENRE"
+                    cssPixelSize: position.size
+                    font.letterSpacing: 1.3
+                    color: root.tokens.muted
+                }
+                OrdinalReel {
+                    tokens: root.tokens
+                    clock: root.clock
+                    value: root.columnNumber
+                    direction: root.inputRouter ? root.inputRouter.columnDirection : 0
+                    digitFont: root.tokens.regular
+                    cssPixelSize: position.size
+                    letterSpacing: 1.3
+                    color: root.tokens.muted
+                }
+                ArchiveText {
+                    tokens: root.tokens
+                    text: "/"
+                    cssPixelSize: position.size
+                    color: root.tokens.muted
+                }
+                OrdinalReel {
+                    tokens: root.tokens
+                    clock: root.clock
+                    value: root.columnCount
+                    digitFont: root.tokens.regular
+                    cssPixelSize: position.size
+                    letterSpacing: 1.3
+                    color: root.tokens.muted
+                }
+            }
+            ArchiveText {
+                id: columnName
+                tokens: root.tokens
+                text: root.columnLabel
+                cssPixelSize: root.metrics.width <= 700 ? 11 : 14
+                font.letterSpacing: 1
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+        ArchiveButton {
+            tokens: root.tokens
+            text: "→"
+            cssPixelSize: root.metrics.width <= 700 ? 20 : 25
+            Accessible.name: "下一列"
+            onClicked: root.inputRouter.lane(1)
+        }
+    }
+    Binding {
+        target: root.rulerController
+        property: "narrow"
+        value: root.metrics.width <= 700
+        when: Boolean(root.rulerController)
+    }
+    Binding {
+        target: root.rulerController
+        property: "active"
+        value: root.visible && (!root.Window.window || root.Window.window.visible)
+        when: Boolean(root.rulerController)
     }
 }

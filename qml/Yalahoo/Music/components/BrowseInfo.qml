@@ -9,6 +9,8 @@ Flickable {
     required property DesignTokens tokens
     property var album: ({})
     property string ordinal: "001"
+    property FrameClock clock: null
+    property int ordinalDirection: 0
     property real calloutBottom: metrics.portrait ? 135 : 165
     signal openRequested
     readonly property real portraitHeight: Math.min(Math.max(210, metrics.height / 3),
@@ -105,9 +107,23 @@ Flickable {
                 id: codeLabel
                 tokens: root.tokens
                 y: rule.ruleTop
-                text: "ALBUM " + root.ordinal
+                text: root.clock ? "ALBUM " : "ALBUM " + root.ordinal
                 cssPixelSize: root.metrics.width >= 1700 ? 12 : root.metrics.width <= 700 ? 8 : 10
                 font.letterSpacing: 1
+            }
+            OrdinalReel {
+                objectName: "albumCodeReel"
+                tokens: root.tokens
+                clock: root.clock
+                visible: Boolean(root.clock)
+                value: parseInt(root.ordinal, 10)
+                digits: 3
+                direction: root.ordinalDirection
+                digitFont: root.tokens.regular
+                cssPixelSize: codeLabel.cssPixelSize
+                letterSpacing: 1
+                x: codeLabel.width
+                y: codeLabel.y + codeLabel.baselineOffset - baselineOffset
             }
             Rectangle {
                 y: parent.height - rule.ruleMargin - 1

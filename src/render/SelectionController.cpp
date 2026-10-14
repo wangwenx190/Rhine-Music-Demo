@@ -188,12 +188,17 @@ bool SelectionController::moveLane(int direction)
 }
 bool SelectionController::enterColumn(int lane, bool guided)
 {
+    const auto target = columnTarget(lane, guided);
+    return target && selectCell(*target, guided);
+}
+std::optional<ArchiveCell> SelectionController::columnTarget(int lane, bool guided) const
+{
     if (!m_motion || !m_pool.columnCount())
-        return false;
+        return std::nullopt;
     const int canonicalLane = ArchivePool::wrap(lane, m_pool.columnCount());
     const auto &column = m_pool.columns()[canonicalLane];
     if (column.albumIds.isEmpty())
-        return false;
+        return std::nullopt;
     const auto remembered = m_pool.location(m_memory.recalled(column.key));
     double row;
     if (remembered && remembered->lane == canonicalLane)
@@ -208,7 +213,7 @@ bool SelectionController::enterColumn(int lane, bool guided)
             : guided ? ArchivePool::nearestOccurrence(canonicalLane, m_motion->column() / 5.2 + 2,
                                                       m_pool.columnCount())
                      : double(lane);
-    return selectCell({ physicalLane, row }, guided);
+    return ArchiveCell{ physicalLane, row };
 }
 bool SelectionController::navigateRow(double row)
 {

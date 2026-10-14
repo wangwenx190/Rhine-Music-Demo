@@ -1,0 +1,65 @@
+#pragma once
+#include "FrameClock.h"
+#include <QPointer>
+#include <QVariantList>
+#include <QQmlParserStatus>
+#include <array>
+
+namespace yalahoo {
+// Frozen rolling-number's 49-point critically damped track, sampled by the shared clock.
+struct OrdinalTrack
+{
+    std::array<double, 49> points{ };
+    double value = 0, velocity = 0, target = 0, elapsed = .460;
+    void retarget(double to, bool instant);
+    void advance(double dt);
+};
+class OrdinalMotion : public QObject, public QQmlParserStatus
+{
+    Q_OBJECT
+    Q_INTERFACES(QQmlParserStatus)
+    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY clockChanged)
+    Q_PROPERTY(int value READ value WRITE setValue NOTIFY valueChanged)
+    Q_PROPERTY(int digits READ digits WRITE setDigits NOTIFY digitsChanged)
+    Q_PROPERTY(int direction READ direction WRITE setDirection NOTIFY directionChanged)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
+    Q_PROPERTY(QVariantList faces READ faces NOTIFY changed)
+public:
+    explicit OrdinalMotion(QObject *parent = nullptr);
+    void classBegin() override;
+    void componentComplete() override;
+    FrameClock *clock() const;
+    void setClock(FrameClock *clock);
+    int value() const;
+    void setValue(int value);
+    int digits() const;
+    void setDigits(int digits);
+    int direction() const;
+    void setDirection(int direction);
+    bool reducedMotion() const;
+    void setReducedMotion(bool reduced);
+    bool active() const;
+    void setActive(bool active);
+    QVariantList faces() const;
+    void advance(double dt);
+signals:
+    void clockChanged();
+    void valueChanged();
+    void digitsChanged();
+    void directionChanged();
+    void reducedMotionChanged();
+    void activeChanged();
+    void changed();
+
+private:
+    void retarget(bool instant);
+    void publish();
+    QPointer<FrameClock> m_clock;
+    QMetaObject::Connection m_connection;
+    std::array<OrdinalTrack, 10> m_tracks;
+    QVariantList m_faces;
+    int m_value = 1, m_previous = 1, m_digits = 2, m_direction = 0, m_count = 2;
+    bool m_reduced = false, m_active = true, m_initialized = false;
+};
+}
