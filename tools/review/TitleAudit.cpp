@@ -20,6 +20,7 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QMouseEvent>
+#include <QFontMetricsF>
 #include <rhi/qrhi.h>
 #include <atomic>
 #include <functional>
@@ -78,14 +79,23 @@ QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
         const auto &actual = slot->glyph;
         QJsonArray rawFonts;
         for (const auto &run : actual.renderRuns)
-            rawFonts.append(QJsonObject{ { "family", run.font.family() },
-                                         { "size", run.font.pixelSize() } });
+            rawFonts.append(QJsonObject{
+                    { "family", run.font.family() },
+                    { "size", run.font.pixelSize() },
+                    { "weight", int(run.font.weight()) },
+                    { "ascent", QFontMetricsF(run.font).ascent() },
+                    { "descent", QFontMetricsF(run.font).descent() },
+                    { "style", run.font.styleName() },
+                    { "firstY", run.positions.isEmpty() ? 0 : run.positions.first().y() } });
         actualGlyphs.append(QJsonObject{ { "key", actual.key },
                                          { "text", actual.text },
                                          { "x", actual.x },
                                          { "y", actual.y },
                                          { "width", actual.width },
                                          { "height", actual.height },
+                                         { "baseline", actual.baseline },
+                                         { "scale", actual.scale },
+                                         { "colorGlyph", actual.colorGlyph },
                                          { "fonts", rawFonts } });
         actualText += actual.text;
         for (const auto &entry : glyphs) {
@@ -253,7 +263,7 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                 renderNs += timer.nsecsElapsed() - renderStart;
             },
             Qt::DirectConnection);
-    std::atomic<bool> requested{ false }, inFlight{ false };
+    std::atomic<bool> requested{ false }, inFlight{ false }, restorePending{ false };
     std::atomic<int> drain{ 0 };
     QRhiReadbackResult readback;
     int step = 0, warmFrames = 0, marker = 0;
@@ -275,6 +285,21 @@ int reviewTitle(QGuiApplication &app, const QString &output)
     quint64 beginGeometry = 0, beginReuse = 0;
     std::function<void()> next;
     std::function<void(QImage)> completed;
+    QObject::connect(
+            &window, &QQuickWindow::sceneGraphInvalidated, &window,
+            [&] {
+                QMetaObject::invokeMethod(
+                        &window,
+                        [&] {
+                            if (!restorePending.exchange(false))
+                                return;
+                            window.showNormal();
+                            root->setProperty("marker", ++marker);
+                            window.update();
+                        },
+                        Qt::QueuedConnection);
+            },
+            Qt::DirectConnection);
     QObject::connect(
             &window, &QQuickWindow::afterRendering, &window,
             [&] {
@@ -416,6 +441,11 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                     { "antialiasBand", band },
                     { "geometry", geometry },
                     { "resources", QJsonObject::fromVariantMap(controller.diagnostics()) } });
+            QSaveFile progress(output + "/captures.json");
+            if (progress.open(QIODevice::WriteOnly)) {
+                progress.write(QJsonDocument(captures).toJson());
+                progress.commit();
+            }
             costs.append(
                     QJsonObject{ { "mode", mode },
                                  { "guiStateNs", guiNs },
@@ -535,7 +565,7 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                     && !image.isNull() && yalahoo::verification::windowPolicySatisfied(window);
             passed &= valid;
             lifecycle.append(QJsonObject{
-                    { "cycle", index - staticSteps },
+                    { "cycle", index - staticSteps - animationSteps - headerSteps },
                     { "passed", valid },
                     { "liveInkNodes", nodes },
                     { "liveCanvasRenderers", renderers },
@@ -659,12 +689,14 @@ int reviewTitle(QGuiApplication &app, const QString &output)
             root->setProperty("headerMode", false);
             root->setProperty("testReduced", true);
             controller.setReducedMotion(true);
+            restorePending = true;
             window.hide();
             window.releaseResources();
             controller.setAvailableWidth(300 + (step % 2) * 20);
+            window.resize(int(controller.availableWidth()) + 2, 152);
+            root->setSize(window.size());
             controller.reconcile();
             root->setProperty("mode", (step - staticSteps) % 3);
-            window.showNormal();
         }
         guiNs = guiTimer.nsecsElapsed();
         ++step;
@@ -691,6 +723,8 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                                   { "inFlight", inFlight.load() },
                                                   { "drain", drain.load() },
                                                   { "visible", window.isVisible() },
+                                                  { "exposed", window.isExposed() },
+                                                  { "restorePending", restorePending.load() },
                                                   { "dpr", dpr },
                                                   { "windowPolicy",
                                                     yalahoo::verification::windowPolicy(window) } })

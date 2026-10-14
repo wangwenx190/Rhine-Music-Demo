@@ -52,12 +52,11 @@
 - 处理：保留整行glyph ID/位置，非歌名单行模式按源CSS折叠并移除有效行末ASCII空白；字面text提取和宽度的cursorToX末端同时限制为 `min(nextGroupStart, inkEnd)`，而非只跳过起点已经在空白区的分组。只改text会保留约7.73–8.26逻辑px的行末空白advance，导致文本已经一致而结构宽度仍失败；不能凭正确像素放行。上下文glyph变化用sameGlyphInk比较实际描述符，不能只比较文本/字体。
 - 验证与限制：修正通过title-reels/source-format及Windows Release/D3D11/实际DPR1双主题20项结构/文字对照，最大结构误差0.24087逻辑px；原失败报告保留，其他DPR/后端待R16B2/B3。以后先对齐可见行文本与whole-line关联语义，不能把结构统计问题当字体像素问题反复调参。
 
-### R16：PowerShell直接调用GUI程序不能可靠等待退出
+### R16：PowerShell GUI等待与退出码必须分别确认
 
-- 表现与触发：在PowerShell中 `& yalahoo.exe ... *> file` 可立即返回、LASTEXITCODE为空，实际GUI进程仍在采集；按这个空值继续执行会误报退出状态或启动并发GPU验证。本轮已观察到空退出值和仍存活的yalahoo进程，没有把空值当作通过。
-- 处理：用捕获管线 `$output = & ... 2>&1 | Out-String` 强制等待GUI完成后读取LASTEXITCODE，再写日志并核对JSON报告。若用Start-Process，则必须 `-Wait -PassThru -WindowStyle Hidden` 并读取ExitCode；保留VerificationWindow在第一次show前置底/拒绝焦点。正常采样严格串行，不和构建或另一个GPU程序并行。
-- 验证与限制：最后生产检查通过等待管线取得真实exit0，报告18项通过；所有后续GUI重建脚本必须沿用可靠等待方式，不依赖启动成功或空退出码推断采集结束。
-
+- 表现与触发：直接`& yalahoo.exe`可能立即返回，输出管线可用于等待，但不能保证WIN32 GUI更新调用者的LASTEXITCODE。R16B2V诊断的console ui-audit先返回像素失败6，随后实际GUI浏览report.passed=true，包装函数却继续读到陈旧6；不能把旧非零值当作本次GUI失败，也不能把之前的0当作GUI通过。
+- 处理：GUI验证使用ProcessStartInfo（UseShellExecute=false、CreateNoWindow=true、WindowStyle=Hidden、ArgumentList逐项传参）；stdout/stderr同时ReadToEndAsync，WaitForExit后读取该Process.ExitCode，再核对真实JSON报告。`tools/build/verify-r16.ps1::RunGui`直接记录actual GUI exit，不依赖LASTEXITCODE。也可Start-Process -Wait -PassThru -WindowStyle Hidden后读ExitCode；Qt窗口仍必须首次show前使用VerificationWindow置底/拒绝焦点。console工具继续核对其实际exit及报告，诊断的像素6不豁免其他门禁。
+- 验证与边界：本轮同一DPR1.5生产浏览报告18项通过，Process实际退出0，证明原包装错误来自陈旧退出码。输出等待和退出码证明是两件事；所有后续GUI重建脚本必须使用进程对象，不依赖启动成功、空值或管线结束推断GUI退出状态。
 ### R16B1：隐藏候选仍重建字形节点
 
 - 表现与触发：TitleReview切换到纯Text/Canvas候选时，生产ReelInk不可见，但其槽contentChanged仍会安排update；只核对slot.shown的updatePaintNode继续创建普通字形节点，三个候选的成本受隐藏生产工作污染。不能从父级visible=false推断所有layer/SG节点都没有工作。
@@ -82,6 +81,21 @@
 - 验证边界：修复前D3D11/DPR1文字与页眉通过，但成本被隐藏Canvas污染；DPR1.5有明确像素失败。仅GUI守卫版本在DPR1留下失败成本计数，DPR1.5/2及NativeRendering试验出现退出7且无最终report，失败和原始图保存在`verification/windows/title-reels/r16b2/`，未算作通过。生产CurveRendering不变；窗口恢复、字体栅格与高DPR完整验证仍依R16B2V/W，不能把未完成试验当作选型证据。
 - 诊断限制与避免再犯：高DPR文字比较遍历物理像素，工具整体完成预算按DPR²扩展；这只改变验证驱动的超时，不改变像素、运动或性能门槛。现有超时尚未证实是CPU比较还是恢复/readback停滞，不能归因于GPU慢或宣称可见性修复已解决所有高DPR问题。超时另写`timeout.json`记录step、warmFrames、请求/在途读回、drain和窗口策略；后续先定位阶段与资源所有者，再修改产品渲染，所有候选的隐藏工作都须独立检查。
 
+### R16B2V：混合回退字体抬高普通字形基线
+
+- 表现与确认根因：20项结构/文本一致时，emoji混排的case10/11普通MiSans字形仍出现带外差异。原布局按主字体ascent计算top，却让QTextLine以混合字体的较大ascent排glyph；28px输入的原报告普通glyph基线为31.078125；修正后约30.109375，无emoji同字形为30.09375。混合行ascent增大后旧top仍减主字体ascent，导致普通字形基线向下移动。不能将结构行框通过视为绘制基线正确。
+- 修正：主CSS行框和粗搜/细搜、字号、整行glyph ID/关联不变，line.setPosition减去实际line.ascent乘局部scale，普通glyph回到主字体基线。彩色Text保留原回退行基线，在colorGlyph描述符中补回line.ascent与主字体ascent之差；不把普通字体的基线修正施加到彩色字体。单元回归比较有/无emoji前缀时普通字形ID和竖向位置，覆盖DPR1/1.5/2的布局输入；QTextLine使用QFixed坐标，setPosition在不同混合行ascent下可能相差一个1/64逻辑px步长，新回归按该已确认量化步长检查，仍会拒绝原近1px的偏移，原像素/结构/运动门槛不变；这些单元输入不代表三个DPR均已像素验收。
+- 验证边界：完整Windows D3D11/DPR1.5诊断与受影响DPR1回归由本轮入口核对；剩余普通字形采样差异依R16B2V-P。后续先区分primary/fallback度量和具体绘制路径，不拆字符重新shaping，不用换字号去追混合行ascent。
+
+### R16B2V：恢复测试沿用最终超宽页眉窗口而停帧
+
+- 表现与范围：采集完成60项三路径静态图、9组活动成本和18项页眉后，在第一恢复周期step88停止；warmFrames=1、requested=false、inFlight=false、drain=0、visible=true，窗口策略正常。CPU比较已经完成、没有读回在途，增加DPR²预算不能解决该停帧。原测试沿用最终3440×1440页眉窗口与root大小，只改变300/320px标题宽度。
+- 修正与已验证区别：恢复场景先hide/release，将window/root明确恢复为标题宽度加2、高度152；sceneGraphInvalidated后排队showNormal，保持置底/拒绝焦点，再请求正常Qt帧。单独等待invalidation的试验仍在同阶段超时；重设标题场景尺寸后多个独立完整试验均完成十次恢复/最终释放。已确认驱动场景尺寸不一致；Qt/compositor内部为什么停止后续frameSwapped尚未确认，不能宣称GPU驱动故障或归因于CPU耗时。timeout报告补exposed/restorePending，采集按正常事件与一个有界在途读回驱动，不加轮询/抢焦点。
+
+### R16B2V：局部栅格改善不能替代完整文字矩阵
+
+- NativeRendering在20px普通字形的局部图更接近源，但分数拟合/译名字号仍失败；原生透明层试验出现彩色子像素边缘，显式GrayAntialiasing去除彩边后仍未满足全部门槛。重设分数QRawFont字号/补偿transform、将层改为实际DPR也没有全通过。统一按DPR取整度量使case6/7带外SSIM从约0.976下降到约0.941，不能将其作为普遍CSS度量规则。
+- CurveRendering四倍离屏层让case6/7、14/15改善，却使44px标题下19.8px译名的case16/17失败；分数度量取整、重设Curve字号与mipmap面积滤波也未全通过。原因仍需实际层/最终输出亚像素相位与源字体度量诊断；不能据某个局部通过保留新生产路径。所有这些试验已撤回，失败报告/成对图在本地r16b2v目录保留；不把采样门槛降低、1px带扩大或新增逐case偏移作为解决方案。
 ## 目标、范围与固定取舍
 
 1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
@@ -373,16 +387,16 @@
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
 
-### R16B2V · D3D11/DPR1.5文字像素与恢复补修
+### R16B2V-P · D3D11/DPR1.5剩余普通字形像素补修
 
-- 依赖R16B2；预估代码≤600行、有效时间≤45分钟，开始前须重新评估。只处理D3D11/实际DPR1.5，输入仍为`tests/fixtures/text/titles.json`、双主题和九尺寸页眉，不进入其他后端。
-- 复现`verification/windows/title-reels/r16b2/pre-visibility-fix/d3d11-dpr-1.5/report.json`的生产case6/7、10/11、14/15、17带外SSIM失败：结构/文本已一致，最低SSIM约0.95282；以冻结源码的字体、字形位置、行框及真实绘制为准，核对普通整行glyph、彩色Text回退和离屏层的实际缩放/裁切，不扩大1物理px边缘带或降低0.98门槛。根因尚未确认，不根据截图猜测修改字号。
-- 检查可见性修复后的十次hide/release/show是否完成；此前DPR1.5/2及NativeRendering试验有超时、缺最终报告，不能记为通过。诊断时核对最后帧/阶段、readback及窗口恢复；CPU物理像素比较超时按实际DPR平方给出明确执行预算，图形/性能门槛不变。NativeRendering试验未完成，生产仍用CurveRendering。
-- 串行完成三个绘制路径各三次120帧GUI/tick、同步/绘制、缓存/资源采样，隐藏候选无文字绘制；GPU不可测写null。20项文字、18项页眉、改速/减少动态/定位不改变播放、释放、受影响Release回归与平台静态审计全部通过后，简明结论交接R16B2W/B3；保留全部失败样本。
-
+- 依赖R16B2V的混合字体基线、完整诊断与恢复入口；预估代码≤600行、有效时间≤45分钟，开始前重新评估，给最终Release回归留足时间。只处理D3D11/实际DPR1.5，不进入DPR2或OpenGL。
+- 输入为`tests/fixtures/text/titles.json`、冻结字体/生产字轮源码和`verification/windows/title-reels/r16b2v/accepted/d3d11-dpr-1.5/report.json`。精确修复生产case6/7（20px两行/省略号）、14/15（窄屏拟合主标题/译名）、17（44px主标题下19.8px译名）的带外SSIM失败；普通字形与emoji混排的case10/11已单独修正，不以旧最低0.95282代表当前五项残差。
+- 先在真实字形位置、字体度量、槽离屏层与最终输出之间补齐可复现的亚像素相位/采样诊断，核对请求字号、整行glyph ID/位置、CSS行框和实际像素轮廓。局部滤波/相位原因尚未确认；禁止按case或截图猜测改字号/基线。NativeRendering、统一DPR取整、四倍层、分数字号重设及mipmap试验均未通过完整矩阵，不能从其中局部通过选为生产路径。失败保存在`verification/windows/title-reels/r16b2v/`，生产保留CurveRendering与两倍层。
+- 使用`./tools/build/verify-r16.ps1 -TitleContext -Backend d3d11 -Dpr 1.5 -UseExistingWebSource`做正常退出验收；`-TitleDiagnostics`只保留明确passed=false的像素待修报告，不豁免结构/源码轨迹、18项页眉、三路径各三次120帧、隐藏候选无文字绘制、十次恢复与最终释放门禁，不可用于像素收口。采样严格串行，GPU不可测仍写null，固定1物理px带外SSIM≥0.98/RGB≤6不变。
+- 退出：20项双主题生产文字全部通过，九尺寸页眉、改速/减少动态/定位不改变播放、成本/缓存/资源与窗口策略通过；涉及字号/字体/层或合成修改时补受影响DPR1回归。Release/source-format/qmllint/qsb与PERF-01–07/Metal/GL静态审计通过，macOS/Linux标明“静态审计通过，实机待用户验证”。交接R16B2W/B3，保留全部失败样本。
 ### R16B2W · D3D11/DPR2文字与成本验收
 
-- 依赖R16B2V；预估代码≤300行、有效时间≤45分钟，开始前须重新评估。以同一匿名输入/主题/九尺寸/运动与生命周期序列校准实际DPR2，完成20项生产文字、18项页眉、十次恢复和最终释放；先前超时不能替代此验收。
+- 依赖R16B2V-P；预估代码≤300行、有效时间≤45分钟，开始前须重新评估。以同一匿名输入/主题/九尺寸/运动与生命周期序列校准实际DPR2，完成20项生产文字、18项页眉、十次恢复和最终释放；先前超时不能替代此验收。
 - 三路径各三次独立120帧采样，分开GUI状态/活动tick、Qt同步/CPU提交、Canvas同步/绘制、缓存与资源，记录隐藏候选无绘制、静止无重排及GPU null；DPR1.5修正若影响DPR1则重跑对应回归，否则不重复无关矩阵。
 - 原结构、1物理px文字边缘带外SSIM≥0.98/RGB≤6、源运动与窗口策略门槛全部保留；Release、qsb及Metal/GL调用链审计通过，macOS/Linux标明“静态审计通过，实机待用户验证”。退出：D3D11三个DPR均有真实完整结论与各次成本，交接R16B3。
 

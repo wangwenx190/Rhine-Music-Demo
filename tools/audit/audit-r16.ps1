@@ -1,8 +1,10 @@
 [CmdletBinding()]
-param([ValidateSet('R16', 'R16B1', 'R16B2')][string]$Round = 'R16')
+param([ValidateSet('R16', 'R16B1', 'R16B2', 'R16B2V')][string]$Round = 'R16')
 
 $ErrorActionPreference = 'Stop'
-$remaining = if ($Round -eq 'R16B2') {
+$remaining = if ($Round -eq 'R16B2V') {
+    'R16B2V-P/R16B2W-R16B3'
+} elseif ($Round -eq 'R16B2') {
     'R16B2V/W-R16B3'
 } elseif ($Round -eq 'R16B1') {
     'R16B2-B3'
@@ -48,6 +50,21 @@ if ($Round -eq 'R16B2') {
     $checks += @(
         @('COMMON-05', 'tools/build/verify-r16.ps1', 'BackendMatrix', 'The selected-backend entry reuses one frozen input matrix and calibrates each requested DPR against the native screen query. Complete single-context reports require twenty production captures, eighteen header cases, ten lifetime cycles and three distinct serial 120-frame samples per drawing path. R16B2 verifies D3D11/DPR1 only; high-DPR failures/timeouts remain R16B2V/W and final OpenGL selection remains R16B3.'),
         @('PERF-07', 'tools/review/CanvasTitleProbe.cpp', 'm_windowVisibility', 'GUI requests coalesce only while effectively visible. Render synchronization takes the actual item/window visibility before copying faces, and hidden paint resets then returns before any text/font work. Window replacement disconnects its previous visibility callback; show/restore republishes the current controller values. Per-run Canvas drawing deltas require zero hidden text paints. D3D11/DPR1 checks ten restores and final zero tracked nodes/renderers. Shared Metal/GL Qt ownership has no Windows-only branch; target font atlases/compositor/GPU and Windows high-DPR acceptance remain unverified.')
+    )
+    $paths += 'tools/build/verify-r16.ps1'
+    $paths += 'tools/review/CanvasTitleProbe.h'
+}
+if ($Round -eq 'R16B2V') {
+    $summary = Get-Content -Raw (Join-Path $repository 'verification/windows/title-reels/r16b2v/accepted/summary.json') | ConvertFrom-Json
+    $regression = Get-Content -Raw (Join-Path $repository 'verification/windows/title-reels/r16b2v/dpr1-regression/summary.json') | ConvertFrom-Json
+    if (-not $summary.diagnosticsPassed -or -not $summary.diagnosticMode -or $summary.passed -or -not $regression.passed -or $summary.reports.Count -ne 1 -or $regression.reports.Count -ne 1 -or $summary.reports[0].dpr -ne 1.5 -or $regression.reports[0].dpr -ne 1 -or ($summary.reports[0].pendingPixelCases -join ',') -ne '6,7,14,15,17') {
+        throw 'R16B2V requires complete diagnostics, the five declared pending pixels and passed DPR1 regression'
+    }
+    $checks = @($checks | Where-Object { $_[0] -notin @('COMMON-05', 'PERF-05', 'PERF-07') })
+    $checks += @(
+        @('COMMON-05', 'tools/build/verify-r16.ps1', 'TitleDiagnostics', 'Diagnostic mode permits only the pixel-failure exit code after separately requiring all structure/motion/header/cost/visibility/lifecycle gates. It saves passed=false with the exact pending production cases; it cannot report full title pixel acceptance. D3D11/DPR1 regression remains a normal full gate. DPR1.5 pixel closure remains R16B2V-P, then DPR2 and OpenGL/final selection remain R16B2W/B3.'),
+        @('PERF-05', 'src/render/text/TextLayoutAdapter.cpp', 'line.ascent() * scale', 'Line positioning subtracts actual mixed-layout ascent so primary glyphs keep the primary CSS line-box baseline. Colored Text separately retains its fallback inline baseline. Font size fitting, wrapping, glyph IDs/association and cache keys remain unchanged. The mixed-versus-plain regression checks primary glyph IDs and vertical positions at three DPR values. No new layout pass, font or resource is introduced.'),
+        @('PERF-07', 'tools/review/TitleAudit.cpp', 'restorePending.exchange(false)', 'Lifecycle verification restores the actual title-sized content instead of the final ultrawide header window, and queues show after scene graph invalidation. Window policy remains bottom/no focus. Ten cycles and final zero tracked nodes/renderers are independently checked; one bounded readback stays in flight. Waiting for invalidation alone did not resolve the large-window stall; its Qt/compositor internal cause remains unconfirmed. Shared Metal/GL lifecycle and font values are statically checked, with target fonts/compositor/GPU still untested.')
     )
     $paths += 'tools/build/verify-r16.ps1'
     $paths += 'tools/review/CanvasTitleProbe.h'

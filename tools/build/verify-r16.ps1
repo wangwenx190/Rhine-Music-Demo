@@ -3,6 +3,7 @@ param(
     [switch]$FullMatrix,
     [switch]$BackendMatrix,
     [switch]$TitleContext,
+    [switch]$TitleDiagnostics,
     [switch]$UseExistingWebSource,
     [ValidateSet('d3d11', 'opengl')][string]$Backend = 'd3d11',
     [ValidateSet(1, 1.5, 2)][double]$Dpr = 1,
@@ -15,16 +16,42 @@ $evidence = Join-Path $repository $EvidenceDirectory
 if ([int][bool]$FullMatrix + [int][bool]$BackendMatrix + [int][bool]$TitleContext -gt 1) {
     throw 'Choose FullMatrix, BackendMatrix or TitleContext'
 }
+if ($TitleDiagnostics -and -not $TitleContext) {
+    throw 'TitleDiagnostics requires an explicit single TitleContext'
+}
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8 = [Text.UTF8Encoding]::new($false)
-function Run([string]$Name, [scriptblock]$Command) {
+function Run([string]$Name, [scriptblock]$Command, [int[]]$AllowedCodes = @(0)) {
     $output = & $Command 2>&1 | Out-String
     $code = $LASTEXITCODE
     [IO.File]::WriteAllText((Join-Path $evidence $Name), $output, $utf8)
-    if ($code -ne 0) {
+    if ($code -notin $AllowedCodes) {
         throw "$Name failed; output retained"
     }
-    Write-Output "$Name passed"
+    Write-Output "$Name completed with exit $code"
+}
+function RunGui([string]$Name, [string]$Executable, [string[]]$Arguments) {
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = $Executable
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    foreach ($argument in $Arguments) {
+        $start.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::Start($start)
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.WaitForExit()
+    $code = $process.ExitCode
+    [IO.File]::WriteAllText((Join-Path $evidence $Name), $stdout.Result + $stderr.Result, $utf8)
+    $process.Dispose()
+    if ($code -ne 0) {
+        throw "$Name failed with actual GUI exit $code; output retained"
+    }
+    Write-Output "$Name completed with actual GUI exit $code"
 }
 $names = @('PATH', 'QT_PLUGIN_PATH', 'QSG_RHI_BACKEND', 'QSG_RENDER_LOOP', 'QSG_NO_VSYNC', 'QT_SCALE_FACTOR', 'QCPAINTER_DEBUG_COLLECT')
 $saved = @{}
@@ -88,10 +115,19 @@ try {
         foreach ($dpr in $dprs) {
             $env:QT_SCALE_FACTOR = ($dpr / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
             $directory = Join-Path $evidence "$backend-dpr-$dpr"
-            Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe --titles $directory }
+            $titleExitCodes = if ($TitleDiagnostics) {
+                @(0, 6)
+            } else {
+                @(0)
+            }
+            Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe --titles $directory } $titleExitCodes
             $report = Get-Content -Raw (Join-Path $directory 'report.json') | ConvertFrom-Json
-            if (-not $report.passed -or $report.backend -ne $backend -or [Math]::Abs($report.dpr - $dpr) -gt 0.001 -or -not $report.released -or $report.animatedCosts.Count -ne 9 -or $report.headerChecks.Count -ne 18 -or $report.lifecycle.Count -ne 10) {
+            if ((-not $report.passed -and -not $TitleDiagnostics) -or $report.backend -ne $backend -or [Math]::Abs($report.dpr - $dpr) -gt 0.001 -or -not $report.released -or @($report.captures | Where-Object mode -eq 0).Count -ne 20 -or $report.animatedCosts.Count -ne 9 -or $report.headerChecks.Count -ne 18 -or $report.lifecycle.Count -ne 10) {
                 throw 'Title glyph, animation, transport, DPR or lifecycle verification failed'
+            }
+            $production = @($report.captures | Where-Object mode -eq 0)
+            if ($report.motionError -gt 0.000001 -or -not $report.windowPolicy.passed -or @($production | Where-Object { -not $_.valid -or -not $_.geometry.passed -or -not $_.raw.valid -or -not $_.antialiasBand.valid }).Count -gt 0 -or @($report.headerChecks | Where-Object { -not $_.passed }).Count -gt 0 -or @($report.lifecycle | Where-Object { -not $_.passed }).Count -gt 0) {
+                throw 'Diagnostics cannot waive structure, motion, header, window or lifecycle gates'
             }
             foreach ($mode in 0..2) {
                 $samples = @($report.animatedCosts | Where-Object { $_.mode -eq $mode })
@@ -118,19 +154,28 @@ try {
                 maximumRgbOutsideGlyphEdge = ($production.antialiasBand.meanAbsoluteRgb | Measure-Object -Maximum).Maximum
                 maximumGeometryError = ($production.geometry.maximumError | Measure-Object -Maximum).Maximum
                 captures = $production.Count
+                pixelAcceptancePassed = [bool]$report.passed
+                pendingPixelCases = @($production | Where-Object { -not $_.candidatePassed } | Select-Object -ExpandProperty case)
                 candidatePassCounts = @(foreach ($mode in 0..2) {
                         @($report.captures | Where-Object { $_.mode -eq $mode -and $_.candidatePassed }).Count
                     })
                 animatedCosts = @($report.animatedCosts | Select-Object run, mode, frames, guiStateNs, clockTickCpuNs, syncCpuNs, renderSubmitCpuNs, canvasSyncCpuNs, canvasPaintCpuNs, canvasPaints, gpuTime, glyphNodesCreated, glyphNodesReused, resources)
             }
         }
-        $env:QT_SCALE_FACTOR = (1 / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
-        Run "$backend-production.txt" { & ./build/release/bin/yalahoo.exe --verify-browse (Join-Path $evidence "$backend-production") }
+        $productionDpr = if ($TitleContext) {
+            $Dpr
+        } else {
+            1
+        }
+        $env:QT_SCALE_FACTOR = ($productionDpr / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
+        RunGui "$backend-production.txt" (Join-Path $repository 'build/release/bin/yalahoo.exe') @('--verify-browse', (Join-Path $evidence "$backend-production"))
     }
     Run 'ctest.txt' { ctest --preset qt-release --output-on-failure }
     Run 'shader.txt' { & "$($chain.qtKit)/bin/qsb.exe" --dump build/release/src/app/.qsb/reel-slot.frag.qsb }
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{
-                passed = $true
+                passed = @($reports | Where-Object { -not $_.pixelAcceptancePassed }).Count -eq 0
+                diagnosticsPassed = $true
+                diagnosticMode = [bool]$TitleDiagnostics
                 fullMatrixCompleted = [bool]$FullMatrix
                 backendMatrixCompleted = [bool]$BackendMatrix
                 requestedBackend = $Backend

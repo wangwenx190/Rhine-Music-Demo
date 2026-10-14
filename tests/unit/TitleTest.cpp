@@ -6,6 +6,7 @@
 #include <QFontMetricsF>
 #include <QAbstractItemModelTester>
 #include <QTextLayout>
+#include <algorithm>
 #include <cmath>
 
 class TitleTest : public QObject
@@ -116,6 +117,28 @@ private slots:
         const auto misses = adapter.misses();
         adapter.measure(text, font, font, 28, 600, 150, false, 2);
         QCOMPARE(adapter.misses(), misses + 1);
+    }
+    void fallbackDoesNotMovePrimaryInk()
+    {
+        yalahoo::TextLayoutAdapter adapter;
+        const auto font = yalahoo::assetFont(700);
+        for (const double dpr : { 1.0, 1.5, 2.0 }) {
+            const auto plain =
+                    adapter.measure(QStringLiteral("收藏"), font, font, 28, 600, 150, false, dpr);
+            const auto mixed = adapter.measure(QStringLiteral("👨‍👩‍👧‍👦 收藏"),
+                                               font, font, 28, 600, 150, false, dpr);
+            const auto &expected = plain.glyphs.first();
+            const auto found =
+                    std::find_if(mixed.glyphs.cbegin(), mixed.glyphs.cend(), [](const auto &glyph) {
+                        return glyph.text == QStringLiteral("收");
+                    });
+            QVERIFY(found != mixed.glyphs.cend());
+            QCOMPARE(found->renderRuns.first().indexes, expected.renderRuns.first().indexes);
+            // QTextLine positions use a 1/64-pixel fixed-point grid.
+            QVERIFY(std::abs(found->renderRuns.first().positions.first().y()
+                             - expected.renderRuns.first().positions.first().y())
+                    <= 1.0 / 64);
+        }
     }
     void analyticAndInterruptions()
     {

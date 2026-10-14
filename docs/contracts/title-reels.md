@@ -1,6 +1,6 @@
 # 标题字轮实现与补验收边界
 
-R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见下文；完整绘制选择、其余 DPR/后端视觉和局部成本验收由迁移计划 R16B2V/W、R16B3 收尾，R17 的前置条件仍等待这些轮次。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
+R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见下文；完整绘制选择、其余 DPR/后端视觉和局部成本验收由迁移计划 R16B2V-P/W、R16B3 收尾，R17 的前置条件仍等待这些轮次。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
 
 ## 来源与接口
 
@@ -16,7 +16,7 @@ R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1 补验收见�
 
 当前生产普通文字由 `ReelInk → ReelTextNode` 提交整行 shaping 后的 glyph ID/位置。GUI 只缓存字体描述、字体 head 身份与字形值；render thread 独立取得 QRawFont，并核对身份，GUI 的 QRawFont/QTextLayout 不跨线程。私有 Qt Quick glyph 接口隔离在 `src/render/rhi/`，配置时探测最新 Kit 的实际接口，不锁版本或回退旧 Qt。彩色 grapheme 使用 Qt Quick Text 的系统字体/彩色缓存；普通字形的隐藏 Text 不创建。整行上下文变化即使文本相同也失效。
 
-Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；其余 DPR/后端像素与成本差异仍需 R16B2V/W、R16B3 完整判定。目前普通字形节点加彩色 Text 是已集成方案，尚未宣称最终比较选型通过。
+Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；其余 DPR/后端像素与成本差异仍需 R16B2V-P/W、R16B3 完整判定。目前普通字形节点加彩色 Text 是已集成方案，尚未宣称最终比较选型通过。
 
 测量缓存键包含文本、两种字体/字重、字号、宽度、预算、窄屏/DPR/歌名模式；96项 LRU与8MiB描述符计费上限并存，超限结果不缓存。8MiB是缓存计费而非完整进程内存。字体数据库变更清空缓存；同帧输入合并成一个 queued reconcile。布局为输入长度 n 的一次整行 shaping，拟合最多25次候选行框测量，字形提取只在选中候选执行；按 string index 分组为 O(n log n)。动画只访问活动槽，不逐帧创建 QTextLayout 或替换面板；静止入口 O(1)。当前生产字号/视口下，内容 revision 只匹配本槽至多八个字面，以 sameGlyphInk 核对字体身份、glyph ID/位置、缩放和行框，保留仍可见的 QSGTextNode/transform/clip，只创建新增字面并删除离开视口的节点；局部匹配最坏 O(f²)，f≤8，不随曲库增长。clip 容量、颜色和滚动变换独立更新，隐藏的 ReelInk 不创建几何。geometryUpdates 计新增字形节点，geometryReuses 计内容 revision 中的节点复用，均为累计诊断计数，不是逐帧 GPU 成本。
 
@@ -64,6 +64,30 @@ Windows Qt 6.12.0/MSVC 19.51、Release/D3D11/实际DPR1：20项双主题生产�
 
 Canvas三次文字同步为0.2661/0.2686/0.2709ms，paint为6.4246/6.9305/7.7498ms，实际文字paint次数98/97/97；它们是Qt区间的局部计量，不与Qt区间相加。各路径共享布局描述符缓存计费100314bytes，控制器所描述槽层RGBA8估算383408bytes；Canvas模式不实际启用这些隐藏槽层，不能把共享描述符估算当成该候选显存。可见Canvas的300×150逻辑范围、DPR1单采样RGBA8附件估算180000bytes，深度上界按8bytes/像素另计，resize新旧可重叠；Qt字体图集/内部缓存/驱动实际内存未知。生产节点新建68/82/82、复用73/65/65，两个隐藏生产路径新建为零。GPU时间全部null。
 
-局部CPU结果支持本上下文中Canvas提交成本较低，但其按字面重新shaping与当前整行glyph语义有差异，不能据此选为生产路径。DPR1.5修复前有7项生产带外SSIM失败，最低约0.95282；DPR1.5/2与NativeRendering试验曾超时、无最终报告，未通过。生产仍用CurveRendering。原始失败保存在`verification/windows/title-reels/r16b2/`，补修任务为R16B2V/W，最终选型仍为R16B3。工具超时另写阶段、窗口与readback状态；DPR²完成预算只用于CPU物理像素比较的验证时限，不放宽图像或性能门槛。
+局部CPU结果支持本上下文中Canvas提交成本较低，但其按字面重新shaping与当前整行glyph语义有差异，不能据此选为生产路径。DPR1.5修复前有7项生产带外SSIM失败，最低约0.95282；DPR1.5/2与NativeRendering试验曾超时、无最终报告，未通过。生产仍用CurveRendering。原始失败保存在`verification/windows/title-reels/r16b2/`，补修任务为R16B2V-P/W，最终选型仍为R16B3。工具超时另写阶段、窗口与readback状态；DPR²完成预算只用于CPU物理像素比较的验证时限，不放宽图像或性能门槛。
 
 本轮源码PERF-01–07、字体身份/值交接、QML/qrc层资源、窗口恢复、Metal/GL和qsb闭包审计入口为 `./tools/audit/audit-r16.ps1 -Round R16B2`。macOS/Linux：静态审计通过，实机待用户验证；未运行目标编译器、字体回退、compositor或GPU，不能由本轮Windows结果推断。
+
+## R16B2V 恢复/混合字体补修与剩余像素任务
+
+本轮按时间约束收敛到恢复驱动、普通字形基线及完整诊断，原像素收口拆为R16B2V-P；本轮实际耗时超过一小时目标，不将其记为规模/耗时达标。生产仍使用CurveRendering和两倍DPR层；NativeRendering、四倍层、mipmap与分数字号/度量试验全部撤回，失败样本只保留在本地。没有完成DPR2或OpenGL验收，也没有完成最终文字路径选型。
+
+普通字形的CSS半行距仍用主字体度量，QTextLine的position减去实际混合行ascent，避免emoji回退改变普通字形baseline。彩色Text描述符补回fallback ascent差，保持原回退绘制基线。字号拟合、断行、整行glyph ID/位置关联、缓存键/容量、时钟和层资源均不变。新单元回归的普通glyph竖向位置允许Qt QFixed自身一个1/64逻辑px量化步长；这不修改原结构、像素或运动门槛。
+
+生命周期测试从最终超宽页眉窗口恢复到300/320px标题场景，root与window尺寸一起恢复，在sceneGraphInvalidated后排队showNormal。仅等待invalidation仍会停在step88；场景尺寸修正后十次恢复及最终释放完成。Qt/compositor内部停帧原因仍未确认，超时单列visible/exposed/restorePending/readback状态，不能归因于CPU图像比较或通过抢焦点取样。GUI进程等待与退出码使用RunGui的Process.ExitCode；管线结束后的LASTEXITCODE曾沿用console诊断的6，不能当作GUI退出事实。
+
+Windows Qt 6.12.0/MSVC 19.51 Release：D3D11/实际DPR1.5的20项文字结构/文本与源码轨迹、18项九尺寸页眉、三路径各三次120帧成本/缓存、隐藏Canvas文字零绘制、十次恢复和最终零tracked node/renderer通过；实际生产浏览18项通过，GUI进程真实退出0。固定1物理px带外像素仍有case6/7、14/15、17五项失败，最低SSIM0.97892，最高RGB平均误差1.90992/255；case10/11修正后SSIM0.98754/0.98852。原始ROI最低SSIM0.77191、最高RGB平均误差16.27161/255，不能把带外数字当原图成绩。正常TitleContext仍拒绝像素失败；TitleDiagnostics只允许结构/行为/成本/释放都通过后保存diagnosticsPassed=true、passed=false和pendingPixelCases，不能用来收口R16B2V-P。
+
+受影响DPR1完整回归通过：20项文字的带外SSIM最低0.98773，18项页眉、三路径各三次成本、十次恢复/释放和18项生产浏览通过。27项Release CTest（含source-format/title-reels）、两组qmllint、check-format、维护脚本格式与qsb GLSL/HLSL/MSL检查通过。DPR1.5最终采集后仅修正独立单元断言，UI二进制未改变；结构/行为/成本/释放报告继续从原始完整报告核对，Release CTest重新通过。
+
+下表是DPR1.5每组120帧的CPU累计毫秒，依次列三次独立结果；包含初始准备/切换与诊断提交，不池化、不推导GPU或产品FPS。
+
+| 路径 | GUI准备 | 活动tick | Qt同步 | CPU绘制提交 |
+| --- | --- | --- | --- | --- |
+| 整行glyph＋彩色Text | 3.3031 / 0.3662 / 0.3718 | 15.9764 / 10.4975 / 11.2053 | 10.8445 / 5.3010 / 7.0073 | 36.1749 / 23.7429 / 27.7291 |
+| Qt Quick Text候选 | 1.3013 / 1.1000 / 1.2422 | 13.4301 / 10.8939 / 11.6773 | 6.5179 / 7.3664 / 6.0768 | 21.4267 / 25.1163 / 22.5337 |
+| Canvas候选 | 0.4375 / 0.4405 / 0.4609 | 6.7877 / 7.1306 / 5.6132 | 1.8594 / 1.8702 / 1.7645 | 11.3856 / 12.1404 / 11.4580 |
+
+Canvas三次文字paint均96次，局部sync为0.2898/0.2770/0.2616ms、paint为7.6962/8.2193/7.6596ms；其他路径Canvas文字paint均零。共享控制器描述符缓存101156bytes、生产槽RGBA8层估算858552bytes；这不是Canvas/Text候选的实际显存，更不含字体图集/驱动或resize新旧峰值。GPU时长全部null，未测内存保持未知。PERF-01–07及共同字体值/窗口/qrc/Metal/GL静态链已审计，macOS/Linux为“静态审计通过，实机待用户验证”。
+
+复现诊断：`./tools/build/verify-r16.ps1 -TitleContext -TitleDiagnostics -Backend d3d11 -Dpr 1.5 -UseExistingWebSource -EvidenceDirectory verification/windows/title-reels/r16b2v/accepted`；完整DPR1回归使用相同入口去掉TitleDiagnostics、设Dpr 1及独立dpr1-regression目录。静态入口为`./tools/audit/audit-r16.ps1 -Round R16B2V`，要求声明的五个像素待修项和完整DPR1回归，不将诊断摘要冒充像素通过。

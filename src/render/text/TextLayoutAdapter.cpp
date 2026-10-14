@@ -58,12 +58,12 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         if (!line.isValid())
             break;
         line.setLineWidth(oneLine ? 1e9 : width / scale);
-        // CSS inline line box: independently rounded font ascent/descent, plus half leading.
+        // CSS half leading uses the primary face. Fallback ascent must not move its ink.
         const QFontMetricsF metrics(font);
         const double ascent = metrics.ascent() * scale;
         const double descent = metrics.descent() * scale;
         const double top = (lineHeight - std::round(ascent) - std::round(descent)) / 2
-                + std::round(ascent) - ascent;
+                + std::round(ascent) - line.ascent() * scale;
         line.setPosition({ 0, (index * lineHeight + top) / scale });
         part.naturalWidth = std::max(part.naturalWidth, line.naturalTextWidth() * scale);
         ++part.lines;
@@ -150,6 +150,8 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             }
             if (colored) {
                 glyph.colorGlyph = true;
+                // Qt Quick Text retains the fallback face's own inline baseline.
+                glyph.baseline += line.ascent() - QFontMetricsF(font).ascent();
                 glyph.font.setWeight(QFont::Normal);
                 glyph.font.setStyleName(QStringLiteral("Regular"));
             }
