@@ -79,8 +79,12 @@ int main(int argc, char **argv)
     qInstallMessageHandler(message);
     if (app.arguments().contains("--ruler"))
         return argc == 3 ? reviewRuler(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--titles"))
-        return argc == 3 ? reviewTitle(app, QString::fromLocal8Bit(argv[2])) : 2;
+    if (app.arguments().contains("--titles")) {
+        const auto arguments = app.arguments();
+        if ((arguments.size() != 3 && arguments.size() != 4) || arguments[1] != "--titles")
+            return 2;
+        return reviewTitle(app, arguments[2], arguments.size() == 4 ? arguments[3] : QString());
+    }
     const QString output = QString::fromLocal8Bit(argv[1]);
     QDir().mkpath(output);
     yalahoo::LayoutMetrics metrics;

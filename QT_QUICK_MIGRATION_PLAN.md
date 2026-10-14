@@ -387,10 +387,16 @@
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
 
+### R16M1 · Apple Silicon 开发机接续验证
+
+- 用户已指定后续开发设备为 macOS Apple Silicon；依赖当前已入库的源码、资源、测试输入及冻结 Git 来源映射，不依赖 Windows 构建树或未入库采集目录。换机命令与边界见 `docs/platforms/macos.md` 顶部。预估代码≤300行、有效时间≤45分钟，开始前重新评估；先用原生 arm64 终端和最新完整 Qt Kit，以 Release 完成 C++23 探针、构建、全部 CTest、check-format、两个 qmllint 和 qsb/MSL 检查，修复真实平台构建问题。
+- 同机 headless 浏览器从冻结源码重新生成 DPR2 标题参照，以 Metal 执行完整标题诊断；记录实际 Qt/编译器/架构/后端/DPR，以及20项生产文字、18项页眉、九组成本、十次恢复与最终释放。像素退出6须保留 passed=false 和具体待修项；其他非零退出、结构/行为/成本/窗口策略缺陷必须修复或拆出明确补修。不能拿 Windows 的系统回退字体、图像、性能或成功报告充作 Mac 结果。
+- 退出：Apple Silicon 的 Release 开发入口和诊断能完整运行，有真实平台结论及具体缺陷任务。移除本轮，继续 R16B2V-P 的共用文字实现研究；其 D3D11/DPR1.5 最终验收、R16B2W 和 Windows OpenGL 验收仍须真实 Windows 环境，不可由 Metal 代替。没有 Windows 环境时保留这些门禁与 R17 依赖，不擅自解除。
+
 ### R16B2V-P · D3D11/DPR1.5剩余普通字形像素补修
 
 - 依赖R16B2V的混合字体基线、完整诊断与恢复入口；预估代码≤600行、有效时间≤45分钟，开始前重新评估，给最终Release回归留足时间。只处理D3D11/实际DPR1.5，不进入DPR2或OpenGL。
-- 输入为`tests/fixtures/text/titles.json`、冻结字体/生产字轮源码和`verification/windows/title-reels/r16b2v/accepted/d3d11-dpr-1.5/report.json`。精确修复生产case6/7（20px两行/省略号）、14/15（窄屏拟合主标题/译名）、17（44px主标题下19.8px译名）的带外SSIM失败；普通字形与emoji混排的case10/11已单独修正，不以旧最低0.95282代表当前五项残差。
+- 输入为`tests/fixtures/text/titles.json`、冻结字体/生产字轮源码和`docs/contracts/title-reels.md`的最小失败结论；完整Windows报告由冻结源码按同文入口重建到`verification/windows/title-reels/r16b2v/accepted/d3d11-dpr-1.5/report.json`，它不是换机必须携带的Git输入。精确修复生产case6/7（20px两行/省略号）、14/15（窄屏拟合主标题/译名）、17（44px主标题下19.8px译名）的带外SSIM失败；普通字形与emoji混排的case10/11已单独修正，不以旧最低0.95282代表当前五项残差。
 - 先在真实字形位置、字体度量、槽离屏层与最终输出之间补齐可复现的亚像素相位/采样诊断，核对请求字号、整行glyph ID/位置、CSS行框和实际像素轮廓。局部滤波/相位原因尚未确认；禁止按case或截图猜测改字号/基线。NativeRendering、统一DPR取整、四倍层、分数字号重设及mipmap试验均未通过完整矩阵，不能从其中局部通过选为生产路径。失败保存在`verification/windows/title-reels/r16b2v/`，生产保留CurveRendering与两倍层。
 - 使用`./tools/build/verify-r16.ps1 -TitleContext -Backend d3d11 -Dpr 1.5 -UseExistingWebSource`做正常退出验收；`-TitleDiagnostics`只保留明确passed=false的像素待修报告，不豁免结构/源码轨迹、18项页眉、三路径各三次120帧、隐藏候选无文字绘制、十次恢复与最终释放门禁，不可用于像素收口。采样严格串行，GPU不可测仍写null，固定1物理px带外SSIM≥0.98/RGB≤6不变。
 - 退出：20项双主题生产文字全部通过，九尺寸页眉、改速/减少动态/定位不改变播放、成本/缓存/资源与窗口策略通过；涉及字号/字体/层或合成修改时补受影响DPR1回归。Release/source-format/qmllint/qsb与PERF-01–07/Metal/GL静态审计通过，macOS/Linux标明“静态审计通过，实机待用户验证”。交接R16B2W/B3，保留全部失败样本。

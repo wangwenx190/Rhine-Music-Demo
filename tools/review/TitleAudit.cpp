@@ -156,10 +156,11 @@ double rollingError(const QJsonArray &samples)
     return error;
 }
 }
-int reviewTitle(QGuiApplication &app, const QString &output)
+int reviewTitle(QGuiApplication &app, const QString &output, const QString &source)
 {
-    const QString sourceDirectory =
-            QStringLiteral(FIXTURE_ROOT "/verification/windows/title-reels/web");
+    const QString sourceDirectory = source.isEmpty()
+            ? QStringLiteral(FIXTURE_ROOT "/verification/windows/title-reels/web")
+            : QDir(source).absolutePath();
     QFile input(sourceDirectory + "/report.json");
     if (!input.open(QIODevice::ReadOnly))
         return 3;
@@ -603,7 +604,11 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                                        : window.rendererInterface()->graphicsApi()
                                                                == QSGRendererInterface::OpenGL
                                                        ? "opengl"
+                                                       : window.rendererInterface()->graphicsApi()
+                                                               == QSGRendererInterface::Metal
+                                                       ? "metal"
                                                        : "unsupported" },
+                                             { "sourceDirectory", sourceDirectory },
                                              { "captures", captures },
                                              { "lifecycle", lifecycle },
                                              { "animatedCosts", animatedCosts },

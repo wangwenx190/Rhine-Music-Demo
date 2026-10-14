@@ -1,4 +1,16 @@
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/QtKit.cmake")
+function(expect_architectures pri system expected)
+    yalahoo_kit_architectures("${pri}" "${system}" actual)
+    if(NOT actual STREQUAL expected)
+        message(FATAL_ERROR "Expected Kit architectures '${expected}', got '${actual}'")
+    endif()
+endfunction()
+expect_architectures("QT_ARCH = x86_64\nQT_ARCHS = x86_64 arm64\n" Darwin "x86_64;arm64")
+expect_architectures("QT_ARCH = aarch64\nQT_ARCHS = $$QT_ARCH\n" Darwin arm64)
+expect_architectures("QT_ARCH = x86_64\nQT_ARCHS = x86_64 arm64\n" Windows x86_64)
+expect_architectures("QT_HOST_ARCH = x86_64\nQT_ARCH = arm64\n" Darwin arm64)
+expect_architectures("QT_HOST_ARCH = arm64\n" Darwin "")
+expect_architectures("QT_ARCH = arm64\nQT_ARCHS = arm64 arm64\n" Darwin arm64)
 function(expect records system arch abi expected error_pattern)
     yalahoo_choose_kit("${records}" "${system}" "${arch}" "${abi}" chosen problem)
     if(NOT chosen STREQUAL expected)
@@ -55,6 +67,14 @@ expect(
     ""
 )
 expect("${old}" Linux x86_64 gcc "" "No native desktop")
+expect(
+    "/universal|7.2.0|Darwin|x86_64|clang|none;/universal|7.2.0|Darwin|arm64|clang|none;/intel|7.3.0|Darwin|x86_64|clang|none"
+    Darwin
+    arm64
+    clang
+    /universal
+    ""
+)
 yalahoo_validate_override(/new /old error)
 if(NOT error MATCHES "--fresh")
     message(FATAL_ERROR "Stale cache/override was accepted")

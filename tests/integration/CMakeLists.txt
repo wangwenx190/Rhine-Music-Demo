@@ -54,7 +54,9 @@ if(WIN32)
 endif()
 qt_add_executable(LibraryQmlTest LibraryQmlTest.cpp)
 add_test(NAME ui-drawing COMMAND ui-audit "${CMAKE_BINARY_DIR}/verification/ui-drawing" --representative)
-set_tests_properties(ui-drawing PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+# Match migration verification's render loop and explicit native scale factor.
+# Factor 1 keeps the screen's real DPR; it does not force a DPR1 framebuffer.
+set_tests_properties(ui-drawing PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1")
 if(WIN32)
     set_tests_properties(ui-drawing PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()

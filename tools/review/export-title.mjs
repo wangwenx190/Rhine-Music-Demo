@@ -9,12 +9,27 @@ import {createHash} from 'node:crypto';
 const root = path.resolve(import.meta.dirname, '../..');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const frozen = path.join(root, 'build/title-web/legacy-web');
-const output = path.join(root, 'verification/windows/title-reels/web');
 const args = process.argv.slice(2);
-if (args.length
-    && (args.length !== 2 || args[0] !== '--dpr' || ![1, 1.5, 2].includes(Number(args[1]))))
-    throw Error('Usage: export-title.mjs [--dpr 1|1.5|2]');
-const dprs = args.length ? [Number(args[1])] : [1, 1.5, 2];
+const platform = process.platform === 'win32'    ? 'windows'
+                 : process.platform === 'darwin' ? 'macos'
+                                                 : 'linux';
+let output = path.join(root, 'verification', platform, 'title-reels/web');
+let dprs = [1, 1.5, 2];
+const seen = new Set();
+for (let i = 0; i < args.length; i += 2) {
+    const option = args[i];
+    const value = args[i + 1];
+    if (!value || seen.has(option) || !['--dpr', '--output'].includes(option))
+        throw Error('Usage: export-title.mjs [--dpr 1|1.5|2] [--output directory]');
+    seen.add(option);
+    if (option === '--dpr') {
+        if (![1, 1.5, 2].includes(Number(value)))
+            throw Error('DPR must be 1, 1.5 or 2');
+        dprs = [Number(value)];
+    } else {
+        output = path.resolve(value);
+    }
+}
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
@@ -94,12 +109,18 @@ const server = await createServer({
 await server.listen();
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
 let executable;
-for (const candidate
-         of [process.env.REVIEW_BROWSER,
-             path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
-             path.join(process.env['PROGRAMFILES(X86)'] || '',
-                       'Microsoft/Edge/Application/msedge.exe')]
-             .filter(Boolean)) {
+const installedBrowsers = process.platform === 'win32'
+    ? [path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
+       path.join(process.env['PROGRAMFILES(X86)'] || '',
+                 'Microsoft/Edge/Application/msedge.exe')]
+    : process.platform === 'darwin'
+    ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+       path.join(process.env.HOME || '',
+                 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')]
+    : ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+for (const candidate of (process.env.REVIEW_BROWSER ? [process.env.REVIEW_BROWSER]
+                                                    : installedBrowsers)) {
     try {
         await fs.access(candidate);
         executable = candidate;
@@ -108,7 +129,7 @@ for (const candidate
     }
 }
 if (!executable)
-    throw Error('Installed browser required');
+    throw Error('Installed Chrome/Edge/Chromium required; REVIEW_BROWSER selects its executable');
 const profile = path.join(root, 'build/title-profile-' + process.pid);
 await fs.mkdir(profile, {recursive: true});
 const processHandle =
@@ -241,6 +262,8 @@ try {
     }
     await fs.writeFile(path.join(output, 'report.json'), JSON.stringify({
         baseline,
+        platform: process.platform,
+        architecture: process.arch,
         sources,
         version,
         captures,
