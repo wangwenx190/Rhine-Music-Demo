@@ -14,6 +14,9 @@ struct PresentationPorts
     std::function<bool()> presentationReady, archiveReady, archiveInteractive;
     std::function<void()> enterCamera, returnCamera;
     std::function<void(const PresentationSelection &)> select, switchDetail;
+    std::function<bool(const PresentationSelection &)> canSelect;
+    std::function<QString(const QString &, int)> adjacentAlbum;
+    std::function<bool(const QString &, int)> navigationEnabled;
 };
 // GUI-thread owner. Readiness is supplied by the scene; elapsed time never substitutes for it.
 class PresentationController final : public QObject
@@ -23,6 +26,8 @@ class PresentationController final : public QObject
     Q_PROPERTY(bool wantsDetail READ wantsDetail NOTIFY changed)
     Q_PROPERTY(bool archiveEnabled READ archiveEnabled NOTIFY changed)
     Q_PROPERTY(bool detailEnabled READ detailEnabled NOTIFY changed)
+    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY changed)
+    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY changed)
     Q_PROPERTY(quint64 layoutRevision READ layoutRevision NOTIFY prepared)
     Q_PROPERTY(yalahoo::SurfaceTransition *browseSurface READ browseSurface CONSTANT)
     Q_PROPERTY(yalahoo::SurfaceTransition *detailSurface READ detailSurface CONSTANT)
@@ -65,6 +70,16 @@ public:
     Q_INVOKABLE void back();
     Q_INVOKABLE void select(const QString &albumId, bool openAfter, bool archiveRoute = false,
                             const QString &trackId = { });
+    bool canMovePrevious() const
+    {
+        return navigationEnabled(-1);
+    }
+    bool canMoveNext() const
+    {
+        return navigationEnabled(1);
+    }
+    Q_INVOKABLE void stepAlbum(int direction);
+    Q_INVOKABLE bool canStepAlbum(int direction) const;
     Q_INVOKABLE void layoutReady(quint64 revision);
     Q_INVOKABLE void reset();
     void update();
@@ -75,12 +90,13 @@ signals:
     void focusRequested(bool detail);
 
 private:
+    bool navigationEnabled(int direction) const;
     void transact(const std::function<void()> &operation);
     void beginOpen();
     void beginExit();
     void beginDetailSwitch();
     void returnToArchive();
-    void commitSelection(bool detail);
+    bool commitSelection(bool detail);
     void prepareMenu();
     void showMenu();
     PresentationPorts m_ports;

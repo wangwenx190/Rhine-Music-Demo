@@ -61,8 +61,8 @@ void PresentationController::select(const QString &albumId, bool openAfter, bool
         if (m_phase == "opening" && !m_cameraEntered)
             return;
         if (m_phase == "archive") {
-            commitSelection(false);
-            if (openAfter) {
+            const bool committed = commitSelection(false);
+            if (openAfter || !committed) {
                 m_phase = "selecting";
                 m_browse.hide(m_reduced);
             }
@@ -75,6 +75,24 @@ void PresentationController::select(const QString &albumId, bool openAfter, bool
         }
     });
 }
+bool PresentationController::navigationEnabled(int direction) const
+{
+    return m_ports.navigationEnabled
+            ? m_ports.navigationEnabled(m_pending ? m_pending->albumId : QString(), direction)
+            : canStepAlbum(direction);
+}
+bool PresentationController::canStepAlbum(int direction) const
+{
+    return (direction == 1 || direction == -1) && m_ports.adjacentAlbum
+            && !m_ports.adjacentAlbum(m_pending ? m_pending->albumId : QString(), direction)
+                        .isEmpty();
+}
+void PresentationController::stepAlbum(int direction)
+{
+    if (!canStepAlbum(direction))
+        return;
+    select(m_ports.adjacentAlbum(m_pending ? m_pending->albumId : QString(), direction), true);
+}
 void PresentationController::layoutReady(quint64 revision)
 {
     if (revision == m_layoutRevision)
@@ -85,8 +103,8 @@ void PresentationController::update()
     transact([&] {
         if (m_phase == "switching") {
             if (m_pending) {
-                commitSelection(true);
-                prepareMenu();
+                if (commitSelection(true))
+                    prepareMenu();
                 return;
             }
             if (m_browseHidden && m_ports.presentationReady() && m_layoutReady)
@@ -102,9 +120,9 @@ void PresentationController::update()
             return;
         if (m_phase == "returning" && !m_wantsDetail && m_ports.archiveInteractive
             && m_ports.archiveInteractive()) {
+            if (m_pending && !commitSelection(false))
+                return;
             m_phase = "archive";
-            if (m_pending)
-                commitSelection(false);
             m_browse.show(m_reduced);
             emit focusRequested(false);
             return;
@@ -179,20 +197,23 @@ void PresentationController::beginDetailSwitch()
             }
             m_phase = "switching";
             if (m_pending) {
-                commitSelection(true);
-                prepareMenu();
+                if (commitSelection(true))
+                    prepareMenu();
             }
         });
     });
 }
-void PresentationController::commitSelection(bool detail)
+bool PresentationController::commitSelection(bool detail)
 {
+    if (m_ports.canSelect && !m_ports.canSelect(*m_pending))
+        return false;
     const auto request = *m_pending;
     m_pending.reset();
     if (detail)
         m_ports.switchDetail(request);
     else
         m_ports.select(request);
+    return true;
 }
 void PresentationController::returnToArchive()
 {

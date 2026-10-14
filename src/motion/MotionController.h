@@ -86,6 +86,7 @@ public:
                  const ArchiveValues &rates);
     bool retarget(const ArchiveValues &targets);
     void translate(const ArchiveValues &offset);
+    void cancelTravel();
     Q_INVOKABLE void travel(double rail, double column, double shoulder, double lane);
     Q_INVOKABLE void finish();
 signals:

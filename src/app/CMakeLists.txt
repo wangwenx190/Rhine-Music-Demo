@@ -5,6 +5,8 @@ qt_add_executable(
     AssetCatalog.h
     BrowseReview.cpp
     BrowseReview.h
+    DetailReview.cpp
+    DetailReview.h
     NavigationReview.cpp
     NavigationReview.h
 )

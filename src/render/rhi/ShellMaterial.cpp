@@ -15,6 +15,11 @@ QVector3D linear(const char *hex)
     return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
 }
 }
+float lidRoughness(float warmth, float clarity)
+{
+    const float w = std::clamp(warmth, 0.0f, 1.0f), c = std::clamp(clarity, 0.0f, 1.0f);
+    return (.34f + .06f * w) * (1 - c) + (.27f + .07f * w) * c;
+}
 ShellMaterial shellMaterial(int surface, float warmth, float clarity, float environment)
 {
     if (surface < 0 || surface > 2 || !std::isfinite(warmth) || !std::isfinite(clarity)
@@ -26,8 +31,7 @@ ShellMaterial shellMaterial(int surface, float warmth, float clarity, float envi
     m.tint = linear(surface == 2 ? "#c6d6e5" : "#f6fbff") * (1 - w) + linear(day[surface]) * w;
     m.attenuation = linear(surface == 2 ? "#f3e9db" : "#dceafd") * (1 - w) + linear("#f3e9db") * w;
     if (surface == 0)
-        m.transport = { .96f - .02f * w, (.34f + .06f * w) * (1 - c) + (.27f + .07f * w) * c,
-                        .018f + .004f * w, 5 - 1.2f * w };
+        m.transport = { .96f - .02f * w, lidRoughness(w, c), .018f + .004f * w, 5 - 1.2f * w };
     else if (surface == 1)
         m.transport = { .88f - .04f * w, .25f + .05f * w, .06f + .02f * w, 4.5f - 1.3f * w };
     else

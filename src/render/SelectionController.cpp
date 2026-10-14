@@ -39,6 +39,12 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
                 m_coverSources.insert(album.id, { path, album.title.left(256) });
         }
     m_returning.clear();
+    m_drag.reset();
+    m_detailMotion.reset();
+    m_clarity.select();
+    m_managedDetail = m_navigationLift = false;
+    m_detail = 0;
+    m_liftTarget = .9;
     m_poolObjects.clear();
     m_pulses.clear();
     m_origin = { 0, 0 };
@@ -158,20 +164,55 @@ quint64 SelectionController::revision() const
 {
     return m_revision;
 }
+std::optional<ArchiveCell> SelectionController::selectionCell(const QString &id) const
+{
+    const auto canonical = m_pool.location(id);
+    if (!canonical || m_realistic)
+        return canonical;
+    return ArchiveCell{
+        ArchivePool::nearestOccurrence(canonical->lane, m_cell.lane, m_pool.columnCount()),
+        ArchivePool::nearestOccurrence(canonical->row, m_cell.row, m_pool.rowCount(canonical->lane))
+    };
+}
+bool SelectionController::albumNavigationEnabled(const QString &id, int direction) const
+{
+    const auto cell = m_pool.location(id.isEmpty() ? albumId() : id);
+    return cell
+            && NavigationAvailability::at(m_pool.rowCount(cell->lane), int(cell->row - 12),
+                                          m_pool.columnCount(), m_realistic)
+                       .allowsRow(direction);
+}
+QString SelectionController::adjacentAlbum(const QString &id, int direction) const
+{
+    if (direction != 1 && direction != -1)
+        return { };
+    const auto cell = m_pool.location(id.isEmpty() ? albumId() : id);
+    if (!cell || m_pool.rowCount(cell->lane) < 2)
+        return { };
+    const ArchiveCell target{ cell->lane, cell->row + direction };
+    return m_realistic ? m_pool.realAlbumAt(target) : m_pool.albumAt(target);
+}
+bool SelectionController::canSelect(const QString &id) const
+{
+    const auto cell = selectionCell(id);
+    return cell && (*cell == m_cell || m_returning.canExchange(*cell, m_lift.value > .0001));
+}
 bool SelectionController::select(const QString &id)
 {
-    const auto location = m_pool.location(id);
-    if (!location)
+    const auto cell = selectionCell(id);
+    return cell && selectCell(*cell, true);
+}
+bool SelectionController::switchDetail(const QString &id)
+{
+    if (!canSelect(id))
         return false;
-    // The period is the actual column length, never the display-pool row count.
-    const auto canonical = *location;
-    if (m_realistic)
-        return selectCell(canonical, true);
-    const auto count = m_pool.rowCount(canonical.lane);
-    return selectCell(
-            { ArchivePool::nearestOccurrence(canonical.lane, m_cell.lane, m_pool.columnCount()),
-              ArchivePool::nearestOccurrence(canonical.row, m_cell.row, count) },
-            true);
+    m_navigationLift = m_detailMotion.placed();
+    const bool result = select(id);
+    if (result) {
+        m_drag.reset();
+        m_clarity.enter(m_clarity.value() > .999);
+    }
+    return result;
 }
 bool SelectionController::moveRow(int direction)
 {
@@ -233,40 +274,43 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
         return false;
     if (cell == m_cell)
         return true;
-    const auto reclaim =
-            std::find_if(m_returning.begin(), m_returning.end(), [&](const Copy &copy) {
-                return copy.cell == cell;
-            });
-    std::optional<Copy> previous;
-    if (reclaim != m_returning.end()) {
-        previous = *reclaim;
-        m_returning.erase(reclaim);
-    }
-    // Refuse before mutation: selected + returning cover ownership is strictly bounded.
-    if (m_lift.value > .0001 && m_returning.size() == 3)
+    if (!m_returning.canExchange(cell, m_lift.value > .0001))
         return false;
+    auto previous = m_returning.take(cell);
     if (m_lift.value > .0001)
         m_returning.append(
                 { m_cell, albumId(), m_lift, m_rotation,
                   m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt,
-                  m_selectedObject });
+                  m_selectedObject, m_clarity.value() });
     const auto old = m_cell;
+    if (m_managedDetail) {
+        if (!m_detailMotion.placed())
+            m_navigationLift = false;
+        m_detailMotion.selectionChanged();
+    }
+    m_drag.reset();
     m_cell = cell;
     m_memory.remember(m_pool.columns()[ArchivePool::wrap(cell.lane, m_pool.columnCount())].key,
                       albumId());
     if (m_realistic)
-        m_realColumns.select(cell, guided, m_detail > .99);
+        m_realColumns.select(cell, guided,
+                             m_managedDetail ? m_detailMotion.placed() : m_detail > .99);
     m_lastInteraction = m_time;
     m_lift = previous ? previous->lift : ScalarSpring{ };
     m_rotation = previous ? previous->rotation : 0;
     m_returnY = previous ? previous->returnY : std::nullopt;
     m_selectedObject = previous ? previous->objectId : ++m_objectSerial;
+    m_clarity.select(previous ? previous->clarity : 0);
     const ArchiveValues targets{ -2.17 - (cell.row - 15.5) * .62, (cell.lane - 2) * 5.2, cell.row,
                                  cell.lane };
     const bool distant = cell.lane != old.lane && std::abs(cell.row - old.row) > 1;
-    if (guided || distant || m_motion->moving())
+    const bool detailNavigation = m_managedDetail && m_navigationLift && m_detailMotion.placed();
+    if (detailNavigation)
+        m_motion->cancelTravel();
+    else if (guided || distant || m_motion->moving())
         m_motion->retarget(targets);
-    m_pulses.append({ cell, m_time });
+    if (!detailNavigation)
+        m_pulses.append({ cell, m_time });
     if (m_pulses.size() > 6)
         m_pulses.removeFirst();
     publish();
@@ -300,6 +344,104 @@ void SelectionController::returnSelected()
 {
     m_returnY = m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt;
     m_liftTarget = 0;
+}
+void SelectionController::requestDetail(bool detail)
+{
+    m_lastInteraction = m_time;
+    m_managedDetail = true;
+    m_detailMotion.request(detail);
+    m_drag.cancel();
+    if (detail) {
+        m_clarity.enter();
+        m_returnY.reset();
+    } else {
+        m_clarity.leave();
+        if (m_rotation != 0)
+            m_returnY = selectedPosition().y;
+    }
+    if (m_motion && m_motion->reducedMotion())
+        advance(0);
+}
+std::array<double, 2> SelectionController::navigationSpeeds() const
+{
+    return m_motion ? std::array<double, 2>{ m_motion->springs()[1].velocity / 5.2,
+                                             m_motion->springs()[0].velocity / .62 }
+                    : std::array<double, 2>{ 0, 0 };
+}
+bool SelectionController::tracksSettled() const
+{
+    if (!m_motion || m_motion->moving())
+        return false;
+    const ArchiveValues targets{ -2.17 - (m_cell.row - 15.5) * .62, (m_cell.lane - 2) * 5.2,
+                                 m_cell.row, m_cell.lane };
+    for (size_t i = 0; i < targets.size(); ++i)
+        if (std::abs(m_motion->springs()[i].value - targets[i]) >= .008
+            || std::abs(m_motion->springs()[i].velocity) >= .025)
+            return false;
+    return !m_realistic || m_realColumns.settled(int(m_cell.lane));
+}
+void SelectionController::updateDetailReadiness(double dt, bool cameraSettled)
+{
+    if (!m_managedDetail)
+        return;
+    const auto &d = m_detailMotion;
+    const double target = d.holdsDetail() ? 1 : 0;
+    const bool liftSettled = d.settled() && tracksSettled() && std::abs(m_detail - target) < .001
+            && std::abs(m_lift.value - (target ? 3.47 : .9)) < .008 && std::abs(m_rotation) < .001
+            && std::abs(m_lift.velocity) < .025;
+    m_detailMotion.updateReadiness(dt, cameraSettled, liftSettled, m_motion->reducedMotion());
+    if (m_detailMotion.phase() == DetailMotion::Phase::Archive)
+        m_navigationLift = false;
+}
+bool SelectionController::archiveReady() const
+{
+    return tracksSettled()
+            && (!m_managedDetail || m_detailMotion.phase() == DetailMotion::Phase::Archive);
+}
+bool SelectionController::archiveInteractive() const
+{
+    return archiveReady()
+            || (m_detailMotion.phase() == DetailMotion::Phase::ReturningArray
+                && m_detailMotion.settled() && m_detail < .001 && std::abs(m_rotation) < .001);
+}
+bool SelectionController::canInspect() const
+{
+    if (!m_managedDetail || m_detailMotion.phase() != DetailMotion::Phase::Presented
+        || m_detail <= .9 || m_pulseGain >= .01)
+        return false;
+    double neighborTop = -std::numeric_limits<double>::infinity();
+    for (int row = -5; row <= 5; ++row)
+        if (row != 0)
+            neighborTop =
+                    std::max(neighborTop, -4.6 + field(m_cell.row + row, m_cell.lane) + 3.525);
+    for (const auto &copy : m_returning)
+        if (copy.cell.lane == m_cell.lane && std::abs(copy.cell.row - m_cell.row) <= 5)
+            neighborTop =
+                    std::max(neighborTop,
+                             -4.6 + field(copy.cell.row, copy.cell.lane) + copy.lift.value + 3.525);
+    return selectedPosition().y + .175 - neighborTop > .05;
+}
+bool SelectionController::beginDrag(QPointF point, int pointerId)
+{
+    if (!canInspect())
+        return false;
+    return m_drag.press(point, pointerId);
+}
+bool SelectionController::moveDrag(QPointF point, int pointerId)
+{
+    if (!canInspect()) {
+        m_drag.cancel();
+        return false;
+    }
+    return m_drag.move(point, pointerId);
+}
+void SelectionController::endDrag(QPointF point, int pointerId)
+{
+    m_drag.release(point, pointerId);
+}
+void SelectionController::cancelDrag()
+{
+    m_drag.cancel();
 }
 double SelectionController::field(double row, double lane) const
 {
@@ -434,8 +576,19 @@ void SelectionController::advance(double dt)
     const bool reduced = m_motion->reducedMotion();
     const ArchiveValues targets{ -2.17 - (m_cell.row - 15.5) * .62, (m_cell.lane - 2) * 5.2,
                                  m_cell.row, m_cell.lane };
-    const ArchiveValues rates{ reduced ? 35.0 : 3.7, reduced ? 35.0 : 3.7, reduced ? 35.0 : 5.0,
-                               reduced ? 35.0 : 4.0 };
+    const bool detailNavigation = m_managedDetail && m_navigationLift && m_detailMotion.placed();
+    const ArchiveValues rates{ reduced ? 35.0
+                                       : detailNavigation ? 9.0
+                                                          : 3.7,
+                               reduced ? 35.0
+                                       : detailNavigation ? 9.0
+                                                          : 3.7,
+                               reduced ? 35.0
+                                       : detailNavigation ? 9.0
+                                                          : 5.0,
+                               reduced ? 35.0
+                                       : detailNavigation ? 9.0
+                                                          : 4.0 };
     if (!m_motion->moving()) {
         auto springs = m_motion->springs();
         for (int i = 0; i < 4; ++i) {
@@ -465,27 +618,54 @@ void SelectionController::advance(double dt)
     m_pulseGain += ((mutePulse ? 0 : 1) - m_pulseGain) * (1 - std::exp(-dt * 8));
     if (reduced)
         m_idleGain = 0;
-    m_rotation = returnStep(m_rotation, dt, reduced);
+    const bool inspecting = m_managedDetail && m_detailMotion.placed() && !m_returnY;
+    m_rotation = m_drag.advance(m_rotation, dt, inspecting, reduced);
+    if (m_managedDetail) {
+        m_detailMotion.advance(dt, reduced, m_rotation == 0);
+        m_detail = m_detailMotion.value();
+    }
     const double base = -4.6 + field(m_cell.row, m_cell.lane);
     if (m_returnY && m_rotation != 0)
         m_lift.finish(*m_returnY - base);
     else {
         m_returnY.reset();
-        if (reduced)
+        const bool aligningNeighbor =
+                std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
+                    return copy.returnY && copy.cell.lane == m_cell.lane
+                            && std::abs(copy.cell.row - m_cell.row) < 5;
+                });
+        if (m_managedDetail && m_navigationLift) {
+            m_liftTarget = m_detailMotion.placed() ? (!reduced && aligningNeighbor ? 0 : 3.47) : .9;
+            if (reduced)
+                m_lift.finish(m_liftTarget);
+            else
+                m_lift.update(m_liftTarget, detailNavigation ? 9 : 4.2, dt);
+        } else if (m_managedDetail
+                   && (m_detail > 0 || !m_detailMotion.settled() || m_detailMotion.holdsDetail())) {
+            m_lift.value = .9 + (3.47 - .9) * m_detail;
+            m_lift.velocity = m_detailMotion.state().value == m_detail
+                    ? (3.47 - .9) * m_detailMotion.state().velocity
+                    : 0;
+        } else if (reduced)
             m_lift.finish(m_liftTarget);
         else
             m_lift.update(m_liftTarget, 4.2, dt);
     }
+    if (m_managedDetail)
+        m_clarity.advance(dt, m_detail > .78 && m_lift.value > 3.3, reduced);
     for (auto &copy : m_returning) {
-        copy.rotation = returnStep(copy.rotation, dt, reduced);
-        if (copy.returnY && copy.rotation != 0)
+        copy.clarity = reduced ? 0 : copy.clarity * std::exp(-dt * 9);
+        copy.rotation = reduced ? 0 : returnStep(copy.rotation, dt, false);
+        if (copy.returnY && !reduced) {
             copy.lift.finish(*copy.returnY + 4.6 - field(copy.cell.row, copy.cell.lane));
-        else {
+            if (copy.rotation == 0)
+                copy.returnY.reset();
+        } else {
             copy.returnY.reset();
             if (reduced)
                 copy.lift.finish(0);
             else
-                copy.lift.update(0, 4.5, dt);
+                copy.lift.update(0, detailNavigation ? 9 : 4.5, dt);
         }
     }
     m_returning.removeIf([](const Copy &copy) {
@@ -529,10 +709,10 @@ void SelectionController::publish()
     m_poolObjects = std::move(objects);
     for (const auto &copy : m_returning)
         next.append({ copy.cell, copy.albumId, copy.objectId,
-                      transform(copy.cell, copy.lift.value, copy.rotation), true });
+                      transform(copy.cell, copy.lift.value, copy.rotation), true, copy.clarity });
     if (!albumId().isEmpty())
         next.append({ m_cell, albumId(), m_selectedObject,
-                      transform(m_cell, m_lift.value, m_rotation), true });
+                      transform(m_cell, m_lift.value, m_rotation), true, m_clarity.value() });
     if (next == m_instances)
         return;
     m_instances = std::move(next);

@@ -113,13 +113,52 @@ FocusScope {
                 if (tracks.preserveBeginning)
                     Qt.callLater(tracks.restoreBeginning);
             }
-            ArchiveText {
-                objectName: "detailOrdinal"
-                tokens: root.tokens
-                text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
-                cssPixelSize: root.width <= 700 ? 7 : 8
-                font.letterSpacing: 1.6
-                bottomPadding: 18
+            Item {
+                id: overline
+                width: parent.width
+                readonly property real contentHeight: Math.max(ordinal.implicitHeight,
+                                                               navigation.implicitHeight)
+                height: contentHeight + (root.width <= 700 ? 12 : 18)
+                ArchiveText {
+                    id: ordinal
+                    objectName: "detailOrdinal"
+                    y: (overline.contentHeight - height) / 2
+                    tokens: root.tokens
+                    text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
+                    cssPixelSize: root.width <= 700 ? 7 : 8
+                    font.letterSpacing: 1.6
+                }
+                ArchiveText {
+                    id: navigationMeasure
+                    tokens: root.tokens
+                    visible: false
+                    text: "下一张 ↓"
+                    cssPixelSize: 9
+                }
+                Row {
+                    id: navigation
+                    anchors.right: parent.right
+                    y: (overline.contentHeight - height) / 2
+                    spacing: 20
+                    ArchiveButton {
+                        objectName: "detailPrevious"
+                        tokens: root.tokens
+                        text: "↑ 上一张"
+                        cssPixelSize: 9
+                        height: navigationMeasure.implicitHeight
+                        enabled: root.presentation.canMovePrevious
+                        onClicked: root.presentation.stepAlbum(-1)
+                    }
+                    ArchiveButton {
+                        objectName: "detailNext"
+                        tokens: root.tokens
+                        text: "下一张 ↓"
+                        cssPixelSize: 9
+                        height: navigationMeasure.implicitHeight
+                        enabled: root.presentation.canMoveNext
+                        onClicked: root.presentation.stepAlbum(1)
+                    }
+                }
             }
             Column {
                 width: parent.width

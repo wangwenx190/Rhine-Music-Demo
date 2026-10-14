@@ -8,6 +8,16 @@ qt_add_library(
     SceneFrame.h
     ArchivePool.cpp
     ArchivePool.h
+    CaseClarity.cpp
+    CaseClarity.h
+    DetailPorts.cpp
+    DetailPorts.h
+    DetailMotion.cpp
+    DetailMotion.h
+    PointerDragController.cpp
+    PointerDragController.h
+    ReturningCasePool.cpp
+    ReturningCasePool.h
     SelectionController.cpp
     SelectionController.h
     RealColumns.cpp

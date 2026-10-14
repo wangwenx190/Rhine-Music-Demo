@@ -101,6 +101,15 @@ void MotionController::translate(const ArchiveValues &offset)
         m_springs[i].translate(offset[i]);
     emit stateChanged();
 }
+void MotionController::cancelTravel()
+{
+    // Detail uses rate-nine springs from displayed derivatives, never a browse polynomial.
+    if (!moving())
+        return;
+    m_archive.reset();
+    ++m_revision;
+    emit stateChanged();
+}
 void MotionController::setReducedMotion(bool reduced)
 {
     if (m_reduced == reduced)

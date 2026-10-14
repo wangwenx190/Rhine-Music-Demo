@@ -26,7 +26,7 @@ checks = [
      "change is introduced. The surface translates only the content panel to screen right, fades "
      "back/caption as well, and retains the exiting layer until completion. Backend-specific "
      "rendering remains in the existing renderer; qsb variants are checked by shader-tools."),
-    ("COMMON-04", "src/app/main.cpp", "presentationPorts.select",
+    ("COMMON-04", "src/render/DetailPorts.cpp", "ports.select",
      "Selection/navigation are the only ports called by this state machine. Playback IDs, "
      "QMediaPlayer and provider request queues are untouched. Track requested is a UI intent for "
      "R24; no simulated playing state is assigned. Library replacement cancels surface callbacks."),

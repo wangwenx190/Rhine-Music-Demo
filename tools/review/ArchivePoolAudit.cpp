@@ -390,7 +390,12 @@ int main(int argc, char **argv)
                           QPointF(pixel.x(), pixel.y()), Qt::LeftButton, Qt::LeftButton,
                           Qt::NoModifier);
         QCoreApplication::sendEvent(item, &press);
-        require(press.isAccepted(), "Production ray event did not accept selected cover");
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(pixel.x(), pixel.y()),
+                            QPointF(pixel.x(), pixel.y()), Qt::LeftButton, Qt::NoButton,
+                            Qt::NoModifier);
+        QCoreApplication::sendEvent(item, &release);
+        require(press.isAccepted() && release.isAccepted(),
+                "Production ray click did not accept selected cover");
         const auto detail = capture("detail");
         motion.setReducedMotion(true);
         selection.advance(0);
@@ -413,6 +418,17 @@ int main(int argc, char **argv)
         selection.advance(.2);
         waitPrepared();
         const auto restored = capture("restored-night");
+        if (item->coverStatistics()["owned"].toInt() != 1) {
+            std::fprintf(
+                    stderr,
+                    "Return mismatch: cases=%lld cpuOwners=%d inputFrame=%llu sceneFrame=%llu\n",
+                    qlonglong(selection.returningCases().size()),
+                    item->coverStatistics()["owned"].toInt(),
+                    qulonglong(item->input().scene.revision), qulonglong(adapter.frameRevision()));
+            for (const auto &copy : selection.returningCases())
+                std::fprintf(stderr, "copy row=%g lift=%g yaw=%g hold=%d\n", copy.cell.row,
+                             copy.lift.value, copy.rotation, copy.returnY.has_value());
+        }
         require(item->coverStatistics()["owned"].toInt() == 1, "Returning covers did not release");
         const auto coverMemory = item->coverStatistics();
         selection.setLift(0);

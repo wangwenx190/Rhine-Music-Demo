@@ -92,6 +92,7 @@ public:
         return m_reduced;
     }
     void setDetail(double detail);
+    void requestDetail(bool detail);
     void setReducedMotion(bool reduced);
     // Called with the already speed-scaled motionDt from the single FrameClock.
     void advance(double motionDt);
@@ -128,6 +129,6 @@ private:
     std::array<ScalarSpring, 3> m_position, m_aim;
     ScalarSpring m_span, m_yaw, m_elevation;
     double m_detail = 0, m_laneSpeed = 0, m_rowSpeed = 0, m_pointerX = 0, m_pointerY = 0;
-    bool m_reduced = false;
+    bool m_reduced = false, m_managedDetail = false;
 };
 }

@@ -712,3 +712,14 @@ if(WIN32)
     set_tests_properties(presentation PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(DetailMotionTest DetailMotionTest.cpp)
+target_link_libraries(DetailMotionTest PRIVATE YalahooScene Qt6::Test)
+target_compile_definitions(DetailMotionTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_platform(DetailMotionTest)
+add_test(NAME detail-motion COMMAND DetailMotionTest)
+set_tests_properties(detail-motion PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(detail-motion PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

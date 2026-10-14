@@ -16,6 +16,7 @@ struct ArchiveInstance
     quint64 objectId = 0;
     QMatrix4x4 transform;
     bool owned = false;
+    double clarity = 0;
     bool operator==(const ArchiveInstance &) const = default;
 };
 class ArchivePool

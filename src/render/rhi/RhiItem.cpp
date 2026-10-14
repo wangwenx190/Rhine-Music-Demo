@@ -1075,6 +1075,14 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
             && !atlasQueue.ready(tile, effectiveCoverLeases[entity]))
             copy(u.coverUv, QVector4D());
     }
+    if (kind == 3 && entity >= 0 && input.scene.individualMaterials
+        && entity < input.scene.instances.size()) {
+        // Only the lid roughness depends on clarity. Preserve the cached material
+        // template and all other optical parameters; no QColor or resource rebuild.
+        u.material[1] = std::clamp(
+                lidRoughness(input.warmth, float(input.scene.instances[entity].clarity)) * 1.01f,
+                0.0f, 1.0f);
+    }
     if (entity >= 0) {
         copy(u.originLight0, entityLight0[entity]);
         copy(u.originLight1, entityLight1[entity]);

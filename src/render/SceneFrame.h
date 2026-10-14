@@ -64,6 +64,7 @@ struct SceneFrame
     double nearPlane = 5, farPlane = 300;
     bool portrait = false;
     bool hasArchivePool = false;
+    bool individualMaterials = false;
     QVector<ArchiveInstance> instances;
 };
 }

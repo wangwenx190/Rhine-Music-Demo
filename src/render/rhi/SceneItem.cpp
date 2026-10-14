@@ -7,8 +7,10 @@
 #include <QWheelEvent>
 #include <QKeyEvent>
 #include <QTouchEvent>
+#include <QHoverEvent>
 #include <memory>
 #include <limits>
+#include <cmath>
 
 namespace yalahoo::rhi {
 TitleReel *SceneItem::titleReel() const
@@ -66,6 +68,7 @@ SceneItem::SceneItem(QQuickItem *parent)
 {
     setAcceptedMouseButtons(Qt::LeftButton);
     setAcceptTouchEvents(true);
+    setAcceptHoverEvents(true);
     setFlag(QQuickItem::ItemIsFocusScope, true);
     setFocus(true);
     m_cover.fill(Qt::transparent);
@@ -106,11 +109,38 @@ SceneItem::SceneItem(QQuickItem *parent)
         emit errorTextChanged();
     });
     connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
+        disconnect(m_visibilityConnection);
+        disconnect(m_activeConnection);
+        mouseUngrabEvent();
         if (window) {
             connect(window, &QWindow::screenChanged, this, &SceneItem::schedule,
                     Qt::UniqueConnection);
-            connect(window, &QWindow::visibleChanged, this, &SceneItem::schedule,
-                    Qt::UniqueConnection);
+            m_visibilityConnection =
+                    connect(window, &QWindow::visibleChanged, this, [this](bool visible) {
+                        if (!visible)
+                            mouseUngrabEvent();
+                        schedule();
+                        if (visible && !m_restorePending) {
+                            m_restorePending = true;
+                            // A native surface can be replaced while the basic loop retains
+                            // its scene graph. Submit the current immutable frame on restore,
+                            // even when reduced motion leaves all scene values unchanged.
+                            QMetaObject::invokeMethod(
+                                    this,
+                                    [this] {
+                                        m_restorePending = false;
+                                        if (this->window() && this->window()->isVisible()) {
+                                            ensurePolished();
+                                            update();
+                                        }
+                                    },
+                                    Qt::QueuedConnection);
+                        }
+                    });
+            m_activeConnection = connect(window, &QWindow::activeChanged, this, [this, window] {
+                if (!window->isActive())
+                    mouseUngrabEvent();
+            });
         }
         schedule();
     });
@@ -120,6 +150,8 @@ void SceneItem::setAdapter(SceneAdapter *adapter)
     if (m_adapter == adapter)
         return;
     if (m_adapter) {
+        if (m_adapter->selection())
+            m_adapter->selection()->cancelDrag();
         disconnect(m_adapter, nullptr, this, nullptr);
         disconnect(m_adapter->lighting(), nullptr, this, nullptr);
         disconnect(m_adapter->quality(), nullptr, this, nullptr);
@@ -258,6 +290,15 @@ void SceneItem::preparePool(Input &in)
     in.atlasUploads += m_atlas.replay(0);
     in.immutableCover = true;
 }
+void SceneItem::setInspectionEnabled(bool enabled)
+{
+    if (m_inspectionEnabled == enabled)
+        return;
+    m_inspectionEnabled = enabled;
+    if (!enabled)
+        mouseUngrabEvent();
+    emit inspectionEnabledChanged();
+}
 void SceneItem::setGeometryOnly(bool enabled)
 {
     if (m_geometryOnly == enabled)
@@ -332,10 +373,16 @@ QJsonObject SceneItem::coverStatistics() const
     int detailed = 0, owned = 0;
     qint64 ownedBytes = 0, tiledBytes = 0;
     bool selectedDetailed = false;
+    QJsonArray owners;
     for (const auto &cover : m_ownedCovers) {
         if (!cover.pixels)
             continue;
         ++owned;
+        owners.append(QJsonObject{
+                { "objectId", qint64(cover.objectId) },
+                { "albumId", cover.pixels->identity },
+                { "lease", qint64(cover.lease) },
+                { "resolution", cover.pixels->pixels ? cover.pixels->pixels->resolution : 0 } });
         if (cover.pixels->pixels) {
             ownedBytes += cover.pixels->pixels->image.sizeInBytes();
             detailed += cover.pixels->pixels->resolution == 1024;
@@ -345,7 +392,8 @@ QJsonObject SceneItem::coverStatistics() const
         for (const auto &upload : cover.uploads)
             tiledBytes += upload.pixels.sizeInBytes();
     }
-    return { { "cache", m_covers.statistics() },
+    return { { "owners", owners },
+             { "cache", m_covers.statistics() },
              { "identities", m_poolLeases.size() },
              { "ready", m_readyCovers.size() },
              { "owned", owned },
@@ -363,29 +411,99 @@ void SceneItem::schedule()
 }
 bool SceneItem::event(QEvent *event)
 {
+    if (event->type() == QEvent::Hide || event->type() == QEvent::WindowDeactivate) {
+        mouseUngrabEvent();
+        m_touchStart.reset();
+        m_touchInspecting = false;
+    }
     if (event->type() == QEvent::DevicePixelRatioChange)
         schedule();
     return RhiItem::event(event);
 }
+bool SceneItem::selectAt(QPointF point)
+{
+    if (!m_adapter || !m_adapter->selection() || (m_inputRouter && !m_inputRouter->enabled()))
+        return false;
+    const auto hit = m_adapter->hitTest(point.x(), point.y());
+    if (hit.isEmpty())
+        return false;
+    if (m_inputRouter)
+        m_inputRouter->reset();
+    if (!window() || !window()->flags().testFlag(Qt::WindowDoesNotAcceptFocus))
+        forceActiveFocus(Qt::MouseFocusReason);
+    m_adapter->recordInput();
+    const bool selected = m_adapter->selection()->selectCell(
+            { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true);
+    if (selected)
+        m_adapter->recordNavigationCommit(m_adapter->selection()->revision());
+    return selected;
+}
 void SceneItem::mousePressEvent(QMouseEvent *event)
 {
-    if (!m_adapter || !m_adapter->selection() || (m_inputRouter && !m_inputRouter->enabled())) {
+    auto *selection = m_adapter ? m_adapter->selection() : nullptr;
+    m_mouseStart.reset();
+    if (!selection || event->button() != Qt::LeftButton) {
         event->ignore();
         return;
     }
-    const auto hit = m_adapter->hitTest(event->position().x(), event->position().y());
-    if (!hit.isEmpty()) {
-        if (m_inputRouter)
-            m_inputRouter->reset();
-        if (!window() || !window()->flags().testFlag(Qt::WindowDoesNotAcceptFocus))
-            forceActiveFocus(Qt::MouseFocusReason);
+    if (m_inspectionEnabled && selection->beginDrag(event->position())) {
         m_adapter->recordInput();
-        event->setAccepted(m_adapter->selection()->selectCell(
-                { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true));
-        if (event->isAccepted())
-            m_adapter->recordNavigationCommit(m_adapter->selection()->revision());
+        event->accept();
+    } else if (!m_inputRouter || m_inputRouter->enabled()) {
+        m_mouseStart = event->position();
+        m_mouseMoved = false;
+        event->accept();
     } else
         event->ignore();
+}
+void SceneItem::mouseMoveEvent(QMouseEvent *event)
+{
+    auto *selection = m_adapter ? m_adapter->selection() : nullptr;
+    if (selection && selection->dragging()) {
+        event->setAccepted(selection->moveDrag(event->position()));
+        return;
+    }
+    if (m_mouseStart) {
+        const auto delta = event->position() - *m_mouseStart;
+        m_mouseMoved |= std::hypot(delta.x(), delta.y()) > 6;
+        event->accept();
+    } else
+        event->ignore();
+}
+void SceneItem::mouseReleaseEvent(QMouseEvent *event)
+{
+    auto *selection = m_adapter ? m_adapter->selection() : nullptr;
+    if (selection && selection->dragging()) {
+        selection->endDrag(event->position());
+        event->accept();
+    } else if (m_mouseStart) {
+        const auto delta = event->position() - *m_mouseStart;
+        const bool click = !m_mouseMoved && std::hypot(delta.x(), delta.y()) <= 6;
+        m_mouseStart.reset();
+        event->setAccepted(click && selectAt(event->position()));
+    } else
+        event->ignore();
+}
+void SceneItem::mouseUngrabEvent()
+{
+    m_mouseStart.reset();
+    m_touchStart.reset();
+    m_touchInspecting = false;
+    if (m_adapter && m_adapter->selection())
+        m_adapter->selection()->cancelDrag();
+}
+void SceneItem::hoverMoveEvent(QHoverEvent *event)
+{
+    if (m_adapter && width() > 0 && height() > 0)
+        m_adapter->setPointer(event->position().x() / width() - .5,
+                              event->position().y() / height() - .5);
+    event->accept();
+}
+void SceneItem::hoverLeaveEvent(QHoverEvent *event)
+{
+    if (m_adapter)
+        m_adapter->setPointer(0, 0);
+    event->accept();
 }
 InputRouter *SceneItem::inputRouter() const
 {
@@ -408,26 +526,43 @@ void SceneItem::keyPressEvent(QKeyEvent *event)
 }
 void SceneItem::touchEvent(QTouchEvent *event)
 {
-    if (event->type() == QEvent::TouchCancel) {
+    auto *selection = m_adapter ? m_adapter->selection() : nullptr;
+    if (!selection || event->type() == QEvent::TouchCancel || event->points().size() != 1) {
         m_touchStart.reset();
+        m_touchInspecting = false;
+        if (selection)
+            selection->cancelDrag();
         event->accept();
         return;
     }
-    if (!m_adapter || !m_adapter->selection() || (m_inputRouter && !m_inputRouter->enabled())
-        || event->points().size() != 1) {
-        m_touchStart.reset();
-        event->ignore();
-        return;
-    }
-    const auto point = event->points().first().position();
+    const auto &point = event->points().first();
     if (event->type() == QEvent::TouchBegin) {
-        m_touchStart = point;
+        m_touchInspecting =
+                m_inspectionEnabled && selection->beginDrag(point.position(), point.id());
+        if (m_touchInspecting) {
+            m_adapter->recordInput();
+            event->accept();
+            return;
+        }
+        if (m_inputRouter && !m_inputRouter->enabled()) {
+            event->ignore();
+            return;
+        }
+        m_touchStart = point.position();
         m_touchTimestamp = event->timestamp();
+    } else if (m_touchInspecting) {
+        if (event->type() == QEvent::TouchEnd) {
+            selection->endDrag(point.position(), point.id());
+            m_touchInspecting = false;
+        } else
+            selection->moveDrag(point.position(), point.id());
     } else if (event->type() == QEvent::TouchEnd && m_touchStart) {
-        const auto delta = point - *m_touchStart;
+        const auto delta = point.position() - *m_touchStart;
         m_touchStart.reset();
-        if (m_inputRouter)
-            m_inputRouter->swipe(delta, double(event->timestamp() - m_touchTimestamp));
+        const bool swiped = m_inputRouter
+                && m_inputRouter->swipe(delta, double(event->timestamp() - m_touchTimestamp));
+        if (!swiped && std::hypot(delta.x(), delta.y()) <= 6)
+            selectAt(point.position());
     }
     event->accept();
 }
@@ -482,7 +617,7 @@ void SceneItem::updatePolish()
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
     in.aperture = float((.0003 + .0005 * adapter.detail())
                         * settings.value("depthOfField").toDouble() / 100);
-    in.clarity = float(adapter.detail());
+    in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
     in.background = l.backgroundLinear();
     in.keyColor = l.keyColor();
     in.skyColor = l.skyColor();

@@ -1,6 +1,6 @@
 # Presentation 与详情界面契约
 
-冻结定义为 `legacy-web/src/music-presentation.ts`、音乐入口 `music-app.ts` 的实际 ports、`ui-transitions.ts`、`music-title.ts` 及 `music.css`，来源标识沿用 `web-baseline.md`。三维抽取、换片与归位的同步运动由 R18 接入，当前使用已有 SceneAdapter 相机目标和 settled 检查，不把这条阶段接线当成 R18 的轨迹验收。
+冻结定义为 `legacy-web/src/music-presentation.ts`、音乐入口 `music-app.ts` 的实际 ports、`ui-transitions.ts`、`music-title.ts` 及 `music.css`，来源标识沿用 `web-baseline.md`。三维抽取、换片与归位通过 DetailPorts 接入 DetailMotion 和 ReturningCasePool；同步轨迹、场景 readiness、拖动门禁与产品回放范围见 [detail-motion.md](detail-motion.md)。
 
 `PresentationController` 是 GUI 线程的唯一展示状态所有者，保留 archive/opening/detail/switch-hiding/switching/hiding/returning/selecting。退 browse 后才请求相机；详情的场景 readiness 与当前 layoutRevision 都满足才显示文字。退字中的新输入替换一个 pendingSelection；搜索/歌曲定位的 archiveRoute 等归位和选中行完全就绪再重开。back 清掉 pending；reset 使旧回调和布局结果失效。嵌套完成路径批量发一次状态通知，重复 update 不发通知。各相机/选中 ports 不修改播放状态，不发网络请求。
 
@@ -22,7 +22,7 @@ python3 tools/audit/audit-presentation.py
 
 `presentation` 覆盖场景/布局双门禁、browse 退场中连选、连续详情目标、四种状态中的 archiveRoute、取消重开、快速 open/back、reset 过期回调、改速/减少动态、10,000 曲目的快照与字段。`presentation-qml` 使用生产 Detail/TrackList：九尺寸×双主题、实际标题/header 起点、跳转第 8,000 曲目的有限委托、介绍切换、退出禁用/快速重开、十次离屏释放恢复、最终释放与窗口策略。运行时 QQmlEngine warnings 和绑定/类型/shader 日志另行检查，不替代官方 lint target。
 
-当前 25 项启用 Release CTest 全部通过，四项可见 runtime 仍禁用并保留 R34；官方两组 lint targets 与 check-format 均无新增警告。macOS/arm64、自动发现的 Qt 6.12.0、AppleClang 21、Release/真实隐藏 Metal、实际 DPR1 通过上述 18 项结构与资源检查，10,000 曲目的可见/复用池 31 个，QML warnings 为零。报告与自身 texture 的 PNG 位于 `build/release/verification/presentation/`，不提交。这里没有做冻结 Web 成对 SSIM，也没有测 present/VSYNC、输入到光子或 GPU 时间；完整 GUI 成对补修仍按 R29，实际可见和目标平台门槛保留 R34。
+R17 阶段的 25 项启用 Release CTest 全部通过；当时四项可见 runtime 禁用，后续可见覆盖见下节及 detail-motion.md；官方两组 lint targets 与 check-format 均无新增警告。macOS/arm64、自动发现的 Qt 6.12.0、AppleClang 21、Release/真实隐藏 Metal、实际 DPR1 通过上述 18 项结构与资源检查，10,000 曲目的可见/复用池 31 个，QML warnings 为零。报告与自身 texture 的 PNG 位于 `build/release/verification/presentation/`，不提交。这里没有做冻结 Web 成对 SSIM，也没有测 present/VSYNC、输入到光子或 GPU 时间；完整 GUI 成对补修仍按 R29，实际可见和目标平台门槛保留 R34。
 
 ## 平台实机清单与交接
 
@@ -36,4 +36,4 @@ R34 的可见产品检查使用匿名库和 R17 交付源码：九尺寸、双�
 
 2026-10-14：本机 Release 的可见 Metal/threaded 和 OpenGL/basic 均覆盖有效DPR1/1.5/2，每项九尺寸双主题18结构、10,000曲目、31个可见/复用委托（门槛仍为0<数量<100）、零QML warnings、介绍切换/快速重开和十次恢复通过。采用授权前台策略，不称为不干扰或其他显示设备已验证。
 
-窄屏转宽屏时header的字体/高度在polish后改变，ListView原点可晚于layoutReady更新，曾使标题位于目标顶部之上4.58px。TrackList显式保持准备后的顶部，header高度改变合并restoreBeginning；移动、非首项键盘索引、滚动条按下及显式positionViewAtIndex取消保持，排队回调再次核对取消，不跳回用户已滚动的顶部。采集通过对应afterSynchronizing/presented revision排除先前在途帧。实际R18运动ports、产品有效焦点恢复、触摸/设备输入与R23/R24定位播放集成仍保留R34；组件结构通过不冒充这些产品检查。
+窄屏转宽屏时header的字体/高度在polish后改变，ListView原点可晚于layoutReady更新，曾使标题位于目标顶部之上4.58px。TrackList显式保持准备后的顶部，header高度改变合并restoreBeginning；移动、非首项键盘索引、滚动条按下及显式positionViewAtIndex取消保持，排队回调再次核对取消，不跳回用户已滚动的顶部。采集通过对应afterSynchronizing/presented revision排除先前在途帧。R18运动ports和自动产品回放范围见detail-motion.md；产品系统级有效焦点恢复、真实触摸/设备输入与R23/R24定位播放集成仍保留R34；组件结构通过不冒充这些产品检查。

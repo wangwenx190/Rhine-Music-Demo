@@ -22,6 +22,12 @@ void SceneAdapter::setSelection(SelectionController *selection)
     m_selectionRevision = 0;
     if (selection) {
         connect(selection, &SelectionController::frameChanged, this, &SceneAdapter::publish);
+        connect(selection, &SelectionController::libraryChanged, this, [this] {
+            m_managedDetail = false;
+            m_detail = 0;
+            snapToTarget();
+            emit detailChanged();
+        });
         connect(selection, &SelectionController::arrayModeChanged, this, [this] {
             m_lighting.ribbon.reset();
         });
@@ -126,6 +132,15 @@ CameraPose SceneAdapter::target() const
     }
     return { position, aim, span };
 }
+void SceneAdapter::requestDetail(bool detail)
+{
+    if (!m_selection)
+        return;
+    m_managedDetail = true;
+    m_selection->requestDetail(detail);
+    if (m_reduced)
+        advance(0);
+}
 void SceneAdapter::setDetail(double detail)
 {
     if (!std::isfinite(detail))
@@ -133,6 +148,7 @@ void SceneAdapter::setDetail(double detail)
     detail = std::clamp(detail, 0.0, 1.0);
     if (detail == m_detail)
         return;
+    m_managedDetail = false;
     m_detail = detail;
     if (m_selection)
         m_selection->setDetail(detail);
@@ -151,7 +167,10 @@ void SceneAdapter::setReducedMotion(bool reduced)
     if (reduced) {
         m_yaw.finish(0);
         m_elevation.finish(0);
-        snapToTarget();
+        if (m_managedDetail && m_selection)
+            advance(0);
+        else
+            snapToTarget();
     }
     updateLighting(0);
     emit reducedMotionChanged();
@@ -174,8 +193,21 @@ void SceneAdapter::advance(double dt)
 {
     if (!std::isfinite(dt) || dt < 0)
         return;
+    if (m_selection) {
+        const auto speeds = m_selection->navigationSpeeds();
+        setNavigation(speeds[0], speeds[1], m_selection->realistic());
+    }
+    if (m_managedDetail && m_selection) {
+        const double detail = m_selection->detailMotion().value();
+        if (m_detail != detail) {
+            m_detail = detail;
+            emit detailChanged();
+        }
+    }
     if (m_reduced) {
         snapToTarget();
+        if (m_managedDetail && m_selection)
+            m_selection->updateDetailReadiness(dt, true);
         return;
     }
     m_yaw.update(std::clamp(m_laneSpeed / 2.5, -1.0, 1.0) * .018 * (1 - m_detail), 6, dt);
@@ -188,6 +220,8 @@ void SceneAdapter::advance(double dt)
     }
     m_span.update(goal.span, 9, dt);
     publish();
+    if (m_managedDetail && m_selection)
+        m_selection->updateDetailReadiness(dt, settled());
 }
 void SceneAdapter::observe(CameraPose pose, double dt)
 {
@@ -231,6 +265,7 @@ void SceneAdapter::publish()
     if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
         && m_frame.camera.position == position && m_frame.camera.aim == aim
         && m_frame.camera.span == m_span.value && m_frame.casePosition == caseOrigin
+        && m_frame.individualMaterials == (m_managedDetail && bool(m_selection))
         && m_selectionRevision == (m_selection ? m_selection->revision() : 0))
         return;
     m_selectionRevision = m_selection ? m_selection->revision() : 0;
@@ -253,6 +288,7 @@ void SceneAdapter::publish()
     m_frame.caseTransform.setToIdentity();
     m_frame.caseTransform.translate(casePosition());
     m_frame.hasArchivePool = bool(m_selection);
+    m_frame.individualMaterials = m_managedDetail && bool(m_selection);
     m_frame.instances = m_selection ? m_selection->instances() : QVector<ArchiveInstance>{ };
     if (m_selection) {
         m_frame.caseTransform.rotate(m_selection->selectedRotation());

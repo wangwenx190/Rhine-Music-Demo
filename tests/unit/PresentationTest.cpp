@@ -38,7 +38,10 @@ struct Fixture
                  [&](const PresentationSelection &s) {
                      events << "switch:" + s.albumId;
                      presentationReady = false;
-                 } };
+                 },
+                 { },
+                 { },
+                 { } };
     }
     PresentationController controller{ nullptr, ports() };
     void openDetail()

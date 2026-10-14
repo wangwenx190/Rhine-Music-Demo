@@ -26,7 +26,7 @@
 - 能确实可靠验证的任务必须在当前轮真实执行并通过，例如本机Release构建/CTest、原生字体与资源、真实Metal离屏、公开媒体事件和本机部署检查中已具备可靠入口的部分。离屏是真实GPU运行，但其结果只证明对应画面/状态/资源，不证明窗口曝光、正常VSYNC、实际显示、输入到光子或输出设备听感。
 - 当前环境无法执行或不能可靠验证的部分暂用COMMON-01–05、目标平台集成项和PERF-01–07严格静态审计；必须在原轮删除前把实机任务移交最后R34，写明原轮/任务ID、目标平台/后端/设备、能力缺口及依据、输入与源码版本、修复对象、运行入口/预期结果、原门槛、实现依赖及受影响主线回归。不存在可靠样本不等于通过；已知失败不得改成未验证，也不得因审计通过丢掉补修对象。
 - 可安装的常规开发工具缺失先补齐；当前源码或可靠本机入口已经能够确定并修复的产品缺陷、当前可靠检查的失败、缺少应由本轮提供的验证入口不能作为跳过理由。确实依赖其他系统/后端/硬件或不可靠采集条件的诊断与修复，才允许后置；源码能确认的缺陷仍在当前轮修复。任务部分可执行时完成该部分，只移动不可执行子任务，不将整个轮次无故跳过。
-- 当前主线顺序为`R18 → R19 → … → R33 → R34`。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
+- 当前主线顺序为`R19 → R20 → … → R33 → R34`。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
 - R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务默认集中在专项阶段处理；用户明确要求提前补可见窗口验收时，只处理已实现的指定欠验边界，通过条目从R34删除，不提前实施后续功能。
 - R34是计划最后的特殊轮次，承接全部未执行平台/后端问题修复及必需实机验证。执行前依据真实目标环境逐项评估、按依赖串行处理并遵守单轮规模上限，必要时拆成明确的小轮次；没有相应环境时保留未完成任务，不能删除R34或宣称全平台最终验收完成。主线阶段完成、静态审计通过与最终实机完成分别报告。
 
@@ -139,7 +139,31 @@
 - 表现与定位：同一ListView启用reuseItems，歌单使用带required角色的QAbstractItemModel委托，切介绍时同时改为QVariantList制作人员与另一个委托。隐藏Metal已写出18项静态图后在切tab发生SIGSEGV，macOS栈落在QtQmlModels/QMetaProperty::read，经QQuickItemView::setModel进入；这证明故障发生在模型/角色交接，Qt内部哪个缓存指针失效尚未追踪，不能归因于Metal渲染或字体。
 - 处理与避免再犯：TrackList的Loader分别创建曲目/制作人员两个ListView组件，每个实例保持固定模型类型和delegate角色契约，保留可见/复用池与100px预留，不通过关闭虚拟化回避。Loader返回值显式转为ListView，使官方Yalahoo_qmllint/ui-audit_qmllint targets能验证forceLayout/定位接口；运行时warnings另查，不自行组装qmllint命令。
 - 布局与计数陷阱：有header的ListView起始contentY不一定为0；强设0让header位于可视区上方，锚点/标题字符串检查仍可能通过。改为布局完成后positionViewAtBeginning，并验收实际title的场景Y在内容顶端60px内。QObject::findChildren曾报告0个委托，但自身PNG已经绘出曲目；计数改走QQuickItem::childItems实际视觉树，不能把QObject父子树当成委托可见池。
-- 验证边界：相同Release/arm64隐藏Metal、实际DPR1入口的九尺寸双主题、10,000曲目跳转、介绍切换和快速重开通过，实际可见/复用池31个、QML warnings=0；失败栈/原图与正常报告只保留本地。十次离屏重建与完整Release回归由presentation-qml/CTest复现；离屏不证明真实焦点恢复、窗口呈现或其他系统，R34保留这些检查，R18仍须接入同步运动ports。
+- 验证边界：相同Release/arm64隐藏Metal、实际DPR1入口的九尺寸双主题、10,000曲目跳转、介绍切换和快速重开通过，实际可见/复用池31个、QML warnings=0；失败栈/原图与正常报告只保留本地。十次离屏重建与完整Release回归由presentation-qml/CTest复现；离屏不证明真实焦点恢复、窗口呈现或其他系统。同步运动由DetailPorts接入；后续真实设备与目标平台集成按R34，回放边界见docs/contracts/detail-motion.md。
+
+### R18：场景状态与封面 polish 的交接不能跨帧混读
+
+- 表现与确认范围：真实 Metal/threaded 产品回放执行减少动态和连续三十次换片后，GUI 的选中/归位实体已只有一个，但 frameSwapped 的排队回调仍可能读取上一轮 polish 保留的两个 CPU 封面租约；第一份报告的 stress-resource-return 明确失败。后续同一次回放的下一帧封面已回落到一个，未发现资源持续增长。这里确认的是采集观察了不同交接阶段，不能把前台帧事件当作所有 GUI/资源状态的共同 revision，也不能用这个失败样本宣称产品泄漏。
+- 处理：产品 Review 的 ready 同时核对当前实体的 objectId/albumId 集合、CPU 封面租约的同一集合及选中 1024px 资源，再检查回落；不延时猜测、不把上界从一改成二。实际绘制仍通过原不可变 SceneFrame/上传 lease 接入，运动不为采集而暂停。保留首份失败及后续报告在 verification/macos/detail/r18/；固定窗口下目标/后处理 generation、每批上传、真实上下文重建与完整渲染结果分别验收。
+- 复现与避免再犯：使用 tools/build/verify-detail.py 的正常产品入口及减少动态三十次序列；校验身份而非只比数量。renderer 的回调可跨引擎清理阶段，跨线程元数据使用共享原子值且退出前解除连接；不让直接 render 回调引用 Review 栈变量。该生命周期修正来自静态审计，不能写成曾实际发生崩溃。实际采样范围与尚欠目标后端/设备按 docs/contracts/detail-motion.md 和 R34 保留。
+
+### R18：OpenGL basic 的 surface 恢复与完整窗口重建
+
+- 表现与定位：macOS/OpenGL/basic 在减少动态、三十次切片后的第一次 hide/release/destroy/create/show 中，窗口仍 exposed/onScreen 且 frameSwapped 持续，但 SceneItem 的 frameSubmitted 停在重建前；120秒报告明确失败，sceneGraphInitialized 只有一次。未见 shader/renderError，不能把它写成平台无法验证，也不能从窗口帧推断三维仍在更新。
+- 已确认语义：所选 Kit 的 QQuickWindow 文档明确 setPersistentGraphics/setPersistentSceneGraph 是可忽略的 hint，basic 为多个窗口共享设备/上下文，surface 重建不保证产生新图形上下文；只有删除最后一个 QQuickWindow 才保证释放图形资源。最初探针把十次 surface 重建等同于十次 context 初始化，属于验收入口假设错误，不能强迫产品每次恢复销毁可复用设备。另一方面，原 SceneItem 恢复只排 polish，静止/减少动态场景没有重新推动三维提交；Qt 内部 dirty/polish 状态在哪一步保留尚未追踪，不把推断当作已确认内部根因。
+- 修正：SceneItem 的 visible 恢复事件排一个对象所属回调，核对仍可见后 ensurePolished 并 update，重新提交当前不可变 SceneFrame/cover lease，不加持续轮询、不改变画质或资产。修正后十次 surface 恢复实际恢复了三维帧；basic 仍共享一个上下文，这个观测保留，不伪报十一次。Review 另做十次完整 App/QML 根窗口销毁和重建，业务控制器继续存活，重新绑定输入路由；旧窗口排队回调按 windowEpoch 丢弃，回调上下文随 Review 销毁，渲染线程元数据仅持有共享原子值。新窗口在首次 show 前落实 VerificationWindow 策略。
+- 验证与复现：`python3 tools/build/verify-detail.py --backend opengl --dpr 1 --runs 1 --foreground --output 全新目录` 的完整窗口入口实际通过，十次 surface 恢复加十次完整根窗口重建观察到十一次上下文初始化，重建后的详情换片也通过；首份停帧、只修恢复但旧 context 假设仍失败的报告，以及中断的旧二进制尝试均保留在 verification/macos/detail/r18/，后者不计入通过。其他后端/DPR与串行三次结论按 detail-motion.md 的实际范围记录。后续不能只等待 sceneGraphInvalidated 或 frameSwapped；分别验证自身三维提交、真实对象重建、资源/图像与窗口策略。
+
+### R18：减少动态必须清除旋转副本的角度与高度等待
+
+- 原有阵列GPU回归在returning-night之后报告Returning covers did not release；新增reducedRotatedSnapshotReturnCompletesImmediately在Release中复现：三个归位副本里仍剩一个旋转副本。冻结returnStep的reduced分支只是rate=35的指数衰减，dt=0不会改变角度，不能把它当作立即完成。只取消returnY等待仍留下非零yaw，回收条件依旧不满足。
+- 归位副本在减少动态下直接yaw=0、清除returnY、lift.finish(0)，同次发布回收；普通运动仍保留源码returnStep以及对齐帧的高度，不提前下降。共享PointerDragController对正在查看的选中盒仍按源码保留手动目标角，不能把归位副本规则错误施加到它。新增单元修正前失败、修正后通过，Metal原有阵列GPU回归实际通过；其他范围按detail-motion.md记录。后续减少动态审计要区分解析衰减与精确终点，不能用“rate很大”替代完成与资源释放。
+
+### R18：副本材质状态不能用全局详情进度替代
+
+- 源码审计确认：原生产SceneItem把adapter.detail作为全局clarity，Renderer的材质模板将它用于所有实体。冻结scene/decryption实际为选中盒的独立揭示状态，归位副本捕获自身clarity并按exp(-9*dt)回雾，阵列保持磨砂；直接换片时全局详情构图不变，全局clarity因而无法代表这些状态。此项来自调用链审计，不声称此前做过失败的同机像素对照。
+- 修正：CaseClarity移植六个REVEAL节点及单调Hermite、ready门禁、34.12–39.56秒参考时间和1.5倍率；静态导数编译期缓存。ReturningCase独立保存并回收clarity，SceneFrame交付不可变实体值；生产阵列模板clarity为0，选中/归位主盖仅覆盖原uniform的粗糙度。lidRoughness与既有ShellMaterial共用同一公式和R07校准，不改shader布局、光学参数或重建材质/图集/PSO。固定状态Review保留原全局输入以维持既有oracle，不能把它当生产时序。
+- 验证边界：冻结decryption执行生成的1200个1/120秒样本覆盖进入、离开、回收、已清晰重选、改速和减少动态，最大误差约1.33e-14；独立副本/反向回收和既有210项材质参数实际通过。实际后端回放在清晰后开始拖动和换片，保留实体clarity序列；完整源图ROI仍按R29/MAC-VISIBLE-3D原门槛执行，不把数值/自渲染通过写成源像素已经通过。后续不能把相机放置进度、材质揭示和封面CPU/GPU就绪合并成一个ready值。
 
 ### 可见验证：原生策略、OpenGL drawable/MSAA 与采集生命周期
 
@@ -343,6 +367,7 @@
 - 同目标不重启轨迹；坐标 rebase 只平移位置与多项式常数项，时间、速度、加速度不变。减少动态效果直接完成目标并处理回调/焦点，不能只把 duration 设成 1ms。
 - 运动内核、唯一 QML 帧源、时钟/轨迹 API、revision 完成语义及冻结数值对照见 `docs/contracts/motion.md`；Windows 证据在 `verification/windows/motion/`，新增 oracle 在 `tests/fixtures/motion/kernel-golden.json`，macOS/Linux 对应审计在各平台 `motion/` 子目录。后续视觉模块只消费同一 FrameClock 的 dt/motionDt，不重复缩放速度；实际列布局和开场界面分别由 R13/R20 接入。
 - 共用 LayoutMetrics、SceneFrame/SceneAdapter、相机目标/阻尼、逻辑像素投影及包围体拾取接口见 `docs/contracts/scene.md`；几何与相机的 Windows Release 重建入口为 `tools/build/verify-r06.ps1`，macOS/Linux 新增调用链审计为 `tools/audit/audit-r06.ps1`。QML 只消费同一场景对象的相机参数与布局指标，后续阵列/抽取/总览扩展该接口，不建立第二套常数。
+- 详情同步放置、同构图换片、有限归位池、实体竖轴拖动和独立材质揭示由DetailPorts/DetailMotion/ReturningCasePool/PointerDragController/CaseClarity接入；单帧顺序、1.45/1.05秒C2轨道、rate=9、80ms场景门禁、容量/回收、REVEAL曲线、不可变逐实体材质及复现/范围见`docs/contracts/detail-motion.md`。固定状态Review输入与生产请求接口分开，不用全局detail替代副本状态。
 - UI 曲线采用原 cubic-bezier，通过求解横坐标获取 progress，不把 CSS 控制点直接解释为均匀参数 t。改速从当前进度继续，不重新设置起点。
 - 表面进入/退出采样当前 opacity/transform；被打断时基础时长 `max(72ms,baseDuration*sqrt(opacityDistance))`。右侧进入 24px/退出 32px，上下进入 10px/退出 6px；有独立图层的面板分别过渡。
 - PresentationPhase 保留 archive/opening/detail/switch-hiding/switching/hiding/returning/selecting；退浏览文字后才能抽取，盒体和相机落稳后才能进详情字。退场中只保留最后目标，旧完成事件按 revision 丢弃。
@@ -449,15 +474,6 @@
 ## 待执行轮次
 
 下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
-
-### R18 · 详情抽取、直接换片、归位与拖动查看
-
-- 依赖R12、R17。交付DetailMotion、ReturningCasePool、PointerDragController。
-- 相机和抽取按基线同步轨道，不能改成先抽完再侧移。详情换片：退旧字→同构图内旧盒归位/新盒抽出→新字进入，不绕主页。
-- 归位副本维持自身封面与状态，朝向落稳后才下降；快速换片管理有限副本池，回收只能发生在归位完成/明确失效。
-- 拖动查看保留轴向、角度限幅、惯性/回正，与PointerHandler手势区分点击；按实体transform更新拾取，不用二维假旋转。
-- 性能设计与验证：归位池有限容量与明确回收，分别统计纹理租约/GPU驻留；拖动/换片只更新变换和必要光场，不重建材质/图集。三次换片的输入/就绪延迟、突发上传与资源峰值分开验证。
-- 退出：连续三次换片、反向、途中返回/搜索、拖动中切片和减少动态均无跳变/错封面。
 
 ### R19 · 总览取景、边缘折叠与列名两步进入
 
@@ -646,6 +662,13 @@
 - 先运行目标Release configure/build、官方Yalahoo_qmllint/ui-audit_qmllint targets及完整CTest；使用`ui-audit --presentation 输出目录`验收18项结构、非零且<100的可见/复用委托、零QML warnings、十次恢复/释放与windowPolicy。源码审计入口为`python3 tools/audit/audit-presentation.py 对应report.json`，只能辅助实际运行，不代替窗口/设备事实；细节和三平台命令见`docs/contracts/presentation.md`。
 - 再在实际产品与R18运动接口中验证退browse后相机才进入、layoutRevision与场景双就绪门禁、退字连选/取消只提交最后目标、四种archiveRoute、快速open/back、改速/减少动态、介绍/歌单滚轮和鼠标/触摸/键盘。补修对象包括nativeScene输入守卫、退出期禁用、有效Item焦点恢复、hide/restore/minimize和surface/flags重建；R23/R24完成后补真实定位不改变播放。按用户指定轮次授权选择前台或默认置底策略，记录实际模式；默认模式遮挡样本不可用时保留任务，不偷偷改变策略。
 - 原结构≤1逻辑px、时序≤1个60Hz帧、源码状态顺序/revision与PERF-01–07、既有UI像素门槛全部保留；R29先收口完整GUI同机源成对图，不能拿本轮没有执行的SSIM作通过。共享状态/模型/标题规则变更后回归当前主力平台presentation、presentation-qml、navigation、title-reels及完整Release CTest；离屏不证明present/VSYNC或最终焦点行为。
+
+#### R18-P · 详情运动的目标后端、物理输入与完整产品回归
+
+- 依赖R33交接及可靠目标Kit/窗口管理器/设备。输入为R18交付提交的DetailMotion/ReturningCasePool/PointerDragController/CaseClarity、tests/fixtures/motion/detail-golden.json、匿名qrc演示封面，以及冻结music-camera/scene/music-app生产路径；不读取私人曲库。当前macOS/arm64缺少Windows原生编译器/D3D11会话及Linux原生Kit/X11/Wayland会话，不能从Metal或macOS OpenGL消除目标任务；这些目标尚未运行，没有新的目标失败数据。
+- Windows/D3D11、Linux/OpenGL/X11与Wayland及实际启用后端先运行Release configure/build、官方两组qmllint和完整CTest，再用`python3 tools/build/verify-detail.py --backend d3d11|opengl --dpr 1|1.5|2 --runs 3 --output 全新目录`执行对应目标产品回放；只有该轮获得可见前台授权时增加`--foreground`。原尺寸矩阵与双主题组件要求仍按presentation.md，实际产品抽取/换片的代表性DPR逐项保留，夜间回放增加`--night`。不可靠窗口样本不能作为通过。
+- 核对退browse后同步抽取/相机、同构图三次换片和反向、满池最后目标等待、旋转副本先对齐再下降/相邻新盒等待、换片中返回/搜索、拖动中切片/取消、.25→3倍速度及减少动态、三十次切片与十次真实图形上下文重建。每次保留Qt提交与ready延迟、上传突发、四个CPU封面租约/分块暂存和GPU图集/附件估算的分别记账；运动不重建不变目标/材质，driver/实际显存不可测仍为null。数值轨迹各1e-6、投影≤2逻辑px、时序≤一个60Hz帧、原ROI/SSIM/RGB与PERF-01–07门槛不变。
+- 三平台真实触摸硬件/系统抓取与焦点丢失、有效Item焦点恢复，以及R23/R24完成后的实际搜索/歌曲定位不改变播放仍需集成；Qt自身事件注入不冒充物理设备或input-to-photon。macOS已实现并实际通过的R18自动回放范围不重复列为欠验；其三维同输入PMREM/ROI参照仍依MAC-VISIBLE-3D，完整GUI依R29，120秒产品性能依R28/最终矩阵。补修共享轨迹/输入/所有权后回归当前平台detail-motion、scene、archive-pool、real-columns、presentation、presentation-qml、navigation、title-reels及对应实际后端回放。严格审计与命令/预期见docs/contracts/detail-motion.md及tools/audit/audit-detail.py。
 
 #### MAC-VISIBLE-3D · 三维同输入参照与正式采样收口
 

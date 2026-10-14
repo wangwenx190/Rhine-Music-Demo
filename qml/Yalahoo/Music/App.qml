@@ -46,6 +46,8 @@ ApplicationWindow {
         anchors.fill: parent
         adapter: window.sceneAdapter
         inputRouter: window.inputRouter
+        inspectionEnabled: window.presentationController !== null
+                           && window.presentationController.detailEnabled
         titleReel: browse.titleController
         transportReel: browse.transportController
     }

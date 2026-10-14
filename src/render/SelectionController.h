@@ -4,6 +4,10 @@
 #include "SceneFrame.h"
 #include "RealColumns.h"
 #include "ColumnMemory.h"
+#include "DetailMotion.h"
+#include "CaseClarity.h"
+#include "ReturningCasePool.h"
+#include "PointerDragController.h"
 #include <QPointer>
 
 namespace yalahoo {
@@ -44,6 +48,44 @@ public:
     void setDetail(double detail);
     void setRotation(double radians);
     void returnSelected();
+    void requestDetail(bool detail);
+    bool canSelect(const QString &id) const;
+    QString adjacentAlbum(const QString &id, int direction) const;
+    bool albumNavigationEnabled(const QString &id, int direction) const;
+    bool switchDetail(const QString &id);
+    double selectedClarity() const
+    {
+        return m_clarity.value();
+    }
+    const DetailMotion &detailMotion() const
+    {
+        return m_detailMotion;
+    }
+    void updateDetailReadiness(double dt, bool cameraSettled);
+    bool archiveReady() const;
+    bool archiveInteractive() const;
+    bool canInspect() const;
+    bool beginDrag(QPointF point, int pointerId = 0);
+    bool moveDrag(QPointF point, int pointerId = 0);
+    void endDrag(QPointF point, int pointerId = 0);
+    void cancelDrag();
+    bool dragging() const
+    {
+        return m_drag.dragging();
+    }
+    std::array<double, 2> navigationSpeeds() const;
+    double rotation() const
+    {
+        return m_rotation;
+    }
+    Kinematics liftState() const
+    {
+        return m_lift;
+    }
+    const ReturningCasePool &returningCases() const
+    {
+        return m_returning;
+    }
     void advance(double dt);
     ArchiveCell rebase();
     double field(double row, double lane) const;
@@ -60,21 +102,15 @@ signals:
     void memoryChanged();
 
 private:
-    struct Copy
-    {
-        ArchiveCell cell;
-        QString albumId;
-        ScalarSpring lift;
-        double rotation = 0;
-        std::optional<double> returnY;
-        quint64 objectId = 0;
-    };
     struct Pulse
     {
         ArchiveCell cell;
         double time = 0;
     };
     void publish();
+    bool tracksSettled() const;
+    std::optional<ArchiveCell> selectionCell(const QString &id) const;
+    using Copy = ReturningCase;
     std::array<double, 2> displayOffset() const;
     QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0) const;
     QPointer<MotionController> m_motion;
@@ -86,7 +122,11 @@ private:
     ArchiveCell m_cell, m_origin;
     QVector<ArchiveInstance> m_instances;
     QHash<QPair<qint64, qint64>, quint64> m_poolObjects;
-    QVector<Copy> m_returning;
+    ReturningCasePool m_returning;
+    DetailMotion m_detailMotion;
+    CaseClarity m_clarity;
+    PointerDragController m_drag;
+    bool m_managedDetail = false, m_navigationLift = false;
     QVector<Pulse> m_pulses;
     ScalarSpring m_lift;
     double m_time = 0, m_scanTime = 26.56, m_scanBlend = 0;
