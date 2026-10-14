@@ -53,4 +53,4 @@ Windows 最新原生 Kit 的 Release 构建、check-format、两组 qmllint 和2
 
 ## 标题绘制的单上下文边界
 
-R16B1 的 D3D11/实际DPR1双主题文字、字轮与歌名功能/释放门槛通过，具体原始与固定1px边缘带结果见 title-reels.md。普通整行glyph节点保留当前生产路径；Qt Quick Text和C++ Canvas fillText候选沿用同一布局与时钟，但字面重新shaping的API不能直接复用完整glyph run，不据此宣称复杂连字等价。槽内几何按字体身份/字形/位置复用，隐藏字形路径不继续建节点，层随组件/窗口可见性关闭；没有改变三维资源键。最终文字绘制选型和三DPR/双后端成本比较仍由R16B2/B3完成。
+R16B1及R16B2的 D3D11/实际DPR1双主题文字、字轮与歌名功能/释放门槛通过，具体原始与固定1px边缘带结果见 title-reels.md。普通整行glyph节点保留当前生产路径；Qt Quick Text和C++ Canvas fillText候选沿用同一布局与时钟，但字面重新shaping的API不能直接复用完整glyph run，不据此宣称复杂连字等价。槽内几何按字体身份/字形/位置复用，隐藏字形路径不继续建节点，层随组件/窗口可见性关闭；没有改变三维资源键。R16B2修复隐藏Canvas仍绘制文字的问题，DPR1三个串行样本中其他路径的Canvas文字绘制计数均为零；仅GUI守卫不能消除已排队的Qt回调，render同步/paint需同时核对可见性，恢复通过窗口可见性连接失效。成本差异和估算/未知资源见 title-reels.md，不推导GPU或完整产品FPS。最终文字绘制选型和其余DPR/后端比较仍由R16B2V/W、R16B3完成。

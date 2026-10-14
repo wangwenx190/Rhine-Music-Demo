@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [switch]$FullMatrix,
+    [switch]$BackendMatrix,
     [switch]$TitleContext,
+    [switch]$UseExistingWebSource,
     [ValidateSet('d3d11', 'opengl')][string]$Backend = 'd3d11',
     [ValidateSet(1, 1.5, 2)][double]$Dpr = 1,
     [string]$EvidenceDirectory = 'verification/windows/title-reels'
@@ -10,8 +12,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $evidence = Join-Path $repository $EvidenceDirectory
-if ($FullMatrix -and $TitleContext) {
-    throw 'Choose FullMatrix or TitleContext'
+if ([int][bool]$FullMatrix + [int][bool]$BackendMatrix + [int][bool]$TitleContext -gt 1) {
+    throw 'Choose FullMatrix, BackendMatrix or TitleContext'
 }
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -48,7 +50,20 @@ try {
     if ($LASTEXITCODE -ne 0 -or $nativeDpr -le 0) {
         throw 'Native DPR query failed'
     }
-    if ($FullMatrix) {
+    if ($UseExistingWebSource) {
+        $sourceReport = Get-Content -Raw verification/windows/title-reels/web/report.json | ConvertFrom-Json
+        $requiredDprs = if ($FullMatrix -or $BackendMatrix) {
+            @(1, 1.5, 2)
+        } else {
+            @($Dpr)
+        }
+        foreach ($requiredDpr in $requiredDprs) {
+            if (@($sourceReport.captures | Where-Object { [Math]::Abs($_.dpr - $requiredDpr) -lt 0.001 }).Count -ne 20) {
+                throw 'Existing frozen title source does not contain the requested DPR matrix'
+            }
+        }
+        Copy-Item -LiteralPath verification/windows/title-reels/web/report.json -Destination (Join-Path $evidence 'web-source.json')
+    } elseif ($FullMatrix -or $BackendMatrix) {
         Run 'web-source.txt' { node tools/review/export-title.mjs }
     } elseif ($TitleContext) {
         Run 'web-source.txt' { node tools/review/export-title.mjs --dpr $Dpr }
@@ -56,14 +71,14 @@ try {
     $reports = @()
     $backends = if ($FullMatrix) {
         @('d3d11', 'opengl')
-    } elseif ($TitleContext) {
+    } elseif ($TitleContext -or $BackendMatrix) {
         @($Backend)
     } else {
         @('d3d11')
     }
     foreach ($backend in $backends) {
         $env:QSG_RHI_BACKEND = $backend
-        $dprs = if ($FullMatrix) {
+        $dprs = if ($FullMatrix -or $BackendMatrix) {
             @(1, 1.5, 2)
         } elseif ($TitleContext) {
             @($Dpr)
@@ -78,15 +93,35 @@ try {
             if (-not $report.passed -or $report.backend -ne $backend -or [Math]::Abs($report.dpr - $dpr) -gt 0.001 -or -not $report.released -or $report.animatedCosts.Count -ne 9 -or $report.headerChecks.Count -ne 18 -or $report.lifecycle.Count -ne 10) {
                 throw 'Title glyph, animation, transport, DPR or lifecycle verification failed'
             }
+            foreach ($mode in 0..2) {
+                $samples = @($report.animatedCosts | Where-Object { $_.mode -eq $mode })
+                if ($samples.Count -ne 3 -or @($samples.run | Sort-Object -Unique).Count -ne 3) {
+                    throw 'Three distinct serial samples are required for each drawing path'
+                }
+                foreach ($sample in $samples) {
+                    if (-not $sample.passed -or $sample.frames -ne 120 -or $sample.samples.Count -ne 120 -or $null -ne $sample.gpuTime -or $null -eq $sample.guiStateNs -or $null -eq $sample.canvasPaintCpuNs -or $sample.resources.cacheBytes -gt 8388608 -or $sample.resources.cacheEntries -gt 96) {
+                        throw 'Incomplete title cost, cache or raw-sequence evidence'
+                    }
+                }
+            }
             $production = @($report.captures | Where-Object { $_.mode -eq 0 })
+            if ($production.Count -ne 20) {
+                throw 'Twenty production title cases are required at each DPR'
+            }
             $reports += @{
                 backend = $backend
                 dpr = $dpr
+                nativeScreenDpr = $nativeDpr
+                scaleFactor = $dpr / $nativeDpr
                 motionError = $report.motionError
                 minimumSsimOutsideGlyphEdge = ($production.antialiasBand.ssim | Measure-Object -Minimum).Minimum
                 maximumRgbOutsideGlyphEdge = ($production.antialiasBand.meanAbsoluteRgb | Measure-Object -Maximum).Maximum
                 maximumGeometryError = ($production.geometry.maximumError | Measure-Object -Maximum).Maximum
                 captures = $production.Count
+                candidatePassCounts = @(foreach ($mode in 0..2) {
+                        @($report.captures | Where-Object { $_.mode -eq $mode -and $_.candidatePassed }).Count
+                    })
+                animatedCosts = @($report.animatedCosts | Select-Object run, mode, frames, guiStateNs, clockTickCpuNs, syncCpuNs, renderSubmitCpuNs, canvasSyncCpuNs, canvasPaintCpuNs, canvasPaints, gpuTime, glyphNodesCreated, glyphNodesReused, resources)
             }
         }
         $env:QT_SCALE_FACTOR = (1 / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -97,13 +132,19 @@ try {
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{
                 passed = $true
                 fullMatrixCompleted = [bool]$FullMatrix
+                backendMatrixCompleted = [bool]$BackendMatrix
+                requestedBackend = $Backend
                 titleContextCompleted = [bool]$TitleContext
                 qtVersion = $chain.qtVersion
                 compiler = $chain.compiler
                 configuration = 'Release'
+                fixtureSha256 = (Get-FileHash -LiteralPath tests/fixtures/text/titles.json).Hash.ToLowerInvariant()
+                webReferenceSha256 = (Get-FileHash -LiteralPath verification/windows/title-reels/web/report.json).Hash.ToLowerInvariant()
+                titleBinarySha256 = (Get-FileHash -LiteralPath build/release/tools/ui-audit.exe).Hash.ToLowerInvariant()
+                productionBinarySha256 = (Get-FileHash -LiteralPath build/release/bin/yalahoo.exe).Hash.ToLowerInvariant()
                 reports = $reports
                 scope = 'Release implementation checks and production browse captures. Full title/path/DPR/backend selection is passed only when fullMatrixCompleted is true. CPU drawing diagnostics include initialization and bounded diagnostic submissions; GPU timestamps unavailable. No complete-product FPS claim.'
-            } | ConvertTo-Json -Depth 8), $utf8)
+            } | ConvertTo-Json -Depth 12), $utf8)
 } finally {
     foreach ($name in $names) {
         [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process')

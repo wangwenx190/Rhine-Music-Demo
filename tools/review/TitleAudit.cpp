@@ -270,6 +270,8 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                      { 960, 900 },   { 930, 900 },   { 390, 844 },
                                      { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
     qint64 guiNs = 0, beginSync = 0, beginRender = 0;
+    qint64 beginCanvasSync = 0, beginCanvasPaint = 0;
+    quint64 beginCanvasPaints = 0;
     quint64 beginGeometry = 0, beginReuse = 0;
     std::function<void()> next;
     std::function<void(QImage)> completed;
@@ -421,10 +423,13 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                                  { "renderSubmitCpuNs", double(renderNs.load() - beginRender) },
                                  { "gpuTime", QJsonValue::Null } });
         } else if (index < staticSteps + animationSteps) {
-            const bool nativeMode = (index - staticSteps) % 3 == 0;
+            const int mode = (index - staticSteps) % 3;
+            const bool nativeMode = mode == 0;
             const auto reused = yalahoo::ReelInk::geometryReuses() - beginReuse;
+            const auto canvasPaints = canvasTitleStats().paints.load() - beginCanvasPaints;
             const bool valid = !image.isNull() && noFrameShaping && (!nativeMode || reused > 0)
                     && (nativeMode || yalahoo::ReelInk::geometryUpdates() == beginGeometry)
+                    && (mode == 2 || canvasPaints == 0)
                     && yalahoo::verification::windowPolicySatisfied(window);
             passed &= valid;
             animatedCosts.append(QJsonObject{
@@ -432,11 +437,17 @@ int reviewTitle(QGuiApplication &app, const QString &output)
                     { "mode", (index - staticSteps) % 3 },
                     { "passed", valid },
                     { "frames", animatedFrame },
+                    { "guiStateNs", double(guiNs) },
                     { "clockTickCpuNs", double(tickNs) },
                     { "samples", frameRecords },
                     { "syncCpuNs", double(syncNs.load() - beginSync) },
                     { "renderSubmitCpuNs", double(renderNs.load() - beginRender) },
                     { "gpuTime", QJsonValue::Null },
+                    { "canvasSyncCpuNs",
+                      double(canvasTitleStats().syncNs.load() - beginCanvasSync) },
+                    { "canvasPaintCpuNs",
+                      double(canvasTitleStats().paintNs.load() - beginCanvasPaint) },
+                    { "canvasPaints", double(canvasPaints) },
                     { "glyphNodesCreated",
                       double(yalahoo::ReelInk::geometryUpdates() - beginGeometry) },
                     { "glyphNodesReused", double(reused) },
@@ -584,6 +595,9 @@ int reviewTitle(QGuiApplication &app, const QString &output)
         }
         beginSync = syncNs;
         beginRender = renderNs;
+        beginCanvasSync = canvasTitleStats().syncNs;
+        beginCanvasPaint = canvasTitleStats().paintNs;
+        beginCanvasPaints = canvasTitleStats().paints;
         beginGeometry = yalahoo::ReelInk::geometryUpdates();
         beginReuse = yalahoo::ReelInk::geometryReuses();
         QElapsedTimer guiTimer;
@@ -662,7 +676,27 @@ int reviewTitle(QGuiApplication &app, const QString &output)
     QTimer::singleShot(0, &app, [&] {
         next();
     });
-    QTimer::singleShot(90000, &app, [&] {
+    const double dpr = window.devicePixelRatio();
+    // Reference-contour and SSIM comparisons run on CPU over physical pixels.
+    QTimer::singleShot(int(90000 * std::max(1.0, dpr * dpr)), &app, [&] {
+        QSaveFile file(output + "/timeout.json");
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(QJsonDocument(QJsonObject{ { "passed", false },
+                                                  { "step", step },
+                                                  { "staticSteps", staticSteps },
+                                                  { "animationSteps", animationSteps },
+                                                  { "headerSteps", headerSteps },
+                                                  { "warmFrames", warmFrames },
+                                                  { "requested", requested.load() },
+                                                  { "inFlight", inFlight.load() },
+                                                  { "drain", drain.load() },
+                                                  { "visible", window.isVisible() },
+                                                  { "dpr", dpr },
+                                                  { "windowPolicy",
+                                                    yalahoo::verification::windowPolicy(window) } })
+                               .toJson());
+            file.commit();
+        }
         app.exit(7);
     });
     const int result = app.exec();

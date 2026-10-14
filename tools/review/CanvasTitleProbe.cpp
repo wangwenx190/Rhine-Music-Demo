@@ -3,6 +3,7 @@
 #include <QCanvasLinearGradient>
 #include <QElapsedTimer>
 #include <QFontMetricsF>
+#include <QQuickWindow>
 namespace {
 CanvasTitleStats stats;
 struct Slot
@@ -30,9 +31,12 @@ protected:
         QElapsedTimer timer;
         timer.start();
         auto *probe = static_cast<CanvasTitleProbe *>(item);
+        m_visible = probe->isVisible() && (!probe->window() || probe->window()->isVisible());
         ink = probe->ink;
         muted = probe->muted;
         m_slots.clear();
+        if (!m_visible)
+            return;
         if (auto *controller = probe->controller())
             for (int i = 0; i < controller->slotCount(); ++i) {
                 const auto *slot = controller->slotAt(i);
@@ -49,6 +53,8 @@ protected:
         QElapsedTimer timer;
         timer.start();
         p->reset();
+        if (!m_visible)
+            return;
         p->setTextBaseline(QCanvasPainter::TextBaseline::Alphabetic);
         for (const auto &slot : m_slots) {
             const QColor color = slot.translation ? muted : ink;
@@ -91,6 +97,7 @@ protected:
 private:
     QList<Slot> m_slots;
     QColor ink, muted;
+    bool m_visible = false;
 };
 }
 CanvasTitleStats &canvasTitleStats()
@@ -102,7 +109,20 @@ CanvasTitleProbe::CanvasTitleProbe(QQuickItem *parent) : QCanvasPainterItem(pare
     setFillColor(Qt::transparent);
     setAlphaBlending(true);
     setSampleCount(1);
-    connect(this, &CanvasTitleProbe::changed, this, &CanvasTitleProbe::update);
+    connect(this, &CanvasTitleProbe::changed, this, &CanvasTitleProbe::requestPaint);
+    connect(this, &QQuickItem::visibleChanged, this, &CanvasTitleProbe::requestPaint);
+    connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
+        disconnect(m_windowVisibility);
+        if (window)
+            m_windowVisibility = connect(window, &QWindow::visibleChanged, this,
+                                         &CanvasTitleProbe::requestPaint);
+        requestPaint();
+    });
+}
+void CanvasTitleProbe::requestPaint()
+{
+    if (isVisible())
+        update();
 }
 yalahoo::TitleReel *CanvasTitleProbe::controller() const
 {
@@ -116,7 +136,7 @@ void CanvasTitleProbe::setController(yalahoo::TitleReel *controller)
         disconnect(m_controller, nullptr, this, nullptr);
     m_controller = controller;
     if (controller)
-        connect(controller, &yalahoo::TitleReel::changed, this, &CanvasTitleProbe::update);
+        connect(controller, &yalahoo::TitleReel::changed, this, &CanvasTitleProbe::requestPaint);
     emit changed();
 }
 QCanvasPainterItemRenderer *CanvasTitleProbe::createItemRenderer() const

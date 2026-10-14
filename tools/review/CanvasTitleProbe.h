@@ -27,5 +27,7 @@ signals:
     void changed();
 
 private:
+    void requestPaint();
+    QMetaObject::Connection m_windowVisibility;
     QPointer<yalahoo::TitleReel> m_controller;
 };
