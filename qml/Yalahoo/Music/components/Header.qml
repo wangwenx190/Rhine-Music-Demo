@@ -8,6 +8,8 @@ Item {
     required property DesignTokens tokens
     property string playingTitle: ""
     property bool playing: false
+    property FrameClock clock: null
+    readonly property TitleReelMotion transportController: song.reelController
     signal actionRequested(string action)
     signal themeRequested(bool night)
     readonly property bool narrow: metrics.width <= 1100
@@ -99,18 +101,16 @@ Item {
         Item {
             id: transport
             objectName: "minimalTransport"
-            readonly property real songCap: root.metrics.portrait ? Math.max(0, Math.min(280,
-                                                                                         root.metrics.width
-                                                                                         - 320)) : root.narrow
-                                                                    ? Math.max(0, Math.min(180,
-                                                                                           root.metrics.width
-                                                                                           - 610)) : Math.max(
-                                                                          0, Math.min(240,
-                                                                                      root.metrics.width
-                                                                                      - 760))
-            readonly property real songWidth: root.playingTitle.length ? Math.min(songCap,
-                                                                                  song.implicitWidth
-                                                                                  + 14) : 0
+            readonly property real songCap: root.metrics.width <= 700 ? Math.max(0, Math.min(100,
+                                                                                             root.metrics.width
+                                                                                             - 340)) : root.narrow
+                                                                        ? Math.max(0, Math.min(180,
+                                                                                               root.metrics.width
+                                                                                               - 610)) : Math.max(
+                                                                              0, Math.min(240,
+                                                                                          root.metrics.width
+                                                                                          - 760))
+            readonly property real songWidth: song.width
             width: root.metrics.portrait ? root.width - 28 - 28 - 104 - 28 - root.navGap * 4 : 12
                                            + songWidth + 29 * 2 + 7
             height: 29
@@ -121,30 +121,60 @@ Item {
                 height: parent.height
                 color: root.tokens.line
             }
-            ArchiveText {
+            TransportTitle {
                 id: song
                 objectName: "playingTitle"
                 tokens: root.tokens
-                x: root.metrics.portrait ? parent.width - 48 - transport.songWidth : 12
-                width: Math.max(0, transport.songWidth - 14)
-                height: 29
-                y: (nav.height - (height - (root.metrics.portrait ? 0 : 5))) / 2 - (
-                       root.metrics.portrait ? 0 : 5)
-                verticalAlignment: Text.AlignVCenter
-                text: root.playingTitle
-                elide: Text.ElideRight
-                cssPixelSize: root.metrics.portrait ? 10 : root.narrow ? 11 : 12
+                clock: root.clock
+                x: root.metrics.portrait ? parent.width - 49 - transport.songWidth : 13
+                title: root.playingTitle
+                cap: transport.songCap
+                pixelSize: root.metrics.width <= 700 ? 10 : root.narrow ? 11 : 12
+                onLocateRequested: root.actionRequested("locate-song")
+            }
+            TransportMotion {
+                id: iconMotion
+                clock: root.clock
+                playing: root.playing
+                reducedMotion: root.tokens.reducedMotion
+                active: root.visible && (!root.Window.window || root.Window.window.visible)
             }
             ArchiveButton {
                 objectName: "playButton"
                 iconSize: root.metrics.width <= 700 ? 15 : 17
-                opacity: hovered ? 1 : 0.8
+                opacity: hovered || root.playing ? 1 : 0.8
                 tokens: root.tokens
                 x: parent.width - width * 2 - (root.metrics.portrait ? 1 : 6)
                 width: root.metrics.portrait ? 24 : 29
-                iconName: root.playing ? "pause" : "play"
+                iconName: ""
                 text: root.playing ? "暂停" : "播放"
                 showText: false
+                contentItem: Item {
+                    Image {
+                        anchors.centerIn: parent
+                        width: root.metrics.width <= 700 ? 15 : 17
+                        height: width
+                        opacity: 1 - iconMotion.pauseOpacity
+                        scale: .7 + .3 * opacity
+                        source: "qrc:/assets/icons/play-" + (root.tokens.night ? "night" : "day")
+                                + ".svg"
+                        sourceSize: Qt.size(width * Screen.devicePixelRatio * 4, height * Screen.devicePixelRatio
+                                            * 4)
+                        mipmap: true
+                    }
+                    Image {
+                        anchors.centerIn: parent
+                        width: root.metrics.width <= 700 ? 15 : 17
+                        height: width
+                        opacity: iconMotion.pauseOpacity
+                        scale: .7 + .3 * opacity
+                        source: "qrc:/assets/icons/pause-" + (root.tokens.night ? "night" : "day")
+                                + ".svg"
+                        sourceSize: Qt.size(width * Screen.devicePixelRatio * 4, height * Screen.devicePixelRatio
+                                            * 4)
+                        mipmap: true
+                    }
+                }
                 onClicked: root.actionRequested("play-pause")
             }
             ArchiveButton {

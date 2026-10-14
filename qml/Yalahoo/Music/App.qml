@@ -43,8 +43,11 @@ ApplicationWindow {
         anchors.fill: parent
         adapter: window.sceneAdapter
         inputRouter: window.inputRouter
+        titleReel: browse.titleController
+        transportReel: browse.transportController
     }
     Browse {
+        id: browse
         anchors.fill: parent
         metrics: window.sceneAdapter.layout
         tokens: design

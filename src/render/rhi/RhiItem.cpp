@@ -288,6 +288,7 @@ private:
         float aoResolution = 0;
         bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false;
         double navigationDpr = 0;
+        quint64 textResourceRevision = 0;
         bool operator==(const AllocationKey &) const = default;
     };
     AllocationKey allocationKey;
@@ -588,10 +589,19 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         return;
     const auto requestedSize = renderTarget()->pixelSize();
     const auto requestedCover = input.atlasGeneration ? input.atlasSize : input.cover.size();
-    const AllocationKey key{ requestedSize,        requestedCover,  input.shadowSize,
-                             input.captureSamples, input.aoSamples, input.aoResolution,
-                             input.shells,         bool(deliver),   input.postprocess,
-                             input.bokeh,          input.smaa,      input.navigationDpr };
+    const AllocationKey key{ requestedSize,
+                             requestedCover,
+                             input.shadowSize,
+                             input.captureSamples,
+                             input.aoSamples,
+                             input.aoResolution,
+                             input.shells,
+                             bool(deliver),
+                             input.postprocess,
+                             input.bokeh,
+                             input.smaa,
+                             input.navigationDpr,
+                             input.textResourceRevision };
     if (key != allocationKey || !vertices) {
         for (const auto format :
              { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })

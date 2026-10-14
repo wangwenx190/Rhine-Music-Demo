@@ -7,6 +7,9 @@
 #include "RulerInk.h"
 #include "InputRouter.h"
 #include "OrdinalMotion.h"
+#include "TitleReel.h"
+#include "ReelInk.h"
+#include "TransportMotion.h"
 #include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>
 
@@ -122,4 +125,29 @@ struct CanvasPainterBase
     Q_GADGET
     QML_FOREIGN(QCanvasPainterItem)
     QML_ANONYMOUS
+};
+struct TitleReelQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::TitleReel)
+    QML_NAMED_ELEMENT(TitleReelMotion)
+};
+struct ReelSlotQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::ReelSlot)
+    QML_NAMED_ELEMENT(ReelSlot)
+    QML_UNCREATABLE("Owned by TitleReelMotion")
+};
+struct ReelInkQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::ReelInk)
+    QML_NAMED_ELEMENT(ReelInk)
+};
+struct TransportMotionQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::TransportMotion)
+    QML_NAMED_ELEMENT(TransportMotion)
 };

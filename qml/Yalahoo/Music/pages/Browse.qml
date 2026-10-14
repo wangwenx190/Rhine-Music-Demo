@@ -15,6 +15,8 @@ Item {
     property int albumCount: 0
     property string playingTitle: ""
     property bool showNavigation: true
+    readonly property TitleReelMotion titleController: info.titleController
+    readonly property TitleReelMotion transportController: header.transportController
     signal actionRequested(string action)
     signal themeRequested(bool night)
     ReadingVeil {
@@ -25,8 +27,10 @@ Item {
         calloutHeight: info.height
     }
     Header {
+        id: header
         metrics: root.metrics
         tokens: root.tokens
+        clock: root.clock
         playingTitle: root.playingTitle
         onActionRequested: action => root.actionRequested(action)
         onThemeRequested: night => root.themeRequested(night)

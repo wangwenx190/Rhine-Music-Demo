@@ -1,6 +1,6 @@
 # 二维绘制与 R14 浏览界面契约
 
-生产入口 `App.qml` 使用 `DesignTokens`、`Header`、`BrowseInfo`、`Footer`、`NavigationFrame` 和 `ReadingVeil`，叠在已有三维 `SceneItem` 之上。旧运行探针移至 `BootstrapProbe.qml`，只由验证参数加载。导航输入、生产滑尺和数字字轮按 [navigation.md](navigation.md) 接入同一选择控制器及帧时钟；多行标题字轮、详情、面板和播放操作分别归后续轮次。
+生产入口 `App.qml` 使用 `DesignTokens`、`Header`、`BrowseInfo`、`Footer`、`NavigationFrame` 和 `ReadingVeil`，叠在已有三维 `SceneItem` 之上。旧运行探针移至 `BootstrapProbe.qml`，只由验证参数加载。导航输入、生产滑尺和数字字轮按 [navigation.md](navigation.md) 接入同一选择控制器及帧时钟；标题与歌名字轮按 [title-reels.md](title-reels.md) 接入，其完整绘制选择及矩阵验收留在R16B1–B3，详情、面板和播放操作分别归后续轮次。
 
 ## 源码与接口
 

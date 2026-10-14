@@ -57,6 +57,12 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
             plan.plannedTexture(QString("navigation-small-wheel-%1-upper-bound").arg(i),
                                 scaled(160, 12), QRhiTexture::RGBA8);
     }
+    for (int i = 0; i < in.textLayerSizes.size(); ++i)
+        plan.plannedTexture(QString("title-reel-layer-%1").arg(i), in.textLayerSizes[i],
+                            QRhiTexture::RGBA8);
+    for (int i = 0; i < in.textLayerSizes.size(); ++i)
+        plan.plannedTexture(QString("title-reel-depth-%1-upper-bound").arg(i), in.textLayerSizes[i],
+                            QRhiTexture::D32FS8);
     if (in.postprocess) {
         const QSize ao(qMax(1, int(size.width() * in.aoResolution)),
                        qMax(1, int(size.height() * in.aoResolution)));

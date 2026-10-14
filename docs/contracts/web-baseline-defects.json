@@ -16,6 +16,17 @@
       },
       "nativeRequirement": "Improve edge smoothing; preserve geometry, projection, artwork sharpness, materials, lighting and motion. Do not reproduce jagged edges or conceal them with global blur/noise.",
       "comparison": "Report confirmed edge ROIs separately with paired close-ups. Improved antialiasing is an allowed and required difference; unaffected image regions and geometric anchors retain their original gates."
+    },
+    {
+      "id": "WEB-TEXT-PROBE-01",
+      "classification": "capture-observation-defect-not-reproduction-target",
+      "description": "Chromium source title measurement probe can retain the coarse computed font after a fine inline font-size write; inline and computed values disagree under the contained probe.",
+      "evidence": [
+        "verification/windows/title-reels/web-raw/report.json",
+        "verification/windows/title-reels/web/report.json"
+      ],
+      "nativeRequirement": "Follow the source algorithm, CSS and requested fine font size; do not reproduce stale probe observation.",
+      "comparison": "Keep raw unrefreshed capture separately. Refresh only the measurement probe root with identical inline CSS and children, preserving source algorithms, parameters and production styles; record the observation intervention. Complete pixel/path/DPR validation remains R16B1-B3."
     }
   ]
 }

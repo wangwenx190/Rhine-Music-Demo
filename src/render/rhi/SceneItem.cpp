@@ -11,6 +11,56 @@
 #include <limits>
 
 namespace yalahoo::rhi {
+TitleReel *SceneItem::titleReel() const
+{
+    return m_titleReel;
+}
+void SceneItem::setTitleReel(TitleReel *reel)
+{
+    if (m_titleReel == reel)
+        return;
+    disconnect(m_titleConnection);
+    disconnect(m_titleDestroyedConnection);
+    m_titleReel = reel;
+    if (reel) {
+        m_titleConnection =
+                connect(reel, &TitleReel::resourcesChanged, this, &SceneItem::refreshTextResources);
+        m_titleDestroyedConnection =
+                connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
+    }
+    refreshTextResources();
+    emit textReelsChanged();
+}
+TitleReel *SceneItem::transportReel() const
+{
+    return m_transportReel;
+}
+void SceneItem::setTransportReel(TitleReel *reel)
+{
+    if (m_transportReel == reel)
+        return;
+    disconnect(m_transportConnection);
+    disconnect(m_transportDestroyedConnection);
+    m_transportReel = reel;
+    if (reel) {
+        m_transportConnection =
+                connect(reel, &TitleReel::resourcesChanged, this, &SceneItem::refreshTextResources);
+        m_transportDestroyedConnection =
+                connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
+    }
+    refreshTextResources();
+    emit textReelsChanged();
+}
+void SceneItem::refreshTextResources()
+{
+    const auto sizes = (m_titleReel ? m_titleReel->resourceSizes() : QList<QSize>())
+            + (m_transportReel ? m_transportReel->resourceSizes() : QList<QSize>());
+    if (sizes == m_textSizes)
+        return;
+    m_textSizes = sizes;
+    ++m_textRevision;
+    schedule();
+}
 SceneItem::SceneItem(QQuickItem *parent)
     : RhiItem(parent), m_cover(256, 256, QImage::Format_RGBA8888_Premultiplied)
 {
@@ -410,6 +460,8 @@ void SceneItem::updatePolish()
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
     in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
+    in.textLayerSizes = m_textSizes;
+    in.textResourceRevision = m_textRevision;
     in.cover = m_cover;
     in.coverPainted = true;
     in.immutableCover = true;
@@ -460,7 +512,9 @@ void SceneItem::updatePolish()
     const bool unchanged = in.scene.revision == old.scene.revision
             && in.scene.navigationRevision == old.scene.navigationRevision
             && in.scene.navigationCommittedNs == old.scene.navigationCommittedNs
-            && in.navigationDpr == old.navigationDpr && m_coverRevision == m_publishedCoverRevision
+            && in.navigationDpr == old.navigationDpr
+            && in.textResourceRevision == old.textResourceRevision
+            && m_coverRevision == m_publishedCoverRevision
             && in.scene.inputRevision == old.scene.inputRevision
             && in.cover.cacheKey() == old.cover.cacheKey()
             && target == QSize(fixedColorBufferWidth(), fixedColorBufferHeight())

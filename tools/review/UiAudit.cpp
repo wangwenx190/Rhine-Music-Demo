@@ -2,6 +2,7 @@
 #include "AppIdentity.h"
 #include "CanvasProbe.h"
 #include "RulerAudit.h"
+#include "TitleAudit.h"
 #include "GraphicsBackend.h"
 #include "ImageComparison.h"
 #include "LayoutMetrics.h"
@@ -78,6 +79,8 @@ int main(int argc, char **argv)
     qInstallMessageHandler(message);
     if (app.arguments().contains("--ruler"))
         return argc == 3 ? reviewRuler(app, QString::fromLocal8Bit(argv[2])) : 2;
+    if (app.arguments().contains("--titles"))
+        return argc == 3 ? reviewTitle(app, QString::fromLocal8Bit(argv[2])) : 2;
     const QString output = QString::fromLocal8Bit(argv[1]);
     QDir().mkpath(output);
     yalahoo::LayoutMetrics metrics;

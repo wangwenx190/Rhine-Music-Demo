@@ -3,6 +3,7 @@
 #include "SceneAdapter.h"
 #include "InputRouter.h"
 #include "AtlasAllocator.h"
+#include "TitleReel.h"
 #include <QPointer>
 
 namespace yalahoo::rhi {
@@ -14,6 +15,8 @@ class SceneItem : public RhiItem
     Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged)
     Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
+    Q_PROPERTY(yalahoo::TitleReel *titleReel READ titleReel WRITE setTitleReel NOTIFY textReelsChanged)
+    Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged)
 public:
     explicit SceneItem(QQuickItem *parent = nullptr);
     SceneAdapter *adapter() const
@@ -39,6 +42,10 @@ public:
     }
     Q_INVOKABLE QVector3D qtProjection(QVector3D world) const;
     QJsonObject coverStatistics() const;
+    TitleReel *titleReel() const;
+    void setTitleReel(TitleReel *reel);
+    TitleReel *transportReel() const;
+    void setTransportReel(TitleReel *reel);
 signals:
     void adapterChanged();
     void inputRouterChanged();
@@ -46,6 +53,7 @@ signals:
     void telemetryEnabledChanged();
     void frameSubmitted(QJsonObject sample);
     void errorTextChanged();
+    void textReelsChanged();
 
 protected:
     void updatePolish() override;
@@ -59,6 +67,12 @@ private:
     void schedule();
     void preparePool(Input &input);
     void resetPool();
+    void refreshTextResources();
+    QPointer<TitleReel> m_titleReel, m_transportReel;
+    QMetaObject::Connection m_titleConnection, m_transportConnection;
+    QMetaObject::Connection m_titleDestroyedConnection, m_transportDestroyedConnection;
+    QList<QSize> m_textSizes;
+    quint64 m_textRevision = 0;
     struct OwnedCover
     {
         quint64 objectId = 0, lease = 0;

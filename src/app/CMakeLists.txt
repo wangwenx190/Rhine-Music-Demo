@@ -181,6 +181,7 @@ qt_add_shaders(
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
 )
 target_link_libraries(
     Yalahoo
@@ -189,6 +190,7 @@ target_link_libraries(
     YalahooScene
     YalahooRhi
     YalahooNavigation
+    YalahooText
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick

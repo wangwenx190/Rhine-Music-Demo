@@ -13,6 +13,7 @@ Flickable {
     property int ordinalDirection: 0
     property real calloutBottom: metrics.portrait ? 135 : 165
     signal openRequested
+    readonly property TitleReelMotion titleController: title.controller
     readonly property real portraitHeight: Math.min(Math.max(210, metrics.height / 3),
                                                     metrics.height - calloutBottom - 150)
     readonly property real titleSize: metrics.width <= 700 ? 25 : metrics.width <= 1100 ? 28 : Math.max(
@@ -132,21 +133,22 @@ Flickable {
                 color: root.tokens.ink
             }
         }
-        ArchiveText {
+        TitleReel {
+            id: title
             objectName: "albumTitle"
             tokens: root.tokens
+            clock: root.clock
             width: parent.width
             text: root.album.title || "让音乐进入这座档案馆。"
-            font.family: root.tokens.bold.family
-            font.styleName: root.tokens.bold.styleName
-            font.weight: root.tokens.bold.weight
-            cssPixelSize: root.titleSize
-            font.letterSpacing: -0.6
-            wrapMode: Text.WrapAnywhere
-            cssLineHeight: root.titleSize * 1.4
+            pixelSize: root.titleSize
+            narrow: root.metrics.width <= 700
+            budget: Math.max(28, root.height - eyebrow.height - rule.height - artist.height
+                             - meta.height - openGap.height - openButton.height - bottomPadding - (
+                                 root.metrics.portrait ? 20 : 0))
             bottomPadding: root.metrics.width <= 700 ? 9 : 13
         }
         ArchiveText {
+            id: artist
             tokens: root.tokens
             width: parent.width
             objectName: "albumArtist"
@@ -163,6 +165,7 @@ Flickable {
             bottomPadding: root.metrics.height <= 650 || root.metrics.width <= 700 ? 10 : 21
         }
         ArchiveText {
+            id: meta
             tokens: root.tokens
             objectName: "albumMeta"
             text: (root.album.year || "") + (root.album.year ? "  ·  " : "") + (root.album.tracks
@@ -172,10 +175,12 @@ Flickable {
             font.letterSpacing: 0.5
         }
         Item {
+            id: openGap
             width: 1
             height: root.metrics.height <= 650 ? 12 : root.metrics.width <= 700 ? 13 : 22
         }
         ArchiveButton {
+            id: openButton
             objectName: "openAlbumButton"
             tokens: root.tokens
             width: parent.width
