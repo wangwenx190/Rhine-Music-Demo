@@ -3,10 +3,18 @@
 #include <QJsonObject>
 
 namespace yalahoo::verification {
+inline bool foregroundVerification()
+{
+    return qEnvironmentVariableIntValue("YALAHOO_VERIFY_FOREGROUND") == 1;
+}
+#if defined(Q_OS_MACOS)
+void prepareNativeApplication();
+#endif
 inline void prepareApplication()
 {
 #if defined(Q_OS_MACOS)
     qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1");
+    prepareNativeApplication();
 #endif
 }
 #if defined(Q_OS_MACOS)
@@ -15,7 +23,9 @@ QJsonObject nativeWindowPolicy(const QWindow &window);
 #endif
 inline Qt::WindowFlags windowFlags(bool frameless = false)
 {
-    auto flags = Qt::Window | Qt::WindowStaysOnBottomHint | Qt::WindowDoesNotAcceptFocus;
+    Qt::WindowFlags flags = Qt::Window;
+    if (!foregroundVerification())
+        flags |= Qt::WindowStaysOnBottomHint | Qt::WindowDoesNotAcceptFocus;
     if (frameless)
         flags |= Qt::FramelessWindowHint;
     return flags;
@@ -30,8 +40,11 @@ inline void prepareWindow(QWindow &window, bool frameless = false)
 }
 inline bool windowPolicySatisfied(const QWindow &window)
 {
-    const bool flags = window.flags().testFlag(Qt::WindowStaysOnBottomHint)
-            && window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) && !window.isActive();
+    const bool flags = foregroundVerification()
+            ? !window.flags().testFlag(Qt::WindowStaysOnBottomHint)
+                    && !window.flags().testFlag(Qt::WindowDoesNotAcceptFocus)
+            : window.flags().testFlag(Qt::WindowStaysOnBottomHint)
+                    && window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) && !window.isActive();
 #if defined(Q_OS_MACOS)
     return flags && nativeWindowPolicy(window)["passed"].toBool();
 #else
@@ -40,11 +53,17 @@ inline bool windowPolicySatisfied(const QWindow &window)
 }
 inline QJsonObject windowPolicy(const QWindow &window)
 {
-    QJsonObject result{ { "staysOnBottom", window.flags().testFlag(Qt::WindowStaysOnBottomHint) },
-                        { "doesNotAcceptFocus",
-                          window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) },
-                        { "active", window.isActive() },
-                        { "passed", windowPolicySatisfied(window) } };
+    QJsonObject result{
+        { "staysOnBottom", window.flags().testFlag(Qt::WindowStaysOnBottomHint) },
+        { "mode",
+          foregroundVerification() ? "user-authorized-foreground" : "nonactivating-bottom" },
+        { "nonInterferenceEnforced", !foregroundVerification() },
+        { "doesNotAcceptFocus", window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) },
+        { "active", window.isActive() },
+        { "visible", window.isVisible() },
+        { "exposed", window.isExposed() },
+        { "passed", windowPolicySatisfied(window) }
+    };
 #if defined(Q_OS_MACOS)
     result.insert("native", nativeWindowPolicy(window));
 #endif

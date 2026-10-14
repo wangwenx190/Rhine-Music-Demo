@@ -15,7 +15,7 @@
 
 当前主力开发与验证环境为 macOS，Windows/macOS/Linux 均须完整实现。每轮按实际环境、后端、设备和采集入口判断：能可靠验证的真实执行，当前无法执行或可靠验证的部分暂用严格静态审计，原实机要求和已知补修完整保留到最后 R34。当前主线按计划顺序连续推进，不等待已移交 R34 的 D3D11 等专项，但不能跳过当前可执行的前序任务。
 
-常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；当前macOS优先真正离屏验证，默认暂缓尚无可靠非激活显示入口的可见窗口CTest（`YALAHOO_MACOS_VISIBLE_TESTS=OFF`）；本机arm64 Release与Metal二维离屏已实测，不能将整个macOS写成仅静态通过。窗口/VSYNC/媒体设备和其他平台检查按实际可靠能力执行或移交R34；纯静态项标明“静态审计通过，实机待验证（R34）”。清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
+常规构建、测试、GUI/性能验证与验收只使用 Release。Windows 运行 `./tools/build/build.ps1`（默认 `qt-release`），自动导入 MSVC 环境、发现最新 Qt Kit 并执行 configure/build/CTest。macOS/Linux 使用 `sh tools/build/build.sh qt-release`；当前macOS优先真正离屏验证，默认暂缓尚无可靠非激活显示入口的可见窗口CTest（`YALAHOO_MACOS_VISIBLE_TESTS=OFF`）；本机arm64 Release与Metal二维离屏已实测，不能将整个macOS写成仅静态通过。用户明确要求可见验证即授权指定轮次前置/激活/焦点，复现及恢复默认见[测试窗口契约](docs/contracts/test-window-policy.md)。窗口/VSYNC/媒体设备和其他平台检查按实际可靠能力执行或移交R34；纯静态项标明“静态审计通过，实机待验证（R34）”。清单见 [macOS](docs/platforms/macos.md) / [Linux](docs/platforms/linux.md)。保留 `qt-debug`，但只有明确需要获取堆栈时才编译和运行，不执行例行双配置验证。构建输出在 `build/`，未来部署输出在 `out/`；当前依赖开发 Kit，完整播放器及独立部署包尚未接入。
 
 数据模型、排序列、冻结规则搜索和可注入的异步离线资料 Provider 已接入；导航 ID 与播放 ID 独立，默认不读取真实曲库。接口、模型角色与 Release 验证命令见 [数据契约](docs/contracts/library-data.md)。
 

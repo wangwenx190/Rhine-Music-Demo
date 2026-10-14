@@ -28,6 +28,8 @@
 #include <functional>
 #include <cmath>
 #include <tuple>
+#include <QMutex>
+#include <QMutexLocker>
 
 namespace {
 double trackError(const QJsonArray &samples)
@@ -257,6 +259,10 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
     QElapsedTimer timer;
     timer.start();
     std::atomic<qint64> syncStart{ 0 }, renderStart{ 0 }, syncNs{ 0 }, renderNs{ 0 };
+    QMutex positionsMutex;
+    QPointF synchronizedPlayPosition, synchronizedStopPosition;
+    QPointer<QQuickItem> playButton = root->findChild<QQuickItem *>("playButton");
+    QPointer<QQuickItem> stopButton = root->findChild<QQuickItem *>("stopButton");
     QObject::connect(
             &window, &QQuickWindow::beforeSynchronizing, &window,
             [&] {
@@ -267,6 +273,13 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
             &window, &QQuickWindow::afterSynchronizing, &window,
             [&] {
                 syncNs += timer.nsecsElapsed() - syncStart;
+                // GUI is blocked here and polish has settled the Row geometry.
+                // frameSwapped's GUI callback can observe the next unpolished tick instead.
+                if (playButton && stopButton) {
+                    const QMutexLocker lock(&positionsMutex);
+                    synchronizedPlayPosition = playButton->mapToScene({ 0, 0 });
+                    synchronizedStopPosition = stopButton->mapToScene({ 0, 0 });
+                }
             },
             Qt::DirectConnection);
     QObject::connect(
@@ -362,8 +375,9 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                     auto *play = root->findChild<QQuickItem *>("playButton");
                     auto *stop = root->findChild<QQuickItem *>("stopButton");
                     if (play && stop) {
-                        const auto playPosition = play->mapToScene({ 0, 0 });
-                        const auto stopPosition = stop->mapToScene({ 0, 0 });
+                        const QMutexLocker lock(&positionsMutex);
+                        const auto playPosition = synchronizedPlayPosition;
+                        const auto stopPosition = synchronizedStopPosition;
                         // Establish the prepared layout before the first playback change at 8.
                         if (animatedFrame == 7) {
                             initialPlayPosition = playPosition;
@@ -596,8 +610,21 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         if (step >= staticSteps + animationSteps + headerSteps + 10) {
             root->setParentItem(nullptr);
             object.reset();
-            surface.hide();
-            window.releaseResources();
+            if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic") {
+                // Run Qt's queued renderer deletions with a current context before hiding.
+                QObject::connect(
+                        &window, &QQuickWindow::frameSwapped, &window,
+                        [&] {
+                            surface.hide();
+                            window.releaseResources();
+                            window.destroy();
+                        },
+                        Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+                surface.requestFrame();
+            } else {
+                surface.hide();
+                window.releaseResources();
+            }
             QTimer::singleShot(200, &app, [&] {
                 const bool released =
                         yalahoo::ReelInk::liveNodes() == 0 && canvasTitleStats().renderers == 0;
@@ -718,6 +745,16 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
             restorePending = true;
             surface.hide();
             window.releaseResources();
+            if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic") {
+                restorePending = false;
+                window.destroy();
+                QTimer::singleShot(0, &window, [&] {
+                    window.create();
+                    surface.show();
+                    root->setProperty("marker", ++marker);
+                    surface.requestFrame();
+                });
+            }
             controller.setAvailableWidth(300 + (step % 2) * 20);
             window.resize(int(controller.availableWidth()) + 2, 152);
             root->setSize(window.size());

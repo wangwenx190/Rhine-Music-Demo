@@ -81,7 +81,8 @@ void RenderQuality::configure(const QVariantMap &input, bool legacyHigh)
     measure();
     emit changed();
 }
-void RenderQuality::resize(double w, double h, double stage, double dpr, int maximum)
+void RenderQuality::resize(double w, double h, double stage, double dpr, int maximum,
+                           bool nativeDpr)
 {
     if (!std::isfinite(w) || !std::isfinite(h) || !std::isfinite(stage) || !std::isfinite(dpr)
         || w <= 0 || h <= 0 || stage <= 0 || dpr <= 0 || maximum <= 0)
@@ -91,6 +92,7 @@ void RenderQuality::resize(double w, double h, double stage, double dpr, int max
     m_stageScale = stage;
     m_dpr = dpr;
     m_maxTexture = maximum;
+    m_nativeDpr = nativeDpr;
     const auto old = m_size;
     const auto limited = m_limited;
     measure();
@@ -99,8 +101,9 @@ void RenderQuality::resize(double w, double h, double stage, double dpr, int max
 }
 void RenderQuality::measure()
 {
-    const double requested = std::min(m_dpr, m_values["pixelRatio"].toDouble()) * m_stageScale
-            * m_values["scale"].toDouble() / 100;
+    const double requested =
+            (m_nativeDpr ? m_dpr : std::min(m_dpr, m_values["pixelRatio"].toDouble()))
+            * m_stageScale * m_values["scale"].toDouble() / 100;
     const double ratio =
             std::min({ requested, std::sqrt(8294400 / std::max(1.0, m_width * m_height)),
                        m_maxTexture / std::max({ 1.0, m_width, m_height }) });

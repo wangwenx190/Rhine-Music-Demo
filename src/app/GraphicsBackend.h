@@ -9,6 +9,9 @@ inline bool selectGraphicsBackend()
     const auto requested = qgetenv("QSG_RHI_BACKEND");
     if (requested == "opengl") {
 #if defined(Q_OS_MACOS)
+        // Current AppKit requires NSOpenGLContext::setView on the main thread.
+        // The Qt basic loop keeps the visible OpenGL drawable on that thread.
+        qputenv("QSG_RENDER_LOOP", "basic");
         // Cocoa's legacy default cannot consume the Kit's GLSL 150 shaders.
         // Select the core context before QGuiApplication creates any shared contexts.
         auto format = QSurfaceFormat::defaultFormat();

@@ -452,7 +452,8 @@ void SceneItem::updatePolish()
     }
     auto &quality = *adapter.quality();
     quality.resize(width(), height(), m_geometryOnly ? 1 : qMin(width() / 1920, height() / 1080),
-                   window()->effectiveDevicePixelRatio(), std::numeric_limits<int>::max());
+                   window()->effectiveDevicePixelRatio(), std::numeric_limits<int>::max(),
+                   m_geometryOnly);
     const auto &l = *adapter.lighting();
     const auto settings = quality.values();
     Input in;
@@ -505,10 +506,7 @@ void SceneItem::updatePolish()
     in.areaIntensity = float(l.areaIntensity());
     in.warmth = float(l.warmth());
     in.exposure = float(l.exposure());
-    const auto target = m_geometryOnly
-            ? QSize(qRound(width() * window()->effectiveDevicePixelRatio()),
-                    qRound(height() * window()->effectiveDevicePixelRatio()))
-            : quality.targetSize();
+    const auto target = quality.targetSize();
     const auto &old = input();
     const bool unchanged = in.scene.revision == old.scene.revision
             && in.scene.navigationRevision == old.scene.navigationRevision

@@ -8,6 +8,7 @@ let source = await fs.readFile(
     'utf8',
 );
 source = source.replace('from \'./cdp.mjs\'', 'from \'../tools/review/cdp.mjs\'')
+             .replace('from \'./frozen-git.mjs\'', 'from \'../tools/review/frozen-git.mjs\'')
              .replace(/path\.resolve\(import\.meta\.dirname,\s*'\.\.\/\.\.'\)/,
                       'path.resolve(import.meta.dirname,\'..\')')
              .replaceAll('postprocess-baseline', 'render-backend-baseline')

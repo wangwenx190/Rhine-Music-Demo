@@ -27,7 +27,7 @@
 - 当前环境无法执行或不能可靠验证的部分暂用COMMON-01–05、目标平台集成项和PERF-01–07严格静态审计；必须在原轮删除前把实机任务移交最后R34，写明原轮/任务ID、目标平台/后端/设备、能力缺口及依据、输入与源码版本、修复对象、运行入口/预期结果、原门槛、实现依赖及受影响主线回归。不存在可靠样本不等于通过；已知失败不得改成未验证，也不得因审计通过丢掉补修对象。
 - 可安装的常规开发工具缺失先补齐；当前源码或可靠本机入口已经能够确定并修复的产品缺陷、当前可靠检查的失败、缺少应由本轮提供的验证入口不能作为跳过理由。确实依赖其他系统/后端/硬件或不可靠采集条件的诊断与修复，才允许后置；源码能确认的缺陷仍在当前轮修复。任务部分可执行时完成该部分，只移动不可执行子任务，不将整个轮次无故跳过。
 - 当前主线顺序为`R18 → R19 → … → R33 → R34`。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
-- R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务仍集中在专项阶段处理，不临时插队打断当前主线。
+- R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务默认集中在专项阶段处理；用户明确要求提前补可见窗口验收时，只处理已实现的指定欠验边界，通过条目从R34删除，不提前实施后续功能。
 - R34是计划最后的特殊轮次，承接全部未执行平台/后端问题修复及必需实机验证。执行前依据真实目标环境逐项评估、按依赖串行处理并遵守单轮规模上限，必要时拆成明确的小轮次；没有相应环境时保留未完成任务，不能删除R34或宣称全平台最终验收完成。主线阶段完成、静态审计通过与最终实机完成分别报告。
 
 ## 轮次规模与耗时约束
@@ -141,6 +141,16 @@
 - 布局与计数陷阱：有header的ListView起始contentY不一定为0；强设0让header位于可视区上方，锚点/标题字符串检查仍可能通过。改为布局完成后positionViewAtBeginning，并验收实际title的场景Y在内容顶端60px内。QObject::findChildren曾报告0个委托，但自身PNG已经绘出曲目；计数改走QQuickItem::childItems实际视觉树，不能把QObject父子树当成委托可见池。
 - 验证边界：相同Release/arm64隐藏Metal、实际DPR1入口的九尺寸双主题、10,000曲目跳转、介绍切换和快速重开通过，实际可见/复用池31个、QML warnings=0；失败栈/原图与正常报告只保留本地。十次离屏重建与完整Release回归由presentation-qml/CTest复现；离屏不证明真实焦点恢复、窗口呈现或其他系统，R34保留这些检查，R18仍须接入同步运动ports。
 
+### 可见验证：原生策略、OpenGL drawable/MSAA 与采集生命周期
+
+- 授权与范围：用户明确要求可见验证即授权指定轮次前置/激活/焦点；`YALAHOO_VERIFY_FOREGROUND=1` 只作用于显式启动的验证进程，普通播放器不调用验证 helper。报告必须区分授权前台与默认置底策略；结束恢复可见 CTest OFF 并真实回归隐藏策略。Prohibited/Accessory 不可靠方案不能冒充可见通过；原生 visible、WindowServer onScreen、occlusion、Qt exposed、实际帧事件分别记录，不能用首次 grab 得到图像推断持续呈现。
+- Metal 静态读回：Review 只在提交读回时安排一次 update；Metal 异步完成还需要后续真实帧，静止封面/阵列因此超时。每个 Pending 以 QRhi 的 MaxAsyncReadbackFrames+1 约束续帧，最多两个在途请求；不重复 submit、不轮询、不改效果。产品没有 captured 回调时不产生该工作。封面/真实列 GPU 已实际复现失败并在修复后通过；图像来源对照仍须独立验收。
+- macOS 可见 OpenGL：当前系统的崩溃栈明确报告 NSOpenGLContext setView 必须在主线程，隐藏 RenderControl 不触发该 drawable 路径。macOS 显式 OpenGL 在应用构建前使用 Qt basic 循环与 4.1/CoreProfile；Metal 保持 threaded，不能混称线程隔离或把两者成本池化。当前 QRhi 报告多采样纹理可用，但创建调用 glTexStorage2DMultisample，而 macOS 4.1 上该入口不存在，生产浏览在 makeTarget 空函数地址崩溃。分配阶段核对实际入口，缺少时改用 QRhi 多采样 color renderbuffer，保持原采样数、RGBA16F/RGBA8 和 resolve，核对 backingFormat，并纳入实际资源清单；不降采样/精度，不锁 Kit 版本。窗口浏览已在适配后退出0；完整源 ROI/后处理及长时测量仍按剩余专项收口。
+- 详情与观测：header 高度在字体/宽度 polish 后改变，ListView 的原点随之变化，出现标题 Y=205.42 对目标210；准备期间保持顶部，header 变化合并一次排队定位，滚动、键盘索引、滚动条或显式跳转取消顶部保持，回调执行时再次检查取消状态。三路径页眉的 frameSwapped GUI 回调曾读到下一 tick 尚未 polish 的 Row，中间一帧按钮偏0.842px；测量改在 afterSynchronizing、GUI 被阻塞时取得已 polish 的值，不改生产按钮布局和门槛。保存按钮以 QPointer 跟随销毁，不让最终清理帧读悬空对象。
+- basic 生命周期：native frameSwapped 回调排队到 GUI，避免在 basic render 调用栈重入状态发布。basic 的 hide/release 不保证发出所等待的 sceneGraphInvalidated；文字 Review 显式 destroy/create 实际 surface，保持外层业务对象。最终删除 QML 后先提交真实清理帧，让 Qt 在有效上下文执行排队 renderer 删除，再隐藏/销毁；不能把仍存活的 Canvas renderer 写成已归零。失败/超时和修复前后采集只保留本地 verification/macos/visible-window，正常入口保持全部结构、像素、隐藏工作与释放门禁。
+- 几何探针与输入语义：geometryOnly原先直接按width×DPR申请目标，绕过RenderQuality的8294400像素保护；DPR1.5的3440×1440触发分配失败后renderer停止，后续944×900仅98个错误提示文字像素，其他错误画面竟因提示文字超过100而误通过。几何模式改为显式使用原生DPR请求但共用像素/尺寸保护，偏好值保持，limited状态与实际目标尺寸进入报告；模型检查排除顶/底提示区域并强制renderError为空，不降低100像素门槛。单元输入覆盖正常→超大受限→正常恢复，修正后的Metal可见实际DPR1/1.5/2完整几何矩阵也通过；正常与受限目标尺寸/limited状态分开记录，不称为全部尺寸都以未受限分辨率绘制。旧ArchivePool Review未接InputRouter，接入后边界键/滚轮按现行语义消费事件且不改变稳定ID；验收核对两者，不以event.accepted=false代替未越界。
+- 三维来源重建：旧生成 wrapper 漏改 frozen-git 相对导入，浏览器又固定 ANGLE/D3D11；已适配路径和当前系统后端。macOS ANGLE/Metal 成功进入冻结 harness 后，Room PMREM 导出与提交的 rgba32f 精确字节仍不同，原因未确认。不能跳过 Room guard、覆盖产品环境资产或使用另一平台图片来宣称同输入 ROI 通过；完整参照校准、旧 oracle/后处理对照和正式性能任务保留下面具体专项。
+
 ## 目标、范围与固定取舍
 
 1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
@@ -202,8 +212,8 @@
 - `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
 - 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
 - Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
-- 所有当前及后续 session 的测试、GUI/性能采集和证据重建强制遵守 `docs/contracts/test-window-policy.md`：无需真正显示的窗口保持隐藏；必须显示的 Qt 窗口在首次 show 前统一设置 `Qt::WindowStaysOnBottomHint`、`Qt::WindowDoesNotAcceptFocus`，恢复/重建后保留，禁止置顶、raise/requestActivate 或抢焦点。普通产品窗口不受测试策略影响。浏览器使用 headless，后台 helper 隐藏；采集自身渲染/读回，不采集被遮挡窗口所在的用户桌面。
-- 当前macOS优先以真正Qt离屏渲染验证画面、状态和资源生命周期，已有arm64 Release/Metal运行结果按实测范围记录。可见窗口、正常VSYNC、真实输入/呈现、媒体设备或部署检查能否可靠执行逐项判断；不可靠的部分先严格审计并保留到R34。离屏CPU成本不代表present、VSYNC或产品render-thread性能。现有`YALAHOO_MACOS_VISIBLE_TESTS=OFF`是本机非干扰策略，未建立可靠非激活显示方案前保持默认；disabled明确记为暂缓。换平台或验证入口可用性改变后重新评估，不沿用Windows必需实机/macOS仅静态的旧固定分工。
+- 所有当前及后续 session 的测试、GUI/性能采集和证据重建强制遵守 `docs/contracts/test-window-policy.md`：无需真正显示的窗口保持隐藏；默认需要显示的 Qt 窗口在首次 show 前统一设置 `Qt::WindowStaysOnBottomHint`、`Qt::WindowDoesNotAcceptFocus`，恢复/重建后保留，禁止置顶、raise/requestActivate 或抢焦点。用户明确要求可见验证的指定轮次按下条授权例外执行。普通产品窗口不受测试策略影响。浏览器使用 headless，后台 helper 隐藏；采集自身渲染/读回，不采集被遮挡窗口所在的用户桌面。
+- 当前macOS优先以真正Qt离屏渲染验证画面、状态和资源生命周期，已有arm64 Release/Metal运行结果按实测范围记录。可见窗口、正常VSYNC、真实输入/呈现、媒体设备或部署检查能否可靠执行逐项判断；不可靠的部分先严格审计并保留到R34。离屏CPU成本不代表present、VSYNC或产品render-thread性能。现有`YALAHOO_MACOS_VISIBLE_TESTS=OFF`是默认非干扰策略；用户明确要求可见窗口验证即授权指定轮次前置/激活/焦点，无需再次确认，可显式启用`YALAHOO_VERIFY_FOREGROUND=1`和可见CTest。报告区分授权前台与置底策略，结束恢复默认并回归隐藏策略；未运行的disabled明确记为暂缓。换平台或验证入口可用性改变后重新评估，不沿用Windows必需实机/macOS仅静态的旧固定分工。
 - 原生构建入口、最新 Kit 覆盖/旧缓存处理、QML/qsb 别名、最小运行探针与证据重建命令见 `docs/contracts/native-bootstrap.md`；Windows 证据在 `verification/windows/native-bootstrap/`。macOS/Linux 的现有 R02 审计矩阵仅覆盖最小工程，后续轮次必须按新增实现扩展，不替代 R31/R32 的完整平台审计。
 
 ## 架构与数据契约
@@ -599,7 +609,7 @@
 - 依赖R33的主线实现/阶段交接和所有轮次移交清单，作为最后一个专项阶段。按真实环境能力安排目标，不固定哪个平台必须先实机或只能静态；当前暂存的D3D11/Windows问题须取得对应可靠环境后实际解决，不能用Metal结果或静态审计消除原失败。各目标内部按原依赖顺序执行，修改共享路径后回归当前主力平台的受影响功能。
 - 本专项包含下列保留原编号的后端任务和最终实机矩阵，不能按一个超大轮次直接执行。开始前评估总范围，将执行单元按后端/DPR、窗口、媒体、部署或性能边界拆为具体小轮次，每次只完成一个边界并保留原门槛；拆分不能重置同一工作边界耗时，也不能把难题藏在“补验收”中。
 - 后续各轮移交项须在本节追加具体任务：原轮/任务ID、目标平台/后端/设备、环境不可执行或不可靠的证据、输入/源码版本、修复对象、准确入口/预期结果、原门槛、依赖和共享回归。已知失败与仅未运行分别记录；完整平台实现仍须先通过严格静态审计。
-- 已明确后置的范围：下列R16B2V-P/R16B2W/R16B3；现有macOS暂缓可见窗口及真实present/VSYNC/输入验证；其他目标平台构建、GPU/彩色字体、窗口管理器、媒体设备和干净部署实机检查；R28中无法在当前环境可靠测得的完整产品指标及历史Windows波动复现。各轮尚未实现的具体入口在原实现轮交付后补入本节，不提前生成假命令或假证据。
+- 已明确后置的范围：下列R16B2V-P/R16B2W/R16B3；下述macOS三维同输入参照收口及正式呈现性能采样；其他目标平台构建、GPU/彩色字体、窗口管理器、媒体设备和干净部署实机检查；R28中无法在当前环境可靠测得的完整产品指标及历史Windows波动复现。各轮尚未实现的具体入口在原实现轮交付后补入本节，不提前生成假命令或假证据。
 
 #### R16B2V-P · D3D11/DPR1.5剩余普通字形像素补修
 
@@ -618,7 +628,7 @@
 #### R16B3 · OpenGL补验收与文字路径选型收口
 
 - 依赖R16B2W及R16M3阶段选型；预估代码≤300行、有效时间≤45分钟，开始前须重新评估。只对OpenGL重复相同DPR/主题/文字/页眉/生命周期输入与三次成本采样，保留全部原始结果，不重跑已通过且未受改动影响的D3D11矩阵。
-- R16M3的macOS隐藏OpenGL4.1/CoreProfile、DPR1/1.5/2完整矩阵已实际通过，原默认GLSL120/pipeline崩溃已在共用macOS显式分支修正；输入/失败日志和正常入口见`docs/contracts/title-reels.md`。本任务继续验证Windows/Linux目标OpenGL与真实可见呈现，不把macOS离屏结果外推到其他系统；无共享改动时不重复该离屏矩阵。
+- R16M3的macOS隐藏OpenGL4.1/CoreProfile、DPR1/1.5/2完整矩阵已实际通过，原默认GLSL120/pipeline崩溃已在共用macOS显式分支修正；输入/失败日志和正常入口见`docs/contracts/title-reels.md`。本任务继续验证Windows/Linux目标OpenGL与真实可见呈现，不把macOS运行结果外推到其他系统；无共享改动时不重复该离屏矩阵。
 - 修复后端相关失败，按PERF-01–07审计；与D3D11分别解释，核对macOS/Linux共享分支与qsb变体，实际运行与纯静态结论分别记录。
 - 基于源码文字/运动门槛及全部成本结果选择生产绘制路径，在共用绘制契约写明连字/组合字、彩色字体、基线/字距、缓存/失效与资源差异。当前候选不满足门槛时保留具体补修任务，不能降低门槛收口。
 - 退出：原R16全部适用门槛完成、简明结论更新；完成后收口跨平台最终选型并回归已实现的R17–R33受影响路径，不作为此前当前主线R17的前置。
@@ -631,17 +641,24 @@
 
 #### R17-P · 详情展示的目标后端与可见输入/焦点回归
 
-- 依赖R33交接、R18同步运动ports，以及对应可靠目标Kit/窗口管理器/后端。当前macOS/arm64只具备可靠隐藏Metal入口；R17已真实覆盖实际DPR1的九尺寸双主题与十次离屏恢复，其他系统没有原生编译器/窗口管理器入口，当前macOS可见非激活显示/正常present仍不可靠。此项是尚未执行的目标检查，不是现存像素失败；先前ListView跨模型崩溃已在本机可靠入口修复，失败栈/图保留本地。
-- 输入为R17交付提交中的PresentationTest匿名状态序列、PresentationAudit生成的10,000匿名曲目/介绍/制作人员及冻结music-presentation/ui-transitions/music-title/music.css生产调用链；不读取私人曲库。目标包括Windows/D3D11、macOS/Metal及OpenGL、Linux/OpenGL/X11/Wayland与实际启用后端，实际DPR1/1.5/2、九尺寸双主题，不能把当前Metal图片作为其他后端证明。
+- 依赖R33交接、R18同步运动ports，以及对应可靠目标Kit/窗口管理器/后端。其他系统尚缺原生编译器/窗口管理器入口。macOS 已实现详情组件的九尺寸/双主题/DPR1、1.5、2结构、10,000曲目虚拟化、介绍切换、快速重开和十次恢复不再列为欠验；此任务保留 Windows/Linux 组件验收及三平台后续产品运动/焦点集成。此项是尚未执行的目标检查，不是现存像素失败；先前ListView跨模型崩溃已在本机可靠入口修复，失败栈/图保留本地。
+- 输入为R17交付提交中的PresentationTest匿名状态序列、PresentationAudit生成的10,000匿名曲目/介绍/制作人员及冻结music-presentation/ui-transitions/music-title/music.css生产调用链；不读取私人曲库。尚欠组件目标为Windows/D3D11、Linux/OpenGL/X11/Wayland与实际启用后端，实际DPR1/1.5/2、九尺寸双主题；macOS 只保留下一条的实际产品集成，不重复已验收组件，其他平台仍须自己的图片。
 - 先运行目标Release configure/build、官方Yalahoo_qmllint/ui-audit_qmllint targets及完整CTest；使用`ui-audit --presentation 输出目录`验收18项结构、非零且<100的可见/复用委托、零QML warnings、十次恢复/释放与windowPolicy。源码审计入口为`python3 tools/audit/audit-presentation.py 对应report.json`，只能辅助实际运行，不代替窗口/设备事实；细节和三平台命令见`docs/contracts/presentation.md`。
-- 再在实际产品与R18运动接口中验证退browse后相机才进入、layoutRevision与场景双就绪门禁、退字连选/取消只提交最后目标、四种archiveRoute、快速open/back、改速/减少动态、介绍/歌单滚轮和鼠标/触摸/键盘。补修对象包括nativeScene输入守卫、退出期禁用、有效Item焦点恢复、hide/restore/minimize和surface/flags重建；R23/R24完成后补真实定位不改变播放。置底/拒绝焦点及无激活保持，遮挡样本不可用时保留任务，不抢焦点取样。
+- 再在实际产品与R18运动接口中验证退browse后相机才进入、layoutRevision与场景双就绪门禁、退字连选/取消只提交最后目标、四种archiveRoute、快速open/back、改速/减少动态、介绍/歌单滚轮和鼠标/触摸/键盘。补修对象包括nativeScene输入守卫、退出期禁用、有效Item焦点恢复、hide/restore/minimize和surface/flags重建；R23/R24完成后补真实定位不改变播放。按用户指定轮次授权选择前台或默认置底策略，记录实际模式；默认模式遮挡样本不可用时保留任务，不偷偷改变策略。
 - 原结构≤1逻辑px、时序≤1个60Hz帧、源码状态顺序/revision与PERF-01–07、既有UI像素门槛全部保留；R29先收口完整GUI同机源成对图，不能拿本轮没有执行的SSIM作通过。共享状态/模型/标题规则变更后回归当前主力平台presentation、presentation-qml、navigation、title-reels及完整Release CTest；离屏不证明present/VSYNC或最终焦点行为。
+
+#### MAC-VISIBLE-3D · 三维同输入参照与正式采样收口
+
+- 输入为冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经来源映射读取）、原资源/environment、render-backend/rhi-shell/postprocess/occlusion fixtures 及上述当前 macOS 失败记录。先执行 `REVIEW_BROWSER=本机浏览器 node tools/review/export-render-backend.mjs`，诊断 Room PMREM 字节不一致的来源/读回/精度/方向，建立可追溯同输入参照；不得覆盖冻结资产或跳过一致性检查。缺完整本地参照时旧 rhi-opaque-gpu/rhi-postprocess-gpu 的 Missing witness/Final source size mismatch 明确是未完成输入与图像验收，不是通过。
+- 参照就绪后执行 Review Release 的全部历史 oracle/阴影/玻璃/纸面/后处理/DPR对照，保留原ROI、SSIM/RGB、结构、资源与PERF-01–07门槛，分别核对 Metal/threaded 和 macOS OpenGL/basic；MSAA renderbuffer 适配须验证原采样数、颜色格式和 resolve 输出等价。已通过的封面/阵列功能与文字/详情组件仅回归受影响部分，不整套无故重复。
+- 使用实际存在的 `yalahoo --verify-integration 新目录 --integration-seconds 120` 在同 Kit/设备/fixture 下串行至少三次正常 VSYNC；未限速吞吐另列。当前12秒单盒输入/九尺寸/四画质/十次重建通过，只证明该探针功能，不能代替120秒正式样本、完整产品、p95/p99/长帧、GPU/显示延迟或实测显存。完整产品准备、十次重建/30次换片与预算仍依R28/R33，不提前生成未实现的输入场景。历史Windows18.35/20.98ms仍需原环境，Metal不能消除原记录。
+- 按来源参照、单后端/MSAA输出与正式采样边界分别执行，每单元开始重新评估≤一小时规模；退出要求是各自原门槛真实通过，失败或未执行项保留具体报告/入口。所有产物保持忽略，只保存必要结论。
 
 #### 各平台最终实机矩阵与专项退出
 
 - 输入为各轮同源匿名fixture、同机冻结参照、当前Release源码/二进制及明确暂缓/失败记录。每项先核对目标系统/Kit/后端/设备/采集入口及不干扰桌面策略，可靠环境尚未具备则保留任务，不能把“已安排”当作“已执行”。
-- 窗口：真实首次show、hide/restore、minimize、flags/surface重建及退出，保持置底、拒绝焦点和无自动激活。macOS的Prohibited仅证明前期隐藏策略，Accessory试验曾激活进程，不能直接恢复失败方案；先完成可靠非激活显示和原生状态证明，再按测试边界显式启用暂缓CTest。其他平台同样核对真实窗口管理器行为；遮挡/节流无样本判为不可用，不提升Z顺序。
-- 图形/输入：适用D3D11、Metal/Retina、OpenGL及实际启用Vulkan，九尺寸/双主题/DPR1/1.5/2，浏览/详情/总览/片头、文字/彩色字体/滑尺、玻璃/纸面ROI、透明合成、键鼠/触摸板/快捷键与焦点。使用同机源参照和原结构/图像/运动门槛，保留失败及三路径缓存/资源差异；其他平台的图像不替代目标结果。
+- 窗口：Windows/Linux 真实首次show、hide/restore、minimize、flags/surface重建及退出仍须目标窗口管理器证明；按用户指定轮次授权选择前台或默认置底策略。macOS 已验收的前台首次show、最小化及十次原生 flags/surface 重建不重复列为欠验；默认隐藏策略持续回归。未授权模式的遮挡/节流样本判为不可用，不偷偷提升Z顺序。
+- 图形/输入：只保留未验收目标及后续完整产品集成，不重复已通过的macOS文字、详情组件和已实现浏览/导航功能边界。剩余适用D3D11、Metal/Retina、OpenGL及实际启用Vulkan，九尺寸/双主题/DPR1/1.5/2，浏览/详情/总览/片头、文字/彩色字体/滑尺、玻璃/纸面ROI、透明合成、键鼠/触摸板/快捷键与焦点。使用同机源参照和原结构/图像/运动门槛，保留失败及三路径缓存/资源差异；其他平台的图像不替代目标结果。
 - 媒体/部署：匿名或用户指定本地样本真实播放、暂停/seek/停止/换曲、独立歌曲/BGM/音效、后台播放、默认/切换/消失设备及格式错误；对应windeployqt/macdeployqt/Linux部署包脱离开发Kit、Node/外部FFmpeg运行，验证Unicode/空格路径、资源/插件/字体、图标和可写目录，不改动用户音乐文件。
 - 性能/资源：同Kit/设备/fixture的正常VSYNC与未限速吞吐各至少三次串行样本，记录实际呈现事件、输入到Qt提交、冷启动/准备、资源峰值、十次重建/30次换片回落；保留120秒/1920×1080及p95/p99/长帧原目标，解释R10D历史18.35/20.98ms的适用范围和噪声。无法测实际显示或GPU完成时明确null/估算，不以离屏帧、CPU提交或另一设备成绩替代。
 - 退出：全部适用后置修复与必需实机项目在相应可靠目标环境实际通过，跨后端最终选型及受影响主线回归完成；更新各平台和最终文档后删除专项。缺环境、有效失败或未完成检查均保留具体子任务，不降低门槛、不伪报通过；R33主线阶段完成不豁免本专项。

@@ -14,7 +14,7 @@ class OffscreenSurface : public QObject
 {
     Q_OBJECT
 public:
-    static constexpr bool Enabled =
+    static inline bool Enabled =
 #if defined(Q_OS_MACOS)
             true;
 #else
@@ -82,7 +82,8 @@ public:
         if (Enabled)
             connect(this, &OffscreenSurface::frameRendered, context, callback);
         else
-            connect(&m_window, &QQuickWindow::frameSwapped, context, callback);
+            connect(&m_window, &QQuickWindow::frameSwapped, context, callback,
+                    Qt::QueuedConnection);
     }
     QRhi *rhi() const
     {

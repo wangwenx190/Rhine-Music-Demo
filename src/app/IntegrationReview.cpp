@@ -77,7 +77,6 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &window, SceneAdapter &
     if (!item || window.isVisible() || !verification::windowPolicySatisfied(window))
         return 20;
     QDir().mkpath(output);
-    verification::prepareWindow(window, true);
     item->setTelemetryEnabled(true);
     window.setPersistentGraphics(false);
     window.setPersistentSceneGraph(false);
@@ -326,12 +325,13 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &window, SceneAdapter &
             { "estimatedInitialBytes", baseBytes },
             { "estimatedFinalBytes", finalBytes },
             { "actions", actions },
-            { "samplingComplete", coalesced == 0 },
+            { "samplingComplete",
+              coalesced == 0 && samples.size() > 100 && receivedInputs.size() == 4 },
             { "samples", samples },
             { "frameEvents", swappedEvents },
             { "distributions", distributions },
             { "scope",
-              "R10D one-case production bootstrap, both themes, real QML input to Qt command submission. frameSwapped is not scanout; no measured input-to-photon or compositor latency. UI array/search/presentation/scanning are not implemented; full product budgets and baseline/noise remain R28. GPU memory values are descriptor estimates, not measured VRAM." }
+              "R10D one-case production bootstrap, both themes, real QML input to Qt command submission. frameSwapped is not scanout; no measured input-to-photon or compositor latency. This probe does not cover the full array/search/presentation/scanning product paths; full product budgets and baseline/noise remain R28. GPU memory values are descriptor estimates, not measured VRAM." }
         };
         QSaveFile file(output + "/runtime.json");
         const bool opened = file.open(QIODevice::WriteOnly);
@@ -349,6 +349,16 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &window, SceneAdapter &
         finish();
     });
     window.show();
+    QTimer::singleShot(3000, Qt::PreciseTimer, &window, [&] {
+        actions.append(QJsonObject{ { "stage", "first-show" },
+                                    { "windowPolicy", verification::windowPolicy(window) } });
+        if (samples.isEmpty()) {
+            passed = false;
+            actions.append(
+                    QJsonObject{ { "error", "No actual production submission after show" } });
+            finish();
+        }
+    });
     const int result = app.exec();
     QObject::disconnect(swapped);
     return result;

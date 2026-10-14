@@ -41,9 +41,17 @@ if(WIN32)
 endif()
 qt_add_executable(VerificationWindowTest VerificationWindowTest.cpp)
 target_include_directories(VerificationWindowTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(VerificationWindowTest PRIVATE Qt6::Gui Qt6::Test)
+target_link_libraries(VerificationWindowTest PRIVATE Qt6::Quick Qt6::Test)
+target_compile_definitions(VerificationWindowTest PRIVATE
+    VISIBLE_WINDOW_REPORT="${CMAKE_BINARY_DIR}/verification/native-window-visible.json")
 yalahoo_platform(VerificationWindowTest)
 add_test(NAME verification-window-policy COMMAND VerificationWindowTest)
+set_tests_properties(verification-window-policy PROPERTIES ENVIRONMENT "YALAHOO_VERIFY_FOREGROUND=0")
+if(NOT APPLE OR YALAHOO_MACOS_VISIBLE_TESTS)
+    add_test(NAME verification-window-visible COMMAND VerificationWindowTest visibleNativeWindow)
+    set_tests_properties(verification-window-visible PROPERTIES TIMEOUT 60
+        ENVIRONMENT "YALAHOO_VERIFY_VISIBLE=1;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC=")
+endif()
 if(WIN32)
     target_link_libraries(VerificationWindowTest PRIVATE user32)
     set_tests_properties(

@@ -18,6 +18,21 @@ class RenderQualityTest : public QObject
         return QJsonDocument::fromJson(f.readAll()).object();
     }
 private slots:
+    void nativeDiagnosticDprProtection()
+    {
+        RenderQuality quality;
+        const auto preferences = quality.values();
+        quality.resize(944, 900, 1, 1.5, 16384, true);
+        QCOMPARE(quality.targetSize(), QSize(1416, 1350));
+        QVERIFY(!quality.limited());
+        quality.resize(3440, 1440, 1, 1.5, 16384, true);
+        QVERIFY(quality.limited());
+        QVERIFY(qint64(quality.targetSize().width()) * quality.targetSize().height() <= 8294400);
+        QCOMPARE(quality.values(), preferences);
+        quality.resize(944, 900, 1, 1.5, 16384, true);
+        QCOMPARE(quality.targetSize(), QSize(1416, 1350));
+        QVERIFY(!quality.limited());
+    }
     void frozenQuality()
     {
         const auto oracle = load("quality.json");

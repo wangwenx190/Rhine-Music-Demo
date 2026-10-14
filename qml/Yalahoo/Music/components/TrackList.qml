@@ -16,16 +16,24 @@ Item {
     property string playingTrackId: ""
     signal trackRequested(string trackId)
     property Component header: null
+    property bool preserveBeginning: true
     readonly property ListView currentView: view.item as ListView
     function forceLayout() {
         if (currentView)
             currentView.forceLayout();
     }
     function positionViewAtBeginning() {
+        preserveBeginning = true;
+        restoreBeginning();
+    }
+    function restoreBeginning() {
+        if (!preserveBeginning)
+            return;
         if (currentView)
             currentView.positionViewAtBeginning();
     }
     function positionViewAtIndex(index, mode) {
+        preserveBeginning = false;
         if (currentView)
             currentView.positionViewAtIndex(index, mode);
     }
@@ -33,6 +41,7 @@ Item {
         id: view
         anchors.fill: parent
         sourceComponent: root.about ? aboutView : tracksView
+        onLoaded: root.preserveBeginning = true
     }
     Component {
         id: tracksView
@@ -43,9 +52,14 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             model: root.detailModel
             header: root.header
+            onMovementStarted: root.preserveBeginning = false
+            onCurrentIndexChanged: if (currentIndex > 0)
+                                       root.preserveBeginning = false
             delegate: trackDelegate
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
+                onPressedChanged: if (pressed)
+                                      root.preserveBeginning = false
             }
         }
     }
@@ -58,9 +72,14 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             model: root.detailModel.album.producers || []
             header: root.header
+            onMovementStarted: root.preserveBeginning = false
+            onCurrentIndexChanged: if (currentIndex > 0)
+                                       root.preserveBeginning = false
             delegate: creditDelegate
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
+                onPressedChanged: if (pressed)
+                                      root.preserveBeginning = false
             }
         }
     }

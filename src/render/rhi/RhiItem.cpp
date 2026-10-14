@@ -17,6 +17,7 @@
 #include <QtEndian>
 #include <QFloat16>
 #include <QElapsedTimer>
+#include <QOpenGLContext>
 #include <cstring>
 #include <algorithm>
 #include <cstdio>
@@ -72,6 +73,7 @@ struct Target
     QSize size;
     Owned<QRhiTexture> color, normal, depth;
     std::array<Owned<QRhiTexture>, 3> multisample;
+    std::array<Owned<QRhiRenderBuffer>, 3> multisampleBuffers;
     std::shared_ptr<QRhiRenderBuffer> z;
     Owned<QRhiTexture> hardwareDepth;
     Owned<QRhiRenderPassDescriptor> pass;
@@ -84,6 +86,8 @@ struct Target
         hardwareDepth.reset();
         for (auto &t : multisample)
             t.reset();
+        for (auto &buffer : multisampleBuffers)
+            buffer.reset();
         depth.reset();
         normal.reset();
         color.reset();
@@ -96,6 +100,7 @@ struct Pending
     Capture capture;
     std::function<void(Capture)> deliver;
     int remaining = 13;
+    int drainFrames = 0;
     bool yUp = false;
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
@@ -497,10 +502,25 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
         const std::array<QRhiTexture *, 3> resolves{ target.color.get(), target.normal.get(),
                                                      target.depth.get() };
         for (int i = 0; i < (mrt ? 3 : 1); ++i) {
-            target.multisample[i].reset(api->newTexture(resolves[i]->format(), size, samples,
-                                                        QRhiTexture::RenderTarget));
-            require(target.multisample[i]->create(), "Cannot create RHI MSAA attachment");
-            QRhiColorAttachment attachment(target.multisample[i].get());
+            QRhiColorAttachment attachment;
+            const auto *context = QOpenGLContext::currentContext();
+            const bool textureStorageAvailable = api->backend() != QRhi::OpenGLES2
+                    || (context && context->getProcAddress("glTexStorage2DMultisample"));
+            if (textureStorageAvailable) {
+                target.multisample[i].reset(api->newTexture(resolves[i]->format(), size, samples,
+                                                            QRhiTexture::RenderTarget));
+                require(target.multisample[i]->create(), "Cannot create RHI MSAA attachment");
+                attachment.setTexture(target.multisample[i].get());
+            } else {
+                require(api->isFeatureSupported(QRhi::MultisampleRenderBuffer),
+                        "Backend cannot allocate the requested MSAA attachment");
+                target.multisampleBuffers[i].reset(api->newRenderBuffer(
+                        QRhiRenderBuffer::Color, size, samples, { }, resolves[i]->format()));
+                require(target.multisampleBuffers[i]->create(), "Cannot create RHI MSAA buffer");
+                require(target.multisampleBuffers[i]->backingFormat() == resolves[i]->format(),
+                        "MSAA buffer changed the requested color precision");
+                attachment.setRenderBuffer(target.multisampleBuffers[i].get());
+            }
             attachment.setResolveTexture(resolves[i]);
             attachments.append(attachment);
         }
@@ -1464,6 +1484,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (deliver && input.request != capturedRequest && pending.size() < 2) {
         capturedRequest = input.request;
         auto p = std::make_shared<Pending>();
+        p->drainFrames = api->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1;
         p->capture.request = input.request;
         p->deliver = deliver;
         p->yUp = api->isYUpInFramebuffer();
@@ -1587,8 +1608,18 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         }
         pending.push_back(p);
         cb->resourceUpdate(reads);
-        update();
     }
+    // Static scenes still need real frames to retire asynchronous backend readbacks.
+    // Bound continuation by the backend limit; never resubmit the scene or poll the GUI.
+    bool drain = false;
+    for (const auto &capture : pending) {
+        if (capture->remaining > 0 && capture->drainFrames > 0) {
+            --capture->drainFrames;
+            drain = true;
+        }
+    }
+    if (drain)
+        update();
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{
@@ -1638,8 +1669,11 @@ QJsonObject Renderer::resourceInventory()
         inventory.texture(name + "-linear-depth", t.depth.get());
         inventory.texture(name + "-hardware-depth", t.hardwareDepth.get());
         inventory.renderBuffer(name + "-depth-stencil", t.z.get());
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < 3; ++i) {
             inventory.texture(name + QString("-msaa-%1").arg(i), t.multisample[i].get());
+            inventory.renderBuffer(name + QString("-msaa-%1").arg(i),
+                                   t.multisampleBuffers[i].get());
+        }
     };
     target("shadow", shadow);
     target("opaque", opaque);

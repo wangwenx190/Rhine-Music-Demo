@@ -329,3 +329,11 @@ R16M3阶段交接：当前同机Release/arm64的隐藏Metal与OpenGL均已覆盖
 
 
 R17详情检查使用真正隐藏Metal入口，Release的`presentation`和`presentation-qml`及官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets；九尺寸双主题、10,000曲目虚拟化和十次离屏恢复的范围与平台实机清单见[presentation.md](../contracts/presentation.md)。可见焦点/呈现与其他DPR/后端仍归R34，离屏耗时不代表窗口性能。
+
+## 已实现可见入口的补验边界
+
+2026-10-14：用户授权本轮前置/焦点，Release/arm64、Qt 6.12.0、macOS 27.0.1 的Metal/threaded与OpenGL/basic完成有效DPR1/1.5/2文字及详情组件、九尺寸双主题浏览和20项生产导航检查；原生首次show/最小化/十次flags与surface重建另行验证。默认置底策略仍以独立隐藏检查回归，本轮授权不继承到后续session。历史“四项runtime暂缓”描述属于此前范围，本轮实际运行结果见[测试窗口契约](../contracts/test-window-policy.md)、[文字](../contracts/title-reels.md)、[详情](../contracts/presentation.md)与[RHI集成](../contracts/rhi-integration.md)，原始产物保持本地忽略。
+
+OpenGL当前AppKit要求drawable在主线程，故采用basic；MSAA纹理入口不存在时用同采样/颜色格式的renderbuffer+resolve，不降低效果。该后端没有Metal/threaded的线程隔离语义。完整三维同输入Room参照、旧oracle/后处理ROI、120秒三次正式呈现/吞吐与产品运动/焦点/媒体/部署仍按R34明确任务执行，不能用上述功能矩阵或12秒单盒探针写成最终通过。
+
+默认策略恢复后的最终Release配置为Review/可见测试/性能记录开关均OFF；25项实际执行CTest全部通过，4项默认可见runtime按策略disabled（本轮授权前台已另行执行通过），check-format和两个官方qmllint targets通过。没有提交验证输出。

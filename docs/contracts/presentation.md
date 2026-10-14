@@ -28,6 +28,12 @@ python3 tools/audit/audit-presentation.py
 
 三平台 COMMON/PERF/平台源码审计由 `tools/audit/audit-presentation.py` 生成到 `verification/{windows,macos,linux}-static/presentation/`，每项记录实际符号、源码 hash、调用链推演和限制。Windows/Linux 为严格静态审计，尚未运行目标系统；macOS 上述 Metal 离屏为真实运行，窗口/焦点/正常呈现仍待 R34。不能将其他平台图片或 C++ readiness fixture 当目标系统窗口证明。
 
-在可靠目标环境先运行上述 Release/官方 lint/CTest，再运行 `ui-audit --presentation 输出目录`（Windows 位于 `build/release/tools/ui-audit.exe`，macOS/Linux 位于 `build/release/tools/ui-audit`）。输出需核对实际 Qt、后端、DPR、18 项 geometry、31 仅作为本次样本的委托数而非跨设备固定值、warnings、10 次 lifecycle 和 windowPolicy；委托门槛是非零且少于 100。macOS 优先隐藏 RenderControl；Windows/Linux 当前入口有 native show，必须遵守 VerificationWindow 的置底/拒绝焦点，窗口管理器不能可靠采集时停止并保留任务。
+在可靠目标环境先运行上述 Release/官方 lint/CTest，再运行 `ui-audit --presentation 输出目录`（Windows 位于 `build/release/tools/ui-audit.exe`，macOS/Linux 位于 `build/release/tools/ui-audit`）。输出需核对实际 Qt、后端、DPR、18 项 geometry、31 仅作为本次样本的委托数而非跨设备固定值、warnings、10 次 lifecycle 和 windowPolicy；委托门槛是非零且少于 100。macOS 优先隐藏 RenderControl；Windows/Linux 当前入口有 native show，默认遵守 VerificationWindow 的置底/拒绝焦点，用户明确要求可见验证的指定轮次允许前置/激活。所选策略不能可靠采集时停止并保留任务。
 
-R34 的可见产品检查使用匿名库和 R17 交付源码：九尺寸、双主题、实际 DPR1/1.5/2，快速 open/back、退字连选/取消、四种 archiveRoute、介绍/歌单滚动、真实鼠标/触摸/键盘、退出时底层禁用和有效 Item 的焦点恢复。核对首次 show、hide/restore/minimize 与 flags/surface 重建，源码顺序和 revision 门禁不变；保持原结构≤1逻辑px、时序≤1个60Hz帧与既有 UI 像素门槛，不提高 Z 顺序。R18 接入运动 ports 后再验收实际相机/抽取 readiness；R23/R24 接入定位/播放后回归滚动和展示不改变播放的边界。当前主力平台同时回归 presentation、presentation-qml、navigation、title-reels 和完整 Release CTest。
+R34 的可见产品检查使用匿名库和 R17 交付源码：九尺寸、双主题、实际 DPR1/1.5/2，快速 open/back、退字连选/取消、四种 archiveRoute、介绍/歌单滚动、真实鼠标/触摸/键盘、退出时底层禁用和有效 Item 的焦点恢复。核对尚未验收的首次 show、hide/restore/minimize 与 flags/surface 重建，源码顺序和 revision 门禁不变；保持原结构≤1逻辑px、时序≤1个60Hz帧与既有 UI 像素门槛，默认不提高 Z 顺序，授权轮次按测试窗口契约前置。R18 接入运动 ports 后再验收实际相机/抽取 readiness；R23/R24 接入定位/播放后回归滚动和展示不改变播放的边界。当前主力平台同时回归 presentation、presentation-qml、navigation、title-reels 和完整 Release CTest。
+
+## 可见窗口与顶部保持补验
+
+2026-10-14：本机 Release 的可见 Metal/threaded 和 OpenGL/basic 均覆盖有效DPR1/1.5/2，每项九尺寸双主题18结构、10,000曲目、31个可见/复用委托（门槛仍为0<数量<100）、零QML warnings、介绍切换/快速重开和十次恢复通过。采用授权前台策略，不称为不干扰或其他显示设备已验证。
+
+窄屏转宽屏时header的字体/高度在polish后改变，ListView原点可晚于layoutReady更新，曾使标题位于目标顶部之上4.58px。TrackList显式保持准备后的顶部，header高度改变合并restoreBeginning；移动、非首项键盘索引、滚动条按下及显式positionViewAtIndex取消保持，排队回调再次核对取消，不跳回用户已滚动的顶部。采集通过对应afterSynchronizing/presented revision排除先前在途帧。实际R18运动ports、产品有效焦点恢复、触摸/设备输入与R23/R24定位播放集成仍保留R34；组件结构通过不冒充这些产品检查。

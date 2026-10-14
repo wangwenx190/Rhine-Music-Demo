@@ -109,6 +109,10 @@ FocusScope {
         header: Column {
             width: tracks.width
             spacing: 0
+            onHeightChanged: {
+                if (tracks.preserveBeginning)
+                    Qt.callLater(tracks.restoreBeginning);
+            }
             ArchiveText {
                 objectName: "detailOrdinal"
                 tokens: root.tokens

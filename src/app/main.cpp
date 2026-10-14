@@ -306,14 +306,18 @@ int main(int argc, char **argv)
         presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
     }
     auto initialProperties = presentationProperties;
+    const bool verificationFrameless = parser.isSet(QStringLiteral("verify-browse"))
+            || parser.isSet(QStringLiteral("verify-navigation"))
+#ifdef YALAHOO_REVIEW
+            || parser.isSet(QStringLiteral("verify-integration"))
+#endif
+            ;
     const QVariantMap commonProperties(
             { { "inputRouter", QVariant::fromValue(&inputRouter) },
               { "rulerController", QVariant::fromValue(&rulerController) },
               { "verificationRun", verificationRun },
               { "verificationFlags",
-                int(yalahoo::verification::windowFlags(
-                        parser.isSet(QStringLiteral("verify-browse"))
-                        || parser.isSet(QStringLiteral("verify-navigation")))) },
+                int(yalahoo::verification::windowFlags(verificationFrameless)) },
               { "librarySession", QVariant::fromValue(&library) },
               { "motionController", QVariant::fromValue(&motion) },
               { "sceneAdapter", QVariant::fromValue(&scene) },
@@ -351,10 +355,7 @@ int main(int argc, char **argv)
     if (!window)
         return 3;
     if (verificationRun)
-        yalahoo::verification::prepareWindow(
-                *window,
-                parser.isSet(QStringLiteral("verify-browse"))
-                        || parser.isSet(QStringLiteral("verify-navigation")));
+        yalahoo::verification::prepareWindow(*window, verificationFrameless);
     inputRouter.attach(window);
     if (preferences)
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,

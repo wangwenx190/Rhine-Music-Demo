@@ -130,7 +130,9 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         // Actual no-light mesh pixels and client dimensions/DPR, in addition to the submitted RHI snapshot mapping.
         int pixels = 0;
         const auto rgb = image.convertToFormat(QImage::Format_RGB32);
-        for (int y = 0; y < rgb.height(); ++y)
+        // Diagnostic labels must not stand in for missing mesh pixels.
+        const int inset = qRound(40 * window.devicePixelRatio());
+        for (int y = inset; y < rgb.height() - inset; ++y)
             for (int x = 0; x < rgb.width(); ++x) {
                 const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
                 if (qGreen(color) > qRed(color) + 8 && qGreen(color) < 165 && qRed(color) > 15)
@@ -142,7 +144,8 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                                      .arg(window.height())
                                      .arg(scene.detail());
         const bool saved = !capture || (!image.isNull() && image.save(folder + "/" + file));
-        const bool passed = bindings && points && saved && (!capture || pixels > 100);
+        const bool passed = bindings && points && saved && view->errorText().isEmpty()
+                && (!capture || pixels > 100);
         pass = pass && passed;
         results.append(QJsonObject{ { "index", index },
                                     { "width", window.width() },
@@ -158,6 +161,10 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                                     { "imageHeight", image.height() },
                                     { "dpr", window.devicePixelRatio() },
                                     { "modelPixels", pixels },
+                                    { "renderTargetWidth", view->fixedColorBufferWidth() },
+                                    { "renderTargetHeight", view->fixedColorBufferHeight() },
+                                    { "pixelProtectionLimited", scene.quality()->limited() },
+                                    { "renderError", view->errorText() },
                                     { "bindings", bindings },
                                     { "passed", passed },
                                     { "screenshot", capture ? file : QString{ } },

@@ -72,6 +72,8 @@ int main(int argc, char **argv)
         return 2;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
+        OffscreenSurface::Enabled = false;
     if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--native-dpr") {
         std::printf("%.9f\n", app.primaryScreen()->devicePixelRatio());
         return 0;

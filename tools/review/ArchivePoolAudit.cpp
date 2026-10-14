@@ -66,6 +66,7 @@ int main(int argc, char **argv)
         require(QDir().mkpath(output), "Cannot create pool output");
         MotionController motion;
         SelectionController selection(&motion);
+        InputRouter inputRouter(&selection);
         SceneAdapter adapter(motion.clock());
         auto snapshot = library(10000);
         if (real) {
@@ -97,6 +98,7 @@ int main(int argc, char **argv)
         auto *item = new SceneItem(window.contentItem());
         item->setSize({ 960, 640 });
         item->setAdapter(&adapter);
+        item->setInputRouter(&inputRouter);
         item->setTelemetryEnabled(true);
         QJsonArray submissionSamples;
         QObject::connect(item, &SceneItem::frameSubmitted, &app, [&](QJsonObject sample) {
@@ -251,7 +253,7 @@ int main(int argc, char **argv)
             const auto generation = stable.metadata["resourceGeneration"];
             QKeyEvent boundary(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
             QCoreApplication::sendEvent(item, &boundary);
-            require(!boundary.isAccepted() && selection.albumId() == QLatin1String("1:0"),
+            require(boundary.isAccepted() && selection.albumId() == QLatin1String("1:0"),
                     "Single-column keyboard boundary wrapped");
             selection.setLift(0);
             require(selection.select("5:105"), "Cannot select last finite album");
@@ -266,7 +268,8 @@ int main(int argc, char **argv)
             QWheelEvent wheel({ 480, 320 }, { 480, 320 }, { }, { 0, -120 }, Qt::NoButton,
                               Qt::NoModifier, Qt::NoScrollPhase, false);
             QCoreApplication::sendEvent(item, &wheel);
-            require(!wheel.isAccepted(), "Finite wheel boundary wrapped");
+            require(wheel.isAccepted() && selection.albumId() == QLatin1String("5:105"),
+                    "Finite wheel boundary wrapped");
             require(selection.moveLane(-1), "Finite column navigation failed");
             selection.advance(.2);
             const double unfinished = selection.browseRow(5);

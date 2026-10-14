@@ -1,11 +1,16 @@
 #include "VerificationWindow.h"
 #include <QEvent>
 #include <QPlatformSurfaceEvent>
+#include <QTimer>
 #import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 
 namespace {
 constexpr NSInteger VerificationLevel = NSNormalWindowLevel - 1;
 pid_t foregroundPid = 0;
+bool activationObserved = false;
+bool focusObserved = false;
+id activationObserver = nil;
 }
 
 // Observe public Cocoa properties synchronously: Qt can reset the level or replace
@@ -16,6 +21,7 @@ pid_t foregroundPid = 0;
 }
 - (instancetype)initWithView:(NSView *)nativeView;
 - (void)bindWindow;
+- (void)focusChanged:(NSNotification *)notification;
 @end
 
 @implementation YalahooVerificationObserver
@@ -32,15 +38,29 @@ pid_t foregroundPid = 0;
 - (void)bindWindow
 {
     if (nativeWindow != view.window) {
+        [NSNotificationCenter.defaultCenter removeObserver:self];
         [nativeWindow removeObserver:self forKeyPath:@"level"];
         [nativeWindow release];
         nativeWindow = [view.window retain];
         [nativeWindow addObserver:self forKeyPath:@"level" options:0 context:nullptr];
+        for (NSString *name in
+             @[ NSWindowDidBecomeKeyNotification, NSWindowDidBecomeMainNotification ])
+            [NSNotificationCenter.defaultCenter addObserver:self
+                                                   selector:@selector(focusChanged:)
+                                                       name:name
+                                                     object:nativeWindow];
     }
-    if (nativeWindow.level != VerificationLevel)
-        nativeWindow.level = VerificationLevel;
+    const NSInteger level = yalahoo::verification::foregroundVerification() ? NSNormalWindowLevel
+                                                                            : VerificationLevel;
+    if (nativeWindow.level != level)
+        nativeWindow.level = level;
     nativeWindow.collectionBehavior |= NSWindowCollectionBehaviorIgnoresCycle;
     nativeWindow.ignoresMouseEvents = YES;
+}
+- (void)focusChanged:(NSNotification *)notification
+{
+    Q_UNUSED(notification);
+    focusObserved = true;
 }
 - (void)observeValueForKeyPath:(NSString *)keyPath
                       ofObject:(id)object
@@ -55,6 +75,7 @@ pid_t foregroundPid = 0;
 }
 - (void)dealloc
 {
+    [NSNotificationCenter.defaultCenter removeObserver:self];
     [view removeObserver:self forKeyPath:@"window"];
     [nativeWindow removeObserver:self forKeyPath:@"level"];
     [nativeWindow release];
@@ -99,6 +120,19 @@ protected:
             }
         } else if (event->type() == QEvent::Show || event->type() == QEvent::WinIdChange) {
             bind();
+            if (event->type() == QEvent::Show && yalahoo::verification::foregroundVerification()) {
+                QTimer::singleShot(0, this, [this] {
+                    if (!m_window.isVisible())
+                        return;
+                    [NSApp unhide:nil];
+                    if (@available(macOS 14.0, *))
+                        [NSApp activate];
+                    else
+                        [NSApp activateIgnoringOtherApps:YES];
+                    m_window.raise();
+                    m_window.requestActivate();
+                });
+            }
         }
         return false;
     }
@@ -109,12 +143,28 @@ private:
 };
 }
 
-void yalahoo::verification::prepareNativeWindow(QWindow &window)
+void yalahoo::verification::prepareNativeApplication()
 {
     if (!foregroundPid)
         foregroundPid = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
-    // Verification processes must never activate themselves or gain a Dock entry.
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+    NSApplication *application = NSApplication.sharedApplication;
+    if (!activationObserver) {
+        activationObserver = [NSNotificationCenter.defaultCenter
+                addObserverForName:NSApplicationDidBecomeActiveNotification
+                            object:application
+                             queue:nil
+                        usingBlock:^(NSNotification *) {
+                            activationObserved = true;
+                        }];
+        [application setActivationPolicy:NSApplicationActivationPolicyProhibited];
+    }
+}
+
+void yalahoo::verification::prepareNativeWindow(QWindow &window)
+{
+    prepareNativeApplication();
+    if (foregroundVerification())
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     auto *guard = static_cast<NativeWindowGuard *>(window.findChild<QObject *>(
             "yalahooVerificationNativeGuard", Qt::FindDirectChildrenOnly));
     if (!guard)
@@ -133,18 +183,41 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
             !qgetenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM").isEmpty();
     const bool foregroundUnchanged = foregroundPid
             && NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier == foregroundPid;
-    const bool safe = (!window.handle()
-                       || (native.level == VerificationLevel && !native.canBecomeKeyWindow
-                           && native.ignoresMouseEvents && !native.keyWindow && !native.mainWindow))
-            && prohibited && launchActivationDisabled && !NSApp.active;
+    const bool safe = foregroundVerification()
+            ? NSApp.activationPolicy == NSApplicationActivationPolicyRegular
+                    && (!window.handle() || (native && native.level == NSNormalWindowLevel))
+            : (!window.handle()
+               || (native.level == VerificationLevel && !native.canBecomeKeyWindow
+                   && native.ignoresMouseEvents && !native.keyWindow && !native.mainWindow))
+                    && prohibited && launchActivationDisabled && !NSApp.active
+                    && foregroundUnchanged && !activationObserved && !focusObserved;
+    bool onScreen = false;
+    if (native) {
+        const auto info = CGWindowListCopyWindowInfo(kCGWindowListOptionIncludingWindow,
+                                                     CGWindowID(native.windowNumber));
+        if (info) {
+            for (NSDictionary *entry in reinterpret_cast<NSArray *>(info))
+                onScreen = onScreen ||
+                        [entry[reinterpret_cast<NSString *>(kCGWindowIsOnscreen)] boolValue];
+            CFRelease(info);
+        }
+    }
     return { { "passed", safe },
              { "nativeWindowAvailable", native != nil },
+             { "visible", native && bool(native.visible) },
+             { "onScreen", onScreen },
+             { "miniaturized", native && bool(native.miniaturized) },
+             { "occlusionVisible",
+               native && bool(native.occlusionState & NSWindowOcclusionStateVisible) },
              { "level", native ? int(native.level) : int(VerificationLevel) },
              { "belowNormal", !native || native.level < NSNormalWindowLevel },
              { "canBecomeKey", native && native.canBecomeKeyWindow },
              { "canBecomeMain", native && native.canBecomeMainWindow },
              { "applicationActive", bool(NSApp.active) },
+             { "applicationHidden", bool(NSApp.hidden) },
              { "activationProhibited", prohibited },
+             { "activationObserved", activationObserved },
+             { "focusObserved", focusObserved },
              { "launchActivationDisabled", launchActivationDisabled },
              { "ignoresMouseEvents", !native || bool(native.ignoresMouseEvents) },
              { "foregroundUnchanged", foregroundUnchanged } };

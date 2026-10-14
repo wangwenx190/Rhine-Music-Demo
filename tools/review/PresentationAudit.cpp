@@ -17,6 +17,7 @@
 #include <QSaveFile>
 #include <QSignalSpy>
 #include <QTest>
+#include <atomic>
 
 using namespace yalahoo;
 int reviewPresentation(QGuiApplication &, const QString &output)
@@ -82,20 +83,39 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     }
     QQuickRenderControl control;
     QQuickWindow window(OffscreenSurface::Enabled ? &control : nullptr);
+    window.setPersistentGraphics(false);
+    window.setPersistentSceneGraph(false);
     OffscreenSurface surface(window, control);
     verification::prepareWindow(window, true);
     root->setParentItem(window.contentItem());
     QSignalSpy frames(&surface, &OffscreenSurface::frameRendered);
     QSignalSpy swaps(&window, &QQuickWindow::frameSwapped);
+    std::atomic<quint64> requestedFrame{ 0 }, synchronizedFrame{ 0 }, presentedFrame{ 0 };
+    QObject::connect(
+            &window, &QQuickWindow::afterSynchronizing, &window,
+            [&] {
+                synchronizedFrame.store(requestedFrame.load());
+            },
+            Qt::DirectConnection);
+    QObject::connect(
+            &window, &QQuickWindow::frameSwapped, &window,
+            [&] {
+                presentedFrame.store(synchronizedFrame.load());
+            },
+            Qt::DirectConnection);
     const auto render = [&] {
         const int previous = OffscreenSurface::Enabled ? frames.size() : swaps.size();
+        const auto requested = ++requestedFrame;
         surface.requestFrame();
         QElapsedTimer timer;
         timer.start();
-        while ((OffscreenSurface::Enabled ? frames.size() : swaps.size()) == previous
-               && timer.elapsed() < 3000)
+        const auto completed = [&] {
+            return OffscreenSurface::Enabled ? frames.size() > previous
+                                             : presentedFrame.load() >= requested;
+        };
+        while (!completed() && timer.elapsed() < 3000)
             QTest::qWait(10);
-        return (OffscreenSurface::Enabled ? frames.size() : swaps.size()) > previous;
+        return completed();
     };
     bool passed = true;
     QJsonArray captures, lifecycle;
@@ -143,6 +163,10 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                                          { "height", size.height() },
                                          { "night", night },
                                          { "geometryPassed", geometry },
+                                         { "listX", list->x() },
+                                         { "listY", list->y() },
+                                         { "titleSceneY", titleY },
+                                         { "expectedTop", expectedTop },
                                          { "image", file },
                                          { "dpr", window.devicePixelRatio() } });
             presentation.back();
@@ -192,6 +216,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     passed = presentation.detailEnabled() && warnings.isEmpty() && passed;
     for (int cycle = 0; cycle < 10; ++cycle) {
         surface.hide();
+        window.releaseResources();
         presentation.reset();
         surface.show();
         presentation.open();

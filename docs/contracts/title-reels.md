@@ -194,3 +194,9 @@ node tools/audit/audit-title.mjs verification/macos/title-reels/r16m3/new-metal-
 其余五上下文替换backend/DPR和对应source，禁止并行GPU采样。最终本地报告为`accepted-v3-{metal|opengl}-dpr{1|1_5|2}/`；COMMON-01–05/PERF-01–07/qsb及三个平台源码hash矩阵在各自`*-static/title-reels/r16m3/{backend}-dpr-{DPR}/`。实际后端/DPR、匿名fixture、源参照及二进制hash分开登记，静态矩阵不代替Windows/Linux实机。全平台最终选型、D3D11五项已知失败、高DPR及其他目标OpenGL、可见窗口与共享hide回归继续由R34保留；R17只依赖本阶段实现和当前可靠验收。原始PNG/逐帧JSON/日志/矩阵全部忽略，不提交。
 
 本轮Release全部23项启用CTest（含source-format/title-reels/隐藏窗口策略）通过，format/check-format、Yalahoo及ui-audit两组qmllint和文本qsb的MSL/GLSL/HLSL通过；四项可见runtime明确disabled，未记为通过。
+
+## macOS 可见窗口补验范围
+
+2026-10-14 的同机 Release 可见 Metal/threaded 与 OpenGL/basic 分别覆盖实际有效 DPR1/1.5/2，六上下文正常退出0。每项20个生产文字、18个页眉、三路径各三次120帧、十次恢复及最终零tracked节点/renderer通过；原固定1物理px带与像素、结构、运动门槛不变，候选失败继续单列。前台由用户按本轮授权，报告明确 user-authorized-foreground；屏幕原生DPR1，高DPR由 nativeScreenDpr 校准后的有效渲染DPR验证，不声称已换到其他物理显示器。
+
+复现为上述正常命令增加 `--visible`，并仅在用户授权轮次设置 `YALAHOO_VERIFY_FOREGROUND=1`。本地产物在 `verification/macos/visible-window/`，包括旧失败与最终 `verified-title-opengl-dpr*/` 和 Metal 正常目录；不提交。按钮位置取 afterSynchronizing 后的已polish几何，避免 GUI frameSwapped 回调读到下一 tick 的中间Row布局；QPointer随QML销毁失效。basic 的原生恢复显式重建surface，最终删除QML后先交付真实清理帧，再hide/destroy。CPU成本按native/离屏、basic/threaded分别解释，GPU与真实显示延迟仍未测，不外推完整产品120秒性能。Windows/Linux与跨平台最终选型仍按R34。

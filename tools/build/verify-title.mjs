@@ -14,6 +14,7 @@ const options = {
     source: path.join(root, 'verification', platform, 'title-reels/web')
 };
 let diagnostics = false;
+let visible = false;
 const seen = new Set();
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; ++i) {
@@ -23,10 +24,12 @@ for (let i = 0; i < args.length; ++i) {
     seen.add(option);
     if (option === '--diagnostics') {
         diagnostics = true;
+    } else if (option === '--visible') {
+        visible = true;
     } else {
         if (!['--backend', '--dpr', '--source', '--output'].includes(option) || !args[i + 1])
             throw Error('Usage: verify-title.mjs [--backend metal|d3d11|opengl] [--dpr 1|1.5|2] ' +
-                        '[--source directory] [--output directory] [--diagnostics]');
+                        '[--source directory] [--output directory] [--diagnostics] [--visible]');
         options[option.slice(2)] = args[++i];
     }
 }
@@ -59,6 +62,7 @@ const environment = {
     QCPAINTER_DEBUG_COLLECT: '0',
     QT_SCALE_FACTOR: '1'
 };
+environment.YALAHOO_VERIFY_VISIBLE = visible ? '1' : '0';
 const executable =
     path.join(root, 'build/release/tools/ui-audit' + (process.platform === 'win32' ? '.exe' : ''));
 fs.mkdirSync(output, {recursive: true});
@@ -88,7 +92,9 @@ if (/Binding loop detected|Failed to build graphics pipeline|No GLSL shader code
 if (result.status !== 0 && !(diagnostics && result.status === 6))
     throw Error('Title audit exited ' + result.status + '; output retained in ' + output);
 const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
-if (process.platform === 'darwin'
+if (visible && (report.offscreen || report.renderProtocol !== 'native-window'))
+    throw Error('Visible verification requires an actual native window');
+if (process.platform === 'darwin' && !visible
     && (!report.offscreen || report.renderProtocol !== 'render-control-gui-thread'
         || report.offscreenResourcePlan?.nativeWindowVisible !== false
         || report.offscreenResourcePlan?.attachmentEstimateBytesPerPixel !== 12

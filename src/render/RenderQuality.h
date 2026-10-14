@@ -25,7 +25,7 @@ public:
     void setPreset(const QString &name);
     Q_INVOKABLE void configure(const QVariantMap &values, bool legacyHigh = true);
     Q_INVOKABLE void resize(double width, double height, double stageScale, double dpr,
-                            int maxTextureSize);
+                            int maxTextureSize, bool nativeDpr = false);
     int shadows() const
     {
         return m_values["shadows"].toInt();
@@ -58,5 +58,6 @@ private:
     double m_width = 960, m_height = 640, m_stageScale = 1, m_dpr = 1;
     int m_maxTexture = 4096;
     bool m_limited = false;
+    bool m_nativeDpr = false;
 };
 }

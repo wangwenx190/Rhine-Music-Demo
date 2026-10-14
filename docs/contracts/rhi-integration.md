@@ -41,3 +41,11 @@ GPU descriptor 载荷不等于物理显存。driver padding、内部 PSO/SRB、b
 按用户明确要求，R10D 性能实测为记录项，20ms 保留参考值，不阻止本轮完成和提交。结构/算法、Windows 功能/视觉、上传、资源与生命周期仍为门禁；正常 VSYNC 三次样本及 OpenGL 实机探测必须完整。已有受控吞吐 p95=18.35ms 和 20.98ms 分开保存，后者仍保留原 passed=false，不改写成数值达标，不继续为过线采样。复核后的其他 GPU 占用只作为环境记录，不能反推为已证明的超限原因。
 
 复建脚本在 Review 配置显式设置 YALAHOO_PERFORMANCE_RECORD_ONLY=ON，CTest 使用 --record-performance；工具仍执行完整视觉/上传/资源检查并保留性能原值和原数值比较结果。functionalPassed、samplingComplete、gateEnforced 与汇总的 performanceAcceptance 分开说明范围，普通 Review 默认仍保留历史数值门槛。生产配置恢复该选项为 OFF。record-only-validation 仅验证新增记录模式的完整输出/退出语义，不用于挑选更好的性能样本。R28 用同设备/Kit/fixture 解释这些波动并建立完整产品预算和噪声依据。
+
+## 本机可见补验与范围
+
+2026-10-14 的macOS/arm64、Release、Metal、原生DPR1授权前台运行：四项runtime、封面/真实列/循环阵列GPU检查通过；12秒单盒集成实际覆盖4个输入revision、9尺寸、4档画质和10次重建，记录1214个提交与1344个frameSwapped事件，描述符初末均382958468bytes。数字对应这一运行和范围，不代表实测显存、120秒正式样本或完整播放器性能。长时三次独立VSYNC/吞吐与完整产品指标继续保留R28/R34。
+
+静止Review读回按后端MaxAsyncReadbackFrames+1续真实帧、在途至多2，不重复submit或GUI轮询，普通产品无captured回调时无该续帧。macOS OpenGL可见 drawable 使用basic；当前QRhi在4.1上多采样纹理创建可能调用不存在的glTexStorage2DMultisample。分配阶段探测入口，缺少时使用同格式/采样数的QRhi color renderbuffer和原resolve，核对backingFormat并记账；Metal/D3D11未改该路径。OpenGL实际浏览/输入补验与图形源ROI证明分别记录。冻结Web来源重建已进入ANGLE/Metal harness，但Room PMREM精确字节与已提交资源不同，尚未建立完整同输入参照，旧oracle/完整后处理图像检查仍未通过，不能跳过guard；具体入口和修复对象见计划MAC-VISIBLE-3D。
+
+几何Review原先绕过像素保护，超大DPR目标失败后仍用提示文字凑模型像素。已改为原生DPR请求共用RenderQuality保护、保持偏好值，报告实际target和limited；模型统计排除提示区域并要求renderError为空。正常→超大受限→正常恢复单元及Metal可见DPR1/1.5/2的全部几何序列通过，不把超过保护上限的窗口说成未受限分辨率。真实列Review接上InputRouter后，边界事件按现行语义消费并保持稳定ID，完整GPU回归通过。
