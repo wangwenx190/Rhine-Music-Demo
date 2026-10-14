@@ -201,11 +201,29 @@ try {
                     const {object} = await page.send('DOM.resolveNode', {nodeId});
                     const description = await page.send('Runtime.callFunctionOn', {
                         objectId: object.objectId,
-                        functionDeclaration: 'function() { return this.textContent; }',
+                        functionDeclaration: `function() {
+                            const style = getComputedStyle(this);
+                            const canvas = document.createElement('canvas').getContext('2d');
+                            canvas.font = style.font;
+                            const metrics = canvas.measureText(this.textContent);
+                            const range = document.createRange();
+                            range.selectNodeContents(this);
+                            const box = range.getBoundingClientRect();
+                            const face = this.getBoundingClientRect();
+                            return {
+                                text: this.textContent,
+                                font: style.font,
+                                lineHeight: style.lineHeight,
+                                rangeTop: box.top - face.top,
+                                rangeHeight: box.height,
+                                fontAscent: metrics.fontBoundingBoxAscent,
+                                fontDescent: metrics.fontBoundingBoxDescent
+                            };
+                        }`,
                         returnByValue: true
                     });
                     const fonts = await page.send('CSS.getPlatformFontsForNode', {nodeId});
-                    platformFonts.push({text: description.result.value, fonts: fonts.fonts});
+                    platformFonts.push({...description.result.value, fonts: fonts.fonts});
                     await page.send('Runtime.releaseObject', {objectId: object.objectId});
                 }
                 const file = 'title-' + captures.length + '.png';

@@ -62,8 +62,13 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         const QFontMetricsF metrics(font);
         const double ascent = metrics.ascent() * scale;
         const double descent = metrics.descent() * scale;
-        const double top = (lineHeight - std::round(ascent) - std::round(descent)) / 2
-                + std::round(ascent) - line.ascent() * scale;
+        double halfLeading = (lineHeight - std::round(ascent) - std::round(descent)) / 2;
+#ifdef Q_OS_MACOS
+        // The frozen Chromium/CoreText face paints at the integral CSS font-box top.
+        // Keep the line height and shaping positions; only align its primary baseline.
+        halfLeading = std::floor(halfLeading);
+#endif
+        const double top = halfLeading + std::round(ascent) - line.ascent() * scale;
         line.setPosition({ 0, (index * lineHeight + top) / scale });
         part.naturalWidth = std::max(part.naturalWidth, line.naturalTextWidth() * scale);
         ++part.lines;

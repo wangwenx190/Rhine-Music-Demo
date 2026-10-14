@@ -4,9 +4,12 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '../..');
-if (process.argv.length !== 3)
-    throw Error('Usage: node tools/audit/audit-title.mjs complete-diagnostic-directory');
+if (process.argv.length < 3 || process.argv.length > 4)
+    throw Error('Usage: node tools/audit/audit-title.mjs complete-directory [R16M2|R16M2P]');
 const evidence = path.resolve(process.argv[2]);
+const round = process.argv[3] || 'R16M2';
+if (!['R16M2', 'R16M2P'].includes(round))
+    throw Error('Unsupported audit round');
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const summary = readJson(path.join(evidence, 'summary.json'));
 const report = readJson(path.join(evidence, 'report.json'));
@@ -19,6 +22,29 @@ if (!summary.diagnosticsPassed || summary.platform !== 'darwin' || summary.backe
 const sourceCaptures = source.captures.filter((capture) => Math.abs(capture.dpr - 2) < .001);
 if (source.platform !== 'darwin' || sourceCaptures.length !== 20)
     throw Error('Twenty same-platform DPR2 source captures required');
+if (round === 'R16M2P') {
+    const production = report.captures.filter((capture) => capture.mode === 0);
+    if (!summary.passed || summary.diagnosticMode || !report.passed
+        || summary.pendingPixelCases.length || production.length !== 20
+        || production.some((capture) => !capture.candidatePassed))
+        throw Error('R16M2P requires normal full pixel acceptance');
+    for (const capture of production) {
+        const faces = sourceCaptures[capture.case].platformFonts;
+        for (const glyph of capture.geometry.actualGlyphs) {
+            if (glyph.colorGlyph)
+                continue;
+            const face = faces.find((face) => face.text === glyph.text);
+            if (!face || !Number.isFinite(face.fontAscent) || !Number.isFinite(face.fontDescent)
+                || !Number.isFinite(face.rangeTop) || !Number.isFinite(parseFloat(face.lineHeight)))
+                throw Error('Same-host CSS font-box metrics required');
+            const leading = (parseFloat(face.lineHeight) - face.fontAscent - face.fontDescent) / 2;
+            const expected = face.fontAscent + Math.floor(leading);
+            if (Math.abs(face.rangeTop - Math.floor(leading)) > .001
+                || Math.abs(glyph.fonts[0].firstY * glyph.scale - expected) > 1 / 64)
+                throw Error('Frozen CSS font-box and native baseline disagree');
+        }
+    }
+}
 for (const index of [10, 11]) {
     const expected = sourceCaptures[index].platformFonts.filter(
         (face) => face.fonts.some((font) => font.postScriptName === 'AppleColorEmoji'));
@@ -74,7 +100,9 @@ const checks = [
     [
         'COMMON-05', 'tools/review/export-title.mjs', 'CSS.getPlatformFontsForNode',
         'Frozen Git mapping supplies source CSS/markup/WOFF2. CDP reads actual rendered ' +
-            'face text and platform family/PostScript identity without changing source layout. ' +
+            'face text, platform family/PostScript identity and CSS font-box top/Canvas ascent ' +
+            'and descent without changing source layout. R16M2P requires normal pixel acceptance ' +
+            'and checks every ordinary baseline against these same-host source metrics. ' +
             'Resolved remote objects are released per face. Native geometry records measured ' +
             'font-head hashes and whole-line IDs/positions. verify-title still rejects structure, '
             +
@@ -115,11 +143,16 @@ const checks = [
     ],
     [
         'PERF-05', 'src/render/text/TextLayoutAdapter.cpp', 'line.ascent() * scale',
-        'Primary CSS half-leading and mixed-line ascent correction are unchanged. Emoji ' +
-            'now resolves to the source face while whole-line QTextLayout still supplies ' +
+        'macOS primary half-leading is floored in logical CSS units, matching the same-host ' +
+            'frozen face range top; fractional line heights, font sizes, fit search and mixed-line '
+            +
+            'ascent correction remain intact. Other platforms retain their earlier half-leading. ' +
+            'Emoji resolves to the source face while whole-line QTextLayout still supplies ' +
             'grapheme/ligature IDs and positions. The full cache key and 96-entry/8MiB limits ' +
             'are unchanged; fontDatabaseChanged clears caches. No case-dependent offsets, ' +
-            'font-size adjustment or per-character shaping is introduced.'
+            'font-size adjustment or per-character shaping is introduced. The regression fixes ' +
+            'measured integral/fractional source baselines; full DPR2 pixels and mixed emoji are ' +
+            'separate acceptance evidence, not inferred from layout tests.'
     ],
     [
         'PERF-06', 'qml/Yalahoo/Music/components/TitleReel.qml', 'root.clock',
@@ -147,7 +180,8 @@ const checks = [
     [
         'LNX-01', 'src/app/AssetCatalog.cpp', '#ifdef Q_OS_MACOS',
         'The new family selection is removed by preprocessing on Linux and Windows. ' +
-            'Shared layout/render descriptors, qrc aliases and shader path are unchanged. ' +
+            'The half-leading correction is also macOS-only; shared layout/render descriptors, ' +
+            'qrc aliases and shader path are unchanged. ' +
             'GraphicsBackend selects OpenGL for Linux and D3D11 for Windows, with the existing ' +
             'explicit OpenGL option. No Apple/Windows handle or library enters another platform. ' +
             'Native target fonts, compositor, deployment and GPU results remain unverified.'
@@ -170,8 +204,9 @@ const records = [...sourcePaths].map(
 for (const [checkId, file, symbol] of checks)
     if (!fs.readFileSync(path.join(root, file), 'utf8').includes(symbol))
         throw Error('Reviewed source drift: ' + checkId + ':' + file + ':' + symbol);
-for (const platform of ['macos', 'linux']) {
-    const directory = path.join(root, 'verification', platform + '-static/title-reels/r16m2');
+for (const platform of ['macos', 'linux', 'windows']) {
+    const directory =
+        path.join(root, 'verification', platform + '-static/title-reels', round.toLowerCase());
     fs.mkdirSync(directory, {recursive: true});
     const conclusion = '静态审计通过，实机待用户验证';
     const matrix = checks.map(
@@ -186,14 +221,17 @@ for (const platform of ['macos', 'linux']) {
             result: 'static-passed',
             limitations:
                 platform === 'macos'
-                    ? 'Real arm64 Release/Metal/DPR2 offscreen diagnostics ran; visible native ' +
-                          'windows/present/VSYNC and remaining pixels are not accepted.'
-                    : 'No Linux compiler, color-font backend, compositor or GPU ran. Windows ' +
-                          'shared code is unchanged but Windows runtime was not available this round.'
+                    ? 'Real arm64 Release/Metal/DPR2 offscreen checks ran; pixel status is recorded '
+                          +
+                          'separately. Native visible windows/present/VSYNC remain R34; DPR1/1.5 ' +
+                          'full pixel matrices remain R16M3.'
+                    : 'No target compiler, color-font backend, compositor or GPU ran. The new ' +
+                          'baseline branch is removed by preprocessing; required real checks and ' +
+                          'known D3D11/OpenGL failures remain R34.'
         }));
     fs.writeFileSync(path.join(directory, 'audit-matrix.json'), JSON.stringify({
         conclusion,
-        round: 'R16M2',
+        round,
         toolchain: chain,
         sourceRecords: records,
         diagnosticDirectory: evidence,
@@ -203,7 +241,7 @@ for (const platform of ['macos', 'linux']) {
                                                                                null, 2)
                                                                     + '\n');
     fs.writeFileSync(path.join(directory, 'audit-report.md'),
-                     '# R16M2 / ' + platform + '\n\n' + conclusion + '\n\n'
+                     '# ' + round + ' / ' + platform + '\n\n' + conclusion + '\n\n'
                          + matrix
                                .map((check) => check.checkId + ' — ' + check.sourcePath + ':'
                                                + check.lineOrSymbol + '\n' + check.evidence
@@ -211,5 +249,5 @@ for (const platform of ['macos', 'linux']) {
                                .join('\n\n')
                          + '\n');
 }
-console.log('R16M2 source/performance audit and text qsb variants passed; pixels pending: '
+console.log(round + ' source/performance audit and text qsb variants passed; pixels pending: '
             + summary.pendingPixelCases.join(','));

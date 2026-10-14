@@ -181,6 +181,41 @@ private slots:
         QSKIP("Source Apple emoji face policy is macOS-specific");
 #endif
     }
+    void macSourceFontBoxBaseline()
+    {
+#ifdef Q_OS_MACOS
+        // Same-host frozen CSS range top + Canvas fontBoundingBoxAscent.
+        // These cover integral, fractional and translated title sizes, not GPU pixels.
+        const QList<QPair<double, double>> baselines{ { 12.6, 13 }, { 19.8, 21 },
+                                                      { 20, 21 },   { 24.609375, 26 },
+                                                      { 28, 30 },   { 29.75, 32 },
+                                                      { 44, 47 } };
+        yalahoo::TextLayoutAdapter adapter;
+        const auto font = yalahoo::assetFont(700);
+        for (const double dpr : { 1.0, 1.5, 2.0 }) {
+            for (const auto &[size, baseline] : baselines) {
+                const auto layout = adapter.measure(QStringLiteral("收藏"), font, font, size, 600,
+                                                    150, false, dpr);
+                QCOMPARE(layout.glyphs.size(), 2);
+                for (const auto &glyph : layout.glyphs) {
+                    const auto &run = glyph.renderRuns.first();
+                    QVERIFY(std::abs(run.positions.first().y() * glyph.scale - baseline)
+                            <= 1.0 / 64);
+                }
+            }
+        }
+        const auto translated = adapter.measure(QStringLiteral("音乐（Music archive gyp）"), font,
+                                                yalahoo::assetFont(600), 44, 500, 220, false, 2);
+        for (const auto &glyph : translated.glyphs) {
+            if (!glyph.translation)
+                continue;
+            QVERIFY(std::abs(glyph.renderRuns.first().positions.first().y() * glyph.scale - 21)
+                    <= 1.0 / 64);
+        }
+#else
+        QSKIP("Frozen CoreText font-box alignment is macOS-specific");
+#endif
+    }
     void analyticAndInterruptions()
     {
         for (const int fps : { 20, 30, 60, 120 }) {
