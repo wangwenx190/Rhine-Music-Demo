@@ -5,29 +5,36 @@ import {spawnSync} from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '../..');
 if (process.argv.length < 3 || process.argv.length > 4)
-    throw Error('Usage: node tools/audit/audit-title.mjs complete-directory [R16M2|R16M2P]');
+    throw Error('Usage: node tools/audit/audit-title.mjs complete-directory [R16M2|R16M2P|R16M3]');
 const evidence = path.resolve(process.argv[2]);
 const round = process.argv[3] || 'R16M2';
-if (!['R16M2', 'R16M2P'].includes(round))
+if (!['R16M2', 'R16M2P', 'R16M3'].includes(round))
     throw Error('Unsupported audit round');
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const summary = readJson(path.join(evidence, 'summary.json'));
 const report = readJson(path.join(evidence, 'report.json'));
 const source = readJson(path.join(summary.sourceDirectory, 'report.json'));
-if (!summary.diagnosticsPassed || summary.platform !== 'darwin' || summary.backend !== 'metal'
-    || summary.configuration !== 'Release' || summary.dpr !== 2 || !report.offscreen
+if (!summary.diagnosticsPassed || summary.platform !== 'darwin'
+    || !['metal', ...(round === 'R16M3' ? ['opengl'] : [])].includes(summary.backend)
+    || summary.configuration !== 'Release'
+    || !(round === 'R16M3' ? [1, 1.5, 2] : [2]).includes(summary.dpr) || !report.offscreen
     || report.offscreenResourcePlan?.nativeWindowVisible !== false || !report.windowPolicy.passed
     || !report.released)
-    throw Error('Complete hidden Metal/DPR2 diagnostics required');
-const sourceCaptures = source.captures.filter((capture) => Math.abs(capture.dpr - 2) < .001);
+    throw Error('Complete hidden supported-backend/DPR diagnostics required');
+const sourceCaptures =
+    source.captures.filter((capture) => Math.abs(capture.dpr - summary.dpr) < .001);
 if (source.platform !== 'darwin' || sourceCaptures.length !== 20)
-    throw Error('Twenty same-platform DPR2 source captures required');
-if (round === 'R16M2P') {
+    throw Error('Twenty same-platform source captures at the actual DPR required');
+if (round === 'R16M3'
+    && (report.offscreenResourcePlan?.attachmentEstimateBytesPerPixel !== 12
+        || report.offscreenResourcePlan?.actualDriverAllocationBytes !== null))
+    throw Error('Conservative RGBA8/depth-stencil estimate and unknown driver bytes required');
+if (round === 'R16M2P' || round === 'R16M3') {
     const production = report.captures.filter((capture) => capture.mode === 0);
     if (!summary.passed || summary.diagnosticMode || !report.passed
         || summary.pendingPixelCases.length || production.length !== 20
         || production.some((capture) => !capture.candidatePassed))
-        throw Error('R16M2P requires normal full pixel acceptance');
+        throw Error('This round requires normal full pixel acceptance');
     for (const capture of production) {
         const faces = sourceCaptures[capture.case].platformFonts;
         for (const glyph of capture.geometry.actualGlyphs) {
@@ -61,6 +68,14 @@ const chain = readJson(path.join(root, 'build/release/toolchain.json'));
 const qsb = [path.join(chain.qtKit, 'bin/qsb'), path.join(chain.qtKit, 'libexec/qsb')].find(
     (file) => fs.existsSync(file));
 const shader = path.join(root, 'build/release/src/app/.qsb/reel-slot.frag.qsb');
+if (summary.qtVersion !== chain.qtVersion || report.backend !== summary.backend
+    || report.dpr !== summary.dpr)
+    throw Error('Toolchain and actual report context disagree');
+const fileHash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const binarySha256 = fileHash(path.join(root, 'build/release/tools/ui-audit'));
+const fixtureSha256 = fileHash(path.join(root, 'tests/fixtures/text/titles.json'));
+const sourceReportSha256 = fileHash(path.join(summary.sourceDirectory, 'report.json'));
+
 const dump = spawnSync(qsb, ['--dump', shader], {encoding: 'utf8', windowsHide: true});
 if (dump.status !== 0 || !['MSL', 'GLSL', 'HLSL'].every((kind) => dump.stdout.includes(kind)))
     throw Error('Shared text shader must contain MSL/GLSL/HLSL variants');
@@ -138,7 +153,9 @@ const checks = [
             'Font choice creates no new product render target and leaves 3D compatibility keys ' +
             'unchanged. OffscreenSurface owns one RGBA8 plus depth/stencil target, single sample, '
             +
-            'no mips; its target size/DPR changes only on corresponding compatibility changes. ' +
+            'no mips; the conservative attachment plan uses 4+8 bytes per physical pixel and ' +
+            'includes old/new overlap. Memoryless storage is not claimed as measured VRAM. ' +
+            'Its target size/DPR changes only on corresponding compatibility changes. ' +
             'Qt font atlas and driver memory remain unknown.'
     ],
     [
@@ -159,7 +176,15 @@ const checks = [
         'The same FrameClock controls all motion. Hidden normal/Canvas candidates skip ' +
             'text work; offscreenRendering explicitly permits the hidden review root. QML ' +
             'faces retain Tooltip/Accessible full names and only visible color/candidate Text ' +
-            'instances. Header checks cover both themes, nine sizes and unchanged playback IDs.'
+            'instances. Natural width uses a dedicated change signal: animation and visibility ' +
+            'finish cannot republish an unchanged transport width. Caption visibility follows ' +
+            'title/shown motion rather than derived width/opacity, removing the feedback edge. ' +
+            'Hide sets active=false immediately and coalesces finish into one queued callback; ' +
+            'restoration cancels that finish and object destruction cancels its delivery. ' +
+            'A visibility callback ' +
+            'regression checks one real width notification; full review logs reject binding ' +
+            'loops and shader pipeline failures. Header checks cover both themes, nine sizes ' +
+            'and unchanged playback IDs.'
     ],
     [
         'PERF-07', 'tools/review/OffscreenSurface.h', 'm_pending',
@@ -174,7 +199,9 @@ const checks = [
         'The Apple branch selects Metal. Apple Color Emoji is verified against the same-host ' +
             'browser identity and four color glyphs; the private UI family is no longer used. ' +
             'prepareApplication/prepareWindow and the native Cocoa guard remain in place. ' +
-            'Actual diagnostics used RenderControl with no native show or swapchain present. ' +
+            'The explicit Apple OpenGL path requests a 4.1 core format before QGuiApplication; ' +
+            'Metal keeps its default format. Actual diagnostics used RenderControl with no ' +
+            'native show or swapchain present. ' +
             'Visible interaction and deployment remain R34/R31.'
     ],
     [
@@ -190,6 +217,7 @@ const checks = [
 const sourcePaths = new Set(checks.map((check) => check[1]));
 for (const file
          of ['CMakeLists.txt', 'cmake/BrowseQml.cmake', 'src/render/text/TextLayoutAdapter.h',
+             'src/render/text/TitleReel.h', 'src/app/GraphicsBackend.h',
              'src/app/VerificationWindow.h', 'src/app/VerificationWindowMac.mm', 'src/app/main.cpp',
              'src/app/CMakeLists.txt', 'tools/review/UiAudit.cpp', 'tools/review/CMakeLists.txt',
              'tests/unit/CMakeLists.txt', 'tools/review/TitleAudit.cpp',
@@ -206,9 +234,10 @@ for (const [checkId, file, symbol] of checks)
         throw Error('Reviewed source drift: ' + checkId + ':' + file + ':' + symbol);
 for (const platform of ['macos', 'linux', 'windows']) {
     const directory =
-        path.join(root, 'verification', platform + '-static/title-reels', round.toLowerCase());
+        path.join(root, 'verification', platform + '-static/title-reels', round.toLowerCase(),
+                  ...(round === 'R16M3' ? [summary.backend + '-dpr-' + summary.dpr] : []));
     fs.mkdirSync(directory, {recursive: true});
-    const conclusion = '静态审计通过，实机待用户验证';
+    const conclusion = '静态审计通过，实机待验证（R34）；本机离屏实测另列';
     const matrix = checks.map(
         ([checkId, sourcePath, lineOrSymbol, evidence]) => ({
             checkId,
@@ -221,10 +250,10 @@ for (const platform of ['macos', 'linux', 'windows']) {
             result: 'static-passed',
             limitations:
                 platform === 'macos'
-                    ? 'Real arm64 Release/Metal/DPR2 offscreen checks ran; pixel status is recorded '
-                          +
-                          'separately. Native visible windows/present/VSYNC remain R34; DPR1/1.5 ' +
-                          'full pixel matrices remain R16M3.'
+                    ? 'Real arm64 Release/' + summary.backend + '/DPR' + summary.dpr
+                          + ' offscreen checks ran; pixel status is recorded ' +
+                          'separately. Native visible windows/present/VSYNC remain R34; ' +
+                          'other contexts are never inferred from this report.'
                     : 'No target compiler, color-font backend, compositor or GPU ran. The new ' +
                           'baseline branch is removed by preprocessing; required real checks and ' +
                           'known D3D11/OpenGL failures remain R34.'
@@ -233,6 +262,9 @@ for (const platform of ['macos', 'linux', 'windows']) {
         conclusion,
         round,
         toolchain: chain,
+        binarySha256,
+        fixtureSha256,
+        sourceReportSha256,
         sourceRecords: records,
         diagnosticDirectory: evidence,
         pendingPixelCases: summary.pendingPixelCases,

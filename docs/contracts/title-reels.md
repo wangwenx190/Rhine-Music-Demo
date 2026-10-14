@@ -1,6 +1,6 @@
 # 标题字轮实现与补验收边界
 
-R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1、Metal/DPR2验收见下文；当前平台文字/绘制阶段验收顺序为R16M3 → R17；本机无法执行的R16B2V-P/R16B2W/R16B3已移入最后R34，保留D3D11/OpenGL原补修和最终跨平台选型要求，阶段主线不等待这些后置任务。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
+R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1及当前macOS Metal/OpenGL的DPR1/1.5/2验收见下文；当前平台R16阶段实现依赖已满足，主线下一轮为R17；本机无法执行的R16B2V-P/R16B2W/R16B3已移入最后R34，保留D3D11/OpenGL原补修和最终跨平台选型要求，阶段主线不等待这些后置任务。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
 
 ## 来源与接口
 
@@ -16,7 +16,7 @@ R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1、Metal/DPR2�
 
 当前生产普通文字由 `ReelInk → ReelTextNode` 提交整行 shaping 后的 glyph ID/位置。GUI 只缓存字体描述、字体 head 身份与字形值；render thread 独立取得 QRawFont，并核对身份，GUI 的 QRawFont/QTextLayout 不跨线程。私有 Qt Quick glyph 接口隔离在 `src/render/rhi/`，配置时探测最新 Kit 的实际接口，不锁版本或回退旧 Qt。彩色 grapheme 使用 Qt Quick Text 的系统字体/彩色缓存；普通字形的隐藏 Text 不创建。整行上下文变化即使文本相同也失效。
 
-Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；当前可靠后端/DPR由R16M2P/M3逐项验收，不可执行的R16B2V-P/W、R16B3在R34完成最终判定。目前普通字形节点加彩色 Text 是已集成方案，尚未宣称最终比较选型通过。
+Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；当前macOS Metal/OpenGL三个DPR已由R16M3逐项验收，不可执行的R16B2V-P/W、R16B3在R34完成最终判定。普通字形节点加彩色Text是当前平台阶段生产路径；全平台最终选型仍待R34。
 
 测量缓存键包含文本、两种字体/字重、字号、宽度、预算、窄屏/DPR/歌名模式；96项 LRU与8MiB描述符计费上限并存，超限结果不缓存。8MiB是缓存计费而非完整进程内存。字体数据库变更清空缓存；同帧输入合并成一个 queued reconcile。布局为输入长度 n 的一次整行 shaping，拟合最多25次候选行框测量，字形提取只在选中候选执行；按 string index 分组为 O(n log n)。动画只访问活动槽，不逐帧创建 QTextLayout 或替换面板；静止入口 O(1)。当前生产字号/视口下，内容 revision 只匹配本槽至多八个字面，以 sameGlyphInk 核对字体身份、glyph ID/位置、缩放和行框，保留仍可见的 QSGTextNode/transform/clip，只创建新增字面并删除离开视口的节点；局部匹配最坏 O(f²)，f≤8，不随曲库增长。clip 容量、颜色和滚动变换独立更新，隐藏的 ReelInk 不创建几何。geometryUpdates 计新增字形节点，geometryReuses 计内容 revision 中的节点复用，均为累计诊断计数，不是逐帧 GPU 成本。
 
@@ -150,3 +150,47 @@ node tools/audit/audit-title.mjs verification/macos/title-reels/r16m2p/accepted 
 ```
 
 本机正常结果在`verification/macos/title-reels/r16m2p/final/`，含CSS诊断的参照在`font-metrics/`。COMMON-01–05/PERF-01–07矩阵分别写入三个平台的本地`*-static/title-reels/r16m2p/`，人工展开缓存/值交接、线程所有权、层/附件/释放与平台预处理；脚本符号/hash只防源码漂移，不代替推演。Windows/Linux为静态审计通过、实机待验证（R34），无目标编译器/字体后端/窗口管理器/GPU环境；不改写D3D11五项已知失败。macOS的可见窗口、正常VSYNC及真实输入/呈现仍依R34既有清单。全部原图、逐帧成本、日志和矩阵保持忽略。
+
+## 当前平台完整文字矩阵与阶段选型（R16M3）
+
+Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release，同机Edge冻结生产源码/原字体参照，真正隐藏RenderControl的Metal和OpenGL分别覆盖实际DPR1/1.5/2。六个正常入口全部退出0，diagnosticMode=false，无待修生产像素项或绑定环/pipeline错误。每个上下文有20项双主题文字、18项九尺寸页眉、三路径各三次独立120帧、十次恢复及最终零tracked节点/renderer；共120项生产文字、108项页眉、54组活动诊断及60次恢复。源码轨迹最大误差4.55e-13、结构最大误差0.240865逻辑px。原四项可见runtime仍disabled，窗口/present/VSYNC、目标平台与媒体不由本轮离屏结果推断。
+
+Metal/OpenGL的生产文字极值一致，以下带外使用原固定1物理px参照边缘带；原始ROI另列，不能将二者混用。
+
+| 实际DPR | 带外最低SSIM | 带外最高RGB误差 /255 | 原始最低SSIM | 原始最高RGB误差 /255 | 最大边缘带占比 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 0.997696028 | 0.198661 | 0.853568339 | 14.493171 | 43.76% |
+| 1.5 | 0.998250161 | 0.142444 | 0.882891366 | 11.639048 | 31.06% |
+| 2 | 0.996912214 | 0.264246 | 0.869280017 | 10.617510 | 24.40% |
+
+阶段生产保留普通整行glyph＋彩色Qt Quick Text、CurveRendering及两倍DPR槽层。QTextLayout保留整行shaping/连字/组合字，再关联字面；render侧重建并核对同字体head身份，不跨线程迁移QRawFont/QTextLayout。彩色Text仍使用源系统Apple Color Emoji面及其回退基线。布局cache完整依赖为text、主/译名字体、字号、宽度、budget、narrow、DPR、transport，fontDatabaseChanged清空；容量96项/8MiB，动画只更新活动槽和必要矩阵，不逐帧测量。
+
+两个候选在DPR1当前20项像素通过，但均按字面重新shaping，无法据共享controller结构数据证明整行上下文等价。Metal/OpenGL的DPR1.5/2 Text候选均失败case6/7、14/15、16/17；Canvas在DPR1.5失败emoji case10/11，DPR2失败case0–5、8–13。它们是候选失败，不是生产路径已通过的范围；不为低CPU成本换入像素或shaping不等价方案。Canvas Painter仍用于已验收的滑尺，后续序章按所属轮次接入；模块类别不作为排除理由。
+
+以下是每组三次独立120帧的CPU绘制提交累计毫秒，依次保留三次，不池化或挑最快。含切换/首次准备和诊断提交；GUI准备、tick、Qt同步、Canvas同步/paint原序列保留在本地报告，局部计量不能相加，也不能将这些累计量称为GPU、单帧耗时、VSYNC或产品FPS。
+
+| 后端 / DPR | 整行glyph＋彩色Text | Qt Quick Text候选 | Canvas候选 |
+| --- | --- | --- | --- |
+| Metal / 1 | 34.414 / 24.793 / 24.528 | 23.471 / 23.066 / 22.802 | 6.452 / 6.222 / 6.252 |
+| Metal / 1.5 | 34.350 / 24.544 / 26.080 | 23.183 / 23.003 / 22.791 | 6.463 / 6.395 / 6.214 |
+| Metal / 2 | 36.206 / 25.138 / 24.825 | 23.932 / 23.669 / 23.790 | 6.507 / 6.254 / 6.348 |
+| OpenGL / 1 | 18.383 / 15.315 / 14.245 | 15.268 / 13.829 / 14.112 | 4.423 / 3.908 / 3.667 |
+| OpenGL / 1.5 | 19.654 / 13.841 / 14.518 | 13.633 / 14.178 / 13.646 | 4.574 / 3.790 / 3.677 |
+| OpenGL / 2 | 19.384 / 18.032 / 14.111 | 14.986 / 14.549 / 14.043 | 4.336 / 4.060 / 3.881 |
+
+隐藏Canvas文字paint及隐藏生产glyph重建每组均为零；Canvas活动各组三次均97次文字paint，活动tick无layout miss。描述符cache在DPR1为98806bytes，DPR1.5/2为99546bytes；生产槽RGBA8层估算分别383408/858552/1524220bytes。该层估算不是Canvas附件实测，不包含Qt图集/驱动内存；外层离屏RGBA8和depth/stencil单采样、无mips，颜色4bytes加深度模板8bytes保守上界按12bytes/物理像素记账；原8bytes估算未覆盖D32FS8，旧报告保留但不当作完整附件上界。resize旧/新峰值由OffscreenSurface单列，层与内部图集不能漏计或重复相加。GPU时间均null、实际显存未知。外层resize附件峰值上界在DPR1/1.5/2分别为92620800/208396800/370483200bytes；这是旧/新资源计划的保守估算，不是实测显存。
+
+macOS显式OpenGL分支在QGuiApplication创建前请求4.1/CoreProfile；旧默认GLSL120与Kit shader不兼容的崩溃保留在opengl-dpr1失败目录。采用[QSurfaceFormat的公开默认格式接口](https://doc.qt.io/qt-6/qsurfaceformat.html#setDefaultFormat)，Metal默认分支及Windows/Linux格式不变。歌名caption可见性改由有标题或退出动画未结束决定，容器原宽度/opacity/offset曲线和退出禁用不变；naturalWidth独立通知，hide立即停tick并合并排队finish，restore取消陈旧完成。两个单元回归覆盖通知重入、十次合并hide及恢复取消；只拆宽度通知/可见性时仍有绑定失败的中间报告保留，最终六上下文重新通过。
+
+复现时每个后端/DPR串行执行并选择新输出目录，先用`node tools/review/export-title.mjs --dpr 1 --output verification/macos/title-reels/r16m3/source-dpr1`生成对应参照；DPR1.5/2同理。正常验证：
+
+```sh
+node tools/build/verify-title.mjs --backend metal --dpr 1 \
+    --source verification/macos/title-reels/r16m3/source-dpr1 \
+    --output verification/macos/title-reels/r16m3/new-metal-dpr1
+node tools/audit/audit-title.mjs verification/macos/title-reels/r16m3/new-metal-dpr1 R16M3
+```
+
+其余五上下文替换backend/DPR和对应source，禁止并行GPU采样。最终本地报告为`accepted-v3-{metal|opengl}-dpr{1|1_5|2}/`；COMMON-01–05/PERF-01–07/qsb及三个平台源码hash矩阵在各自`*-static/title-reels/r16m3/{backend}-dpr-{DPR}/`。实际后端/DPR、匿名fixture、源参照及二进制hash分开登记，静态矩阵不代替Windows/Linux实机。全平台最终选型、D3D11五项已知失败、高DPR及其他目标OpenGL、可见窗口与共享hide回归继续由R34保留；R17只依赖本阶段实现和当前可靠验收。原始PNG/逐帧JSON/日志/矩阵全部忽略，不提交。
+
+本轮Release全部23项启用CTest（含source-format/title-reels/隐藏窗口策略）通过，format/check-format、Yalahoo及ui-audit两组qmllint和文本qsb的MSL/GLSL/HLSL通过；四项可见runtime明确disabled，未记为通过。

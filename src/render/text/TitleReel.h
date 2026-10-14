@@ -103,7 +103,7 @@ class TitleReel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY inputChanged)
     Q_PROPERTY(int slotCount READ slotCount NOTIFY slotsChanged)
     Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY changed)
-    Q_PROPERTY(double naturalWidth READ naturalWidth NOTIFY changed)
+    Q_PROPERTY(double naturalWidth READ naturalWidth NOTIFY naturalWidthChanged)
     Q_PROPERTY(double fittedSize READ fittedSize NOTIFY changed)
     Q_PROPERTY(QString fittedText READ fittedText NOTIFY changed)
     Q_PROPERTY(bool moving READ moving NOTIFY changed)
@@ -155,6 +155,7 @@ signals:
     void clockChanged();
     void slotsChanged();
     void changed();
+    void naturalWidthChanged();
     void resourcesChanged();
 
 private:
@@ -173,6 +174,7 @@ private:
     double m_size = 28, m_width = 300, m_budget = 300, m_dpr = 1;
     bool m_narrow = false, m_transport = false, m_reduced = false, m_active = true;
     bool m_complete = false, m_scheduled = false, m_instant = true;
+    bool m_finishPending = false;
     bool m_dirty = true;
     ReelTrack m_height;
     QList<QSize> m_resourceSizes;

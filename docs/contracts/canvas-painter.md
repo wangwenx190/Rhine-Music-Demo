@@ -56,3 +56,5 @@ Windows 最新原生 Kit 的 Release 构建、check-format、两组 qmllint 和2
 R16B1及R16B2的 D3D11/实际DPR1双主题文字、字轮与歌名功能/释放门槛通过，具体原始与固定1px边缘带结果见 title-reels.md。普通整行glyph节点保留当前生产路径；Qt Quick Text和C++ Canvas fillText候选沿用同一布局与时钟，但字面重新shaping的API不能直接复用完整glyph run，不据此宣称复杂连字等价。槽内几何按字体身份/字形/位置复用，隐藏字形路径不继续建节点，层随组件/窗口可见性关闭；没有改变三维资源键。R16B2修复隐藏Canvas仍绘制文字的问题，DPR1三个串行样本中其他路径的Canvas文字绘制计数均为零；仅GUI守卫不能消除已排队的Qt回调，render同步/paint需同时核对可见性，恢复通过窗口可见性连接失效。成本差异和估算/未知资源见 title-reels.md，不推导GPU或完整产品FPS。最终文字绘制选型和其余DPR/后端比较仍由R16B2V-P/W、R16B3完成。
 
 Metal/DPR2真正离屏的R16M2P正常文字矩阵通过，普通整行glyph＋彩色Text路径保持；macOS主字体CSS基线按同机源字体框顶部对齐，保留原分数行高、字号和两倍层，未改变Canvas/Qt Quick API能力或shaping等价性。三路径各三次活动、隐藏零文字工作与恢复/释放检查通过，详见[title-reels.md](title-reels.md)。该范围不代表DPR1/1.5或全平台选型完成；当前平台阶段选型归R16M3，D3D11/OpenGL补修和最终选型仍归R34。
+
+R16M3当前平台阶段选型保留整行glyph＋彩色Text：macOS真正隐藏Metal/OpenGL的DPR1/1.5/2完整文字/页眉/活动/缓存/恢复/释放矩阵均通过。Text与Canvas候选在高DPR仍存在具体像素失败和按字面重新shaping的语义限制，因此当前较低离屏CPU提交不能作为换入生产的依据。完整差异、三次成本、估算资源和复现入口见[title-reels.md](title-reels.md)。生产层/缓存/唯一FrameClock及Canvas滑尺选择不变；歌名自然宽度独立通知，隐藏完成仅一个排队回调，恢复取消陈旧完成。当前主线交接R17，Windows/Linux及可见/present/VSYNC范围与最终跨后端选型仍归R34。

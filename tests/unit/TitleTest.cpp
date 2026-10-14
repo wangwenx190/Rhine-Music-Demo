@@ -7,6 +7,7 @@
 #include <QAbstractItemModelTester>
 #include <QTextLayout>
 #include <QRawFont>
+#include <QSignalSpy>
 #include <algorithm>
 #include <cmath>
 
@@ -241,6 +242,57 @@ private slots:
             QCOMPARE(track.sample().value, -30.0);
             QCOMPARE(track.sample().velocity, 0.0);
         }
+    }
+    void naturalWidthDoesNotRetargetDuringVisibilityChanges()
+    {
+        yalahoo::TitleReel reel;
+        reel.setFont(yalahoo::assetFont(400));
+        reel.setTransport(true);
+        reel.setText(QStringLiteral("歌曲标题"));
+        reel.componentComplete();
+        QSignalSpy widths(&reel, &yalahoo::TitleReel::naturalWidthChanged);
+        // Model the transport's visibility change while its width binding is evaluated.
+        connect(&reel, &yalahoo::TitleReel::naturalWidthChanged, &reel, [&] {
+            reel.setActive(false);
+        });
+        reel.setText(QStringLiteral("更长的歌曲标题"));
+        reel.reconcile();
+        QCOMPARE(widths.count(), 1);
+        const double width = reel.naturalWidth();
+        reel.setActive(true);
+        reel.finish();
+        reel.advance(.05);
+        QCOMPARE(reel.naturalWidth(), width);
+        QCOMPARE(widths.count(), 1);
+    }
+    void hiddenFinishIsDeferredAndCoalesced()
+    {
+        yalahoo::TitleReel reel;
+        reel.setFont(yalahoo::assetFont(400));
+        reel.setText(QStringLiteral("第一首歌曲"));
+        reel.componentComplete();
+        reel.setText(QStringLiteral("下一首歌曲"));
+        reel.reconcile();
+        QVERIFY(reel.moving());
+        QSignalSpy frames(&reel, &yalahoo::TitleReel::changed);
+        for (int i = 0; i < 10; ++i) {
+            reel.setActive(false);
+            reel.setActive(true);
+        }
+        reel.setActive(false);
+        QCOMPARE(frames.count(), 0);
+        QCoreApplication::sendPostedEvents(&reel, QEvent::MetaCall);
+        QCOMPARE(frames.count(), 1);
+        QVERIFY(!reel.moving());
+        // A restored item must retain its motion when an old hide callback arrives.
+        reel.setActive(true);
+        reel.setText(QStringLiteral("恢复的歌曲"));
+        reel.reconcile();
+        QVERIFY(reel.moving());
+        reel.setActive(false);
+        reel.setActive(true);
+        QCoreApplication::sendPostedEvents(&reel, QEvent::MetaCall);
+        QVERIFY(reel.moving());
     }
     void boundedPoolAndSingleClock()
     {

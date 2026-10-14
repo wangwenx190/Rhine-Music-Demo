@@ -126,7 +126,11 @@ public:
                  { "colorFormat", "RGBA8" },
                  { "samples", 1 },
                  { "mips", false },
+                 { "colorBytesPerPixel", 4 },
+                 { "depthStencilBytesPerPixelUpperBound", 8 },
+                 { "attachmentEstimateBytesPerPixel", 12 },
                  { "attachmentPeakBytesUpperBound", double(m_peakBytes) },
+                 { "actualDriverAllocationBytes", QJsonValue::Null },
                  { "includesQtLayersOrFontAtlas", false } };
     }
 signals:
@@ -159,8 +163,12 @@ private:
             if (size.isEmpty() || size.width() > limit || size.height() > limit)
                 qFatal("Offscreen target exceeds the device texture limit");
             const QSize oldSize = m_texture ? m_texture->pixelSize() : QSize();
-            const qint64 bytes = qint64(size.width()) * size.height() * 8;
-            const qint64 oldBytes = qint64(oldSize.width()) * oldSize.height() * 8;
+            // RGBA8 is 4 bytes; depth/stencil may use an 8-byte format (D32FS8).
+            // Include both old/new plans even if the driver uses memoryless storage.
+            constexpr qint64 attachmentBytesPerPixel = 4 + 8;
+            const qint64 bytes = qint64(size.width()) * size.height() * attachmentBytesPerPixel;
+            const qint64 oldBytes =
+                    qint64(oldSize.width()) * oldSize.height() * attachmentBytesPerPixel;
             m_peakBytes = std::max(m_peakBytes, bytes + oldBytes);
             m_window.setRenderTarget({ });
             m_target.reset();

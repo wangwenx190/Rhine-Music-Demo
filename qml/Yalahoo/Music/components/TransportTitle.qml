@@ -39,7 +39,7 @@ Button {
             width: Math.max(0, root.cap - 18)
             height: 29
             budget: 29
-            visible: root.width > 0 && root.opacity > 0
+            visible: root.title.length > 0 || transition.moving
         }
     }
     TransportMotion {

@@ -433,8 +433,19 @@ void TitleReel::setActive(bool value)
     if (m_active == value)
         return;
     m_active = value;
-    if (!value)
-        finish();
+    if (!value && !m_finishPending) {
+        // Visibility is evaluated by QML bindings. Publishing finished motion here
+        // can synchronously reevaluate the same binding through the transport.
+        m_finishPending = true;
+        QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    m_finishPending = false;
+                    if (!m_active)
+                        finish();
+                },
+                Qt::QueuedConnection);
+    }
     emit inputChanged();
 }
 int TitleReel::slotCount() const
@@ -492,6 +503,7 @@ void TitleReel::reconcile()
     const bool instant = m_instant || m_reduced || !m_active || m_displayed.isEmpty()
             || (m_displayed == m_text && !moving()) || (m_clock && !m_clock->applicationVisible());
     m_instant = false;
+    const double previousNaturalWidth = m_target.naturalWidth;
     m_target = m_layout.measure(m_text, m_font, m_subtitle, m_size, m_width, m_budget, m_narrow,
                                 m_dpr, m_transport);
     QSet<QString> keys;
@@ -547,6 +559,8 @@ void TitleReel::reconcile()
         finish();
     else if (!moving())
         prune();
+    if (previousNaturalWidth != m_target.naturalWidth)
+        emit naturalWidthChanged();
     emit changed();
 }
 void TitleReel::prune()

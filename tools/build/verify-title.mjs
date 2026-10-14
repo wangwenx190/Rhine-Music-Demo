@@ -82,12 +82,17 @@ if (native.status !== 0 || !Number.isFinite(nativeDpr) || nativeDpr <= 0)
     throw Error('Native screen DPR query failed');
 environment.QT_SCALE_FACTOR = String(dpr / nativeDpr);
 const result = run(['--titles', output, source], 'title-audit.txt');
+if (/Binding loop detected|Failed to build graphics pipeline|No GLSL shader code found/.test(
+        (result.stdout || '') + (result.stderr || '')))
+    throw Error('QML binding or shader pipeline failure; output retained in ' + output);
 if (result.status !== 0 && !(diagnostics && result.status === 6))
     throw Error('Title audit exited ' + result.status + '; output retained in ' + output);
 const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
 if (process.platform === 'darwin'
     && (!report.offscreen || report.renderProtocol !== 'render-control-gui-thread'
-        || report.offscreenResourcePlan?.nativeWindowVisible !== false))
+        || report.offscreenResourcePlan?.nativeWindowVisible !== false
+        || report.offscreenResourcePlan?.attachmentEstimateBytesPerPixel !== 12
+        || report.offscreenResourcePlan?.actualDriverAllocationBytes !== null))
     throw Error('macOS title verification requires a hidden RenderControl target');
 const production = report.captures.filter((capture) => capture.mode === 0);
 if (report.backend !== options.backend || Math.abs(report.dpr - dpr) > 0.001 || !report.released

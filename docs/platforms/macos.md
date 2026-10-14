@@ -324,3 +324,5 @@ QSG_RHI_BACKEND=metal build/release/bin/yalahoo.app/Contents/MacOS/yalahoo --ver
 ```
 
 对 DPR 1/1.5/2 应先查询 `ui-audit --native-dpr`，将 QT_SCALE_FACTOR 设为目标 DPR / 查询值，并核对报告的实际 DPR。检查九尺寸双主题、短屏滚动、SVG 与字体/emoji 回退、主题按钮输入、无焦点窗口策略，以及双 API 静止、hide/restore/resize/十次重建结果。PNG 只采集自身渲染或提交的 swapchain，禁止桌面截屏或激活窗口。窗口管理器不支持置底/拒绝焦点时须报告实际失败；目标平台的颜色、GPU 时间及呈现不能由 Windows 成绩代替。此处实际结果：待用户填写。
+
+R16M3阶段交接：当前同机Release/arm64的隐藏Metal与OpenGL均已覆盖实际DPR1/1.5/2完整20项文字、18项页眉、三路径各三次120帧与十次恢复/释放，23项启用CTest、格式、两组qmllint/qsb通过。macOS显式OpenGL在应用创建前请求4.1/CoreProfile，解决旧默认GLSL120的pipeline失败；歌名绑定环由自然宽度独立通知、状态可见性及有界queued隐藏完成消除。原失败、候选高DPR不等价和CPU成本分别保留，阶段生产继续整行glyph＋彩色Text，详见[title-reels.md](../contracts/title-reels.md)。当前R16实现依赖已满足，下一轮R17；四项可见runtime、present/VSYNC和其他目标平台的共享hide回归仍依R34，不宣称全平台最终选型完成。

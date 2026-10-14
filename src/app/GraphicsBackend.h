@@ -1,12 +1,21 @@
 #pragma once
 #include <QQuickWindow>
 #include <QSGRendererInterface>
+#include <QSurfaceFormat>
 
 namespace yalahoo {
 inline bool selectGraphicsBackend()
 {
     const auto requested = qgetenv("QSG_RHI_BACKEND");
     if (requested == "opengl") {
+#if defined(Q_OS_MACOS)
+        // Cocoa's legacy default cannot consume the Kit's GLSL 150 shaders.
+        // Select the core context before QGuiApplication creates any shared contexts.
+        auto format = QSurfaceFormat::defaultFormat();
+        format.setVersion(4, 1);
+        format.setProfile(QSurfaceFormat::CoreProfile);
+        QSurfaceFormat::setDefaultFormat(format);
+#endif
         QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
         return true;
     }
