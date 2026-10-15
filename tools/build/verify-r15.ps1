@@ -20,7 +20,7 @@ foreach ($name in $names) {
 Push-Location -LiteralPath $repository
 try {
     . (Join-Path $PSScriptRoot 'enter-msvc.ps1')
-    Run 'configure.txt' { cmake --preset qt-release -DYALAHOO_REVIEW=OFF }
+    Run 'configure.txt' { cmake --preset qt-release -DYALAHOO_REVIEW=ON }
     Run 'format.txt' { cmake --build --preset qt-release --target format }
     Run 'check-format.txt' { cmake --build --preset qt-release --target check-format }
     Run 'build.txt' { cmake --build --preset qt-release }
@@ -56,7 +56,10 @@ try {
             }
         }
         $env:QT_SCALE_FACTOR = (1 / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
-        Run "$backend-production.txt" { & ./build/release/bin/yalahoo.exe --verify-navigation (Join-Path $evidence "$backend-production") }
+        $process = Start-Process -FilePath './build/release/bin/yalahoo.exe' -ArgumentList @('--verify-navigation', ('"' + (Join-Path $evidence "$backend-production") + '"')) -Wait -PassThru
+        if ($process.ExitCode -ne 0 -or -not (Get-Content -Raw (Join-Path $evidence "$backend-production/report.json") | ConvertFrom-Json).passed) {
+            throw 'Product navigation verification failed'
+        }
     }
     Run 'ctest.txt' { ctest --preset qt-release --output-on-failure }
     Run 'shader.txt' { & "$($chain.qtKit)/bin/qsb.exe" --dump build/release/src/app/.qsb/edge-fade.frag.qsb }

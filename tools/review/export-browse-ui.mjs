@@ -79,6 +79,8 @@ const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
 let executable;
 for (const candidate
          of [process.env.REVIEW_BROWSER,
+             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+             '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
              path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
              path.join(process.env['PROGRAMFILES(X86)'] || '',
                        'Microsoft/Edge/Application/msedge.exe')]
@@ -143,7 +145,6 @@ try {
     await wait(() => page.evaluate('window.ready'));
     const captures = [];
     for (const dpr of (process.argv.includes('--dpr-1') ? [1] : [1, 1.5, 2])) {
-        let index = 0;
         for (const [width, height] of [[1920, 1080], [1280, 720], [995, 858], [960, 900],
                                        [930, 900], [390, 844], [320, 720], [2560, 1080],
                                        [3440, 1440]]) {
@@ -153,62 +154,7 @@ try {
                 const input = {width, height, dpr, night};
                 const bounds =
                     await page.evaluate('window.renderCase(' + JSON.stringify(input) + ')');
-                const file = 'browse-' + String(index++).padStart(2, '0') + '-dpr-' + dpr + '.png';
-                const image = await page.send('Page.captureScreenshot',
-                                              {format: 'png', captureBeyondViewport: false});
-                await fs.writeFile(path.join(output, file), Buffer.from(image.data, 'base64'));
-                captures.push({...input, ...bounds, file});
-                await page.send('Emulation.setDefaultBackgroundColorOverride',
-                                {color: {r: 0, g: 0, b: 0, a: 0}});
-                await page.evaluate('window.setAlpha(true)');
-                const alpha = await page.send('Page.captureScreenshot',
-                                              {format: 'png', captureBeyondViewport: false});
-                const alphaFile = 'alpha-' + file;
-                await fs.writeFile(path.join(output, alphaFile), Buffer.from(alpha.data, 'base64'));
-                captures.at(-1).alphaFile = alphaFile;
-                for (const region of ['transport']) {
-                    const rect = {
-                        x: bounds.nav.x,
-                        y: bounds.nav.y - 1,
-                        width: bounds.nav.width,
-                        height: bounds.nav.height + 2
-                    };
-                    const selector = '.music-topnav';
-                    const originRect = await page.evaluate('window.mountOutline('
-                                                           + JSON.stringify(selector) + ')');
-                    const clip = {
-                        x: (rect.x - originRect.x) * 8,
-                        y: (rect.y - originRect.y) * 8,
-                        width: rect.width * 8,
-                        height: rect.height * 8,
-                        scale: 1
-                    };
-                    // Negative padding is placed in the clone transform instead of a screenshot's negative clip.
-                    await page.evaluate('window.translateOutline(' + Math.max(0, -clip.x) + ','
-                                        + Math.max(0, -clip.y) + ')');
-                    clip.x = Math.max(0, clip.x);
-                    clip.y = Math.max(0, clip.y);
-                    await page.send('Emulation.setDeviceMetricsOverride', {
-                        width: Math.ceil(clip.x + clip.width + 4),
-                        height: Math.max(160, Math.ceil(clip.y + clip.height + 4)),
-                        deviceScaleFactor: dpr,
-                        mobile: false
-                    });
-                    await page.evaluate('window.paintReady()');
-                    const high =
-                        await page.send('Page.captureScreenshot',
-                                        {format: 'png', captureBeyondViewport: false, clip});
-                    const highFile = region + '-outline-' + file;
-                    await fs.writeFile(path.join(output, highFile),
-                                       Buffer.from(high.data, 'base64'));
-                    captures.at(-1)[region + 'Outline'] = highFile;
-                    await page.evaluate('window.removeOutline()');
-                    await page.send('Emulation.setDeviceMetricsOverride',
-                                    {width, height, deviceScaleFactor: dpr, mobile: false});
-                    await page.evaluate('window.paintReady()');
-                }
-                await page.evaluate('window.setAlpha(false)');
-                await page.send('Emulation.setDefaultBackgroundColorOverride', {});
+                captures.push({...input, ...bounds});
             }
         }
     }

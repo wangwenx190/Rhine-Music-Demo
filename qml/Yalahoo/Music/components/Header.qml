@@ -44,7 +44,9 @@ Item {
             width: parent.width
             height: root.brandHeight * 208 / 104
             source: "qrc:/assets/branding/logo-" + (root.tokens.night ? "dark" : "light") + ".svg"
-            sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+            readonly property real outputDpr: Window.window ? Window.window.devicePixelRatio :
+                                                              Screen.devicePixelRatio
+            sourceSize: Qt.size(width * outputDpr, height * outputDpr)
         }
         ArchiveText {
             tokens: root.tokens
@@ -127,15 +129,18 @@ Item {
         Item {
             id: transport
             objectName: "minimalTransport"
-            readonly property real songCap: root.metrics.width <= 700 ? Math.max(0, Math.min(100,
-                                                                                             root.metrics.width
-                                                                                             - 340)) : root.narrow
-                                                                        ? Math.max(0, Math.min(180,
+            readonly property real songCap: root.metrics.portrait ? Math.max(0, Math.min(280,
+                                                                                         root.metrics.width
+                                                                                         - 320)) : root.metrics.width
+                                                                    <= 700 ? Math.max(0, Math.min(
+                                                                                          100, root.metrics.width
+                                                                                          - 340)) : root.narrow
+                                                                             ? Math.max(0, Math.min(
+                                                                                            180, root.metrics.width
+                                                                                            - 610)) : Math.max(
+                                                                                   0, Math.min(240,
                                                                                                root.metrics.width
-                                                                                               - 610)) : Math.max(
-                                                                              0, Math.min(240,
-                                                                                          root.metrics.width
-                                                                                          - 760))
+                                                                                               - 760))
             readonly property real songWidth: song.width
             width: root.metrics.portrait ? root.width - 28 - 28 - 104 - 28 - root.navGap * 4 : 12
                                            + songWidth + 29 * 2 + 7
@@ -185,9 +190,10 @@ Item {
                         scale: .7 + .3 * opacity
                         source: "qrc:/assets/icons/play-" + (root.tokens.night ? "night" : "day")
                                 + ".svg"
-                        sourceSize: Qt.size(width * Screen.devicePixelRatio * 4, height * Screen.devicePixelRatio
-                                            * 4)
-                        mipmap: true
+                        readonly property real outputDpr: Window.window
+                                                          ? Window.window.devicePixelRatio :
+                                                            Screen.devicePixelRatio
+                        sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                     }
                     Image {
                         anchors.centerIn: parent
@@ -197,9 +203,10 @@ Item {
                         scale: .7 + .3 * opacity
                         source: "qrc:/assets/icons/pause-" + (root.tokens.night ? "night" : "day")
                                 + ".svg"
-                        sourceSize: Qt.size(width * Screen.devicePixelRatio * 4, height * Screen.devicePixelRatio
-                                            * 4)
-                        mipmap: true
+                        readonly property real outputDpr: Window.window
+                                                          ? Window.window.devicePixelRatio :
+                                                            Screen.devicePixelRatio
+                        sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                     }
                 }
                 onClicked: root.actionRequested("play-pause")

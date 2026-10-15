@@ -37,7 +37,8 @@ Item {
         digits: root.digits
         value: root.value
         reducedMotion: root.tokens.reducedMotion
-        active: root.visible && (!root.Window.window || root.Window.window.visible)
+        active: root.visible && (root.tokens.offscreenRendering || !root.Window.window
+                                 || root.Window.window.visible)
     }
     Row {
         height: root.cssPixelSize

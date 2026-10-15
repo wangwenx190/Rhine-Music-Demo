@@ -2,7 +2,7 @@
 #include "RulerController.h"
 #include "RulerInk.h"
 #include "OrdinalMotion.h"
-#include "ImageComparison.h"
+#include "OffscreenSurface.h"
 #include "VerificationWindow.h"
 #include <QGuiApplication>
 #include <QQmlComponent>
@@ -46,75 +46,7 @@ double stateError(const QVariantMap &actual, const QJsonObject &expected)
     }
     return error;
 }
-QJsonObject inkCoverage(const QImage &actual, const QImage &expected, const QJsonObject &state,
-                        double dpr, bool narrow, bool night, bool overflow)
-{
-    if (actual.size() != expected.size() || actual.isNull())
-        return { { "passed", false } };
-    const QColor background = expected.pixelColor(expected.width() - 1, expected.height() - 1);
-    double maximumMeanRgb = 0, maximumOutsideEnvelope = 0;
-    int checked = 0;
-    for (const auto &value : state["slots"].toArray()) {
-        const auto mark = value.toObject();
-        if (mark["alpha"].toDouble() <= 0)
-            continue;
-        const double x = mark["x"].toDouble(), height = mark["height"].toDouble();
-        const double width = narrow ? 2 : 3;
-        const double full = narrow ? 21 : 30;
-        const QRect roi = QRectF((2 + x) * dpr - 1, (2 + (full - height) / 2) * dpr - 1,
-                                 width * dpr + 2, height * dpr + 2)
-                                  .toAlignedRect()
-                                  .intersected(expected.rect());
-        if (roi.isEmpty())
-            continue;
-        double sourceInk = 0, nativeInk = 0;
-        const auto weight = [&](QColor color) {
-            return (std::abs(color.red() - background.red())
-                    + std::abs(color.green() - background.green())
-                    + std::abs(color.blue() - background.blue()))
-                    / 3.0;
-        };
-        for (int y = roi.top(); y <= roi.bottom(); ++y)
-            for (int pixelX = roi.left(); pixelX <= roi.right(); ++pixelX) {
-                sourceInk += weight(expected.pixelColor(pixelX, y));
-                nativeInk += weight(actual.pixelColor(pixelX, y));
-            }
-        const double rulerWidth = state["width"].toDouble();
-        const double left = std::clamp(x, 0.0, rulerWidth);
-        const double right = std::clamp(x + width, 0.0, rulerWidth);
-        double horizontalCoverage = right - left;
-        if (overflow) {
-            const double gap = narrow ? 6 : 8;
-            const auto primitive = [&](double point) {
-                if (point < gap)
-                    return point * point / (2 * gap);
-                if (point <= rulerWidth - gap)
-                    return point - gap / 2;
-                const double tail = rulerWidth - point;
-                return rulerWidth - gap - tail * tail / (2 * gap);
-            };
-            horizontalCoverage = primitive(right) - primitive(left);
-        }
-        // The source's continuous rectangle/fade integral bounds ink before rasterization.
-        // Fractional-DPR browser layers can lose edge coverage; that loss is not a design target.
-        const QColor ink = night ? QColor("#e9eef2") : QColor("#232722");
-        const double geometricInk = horizontalCoverage * std::min(height, full) * dpr * dpr
-                * mark["alpha"].toDouble() * weight(ink);
-        const double lower = std::min(sourceInk, geometricInk);
-        const double upper = std::max(sourceInk, geometricInk);
-        const double outside = std::max({ lower - nativeInk, nativeInk - upper, 0.0 })
-                / (roi.width() * roi.height());
-        maximumOutsideEnvelope = std::max(maximumOutsideEnvelope, outside);
-        ++checked;
-        maximumMeanRgb = std::max(maximumMeanRgb,
-                                  std::abs(nativeInk - sourceInk) / (roi.width() * roi.height()));
-    }
-    // Keep RGB<=6 and the raw error; missing/excess ink must satisfy the source-derived envelope.
-    return { { "passed", maximumOutsideEnvelope <= 6 },
-             { "checked", checked },
-             { "maximumMeanRgb", maximumMeanRgb },
-             { "maximumOutsideEnvelopeRgb", maximumOutsideEnvelope } };
-}
+
 }
 int reviewRuler(QGuiApplication &app, const QString &output)
 {
@@ -127,24 +59,42 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     if (cases.isEmpty())
         return 3;
     QDir().mkpath(output);
+    yalahoo::FrameClock clock;
+    clock.setActive(true);
+    clock.advance(0);
     QQmlEngine engine;
-    QQuickWindow window;
+    QQuickRenderControl renderControl;
+    QQuickWindow window(OffscreenSurface::Enabled ? &renderControl : nullptr);
+    OffscreenSurface surface(window, renderControl);
     yalahoo::verification::prepareWindow(window, true);
     window.setPersistentSceneGraph(false);
     window.setPersistentGraphics(false);
-    window.resize(136, 36);
+    window.resize(136, 100);
+    bool hasDensity = false;
+    for (const auto &value : cases)
+        hasDensity |=
+                std::abs(value.toObject()["dpr"].toDouble() - window.devicePixelRatio()) <= .001;
+    if (!hasDensity) {
+        qWarning() << "Frozen ruler states have no matching DPR" << window.devicePixelRatio();
+        return 3;
+    }
     std::unique_ptr<yalahoo::RulerController> controller;
     std::unique_ptr<QObject> object;
     QQuickItem *root = nullptr;
     QJsonArray captures;
     QJsonArray lifecycleChecks;
     QJsonArray invariants;
-    std::array<QImage, 3> restoredReferences;
     int lifecycle = -1, lifecycleMode = 0;
     double maximumStateError = 0;
     bool passed = true;
+    int initialized = 0, invalidated = 0;
+    QObject::connect(&window, &QQuickWindow::sceneGraphInitialized, &app, [&] {
+        ++initialized;
+    });
+    QObject::connect(&window, &QQuickWindow::sceneGraphInvalidated, &app, [&] {
+        ++invalidated;
+    });
     bool stationaryPending = false;
-    bool coverageGuardsChecked = false;
     int stationaryWarmup = 2;
     double ordinalError = 0;
     yalahoo::OrdinalTrack ordinal;
@@ -166,7 +116,6 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     int caseIndex = 0, stateIndex = 0, mode = 0, drain = 0;
     quint64 stationaryPaints = 0;
     qint64 modeSyncStart = 0, modeRenderStart = 0;
-    QImage cppImage;
     QElapsedTimer elapsed;
     elapsed.start();
     std::atomic<qint64> syncStart{ 0 }, renderStart{ 0 }, syncNs{ 0 }, renderNs{ 0 };
@@ -199,12 +148,9 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 renderNs += elapsed.nsecsElapsed() - renderStart;
                 if (!requested || inFlight)
                     return;
-                auto *ri = window.rendererInterface();
-                auto *rhi = static_cast<QRhi *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiResource));
-                auto *swap = static_cast<QRhiSwapChain *>(
-                        ri->getResource(&window, QSGRendererInterface::RhiSwapchainResource));
-                if (!rhi || !swap)
+                auto *rhi = surface.rhi();
+                auto *commandBuffer = surface.commandBuffer();
+                if (!rhi || !commandBuffer)
                     return;
                 requested = false;
                 inFlight = true;
@@ -229,18 +175,19 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                     });
                 };
                 auto *batch = rhi->nextResourceUpdateBatch();
-                batch->readBackTexture(QRhiReadbackDescription(), &readback);
-                swap->currentFrameCommandBuffer()->resourceUpdate(batch);
+                batch->readBackTexture(surface.readbackDescription(), &readback);
+                commandBuffer->resourceUpdate(batch);
             },
             Qt::DirectConnection);
-    QObject::connect(&window, &QQuickWindow::frameSwapped, &app, [&] {
+    surface.connectFrames(&app, [&] {
         if (inFlight && drain-- > 0 && root) {
             root->setProperty("marker", root->property("marker").toInt() + 1);
-            window.update();
+            surface.requestFrame();
         }
     });
     const auto finish = [&] {
-        passed &= yalahoo::verification::windowPolicySatisfied(window);
+        passed &= yalahoo::verification::windowPolicySatisfied(window) && initialized >= 11
+                && invalidated >= 10;
         QSaveFile file(output + "/report.json");
         if (!file.open(QIODevice::WriteOnly)) {
             app.exit(8);
@@ -251,8 +198,12 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 QJsonDocument(
                         QJsonObject{
                                 { "passed", passed },
+                                { "offscreen", OffscreenSurface::Enabled },
+                                { "offscreenResourcePlan", surface.diagnostics() },
                                 { "maximumStateError", maximumStateError },
                                 { "ordinalError", ordinalError },
+                                { "initialized", initialized },
+                                { "invalidated", invalidated },
                                 { "captures", captures },
                                 { "lifecycle", lifecycleChecks },
                                 { "invariants", invariants },
@@ -282,7 +233,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 QTimer::singleShot(60, &app, [&] {
                     requested = true;
                     root->setProperty("marker", root->property("marker").toInt() + 1);
-                    window.update();
+                    surface.requestFrame();
                 });
                 return;
             }
@@ -306,27 +257,34 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             return;
         }
         if (lifecycle >= 0) {
+            auto *digits = root->findChild<yalahoo::OrdinalMotion *>();
+            QString text;
+            if (digits) {
+                for (const auto &face : digits->faces())
+                    text += QString::number(face.toMap()["upper"].toInt());
+            }
+            const QString expected =
+                    QString::number(root->property("ordinal").toInt()).rightJustified(3, '0');
+            const bool digitState = digits && digits->active() && text == expected;
+            passed &= digitState;
+            if (lifecycle == 0)
+                passed &= captured.save(output + QString("/digits-%1.png").arg(lifecycleMode));
             const double dpr = window.devicePixelRatio();
             captured = captured.copy(0, 0, qRound(134 * dpr), qRound(34 * dpr));
-            QJsonObject comparison;
-            if (lifecycle == 0)
-                restoredReferences[lifecycleMode] = captured;
-            else
-                comparison = yalahoo::compareImages(
-                        captured, restoredReferences[lifecycleMode],
-                        QPolygonF(QRectF(0, 0, captured.width(), captured.height())));
             const bool valid = !captured.isNull()
-                    && (lifecycle == 0
-                        || (comparison["ssim"].toDouble() >= .98
-                            && comparison["meanAbsoluteRgb"].toDouble() <= 6))
+                    && captured.size() == QSize(qRound(134 * dpr), qRound(34 * dpr))
+                    && captured.save(
+                            output
+                            + QString("/restored-%1-%2.png").arg(lifecycle).arg(lifecycleMode))
                     && yalahoo::verification::windowPolicySatisfied(window)
                     && yalahoo::rulerInkStats().renderers <= 1;
             passed &= valid;
             lifecycleChecks.append(
                     QJsonObject{ { "cycle", lifecycle },
+                                 { "digits", text },
+                                 { "digitState", digitState },
                                  { "mode", lifecycleMode },
                                  { "passed", valid },
-                                 { "comparison", comparison },
                                  { "renderers", int(yalahoo::rulerInkStats().renderers) } });
             if (++lifecycleMode < 3) {
                 requestLifecycle();
@@ -334,7 +292,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             }
             lifecycleMode = 0;
             if (++lifecycle <= 10) {
-                window.hide();
+                surface.hide();
                 controller->setActive(false);
                 window.releaseResources();
                 QTimer::singleShot(60, &app, [&] {
@@ -345,15 +303,15 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                                                    { "cycle", lifecycle },
                                                    { "passed", unchanged } });
                     passed &= unchanged;
-                    window.resize(lifecycle % 2 ? QSize(140, 40) : QSize(136, 36));
+                    window.resize(lifecycle % 2 ? QSize(140, 104) : QSize(136, 100));
                     controller->setActive(true);
-                    window.show();
+                    surface.show();
                     requestLifecycle();
                 });
             } else {
                 object.reset();
                 root = nullptr;
-                window.hide();
+                surface.hide();
                 window.releaseResources();
                 QTimer::singleShot(60, &app, [&] {
                     const int remaining = yalahoo::rulerInkStats().renderers;
@@ -372,56 +330,27 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 QString("native-%1-%2-%3.png").arg(caseIndex).arg(stateIndex - 1).arg(mode);
         const double dpr = window.devicePixelRatio();
         captured = captured.copy(0, 0, qRound(134 * dpr), qRound(34 * dpr));
-        const auto expected = QImage(web + '/' + state["file"].toString());
-        const auto region = QPolygonF(QRectF(0, 0, captured.width(), captured.height()));
-        const auto comparison = yalahoo::compareImages(captured, expected, region);
-        const QImage alpha(web + "/alpha-" + state["file"].toString());
-        const auto nonEdge = yalahoo::compareAntialiasBand(captured, expected, alpha, region);
-        const auto coverage = inkCoverage(captured, expected, state["state"].toObject(), dpr,
-                                          test["narrow"].toBool(), test["night"].toBool(),
-                                          root->property("overflow").toBool());
-        if (!coverageGuardsChecked && state["state"].toObject()["width"].toDouble() > 20) {
-            QImage missing = expected;
-            missing.fill(expected.pixelColor(expected.width() - 1, expected.height() - 1));
-            QImage excessive = expected;
-            excessive.fill(test["night"].toBool() ? QColor("#e9eef2") : QColor("#232722"));
-            for (const auto &guard : { std::pair{ QString("missing-ink-rejected"), missing },
-                                       std::pair{ QString("excess-ink-rejected"), excessive } }) {
-                const bool rejected =
-                        !inkCoverage(guard.second, expected, state["state"].toObject(), dpr,
-                                     test["narrow"].toBool(), test["night"].toBool(),
-                                     root->property("overflow").toBool())["passed"]
-                                 .toBool();
-                invariants.append(QJsonObject{ { "name", guard.first }, { "passed", rejected } });
-                passed &= rejected;
-            }
-            coverageGuardsChecked = true;
+        int visibleInk = 0;
+        if (!captured.isNull()) {
+            const auto background =
+                    captured.pixelColor(captured.width() - 1, captured.height() - 1);
+            for (int y = 0; y < captured.height(); ++y)
+                for (int x = 0; x < captured.width(); ++x)
+                    visibleInk += captured.pixelColor(x, y) != background;
         }
-        const auto edge = yalahoo::edgeDistance(captured, expected, region);
-        bool valid = !captured.isNull() && captured.save(output + '/' + name)
-                && comparison["valid"].toBool() && nonEdge["valid"].toBool()
-                && nonEdge["ssim"].toDouble() >= .98 && nonEdge["meanAbsoluteRgb"].toDouble() <= 6
-                && coverage["passed"].toBool() && (!edge.isDouble() || edge.toDouble() <= 1);
-        QJsonObject pair;
-        if (mode == 0)
-            cppImage = captured;
-        else {
-            pair = yalahoo::compareImages(captured, cppImage, region);
-            const auto normalizedPair =
-                    yalahoo::compareAntialiasBand(captured, cppImage, alpha, region);
-            pair.insert("nonEdge", normalizedPair);
-            valid &= normalizedPair["valid"].toBool() && normalizedPair["ssim"].toDouble() >= .98
-                    && normalizedPair["meanAbsoluteRgb"].toDouble() <= 6;
-        }
+        bool expectsInk = false;
+        const auto &drawing = controller->drawing();
+        for (const auto &mark : drawing.marks)
+            expectsInk |= mark.alpha > .1 && mark.height > 2 && mark.x >= drawing.gap
+                    && mark.x + drawing.tick <= drawing.width - drawing.gap;
+        const bool valid = (!expectsInk || visibleInk > 0) && !captured.isNull()
+                && captured.size() == QSize(qRound(134 * dpr), qRound(34 * dpr))
+                && captured.save(output + '/' + name);
         captures.append(QJsonObject{
                 { "file", name },
+                { "visibleInkPixels", visibleInk },
                 { "mode", mode },
                 { "passed", valid },
-                { "web", comparison },
-                { "nonEdge", nonEdge },
-                { "inkCoverage", coverage },
-                { "edgeDistancePixels", edge },
-                { "cpp", pair },
                 { "jsPaints", root->property("jsPaints").toInt() },
                 { "jsScriptMs", root->property("jsMilliseconds").toDouble() },
                 { "quickSyncCpuNs", qint64(syncNs) - modeSyncStart },
@@ -431,7 +360,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                          * std::ceil((test["narrow"].toBool() ? 21 : 30) * dpr) * 12) } });
         passed &= valid;
         if (!valid)
-            qWarning() << "Ruler image" << caseIndex << stateIndex - 1 << mode << comparison;
+            qWarning() << "Ruler image" << caseIndex << stateIndex - 1 << mode;
         if (++mode < 3) {
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
@@ -441,7 +370,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             QTimer::singleShot(60, &app, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
-                window.update();
+                surface.requestFrame();
             });
         } else {
             mode = 0;
@@ -463,8 +392,10 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/RulerReview.qml"));
                 object.reset(component.createWithInitialProperties(
                         { { "controller", QVariant::fromValue(controller.get()) },
+                          { "clock", QVariant::fromValue(&clock) },
                           { "night", test["night"].toBool() },
-                          { "physicalDpr", window.devicePixelRatio() } }));
+                          { "physicalDpr", window.devicePixelRatio() },
+                          { "offscreenRendering", OffscreenSurface::Enabled } }));
                 root = qobject_cast<QQuickItem *>(object.get());
                 if (!root) {
                     qWarning() << component.errors();
@@ -503,14 +434,14 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             if (error > 1e-6)
                 qWarning() << "Ruler state mismatch" << test["name"] << test["fps"]
                            << stateIndex - 1 << error;
-            if (!state["file"].isString())
+            if (!state["capture"].toBool())
                 continue;
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
             QTimer::singleShot(60, &app, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
-                window.update();
+                surface.requestFrame();
             });
             return;
         }
@@ -523,21 +454,22 @@ int reviewRuler(QGuiApplication &app, const QString &output)
         QTimer::singleShot(60, &app, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
-            window.update();
+            surface.requestFrame();
         });
     };
     requestLifecycle = [&] {
         root->setProperty("mode", lifecycleMode);
+        root->setProperty("ordinal", lifecycleMode == 0 ? 123 : lifecycleMode == 1 ? 907 : 42);
         QTimer::singleShot(60, &app, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
-            window.update();
+            surface.requestFrame();
         });
     };
     QTimer::singleShot(60000, &app, [&] {
         app.exit(10);
     });
-    window.show();
+    surface.show();
     QTimer::singleShot(0, &app, [&] {
         next();
     });

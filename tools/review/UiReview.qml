@@ -7,6 +7,8 @@ import "pages"
 Rectangle {
     id: root
     required property LayoutMetrics metrics
+    property string lastAction: ""
+    property int actionCount: 0
     property bool night: false
     property bool probes: false
     property int probeMode: 0
@@ -37,6 +39,10 @@ Rectangle {
         albumCount: 27
         showNavigation: false
         playingTitle: root.playingTitle
+        onActionRequested: action => {
+            root.lastAction = action;
+            root.actionCount++;
+        }
         onThemeRequested: night => root.night = night
     }
     Loader {

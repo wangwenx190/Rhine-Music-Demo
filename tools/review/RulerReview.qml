@@ -7,6 +7,9 @@ import "components"
 Item {
     id: root
     required property RulerController controller
+    property FrameClock clock: null
+    property int ordinal: 123
+    property bool offscreenRendering: false
     property bool night: false
     property int mode: 0
     property int marker: 0
@@ -20,11 +23,12 @@ Item {
     readonly property real rulerHeight: controller.narrow ? 21 : 30
     property bool overflow: true
     width: 136
-    height: 36
+    height: 100
     DesignTokens {
         id: tokens
         night: root.night
         reducedMotion: true
+        offscreenRendering: root.offscreenRendering
     }
     Rectangle {
         anchors.fill: parent
@@ -42,6 +46,17 @@ Item {
         controller: root.controller
         tokens: tokens
         visible: root.mode === 0
+    }
+    OrdinalReel {
+        objectName: "ordinalProbe"
+        x: 2
+        y: 40
+        tokens: tokens
+        clock: root.clock
+        value: root.ordinal
+        digits: 3
+        cssPixelSize: 34
+        visible: root.controller.active
     }
     function rebuild() {
         rebuilding = true;
@@ -71,8 +86,9 @@ Item {
         Loader {
             width: root.controller.narrow ? 96 : 130
             height: root.rulerHeight
-            active: root.mode === 1 && root.surface && !root.rebuilding && root.Window.window
-                    && root.Window.window.visible && root.controller.width > 0
+            active: root.mode === 1 && root.surface && !root.rebuilding && root.Window.window && (
+                        root.offscreenRendering || root.Window.window.visible)
+                    && root.controller.active && root.controller.width > 0
             sourceComponent: Component {
                 Canvas2D {
                     id: canvas
@@ -97,7 +113,7 @@ Item {
                         const ctx = getContext("2d");
                         ctx.reset();
                         ctx.resetClipping();
-                        ctx.antialias = 1 / root.physicalDpr;
+                        ctx.antialias = 1;
                         const rulerWidth = root.controller.width;
                         for (const mark of root.controller.slotStates) {
                             if (mark.alpha <= 0 || mark.x + root.tick <= 0 || mark.x

@@ -20,7 +20,7 @@ foreach ($name in $names) {
 }
 try {
     . (Join-Path $PSScriptRoot 'enter-msvc.ps1')
-    Run 'configure.txt' { cmake --preset qt-release -DYALAHOO_REVIEW=OFF }
+    Run 'configure.txt' { cmake --preset qt-release -DYALAHOO_REVIEW=ON }
     Run 'format.txt' { cmake --build --preset qt-release --target format }
     Run 'check-format.txt' { cmake --build --preset qt-release --target check-format }
     Run 'build.txt' { cmake --build --preset qt-release }
@@ -41,11 +41,7 @@ try {
         foreach ($dpr in @(1, 1.5, 2)) {
             $env:QT_SCALE_FACTOR = ($dpr / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
             $directory = Join-Path $evidence "$backend-dpr-$dpr"
-            if ($dpr -eq 1) {
-                Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe $directory }
-            } else {
-                Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe $directory --representative }
-            }
+            Run "$backend-dpr-$dpr.txt" { & ./build/release/tools/ui-audit.exe $directory }
             $report = Get-Content -Raw (Join-Path $directory 'report.json') | ConvertFrom-Json
             if (-not $report.passed -or [Math]::Abs($report.probes[0].dpr - $dpr) -gt 0.001) {
                 throw 'Drawing verification failed or DPR differs from requested input'
@@ -54,7 +50,10 @@ try {
     }
     $env:QSG_RHI_BACKEND = 'd3d11'
     $env:QT_SCALE_FACTOR = (1 / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
-    Run 'production.txt' { & ./build/release/bin/yalahoo.exe --verify-browse (Join-Path $evidence 'production') }
+    $process = Start-Process -FilePath './build/release/bin/yalahoo.exe' -ArgumentList @('--verify-browse', ('"' + (Join-Path $evidence 'production') + '"')) -Wait -PassThru
+    if ($process.ExitCode -ne 0 -or -not (Get-Content -Raw (Join-Path $evidence 'production/report.json') | ConvertFrom-Json).passed) {
+        throw 'Product browse verification failed'
+    }
     Run 'ctest.txt' { ctest --preset qt-release --output-on-failure }
     Run 'paired-ui.txt' { & ./tools/review/compare-browse-ui.ps1 }
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{

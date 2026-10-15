@@ -54,6 +54,14 @@ if(WIN32)
 endif()
 qt_add_executable(LibraryQmlTest LibraryQmlTest.cpp)
 add_test(NAME ui-drawing COMMAND ui-audit "${CMAKE_BINARY_DIR}/verification/ui-drawing" --representative)
+add_test(NAME ruler-drawing COMMAND ui-audit --ruler "${CMAKE_BINARY_DIR}/verification/ruler-drawing")
+set_tests_properties(ruler-drawing PROPERTIES TIMEOUT 120
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(ruler-drawing PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 # Match migration verification's render loop and explicit native scale factor.
 # Factor 1 keeps the screen's real DPR; it does not force a DPR1 framebuffer.
 set_tests_properties(ui-drawing PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1")

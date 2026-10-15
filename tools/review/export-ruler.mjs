@@ -64,6 +64,8 @@ const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
 let executable;
 for (const candidate
          of [process.env.REVIEW_BROWSER,
+             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+             '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
              path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
              path.join(process.env['PROGRAMFILES(X86)'] || '',
                        'Microsoft/Edge/Application/msedge.exe')]
@@ -112,17 +114,9 @@ try {
     const version = await browser.send('Browser.getVersion');
     console.log('Browser version read');
 
+    const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
     const targets = await (await fetch('http://127.0.0.1:' + port[0] + '/json/list')).json();
-    const target = targets.find((entry) => entry.type === 'page');
-    const {sessionId} =
-        await browser.send('Target.attachToTarget', {targetId: target.id, flatten: true});
-    page = {
-        send: (method, params) => browser.send(method, params, sessionId),
-        on: (method, callback) => browser.on(method, callback),
-        evaluate: CDP.prototype.evaluate,
-        close: () => {
-        }
-    };
+    page = await CDP.connect(targets.find((entry) => entry.id === targetId).webSocketDebuggerUrl);
     console.log('Page connected');
     console.log('Enabling Runtime');
     await page.send('Runtime.enable');
@@ -168,34 +162,8 @@ try {
                             const state = await page.evaluate(
                                 'window.rulerOperation(' + JSON.stringify(op) + ',' + fps + ','
                                 + (dpr === 1 && !narrow && !night && fps === 120) + ')');
-                            let file = null;
-                            if (fps === 120 && (i === 0 || op.frames)) {
-                                file = 'ruler-' + captures.length + '-' + i + '.png';
-                                const png = await page.send('Page.captureScreenshot', {
-                                    format: 'png',
-                                    clip: {x: 0, y: 0, width: 134, height: 34, scale: 1}
-                                });
-                                await fs.writeFile(path.join(output, file),
-                                                   Buffer.from(png.data, 'base64'));
-                                await page.send('Emulation.setDefaultBackgroundColorOverride',
-                                                {color: {r: 0, g: 0, b: 0, a: 0}});
-                                await page.evaluate(
-                                    `window.savedBackground=document.body.style.background;
-                                    document.body.style.background='transparent';
-                                    window.outlineStyle=document.createElement('style');
-                                    window.outlineStyle.textContent='#album-ticks>button,#album-ticks .music-ruler-mark{opacity:1!important}';
-                                    document.head.append(window.outlineStyle)`);
-                                const alpha = await page.send('Page.captureScreenshot', {
-                                    format: 'png',
-                                    clip: {x: 0, y: 0, width: 134, height: 34, scale: 1}
-                                });
-                                await fs.writeFile(path.join(output, 'alpha-' + file),
-                                                   Buffer.from(alpha.data, 'base64'));
-                                await page.evaluate(`window.outlineStyle.remove();
-                                    document.body.style.background=window.savedBackground`);
-                                await page.send('Emulation.setDefaultBackgroundColorOverride', {});
-                            }
-                            states.push({op, state, file});
+                            const capture = fps === 120 && (i === 0 || Boolean(op.frames));
+                            states.push({op, state, capture});
                         }
                         captures.push({name: test.name, dpr, narrow, night, fps, states});
                     }

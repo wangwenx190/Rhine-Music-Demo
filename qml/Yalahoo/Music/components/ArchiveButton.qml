@@ -66,10 +66,8 @@ Button {
                     readonly property real outputDpr: Window.window
                                                       ? Window.window.devicePixelRatio :
                                                         Screen.devicePixelRatio
-                    // Preserve tiny circles and rounded caps before filtering
-                    // the SVG to the physical output extent.
-                    sourceSize: Qt.size(width * outputDpr * 4, height * outputDpr * 4)
-                    mipmap: true
+                    // Rasterize the source SVG at the actual output extent.
+                    sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                 }
                 Item {
                     visible: control.iconName === "settings"

@@ -12,9 +12,6 @@ document.querySelector('#selection-meta').textContent = '2026  ·  12 TRACKS';
 document.querySelector('#library-count').textContent = '27 ALBUMS';
 document.querySelector('#runtime-info').textContent = 'QT / LOCAL';
 let title = setupMusicTitleLayout(stage);
-let alphaStyle;
-let mask;
-let maskHolder;
 
 const paint = () => new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
@@ -75,67 +72,4 @@ window.renderCase = async (input) => {
         bottom: getComputedStyle(stage).getPropertyValue('--callout-bottom'),
     };
 };
-window.setAlpha = async (enabled) => {
-    if (enabled) {
-        alphaStyle = document.createElement('style');
-        alphaStyle.textContent = `
-html, body, #stage {
-    background: transparent !important;
-}
-.music-vignette, .music-browse-veil {
-    display: none !important;
-}
-.album-callout {
-    background: none !important;
-}
-`;
-        document.head.append(alphaStyle);
-    } else {
-        alphaStyle.remove();
-    }
-    await paint();
-};
-window.mountOutline = (selector) => {
-    const source = document.querySelector(selector);
-    const rect = source.getBoundingClientRect();
-    mask = source.cloneNode(true);
-    const originals = [source, ...source.querySelectorAll('*')];
-    const copies = [mask, ...mask.querySelectorAll('*')];
-    for (let i = 0; i < originals.length; ++i) {
-        const style = getComputedStyle(originals[i]);
-        for (const property of style) {
-            copies[i].style.setProperty(property, style.getPropertyValue(property), 'important');
-        }
-    }
-    for (const [property, value] of Object.entries({
-             position: 'fixed',
-             left: '0',
-             top: '0',
-             right: 'auto',
-             bottom: 'auto',
-             margin: '0',
-             'transform-origin': '0 0',
-             transform: 'scale(8)',
-             'z-index': '999999',
-         })) {
-        mask.style.setProperty(property, value, 'important');
-    }
-    // Preserve the frozen pseudo-elements and inherited theme rules as well as computed styles.
-    maskHolder = document.createElement('div');
-    maskHolder.className = 'music-app reduce-motion';
-    maskHolder.dataset.theme = stage.dataset.theme;
-    maskHolder.dataset.layout = stage.dataset.layout;
-    maskHolder.append(mask);
-    document.body.append(maskHolder);
-    stage.style.visibility = 'hidden';
-    return {x: rect.x, y: rect.y};
-};
-window.translateOutline = (x, y) => {
-    mask.style.setProperty('transform', `translate(${x}px,${y}px) scale(8)`, 'important');
-};
-window.removeOutline = () => {
-    maskHolder.remove();
-    stage.style.visibility = '';
-};
-window.paintReady = paint;
 window.ready = true;

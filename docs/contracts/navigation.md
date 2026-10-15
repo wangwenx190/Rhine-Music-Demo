@@ -44,7 +44,7 @@ renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不�
 ## 非像素验证入口
 
 - `NavigationTest`：滚轮余量/反向/上限、有限列、36px/1.3/1400ms触摸边界、控件所有权、循环点击、rebase、待提交目标/方向、隐藏及数字重定向。
-- `node tools/review/export-ruler.mjs`导出冻结数学；`ui-audit --ruler 输出目录`中的状态检查覆盖20/30/60/120fps及1/120秒槽采样，double误差≤1e-6。实际三API检查完整刻线/Quick clip、淡隐、两主题/桌面窄屏/实际DPR、零无效重绘及十次恢复/renderer归零；旧图像评分必须按R19E先拆耦。
-- Canvas2D比较项显式rect/fill，antialias=1/DPR维持物理AA宽度；不足一像素露出仍绘完整刻线后裁切。
+- `node tools/review/export-ruler.mjs`导出冻结数学；`ui-audit --ruler 输出目录`（CTest `ruler-drawing`）中的状态检查覆盖20/30/60/120fps及1/120秒槽采样，double误差≤1e-6。实际三API检查完整刻线/Quick clip、淡隐、两主题/桌面窄屏/实际DPR、零无效重绘及十次恢复/renderer归零；自身输出只用于内容/实际质量检查，不读浏览器PNG或运行图像分数。
+- Canvas2D比较项显式rect/fill，antialias保持Qt默认1，与C++路径同值，DPR由所属目标处理；不足一像素露出仍绘完整刻线后裁切。
 - `yalahoo --verify-navigation 输出目录`通过真实App发送pixelDelta/反向/切列/编辑焦点/有限端点/滑尺/主题/触摸/隐藏恢复事件，核对导航与播放隔离、input与实际提交revision。
-- 历史Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`不自动恢复旧图评分；共享测试分组见[test-gates.md](test-gates.md)，欠验归计划R19E/R34。
+- Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`复用非像素检查；源码审计统一为`python3 tools/audit/audit-browse-navigation.py`。共享测试分组见[test-gates.md](test-gates.md)，欠验只归计划R34的R19E-P。

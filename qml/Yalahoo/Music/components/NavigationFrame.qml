@@ -230,7 +230,8 @@ Item {
     Binding {
         target: root.rulerController
         property: "active"
-        value: root.visible && (!root.Window.window || root.Window.window.visible)
+        value: root.visible && (root.tokens.offscreenRendering || !root.Window.window
+                                || root.Window.window.visible)
         when: Boolean(root.rulerController)
     }
 }

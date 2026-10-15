@@ -2,7 +2,7 @@
 
 本文只保存历史轮次/提交→实际对象→适配或补偿判定；具体接口、算法参数、组件检查入口各归迁移计划职责索引中的组件契约。未完成任务/平台回归/BLUR与FLICKER退出条件只在迁移计划维护；运行数据、实验过程和成绩不在此追加。
 
-冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，尚未存在的R19E/F/G/H仍为待执行。
+冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，尚未存在的R19F/G/H仍为待执行。
 
 ## R19A 范围与来源
 
@@ -29,8 +29,8 @@
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
 | R12 | `b7f73d4`；`0d06b7b`、`e98c798`、`ed5aaef` | 432 实例、波浪/rebase、选中/归位坐标与稳定物理格 ID 由 R19B 审查；合并图集来源见 R19A，透明与后处理仍待 R19C/D。 |
 | R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
-| R14 | `1a082f2`；`2abb4f6`、`e98c798` | 品牌容器/控件/运输信息、Canvas Painter 的实际合成及成本；待 R19E。 |
-| R15 | `2ee2294`；`2abb4f6` | 滑尺、数字字轮及 Pointer/InputRouter；待 R19E。 |
+| R14 | `1a082f2`；`2abb4f6`、`e98c798` | R19E已逐对象复查品牌容器/控件/运输信息、遮罩及Canvas合成；移除四倍图标采样，恢复最终竖屏歌名cap。 |
+| R15 | `2ee2294`；`2abb4f6` | R19E已复查滑尺/数字轨迹和Pointer/InputRouter；保留源数学与有界所有权，移除全部浏览器图像门禁。 |
 | R16 | `2abb4f6` | 全部标题字轮、整行 shaping、CSS/字体/布局和候选路径；待 R19F。 |
 | R16B1 | `6636ddb` | 普通 glyph 节点复用、隐藏工作、页眉测量；待 R19F。 |
 | R16B2 | `509afe8` | Canvas 隐藏绘制、按组成本与高 DPR 超时；待 R19F。 |
@@ -260,3 +260,20 @@ R19D4B2的MSAA/resolve和组合资源图检查本身不关闭VIS-ARRAY-BLUR-01�
 | R19D1 `4ab1e73`；D2 `2f50812`；D3A `f45024d`/`e9360b7`；D3B `f4e1610` | D1的三核/标量精度/常量前缀、D2线性雾/最终颜色次序、D3投射偏置/过滤和产品地面均继续使用既有生产资源图；尺寸修正只改变源公式应有的物理目标。逐项数学与实际附件规范引用对应组件，完整历史hash由audit-rhi-scale输出。 |
 | D4A `704a99d`；D4B1 `5e333ec`；D4B2 `4e86136` | 保留view空间focus、完整RGB24 depth、nearest深度/linear颜色、41点UV CoC/.011与aspect；核本身不随窗口像素加倍。保留SMAA源核/lookup、4×几何与单样本resolve/后处理，不以关效果改善清晰度。 |
 | 质量/资源/绘制路径选择 | RHI继续承担源全局透明排序/阴影与显式捕获，Quick3D只Review。新独立入口检查实际DPR/物理附件/最终合成和源数学，连续入口保留数量/动效/重叠与恢复；运行结果留本地，物理屏幕、正常VSYNC、完整产品性能及缺设备平台按原专项。 |
+
+
+## R19E 浏览界面、滑尺与数字轨迹
+
+规范归[browse-ui.md](browse-ui.md)、[navigation.md](navigation.md)、[canvas-painter.md](canvas-painter.md)。`tools/audit/audit-browse-navigation.py`读取冻结源及实际历史对象，输出逐符号/hash的COMMON/PERF/三平台矩阵；该脚本固定审查边界，运行报告与实际质量单列。
+
+| 实际历史对象与调用链 | 来源与判定 |
+| --- | --- |
+| R14 `1a082f2` Header/品牌容器、ArchiveButton、ThemeSwitch | 源`music.css`及最后加载的`music-theme-switch.css`定义容器锚点、竖屏网格、17px SVG/圆端点、主题pill；新品牌图形由用户差异替换，容器位置保留。设置图标的两条线/两个圆用Curve Shape保留原矢量几何/层级，原生可访问焦点框是必要交互适配。其余SVG及R16新增play/pause四倍栅格+mip没有独立必要性，移除，按所属窗口实际DPR栅格化；动画scale保留。 |
+| R14 BrowseInfo/ArchiveText/NavigationFrame/Footer、R15数字接入 | 源最终callout CSS覆盖早期57%定位，采用68.633333%与竖屏clamp；navigation高度驱动callout-bottom。保留CSS normal ascent/descent分别取整、16px父inline strut、1.7行高、眉题span边距/空格advance、按钮继承16px及Basic padding清零；这些是文字度量和盒模型适配，分数字号使用局部矢量scale而非增加缓存字号/离屏层。`ArchiveText`通用文字语义及标题专用基线进一步由R19F复查，不能由本节静态锚点关闭。 |
+| R14 DesignTokens/ReadingVeil、R19 `1c9b8c6`界面连接 | 650ms颜色/.4,0,.2,1、380ms pill/.22,1,.36,1及源渐变停点有明确CSS依据。直接Quick渐变节点按原层级位于三维与页眉之间，无额外全屏采样；稳定透明层停绘。R19的overview opacity/offset/enabled只是状态委托，实际总览时序仍归R19G。 |
+| R16 `2abb4f6` Header/TransportTitle接入 | song slot增长推动前置控件而右侧play/stop不动，退出保宽由既有TransportMotion管理。该提交将竖屏cap误替换为横屏宽度断点，现恢复最后生产CSS的`clamp(0,width-320,280)`优先级；横屏760/610/340规则及间距保留。标题shaping、退字与采样归R19F。 |
+| R15 `2ee2294` RulerController→RulerInk/Quick clip→固定Button池 | 12+2×2槽、anchor5、rate18、560ms ripple/24ms展开及完整刻线/边缘alpha均来自`music-ruler.ts`/CSS；nearest槽匹配与循环occurrence保留。三份actual-size路径按geometry失效，动画高度用rect而不拉伸AA fringe；透明单采样附件固定130×30/96×21，动画宽度仅改变Quick clip。Canvas2D原`antialias=1/DPR`只存在于图像对照路径，没有独立于旧图像门禁的必要性，移除；两API使用[Qt默认antialias=1](https://doc.qt.io/qt-6/qcanvaspainter.html#setAntialias)，DPR由所属目标处理，不取浏览器栅格损失为目标。 |
+| R15 InputRouter→SelectionController→SceneFrame、OrdinalMotion→OrdinalReel | Qt像素/角度单位与Y反号、控件/祖先所有权和窗口内焦点是输入API适配；源48px/三张/200ms、36px/1.3/1400ms边界保留。最多一个可替换目标服务既有四封面背压，真实提交revision与新输入receipt分开。49点/460ms轨迹来自锁定rolling-number实际函数，保留重定向速度/方向/终点归一、十位/两面和唯一FrameClock；RenderControl专用offscreen开关接通数字/滑尺，普通隐藏窗口仍停进度。 |
+| R14/R15 Review、`c7e9b61`隐藏适配、`e98c798`窗口适配 | 删除跨API/浏览器SSIM、RGB、边缘、coverage envelope及恢复图像分数，导出器仅交付最终CSS结构与冻结数学。保留自身纹理、revision、有内容、固定位置/键盘路由、静止/隐藏零paint、真实surface失效/恢复/释放及CPU成本。滑尺复用OffscreenSurface，单读回/有界续帧；不把离屏frameRendered当VSYNC或物理输入。PowerShell审计改为共同源码入口，产品GUI包装读取Process.ExitCode及报告。 |
+
+Canvas Painter的采用依据为源矩形/路径表达、固定值同步、renderer所有权和三份路径缓存；API间像素相似度与旧benchmark成绩不参与选型。实际隐藏质量检查保留正常轮廓/裁切/渐变/文本/图标输出；物理屏幕、正常VSYNC和缺少目标设备的项目只在R34维护。
