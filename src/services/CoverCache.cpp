@@ -178,6 +178,7 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
         };
         label(title.isEmpty() ? QStringLiteral("暂无专辑封面") : title.left(256), logical * .045,
               logical * .8);
+        font.setWeight(QFont::Normal);
         label(QStringLiteral("LOCAL COLLECTION / NO COVER"), logical * .025, logical * .87);
     }
     return image;

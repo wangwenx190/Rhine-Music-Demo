@@ -1,4 +1,5 @@
 #include "GeometryAudit.h"
+#include "VerificationWindow.h"
 #include <QCryptographicHash>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -60,14 +61,60 @@ QByteArray execute(const QString &program, const QStringList &arguments)
                         .toStdString());
     return process.readAllStandardOutput() + process.readAllStandardError();
 }
+// Validate every frozen input before the first generated file is written. Direct
+// invocations must have the same provenance guard as the PowerShell wrapper.
+void verifyFrozenInputs(const QDir &root)
+{
+    const QString original = "57f4f845c20cce646a15dbf4008c2a162aaaf4e2";
+    const auto mappings =
+            QJsonDocument::fromJson(readFile(root.filePath("docs/contracts/history-rewrite.json")))
+                    .object()["revisions"]
+                    .toObject();
+    const QString revision = mappings[original].toString(original);
+    if (!QRegularExpression("^[a-f0-9]{40}$").match(revision).hasMatch())
+        throw std::runtime_error("Invalid frozen source revision");
+    const auto manifest =
+            QJsonDocument::fromJson(readFile(root.filePath("resources/manifests/assets.json")))
+                    .object();
+    if (manifest["baselineCommit"].toString() != original)
+        throw std::runtime_error("Unexpected asset baseline");
+    QMap<QString, QString> inputs;
+    auto addInput = [&](const QString &source, const QString &sha256) {
+        if (!source.startsWith("legacy-web/") || source.contains("..")
+            || !QRegularExpression("^[a-f0-9]{64}$").match(sha256).hasMatch()
+            || (inputs.contains(source) && inputs[source] != sha256))
+            throw std::runtime_error("Invalid asset input provenance");
+        inputs.insert(source, sha256);
+    };
+    for (const auto &value : manifest["entries"].toArray()) {
+        const auto entry = value.toObject();
+        addInput(entry["source"].toString(), entry["inputSha256"].toString());
+    }
+    for (const auto &value : manifest["additionalInputs"].toArray()) {
+        const auto entry = value.toObject();
+        addInput(entry["source"].toString(), entry["sha256"].toString());
+    }
+    if (inputs.size() != 24)
+        throw std::runtime_error("Incomplete frozen asset inputs");
+    for (auto input = inputs.cbegin(); input != inputs.cend(); ++input) {
+        const auto frozen = execute(
+                "git", { "-C", root.absolutePath(), "show", revision + ':' + input.key().mid(11) });
+        if (hash(frozen) != input.value()
+            || hash(readFile(root.filePath(input.key()))) != input.value())
+            throw std::runtime_error(("Frozen asset input changed: " + input.key()).toStdString());
+    }
+}
 }
 int main(int argc, char **argv)
 {
+    yalahoo::verification::prepareApplication();
     QGuiApplication app(argc, argv);
     try {
         const auto args = app.arguments();
-        if (args.size() != 3)
-            throw std::runtime_error("Usage: prepare-assets <repository-root> <selected-Qt-Kit>");
+        const bool verifyInputsOnly = args.size() == 4 && args[3] == "--verify-inputs";
+        if (args.size() != 3 && !verifyInputsOnly)
+            throw std::runtime_error(
+                    "Usage: prepare-assets <repository-root> <selected-Qt-Kit> [--verify-inputs]");
         const QDir root(args[1]);
         const QDir kit(args[2]);
 #ifdef Q_OS_WIN
@@ -87,6 +134,11 @@ int main(int argc, char **argv)
         if (execute(kitTool({ "qmake", "qmake6" }), { "-query", "QT_VERSION" }).trimmed()
             != qVersion())
             throw std::runtime_error("Preparation tool and selected Kit must use the same Qt");
+        verifyFrozenInputs(root);
+        if (verifyInputsOnly) {
+            QTextStream(stdout) << "Verified 24 frozen asset inputs before generation\n";
+            return 0;
+        }
         QJsonArray entries, fonts;
         auto add = [&](const QString &path, const QByteArray &bytes, const QString &source,
                        const QString &operation) {

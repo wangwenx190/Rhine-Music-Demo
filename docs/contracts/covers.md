@@ -53,3 +53,6 @@ CoverCacheTest 覆盖横/竖/方、透明 alpha、缺图、过大展开、Unicod
 macOS/Linux 同一源码、CMake 链、Qt reader、generation/所有权和 QRhi/qsb 路径严格静态审计，矩阵含 source hash、symbol、具体调用链及限制。结论为“静态审计通过，实机待用户验证”；目标平台 codecs、GPU/Metal/GL、窗口管理器和性能并未运行。目标机配置 Review 后执行 `ctest --preset qt-release -R '^(cover-cache|cover-gpu)$' --output-on-failure`，检查 runtime.json 的 windowPolicy、实际后端、局部像素与恢复；再恢复生产配置运行全部 CTest。全曲库扫描/填充阵列/详情运动与完整产品 120 秒性能验收属于后续轮次。
 
 Windows 验收结论：Qt 6.12.0 Release 的 D3D11/OpenGL 封面、局部上传、稳定帧、重建和窗口策略检查通过；九项受影响 Review 回归、全部 21 项生产 CTest、qmllint 与 source-format 通过。实际 D3D11 tile destinationBytes=262144，selected=4194304；纸面 ROI 横/竖/方 SSIM≥0.992。96 个大图的三次记录为 36/38/42ms 就绪、并发峰值3、待解码峰值93、LRU 16MiB；这些是局部事件循环样本，非完整播放器性能验收，最终小图不预放大修正不改变这组 2048→256 输入路径，最终源码另通过全部生产测试。macOS/Linux：静态审计通过，实机待用户验证。
+
+
+R19A 逐式复查 `paintCover`：缺图首行使用 CSS 500，脚注未声明字重，按默认 400。原生现在在绘制脚注前恢复 `QFont::Normal`，不再继承首行 Medium；1024 逻辑画布、字号、基线、留边、contain 和 alpha 均不变。ICC→sRGB、仅缩大图与独立不可变租约是有依据的原生适配；本机 `cover-cache`、资产和完整隐藏回归实际通过。GPU 采样/透明合成与用户报告的模糊、闪烁仍由 R19C/D 按 [source-fidelity-review.md](source-fidelity-review.md) 检查，不把本轮 CPU/资源通过当作三维连续质量通过。

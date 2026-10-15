@@ -1,4 +1,5 @@
 qt_add_executable(prepare-assets PrepareAssets.cpp GeometryAudit.cpp)
+target_include_directories(prepare-assets PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(prepare-assets PRIVATE Qt6::Gui)
 if(WIN32)
     target_link_libraries(prepare-assets PRIVATE dwrite)

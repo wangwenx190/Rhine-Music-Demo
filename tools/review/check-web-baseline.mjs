@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {loadSceneIndex} from './scene-index.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = async (file) => JSON.parse(await fs.readFile(path.join(root, file), 'utf8'));
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -50,66 +48,48 @@ assert.deepEqual(
 for (const entry of source.modules) {
     const bytes = execFrozenGit(['show', expected + ':' + entry.baselinePath], {cwd: root});
     assert.equal(hash(bytes), entry.sha256, entry.baselinePath);
+    assert.equal(hash(await fs.readFile(path.join(root, entry.sourcePath))), entry.sha256,
+                 entry.sourcePath);
     assert.ok(entry.responsibility);
     if (entry.role === 'migrate')
         assert.ok(entry.target);
 }
-const manifest = await read('docs/media/web-baseline/screenshots.json');
-const scene = await loadSceneIndex(root, await read('docs/contracts/scene-parameters.json'));
-assert.equal(manifest.fixtureHash, fixtureHash);
-assert.equal(scene.fixtureHash, fixtureHash);
-assert.equal(scene.states.length, manifest.captures.length);
-const dimensions = [
-    [1920, 1080],
-    [1280, 720],
-    [995, 858],
-    [960, 900],
-    [930, 900],
-    [390, 844],
-    [320, 720],
-    [2560, 1080],
-    [3440, 1440],
-];
-for (const theme of ['day', 'night'])
-    for (const mode of ['filled', 'realistic'])
-        for (const [width, height] of dimensions)
-            assert.ok(
-                manifest.captures.some(
-                    (c) => c.name === `browse-${theme}-${mode}-${width}x${height}`,
-                    ),
-                'Missing size/theme/mode',
-            );
-for (const entry of manifest.captures) {
-    assert.equal(entry.baseline, expected);
-    assert.equal(entry.fixtureHash, fixtureHash);
-    const bytes = await fs.readFile(path.join(root, entry.file));
-    assert.equal(hash(bytes), entry.sha256, entry.file);
-    assert.equal(bytes.readUInt32BE(16), entry.viewport.width * entry.DPR);
-    assert.equal(bytes.readUInt32BE(20), entry.viewport.height * entry.DPR);
-    assert.equal(entry.arrayMode, entry.state.arrayMode);
-    assert.equal(entry.theme, entry.state.theme);
-    const parameters = scene.states.find((s) => s.name === entry.name).parameters;
-    assert.equal(parameters.camera.projectionMatrix.length, 16);
-    assert.equal(parameters.camera.matrixWorld.length, 16);
-    for (const field of ['fov', 'near', 'far', 'aspect'])
-        assert.ok(Number.isFinite(parameters.camera[field]));
-    assert.ok(parameters.lights.length >= 3);
-    assert.ok(parameters.materials.length >= 4);
-    assert.ok(parameters.paper.uv.length >= 8);
-    assert.ok(parameters.UI.length > 20);
-    assert.ok(
-        parameters.paper.material.some((m) => m.kind === 'MeshLambertMaterial'),
-        'Independent paper material',
-    );
-    assert.ok(parameters.paper.tileUV.length > 0, 'Actual instance atlas UV');
-    assert.ok(parameters.postprocessing.AO.kernelSize > 0, 'Actual AO kernel size');
-    for (const surface of ['Frosted_Polymer', 'Ivory_Edges', 'Optical_Diffuser'])
-        assert.ok(
-            parameters.materials.some((m) => m.surface === surface),
-            'Missing final surface ' + surface,
-        );
-    for (const instance of parameters.instances)
-        assert.equal(instance.matrix.length, instance.count * 16);
+// Resource hashes establish provenance; no screenshots, GPU witnesses or scene dumps.
+const assets = await read('resources/manifests/assets.json');
+assert.equal(assets.baselineCommit, expected);
+assert.equal(assets.entries.length, 47);
+const inputs = new Map();
+for (const entry of assets.entries) {
+    const bytes = await fs.readFile(path.join(root, 'resources', entry.path));
+    assert.equal(bytes.length, entry.bytes, entry.path);
+    assert.equal(hash(bytes), entry.sha256, entry.path);
+    assert.equal(entry.qrc, ':/assets/' + entry.path);
+    if (inputs.has(entry.source))
+        assert.equal(inputs.get(entry.source), entry.inputSha256, entry.source);
+    inputs.set(entry.source, entry.inputSha256);
+    if (entry.operation === 'unchanged copy')
+        assert.equal(entry.sha256, entry.inputSha256, entry.path);
+}
+for (const entry of assets.additionalInputs) {
+    if (inputs.has(entry.source))
+        assert.equal(inputs.get(entry.source), entry.sha256, entry.source);
+    inputs.set(entry.source, entry.sha256);
+}
+assert.equal(inputs.size, 24);
+for (const [sourcePath, sha256] of inputs) {
+    assert.ok(sourcePath.startsWith('legacy-web/'), sourcePath);
+    const bytes = execFrozenGit(['show', expected + ':' + sourcePath.slice(11)],
+                                {cwd: root, maxBuffer: 64 * 1024 * 1024});
+    assert.equal(hash(bytes), sha256, sourcePath);
+    assert.equal(hash(await fs.readFile(path.join(root, sourcePath))), sha256, sourcePath);
+}
+const branding = await read('resources/manifests/branding.json');
+assert.equal(branding.displayName, 'yalahOO!!!');
+assert.equal(branding.entries.length, 36);
+for (const entry of branding.entries) {
+    const bytes = await fs.readFile(path.join(root, entry.path));
+    assert.equal(bytes.length, entry.bytes, entry.path);
+    assert.equal(hash(bytes), entry.sha256, entry.path);
 }
 const order = await read('docs/contracts/library-order.json');
 assert.equal(order.fixtureHash, fixtureHash);
@@ -155,29 +135,43 @@ assert.equal(
     presentation.samples.find((s) => s.time > 2 && s.time < 3).state.selected,
     'fixture-album-0002',
 );
-assert.ok(scene.sourceEasings.length >= 8);
-const environment = await read('docs/contracts/room-environment.json');
-assert.equal(hash(await fs.readFile(path.join(root, environment.sampleFile))), environment.sha256);
-const report = await read('verification/windows/web-baseline/capture-report.json');
-assert.equal(report.result, 'passed');
-assert.equal(report.errors.length, 0);
-assert.equal(report.blockedExternalRequests.length, 0);
-const checks = await read('verification/windows/web-baseline/production-checks.json');
-assert.equal(checks.checks.length, 13);
-assert.ok(checks.checks.every((c) => c.result === 'passed'));
+const search = await read('tests/fixtures/core/search-golden.json');
+assert.equal(search.baseline, expected);
+assert.equal(search.fixtureSha256, fixtureHash);
+assert.equal(search.sourceSha256,
+             hash(execFrozenGit(['show', expected + ':' + search.sourcePath], {cwd: root})));
+assert.equal(search.cases.length, 216);
+// Bind the human PERF/source audit to the actual implementation under review.
+// These hashes identify code, not a machine output or an image oracle.
+const reviewedImplementation = [];
+for (const file of ['tools/assets/PrepareAssets.cpp',
+                    'tools/assets/GeometryAudit.cpp',
+                    'cmake/QtKit.cmake',
+                    'src/app/AssetCatalog.cpp',
+                    'src/core/MusicTypes.cpp',
+                    'src/core/LibraryModels.cpp',
+                    'src/services/LibrarySession.cpp',
+                    'src/services/OfflineMetadataProvider.cpp',
+                    'src/services/CoverCache.cpp',
+                    'src/render/rhi/AtlasAllocator.cpp',
+                    'src/render/rhi/AtlasUpload.cpp',
+                    'src/render/rhi/SceneItem.cpp',
+]) {
+    reviewedImplementation.push({file, sha256: hash(await fs.readFile(path.join(root, file)))});
+}
 const result = {
     baseline: expected,
     fixtureHash,
     sourceModules: source.modules.length,
-    captures: manifest.captures.length,
-    productionChecks: checks.checks.length,
+    reviewedImplementation,
+    assetEntries: assets.entries.length,
+    frozenAssetInputs: inputs.size,
+    brandEntries: branding.entries.length,
     presentationSamples: presentation.samples.length,
     motionSamples: motion.samples.length,
     maximumDampError,
+    scope:
+        'Source, immutable asset provenance and numerical inputs; no image or GPU-readback equivalence',
     result: 'passed',
 };
-await fs.writeFile(
-    path.join(root, 'verification/windows/web-baseline/contract-check.json'),
-    JSON.stringify(result, null, 2) + '\n',
-);
 console.log(JSON.stringify(result, null, 2));
