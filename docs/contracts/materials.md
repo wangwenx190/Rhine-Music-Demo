@@ -39,8 +39,28 @@ ctest --preset qt-release -R '^(rhi-material-parameters|lighting)$' --output-on-
 ctest --preset qt-release-render -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure
 ```
 
-`calibrate-materials.py` 已退役，执行即报错且不写文件；MaterialReview拒绝calibration/factors输入，参数核对不再将expected乘同一拟合系数。旧 `verify-r07.ps1`/`verify-r08.ps1`、MaterialReview和RHI图像/ROI门禁尚待R19C2完整拆耦，不能作为当前验收入口。R07曾使用90个双主题/视角/封面/分层状态及9项纸面探针；历史采集与像素分数仅保留原事实，不再执行或据此调参。
+`calibrate-materials.py` 已退役，执行即报错且不写文件；MaterialReview拒绝calibration/factors输入，参数核对不再将expected乘同一拟合系数。MaterialReview及`verify-r07.ps1`/`verify-r08.ps1`已在R19C2A移除原图/ROI/标定依赖。两个PowerShell入口转交跨平台`tools/build/verify-material-review.py materials|lighting`，只验证当前源参数/投影、自己的输出及资源；Windows入口仍先进入MSVC环境，进程退出由Python真实等待。RhiShellAudit/RhiAudit的原图/环境witness仍待R19C2B拆耦，不能执行。R07曾使用90个双主题/视角/封面/分层状态及9项纸面探针；历史采集与像素分数仅保留原事实，不再执行或据此调参。
 
 参数通过不证明光学捕获、磨砂LOD、连续闪烁或最终缩放已正确；这些检查分别由R19C2/R19D执行，用户问题保持开放。Windows/D3D11与Linux/OpenGL目标回归按迁移计划R34移交，本机Metal结果不外推。完整逐项历史归属、PERF与验证范围见 [source-fidelity-review.md](source-fidelity-review.md)。
 
 公开接口语义：[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)、[SceneEnvironment 色调输出](https://doc.qt.io/qt-6/qml-qtquick3d-sceneenvironment.html)、[TextureData](https://doc.qt.io/qt-6/qquick3dtexturedata.html)。音乐生产路径环境强度为暖昼 .25 / 深夜 .16，纸面接入真实漫反射环境与世界光场；上文 .48 / .68 和固定白色入射只用于 R07 隔离材质参照。
+
+## 材质/灯光隐藏 Review 入口
+
+`--verify-materials`在创建ApplicationWindow前分派，直接在自己的QQuickWindow中加载同一`GeometryScene`。macOS默认使用`OffscreenSurface`/QQuickRenderControl真实Metal，其他系统暂保留原生置底/拒绝焦点路径；`YALAHOO_VERIFY_VISIBLE=1`才在macOS选择窗口，前台授权规则不变。既有90个材质状态和48个灯光状态均来自已提交源参数fixture，保留三表面参数、独立源投影和CPU/Quick3D投影的2逻辑px容差。每状态由真实帧事件驱动四个准备帧，然后仅采集一次自己的texture；不使用轮询或原图。
+
+纸面九项数值探针使用`tests/fixtures/materials/paper-probe.png`的均匀RGBA墨色(96,160,208,255)，这是测试输入，只在Review链接。期望值由源公式`sRGBEncode(min(sRGBDecode(ink)*irradiance, sRGBDecode(ink)))`推导，覆盖0/.25/2入射，保留原3码值容差；本机误差为0。三种正式封面形状/contain仍由原90状态覆盖，不拿均匀墨色证明封面细节正确。
+
+材质额外执行十次完整QML root/scene graph重建，灯光执行一次并重新应用相同源状态；每次检查真实invalidation和有效输出。报告显式`qmlRootRecreated=true`，不宣称同一View3D对象恢复或可见窗口恢复通过。首次尝试只invalidate/initialize、补releaseResources及重新挂接同一View3D后均为背景；完整root重建恢复有效输出，内部Quick3D原因尚未确认。该流程属于独立Review生命周期，生产SceneItem/RHI不走此路径。
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+cmake --build --preset qt-release
+ctest --preset qt-release-render -R '^(runtime-materials|runtime-lighting)$' --output-on-failure
+python3 tools/audit/audit-material-review.py
+# 其他系统当前使用qt-release-visible选择同名测试，遵守窗口契约。
+# 一体复建入口（Windows需MSVC shell）：
+python3 tools/build/verify-material-review.py materials
+```
+
+一体入口最后恢复Review OFF并构建/运行普通Release快速回归；日常Review ON的完整隐藏preset包含这两个测试，快速preset不包含。报告`validation=source-state-and-own-output`、`imageComparison=false`，保存warnings、实际后端/DPR、窗口策略及Offscreen附件估算；未知driver分配保持null。检查只证明有限Review场景源状态、纸面公式、有效输出与完整root重建，不能证明RHI光学等价、连续透明闪烁、正常VSYNC或完整性能。原SSIM/RGB/ROI历史数据不再重算，R19C2B/C、R19D继续处理光学与用户问题。

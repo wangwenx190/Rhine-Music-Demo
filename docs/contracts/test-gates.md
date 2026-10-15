@@ -29,3 +29,5 @@ ctest --preset qt-release -R verification-window-policy
 未通过检查不能通过改标签藏起；现行变化调整的是执行时机与范围，不改功能断言或数值门槛。最终报告注明选择/复用/未运行项目及原因；格式、两组官方qmllint按改动范围执行，生成输出保持忽略。
 
 R19B 的 Review 配置新增两个可选择的隐藏项：`archive-pool-gpu` 与 `real-columns-gpu`。macOS 默认使用 RenderControl，完整自动 preset 会选入；其他平台仍使用原生窗口并标为 native-visible。它们不再调用 SSIM/RGB 比较，检查源矩阵/拾取/身份/cover fallback、上传及真实 scene graph 失效后的重放。运行前用对应源码导出器在当前系统目录生成 `frozen-poses.json` / `frozen-fields.json`；这些是忽略的开发输入，普通构建不依赖它们。`YALAHOO_REVIEW=OFF` 时不注册这两个开发测试。
+
+R19C2A将`runtime-materials`和`runtime-lighting`恢复为独立的非像素`render-integration`项：macOS使用真正隐藏Metal并标`hidden-render`，进入完整自动/渲染preset；其他平台使用置底拒绝焦点窗口并标`native-visible`。前者覆盖99个源材质/纸面状态和十次完整root重建，后者覆盖48个灯光状态和一次完整root重建；不读取浏览器截图或执行ROI评分。RHI/后处理旧图像项仍disabled，按R19C2B/R19D处理，不因此自动启用。

@@ -41,6 +41,12 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/tools/review/instanced-glass.vert"
         "${PROJECT_SOURCE_DIR}/tools/review/instanced-paper.vert"
     )
+    target_include_directories(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tools/review")
+    target_link_libraries(Yalahoo PRIVATE Qt6::GuiPrivate)
+    target_sources(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tools/review/OffscreenSurface.h")
+    qt_add_resources(Yalahoo material_probe PREFIX /review
+        BASE "${PROJECT_SOURCE_DIR}/tests/fixtures/materials"
+        FILES "${PROJECT_SOURCE_DIR}/tests/fixtures/materials/paper-probe.png")
     target_compile_definitions(Yalahoo PRIVATE YALAHOO_REVIEW)
     target_link_libraries(Yalahoo PRIVATE YalahooImageComparison)
 endif()

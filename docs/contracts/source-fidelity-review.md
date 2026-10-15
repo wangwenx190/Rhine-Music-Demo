@@ -200,3 +200,29 @@ ctest --preset qt-release --output-on-failure
 ```
 
 已有参数/资源重建执行一次，相关十次隐藏资源压力复用R19B同一所有权实现，不把本轮一次重建称为十次。所有新输出保持忽略；入库的45组参数为直接执行冻结代码得到的测试输入，不是运行报告。
+
+## R19C2A 材质/灯光 Review 与原图门禁拆耦
+
+起点`48a9495`，依规模契约在实施前将R19C2拆为A（本入口）、B（RHI光学与捕获）和C（连续透明闪烁）；仍全部位于R20前。恢复`1556a55`、`178ca45`的原计划/实现，沿`3fc6a39`、`522a3f3`、`d06e5f3`、`5b2df80`、`5625d73`和R19C1追到当前MaterialReview调用。未修改生产shader、材质参数、PMREM/DFG/LTC资产或生产RHI；本节不能视作R07/R08/R10B剩余光学算法已复查。
+
+| 原轮次 / 实际审查对象 | 源码依据与结论 | 验证边界 |
+| --- | --- | --- |
+| R07：MaterialReview、verify-r07的90状态、9纸面探针、标定与ROI门禁 | 投影/三个表面参数有源定义；R07用浏览器像素作纸面期望并计算ROI/SSIM，无独立数学必要性。删除图像读取/分数/diff及标定调度；源公式改用均匀测试墨色推导线性入射/限制/编码，3码值容差保留。 | 99状态实际通过，纸面误差0；45组连续源参数/210端点测试继续独立保留。玻璃BRDF/环境/LOD完整复查归B。 |
+| R08：MaterialReview的48灯光状态、verify-r08的场核与图像混合条件 | 保留实际光场模式、detail、主题、相机与源表面参数；删除五ROI的6/.97及固定D3D11 API编号假设。924轨迹/392场核继续由LightingTest验证，脚本只等待实际CTest/进程退出。 | 48状态、4种模式、前/低视角/两主题实际输出通过；不以自己的单盒状态证明生产透明阵列无闪烁。 |
+| R09：MaterialReview的AO/阴影诊断调用与目标尺寸断言 | 共用驱动不再加载原图；保留channel、shadows、near/far、aoRadius与实际effectiveTextureSize检查。原occlusion GPU evaluator仍标旧门禁disabled。 | 此处仅审查驱动接口，完整AO/shadow shader、旧报告消费者和目标后端归R19D。 |
+| R09B：MaterialReview的Bokeh/SMAA/AA与focus/aperture断言 | 保留有效质量设置、目标大小、focus/aperture参数检查；移除共享ROI/full-image比较。未改任何核/曝光/采样。 | 仅共用驱动拆耦；后处理专用工具尚未恢复，算法/连续质量归R19D。 |
+| R10：MaterialReview的instance/atlas probe路径与颜色输出 | Probe的实例、深度排序、atlas phase及字节元数据保留；报告不再输出edgeDistance/ROI。原render-backend GPU evaluator不自动启用。 | 未用此路径重新选型或宣称RHI等价，正式拆耦/算法结论归R19C2B/R19D。 |
+| R10B：VerificationWindow接入、MaterialReview首次show与引擎所有权 | 新CLI在ApplicationWindow加载前分派；独立GeometryScene在macOS使用真正隐藏RenderControl，普通产品窗口及生产RHI不变。 | 默认原生visible/active均false；相同View3D失效后背景、完整root重建有效的边界详见计划经验记录。Windows/Linux实机归R34/R19C2A-P。 |
+| R19C1：拒绝factors/calibration与参数核对 | 两类输入仍在创建window/采集之前退出12；不把expected乘同一拟合系数，不放宽源参数容差。 | 负向CLI与无图像依赖的真实输出回归；R19C1实际uniform检查保持独立。 |
+
+PERF-01–07/COMMON-01–05与各平台符号/hash矩阵由`tools/audit/audit-material-review.py`在忽略目录生成。GUI有限状态只应用一次，真实帧事件串行推进四个准备帧；显式采集一次自己的texture并做一次线性前景存在检查，不执行Gaussian ROI/边缘搜索/两图比较。同步readback/等待和PNG只在Review，不引入产品逐帧工作、worker或上传队列；Offscreen附件按实际物理大小复用，估算与driver未知值分开。root/engine/窗口/控制器依序释放，render线程invalidation用atomic交接。十次完整root重建不声称同对象恢复，原生窗口恢复按R34保留。
+
+本机macOS/arm64、Apple M4、自动发现Qt6.12.0/AppleClang 21、Release、真实Metal/DPR1/960×720。两个入口的147状态、十次材质和一次灯光完整root重建通过；源投影最大误差约0.000226逻辑px、CPU/Quick3D最大0.000244逻辑px，QML warnings为空。实际读取自己生成的昼/夜和前/低视角图检查有效内容，未执行原图比较；仍能看到壳体朦胧、侧缘阶梯，这不关闭光学/抗锯齿或用户BLUR-01/FLICKER-01。最初受限服务中止保留日志，原生服务权限下执行同一隐藏入口；没有改为软件后端或show。一次初期灯光仅foregroundUnchanged失败原因未确认，后续新生命周期实现的两个入口默认策略通过；失败未改写。
+
+复现：按`materials.md`选择两个隐藏CTest；`check-web-baseline.mjs`、两组官方qmllint、check-format及`audit-material-review.py`保留来源/构建/静态核对。PowerShell薄入口只调用共同Python驱动，目标平台尚未实跑，不声称其格式/解析或D3D11/OpenGL通过。生成图、逐状态JSON、日志与机器矩阵均保持忽略；均匀paper-probe.png为必要测试输入。
+
+Release完整隐藏回归32/32通过，两组官方qmllint与check-format/source-format通过；额外实际DPR2/1920×1440自身目标的99状态和十次完整root重建通过，纸面误差仍为0。calibration、逐case factors及缺失参数三类实际CLI均在window创建前退出12且未生成报告；报告校验器拒绝陈旧fixture hash、旧imageComparison和缺失重建记录。DPR2仅证明该Review目标，不外推生产渲染缩放或可见显示质量。
+
+审计还发现共用驱动无条件创建R10的2048²/16MiB探针atlas，即使材质/灯光不使用它。现只在backendReview路径构造，普通两入口报告probe payload/submission为0；这是删除无效准备工作，不改实际封面/环境/透射捕获，也不声称产品显存或FPS改进。
+
+移除无关atlas后，材质99状态/十次root重建和灯光48状态/一次root重建均补验通过，probe payload/submission均为0；一体Python入口实际完整执行成功，恢复Review OFF、可见测试OFF，生产Release构建与25/25快速CTest（含source-format及默认隐藏窗口策略）通过，生产程序拒绝Review CLI返回1。未重跑不受该无用分配移除影响的整套32项，复用上面的完整隐藏结果。首次一体入口在收尾编辑后正确拒绝未格式化的MaterialReview，格式化后的最终流程通过；不将首次失败改写为通过。

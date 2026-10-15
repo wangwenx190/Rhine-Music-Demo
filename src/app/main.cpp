@@ -120,10 +120,10 @@ int main(int argc, char **argv)
                        QStringLiteral("Production sampling duration (12-120 seconds)"),
                        QStringLiteral("seconds"), QStringLiteral("12") });
     parser.addOption({ QStringLiteral("verify-materials"),
-                       QStringLiteral("Run source-based single-case material comparison"),
+                       QStringLiteral("Verify source material state and native output"),
                        QStringLiteral("fixture") });
-    parser.addOption({ QStringLiteral("material-report"), QStringLiteral("Material ROI report"),
-                       QStringLiteral("report") });
+    parser.addOption({ QStringLiteral("material-report"),
+                       QStringLiteral("Material source/state report"), QStringLiteral("report") });
     parser.addOption({ QStringLiteral("verify-scene"),
                        QStringLiteral("Run deterministic geometry fixtures"),
                        QStringLiteral("fixture") });
@@ -327,6 +327,15 @@ int main(int argc, char **argv)
                         && !parser.isSet(QStringLiteral("verify-shading")) } });
     for (auto it = commonProperties.cbegin(); it != commonProperties.cend(); ++it)
         initialProperties.insert(it.key(), it.value());
+#ifdef YALAHOO_REVIEW
+    if (parser.isSet(QStringLiteral("verify-materials"))) {
+        if (!parser.isSet(QStringLiteral("material-report")))
+            return 12;
+        return yalahoo::reviewMaterials(app, scene,
+                                        parser.value(QStringLiteral("verify-materials")),
+                                        parser.value(QStringLiteral("material-report")));
+    }
+#endif
     engine.setInitialProperties(initialProperties);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -334,15 +343,8 @@ int main(int argc, char **argv)
                 QCoreApplication::exit(2);
             },
             Qt::QueuedConnection);
-#ifdef YALAHOO_REVIEW
-    engine.loadFromModule("Yalahoo.Music",
-                          parser.isSet(QStringLiteral("verify-materials")) ? "ResearchApp"
-                                  : verificationRun && !appVerification    ? "BootstrapProbe"
-                                                                           : "App");
-#else
     engine.loadFromModule("Yalahoo.Music",
                           verificationRun && !appVerification ? "BootstrapProbe" : "App");
-#endif
     if (engine.rootObjects().isEmpty())
         return 2;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
@@ -379,13 +381,6 @@ int main(int argc, char **argv)
             return 20;
         return yalahoo::reviewIntegration(
                 app, *window, scene, parser.value(QStringLiteral("verify-integration")), seconds);
-    }
-    if (parser.isSet(QStringLiteral("verify-materials"))) {
-        if (!parser.isSet(QStringLiteral("material-report")))
-            return 12;
-        return yalahoo::reviewMaterials(app, *window, scene,
-                                        parser.value(QStringLiteral("verify-materials")),
-                                        parser.value(QStringLiteral("material-report")));
     }
     if (parser.isSet(QStringLiteral("verify-scene"))) {
         if (!parser.isSet(QStringLiteral("scene-report")))
