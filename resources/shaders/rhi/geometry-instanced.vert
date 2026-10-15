@@ -1,6 +1,7 @@
 #version 440
 #extension GL_GOOGLE_include_directive : require
 #include "frame.glsl"
+invariant gl_Position;
 layout(binding = 1) uniform sampler2D coverMap;
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
@@ -43,5 +44,5 @@ void main()
     viewNormal = normalize(mat3(f.view) * worldNormal);
     viewDepth = -(f.view * p).z;
     localPosition = position;
-    gl_Position = f.draw.x < -.5 ? vec4(position, 1) : f.nativeVP * model * vec4(rasterPosition, 1);
+    gl_Position = f.draw.x < -.5 ? vec4(position, 1) : f.nativeVP * p;
 }

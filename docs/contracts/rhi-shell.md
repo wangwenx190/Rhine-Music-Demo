@@ -34,3 +34,12 @@ R19C2B2恢复非像素`rhi-shell-gpu`门禁，macOS为真正隐藏Metal，其他
 五个 ROI 全部计分，MAE/SSIM/edge 和等权损失不屏蔽边缘、侧脊或背景。退出使用迁移计划的“全部材质 ROI 通过或残差进一步缩小”分支；整体损失降低不宣称每个 ROI 都达到 .97/6。逐项残差保留于 `verification/windows/rhi-shell/release-runtime.json`，源/Quick3D/RHI/差分与 4× 局部图位于 `docs/media/rhi-shell/`。较窄 rim 的 SSIM 无完整窗口时明确为 null，仍保留 MAE 和轮廓，不删除该区域。R10D 成对重放时必须复验这些具体 sourceIndex/ROI 和 `verification/windows/rhi-postprocess/` 的当前 pre-stage/final 残差，不能用整体平均数覆盖。
 
 以下为R10B历史图像门槛，已由R19C2B2上面的源公式/实际graph及资源门禁替代，不在当前执行：两场景开启/关闭壳体的不透明捕获逐像素一致；六场景倒序提交颜色/深度完全一致；相同深度使用固定 ID、重复 ID 拒绝；合成透明留白的 1×/4× resolve 只改变边缘覆盖，中心印刷不变且透明区不写法线/深度。阴影 on/off 用壳体实际深度掩码统计有效像素。R10B 历史图集传输字节仍未知；当前 R10C 的上传预算与性能证据独立保存于 `verification/windows/rhi-postprocess/`。
+
+
+## 连续重叠与Equal深度门禁
+
+R19C2C确认并修复visibility和颜色pass的位置差异：两个geometry顶点shader均从已计算world position执行`nativeVP*p`，并声明位置invariant。仅这两项使用qsb MSL2.1以承载该语义；其他目标语言及源材质不变。mvp槽保留ABI但不再计算无用CPU矩阵乘法。完整控制变量、960帧生产连续回放和范围见[source-fidelity-review.md](source-fidelity-review.md)；不能把本机结果外推为全部设备呈现完成。
+
+Review ON后执行`ctest --preset qt-release-render -R '^rhi-flicker-gpu$' --output-on-failure`。入口复用生产SceneItem、匿名库和真实封面/atlas，分段采集正常光学和逐pass覆盖探针，检查深度漏画与非有限颜色均为0、有效shade>100、真实目标不随运动/selector重建；macOS真正隐藏，其他平台暂用native-visible入口及窗口契约。源动画/透明度/排序/深度阈值未变；BLUR-01的分辨率/后处理调查仍R19D。
+
+本机OpenGL可用隐藏入口已执行同一61状态及optics-only连续960帧；完整生产AO在R16F读回报告非有限值，已写入R19D当前主线修复，不能记为完整OpenGL通过。专项命令为`QSG_RHI_BACKEND=opengl QT_SCALE_FACTOR=1 build/release/tools/rhi-flicker-audit verification/rhi-flicker-gl --optics-only`；该参数不会更改默认完整CTest。

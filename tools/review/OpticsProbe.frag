@@ -4,7 +4,11 @@ void main()
 {
     vec3 result;
     int probe = int(f.paperSize.w);
-    if (probe == 1) {
+    if (probe == 10) {
+        productionShellMain();
+        color = any(isnan(color)) || any(isinf(color)) ? vec4(0, 1, 0, 1) : vec4(1);
+        return;
+    } else if (probe == 1) {
         vec3 rect[4];
         rect[0] = vec3(1, -1, 1);
         rect[1] = vec3(-1, -1, 1);

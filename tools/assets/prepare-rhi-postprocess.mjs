@@ -93,15 +93,13 @@ layout(location = 7) in vec4 coverUv;
 layout(location = 8) in vec4 light0;
 layout(location = 9) in vec4 light1;
 `;
-vertex =
-    vertex.replace('void main()', instanceDeclaration + 'void main()')
-        .replace('    entityLight0 = f.originLight0;',
-                 `    mat4 model = mat4(model0, model1, model2, model3);
+vertex = vertex.replace('void main()', instanceDeclaration + 'void main()')
+             .replace('    entityLight0 = f.originLight0;',
+                      `    mat4 model = mat4(model0, model1, model2, model3);
     entityLight0 = light0;`)
-        .replace('entityLight1 = f.originLight1', 'entityLight1 = light1')
-        .replace('entityCoverUv = f.coverUv', 'entityCoverUv = coverUv')
-        .replaceAll('f.model', 'model')
-        .replace('f.mvp * vec4(rasterPosition, 1)', 'f.nativeVP * model * vec4(rasterPosition, 1)');
+             .replace('entityLight1 = f.originLight1', 'entityLight1 = light1')
+             .replace('entityCoverUv = f.coverUv', 'entityCoverUv = coverUv')
+             .replaceAll('f.model', 'model');
 await fs.writeFile(path.join(shaderRoot, 'geometry-instanced.vert'), vertex);
 for (const name of ['shell', 'shell-basic']) {
     const regular = await fs.readFile(path.join(shaderRoot, name + '.frag'), 'utf8');

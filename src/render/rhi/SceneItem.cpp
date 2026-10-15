@@ -596,6 +596,9 @@ void SceneItem::updatePolish()
     Input in;
     // Review capture tokens survive a coalesced camera/cover polish before synchronization.
     in.request = input().request;
+#ifdef YALAHOO_RHI_AUDIT
+    in.opticalProbe = input().opticalProbe;
+#endif
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
     in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
@@ -616,6 +619,14 @@ void SceneItem::updatePolish()
     in.aoResolution = float(quality.aoResolution());
     in.bokeh = !m_geometryOnly && settings.value("depthOfField").toDouble() > 0;
     in.smaa = !m_geometryOnly && settings.value("antialias") == "smaa";
+#ifdef YALAHOO_RHI_AUDIT
+    if (property("_yalahooReviewOpticsOnly").toBool()) {
+        in.postprocess = false;
+        in.aoSamples = 0;
+        in.bokeh = false;
+        in.smaa = false;
+    }
+#endif
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
     in.aperture = float((.0003 + .0005 * adapter.detail())
                         * settings.value("depthOfField").toDouble() / 100);

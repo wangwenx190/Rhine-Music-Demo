@@ -15,7 +15,7 @@ namespace yalahoo::review {
 class RhiCaptureHarness
 {
 public:
-    RhiCaptureHarness()
+    RhiCaptureHarness(const std::function<rhi::RhiItem *(QQuickItem *)> &create = { })
         : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
     {
         verification::prepareWindow(window, true);
@@ -27,7 +27,7 @@ public:
                     ++invalidations;
                 },
                 Qt::DirectConnection);
-        item = new rhi::RhiItem(window.contentItem());
+        item = create ? create(window.contentItem()) : new rhi::RhiItem(window.contentItem());
         QObject::connect(item, &rhi::RhiItem::renderFailed, &window,
                          [state = state](const QString &message) {
                              state->error = message;
@@ -149,8 +149,10 @@ private:
     };
     void setInput(rhi::Input input, QSize size)
     {
-        window.resize(size);
-        item->setSize(size);
+        if (manageGeometry) {
+            window.resize(size);
+            item->setSize(size);
+        }
         item->submit(std::move(input), size);
         surface.requestFrame();
     }
@@ -160,6 +162,7 @@ private:
     QQuickRenderControl control;
 
 public:
+    bool manageGeometry = true;
     QQuickWindow window;
     OffscreenSurface surface;
     rhi::RhiItem *item = nullptr;

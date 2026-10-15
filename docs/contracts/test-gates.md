@@ -35,3 +35,5 @@ R19C2A将`runtime-materials`和`runtime-lighting`恢复为独立的非像素`ren
 R19C2B1将`rhi-opaque-gpu`从旧图像disabled列表移出，macOS标为真正隐藏的render-integration/hidden-render，进入完整自动preset；其他系统仍为native-visible。入口使用源平面/法向/投影和纸面公式、真实格式、resize/封面revision/读回共享及十次重建，不加载Quick3D或浏览器图像。旧rhi-shell/postprocess evaluator仍disabled；不把本项通过外推为光学或后处理已复审。
 
 R19C2B2恢复`rhi-shell-gpu`为源公式/真实graph/自身输出门禁，macOS真正隐藏，完整自动preset包含；其他系统为native-visible。原`runtime-rhi-shell-quick3d`替代渲染步骤已移除，测试直接消费源JSON；61状态、10数学样本、排序/隔离、alpha和10次重建独立验证。后处理旧图像项仍disabled，等R19D拆耦；本项不替代连续阵列质量检查。
+
+R19C2C新增`rhi-flicker-gpu`，macOS真正隐藏且进入完整自动preset，其他平台为native-visible。它以8个跨批量阈值/MSAA输入和16×60帧生产序列验证多pass位置不变性、有限光学和资源稳定；交替正常输出与Review诊断，不执行旧图像比较，不代表正常窗口/VSYNC。

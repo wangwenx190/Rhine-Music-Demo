@@ -346,7 +346,7 @@ private:
     QSize targetSize;
     int shadowSize = 0, uniformStride = 0, captureSamples = 0;
     bool targetsHaveShells = false;
-    bool areaShader = false, opticsProbeShader = false;
+    bool areaShader = false, opticsProbeShader = false, visibilityProbeShader = false;
     bool diagnosticTargets = false;
     std::array<Uniform, 7> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
@@ -886,6 +886,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             shellPipeline->setDepthOp(QRhiGraphicsPipeline::Equal);
             shellPipeline->setDepthWrite(false);
             require(shellPipeline->create(), "Shell visible-surface pipeline failed");
+            visibilityProbeShader = false;
             coveragePipeline = pipeline(composite, geometryBindings.get(), false);
             coveragePipeline->setShaderStages(
                     { { QRhiShaderStage::Vertex, shader(":/rhi/geometry.vert.qsb") },
@@ -942,6 +943,29 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         areaShader = input.areaIntensity > 0;
         opticsProbeShader = input.opticalProbe > 0;
     }
+#ifdef YALAHOO_RHI_AUDIT
+    if (input.shells && visibilityProbeShader != (input.opticalProbe == 10)) {
+        visibilityProbeShader = input.opticalProbe == 10;
+        for (int instanced = 0; instanced < 2; ++instanced) {
+            auto *p = instanced ? coverageInstances.get() : coveragePipeline.get();
+            p->setShaderStages({ { QRhiShaderStage::Vertex,
+                                   shader(instanced ? ":/rhi/geometry-instanced.vert.qsb"
+                                                    : ":/rhi/geometry.vert.qsb") },
+                                 { QRhiShaderStage::Fragment,
+                                   shader(visibilityProbeShader ? ":/rhi/VisibilityProbe.frag.qsb"
+                                                                : ":/rhi/coverage.frag.qsb") } });
+            QRhiGraphicsPipeline::TargetBlend color, disabled;
+            disabled.colorWrite = { };
+            if (!visibilityProbeShader)
+                color.colorWrite = { };
+            if (diagnosticTargets)
+                p->setTargetBlends({ color, disabled, disabled });
+            else
+                p->setTargetBlends({ color });
+            require(p->create(), "Visibility diagnostic pipeline failed");
+        }
+    }
+#endif
     const QSize aoSize(std::max(1, int(targetSize.width() * input.aoResolution)),
                        std::max(1, int(targetSize.height() * input.aoResolution)));
     const bool wantAo = input.postprocess && input.aoSamples > 0;
@@ -1067,7 +1091,7 @@ Uniform Renderer::uniformTemplate(int kind) const
 Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
 {
     auto u = uniformBases[kind + 1];
-    copy(u.mvp, nativeVP * model);
+    // mvp remains reserved in the std140 ABI; both geometry paths reuse world position.
     copy(u.model, model);
     copy(u.lightMvp, nativeLightVP * model);
     if (input.atlasGeneration && entity >= 0) {
@@ -1904,7 +1928,7 @@ void RhiItem::submit(Input input, QSize target)
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");
     require(input.captureSamples > 0, "Invalid RHI sample count");
-    require(input.opticalProbe >= 0 && input.opticalProbe <= 9
+    require(input.opticalProbe >= 0 && input.opticalProbe <= 10
                     && (input.opticalProbe == 0 || input.shells),
             "Invalid optical math probe");
 #ifndef YALAHOO_RHI_AUDIT

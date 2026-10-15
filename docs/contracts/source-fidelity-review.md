@@ -268,3 +268,26 @@ COMMON-01–05/PERF-01–07与平台逐项符号/hash由`audit-rhi-opaque.py`写
 事件驱动RhiCaptureHarness复用B1隐藏入口；61状态和十次重建没有processEvents轮询、Quick3D替代renderer、浏览器GPU witness或图像差分。工具新OpticsProbe只在构建目录将生产函数与测试main组合；qsb不支持此次尝试的绝对include，改为CMake显式内联两个受configure-depends跟踪的公共头，所有五目标编译通过。生成器现在同时维护early/basic四变体，生成+Qt格式化与提交shader完全一致，避免未来生成倒退修复。
 
 COMMON-01–05/PERF-01–07及三平台符号/hash矩阵由`python3 tools/audit/audit-rhi-optics.py`生成，人工展开了实际生产函数、附件依赖、资源所有权与回调。无新增生产逐帧JSON/readback/队列，probe使用现有float读回、在RGBA8转换前解码；不以功能运行耗时宣称产品性能。当前macOS/arm64/Apple M4、最新自动发现Qt6.12.0、AppleClang21、Release、真正隐藏Metal/DPR1完整34/34、两组qmllint/check-format、六材质五目标qsb及四变体重建通过。普通配置已恢复Review OFF/可见OFF，构建及25/25快速回归通过。Windows/D3D11、Linux/OpenGL实机与PowerShell解析未执行，交R34/R19C2B2-P；正常VSYNC/窗口恢复仍按原专项。VIS-ARRAY-FLICKER-01连续定位紧随R19C2C，BLUR-01及后处理/fog仍R19D，不能用本轮通过销项。
+
+
+## R19C2C 透明重叠连续漏画与位置不变性
+
+起点`ebfb320`。追踪R10C的visibility→Equal shading优化、R10D生产SceneItem、R12/13有界批量实例、R18/19连续归位/总览以及`e98c798`跨后端适配；源Three的FrontSide、alpha=1/无blend、正常透明物理材质、排序、数量和动效均保持。用户原观察没有完整入口/设备记录，本轮建立匿名9×64库的生产路径复现，不冒称恢复用户当时的全部环境。
+
+已确认首个异常在visibility之后的Equal颜色pass：原逐实体shader用CPU计算的`nativeVP*model`，批量shader在GPU结合矩阵；两个不同管线未声明位置不变性。同一源表面可以得到略异深度/覆盖，前pass已写深度，后pass却拒绝该片元，留下不透明捕获，随运动形成孔洞/闪烁。独立九实例/1×诊断原漏14646点；只统一GPU运算仍漏17171点；只声明invariant在简化输入为0，却在640×480生产状态177个可见实体中仍漏1191点。最后同时统一`p=model*vertex; gl_Position=nativeVP*p`并声明`invariant gl_Position`，以下完整连续样本均为0。这些控制变量日志保持忽略；未将LTC奇点或正常光场动效误称为本问题根因。
+
+[GLSL不变性规范](https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.html)要求跨程序相同输入和相同计算；[Apple位置不变性说明](https://developer.apple.com/documentation/metal/mtlcompileoptions/preserveinvariance)解释多pass一致计算用途。qsb实际拒绝MSL1.2的invariant，故仅两个geometry顶点shader使用MSL2.1，SPIR-V/GLSL330/ES300/HLSL50仍生成，其他shader不改最低MSL。实际提取的MSL含`[[position, invariant]]`，HLSL50含precise SV_Position，GLSL330含invariant gl_Position。本机观察不外推为任意Metal编译器/设备保证，目标仍跑同一精确门禁。重用本来已计算的world position，删除每份uniform不再使用的CPU矩阵乘法；mvp槽保留零值以保持816-byte ABI，不搬动其他字段。
+
+`rhi-flicker-audit`新增Review专属逐pass覆盖探针：visibility只在颜色附件写magenta，真实生产shell helper执行后，有限颜色片元写white，非有限颜色写green。Equal漏画会留下magenta，包括完全覆盖中的部分MSAA样本；不是两图相似/差分，不用正常输出推断阈值。默认产品拒绝selector，两个probe shader都不打包；SceneItem只在Review保留该selector以防异步封面polish覆盖。其他normal/depth、捕获/mips、材质、前后表面和资源边保持。每段前30帧诊断、后30帧普通输出，所有真正浮点读回仍经imageOf有限值检查。
+
+实际Release/arm64/Apple M4/最新自动Qt6.12.0/Metal隐藏DPR1：1/7/8/9实体跨批量阈值×1×/4×共8项；生产640×480和1280×720、暖昼/深夜、静止/活动波浪/浏览/总览进入退出共16×60=960帧，其中480诊断、480正常光学。预期missing=0、nonfinite=0、有效shade>100，全部检查真实有界实体、上传预算、模式和resourceGeneration，静止之外以原FrameClock每次1/60推进、速度1/减少动态关闭。正常自身输出取有限代表帧检查；不读取桌面内容，不进行旧图配对。实际可见实体146–247，生产目标分别213×159/853×479；大小沿现有生产质量路径原样记录，小视口目标偏低及BLUR-01仍由R19D逐源判断，不能用本轮修正关闭模糊问题。正常VSYNC、窗口drawable与用户原设备未测。
+
+COMMON-01–05/PERF-01–07/三平台符号/hash入口`python3 tools/audit/audit-rhi-flicker.py`。回放事件驱动、封面ready以帧事件等待、有界超时、读回串行；诊断切换会重建特化pipeline，仅Review测试成本，真实target generation每个序列保持不变。已有十次SG重建/尺寸/封面等随同完整隐藏回归，产品request=0不增加读回/逐帧图像分析。Windows/D3D11、Linux/OpenGL本机不可执行，保留R34/R19C2C-P；R19H继续核对本机已修项与其他后端未验范围。
+
+本轮完整隐藏Release回归35/35（含960帧Metal及既有十次重建）、check-format、两组官方qmllint通过。生成器在临时隔离资源树执行并格式化后，instanced顶点shader与提交版本完全一致。额外本机OpenGL独立8项光学通过，但完整入口首个生产采集因R16F rawAO出现Nonfinite scalar AO pixel而终止，原失败与输入已完整写入紧接R19D主线；不是目标环境缺失，不能推到R34或记为全管线通过。工具显式`--optics-only`只关闭该专项的后处理捕获，用于独立透明路径定位，默认完整门禁不变。
+
+OpenGL最初的optics-only尝试曾在后半程又读回AO：SceneItem异步polish重建Input恢复了后处理，诊断覆盖不完整；现在仅Review的动态属性在polish处保持专项配置，普通产品无此入口。连续逐帧切换诊断特化还触发AGX compiled-variants footprint日志，最终改为每段前30诊断、后30普通以有界切换完成相同480+480覆盖；该日志不归因于正常产品逐帧工作。默认完整入口仍保留AO有限值断言，未用optics-only修改或代替它。
+
+本机隐藏OpenGL最终optics-only 960帧通过，覆盖/有限值均0；另以正常`rhi-shell-gpu`入口执行61源状态、数学探针及十次重建通过（11.46秒为该功能运行耗时，不是性能结论）。完整OpenGL生产AO失败仍未销项。Metal默认完整路径在最终诊断分段方式下另跑连续门禁，其他未改共享项复用上述35/35；所有采集物只留本地忽略目录。
+
+最终默认Metal连续门禁72.52秒通过；恢复Review OFF/可见OFF后，普通Release构建和25/25快速CTest通过，source-format与隐藏窗口策略通过。所有日志/图像/矩阵输出保持忽略，未提交采集产物。

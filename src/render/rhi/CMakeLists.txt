@@ -32,6 +32,12 @@ if(YALAHOO_REVIEW)
     target_compile_definitions(YalahooRhi PRIVATE YALAHOO_RHI_AUDIT)
 endif()
 yalahoo_platform(YalahooRhi)
+# Position invariance for the shared visibility/Equal color geometry requires MSL 2.1.
+qt_add_shaders(YalahooRhi rhi_geometry PREFIX /rhi
+    BASE "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"
+    GLSL "330,300 es" HLSL 50 MSL 21 FILES
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry-instanced.vert")
 qt_add_shaders(
     YalahooRhi
     rhi_shaders
@@ -46,8 +52,6 @@ qt_add_shaders(
     MSL
     12
     FILES
-    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry.vert"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/geometry-instanced.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/opaque.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/coverage.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/copy.frag"
@@ -113,4 +117,7 @@ if(YALAHOO_REVIEW)
     file(WRITE "${optics_generated}" "${optics_body}\n${optics_probe_tail}")
     qt_add_shaders(YalahooRhi review_optics PREFIX /rhi BASE "${CMAKE_CURRENT_BINARY_DIR}"
         GLSL "330,300 es" HLSL 50 MSL 12 FILES "${optics_generated}")
+    qt_add_shaders(YalahooRhi review_visibility PREFIX /rhi
+        BASE "${PROJECT_SOURCE_DIR}/tools/review" GLSL "330,300 es" HLSL 50 MSL 12
+        FILES "${PROJECT_SOURCE_DIR}/tools/review/VisibilityProbe.frag")
 endif()

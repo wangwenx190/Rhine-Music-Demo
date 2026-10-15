@@ -1,7 +1,7 @@
 // std140; byte layout asserted in RhiItem.cpp. Same interface in every stage.
 layout(std140, binding = 0) uniform Frame
 {
-    mat4 mvp;
+    mat4 mvp; // Reserved ABI slot; geometry reuses nativeVP * world position.
     mat4 model;
     mat4 view;
     mat4 lightMvp;
