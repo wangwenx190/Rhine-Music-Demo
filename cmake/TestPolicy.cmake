@@ -12,7 +12,7 @@ foreach(directory IN ITEMS "${PROJECT_SOURCE_DIR}" tests/unit tests/integration)
     get_property(native_tests DIRECTORY "${directory}" PROPERTY TESTS)
     foreach(test IN LISTS native_tests)
         set(needs_native_window FALSE)
-        if(test STREQUAL "rhi-bokeh-gpu")
+        if(test MATCHES "^rhi-(bokeh|smaa)-gpu$")
             # Direct QRhi offscreen frames do not create native windows on any platform.
             set_property(TEST "${test}" DIRECTORY "${directory}" APPEND PROPERTY LABELS render-integration hidden-render)
             set_property(TEST "${test}" DIRECTORY "${directory}" PROPERTY RUN_SERIAL TRUE)

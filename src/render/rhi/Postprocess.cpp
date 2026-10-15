@@ -264,6 +264,22 @@ QRhiTexture *Postprocess::blurredAo() const
 {
     return m_state->blur.texture.get();
 }
+QRhiTexture *Postprocess::smaaEdges() const
+{
+#ifdef YALAHOO_RHI_AUDIT
+    return m_state ? m_state->edges.texture.get() : nullptr;
+#else
+    return nullptr;
+#endif
+}
+QRhiTexture *Postprocess::smaaWeights() const
+{
+#ifdef YALAHOO_RHI_AUDIT
+    return m_state ? m_state->weights.texture.get() : nullptr;
+#else
+    return nullptr;
+#endif
+}
 QJsonArray Postprocess::passes() const
 {
     QJsonArray result;

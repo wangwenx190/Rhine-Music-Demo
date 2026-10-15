@@ -35,3 +35,5 @@ R19D1对源SSAO、R16F诊断行跨度、常量数据及27状态/数学/重建门
 生产雾与颜色域按[source-fidelity-review.md](source-fidelity-review.md)的R19D2执行：SceneAdapter按实际相机距离/详情生成范围；纸面在透射capture前、壳体在自身着色后分别应用线性smoothstep雾，然后才后处理与一次ACES/sRGB。独立Review默认fogEnabled=false，生产SceneItem正常路径始终true；不新增图形资源或将雾变化加入资源兼容键。
 
 R19D4A的Bokeh源数学/真实offscreen/实际上传与资源门禁见[postprocess.md](postprocess.md)末节。普通生产Postprocess的41点shader与采样参数未改，新增实际前缀诊断仅编入Review；独立测试直接执行同一生产qsb而非另一套shader。SMAA/目标尺度与旧工具拆耦仍由R19D4B/C承担，不把Bokeh单通道通过当作BLUR-01已关闭。
+
+SMAA的独立源公式、lookup行序、真实三pass和资源门禁按[postprocess.md](postprocess.md)的R19D4B1执行；仅Review返回中间目标，生产不增加采集。锁定源GLSL的`float(ivec2)`广播语义保持，未改变shader、lookup或阈值。旧postprocess/occlusion/render-backend/rhi-postprocess图像入口保持停用，其完整非像素覆盖映射、生产组合和MSAA/resolve由R19D4B2完成，不因孤立SMAA通过而销项。

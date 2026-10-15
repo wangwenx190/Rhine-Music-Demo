@@ -26,6 +26,9 @@ public:
                  QRhiTexture *aoDepth, QRhiTexture *dofDepth);
     void render(QRhiCommandBuffer *cb);
     QRhiTexture *output() const;
+    // Review returns intermediate targets; ordinary builds return nullptr.
+    QRhiTexture *smaaEdges() const;
+    QRhiTexture *smaaWeights() const;
     QJsonArray passes() const;
     QJsonObject submittedBokeh() const;
     QRhiTexture *rawAo() const;

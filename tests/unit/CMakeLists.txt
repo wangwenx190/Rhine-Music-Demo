@@ -124,6 +124,17 @@ if(YALAHOO_REVIEW)
         set_tests_properties(rhi-bokeh-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
     endif()
+    add_test(NAME rhi-smaa-gpu COMMAND rhi-smaa-audit "${CMAKE_BINARY_DIR}/verification/rhi-smaa")
+    set_tests_properties(rhi-smaa-gpu PROPERTIES TIMEOUT 120
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
+        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
+    if(WIN32)
+        set_tests_properties(rhi-smaa-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    elseif(APPLE)
+        set_tests_properties(rhi-smaa-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
+    endif()
     add_test(NAME rhi-ao-gpu COMMAND rhi-ao-audit "${CMAKE_BINARY_DIR}/verification/rhi-ao")
     set_tests_properties(rhi-ao-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"

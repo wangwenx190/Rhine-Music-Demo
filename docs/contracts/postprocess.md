@@ -45,3 +45,15 @@ Release Review ON下执行`ctest --preset qt-release-render -R '^rhi-bokeh-gpu$'
 Bokeh-only实际资源为一个全尺寸RGBA16F ping目标及一个uniform，常态API前缀上传80 bytes；焦点/aperture变化不得重建，关闭后目标全部释放。`Postprocess::submittedBokeh`仅Review保存真正交给updateDynamicBuffer的前缀，显式request才序列化；生产不增加采集、缓存或逐帧JSON。`rhi-flicker-gpu`的1200帧真实生产回放进一步对上传focus/aperture/maxblur/near/far/aspect及绑定的完整DOF附件尺寸核对，覆盖详情/相机变化与原光学连续门禁。
 
 本节不恢复历史postprocess/occlusion/RenderBackend/RhiPostprocess原图入口；AA与旧门禁覆盖映射属R19D4B，最终窗口/DPR/render scale/BLUR-01属R19D4C。Postprocess资源重建不等于Qt scene-graph或原生窗口恢复。正式性能/正常VSYNC及目标设备按原R28/R34任务；当前实际运行结论见source-fidelity-review.md。
+
+## R19D4B1 当前 SMAA 门禁
+
+`ctest --preset qt-release-render -R '^rhi-smaa-gpu$'`在Review构建直接运行生产Postprocess/qsb及真实QRhi offscreen frame，整个入口不创建窗口。独立double公式以像素坐标转写锁定Three Medium，覆盖.1颜色阈值、局部对比抑制、八步搜索/交叉边、160×560线性area/66×33 nearest search、gamma2.2及alpha混合；lookup保持原PNG解码行序、不转sRGB、不建mip。`audit-rhi-smaa.py`核对原文件hash、helper完整token、lookup内嵌PNG、冻结调用者和历史/平台/PERF矩阵，不需要浏览器或GPU oracle。
+
+源宏`float(ivec2)`取首分量；crossing的(1,0)实际对两轴各加1，(0,1)不增加任何轴。独立公式必须保留此源码语义，不能按常见二维offset含义重写。生产shader/参数及生成器没有变化。
+
+34组包含三尺寸、七种解析模式、复用目标回到无边缘状态和十次Postprocess真实reset/recreate。对三个实际RGBA16F输出分别执行源公式门槛：edges≤1/255，weights/blend≤既有3/255；全部通道有限，包含HDR和变化alpha。各图只用于自身质量检查；不是原实机图匹配。只读中间目标访问沿现有submittedBokeh模式，普通构建返回nullptr，不改变类在不同编译单元的声明，不增加产品采集或状态。
+
+SMAA-only为三个单采样全尺寸RGBA16F目标、两张无mip RGBA8 lookup、三个1104-byte uniform容量，共`24×width×height + 4×(160×560+66×33) + 3312`字节描述符载荷估算；不是实测VRAM。常态三个pass实际API前缀共240 bytes；数值/输入内容变化保持资源revision，关闭释放所有后处理资源。报告cpuSubmitNs只含本次命令记录，创建期可能含lookup上传；单次诊断不是正式成本比较、GPU完成或VSYNC指标。
+
+本机Metal/OpenGL实际结论见source-fidelity-review.md；Windows/D3D11与Linux/OpenGL原门槛交R34/R19D4B1-P。旧四套图像门禁的逐项覆盖迁移、MSAA/resolve与生产组合仍B2，目标尺度和BLUR-01仍C；本入口不证明scene-graph/native窗口恢复或正常呈现。

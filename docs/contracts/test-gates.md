@@ -41,3 +41,5 @@ R19C2C新增`rhi-flicker-gpu`，macOS真正隐藏且进入完整自动preset，�
 R19D1新增`rhi-ao-gpu`非图像门禁：27个背景/倍率/核/尺寸状态、243个源数学点（含box及.22）、实际R16F/缓存复用/十次重建。macOS真正隐藏并进入完整自动preset，其他系统为native-visible；不会启用旧occlusion-gpu-audit或原图比较。
 
 R19D4A新增`rhi-bokeh-gpu`：直接QRhi offscreen frame，不创建可见窗口，因此各平台均标`render-integration/hidden-render`并串行执行；它不依赖OffscreenSurface在不同平台是否显示窗口。当前真实执行环境仍须逐项记录。46组独立源数学/十次Postprocess资源重建，以及既有`rhi-flicker-gpu`1200帧中的实际Bokeh uniform/完整depth检查分别覆盖孤立算法和生产集成，不启用旧图像门禁。
+
+R19D4B1新增`rhi-smaa-gpu`：与Bokeh独立入口一样直接使用QRhi offscreen frame，各平台按实际入口标为`render-integration/hidden-render`并串行进入完整自动preset。34解析状态分别验证生产edges/weights/blend、两张lookup、RGBA16F/资源复用、240-byte前缀及十次Postprocess重建；当前只实际验证macOS Metal/OpenGL，其他目标保留R34。它不启用旧四套图像门禁；其非像素覆盖闭包和真实MSAA/resolve仍R19D4B2。

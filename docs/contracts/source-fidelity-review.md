@@ -409,3 +409,24 @@ PCF数值是同次真实几何深度上的独立源公式，非源实机图/浏�
 受限进程最初无法获得MTLDevice，原生执行环境下真正隐藏验证通过，原失败日志保留本地；没有通过显示窗口绕过。Windows/D3D11、Linux/OpenGL缺实际系统/Kit/设备，只做严格静态审计，原门槛和生产回归交R34/R19D4A-P。AA、旧图像入口覆盖映射与目标尺度仍D4B/C；BLUR-01尚未关闭，正常VSYNC/物理输入/完整性能仍R28/R34。生成图/日志/逐帧与matrix不入Git。
 
 最终普通Release已恢复Review OFF/可见OFF；生产构建、25/25快速CTest（含source-format/默认隐藏窗口策略）、两组官方qmllint及check-format通过。GL本轮实际执行独立46状态；没有修改生产shader/目标/事件驱动，GL生产1200帧与scene-graph边界复用R19D3B的有效事实，不将新增实际前缀断言记作本轮已在GL生产回放运行。原生可见窗口/正常VSYNC/物理设备矩阵本轮未选择，按原任务保留。Git仅新增最小41点数学输入、验证源码和必要契约。
+
+## R19D4B1 SMAA 源码、查表与真正离屏门禁
+
+起点`704a99d`。原D4B同时包含SMAA、MSAA/resolve与四套旧门禁覆盖迁移，实施前按一小时/单集成边界拆为B1与B2；本轮只处理B1，B2保留MSAA/resolve、真实生产组合及旧非像素检查逐项闭包。锁定Three0.183.2 SMAAShader/SMAAPass与既有manifest SHA256一致，两个lookup逐字等于源内嵌PNG；原MIT署名/许可保留。R09B `522a3f3`、R10C `1f2352a`、R10D `75775b3`及后续Metal/OpenGL适配`e98c798`的三个数学helper保持；当前canonical framebuffer适配由不同Y方向的真实后端独立验证。没有修改生产算法、阈值、搜索数、gamma或绘制路径。
+
+| 边界 | 源码/实际检查 |
+| --- | --- |
+| 冻结scene.ts/RenderQuality → SceneItem → Postprocess | 源SMAA在Bokeh后、一次Output前；高/极高启用SMAA，普通antialias off不关闭几何MSAA。静态核对实际设置发布；生产组合的完整闭包仍B2/C。 |
+| edges → weights → blend | 独立double像素坐标公式对应.1阈值/局部对比/八步搜索/crossing/area与search采样/gamma2.2/alpha；分别读回三个真实生产RGBA16F目标，无浏览器GPU、旧图或ROI评分。源`float(ivec2)`只取首分量再广播，CPU遵守真实展开语义；初期按二维offset转写的错误及失败日志保留本地，未改产品去追错误期望。 |
+| 资源与上传 | 三个独立单采样RGBA16F目标、两张无mip RGBA8 lookup、三个1104-byte容量uniform；描述符载荷估算`24×目标像素+370424`bytes，不是实测VRAM。每次真实API前缀共240 bytes；输入内容/focus变化不重建，同资源回到flat无残留；十次真实Postprocess重建、关闭全部释放。 |
+| PERF-01–07/COMMON-01–05及平台 | 固定三屏幕pass，最多八步搜索，O(目标像素)，不随曲库增长；既有render所有权/预载缓存，不增加产品I/O、队列、时钟、复制或读回。中间目标访问沿submittedBokeh的Review模式，普通构建返回nullptr，类声明跨编译单元一致。静态symbol/hash矩阵写本地忽略目录，目标真实GPU另列。 |
+
+macOS27.0.1/arm64/Apple M4、自动最新Qt6.12.0、AppleClang21、Release：Metal与本机OpenGL各34状态、每后端277610个解析像素通过，实际topLevelWindows=visibleWindows=0且无focusWindow。64×64/129×73/73×129包含斜向、相交边、矩形、低对比、局部抑制、动态后flat清零、HDR/alpha和十次资源重建。最大edges误差均0；weights为Metal .0008544921875、GL .00054931640625；blend均.0009765625，低于既有公式门槛1/255与3/255。自身两向斜边预览已查看，无方向颠倒/漏画/错误合成；这是解析小目标SMAA质量，不是小窗口BLUR-01或屏幕显示验收。
+
+三个生产qsb均核对含SPIR-V、GLSL330/ES300、HLSL50、MSL12；跨目标翻译不等于目标运行。报告中的局部CPU命令记录（含创建期lookup上传）只是一次功能回放诊断；没有三次成本比较，不推导GPU/VSYNC/FPS改善。资源/常态240-byte API请求为本轮成本结论，后端物理传输与driver分配未知。
+
+沙箱初次无MTLDevice，原生服务权限下同一真正离屏入口有效；没有show/抢焦点。Windows/D3D11、Linux/OpenGL当前缺对应系统/Kit/设备，只做严格静态审计，原门槛/修复入口/受影响回归交R34/R19D4B1-P。本轮不运行可见窗口/正常VSYNC/物理输入，旧四套图像门禁保持disabled，非像素覆盖闭包及MSAA/resolve仍B2，尺度与BLUR-01仍C，完整产品性能仍R28/R34。生成图、逐状态JSON、日志与机器矩阵不入Git。
+
+共享Release完整隐藏回归首轮39/40：`rhi-opaque-gpu`记录foregroundUnchanged=false，initial/current前台PID不同且均不是验证PID，同时native visible/active、activationObserved/focusObserved均false。原因未确认，不能归因于产品主动激活或用户操作，也不能写为完整40/40；原报告保留`verification/macos/rhi-smaa/r19d4b1/full-foreground-change.log`。最终相同渲染行为下单独复核opaque与SMAA 2/2通过，其他39项有效结果复用，包含1200帧生产光学及原AO/阴影/二维/资源回归，不放宽窗口策略。两组官方qmllint与check-format通过。
+
+最终恢复普通Release `YALAHOO_REVIEW=OFF`、`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，生产完整构建、25/25快速CTest（含source-format/默认隐藏策略）与两组官方qmllint/check-format通过。Git只保留验证源码、Review只读访问及必要契约；本轮代码规模约550行（新增/删除合计，不含审计生成脚本与文档），未实施B2或C。

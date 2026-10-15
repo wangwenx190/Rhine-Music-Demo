@@ -86,6 +86,14 @@ if(YALAHOO_REVIEW)
     set_target_properties(rhi-bokeh-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
         "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
     yalahoo_platform(rhi-bokeh-audit)
+    qt_add_executable(rhi-smaa-audit RhiSmaaAudit.cpp SmaaReference.h)
+    target_link_libraries(rhi-smaa-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
+    target_include_directories(rhi-smaa-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
+        "${PROJECT_SOURCE_DIR}/tools/assets")
+    target_compile_definitions(rhi-smaa-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+    set_target_properties(rhi-smaa-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(rhi-smaa-audit)
     qt_add_executable(rhi-ao-audit RhiAoAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
     target_link_libraries(rhi-ao-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(rhi-ao-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
