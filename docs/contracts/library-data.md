@@ -1,6 +1,6 @@
 # 数据模型、排序、搜索与离线资料契约
 
-冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts` 和 `data.ts:setMusicAlbums`。当前 Qt 窗口仍是资产/数据运行探针；本契约不提前实现扫描、详情或播放器。
+冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts` 和 `data.ts:setMusicAlbums`。本文只管值模型、身份/排序/搜索、存储序列化与Provider协议；扫描/媒体/UI消费者按计划对应轮次接入。
 
 `src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留原 JSON，写回时覆盖已知字段，其余未知字段不丢失。`readLibrary` 使用临时值解析，重复/错配 ID 或非法集合返回错误，原快照不变。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
 
@@ -21,14 +21,6 @@ LibrarySession 的 navigationAlbumId/navigationTrackId 与 playbackAlbumId/playb
 IMetadataProvider 构造注入，固定 Introduction/Credits/Enrichment/cancel 异步接口。AlbumQuery 预留批量 ID、联系人、enabled/force/configuration；ProviderCapabilities 预留各类能力，产品只注册 OfflineMetadataProvider，networkEnabled=false。ProviderResult 带 requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error；状态为 Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。来源与日期为缓存原值，不伪造检查时间。
 
 OfflineMetadataProvider 对不可变本地缓存快照进行事件循环异步读取；已有介绍或制作信息及历史查询状态直接返回，即使 force 也不重查。没有缓存返回 Deferred、“联网资料功能暂未启用”，不写成 NotFound，不生成 retryAt。历史缓存中的 NotFound/error/retryAt 原样保留。使用绑定 QObject 上下文的 QTimer，取消只改变对应 token，销毁后回调不执行；语义见 [QTimer](https://doc.qt.io/qt-6/qtimer.html)。不创建网络对象、请求、子进程或写缓存。LibrarySession 用 queued connection 路由结果，检查 requestId、generation、实体和 kind，处理请求覆盖/取消/库替换/销毁，重复或过期结果丢弃。
+## 检查入口
 
-常规验证只使用 Release；只有明确需要获取堆栈时才编译和运行 Debug。
-
-```powershell
-./tools/build/verify-r04.ps1
-./tools/audit/audit-r04.ps1
-```
-
-CTest 包含 library-data（所有冻结库列、排序、216 搜索用例、JSON/URL、模型通知、独立 ID 和 Provider 竞态）、library-qml（同一 QML 读角色并切换离线/测试 Provider）及 runtime-library（真实窗口、21 张匿名专辑、28 条 Typography 结果、缓存返回、鼠标、GPU、零歌曲来源）。`--verify-library <anonymous.json>` 仅与 `--verify-runtime` 配合读取 mixed fixture，默认启动不读用户曲库。
-
-Windows 证据在 `verification/windows/library-data/`，窗口图在 `docs/media/library-data/`。macOS/Linux 的新增数据/Provider 调用链审计在 `verification/{macos,linux}-static/library-data/`，结论为“静态审计通过，实机待用户验证”。平台实机清单在 `docs/platforms/`，不把 Windows 图像/运行当成对应平台的证据。
+`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/review/export-search-golden.mjs`导出，历史薄入口verify-r04.ps1/audit-r04.ps1；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。

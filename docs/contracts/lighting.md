@@ -1,6 +1,6 @@
 # 灯光与连续主题契约
 
-冻结源码及锁定 Three 算法 hash 在 [lighting.json](lighting.json)。这是音乐生产调用的光照扩展；R07 的隔离白色入射测试仍保留。阴影、AO 与景深分别由后续轮次接入。
+冻结源码及锁定 Three 算法 hash 在 [lighting.json](lighting.json)。这是音乐生产调用的光照扩展；R07 的隔离白色入射测试仍保留。本文只管光场与主题；阴影归rhi-opaque.md，AO/DOF归occlusion.md/postprocess.md。
 
 `SceneAdapter.lighting` 持有 `SelectionLighting`，唯一 FrameClock 在相机更新后传入已经缩放一次的 motionDt；没有灯光自己的计时器或第二次 speed 乘法。`RowLightController` 以 double 保存行/列位置与速度，按源函数限幅同向动量并使用 rate=4.743864518390578/duration。guided 默认参数为 strength=1.3、width=1.35、offset=.3、fill=1、duration=1.1。设置校验保持原范围，改变模式只修改 uniform。
 
@@ -12,14 +12,11 @@
 
 主题在650ms内按 cubic-bezier(.4,0,.2,1) 解横坐标并在线性RGB空间插值。反向请求以当前已显示 palette 为起点，相同目标不重启；减少动态直接完成。warmth 驱动既有材质数值与线性 tint 插值；背景和未来阅读层共用同一个 palette/backgroundColor。QML 不另用 Behavior/ColorAnimation 重算主题时间。
 
-灯光通过公有 CustomMaterial uniform 在 GLSL 中计算，保留源 Lambert、GGX/Smith 多次散射、LTC 面光与固定 PMREM；没有使用 Qt 内置灯的不同 brightness 单位，因此无需以不相同的单位抄数或搜索换算因子。灯/面积光计算因子均为1，暖昼与深夜相同，未按主题调参。材质参数不乘图像标定系数；R19C1已移除R07遗留的ROI搜索补偿。LTC 两张64×64原始表经已有锁定依赖导出为 qrc RGBA32F；原 MIT 许可与来源保留。
+灯光通过公有 CustomMaterial uniform 在 GLSL 中计算，保留源 Lambert、GGX/Smith 多次散射、LTC 面光与固定 PMREM；没有使用 Qt 内置灯的不同 brightness 单位，因此无需以不相同的单位抄数或搜索换算因子。灯/面积光计算因子均为1，暖昼与深夜相同，未按主题调参。材质参数不乘图像标定系数；所有材质/灯光参数直接按源公式，不使用图像标定系数。LTC 两张64×64原始表经已有锁定依赖导出为 qrc RGBA32F；原 MIT 许可与来源保留。
 
 `lighting-field.glsl` 是纸面和壳体唯一的光场源码，开发工具展开成两个独立 Qt shader，`expand-lighting-shaders.py --check` 校验一致性。row field 以实体 world origin 的x/z计算，排除纸面局部位置、y高度和相机；源 CoverAtlas 的纸面偏移烘焙在几何中，Qt 的独立 Rectangle 反向消去本地偏移得到同一实体原点。主盖/侧脊接入边缘输运与角度 glint，后托只接入源曝光规则；纸面只乘已有漫反射和 fieldExposure，原图上限限制先于光场乘法，不加白/自发光。纸面环境漫反射按原 Lambert PMREM 参与，Lambert 不接收 area 的合成照明。面积光沿用原 LTC 面积积分，不能再额外除π。
 
-当前单盒、抽取和归位可共用同一世界原点函数；后续 R12 的实例表须提供同一每实例实体原点并使用 Qt 仅在实例绘制时可用的实例矩阵关键词。当前非实例 shader 使用 MODEL_MATRIX，不提前实现阵列。R18 可通过 `setLightingInput` 提供真实旋转和绝对坐标；接口不改变 SceneAdapter 的产品导航边界。
-
 当前光场数值复建入口为 `node tools/review/export-lighting-golden.mjs`，直接执行冻结MusicSelectionLighting/ThemeTransition/music-row-lighting并生成20/30/60/120fps轨迹、主题反向/减少动态/隐藏/rebase和392组光场采样。`ctest --preset qt-release -R '^lighting$' --output-on-failure` 检查其数值，不需要原图。sampleRowLighting的核本身不依赖mode/fill，测试仍显式传入两者；灯光shader的模式合成另由R19C2复查，不能用核测试代替。
 
-旧 `verify-r08.ps1` 的48场景ROI比较已失去门禁效力，等待R19C2完成独立功能入口，不运行旧图追分。光强沿用Three源码GLSL单位，无Qt内置灯换算。R19C1本机隐藏生产场景及目标平台交接见 [source-fidelity-review.md](source-fidelity-review.md)，静态与目标实机结论分开。
 
-公开 API 依据：[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)、[TextureData](https://doc.qt.io/qt-6/qquick3dtexturedata.html)。
+`runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。`python3 tools/audit/audit-material-parameters.py`与`audit-material-review.py`分别检查实际参数链与Review生命周期，目标欠验归计划R34。

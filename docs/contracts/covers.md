@@ -4,7 +4,7 @@ R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量
 
 冻结来源为原始提交 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/cover-atlas.ts` 和 `src/viewer-album-cover.ts`，当前工作树位于 `legacy-web/src/`；历史 Git 读取继续使用既有清理映射。contain、1/64 留边、透明背景、选中/归位独立所有权和 tile 像素中心钳制按源码执行。
 
-生产调用链是 `SceneItem -> CoverCache::request -> decodePool/ QImageReader -> CoverSnapshot -> SelectedCoverPool -> SceneItem::schedule/updatePolish -> RhiItem::submit/synchronize/renderFrame`。当前既有单盒入口异步请求演示封面的 256/1024 两级图像，先采用较低清晰度，再升级；不在 GUI/render 热路径读盘、解码或绘图。阵列消费者在 R12 接入 AtlasAllocator 分页接口，详情归位实体在 R18 接入已有独立租约，不提前实现阵列或详情运动。
+生产调用链是 `SceneItem -> CoverCache::request -> decodePool/ QImageReader -> CoverSnapshot -> SelectedCoverPool -> SceneItem::schedule/updatePolish -> RhiItem::submit/synchronize/renderFrame`。消费者异步请求256/1024两级图像，先低清再升级；生产池布局与副本消费者分别见archive-pool.md/detail-motion.md。
 
 ## 请求、像素与失效
 
@@ -44,15 +44,8 @@ atlas 无 mip 链、使用线性 clamp 采样，无跨格各向异性。当前 Q
 
 RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、lookup、geometry/uniform/instance buffer 和 Qt item 输出仍由 ResourcePlan/ResourceInventory 按实际尺寸计算，见 rhi-integration.md；不再另建整页 CPU atlas 或 tile GPU staging texture。按保守独立所有者相加，新增 CPU reservation/完成缓存/retained/单页外部隔离/租约像素 reservation/载荷小计上界为 576MiB；生产隐式共享实际载荷通常更低。这些数值不包含库模型、固定资产、opaque codec scratch、驱动/PSO/SRB、Qt swapchain/compositor。旧/新封面或页面更换同时存活的 descriptor 上界为两套 cover 载荷，其他兼容资源不重建；现有报告的全场景 old+new 是更保守的 descriptor 对上界，非 VRAM 驻留峰值。measuredVramBytes 保持 null。
 
-## 验证与平台边界
+## 检查入口
 
-Windows 复建：`./tools/build/verify-r11.ps1`，随后 `./tools/audit/audit-r11.ps1`。格式、全部生产 Release CTest、qmllint 与受影响的 RHI 诊断/场景/集成检查都执行。工具只写忽略的 `verification/windows/covers/` 和 build 目录；图像来自自身 GPU readback，窗口首次 show 前置底、不接受焦点，hide/release/restore 保持。
+`CoverCacheTest`覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 
-CoverCacheTest 覆盖横/竖/方、透明 alpha、缺图、过大展开、Unicode/空格路径、重复请求、队列拒绝、LRU、30 次取消、reset 和十次在途关闭以及发布时销毁。采集计数区分 reader 返回的图像字节与不可直接观测的插件展开 scratch，并记录解码缩放能力。96 个独立 2048² JPEG 的三次运行分别保存完整就绪时间、GUI 事件 timer 间隔和队列峰值；采用正常 QEventLoop，不把单元测试轮询成本当产品帧率。CoverAudit 检查真实八 tile/下一帧预算、旧槽隐藏、晚到拒绝、局部像素、selected 4MiB 独立上传、稳定零复制/上传、封面尺寸不重建其他目标及真实 scene graph 释放恢复。D3D11 native UpdateSubresource 的 destinationBytes 与 caller 像素载荷分别报告；OpenGL 使用实际 readback 和 QRhi 区域计数，native command introspection 不可用，不宣称物理总线流量。
-
-macOS/Linux 同一源码、CMake 链、Qt reader、generation/所有权和 QRhi/qsb 路径严格静态审计，矩阵含 source hash、symbol、具体调用链及限制。结论为“静态审计通过，实机待用户验证”；目标平台 codecs、GPU/Metal/GL、窗口管理器和性能并未运行。目标机配置 Review 后执行 `ctest --preset qt-release -R '^(cover-cache|cover-gpu)$' --output-on-failure`，检查 runtime.json 的 windowPolicy、实际后端、局部像素与恢复；再恢复生产配置运行全部 CTest。全曲库扫描/填充阵列/详情运动与完整产品 120 秒性能验收属于后续轮次。
-
-Windows 验收结论：Qt 6.12.0 Release 的 D3D11/OpenGL 封面、局部上传、稳定帧、重建和窗口策略检查通过；九项受影响 Review 回归、全部 21 项生产 CTest、qmllint 与 source-format 通过。实际 D3D11 tile destinationBytes=262144，selected=4194304；纸面 ROI 横/竖/方 SSIM≥0.992。96 个大图的三次记录为 36/38/42ms 就绪、并发峰值3、待解码峰值93、LRU 16MiB；这些是局部事件循环样本，非完整播放器性能验收，最终小图不预放大修正不改变这组 2048→256 输入路径，最终源码另通过全部生产测试。macOS/Linux：静态审计通过，实机待用户验证。
-
-
-R19A 逐式复查 `paintCover`：缺图首行使用 CSS 500，脚注未声明字重，按默认 400。原生现在在绘制脚注前恢复 `QFont::Normal`，不再继承首行 Medium；1024 逻辑画布、字号、基线、留边、contain 和 alpha 均不变。ICC→sRGB、仅缩大图与独立不可变租约是有依据的原生适配；本机 `cover-cache`、资产和完整隐藏回归实际通过。GPU 采样/透明合成与用户报告的模糊、闪烁仍由 R19C/D 按 [source-fidelity-review.md](source-fidelity-review.md) 检查，不把本轮 CPU/资源通过当作三维连续质量通过。
+目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码审计`tools/audit/audit-r11.ps1`。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R34。

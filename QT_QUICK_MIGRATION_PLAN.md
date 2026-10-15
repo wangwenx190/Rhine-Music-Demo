@@ -1,32 +1,169 @@
 # yalahOO!!! · Qt Quick / QML 原生迁移执行计划
 
-## 项目文档优先级
+## 优先级与源码基准
 
-- 本计划是项目内最高优先级的实施契约；根 `AGENTS.md`、`README.md` 和 `legacy-web/` 内的开发约定、设计说明、贡献指南及其他计划、版本文档与其冲突时，以本计划为准。未冲突的约定继续适用。
-- 新的用户明确要求优先于已有项目文档；长期范围、技术路线或验收要求发生变化时，同步修订本计划及相关约定。
-- 历史 Web 实施和验收文档提供设计、参数与验证参照，其中的旧任务、旧授权、音频路线和发布检查不自动适用于本次原生迁移。
-- 所有视觉工作强制遵守下一节“外观复刻的绝对基准”；原项目实机图仅作大致参考，禁止逐像素对比或复制其渲染缺陷。
+- 优先级：用户最新明确要求 → 本计划 → `AGENTS.md`及各专项契约 → 历史资料。下表专项契约是本计划的实施细则，未冲突内容必须遵守；历史任务、授权和验收方法不自动沿用。
+- 冻结基线为 V0.4.1、`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，通过`docs/contracts/history-rewrite.json`及`frozen-git.mjs`/`ResolveFrozenRevision.ps1`解析清理后的等价源码。旧路径在当前树对应`legacy-web/`，旧模块名从该目录解析；根`.git/`保留。Web工具在`legacy-web/`运行并显式使用隔离`MUSIC_DATA_DIR`，不得写回冻结文件或用户旧数据。
+- **所有外观、几何、相机、字体、材质、光照、特效、动画与合成，均以冻结源码的实际生产调用、最终override和理论效果为基准。** 新品牌及用户指定差异优先；布局/数学/状态可严格核对，原实机图只作大致参考。
+- **禁止用截图逐像素比较、SSIM/RGB/ROI/边缘带分数或浏览器GPU字节相等驱动实现、调参、选型、诊断或验收。** 此规则覆盖所有旧契约/脚本及R34；旧分数不重跑、不改写为通过、不再作为待修门禁。耦合工具须拆出必要的非像素检查。
+- 原生运行检查漏画、错位、裁切、错误合成、锯齿和异常模糊；按源码定位并消除缺陷，保留设计景深/磨砂/背景模糊。禁止锐化、整体模糊、噪点或无依据改变分辨率来掩盖问题。
 
-## 外观复刻的绝对基准（所有轮次强制遵守）
+## 文件维护与经验规则
 
-**所有外观方面的内容——GUI、布局、字体与样式、几何、相机、主题、材质、光照、shader、后处理、特效和动画——都必须以原项目的算法和代码及其实际生产调用路径为绝对基准。目标是精确到每个像素地复现其源码理论上应有的渲染效果，也就是不包含渲染瑕疵的理想状态；不是复刻某台机器、某次浏览器或某张截图的输出。用户明确要求的新品牌和固定产品差异仍优先。**
+- 本文件只保留长期约束、剩余任务和必要经验。完成轮次直接删除，编号不重排；依赖指向既有交付物，不要求保留已完成小节。未完成项须有明确修复对象、输入、依赖、入口和退出条件。
+- **经验只记录“明确触发条件 → 核心解决方案”。** 必要适用边界写入触发条件或方案本身；不记实验过程、尝试顺序、失败数值、验证成绩、过程日志或重复说明。只保留已确认、后续仍适用的经验；未决问题归入具体待办，不写成经验结论。
+- 同一规则/接口/算法只有一个权威归属；计划写任务与关键边界，专项契约写技术规范，来源复查文档写逐项判定，平台文档写平台操作。其他位置引用，不复制正文。已有表述更新或合并，禁止按轮次不断追加重复小节。
+- 运行输出按[验证产物边界](docs/contracts/verification-artifacts.md)保留本地：`verification/`、`docs/media/`、`docs/contracts/web-scenes/`及旧Web输出不入Git。只提交源码、产品资产、真正测试输入和必要简明契约；大体积证据须用户明确指定个别文件。提交前按明确路径暂存并检查文件数量/体积，禁止改名绕过规则。
+- 本阶段不自动发布、上传私人数据、改写发行标签或改动用户音乐文件；保留冻结资料、作者署名与资源许可链。
 
-**原项目的实机渲染图、截图和视频只作大致视觉参考。其存在较多锯齿、模糊等渲染缺陷，绝不允许与这些实机图进行逐像素对比，也绝不允许逐像素复制其中的缺陷。不得以SSIM、RGB误差、差分图、文字边缘带或浏览器GPU读回逐字节相等，驱动实现、调参、选型、补修或验收；即使用作“诊断”也不例外。**
+## 执行顺序、规模与动态验证
 
-- 先逐项还原源码的布局/几何、数学函数、有效参数、执行顺序、颜色/合成语义、材质/光场、状态和时序。通过源码推导及直接执行源码生成的数学/状态测试验证实现，不从实机图反推字号、基线、模糊、采样、几何、光照或运动参数。
-- 原生实际运行用于检查实现是否完整、质量是否正确，以及漏画、错位、裁切、错误合成、可见锯齿、异常模糊等产品问题；发现问题必须回到算法、代码和渲染链定位原因。应消除渲染瑕疵，保持清晰、平滑的理论效果。源码有意定义的景深、背景模糊、透明度和运动模糊属于设计，须与非预期的模糊/失真分别判断。
-- 源码可直接推导的坐标/投影、布局尺寸、运动位置/速度/加速度和时序数值仍可严格核对；它们是代码/数学验证，不是截图逐像素匹配。源码与实际输出有矛盾时先查源码调用链、原生实现、后端及采集问题，不能迁就有缺陷的实机输出。
-- 本条覆盖本计划后文、所有历史契约、验证脚本和R34中旧的逐像素/SSIM/RGB/边缘带要求。历史图像数字仅作历史记录，不再执行相应比较，不保留为待修目标或完成门禁，也不改写旧记录为通过。已有工具若耦合这些比较，须分离后只执行源码、结构、行为、实际质量、资源及性能检查，不能以工具的旧设计为理由继续逐像素比较。
+- 当前主线：`R19D4B2 → R19D4C → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。一次只执行一个轮次，不跳轮；R01–R19历史复查全部收口后才能进入R20。R17–R33的“依赖R16”等指实现与阶段交接，不等待R34，避免循环依赖。
+- 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
+- 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
+- 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
+- 只有独立缺环境或采集不可靠的子任务可严格审计后移交R34，保留原任务ID、目标/能力缺口、源码与输入、已知失败、修复对象、准确入口/预期结果、原门槛、依赖和受影响回归。移交不代表通过，不减少实机要求。已交R34默认集中处理；用户指定提前补验仅处理指定已实现边界。
+- R30–R32按顺序交付实现与阶段审计，缺目标环境的部分交R34；本机R31可靠构建/macdeployqt/脱离Kit检查仍须执行。R34是最终专项，按实际环境及单轮规模拆执行单元；缺环境时保留任务，不宣称全平台验收完成。
 
-## 外部原生项目的有限参考范围（所有后续轮次）
+### 测试与窗口
 
-- 参考对象为本机 `/Users/zhaoyuhang/my/Rhine-Music-Database` 的当前源码，以下路径均相对该目录；它是可选实现参考，不是冻结基线、效果 oracle、优先架构或新增依赖。未取得其 Git 历史不阻碍局部源码审查；本表只表示已确认有参考价值，不表示代码、运行效果或性能已通过本项目验收。
-- 采用顺序按质量与适用性判断，不按“对方已完成”或节省工作量排序。核心架构、算法或共享机制的替换必须证明效果/行为符合本项目契约，并说明复杂度、线程/所有权、有界性、资源和维护成本相对现实现的优势；不得退化已有能力。边界清楚的小功能允许直接适配，无须为了形式重写，但仍须核对边界条件、依赖和受影响回归。现实现已满足要求且没有明确改善时，记录不采用即可，不强制做第二套实现或无关 benchmark。
-- 下表是本次安排的有限清单。只在所属轮次处理其已有职责，保持当前顺序、依赖和单轮规模，不另开全项目移植任务。清单外的新候选先指出具体问题、符号、适用性与改善依据，并在实施前补入对应剩余轮次；不能因本节存在而无边界地继续搜索、模仿或优先采用对方设计。不得以“供以后参考”批量复制目录、资产、测试或来源清单。
-- 对方代码与冻结音乐生产源码有差异时，仍以本计划的冻结源码理论效果、固定产品差异与现行质量要求为准。不得迁入其测量视频/截图重建的开场关键帧、旧品牌轮廓、固定1080逻辑舞台、逐字符字形系统、在线分类/专辑身份映射、灯光/SSAO/阴影/景深参数或整套渲染器。对方的圆盘/盘面 UV 与本项目方形封面纸面不同，`Qt/src/DiscGeometry.*` 和 `RhiScene.cpp::musicDraws` 不列为当前采用项；这不是已授权的几何/材质/封面裁切变更。
-- 不迁入 QJSEngine 场景/HUD 桥接、Three.js 数学运行依赖、Node/MusicBridge/联网账号与歌词链、QtMultimedia 私有设备补丁或平台/Qt版本限制。保留现有 C++/QML、公开媒体 API、离线 Provider、三平台及最新 Kit 契约；不得改变搜索/浏览与播放的隔离，也不引入新的运行库。
-- 采用时只记录必要的来源路径/符号、实际读取文件的内容 hash、改动范围、原始作者/许可链及采用或拒绝理由；直接复制的片段保留适用署名与许可，不将对方 NOTICE 当成全部自维护源码均已明确授权的证明。源文件变化后仅复核本次拟采用的差异；目录缺失或候选被否决时继续本项目原方案，不把外部副本变成构建/测试前置条件。
-- 验证按改动风险执行现有 Release、源码/数学/状态、真实质量及 PERF-01–07 适用项；不降低门槛、不搬用对方成绩，不引入截图相等/SSIM 门禁或照搬窗口激活、手动事件循环和等待式采集。只借用测试场景也要改接本项目生产入口、匿名输入和测试窗口策略，保留当前可执行检查及 R34 的实机边界。
+- 全部执行使用Release `qt-release`；仅明确需要堆栈时使用`qt-debug`，禁止例行双配置。门禁分组和执行策略统一见[test-gates.md](docs/contracts/test-gates.md)：受影响检查后跑一次快速回归，共享状态/渲染/模块/资源/构建变化补完整隐藏回归；同版本同环境有效结果可复用。
+- 正常功能一次有效回放；三次独立采样用于正式性能/成本比较或具体不稳定问题。十次重建/三十次换片在相关所有权/缓存/上下文边界执行，不随每个尺寸、DPR、主题机械重复。GPU/窗口检查串行；范围按风险选择，未运行不得记为通过。
+- [test-window-policy.md](docs/contracts/test-window-policy.md)统一约束全部测试/采集/重建：无需显示保持隐藏；默认需要显示的窗口首次show前通过`VerificationWindow.h`置底/拒绝焦点，恢复/重建后保持，禁止raise/requestActivate。浏览器headless，只读自身渲染，不截用户桌面。
+- 用户明确要求指定轮次可见验证即授权该轮前置/激活/焦点，无需再确认；仅该验证进程使用`YALAHOO_VERIFY_FOREGROUND=1`，报告真实策略，结束清除并恢复`YALAHOO_MACOS_VISIBLE_TESTS=OFF`及隐藏策略回归。普通产品窗口不受测试策略影响。
+- 离屏只证明对应画面/状态/资源；CPU提交、GPU完成、Qt呈现事件、正常VSYNC、物理输入/屏幕显示、媒体听感分别记录，未知值写null。遮挡/节流无样本不算通过或产品性能失败，不能用抢前台补救未授权采集。
+
+## 产品与身份
+
+- 原生三平台Windows/macOS/Linux，C++23、最新本机原生Qt、Qt Quick/QML、Qt Quick 3D（Review）、QtMultimedia与根CMake；移动端不在范围。QML管界面，C++管模型、状态机、运动、扫描和控制器。
+- 最终运行不依赖Node、浏览器、WebEngine、本地HTTP、Swift桥接、外部FFmpeg或新增第三方库；Qt随附依赖由部署工具处理，不自行链接内部FFmpeg。Web开发工具只可用已有锁定依赖，不新增图像比较库或下载浏览器。
+- 普通播放器只用QtMultimedia公开API：播放/暂停/停止/上下曲/队列/进度/音量/设备/错误。歌曲、BGM、UI音效独立；删除旧无缝三档及浏览器/CoreAudio后端选择。不实现无缝、交叉混音、手动PCM/重采样/音频回调/环形缓冲/自建引擎，不引入QAudioSink/QAudioDecoder/QAudioBufferOutput或AVAudioEngine/CoreAudio路线。
+- 保留双主题、减少动态、0.25×–3×速度、响应式、真实列/填充、列记忆、详情拖动、画质与光效调节；浏览/搜索/总览定位不改变播放。旧`?original=1`、PWA、浏览器菜单限制、在线播放代理及拆解研究界面不进入产品。
+- 本阶段零网络请求；保留异步Provider、来源/缓存/状态/查询配置、未知JSON字段和未来能力扩展，不能删字段或伪造查询结果。
+- 展示名统一`yalahOO!!!`，技术名`yalahoo`；CMake项目`yalahoo`，目标`Yalahoo`/`YalahooCore`，输出`yalahoo`，QML模块`Yalahoo.Music`。创建引擎/读取QStandardPaths前设organizationName/applicationName=`yalahoo`、applicationDisplayName=`yalahOO!!!`，改展示名不迁移数据根。
+- macOS bundle ID=`yalahoo.music`；Linux desktop/图标名=`yalahoo`。旧档案/署名保留原名。原创图标/Logo以真正SVG路径为主，不嵌PNG、不套用旧标识；主素材`resources/branding/`、衍生`resources/icons/yalahoo/`，设计/中心线/分组/安全区/16–32px光学稿及来源按[branding.md](docs/contracts/branding.md)。品牌替换保留原容器锚点、留白、层级和动效时间窗。
+
+## 专项契约与职责
+
+下列文档各管表中职责；复现命令放所属组件，公共规则只在对应公共契约维护。来源hash/数值输入以其引用的JSON和manifest为准，当前Kit/运行成绩不写成永久平台限制。
+
+| 文档（`docs/contracts/`） | 唯一职责 |
+| --- | --- |
+| [code-style.md](docs/contracts/code-style.md) | 源码格式、格式工具及官方qmllint使用 |
+| [native-bootstrap.md](docs/contracts/native-bootstrap.md) | 最新原生Kit发现、C++23探测、构建与模块加载 |
+| [web-baseline.md](docs/contracts/web-baseline.md) | 冻结来源解析、匿名输入和基线重建 |
+| [assets.md](docs/contracts/assets.md) / [branding.md](docs/contracts/branding.md) | 导入资产/字体/图标/音频来源；原创品牌资产 |
+| [library-data.md](docs/contracts/library-data.md) | 稳定身份、排序/搜索、存储与离线Provider接口 |
+| [motion.md](docs/contracts/motion.md) / [scene.md](docs/contracts/scene.md) | 唯一帧源/运动数学；布局/相机/坐标/拾取 |
+| [materials.md](docs/contracts/materials.md) / [lighting.md](docs/contracts/lighting.md) | 源材质/纸面语义；世界光场/主题/源单位 |
+| [canvas-painter.md](docs/contracts/canvas-painter.md) / [browse-ui.md](docs/contracts/browse-ui.md) | 两种绘制API共用能力与选型；浏览静态布局/遮罩/图标合成 |
+| [navigation.md](docs/contracts/navigation.md) / [title-reels.md](docs/contracts/title-reels.md) | 滑尺/数字/输入；标题字轮/字体/文字缓存 |
+| [presentation.md](docs/contracts/presentation.md) / [detail-motion.md](docs/contracts/detail-motion.md) / [overview.md](docs/contracts/overview.md) | 详情展示；抽取/换片/拖动；总览取景/折叠/标签 |
+| [covers.md](docs/contracts/covers.md) / [archive-pool.md](docs/contracts/archive-pool.md) / [real-columns.md](docs/contracts/real-columns.md) | 封面解码/图集/租约；填充池/选择坐标；真实列/会话记忆 |
+| [render-backend.md](docs/contracts/render-backend.md) | 后端选择和SceneAdapter固定业务边界 |
+| [rhi-opaque.md](docs/contracts/rhi-opaque.md) / [rhi-shell.md](docs/contracts/rhi-shell.md) | 不透明目标/阴影/地面；透射捕获/壳体/排序 |
+| [occlusion.md](docs/contracts/occlusion.md) / [postprocess.md](docs/contracts/postprocess.md) | SSAO/画质；雾/Bokeh/SMAA/最终输出算法与组件验证 |
+| [rhi-postprocess.md](docs/contracts/rhi-postprocess.md) / [rhi-integration.md](docs/contracts/rhi-integration.md) | RHI图集/后处理资源图；生产快照/同步/生命周期/测量接线 |
+| [performance.md](docs/contracts/performance.md) | PERF-01–07、预算来源、采样/统计和结果解释 |
+| [test-gates.md](docs/contracts/test-gates.md) / [test-window-policy.md](docs/contracts/test-window-policy.md) / [verification-artifacts.md](docs/contracts/verification-artifacts.md) | 门禁分组；验证窗口；输出/Git边界 |
+| [source-fidelity-review.md](docs/contracts/source-fidelity-review.md) | 逐历史轮次来源、适配/补偿判定与覆盖索引，非实施规范或运行日志 |
+| `docs/platforms/{macos,linux}.md` | 平台操作/部署差异与执行入口；欠验归属和门槛集中在R34 |
+
+### 工具链与目录
+
+- Kit发现每次枚举标准安装根或本机配置，读取Qt CMake实际版本并用qmake交叉核对，按数值选匹配系统/CPU/编译器ABI的最高原生Kit。排除Tools、移动端/交叉Kit；显式旧覆盖和旧cache不能绕过最新版本。最高Kit缺模块/API不兼容时修复并明确报错，不降级、不写固定minor/patch/安装目录。
+- qmake/balsam/qsb/qmlformat/部署工具和插件来自同一Kit/配套host-tools；GuiPrivate通过实际编译探测适配。C++23显式REQUIRED、无扩展、真实能力探针，不静默降级。基础模块Core/Gui/Qml/Quick/QuickControls2/QuickDialogs2/Quick3D/Multimedia/Concurrent/Svg/ShaderTools/CanvasPainter，测试Test/QuickTest，按生产/Review闭包部署。
+- Qt Canvas Painter的C++ API为QCanvasPainter/QCanvasPainterItem/Renderer，QML用`QtCanvas2D`；许可类别/技术预览标签/较新API不构成排除理由。按实际等价性、质量、成本和维护性选用，缺能力明确定位；不得为旧Kit放弃更适合的实现。
+- 根CMake/presets；C++在`src/{app,core,motion,render,media,library,services,platform}`，QML在`qml/Yalahoo/Music/{components,pages,panels,scene}`，资产`resources/`，测试`tests/`，工具`tools/{build,assets,review,deploy,audit,launchers}`。普通启动器在根，演示/研究启动器在`tools/launchers/`；不提前创建未来轮次的空实现。
+- `src/`子目录维护源清单；共用代码优先Qt，平台目录只放真实差异。QML用模块相对别名和`loadFromModule("Yalahoo.Music","App")`，非QML资源qrc `/assets/`，shader用qt_add_shaders/qsb；不依赖工作目录。构建`build/{release,debug}`、部署`out/{windows,macos,linux}`；本机配置/路径不提交。
+- 提交前依次执行`format`、`check-format`及适用Release检查，`source-format`必须通过；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
+
+### 架构与产品接线
+
+- AppController组合模型、选择/展示/运动、媒体、偏好与Provider，禁止巨型业务类；稳定ID操作，导航与播放独立。模型通知在GUI，GUI→render仅不可变SceneFrame，render不访问QML/LibraryStore/IO；扫描/解码用受限worker，媒体探测用有事件循环的专用线程，异步按requestId/generation/entityId淘汰陈旧结果。
+- 数据根/JSON/排序/搜索/Provider协议以library-data契约为准。专辑/曲目ID固定为`album-/track-`加原生绝对目录/直属单曲/文件路径UTF-8的SHA256前24位；跨系统不猜映射。旧数据仅显式只读导入，不移动原目录或导入PCM缓存，不写源歌曲标签。
+- SceneAdapter/QML接口稳定，生产唯一RHI SceneItem；Quick3D仅Review，私有API留在RHI/字体适配边界。通道/格式/ABI与资源图分别由rhi-opaque/shell/postprocess/integration维护，旧说明不能覆盖当前实现，不再重选框架。
+- 源材质/几何/光场、局部LOD、原contain/透明留白、帧源/打断/减少动态与状态机均按专项契约；不得建立第二套常量/时间/播放/身份机制。跨API换算必须有源公式/单位依据。
+- 生产滑尺用C++ Canvas Painter，标题当前glyph+彩色Quick Text；R20接序章，R34完成跨平台最终选型。列表/输入/焦点/Accessible由Quick承担；固定有界池/封面队列/上传预算、ResourcePlan及异常失败路径按对应契约，不以局部benchmark豁免设计缺陷。
+
+## 验收要点
+
+- 匿名fixture覆盖空/单/奇偶/短长列/超过12张列/超过432库、横竖方/alpha封面、长中文/下伸英文/括号/emoji/组合字。Web/Qt共用viewport/DPR/theme/quality/arrayMode/IDs/selection/motionTime/事件JSON，不读私人库；Review冻结时钟CLI不进入普通产品。
+- 尺寸1920×1080、1280×720、995×858、960×900、930×900、390×844、320×720、2560×1080、3440×1440，代表DPR1/1.5/2；布局锚点≤1逻辑px、三维投影≤2逻辑px、double运动≤1e-6，时序≤一个60Hz帧。20/30/60/120fps和长帧，轨迹以1/120秒源状态采样。
+- 打断覆盖立即返回/退字连选、三次换片与反向、搜索替换/取消、总览切列、改速/途中减少动态、扫描替换及跨1.05分界；真实清晰度/轮廓/合成、功能、数学和资源分别验收。
+- 性能指标、正式采样/临界复核、预算与结果解释统一按performance契约；R10D的record-only例外保留，R28交付测量入口/预算/当前可靠基线，缺同环境的历史波动及最终设备复现交R34。后台视觉停止且歌曲继续，十次重建/三十次换片验证资源回落。
+
+### 严格静态审计
+
+工具置`tools/audit/`，输出只留本地。每平台矩阵含checkId/requirement/platform/sourcePath/lineOrSymbol/evidence/result/limitations和内容hash；自动检查后必须推演实际调用链/条件分支/错误路径，字符串命中或文件清单不足以证明实现。N/A须说明原因，源码可确定缺陷必须修复，实际与静态结果分开。
+
+| ID | 审计职责 |
+| --- | --- |
+| COMMON-01 | 顶层CMake到目标/源/链接/moc/qrc/qsb/安装/测试完整闭包；C++23/最新Kit；禁止空平台分支、#error或静默关闭产品功能 |
+| COMMON-02 | QFile/QDir/QUrl/QStandardPaths的Unicode/空格/大小写/分隔符/可写根；模块/qrc/字体/图标/模型/音频/插件到部署读取的解析链 |
+| COMMON-03 | 相机/clip/Y/深度、MSAA/resolve、透明排序、屏幕采样、binding/location和qsb各目标；当前可执行的跨目标生成必须执行，不能冒充目标GPU运行 |
+| COMMON-04 | 命令到公开媒体API的source/设备/错误/结束/取消/销毁、不可seek/未知格式/后台恢复，禁止模拟后端替代真实产品 |
+| COMMON-05 | 每项证据可追溯；功能、构建/资源、平台、部署缺陷与未实现路径修复；缺实机单独交接，不能以静态通过冲销失败 |
+| WIN-01 | MSVC/入口/PE与ICO、windeployqt/QML/CanvasPainter/媒体/运行库、启动器自身路径/参数/退出；不伪称生成/运行PE |
+| MAC-01 | bundle/Info.plist/Resources/Frameworks/PlugIns/qml/macdeployqt、Metal/Retina/Command/菜单/关闭/数据根、.command引用 |
+| LNX-01 | xcb/Wayland/GL及可选Vulkan探测回退、库/插件/媒体依赖、LF/可执行位/参数/XDG/权限错误；不静默改系统配置 |
+| PERF-01–07 | 按performance契约展开复杂度/背压/快照上传/资源图/缓存/QML输入/生命周期，覆盖本轮与受影响路径 |
+
+## 跨轮次经验
+
+仅在修改对应领域时读取；以下每条只表达触发条件及已确认核心方案。
+
+### 文字与布局
+
+- 源文字探针请求字号与computed字号不一致 → 在测量前以相同CSS/children替换整个probe根并重绑定引用，保留原粗搜/细搜算法。
+- 主题切换使彩色字形节点丢失 → 普通文字保留整行glyph ID/位置，彩色grapheme交Qt Quick Text/Regular；GUI只传字体描述和值，render重新取得QRawFont并核对物理表。
+- 整行glyph关联将行末空白并入前组 → text范围与cursorToX终点同时限制到inkEnd；保留整行shaping，不拆字测宽。
+- 混合字体较大ascent使普通字形下移 → line.setPosition减实际line.ascent×局部scale；彩色描述符补回回退与主字体ascent差，按QFixed的1/64逻辑px核对。
+- macOS选中`.Apple Color Emoji UI`而源使用`AppleColorEmoji` → 控制器/QML创建前公开API指定`Apple Color Emoji`；缺字体显式失败并回滚注册，比较实际run表而非重新查询的描述符。
+- macOS主字体CSS半行距小数导致字体框基线偏移 → 主字体半行距按逻辑CSS px取floor，保留分数字号/行高、整行shaping、混合ascent和彩色基线；不外推Windows/Linux。
+- 隐藏ReelInk/Canvas候选仍处理文字 → GUI请求核对有效可见性，render同步保存item/window可见状态，隐藏paint不遍历/排版/绘字；层同时核对窗口，恢复重发状态、换窗口断旧连接，资源由render释放。
+- 自然宽度/active/visible同步通知形成绑定重入 → 宽度仅实际变化通知；caption按内容/退出状态保留，hide立即停advance并合并一个对象所属queued finish，恢复取消旧完成。
+- 测量读到未polish的页眉状态 → 在提交下一状态前或afterSynchronizing读取已布局值；ToolTip/Accessible由QML直接读取，QPointer跟随控件销毁。
+- ListView header变化/模型替换导致顶部或委托错误 → 分类模型禁跨类型复用；布局后positionViewAtBeginning，准备期合并顶部保持、用户滚动/定位即取消；按QQuickItem视觉树统计虚拟委托。
+
+### 验证驱动与生命周期
+
+- PowerShell启动WIN32 GUI读到陈旧LASTEXITCODE → 用Process对象等待并读取本次ExitCode，同时检查真实报告；console工具仍单独核对退出码。
+- headless CDP的页面Runtime请求在受限环境不返回 → 使用独立页面连接并在具原生服务权限的环境运行同一导出入口，保持headless/外部请求拦截，不改产品算法。
+- 标题恢复仍沿用超宽页眉root而停帧 → 恢复前明确设置标题window/root尺寸，以正常Qt事件与单个有界在途读回驱动。
+- macOS验证窗口仅Qt flags仍可能激活 → QGuiApplication前设置启动策略；默认Prohibited、原生低层级/拒key/忽略输入并观察重建，授权前台则预先Regular，统一走VerificationWindow。
+- RenderControl的高DPR图像占错误区域或隐藏控件不消费状态 → 显式设置target DPR，Title/Header/Transport/Canvas接offscreenRendering，仍消费生产FrameClock。
+- Metal静态场景异步读回无后续帧 → 显式采集按MaxAsyncReadbackFrames+1有界续帧、最多两批在途，不重复submit或轮询；无采集回调时不增加生产工作。
+- macOS OpenGL shader/context不兼容或可见drawable需主线程 → QGuiApplication前选择4.1/CoreProfile，显式GL用basic、Metal保持threaded；不补旧GLSL近似或降Qt。
+- macOS缺glTexStorage2DMultisample入口 → 能力探测后改用同采样数/同格式QRhi color renderbuffer并保留resolve，核对backingFormat与资源清单。
+- basic的surface重建未产生新context或静止SceneItem不再提交 → 可见恢复排对象所属ensurePolished/update，分别验证实际三维提交与context；完整释放需销毁最后QQuickWindow，旧窗口回调按epoch丢弃，清理帧在有效context执行。
+- Quick3D Review仅复用旧root重新initialize后漏画 → 销毁拥有场景的QML root，再释放离屏上下文/窗口并重建场景；同时核对真实invalidation和有效输出，不混称同对象恢复。
+- 封面数量与呈现状态跨polish帧混读 → ready核对同revision实体objectId/albumId集合、租约集合及选中资源；不放宽数量上界。
+- 新renderer的resourceGeneration从1重置 → 用真实sceneGraphInvalidated事件及恢复输出/上传证明重建，不把局部代次当全局身份。
+- 几何探针绕过像素保护或把错误提示算作模型 → 共用RenderQuality保护、记录limited/实际尺寸，要求renderError为空并排除提示区域。
+- Offscreen附件估算漏D32FS8或resize重叠 → RGBA8颜色4bytes加depth/stencil8bytes保守上界并计旧/新同时存活；估算与driver实分配分开。
+
+### 三维与数值实现
+
+- 减少动态时旋转归位副本无法回收 → yaw归零、清returnY、lift.finish(0)并当次发布回收；选中盒手动查看目标仍独立保留。
+- 全局detail无法表达阵列/选中/归位材质 → CaseClarity维护逐实体REVEAL曲线与ready，归位副本保存自身clarity按exp(-9dt)回雾，阵列保持磨砂；只更新对应uniform。
+- 辅助参数测试正确而实际上传含无依据ROI系数 → 沿实际override/upload核对每实体uniformScratch，移除全部无源补偿；Review拒绝校准输入，不能只测helper。
+- GL奇数宽R16F读回受PACK_ALIGNMENT填充影响 → 仅显式未对齐捕获同格式复制到按实际pack补齐的缓存，按storage stride读取逻辑宽；产品目标/精度不变、正常无捕获不做该工作。
+- SSAO深度/核与源不一致或存在闲置上传 → RGB24白哨兵精确判断、法线只unpack；kernel仅创建时写入、动态80-byte前缀、删除未采样纹理，保留16/32/64累加顺序与源seed417。
+- visibility与Equal壳体pass位置不同导致漏画 → 两个geometry顶点统一`p=model*vertex; nativeVP*p`且声明invariant，只有这两个shader使用MSL2.1；不加depth epsilon/偏置掩盖。
+- roughness导数因相机roll变化而不等价 → 计算源view-space normal最大分量导数，不能替换为world-space无穷范数；LTC奇点独立验证。
+- alpha黑边断言混用连续值与RGBA8码值 → 使用原整数码值门槛`qRound(expected*255)-1`，不扩大容差。
+- 多个Capture字段别名到同一纹理 → 按纹理身份去重读回/转换并计真实回调数，最后一次统一交付共享QImage；不能按语义字段数等待。
+- shader生成丢失后续适配 → 核对完整生成token与依赖，覆盖basic/early变体，生成后format可复现提交内容；纸面生成保留entityLight0.xy原点场提升。
+- 倾斜平面depth误差与投影门槛单位不同 → 保留原depth差并按解析平面每物理像素梯度换算≤2物理px；恒深面仍检查2e-6，法向/颜色门槛不变；远平面射线用解析camera ray避免端点相减消减误差。
+- 地面探针取景使接收阴影全在视口外 → 专项相机aim=(0,-4.63,0)，强制开启阴影场景实际occluded>0，生产相机不改。
+- 源SMAA宏`float(ivec2)`被误作二维偏移 → 取首分量后广播：(1,0)两轴加1，(0,1)不增加轴并保留调用前y减1；严格按GLSL展开，不改shader迎合错误测试。
+
+## 外部原生项目的有限参考
+
+- 可选参考`/Users/zhaoyuhang/my/Rhine-Music-Database`，只在下表所属轮次读取指定边界。它不构成冻结源、优先架构或构建依赖；现实现等价且无明确改善时可拒绝，不强制另做实现/benchmark。清单外候选须先写明具体问题/符号/收益并补入对应未完成轮次。
+- 采用须证明源码效果/行为等价及复杂度、线程/所有权、有界性、资源和维护收益，保留实际读取文件hash/符号/作者/许可与理由；小功能按边界适配，不批量复制目录、资产或测试。目录缺失或拒绝后继续本项目方案，不能把NOTICE当全部自维护代码授权。
+- 禁迁入截图关键帧、旧品牌、固定1080舞台、逐字符系统、在线身份/账号/歌词链、光照/AO/阴影/DOF参数、整套渲染器、QJSEngine/HUD桥接、Three运行依赖、Node/MusicBridge或QtMultimedia私有补丁。DiscGeometry/musicDraws的圆盘UV不适用方形封面，不构成几何/裁切授权；不得引入第二套状态/取消机制或改变播放隔离。
 
 | 参考项 | 所属轮次 | 已确认的局部入口与允许范围 | 采用边界 |
 | --- | --- | --- | --- |
@@ -36,567 +173,20 @@
 | REFDB-05 异步结果换代隔离 | R26 | `Qt/src/Host.cpp::acceptCookies` 与 `cover` 完成回调的 epoch 检查；参考换代后旧结果不能回写当前状态的局部保护 | 只补本项目 IMetadataProvider 的 requestId/generation/取消测试或小段防陈旧逻辑，用离线测试 Provider 注入；不复制账号/Cookie 业务、Host/网络/队列架构，不触发请求，不增加第二套身份或取消机制 |
 | REFDB-06 休眠唤醒与资源恢复用例 | R28 | `Qt/tests/UiChecks.cpp` 中静止零 step/三维 render、绘制中晚到失效、隐藏期间失效、恢复最新状态、缓存命中资源稳定和重建保留当前歌曲等场景 | 仅补已有生命周期覆盖的缺口；沿本项目 dirty revision、生产计数器和有界缓存实现，不搬用逐帧 JSON/缓冲比较来判静止，不照搬隐藏即清空所有资源、固定等待时长、窗口截图相等或 JS 状态机 |
 
-## 文件维护规则
-
-**【已经完成的轮次直接移除，不允许输出过程性文字到这个文件中，除非是需要跨轮次传播的信息或者执行的任务】**
-
-- 本文件是剩余任务清单与跨轮次实施契约，不是开发日志。禁止加入“本轮完成了”“正在处理”“检查通过”、完成勾选、流水账、聊天记录和历史进度表。
-- 一个轮次的交付物及退出条件全部满足后，删除该轮次整个小节。编号保持不变，不重新编号；依赖编号指向代码、测试和验收资产，不要求被依赖的小节仍存在。
-- 完成轮次涉及的接口、参数、资产路径、构建命令及固定限制，合并到本文件对应的长期契约，或保存到代码和 `docs/contracts/`；不得用保留已完成轮次代替交接。
-- 未通过的验收项保留为具体任务：写清输入、修复对象、预期结果、验收方法和依赖。禁止用“继续优化”“自行研究”“视情况调整”作为任务。
-- 各平台实际运行输出在本地`verification/windows/`、`verification/macos/`、`verification/linux/`生成，严格静态矩阵在对应`verification/*-static/`生成，视觉对照在`docs/media/`生成；路径表示证据所属环境，不规定验证方式。这些目录及`docs/contracts/web-scenes/`批量导出不进入Git，原始产物单独归档；只保留源码、产品资产、真正测试输入、必要契约和简明结论，按`docs/contracts/verification-artifacts.md`执行。不能将私人曲库、个人配置或绝对音乐路径放入版本控制。
-- **禁止再次批量提交验证产物。** 默认不提交任何运行输出；确需保留证据时，只保留证明结论不可缺少的核心文件，优先合并进现有契约：简短结论、必要指标/未决项、最小复现命令和来源标识。没有直接验证用途的文件不保留。不得提交整套截图/差分、重复报告、逐帧 JSON、全量场景导出、日志、逐机审计矩阵或完整产物 hash 清单；不得以“便于追溯”作为全量入库理由。图片或其他大体积证据只有用户明确指定个别文件时才允许例外。
-- 提交前必须检查暂存文件清单、数量与体积，逐项确认新增文件属于源码/产品资产/必要测试输入或上述最小核心文件；按明确文件路径暂存，不使用全工作区暂存把生成输出带入提交。不可把运行产物改名为 fixture 或 contract 绕过规则。复现优先使用保留的生成/验证工具，原始数据只在本地或仓库外归档。
-- 当前平台主线按列出的顺序和实现依赖连续执行，一次以一个轮次为边界；不得因困难跳过当前环境可执行的任务。按下述动态验证规则，将当前环境确实无法执行或无法可靠验证的独立任务移入最后R34专项轮次，保留输入、原门槛、失败记录和依赖；移交不等于通过，也不取消实机要求。
-
-## 当前环境能力、动态验收与执行顺序
-
-- 当前主力环境为macOS/Apple Silicon；Windows旧报告和各平台历史静态结论只说明当时的源码/设备/范围，不决定后续验证方式。每轮开始先逐项核对实际系统/CPU、最新原生Kit、后端/设备、工具与匿名输入、采集入口和不干扰桌面策略，给出可执行性依据；不能只按平台名称推断可以或不可以验证。
-- 能确实可靠验证的任务必须在当前轮真实执行并通过，例如本机Release构建/CTest、原生字体与资源、真实Metal离屏、公开媒体事件和本机部署检查中已具备可靠入口的部分。离屏是真实GPU运行，但其结果只证明对应画面/状态/资源，不证明窗口曝光、正常VSYNC、实际显示、输入到光子或输出设备听感。
-- 当前环境无法执行或不能可靠验证的部分暂用COMMON-01–05、目标平台集成项和PERF-01–07严格静态审计；必须在原轮删除前把实机任务移交最后R34，写明原轮/任务ID、目标平台/后端/设备、能力缺口及依据、输入与源码版本、修复对象、运行入口/预期结果、原门槛、实现依赖及受影响主线回归。不存在可靠样本不等于通过；已知失败不得改成未验证，也不得因审计通过丢掉补修对象。
-- 可安装的常规开发工具缺失先补齐；当前源码或可靠本机入口已经能够确定并修复的产品缺陷、当前可靠检查的失败、缺少应由本轮提供的验证入口不能作为跳过理由。确实依赖其他系统/后端/硬件或不可靠采集条件的诊断与修复，才允许后置；源码能确认的缺陷仍在当前轮修复。任务部分可执行时完成该部分，只移动不可执行子任务，不将整个轮次无故跳过。
-- 当前主线顺序为`R19D4B2 → R19D4C → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。R19A–R19H是用户要求的历史源码复查，必须紧接R19、在R20前全部完成，不以继续新功能或后置R34替代。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
-- R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务默认集中在专项阶段处理；用户明确要求提前补可见窗口验收时，只处理已实现的指定欠验边界，通过条目从R34删除，不提前实施后续功能。
-- R34是计划最后的特殊轮次，承接全部未执行平台/后端问题修复及必需实机验证。执行前依据真实目标环境逐项评估、按依赖串行处理并遵守单轮规模上限，必要时拆成明确的小轮次；没有相应环境时保留未完成任务，不能删除R34或宣称全平台最终验收完成。主线阶段完成、静态审计通过与最终实机完成分别报告。
-
-## 验证门禁分层与去重（所有后续轮次）
-
-- 日常`ctest --preset qt-release`只运行快速源码/算法/状态、资产/模块及格式门禁；通过不等于GUI/全平台验收。`qt-release-full`运行当前可可靠隐藏的完整自动回归，排除需要显示的窗口；`qt-release-render`只选真正隐藏的渲染集成项，可再用`-R`选择受影响组件。实际分组见`cmake/TestPolicy.cmake`与`docs/contracts/test-gates.md`，不以平台名称假定所有工具都能离屏。
-- 原生窗口检查使用显式`qt-release-visible -R 具体测试`或具体产品验证入口，只在相关窗口/焦点/输入/呈现/资源改动需要时执行；不能因开启`YALAHOO_MACOS_VISIBLE_TESTS`或需要一次完整回归，就把所有可见历史测试混入日常门禁。前台仍须当轮用户授权；不授权时遵循置底/拒绝焦点策略，无法可靠验证的目标按原规则交接。
-- 修改后先跑受影响的源码/数学/结构与隐藏组件检查，最终跑一次快速回归；共享状态/渲染/模块/资源或构建集成变更时补一次完整自动回归。相同二进制/同环境已有效通过的结果可复用，不因文档、格式或没有语义影响的收尾反复重跑全部矩阵；出现新改动、失败或未决风险才扩大回归。
-- 功能事件序列通常一次有效运行即可。三次独立采样只用于正式性能、成本比较或具体不稳定问题的复核，不把每个后端×DPR×主题的功能测试机械重复三遍。尺寸/双主题/DPR矩阵按改动风险选择：字体/采样/布局/后端共享变更覆盖对应完整范围，其余先代表性与边界；各阶段明确的最终目标平台矩阵保留，不把缩小日常门禁写成已验收未运行范围。
-- 十次生命周期/三十次换片等压力序列在相关所有权、缓存、图形上下文或状态机边界执行；同一实现无需在每个尺寸/DPR/主题和每次功能重复中再做整套重建。没有新增相关风险时复用有效结果，原生窗口专项避免反复show/抢焦点，隐藏资源验证保持真正隐藏。
-- 旧原图比较门禁不进入任何测试preset，解除耦合由R19A–R19H按组件完成；数学/合成输入的独立工具单元测试不等于运行原实机图匹配。禁止以“测试已存在”为理由继续图像追分，也不为减少耗时删除有必要的功能、资源、实际质量或目标平台最终检查。
-- 报告明确列出本次实际执行、复用、未选择和暂缓范围及理由，不把被筛选项记为通过。GPU/窗口集成串行运行，不能用并发增加桌面干扰或污染成本样本；所有生成物继续保持本地忽略。
-
-## 轮次规模与耗时约束
-
-- 每个轮次的规模必须按执行本计划的AI代理自身的实际能力、当前上下文、工具延迟和已有验证入口评估，不采用人类工程师的开发日/工时作为轮次容量依据。一个轮次只处理一个明确集成边界。
-- **每轮开始执行前必须先判断规模与耗时是否合理。** 估算代码增删行数、实现/修复、构建、测试、视觉/性能采集、审计、文档收尾及提交的总有效执行时间，并向用户简要说明范围与估算。代码修改理想不超过1000行，通常不超过2000行，**规模上限目标为两三千行；总有效执行时间上限目标为一小时**。允许必要收尾引起的小幅超出，不能机械判定3001行或61分钟不合格；如果明显将达到4000行甚至更多，或七八十分钟仍不一定足够，必须先拆分。行数按该轮最终diff的代码新增与删除相加统计，新增代码文件计入；不以净增抵消删除、不用改名或拆提交规避。生成脚本、文档与可按行计的素材暂不计入代码行数，但它们的执行/检查耗时仍计入总时间。
-- 网络连接断开、用户手动终止引起的停顿间隔不计入有效执行时间；恢复时累计中断前后的实际执行时间。正常思考、工具等待、构建/测试、失败调试和重跑均计入，不能以验证、审计或后台运行名义排除。
-- 预估明显超过上述规模/时间目标，或存在七八十分钟仍无法合理收尾的风险时，**必须先修改计划再开始实现**：将当前轮次一部分内容合理转移到后续具体轮次，分别写明接口、依赖、输入、修复对象、验收方法和退出条件，保留原有门槛；优先拆分实现、单后端/单DPR验证与最终选型，不能把整个复杂系统塞进“补验收”。不得开始大轮次后才靠延长会话完成。
-- 执行中也持续核对规模与剩余时间，给构建、验证和提交留出余量；预计明显超出时立即停止扩展并拆分剩余任务，不得连续以“小幅超出”为由延长。已经明显超时的轮次如实报告，不能追认达标；在已有授权下只做必要的安全收尾，将未完成验收保留为待执行任务，不虚报完成、不跳过门槛。新会话或拆提交不重置同一轮次的累计时间。
-- 已列出的后续轮次不是自动批准其规模；每次真正开始仍必须执行上述前置评估并按需拆分，不提前实现尚未执行的轮次。
-
-## 每轮必读的问题与解决方案记录
-
-- 每轮开始前必须完整读取本节及涉及的契约，再评估规模/耗时。每轮结束或拆分收尾时，必须把耗时较长才解决的问题、反复调试的陷阱写入本计划：如实、详细、准确记录问题表现、触发条件、已确认根因、解决方案、验证范围、未解决限制及避免再犯的方法。这些是跨轮次技术经验，不属于过程性文字，不需要专门豁免；不能只写“已修复”或把详细内容全部外置后仅留链接。没有确认的推断必须标明，未验证的修正不能写成通过。
-- 已有记录后续被证明不准确时直接修正，并保留仍适用的触发条件与解决办法。机器日志/截图/逐帧数据保持忽略，记录保留复现入口和必要症状，不把大量采集产物纳入计划。
-
-### R16：源文字测量探针返回陈旧字号
-
-- 表现与触发：冻结 `setupMusicTitleLayout` 做粗搜后细搜，Chromium 中受 contain/style 影响的测量probe更新fine字号后，inline font-size与getComputedStyle仍可能不一致，后者保留前一次coarse字号。原生按fine字号实现后，窄屏字号/行框对照反复失败；只看截图容易误判为Qt字体度量错误。
-- 处理：先同时记录candidate.size、inline/computed字号与glyph位置，区分请求状态与实际采集状态。导出器在stageCandidate结束、测量前，以完全相同inline CSS和children克隆并替换整个probe根，同时重绑定main/translation引用；不改粗搜/细搜算法、参数、生产样式或字体。旧未刷新数据保留在 `verification/windows/title-reels/web-raw/`，刷新数据在 `web/`，登记 `WEB-TEXT-PROBE-01`。
-- 验证与限制：刷新后的fine字号与inline/computed状态一致，窄屏结构误差降至约0.12逻辑px；完整跨DPR/后端视觉仍待R16B1–B3。以后先核对源状态与实际CSS，不用改原生字号去追陈旧采集值，不为校正观测降低像素门槛。
-
-### R16：彩色emoji在主题切换后的文字节点复用中消失
-
-- 表现与触发：普通字形节点复用后仅更新文字颜色，彩色字体内容在昼夜切换的对照中消失；普通汉字仍存在。单看整体截图容易把问题误归为字体未加载、裁切或原生不支持emoji。逐个重建彩色节点的尝试又增加了私有字体/缓存处理复杂度。
-- 处理：生产普通文字仍提交整行shaping后的glyph ID/位置；只让彩色grapheme走Qt Quick Text成熟的彩色字体路径。普通字面不再创建隐藏Text，彩色fallback显式保持Regular，匹配源font-synthesis:none；GUI只保存字体描述与字形值，render thread重新取得QRawFont并核对head身份，不迁移GUI的QRawFont/QTextLayout。私有接口集中在ReelTextNode并在配置时探测，不依赖写死Qt版本。
-- 验证与限制：D3D11/DPR1两主题emoji可见，单上下文带外SSIM约0.98285/0.98172，原始/边缘带数据分别保留；这仅支持当前上下文，不能外推DPR2、OpenGL或其他系统。后续先区分普通glyph与彩色字体缓存路径，不再反复用改色遍历尝试重建彩色glyph。
-
-### R16：整行glyph关联把行末空白并入前一个字面
-
-- 表现与触发：改用整行glyphRuns/stringIndexes提取、合并连字后，换行末尾的space可能没有独立glyph，前一个分组的text范围延伸到line end。原生可见位置与像素正确，但结构文本出现 `gyp (Live)` 对 `gyp(Live)`、`AV gyp` 对 `AVgyp` 的差别；三个输入的两主题共六项结构门槛失败。不能凭像素接近而忽略结构失败，也不能拆字符重新shaping来迎合源观察单元。
-- 处理：保留整行glyph ID/位置，非歌名单行模式按源CSS折叠并移除有效行末ASCII空白；字面text提取和宽度的cursorToX末端同时限制为 `min(nextGroupStart, inkEnd)`，而非只跳过起点已经在空白区的分组。只改text会保留约7.73–8.26逻辑px的行末空白advance，导致文本已经一致而结构宽度仍失败；不能凭正确像素放行。上下文glyph变化用sameGlyphInk比较实际描述符，不能只比较文本/字体。
-- 验证与限制：修正通过title-reels/source-format及Windows Release/D3D11/实际DPR1双主题20项结构/文字对照，最大结构误差0.24087逻辑px；原失败报告保留，其他DPR/后端待R16B2/B3。以后先对齐可见行文本与whole-line关联语义，不能把结构统计问题当字体像素问题反复调参。
-
-### R16：PowerShell GUI等待与退出码必须分别确认
-
-- 表现与触发：直接`& yalahoo.exe`可能立即返回，输出管线可用于等待，但不能保证WIN32 GUI更新调用者的LASTEXITCODE。R16B2V诊断的console ui-audit先返回像素失败6，随后实际GUI浏览report.passed=true，包装函数却继续读到陈旧6；不能把旧非零值当作本次GUI失败，也不能把之前的0当作GUI通过。
-- 处理：GUI验证使用ProcessStartInfo（UseShellExecute=false、CreateNoWindow=true、WindowStyle=Hidden、ArgumentList逐项传参）；stdout/stderr同时ReadToEndAsync，WaitForExit后读取该Process.ExitCode，再核对真实JSON报告。`tools/build/verify-r16.ps1::RunGui`直接记录actual GUI exit，不依赖LASTEXITCODE。也可Start-Process -Wait -PassThru -WindowStyle Hidden后读ExitCode；Qt窗口仍必须首次show前使用VerificationWindow置底/拒绝焦点。console工具继续核对其实际exit及报告，诊断的像素6不豁免其他门禁。
-- 验证与边界：本轮同一DPR1.5生产浏览报告18项通过，Process实际退出0，证明原包装错误来自陈旧退出码。输出等待和退出码证明是两件事；所有后续GUI重建脚本必须使用进程对象，不依赖启动成功、空值或管线结束推断GUI退出状态。
-### R16B1：隐藏候选仍重建字形节点
-
-- 表现与触发：TitleReview切换到纯Text/Canvas候选时，生产ReelInk不可见，但其槽contentChanged仍会安排update；只核对slot.shown的updatePaintNode继续创建普通字形节点，三个候选的成本受隐藏生产工作污染。不能从父级visible=false推断所有layer/SG节点都没有工作。
-- 根因与处理：ReelInk的更新入口缺少自身有效可见性检查，QML槽层仅按槽visible启用。入口加入isVisible并在隐藏时删除自身节点；layer.enabled同时核对组件和窗口可见性。内容revision匹配完整sameGlyphInk描述符，保留仍滚动的旧字面，不整槽重建；颜色、clip容量与transform独立更新，旧节点归render thread删除。
-- 验证与限制：D3D11/DPR1三次生产活动诊断复用73/65/65次，纯Text/Canvas候选期间隐藏生产节点的新建计数均为零；十次恢复/释放和最终零tracked节点/renderer检查通过。该计数包含初始化/候选切换，不能宣称FPS或总显存改进；其他DPR/后端成本与生命周期仍归R16B2/B3。
-
-### R16B1：页眉测量初始布局与附加属性
-
-- 表现与触发：在frameSwapped回调中先改标题再立即测按钮位置，会读到尚未完成polish的中间绑定；把复用窗口resize后的第3帧当基线，又会记录1280×720暖昼的一次约0.30逻辑px准备期调整，第4帧已稳定且第8帧才发送首个换歌输入。C++ QQmlProperty读取ToolTip/Accessible附加属性还返回空值，不能把探针读取失败当作产品全名丢失。
-- 处理：在发布下一帧状态前读取已呈现帧的位置；先以减少动态准备初始标题终态，在第7帧建立输入前基线并开启动画，再执行第8/21帧换歌、第15/21帧改速及第25帧减少动态。保持0.01逻辑px的位置容差，正式窗口锚点/图像门槛不变。全名由工具QML直接读取控件的真实ToolTip.text/Accessible.name，退出禁用在width仍保留的视觉退出期检查。
-- 验证与限制：九尺寸×双主题18项位置、名称、定位、改速/减少动态及退出禁用全部通过；初始准备与输入阶段分开，不将准备期的复用窗口布局当成换歌位移。实际播放对象与定位执行仍依赖R24/R23，当前使用真实LibrarySession匿名ID状态，不宣称已播放音频。
-
-### R16B1：受限环境的无头浏览器页面无响应
-
-- 表现与边界：浏览器级CDP可连接并读版本，受限执行环境中的页面Runtime.enable不返回；换成独立页面WebSocket仍失败，相同源码/浏览器在原生权限环境成功导出20项。尚未确认Chromium内部根因，不能把超时归因于字体、源运动算法或flatten会话本身。
-- 处理与复现：export-title沿用其他导出器的独立页面连接，后台/headless及外部请求拦截不变；本机发生相同症状时在授权的原生验证环境运行 `node tools/review/export-title.mjs --dpr 1`，保留受限环境失败日志，不改字体或源算法去追连接问题。原生产物仍只写本地忽略目录；没有关闭窗口/网络/像素门槛。
-
-### R16B2：隐藏Canvas候选污染分组成本与恢复失效
-
-- 表现与确认根因：原`CanvasTitleProbe`将controller.changed直接连接update；即使QML候选不可见，Canvas仍在普通glyph与Text候选的120帧区间绘制约96–120次。原进程级Canvas计量混合了这些工作，只补入分组差值才暴露问题。GUI只加isVisible守卫后仍有2–3次初始化/已排队的绘制回调；不能据此把其余路径的原成本当作隔离结果，也不能假定隐藏会自动取消Qt已排队的工作。
-- 处理：GUI的内容/有效可见性请求只在item可见时update；render同步先保存item/window有效可见性，隐藏时不遍历faces，paint在reset后返回、不调用字体或fillText。Canvas计数明确统计可见文字同步/绘制，Qt可能的初始化/空清理由整体Qt同步/CPU提交区间承担。窗口更换断开旧visibleChanged连接，show/restore重发当前状态，避免只检查item可见性而漏掉窗口恢复。分组成本加入GUI准备及Canvas同步/绘制差值、每组120条事件原始序列与隐藏文字绘制为零的门禁。
-- 验证边界：修复前D3D11/DPR1文字与页眉通过，但成本被隐藏Canvas污染；DPR1.5有明确像素失败。仅GUI守卫版本在DPR1留下失败成本计数，DPR1.5/2及NativeRendering试验出现退出7且无最终report，失败和原始图保存在`verification/windows/title-reels/r16b2/`，未算作通过。生产CurveRendering不变；窗口恢复、字体栅格与高DPR完整验证仍依R16B2V/W，不能把未完成试验当作选型证据。
-- 诊断限制与避免再犯：高DPR文字比较遍历物理像素，工具整体完成预算按DPR²扩展；这只改变验证驱动的超时，不改变像素、运动或性能门槛。现有超时尚未证实是CPU比较还是恢复/readback停滞，不能归因于GPU慢或宣称可见性修复已解决所有高DPR问题。超时另写`timeout.json`记录step、warmFrames、请求/在途读回、drain和窗口策略；后续先定位阶段与资源所有者，再修改产品渲染，所有候选的隐藏工作都须独立检查。
-
-### R16B2V：混合回退字体抬高普通字形基线
-
-- 表现与确认根因：20项结构/文本一致时，emoji混排的case10/11普通MiSans字形仍出现带外差异。原布局按主字体ascent计算top，却让QTextLine以混合字体的较大ascent排glyph；28px输入的原报告普通glyph基线为31.078125；修正后约30.109375，无emoji同字形为30.09375。混合行ascent增大后旧top仍减主字体ascent，导致普通字形基线向下移动。不能将结构行框通过视为绘制基线正确。
-- 修正：主CSS行框和粗搜/细搜、字号、整行glyph ID/关联不变，line.setPosition减去实际line.ascent乘局部scale，普通glyph回到主字体基线。彩色Text保留原回退行基线，在colorGlyph描述符中补回line.ascent与主字体ascent之差；不把普通字体的基线修正施加到彩色字体。单元回归比较有/无emoji前缀时普通字形ID和竖向位置，覆盖DPR1/1.5/2的布局输入；QTextLine使用QFixed坐标，setPosition在不同混合行ascent下可能相差一个1/64逻辑px步长，新回归按该已确认量化步长检查，仍会拒绝原近1px的偏移，原像素/结构/运动门槛不变；这些单元输入不代表三个DPR均已像素验收。
-- 验证边界：完整Windows D3D11/DPR1.5诊断与受影响DPR1回归由本轮入口核对；剩余普通字形采样差异依R16B2V-P。后续先区分primary/fallback度量和具体绘制路径，不拆字符重新shaping，不用换字号去追混合行ascent。
-
-### R16B2V：恢复测试沿用最终超宽页眉窗口而停帧
-
-- 表现与范围：采集完成60项三路径静态图、9组活动成本和18项页眉后，在第一恢复周期step88停止；warmFrames=1、requested=false、inFlight=false、drain=0、visible=true，窗口策略正常。CPU比较已经完成、没有读回在途，增加DPR²预算不能解决该停帧。原测试沿用最终3440×1440页眉窗口与root大小，只改变300/320px标题宽度。
-- 修正与已验证区别：恢复场景先hide/release，将window/root明确恢复为标题宽度加2、高度152；sceneGraphInvalidated后排队showNormal，保持置底/拒绝焦点，再请求正常Qt帧。单独等待invalidation的试验仍在同阶段超时；重设标题场景尺寸后多个独立完整试验均完成十次恢复/最终释放。已确认驱动场景尺寸不一致；Qt/compositor内部为什么停止后续frameSwapped尚未确认，不能宣称GPU驱动故障或归因于CPU耗时。timeout报告补exposed/restorePending，采集按正常事件与一个有界在途读回驱动，不加轮询/抢焦点。
-
-### R16B2V：局部栅格改善不能替代完整文字矩阵
-
-- NativeRendering在20px普通字形的局部图更接近源，但分数拟合/译名字号仍失败；原生透明层试验出现彩色子像素边缘，显式GrayAntialiasing去除彩边后仍未满足全部门槛。重设分数QRawFont字号/补偿transform、将层改为实际DPR也没有全通过。统一按DPR取整度量使case6/7带外SSIM从约0.976下降到约0.941，不能将其作为普遍CSS度量规则。
-- CurveRendering四倍离屏层让case6/7、14/15改善，却使44px标题下19.8px译名的case16/17失败；分数度量取整、重设Curve字号与mipmap面积滤波也未全通过。原因仍需实际层/最终输出亚像素相位与源字体度量诊断；不能据某个局部通过保留新生产路径。所有这些试验已撤回，失败报告/成对图在本地r16b2v目录保留；不把采样门槛降低、1px带扩大或新增逐case偏移作为解决方案。
-### R16M1：macOS窗口激活、遮挡与离屏驱动
-
-- 表现与确认边界：仅设置Qt置底/拒绝焦点flags时，测试窗口仍干扰用户工作。Qt Cocoa的windowLevel不处理WindowStaysOnBottomHint，启动委托可主动激活进程。原生低层级后，窗口完全遮挡时isExposed=false，Canvas异步读回没有完成；静态grabWindow曾仍可得到自己的内容，因此不能从缺少frameSwapped推断应用被系统终止。Qt/compositor各自的停帧内部原因尚未确认。
-- 处理：测试在QGuiApplication之前关闭Qt foreground transform/启动激活，隐藏原生窗口使用Prohibited应用策略、NSNormalWindowLevel-1、拒绝key与忽略系统鼠标输入。NSView.window/NSWindow.level同步观察在Qt重设/重建时保持层级，销毁surface前撤销观察。Accessory试验虽保留低层级，却检测到applicationActive=true及前台变化，已撤回，不能作为安全显示方案。当时将macOS可见窗口测试暂缓到最后R34；当前按动态能力规则判断，尚未建立可靠入口的对应CTest继续暂缓，不能写成已运行通过。
-- 离屏修正：Review用QQuickRenderControl与真实Metal RGBA8+depth/stencil单采样目标，不调用macOS原生show；有界事件请求驱动sync/render和自身texture读回，业务仍使用原FrameClock。离屏目标必须显式设置devicePixelRatio，否则DPR2图像尺寸虽正确，文字/背景却只占左上四分之一，像素失败来自验证投影而非字号。hidden窗口下TitleReel/Header/Transport与Canvas探针需要显式offscreenRendering消费状态，生产默认false；漏接Transport会让全部页眉退出期宽度不保留。修正后18项页眉通过，十次离屏恢复/最终释放和原生隐藏窗口策略通过。
-- 验证限制：离屏frame完成事件不叫present，GUI线程sync/render局部CPU与offscreen endFrame等待分开；不宣称正常VSYNC、跨线程渲染或产品性能。R16M1曾有Metal/DPR2两项emoji几何和八项像素失败；字体身份修正见下节，剩余六项像素收口依R16M2P，门槛不变。所有失败/原图保持本地忽略；后续先核对目标DPR、完整隐藏状态依赖和真实字体，再研究产品字形采样。
-
-### R16M2：macOS默认emoji回退选中不同的系统字体面
-
-- 表现与确认根因：同机冻结源码在28px、letter-spacing=-0.6px下，浏览器的四个彩色grapheme使用`Apple Color Emoji`，CDP实际PostScript身份为`AppleColorEmoji`；Qt整行glyph run却为`.Apple Color Emoji UI`，advance约31.40625而源约27.40625逻辑px，后续普通字形累积偏移16.078125。两个系统字体面的选择差异已由实际run与CDP证据确认；Qt/CoreText为什么默认选择私有UI面尚未追踪，不能归因于字号、DPR投影或字体资产损坏。私有family别名未必能通过QRawFont::fromFont重新取得，旧报告中用描述符重新查询的metrics不应冒充原始run的字体表证据。
-- 处理：`initializeAssetFonts`完成四个MiSans物理字形验证后，仅macOS通过公开`QFontDatabase::setApplicationEmojiFontFamilies`一次性指定系统`Apple Color Emoji`；缺少该family显式失败并回滚原字体注册。设置早于控制器/QML创建，使整行QTextLayout与彩色Qt Quick Text使用同一策略。保留粗搜/细搜、请求字号、整行glyph ID/position、普通字形CSS基线、grapheme关联和两倍DPR层；不按case挪位置、不拆字符shaping、不改其他平台的fallback。CDP导出实际字面/family/PostScript身份并及时释放远程对象，原生诊断保留测量run的head hash与glyph ID/position，后续先对齐实际字体身份再研究栅格。
-- 验证范围：arm64 Release/Metal/实际DPR2真正隐藏RenderControl，case10/11最大结构误差降至0.078125逻辑px，固定1物理px带外SSIM为0.999285581/0.999253834，原始ROI SSIM为0.962329861/0.943559874，不能混用两种统计。20项结构/文本、18项页眉、九组活动/缓存、隐藏Canvas零文字绘制、十次恢复/最终释放通过。字体身份/advance回归覆盖12、28、29.75、44px与DPR1/1.5/2输入，修复前失败、修复后通过；这不表示全部DPR像素已验收。case6/7、14/15、16/17仍失败，具体采样收口依R16M2P；普通CurveRendering和层采样未改变，当前缺少可靠Windows环境的后端补修和原实机要求保留到R34。离屏CPU诊断不代表present/VSYNC或产品性能；所有原图/报告保持本地忽略，重建与静态审计入口见`docs/contracts/title-reels.md`。
-
-### R16M2P：字体框顶部定位与半行距小数
-
-- 表现与已确认根因：同机Metal/DPR2完整基线复现case6/7、14/15、16/17六项带外像素失败，整行字形、字号和结构已通过。冻结生产字面读取的Range顶部相对face为整逻辑px，Canvas的fontBoundingBoxAscent/Descent与Qt主字体缩放后取整度量一致；原生却保留CSS半行距的小数。例如20px/28px行框，源顶部0、ascent21，原生baseline21.5；44px/61.6px行框，源顶部1、ascent46，原生约47.796875。问题是主字体baseline没有匹配源字体框定位，不能仅因结构≤1px就认定绘制正确，也不能继续把垂直位移归因于CurveRendering或层过滤。Chromium内部具体在哪个绘制阶段取整尚未追踪；这里依据真实生产字面几何和字体度量，不把推断写成浏览器内部实现事实。
-- 处理与避免再犯：导出器补实际CSS font/lineHeight、Range顶部/高度和Canvas字体ascent/descent，仍保留PostScript身份；不改冻结布局/样式。macOS在主字体CSS基线计算中对半行距使用floor，单位为逻辑CSS px，保留分数行高、请求字号、粗搜/细搜、整行glyph ID/位置关联、混合字体ascent补偿、彩色Text与两倍DPR层。Windows/Linux预处理分支不变，不外推该规则到未经验证的字体后端。先用源字体框核对实际基线，再研究采样；不能以DPR取整整行度量、换字号或逐case偏移追截图。
-- 验证与限制：原生Release/Metal/实际DPR2的正常入口不带diagnostics，20项文字全部通过；带外SSIM最低0.996912214、RGB最高0.264246/255，原始ROI最低SSIM0.869280017、RGB最高10.617510/255，固定1物理px带未扩大。逐个普通字面的实际baseline与同机源字体框在Qt的1/64逻辑px量化步长内一致；18项页眉、三路径各三次120帧、隐藏Canvas零文字绘制、十次离屏恢复/最终释放通过。基线单元输入覆盖12.6/19.8/20/24.609375/28/29.75/44px和DPR1/1.5/2，旧计算实际失败、修正后通过；这不是DPR1/1.5像素验收，完整矩阵仍依R16M3。全部23项启用Release CTest、格式、两组qmllint和qsb变体通过；受限环境CTest曾因无屏幕中止，原生权限完整执行通过，不修改测试/Qt平台插件绕过。四项可见runtime仍归R34；离屏成本不代表present/VSYNC或产品性能。复现及严格审计入口见`docs/contracts/title-reels.md`，原失败和成对图只在忽略目录保留。
-
-### R16M3：macOS OpenGL 的旧默认上下文与绑定重入
-
-- OpenGL表现与定位：同机隐藏RenderControl的DPR1入口收到SIGSEGV；日志反复请求GLSL120，但Kit的Canvas shader只有GLSL130/150/ES300等变体，图形pipeline创建失败。系统崩溃报告落在Canvas绘制提交链；已确认旧默认上下文与shader不兼容，崩溃内部具体解引用原因未追踪，不把它归为字体像素或环境不可执行。
-- OpenGL处理：共用`selectGraphicsBackend`只在macOS显式OpenGL分支、QGuiApplication创建前，通过QSurfaceFormat请求OpenGL4.1/CoreProfile；Metal默认分支及其他系统不变。不能补一个GLSL120近似shader或降低Qt版本绕过。原失败日志保留在`verification/macos/title-reels/r16m3/opengl-dpr1/`；窗口和正常VSYNC仍不能从隐藏离屏成功推断，其他系统OpenGL能力也须分别验证。
-- 绑定表现与根因边界：完整文字/页眉报告曾通过，日志却出现TransportTitle.opacity与caption.visible绑定环。caption从容器宽度/透明度推导visible，active=false时TitleReel同步finish并发出changed，自然宽度也共用每帧changed，状态通知回到布局/可见性求值链。只把自然宽度通知拆开仍有两个绑定警告；caption改用有标题或退出动画未结束的状态后，opacity警告消失但visible仍重入。隐藏完成改为有界排队后全部警告消失；这些分步日志保留，不能把第一项改动单独描述为已解决整个环。
-- 处理与避免再犯：naturalWidth只有实际测量结果变化才通知；caption退出仍保留完整字面、容器原宽度/opacity/offset曲线和禁用条件。hide立即停止advance，仅一个对象所属的queued finish待处理，restore在交付前取消其完成行为，销毁自动取消回调；不另加时钟或轮询。单元检查真实宽度通知、十次合并hide、恢复取消和最终静止；完整验证入口额外拒绝绑定环、缺GLSL及pipeline失败日志。像素、源码轨迹和资源验收仍独立执行，不能只靠日志没有警告宣称视觉等价。
-- 资源估算陷阱：OffscreenSurface原按RGBA8+深度模板合计8bytes/物理像素记账，未覆盖8bytes的D32FS8深度模板格式。现采用RGBA8的4bytes加深度模板8bytes上界，共12bytes，并保留resize旧/新计划重叠；字段明确标记保守估算和实际driver allocation未知。Metal的memoryless附件不据此声称系统显存分配量；不改变真实附件、sampleCount或画质。最终六上下文重跑资源与释放门禁，历史8bytes结果保留但不当作完整上界。
-- 验证与限制：修正后的Release/arm64/真正隐藏Metal及macOS OpenGL，实际DPR1/1.5/2六个完整正常矩阵通过，无绑定环或pipeline失败；每项20文字/18页眉/三路径各三次120帧/十次恢复及最终释放。生产带外SSIM最低0.996912214，原固定1物理px带不变；23项启用CTest、格式、两组qmllint与文本qsb变体通过。四项可见runtime仍disabled；Windows/Linux共享隐藏通知回归及可见/present/VSYNC仍依R34，离屏成本不代表正常窗口或GPU性能。
-
-### R17：ListView 跨模型类型复用、header 起点与委托计数
-
-- 表现与定位：同一ListView启用reuseItems，歌单使用带required角色的QAbstractItemModel委托，切介绍时同时改为QVariantList制作人员与另一个委托。隐藏Metal已写出18项静态图后在切tab发生SIGSEGV，macOS栈落在QtQmlModels/QMetaProperty::read，经QQuickItemView::setModel进入；这证明故障发生在模型/角色交接，Qt内部哪个缓存指针失效尚未追踪，不能归因于Metal渲染或字体。
-- 处理与避免再犯：TrackList的Loader分别创建曲目/制作人员两个ListView组件，每个实例保持固定模型类型和delegate角色契约，保留可见/复用池与100px预留，不通过关闭虚拟化回避。Loader返回值显式转为ListView，使官方Yalahoo_qmllint/ui-audit_qmllint targets能验证forceLayout/定位接口；运行时warnings另查，不自行组装qmllint命令。
-- 布局与计数陷阱：有header的ListView起始contentY不一定为0；强设0让header位于可视区上方，锚点/标题字符串检查仍可能通过。改为布局完成后positionViewAtBeginning，并验收实际title的场景Y在内容顶端60px内。QObject::findChildren曾报告0个委托，但自身PNG已经绘出曲目；计数改走QQuickItem::childItems实际视觉树，不能把QObject父子树当成委托可见池。
-- 验证边界：相同Release/arm64隐藏Metal、实际DPR1入口的九尺寸双主题、10,000曲目跳转、介绍切换和快速重开通过，实际可见/复用池31个、QML warnings=0；失败栈/原图与正常报告只保留本地。十次离屏重建与完整Release回归由presentation-qml/CTest复现；离屏不证明真实焦点恢复、窗口呈现或其他系统。同步运动由DetailPorts接入；后续真实设备与目标平台集成按R34，回放边界见docs/contracts/detail-motion.md。
-
-### R18：场景状态与封面 polish 的交接不能跨帧混读
-
-- 表现与确认范围：真实 Metal/threaded 产品回放执行减少动态和连续三十次换片后，GUI 的选中/归位实体已只有一个，但 frameSwapped 的排队回调仍可能读取上一轮 polish 保留的两个 CPU 封面租约；第一份报告的 stress-resource-return 明确失败。后续同一次回放的下一帧封面已回落到一个，未发现资源持续增长。这里确认的是采集观察了不同交接阶段，不能把前台帧事件当作所有 GUI/资源状态的共同 revision，也不能用这个失败样本宣称产品泄漏。
-- 处理：产品 Review 的 ready 同时核对当前实体的 objectId/albumId 集合、CPU 封面租约的同一集合及选中 1024px 资源，再检查回落；不延时猜测、不把上界从一改成二。实际绘制仍通过原不可变 SceneFrame/上传 lease 接入，运动不为采集而暂停。保留首份失败及后续报告在 verification/macos/detail/r18/；固定窗口下目标/后处理 generation、每批上传、真实上下文重建与完整渲染结果分别验收。
-- 复现与避免再犯：使用 tools/build/verify-detail.py 的正常产品入口及减少动态三十次序列；校验身份而非只比数量。renderer 的回调可跨引擎清理阶段，跨线程元数据使用共享原子值且退出前解除连接；不让直接 render 回调引用 Review 栈变量。该生命周期修正来自静态审计，不能写成曾实际发生崩溃。实际采样范围与尚欠目标后端/设备按 docs/contracts/detail-motion.md 和 R34 保留。
-
-### R18：OpenGL basic 的 surface 恢复与完整窗口重建
-
-- 表现与定位：macOS/OpenGL/basic 在减少动态、三十次切片后的第一次 hide/release/destroy/create/show 中，窗口仍 exposed/onScreen 且 frameSwapped 持续，但 SceneItem 的 frameSubmitted 停在重建前；120秒报告明确失败，sceneGraphInitialized 只有一次。未见 shader/renderError，不能把它写成平台无法验证，也不能从窗口帧推断三维仍在更新。
-- 已确认语义：所选 Kit 的 QQuickWindow 文档明确 setPersistentGraphics/setPersistentSceneGraph 是可忽略的 hint，basic 为多个窗口共享设备/上下文，surface 重建不保证产生新图形上下文；只有删除最后一个 QQuickWindow 才保证释放图形资源。最初探针把十次 surface 重建等同于十次 context 初始化，属于验收入口假设错误，不能强迫产品每次恢复销毁可复用设备。另一方面，原 SceneItem 恢复只排 polish，静止/减少动态场景没有重新推动三维提交；Qt 内部 dirty/polish 状态在哪一步保留尚未追踪，不把推断当作已确认内部根因。
-- 修正：SceneItem 的 visible 恢复事件排一个对象所属回调，核对仍可见后 ensurePolished 并 update，重新提交当前不可变 SceneFrame/cover lease，不加持续轮询、不改变画质或资产。修正后十次 surface 恢复实际恢复了三维帧；basic 仍共享一个上下文，这个观测保留，不伪报十一次。Review 另做十次完整 App/QML 根窗口销毁和重建，业务控制器继续存活，重新绑定输入路由；旧窗口排队回调按 windowEpoch 丢弃，回调上下文随 Review 销毁，渲染线程元数据仅持有共享原子值。新窗口在首次 show 前落实 VerificationWindow 策略。
-- 验证与复现：`python3 tools/build/verify-detail.py --backend opengl --dpr 1 --runs 1 --foreground --output 全新目录` 的完整窗口入口实际通过，十次 surface 恢复加十次完整根窗口重建观察到十一次上下文初始化，重建后的详情换片也通过；首份停帧、只修恢复但旧 context 假设仍失败的报告，以及中断的旧二进制尝试均保留在 verification/macos/detail/r18/，后者不计入通过。其他后端/DPR与串行三次结论按 detail-motion.md 的实际范围记录。后续不能只等待 sceneGraphInvalidated 或 frameSwapped；分别验证自身三维提交、真实对象重建、资源/图像与窗口策略。
-
-### R18：减少动态必须清除旋转副本的角度与高度等待
-
-- 原有阵列GPU回归在returning-night之后报告Returning covers did not release；新增reducedRotatedSnapshotReturnCompletesImmediately在Release中复现：三个归位副本里仍剩一个旋转副本。冻结returnStep的reduced分支只是rate=35的指数衰减，dt=0不会改变角度，不能把它当作立即完成。只取消returnY等待仍留下非零yaw，回收条件依旧不满足。
-- 归位副本在减少动态下直接yaw=0、清除returnY、lift.finish(0)，同次发布回收；普通运动仍保留源码returnStep以及对齐帧的高度，不提前下降。共享PointerDragController对正在查看的选中盒仍按源码保留手动目标角，不能把归位副本规则错误施加到它。新增单元修正前失败、修正后通过，Metal原有阵列GPU回归实际通过；其他范围按detail-motion.md记录。后续减少动态审计要区分解析衰减与精确终点，不能用“rate很大”替代完成与资源释放。
-
-### R18：副本材质状态不能用全局详情进度替代
-
-- 源码审计确认：原生产SceneItem把adapter.detail作为全局clarity，Renderer的材质模板将它用于所有实体。冻结scene/decryption实际为选中盒的独立揭示状态，归位副本捕获自身clarity并按exp(-9*dt)回雾，阵列保持磨砂；直接换片时全局详情构图不变，全局clarity因而无法代表这些状态。此项来自调用链审计，不声称此前做过失败的同机像素对照。
-- 修正：CaseClarity移植六个REVEAL节点及单调Hermite、ready门禁、34.12–39.56秒参考时间和1.5倍率；静态导数编译期缓存。ReturningCase独立保存并回收clarity，SceneFrame交付不可变实体值；生产阵列模板clarity为0，选中/归位主盖仅覆盖原uniform的粗糙度。lidRoughness与既有ShellMaterial共用同一公式和R07校准，不改shader布局、光学参数或重建材质/图集/PSO。固定状态Review保留原全局输入以维持既有oracle，不能把它当生产时序。
-- 验证边界：冻结decryption执行生成的1200个1/120秒样本覆盖进入、离开、回收、已清晰重选、改速和减少动态，最大误差约1.33e-14；独立副本/反向回收和既有210项材质参数实际通过。实际后端回放在清晰后开始拖动和换片，保留实体clarity序列；完整三维源码与实际质量检查仍按R29/MAC-VISIBLE-3D执行；历史图像比较不再执行，不把数值验证写成完整产品质量通过。后续不能把相机放置进度、材质揭示和封面CPU/GPU就绪合并成一个ready值。
-
-### 可见验证：原生策略、OpenGL drawable/MSAA 与采集生命周期
-
-- 授权与范围：用户明确要求可见验证即授权指定轮次前置/激活/焦点；`YALAHOO_VERIFY_FOREGROUND=1` 只作用于显式启动的验证进程，普通播放器不调用验证 helper。报告必须区分授权前台与默认置底策略；结束恢复可见 CTest OFF 并真实回归隐藏策略。Prohibited/Accessory 不可靠方案不能冒充可见通过；原生 visible、WindowServer onScreen、occlusion、Qt exposed、实际帧事件分别记录，不能用首次 grab 得到图像推断持续呈现。
-- Metal 静态读回：Review 只在提交读回时安排一次 update；Metal 异步完成还需要后续真实帧，静止封面/阵列因此超时。每个 Pending 以 QRhi 的 MaxAsyncReadbackFrames+1 约束续帧，最多两个在途请求；不重复 submit、不轮询、不改效果。产品没有 captured 回调时不产生该工作。封面/真实列 GPU 已实际复现失败并在修复后通过；图像来源对照仍须独立验收。
-- macOS 可见 OpenGL：当前系统的崩溃栈明确报告 NSOpenGLContext setView 必须在主线程，隐藏 RenderControl 不触发该 drawable 路径。macOS 显式 OpenGL 在应用构建前使用 Qt basic 循环与 4.1/CoreProfile；Metal 保持 threaded，不能混称线程隔离或把两者成本池化。当前 QRhi 报告多采样纹理可用，但创建调用 glTexStorage2DMultisample，而 macOS 4.1 上该入口不存在，生产浏览在 makeTarget 空函数地址崩溃。分配阶段核对实际入口，缺少时改用 QRhi 多采样 color renderbuffer，保持原采样数、RGBA16F/RGBA8 和 resolve，核对 backingFormat，并纳入实际资源清单；不降采样/精度，不锁 Kit 版本。窗口浏览已在适配后退出0；完整三维源码/后处理质量及长时测量仍按剩余专项收口，不再执行源图ROI比较。
-- 详情与观测：header 高度在字体/宽度 polish 后改变，ListView 的原点随之变化，出现标题 Y=205.42 对目标210；准备期间保持顶部，header 变化合并一次排队定位，滚动、键盘索引、滚动条或显式跳转取消顶部保持，回调执行时再次检查取消状态。三路径页眉的 frameSwapped GUI 回调曾读到下一 tick 尚未 polish 的 Row，中间一帧按钮偏0.842px；测量改在 afterSynchronizing、GUI 被阻塞时取得已 polish 的值，不改生产按钮布局和门槛。保存按钮以 QPointer 跟随销毁，不让最终清理帧读悬空对象。
-- basic 生命周期：native frameSwapped 回调排队到 GUI，避免在 basic render 调用栈重入状态发布。basic 的 hide/release 不保证发出所等待的 sceneGraphInvalidated；文字 Review 显式 destroy/create 实际 surface，保持外层业务对象。最终删除 QML 后先提交真实清理帧，让 Qt 在有效上下文执行排队 renderer 删除，再隐藏/销毁；不能把仍存活的 Canvas renderer 写成已归零。失败/超时和修复前后采集只保留本地 verification/macos/visible-window，正常入口保持全部结构、像素、隐藏工作与释放门禁。
-- 几何探针与输入语义：geometryOnly原先直接按width×DPR申请目标，绕过RenderQuality的8294400像素保护；DPR1.5的3440×1440触发分配失败后renderer停止，后续944×900仅98个错误提示文字像素，其他错误画面竟因提示文字超过100而误通过。几何模式改为显式使用原生DPR请求但共用像素/尺寸保护，偏好值保持，limited状态与实际目标尺寸进入报告；模型检查排除顶/底提示区域并强制renderError为空，不降低100像素门槛。单元输入覆盖正常→超大受限→正常恢复，修正后的Metal可见实际DPR1/1.5/2完整几何矩阵也通过；正常与受限目标尺寸/limited状态分开记录，不称为全部尺寸都以未受限分辨率绘制。旧ArchivePool Review未接InputRouter，接入后边界键/滚轮按现行语义消费事件且不改变稳定ID；验收核对两者，不以event.accepted=false代替未越界。
-- 三维来源重建：旧生成 wrapper 漏改 frozen-git 相对导入，浏览器又固定 ANGLE/D3D11；已适配路径和当前系统后端。macOS ANGLE/Metal 成功进入冻结 harness 后，Room PMREM 导出与提交的 rgba32f 精确字节仍不同，原因未确认。这是历史采集差异，不再要求Room GPU字节相等或浏览器witness，不再安排图像参照校准。禁止据此覆盖正确产品资产；后续按冻结源码核对环境算法、方向/精度、材质/后处理和真实质量，正式性能任务保留下面具体专项。
-
-
-### 总览验证：macOS授权前台须在应用创建前选择激活策略
-
-- 表现与条件：真实App总览验证窗口在Qt侧visible，但Cocoa侧hidden，首阶段没有有效呈现帧；独立可见窗口策略测试却能通过。两者启动调用顺序不同，不能据独立探针推断真实产品已显示，也不能把无帧当作总览算法失败。
-- 已确认调用链与处理：`prepareNativeApplication()`原先在`QGuiApplication`之前一律选择Prohibited，仅在`prepareWindow()`中为授权验证切换Regular。授权分支现在在应用创建前直接选择Regular，并继续由统一窗口入口设置普通层级/允许激活；默认分支仍为Prohibited、置底且拒绝焦点。具体AppKit内部隐藏时序未追踪，不将其推测写为已确认根因。
-- 验证边界与复现：`tools/build/verify-overview.py --foreground`使用真实App/SceneItem提交与原生窗口状态；独立`verification-window-visible`及默认`verification-window-policy`分别回归。子进程显式设置授权开关，不在后续会话继承；结束恢复`YALAHOO_MACOS_VISIBLE_TESTS=OFF`。自己的窗口读回不证明屏幕扫描时刻或完整产品性能。
-- 外观检查不能由旧实机图反推定义：字体行框取原CSS结构和原生字体度量，背景模糊取源码设计，投影/运动取实际算法。锯齿、异常模糊或采集误差不是复刻目标，禁止逐像素比较及据图调参；新数值输入只由直接执行冻结代码生成。
-
-### R19B：隐藏重建的资源代次与窗口策略诊断
-
-- `ArchivePoolAudit` 接入真正 RenderControl 后，初次新断言要求重建前后 `resourceGeneration` 不同，有限列失败；该字段是每个 renderer 自身的目标重建计数，新的 renderer 也从 1 开始，不能当作跨 renderer 的全局身份。检查改为观察 `sceneGraphInvalidated` 的实际事件，并核对重建后的逻辑实体、上传排空及实际 cover fallback/lease；不以代次数值相等推断没有释放或使用图像分数验收。回调计数的寿命覆盖 window/surface 销毁，原生 threaded 分支使用原子计数。
-- 同一次隐藏完整回归的 filled 在 far-night 曾触发 windowPolicy 失败，旧日志没有具体 native 字段，根因未确认；不能推断为 GPU 故障、产品主动激活或用户切前台。入口补充失败策略 JSON，本地保留原失败；修正后的两个真实 Metal 隐藏入口通过，记录 native visible/active 均 false、foregroundUnchanged=true。后续遇到策略失败先保留具体原生状态、定位触发条件，不能提高窗口层级、显示窗口或绕过 helper。本轮结果不代表正常 VSYNC/物理输入，也不关闭 BLUR-01/FLICKER-01。
-
-### R19C1：参数辅助函数通过不代表实际提交值正确
-
-- 表现与根因：R10B的210组shellMaterial测试检查未补偿的transport，Renderer::uniformTemplate却继续乘R07 ROI拟合系数，R18逐实体lid又独立乘1.01；辅助函数与有效uniform不一致仍能全通过。QML和Review也把expected乘同一系数，形成自洽而无源码依据的验证。不能用参数golden通过证明实际材质提交正确。
-- 处理：从冻结configure/appearance/theme/clarity完整模块执行45组连续参数，核对真正加载的QML与C++；删除QML/RHI/逐实体lid的ROI乘数，Review拒绝factors/calibration并直接核对源值。显式capture按draw.offset读取真正上传的uniformScratch，逐可见壳体检查；只在采集生成有界JSON，不增加生产逐帧读取或资源。
-- 验证与限制：本机Release/Metal隐藏完整回归及实际uniform通过，旧标定入口无写入失败、产品两类标定输入在show前退出12。该结论不证明BRDF/LOD/透明排序、连续闪烁或小大目标清晰度，R19C2/D/H仍须按各自边界收口，不能用静态图或零warnings关闭用户问题。后续检查任何参数迁移必须同时追到最终upload/调用override，不能只测辅助值。
-
-### R19C2A：离屏Quick3D失效与完整场景重建
-
-- 表现与触发：新MaterialReview的源参数、99个材质/纸面和48个灯光状态能实际绘制；在同一View3D上直接调用RenderControl invalidate/initialize后，只剩背景，foreground=0。补`window.releaseResources()`、将同一item从contentItem脱开后重新挂接的两个尝试仍为空白，不能把真实invalidation或零QML warnings当成恢复成功。
-- 处理与确认边界：独立Review执行完整场景重建：先删除拥有Quick3D场景的QML root，再释放离屏上下文/窗口资源，重新创建同一GeometryScene并应用相同源状态。实际输出恢复；材质十次、灯光一次均有真实sceneGraphInvalidated与有效输出。报告区分`qmlRootRecreated=true`和scene graph重建，不宣称同一View3D对象恢复。已确认的是手动离屏复用旧root会漏画、完整root重建可恢复；Qt内部scene-manager失效原因尚未确认，不能写成已修复Qt缺陷。生产SceneItem/RHI不走这条Review QML路径。
-- 避免再犯与限制：为新离屏组件建立生命周期入口时，同时核对真实失效、所有者重建和有效输出，不能只看事件或计数。遵守[Qt RenderControl](https://doc.qt.io/qt-6/qquickrendercontrol.html)的隐藏窗口、initialize/invalidate及帧边界；不得通过show/抢焦点修复采集。macOS隐藏完整root重建不证明原生窗口恢复、目标平台或正常VSYNC；对应R34保留。另一次初期灯光运行仅foregroundUnchanged=false，其余原生visible/active及activationObserved均false，具体前台变化原因未确认，失败日志保留，不归因于产品主动激活或用户操作。
-
-###### R19D1：标量GPU读回行跨度与常量数据必须按真实使用路径审计
-
-- R19C2C隐藏GL的Nonfinite scalar AO pixel最终确认在诊断读回：GL_PACK_ALIGNMENT=4时，奇数宽R16F行有填充；当前Qt GL readPixels缓冲按紧密纹理大小分配且不改pack，可能越过逻辑缓冲边界。背景恒1输入213×159亦错，不证明产品AO shader生成非有限值。不能靠clamp坏字节、忽略有限值断言、改产品目标/精度或退回旧Qt过关。
-- 仅显式未对齐GL R16F捕获，同格式复制到按实际pack补齐宽的缓存纹理；按storage stride只解码逻辑宽，尾部未初始化列不消费。缓存有界、同尺寸复用、实际inventory计入、重建清理；正常request=0不查询/分配/copy，也不改全局GL状态。目标其他GL实现必须跑奇偶宽/倍率与真正同对象重建，不能只看标准偶数960px。
-- 源SSAO仅unpack normal；额外normalize与扩大的背景epsilon均无源依据，背景以RGB24精确white哨兵处理。source-input核/noise按计划417直接重建，不是GPU byte oracle；源数学点、5×5与.22验证同次输入而非旧图。
-- RHI kernel早已改用uniform却遗留未读取的纹理及每pass整块1104-byte上传。移除闲置GPU副本，核创建时一次写入，动态前缀80字节；三AO pass常态API请求240而非3312，实际后端物理传输未知。后续任何优化同时追到真正shader读取与所有上传调用，避免闲置资源和复制被旧分数掩盖。
-
-## R19C2C：多pass Equal深度必须同时保证计算顺序和位置不变性
-
-- 已确认visibility先写depth而shell颜色Equal拒绝相同表面会形成随运动变化的漏画。原独立九实例漏14646点；只统一GPU运算仍漏17171点；只加invariant在简化输入通过，却在生产177可见实体仍漏1191点。不能用单盒、静态图或零warnings关闭大量重叠问题。
-- 两个geometry顶点shader统一复用`p=model*vertex`再`nativeVP*p`并声明invariant；MSL1.2不支持该属性，只有这两个shader升到MSL2.1。删除无用CPU mvp乘法但保留ABI槽。实际诊断执行生产光学helper，检查visibility覆盖没有在Equal颜色pass丢失；正常动效/数量/透明度/深度阈值保持，未加偏置或epsilon。
-- 代表双主题/大小视口的静止、波浪、浏览和总览进退960帧须同时有正常光学与逐pass有限值/覆盖数据。封面ready依实际帧事件等待，不能在异步解码前快速重复若干帧便判产品失败；相同源参数不保证跨pipeline编译的浮点位置相同。目标其他GPU、呈现/VSYNC仍需原专项，R19H核销时保留范围。
-
-## R19C2B2：数值探针必须保留坐标域与量化域
-
-- 源Three geometryRoughness取view-space normal的最大分量导数；world-space无穷范数在旋转后不等价。用已知normal梯度和相机roll0/45的独立解析测试直接执行生产helper，不能用正视静态图掩盖该差异。LTC零切线/相反light-view单独检查有限奇点，不能未定位就声称其为阵列闪烁根因。
-- 新alpha探针曾将连续期望界限与RGBA8整数码值比较，1×出现48点假黑边；应按原整数码值门槛qRound(expected×255)-1比较。修正测试量化域后1×/4×黑边均0，原一代码值容差、产品shader和采样未改；保留失败与修复日志，不扩大门槛。
-- shader生成须覆盖basic/early全部变体并验证生成+格式化一致；Review数学probe复用生产helper、以现有float读回在RGBA8转换前取值，避免显示量化掩盖公式误差。probe只编入Review，不能变成生产逐帧诊断或新增目标重建。
-
-## R19C2B1：采集语义字段不等于独立GPU资源
-
-- 原RhiItem为13个Capture字段逐项提交readback并调用imageOf，fallback使多个字段指向同一纹理；不透明且captureAtlas=false时12个字段实际只有color/normal/depth/shadow四张纹理。继续按字段计remaining会把去重后的批次永久挂起；因此必须同时按真实纹理身份分组、只计算实际异步回调数，并在最后一组完成后一次deliver。跳过atlas不是一个待完成回调。
-- 实现以每批最多13项指针表建立owner索引，完成后只转换一次、向各语义字段赋同一不可变QImage值；Qt隐式共享由constBits一致实际核对，不深复制。GPU资源仍归render，GUI只得到值；最多2批及backend读回帧上限不变。Metal实际四资源/十二字段、resize/alias、30次连续状态和十次真实重建及完整隐藏回归通过；目标D3D/GL另见R34，不能从本机外推。
-- 生成器陷阱：旧prepare-rhi-shaders.ps1从共享GLSL重建时不包含后续CPU原点场提升，会静默恢复逐片元重复计算。当前转交prepare-rhi-paper.py，明确保留entityLight0.xy；--check核对完整适配后的token，实际生成再format能逐字复现当前shader。以后修改生成脚本必须同时验证生成结果和提升依赖，不能仅证明脚本可解析或旧图分数未变。
-
-## R19D3A：倾斜阴影面的深度误差与投影误差不能混用
-
-- 新caster探针用源GLB backface三角形独立推导正交投影，在1024图上曾测得约3.81e-6的深度差；最初直接借用恒深纸面的2e-6深度门槛而失败。保持model→light的源运算顺序仍相同；改用gl_FragCoord.z的诊断实验也相同，未证明原阴影shader错误，实验已撤回。倾斜面深度随平面位置变化，不能把恒深面的数值门槛当作所有光栅三角形的精确逐纹素要求。
-- 投影探针仍保留全部已选中的内部采样点和原失败日志，按独立三角形平面的每纹素depth梯度，将误差换算为物理阴影纹素，采用既有两物理像素投影门槛；恒深面没有该换算，仍检查2e-6。当前Metal三map/批量边界最大约.00184纹素，深度原值同时记录；这是数学/投影验证，不是源截图匹配，也不改变原PCF、强度或其他既有数值门槛。GPU内部子像素位数未确认，不写成具体硬件精度根因。
-- 共享隐藏回归曾在presentation及后来的shadow采集记录foregroundUnchanged=false；窗口visible/active、activationObserved、focusObserved均false，具体前台变化原因未确认。保留失败报告/日志，不归因于产品抢焦点或用户操作，不放宽原策略；VerificationWindowMac报告加入initial/current/verification PID以供后续定位，避免再次只有布尔失败而无法区分进程。后续有效样本与原失败分别报告。
-- 源scene产品地面与诊断receiver是不同对象，前者缺失不能用后者通过关闭。R19D3B明确补齐原200×200、y=-4.63的PBR/主题/雾/AO/DOF接收；R19D4仍负责BLUR-01与后处理收口。
-
-## R19D3B：地面数值探针的观察范围与投影单位
-
-- 初始地面探针沿旧盒体相机aim取景，地面虽可绘制但近处投影阴影在视口外，所有稀疏样本occluded=0；只看公式最大误差小会漏掉接收验收。专项相机改为显式aim=(0,-4.63,0)，保留同样生产plane/shader/caster，强制每个开启阴影的数学场景实际occluded>0；真实产品取景仍由独立1200帧SceneItem回放验证，不改变产品相机。
-- 远处倾斜地面最初采用两个单精度inverse projection端点相减，出现约.001世界单位深度差；解析camera ray消除该探针的消减误差后仍存在小量float投影/插值差，不能把任意世界深度阈值当作源投影契约。沿已有R19D3A做法，保留未换算depth误差，同时用解析平面每物理像素depth梯度换算原≤2物理px投影门槛；法向仍≤1/255、PBR/fog仍≤3/255。该调整只修正测试单位，不改变产品几何、精度、bias或画质。最终不同后端范围与数值记录在source-fidelity-review.md；原失败日志保留本地，不能用这些数值关闭BLUR-01或窗口/VSYNC验收。
-
-## R19D4B1：SMAA crossing offset 的标量转换语义
-
-- 新独立double公式最初在64×64斜边上得到edges误差0、weights约.4675、blend约.5980；不是生产shader已经确认的缺陷。锁定Three的`SMAASampleLevelZeroOffset`使用`float(offset)`，实际传入`ivec2(1,0)`和`ivec2(0,1)`时只取首分量，再广播乘resolution。按常见二维offset含义转写CPU公式会错误地只移动一个轴。
-- 独立公式现在严格执行锁定源码：north crossing的`(1,0)`使两轴各加1；west crossing的`(0,1)`不增加任何轴，保留调用前的y减1。生产公共/QRhi shader与其生成器没有改动，没有更换阈值、搜索步数、gamma或lookup；查表原PNG逐字来源及完整helper token分别验证。以后必须先核对GLSL构造/广播和实际展开表达式，不能按注释或算法名称推定偏移，更不能改产品去迎合错误测试。
-- macOS Metal/OpenGL直接QRhi真正离屏各34状态、十次Postprocess重建与关闭释放通过，初期独立公式失败保留本地。沙箱首次无MTLDevice，仅在原生服务权限下运行同一隐藏入口，没有show/抢焦点。此项只证明SMAA源公式、真实输出及后处理资源；MSAA/resolve和旧工具闭包仍B2，BLUR-01仍C，原生窗口/VSYNC及目标平台仍按原任务。
-
-## 目标、范围与固定取舍
-
-1. GUI、布局、动画、相机、材质、灯光和特效尽最大可能逼近当前 Web 音乐入口；静态相似和动画连续性分别验收，不能只凭截图宣称复刻。
-2. 原生应用使用 C++23、开发机已安装的最新 Qt 版本、Qt Quick/QML、Qt Quick Controls 和 Qt Quick 3D；CMake 构建。QML 承担界面，C++ 承担模型、状态机、运动算法、文件扫描与控制器。计划中的当前版本与路径仅作为定位参考，不作为 CMake、脚本或产品的版本锁定。
-3. 最终运行不依赖 Node、浏览器、WebEngine、本地 HTTP 服务、Swift 桥接、外部 FFmpeg 命令或其他第三方库。Qt 自带的插件及其内部依赖由 Qt 部署工具部署，不自行链接其内部 FFmpeg 库。
-4. 音乐定位为普通播放器：播放、暂停、停止、上一首、下一首、专辑队列、进度、音量、输出设备和错误提示。全部使用 QtMultimedia 公开 API。
-5. **不实现无缝播放、交叉混音、手动 PCM、重采样、音频回调、音频环形缓冲、自建音频引擎或专业输出。** 不引入 `QAudioSink`、`QAudioDecoder`、`QAudioBufferOutput`、AVAudioEngine/CoreAudio 自建路线。
-6. 歌曲衔接改为普通顺序换曲；删除原三档衔接和浏览器/CoreAudio 后端选择。保留原播放按钮位置、歌曲标题和播放定位行为。音频简化不降低 GUI 复刻标准。
-7. 联网能力本阶段不执行，但保留异步接口、来源模型、状态占位、配置扩展和可替换 Provider。禁止删掉以后接入联网功能所需的数据字段；不实现外部服务协议，不发送请求。
-8. 暖昼/深夜、减少动态效果、0.25×–3× 动效速度、横竖屏/短屏/超宽屏、填充与真实列、列记忆、搜索不改变播放等行为保留。
-9. 不迁移旧档案终端 `?original=1`、PWA、浏览器专用菜单限制、在线播放器代理和旧拆解研究入口到产品主界面。原文件保留作为历史及参照；原生产品内的详情拖动查看、画质和光效调节保留。
-10. Windows、macOS、Linux 均须完整实现。当前主力开发与验证环境为macOS；每轮按实际可用的系统、Kit、后端、设备、采集入口及桌面策略动态决定验证方式，不固定某个平台必须实机或只能静态。当前能可靠执行的构建/功能/渲染检查必须真实执行；不可执行或不可可靠验证的部分暂以严格静态审计交接，并把必需实机任务保留到最后R34。移动端不属于本计划。
-11. 本阶段只编写与执行本地改造，不自动发布、上传私人数据、改写发行标签或删除 Web 基线。
-12. 新项目正式名称为 **yalahOO!!!**，大小写及三个感叹号必须完整保留。新品牌图标和 Logo 原创设计，以 SVG 为主素材；品牌替换是用户指定的视觉差异，其余界面、动画和特效继续按原基线尽最大可能复刻。
-13. Web 基线中的可见锯齿属于渲染缺陷，不属于需要复刻的设计内容。Qt 必须改善几何、玻璃、纸面及文字边缘的平滑度，同时保持轮廓位置、封面清晰度、材质、灯光与动效；不得主动重现阶梯边缘，也不得用整体模糊或噪点掩盖锯齿。
-
-### 项目身份与品牌契约
-
-- 用户可见名称统一为 `yalahOO!!!`：窗口标题、关于界面、桌面入口显示名、安装包说明、开场和界面 Logo。文件名、CMake 标识、数据路径及脚本参数采用稳定的安全标识 `yalahoo`，不把感叹号写入可能启用延迟展开的脚本变量或技术标识。
-- CMake 项目名 `yalahoo`，目标 `Yalahoo`、`YalahooCore`，可执行输出名 `yalahoo`；QML URI `Yalahoo.Music`，源目录 `qml/Yalahoo/Music/`。在创建引擎和读取 QStandardPaths 之前设置 organizationName/applicationName 为 `yalahoo`，applicationDisplayName 为 `yalahOO!!!`；后续更改展示名称不能隐式改变用户数据目录。
-- macOS bundle 展示名称为 `yalahOO!!!`，技术 bundle 标识 `yalahoo.music`；Linux desktop 文件名与图标名 `yalahoo`、显示 Name 为 `yalahOO!!!`。Qt 工程文件、部署清单和原生文档统一使用新标识；`legacy-web/` 的原产品名、版权署名、基线提交与历史资产保留原貌。
-- 图标为精致的独立应用符号，Logo 为完整名称字标及图形组合。主题围绕本地音乐收藏、实体专辑盒、双 O 唱片圆环、暖昼/深夜光感；主资产必须是可编辑的真正 SVG 路径，不把 PNG 嵌入 SVG，也不直接复制上游标识或套用现成图标。
-- 品牌主素材在 `resources/branding/`，原稿与生产稿均保留；桌面衍生图标在 `resources/icons/yalahoo/`，设计规范在 `docs/contracts/branding.md`，预览和验收在 `docs/media/branding/`、`verification/windows/branding/`。颜色、比例、安全区、16–32px 光学稿、稳定分组、开场中心线/弧长映射及导出命令按品牌规范执行；原创来源与 hash 在 `resources/manifests/branding.json`。R14/R20 接入页眉与开场，R30–R32 接入系统图标及平台元数据。
-
-## 跨轮次基线与工具链
-
-### Qt 源码风格契约
-
-- QML 静态诊断统一构建 Qt/CMake 自动生成的 `Yalahoo_qmllint`、`ui-audit_qmllint` 等对应 target；禁止自行组装命令行或直接调用 qmllint 程序。运行时 warnings/日志检查另行保留，不能替代官方 target。
-
-- 所有剩余轮次及后续修改强制遵守 [docs/contracts/code-style.md](docs/contracts/code-style.md)；C++/shader 由根 `.clang-format` 约束，QML 由 `.qmlformat.ini` 及同一最新原生 Kit 的 `qmlformat` 约束，编辑器采用 `.editorconfig`。维护工具使用相同的四空格缩进和逐行语句规则。
-- 使用四个空格，禁止 Tab；C++ 函数、类和结构体的左花括号另起一行，控制流与命名空间的左花括号留在行尾。短函数、短分支、循环体与多个独立语句必须展开；QML 对象、属性和 JavaScript 语句分别换行。以 100 列为换行目标，字符串、URL、许可证行及语法约束可例外；不得为换行改变字面量、宏语义、声明/导入顺序或执行行为。
-- 每轮提交前先执行 `cmake --build --preset qt-release --target format`，再执行 `cmake --build --preset qt-release --target check-format` 及 Release 检查；`source-format` 纳入 CTest，未通过不得宣告轮次完成或提交。不得关闭检查、临时覆盖配置或为压缩代码添加格式化豁免。
-- 格式化范围为当前原生项目、测试、shader 与维护工具；`legacy-web/` 冻结源码、历史验收证据、第三方资产及构建/部署输出不格式化。仅格式整理不得修改算法、数值、资源内容或业务行为。
-
-### 基线与参数优先级
-
-- Web 基线提交：`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，产品版本 V0.4.1。后续工作树中的新改动不能自动改变基线。
-- 原项目所有工作文件和目录统一位于 `legacy-web/`，包括原 `.github/`、`.gitignore`、`.gitattributes`、AGENTS、源码、文档、启动器和资源；根 `.git/` 是当前仓库元数据，保留原位，不嵌套另一个仓库。本计划保留根目录；根 AGENTS、README 和 Git 规则是面向 Qt 项目重新建立的文件。
-- 冻结提交中的旧路径 `src/...`、`public/...`、`scripts/...`、`art/...` 在当前工作树对应 `legacy-web/src/...` 等。除明确给出根路径外，轮次中未带目录的旧模块名均指 `legacy-web/src/` 下的同名模块；旧资源均从 `legacy-web/public/`、`legacy-web/art/` 读取，新实现不得写回该基线。
-- 读取冻结提交时使用 Git 中的原路径，运行工作树 Web 参照时以 `legacy-web/` 为工作目录；不能对根目录运行 npm 或把新 `src/` 当作 Web 源码。基线工具把仓库根与 Web 根作为独立参数，输出只能写到新工具/资产/验收目录。
-- 产品语义首先以本计划的固定取舍为准；根 AGENTS 与 `legacy-web/DESIGN.md` 顶部、V0.4.1 专项文档仅补充未冲突的约定。外观、动画、特效及其渲染/时序参数从冻结提交源码的实际执行路径、初始化/覆盖顺序与有效分支解析；采集数据仅用于核对和诊断，不替代源码判断。
-- 依据文件：`legacy-web/DESIGN.md`、`legacy-web/docs/MODEL-V0.4.0.md`、`legacy-web/docs/MOTION-V0.4.0.md`、`legacy-web/docs/MOTION-REVIEW-2026-10-07.md`、`legacy-web/docs/REAL-COLUMNS-V0.4.1.md`、`legacy-web/docs/COLUMN-POSITION-V0.4.1.md`、`legacy-web/docs/OVERVIEW-V0.4.0.md`、`legacy-web/docs/STARTUP-V0.4.0.md`、`legacy-web/docs/TITLE-CLIP-V0.4.1.md`。
-- 冻结基线的复建命令、匿名输入与允许差异见 `docs/contracts/web-baseline.md`；生产模块映射为 `source-map.json`，最终运行参数索引为 `scene-parameters.json`（按 hash 引用 `web-scenes/`），固定列顺序为 `library-order.json`，运动与换片采样为 `motion-golden.json` / `presentation-golden.json`，环境输入与 GPU 样本为 `room-environment.json`。这些 JSON 均在 `docs/contracts/`；截图清单在 `docs/media/web-baseline/screenshots.json`，输入在 `tests/fixtures/web-baseline/anonymous.json`，Windows 验收在 `verification/windows/web-baseline/`。
-- 不能用历史截图代替当前运行参照，更不能用任何截图或采集结果替代冻结源码。文档、截图或采集数值与源码冲突时，追踪实际生产调用链及最终覆盖值，以源码定义为准；导出的运行参数用于辅助核对，实际渲染或采集缺陷单独登记。例如当前 `music-model.ts` 中侧脊基础/暖昼粗糙度为 0.25/0.30、厚度为 0.06/0.08，不直接照搬模型日志中的旧表格。
-
-### 工具链契约
-
-- 历史Windows开发机定位参考：Qt 安装根 `C:/Qt/`，已安装版本包括 6.11.1、6.12.0，目前最新 Kit 为 `C:/Qt/6.12.0/msvc2022_64`，qmake 报告 6.12.0；VS C++ 工具路径为 `C:/Program Files/Microsoft Visual Studio/18/Community`。这些值仅供 agent 定位，执行时重新枚举安装并选最新版本，升级 Qt 不要求修改仓库中的版本常量或路径。以 Kit 配套 ABI 和实际编译探测为准，不因为目录名 msvc2022 就切换到不存在的 VS 安装。
-- 当前主力macOS/Apple Silicon开发机定位参考：用户安装的 Qt Kit 为 `/Users/zhaoyuhang/Qt/6.12.0/macos`，安装根为 `$HOME/Qt`，已纳入默认自动发现。此路径只供后续 session 定位，不是版本要求；每次配置仍重新枚举最新原生 Kit。现有 LLVM 的 clang-format 位于 `/opt/homebrew/opt/llvm/bin/clang-format`，不在 PATH 时通过本机 cache 变量 `YALAHOO_CLANG_FORMAT` 指定，不写入公共 presets。
-- 全部原生 C++ 目标与资产/审计工具采用 C++23：CMake 设置 `CMAKE_CXX_STANDARD 23`、`CMAKE_CXX_STANDARD_REQUIRED ON`、`CMAKE_CXX_EXTENSIONS OFF`，公共目标按需声明 `cxx_std_23`。必须编译实际 C++23 能力探针；编译器不满足时明确报错，不静默退回 C++20 或依赖编译器默认标准。
-- Qt 自动选择由 `tools/build/` 的公共 Kit 定位逻辑负责：安装根从本机 UserPresets/环境配置读取，缺省枚举平台标准安装位置（Windows 当前参考 `C:/Qt/`）；枚举包含 Qt CMake 配置的本机原生 Kit，读取配置中的实际版本，并用 Kit 的 `qmake -query QT_VERSION` 交叉核对。按版本数值而非目录字符串排序，选择最高版本中匹配目标系统、CPU 架构与当前编译器 ABI 的 Kit；不将 Android、交叉编译 Kit 或 Qt 安装器的 Tools 目录当作桌面 Qt。
-- 不在 CMake、公共 presets 或脚本中写 `6.12`/`6.12.0` 版本条件、固定版本安装目录、`EXACT` 版本要求或只允许某版本的白名单。Qt 模块用 `find_package(Qt6 REQUIRED COMPONENTS ...)` 查找，不传固定版本参数；定位出的前缀传给 CMake，具体路径只保存在本机 UserPresets/环境或构建目录。Qt6 是本项目框架系列，minor/patch 版本随本机最新安装变化。
-- 本机 Qt 更新后构建入口重新检测最高版本与选中 Kit；原构建目录指向旧 Kit 时清除旧配置引用或要求重新配置，不能继续缓存旧路径。最高版本缺少必需模块、编译器 ABI 不匹配或 API/GuiPrivate 探针失败时给出明确诊断并修复，不自动降到较旧 Qt。用户显式提供 Kit 时也核对本机最高版本，过期覆盖不能绕过最新版本规则。
-- `qmake`、`balsam`、`qsb`、`qmllint`、部署工具及 Qt 插件均从同一已选 Kit 或其配套 host-tools 定位并校验版本一致，不从任意 PATH 混用其他 Qt 安装；记录实际 Qt/编译器/工具版本到验收产物。
-- 本机 CMake/Ninja：`C:/Program Files/CMake/bin/cmake.exe`、同目录 `ninja.exe`。使用 `vswhere.exe` 定位带 VC.Tools.x86.x64 的工具链，构建脚本导入 VsDevCmd 环境，不修改全局 PATH。
-- Qt 模块：Core、Gui、Qml、Quick、QuickControls2、QuickDialogs2、Quick3D、Multimedia、Concurrent、Svg、ShaderTools；测试使用 Test、QuickTest。上述关键 Kit 模块存在；实际构建仍需 R02 的链接及运行探测。
-- Qt Canvas Painter 的构建与运行闭包：CMake 通过 `find_package(Qt6 REQUIRED COMPONENTS CanvasPainter)` 和 `Qt6::CanvasPainter` 接入；QML API 使用 `import QtCanvas2D`，C++ API 使用 QCanvasPainter / QCanvasPainterItem / QCanvasPainterItemRenderer。同一最新原生 Kit 必须具备模块、QML 插件和配套工具，按实际 API 编译/导入探测，不锁定 minor/patch 或安装目录；缺模块时明确诊断，不降到旧 Kit。本机已安装信息只供定位；共用接口、失效策略、资源和验证范围见 `docs/contracts/canvas-painter.md`。
-- `CMakeLists.txt`、`CMakePresets.json` 在根目录；C++ 源放 `src/`，QML 放 `qml/Yalahoo/Music/`，资产放 `resources/`，测试放 `tests/`，公共构建模块放 `cmake/`。构建输出使用 `build/debug/`、`build/release/`，部署使用 `out/windows/`、`out/macos/`、`out/linux/`；不在源目录构建。本机路径只写入被忽略的 `CMakeUserPresets.json` 或环境变量，不写死到跨平台 CMake。
-- 保留统一 preset 名称 `qt-debug`、`qt-release`，不同系统用各自 UserPresets 提供 Qt 前缀和编译器环境。常规构建、测试、GUI/性能验证与验收只使用 Release；统一命令：`cmake --preset qt-release`、`cmake --build --preset qt-release`、`ctest --preset qt-release --output-on-failure`。只有明确需要获取堆栈时才编译和运行 `qt-debug`，不执行例行双配置验证；构建默认值与证据重建脚本遵循此规则，适用于后续会话。
-- Web 参照可以使用仓库已有且锁定的开发依赖；不得为 Qt 应用新增第三方运行库、下载新浏览器或引入新的 npm/Python 图形比较库。
-- 所有当前及后续 session 的测试、GUI/性能采集和证据重建强制遵守 `docs/contracts/test-window-policy.md`：无需真正显示的窗口保持隐藏；默认需要显示的 Qt 窗口在首次 show 前统一设置 `Qt::WindowStaysOnBottomHint`、`Qt::WindowDoesNotAcceptFocus`，恢复/重建后保留，禁止置顶、raise/requestActivate 或抢焦点。用户明确要求可见验证的指定轮次按下条授权例外执行。普通产品窗口不受测试策略影响。浏览器使用 headless，后台 helper 隐藏；采集自身渲染/读回，不采集被遮挡窗口所在的用户桌面。
-- 当前macOS优先以真正Qt离屏渲染验证画面、状态和资源生命周期，已有arm64 Release/Metal运行结果按实测范围记录。可见窗口、正常VSYNC、真实输入/呈现、媒体设备或部署检查能否可靠执行逐项判断；不可靠的部分先严格审计并保留到R34。离屏CPU成本不代表present、VSYNC或产品render-thread性能。现有`YALAHOO_MACOS_VISIBLE_TESTS=OFF`是默认非干扰策略；用户明确要求可见窗口验证即授权指定轮次前置/激活/焦点，无需再次确认，可显式启用`YALAHOO_VERIFY_FOREGROUND=1`和可见CTest。报告区分授权前台与置底策略，结束恢复默认并回归隐藏策略；未运行的disabled明确记为暂缓。换平台或验证入口可用性改变后重新评估，不沿用Windows必需实机/macOS仅静态的旧固定分工。
-- 原生构建入口、最新 Kit 覆盖/旧缓存处理、QML/qsb 别名、最小运行探针与证据重建命令见 `docs/contracts/native-bootstrap.md`；Windows 证据在 `verification/windows/native-bootstrap/`。macOS/Linux 的现有 R02 审计矩阵仅覆盖最小工程，后续轮次必须按新增实现扩展，不替代 R31/R32 的完整平台审计。
-
-## 架构与数据契约
-
-### 性能设计与算法审计
-
-- 所有剩余轮次遵守 [docs/contracts/performance.md](docs/contracts/performance.md)：设计与算法审计是前置要求，benchmark是验证和定位工具。每轮按PERF-01–07展开复杂度、调用链、线程/背压、快照/增量、渲染图、缓存失效、QML/输入及生命周期；发现可确定的结构缺陷必须修复，数值通过不构成豁免。
-- 保留源码效果数学和产品行为，优化调度、索引、数据布局、缓存、局部上传、批处理与资源所有权，不要求移植冻结实现中的无效工作。替代方案须有适用条件和等价性证据；减少采样、近似透明、降精度/分辨率或关闭效果不能冒充无损优化。临时解冻须用户按轮次明确授权，不向后续session延续；历史Web提交、来源资产与验收结果仍作为对照保留。
-- GUI/render热路径不读盘、不解码、不等待worker、不手动转事件循环，不执行常态GPU finish/readback。不可变快照按revision更新，有界队列合并稳定ID并淘汰过期结果；只复制新内容、只提交有效范围。每帧工作量与可见池/活动动画绑定，不能随曲库总量增长。
-- 资源与兼容性键分离：可见数量、相机、焦点、光照数值不能触发完整目标/PSO/SRB重建；buffer采用固定有界容量或独立容量增长策略。展开附件格式/MSAA/resolve/mips与最后使用位置，非重叠目标才可复用；阴影/实体光场/文本缓存记录完整依赖和失效规则。
-- 每轮输出适用检查的源码符号/hash、设计结论、修复与局部成本及验证限制；完整产品体验/资源收敛在R10D/R28/R30集成边界验收，不把所有性能工作推迟到R28，也不强制低风险文字修改重复整套GPU矩阵。
-- 维护已实现算法时，新证据使用独立目录并关联前后源码/二进制hash，旧轮次报告保留其原内容和适用范围。现有原生算法维护证据见`verification/windows/performance-review/`及对应平台同名静态审计；历史R10C证据不自动代表后来修改的源码。
-
-### 目录及职责
-
-```text
-项目根（yalahOO!!!）/
-  .git/                     当前仓库元数据；不归档、不复制
-  QT_QUICK_MIGRATION_PLAN.md 剩余轮次与长期实施契约
-  AGENTS.md                 Qt 项目开发约定
-  README.md                 Qt 项目入口与构建/平台说明
-  .gitignore / .gitattributes 原生构建忽略规则与文本/二进制属性
-  CMakeLists.txt            顶层 Qt/C++23 目标、模块、测试与安装入口
-  CMakePresets.json         qt-debug / qt-release 的公共 configure/build/test presets
-  CMakeUserPresets.json     本机 Kit/编译器覆盖；不提交
-  cmake/                    可复用的资源、部署和平台 CMake 模块
-  src/
-    app/        main、命令行、应用生命周期
-    core/       LibrarySnapshot、Album、Track、排序/搜索、偏好、选择控制
-    motion/     FrameClock、阻尼、五次轨迹、相机与阵列运动
-    render/     SceneAdapter、实例表、模型、材质、图集、后处理
-    media/      PlaybackController、BackgroundMusicController、InterfaceSoundController
-    library/    扫描、Qt 元数据探测、缓存、旧数据导入
-    services/   Provider 接口、OfflineProvider、资料缓存模型
-    platform/   仅必要的平台差异；win / mac / linux 分支完整实现
-  qml/Yalahoo/Music/
-    App.qml                 模块主入口
-    components/             Header、字轮、滑尺和基础控件
-    pages/                  Browse、Detail、Overview、Opening
-    panels/                 搜索、设置、曲库、光照与动效面板
-    scene/                  Review 的 Quick3D 模型、材质与后处理声明；生产使用 SceneItem
-  resources/
-    fonts/ models/ icons/ branding/ audio/ shaders/ manifests/
-  tests/
-    unit/ qml/ integration/ visual/ fixtures/
-  tools/
-    build/ assets/ review/ deploy/ audit/ launchers/
-  docs/
-    contracts/              参数、接口、源模块映射与固定差异
-    platforms/              各平台构建/部署说明与实机验证清单
-    media/                  非私人视觉基线与成对对照图
-  verification/
-    windows/                Windows 实际运行证据（可用时生成）
-    macos/                  macOS 实际运行证据（按覆盖范围记录）
-    linux/                  Linux 实际运行证据（可用时生成）
-    windows-static/         Windows 严格静态审计矩阵与证据
-    macos-static/           macOS 严格静态审计矩阵与证据（不代替已有实测）
-    linux-static/           Linux 严格静态审计矩阵与证据
-  build/debug/ build/release/ 本机构建输出；不提交
-  out/windows/ out/macos/ out/linux/ 部署输出；不提交
-  启动音乐播放器.cmd / .command / .sh 普通 Qt 音乐启动器
-  legacy-web/               全部原项目文件与目录；Web 基线及历史资料
-```
-
-- 此结构是各轮次创建新文件时必须遵循的目标布局；不为未执行的轮次提前生成空 CMake、假入口或占位实现。归档文件不混入新的 `src/`、`qml/`、`resources/`、`tests/`。
-- `src/` 子目录各自维护 CMake 源清单；目标固定为 `YalahooCore`（模型/运动/存储）、`Yalahoo`（应用/渲染/媒体/QML）和独立测试目标。`src/platform/` 只放实际存在的平台差异，共用逻辑优先使用 Qt。
-- `qt_add_qml_module` 的 URI 固定 `Yalahoo.Music`；`qml/Yalahoo/Music/App.qml` 及子目录文件使用模块相对资源别名，以 `loadFromModule("Yalahoo.Music", "App")` 加载，不依赖工作目录或文件系统 import。非 QML 资产经 qrc `/assets/` 加载；shader 从 `resources/shaders/` 使用 `qt_add_shaders` 生成 qsb。
-- 新文档中的源码/资产路径均从仓库根解析；Web 资料引用显式带 `legacy-web/`。保留 `legacy-web/LICENSE`、`legacy-web/NOTICE.md` 和原署名/素材说明，新应用资源清单记录复制来源。
-
-### 数据流与线程边界
-
-- `AppController` 组合 `LibraryStore`、`SelectionController`、`PresentationController`、`MotionController`、`PlaybackController`、`PreferencesStore` 与资料 Provider；不建立替代 `music-app.ts` 的单个巨型类。
-- 导航状态与播放状态独立：选择专辑/搜索定位/总览定位只改变导航。只有明确播放命令和当前曲目结束事件改变播放队列。
-- 所有公开操作按稳定 `albumId`/`trackId`，不把列内序号、ALBUM 编号、代理模型行号当成持久 ID。
-- `AlbumListModel`、`TrackListModel`、`SearchResultsModel`、`OverviewLabelsModel` 使用 QAbstractListModel；所有 begin/end 更新及 QML 属性通知在 GUI 线程。
-- 扫描目录、QImage 解码、缓存读写使用受限工作线程；QMediaPlayer 探测对象放在有事件循环的专用线程，跨线程传回值对象，不在普通线程池任务中创建后等待异步媒体对象。
-- GUI 线程向渲染层交付不可变 `SceneFrame` 快照：revision、camera、theme、quality、instances、selected、returning、rowLight。渲染线程不直接访问 QML/LibraryStore，不做磁盘或网络 IO。
-- 每个异步任务包含 `{requestId, generation, entityId}`；发布结果前核对代次、当前实体及销毁状态。取消、扫描替换、重建、关闭必须使旧结果失效。
-- 使用 Qt RAII、QObject 父子关系、QPointer 与可取消任务。GPU 资源在所属渲染线程释放；已销毁对象的晚到结果只能丢弃。
-
-### 资料与联网扩展接口
-
-- 保留原 `MusicAlbum` 的 description/descriptionSource、introduction、producers、creditsLookup、online、localNote；保留原查询配置字段，未知 JSON 字段读入后写回。
-- `IMetadataProvider` 固定异步方法：`requestIntroduction(AlbumQuery, RequestToken)`、`requestCredits(AlbumQuery, RequestToken)`、`requestEnrichment(AlbumQuery, RequestToken)`、`cancel(RequestToken)`。以回调/信号交付 `ProviderResult`，不得让 GUI 等待同步返回。
-- `ProviderResult` 固定包含 requestId、generation、albumId、kind、status、payload、source、checkedAt、retryAt、error。状态包括 Deferred、Matched、Partial、NotFound、Uncertain、Error、Cancelled。
-- 本阶段唯一实现是 `OfflineMetadataProvider`：从本地缓存读取已有内容；无缓存返回 Deferred，并显示“联网资料功能暂未启用”。这不等同于 NotFound，不写入失败重试时间。
-- Provider 通过构造注入或注册工厂接入，不通过 QML 判断平台/服务名称。设置保留“专辑介绍”“制作信息”“MusicBrainz”入口及状态占位；联网执行按钮禁用，来源链接显示文本且本阶段不自动打开。
-- 未来 Provider 能接收联系人、开关、批量 albumIds、force 和取消令牌；预留 ProviderCapabilities，但本阶段 capabilities 统一 networkEnabled=false。全应用不创建联网请求，离线测试断言零请求。
-- 值类型/未知 JSON 字段、本地 QUrl、稳定模型角色、排序列/搜索规则、导航与播放 ID、Provider 构造注入和过期结果路由见 `docs/contracts/library-data.md`；实现分别在 `src/core/` 与 `src/services/`。匿名数据与 Release 验证入口为 `tools/build/verify-r04.ps1`，跨平台新增调用链审计入口为 `tools/audit/audit-r04.ps1`。
-
-### 存储与本地资料
-
-- 默认数据根为 `QStandardPaths::AppLocalDataLocation`；`--data-dir` 可显式覆盖。配置、索引、封面、偏好各自分文件；偏好存 `preferences.json`，列位置仅存在会话内存。
-- 旧音乐数据目录只作为用户显式选择的导入来源，不按新的 `legacy-web/` 相对路径自动推断。原根目录旁的 `../music-data-v3` 不随源码归档移动；归档后直接运行旧服务可能改变默认相对位置，参照工具必须显式配置隔离的 `MUSIC_DATA_DIR`。导入配置/索引/封面/本地备注/来源信息到新的数据根，原目录只读；不导入旧 PCM 缓存。
-- JSON 使用 QJsonDocument、QSaveFile 原子提交；异步保存串行化。损坏文件保持原件并显示错误，不默默覆盖。源歌曲永不写回标签。
-- ID 保留原规则：专辑 `album-` + SHA256(原生绝对目录或直属单曲路径 UTF-8) 前 24 位；曲目 `track-` + SHA256(原生绝对文件路径 UTF-8) 前 24 位。同机导入保留原 ID；跨系统路径不能自动猜测映射。
-- 排序使用 Qt QCollator，zh_CN、numericMode=true、CaseInsensitive；NFKC、trim、合并空白，等价时按规范化字符串和 ID 稳定排序。不同系统的排序器可能与浏览器 ICU 有差别；固定视觉 fixture 使用冻结的列顺序，不引入 ICU/OpenCC/TagLib 弥补差异。
-- 新元数据读取限于 QtMultimedia 的 QMediaMetaData；缺失信息保留 unknown/空值与现有占位，不猜测无损、位深、采样率或制作角色。已有本地索引中的丰富字段继续显示。
-
-## 视觉、运动与渲染实施契约
-
-### 布局与资源
-
-- 使用真实窗口内容尺寸与 Qt 逻辑像素；不把整个应用缩放为固定 1920×1080 画布。电影式开场的参考坐标独立处理。
-- 宽高比 `<1.05` 为竖屏，等于 1.05 为横屏；相机与 QML 共用一个 LayoutMetrics 对象。保留 1100/700/480 等样式密度分界，并从冻结源码解析实际规则，采集结果仅辅助核对。
-- 横屏专辑信息 x=68.633333% 屏宽、右边距=max(24px,2.2% 屏宽)；短屏内容自行滚动。竖屏品牌与控件两行，返回按钮固定品牌下方。
-- 横屏主页相机下移由 16:9 的 8% 连续过渡到 21:9 的 10%；向左偏移由 0 到 3.5%，更宽保持终值；详情和竖屏不套用此偏移。
-- 字体先用 Qt 加载现有 MiSans WOFF2 并逐个字重验证；若字体后端不支持，固定使用 Windows 系统 DirectWrite 的 `IDWriteFactory5::UnpackFontFile` 解包仓库四个 WOFF2 为原始 SFNT，再由 Qt 加载同一组可跨平台使用的字体。资产工具仅链接系统 Dwrite.lib，读取返回的 IDWriteFontFileStream，以 Qt QFile/QSaveFile 保存；根据 SFNT 签名选择 .ttf/.otf，保留字形/字重/字距数据及输入hash。转换只在准备资产时执行，不进入产品运行路径；禁止新增字体转换库、下载替代字体或用相近系统字体冒充。
-- 原功能按钮图标提取为 SVG 或 Qt Quick Shape，保留 viewBox、描边宽度、端点与颜色；不替换成系统主题图标。产品品牌标识按 R03B 原创 SVG 替换，保持原品牌容器锚点、留白、出现/退出时序与层级；不把旧品牌轮廓复制到新 Logo。
-- 原生资产来源/hash、qrc 别名、模型批次/UV 约定、功能图标、音效静音事件映射与准备/验证命令见 `docs/contracts/assets.md`；生成清单在 `resources/manifests/`。原 MiSans 的 OS/2 权重与 Web CSS 权重不同，QML 使用 `MusicFonts.light/regular/demibold/bold` 的 family/styleName/weight 显式选择对应字形，C++ 使用 `assetFont(cssWeight)`，不按 CSS 数值让 Qt 自动匹配其他字体面。
-- GLB 保留原资产，用 Kit 自带 balsam 导入或通过 Qt 自带导入器读取；若某 glTF 特性导入丢失，写窄用途 C++/Qt 解析器读取本项目 GLB 的 JSON/BIN、POSITION/NORMAL/TEXCOORD/indices，不引入 Assimp 等库。
-
-### 二维绘制选型与 Qt Canvas Painter
-
-- Qt Canvas Painter 的 C++ API 与 QML Canvas2D 均纳入实际候选，模块许可证类别、技术预览标签及使用较新的 Qt API 不作为本项目的排除理由，也不据此固定优先 C++。保留必要署名与随附文件；选型依据为源码效果/行为等价性、实际 API 能力、CPU/GPU 与资源成本、实现和维护复杂度。继续使用最新 Kit，不能为兼容旧 Qt 而放弃更适合的能力；实际缺失功能或验证失败须指出具体输入、对象和技术原因。
-- 两种 API 的共用绘制契约见 `docs/contracts/canvas-painter.md`；生产滑尺刻线/路径使用 C++ Canvas Painter，固定十六槽、完整刻线的 Qt Quick 裁切、数字轨迹、统一输入路由及资源/失效规则见 `docs/contracts/navigation.md`。R20 将 Canvas Painter 用于生产二维序章的原创品牌轮廓/圆环。R16 比较文字绘制路径后确定字轮实现，不因已引入绘制模块就强制替换全部文字。R16M3当前平台阶段生产字轮采用整行glyph＋彩色Qt Quick Text、CurveRendering及两倍DPR槽层，macOS Metal/OpenGL三个DPR已按同机源参照验收；完整比较、缓存、通知/隐藏规则及成本边界见`docs/contracts/title-reels.md`。其他目标后端补修和最终跨平台选型依R34。普通控件/输入/焦点/Accessible 与列表虚拟化继续由 Qt Quick 承担，三维 SceneItem 的 RHI 管线按既有契约执行。
-- 同组件的 C++/Canvas2D 及适用的 Qt Quick Text/Shape/ShaderEffect 对照使用同一内容、字体、路径、主题、逻辑/物理尺寸、DPR、时刻和抗锯齿目标；先满足源码定义、结构、文本、运动和实际渲染质量，再比较成本；禁止通过实机图逐像素匹配验收。不能用 CPU QPainter/旧 Canvas 的测试成绩代替与实际 Qt Quick GPU 路径的比较，也不直接转抄官方 benchmark 宣称本项目提速。采用的具体组件、API、比较范围与理由写入 R14 建立的 `docs/contracts/canvas-painter.md`，原始产物只留本地忽略目录。
-- 验证描边宽度/端点/连接、曲线与路径缓存、透明背景/预乘及颜色空间、渐变/遮罩/裁切、文字基线/字重/字距/shaping/emoji 和 DPR 边缘。接口不支持的效果不得擅自近似：同组件可组合 Qt Quick 合成层保持等价，或依据明确对照保留更合适的原路径。R15/R20 的生产使用是具体交付；若目标组件存在可复现的不等价或结构/资源回归，须修复或保留针对该组件的具体补修任务，不能只完成演示探针就宣告接入完成。
-- 绘制只消费已有控制器/不可变状态和唯一 FrameClock，使用已缩放 dt，不新增独立 Timer/FrameAnimation/requestAnimationFrame 时钟。静态状态按内容/布局 revision 触发重绘，隐藏/遮挡后停止无效 tick；缓存按路径/样式/字体/尺寸/DPR 等实际依赖失效，动画只更新必要参数，不逐帧重建不变路径、字体布局、图像或绘制目标。C++ 同步与 QML JavaScript 成本分别记录，禁止在绘制/同步热路径读盘、解码、等待或 GPU 读回。
-- 展开Canvas Painter与Qt Quick的真实渲染/合成顺序、离屏附件、MSAA/resolve、纹理上传、缓存容量、资源所有者及hide/restore/resize/重建/退出路径，新增资源纳入ResourcePlan。按当前环境能力实际验证可用后端；D3D11、Metal、OpenGL、平台合成器和部署闭包不可执行的部分严格审计并移交R34。共享源码/qsb生成不代替目标设备运行，局部绘制成绩不代替完整产品验收。
-
-### 连续运动
-
-- 时间单位统一秒，核心计算 double。唯一 FrameClock 接收 QML FrameAnimation 的帧间隔：`dt=min(max(dt,0),0.05)`；普通动效 `motionDt=dt*speed`，速度只缩放一次。片头和音频不受 speed 影响。
-- 临界阻尼原样移植：`d=x-target`，`j=v+r*d`，`e=exp(-r*dt)`；`x=target+(d+j*dt)*e`，`v=(v-r*j*dt)*e`。普通真实列 rate=3.7，详情换片 rate=9，总览 rate=6.5。
-- 搜索/跨列远记忆/归中按现有五次多项式接续 x/v/a，终点 v=a=0；时长 `1.4+clamp((hypot(lanes,rows/8)-1)/7,0,1)` 秒。系数直接移植 `music-archive-motion.ts`、`music-real-columns.ts`，不能用 Qt SpringAnimation 默认参数替换。
-- 同目标不重启轨迹；坐标 rebase 只平移位置与多项式常数项，时间、速度、加速度不变。减少动态效果直接完成目标并处理回调/焦点，不能只把 duration 设成 1ms。
-- 运动内核、唯一 QML 帧源、时钟/轨迹 API、revision 完成语义及冻结数值对照见 `docs/contracts/motion.md`；Windows 证据在 `verification/windows/motion/`，新增 oracle 在 `tests/fixtures/motion/kernel-golden.json`，macOS/Linux 对应审计在各平台 `motion/` 子目录。后续视觉模块只消费同一 FrameClock 的 dt/motionDt，不重复缩放速度；实际列布局和开场界面分别由 R13/R20 接入。
-- 共用 LayoutMetrics、SceneFrame/SceneAdapter、相机目标/阻尼、逻辑像素投影及包围体拾取接口见 `docs/contracts/scene.md`；几何与相机的 Windows Release 重建入口为 `tools/build/verify-r06.ps1`，macOS/Linux 新增调用链审计为 `tools/audit/audit-r06.ps1`。QML 只消费同一场景对象的相机参数与布局指标，后续阵列/抽取/总览扩展该接口，不建立第二套常数。
-- 详情同步放置、同构图换片、有限归位池、实体竖轴拖动和独立材质揭示由DetailPorts/DetailMotion/ReturningCasePool/PointerDragController/CaseClarity接入；单帧顺序、1.45/1.05秒C2轨道、rate=9、80ms场景门禁、容量/回收、REVEAL曲线、不可变逐实体材质及复现/范围见`docs/contracts/detail-motion.md`。固定状态Review输入与生产请求接口分开，不用全局detail替代副本状态。
-- 总览取景/折叠/标签与FrameClock顺序、rate=6.5、真实列共用progress、底边补偿、extent≤.12不可拾取、九候选/十八槽、两步进入及局部模糊资源边界见`docs/contracts/overview.md`。只投影可见物理邻域，复用view-projection和现有三维目标；普通功能与显式生命周期压力分开，目标平台欠验见R34/R19-P。
-- UI 曲线采用原 cubic-bezier，通过求解横坐标获取 progress，不把 CSS 控制点直接解释为均匀参数 t。改速从当前进度继续，不重新设置起点。
-- 表面进入/退出采样当前 opacity/transform；被打断时基础时长 `max(72ms,baseDuration*sqrt(opacityDistance))`。右侧进入 24px/退出 32px，上下进入 10px/退出 6px；有独立图层的面板分别过渡。
-- PresentationPhase 保留 archive/opening/detail/switch-hiding/switching/hiding/returning/selecting；退浏览文字后才能抽取，盒体和相机落稳后才能进详情字。退场中只保留最后目标，旧完成事件按 revision 丢弃。
-- 字轮基础 460ms，按当前显示位置和速度重定向；按 Unicode grapheme 分段，不能按 UTF-16 单元拆 emoji/组合字。QTextLayout 的整行 shaping 位置用于文字测量，不能逐字符独立测宽破坏字偶距。
-
-### 几何、材质、封面与光场
-
-- 盒体 4.45×3.35×0.14，中心 (0,1.85,0)；封面纸面 3.06×3.06，中心 (0.17,1.85,0.027)。后托前面 -0.032，前盖背面 0.052、正面 0.070；不能共面，不能扁平化为无厚度卡片。
-- Three 与 Qt Quick 3D 都按右手、Y 向上处理；用显式矩阵和 camera aim 对齐，不全局翻转 Z。导入节点变换只应用一次，先以已知顶点验证坐标再加入动画。
-- 模型分 Frosted_Polymer、Ivory_Edges、Optical_Diffuser 三壳体批次，封面单独批次。复制项目已有几何，不重新凭视觉建模。
-- 主盖透射基础/暖昼 0.96/0.94，粗糙度 0.34/0.40，厚度 0.018/0.022，IOR 1.46，clearcoat 0.08；详情粗糙度趋向 0.27/0.34。其他最终参数按冻结源码的有效分支及最终覆盖顺序确定，R01 的 scene-parameters.json 只用于辅助核对。
-- 纸面局部距离 `d=max(abs(localXY-(0.17,1.85))-(1.53,1.53))`；`p=1-smoothstep(0.015,0.15,d)`；透射 LOD 因子 `mix(1.0,0.16,p)`。它随实例/抽取盒移动，不能在屏幕固定区域模糊，不能增加噪点掩盖材质误差。
-- 纸面为独立漫反射，参与既有光场且不自发光；最终颜色上限限制在原图颜色范围，不能用加白增亮改变封面。透明留白、1/64 内缩、contain 与采样钳制在阵列/选中/归位/查看中共用。
-- 光带移植 `music-row-lighting.ts` 和 `music-lighting.ts` 的世界空间函数：rowSpacing=0.62、laneSpacing=5.2、laneRadius=27；横排高斯半高宽按 ln(2)，列衰减按六次幂指数。默认 guided、strength=1.3、width=1.35、offset=0.3、fill=1、transitionDuration=1.1。
-- light follow rate=`4.743864518390578/duration`，同向速度限幅后接续；跨列换算旧世界原点，真实列使用独立列原点。详情把行光按原轨迹收退，不新增不受主题控制的白色高光。
-- 环境取基线 RoomEnvironment 的方向性与颜色，R01 从现有 Web 渲染路径导出无私人资源的环境输入/样本。Qt 内置 PBR 的强度单位不与 Three 直接等同，按冻结环境/BRDF算法、光强单位和颜色空间换算确认等价性，禁止按实机图ROI损失标定或搜索参数。
-
-- 灯光、世界空间光带、独立列/rebase 跟随、650ms 连续主题及纸面/壳体共享世界原点函数见 `docs/contracts/lighting.md`，冻结源码/算法 hash 在 `lighting.json`。音乐生产环境/半球/方向/spot/area 使用原源单位的自定义 GLSL；不得与 Qt 内置灯重复叠加。LTC 资源与来源在 `resources/manifests/lighting.json`，Windows Release 复建为 `tools/build/verify-r08.ps1`，对应证据在 `verification/windows/lighting/`、`docs/media/lighting/`；平台新增审计在各静态目录 `lighting/`。R12 实例与 R18 抽取/归位继续消费同一实体 origin、绝对 row/lane 和 palette，不重建灯光或重新滤波整列平移。
-
-### 首选管线与确定的补救路径
-
-- SceneAdapter 的产品接口固定，不因渲染实现变化修改 QML/导航。生产使用 QQuickRhiItem + QRhi/qsb；Qt Quick 3D View3D/CustomMaterial/Effect 仅用于 Review 来源对照。图形私有接口集中在 RHI 边界与能力探测，不进入 QML/导航。
-- 正常管线：阴影目标 → 不透明背景/纸面/结构与供透射采样的捕获 → 磨砂壳体合成 → SSAO合成 → 景深 → 按画质SMAA → 色调映射/输出；以冻结基线的实际通道顺序和例外为准。QML文字与阅读遮罩在三维合成之后，不参与景深。
-- Qt 的 SCREEN_TEXTURE/SCREEN_MIP_TEXTURE 不包含透明材质和使用该屏幕采样的物体；不得假设它会递归捕获其他玻璃。先采用与当前 Web 一致的屏幕空间近似，不要求真实光线追踪。
-- CustomMaterial 显式实现局部纸面 LOD、侧脊密度/高光、印刷光场和按主题混合；不只填 PrincipledMaterial 参数就宣布完成。Effect 移植基线 SSAO/Bokeh/SMAA 的有效算法及参数，避免 Qt 默认后处理改变画面。
-- 线性渲染与 sRGB 输出分开，盒体跟随原 ACES 曝光；纸面 `toneMapped=false` 的路径单独核对。避免 View3D 与自定义 Effect 重复色调映射。
-- 材质、光场与颜色按冻结shader、生产有效参数、光强单位、颜色空间和合成算法逐项移植；保持纸面、留白、侧脊、外框和背景的理论关系，在双主题/视角中检查实际质量。禁止用实机图ROI/RGB损失标定或搜索参数。
-- 跨渲染API的光强或材质语义转换须由源码公式、单位与解析/数值测试推导，记录转换依据；不能扫描参数去追浏览器像素。IOR、几何、封面纹理、主题颜色和各项效果按生产代码保留；确有算法/能力缺口时按R10既定管线修复，不以图像残差新增补修轮次。
-- 单盒材质的参数/线性捕获/局部 LOD/印刷限制、固定环境和重建命令以 `docs/contracts/materials.md` 为准，冻结源码与算法 hash 在 `materials.json`，资源清单在 `resources/manifests/materials.json`；同输入 fixture 为 `tests/fixtures/materials/single-case.json`。Windows 材质证据与残差在 `verification/windows/materials/`、成对图在 `docs/media/materials/`；平台矩阵在 `verification/macos-static/materials/` 和 `verification/linux-static/materials/`。后续灯光、图集与后处理接入保留纸面入射量、一次 ACES/一次 sRGB 输出和独立侧脊参数契约。
-- 阴影/SSAO/RenderQuality 的有效参数、seed=417 核、RGB24 线性深度/独立 view normal 预通道、四预设及 8.3MP 限制见 `docs/contracts/occlusion.md`；资源来源/hash 在 `resources/manifests/occlusion.json`，同输入为 `tests/fixtures/occlusion/`，Release 复建为 `tools/build/verify-r09.ps1`。Windows 证据和成对图在 `verification/windows/occlusion/`、`docs/media/occlusion/`，平台新增审计在各静态目录 `occlusion/`；公开阴影投影/偏置/滤波、Unshaded 壳体接收/邻盒透射与背景输出的具体后续输入以 `docs/contracts/occlusion-limitations.json` 为准。画质只改变渲染资源，不重建业务状态；后续实例池须向两个几何预通道供应同一实体 origin/位置。
-- 景深 41 点 Bokeh、SMAA 1x Medium/lookup、最终 ACES/sRGB 与三个固定公开 Effect 通道布局见 `docs/contracts/postprocess.md`；资源来源/hash 在 `resources/manifests/postprocess.json`，Release 复建为 `tools/build/verify-r09b.ps1`。Windows 九尺寸/双主题及真实 DPR 1/1.5/2 的 105 状态证据在 `verification/windows/postprocess/`、成对图和局部放大图在 `docs/media/postprocess/`；新增平台静态审计在各静态目录 `postprocess/`。原始画质开启实际几何 MSAA，高/极高追加 SMAA；纸面透射捕获边界及邻盒背景 ROI 的 R10 输入见 `docs/contracts/occlusion-limitations.json`，不能以 SSAA 诊断或整体模糊替代生产修复。
-- 渲染目的后端固定为 QQuickRhiItem + QRhi/qsb，实施边界为 R10A–R10D；接口、固定参数、源捕获语义及各项补修输入/验收见 `docs/contracts/render-backend.json`、`render-backend.md`。Windows 70 状态证据在 `verification/windows/render-backend/`、成对图在 `docs/media/render-backend/`。生产唯一运行实现为 RHI SceneItem，`SceneAdapter.renderBackendContract` 的 implementationReady=true / activeImplementation=rhi；集成、纯值资源键/预载缓存、累计资源和输入/正常VSYNC帧入口按 `docs/contracts/rhi-integration.md` 执行。Quick3D oracle 只在 Review 构建打包，普通产品不链接 Quick3D 或打包第二套场景。R10 的历史图集 GPU 传输字节保持未知；当前 RHI 的实际 tile 目标传输字节以 `verification/windows/rhi-postprocess/` 为准，不把 CPU payload/调用次数当预算证据。不能直接删效果、自动降低默认画质或换成 WebEngine。
-- RHI 不透明基础、不可变 SceneFrame 同步、阴影实际 PCF/Vogel 算法、std140/qsb 和目标/读回所有权以 `docs/contracts/rhi-opaque.md` 为准，代码在 `src/render/rhi/`；历史 R10A 六 shader 证据在 `verification/windows/rhi-opaque/`、`docs/media/rhi-opaque/`，历史重建使用对应验收提交的 `tools/build/verify-r10a.ps1`。R10B 七 shader 历史复建同样使用对应验收提交。当前源树由 `tools/build/verify-r10c.ps1` 复建 24 shader 并回归不透明基础、材质与后处理，历史证据 hash 不回写。单采样基础检查不代表产品替换或完整后处理，生产接入与测量边界以 `rhi-integration.md` 为准，基础 Review 不等于完整播放器。
-- RHI 磨砂捕获、4× MSAA resolve/mips、局部纸面 LOD、显式三壳体材质、近到远不透明/远到近全局壳体稳定 ID 排序按 `docs/contracts/rhi-shell.md` 执行；当前 816-byte std140 保留 R10B 的 752-byte 前缀，新增边界按 `rhi-postprocess.md` 执行；源参数/hash 在 `resources/manifests/rhi-shell.json`。独立捕获不含透射壳体，独立合成目标禁止反馈；contain 可见边界由 centroid 几何 MSAA 抗锯齿，预乘滤波避免透明黑 texel 形成黑边。Windows 61 状态、原 58/59 邻盒通道及五 ROI 残差在 `verification/windows/rhi-shell/`、`docs/media/rhi-shell/`，对应静态矩阵在各平台 `rhi-shell/`。当前 61 pre-stage 与 50 final-output 同输入重放、五 ROI/轮廓和逐项残差在 `verification/windows/rhi-postprocess/`、`docs/media/rhi-postprocess/`，这些图像指标保留历史记录，不再重跑像素匹配；后续核对源码材质/合成与实际质量。
-- RHI 图集 generation/lease/serial、256² tile 的 2MiB 稳态/16MiB 初始化队列、112-byte 几何实例、独立 AO/DOF 几何、RGBA16F 颜色、保持相同 half 精度的 R16F 标量AO、32/64 原始核及 Bokeh/SMAA/一次输出以 `docs/contracts/rhi-postprocess.md`、`resources/manifests/rhi-postprocess.json` 为准。Windows 实际 D3D11 destination box/row pitch 和已完成 GPU 整页读回证明单 tile 262144 bytes、稳定帧零、稳态批次 2097152 bytes、初始化批次 16777216 bytes；不是物理总线流量。432 实例的 120 秒未限速原生呈现与 CPU 提交分别记录，GPU timestamp 在验收运行中不可用；系统 compositor 和产品交互仍由 R10D 验证。平台静态审计见各 `rhi-postprocess/`，用户实机步骤见 `docs/platforms/`。
-- 补救实现是 QQuickRhiItem + Qt 自带 QRhi/qsb：仍为 Qt Quick 原生应用。QRhi 使用所选最新 Kit 的 GuiPrivate，编译探测实际接口并将版本差异隔离在 `src/render/rhi/`；升级 Qt 后重新探测、适配并复验，不通过固定版本或退回旧 Kit 绕过私有接口变化。不引入第三方渲染引擎，不改 QML 业务接口，不让私有类型泄漏到 core/media。
-- R10A–R10D 的触发已由实际对照固定；后续轮次按合同执行，不再讨论框架选择。保持源屏幕空间透射近似：Three 音乐壳体为 FrontSide，不透明捕获同样不含透射壳体，不能误增递归玻璃捕获；修复对象为源码及真实运行确认的 shadow/resolve/排序/深度写入错误和实际渲染缺陷，不含像素残差追分。
-
-### 纹理与实例预算
-
-- 填充可见池 9×48=432，COLUMN_SPACING=5.2、ROW_SPACING=0.62；真实列按有效单元显示，数量大于可见池时按当前位置虚拟化，保持唯一逻辑身份。
-- RealColumns、ColumnMemory、NavigationAvailability 的独立深度、五次归中、真实单元过滤、实际显示深度选择及会话记忆遵守 `docs/contracts/real-columns.md`；输入统一进入 SelectionController。只保存偏好开关/阵列模式，不保存会话行位；PreferencesStore 串行合并后台原子保存并保留未知字段和损坏原件。Windows Release 复建与平台审计入口为 `tools/build/verify-r13.ps1` / `tools/audit/audit-r13.ps1`。
-- QML 不创建每张专辑一套三维节点；共享几何、材质和 C++ 实例表。选中与归位副本拥有独立纹理租约，不能在换片时换错封面。
-- 封面后台尺寸最长边 256、选中 1024；同时解码最多 3 张，已完成 CPU 图像 LRU 16MiB。图集使用固定容量分页面，单边不超过 GPU 上限；每格保留采样边界和透明留白。
-- 以上为有来源的工作集/突发上限，不是整体流畅保证。R11分别约束待解码、在途展开图、完成缓存、待上传及选中/归位纹理的容量和字节，按身份合并与generation取消；不能将16MiB完成缓存宣称为总内存预算。
-- 图集背景禁止跨格 mipmap/各向异性，选中纹理保留最多 8×；常态每帧最多上传 8×256² RGBA=2MiB，初始化每批最多 16MiB且让出一帧；稳定帧无重复上传。
-- CoverCache、AtlasAllocator、SelectedCoverLease 的请求/来源 generation、取消、分页、槽位就绪、不可变像素、独立租约和各阶段容量按 `docs/contracts/covers.md` 执行。Windows Release 复建入口为 `tools/build/verify-r11.ps1`、平台审计为 `tools/audit/audit-r11.ps1`；原图展开保护、selected 与 atlas 分开记账，不把 LRU 或 descriptor 估算当总内存/显存实测。生产填充池的合并页面、高清分块、增量上传、独立归位租约、统一实例/拾取/rebase 坐标和数值残差处理按 `docs/contracts/archive-pool.md` 执行，复建与平台审计入口为 `tools/build/verify-r12.ps1` / `tools/audit/audit-r12.ps1`。
-- Qt Quick 3D TextureData 更新可能导致整页上传；必须实测。若超过上述预算，触发 R10A–R10D 的局部上传实现，不把 setTextureData 次数当成实际 GPU 上传证据。
-- 全分辨率中间目标限制 8,294,400 像素及硬件尺寸；画质配置沿用 render-quality.ts 的范围和预设。限制发生时明确显示，不偷偷保存更低的用户设置。
-- R10D/R11给出附件、MSAA/resolve/mips、图集、buffer、lookup、Qt输出及resize同时存活峰值的资源清单，共享附件只计一次。估算与实测分开，像素上限不替代累计GPU资源预算；设备不支持时明确失败，不编造跨设备通用显存阈值。
-
-## 验收契约
-
-### 固定测试数据与可重放输入
-
-- fixture 仅使用内置演示封面与合成/匿名标题：空库、单专辑、两张偶数列、三张奇数列、短列/长列、多于12张列、超过432张库；方形/竖版/横版封面；长中文、英文下伸字符、括号、emoji 和组合字。
-- Web 与 Qt 使用同一 JSON 场景输入：viewport、DPR、theme、quality、arrayMode、albumIds、selection、motionTime、输入事件序列。fixture 不读取用户真实 music-data-v3。
-- Qt `--review-fixture`、`--review-time`、`--review-script` 仅在 Review 构建启用；冻结时钟可按精确时间采样，不使用睡眠截图代替确定状态。
-- 每份视觉产物携带基线提交、fixture hash、Qt/浏览器版本、图形后端、内容尺寸、DPR、画质、时间和 ROI；用于说明自身输出与采集范围，不进行截图逐像素比较。
-
-### 尺寸、源码效果、运动与实际质量
-
-- 各平台适用的内容尺寸为1920×1080、1280×720、995×858、960×900、930×900、390×844、320×720、2560×1080、3440×1440；代表性尺寸覆盖DPR1/1.5/2。当前可靠的结构、运动、功能与实际渲染质量检查必须真实执行；不可执行的目标环境严格审计并移交R34，不以其他平台结果替代。
-- 布局按源码推导：主锚点误差≤1逻辑px、三维轮廓/投影锚点≤2逻辑px，核对分界、断行、裁切和点击范围。坐标来自代码/数学状态，禁止通过截图逐像素匹配确定位置。
-- 几何、取景、颜色空间、光照、材质、后处理与时序以源码理论效果为准。真实输出检查缺失、错位、异常合成、锯齿和模糊；原项目实机图只供大致参考，不计算图像相似度、不生成像素差分、不设置图像匹配门槛。
-- 抗锯齿以消除可见渲染缺陷、达到理论上平滑的轮廓为目标，不复制旧图锯齿或用整体模糊掩盖边缘。源码有意的景深/背景模糊保留；错误分辨率、缩放、采样、字体回退或采集引起的非预期模糊须定位修复。
-- 原品牌改为`yalahOO!!!`，新SVG按R03B精度、缩放与主题要求验收；容器锚点、留白、布局、动画与相邻控件仍还原生产源码，不设置旧品牌图像排除区或像素比较。
-- 运动数学：double轨迹误差≤1e-6，分别记录位置/速度/加速度；代码投影误差≤2逻辑px、时序事件差≤一个60Hz帧。覆盖20/30/60/120fps与长帧；每段按1/120秒采样状态，直接对照原算法执行结果，不以完成态代替过程。
-- 打断序列包括立即返回、退字连选、详情三次换片/反向、搜索替换/取消、总览切列、改速、途中减少动态、扫描替换和跨1.05布局分界。功能、源码数学、资源和质量要求分别证明，不用图像分数代替。
-- 不新增OpenCV/Pillow/scikit-image等第三方图像库；验证产物仍只在本地忽略目录保留。
-
-### 性能与平台边界
-
-- 按用户明确修订，R10D 集成边界的性能实测为记录项，20ms 保留为参考而不阻止本轮完成或提交；结构/算法、功能、视觉、上传、资源与生命周期要求仍须通过。保留全部超限和环境不确定样本，不宣称实际性能已达标。复建使用显式 record-only 模式，普通 Review 默认仍保留历史数值门槛；完整产品预算与噪声按 R28 建立。
-
-
-- 按性能契约分开执行静态/算法审计、局部诊断和实际产品验收。保留Windows参考机60Hz、原始画质/1920×1080、预热后120秒混合交互p95≤20ms及稳定阶段不重复出现>50ms的目标；20ms是工程容差，不是稳定60fps证明。RHI关闭VSYNC的Review仅验收吞吐，不能替代正常VSYNC产品节奏和系统compositor。
-- 完整产品增加p99≤两个目标刷新周期的尾部目标（60Hz为33.33ms），逐场景报告一/两/三周期长帧、连续卡顿、输入收到→状态提交→对应帧提交及可测漏帧/显示延迟；不能以混合总p95覆盖局部失败。缺少真实显示时刻时标明估算/输入到Qt提交，R10D建立测量入口，R28前交付实际基线、噪声与各预算依据。
-- 原始画质两主题为主要目标，高/极高、大尺寸和DPR2另列压力结果及资源峰值，不能直接套用1080p门槛，也不能省略检查。冷启动、封面就绪、扫描交接、稳定、重载、恢复分开采集，固定片头时长单列；准备期仍检查输入响应/队列，禁止扩大准备期排除卡顿或无限推迟就绪。
-- 正式场景串行采样至少三次，保存每次原始时间序列/分布，优化用同机同Kit同输入前后二进制交错对照；不挑最快值、不并行构建或GPU测试。临界失败仅进行一次固定三次复核批次，按有效性、重复性和具体事件归因，保留失败样本。调整预算必须有设计推导、全样本和体验影响证据，不能为过关调数字或无限重跑。
-- GUI/同步、CPU提交、GPU完成、资源重建、上传、解码与帧率分开；CPU提交不得称为GPU耗时或与GPU分位相加。不可用GPU timestamp写null，frameSwapped不是屏幕扫描时间；窗口遮挡/节流导致无效采样时明确限制，继续遵守置底/不接受焦点策略。
-- 连续10次界面重建和30次详情切换后，资源回落且无单调增长；隐藏/最小化暂停视觉更新，歌曲继续播放。
-- 最终实机要求对所有适用平台保留：真实Release构建、Qt窗口交互、GPU视觉/资源/性能、QtMultimedia播放与设备变化、部署包脱离开发路径运行。当前可靠项目必须执行，其他项目按动态规则严格审计并排入R34；模拟媒体、CI配置、仅configure或其他平台截图不能代替这些最终检查。Debug仅在明确需要堆栈时使用。
-- 各平台代码、CMake、QML/资源、shader和部署脚本必须完整实现；当前确实无法执行的目标构建、后端补修或部署运行可阶段性移交R34。严格审计须先修复能由源码确定的缺陷，不得把已在可靠本机检查中失败的产品功能改判为环境不可用。实机清单与R34待办保持一一对应，静态交接只解除当前主线对不可执行检查的等待，不构成最终产品实机验收。
-
-### 所有平台的严格静态审计契约
-
-- 每个平台形成独立 `audit-matrix.json`、`audit-report.md` 和用户实机验证清单。矩阵逐项包含 checkId、requirement、platform、sourcePath、lineOrSymbol、evidence、result、limitations；每条结论必须指向实际代码分支、CMake 条件、资源清单、脚本行或所选最新 Qt 版本的官方 API 依据。审计同时核对 C++23、Qt 自动选版、无固定版本路径及完整平台分支。只写“跨平台 Qt 已支持”、只列文件名或只靠字符串搜索不算证据。
-- 审计工具放 `tools/audit/`，使用 C++/Qt 或系统现有脚本能力，输入为当前源码与规则清单，输出机器可读覆盖/发现报告；自动检查之后逐项人工推演实际调用链、平台预处理分支、资源解析与错误路径。审计修复须真实回归当前可用平台的共享路径；不可执行的其他平台回归列入R34，不能宣称已通过。
-- **COMMON-01 构建闭包：** 从顶层 CMake 展开 WIN32/APPLE/UNIX 分支，核对每个目标、源清单、链接模块、moc/qrc/qsb、安装路径和测试注册。Windows API、Dwrite/MSVC 选项必须仅存在 Windows 分支；Apple 与 Linux 分支引用的文件/符号必须真实存在，不得 `#error`、空实现、无条件提前返回或 silently disable 产品功能。禁止把运行时后端强制写死 D3D11 到所有系统。
-- **COMMON-02 路径与资源：** 检查所有文件通过 QFile/QDir/QUrl/QStandardPaths 正确处理 Unicode、大小写、空格、路径分隔符和可写目录；不依赖盘符、当前目录或硬编码 Kit。QML 模块别名、qrc 字体/图标/模型/音频、插件相对路径、打包后读取位置必须形成完整解析链；DirectWrite 字体转换只作为 Windows 资产工具，转换产物供三平台共用。
-- **COMMON-03 渲染闭包：** 检查相机矩阵、clip-space 修正、纹理 Y 方向、深度范围、MSAA resolve、透明排序、屏幕采样和 shader binding/location；Qt Quick 3D 自定义片段按 Qt 跨后端生成规则审计，独立 shader 与条件 QRhi 路径检查 Metal/GL 所需代码和 qsb 变体。当前环境可执行的qsb跨目标生成与产物清单核对必须运行；生成 MSL/GLSL 只作为静态证据，不能宣称目标 GPU 已验证。当前环境无法执行的目标编译器检查逐项写明限制，不要求安装第三方交叉工具链。
-- **COMMON-04 媒体与生命周期：** 从命令到 QMediaPlayer/QAudioOutput/QSoundEffect 的调用链逐项检查 source/设备/错误/EndOfMedia/取消/销毁；保留真实公开 API 实现，不用模拟播放器作为非 Windows 产品后端。默认设备及设备消失回退、不可 seek、未知格式、资源错误、后台与恢复都有可执行逻辑；不引用 Swift、外部 FFmpeg 命令或手动 PCM。
-- **WIN-01 平台集成：** 展开MSVC/C++23、WIN32入口、PE资源/原创ICO、windeployqt的QML/CanvasPainter/媒体插件与随附依赖闭包、运行库要求、Unicode/空格路径和QStandardPaths数据目录；检查根启动器从自身位置解析安装/构建产物，参数引用与退出语义正确，不依赖开发PATH/Node/外部FFmpeg。静态审计不生成或宣称已运行目标PE/DLL；缺少可靠Windows环境的真实构建、后端、设备、图标及干净部署检查逐项移交R34。
-- **MAC-01 平台集成：** 审核 bundle 目标、Info.plist、可执行文件与 Resources/Frameworks/PlugIns/qml 安装位置、macdeployqt 调用与输入存在性；确认 Metal 选择/默认行为、Retina 逻辑像素、Command 快捷键、菜单/关闭语义与可写数据目录实现。普通 `.command` 从自身路径解析产物并正确引用带空格路径，不依赖 Node、开发 Kit 路径或系统音频改造。
-- **LNX-01 平台集成：** 审核 Linux 的 Qt 平台插件及依赖清单、xcb/Wayland 选择、OpenGL 默认和可选 Vulkan 的探测/回退；核对共享库搜索路径、插件/QML/媒体部署位置、`.sh` 文件的 LF/可执行位/参数透传/带空格路径及 XDG 数据路径。媒体依赖以所部署 Qt 插件的真实要求为依据，不把 Windows DLL 名称照搬成 Linux 库；权限/设备错误有提示，不静默安装软件或修改系统配置。
-- **COMMON-05 证据与缺陷门槛：** 全部适用项均有可追溯证据，所有发现的功能缺失、构建/链接/资源错误、平台不兼容、部署缺陷与未实现路径必须修复；N/A 必须说明代码不适用的具体原因。当前平台共享测试、qmllint和可执行的资产/qsb检查提供真实结果，但不充作其他平台编译或运行结果。单纯缺少对应系统实机不构成缺陷，平台实现或审计证据缺失构成阻塞。
-- **PERF-01–07性能闭包：** 按性能契约逐项审计复杂度/索引、线程/队列、复制/上传、资源/失效、算法/缓存、QML/输入和生命周期。展开目标平台实际调用链与资源计算，Windows结果不宣称目标GPU性能；新增优化记录源码hash及受影响功能/视觉证据。
-- 纯静态检查结论写“静态审计通过，实机待验证（R34）”；实际运行检查单列系统/Kit/后端/设备/尺寸/DPR、覆盖范围和真实结果，不把整个macOS或其他平台统称为只通过静态审计。报告记录源码hash、Qt版本、覆盖及无法静态证明的风险。实机清单给出configure/build/部署/启动、GUI、播放与设备检查的准确入口和预期结果；缺少实机任务必须保留在R34，不因阶段性主线收口而删除。
-
 ## 待执行轮次
 
-下列轮次按AI代理自身能力评估并遵守上述规模与时间约束，允许小幅收尾浮动；真正开始前重新估算，不把人类开发日作为容量依据。达不到退出条件时先拆出具体补修轮次。
+### 历史源码复查（R20前置）
 
-### 历史源码复查契约（R19之后立即执行）
+- 覆盖R01–R19及全部实际子轮次/后续格式、性能、平台修正；从Git计划历史与实现diff恢复原任务和生产override，逐项写入source-fidelity-review索引，不以分组标题/既有测试代替覆盖。
+- 判定分源设计、必要原生适配、无源码/技术依据的图像补偿。适配保留须证明语义/质量/资源必要性；不凭偏移/倍采样/平台分支形式机械删除，也不能因出处不明而默认保留。取消的旧像素任务只复查已有代码，不恢复评分。
+- 依当前轮次边界核对算法/参数/资源/调用者与历史理由，修复附源数学/状态及实际质量/交互/资源回归；当前可确认/执行缺陷当轮解决，独立目标事项按R34规则交接。各组件协议与公共验证不在此重抄。
 
-- 用户要求对R01至R19及全部已实施子轮次逐项复审，防止此前为图像相似度引入的锯齿、模糊、字体/采样补偿等缺陷进入产品。**所有剩余复查轮次完成后才进入R20。** 本轮R19仍须纳入复查；不以其最近实现或已有测试通过豁免。
-- 从`git log -- QT_QUICK_MIGRATION_PLAN.md`、各版本计划与对应实现diff恢复已移除的原任务、有效生产路径及后续修正。覆盖编号见各轮；R16B2V-P/B2W/B3等未完整完成的历史任务只复审已经存在的实现，不恢复已取消的像素门禁。格式、性能优化、平台迁移和未改计划的后续提交也追踪，不能只读最初实现提交。
-- 每项外观算法、参数、资源及可疑补偿记录：原源码文件/符号、实际生产调用及有效override，原生位置，引入/修改提交和理由，跨技术栈差异、判定与验证。简明矩阵保存在`docs/contracts/source-fidelity-review.md`；批量历史导出、逐帧/截图/机器报告仍只放忽略目录。覆盖表须逐个原轮次/子轮次列出实际审查对象和结论，不以分组标题或“同前”替代逐项审查。
-- 判定须区分三类：①有源码/算法证据的设计，保持其理论语义；②Qt/C++/RHI、字体与平台API所必需的适配，说明为何需要、语义如何等价、实际质量与生命周期证据，不能因代码形式或数值不同就机械回退；③仅由截图/SSIM/RGB/边缘差异推动、没有代码或独立技术依据的调参/补偿，移除或修复。历史图像通过不是保留理由，历史分数失败也不是回退正确实现的理由。
-- 对出处或必要性不明的改动，继续追踪原调用链、数学推导、Qt实际API、原生字体/采样与资源路径并做有界实验，查明后处理；不能凭“可能必要”保留，也不能见到偏移/倍采样/平台分支就全部删除。源码有意的模糊、景深和风格化必须保留，消除错误DPR、采集、缩放、合成或采样造成的非预期瑕疵。
-- 每轮先给出覆盖范围、可疑项、规模/耗时与验证能力，按现有规模契约执行；必要时在该轮开始前拆分为明确连续子轮，保持全量覆盖和R20前置关系。R19的时间/改动规模和可见窗口授权不继承给复查轮次。
-- 修复必须附原理、受影响源码/状态/数学测试与当前可靠环境的实际质量/交互/资源回归；不生成原实机图像差分，不进行任何像素匹配或据图调参。共享渲染变更回归相关材质/灯光/后处理/封面/场景/文字/界面路径、格式、两组官方qmllint及Release CTest。缺少目标平台实机只把独立目标回归移交R34，当前可确认和可执行的修复本轮解决。
+#### 用户观察问题与退出条件
 
-#### 用户观察到的阵列渲染问题（复查必办）
-
-- **VIS-ARRAY-BLUR-01 · 小窗口阵列画面模糊，大画面较清晰，原因未查明。** 用户在R19测试期间观察到：摆放大量专辑的页面在一个较小的测试程序窗口中明显模糊，后续较大渲染画面的程序看起来较清晰。尚不能确认两者是否同一产品/探针入口、相机状态、画质、后端、真实DPR或渲染分辨率，也不能直接判为源码有意景深、DPR问题或复制了旧渲染缺陷。R19A先从已有本地输出和调用链识别入口/输入并登记缺失条件；R19D主责调查和修复，R19B核对相机/投影，R19A核对封面资源，R19C核对材质透射/LOD，R19G核对总览取景与合成。
-- BLUR-01调查须在相同匿名库、相机/运动状态和画质下分别控制窗口大小、实际DPR及render scale，记录逻辑尺寸、实际物理目标/附件尺寸、像素保护是否生效和最终显示缩放；核对封面解码/图集/高清租约、mipmap/LOD/过滤、Qt合成层尺寸与采样，以及景深焦平面、深度与CoC单位是否按源码正确换算。先区分不同程序/场景和采集路径，不仅比较窗口大小；不把环境变量当真实DPR，不拿放大的图片或离屏目标尺寸冒充实际窗口清晰度。保留有源码依据的景深/磨砂/背景模糊，修复额外缩放或采样等造成的非预期模糊，不以锐化、关闭效果或无依据提高全局分辨率掩盖原因。
-- **VIS-ARRAY-FLICKER-01 · 大量专辑闪烁，半透明重叠区域尤其明显，属于待修渲染缺陷。** 用户在同一类大量专辑页面中观察到明显闪烁，当前未确认具体入口、后端及触发状态。不得将其当作复刻目标、正常设计或测试噪声；即使旧项目也有相同表现，仍须消除缺陷。R19C主责透明材质/排序/合成修复，R19D协查深度、采样、后处理与资源时序，R19B协查几何/相机；R19A先登记已有输入与入口，不能用此前功能或资源检查通过否定用户观察。
-- FLICKER-01须分别观察静止/活动波浪、浏览移动、总览转换与不同重叠关系，定位最早出现异常的渲染通道。沿生产路径核查透明排序与稳定ID/深度键、前后表面及draw顺序、depth test/write和深度精度/共面冲突、捕获隔离与读写反馈、MSAA/resolve、跨帧目标/图集就绪与资源复用；检查shader非有限值或不连续状态。以上是待验证方向，不是已确认根因。用源码、通道状态和实际连续运行证明原因，不以旧实机图逐像素匹配或相似度打分定位；不得靠移除透明度、减少专辑、冻结正常动效或整体模糊隐藏闪烁。
-- **两项均为R19A–R19H复查的明确退出约束。** 分别记录复现条件、源码依据、已确认根因、修复/保留设计的理由及受影响回归。BLUR-01须说明哪些模糊为源码设计，并消除非预期模糊；FLICKER-01须在代表性静止/运动/重叠场景下真实连续验证无异常闪烁。按风险选择小/大窗口、实际DPR及相关后端，复用有效结果，优先隐藏检查；确需原生窗口时遵守当轮授权与显式选择规则，不重启无关完整窗口矩阵。当前环境可可靠复现/修复的部分必须在复查阶段收口，不以“源码审计通过”“零warnings”代替实际质量，也不默认推给R34；只有独立缺环境的目标平台回归可按动态规则移交。R19H在进入R20前逐项核对，不得遗漏或无结论关闭。
+- **VIS-ARRAY-BLUR-01：小窗口大量专辑明显模糊，大画面较清晰，根因未收口。** 候选ArchivePool/RealColumnAudit初始960×640，Detail/Overview产品初始1280×720；既有`overview/r19/final3-metal-1/run-1/report.json`不能认定为用户所见窗口。hidden-final-metal-1只是标签/布局RenderControl，不是完整三维阵列。
+- R19D4C在同匿名库/相机/运动/画质下分别控制小大逻辑窗口、实际DPR/render scale，记录所有物理附件/像素保护/最终合成缩放，核对解码/图集/高清租约、mip/LOD/过滤与DOF深度/焦平面/CoC单位；先识别程序/场景/采集入口，环境变量或放大图不能冒充真实DPR/窗口清晰度。R19G复核总览取景；保留源设计模糊，消除非预期模糊。
+- **VIS-ARRAY-FLICKER-01：大量专辑半透明重叠闪烁。** R19C2C已确认并修正visibility/Equal颜色pass位置不变性问题，R19H仍须核对代表性正常光学连续运行及目标欠验，不能以静态图/零warnings关闭用户问题。D4B2/C继续查resolve/后处理/跨帧资源，G查总览转换。
+- 两项均为进入R20前硬退出条件：保留明确复现输入、源依据、已确认根因/修复与设计效果边界和受影响回归；静止/波浪/浏览/总览进退/重叠关系正常、无异常模糊/闪烁，当前可靠检查真实通过。独立缺环境目标回归可交R34，不能以移交替代本机调查或通过降低数量/冻结动效/关效果掩盖。
 
 ### R19D4B2 · MSAA/resolve 与旧门禁覆盖闭包
 
@@ -777,48 +367,49 @@
 - 性能设计与验证：收口核对性能设计审计、资源清单、逐场景多次原始样本、预算依据/测量范围与残余风险；不能以平均FPS、CPU提交或Review报告承诺所有设备完整体验。
 - 退出：主线实现与当前可靠检查完成，文档准确描述范围、残差与限制，R34完整保留所有尚未执行的专项任务；删除已完成主线轮次但不得清空R34或宣称未运行平台可用。最终实机结论在R34完成后更新。
 
-### R34 · 后置平台/后端补修与最终实机验证（特殊轮次）
+### R34 · 后置平台/后端补修与最终实机验证
 
-- 依赖R33的主线实现/阶段交接和各轮移交清单，作为最后一个专项阶段。按真实环境能力安排目标，不固定平台的验证方式；修改共享路径后回归当前主力平台受影响功能。
-- **本专项不保留任何逐像素比较任务或完成门禁。** 删除浏览器/后端图像趋同、SSIM/RGB/ROI分数、文字边缘带、GPU导出PMREM与浏览器逐字节相等的补验收。历史未达图像目标的记录不改写为通过，也不再构成待修任务；只有源码审计或真实产品运行确认的缺陷才进入修复清单。本节引用的旧契约/脚本若仍耦合这些比较，先拆开相应检查，不以旧像素结果阻止功能/质量验收。
-- 保留源码定义、结构/投影、文字内容与字体身份、运动/时序、实际渲染质量、交互、资源、窗口、媒体、部署和性能验证。图像可用于定位漏画、错位、裁切、错误合成、可见锯齿或异常模糊，不进行逐像素匹配，不复制基线渲染缺陷；源码明确要求的景深和背景模糊分别核对。
-- 按后端/DPR、窗口、媒体、部署或性能边界拆为明确执行单元，每次只完成一个边界。各轮移交记录目标环境、能力缺口、匿名输入/源码版本、修复对象、准确入口/预期结果、非像素门槛、依赖和共享回归；已知产品失败与尚未运行分别记录，不提前生成假入口或假证据。
+- 依赖R33阶段交接，按目标后端/DPR、窗口、媒体、部署或性能边界拆执行单元；共享修正回归当前主力平台受影响组件和完整隐藏Release。每单元执行实际适用的构建、check-format、两组官方qmllint、COMMON-01–05/目标平台及PERF-01–07检查，适用PowerShell入口须真实解析/格式核对。
+- 下列R19A/B/C/D的`-P`目标默认是Windows/D3D11与Linux/OpenGL最新原生Kit/编译器/设备；特殊目标见各项。当前这些目标未运行，无新增目标实机失败；本机Metal/GL和历史Windows成绩不外推。冻结输入统一为本计划指定来源及映射，逐项保留独有fixture/实现起点/门槛。
+- GPU入口先按真实能力选择隐藏；当前需窗口的用`qt-release-visible -R 具体项`并遵守窗口契约，有可靠隐藏能力时重评分类。直接QRhi Bokeh/SMAA继续真正离屏；qsb跨目标翻译只作静态证据。
+- 组件完整断言按对应专项契约执行，下列只列目标专有交接/关键门槛；共同数学/质量/窗口/资源要求不重复抄录。Postprocess资源、SG失效、完整root重建、同对象surface恢复、正常VSYNC/物理输入是不同事实，各自保留。
+- 不恢复旧图评分/浏览器witness/PMREM字节相等门禁；旧像素失败只为历史。独立目标欠验不替代主线BLUR-01/FLICKER-01收口，缺环境或已知产品失败继续保留，不能删除R34或宣称最终通过。
 
 #### R19A-P · 资产来源保护与缺图绘制的目标平台回归
 
-- 依赖R33及可靠Windows/Linux最新原生Kit。输入为冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2（按history-rewrite映射）、assets/branding清单、匿名本地/qrc封面与现有库fixture；实现与历史归属见`docs/contracts/source-fidelity-review.md`。当前macOS没有目标编译器/Qt原生后端，未执行新Windows/Linux运行，也没有新的目标实机失败；不能把历史通过当成当前源码通过。
+- 输入为冻结基线（按history-rewrite映射）、assets/branding清单、匿名本地/qrc封面与现有库fixture；实现与历史归属见`docs/contracts/source-fidelity-review.md`。
 - 严格静态核对`PrepareAssets::verifyFrozenInputs`、WIN32 DirectWrite/非Windows SFNT复用、QImageReader插件/ICC、CoverCache脚注字重及generation/lease/serial、QtKit架构/ABI、qrc/QtSvg与隐藏窗口分支；本机macOS Release资产/缓存/模型及Metal隐藏回归不外推目标平台。
 - 目标Release构建后运行`prepare-assets <仓库> <同一最新Kit> --verify-inputs`及`ctest --preset qt-release -R '^(assets|branding|cover-cache|rhi-atlas-queue|library-data|library-qml|kit-selection|module-link-and-plugins)$' --output-on-failure`。在临时隔离源码根篡改一个输入，确认普通生成入口在任何写入前失败；不得修改真实归档/产品资产完成负向测试。
-- 退出：冻结blob/归档/清单一致、完整几何/字体物理表/功能SVG及ICO/ICNS容器有效、无声媒体仅加载不播放、ICC/横竖方/alpha/缺图脚注符合源码、队列/租约/关闭与PERF-01–07通过；不运行旧图比较。共享修正回归当前主力平台的assets、cover-cache、library-data/library-qml与完整隐藏Release；目标GPU、部署和媒体设备仍由本节对应专项验证。VIS-ARRAY-BLUR-01/FLICKER-01保持R19C/D主责，不随本项后置。
+- 退出：冻结blob/归档/清单一致、完整几何/字体物理表/功能SVG及ICO/ICNS容器有效、无声媒体仅加载不播放、ICC/横竖方/alpha/缺图脚注符合源码、队列/租约/关闭与PERF-01–07通过；不运行旧图比较。共享修正回归当前主力平台的assets、cover-cache、library-data/library-qml与完整隐藏Release；目标GPU、部署和媒体设备仍由本节对应专项验证。
 
 #### R19B-P · 运动、相机与阵列的目标平台回归
 
-- 依赖 R33 交接及可靠 Windows/D3D11、Linux/OpenGL 原生 Kit/窗口管理器。输入为冻结来源 57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经映射）、motion/scene/archive-pool/real-columns 数学 fixture 和匿名库。当前 macOS 没有目标编译器/Qt 后端/窗口管理器，未运行这些目标；本机 Metal 隐藏结果、历史 Windows 结果均不代替当前目标运行。
-- 严格静态核对唯一帧源/速度、double x/v/a、canonical GL 投影→QRhi 修正、GLB/XYZ 矩阵、最多 432+4 实例、惰性列时间/减少动态 epoch、稳定物理 ID、lease/generation/关闭及所有平台条件编译；审查结论与实现符号/hash 入口见 `docs/contracts/source-fidelity-review.md` 的 R19B。没有新目标实机失败数据；保留本机历史策略失败与局部计数误用诊断，不将其改写为目标失败或通过。
+- 输入为冻结基线（经映射）、motion/scene/archive-pool/real-columns 数学 fixture 和匿名库。
+- 严格静态核对唯一帧源/速度、double x/v/a、canonical GL 投影→QRhi 修正、GLB/XYZ 矩阵、最多 432+4 实例、惰性列时间/减少动态 epoch、稳定物理 ID、lease/generation/关闭及所有平台条件编译；审查结论与实现符号/hash 入口见 `docs/contracts/source-fidelity-review.md` 的 R19B。
 - 目标 Release 构建后运行 `check-web-baseline.mjs` 及 motion/scene/archive-pool/real-columns 源码导出器；用当前系统 `verification/{windows,linux}/real-columns/full-trajectories.json` 设置 `YALAHOO_REAL_COLUMN_GOLDEN` 运行 RealColumnsTest。普通快速 CTest 覆盖 motion、scene、real-columns、archive-pool、cover-cache、rhi-atlas-queue、navigation、detail-motion、overview、verification-window-policy；两组官方 qmllint/check-format 必须通过。
-- `YALAHOO_REVIEW=ON` 后通过 `ctest --preset qt-release-visible -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure` 运行目标实际后端；入口现无任何图像匹配，不要求旧 PNG。按当轮授权选择默认置底/拒绝焦点或显式前台；保留源 x/v/a≤1e-6、Qt float 矩阵按既有测试容差、投影≤2逻辑px、边界事件消费不改变稳定 ID、两模式/记忆/库替换、90,000 库容量、物理 ID/cover 区域 rebase 不变、稳态零上传、≤2MiB 突发及 cover/renderer 生命周期要求。源 x/v/a≤1e-6，不能放宽为图像相似度。
-- macOS 的实际 GPU 隐藏重建已执行；三平台物理输入、原生窗口/表面与正常 VSYNC 按本节已有窗口/输入专项继续，不用 offscreen invalidation 替代。目标共享修正后回归当前平台 motion、scene、archive-pool、real-columns、navigation、detail-motion、overview、封面与隐藏 Release；BLUR-01/FLICKER-01 仍须 R19C/D/H 在 R20 前收口，不能随此项目后置。
+- `YALAHOO_REVIEW=ON` 后通过 `ctest --preset qt-release-visible -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure` 运行目标实际后端；入口现无任何图像匹配，不要求旧 PNG。按当轮授权选择默认置底/拒绝焦点或显式前台；保留源 x/v/a≤1e-6、Qt float 矩阵按既有测试容差、投影≤2逻辑px、边界事件消费不改变稳定 ID、两模式/记忆/库替换、90,000 库容量、物理 ID/cover 区域 rebase 不变、稳态零上传、≤2MiB 突发及 cover/renderer 生命周期要求。
+- macOS 的实际 GPU 隐藏重建已执行；三平台物理输入、原生窗口/表面与正常 VSYNC 按本节已有窗口/输入专项继续，不用 offscreen invalidation 替代。目标共享修正后回归当前平台 motion、scene、archive-pool、real-columns、navigation、detail-motion、overview、封面与隐藏 Release；
 
 #### R19C1-P · 材质与光场参数的目标平台回归
 
-- 依赖R33及可靠Windows/D3D11、Linux/OpenGL原生Kit/编译器/窗口管理器。输入为冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经映射）、R19C1提交中的45组materials/parameters、210组render-backend参数、lighting/golden及匿名阵列；实现符号与hash入口为check-web-baseline及audit-material-parameters。当前macOS缺少目标原生工具链/后端，目标未执行，没有新的目标实机失败；当前受限服务no-screens失败保留本机日志，不冒充目标失败或通过。
+- 输入为冻结基线（经映射）、R19C1提交中的45组materials/parameters、210组render-backend参数、lighting/golden及匿名阵列；实现符号与hash入口为check-web-baseline及audit-material-parameters。
 - 静态展开ShellMaterial/SelectionLighting/RowLightController→SceneItem→Renderer uniformTemplate/逐实体lid/上传、QML有效属性、WIN32 D3D适配隔离、Linux/Apple真实Qt分支、std140和qsb各目标。矩阵入口`python3 tools/audit/audit-material-parameters.py`；当前同Kit跨目标qsb只证明静态翻译。
 - 目标最新Kit配置Release，运行`node tools/review/export-material-parameters.mjs`、check-web-baseline、`ctest --preset qt-release -R '^(rhi-material-parameters|lighting|scene|cover-cache|rhi-atlas-queue|verification-window-policy)$' --output-on-failure`。Review ON后按窗口契约运行`ctest --preset qt-release-visible -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure`，不要求浏览器原图；能可靠隐藏时优先用真实隐藏入口，不能写假offscreen结果。
 - 退出：45+210源参数、924轨迹/392场核和真正上传的transport/coat/tint/attenuation逐实体通过（既有2e-6/3e-5、轨迹/主题1e-6、位置1e-4容差不放宽），无ROI系数重入，双主题/详情/归位、资源重建和默认窗口策略通过；两组官方qmllint/check-format与完整隐藏Release回归。光学shader/连续质量与BLUR-01/FLICKER-01仍由R19C2/D/H在R20前处理，不随本项后置；共享修正回归当前主力平台材质/灯光/阵列/封面与完整隐藏集。
 
 #### R19C2A-P · 材质与灯光Review目标平台回归
 
-- 依赖R33及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为R19C2A实现提交（起点48a9495）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2（按映射）、materials/single-case.json、lighting/visual.json及均匀paper-probe.png。当前macOS没有目标原生工具链/后端，目标实机未执行、没有新目标实机失败；本机Metal隐藏通过不代替目标结果。PowerShell入口本机仅静态核对，目标需执行真实解析/格式及进程等待。
+- 输入为R19C2A实现提交（起点48a9495）、冻结基线（按映射）、materials/single-case.json、lighting/visual.json及均匀paper-probe.png。PowerShell入口本机仅静态核对，目标需执行真实解析/格式及进程等待。
 - 静态展开MaterialReview→独立GeometryScene→OffscreenSurface/原生窗口、QML root/engine/控制器所有权、原子invalidation计数、qrc/GuiPrivate/QtQuick3D、Windows MSVC入口及真实Python进程退出；`python3 tools/audit/audit-material-review.py`生成绑定符号/hash的COMMON-01–05/PERF-01–07及平台矩阵。
 - 目标Release Review ON后运行`ctest --preset qt-release-visible -R '^(runtime-materials|runtime-lighting)$' --output-on-failure`（可靠隐藏能力改变时先重新分类）；默认置底/拒绝焦点，只有当轮授权才可前台。Windows先执行`tools/format/FormatTools.ps1 -Check`并运行verify-r07.ps1/verify-r08.ps1，Linux可在配置工具链后运行`python3 tools/build/verify-material-review.py materials|lighting`的对应单个入口。入口不需要浏览器或原图，禁止恢复旧ROI/SSIM门禁。
-- 退出：99材质/纸面与48灯光状态、3表面参数≤1e-6、源码/CPU/Quick3D投影≤2逻辑px、纸面源公式误差≤3码值、实际DPR/目标与有效输出、QML warnings为空及窗口策略通过；材质十次/灯光一次完整root重建均真实失效并重放有效输出。原生窗口的同对象hide/restore、正常VSYNC仍按本节窗口专项执行，不以完整root重建替代。两组官方qmllint、格式和目标完整适用回归；共享修正回归主力平台完整隐藏Release。RHI光学及BLUR-01/FLICKER-01仍由R19C2B/C、R19D/H在R20前处理，不随本项后置。
+- 退出：99材质/纸面与48灯光状态、3表面参数≤1e-6、源码/CPU/Quick3D投影≤2逻辑px、纸面源公式误差≤3码值、实际DPR/目标与有效输出、QML warnings为空及窗口策略通过；材质十次/灯光一次完整root重建均真实失效并重放有效输出。原生窗口的同对象hide/restore、正常VSYNC仍按本节窗口专项执行，不以完整root重建替代。共享修正回归主力平台完整隐藏Release。RHI光学及BLUR-01/FLICKER-01仍由R19C2B/C、R19D/H在R20前处理，不随本项后置。
 
 #### R19C2B1-P · 不透明RHI目标平台回归
 
-- 依赖R33及可靠Windows/D3D11、Linux/OpenGL原生Kit/编译器/窗口管理器。输入为R19C2B1实现提交（起点75b5543）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经映射）、匿名三封面、已知GLB平面/源纸面光照/阴影公式及有界RhiCaptureHarness；本机macOS缺少目标原生环境，目标未执行，无新目标实机失败。
+- 输入为R19C2B1实现提交（起点75b5543）、冻结基线（经映射）、匿名三封面、已知GLB平面/源纸面光照/阴影公式及有界RhiCaptureHarness；
 - 静态矩阵入口`python3 tools/audit/audit-rhi-opaque.py`逐COMMON-01–05/PERF-01–07/平台绑定符号/hash，核对D3D/GL clip/资源/线程、QPointer值交接、最多2批/唯一纹理读回、实际格式与imageOf端序/Y翻转；不以Metal或同Kit跨目标qsb代替目标运行。PowerShell薄入口和退役脚本本机只静态核对，目标另跑真实解析/FormatTools -Check。
 - 目标最新Kit Release Review ON后，执行paper/shared shader检查、`ctest --preset qt-release-visible -R '^rhi-opaque-gpu$' --output-on-failure`，按当轮窗口契约；可靠隐藏能力变化时先重新评估。预期36状态、16源墨色探针、12有序尺寸、30逐帧resize、同request封面替换、6阴影状态及十次真实graph重建通过；保持深度<2e-6、法向/纸面≤1/255、四角≤2实际DPR1物理px和原shadow强度范围.675–.70，不降低门槛。alias字段共享storage、无额外readback，真实driver bytes未知为null。
-- 两组官方qmllint、check-format及适用Release回归通过；共享修正回归主力平台完整隐藏Release（阵列/真实列/封面/材质/详情/总览）。隐藏graph重建不证明原生窗口恢复、正常VSYNC或产品性能，按本节原专项执行；BRDF/透明捕获、fog与用户BLUR-01/FLICKER-01仍在R19C2B2/C/D/H主线，不随此项后置。
+- 共享修正回归主力平台完整隐藏Release（阵列/真实列/封面/材质/详情/总览）。隐藏graph重建不证明原生窗口恢复、正常VSYNC或产品性能，按本节原专项执行；BRDF/透明捕获、fog与用户BLUR-01/FLICKER-01仍在R19C2B2/C/D/H主线，不随此项后置。
 
 #### R16B2W · D3D11/DPR2文字、成本与生命周期
 
@@ -831,12 +422,12 @@
 
 - 依赖R16B2W及R16M3阶段选型。在可靠Windows/Linux目标OpenGL环境运行相同匿名文字/页眉、DPR/主题、运动、生命周期及三次成本采样，验证实际可见呈现；macOS已有隐藏OpenGL4.1/CoreProfile事实不外推到其他系统，也不无故重复未受影响矩阵。
 - 修复实际后端的shader/pipeline、文字缺失、裁切、输入、缓存或资源错误；按源码核对布局/字形与运动，检查可见锯齿和异常模糊。保留正常画质，不为贴合另一后端的栅格改字号、基线或采样。
-- 依据源码语义、实际功能/质量、成本、缓存失效与生命周期选择生产路径，写明连字/组合字、彩色字体及维护差异。执行COMMON/PERF和平台分支审计；原默认GLSL120故障的修正及失败记录仍见`docs/contracts/title-reels.md`。
+- 依据源码语义、实际功能/质量、成本、缓存失效与生命周期选择生产路径，写明连字/组合字、彩色字体及维护差异。执行COMMON/PERF和平台分支审计；OpenGL上下文/着色器兼容边界见`docs/contracts/title-reels.md`。
 - 退出：上述非像素要求通过，更新简明结论，并回归R17–R33受影响路径；不以跨后端像素趋同作为选型要求。
 
 #### R16M3-S · 共享隐藏完成通知的目标平台回归
 
-- 依赖R33交接及可靠Windows/D3D11、Linux/OpenGL环境。当前macOS缺少对应原生编译器/窗口管理器/GPU入口；已有macOS运行事实和静态审计不代替目标运行。
+- 依赖R33交接及可靠Windows/D3D11、Linux/OpenGL环境。
 - 输入为冻结字轮/字体、匿名titles fixture及TitleReel自然宽度通知、active=false有界queued finish/恢复取消、TransportTitle退出运动。运行目标Release的`title-reels`与完整CTest，确认十次hide合并、恢复取消、真实宽度单次通知；使用上节分离后的结构/运动/缓存/资源入口检查20项文字、18项页眉、九组活动/缓存、隐藏零文字工作、十次恢复/释放及零绑定环/shader错误。
 - 此项为尚未执行的共享回归。结构≤1逻辑px、源码运动≤1e-6及窗口/资源门槛保留；修改共享通知链后回归当前平台受影响路径。真实可见hide/restore/minimize与正常VSYNC另行验证，离屏释放不代替呈现事实。
 
@@ -849,14 +440,14 @@
 
 #### R18-P · 详情运动的目标后端、物理输入与产品集成
 
-- 依赖R33及可靠目标Kit/窗口管理器/设备。输入为DetailMotion/ReturningCasePool/PointerDragController/CaseClarity、匿名detail-golden/qrc封面和冻结music-camera/scene/music-app；当前尚缺Windows/D3D11及Linux/X11/Wayland原生环境，没有新的目标运行失败数据。
+- 依赖R33及可靠目标Kit/窗口管理器/设备。输入为DetailMotion/ReturningCasePool/PointerDragController/CaseClarity、匿名detail-golden/qrc封面和冻结music-camera/scene/music-app；
 - 目标Release构建、官方两组qmllint和完整CTest后，运行`python3 tools/build/verify-detail.py --backend d3d11|opengl --dpr 1|1.5|2 --runs 1 --output 全新目录`；当轮获授权才加`--foreground`，夜间用`--night`；三十次换片/十次重建仅在相关边界以`--lifecycle`另执行一次，不随每个DPR或功能重复运行。检查退browse后同步抽取/相机、三次换片/反向、满池最后目标、旋转副本对齐/下降与新盒等待、途中返回/搜索、拖动取消、改速/减少动态、三十次切片及十次图形上下文重建。
 - 分开记录Qt提交/ready延迟、上传突发、四份CPU封面租约/分块、GPU图集/附件估算；运动不重建不变目标/材质，实际driver显存不可测为null。轨迹各≤1e-6、投影≤2逻辑px、时序≤一个60Hz帧及PERF-01–07保留。
 - 三平台补真实触摸/系统抓取与焦点丢失、有效Item焦点恢复及R23/R24实际定位/播放隔离。自注入Qt事件不冒充物理设备或input-to-photon；macOS已完成回放不重复列欠验。三维源码/质量、完整GUI及120秒性能分别由相关任务验证。共享修正回归detail-motion、scene、archive-pool、real-columns、presentation、presentation-qml、navigation、title-reels及实际后端；入口见`docs/contracts/detail-motion.md`和`tools/audit/audit-detail.py`。
 
 #### R19-P · 总览的目标后端、物理输入及平台回归
 
-- 依赖R33、R19源码交付及R19A–R19H复查结论；输入为冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2、`tests/fixtures/overview/source-golden.json`和匿名内置库。当前macOS没有Windows/D3D11/OpenGL或Linux/xcb/Wayland原生Kit、窗口管理器与GPU入口；对应目标运行尚未执行，没有新的目标实机失败数据。静态审计见`tools/audit/audit-overview.py`，不替代实机。
+- 依赖R33、R19源码交付及R19A–R19H复查结论；输入为冻结基线、`tests/fixtures/overview/source-golden.json`和匿名内置库。静态审计见`tools/audit/audit-overview.py`，不替代实机。
 - 在目标最新原生Kit的Release构建后运行官方两组qmllint、完整CTest及`python3 tools/build/verify-overview.py --backend d3d11|opengl --dpr 1|1.5|2 --runs 1 --output 全新目录`；夜间用`--night`，当轮明确授权才加`--foreground`。窗口压力序列以`--lifecycle`在相关所有权/上下文边界单独执行一次，不在每个DPR或功能重复运行。另以`--visual --runs 1`在真实可用隐藏入口覆盖九尺寸/双主题/收起与展开36状态、十次实际根/资源重建；目标无可靠离屏入口时使用遵守窗口策略的真实渲染并记录范围，不能伪造隐藏运行。
 - 检查V/Esc/点专辑同一返回、第一击只展开/第二击引导进入、真实列/填充共用progress、±4.5折叠与extent≤.12不可拾取、标签滞回/碰撞/窄屏、播放歌名与按钮固定、减少动态/改速/反转、库替换、十次隐藏/surface重建和资源回落。三维目标/postprocess不随总览转换重建，图集稳态突发≤2MiB；UI局部模糊层另行记账，未知driver分配写null。
 - 三平台补物理键鼠/触摸板、焦点丢失/恢复与真实窗口状态；R23/R24后补真实定位不改变播放。当前macOS自注入Qt事件、窗口读回/隐藏UI均不证明物理设备、屏幕扫描或完整120秒性能；这类独立事实仍需实际目标验证。
@@ -864,12 +455,14 @@
 
 #### MAC-VISIBLE-3D · 三维源码、渲染质量与正式采样
 
-- 输入为冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经来源映射读取）、生产资源与render-backend/rhi-shell/postprocess/occlusion参数。按实际生产调用链核对几何/取景、颜色空间、光场/材质、透明深度/排序、阴影、环境贴图方向/精度和后处理，不要求浏览器GPU导出的PMREM字节或PNG与原生相等。
+- 输入为冻结基线（经来源映射读取）、生产资源与render-backend/rhi-shell/postprocess/occlusion参数。按实际生产调用链核对几何/取景、颜色空间、光场/材质、透明深度/排序、阴影、环境贴图方向/精度和后处理，不要求浏览器GPU导出的PMREM字节或PNG与原生相等。
 - 检查Metal/threaded、macOS OpenGL/basic的真实输出、可见锯齿、异常模糊、漏画/裁切/错误合成与资源生命周期。MSAA renderbuffer适配保留原采样数、颜色格式和resolve语义。旧rhi-opaque/rhi-postprocess等Review入口须先解除浏览器witness/图像比较与功能检查的耦合；没有截图参照不构成产品失败，已确认源码或渲染缺陷仍须修复。
 - 用`yalahoo --verify-integration 新目录 --integration-seconds 120`在同Kit/设备/匿名输入下串行至少三次正常VSYNC，未限速吞吐另列；检查实际覆盖范围，不以已有12秒单盒探针代替完整产品、p95/p99/长帧、GPU/显示延迟或实测显存。完整产品准备、十次重建/30次换片与预算依R28/R33；历史Windows18.35/20.98ms按原环境复现，Metal不消除原记录。
 - 按源码/单后端质量/MSAA与正式采样分执行单元，保留真实失败与测量限制；不运行逐像素匹配，不用截图瑕疵定义产品效果。运行产物保持忽略，只保存必要结论。
 
 #### 各平台最终实机矩阵与专项退出
+
+- 窗口策略偶见foregroundUnchanged=false而native visible/active/activation/focus均false，原因未确认；保留原失败，复现时记录initial/current/verification PID定位，不凭布尔值归因或放宽策略。
 
 - 输入为同源匿名fixture、冻结生产源码、当前Release源码/二进制及具体产品失败/暂缓记录。先核对系统/Kit/后端/设备/入口/窗口策略，未具可靠环境的项目继续保留，不能把“已安排”写成“已执行”。
 - 窗口：Windows/Linux验证首次show、hide/restore、minimize、flags/surface重建与退出；按当轮授权选择前台或默认策略。macOS已验收前台窗口边界不重复列欠验，默认隐藏策略持续回归；未授权模式遮挡/节流样本不可用，不提升Z顺序。
@@ -880,74 +473,56 @@
 
 #### R19D4A-P · Bokeh 目标平台与生产集成回归
 
-- 依赖R33及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/设备。输入为R19D4A源码（起点f4e1610）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2经来源映射、锁定Three0.183.2/BokehShader、tests/fixtures/postprocess/bokeh-kernel.json及匿名9×64生产库。当前macOS没有这些目标环境，目标实机未执行且无新增目标实机失败；本机Metal/GL不能外推。
+- 输入为R19D4A源码（起点f4e1610）、冻结基线经来源映射、锁定Three0.183.2/BokehShader、tests/fixtures/postprocess/bokeh-kernel.json及匿名9×64生产库。
 - 静态入口`python3 tools/audit/audit-rhi-bokeh.py`覆盖COMMON-01–05/PERF-01–07/历史版本及三平台符号/hash；`python3 tools/assets/export-bokeh-kernel.py --check`核对锁定源hash/41点与公共/生产shader。核对RGB24线性深度/完整几何、nearest深度/linear颜色、41采样/aspect/±.011、单次最终ACES、仅80-byte动态前缀、资源所有权与关闭释放。目标真实编译/qsb/PowerShell适用解析仍须执行。
 - Release Review ON先运行`ctest --preset qt-release-render -R '^rhi-bokeh-gpu$'`：直接QRhi真正离屏、不创建可见窗口，46状态含横竖/奇数目标、focus20/25/30、强度0/.0003/.0008/.0012及十次真实Postprocess重建/另一组clip范围，预期全部1799438解析像素的颜色误差≤既有3/255、有限值/alpha=1/HDR/完整RGBA16F/缓存/80-byte前缀/关闭释放通过。此重建不替代scene-graph或原生窗口恢复。
 - 再按目标当前可靠隐藏能力运行`rhi-flicker-gpu`1200帧生产序列；无隐藏入口时使用`qt-release-visible -R '^rhi-flicker-gpu$'`并遵守当轮窗口策略。实际上传focus/aperture/maxblur/near/far/aspect与源状态逐帧匹配，完整DOF depth尺寸正确，原光学覆盖/有限值/上传/资源门槛不变。两组qmllint、check-format及目标适用完整Release通过；共享修正回归主力平台Bokeh/AO/光学/完整隐藏集。BLUR-01与AA/尺度仍主线R19D4B/C，原生窗口、正常VSYNC和正式性能按既有专项。
 
-## Qt官方实施参考
-
-以下仅作为公开接口语义依据；执行时优先读取所选最新 Qt Kit 配套文档并核对实际 API，计划中的本机版本参考不构成版本要求。不因查阅文档而在产品中启用联网功能。
-
-- [QML与C++集成](https://doc.qt.io/qt-6/qtqml-cppintegration-overview.html)
-- [Qt Quick性能建议](https://doc.qt.io/qt-6/qtquick-performance.html)、[Qt隐式共享](https://doc.qt.io/qt-6/implicit-sharing.html)和[QQuickRhiItemRenderer同步/资源边界](https://doc.qt.io/qt-6/qquickrhiitemrenderer.html)
-- [Qt Quick帧动画](https://doc.qt.io/qt-6/qml-qtquick-frameanimation.html)
-- [Qt Canvas Painter 模块](https://doc.qt.io/qt-6/qtcanvaspainter-index.html)、[QCanvasPainterItem](https://doc.qt.io/qt-6/qcanvaspainteritem.html)和[Canvas2D](https://doc.qt.io/qt-6/qml-qtcanvas2d-canvas2d.html)
-- [Qt Quick 3D自定义材质及屏幕纹理限制](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)
-- [Qt Quick 3D后处理Effect](https://doc.qt.io/qt-6/qml-qtquick3d-effect.html)
-- [Qt Quick 3D实例表](https://doc.qt.io/qt-6/qml-qtquick3d-instancing.html)
-- [QQuickRhiItem及QRhi版本兼容边界](https://doc.qt.io/qt-6/qquickrhiitem.html)
-- [Windows系统DirectWrite字体容器解包](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_3/nf-dwrite_3-idwritefactory5-unpackfontfile)
-- [QMediaPlayer](https://doc.qt.io/qt-6/qmediaplayer.html)、[QAudioOutput](https://doc.qt.io/qt-6/qaudiooutput.html)、[QSoundEffect](https://doc.qt.io/qt-6/qsoundeffect.html)、[QMediaMetaData](https://doc.qt.io/qt-6/qmediametadata.html)
-
 #### R19C2B2-P · 光学RHI目标平台回归
 
-- 依赖R33及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为R19C2B2实现（起点3c90d2d）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2映射、rhi-shell/visual.json、源GLB/Room/DFG/LTC及Review OpticsProbe。当前macOS无上述目标环境，目标实机未执行且无新目标失败；qsb五目标编译不能替代目标GPU。
+- 输入为R19C2B2实现（起点3c90d2d）、冻结基线映射、rhi-shell/visual.json、源GLB/Room/DFG/LTC及Review OpticsProbe。
 - 静态入口`python3 tools/audit/audit-rhi-optics.py`，COMMON-01–05/PERF-01–07/平台逐符号及hash；核对D3D/GL clip、float readback、SRB、共享depth、resolve/mips、有限奇点及Review生产隔离。目标真实执行格式/PowerShell解析与shader生成，退役verify-r10b不得恢复旧图像流。
 - Release Review ON后执行`ctest --preset qt-release-visible -R '^rhi-shell-gpu$' --output-on-failure`，先按实际能力重评隐藏路径，遵守当轮窗口策略。预期61源状态、6排序/2隔离、重复ID拒绝、法向/深度和投影≤2px、1×/4×alpha中心≤1/255且黑边≤原一整数码值、透明洞不写depth、4×有部分覆盖、十次真实SG重建及窗口策略通过。10数学样本：LTC解析误差≤.001，其他max(1e-6,abs(expected)×.001)，含正视/零光/GGX/DFG/shadow及view-roll0/45的roughness导数；不放宽门槛。
-- 两组qmllint/check-format和目标适用Release回归；共享修正回归主力平台完整隐藏集。正常呈现/VSYNC和原生窗口恢复按R34原专项，连续FLICKER-01与BLUR-01仍按R19C2C/D/H在R20前收口，不随此项后置。
+- 共享修正回归主力平台完整隐藏集。正常呈现/VSYNC和原生窗口恢复按R34原专项，连续FLICKER-01与BLUR-01仍按R19C2C/D/H在R20前收口，不随此项后置。
 
 #### R19C2C-P · 连续透明阵列目标平台回归
 
-- 依赖R33和可靠Windows/D3D11、Linux/OpenGL目标原生Kit/编译器/窗口环境。输入为R19C2C实现（起点ebfb320）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2映射、原GLB/光学资产、匿名9×64三封面库及rhi-shell/visual.json。本机无目标环境，目标未执行且无新目标失败；本机Metal已修复不代替目标结果。
+- 输入为R19C2C实现（起点ebfb320）、冻结基线映射、原GLB/光学资产、匿名9×64三封面库及rhi-shell/visual.json。
 - 严格静态入口`python3 tools/audit/audit-rhi-flicker.py`逐COMMON-01–05/PERF-01–07/平台符号/hash；展开invariant跨目标qsb、相同world→nativeVP计算、稳定ID/depth顺序、capture隔离、Review probe不入产品和有界异步封面/读回。MSL2.1仅两个geometry顶点，其他shader仍保持原目标；任何Kit更新重新核对实际生成限定符与运行。
 - 目标Release Review ON执行`ctest --preset qt-release-visible -R '^rhi-flicker-gpu$' --output-on-failure`，先按当前可靠隐藏能力调整实际入口，遵守窗口契约。1/7/8/9实体×1×/4×、640×480/1280×720双主题静止/波浪/浏览/总览进退16×60帧；480诊断样本missing/nonfinite必须精确0、shade>100，480正常光学保留代表输出实际检查，不恢复旧截图比较。实际DPR/目标/窗口策略、模式、资源generation与上传预算通过；十次SG重建、resize/封面及完整目标适用回归、两组qmllint/check-format通过。
 - 共享修正回归主力平台完整隐藏集。原生窗口、真实呈现/VSYNC和不同设备须按本节原专项，不能将缺环境写通过；BLUR-01仍R19D/H主线，R19H核对本机已修闪烁与各目标欠验边界，不把本轮未运行目标销项。
 
 #### R19D1-P · SSAO 数学、标量读回与常量上传目标平台回归
 
-- 依赖R33与可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为R19D1实现（起点2d3c9b1）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2映射、occlusion/visual.json的source状态80、seed417六份kernel/noise、匿名9×64生产库。当前macOS没有目标环境，目标实机未执行、无新目标实机失败；当前macOS/Metal与本机GL不代替目标。
+- 输入为R19D1实现（起点2d3c9b1）、冻结基线映射、occlusion/visual.json的source状态80、seed417六份kernel/noise、匿名9×64生产库。
 - COMMON-01–05/PERF-01–07及各平台符号/hash入口`python3 tools/audit/audit-rhi-ao.py`，静态展开RGB24精确背景、source法线unpack、TBN/投影/16/32/64完整累积、5×5/.22、native GL pack读取/同格式copy/逻辑stride、缓存边界与销毁、partial uniform更新及不存在闲置kernel纹理。工具使用对应host的qsb，Windows解析/构建仍须真实执行，qsb跨目标编译不是运行。
 - Release Review ON后执行`ctest --preset qt-release-visible -R '^(rhi-ao-gpu|rhi-flicker-gpu)$' --output-on-failure`，按实际可靠隐藏能力重评分类、遵守当轮窗口策略。AO为3核×3倍率(1/.75/.5)×3尺寸(128×17/129×17/213×159)=27个背景恒1状态，实际raw/blur尺寸不加padding且格式R16F；复采alignment revision不变，常态三个pass更新请求240字节，无ao-kernel纹理；三核各81源公式点有接触、raw/blur≤1/255、.22合成≤2/255，十次真实SG重建有效。GL按实际PACK_ALIGNMENT决定诊断宽，不改产品或有限值门禁。
 - 完整960帧生产序列在双主题/大小/静止/波浪/浏览/总览进退中正常输出与诊断均有效、missing/nonfinite精确0；记录实际平台/后端/DPR/尺寸/窗口策略。两组官方qmllint、check-format、公共Effect五目标qsb及目标适用Release回归；共享修正回归主力平台完整隐藏集。正常VSYNC/设备/窗口/完整产品性能按原专项；fog/颜色、阴影、景深/AA/目标尺度/BLUR-01与旧耦合门禁仍依主线D2–D4/H，不随本项后置。
 
-
 #### R19D2-P · 生产雾与线性颜色/捕获次序目标平台回归
 
-- 依赖R33与可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为R19D2实现（起点4ab1e73）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2来源映射、锁定Three0.183.2的fog/meshlambert/meshphysical/WebGLMaterials/WebGLRenderer/OutputPass、rhi-shell/visual.json及匿名9×64生产库。当前macOS没有对应目标硬件/系统，目标运行未执行、没有已知新目标失败；本机Metal/OpenGL隐藏结果不替代目标。
+- 输入为R19D2实现（起点4ab1e73）、冻结基线来源映射、锁定Three0.183.2的fog/meshlambert/meshphysical/WebGLMaterials/WebGLRenderer/OutputPass、rhi-shell/visual.json及匿名9×64生产库。
 - `python3 tools/audit/audit-rhi-fog.py`展开COMMON-01–05/PERF-01–07逐符号/hash：实际相机距离而非target距离、detail-only发布、线性theme fogColor、负view-Z、smoothstep、纸面capture雾→resolve/mips→壳体自身雾→后处理→一次ACES/sRGB。832-byte std140保留既有offset、fog在816；不新增图形资源/生产readback/队列，保留GL/Metal/D3D必要API适配。五目标qsb仅静态翻译，不当作目标运行。
 - Release Review ON后执行`ctest --preset qt-release-visible -R '^(rhi-fog-gpu|rhi-flicker-gpu)$' --output-on-failure`，按实际可靠能力重新选择隐藏分类并遵守当轮窗口策略。fog为双主题×7深度分数×启用/禁用×fog/ACES/sRGB三个实际生产helper，共84状态；RGBA16F数值与独立源数学误差<.001，不引入源截图/浏览器GPU oracle。十次真实SG失效重建后几何和实际fog uniform恢复，雾/颜色变化不得重建无关目标。
 - 生产SceneItem双主题/640×480与1280×720/静止/波浪/浏览/总览进退/详情.5→1→0共1200帧：实际camera/detail与paper/shell已上传range/linear color/outputOptions一致；正常光学与诊断均有效，missing/nonfinite为0，保持正常动效、实体数量、源透明度和后处理。记录真实平台/后端/DPR/目标尺寸/窗口策略；check-format、两组官方qmllint和适用Release回归，共享修正再跑主力平台完整隐藏集。可见窗口/正常VSYNC/输出设备与完整产品指标仍按原专项；阴影、景深/AA/尺度和BLUR-01仍主线D3/D4/H，不随本项目后置。
 
-
 #### R19D3A-P · 阴影投射、偏置与过滤目标平台回归
 
-- 依赖R33交接、R19D3A源码及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2（按历史映射）、锁定Three0.183.2 shadow源码、music-case-v040.glb、匿名rhi-shell/visual与9×64生产fixture；起点2f50812。当前macOS缺目标原生编译器/后端，未执行目标实机，没有新目标设备失败；本机Metal/OpenGL不能外推目标。
+- 依赖R33交接、R19D3A源码及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为冻结基线（按历史映射）、锁定Three0.183.2 shadow源码、music-case-v040.glb、匿名rhi-shell/visual与9×64生产fixture；起点2f50812。
 - 静态入口`python3 tools/audit/audit-rhi-shadow.py`输出COMMON-01–05/PERF-01–07和平台symbol/hash。核对source backface caster、D32F comparison/R32F canonical诊断、receiver顶点normalBias→插值→片元depthBias、五点Vogel/IGN、同Kit qsb五目标、Y/clip转换、缓存失效、最多两读回及所有权。
 - 目标Release Review ON后按当轮窗口契约运行`ctest --preset qt-release-visible -R '^(rhi-shadow-gpu|rhi-opaque-gpu|rhi-shell-gpu|rhi-flicker-gpu)$' --output-on-failure`；若已有可靠隐藏能力先重新分类、真实隐藏执行。期望三map、1/7/8/9 caster边界、源几何投影与PCF、开关/运动/接收相机/灯色/重复捕获、十次真实SG重建，以及1200帧双主题/小大场景通过。投影≤2物理阴影纹素，恒深面depth<2e-6，PCF≤2/255，原.32强度/.035 normalBias/-.0003 bias/radius4和D32F/R32F/单采样不变；实际paper/shell上传参数匹配源、未失效非批量caster专用uniform数为0。
 - 产品地面与真实接收的目标回归另见R19D3B-P，景深/AA/缩放/BLUR-01仍R19D4，不能后置替代。目标修正须回归本机阴影、透明覆盖/雾/封面和完整隐藏Release、两组qmllint及check-format；原生窗口同对象hide/restore、正常VSYNC和正式产品性能按既有专项，不用离屏SG重建冒充。
 
-
 #### R19D3B-P · 产品地面与接收的目标平台回归
 
-- 依赖R33交接、R19D3B实现（起点e9360b7）和可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。冻结来源57f4f845c20cce646a15dbf4008c2a162aaaf4e2经历史映射，输入为scene.ts的200×200/y=-4.63平面、三源主题色、锁定Three0.183.2 Standard/DFG/PMREM/PCF、rhi-shell匿名fixture与9×64生产库。当前macOS无目标系统/设备，目标实机未执行、无已知新增目标失败；本机Metal/OpenGL不代替目标。
+- 依赖R33交接、R19D3B实现（起点e9360b7）和可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。冻结基线经历史映射，输入为scene.ts的200×200/y=-4.63平面、三源主题色、锁定Three0.183.2 Standard/DFG/PMREM/PCF、rhi-shell匿名fixture与9×64生产库。
 - 静态入口`python3 tools/audit/audit-rhi-floor.py`逐COMMON-01–05/PERF-01–07/平台符号/hash及LTC/GGX helper等价检查。核对一次共享几何上传、opaque kind6/Standard PBR、线性theme/fog、capture→resolve/mips→shell→AO/DOF→output、FrontSide与receive/cast、共享SRB/PSO/DFG/LTC、14语义字段最多2批/唯一纹理读回及renderer所有权。目标真实构建/qsb不可由本机跨目标翻译代替。
 - Release Review ON构建后按测试窗口契约执行对应目标`ctest --preset qt-release-visible -R '^rhi-(shadow|flicker|shell|opaque|ao|fog)-gpu$' --output-on-failure`及完整适用回归。rhi-shadow-gpu内含14组地面源数学、320×240/960×720、双主题及dusk源颜色、三map尺寸/开关、实际接收阴影、1×/4×采样、全/半AO与完整DOF附件、颜色变化不重建目标/阴影及十次真实SG重建；rhi-flicker-gpu真实SceneItem双主题/小大视口、静止/波浪/浏览/总览/详情1200帧逐帧检查有效floor提交、上传/资源和连续光学覆盖。
 - 原投影≤2物理px、法向≤1/255、PBR/fog≤3/255、R19D3A原投射/PCF门槛不放宽；必须实际覆盖occluded>0及AO/full DOF ground depth。格式、两组官方qmllint与目标完整Release通过；共享修正回归当前主力平台地面/阴影/封面/光学/雾/AO和完整隐藏集。原生窗口同对象hide/restore、正常VSYNC和正式产品性能仍按既有专项，不把离屏SG重建或数值通过写为实机呈现通过；BLUR-01和总体DOF/AA/尺度仍由R19D4主线收口。
 
 #### R19D4B1-P · SMAA 目标平台独立回归
 
-- 依赖R33交接及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/设备。输入为R19D4B1实现（起点704a99d）、冻结57f4f845c20cce646a15dbf4008c2a162aaaf4e2按来源映射、锁定Three0.183.2 SMAAShader/SMAAPass与既有两个lookup、RhiSmaaAudit解析输入。当前macOS无对应目标系统/Kit/设备，目标运行未执行且无已知新目标失败；本机Metal/OpenGL不外推。
+- 输入为R19D4B1实现（起点704a99d）、冻结基线按来源映射、锁定Three0.183.2 SMAAShader/SMAAPass与既有两个lookup、RhiSmaaAudit解析输入。
 - `python3 tools/audit/audit-rhi-smaa.py`核对冻结生产调用者/锁定hash、三个完整helper、.1阈值/八步/源标量crossing偏移/gamma2.2、lookup原PNG、历史及COMMON-01–05/PERF-01–07/平台symbol/hash。目标同Kit真实构建/qsb仍须执行，跨目标翻译不代替目标GPU。
 - Release Review ON执行`ctest --preset qt-release-render -R '^rhi-smaa-gpu$' --output-on-failure`。入口直接QRhi真正离屏，不创建可见窗口；34状态包含64×64/129×73/73×129、两个斜向/相交/矩形/低对比/局部对比抑制/静态清零、HDR/alpha及十次Postprocess真实重建。每后端277610个解析点分别检查三个实际生产pass：edges≤1/255，weights/blend≤既有颜色公式3/255、值有限、无反馈，八项资源的RGBA16F/RGBA8/单采样/无mip和240-byte实际uniform前缀/缓存/关闭释放通过。不得降低门槛或恢复源图分数。
-- 两组官方qmllint/check-format及目标适用完整Release通过；共享修正回归主力平台SMAA/Bokeh/AO/光学/完整隐藏集。此项不代替B2的SceneItem/MSAA/resolve/旧门禁覆盖闭包或C的尺度/BLUR-01；scene-graph/native窗口恢复、正常VSYNC及完整产品性能按原专项。
+- 共享修正回归主力平台SMAA/Bokeh/AO/光学/完整隐藏集。此项不代替B2的SceneItem/MSAA/resolve/旧门禁覆盖闭包或C的尺度/BLUR-01；scene-graph/native窗口恢复、正常VSYNC及完整产品性能按原专项。

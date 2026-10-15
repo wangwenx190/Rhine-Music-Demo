@@ -1,4 +1,4 @@
-# R03 · 原生资产契约
+# 导入资产、字体与来源保护
 
 输入冻结提交为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2`。`resources/manifests/assets.json` 逐项记录原路径、输入 SHA-256、生产文件 SHA-256、转换方式和 qrc 地址；额外的 CSS 输入也记录 hash。没有读取私人音乐、配置或缓存，旧品牌图形没有接入。
 
@@ -16,11 +16,11 @@ macOS/Linux 可运行 `sh tools/assets/prepare-assets.sh qt-release` 重新导�
 
 `tools/assets/GeometryAudit` 使用 Qt 公共 Core/Gui 和独立的有界文件检查器，不链接 Qt 私有渲染接口。对 GLB 和所选 Kit 实际 mesh 格式做探测；目前接受 mesh v7，未来格式变化必须明确报错后适配，不退回旧 Qt。比较完整顶点属性和保留绕序的三角形集合，允许三角形顺序/循环起点变化。Qt 的 V 为 `1 - glTF V`，位置、法线、节点坐标不变。三批次合计 1,000 三角形，逐批包围盒/顶点/三角数和最大属性误差见 `resources/manifests/geometry.json`。
 
-纸面是后续独立批次，不在原 GLB 三壳体中。保留纸面 3.06×3.06、中心 `(0.17,1.85,0.027)`，后托前面 `-0.032`、前盖背面 `0.052`、正面 `0.070`。检查纸面处于后托和前盖之间。本轮窗口以均匀比例显示原几何，使用临时探针材质，不作为材质复刻验收。
+纸面是后续独立批次，不在原 GLB 三壳体中。保留纸面 3.06×3.06、中心 `(0.17,1.85,0.027)`，后托前面 `-0.032`、前盖背面 `0.052`、正面 `0.070`。检查纸面处于后托和前盖之间。资产几何探针使用无光材质；实际材质规范归materials.md。
 
 ## 字体
 
-四个原 WOFF2 在 `resources/fonts/source/` 保留原字节。先用 Qt 尝试各文件；Windows 所选 Kit 均不支持，按 SFNT 签名通过 `IDWriteFactory5::UnpackFontFile` 解包为 **OTF/CFF**，保存为 `resources/fonts/MiSans-{Light,Regular,Demibold,Bold}.otf`。转换只改变容器，不修改字形、字距或内部字重。MiSans NOTICE 与许可 PDF 随资源保留。
+四个原 WOFF2 在 `resources/fonts/source/` 保留原字节。先用 Qt 尝试各文件；不支持时在Windows资产准备阶段按SFNT签名通过`IDWriteFactory5::UnpackFontFile`解包为 **OTF/CFF**，保存为 `resources/fonts/MiSans-{Light,Regular,Demibold,Bold}.otf`。转换只改变容器，不修改字形、字距或内部字重。MiSans NOTICE 与许可 PDF 随资源保留。
 
 | 字体 | Web CSS 权重 | 原 OS/2 权重 |
 |---|---:|---:|
@@ -42,7 +42,7 @@ font.weight: MusicFonts.demibold.weight
 font.pixelSize: 24
 ```
 
-测试核对四个独立 CFF 表、原 OS/2 权重、QRawFont 实际选择的字形表、中文/拉丁/数字/括号 glyph 覆盖与 QTextLayout 整行 shaping 的字体来源及宽度。Windows 24px 测量在资产报告中，四字重预览在 `docs/media/assets/`。emoji 的通用回退/字轮行为留给 R16，不声称 MiSans 包含全部 emoji。
+测试核对四个独立 CFF 表、原 OS/2 权重、QRawFont 实际选择的字形表、中文/拉丁/数字/括号 glyph 覆盖与 QTextLayout 整行 shaping 的字体来源及宽度。emoji 的通用回退/字轮行为留给 R16，不声称 MiSans 包含全部 emoji。
 
 原创品牌资产另见 [branding.md](branding.md) 和 `resources/manifests/branding.json`；其 SVG/平台图标及导出验证独立维护，页眉/开场与系统接入按后续轮次执行。
 
@@ -56,13 +56,10 @@ font.pixelSize: 24
 
 演示 square/portrait/landscape 封面及原说明随 qrc 接入，供后续匿名 fixture 使用。原项目 LICENSE、NOTICE 和音乐作者署名保留。
 
-## 验证入口与范围
+## 资产检查
 
-`./tools/build/verify-r03.ps1` 重建同 Kit 可复现资源，运行 Windows Release 的全部 CTest、qmllint、真实 D3D11 窗口、中文/空格工作目录启动与无声媒体加载。证据在 `verification/windows/assets/`，预览在 `docs/media/assets/`。`./tools/audit/audit-r03.ps1` 检查逐分支资源闭包，报告在 `verification/{macos,linux}-static/assets/`；结论为“静态审计通过，实机待用户验证”。本轮不覆盖后续完整播放器、材质/动画复刻和独立部署。
-
-接口依据：[Qt balsam/glTF 导入](https://doc.qt.io/qt-6/quick3d-asset-intro.html)、[DirectWrite UnpackFontFile](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_3/nf-dwrite_3-idwritefactory5-unpackfontfile)。实际 API 与格式同时按已选 Kit 的头文件和执行结果核对。
-
+`assets`检查manifest/qrc hash、完整GLB/Qt mesh属性/三批次/纸面间隙、四物理字体表/字重/shaping、功能SVG与无声媒体加载；`branding`检查独立原创资产。准备CLI见本文，通用Kit/构建/窗口规则只引用公共契约；平台剩余验收归计划R34/R19A-P。
 
 ## 写入前的冻结来源保护
 
-`prepare-assets` 自身在任何生成写入前读取 `history-rewrite.json`，核对 24 个资产/CSS 输入的冻结 Git blob、归档文件与 manifest hash。PowerShell、POSIX 和直接运行共享该保护；输入变化或来源不完整立即失败。`prepare-assets <repository> <selected-Qt-Kit> --verify-inputs` 只检查同 Kit qmake 与来源，不导入、不覆盖产品资产；正常生成仍经过相同保护。R19A 实测正常输入通过，临时根篡改一个输入后普通生成入口拒绝，且所有文件保持未写入。详细历史/资产/性能判定见 [source-fidelity-review.md](source-fidelity-review.md)。
+`prepare-assets` 自身在任何生成写入前读取 `history-rewrite.json`，核对 24 个资产/CSS 输入的冻结 Git blob、归档文件与 manifest hash。PowerShell、POSIX 和直接运行共享该保护；输入变化或来源不完整立即失败。`prepare-assets <repository> <selected-Qt-Kit> --verify-inputs` 只检查同 Kit qmake 与来源，不导入、不覆盖产品资产；正常生成仍经过相同保护。详细历史/资产/性能判定见 [source-fidelity-review.md](source-fidelity-review.md)。

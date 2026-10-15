@@ -28,7 +28,7 @@ Qt `pixelDelta` 优先；没有 pixelDelta 时，angleDelta 的 120 单位映射
 
 最多十位，每位只发布当前和下一个可见面；整数 Repeater 模型不会随逐帧 QVariantList 变化重建。专辑编号、选中序号、列内总数及列序号/总数五个数字组件共用同一 FrameClock，速度只缩放一次；减少动态立即落点，隐藏停止推进。列表快照每次发布只构造一次、通过 Qt 隐式共享读取；绘制线程只复制固定十六条刻线值，不读库、磁盘或 QObject 业务状态。
 
-数字使用同源 MiSans、字重和字距，Qt Quick Text 的两个面按源行高垂直裁切，整个小组件用 qsb 边缘渐隐合成。多行标题、grapheme/shaping、文字测量缓存和 TransportTitle 的全面选型仍由 R16 执行，本组件不提前替代它们。
+数字使用同源 MiSans、字重和字距，Qt Quick Text 的两个面按源行高垂直裁切，整个小组件用 qsb 边缘渐隐合成。多行标题、grapheme/shaping、文字缓存与TransportTitle归[title-reels.md](title-reels.md)。
 
 ## Canvas Painter 选型、资源和失效
 
@@ -41,25 +41,10 @@ renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不�
 `ResourcePlan` 在原图集、三维目标和 Qt 输出之外加入物理 DPR 下 UI 附件估算：滑尺 130×30 的 RGBA8 与保守 D32FS8 上界、主数字层最多 700×65 的 RGBA8、四个最多 160×12 的小数字层。这里宽度取十位数字/最大导航字号的保守容量，不是每帧必须分配。DPR1 的这组描述符上界为 259520 bytes，DPR2 按实际取整尺寸计算；resize 时旧/新 UI 附件可能同时存活，要把二者相加，再加三维 resize 资源。Qt 字形图集、模块内部几何/PSO、驱动对齐及 compositor 储存另外列为未知，不当作显存实测。
 
 主题只失效颜色；交互只更新十六条活跃刻线；窄屏分界失效三份几何路径，DPR/实际附件尺寸变化由 Qt 重建相应目标。导航 DPR 只影响累计资源描述符，不能触发无关三维 PSO/纹理重建。GUI/render 热路径没有读盘、解码、等待、GPU finish 或读回。
+## 非像素验证入口
 
-## 验证入口与结论边界
-
-Windows Release：`./tools/build/verify-r15.ps1`；平台/算法调用链审计：`./tools/audit/audit-r15.ps1`。
-
-- `NavigationTest` 检查滚轮余量/反向/上限、真实列夹取、36px/1.3/1400ms、编辑所有权、循环点击、rebase、快速反向最终目标、隐藏与数字重定向。
-- `node tools/review/export-ruler.mjs` 从冻结生产闭包重建参考；原生 `ui-audit --ruler <output>` 比较 20/30/60/120fps，代表场景逐 1/120 秒核对全部槽。数字纯轨迹直接对照锁定依赖的原始 track/sample 函数。
-- D3D11/OpenGL、双主题、桌面/窄屏、实际 DPR1/1.5/2 比较 C++、Canvas2D、Quick。原始 SSIM/RGB/轮廓保留；沿用 R14 的**参照独立的一物理像素**边缘带方法，轮廓仅通过冻结 DOM 提高 alpha 生成，位置/高度/裁切不变。带外仍用 SSIM≥0.98、RGB≤6，独立 double 状态误差≤1e-6，另保存每条几何 ROI 的未归一化墨色积分误差，并以冻结源码矩形/线性淡隐的连续面积积分与原始浏览器墨色积分形成覆盖区间；原生墨色超出该区间仍使用 RGB≤6 门槛。区间仅由源码几何、源颜色/alpha、裁切和参考图确定，不读取原生误差来调整；缺线和过深的亚像素裁切不能由边缘带豁免。不扩带、不模糊，也不把带外分数称为原始全图分数。
-- 每条 API 执行 baseline 加十次隐藏/release/resize/恢复的自身提交图像对照，C++ renderer 同时至多一个，退出回到零。静止重绘采样使用可见且已落点的滑尺，先完成切回可见及资源初始化的三次实际提交，再建立 paint 计数基线并推进控制器一次，区分必要初始化与无效失效。单个异步读回按后端 MaxAsyncReadbackFrames+1 排空；诊断像素在完整比较范围外，不进入产品。
-- `yalahoo --verify-navigation <output>` 在真实 App 路径发送事件，检查 pixelDelta、连续反向、切列、编辑焦点、有限端点、QML 滑尺点击、窄屏/主题、hide/restore、导航/播放独立以及输入和实际提交 revision。
-
-同步、Canvas paint、Canvas2D JS 和 Qt Quick before/afterRendering 的 CPU 诊断分别保留。Date.now 为毫秒分辨率，0 不是零成本；GPU timestamp 不可用写 null。局部指标包含初始化/诊断提交，不是正式 FPS、GPU 完成或屏幕延迟。完整产品预算仍按 R28 验证。
-
-DPR1.5 的冻结浏览器合成在 2px 窄线两边产生 75% 覆盖，即使重新加载同 DPR 文档也保留；源码矩形并无这种额外透明度。覆盖区间保留这份原始差异，同时允许源码连续填充的正确墨色量，不将浏览器栅格损失复制进产品。Quick 对照显式开启几何抗锯齿；两种 Canvas 都绘制完整刻线后用相同 Quick clip 裁切；Canvas2D 使用显式 rect/fill 路径，并按实际 DPR 设置 antialias=1/DPR，保持一物理像素的抗锯齿范围，避免固定逻辑像素宽度在高 DPR 上侵蚀细线。
-
-原始图像、逐帧序列、报告和 hash 矩阵仅保存在忽略的 `verification/windows/navigation/` 及各平台静态审计目录。各平台后续按当前可靠能力验收，历史静态结论不限制macOS等当前平台的真实验证；未可靠执行的compositor、字体回退、Metal/GL、触控或部署项目严格审计并保留到R34。
-
-## 本阶段结论
-
-Windows 最新原生 Kit 的 Release 构建、check-format、两组 qmllint 和 26 项 CTest 通过。D3D11/OpenGL、双主题、桌面/窄屏及实际 DPR1/1.5/2 的三方绘制对照共 864 张、生命周期对照共 198 项通过；静止推进不重绘，renderer 退出归零，缺线/过量墨色反例被拒绝。滑尺 double 状态误差最大 6.19e-13，数字轨迹误差最大 2.23e-16；固定边缘带外 SSIM 最低 0.99745、平均 RGB 误差最高 0.0592/255，覆盖区间外逐刻线误差最高 4.591/255。原始全图 SSIM 最低 0.94977，原始差异与失败样本留在本地；不将边缘带外指标当作原始全图成绩。
-
-两个真实 App 后端的 20 项检查分别通过，覆盖输入/提交 revision、反向、列切换、编辑焦点、滑尺、触摸边界、隐藏恢复及导航/播放独立；行/列循环方向、待提交列后接行输入及外部选择清除旧方向另由 NavigationTest 验证。PERF-01–07 的调用链和资源审计通过；局部 CPU 诊断不构成完整产品性能结论。macOS/Linux：静态审计通过，实机待用户验证。
+- `NavigationTest`：滚轮余量/反向/上限、有限列、36px/1.3/1400ms触摸边界、控件所有权、循环点击、rebase、待提交目标/方向、隐藏及数字重定向。
+- `node tools/review/export-ruler.mjs`导出冻结数学；`ui-audit --ruler 输出目录`中的状态检查覆盖20/30/60/120fps及1/120秒槽采样，double误差≤1e-6。实际三API检查完整刻线/Quick clip、淡隐、两主题/桌面窄屏/实际DPR、零无效重绘及十次恢复/renderer归零；旧图像评分必须按R19E先拆耦。
+- Canvas2D比较项显式rect/fill，antialias=1/DPR维持物理AA宽度；不足一像素露出仍绘完整刻线后裁切。
+- `yalahoo --verify-navigation 输出目录`通过真实App发送pixelDelta/反向/切列/编辑焦点/有限端点/滑尺/主题/触摸/隐藏恢复事件，核对导航与播放隔离、input与实际提交revision。
+- 历史Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`不自动恢复旧图评分；共享测试分组见[test-gates.md](test-gates.md)，欠验归计划R19E/R34。

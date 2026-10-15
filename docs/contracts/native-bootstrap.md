@@ -1,8 +1,6 @@
-# R02 · 原生工程与工具链契约
+# 原生Kit、工程与构建
 
-根工程为 C++23 / Qt Quick 原生工程。R02 运行探针已移至 `BootstrapProbe.qml`，由原运行验证参数加载；当前生产 `App.qml` 为 R14 的二维浏览界面（见 [canvas-painter.md](canvas-painter.md)）。原探针内容：同源 MiSans 中文、Basic 控件与功能 SVG、原专辑盒三壳体几何、qsb ShaderEffect、无来源的 QtMultimedia 对象与可注入的库模型。R03 资产接入见 [assets.md](assets.md)，R04 数据/离线资料接口见 [library-data.md](library-data.md)；扫描、实际材质、其余产品界面与播放功能按后续轮次实现。
-
-唯一生产 `FrameAnimation` 已向原生运动时钟提交帧间隔；R05 内核、隐藏/恢复与数值验证接口见 [motion.md](motion.md)。生产场景现由 RHI SceneItem 实现，Quick3D 几何/材质 oracle 仅在 Review 构建加入；接口与隔离规则见 [rhi-integration.md](rhi-integration.md)。窗口运行报告包含 `visualFrameCount` / `visualTime`；`--verify-motion` 必须配合 `--verify-runtime` 使用，检查真实窗口的隐藏、最小化恢复和减少动态终点。
+本文只维护Kit发现、C++23能力、构建/模块与开发运行。产品范围见迁移计划，渲染接线见rhi-integration.md，组件验证见各契约。
 
 - CMake project：`yalahoo`；目标：`YalahooCore`、`Yalahoo`；输出：`build/<configuration>/bin/yalahoo.exe`，macOS 为同位置的 `yalahoo.app`，Linux 为 `yalahoo`。
 - QML URI：`Yalahoo.Music`；入口：`loadFromModule("Yalahoo.Music", "App")`；资源：`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。
@@ -48,6 +46,6 @@ $env:QT_PLUGIN_PATH = "$selectedKit/plugins"
 
 macOS/Linux 使用 `sh tools/build/build.sh qt-release`；详见平台实机清单。原生程序不依赖 Node、浏览器或 HTTP 服务。旧 Web 参照仍在 `legacy-web/` 使用冻结依赖；新构建不写入归档。
 
-CTest 分别验证身份稳定性、合成 Kit 清单/版本数值/平台/架构/ABI/模块/过期覆盖、独立 Quick3D 链接与无声媒体插件、实际 qsb 变体，以及原生窗口的真实渲染/鼠标点击。`--verify-runtime <report.json>` 在窗口创建后点击 Basic 按钮，记录 RHI 类型、渲染帧、真实模型像素、中文 glyph、QML/qsb 资源和媒体可用性，并写同目录 `runtime.png`；错误通过退出码和 Qt 诊断暴露。该选项只作本地测试，不设置来源或播放音频。
+基础CTest覆盖Kit数值排序/平台/架构/ABI/模块/过期覆盖、身份/模块插件和qsb变体；具体选择见test-gates.md，格式命令见code-style.md。
 
-完整 Windows 证据重建：`./tools/build/verify-r02.ps1`。输出到 `verification/windows/native-bootstrap/`、截图到 `docs/media/native-bootstrap/`；用户 profile 和数据/缓存绝对路径在入库前匿名化。macOS/Linux 自动覆盖检查：`./tools/audit/audit-r02.ps1`，规则中的逐分支人工推演与 hash 写入各平台矩阵。静态报告仅覆盖 R02，后续轮次必须扩展。
+`--verify-runtime 报告路径`为Review基础资源/窗口探针，可组合motion/library/shading参数；不设置歌曲来源或播放音频。它不替代相应生产组件/平台验收。工具输出位置与字段以实现及test-gates为准，不在本契约复制各轮次通过记录。

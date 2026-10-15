@@ -1,6 +1,6 @@
-# 总览：源码、状态与验证契约
+# 总览状态、投影与局部合成
 
-所有外观以迁移计划置顶规则为准：冻结源码及其生产调用是绝对基准，目标是不含渲染瑕疵的理论效果。旧实机图仅作大致参考，禁止逐像素比较、SSIM/RGB/边缘带追分或据图调参。总览仍须在紧接R19的历史源码复查中逐项复审，不能因已有测试通过豁免。
+本文负责OverviewController/标签与折叠；公用相机和帧源分别见scene.md/motion.md，欠验归迁移计划R34/R19-P。
 
 ## 来源与状态
 
@@ -21,49 +21,11 @@
 - 每张卡片预留入口76px和两侧36px核边界；两个RGBA8逻辑网格纹理最大308×129，展开动画不改变目标尺寸，垂直pass直接合成。十八槽两张纹理载荷上界5,721,408 bytes；保守计每目标8-byte depth/stencil为17,164,224 bytes，resize旧/新同时存活按34,328,448 bytes计。此为描述符估算，Qt内部padding、字体图集、driver实际分配未知，不能称为显存实测。
 - Loader随退场完成释放局部资源；库快照替换清空总览/身份。隐藏时共享时钟暂停且恢复不追赶旧dt；没有新增定时器、worker、无界输入历史、解码或帧内I/O。
 
-## 可复现检查
 
-Release自动发现最新原生Kit，不在公共配置固定Qt版本/路径。正常构建后执行：
+## 检查入口
 
-```sh
-cmake --build --preset qt-release --target check-format Yalahoo_qmllint ui-audit_qmllint
-ctest --preset qt-release --output-on-failure
-ctest --preset qt-release-render -R overview-qml --output-on-failure
-```
-
-`overview`直接核对冻结源码执行生成的数学输入：690个运动x/v/a样本、390个折叠输入、54组碰撞、54组生产投影和63组真实相机插值；另检验两步进入、折叠底边/宽深、拾取、隐藏、减少动态及反转。数值门槛为轨迹≤1e-6、投影≤2逻辑px，非截图位置测量。
-
-生成数学输入需要旧项目已有开发依赖，仅为维护工具，产品不依赖Node：
-
-```sh
-node tools/review/export-overview-golden.mjs
-```
-
-`overview-qml`在当前macOS使用真实隐藏RenderControl、九尺寸×双主题×收起/展开共36个状态，检查结构、碰撞、资源和warnings。匿名高频背景在本地生成，作为模糊/合成质量观察输入，无原项目截图或图像评分；仅在显式`--lifecycle`时十次实际销毁/重建QML根和渲染资源，控制器继续存活；普通组件回放不重复压力序列。输出保持忽略。该完整组件回放属于显式隐藏渲染组或`qt-release-full`，日常快速门禁不重复执行；其他平台当前入口需原生窗口，按实际分组和R34验证。
-
-实际产品入口为`yalahoo --verify-overview 全新目录`。包装脚本核对真实进程退出、报告、实际后端/DPR；普通功能使用`--runs 1`，三次独立运行只在正式成本/性能或具体不稳定问题复核时选择。报告包含Qt事件、SceneItem真实提交、上传、固定按钮/歌名和焦点；显式`--lifecycle`才执行十次窗口surface释放/重建，默认只显示初始窗口。该压力序列只在相关生命周期边界执行，其他已有效验证上下文可复用。授权轮次可加`--foreground`，否则遵循统一置底/拒绝焦点策略，不自行提升窗口：
-
-```sh
-python3 tools/build/verify-overview.py --backend metal --dpr 1 --runs 1 --output verification/macos/overview/example-product
-python3 tools/build/verify-overview.py --visual --backend metal --dpr 1 --runs 1 --output verification/macos/overview/example-ui
-```
-
-根据真实目标环境选择metal/opengl/d3d11及DPR1/1.5/2；夜间产品用`--night`，UI入口本身覆盖双主题；`--lifecycle`是独立的压力开关，不能用普通回放的零重建结果宣称压力通过。目录必须全新，不覆盖失败样本。可见授权只在该轮有效；结束恢复`YALAHOO_MACOS_VISIBLE_TESTS=OFF`，并真实回归默认`verification-window-policy`。
-
-审计入口`tools/audit/audit-overview.py`用重复`--report 产品report.json`和`--visual UIreport.json`读取本地证据，验证冻结源码hash/核归一化，并逐项输出COMMON-01–05、PERF-01–07与三平台真实调用链/资源边界。审计结论不等同于其他平台实机通过。
-
-## 验收范围与后置任务
-
-本机Release/arm64总览验证区分Metal/threaded与macOS OpenGL/basic、真实产品窗口与隐藏RenderControl。自身窗口读回不表示屏幕扫描或input-to-photon；自注入Qt鼠键事件不表示物理设备输入。短序列记录的提交/同步/GPU字段只解释其实际范围，完整120秒产品性能及预算仍属于R28和后置专项。
-
-Windows/D3D11、Windows/OpenGL以及Linux/xcb/Wayland当前没有原生Kit/窗口管理器/GPU运行环境，不能从共享C++/qsb或macOS运行推断目标通过。对应源码/平台静态审计及准确复建要求移交R34的R19-P；目标质量、物理输入/焦点、DPR/恢复与平台集成须真实执行。保留源码/数学/功能/质量/资源门槛，不引入任何原图逐像素验收。
-
-
-## 本机R19最小验证结论
-
-- Release/arm64、自动发现的Qt 6.12.0：源码运动最大误差1.5099e-14，相机2.46139e-14，生产投影0.000631929逻辑px；折叠、碰撞、两步进入及拾取回归通过。此为数学/代码验证，没有原图比较。
-- 最终隐藏UI在Metal/OpenGL的实际DPR1/1.5/2六上下文各运行一次，均覆盖36状态、零QML warnings；Metal/DPR1显式完成十次实际QML根/RenderControl资源重建，其余上下文不重复压力序列。
-- 普通单窗口模式实际通过OpenGL/DPR2总览及Metal/DPR1详情：总览cycles=0，详情fullWindowRebuilds=0且lifecycleStressRequested=false。改为显式压力开关前的同一产品逻辑已在Metal三DPR、OpenGL/DPR1及DPR1.5完成有效前台生命周期回放；停止的重复队列不作为完整批次通过，按具体有效报告复用，不重复显示窗口。模式改动只改变验证驱动，未再改相机/布局/折叠/标签/材质实现。
-- `qt-release-full`的28项全部通过，实际46.91秒；同次运行25项fast累计24.49秒、三项真正隐藏集成累计22.40秒。不是单独重复测量的快速preset耗时，也不用于承诺其他设备性能。六项原生窗口测试被明确排除，没有将未选择项记作通过。
-- 完整回归后另补半列边界回归：保留十个投影候选直到按优先级/extent筛选，避免环绕时丢失排序末尾的选中ID；标签准入仍≤9、碰撞≤90次。受影响overview/source-format及隐藏overview-qml单独重跑，不重复其他矩阵或显示窗口。
-- check-format、source-format及两组官方qmllint通过；COMMON/PERF与三平台静态审计通过，目标系统实机仍按R34/R19-P。最终Review、可见测试和性能记录开关均OFF，默认隐藏窗口策略真实通过；没有提交任何运行输出。
+- `node tools/review/export-overview-golden.mjs`生成独立源码数学；`overview`覆盖690运动、390折叠、54碰撞、54生产投影、63相机插值及两步进入/底边/宽深/拾取/隐藏/减少动态/反转。轨迹≤1e-6，投影≤2逻辑px。
+- `overview-qml`检查九尺寸×双主题×收起/展开36状态、结构/碰撞/局部模糊实际质量/资源/warnings；`--lifecycle`才另做十次真实QML根与渲染资源重建，控制器存活。匿名高频背景为自身质量输入，不是源图评分。
+- `python3 tools/build/verify-overview.py --backend metal|opengl|d3d11 --dpr 数值 --runs 1 --output 全新目录`运行产品；`--visual`检查UI，`--night`产品夜间，`--lifecycle`另验窗口surface压力，`--foreground`仅授权时使用。
+- `audit-overview.py`接受重复`--report`与`--visual`报告，核对源hash/核归一化/真实事件、SceneItem提交、按钮/歌名/焦点和资源。正式采样与窗口政策统一由公共契约规定。
+- 标签投影保留半列边界十个候选直到优先级/extent筛选，准入≤9、碰撞≤90，不能因提前截断丢失选中ID。

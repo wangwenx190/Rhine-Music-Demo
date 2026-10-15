@@ -1,42 +1,15 @@
-# RHI 场景快照、目标与不透明通道
+# RHI不透明几何、阴影与地面
 
-`YalahooRhi` 的 `src/render/rhi/RhiItem` 实现真实 QQuickRhiItem/Renderer；独立 Review 由 `rhi-audit` / `rhi-shell-audit` 使用，生产接入由 `SceneItem` 绑定同一 SceneAdapter，见 [rhi-integration.md](rhi-integration.md)。R19C2B1的不透明Review已移除Quick3D图像oracle依赖，产品只打包RHI；旧RhiOracle.qml只保留历史源码，不再链接或加载。
+本文负责源几何覆盖、纸面、不透明附件使用、阴影与地面；生产快照/生命周期归rhi-integration.md，统一格式/ABI归rhi-postprocess.md，壳体/resolve边界归rhi-shell.md。
 
-GUI 调用 `submit(Input, targetSize)`；Input 含 SceneAdapter 的不可变 SceneFrame、实体矩阵、纸面图像及 SelectionLighting 的值快照。targetSize 由调用者的 RenderQuality 有效尺寸提供；Review 明确使用 DPR1、100% 尺寸。Renderer 在 synchronize 拷贝值、独立持有图像，render 不访问 GUI 对象。Renderer 独占 QRhi 资源；读回按 request 标识，回调持有独立结果存储，GUI 使用受保护的排队投递和过期 request 检查。目标重建先释放 pipeline/binding，再释放 target/pass/attachments；读回存活到 QRhi 完成，销毁前 finish。30 次连续替换与恢复由实机检查覆盖。
+## 不透明通道
 
-RHI 私有头和所有 QRhi 类型仅在 `src/render/rhi/` 与 CMake 能力探针中使用。顶层从自动选出的最新 Kit 查找 GuiPrivate；每次配置重新编译探针，不缓存前一个 Kit 的通过状态，不固定 Qt minor/patch。平台选择在 Review 入口分别为 Windows D3D11、macOS Metal、Linux OpenGL；产品仍使用自己的现有平台入口。
+- 三壳体读取原GLB的POSITION/NORMAL/TEXCOORD/indices，不重建模型/翻轴；节点/实体变换一次。纸面源几何、contain/inset/alphaTest/像素钳制遵守materials/covers；transparent洞不写颜色/法线/depth。
+- paper helper执行源Lambert/sRGB/入射限亮/音乐光场，无白光或自发光补偿；生产统一fog/输出域由postprocess.md约束。
+- prepare-rhi-paper.py生成共享数学/声明映射及entityLight0.xy原点场提升；`--check`核对完整token，生成+format复现源码。PowerShell入口转交同一生成器。
+- RhiCaptureHarness按正常帧/读回事件串行推进，每状态只提交一次，request对应独立值结果；无手动事件循环/持续计时帧。窗口策略和配置按公共契约。
 
-本契约的不透明基础为 shadow → opaque-color/normal/depth → Review output；当前磨砂扩展的 capture/resolve/mips → sorted-shell、稳定身份和真实 MSAA 边界按 [rhi-shell.md](rhi-shell.md) 执行。R10A 的独立通道对照仍是单采样，不把它当作完整后处理验收；当前目标格式、816-byte uniform、112-byte 几何实例、图集和 AO/DOF/AA 按 [rhi-postprocess.md](rhi-postprocess.md) 执行；以下 R10A/R10B 的格式与大小描述保留对应历史验收边界。
-
-阴影目标为 RGBA32F canonical-depth + 独立硬件深度附件，颜色、法线、RGB24 线性深度为三个独立 RGBA32F MRT + 硬件深度附件。所有目标在硬件尺寸和 8,294,400 像素约束下创建，失败明确报错；阴影使用 RenderQuality 的 1024/2048/4096 选择，不悄悄改变用户设置。Renderer 为源 FrontSide 的 shadow pass 使用 Front cull，只有 Optical_Diffuser 投射阴影。阴影 bounds [-16,16,-15,15,.1,45]，光源 (-6,14,-5) 指向原点；接收侧世界法向偏移 .035、canonical-depth bias -.0003、strength .32、radius 4。
-
-冻结源码请求 PCFSoftShadowMap；锁定 Three 0.183.2 的 WebGLShadowMap 在执行时转换为 PCFShadowMap。实际 shader 使用 IGN 旋转的 5 点 Vogel disk，每点硬件双线性 depth compare。本实现通过 nearest float target 的四次比较再插值取得同一有效滤波。canonical 光投影保持源 OpenGL 约定；实际 raster 矩阵用 QRhi::clipSpaceCorrMatrix 修正。接收 UV、Vogel offset 与 IGN 的 gl_FragCoord 按 isYUpInFramebuffer 转换，不能只翻转中心 UV。clip-space 能力来自 QRhi，不假定 D3D/Metal/GL 深度范围一致。Three 滤波源码与 MIT 署名继续由 resources/licenses/three-LICENSE、materials-NOTICE.md 保存。
-
-三组壳体直接从已有 GLB 的 POSITION/NORMAL/TEXCOORD/indices 读取，复用 R03 有界解析器；没有重建模型或轴翻转。源节点变换为 identity，实体矩阵只应用一次。纸面 3.06 方形、(.17,1.85,.027)，contain + 1/64 透明留白、alphaTest .025、像素中心 clamp 保持 R07。源 RGBA8 是 sRGB，经一次解码后，沿 R07 的 musicPrintExposure、musicIrradiance 与固定 Room PMREM 输出线性 diffuse，不加白、不自发光、不做纸面 ACES。纸面透明处不写任何颜色/法线/深度。`tools/assets/prepare-rhi-shaders.ps1` 从 R07 准备共享 math，只有 uniform 名适配，不复制未接入的壳体算法。
-
-R10A 原始 frame.glsl std140 block 为 560 bytes；R10B 保留其前缀并扩展为 752 bytes，C++ static_assert 核对大小与偏移，每 draw 采用设备对齐的动态 offset。vertex 属性为位置/法向/UV 的 32-byte stride，shader 的每个 binding/location 显式声明。原六个基础 qsb 与新增 shell qsb 均编译 SPIR-V、GLSL330、GLSL ES300、HLSL50、MSL12；变体生成来自同一已选 Kit，不表示 Metal/GL GPU 已执行。
-
-`tools/build/verify-r10a.ps1` 只运行 Release，保存 Windows runtime、shader reflection/变体、源码/资产 hash、成对 PNG、完整 Review/production CTest 与 qmllint；`tools/audit/audit-r10a.ps1` 检查证据闭包并输出 macOS/Linux 逐项静态矩阵。Windows 36 组当前 Quick3D/RHI 对照，三种封面、双主题、前/低视角覆盖纸面/法线/深度；已知盒盖平面及四角位置独立验收。九种必测内容尺寸、恢复旧尺寸、30 次未等待读回的 resize 替换共同验收目标所有权。阴影使用 R10 的 9–20 同输入冻结 witness：只比较两者共有的白色 receiver，不将透射壳体掩码混入不透明轮次；全壳体五 ROI、shadow reception、捕获、MSAA 边界与排序仍由 R10B 验收。
-
-R10A 历史复建入口固定六个基础 shader，按对应验收提交重建；R10B 历史入口固定七个，均按对应验收提交重建。当前源树以 `verify-r10c.ps1` 复建 24 个 shader 并同时执行不透明基础回归，历史 hash 不回写。R10A 的 readback 数字与 RGBA32F/整图 cover 提交只用于通道验证，不作为图集传输字节或最终性能预算证据。当前实际 tile destination regions/bytes 与性能各自证据见 `verification/windows/rhi-postprocess/`；不得从 R10A 的 CPU 数据量推导 GPU 上传预算。
-
-接口语义依据：[QQuickRhiItem](https://doc.qt.io/qt-6/qquickrhiitem.html)、[QRhi](https://doc.qt.io/qt-6/qrhi.html)、[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)。升级后以最新 Kit 头文件和实际探针为准。
-
-## 当前不透明通道验证（R19C2B1）
-
-`rhi-audit`不再读取或生成原图/Quick3D配对、RGB/MAE/SSIM、浏览器shadow witness；`verify-r10a.ps1`的历史报告流水线直接报退役，不能用它写当前通过结论。使用：
-
-```sh
-python3 tools/assets/prepare-rhi-paper.py --check
-python3 tools/assets/expand-lighting-shaders.py --check
-python3 tools/audit/audit-rhi-opaque.py
-cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
-cmake --build --preset qt-release
-ctest --preset qt-release-render -R '^rhi-opaque-gpu$' --output-on-failure
-# 其他系统当前用qt-release-visible选择同名项，遵守窗口契约。
-```
-
-`RhiCaptureHarness`以正常帧/读回事件串行推进；每次只提交一个状态，等待实际request对应的值结果，有界timeout，无手动processEvents/轮询或额外定时帧。macOS默认真正隐藏Metal，renderThreadDistinct如实为false；这不是产品threaded loop/VSYNC性能。其他系统暂走原生置底拒绝焦点窗口，目标实机仍待R34。
+## 不透明检查
 
 36个双主题×前/低视角×三封面×三通道状态保留独立数学检查：已知前平面线性RGB24深度误差<2e-6，view normal按8位编码精度（1/255），源几何四角投影≤2物理px（本入口实际DPR1）。四角只对数学投影与自身合成几何位置，不读取参考图。16个均匀墨色/入射探针直接按sRGBDecode与源Lambert diffuse clamp推导；半球同色并取`intensity=irradiance*PI`隔离已知入射，关闭环境/spot/key/fill并令print exposure=1，覆盖关闭灯光及0/.25/2入射，不据结果拟合参数。
 
@@ -44,26 +17,20 @@ ctest --preset qt-release-render -R '^rhi-opaque-gpu$' --output-on-failure
 
 保留12个有序尺寸（九种必测尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
 
-本机Release/Qt6.12.0/Apple M4/Metal隐藏通过：深度最大约1.59e-8、法向约.001961、四角最大约1.822px；16墨色公式误差最大约.001792（线性归一化8位），阴影minimum约.678431。完整隐藏回归33/33、两组官方qmllint和格式通过。数据仅代表该源数学/资源范围；BRDF/捕获/透明重叠、远阵列fog、景深和最终抗锯齿仍按R19C2B2/C/D处理，BLUR-01/FLICKER-01没有关闭。
+`rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`和`audit-rhi-opaque.py`为现行入口。旧verify-r10a流水线已退役；未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
 
-纸面helper生成入口改为跨平台`prepare-rhi-paper.py`，PowerShell旧入口转交它；生成完整共享body后显式保留entityLight0.xy的原点项提升。`--check`逐token核对共享数学+声明映射+提升适配，实际生成并经Qt格式化可逐字复现当前shader。旧生成器会撤销该提升、重复逐片元计算，已修正；没有改变源纸面数学或提交一份新的派生shader。
+## 阴影
 
+当前产品阴影为单采样 D32F 硬件比较深度，另有 R32F canonical-depth 诊断颜色附件；过滤为Linear/LessOrEqual硬件PCF，保留源五点Vogel+IGN。灯(-6,14,-5)指向原点、正交范围[-16,16,-15,15,.1,45]、Front cull、Optical_Diffuser唯一caster、radius=4、normalBias=.035、bias=-.0003 和音乐入口 strength=.32 均取自冻结源码有效路径。
 
-## R19D3A 阴影投射、偏置与过滤
-
-当前产品阴影为单采样 D32F 硬件比较深度，另有 R32F canonical-depth 诊断颜色附件；不是本契约上文 R10A 的历史 RGBA32F 布局。过滤在 R10C 已改为 Linear/LessOrEqual 硬件 PCF，保留源五点 Vogel + IGN，而非继续执行上文历史四 fetch 手工比较。正交矩阵、Front cull、Optical_Diffuser 唯一 caster、radius=4、normalBias=.035、bias=-.0003 和音乐入口 strength=.32 均取自冻结源码有效路径。
-
-`geometry.vert` 与实例化变体在每顶点按归一化世界法向偏移，再投影并插值 shadowCoord；片元只做透视除法、canonical→UV、depth bias、frustum 和 PCF。不能在片元重新归一化插值法向后投影。当前三个源 mesh 每个三角形内部法向恒定，因此该修正恢复求值阶段并减少片元工作，不将它描述为已定位的用户闪烁/模糊根因。GL/Metal 的 UV、disk offset、IGN 原点翻转继续按实际 QRhi 能力执行；原生 clipSpaceCorrMatrix 只用于 raster。
+`geometry.vert` 与实例化变体在每顶点按归一化世界法向偏移，再投影并插值 shadowCoord；片元只做透视除法、canonical→UV、depth bias、frustum 和 PCF。不能在片元重新归一化插值法向后投影。GL/Metal 的 UV、disk offset、IGN 原点翻转继续按实际 QRhi 能力执行；原生 clipSpaceCorrMatrix 只用于 raster。
 
 `rhi-shadow-gpu` 独立执行本次 R32F 深度上的标量源 PCF 数学，覆盖三种 map 尺寸、1/7/8/9 实体批量边界、开关/运动/接收相机与灯色变化、十次真实 SG 重建。`Input.captureShadowDepth` 默认 false，只在显式 Review 捕获时共享已有不可变 QByteArray，不增加 GPU readback 或深复制；QImage 仍按历史诊断格式输出。每次捕获检查真正上传的 paper/shell 参数、比较 sampler、cull 和两个附件的格式/尺寸；生产 `request=0` 不做这些诊断。无变化 caster 复用 map，并跳过非批量caster专用uniform生成/复制/上传，实体变换/开启/尺寸或 renderer 重建失效；固定灯相机不依赖接收相机、主题色或封面。
 
-诊断receiver是12×12、y=-.05的白色乘数平面，不代表产品地面。冻结产品为200×200、y=-4.63、roughness=.95的 MeshStandardMaterial 地面；现由 R19D3B 接入真实 SceneItem 的主题、Standard PBR/雾、不透明捕获及 AO/Bokeh geometry；独立诊断receiver仍保留。本专项不关闭BLUR-01、剩余后处理或窗口/VSYNC验收。
-
-复现：开启 Review、保持可见测试 OFF，Release 构建后执行 `ctest --preset qt-release-render -R '^rhi-shadow-gpu$' --output-on-failure`；显式 `QSG_RHI_BACKEND=opengl` 切换本机 GL。COMMON-01–05/PERF-01–07 符号/hash 矩阵由 `python3 tools/audit/audit-rhi-shadow.py` 写入本地忽略目录；源代码矩阵不能冒充目标硬件通过。
-
+诊断receiver独立保留为12×12、y=-.05的白色乘数平面。
 
 ## 产品地面
 
-生产 SceneItem 正常路径始终 productFloor=true；geometryOnly 与独立 Review 默认关闭。线性 floorColor 属于 SelectionLighting palette，原源色及.65秒主题曲线随现有 FrameClock 更新。地面kind=6复用opaque管线，使用Standard dielectric/roughness=.95，不使用纸面限亮和壳体光场调制；它接收既有key阴影、参与capture/resolve/mips、AO和完整Bokeh depth，但不进入caster池。着色后线性fog先于后处理与统一输出。
+源地面为200×200平面，rotation.x=-PI/2、y=-4.63、向上法向、FrontSide、receiveShadow=true/castShadow=false。源色为暖昼#d8c9b9、深夜#0b1828；dusk的#a6b8c0仅作来源测试输入。生产SceneItem正常路径始终productFloor=true；geometryOnly与独立Review默认关闭。线性 floorColor 属于 SelectionLighting palette，原源色及.65秒主题曲线随现有 FrameClock 更新。地面kind=6复用opaque管线，使用Standard dielectric（metalness=0、f0=.04、roughness=.95，无clearcoat/transmission/emission），不使用纸面限亮和壳体光场调制；它接收既有key阴影、参与capture/resolve/mips、AO和完整Bokeh depth，但不进入caster池。着色后线性fog先于后处理与统一输出。
 
-地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。source-fidelity-review.md的R19D3B记录源公式、来源与实际范围。验证入口为rhi-shadow-gpu的地面数学/附件/十次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。
+地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。历史来源及适配判定见source-fidelity-review.md的R19D3B。验证入口为rhi-shadow-gpu的地面数学/附件/十次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。

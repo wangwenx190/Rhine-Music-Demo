@@ -1,6 +1,6 @@
-# 标题字轮实现与补验收边界
+# 标题与歌名字轮
 
-R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1及当前macOS Metal/OpenGL的DPR1/1.5/2验收见下文；当前平台R16阶段实现依赖已满足，主线下一轮为R17；本机无法执行的R16B2V-P/R16B2W/R16B3已移入最后R34，保留D3D11/OpenGL原补修和最终跨平台选型要求，阶段主线不等待这些后置任务。本文区分实现与验收，不以开发中的对照图宣称完整视觉通过。
+本文负责标题/译名/歌名字轮的布局、shaping、运动和缓存；字体资产归[assets.md](assets.md)，静态页眉布局归[browse-ui.md](browse-ui.md)，公共帧源归[motion.md](motion.md)。
 
 ## 来源与接口
 
@@ -16,187 +16,23 @@ R16 已接入多行标题、译名与顶栏歌名槽。D3D11/DPR1及当前macOS 
 
 当前生产普通文字由 `ReelInk → ReelTextNode` 提交整行 shaping 后的 glyph ID/位置。GUI 只缓存字体描述、字体 head 身份与字形值；render thread 独立取得 QRawFont，并核对身份，GUI 的 QRawFont/QTextLayout 不跨线程。私有 Qt Quick glyph 接口隔离在 `src/render/rhi/`，配置时探测最新 Kit 的实际接口，不锁版本或回退旧 Qt。彩色 grapheme 使用 Qt Quick Text 的系统字体/彩色缓存；普通字形的隐藏 Text 不创建。整行上下文变化即使文本相同也失效。
 
-Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；当前macOS Metal/OpenGL三个DPR已由R16M3逐项验收，不可执行的R16B2V-P/W、R16B3在R34完成最终判定。普通字形节点加彩色Text是当前平台阶段生产路径；全平台最终选型仍待R34。
+Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；跨平台最终判定与欠验统一归计划R34。普通字形节点加彩色Text是当前平台阶段生产路径；全平台最终选型仍待R34。
 
 测量缓存键包含文本、两种字体/字重、字号、宽度、预算、窄屏/DPR/歌名模式；96项 LRU与8MiB描述符计费上限并存，超限结果不缓存。8MiB是缓存计费而非完整进程内存。字体数据库变更清空缓存；同帧输入合并成一个 queued reconcile。布局为输入长度 n 的一次整行 shaping，拟合最多25次候选行框测量，字形提取只在选中候选执行；按 string index 分组为 O(n log n)。动画只访问活动槽，不逐帧创建 QTextLayout 或替换面板；静止入口 O(1)。当前生产字号/视口下，内容 revision 只匹配本槽至多八个字面，以 sameGlyphInk 核对字体身份、glyph ID/位置、缩放和行框，保留仍可见的 QSGTextNode/transform/clip，只创建新增字面并删除离开视口的节点；局部匹配最坏 O(f²)，f≤8，不随曲库增长。clip 容量、颜色和滚动变换独立更新，隐藏的 ReelInk 不创建几何。geometryUpdates 计新增字形节点，geometryReuses 计内容 revision 中的节点复用，均为累计诊断计数，不是逐帧 GPU 成本。
 
 每个可见槽只有一个 Qt Quick RGBA8 layer，物理尺寸 `ceil(capacity × DPR × 2)`，容量按需要增长；源垂直边缘淡化与局部歌名 blur 在共享 qsb 中合成，不使用整屏模糊。层只在组件、槽与窗口均可见时开启，SG资源归 Qt 所在线程生命周期。`TitleReel::resourcesChanged → SceneItem::refreshTextResources → RhiInput` 交付值尺寸/revision，`ResourcePlan` 累计颜色与保守 D32FS8 深度上界，既有三维目标兼容性键不受文字内容/位置影响。resize新旧层可重叠，峰值按两份描述符计；Qt字体图集、驱动和私有缓存成本未测，不能当作已知显存。
-
-## 验证入口与限制
-
-实现检查：`./tools/build/verify-r16.ps1`。完整补验收：`./tools/build/verify-r16.ps1 -FullMatrix`。源码审计：`./tools/audit/audit-r16.ps1`。单元测试为 CTest `title-reels`，覆盖 grapheme、长文本/省略、缓存上限、20/30/60/120fps解析与打断、槽复用、改速/减少动态/失效及歌名过渡反转。单上下文入口为 `./tools/build/verify-r16.ps1 -TitleContext -Backend d3d11 -Dpr 1 -EvidenceDirectory verification/windows/title-reels/r16b1-accepted`；Backend 可选 d3d11/opengl，Dpr 可选 1/1.5/2，报告核对实际后端与校准后的真实 DPR。完整对照保留同输入图像、源轨迹、三次活动采样、页眉点击与十次释放检查；单上下文通过不等于完整矩阵通过。
-
-所有验证窗口使用 VerificationWindow，第一次 show 前置底/拒绝焦点，只读取自己的 framebuffer；浏览器 headless、子进程隐藏且拦截非本地请求。QRhi 只有一个在途读回，排空受 MaxAsyncReadbackFrames 约束；退出/超时在读回状态存活期间销毁 graphics surface。GUI tick、同步、CPU绘制提交分开记录，GPU timestamp不可用写null，不能推导完整产品FPS。截图、逐帧数据、日志和内容hash审计矩阵只在忽略的verification目录。
-
-`WEB-TEXT-PROBE-01`：Chromium 对源测量 probe 的 fine 字号更新出现 inline style 与 computed style 不一致，导致采集沿用 coarse 字号。导出器以完全相同 inline CSS 克隆测量根，仅消除陈旧观测状态，原算法、常量和生产CSS不变；未刷新的原始数据单独保留。它是采集问题，不是复制到原生的字体尺寸目标，完整视觉矩阵仍需补验收。
-
-历史Windows通过范围以对应轮次实际报告为准。后续对所有平台按当前可靠能力执行构建/字体/后端/资源检查，并对不可执行项展开共享CMake、Qt值/事件、qrc、qsb及平台分支严格审计；纯静态项标明“静态审计通过，实机待验证（R34）”。目标字体/彩色emoji、编译器/私有接口、compositor与像素结果不能由另一平台代替。部署仍按R30–R32的平台清单，未在本轮生成部署包。
-
-## R16B1 单上下文结论与交接
-
-Windows Qt 6.12.0/MSVC 19.51 的 Release、D3D11、校准实际 DPR1 验收通过：10 个匿名输入×双主题的20项生产标题、18项九尺寸页眉、三种绘制候选各三次120帧活动诊断、十次 hide/release/restore 与最终零 tracked node/renderer 释放，以及实际生产浏览18项检查通过。27项 CTest（含 title-reels/source-format）、两组 qmllint、check-format、维护脚本格式和 qsb GLSL/HLSL/MSL 检查通过。宏观产品性能及 DPR1.5/2、OpenGL 未由这些结果验收。
-
-结构最大误差0.24087逻辑px，源码轨迹误差5.69e-13。未经归一化的原始文字 ROI SSIM最低0.66549、平均RGB误差最高25.027/255；固定1物理px源轮廓边缘带单列后，带外SSIM最低0.98172、RGB误差最高0.94975/255，原门槛通过。边缘带最大比例44.35%，不把带外成绩当作原始全图成绩；小字号曲线栅格与Chromium的字形边缘覆盖差异保留在原始成对图中。WEB-TEXT-PROBE-01的刷新声明保留，旧 web-raw 与失败报告不改写。
-
-新回归比较整行 QTextLayout 的 glyph ID/位置与字面关联，覆盖组合字与断行空白。行末文本范围与宽度端点均限至有效 inkEnd，避免把空白 advance 并入前字面。当前生产普通 glyph 加彩色 Text 路径满足本上下文门槛；两个工具候选仍按字面 fillText/Text 重新 shaping，不能提交相同整行 glyph run，因此不能把共享控制器的结构数据当作候选绘制的整行 shaping 等价证明，最终选型仍待R16B3。
-
-活动诊断的生产路径三次分别新建68/82/82个字形节点、复用73/65/65次；这是包含候选切换/初始化的累计节点诊断，不能当作稳态提交成本或FPS提升。两个隐藏生产字形路径的新建计数均为零；活动tick无逐帧布局miss，静止 advance 为O(1)。槽内匹配、layer显隐、Qt线程所有权、缓存/资源容量及共同平台链按PERF-01–07审计；Qt字体图集/驱动内存和GPU时长仍未知，GPU值保持null。
-
-页眉使用真实 LibrarySession 的匿名专辑/曲目 ID 状态变更，完成两次换歌与专辑导航、0.25×/3×途中改速、开启减少动态和可见退出期间禁用点击检查。先以减少动态准备初始终态，在输入前的已呈现帧建立位置基线；按钮在换歌/改速检查中保持位置，视觉退出期另核对禁用与保留完整字面。QML直接读取实际ToolTip/Accessible附加属性验证完整歌名；点击只发locate-song，导航前后播放ID及播放通知计数不变。本轮不播放音频，实际PlaybackController及定位执行仍分别归R24/R23。
-
-证据与失败样本均在忽略的 verification/windows/title-reels/ 下；静态审计入口 `./tools/audit/audit-r16.ps1 -Round R16B1` 为新增节点复用、可见性与释放链生成独立源码hash矩阵。macOS/Linux：静态审计通过，实机待用户验证。共享Qt事件、字体值/身份、QML/qrc、Metal/GL及qsb链已展开；目标平台编译器、彩色字体、compositor与GPU像素未运行。
-
-## R16B2 验收入口、成本隔离与DPR1交接
-
-单后端三DPR入口为 `./tools/build/verify-r16.ps1 -BackendMatrix -Backend d3d11`；单上下文保留 `-TitleContext -Backend d3d11 -Dpr 1`。`-UseExistingWebSource`仅复用已经生成且含所需每DPR20项的冻结参照，缺失项直接失败，原生仍逐报告核对实际DPR/后端及完整检查数量。受限环境中先在原生权限下执行 `node tools/review/export-title.mjs`，再用此复用参数验证；完整矩阵失败不会产生通过summary。摘要保留匿名输入、参照和二进制hash，不提交原始产物。
-
-Canvas候选的GUI失效仅在有效可见时update；render同步同时核对item/window可见性，隐藏时不读取faces，paint在reset后返回。窗口替换断开旧连接、恢复重发当前状态。Qt初始化/空清理回调仍可能发生，`canvasPaints`及Canvas局部纳秒只计可见文字绘制/同步；整体Qt同步/提交区间包含框架工作。原直接连接controller.changed的隐藏Canvas在其他路径活动期间仍绘制96–120次，修复前成本不能作为公平比较。修复后普通glyph与Text路径的三次Canvas文字绘制均为零。
-
-Windows Qt 6.12.0/MSVC 19.51、Release/D3D11/实际DPR1：20项双主题生产文字、18项九尺寸页眉、三路径各三次120帧活动诊断、十次恢复与最终零tracked节点/renderer、生产浏览18项通过；27项CTest、source-format/check-format、两组qmllint、维护脚本格式及qsb GLSL/HLSL/MSL通过。结构最大误差0.24087逻辑px；原始文字SSIM最低0.66549/RGB最高25.027，固定1物理px带外SSIM最低0.98172/RGB最高0.94975，最大边缘带比例44.35%。原始与带外结果分别解释。
-
-下表为每组120个诊断帧的CPU累计毫秒，依次列出三次原始结果，不池化或挑样；包含模式切换、首次准备及诊断提交，活动输入为暖昼，不能当作稳态GPU或完整播放器FPS。两主题文字/页眉另由上述静态与行为矩阵覆盖。
-
-| 路径 | GUI准备 | 活动tick | Qt同步 | CPU绘制提交 |
-| --- | --- | --- | --- | --- |
-| 整行glyph＋彩色Text | 3.8304 / 0.3878 / 0.3913 | 9.6765 / 6.9968 / 6.5551 | 9.7453 / 5.7093 / 6.8709 | 39.6602 / 25.7749 / 28.1475 |
-| Qt Quick Text候选 | 1.8687 / 2.4260 / 1.1347 | 8.6823 / 12.7970 / 10.1289 | 6.8295 / 6.0645 / 6.9053 | 24.3915 / 23.9880 / 22.9133 |
-| Canvas候选 | 0.6254 / 0.4625 / 0.4408 | 5.8813 / 4.7928 / 4.9698 | 1.6805 / 1.7513 / 1.7873 | 9.6360 / 10.3160 / 11.7763 |
-
-Canvas三次文字同步为0.2661/0.2686/0.2709ms，paint为6.4246/6.9305/7.7498ms，实际文字paint次数98/97/97；它们是Qt区间的局部计量，不与Qt区间相加。各路径共享布局描述符缓存计费100314bytes，控制器所描述槽层RGBA8估算383408bytes；Canvas模式不实际启用这些隐藏槽层，不能把共享描述符估算当成该候选显存。可见Canvas的300×150逻辑范围、DPR1单采样RGBA8附件估算180000bytes，深度上界按8bytes/像素另计，resize新旧可重叠；Qt字体图集/内部缓存/驱动实际内存未知。生产节点新建68/82/82、复用73/65/65，两个隐藏生产路径新建为零。GPU时间全部null。
-
-局部CPU结果支持本上下文中Canvas提交成本较低，但其按字面重新shaping与当前整行glyph语义有差异，不能据此选为生产路径。DPR1.5修复前有7项生产带外SSIM失败，最低约0.95282；DPR1.5/2与NativeRendering试验曾超时、无最终报告，未通过。生产仍用CurveRendering。原始失败保存在`verification/windows/title-reels/r16b2/`，补修任务为R16B2V-P/W，最终选型仍为R16B3。工具超时另写阶段、窗口与readback状态；DPR²完成预算只用于CPU物理像素比较的验证时限，不放宽图像或性能门槛。
-
-本轮源码PERF-01–07、字体身份/值交接、QML/qrc层资源、窗口恢复、Metal/GL和qsb闭包审计入口为 `./tools/audit/audit-r16.ps1 -Round R16B2`。macOS/Linux：静态审计通过，实机待用户验证；未运行目标编译器、字体回退、compositor或GPU，不能由本轮Windows结果推断。
-
-## R16B2V 恢复/混合字体补修与剩余像素任务
-
-本轮按时间约束收敛到恢复驱动、普通字形基线及完整诊断，原像素收口拆为R16B2V-P；本轮实际耗时超过一小时目标，不将其记为规模/耗时达标。生产仍使用CurveRendering和两倍DPR层；NativeRendering、四倍层、mipmap与分数字号/度量试验全部撤回，失败样本只保留在本地。没有完成DPR2或OpenGL验收，也没有完成最终文字路径选型。
-
-普通字形的CSS半行距仍用主字体度量，QTextLine的position减去实际混合行ascent，避免emoji回退改变普通字形baseline。彩色Text描述符补回fallback ascent差，保持原回退绘制基线。字号拟合、断行、整行glyph ID/位置关联、缓存键/容量、时钟和层资源均不变。新单元回归的普通glyph竖向位置允许Qt QFixed自身一个1/64逻辑px量化步长；这不修改原结构、像素或运动门槛。
-
-生命周期测试从最终超宽页眉窗口恢复到300/320px标题场景，root与window尺寸一起恢复，在sceneGraphInvalidated后排队showNormal。仅等待invalidation仍会停在step88；场景尺寸修正后十次恢复及最终释放完成。Qt/compositor内部停帧原因仍未确认，超时单列visible/exposed/restorePending/readback状态，不能归因于CPU图像比较或通过抢焦点取样。GUI进程等待与退出码使用RunGui的Process.ExitCode；管线结束后的LASTEXITCODE曾沿用console诊断的6，不能当作GUI退出事实。
-
-Windows Qt 6.12.0/MSVC 19.51 Release：D3D11/实际DPR1.5的20项文字结构/文本与源码轨迹、18项九尺寸页眉、三路径各三次120帧成本/缓存、隐藏Canvas文字零绘制、十次恢复和最终零tracked node/renderer通过；实际生产浏览18项通过，GUI进程真实退出0。固定1物理px带外像素仍有case6/7、14/15、17五项失败，最低SSIM0.97892，最高RGB平均误差1.90992/255；case10/11修正后SSIM0.98754/0.98852。原始ROI最低SSIM0.77191、最高RGB平均误差16.27161/255，不能把带外数字当原图成绩。正常TitleContext仍拒绝像素失败；TitleDiagnostics只允许结构/行为/成本/释放都通过后保存diagnosticsPassed=true、passed=false和pendingPixelCases，不能用来收口R16B2V-P。
-
-受影响DPR1完整回归通过：20项文字的带外SSIM最低0.98773，18项页眉、三路径各三次成本、十次恢复/释放和18项生产浏览通过。27项Release CTest（含source-format/title-reels）、两组qmllint、check-format、维护脚本格式与qsb GLSL/HLSL/MSL检查通过。DPR1.5最终采集后仅修正独立单元断言，UI二进制未改变；结构/行为/成本/释放报告继续从原始完整报告核对，Release CTest重新通过。
-
-换机保留的五项最小失败数值如下，来源为上述 Qt 6.12.0/MSVC 19.51 Release、D3D11/实际DPR1.5 的最终完整报告，生产 mode=0；这是带外归一化指标，不是原始 ROI 分数或 macOS 成绩。案例编号解析已入库 `tests/fixtures/text/titles.json`，无需将逐帧 JSON/PNG 改名为输入入库。
-
-| case | 带外 SSIM（门槛≥0.98） | RGB 平均误差 /255 | 最大结构误差 /逻辑px |
-| --- | --- | --- | --- |
-| 6 | 0.979641055 | 1.632645503 | 0.046875 |
-| 7 | 0.979015593 | 1.909911817 | 0.046875 |
-| 14 | 0.979517407 | 1.474845679 | 0.1177675 |
-| 15 | 0.978920067 | 1.678155007 | 0.1177675 |
-| 17 | 0.978975576 | 1.139508148 | 0.2025 |
-
-新机器没有旧采集目录时，先运行 `node tools/review/export-title.mjs --dpr 1.5` 重建参照，再运行下文 Windows 诊断；它读取冻结 Git 源码和原字体，不依赖旧机器缓存。Mac 接续和同机 Metal 来源入口见 [macos.md](../platforms/macos.md)，不能用 Mac 重建结果回填这些 Windows 数值。
-
-下表是DPR1.5每组120帧的CPU累计毫秒，依次列三次独立结果；包含初始准备/切换与诊断提交，不池化、不推导GPU或产品FPS。
-
-| 路径 | GUI准备 | 活动tick | Qt同步 | CPU绘制提交 |
-| --- | --- | --- | --- | --- |
-| 整行glyph＋彩色Text | 3.3031 / 0.3662 / 0.3718 | 15.9764 / 10.4975 / 11.2053 | 10.8445 / 5.3010 / 7.0073 | 36.1749 / 23.7429 / 27.7291 |
-| Qt Quick Text候选 | 1.3013 / 1.1000 / 1.2422 | 13.4301 / 10.8939 / 11.6773 | 6.5179 / 7.3664 / 6.0768 | 21.4267 / 25.1163 / 22.5337 |
-| Canvas候选 | 0.4375 / 0.4405 / 0.4609 | 6.7877 / 7.1306 / 5.6132 | 1.8594 / 1.8702 / 1.7645 | 11.3856 / 12.1404 / 11.4580 |
-
-Canvas三次文字paint均96次，局部sync为0.2898/0.2770/0.2616ms、paint为7.6962/8.2193/7.6596ms；其他路径Canvas文字paint均零。共享控制器描述符缓存101156bytes、生产槽RGBA8层估算858552bytes；这不是Canvas/Text候选的实际显存，更不含字体图集/驱动或resize新旧峰值。GPU时长全部null，未测内存保持未知。PERF-01–07及共同字体值/窗口/qrc/Metal/GL静态链已审计，macOS/Linux为“静态审计通过，实机待用户验证”。
-
-复现诊断：`./tools/build/verify-r16.ps1 -TitleContext -TitleDiagnostics -Backend d3d11 -Dpr 1.5 -UseExistingWebSource -EvidenceDirectory verification/windows/title-reels/r16b2v/accepted`；完整DPR1回归使用相同入口去掉TitleDiagnostics、设Dpr 1及独立dpr1-regression目录。静态入口为`./tools/audit/audit-r16.ps1 -Round R16B2V`，要求声明的五个像素待修项和完整DPR1回归，不将诊断摘要冒充像素通过。
-
-## Apple Silicon 字体身份与真正离屏诊断（R16M1/M2）
-
-本机Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release、Metal/实际DPR2；同机Edge 155.0.4283.45从冻结源码生成20项参照。QQuickRenderControl渲染同一QML/生产字轮到隐藏Metal目标，显式DPR2，没有原生show、swapchain呈现或正常VSYNC。FrameClock/源轨迹、CurveRendering、两倍DPR层与原像素门槛不变。
-
-R16M1的case10/11曾累积advance误差16.078125逻辑px。实际CDP字体身份为`Apple Color Emoji / AppleColorEmoji`，Qt却选`.Apple Color Emoji UI`；28px下前者advance为28px，后者约32px，加上源-0.6px字距后差4px。macOS初始化用公开`QFontDatabase::setApplicationEmojiFontFamilies`指定原系统字体面，缺family显式回滚/失败，Windows/Linux策略不变。整行shaping及普通字形基线未改，彩色Text与测量共享应用字体策略。该API依据为[Qt字体数据库公开文档](https://doc.qt.io/qt-6/qfontdatabase.html#setApplicationEmojiFontFamilies)。
-
-原生诊断直接保留测量run的head hash、glyph ID/position，CDP记录真实字面与family/PostScript；不把从私有family描述符重新解析出的替代字体度量当作测量run。当前Apple面head SHA256为`bd2ad7ff0c0cff60a1ceff914f9fbb81a0197cf26472a35721912863f8501e13`，四个彩色grapheme的整行ID为3237/1139/423/822。这些标识用于本机诊断，不锁定以后系统字体版本。四种字号（12/28/29.75/44）与三个DPR输入的字体/advance回归在修复前失败、修复后通过；不等同于三个DPR的像素验收。
-
-R16M2完整诊断：20项生产结构/文本与源码轨迹通过，最大结构误差0.240865逻辑px；case10/11误差0.078125逻辑px，固定1物理px带外SSIM为0.999285581/0.999253834，RGB平均误差为0.079922/0.079038（0–255单位）。原始ROI SSIM为0.962329861/0.943559874、RGB为2.439160/3.169872，原始与带外分别解释。18项页眉、定位不改变播放、三路径各三次120帧有界活动/缓存检查、隐藏Canvas零文字绘制、十次离屏恢复、最终零tracked节点/renderer及隐藏原生窗口策略通过。缓存计费99546bytes，生产槽RGBA8层描述符估算1524220bytes；字体图集/驱动内存未测，GPU时长仍为null，离屏CPU不代表产品threaded render-loop或窗口性能。
-
-完整诊断正常退出，明确`diagnosticsPassed=true`、`passed=false`及六项剩余像素失败；R16M2P处理以下固定1物理px带外分数，不能用诊断豁免像素收口。D3D11/OpenGL等当前不可执行的原门槛与macOS尚不可靠的可见窗口验证完整保留到最后R34。
-
-| case | 带外SSIM | 带外RGB平均误差 /255 | 几何最大误差 /逻辑px |
-| --- | --- | --- | --- |
-| 6 | 0.974967633 | 1.733680556 | 0.046875000 |
-| 7 | 0.972839274 | 1.970763889 | 0.046875000 |
-| 14 | 0.939155120 | 2.469695216 | 0.117767500 |
-| 15 | 0.932594943 | 2.812181713 | 0.117767500 |
-| 16 | 0.942828136 | 1.897446667 | 0.202500000 |
-| 17 | 0.938856444 | 2.214410000 | 0.202500000 |
-
-重建参照：`node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/r16m2/source`。完整诊断：`node tools/build/verify-title.mjs --backend metal --dpr 2 --source verification/macos/title-reels/r16m2/source --output 新目录 --diagnostics`。每次原生运行使用新目录，正常像素收口去掉`--diagnostics`。原R16M1报告和失败图仍在本地`verification/macos/title-reels/r16m1/final/`；R16M2参照、报告及成对图保持忽略，不提交机器输出。
-
-源码/性能审计：`node tools/audit/audit-title.mjs 完整诊断目录`。它要求完整隐藏Metal/DPR2诊断及同机字体证据，校验文本qsb的MSL/GLSL/HLSL，按已人工推演的COMMON/PERF-01–07调用链保存两个平台的源码hash矩阵。该入口输出的严格静态矩阵与本机真实arm64离屏结果分别记录；只对未实际执行的适用检查标注实机待验证，任务归R34，不外推可见窗口性能或Linux/Windows。Release全部23项启用CTest、source-format/check-format、两个qmllint与qsb变体通过；四项可见runtime测试disabled，按R34暂缓，未记为通过。R17等待当前主线R16M2P/M3阶段验收，跨平台最终选型留在R34。
-
-## Metal/DPR2 字体框基线与正常像素验收（R16M2P）
-
-同机冻结生产字面新增CSS font/lineHeight、Range相对face顶部/高度与Canvas字体ascent/descent诊断；Source CSS、字体、粗搜/细搜、状态和像素比较规则不变。原生半行距小数没有匹配源字体框的整逻辑px顶部，导致20px标题、窄屏拟合与19.8px译名的垂直采样差异。macOS只在主字体baseline计算中floor半行距，保留分数行框、原字号/比例、整行glyph关联、混合字体ascent补偿与emoji策略。Windows/Linux分支不变；不是统一DPR取整、逐case偏移或新栅格路径。CurveRendering、两倍DPR层、qsb合成及资源兼容性键不变。
-
-Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release、真正隐藏Metal/实际DPR2，同机Edge 155.0.4283.45参照：正常入口退出0，`diagnosticMode=false`、`passed=true`、无待修像素项。20项生产文字的结构最大误差0.240865逻辑px、源码运动误差4.55e-13；固定1物理px带外SSIM最低0.996912214、RGB平均误差最高0.264246/255，最大边缘带比例24.40%。未经归一化的原始ROI最低SSIM0.869280017、RGB最高10.617510/255；不把带外成绩当原图成绩。原R16M2六项失败和本次独立基线仍保留，原门槛未变。
-
-18项九尺寸双主题页眉、定位不改变播放、三路径各三次独立120帧活动/缓存、隐藏Canvas零文字绘制、十次离屏恢复和最终零tracked节点/renderer通过。描述符缓存99546bytes、槽RGBA8层估算1524220bytes；Qt字体图集/驱动内存未知、GPU时长null，CPU局部结果不宣称性能提升、present或VSYNC。全部23项启用Release CTest、source-format/check-format、两组qmllint与文本qsb的MSL/GLSL/HLSL变体通过；四项可见runtime明确disabled并保留R34。受限环境无屏幕曾使四项CTest中止，原生权限完整运行通过；未更换Qt平台插件或关闭检查。
-
-`macSourceFontBoxBaseline`按同机源字体框独立数值覆盖12.6/19.8/20/24.609375/28/29.75/44px、三个DPR布局输入与真实Demibold译名；旧计算实际失败，修正后通过。审计逐个普通字面核对源Range顶部及有效baseline，允许Qt自身1/64逻辑px量化步长；emoji仍单列字体身份/advance与完整像素。这些布局输入不是DPR1/1.5像素验收，其完整矩阵与阶段选型仍归R16M3；当前候选按字面重新shaping的限制未消除。
-
-重建与验收（每次原生运行选新目录）：
-
-```sh
-node tools/review/export-title.mjs --dpr 2 --output verification/macos/title-reels/r16m2p/source
-node tools/build/verify-title.mjs --backend metal --dpr 2 \
-    --source verification/macos/title-reels/r16m2p/source \
-    --output verification/macos/title-reels/r16m2p/accepted
-node tools/audit/audit-title.mjs verification/macos/title-reels/r16m2p/accepted R16M2P
-```
-
-本机正常结果在`verification/macos/title-reels/r16m2p/final/`，含CSS诊断的参照在`font-metrics/`。COMMON-01–05/PERF-01–07矩阵分别写入三个平台的本地`*-static/title-reels/r16m2p/`，人工展开缓存/值交接、线程所有权、层/附件/释放与平台预处理；脚本符号/hash只防源码漂移，不代替推演。Windows/Linux为静态审计通过、实机待验证（R34），无目标编译器/字体后端/窗口管理器/GPU环境；不改写D3D11五项已知失败。macOS的可见窗口、正常VSYNC及真实输入/呈现仍依R34既有清单。全部原图、逐帧成本、日志和矩阵保持忽略。
-
-## 当前平台完整文字矩阵与阶段选型（R16M3）
-
-Qt 6.12.0/AppleClang 21.0.0、arm64、macOS 27.0.1、Release，同机Edge冻结生产源码/原字体参照，真正隐藏RenderControl的Metal和OpenGL分别覆盖实际DPR1/1.5/2。六个正常入口全部退出0，diagnosticMode=false，无待修生产像素项或绑定环/pipeline错误。每个上下文有20项双主题文字、18项九尺寸页眉、三路径各三次独立120帧、十次恢复及最终零tracked节点/renderer；共120项生产文字、108项页眉、54组活动诊断及60次恢复。源码轨迹最大误差4.55e-13、结构最大误差0.240865逻辑px。原四项可见runtime仍disabled，窗口/present/VSYNC、目标平台与媒体不由本轮离屏结果推断。
-
-Metal/OpenGL的生产文字极值一致，以下带外使用原固定1物理px参照边缘带；原始ROI另列，不能将二者混用。
-
-| 实际DPR | 带外最低SSIM | 带外最高RGB误差 /255 | 原始最低SSIM | 原始最高RGB误差 /255 | 最大边缘带占比 |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 0.997696028 | 0.198661 | 0.853568339 | 14.493171 | 43.76% |
-| 1.5 | 0.998250161 | 0.142444 | 0.882891366 | 11.639048 | 31.06% |
-| 2 | 0.996912214 | 0.264246 | 0.869280017 | 10.617510 | 24.40% |
-
-阶段生产保留普通整行glyph＋彩色Qt Quick Text、CurveRendering及两倍DPR槽层。QTextLayout保留整行shaping/连字/组合字，再关联字面；render侧重建并核对同字体head身份，不跨线程迁移QRawFont/QTextLayout。彩色Text仍使用源系统Apple Color Emoji面及其回退基线。布局cache完整依赖为text、主/译名字体、字号、宽度、budget、narrow、DPR、transport，fontDatabaseChanged清空；容量96项/8MiB，动画只更新活动槽和必要矩阵，不逐帧测量。
-
-两个候选在DPR1当前20项像素通过，但均按字面重新shaping，无法据共享controller结构数据证明整行上下文等价。Metal/OpenGL的DPR1.5/2 Text候选均失败case6/7、14/15、16/17；Canvas在DPR1.5失败emoji case10/11，DPR2失败case0–5、8–13。它们是候选失败，不是生产路径已通过的范围；不为低CPU成本换入像素或shaping不等价方案。Canvas Painter仍用于已验收的滑尺，后续序章按所属轮次接入；模块类别不作为排除理由。
-
-以下是每组三次独立120帧的CPU绘制提交累计毫秒，依次保留三次，不池化或挑最快。含切换/首次准备和诊断提交；GUI准备、tick、Qt同步、Canvas同步/paint原序列保留在本地报告，局部计量不能相加，也不能将这些累计量称为GPU、单帧耗时、VSYNC或产品FPS。
-
-| 后端 / DPR | 整行glyph＋彩色Text | Qt Quick Text候选 | Canvas候选 |
-| --- | --- | --- | --- |
-| Metal / 1 | 34.414 / 24.793 / 24.528 | 23.471 / 23.066 / 22.802 | 6.452 / 6.222 / 6.252 |
-| Metal / 1.5 | 34.350 / 24.544 / 26.080 | 23.183 / 23.003 / 22.791 | 6.463 / 6.395 / 6.214 |
-| Metal / 2 | 36.206 / 25.138 / 24.825 | 23.932 / 23.669 / 23.790 | 6.507 / 6.254 / 6.348 |
-| OpenGL / 1 | 18.383 / 15.315 / 14.245 | 15.268 / 13.829 / 14.112 | 4.423 / 3.908 / 3.667 |
-| OpenGL / 1.5 | 19.654 / 13.841 / 14.518 | 13.633 / 14.178 / 13.646 | 4.574 / 3.790 / 3.677 |
-| OpenGL / 2 | 19.384 / 18.032 / 14.111 | 14.986 / 14.549 / 14.043 | 4.336 / 4.060 / 3.881 |
-
-隐藏Canvas文字paint及隐藏生产glyph重建每组均为零；Canvas活动各组三次均97次文字paint，活动tick无layout miss。描述符cache在DPR1为98806bytes，DPR1.5/2为99546bytes；生产槽RGBA8层估算分别383408/858552/1524220bytes。该层估算不是Canvas附件实测，不包含Qt图集/驱动内存；外层离屏RGBA8和depth/stencil单采样、无mips，颜色4bytes加深度模板8bytes保守上界按12bytes/物理像素记账；原8bytes估算未覆盖D32FS8，旧报告保留但不当作完整附件上界。resize旧/新峰值由OffscreenSurface单列，层与内部图集不能漏计或重复相加。GPU时间均null、实际显存未知。外层resize附件峰值上界在DPR1/1.5/2分别为92620800/208396800/370483200bytes；这是旧/新资源计划的保守估算，不是实测显存。
-
-macOS显式OpenGL分支在QGuiApplication创建前请求4.1/CoreProfile；旧默认GLSL120与Kit shader不兼容的崩溃保留在opengl-dpr1失败目录。采用[QSurfaceFormat的公开默认格式接口](https://doc.qt.io/qt-6/qsurfaceformat.html#setDefaultFormat)，Metal默认分支及Windows/Linux格式不变。歌名caption可见性改由有标题或退出动画未结束决定，容器原宽度/opacity/offset曲线和退出禁用不变；naturalWidth独立通知，hide立即停tick并合并排队finish，restore取消陈旧完成。两个单元回归覆盖通知重入、十次合并hide及恢复取消；只拆宽度通知/可见性时仍有绑定失败的中间报告保留，最终六上下文重新通过。
-
-复现时每个后端/DPR串行执行并选择新输出目录，先用`node tools/review/export-title.mjs --dpr 1 --output verification/macos/title-reels/r16m3/source-dpr1`生成对应参照；DPR1.5/2同理。正常验证：
-
-```sh
-node tools/build/verify-title.mjs --backend metal --dpr 1 \
-    --source verification/macos/title-reels/r16m3/source-dpr1 \
-    --output verification/macos/title-reels/r16m3/new-metal-dpr1
-node tools/audit/audit-title.mjs verification/macos/title-reels/r16m3/new-metal-dpr1 R16M3
-```
-
-其余五上下文替换backend/DPR和对应source，禁止并行GPU采样。最终本地报告为`accepted-v3-{metal|opengl}-dpr{1|1_5|2}/`；COMMON-01–05/PERF-01–07/qsb及三个平台源码hash矩阵在各自`*-static/title-reels/r16m3/{backend}-dpr-{DPR}/`。实际后端/DPR、匿名fixture、源参照及二进制hash分开登记，静态矩阵不代替Windows/Linux实机。全平台最终选型、D3D11五项已知失败、高DPR及其他目标OpenGL、可见窗口与共享hide回归继续由R34保留；R17只依赖本阶段实现和当前可靠验收。原始PNG/逐帧JSON/日志/矩阵全部忽略，不提交。
-
-本轮Release全部23项启用CTest（含source-format/title-reels/隐藏窗口策略）通过，format/check-format、Yalahoo及ui-audit两组qmllint和文本qsb的MSL/GLSL/HLSL通过；四项可见runtime明确disabled，未记为通过。
-
-## macOS 可见窗口补验范围
-
-2026-10-14 的同机 Release 可见 Metal/threaded 与 OpenGL/basic 分别覆盖实际有效 DPR1/1.5/2，六上下文正常退出0。每项20个生产文字、18个页眉、三路径各三次120帧、十次恢复及最终零tracked节点/renderer通过；原固定1物理px带与像素、结构、运动门槛不变，候选失败继续单列。前台由用户按本轮授权，报告明确 user-authorized-foreground；屏幕原生DPR1，高DPR由 nativeScreenDpr 校准后的有效渲染DPR验证，不声称已换到其他物理显示器。
-
-复现为上述正常命令增加 `--visible`，并仅在用户授权轮次设置 `YALAHOO_VERIFY_FOREGROUND=1`。本地产物在 `verification/macos/visible-window/`，包括旧失败与最终 `verified-title-opengl-dpr*/` 和 Metal 正常目录；不提交。按钮位置取 afterSynchronizing 后的已polish几何，避免 GUI frameSwapped 回调读到下一 tick 的中间Row布局；QPointer随QML销毁失效。basic 的原生恢复显式重建surface，最终删除QML后先交付真实清理帧，再hide/destroy。CPU成本按native/离屏、basic/threaded分别解释，GPU与真实显示延迟仍未测，不外推完整产品120秒性能。Windows/Linux与跨平台最终选型仍按R34。
+## 字体定位与隐藏完成
+
+- 普通glyph只传描述符/head身份/ID/位置；彩色grapheme用Quick Text。macOS在QML创建前指定Apple Color Emoji，主字体半行距floor按逻辑CSS px，混合行按实际QTextLine.ascent补偿普通基线；彩色回退基线独立保留。Windows/Linux不套用macOS定位规则。
+- 字面范围和宽度终点均截到inkEnd，普通glyph保留整行上下文。源测量probe若computed字号陈旧，替换相同CSS/children的测量根，不改拟合算法。
+- naturalWidth仅实际变化通知；caption由存在标题或退出动画状态决定，退出保留完整字面/宽度曲线并禁点击。hide立即停advance，合并一个对象所属queued finish，restore取消陈旧完成。
+- 生产ReelInk和比较Canvas均在GUI与render侧核对item/window有效可见性；隐藏不排版/建字形/绘字，窗口替换断旧连接，恢复重发状态。
+
+## 检查与范围
+
+- `ctest --preset qt-release -R '^title-reels$'`覆盖grapheme/连字/组合字、长文省略、缓存容量、20/30/60/120fps/打断/反转/速度/减少动态/复用、宽度通知、hide合并与恢复取消。
+- 完整组件检查为20项双主题文字、18项九尺寸页眉、三路径各三次120帧活动/缓存、隐藏零文字工作、十次恢复和最终节点/renderer释放；轨迹≤1e-6、结构≤1逻辑px。实际播放与定位执行归R24/R23，匿名歌名事件不能证明音频已接入。
+- 工具候选Text/fillText重新按字面shaping，不能因共用控制器布局就认定整行语义等价；当前生产为glyph+彩色Text/CurveRendering/两倍DPR槽层。候选语义/实际质量与成本分开判断，跨平台选型仍在R34。
+- 源数据导出`node tools/review/export-title.mjs --dpr 数值 --output 新目录`；原生驱动`node tools/build/verify-title.mjs --backend metal|opengl|d3d11 --dpr 数值 --source 源目录 --output 新目录`。这些旧驱动含图像评分，R19F/目标R34须先拆出上述非像素检查，不能直接恢复旧评分。
+- Windows薄入口`verify-r16.ps1`/`audit-r16.ps1`与`audit-title.mjs`保留工具定位；详细参数以脚本为准，不复制轮次运行流程。实际DPR读取窗口报告；`--visible`遵守公共窗口策略。
+- macOS Metal/OpenGL已覆盖有效DPR1/1.5/2的隐藏及授权可见组件；有效缩放不等于换用其他物理显示器。原Windows高DPR/目标GL、共享通知和最终选型欠验按R34，历史像素失败不重新设为补修门槛。当前样本不证明完整产品120秒性能/GPU/屏幕延迟。

@@ -24,12 +24,8 @@ RealColumns 保存 O(C) 的两个标量状态，但 update 只推进统一时间
 
 共用 R12/R11 的封面 generation、worker/待解码/上传上界、不可变快照和资源计划。真实列过滤后只为合法可见 ID 请求封面；数量/相机/主题变化不改变目标兼容键。模式切换不销毁渲染树，原像素租约按可见身份更新；库替换、隐藏恢复和销毁沿用既有取消/重放规则。真实模式不做循环坐标 rebase，填充 rebase 继续平移运动、归位和绝对波浪原点。
 
-## 复建与验收
+## 检查入口
 
-Windows 使用 `./tools/build/verify-r13.ps1`，随后 `./tools/audit/audit-r13.ps1`。均为最新 Kit / Release；GPU 窗口第一次 show 前应用 VerificationWindow 的置底/不接受焦点标志，图片来自自身 QRhi texture readback。三次 D3D11 与一次 OpenGL 样本分目录保存，不混合统计；submissionSamples 是包含 Review 读回命令的局部 CPU 提交诊断，不是 GPU 完成、实际显示或完整产品 120 秒成绩。
+`real-columns`使用`tests/fixtures/real-columns/trajectories.json`的独立源输入；完整逐帧数学由`node tools/review/export-real-columns-golden.mjs`输出本地，`YALAHOO_REAL_COLUMN_GOLDEN`可指定对应完整文件。核对x/v/a≤1e-6，包含20/30/60/120fps与.25/1/3×、空/单/奇偶/49/106列、长列尾部及归中打断。
 
-`tests/fixtures/real-columns/trajectories.json` 是稀疏独立源码数值输入，普通 CTest 不依赖本地采集输出。完整逐帧系列及冻结生产 field 由 `export-real-columns-golden.mjs` 生成到忽略的 verification/windows/real-columns；GPU audit 按冻结 field 生成独立变换，同输入比较真实生产 SceneItem 图像。涵盖空/单/奇偶/49/106列、长列尾部、未完成归中返回、首尾键盘/滚轮、低/高清封面、双主题、稳定零上传、资源复用和隐藏后重建。会话/偏好测试涵盖关开无图像副作用、真实深度与负填充周期、未知字段保留、快速保存合并和损坏原件保留。已有填充池/播放隔离/拾取、运动、光带、封面、几何及运行入口另执行受影响回归。
-
-macOS/Metal 与 Linux/OpenGL 使用相同 C++23 模型、运动、文件/事件 API 和 qsb shader。新增路径无 Windows API、网络或第三方依赖；平台后台、编译与部署按既有分支。纯静态项标明“静态审计通过，实机待验证（R34）”，可靠本机检查真实执行并单列范围，目标机步骤见docs/platforms/；Windows OpenGL 不充作 Linux 实机结果。
-
-Windows 验收结论：Qt 6.12.0 / MSVC 19.51 / Release 的三次 D3D11 与一次 OpenGL 功能/资源/图像检查通过；完整冻结 x/v/a 系列最大误差约 1.13e-10，生产初态对冻结 field 的变换误差为 0，D3D11 SSIM=1、OpenGL SSIM≥0.99999994，稳定上传为 0，重建对照 SSIM≥0.99999997。18 项受影响回归、全部 24 项生产 CTest（含 source-format）、check-format、PowerShell 风格和 qmllint 通过。macOS/Linux：静态审计通过，实机待用户验证；未建立完整产品性能达标结论。
+Review `real-columns-gpu`检查有效实体/边界事件、列记忆/模式/库替换、物理ID与rebase、封面租约/上传、资源复用与十次SG重建；偏好检查未知字段、最新值合并与损坏原件。输入事件语义只在[navigation.md](navigation.md)维护。入口分组见test-gates.md，剩余目标验收归计划R34/R19B-P。

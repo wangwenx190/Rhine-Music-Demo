@@ -4,13 +4,13 @@
 
 用户明确要求某轮次进行可见窗口验证，即授权该轮次验证窗口抢前台、前置和获得焦点，无需重复确认。该例外只覆盖指定轮次与验证用途；显式设置 `YALAHOO_VERIFY_FOREGROUND=1`，macOS 可见 CTest 同时以 `YALAHOO_MACOS_VISIBLE_TESTS=ON` 配置。`VerificationWindow` 在该进程创建 QGuiApplication 之前即使用 macOS Regular，随后使用普通窗口 flags 与正常窗口层级，报告 `mode=user-authorized-foreground`、`nonInterferenceEnforced=false`，按实际策略验收，不冒充置底无激活通过。自身图像采集、Release、匿名输入及串行采样要求仍适用；不得截取用户桌面。轮次结束必须清除进程开关，恢复可见测试 OFF，并真实回归默认隐藏窗口策略。后续轮次/session 不继承此前授权。
 
-验证方式按迁移计划逐项核对实际可靠能力，不按平台名称固定为实机或静态。当前macOS尚未建立可靠的非激活可见验证入口，默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`；用户授权轮次可使用上述前台入口，未获授权且仍不可靠的对应runtime/GPU检查暂缓到最后R34，不把disabled写成通过；已有可靠隐藏/离屏入口必须真实运行。当前二维Review优先使用`OffscreenSurface`：QQuickRenderControl在隐藏QQuickWindow上渲染真实Metal单采样RGBA8+depth/stencil目标，显式设置目标DPR，有界合并render请求；只读回自己的texture，不调用macOS原生show、不依赖exposure或swapchain呈现。offscreenRendering只由Review tokens启用，生产默认false。native窗口恢复与显示效果不由离屏生命周期推断，离屏局部成本不代表呈现性能；当前无法可靠验证的窗口/VSYNC等项目严格审计并保留R34实机任务。
+默认macOS可见测试OFF；授权窗口例外与离屏选择由迁移计划的动态能力规则决定。OffscreenSurface在隐藏QQuickWindow上用RenderControl渲染真实RGBA8+depth/stencil，显式target DPR，合并有界render请求，只读自身texture；offscreenRendering只由Review tokens启用。
 
-macOS 必须落实原生窗口策略，不能只检查 Qt flags。Qt Cocoa 的 `windowLevel` 没有处理置底标志，应用启动委托还可能主动激活进程（[Qt Cocoa 窗口源码](https://github.com/qt/qtbase/blob/dev/src/plugins/platforms/cocoa/qcocoawindow.mm)、[启动委托源码](https://github.com/qt/qtbase/blob/dev/src/plugins/platforms/cocoa/qcocoaapplicationdelegate.mm)）。所有 CTest 在创建 QGuiApplication 前设置 `QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM=1`；独立图形验证工具及产品 `--verify-*` 入口调用 `prepareApplication()`。QML 验证 root 保持隐藏，取得对象后、首次 show 前调用 `prepareWindow()`。
+macOS 必须落实原生窗口策略，不能只检查 Qt flags。Qt Cocoa 的 `windowLevel` 没有处理置底标志，应用启动委托还可能主动激活进程。所有 CTest 在创建 QGuiApplication 前设置 `QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM=1`；独立图形验证工具及产品 `--verify-*` 入口调用 `prepareApplication()`。QML 验证 root 保持隐藏，取得对象后、首次 show 前调用 `prepareWindow()`。
 
 `VerificationWindowMac.mm` 仅在验证进程使用 AppKit/CoreGraphics 公开 API；默认模式使用 Prohibited 策略禁止应用激活，并关闭 Qt 启动激活，以 `NSNormalWindowLevel-1` 置于普通工作窗口以下，保留拒绝 key 焦点的 Qt 标志，并禁止原生鼠标事件进入测试窗口。测试输入只通过自身 Qt 对象发送。守卫观察 NSView 的 window 和 NSWindow 的 level，Qt 重设层级/替换窗口时同步重新应用；surface 销毁前移除观察，恢复/重建继续生效。报告原生层级、key/main 状态、应用是否激活与前台应用是否变化；默认模式的实际 key/main 或应用激活（含短暂通知）使窗口策略失败；授权前台模式核对 Regular/正常层级，并记录实际激活与曝光。该边界不包含音频桥接，不修改普通产品窗口。
 
-不需要真实显示窗口的检查保持隐藏：模型、格式、字体、资源、图像比较、shader bake、参数与静态审计不调用 show。纯 QML 组件检查不为方便而加载可见 ApplicationWindow。浏览器采集使用已有 headless 模式，后台进程通过 windowsHide/CreateNoWindow 或 Start-Process 的 `-WindowStyle Hidden` 启动。
+不需要真实显示窗口的检查保持隐藏：模型、格式、字体、资源、合成图像算法单元检查、shader bake、参数与静态审计不调用 show。纯 QML 组件检查不为方便而加载可见 ApplicationWindow。浏览器采集使用已有 headless 模式，后台进程通过 windowsHide/CreateNoWindow 或 Start-Process 的 `-WindowStyle Hidden` 启动。
 
 需要真实 exposed 窗口、真实 RHI 呈现或 hide/minimize/restore 行为的测试使用 `src/app/VerificationWindow.h`。默认在创建/第一次 show 之前设置 `Qt::WindowStaysOnBottomHint` 和 `Qt::WindowDoesNotAcceptFocus`；需要无边框时额外加 FramelessWindowHint。默认禁止 WindowStaysOnTopHint、raise、requestActivate、activateWindow 与系统前台激活；本契约的显式授权轮次可按需前置、激活。任何模式均不自动点击用户桌面。窗口重建、改变尺寸和 showNormal 后必须继续保持选定策略；默认模式保留置底/不接受焦点标志。不能依靠隐藏启动进程代替 Qt 窗口标志：程序后续 show 仍可能显示窗口。
 
@@ -20,16 +20,15 @@ QQuickWindow 使用自身 grabWindow / GPU texture readback 获取完整渲染�
 
 Release CTest 的 `verification-window-policy` 创建隐藏的真实原生 QWindow，验证初次创建、flags 变化和 surface 重建保持隐藏；Windows 同时核对系统 WS_EX_NOACTIVATE、非 topmost 和前台 HWND 不等于测试窗口。macOS 隐藏检查核对原生低层级、拒绝 key、关闭启动激活、忽略原生鼠标事件及前台应用不变；不为检查标志而显示窗口。实际运行/运动/资料及两个 RHI Review 的 windowPolicy 检查覆盖必须显示的窗口和恢复行为；图形对照继续使用原 DPR/fixture/目标尺寸，不因置底而降低画质或改用假渲染。
 
-常规验证：
+授权可见复现使用进程环境开关，不写进公共 preset。`ui-audit` 另设 `YALAHOO_VERIFY_VISIBLE=1` 选择 native window；`node tools/build/verify-title.mjs --visible --backend metal|opengl --dpr 1|1.5|2 --source 同机参照 --output 新目录` 保留有效结构/运动/缓存/释放检查；旧图像流程先按R19F拆耦。macOS OpenGL 按当前 AppKit 要求使用 basic，Metal 使用 threaded；原生 frameSwapped 的驱动回调排队到 GUI，basic 的 surface 重建与最终 renderer 清理帧单列，不能称为 render-thread 隔离。当前 CTest 中 `verification-window-visible` 核对首次曝光、实际帧、原生 onScreen、最小化及十次 flags/surface 重建；`verification-window-policy` 强制 `YALAHOO_VERIFY_FOREGROUND=0`，独立证明默认隐藏策略。
+
+## 授权可见入口
 
 ```sh
-cmake --build --preset qt-release --target format
-cmake --build --preset qt-release --target check-format
-cmake --build --preset qt-release
-ctest --preset qt-release --output-on-failure
-cmake --build --preset qt-release --target Yalahoo_qmllint
+cmake --preset qt-release -DYALAHOO_MACOS_VISIBLE_TESTS=ON
+YALAHOO_VERIFY_FOREGROUND=1 ctest --preset qt-release-visible -R '^runtime-overview$'
+cmake --preset qt-release -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+ctest --preset qt-release -R verification-window-policy
 ```
 
-Windows既有完整Review/生产重建入口为`tools/build/verify-r10b.ps1`，只有具备对应可靠环境时执行。所有平台都检查同一helper/QML初始属性、原生分支及采集所有权；可靠本机检查必须实际通过，不可执行的目标窗口/呈现/重建验证严格审计并保留到R34。纯静态与实际运行结论分别记录，其他平台结果不证明目标窗口管理器或compositor已验证。
-
-授权可见复现使用进程环境开关，不写进公共 preset。`ui-audit` 另设 `YALAHOO_VERIFY_VISIBLE=1` 选择 native window；`node tools/build/verify-title.mjs --visible --backend metal|opengl --dpr 1|1.5|2 --source 同机参照 --output 新目录` 保留正常像素/缓存/释放门禁。macOS OpenGL 按当前 AppKit 要求使用 basic，Metal 使用 threaded；原生 frameSwapped 的驱动回调排队到 GUI，basic 的 surface 重建与最终 renderer 清理帧单列，不能称为 render-thread 隔离。当前 CTest 中 `verification-window-visible` 核对首次曝光、实际帧、原生 onScreen、最小化及十次 flags/surface 重建；`verification-window-policy` 强制 `YALAHOO_VERIFY_FOREGROUND=0`，独立证明默认隐藏策略。
+可见开关只选择入口，不自行授予前台权限；授权来自用户指定轮次。UI独立native入口另需YALAHOO_VERIFY_VISIBLE=1。工具仅发送自身Qt事件，不全局模拟用户键鼠。

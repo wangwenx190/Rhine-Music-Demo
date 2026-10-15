@@ -8,7 +8,7 @@
 
 `SceneFrame` 是按值复制的只读快照，含 revision、double 相机 position/aim/span、Qt view/projection、caseTransform、内容尺寸、布局类别与 clipNear=5/clipFar=300。RHI 在同步边界复制快照；所有状态写入在 GUI 线程，矩阵实际不变时不重新发布几何 revision。输入 revision/time 另按集成契约记录。`projectWorldPoint(world)` 返回内容逻辑像素 x/y 和 OpenGL 约定 NDC z；相机后方返回 NaN x/y、z=-1。不得将此 z 直接写入 D3D/Metal 深度：Quick3D 负责自身后端修正，生产 RHI 使用 QRhi 修正矩阵。
 
-`hitTest(x,y)` 使用同一 frame 的 inverse(projection·view·caseTransform) 做近/远射线与原盒体包围体相交，返回 `objectId`、localPoint、worldPoint、frameRevision；屏幕外/未命中为空。当前唯一调试对象 ID 是 `inspection-case`，不是专辑持久 ID。R12 扩展实体实例、稳定专辑身份及精细拾取；R18 扩展盒体旋转。不要把包围体命中当成每个镂空三角形的精确命中。
+`hitTest(x,y)` 使用同一 frame 的 inverse(projection·view·caseTransform) 做近/远射线与原盒体包围体相交，返回 `objectId`、localPoint、worldPoint、frameRevision；屏幕外/未命中为空。独立探针对象ID `inspection-case`不能作为专辑持久ID。实体身份/实例和旋转拾取分别见archive-pool.md/detail-motion.md。不要把包围体命中当成每个镂空三角形的精确命中。
 
 ## 布局与相机
 
@@ -18,16 +18,14 @@
 
 浏览静止目标使用实际生产 shot=29.1 的终态：yaw=59°、elevation=25°、span=7.33、distance=140、arrayAim=(-1.091,-.045,.481)。详情 progress 在 [0,1]，同一进度插值 yaw 到 8°、elevation 到 20°、distance 到 72、基础 span 到 5.9。portrait span、previewY=.36、detailY=.27+34/height 以及 compact/desktop detailY=.49/560÷1080 来自 `archiveFraming`；音乐入口显式覆盖横屏 detailX=.25，不能误用通用 detailX=.27 或 550/1920。
 
-横屏浏览 offset 的 16:9→21:9 过渡使用原 quintic smooth：right 0→3.5%、up 8→10%。portrait 采用固定 preview aim；detail 使用固定 inspection slot，不跟随实时盒体位置抵消抽取。selected slot 本轮固定匿名位置，基础 y=-4.6+settlingWave(0,26.56)，预览 lift=.9，inspection lift=3.35+.12，z=-2.17；完整波浪/实例池和抽取留在 R12/R18。
+横屏浏览 offset 的 16:9→21:9 过渡使用原 quintic smooth：right 0→3.5%、up 8→10%。portrait 采用固定 preview aim；detail 使用固定 inspection slot，不跟随实时盒体位置抵消抽取。独立固定状态selected slot采用匿名位置，基础 y=-4.6+settlingWave(0,26.56)，预览 lift=.9，inspection lift=3.35+.12，z=-2.17；完整波浪/实例池和抽取留在 R12/R18。
 
-`advance(motionDt)` 消费已经乘速度的唯一 FrameClock 输出，不再乘倍率或另设产品计时器。position/aim 每轴和 span 按 rate=9 的解析临界阻尼推进；FOV=2 atan(max(.1,span)/(2 max(1,distance)))。`observe` 从当前 position/aim/span 差分保留 authored pose 的速度，为 R20 交接提供接口，不在本轮实现开场时间线。`setDetail`/resize 重定向保留相机状态；resize 同步发布新 aspect 和 portrait，同时等待现有速度连续追随新目标。减少动态直接落到新目标。`setNavigation` 保留 rate=6 小轨道，realColumns 屏蔽 row orbit；`setPointer` 只在普通浏览且非减少动态时提供原 .12 偏移。
+`advance(motionDt)` 消费已经乘速度的唯一 FrameClock 输出，不再乘倍率或另设产品计时器。position/aim 每轴和 span 按 rate=9 的解析临界阻尼推进；FOV=2 atan(max(.1,span)/(2 max(1,distance)))。`observe` 从当前 position/aim/span 差分保留 authored pose 的速度，为R20接入开场时间线提供接口。`setDetail`/resize 重定向保留相机状态；resize 同步发布新 aspect 和 portrait，同时等待现有速度连续追随新目标。减少动态直接落到新目标。`setNavigation` 保留 rate=6 小轨道，realColumns 屏蔽 row orbit；`setPointer` 只在普通浏览且非减少动态时提供原 .12 偏移。
 
-## 验证与重建
+## 源状态与投影检查
 
-Windows 运行 `./tools/build/verify-r06.ps1`，仅 Release，自动发现最新 Kit 并开启 `YALAHOO_REVIEW`；完成采集后关闭该开关、构建普通产物并验证 13 个普通测试和 Review CLI 拒绝。普通构建默认不识别 `--verify-scene`/`--scene-report`。它们仅用于精确验证状态，不参与播放器用户流程。`-CollectOnly` 只整理现有已通过的 16 套 Review 报告、核对 fixture hash，不重放 Review GPU 测试；仍执行 qmllint 与普通构建验证。`./tools/audit/audit-r06.ps1` 重建 macOS/Linux 新增调用链的静态审计。
+`node tools/review/export-scene-golden.mjs`生成`tests/fixtures/scene/`；`scene`检查48布局/相机目标、528顶点/锚点、694帧20/30/60/120fps的非零初态、反向/改速/长帧/resize/减少动态，double≤1e-6。
 
-CPU oracle 覆盖九必测尺寸及 1.05/1100/短屏边界，共 48 目标、528 顶点/锚点、694 帧 20/30/60/120fps 非零初态、反向、改速、长帧、resize 与减少动态。真实窗口另外逐状态重放 120fps 的 361 个采样，冻结生产 FrameAnimation 后由既有 FrameClock 规则计算的 motionDt 驱动；每个状态等待三帧实际渲染完成，不能用截图延时决定相机位置。View3D 公开投影同时比较 SceneFrame 与冻结 Three 投影，每点误差≤2逻辑像素；双精度目标/轨迹误差≤1e-6。
+Review真实投影≤2逻辑px；QML浮点属性适配允许position1e-3/FOV1e-4，不能放宽最终投影。窗口记录实际QWindow DPR和目标像素；验证进程缩放环境变量不能替代真实DPR。`--verify-scene`/`--scene-report`仅Review，几何输出须renderError为空并排除错误提示区域，超大目标共用RenderQuality保护并检查恢复。
 
-Review 窗口使用 frameless，允许超出当前显示器的真实客户区尺寸；不比较系统边框。测试 DPI 环境仅在验证进程有效，报告必须记录实际 QWindow DPR 与 PNG 尺寸，不能把 QT_SCALE_FACTOR 当作实际 DPR。Qt float/fuzzy 属性的相机绑定检查允许 position 1e-3、FOV 1e-4，实际投影仍严格≤2px。无光 mesh 像素、qrc/字体/ShaderTools、鼠标交互、生产帧源/隐藏恢复、空媒体源与全量回归一起验证。证据在 `verification/windows/scene/`，实际图片在 `docs/media/scene/`，源数值在 `tests/fixtures/scene/`。
-
-公开接口语义：[PerspectiveCamera](https://doc.qt.io/qt-6/qml-qtquick3d-perspectivecamera.html)、[View3D 映射](https://doc.qt.io/qt-6/qml-qtquick3d-view3d.html)、[High DPI](https://doc.qt.io/qt-6/highdpi.html)。本轮不宣称材质、灯光、完整产品界面或性能门槛已验收。
+历史verify-r06脚本的源码/投影入口可按当前门禁使用；公共构建与窗口行为由native-bootstrap/test-gates/test-window-policy维护。材质/光照/后处理各有独立组件契约。

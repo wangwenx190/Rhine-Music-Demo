@@ -1,9 +1,5 @@
-# 单盒材质算法来源
+# 原生材质与后处理算法来源
 
-原生材质移植项目既有锁定 Three.js 的 cubeUV、透射 bicubic、DFG、物理环境 BRDF 与 ACES 数学；不链接 Three.js 到原生程序。MIT 许可证保存在 `three-LICENSE`，算法与资产 hash 在 `docs/contracts/materials.json` 和 `resources/manifests/materials.json`。原有项目与素材署名保留在原 NOTICE 及 legacy-web 归档。
+原生C++/QRhi/qsb及Qt Quick 3D Review移植既有锁定Three.js的cubeUV/PMREM、透射bicubic、DFG/GGX与多重散射、LTC求值及64×64查表、ACES/sRGB、PCF/Vogel阴影，以及BokehShader（Martins Upitis采样）、SMAAShader/SMAAPass（SMAA v2.8 WebGL 1x Medium及内嵌area/search PNG）。Three.js不在原生运行时链接或加载；MIT许可证保留于[three-LICENSE](three-LICENSE)。
 
-R08 also derives the LTC evaluator, 64×64 LTC tables, cubeUV diffuse environment sampling and GGX multiscatter compensation from the same locked Three.js distribution. See resources/manifests/lighting.json and docs/contracts/lighting.md for the source/hash and retained MIT license. Original world-space field and selection transport follow the frozen project's music-lighting.ts/music-row-lighting.ts; original author notices remain in legacy-web/.
-
-R09B ports the locked Three.js BokehShader (Martins Upitis bokeh sampling), SMAAShader/SMAAPass (SMAA v2.8 WebGL 1x Medium), their embedded area/search PNG lookups, and OutputPass ACES/sRGB mathematics. They are retained under the same Three MIT license in three-LICENSE; exact dependency/source and asset hashes are in resources/manifests/postprocess.json. Native execution uses only Qt resources and public Effect APIs. All original project authors and music artwork notices remain in legacy-web/.
-
-R10B adapts the same verified R07/R08 optical, cubeUV, LTC, DFG/GGX, bicubic, ACES and music field mathematics to explicit QRhi/qsb shaders. Source FrontSide transmission capture, stable render ordering and the effective PCF/Vogel shadow filter follow the frozen project and its locked Three.js distribution. Provenance, unchanged shared calibration and hashes are in resources/manifests/rhi-shell.json and docs/contracts/rhi-shell.md. Three is never linked or loaded by the native program; all MIT notices and original authors remain preserved.
+源码版本和算法/资产hash由`resources/manifests/{materials,lighting,postprocess,rhi-shell}.json`及相应契约JSON维护。音乐世界光场与选择传输来自冻结`music-lighting.ts`/`music-row-lighting.ts`，原项目作者与素材署名保留在`legacy-web/`。本说明只维护算法来源和许可；当前实现规范见`docs/contracts/`，历史参数说明不覆盖现行源码。
