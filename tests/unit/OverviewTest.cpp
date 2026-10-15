@@ -246,6 +246,58 @@ private slots:
         f.overview.setActive(true);
         QVERIFY(!f.overview.active());
     }
+    void retiringAnchorReversalAndSlotReuse()
+    {
+        OverviewLabelsModel labels;
+        OverviewColumn column{ 1, "第一列", 8, 800, 400, 1, true };
+        const auto rowFor = [&](int lane) {
+            for (int row = 0; row < labels.rowCount(); ++row)
+                if (labels.data(labels.index(row), OverviewLabelsModel::Lane).toInt() == lane)
+                    return row;
+            return -1;
+        };
+        labels.update({ column }, 1920, 1080, true, 0, false);
+        labels.update({ column }, 1920, 1080, true, .46, false);
+        const int row = rowFor(1);
+        QVERIFY(row >= 0);
+        const auto index = labels.index(row);
+        QVERIFY(labels.expand(1));
+        labels.update({ column }, 1920, 1080, true, .42, false);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::EntryWidth).toDouble(), 76);
+
+        labels.update({ column }, 1920, 1080, false, 0, false);
+        QVERIFY(!labels.data(index, OverviewLabelsModel::Interactive).toBool());
+        QVERIFY(!labels.canEnter(1));
+        column.x += 37;
+        column.y += 23;
+        column.extent = .7;
+        labels.update({ column }, 1920, 1080, false, .1, false);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::X).toDouble(), column.x);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::Y).toDouble(), column.y);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::Extent).toDouble(), .7);
+        const double opacity = labels.data(index, OverviewLabelsModel::Fade).toDouble();
+        QVERIFY(opacity > 0 && opacity < 1);
+        labels.update({ column }, 1920, 1080, true, 0, false);
+        QCOMPARE(rowFor(1), row);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::Fade).toDouble(), opacity);
+        labels.update({ column }, 1920, 1080, true, 1, false);
+
+        QVERIFY(labels.expand(1));
+        labels.update({ column }, 1920, 1080, true, .42, false);
+        labels.update({ column }, 1920, 1080, false, 0, false);
+        // Card retirement precedes expansion collapse. Reuse must start with no
+        // entry width/opacity, as a newly created source DOM card would.
+        labels.update({ column }, 1920, 1080, false, .24, false);
+        QCOMPARE(labels.liveCount(), 0);
+        column.lane = 2;
+        labels.update({ column }, 1920, 1080, true, 0, false);
+        QCOMPARE(rowFor(2), row);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::EntryWidth).toDouble(), 0);
+        QCOMPARE(labels.data(index, OverviewLabelsModel::EntryOpacity).toDouble(), 0);
+        QVERIFY(!labels.canEnter(2));
+        labels.update({ column }, 1920, 1080, false, 0, true);
+        QCOMPARE(labels.liveCount(), 0);
+    }
     void foldedColumnsCannotBePicked()
     {
         Fixture f({ 3, 3, 3, 3, 3, 3, 3, 3, 3 });

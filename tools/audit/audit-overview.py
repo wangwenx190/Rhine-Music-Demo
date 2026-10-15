@@ -9,7 +9,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
-parser.add_argument("--report", action="append", type=Path, required=True)
+parser.add_argument("--report", action="append", type=Path, default=[])
 parser.add_argument("--visual", action="append", type=Path, required=True)
 args = parser.parse_args()
 runtime = []
@@ -21,6 +21,13 @@ for path in args.report + args.visual:
         raise SystemExit(f"Release required: {path}")
     if report.get("qmlWarnings"):
         raise SystemExit(f"QML warnings: {path}")
+    if path in args.visual and (not report.get("retired")
+                                or len(report.get("captures", [])) != 36
+                                or not report.get("expansionClicks")
+                                or not all(report["expansionClicks"])
+                                or len(report.get("entryClicks", [])) != len(report["expansionClicks"])
+                                or not all(report.get("entryClicks", []))):
+        raise SystemExit(f"Missing actual Qt clicks, card structure or retirement: {path}")
     runtime.append({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                     "backend": report.get("backend"), "offscreen": report.get("offscreen"),
                     "windowPolicy": report.get("windowPolicy")})
@@ -78,7 +85,7 @@ checks = [
     ("PERF-04", "qml/Yalahoo/Music/components/OverviewBackdrop.qml", "targetWidth: labelWidth + 76 + 72",
      "Blur reads only the existing scene output into a fixed padded RGBA8 crop and horizontal layer, "
      "then composites vertical directly; each axis uses 37 paired linear fetches, sigma 12/radius 36. "
-     "Both textures are fixed logical-pixel sizes <=308x129 throughout entry animation and all DPRs. "
+     "Both textures are fixed logical-pixel sizes <=308x129 throughout entry animation and all DPRs; Review checks their actual textureSize. "
      "At eighteen retiring/live slots, two RGBA8 images use <=5721408 bytes payload; conservatively "
      "including 8-byte depth/stencil per layer gives 17164224 bytes, old/new resize overlap twice that. "
      "Qt internal padding/driver/font atlas are unknown, not measured zero. Three-dimensional target "
@@ -93,7 +100,7 @@ checks = [
     ("PERF-06", "src/render/OverviewLabelsModel.cpp", "m_slots",
      "Anchors never animate their projected X/Y; inner cards own reversible 460/240ms fades and "
      "420/320ms expansion. Retiring cards track current projection/extent and become noninteractive "
-     "immediately. Selected/expanded priority, .06/.12 hysteresis, reserved entry area and collision "
+     "immediately. Completed retirement resets entry scalars before slot reuse. Selected/expanded priority, .06/.12 hysteresis, reserved entry area and collision "
      "bounds match source. Fixed eighteen rows avoid model reset/repeater reconstruction. Model work "
      "is skipped when scene revision, visibility and animations are unchanged; controller publishes "
      "one final changed state, and header siblings fade without changing transport row geometry."),

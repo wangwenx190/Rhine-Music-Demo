@@ -10,6 +10,7 @@
 - extent=`1-smoother(progress/.65)*(1-smoother(4.5-abs(lane-center)))`。只缩放已旋转盒体的local Y，用旋转后的底边0.175补偿保持底边固定；不缩放宽/深，不让折叠矩阵污染光照旋转。extent≤.12在逆矩阵/射线测试前排除。
 - `projectColumns()`只枚举中心±4.5内的物理列并映射真实ID，不扫描全库；闭区间边界最多枚举十个整数，其中两端extent为零。标签准入最多九候选，选中/展开优先，保留.06/.12滞回和原边界/碰撞规则。
 - 固定十八个模型槽容纳九个活动与九个退场标签。锚点直接跟随投影，不给X/Y加追赶动画；内部卡片使用460/240ms进出、420ms入口宽度与320ms透明度。退出卡片立即停止交互并继续跟随当前位置/extent，完全退场才释放。
+- 卡片完全退出后复用槽位时清零该列入口宽度/透明度状态；退出未完的同列反转保留显示状态。卡片退出早于入口收拢，不能让新列继承旧入口残值。
 - 第一击只展开入口，第二击调用既有`enterColumn(lane,true)`进行引导定位并退出总览。V、Esc、返回按钮及点击专辑统一回近景；仅在progress<.02、archiveReady及场景settled后恢复浏览内容与有效控件焦点。任何路径都不打开详情或改变播放。
 - 标签字号/留白/边界按源CSS；字体行框通过原生FontMetrics与原结构计算，不能用截图反推。窄屏断点≤600使用116px卡片，宽屏160px；碰撞函数自身的源码断点/缓冲独立保留。
 
@@ -25,7 +26,9 @@
 ## 检查入口
 
 - `node tools/review/export-overview-golden.mjs`生成独立源码数学；`overview`覆盖690运动、390折叠、54碰撞、54生产投影、63相机插值及两步进入/底边/宽深/拾取/隐藏/减少动态/反转。轨迹≤1e-6，投影≤2逻辑px。
-- `overview-qml`检查九尺寸×双主题×收起/展开36状态、结构/碰撞/局部模糊实际质量/资源/warnings；`--lifecycle`才另做十次真实QML根与渲染资源重建，控制器存活。匿名高频背景为自身质量输入，不是源图评分。
+- `overview-qml`检查九尺寸×双主题×收起/展开36状态：实际Qt鼠标第一击只展开、第二击引导进入，锚点/卡片/文字框、两张局部纹理实际尺寸、退场释放和窗口策略；没有准入标签的输入记录空集合，不伪造点击。`--lifecycle`才另做十次真实QML根与渲染资源重建，控制器存活。匿名高频背景为自身质量输入，不是源图评分。
+- `node tools/review/export-browse-ui.mjs --overview --overview-native 原生report.json`从冻结CSS/生产DOM导出九尺寸三DPR双主题卡片结构，并直接执行冻结`visibleOverviewLabels`检查原生投影输入的准入集合。`python3 tools/review/compare-overview-structure.py 原生report.json verification/overview-source/report.json 输出.json`核对全部卡片框≤1逻辑px及源准入；独立运动/投影golden仍保留，不能以结构匹配代替正常输出质量。
 - `python3 tools/build/verify-overview.py --backend metal|opengl|d3d11 --dpr 数值 --runs 1 --output 全新目录`运行产品；`--visual`检查UI，`--night`产品夜间，`--lifecycle`另验窗口surface压力，`--foreground`仅授权时使用。
 - `audit-overview.py`接受重复`--report`与`--visual`报告，核对源hash/核归一化/真实事件、SceneItem提交、按钮/歌名/焦点和资源。正式采样与窗口政策统一由公共契约规定。
+- `audit-detail-overview-source.py`维护R19G1冻结/实际历史与当前调用链、COMMON/PERF/三平台矩阵。`audit-overview.py`可仅传可靠隐藏`--visual`证据；这不产生缺失的原生产品、焦点或呈现证明。
 - 标签投影保留半列边界十个候选直到优先级/extent筛选，准入≤9、碰撞≤90，不能因提前截断丢失选中ID。

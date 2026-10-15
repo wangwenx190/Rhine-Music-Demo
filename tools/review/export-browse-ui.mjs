@@ -5,11 +5,14 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
 
 const root = path.resolve(import.meta.dirname, '../..');
+const overview = process.argv.includes('--overview');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const frozen = path.join(root, 'build/browse-ui-web/legacy-web');
-const output = path.join(root, 'verification/windows/browse-ui/web');
+const output = path.join(root, overview ? 'verification/overview-source'
+                                        : 'verification/windows/browse-ui/web');
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
@@ -52,7 +55,15 @@ for (const weight of ['Light', 'Regular', 'Demibold', 'Bold']) {
 }
 const {createServer} =
     await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
-const harness = await fs.readFile(path.join(root, 'tools/review/browse-ui-harness.js'), 'utf8');
+let harness = await fs.readFile(
+    path.join(root,
+              'tools/review/' + (overview ? 'overview-ui-harness.js' : 'browse-ui-harness.js')),
+    'utf8');
+if (overview) {
+    const ui = source('src/music-overview-ui.ts');
+    const anchorMarkup = ui.match(/anchor\.innerHTML = '([^']+)'/)[1];
+    harness = 'const anchorMarkup = ' + JSON.stringify(anchorMarkup) + ';\n' + harness;
+}
 const html =
     '<!doctype html><html><head><meta charset="utf-8">'
     + styles.map((name) => '<link rel="stylesheet" href="/src/' + name + '.css">').join('')
@@ -119,6 +130,44 @@ async function wait(probe) {
 }
 let browser, page;
 try {
+    const admissions = [];
+    const nativePaths = process.argv.flatMap(
+        (arg, index) => arg === '--overview-native' ? [process.argv[index + 1]] : []);
+    for (const nativePath of overview ? nativePaths : []) {
+        const native = JSON.parse(await fs.readFile(nativePath, 'utf8'));
+        const ts =
+            createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
+        const js =
+            ts.transpileModule(source('src/music-overview.ts'), {
+                  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
+              }).outputText;
+        const exports = {};
+        new Function('exports', 'require', js)(exports, name => {
+            if (name !== 'three' && name !== './motion.ts')
+                throw Error('Unexpected overview dependency: ' + name);
+            return {};
+        });
+        let retained = new Set();
+        for (const capture of native.captures) {
+            if (capture.expanded < 0)
+                retained.clear();
+            const lanes =
+                exports
+                    .visibleOverviewLabels(capture.columns, capture.width, capture.height, retained,
+                                           capture.expanded < 0 ? null : capture.expanded)
+                    .map(c => c.lane);
+            admissions.push({
+                width: capture.width,
+                height: capture.height,
+                night: capture.night,
+                dpr: capture.dpr,
+                expanded: capture.expanded,
+                backend: native.backend,
+                lanes
+            });
+            retained = new Set(lanes);
+        }
+    }
     const port = (await wait(() => fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')))
                      .split('\n');
     browser = await CDP.connect('ws://127.0.0.1:' + port[0] + port[1]);
@@ -159,7 +208,8 @@ try {
         }
     }
     await fs.writeFile(path.join(output, 'report.json'),
-                       JSON.stringify({baseline, sources, version, captures}, null, 2) + '\n');
+                       JSON.stringify({baseline, sources, version, captures, admissions}, null, 2)
+                           + '\n');
     console.log('Frozen browse UI: ' + captures.length + ' states');
 } finally {
     page?.close();

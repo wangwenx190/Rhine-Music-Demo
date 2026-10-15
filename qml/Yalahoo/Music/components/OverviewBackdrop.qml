@@ -13,6 +13,7 @@ Item {
     clip: true
     ShaderEffectSource {
         id: crop
+        objectName: "overviewCrop"
         sourceItem: root.sceneSource
         sourceRect: Qt.rect(root.sceneX - 36, root.sceneY - 36, root.targetWidth, root.targetHeight)
         width: root.targetWidth
@@ -34,6 +35,7 @@ Item {
     }
     ShaderEffectSource {
         id: horizontalTexture
+        objectName: "overviewHorizontalTexture"
         sourceItem: horizontal
         textureSize: Qt.size(root.targetWidth, root.targetHeight)
         width: root.targetWidth

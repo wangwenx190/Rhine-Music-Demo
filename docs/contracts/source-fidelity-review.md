@@ -2,7 +2,7 @@
 
 本文只保存历史轮次/提交→实际对象→适配或补偿判定；具体接口、算法参数、组件检查入口各归迁移计划职责索引中的组件契约。未完成任务/平台回归/BLUR与FLICKER退出条件只在迁移计划维护；运行数据、实验过程和成绩不在此追加。
 
-冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，尚未存在的R19G/H仍为待执行。
+冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，R17展示由R19G2继续、R19H仍为待执行。
 
 ## R19A 范围与来源
 
@@ -28,7 +28,7 @@
 | R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；MSAA/组合/旧门禁由D4B2确认，目标尺度由D4C复查，历史性能只记录的用户边界保留。 |
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
 | R12 | `b7f73d4`；`0d06b7b`、`e98c798`、`ed5aaef` | 432 实例、波浪/rebase、选中/归位坐标与稳定物理格 ID 由 R19B 审查；合并图集来源见 R19A，透明与后处理仍待 R19C/D。 |
-| R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
+| R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者由R19G1确认。 |
 | R14 | `1a082f2`；`2abb4f6`、`e98c798` | R19E已逐对象复查品牌容器/控件/运输信息、遮罩及Canvas合成；移除四倍图标采样，恢复最终竖屏歌名cap。 |
 | R15 | `2ee2294`；`2abb4f6` | R19E已复查滑尺/数字轨迹和Pointer/InputRouter；保留源数学与有界所有权，移除全部浏览器图像门禁。 |
 | R16 | `2abb4f6` | R19F确认整行shaping/分数缩放/源拟合，移除无独立必要性的两倍DPR槽层及图像门禁。 |
@@ -42,9 +42,9 @@
 | R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
 | R16M2P | `9470126` | R19F用DOM rangeTop与Canvas字体框独立核对主基线至1/64逻辑px，保留macOS floor；不依赖旧分数。 |
 | R16M3 | `2840110` | R19F保留GL4.1/CoreProfile、宽度changed-only、对象所属合并finish及恢复取消；离屏保守资源估算保留。 |
-| R17 | `33e8260`；`e98c798`、`ed5aaef` | ListView 模型/复用/顶部定位、详情展示与排版；待 R19G。 |
-| R18 | `ed5aaef` | 详情抽取/旋转/归位、副本 clarity、封面 ready 身份和完整根窗口重建；待 R19G。 |
-| R19 | `1c9b8c6` | 总览相机/居中/折叠/标签及两步进入；待 R19G，产品渲染质量联动 R19C/D。 |
+| R17 | `33e8260`；`e98c798`、`ed5aaef` | ListView 模型/复用/顶部定位、详情展示与排版；剩余具体修复归R19G2。 |
+| R18 | `ed5aaef` | 详情抽取/旋转/归位、副本 clarity、封面 ready 身份和完整根窗口重建；运动/所有权来源由R19G1确认。 |
+| R19 | `1c9b8c6` | 总览相机/居中/折叠/标签及两步进入；R19G1确认，产品渲染质量联动 R19C/D。 |
 
 非编号提交归属：cedd2a4/835f0b4归档/品牌→R19A；5b2df80格式→各组件语义；d03527e性能→R19A数据封面、R19C/D渲染；21ef751/391decc来源/产物边界→R19A；8dcd4f6 Canvas计划→R19E/F实际代码；6740abc/b08e94e平台接续→M轮及R19D/F；e98c798跨组件→R19B/D/E/F/G。R19H核对所有原轮次/子轮次及后续提交，不以该索引代替审查。
 
@@ -86,7 +86,7 @@
 | R06：`viewport-layout.ts::viewportLayout/archiveFraming`、`scene.ts` 音乐相机目标块、`MusicCameraMotion` → `LayoutMetrics`、`SceneAdapter::target/advance` | 1.05 严格分界、1100/coarse 短屏、音乐 `.25` detailX、560/1080 detailY、preview `.36`、59°/25°→8°/20°、140→72、7.33→5.9 及固定检查槽均是有效生产值。轨道在 navigation 与 detail 插值各衰减一次，是原调用链语义。QMatrix4x4 float 是 Qt 交付适配；canonical GL z 仅用于投影/拾取，GPU 使用 QRhi clip 修正。无额外取景补偿。 |
 | R06：`music-model.ts` / `scene.ts::model.rotation` → `SelectionController::transform` / GLB | 模型高度 3.35、底边 .175、厚度 .14 与导入资产一致；音乐 inspection lift=3.47，4.05 只为通用 primitive 压力测试。XYZ 旋转用 double 展开再转 float，独立低 lift/同时 pitch+yaw 输入证明必要顺序，不回退为误差更大的 quaternion 乘法。geometryOnly 目标保护保持原请求精度并显式报告 limited，不是截图缩放。 |
 | R12：`archive-loop.ts` / `scene.ts::field` → `ArchivePool`、`SelectionController::field/rebase/publish` | 9×48 顺序、半周期 floor、5.2/.62 间距、最多六个 3.2 秒脉冲、.24 clamp、2.5 秒 idle 与波浪原点均来自源码。按 selected 相对原点求位移、静止八 ulp 算术残差界和跨 rebase 的有限物理格 ID 是精度/身份适配；不改导数/几何/透明参数。八 ulp 仅覆盖平移、乘法和相消的有界舍入，不是可见像素偏移。 |
-| R13：`MusicRealColumns`、`scene.ts::musicColumnRowOffset/musicRealColumnField`、`music-app.ts` 列记忆 → `RealColumns`、`ColumnMemory`、`SelectionController` | 保留真实行 12…11+count、独立中点/列活动度、五次归中及折返导数、目标实际显示深度、记忆开关无播放副作用。按时间惰性取样是解析算法调度适配，避免每帧遍历全部列；减少动态 epoch 同步未观察列。R19 overview 插值入口留待 R19G，不用该组件普通浏览通过替代其复查。 |
+| R13：`MusicRealColumns`、`scene.ts::musicColumnRowOffset/musicRealColumnField`、`music-app.ts` 列记忆 → `RealColumns`、`ColumnMemory`、`SelectionController` | 保留真实行 12…11+count、独立中点/列活动度、五次归中及折返导数、目标实际显示深度、记忆开关无播放副作用。按时间惰性取样是解析算法调度适配，避免每帧遍历全部列；减少动态 epoch 同步未观察列。R19 overview插值消费者已由R19G1沿同一progress/相机/投影复查，普通浏览结果不替代总览门禁。 |
 
 ## R19C1 材质与光场参数复查
 
@@ -270,7 +270,7 @@ R19D4B2的MSAA/resolve和组合资源图检查本身不关闭VIS-ARRAY-BLUR-01�
 | --- | --- |
 | R14 `1a082f2` Header/品牌容器、ArchiveButton、ThemeSwitch | 源`music.css`及最后加载的`music-theme-switch.css`定义容器锚点、竖屏网格、17px SVG/圆端点、主题pill；新品牌图形由用户差异替换，容器位置保留。设置图标的两条线/两个圆用Curve Shape保留原矢量几何/层级，原生可访问焦点框是必要交互适配。其余SVG及R16新增play/pause四倍栅格+mip没有独立必要性，移除，按所属窗口实际DPR栅格化；动画scale保留。 |
 | R14 BrowseInfo/ArchiveText/NavigationFrame/Footer、R15数字接入 | 源最终callout CSS覆盖早期57%定位，采用68.633333%与竖屏clamp；navigation高度驱动callout-bottom。保留CSS normal ascent/descent分别取整、16px父inline strut、1.7行高、眉题span边距/空格advance、按钮继承16px及Basic padding清零；这些是文字度量和盒模型适配，分数字号使用局部矢量scale而非增加缓存字号/离屏层。`ArchiveText`通用文字语义及标题专用基线进一步由R19F复查，不能由本节静态锚点关闭。 |
-| R14 DesignTokens/ReadingVeil、R19 `1c9b8c6`界面连接 | 650ms颜色/.4,0,.2,1、380ms pill/.22,1,.36,1及源渐变停点有明确CSS依据。直接Quick渐变节点按原层级位于三维与页眉之间，无额外全屏采样；稳定透明层停绘。R19的overview opacity/offset/enabled只是状态委托，实际总览时序仍归R19G。 |
+| R14 DesignTokens/ReadingVeil、R19 `1c9b8c6`界面连接 | 650ms颜色/.4,0,.2,1、380ms pill/.22,1,.36,1及源渐变停点有明确CSS依据。直接Quick渐变节点按原层级位于三维与页眉之间，无额外全屏采样；稳定透明层停绘。R19的overview opacity/offset/enabled只是状态委托，实际总览时序由R19G1复查。 |
 | R16 `2abb4f6` Header/TransportTitle接入 | song slot增长推动前置控件而右侧play/stop不动，退出保宽由既有TransportMotion管理。该提交将竖屏cap误替换为横屏宽度断点，现恢复最后生产CSS的`clamp(0,width-320,280)`优先级；横屏760/610/340规则及间距保留。标题shaping、退字与采样归R19F。 |
 | R15 `2ee2294` RulerController→RulerInk/Quick clip→固定Button池 | 12+2×2槽、anchor5、rate18、560ms ripple/24ms展开及完整刻线/边缘alpha均来自`music-ruler.ts`/CSS；nearest槽匹配与循环occurrence保留。三份actual-size路径按geometry失效，动画高度用rect而不拉伸AA fringe；透明单采样附件固定130×30/96×21，动画宽度仅改变Quick clip。Canvas2D原`antialias=1/DPR`只存在于图像对照路径，没有独立于旧图像门禁的必要性，移除；两API使用[Qt默认antialias=1](https://doc.qt.io/qt-6/qcanvaspainter.html#setAntialias)，DPR由所属目标处理，不取浏览器栅格损失为目标。 |
 | R15 InputRouter→SelectionController→SceneFrame、OrdinalMotion→OrdinalReel | Qt像素/角度单位与Y反号、控件/祖先所有权和窗口内焦点是输入API适配；源48px/三张/200ms、36px/1.3/1400ms边界保留。最多一个可替换目标服务既有四封面背压，真实提交revision与新输入receipt分开。49点/460ms轨迹来自锁定rolling-number实际函数，保留重定向速度/方向/终点归一、十位/两面和唯一FrameClock；RenderControl专用offscreen开关接通数字/滑尺，普通隐藏窗口仍停进度。 |
@@ -292,3 +292,20 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | R16M3 `2840110` / `e98c798`、R17字体失效接线 | naturalWidth仅变化通知、内容/退出motion决定caption可见性、hide立即停advance并合并queued finish，restore取消陈旧完成，避免绑定重入且保留退出宽度。GL4.1/CoreProfile/basic、后端有界readback drain和有效context释放保留，不改源时间。 |
 | B2V-P/B2W/B3及`6740abc`/`b08e94e`交接 | Git中无独立完成的生产实现；现有共享GL/DPR/候选/生命周期代码已按上述归属审查，不能用未完旧任务掩盖遗漏。旧高DPR像素失败保留历史，目标D3D11/Linux GL、真实显示及最终选型仍由R34原专项处理。 |
 | `TitleAudit`/`export-title`/`verify-title`与两个PowerShell审计入口 | 删除SSIM/RGB/边缘带、八倍轮廓导出、候选pixelPassed及诊断容错。按可见次序覆盖全部字面（含裁切后的省略号），不因内部slot key间断跳过几何；保留自身真实输出、结构≤1逻辑px、数值轨迹≤1e-6、字体框/物理身份、18页眉、三路径三次成本、隐藏零工作、十次恢复和最终释放；自动通过不替代实际质量检查。 |
+
+
+## R19G1 详情运动与总览来源复查
+
+技术规范及入口归[detail-motion.md](detail-motion.md)、[overview.md](overview.md)；`audit-detail-overview-source.py`输出冻结/历史/当前逐符号hash和三平台COMMON/PERF矩阵。R17展示缺口仍归计划R19G2，本节不宣称详情排版已完成。
+
+| 实际历史对象 / 调用链 | 来源判定与必要性 |
+| --- | --- |
+| R18 `ed5aaef` DetailPorts → DetailMotion → SelectionController → SceneAdapter | 保留冻结music-camera/scene的C2抽取、相机/placement共享progress、80ms实际ready、rate9换片与4.2/4.5普通归位。额外layoutRevision为Qt异步布局门禁，不能提前打开文字或改变播放。 |
+| R18 drag / ReturningCasePool / CaseClarity → SceneFrame/SceneItem | 保留源水平.004/±.8/2.8跟随、旋转对齐前冻结世界高度、相邻五行净空和逐副本clarity。三副本加选中、满池最后目标和同cell反向回收是有界所有权适配；同矩阵用于绘制/光照/逆射线，运动只更新值与既有封面租约。 |
+| R19 `1c9b8c6` OverviewController → Selection/RealColumns → SceneAdapter | 保留源6.5临界阻尼、方向归一化混合/172距离/span/aim、rate9实际相机、±4.5邻域和旋转后Y折叠/.175底边补偿。全API共用投影；extent缓存和一次VP乘积是等价计算提升。R19D4C的实际viewport/DPR修正继续适用，不另加取景/采样补偿。 |
+| R19 label admission / OverviewLabelsModel / SurfaceTransition | 保留源独立CSS≤600与碰撞函数<600断点、选中/展开优先、.06/.12滞回、当帧投影、460/240ms卡片和420/320ms入口。十八槽代替源动态DOM；卡片已退出时必须清入口残值，防止240ms退出早于420ms收拢而污染下一列。退场中反转仍复用原槽与显示透明度。 |
+| R19 Overview.qml / OverviewBackdrop / overview-blur | 源87%surface及12px有意背景模糊保留；sigma12/radius36、归一化成对采样和固定padding属于有界局部合成适配。只有背景采用逻辑网格，文字保持输出DPR。计数small恢复源block宽度；500字重按源已注册400/600字体匹配规则使用Regular，无合成字重或截图偏移。 |
+| R19E/F Header / ArchiveText及后续R19C/D | 页眉各兄弟层独立透明度保持运输按钮位置，字体框/向量字形沿共有实现。全局透明排序/深度一致性、四样本resolve、DOF/雾/AA和尺度由既有专题维护；总览未降低数量/冻结动效/关闭效果。 |
+| R18/R19 Review与新结构入口 | 原数值golden直接执行冻结类/生产表达式；新增冻结CSS/DOM结构及同输入visibleOverviewLabels准入。自身Qt事件、投影/纹理/退场/重建与正常输出质量分别证明。320px某输入源函数可准入零标签，不伪造展开成功；没有呈现样本的原生回放保留无效结论。 |
+
+此范围未发现需要按旧截图保留的外观补偿。背景模糊与盒体磨砂/景深属于源设计；物理屏幕、正常VSYNC、原生同窗口恢复和缺目标平台仍按R34原任务，G1不关闭用户两个阵列问题的全历史退出条件。

@@ -107,6 +107,7 @@ Item {
             visible: lane >= 0 && fade > 0
             opacity: extent
             Item {
+                objectName: "overviewCard-" + anchor.lane
                 y: anchor.offset
                 width: parent.width
                 height: parent.height
@@ -115,6 +116,7 @@ Item {
                     anchors.fill: parent
                     active: anchor.visible && anchor.extent > 0
                     sourceComponent: OverviewBackdrop {
+                        objectName: "overviewBackdrop-" + anchor.lane
                         sceneSource: root.sceneSource
                         sceneX: anchor.x
                         sceneY: anchor.y + anchor.offset
@@ -158,6 +160,7 @@ Item {
                     }
                     contentItem: Item {
                         ArchiveText {
+                            objectName: "overviewName-" + anchor.lane
                             x: root.narrow ? 8 : 12
                             y: root.narrow ? 8 : 10
                             width: parent.width - x * 2
@@ -169,7 +172,9 @@ Item {
                             font: root.tokens.regular
                         }
                         ArchiveText {
+                            objectName: "overviewCount-" + anchor.lane
                             x: root.narrow ? 8 : 12
+                            width: parent.width - x * 2
                             y: (root.narrow ? 8 : 10) + root.labelLineHeight + 5
                             tokens: root.tokens
                             text: (anchor.lane + 1).toString().padStart(2, "0") + " / "

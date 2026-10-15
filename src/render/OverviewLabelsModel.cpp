@@ -163,8 +163,13 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
         s->fade.advance(dt);
         if (reduced)
             s->fade.finish();
-        if (!s->wanted && !s->fade.shown())
+        if (!s->wanted && !s->fade.shown()) {
             s->column.lane = -1;
+            // The 240ms card exit can finish before its 420ms entry collapse.
+            // A recycled physical slot must not inherit another column's entry.
+            s->entry = s->entryOpacity = s->entryTarget = s->entryFrom = s->opacityFrom = 0;
+            s->entryTime = s->opacityTime = 0;
+        }
     }
     for (const auto &c : visible) {
         auto it = std::find_if(m_slots.begin(), m_slots.end(), [&](const auto &s) {

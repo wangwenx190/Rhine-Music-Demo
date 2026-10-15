@@ -18,6 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QSaveFile>
+#include <QMouseEvent>
 
 using namespace yalahoo;
 namespace {
@@ -102,7 +103,7 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
         if (!tile.save(output + (night ? "/tile-night.png" : "/tile-day.png")))
             return 4;
     }
-    QJsonArray captures;
+    QJsonArray captures, interactions, entries;
     bool passed = true;
     const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                               { 960, 900 },   { 930, 900 },   { 390, 844 },
@@ -125,7 +126,7 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
             for (int variant = 0; variant < 2; ++variant) {
                 for (int i = 0; i < 5; ++i)
                     passed = render() && passed;
-                QJsonArray anchors, rois;
+                QJsonArray anchors, rois, structures;
                 for (const auto &c : overview.projectColumns())
                     anchors.append(QJsonObject{ { "lane", c.lane },
                                                 { "name", c.name },
@@ -143,6 +144,59 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                     auto *label = find(root, "overviewLabel-" + QString::number(lane));
                     if (!label)
                         return 4;
+                    const QString suffix = QString::number(lane);
+                    auto *anchor = find(root, "overviewAnchor-" + suffix);
+                    auto *card = find(root, "overviewCard-" + suffix);
+                    auto *name = find(root, "overviewName-" + suffix);
+                    auto *count = find(root, "overviewCount-" + suffix);
+                    auto *entry = find(root, "overviewEnter-" + suffix);
+                    auto *backdrop = find(root, "overviewBackdrop-" + suffix);
+                    if (!anchor || !card || !name || !count || !entry || !backdrop)
+                        return 4;
+                    const auto rectangle = [](QQuickItem *item, QQuickItem *relative) {
+                        const auto rect = item->mapRectToItem(relative, item->boundingRect());
+                        return QJsonObject{ { "x", rect.x() },
+                                            { "y", rect.y() },
+                                            { "width", rect.width() },
+                                            { "height", rect.height() } };
+                    };
+                    const double labelWidth = size.width() <= 600 ? 116 : 160;
+                    const double entryWidth = variant && expanded == lane ? 76 : 0;
+                    bool structurePassed = std::abs(anchor->x() + labelWidth / 2
+                                                    - overview.labels()
+                                                              ->data(index, OverviewLabelsModel::X)
+                                                              .toDouble())
+                                    <= 1
+                            && std::abs(anchor->y() + card->height()
+                                        - overview.labels()
+                                                  ->data(index, OverviewLabelsModel::Y)
+                                                  .toDouble())
+                                    <= 1
+                            && std::abs(label->width() - labelWidth) <= 1
+                            && std::abs(card->width() - labelWidth - entryWidth) <= 1
+                            && label->isEnabled() && entry->isEnabled() == (entryWidth > 0);
+                    QJsonArray textures;
+                    for (const auto &textureName :
+                         { "overviewCrop", "overviewHorizontalTexture" }) {
+                        auto *texture = find(backdrop, textureName);
+                        if (!texture)
+                            return 4;
+                        const auto target = texture->property("textureSize").toSize();
+                        structurePassed =
+                                target == QSize(int(labelWidth + 148), 129) && structurePassed;
+                        textures.append(QJsonObject{ { "width", target.width() },
+                                                     { "height", target.height() } });
+                    }
+                    passed = structurePassed && passed;
+                    structures.append(QJsonObject{ { "lane", lane },
+                                                   { "expanded", entryWidth > 0 },
+                                                   { "passed", structurePassed },
+                                                   { "card", rectangle(card, anchor) },
+                                                   { "label", rectangle(label, card) },
+                                                   { "name", rectangle(name, card) },
+                                                   { "count", rectangle(count, card) },
+                                                   { "entry", rectangle(entry, card) },
+                                                   { "blurTextures", textures } });
                     if (expanded < 0)
                         expanded = lane;
                     const auto box = label->mapRectToScene(label->boundingRect());
@@ -163,8 +217,33 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                                              { "file", file },
                                              { "expanded", variant ? expanded : -1 },
                                              { "columns", anchors },
+                                             { "structures", structures },
                                              { "rois", rois } });
-                overview.expand(expanded);
+                if (expanded >= 0) {
+                    const auto before = selection.albumId();
+                    auto *button = find(root,
+                                        (variant ? "overviewEnter-" : "overviewLabel-")
+                                                + QString::number(expanded));
+                    if (!button)
+                        return 4;
+                    const auto point =
+                            button->mapToScene({ button->width() / 2, button->height() / 2 });
+                    QMouseEvent press(QEvent::MouseButtonPress, point, point, Qt::LeftButton,
+                                      Qt::LeftButton, Qt::NoModifier);
+                    QMouseEvent release(QEvent::MouseButtonRelease, point, point, Qt::LeftButton,
+                                        Qt::NoButton, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&window, &press);
+                    QCoreApplication::sendEvent(&window, &release);
+                    const bool result = variant ? !overview.active() && !presentation.wantsDetail()
+                                                : overview.labels()->canEnter(expanded)
+                                    && selection.albumId() == before;
+                    if (variant)
+                        entries.append(result);
+                    else
+                        interactions.append(result);
+                    passed = result && passed;
+                    overview.synchronize(0, true);
+                }
             }
             overview.setActive(false);
         }
@@ -200,7 +279,10 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
         lifecycle.append(alive);
         passed = alive && passed;
     }
-    passed = warnings.isEmpty() && passed;
+    overview.setActive(false);
+    passed = render() && passed;
+    const bool retired = overview.labels()->liveCount() == 0;
+    passed = retired && warnings.isEmpty() && verification::windowPolicySatisfied(window) && passed;
     surface.hide();
     object.reset();
     QJsonObject report{ { "passed", passed },
@@ -210,8 +292,11 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                         { "offscreen", OffscreenSurface::Enabled },
                         { "qmlWarnings", warnings.size() },
                         { "captures", captures },
+                        { "expansionClicks", interactions },
+                        { "entryClicks", entries },
                         { "lifecycle", lifecycle },
                         { "requestedLifecycleCycles", requestedCycles },
+                        { "retired", retired },
                         { "resourcePlan", surface.diagnostics() },
                         { "windowPolicy", verification::windowPolicy(window) } };
     QSaveFile file(output + "/report.json");
