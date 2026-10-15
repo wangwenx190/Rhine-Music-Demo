@@ -46,7 +46,8 @@ qt_add_shaders(ui-audit navigation_shaders PREFIX /assets/shaders
     BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag")
+    "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag")
 if(YALAHOO_REVIEW)
     qt_add_executable(archive-pool-audit ArchivePoolAudit.cpp OffscreenSurface.h)
     target_link_libraries(archive-pool-audit PRIVATE YalahooRhi Qt6::GuiPrivate)

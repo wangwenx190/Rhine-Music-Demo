@@ -10,9 +10,17 @@ FocusScope {
     required property PresentationController presentation
     required property DetailModel detailModel
     property string playingTrackId: ""
+    property Item sceneSource: null
     property int activeTab: 0
     property int queuedLayoutRevision: -1
     property bool layoutPending: false
+    function setTab(tab) {
+        if (activeTab === tab)
+            return;
+        tracks.saveScroll();
+        presentation.revealTabContent();
+        activeTab = tab;
+    }
     function finishLayout() {
         const revision = queuedLayoutRevision;
         layoutPending = false;
@@ -23,8 +31,8 @@ FocusScope {
     readonly property var album: detailModel.album
     readonly property real contentLeft: metrics.portrait ? Math.max(22, Math.min(42, width * 0.04)) :
                                                            width * 0.52
-    readonly property real contentRight: metrics.portrait ? Math.max(18, Math.min(42, width * 0.04)) : width
-                                                            * 0.045
+    readonly property real contentRight: metrics.portrait ? Math.max(18, Math.min(42, width * 0.04)) : width * (
+                                                                width <= 1100 ? 0.04 : 0.045)
     readonly property real contentTop: metrics.portrait ? height * 0.5 : width >= 1700 ? 210 :
                                                                                          width <= 1100
                                                                                          ? 132 : 170
@@ -59,6 +67,7 @@ FocusScope {
         }
     }
     Rectangle {
+        id: portraitBackdrop
         visible: root.metrics.portrait
         y: root.height * 0.46
         width: root.width
@@ -83,13 +92,24 @@ FocusScope {
         cssPixelSize: root.width >= 1700 ? 12 : 10
         onClicked: root.backRequested()
     }
-    ArchiveText {
-        tokens: root.tokens
-        x: root.width <= 700 ? 22 : 42
-        y: root.metrics.portrait ? root.height * 0.43 : root.height - 82
-        text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
-        cssPixelSize: root.width <= 700 ? 9 : 12
-        font.letterSpacing: 2
+    Column {
+        objectName: "detailCaption"
+        x: root.metrics.portrait ? root.contentLeft : root.width <= 1100 ? 27 : 42
+        y: root.metrics.portrait ? root.height * 0.43 : root.height - 82 - height
+        spacing: root.width <= 700 || root.metrics.portrait ? 5 : 10
+        ArchiveText {
+            tokens: root.tokens
+            text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
+            cssPixelSize: root.width <= 700 ? 9 : 12
+            font.letterSpacing: 2
+        }
+        ArchiveText {
+            visible: !root.metrics.portrait && root.width > 700
+            tokens: root.tokens
+            text: "拖动卡片，查看完整封面"
+            cssPixelSize: root.width <= 1100 ? 8 : 9
+            color: root.tokens.muted
+        }
     }
     TrackList {
         id: tracks
@@ -99,15 +119,20 @@ FocusScope {
         viewportWidth: root.width
         playingTrackId: root.playingTrackId
         about: root.activeTab === 1
+        contentOpacity: root.presentation.tabOpacity
+        readonly property real tabHeight: tabBar.height
         x: root.contentLeft + root.presentation.detailSurface.offset
         y: root.contentTop
         width: Math.max(0, root.width - root.contentLeft - root.contentRight - (root.metrics.portrait
                                                                                 ? 5 : 9))
         height: Math.max(0, root.height - y - (root.metrics.portrait ? 28 : root.width >= 1700 ? 75 :
-                                                                                                 52))
+                                                                                                 root.width
+                                                                                                 <= 1100 ? 40 :
+                                                                                                           52))
         onTrackRequested: trackId => root.trackRequested(trackId)
         header: Column {
-            width: tracks.width
+            width: tracks.contentWidth
+            property real tabsY: tabSpace.y
             spacing: 0
             onHeightChanged: {
                 if (tracks.preserveBeginning)
@@ -193,13 +218,42 @@ FocusScope {
                     wrapMode: Text.WrapAnywhere
                 }
             }
-            ArchiveText {
-                tokens: root.tokens
+            Row {
+                id: artistRow
+                objectName: "detailArtist"
+                readonly property real contentHeight: Math.max(artistLine.height, offline.visible
+                                                               ? offline.height : 0)
                 width: parent.width
-                text: (root.album.artist || "") + (root.album.offline ? " · 目录离线" : "")
-                cssPixelSize: root.width <= 700 ? 12 : root.width >= 1700 ? 17 : 14
-                wrapMode: Text.Wrap
+                spacing: 12
                 bottomPadding: root.width <= 700 ? 16 : 22
+                ArchiveText {
+                    id: artistLine
+                    tokens: root.tokens
+                    y: (artistRow.contentHeight - height) / 2
+                    text: root.album.artist || ""
+                    width: Math.min(implicitWidth, parent.width - (offline.visible ? offline.width + 12 :
+                                                                                     0))
+                    cssPixelSize: root.width <= 700 ? 12 : root.width >= 1700 ? 17 : 14
+                    wrapMode: Text.Wrap
+                }
+                Rectangle {
+                    id: offline
+                    objectName: "detailOfflineBadge"
+                    visible: root.album.offline || false
+                    width: badge.implicitWidth + 14
+                    height: badge.implicitHeight + 8
+                    color: "transparent"
+                    border.color: root.tokens.line
+                    y: (artistRow.contentHeight - height) / 2
+                    ArchiveText {
+                        id: badge
+                        anchors.centerIn: parent
+                        tokens: root.tokens
+                        text: "目录离线"
+                        cssPixelSize: 10
+                        color: root.tokens.accent
+                    }
+                }
             }
             Rectangle {
                 width: parent.width
@@ -207,23 +261,27 @@ FocusScope {
                 color: root.tokens.ink
             }
             Grid {
+                id: facts
+                objectName: "detailFacts"
                 width: parent.width
                 columns: 2
-                columnSpacing: 18
-                rowSpacing: 14
-                topPadding: 19
-                bottomPadding: 19
+                columnSpacing: root.width <= 700 ? 16 : root.width <= 1100 ? 14 : 18
+                rowSpacing: root.width <= 700 ? 11 : root.width <= 1100 ? 12 : 14
+                topPadding: root.width <= 700 ? 15 : 19
+                bottomPadding: root.width <= 700 ? 15 : 19
                 Repeater {
                     model: root.album.facts || []
                     delegate: Column {
                         required property var modelData
-                        width: (tracks.width - 18) / 2
+                        width: (tracks.contentWidth - facts.columnSpacing) / 2
                         spacing: 5
                         ArchiveText {
                             tokens: root.tokens
                             width: parent.width
                             text: parent.modelData.label
-                            cssPixelSize: root.width >= 1700 ? 9 : 7
+                            objectName: "detailFactLabel"
+                            cssPixelSize: root.width >= 1700 ? 9 : root.width <= 700 ? 6 : 7
+                            font.letterSpacing: 0.6
                             color: root.tokens.muted
                             wrapMode: Text.Wrap
                         }
@@ -231,7 +289,8 @@ FocusScope {
                             tokens: root.tokens
                             width: parent.width
                             text: parent.modelData.value
-                            cssPixelSize: root.width >= 1700 ? 13 : root.width <= 700 ? 10 : 11
+                            objectName: "detailFactValue"
+                            cssPixelSize: root.width >= 1700 ? 13 : root.width <= 1100 ? 10 : 11
                             cssLineHeight: cssPixelSize * 1.5
                             wrapMode: Text.WrapAnywhere
                         }
@@ -243,38 +302,17 @@ FocusScope {
                 height: 1
                 color: root.tokens.line
             }
-            Row {
-                spacing: 22
-                topPadding: 6
-                ArchiveButton {
-                    tokens: root.tokens
-                    text: "01  歌单"
-                    cssPixelSize: root.width >= 1700 ? 14 : 11
-                    height: 42
-                    underline: root.activeTab === 0
-                    onClicked: {
-                        root.activeTab = 0;
-                        tracks.positionViewAtBeginning();
-                    }
-                }
-                ArchiveButton {
-                    objectName: "detailAboutTab"
-                    tokens: root.tokens
-                    text: "02  专辑介绍"
-                    cssPixelSize: root.width >= 1700 ? 14 : 11
-                    height: 42
-                    underline: root.activeTab === 1
-                    onClicked: {
-                        root.activeTab = 1;
-                        tracks.positionViewAtBeginning();
-                    }
-                }
+            Item {
+                id: tabSpace
+                width: parent.width
+                height: tabBar.height
             }
             Column {
                 visible: root.activeTab === 1
+                opacity: root.presentation.tabOpacity
                 width: parent.width
                 spacing: 14
-                topPadding: 25
+                topPadding: 27
                 bottomPadding: 20
                 ArchiveText {
                     tokens: root.tokens
@@ -285,9 +323,10 @@ FocusScope {
                 ArchiveText {
                     tokens: root.tokens
                     width: parent.width
+                    objectName: "detailDescription"
                     text: root.album.description || "专辑介绍待补充"
-                    cssPixelSize: root.width >= 1700 ? 12 : 11
-                    cssLineHeight: cssPixelSize * 1.8
+                    cssPixelSize: 12
+                    cssLineHeight: cssPixelSize * 1.95
                     wrapMode: Text.Wrap
                 }
                 ArchiveText {
@@ -300,6 +339,17 @@ FocusScope {
                     cssPixelSize: 9
                     wrapMode: Text.WrapAnywhere
                     color: root.tokens.muted
+                }
+                ArchiveText {
+                    objectName: "detailIntroductionStatus"
+                    tokens: root.tokens
+                    width: parent.width
+                    text: root.album.introductionStatus || ""
+                    cssPixelSize: 11
+                    cssLineHeight: cssPixelSize * 1.9
+                    wrapMode: Text.Wrap
+                    color: root.tokens.muted
+                    Accessible.role: Accessible.StaticText
                 }
                 ArchiveText {
                     tokens: root.tokens
@@ -317,10 +367,33 @@ FocusScope {
                     wrapMode: Text.WrapAnywhere
                     color: root.tokens.muted
                 }
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    topPadding: 24
+                    ArchiveText {
+                        tokens: root.tokens
+                        text: "ALBUM CREDITS"
+                        cssPixelSize: 9
+                        font.letterSpacing: 1.4
+                        color: root.tokens.muted
+                    }
+                    ArchiveText {
+                        tokens: root.tokens
+                        text: "制作人员"
+                        cssPixelSize: 16
+                        font.letterSpacing: 0.4
+                    }
+                }
                 ArchiveText {
+                    objectName: "detailCreditsStatus"
                     tokens: root.tokens
-                    text: "ALBUM CREDITS / 制作人员"
-                    cssPixelSize: 12
+                    width: parent.width
+                    text: root.album.creditsStatus || "暂无制作资料。"
+                    cssPixelSize: 11
+                    cssLineHeight: cssPixelSize * 1.9
+                    wrapMode: Text.Wrap
+                    color: root.tokens.muted
                 }
             }
             ArchiveText {
@@ -331,6 +404,130 @@ FocusScope {
                 text: "这个专辑还没有可播放曲目"
                 cssPixelSize: 13
                 wrapMode: Text.Wrap
+            }
+        }
+        Item {
+            id: tabBar
+            objectName: "detailTabs"
+            width: tracks.contentWidth
+            height: 6 + Math.max(trackTab.implicitHeight, aboutTab.implicitHeight) + 26 + 1
+            y: Math.max(0, tracks.tabsY)
+            Loader {
+                objectName: "detailTabsBlurLoader"
+                anchors.fill: parent
+                active: root.visible && tabBar.y < tracks.height
+                sourceComponent: DetailTabsBackdrop {
+                    sceneSource: root.metrics.portrait ? portraitBackdrop : root.sceneSource
+                    contentSource: tracks.currentView
+                    sceneX: tracks.x
+                    sceneY: tracks.y + tabBar.y - (root.metrics.portrait ? portraitBackdrop.y : 0)
+                    contentY: tabBar.y
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                color: root.tokens.veil
+            }
+            Row {
+                id: tabs
+                y: 6
+                spacing: root.width <= 1100 ? 14 : 22
+                ArchiveButton {
+                    id: trackTab
+                    objectName: "detailTracksTab"
+                    tokens: root.tokens
+                    text: "歌单"
+                    height: tabBar.height - 7
+                    contentItem: Row {
+                        spacing: 6
+                        topPadding: 15
+                        ArchiveText {
+                            tokens: root.tokens
+                            text: "01"
+                            cssPixelSize: 8
+                            color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
+                        }
+                        ArchiveText {
+                            id: tabText
+                            tokens: root.tokens
+                            text: "歌单"
+                            cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
+                            color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
+                        }
+                    }
+                    implicitWidth: contentItem.implicitWidth
+                    implicitHeight: tabText.implicitHeight
+                    onClicked: root.setTab(0)
+                    Accessible.role: Accessible.PageTab
+                    Accessible.selected: root.activeTab === 0
+                    Keys.onRightPressed: {
+                        root.setTab(1);
+                        aboutTab.forceActiveFocus();
+                    }
+                }
+                ArchiveButton {
+                    id: aboutTab
+                    objectName: "detailAboutTab"
+                    tokens: root.tokens
+                    text: "专辑介绍"
+                    height: trackTab.height
+                    contentItem: Row {
+                        spacing: 6
+                        topPadding: 15
+                        ArchiveText {
+                            tokens: root.tokens
+                            text: "02"
+                            cssPixelSize: 8
+                            color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
+                        }
+                        ArchiveText {
+                            tokens: root.tokens
+                            text: "专辑介绍"
+                            cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
+                            color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
+                        }
+                    }
+                    implicitWidth: contentItem.implicitWidth
+                    implicitHeight: trackTab.implicitHeight
+                    onClicked: root.setTab(1)
+                    Accessible.role: Accessible.PageTab
+                    Accessible.selected: root.activeTab === 1
+                    Keys.onLeftPressed: {
+                        root.setTab(0);
+                        trackTab.forceActiveFocus();
+                    }
+                }
+            }
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: root.tokens.line
+            }
+            Rectangle {
+                objectName: "detailTabIndicator"
+                y: parent.height - 1
+                height: 2
+                x: root.presentation.tabX
+                width: root.presentation.tabWidth
+                color: root.tokens.ink
+            }
+            function syncIndicator(animate) {
+                const button = root.activeTab === 0 ? trackTab : aboutTab;
+                root.presentation.setTabIndicator(button.x, button.width, animate);
+            }
+            onWidthChanged: Qt.callLater(() => syncIndicator(false))
+            Connections {
+                target: root
+                function onActiveTabChanged() {
+                    tabBar.syncIndicator(true);
+                }
+            }
+            Connections {
+                target: root.presentation
+                function onPrepared() {
+                    Qt.callLater(() => tabBar.syncIndicator(false));
+                }
             }
         }
     }

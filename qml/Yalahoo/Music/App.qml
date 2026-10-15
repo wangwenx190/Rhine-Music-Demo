@@ -99,6 +99,7 @@ ApplicationWindow {
         anchors.fill: parent
         active: window.presentationController !== null && window.detailModel !== null
         sourceComponent: Detail {
+            sceneSource: nativeScene
             metrics: window.sceneAdapter.layout
             tokens: design
             presentation: window.presentationController

@@ -1,6 +1,8 @@
 #pragma once
 #include "LibrarySession.h"
 #include <QAbstractListModel>
+#include <QCache>
+#include <QFont>
 
 namespace yalahoo {
 class DetailModel : public QAbstractListModel
@@ -30,11 +32,13 @@ public:
         return m_info;
     }
     void prepare(const LibrarySession &library);
+    Q_INVOKABLE double normalLineHeight(const QString &text, const QFont &font);
     static QString time(double seconds);
 signals:
     void albumChanged();
 
 private:
+    QCache<QString, double> m_lineHeights{ 256 * 1024 };
     Snapshot m_snapshot;
     const Album *m_album = nullptr;
     QVariantMap m_info;

@@ -1,6 +1,6 @@
 function(yalahoo_browse_qml output)
     set(files)
-    foreach(name DesignTokens ArchiveText ArchiveButton ThemeSwitch Header BrowseInfo Footer ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList OverviewBackdrop)
+    foreach(name DesignTokens ArchiveText ArchiveButton ThemeSwitch Header BrowseInfo Footer ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList OverviewBackdrop DetailTabsBackdrop)
         set(file "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/components/${name}.qml")
         set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "components/${name}.qml")
         list(APPEND files "${file}")

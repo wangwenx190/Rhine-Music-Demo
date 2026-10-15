@@ -193,6 +193,7 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag"
 )
 target_link_libraries(
     Yalahoo

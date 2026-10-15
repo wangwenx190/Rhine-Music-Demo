@@ -239,6 +239,77 @@ private slots:
         clock.advance(.04);
         QVERIFY(!timed.browseSurface()->running());
     }
+    void tabIndicatorUsesSharedClock()
+    {
+        FrameClock clock;
+        Fixture f;
+        PresentationController controller(&clock, f.ports());
+        controller.setTabIndicator(0, 40, false);
+        QCOMPARE(controller.tabWidth(), 40);
+        controller.setTabIndicator(60, 70, true);
+        QCOMPARE(controller.tabX(), 0);
+        clock.setActive(true);
+        clock.advance(.01);
+        clock.advance(.04);
+        QVERIFY(controller.tabX() > 0 && controller.tabX() < 60);
+        const auto before = controller.tabX();
+        clock.setSpeed(3);
+        QCOMPARE(controller.tabX(), before);
+        clock.setApplicationVisible(false);
+        clock.setActive(false);
+        clock.advance(.04);
+        QCOMPARE(controller.tabX(), before);
+        clock.setApplicationVisible(true);
+        clock.setActive(true);
+        controller.revealTabContent();
+        QCOMPARE(controller.tabOpacity(), .35);
+        clock.advance(.01);
+        clock.advance(.01);
+        QVERIFY(controller.tabOpacity() > .35 && controller.tabOpacity() < 1);
+        controller.setReducedMotion(true);
+        QCOMPARE(controller.tabOpacity(), 1);
+        QCOMPARE(controller.tabX(), 60);
+        QCOMPARE(controller.tabWidth(), 70);
+    }
+    void offlineStatusAndTrackAttribution()
+    {
+        OfflineMetadataProvider provider;
+        LibrarySession library(&provider);
+        LibrarySnapshot snapshot;
+        Album a;
+        a.id = "offline";
+        a.offline = true;
+        a.description = "保留的介绍";
+        a.introduction = { { "status", "uncertain" } };
+        a.creditsLookup = { { "status", "partial" },
+                            { "matchedTracks", 1 },
+                            { "totalTracks", 2 },
+                            { "retryAt", "2099-01-01T00:00:00Z" } };
+        Track t;
+        t.id = "track";
+        t.title = "实际曲名";
+        a.tracks.append(t);
+        a.producers.append({ "制作人",
+                             "制作",
+                             "manual",
+                             "track",
+                             "过期曲名",
+                             "https://example.invalid/credit",
+                             { } });
+        snapshot.albums.append(a);
+        library.setSnapshot(snapshot);
+        library.navigate(a.id);
+        DetailModel model;
+        model.prepare(library);
+        QVERIFY(model.album()["offline"].toBool());
+        QVERIFY(model.album()["introductionStatus"].toString().contains("存疑"));
+        QVERIFY(model.album()["introductionStatus"].toString().contains("离线阅读"));
+        QVERIFY(model.album()["creditsStatus"].toString().contains("1 / 2"));
+        QVERIFY(model.album()["creditsStatus"].toString().contains("2099"));
+        QCOMPARE(model.album()["producers"].toList()[0].toMap()["trackTitle"].toString(), t.title);
+        QCOMPARE(model.album()["description"].toString(), a.description);
+        QVERIFY(library.playbackTrackId().isEmpty());
+    }
     void immutableDetailAndDataFields()
     {
         OfflineMetadataProvider provider;

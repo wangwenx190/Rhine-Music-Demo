@@ -18,7 +18,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R19G2 → R19H → R20 → … → R33 → R34`。一次只执行一个轮次，不跳轮；R01–R19历史复查全部收口后才能进入R20。R17–R33的“依赖R16”等指实现与阶段交接，不等待R34，避免循环依赖。
+- 当前主线：`R19H → R20 → … → R33 → R34`。一次只执行一个轮次，不跳轮；R01–R19历史复查全部收口后才能进入R20。R17–R33的“依赖R16”等指实现与阶段交接，不等待R34，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -186,17 +186,9 @@
 #### 用户观察问题与退出条件
 
 - **VIS-ARRAY-BLUR-01：R19D4C已修正生产viewport重复舞台缩放导致的小窗口额外降采样。** 源码判定/原用户窗口追溯边界见source-fidelity-review.md；复现为rhi-scale-gpu匿名9×64生产SceneItem，实际附件/最终缩放入口见rhi-integration.md。目标设备及物理屏幕仍按R34的R19D4C-P补验，不把离屏证明外推。
-- R19G1已复核总览取景/转换，R19G2继续复核详情展示与后续新增实现；保留源设计景深/磨砂效果，发现新的非预期模糊须回到实际尺寸/过滤/相机调用链定位，不能用环境变量或放大图冒充真实DPR/窗口清晰度。
+- R19G1/G2已分别复核总览取景/转换与详情展示；保留源设计景深/磨砂效果，发现新的非预期模糊须回到实际尺寸/过滤/相机调用链定位，不能用环境变量或放大图冒充真实DPR/窗口清晰度。
 - **VIS-ARRAY-FLICKER-01：大量专辑半透明重叠闪烁。** R19C2C已确认并修正visibility/Equal颜色pass位置不变性问题，R19H仍须核对代表性正常光学连续运行及目标欠验，不能以静态图/零warnings关闭用户问题。D4B2/C已覆盖resolve/后处理/跨帧资源；G1已复核总览转换，H仍核对连续正常光学与目标欠验。
 - 两项均为进入R20前硬退出条件：保留明确复现输入、源依据、已确认根因/修复与设计效果边界和受影响回归；静止/波浪/浏览/总览进退/重叠关系正常、无异常模糊/闪烁，当前可靠检查真实通过。独立缺环境目标回归可交R34，不能以移交替代本机调查或通过降低数量/冻结动效/关效果掩盖。
-
-### R19G2 · 详情展示结构、排版与交互源码复查
-
-- 依赖R19G1已交付的运动/总览来源判定及R17/R18 ports。R19G因详情展示缺口与运动/总览合计超出单轮规模拆分；本节仅负责R17展示及其后续修正，不重做G1已确认的运动/材质/总览算法。
-- 输入为冻结music-app.ts实际renderAlbum/trackList/albumAbout/producerBlock、最终music.css/music-title/ui-transitions、`33e8260`/`e98c798`/`ed5aaef`历史及当前Detail.qml/TrackList.qml/DetailModel/PresentationController。逐项核对展示结构、CSS/字体度量、虚拟化、焦点及本轮新增实现；来源索引和矩阵不得仅依既有测试。
-- 已确认修复对象：≤1100非竖屏content right/bottom、caption锚点、facts网格各断点gap/padding/字号、track border/文字与源小字号、独立离线badge；核对并补齐源sticky tabs/indicator和切换滚动行为。介绍/制作人员的已有本地内容、来源/许可证/未知状态完整展示；联网执行仍按R26禁用，不能以未来Provider轮次豁免现有排版。源码可确定缺陷当轮修复，不移交R34。
-- 保留两surface原时序、layoutRevision/场景双ready、退字连选、满池背压、退出禁用与有效Item焦点恢复；实际Qt输入/打断/播放隔离、窄屏、减少动态/改速、隐藏及十次重建分别证明。用冻结最终CSS/DOM和字体框核对结构≤1逻辑px，正常原生输出检查裁切/轮廓/清晰度，不恢复截图评分。
-- 入口为presentation/presentation-qml、`ui-audit --presentation 输出目录`及`tools/audit/audit-presentation.py`；按实际缺口扩展独立源结构和可靠隐藏产品输入入口，不能只用相同QML常量自证。退出为R17逐轮矩阵/补偿判定与修复完整、当前可靠Release回归通过；缺目标系统/物理焦点/原生窗口仍按R34/R17-P原门槛。
 
 ### R19H · 全历史覆盖与共享回归收口
 
@@ -414,6 +406,7 @@
 
 - 依赖R33交接、R18同步运动ports及可靠目标Kit/窗口管理器。保留Windows/D3D11、Linux/OpenGL/X11/Wayland的组件验收和三平台后续产品运动/焦点集成；macOS已经执行的九尺寸/双主题/DPR组件、10,000曲目虚拟化、介绍切换与恢复不重复列为欠验。
 - 输入为匿名PresentationTest、PresentationAudit曲目/介绍/制作人员与冻结music-presentation/ui-transitions/music-title/music.css调用链。运行目标Release configure/build、官方两组qmllint和完整CTest；`ui-audit --presentation 输出目录`检查18项结构、非零且<100的委托、零QML warnings、十次恢复/释放与windowPolicy。审计入口`tools/audit/audit-presentation.py`，细节见`docs/contracts/presentation.md`，其中旧像素门槛不适用。
+- R19G2新增sticky tabs/指示条/内容淡入、scroll距离钳制、正常混合字体行高、离线badge/lookup和制作人员分组；目标入口额外执行`node tools/review/export-browse-ui.mjs --presentation`及`compare-presentation-structure.py`独立冻结DOM/CSS结构核对。macOS当前置底完整App回放无context/帧样本，不能计功能或性能通过；保留匿名`verify-detail.py --backend metal --dpr 1 --runs 1 --output 新目录`和原生同窗口/焦点门槛，不以隐藏组件代替。
 - 实际产品验证browse退场后相机进入、layoutRevision/场景就绪、退字连选/取消只提交最后目标、四种archiveRoute、快速open/back、改速/减少动态、介绍/歌单滚轮及键鼠/触摸。检查退出期禁用、有效Item焦点恢复、hide/restore/minimize及surface/flags重建；R23/R24后补真实定位不改变播放。
 - 退出：结构≤1逻辑px、时序≤一个60Hz帧、源码状态/revision与PERF-01–07通过；按授权选择前台或默认策略，遮挡无效样本不算通过。共享变更后回归presentation、presentation-qml、navigation、title-reels和完整Release CTest。
 

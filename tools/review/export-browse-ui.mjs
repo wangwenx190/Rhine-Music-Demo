@@ -9,10 +9,12 @@ import {createRequire} from 'node:module';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const overview = process.argv.includes('--overview');
+const presentation = process.argv.includes('--presentation');
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
 const frozen = path.join(root, 'build/browse-ui-web/legacy-web');
-const output = path.join(root, overview ? 'verification/overview-source'
-                                        : 'verification/windows/browse-ui/web');
+const output = path.join(root, presentation ? 'verification/presentation-source'
+                               : overview   ? 'verification/overview-source'
+                                            : 'verification/windows/browse-ui/web');
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
@@ -55,10 +57,33 @@ for (const weight of ['Light', 'Regular', 'Demibold', 'Bold']) {
 }
 const {createServer} =
     await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
-let harness = await fs.readFile(
-    path.join(root,
-              'tools/review/' + (overview ? 'overview-ui-harness.js' : 'browse-ui-harness.js')),
-    'utf8');
+let harness = await fs.readFile(path.join(root, 'tools/review/'
+                                                    + (presentation ? 'presentation-ui-harness.js'
+                                                       : overview   ? 'overview-ui-harness.js'
+                                                                    : 'browse-ui-harness.js')),
+                                'utf8');
+if (presentation) {
+    const ts =
+        createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
+    const select = (text, names) => {
+        const file = ts.createSourceFile('source.ts', text, ts.ScriptTarget.Latest, true);
+        return file.statements
+            .filter(node => ts.isFunctionDeclaration(node) && names.includes(node.name?.text))
+            .map(node => node.getText(file))
+            .join('\n')
+            .replaceAll('export function', 'function');
+    };
+    const functions = select(appSource, [
+        'renderDetail', 'trackList', 'albumAbout', 'introductionAlbumStatus', 'producerBlock',
+        'groupProducers', 'producerSource', 'creditsCoolingDown', 'creditsAlbumStatus',
+        'valueRange', 'formatList', 'albumDuration', 'time'
+    ]);
+    const titles = select(source('src/music-title.ts'), ['albumTitleParts', 'albumTitleMarkup']);
+    harness = ts.transpileModule(functions + '\n' + titles, {
+                    compilerOptions: {target: ts.ScriptTarget.ES2022}
+                }).outputText
+              + '\n' + harness;
+}
 if (overview) {
     const ui = source('src/music-overview-ui.ts');
     const anchorMarkup = ui.match(/anchor\.innerHTML = '([^']+)'/)[1];

@@ -1,5 +1,7 @@
 #include "PresentationController.h"
 #include <tuple>
+#include <cmath>
+#include <QPointF>
 
 namespace yalahoo {
 PresentationController::PresentationController(FrameClock *clock, PresentationPorts ports,
@@ -12,10 +14,57 @@ PresentationController::PresentationController(FrameClock *clock, PresentationPo
             transact([&] {
                 m_browse.advance(dt);
                 m_detail.advance(dt);
+                advanceTab(dt);
                 update();
             });
         });
     }
+}
+void PresentationController::setTabIndicator(double x, double width, bool animate)
+{
+    if (!std::isfinite(x) || !std::isfinite(width) || width < 0)
+        return;
+    m_tabFromX = m_tabX;
+    m_tabFromWidth = m_tabWidth;
+    m_tabTargetX = x;
+    m_tabTargetWidth = width;
+    m_tabElapsed = 0;
+    if (!animate || m_reduced)
+        advanceTab(.18);
+}
+void PresentationController::revealTabContent()
+{
+    m_tabFadeFrom = m_tabFadeElapsed < .15 ? m_tabOpacity : .35;
+    m_tabFadeElapsed = 0;
+    m_tabOpacity = m_reduced ? 1 : m_tabFadeFrom;
+    if (m_reduced)
+        m_tabFadeElapsed = .15;
+    emit tabIndicatorChanged();
+}
+void PresentationController::advanceTab(double dt)
+{
+    if (!std::isfinite(dt) || dt <= 0)
+        return;
+    QEasingCurve ease(QEasingCurve::BezierSpline);
+    ease.addCubicBezierSegment({ .22, 1 }, { .36, 1 }, { 1, 1 });
+    bool changed = false;
+    if (m_tabElapsed < .18) {
+        m_tabElapsed = std::min(.18, m_tabElapsed + dt);
+        const double t = ease.valueForProgress(m_tabElapsed / .18);
+        const double x = m_tabFromX + (m_tabTargetX - m_tabFromX) * t;
+        const double width = m_tabFromWidth + (m_tabTargetWidth - m_tabFromWidth) * t;
+        changed = x != m_tabX || width != m_tabWidth;
+        m_tabX = x;
+        m_tabWidth = width;
+    }
+    if (m_tabFadeElapsed < .15) {
+        m_tabFadeElapsed = std::min(.15, m_tabFadeElapsed + dt);
+        m_tabOpacity =
+                m_tabFadeFrom + (1 - m_tabFadeFrom) * ease.valueForProgress(m_tabFadeElapsed / .15);
+        changed = true;
+    }
+    if (changed)
+        emit tabIndicatorChanged();
 }
 void PresentationController::transact(const std::function<void()> &operation)
 {
@@ -223,6 +272,9 @@ void PresentationController::returnToArchive()
 void PresentationController::prepareMenu()
 {
     m_detail.reset(false);
+    m_tabOpacity = 1;
+    m_tabFadeElapsed = .15;
+    emit tabIndicatorChanged();
     m_layoutReady = false;
     ++m_layoutRevision;
     emit prepared();
@@ -255,6 +307,7 @@ void PresentationController::setReducedMotion(bool reduced)
         if (reduced) {
             m_browse.finish();
             m_detail.finish();
+            advanceTab(.18);
         }
     });
 }

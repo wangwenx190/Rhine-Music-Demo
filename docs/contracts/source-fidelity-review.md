@@ -2,7 +2,7 @@
 
 本文只保存历史轮次/提交→实际对象→适配或补偿判定；具体接口、算法参数、组件检查入口各归迁移计划职责索引中的组件契约。未完成任务/平台回归/BLUR与FLICKER退出条件只在迁移计划维护；运行数据、实验过程和成绩不在此追加。
 
-冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，R17展示由R19G2继续、R19H仍为待执行。
+冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，R17展示由R19G2确认、R19H仍为待执行。
 
 ## R19A 范围与来源
 
@@ -42,7 +42,7 @@
 | R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
 | R16M2P | `9470126` | R19F用DOM rangeTop与Canvas字体框独立核对主基线至1/64逻辑px，保留macOS floor；不依赖旧分数。 |
 | R16M3 | `2840110` | R19F保留GL4.1/CoreProfile、宽度changed-only、对象所属合并finish及恢复取消；离屏保守资源估算保留。 |
-| R17 | `33e8260`；`e98c798`、`ed5aaef` | ListView 模型/复用/顶部定位、详情展示与排版；剩余具体修复归R19G2。 |
+| R17 | `33e8260`；`e98c798`、`ed5aaef` | R19G2复核ListView模型/复用/顶部定位和详情展示；修正最终CSS几何、sticky tab/滚动、曲目字体框与本地资料，保留状态/所有权适配。 |
 | R18 | `ed5aaef` | 详情抽取/旋转/归位、副本 clarity、封面 ready 身份和完整根窗口重建；运动/所有权来源由R19G1确认。 |
 | R19 | `1c9b8c6` | 总览相机/居中/折叠/标签及两步进入；R19G1确认，产品渲染质量联动 R19C/D。 |
 
@@ -296,7 +296,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 
 ## R19G1 详情运动与总览来源复查
 
-技术规范及入口归[detail-motion.md](detail-motion.md)、[overview.md](overview.md)；`audit-detail-overview-source.py`输出冻结/历史/当前逐符号hash和三平台COMMON/PERF矩阵。R17展示缺口仍归计划R19G2，本节不宣称详情排版已完成。
+技术规范及入口归[detail-motion.md](detail-motion.md)、[overview.md](overview.md)；`audit-detail-overview-source.py`输出冻结/历史/当前逐符号hash和三平台COMMON/PERF矩阵。本节仅负责运动/总览；R17详情展示判定见下节R19G2。
 
 | 实际历史对象 / 调用链 | 来源判定与必要性 |
 | --- | --- |
@@ -309,3 +309,18 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | R18/R19 Review与新结构入口 | 原数值golden直接执行冻结类/生产表达式；新增冻结CSS/DOM结构及同输入visibleOverviewLabels准入。自身Qt事件、投影/纹理/退场/重建与正常输出质量分别证明。320px某输入源函数可准入零标签，不伪造展开成功；没有呈现样本的原生回放保留无效结论。 |
 
 此范围未发现需要按旧截图保留的外观补偿。背景模糊与盒体磨砂/景深属于源设计；物理屏幕、正常VSYNC、原生同窗口恢复和缺目标平台仍按R34原任务，G1不关闭用户两个阵列问题的全历史退出条件。
+
+## R19G2 详情展示来源复查
+
+规范与复现入口归[presentation.md](presentation.md)；`audit-presentation.py`输出冻结、R17及后续提交的逐符号/hash和三平台COMMON/PERF矩阵，独立结构读取实际生产函数与最终CSS，不运行图像评分。
+
+| 原实现/后续改动 | 来源与当前判定 |
+| --- | --- |
+| R17 `33e8260` Detail/TrackList/DetailModel | content right/bottom漏紧凑覆盖、caption忽略自身高度/提示及aspect锚点、facts断点间距/字号、曲目border-box/小字与emoji normal行高均属遗漏，按最终生产CSS/DOM和实际字体框修正。formatList恢复codec和去重分隔，valueRange恢复两端单位。thin滚动条占位源自实际CSS布局，由布局后合并更新避免绑定循环。 |
+| R17状态机、`e98c798` ListView拆分/顶部保持 | 双surface时序、layoutRevision/场景双ready、完成revision、一次pending及退出禁用均保留；类型稳定的两ListView是必要原生适配，保留可见复用池。prepare保持顶部；切tab改为保留/钳制旧距离，移除无源回顶。 |
+| `ed5aaef` 详情导航与满池backpressure；`1c9b8c6` optional enter curve | 保留实际navigationEnabled/canSelect到原ports，不能越过副本净空。overline按真实按钮字体框居中；共享SurfaceTransition新曲线不改变详情原时序。运动、材质与总览来源由G1负责。 |
+| sticky tabs/indicator、ContentTransition | 原实现只有普通header按钮/下划线，缺源sticky/背景/动态indicator。恢复自然位置吸附、Accessible/左右键与原Bezier数字插值，沿唯一FrameClock；局部sigma18高斯由Qt材质适配，不对正文或三维整体模糊。 |
+| albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；这是当前离线产品边界，联网实现仍归R26。 |
+| 原生文字/资源适配 | 公共ArchiveText分数字号/整行shaping保留；曲目CSS normal以实际resolved ascent/descent分别取整，缓存有界，不加按截图调出的偏移。局部backdrop附件随可见Loader销毁，尺寸/DPR不改变3D目标键。 |
+
+macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11、Linux/OpenGL的目标补验仍归R34/R17-P，不外推为全平台通过。

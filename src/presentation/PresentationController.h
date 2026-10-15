@@ -22,6 +22,9 @@ struct PresentationPorts
 class PresentationController final : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(double tabOpacity READ tabOpacity NOTIFY tabIndicatorChanged)
+    Q_PROPERTY(double tabX READ tabX NOTIFY tabIndicatorChanged)
+    Q_PROPERTY(double tabWidth READ tabWidth NOTIFY tabIndicatorChanged)
     Q_PROPERTY(QString phase READ phase NOTIFY changed)
     Q_PROPERTY(bool wantsDetail READ wantsDetail NOTIFY changed)
     Q_PROPERTY(bool archiveEnabled READ archiveEnabled NOTIFY changed)
@@ -83,13 +86,30 @@ public:
     Q_INVOKABLE void layoutReady(quint64 revision);
     Q_INVOKABLE void reset();
     void update();
+    double tabOpacity() const
+    {
+        return m_tabOpacity;
+    }
+    Q_INVOKABLE void revealTabContent();
+    double tabX() const
+    {
+        return m_tabX;
+    }
+    double tabWidth() const
+    {
+        return m_tabWidth;
+    }
+    Q_INVOKABLE void setTabIndicator(double x, double width, bool animate);
+
     void setReducedMotion(bool reduced);
 signals:
     void changed();
+    void tabIndicatorChanged();
     void prepared();
     void focusRequested(bool detail);
 
 private:
+    void advanceTab(double dt);
     bool navigationEnabled(int direction) const;
     void transact(const std::function<void()> &operation);
     void beginOpen();
@@ -107,6 +127,9 @@ private:
     quint64 m_revision = 0, m_layoutRevision = 0;
     bool m_wantsDetail = false, m_browseHidden = false, m_cameraEntered = false;
     bool m_layoutReady = false, m_reduced = false;
+    double m_tabX = 0, m_tabWidth = 0, m_tabFromX = 0, m_tabFromWidth = 0;
+    double m_tabTargetX = 0, m_tabTargetWidth = 0, m_tabElapsed = .18;
+    double m_tabOpacity = 1, m_tabFadeFrom = .35, m_tabFadeElapsed = .15;
     int m_depth = 0;
 };
 }

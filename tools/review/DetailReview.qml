@@ -18,7 +18,13 @@ Rectangle {
         reducedMotion: true
         offscreenRendering: root.offscreenRendering
     }
+    Rectangle {
+        id: background
+        anchors.fill: parent
+        color: design.page
+    }
     Detail {
+        sceneSource: background
         objectName: "detailPage"
         anchors.fill: parent
         metrics: root.metrics

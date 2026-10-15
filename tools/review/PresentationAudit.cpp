@@ -20,6 +20,18 @@
 #include <atomic>
 
 using namespace yalahoo;
+namespace {
+QQuickItem *findVisual(QQuickItem *item, const QString &name)
+{
+    if (item->objectName() == name)
+        return item;
+    for (auto *child : item->childItems()) {
+        if (auto *found = findVisual(child, name))
+            return found;
+    }
+    return nullptr;
+}
+}
 int reviewPresentation(QGuiApplication &, const QString &output)
 {
     QDir().mkpath(output);
@@ -32,6 +44,8 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     album.artist = "匿名音乐人";
     album.description = "离线收藏中的专辑介绍。";
     album.localNote = "匿名本地备注";
+    album.introduction = { { "status", "uncertain" } };
+    album.creditsLookup = { { "status", "partial" }, { "matchedTracks", 1 }, { "totalTracks", 2 } };
     album.descriptionSource = { { "name", "匿名来源" },
                                 { "url", "https://example.invalid/album" },
                                 { "license", "测试输入" } };
@@ -47,6 +61,20 @@ int reviewPresentation(QGuiApplication &, const QString &output)
         track.discNumber = i < 5000 ? 1 : 2;
         album.tracks.append(track);
     }
+    album.producers.append({ "匿名制作人",
+                             "编曲",
+                             "匿名来源",
+                             "anonymous-track-0",
+                             { },
+                             "https://example.invalid/credit/0",
+                             { } });
+    album.producers.append({ "匿名制作人",
+                             "演奏",
+                             "匿名来源",
+                             "anonymous-track-1",
+                             { },
+                             "https://example.invalid/credit/1",
+                             { } });
     snapshot.albums.append(album);
     library.setSnapshot(std::move(snapshot));
     library.navigate(album.id);
@@ -119,59 +147,102 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     };
     bool passed = true;
     QJsonArray captures, lifecycle;
+    const auto bounds = [](QQuickItem *item, QQuickItem *origin) {
+        if (!item)
+            return QJsonObject{ };
+        const auto point = item->mapToItem(origin, { 0, 0 });
+        return QJsonObject{ { "x", point.x() },
+                            { "y", point.y() },
+                            { "width", item->width() },
+                            { "height", item->height() },
+                            { "fontSize", item->property("cssPixelSize").toDouble() } };
+    };
     const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                               { 960, 900 },   { 930, 900 },   { 390, 844 },
                               { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
     surface.show();
     presentation.setReducedMotion(true);
-    for (const auto &size : sizes) {
-        window.resize(size);
-        root->setSize(size);
-        metrics.setViewport(size.width(), size.height());
-        for (bool night : { false, true }) {
-            root->setProperty("night", night);
-            presentation.reset();
-            presentation.open();
-            passed = render() && passed;
-            presentation.update();
-            passed = render() && passed;
-            auto *list = root->findChild<QQuickItem *>("detailTrackList");
-            auto *title = root->findChild<QQuickItem *>("detailTitle");
-            auto *page = root->findChild<QQuickItem *>("detailPage");
-            if (!list || !title || !page)
-                return 4;
-            const double expectedLeft = metrics.portrait()
-                    ? std::clamp(size.width() * .04, 22.0, 42.0)
-                    : size.width() * .52;
-            const double expectedTop = metrics.portrait() ? size.height() * .5
-                    : size.width() >= 1700                ? 210
-                    : size.width() <= 1100                ? 132
-                                                          : 170;
-            const double titleY = title->mapToScene({ 0, 0 }).y();
-            const bool geometry = std::abs(list->x() - expectedLeft) <= 1
-                    && std::abs(list->y() - expectedTop) <= 1 && list->width() > 0
-                    && list->height() > 0 && title->property("text").toString() == album.title
-                    && titleY >= expectedTop && titleY - expectedTop < 60;
-            passed = geometry && presentation.detailEnabled() && page->isEnabled() && passed;
-            const auto image = surface.grab();
-            const auto file = QStringLiteral("detail-%1x%2-%3.png")
-                                      .arg(size.width())
-                                      .arg(size.height())
-                                      .arg(night ? "night" : "day");
-            passed = !image.isNull() && image.save(QDir(output).filePath(file)) && passed;
-            captures.append(QJsonObject{ { "width", size.width() },
-                                         { "height", size.height() },
-                                         { "night", night },
-                                         { "geometryPassed", geometry },
-                                         { "listX", list->x() },
-                                         { "listY", list->y() },
-                                         { "titleSceneY", titleY },
-                                         { "expectedTop", expectedTop },
-                                         { "image", file },
-                                         { "dpr", window.devicePixelRatio() } });
-            presentation.back();
-            passed = !page->isEnabled() && passed;
-            presentation.update();
+    const QList<double> dprs = OffscreenSurface::Enabled
+            ? QList<double>{ 1, 1.5, 2 }
+            : QList<double>{ window.devicePixelRatio() };
+    for (const auto dpr : dprs) {
+        if (OffscreenSurface::Enabled)
+            surface.setDevicePixelRatio(dpr);
+        for (const auto &size : sizes) {
+            window.resize(size);
+            root->setSize(size);
+            metrics.setViewport(size.width(), size.height());
+            for (bool night : { false, true }) {
+                root->setProperty("night", night);
+                presentation.reset();
+                presentation.open();
+                passed = render() && passed;
+                presentation.update();
+                passed = render() && passed;
+                auto *list = root->findChild<QQuickItem *>("detailTrackList");
+                auto *title = root->findChild<QQuickItem *>("detailTitle");
+                auto *page = root->findChild<QQuickItem *>("detailPage");
+                if (!list || !title || !page)
+                    return 4;
+                const double expectedLeft = metrics.portrait()
+                        ? std::clamp(size.width() * .04, 22.0, 42.0)
+                        : size.width() * .52;
+                const double expectedTop = metrics.portrait() ? size.height() * .5
+                        : size.width() >= 1700                ? 210
+                        : size.width() <= 1100                ? 132
+                                                              : 170;
+                const double titleY = title->mapToScene({ 0, 0 }).y();
+                const bool geometry = std::abs(list->x() - expectedLeft) <= 1
+                        && std::abs(list->y() - expectedTop) <= 1 && list->width() > 0
+                        && list->height() > 0 && title->property("text").toString() == album.title
+                        && titleY >= expectedTop && titleY - expectedTop < 60;
+                passed = geometry && presentation.detailEnabled() && page->isEnabled() && passed;
+                const auto image = surface.grab();
+                const auto file = QStringLiteral("detail-%1x%2-%3-dpr%4.png")
+                                          .arg(size.width())
+                                          .arg(size.height())
+                                          .arg(night ? "night" : "day")
+                                          .arg(dpr);
+                passed = !image.isNull() && image.save(QDir(output).filePath(file)) && passed;
+                auto find = [&](const char *name) {
+                    return findVisual(root, QString::fromLatin1(name));
+                };
+                QJsonObject fields{ { "article", bounds(list, root) },
+                                    { "caption", bounds(find("detailCaption"), root) },
+                                    { "title", bounds(title, list) },
+                                    { "artist", bounds(find("detailArtist"), list) },
+                                    { "facts", bounds(find("detailFacts"), list) },
+                                    { "factLabel", bounds(find("detailFactLabel"), list) },
+                                    { "factValue", bounds(find("detailFactValue"), list) },
+                                    { "tabs", bounds(find("detailTabs"), list) },
+                                    { "trackTitle", bounds(find("detailTrackTitle"), list) },
+                                    { "trackArtist", bounds(find("detailTrackArtist"), list) } };
+                // QML list width excludes CSS padding; the scroll box includes it.
+                auto article = fields["article"].toObject();
+                article["width"] = list->width() + (metrics.portrait() ? 5 : 9);
+                fields["article"] = article;
+                auto facts = fields["facts"].toObject();
+                facts["gap"] = find("detailFacts")->property("columnSpacing").toDouble();
+                facts["rowGap"] = find("detailFacts")->property("rowSpacing").toDouble();
+                // CSS facts includes its two separately drawn borders.
+                facts["y"] = facts["y"].toDouble() - 1;
+                facts["height"] = facts["height"].toDouble() + 2;
+                fields["facts"] = facts;
+                captures.append(QJsonObject{ { "fields", fields },
+                                             { "width", size.width() },
+                                             { "height", size.height() },
+                                             { "night", night },
+                                             { "geometryPassed", geometry },
+                                             { "listX", list->x() },
+                                             { "listY", list->y() },
+                                             { "titleSceneY", titleY },
+                                             { "expectedTop", expectedTop },
+                                             { "image", file },
+                                             { "dpr", window.effectiveDevicePixelRatio() } });
+                presentation.back();
+                passed = !page->isEnabled() && passed;
+                presentation.update();
+            }
         }
     }
     // A large jump must instantiate only a bounded visible/reuse pool.
@@ -196,8 +267,75 @@ int reviewPresentation(QGuiApplication &, const QString &output)
             && library.navigationAlbumId() == album.id && library.playbackTrackId().isEmpty()
             && passed;
     auto *page = root->findChild<QQuickItem *>("detailPage");
-    page->setProperty("activeTab", 1);
+    auto *tabs = root->findChild<QQuickItem *>("detailTabs");
+    auto *about = root->findChild<QQuickItem *>("detailAboutTab");
+    auto *trackTab = root->findChild<QQuickItem *>("detailTracksTab");
+    const bool sticky = tabs && std::abs(tabs->y()) <= 1;
+    const auto click = [&](QQuickItem *item) {
+        if (!item)
+            return false;
+        const auto point = item->mapToScene({ item->width() / 2, item->height() / 2 }).toPoint();
+        QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, point);
+        return render();
+    };
+    const bool switched = click(about) && page->property("activeTab").toInt() == 1;
+    const auto *aboutView = list->property("currentView").value<QObject *>();
+    const double actualScroll =
+            aboutView->property("contentY").toDouble() - aboutView->property("originY").toDouble();
+    const double expectedScroll =
+            std::min(list->property("savedScroll").toDouble(),
+                     std::max(0.0,
+                              aboutView->property("contentHeight").toDouble()
+                                      - aboutView->property("height").toDouble()));
+    const bool stayedAtTabs = std::abs(actualScroll - expectedScroll) <= 1;
+    const bool switchedBack = click(trackTab) && page->property("activeTab").toInt() == 0;
+    QJsonObject interaction{ { "sticky", sticky },
+                             { "switched", switched },
+                             { "keptScroll", stayedAtTabs },
+                             { "switchedBack", switchedBack } };
+    passed = sticky && switched && stayedAtTabs && switchedBack && passed;
+    QMetaObject::invokeMethod(list, "positionViewAtBeginning");
     passed = render() && passed;
+    QSignalSpy trackRequests(page, SIGNAL(trackRequested(QString)));
+    const bool trackInput = click(findVisual(root, "detailTrackTitle")) && trackRequests.size() == 1
+            && trackRequests[0][0].toString() == "anonymous-track-0"
+            && library.playbackTrackId().isEmpty();
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 1));
+    passed = render() && passed;
+    const bool keyboardStart = page->property("activeTab").toInt() == 1;
+    about->forceActiveFocus(Qt::OtherFocusReason);
+    QTest::keyClick(&window, Qt::Key_Left);
+    const bool keyboard = render() && keyboardStart && page->property("activeTab").toInt() == 0;
+    interaction["trackIntentOnly"] = trackInput;
+    interaction["keyboardTab"] = keyboard;
+    passed = trackInput && keyboard && passed;
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 1));
+    passed = render() && passed;
+    const auto *introStatus = findVisual(root, "detailIntroductionStatus");
+    const auto *creditStatus = findVisual(root, "detailCreditsStatus");
+    const bool localData = introStatus && creditStatus
+            && introStatus->property("text").toString().contains("存疑")
+            && creditStatus->property("text").toString().contains("1 / 2");
+    interaction["offlineLookupReadable"] = localData;
+    auto *expand = findVisual(root, "detailCreditExpand");
+    const bool creditsExpanded =
+            expand && click(expand) && expand->parentItem()->property("expanded").toBool();
+    interaction["creditExpansion"] = creditsExpanded;
+    passed = localData && creditsExpanded && passed;
+    album.offline = true;
+    LibrarySnapshot offlineSnapshot;
+    offlineSnapshot.albums.append(album);
+    library.setSnapshot(std::move(offlineSnapshot));
+    library.navigate(album.id);
+    model.prepare(library);
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 0));
+    QMetaObject::invokeMethod(list, "positionViewAtBeginning");
+    passed = render() && passed;
+    const auto *badge = findVisual(root, "detailOfflineBadge");
+    const bool offlineInput = badge && badge->isVisible()
+            && click(findVisual(root, "detailTrackTitle")) && trackRequests.size() == 1;
+    interaction["offlineBadgeAndDisabledTrack"] = offlineInput;
+    passed = offlineInput && passed;
     presentation.setReducedMotion(false);
     presentation.back();
     passed = !page->isEnabled() && page->isVisible() && passed;
@@ -226,6 +364,15 @@ int reviewPresentation(QGuiApplication &, const QString &output)
         lifecycle.append(QJsonObject{ { "cycle", cycle }, { "passed", restored } });
         passed = restored && passed;
     }
+    // A fully clipped tab must retire its local sampling layers, including small landscape windows.
+    window.resize(320, 240);
+    root->setSize({ 320, 240 });
+    metrics.setViewport(320, 240);
+    passed = render() && render() && passed;
+    const auto *blurLoader = findVisual(root, "detailTabsBlurLoader");
+    const bool clippedBackdropRetired = blurLoader && !blurLoader->property("active").toBool();
+    interaction["clippedBackdropRetired"] = clippedBackdropRetired;
+    passed = clippedBackdropRetired && passed;
     surface.hide();
     root->setParentItem(nullptr);
     const auto policy = verification::windowPolicy(window);
@@ -237,6 +384,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                         { "offscreen", OffscreenSurface::Enabled },
                         { "graphicsApi", int(window.rendererInterface()->graphicsApi()) },
                         { "captures", captures },
+                        { "interaction", interaction },
                         { "trackCount", model.rowCount() },
                         { "lifecycle", lifecycle },
                         { "delegates", delegates },
