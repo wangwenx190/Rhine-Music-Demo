@@ -37,7 +37,7 @@
 - 能确实可靠验证的任务必须在当前轮真实执行并通过，例如本机Release构建/CTest、原生字体与资源、真实Metal离屏、公开媒体事件和本机部署检查中已具备可靠入口的部分。离屏是真实GPU运行，但其结果只证明对应画面/状态/资源，不证明窗口曝光、正常VSYNC、实际显示、输入到光子或输出设备听感。
 - 当前环境无法执行或不能可靠验证的部分暂用COMMON-01–05、目标平台集成项和PERF-01–07严格静态审计；必须在原轮删除前把实机任务移交最后R34，写明原轮/任务ID、目标平台/后端/设备、能力缺口及依据、输入与源码版本、修复对象、运行入口/预期结果、原门槛、实现依赖及受影响主线回归。不存在可靠样本不等于通过；已知失败不得改成未验证，也不得因审计通过丢掉补修对象。
 - 可安装的常规开发工具缺失先补齐；当前源码或可靠本机入口已经能够确定并修复的产品缺陷、当前可靠检查的失败、缺少应由本轮提供的验证入口不能作为跳过理由。确实依赖其他系统/后端/硬件或不可靠采集条件的诊断与修复，才允许后置；源码能确认的缺陷仍在当前轮修复。任务部分可执行时完成该部分，只移动不可执行子任务，不将整个轮次无故跳过。
-- 当前主线顺序为`R19B → R19C → R19D → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。R19A–R19H是用户要求的历史源码复查，必须紧接R19、在R20前全部完成，不以继续新功能或后置R34替代。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
+- 当前主线顺序为`R19C → R19D → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。R19A–R19H是用户要求的历史源码复查，必须紧接R19、在R20前全部完成，不以继续新功能或后置R34替代。仍须满足各轮实现依赖，不能因为R21等依赖较早满足就越过当前平台的前序轮次。所有原来的“依赖R16”在R17–R33中指当前平台实现和阶段验收；不把R34内跨后端最终收口作为前置，从而形成循环或阻断主线。
 - R30–R32按顺序完成可执行实现与严格审计；当前没有目标环境的构建/部署/运行部分移交R34，后续依赖只等待实现与阶段交接。当前macOS的R31可靠构建与部署入口必须真实执行，不因历史“仅静态”约定省略；尚不可靠的可见/呈现检查仍后置。若环境变化，下一轮重新评估可验证项；已经移交R34的任务默认集中在专项阶段处理；用户明确要求提前补可见窗口验收时，只处理已实现的指定欠验边界，通过条目从R34删除，不提前实施后续功能。
 - R34是计划最后的特殊轮次，承接全部未执行平台/后端问题修复及必需实机验证。执行前依据真实目标环境逐项评估、按依赖串行处理并遵守单轮规模上限，必要时拆成明确的小轮次；没有相应环境时保留未完成任务，不能删除R34或宣称全平台最终验收完成。主线阶段完成、静态审计通过与最终实机完成分别报告。
 
@@ -203,6 +203,11 @@
 - 已确认调用链与处理：`prepareNativeApplication()`原先在`QGuiApplication`之前一律选择Prohibited，仅在`prepareWindow()`中为授权验证切换Regular。授权分支现在在应用创建前直接选择Regular，并继续由统一窗口入口设置普通层级/允许激活；默认分支仍为Prohibited、置底且拒绝焦点。具体AppKit内部隐藏时序未追踪，不将其推测写为已确认根因。
 - 验证边界与复现：`tools/build/verify-overview.py --foreground`使用真实App/SceneItem提交与原生窗口状态；独立`verification-window-visible`及默认`verification-window-policy`分别回归。子进程显式设置授权开关，不在后续会话继承；结束恢复`YALAHOO_MACOS_VISIBLE_TESTS=OFF`。自己的窗口读回不证明屏幕扫描时刻或完整产品性能。
 - 外观检查不能由旧实机图反推定义：字体行框取原CSS结构和原生字体度量，背景模糊取源码设计，投影/运动取实际算法。锯齿、异常模糊或采集误差不是复刻目标，禁止逐像素比较及据图调参；新数值输入只由直接执行冻结代码生成。
+
+### R19B：隐藏重建的资源代次与窗口策略诊断
+
+- `ArchivePoolAudit` 接入真正 RenderControl 后，初次新断言要求重建前后 `resourceGeneration` 不同，有限列失败；该字段是每个 renderer 自身的目标重建计数，新的 renderer 也从 1 开始，不能当作跨 renderer 的全局身份。检查改为观察 `sceneGraphInvalidated` 的实际事件，并核对重建后的逻辑实体、上传排空及实际 cover fallback/lease；不以代次数值相等推断没有释放或使用图像分数验收。回调计数的寿命覆盖 window/surface 销毁，原生 threaded 分支使用原子计数。
+- 同一次隐藏完整回归的 filled 在 far-night 曾触发 windowPolicy 失败，旧日志没有具体 native 字段，根因未确认；不能推断为 GPU 故障、产品主动激活或用户切前台。入口补充失败策略 JSON，本地保留原失败；修正后的两个真实 Metal 隐藏入口通过，记录 native visible/active 均 false、foregroundUnchanged=true。后续遇到策略失败先保留具体原生状态、定位触发条件，不能提高窗口层级、显示窗口或绕过 helper。本轮结果不代表正常 VSYNC/物理输入，也不关闭 BLUR-01/FLICKER-01。
 
 ## 目标、范围与固定取舍
 
@@ -520,12 +525,6 @@
 - FLICKER-01须分别观察静止/活动波浪、浏览移动、总览转换与不同重叠关系，定位最早出现异常的渲染通道。沿生产路径核查透明排序与稳定ID/深度键、前后表面及draw顺序、depth test/write和深度精度/共面冲突、捕获隔离与读写反馈、MSAA/resolve、跨帧目标/图集就绪与资源复用；检查shader非有限值或不连续状态。以上是待验证方向，不是已确认根因。用源码、通道状态和实际连续运行证明原因，不以旧实机图逐像素匹配或相似度打分定位；不得靠移除透明度、减少专辑、冻结正常动效或整体模糊隐藏闪烁。
 - **两项均为R19A–R19H复查的明确退出约束。** 分别记录复现条件、源码依据、已确认根因、修复/保留设计的理由及受影响回归。BLUR-01须说明哪些模糊为源码设计，并消除非预期模糊；FLICKER-01须在代表性静止/运动/重叠场景下真实连续验证无异常闪烁。按风险选择小/大窗口、实际DPR及相关后端，复用有效结果，优先隐藏检查；确需原生窗口时遵守当轮授权与显式选择规则，不重启无关完整窗口矩阵。当前环境可可靠复现/修复的部分必须在复查阶段收口，不以“源码审计通过”“零warnings”代替实际质量，也不默认推给R34；只有独立缺环境的目标平台回归可按动态规则移交。R19H在进入R20前逐项核对，不得遗漏或无结论关闭。
 
-### R19B · 运动、几何、相机与阵列布局源码复查
-
-- 依赖R19A。逐轮覆盖R05、R06、R12、R13及后续相关修正：唯一时钟/速度/减少动态、阻尼与五次轨迹、几何旋转/厚度/底边、相机/投影/LayoutMetrics、实例波浪/rebase/拾取、真实列/填充/列记忆。
-- 沿冻结生产参数和调用顺序核对单位、坐标、矩阵、锚点与布局分界，排查只为截图对齐增加的偏移、缩放、相机/几何/运动补偿；保留有语义证明的Qt坐标/clip-space/精度适配。
-- 退出：对应逐轮矩阵和修复完成，源算法x/v/a与投影/拾取/边界数值、两模式/减少动态/改速/库替换及资源回归通过，无以图像相似度为唯一依据的剩余调整。
-
 ### R19C · 材质、光场与透明合成源码复查
 
 - 依赖R19B。逐轮覆盖R07、R08、R10A、R10B及后续材质/灯光/RHI修正；同时追踪这些实现对R03/R06资产的解释，不重复复制资产作为“修复”。
@@ -716,6 +715,14 @@
 - 严格静态核对`PrepareAssets::verifyFrozenInputs`、WIN32 DirectWrite/非Windows SFNT复用、QImageReader插件/ICC、CoverCache脚注字重及generation/lease/serial、QtKit架构/ABI、qrc/QtSvg与隐藏窗口分支；本机macOS Release资产/缓存/模型及Metal隐藏回归不外推目标平台。
 - 目标Release构建后运行`prepare-assets <仓库> <同一最新Kit> --verify-inputs`及`ctest --preset qt-release -R '^(assets|branding|cover-cache|rhi-atlas-queue|library-data|library-qml|kit-selection|module-link-and-plugins)$' --output-on-failure`。在临时隔离源码根篡改一个输入，确认普通生成入口在任何写入前失败；不得修改真实归档/产品资产完成负向测试。
 - 退出：冻结blob/归档/清单一致、完整几何/字体物理表/功能SVG及ICO/ICNS容器有效、无声媒体仅加载不播放、ICC/横竖方/alpha/缺图脚注符合源码、队列/租约/关闭与PERF-01–07通过；不运行旧图比较。共享修正回归当前主力平台的assets、cover-cache、library-data/library-qml与完整隐藏Release；目标GPU、部署和媒体设备仍由本节对应专项验证。VIS-ARRAY-BLUR-01/FLICKER-01保持R19C/D主责，不随本项后置。
+
+#### R19B-P · 运动、相机与阵列的目标平台回归
+
+- 依赖 R33 交接及可靠 Windows/D3D11、Linux/OpenGL 原生 Kit/窗口管理器。输入为冻结来源 57f4f845c20cce646a15dbf4008c2a162aaaf4e2（经映射）、motion/scene/archive-pool/real-columns 数学 fixture 和匿名库。当前 macOS 没有目标编译器/Qt 后端/窗口管理器，未运行这些目标；本机 Metal 隐藏结果、历史 Windows 结果均不代替当前目标运行。
+- 严格静态核对唯一帧源/速度、double x/v/a、canonical GL 投影→QRhi 修正、GLB/XYZ 矩阵、最多 432+4 实例、惰性列时间/减少动态 epoch、稳定物理 ID、lease/generation/关闭及所有平台条件编译；审查结论与实现符号/hash 入口见 `docs/contracts/source-fidelity-review.md` 的 R19B。没有新目标实机失败数据；保留本机历史策略失败与局部计数误用诊断，不将其改写为目标失败或通过。
+- 目标 Release 构建后运行 `check-web-baseline.mjs` 及 motion/scene/archive-pool/real-columns 源码导出器；用当前系统 `verification/{windows,linux}/real-columns/full-trajectories.json` 设置 `YALAHOO_REAL_COLUMN_GOLDEN` 运行 RealColumnsTest。普通快速 CTest 覆盖 motion、scene、real-columns、archive-pool、cover-cache、rhi-atlas-queue、navigation、detail-motion、overview、verification-window-policy；两组官方 qmllint/check-format 必须通过。
+- `YALAHOO_REVIEW=ON` 后通过 `ctest --preset qt-release-visible -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure` 运行目标实际后端；入口现无任何图像匹配，不要求旧 PNG。按当轮授权选择默认置底/拒绝焦点或显式前台；保留源 x/v/a≤1e-6、Qt float 矩阵按既有测试容差、投影≤2逻辑px、边界事件消费不改变稳定 ID、两模式/记忆/库替换、90,000 库容量、物理 ID/cover 区域 rebase 不变、稳态零上传、≤2MiB 突发及 cover/renderer 生命周期要求。源 x/v/a≤1e-6，不能放宽为图像相似度。
+- macOS 的实际 GPU 隐藏重建已执行；三平台物理输入、原生窗口/表面与正常 VSYNC 按本节已有窗口/输入专项继续，不用 offscreen invalidation 替代。目标共享修正后回归当前平台 motion、scene、archive-pool、real-columns、navigation、detail-motion、overview、封面与隐藏 Release；BLUR-01/FLICKER-01 仍须 R19C/D/H 在 R20 前收口，不能随此项目后置。
 
 #### R16B2W · D3D11/DPR2文字、成本与生命周期
 

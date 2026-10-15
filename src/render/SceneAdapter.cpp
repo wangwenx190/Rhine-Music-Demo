@@ -267,8 +267,9 @@ void SceneAdapter::publish()
             ? m_selection->selectedPosition()
             : SceneVector{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail, -2.17 };
     if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
-        && m_frame.camera.position == position && m_frame.camera.aim == aim
-        && m_frame.camera.span == m_span.value && m_frame.casePosition == caseOrigin
+        && m_frame.hasArchivePool == bool(m_selection) && m_frame.camera.position == position
+        && m_frame.camera.aim == aim && m_frame.camera.span == m_span.value
+        && m_frame.casePosition == caseOrigin
         && m_frame.individualMaterials == (m_managedDetail && bool(m_selection))
         && m_selectionRevision == (m_selection ? m_selection->revision() : 0))
         return;

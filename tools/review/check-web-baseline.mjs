@@ -143,6 +143,17 @@ assert.equal(search.sourceSha256,
 assert.equal(search.cases.length, 216);
 // Bind the human PERF/source audit to the actual implementation under review.
 // These hashes identify code, not a machine output or an image oracle.
+for (const file
+         of ['tests/fixtures/motion/kernel-golden.json', 'tests/fixtures/scene/camera-golden.json',
+             'tests/fixtures/archive-pool/golden.json',
+             'tests/fixtures/real-columns/trajectories.json']) {
+    const input = await read(file);
+    assert.equal(input.baseline, expected, file);
+    for (const source of input.sources) {
+        assert.equal(hash(execFrozenGit(['show', expected + ':' + source.path], {cwd: root})),
+                     source.sha256, file + ': ' + source.path);
+    }
+}
 const reviewedImplementation = [];
 for (const file of ['tools/assets/PrepareAssets.cpp',
                     'tools/assets/GeometryAudit.cpp',
@@ -156,6 +167,19 @@ for (const file of ['tools/assets/PrepareAssets.cpp',
                     'src/render/rhi/AtlasAllocator.cpp',
                     'src/render/rhi/AtlasUpload.cpp',
                     'src/render/rhi/SceneItem.cpp',
+                    'src/motion/FrameClock.cpp',
+                    'src/motion/ScalarSpring.cpp',
+                    'src/motion/QuinticTrack.cpp',
+                    'src/motion/MotionController.cpp',
+                    'src/motion/MotionFunctions.cpp',
+                    'src/render/LayoutMetrics.cpp',
+                    'src/render/SceneAdapter.cpp',
+                    'src/render/ArchivePool.cpp',
+                    'src/render/SelectionController.cpp',
+                    'src/render/RealColumns.cpp',
+                    'src/render/ColumnMemory.cpp',
+                    'src/render/rhi/RhiItem.cpp',
+                    'tools/review/ArchivePoolAudit.cpp',
 ]) {
     reviewedImplementation.push({file, sha256: hash(await fs.readFile(path.join(root, file)))});
 }

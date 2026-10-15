@@ -23,7 +23,7 @@ class SceneTest : public QObject
 {
     Q_OBJECT
     QJsonObject oracle;
-    double maxProjection = 0, maxPose = 0, maxMotion = 0, maxFov = 0;
+    double maxProjection = 0, maxPose = 0, maxMotion = 0, maxFov = 0, maxNavigation = 0;
 private slots:
     void initTestCase()
     {
@@ -130,6 +130,30 @@ private slots:
         QCOMPARE(scene.layout()->referenceWidth(), 1920.0);
         QCOMPARE(scene.layout()->referenceHeight(), 1080.0);
     }
+    void frozenNavigationTargets()
+    {
+        QCOMPARE(oracle["navigation"].toArray().size(), 6);
+        for (const auto runValue : oracle["navigation"].toArray()) {
+            const auto run = runValue.toObject();
+            SceneAdapter scene;
+            scene.layout()->setViewport(run["width"].toDouble(), run["height"].toDouble(),
+                                        run["coarse"].toBool());
+            for (const auto sampleValue : run["samples"].toArray()) {
+                const auto sample = sampleValue.toObject();
+                scene.setDetail(sample["detail"].toDouble());
+                scene.setNavigation(sample["laneSpeed"].toDouble(), sample["rowSpeed"].toDouble(),
+                                    sample["realistic"].toBool());
+                scene.setReducedMotion(sample["reduced"].toBool());
+                scene.advance(sample["dt"].toDouble());
+                const auto pose = scene.target();
+                maxNavigation = std::max({ maxNavigation,
+                                           difference(pose.position, vector(sample["position"])),
+                                           difference(pose.aim, vector(sample["aim"])),
+                                           std::abs(pose.span - sample["span"].toDouble()) });
+                QVERIFY(maxNavigation <= 1e-6);
+            }
+        }
+    }
     void navigationAndPicking()
     {
         SceneAdapter scene;
@@ -149,11 +173,40 @@ private slots:
         QCOMPARE(hit["frameRevision"].toULongLong(), scene.frameRevision());
         QVERIFY(scene.hitTest(0, 0).isEmpty());
     }
+    void selectionSnapshotLifetime()
+    {
+        MotionController motion;
+        SceneAdapter scene;
+        auto selection = std::make_unique<SelectionController>(&motion);
+        selection->setColumns({ { QStringLiteral("test"),
+                                  QStringLiteral("Test"),
+                                  { QStringLiteral("album") } } });
+        scene.setSelection(selection.get());
+        QVERIFY(scene.frame().hasArchivePool);
+        QVERIFY(!scene.frame().instances.isEmpty());
+
+        // Removing the pool must publish its empty snapshot, including when its
+        // selected pose is visually indistinguishable from the default single case.
+        const auto revision = scene.frameRevision();
+        scene.setSelection(nullptr);
+        QVERIFY(scene.frameRevision() > revision);
+        QVERIFY(!scene.frame().hasArchivePool);
+        QVERIFY(scene.frame().instances.isEmpty());
+
+        scene.setSelection(selection.get());
+        QVERIFY(scene.frame().hasArchivePool);
+        selection.reset();
+        QVERIFY(!scene.selection());
+        QVERIFY(!scene.frame().hasArchivePool);
+        QVERIFY(scene.frame().instances.isEmpty());
+    }
     void cleanupTestCase()
     {
         QSaveFile output(QStringLiteral(SCENE_REPORT));
         QVERIFY(output.open(QIODevice::WriteOnly));
         output.write(QJsonDocument(QJsonObject{ { "targetCases", 48 },
+                                                { "navigationTargets", 36 },
+                                                { "maxNavigationTargetError", maxNavigation },
                                                 { "cameraSamples", 694 },
                                                 { "projectionPoints", 528 },
                                                 { "maxProjectionPixels", maxProjection },

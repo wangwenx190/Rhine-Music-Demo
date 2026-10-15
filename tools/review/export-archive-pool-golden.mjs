@@ -8,6 +8,9 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const platform = process.platform === 'win32'    ? 'windows'
+                 : process.platform === 'darwin' ? 'macos'
+                                                 : 'linux';
 const sources = [];
 const counts = [1, 2, 3, 7, 64, 97, 101, 113, 127];
 const data = {
@@ -119,8 +122,8 @@ for (const [lift, rotation, shoulder] of [[.2, .7, 11], [.35, -.6, 13]]) {
     production.call(state, motion, loop, THREE);
     ownedPoses.push({lift, rotation, shoulder, matrix: state.model.matrix.toArray()});
 }
-mkdirSync(path.join(root, 'verification/windows/archive-pool'), {recursive: true});
-writeFileSync(path.join(root, 'verification/windows/archive-pool/frozen-poses.json'),
+mkdirSync(path.join(root, 'verification', platform, 'archive-pool'), {recursive: true});
+writeFileSync(path.join(root, 'verification', platform, 'archive-pool/frozen-poses.json'),
               JSON.stringify({baseline, sources, poses: poseSamples}, null, 2) + '\n');
 const indices = [0, 47, 48, 95, 96, 143, 192, 239, 240, 287, 288, 335, 384, 431];
 const centers =

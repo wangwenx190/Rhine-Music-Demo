@@ -1552,6 +1552,16 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["coverSnapshotCopies"] = qint64(coverSnapshotCopies);
         p->capture.metadata["coverSnapshotShares"] = qint64(coverSnapshotShares);
         p->capture.metadata["coverResourceRevision"] = qint64(coverResourceRevision);
+        QJsonArray effectiveRegions;
+        for (int i = 0; i < effectiveCoverTiles.size(); ++i) {
+            const auto tile = effectiveCoverTiles[i];
+            effectiveRegions.append(QJsonObject{ { "x", tile.x() },
+                                                 { "y", tile.y() },
+                                                 { "width", tile.width() },
+                                                 { "height", tile.height() },
+                                                 { "lease", qint64(effectiveCoverLeases[i]) } });
+        }
+        p->capture.metadata["effectiveCoverRegions"] = effectiveRegions;
         const std::array<QRhiTexture *, 13> textures{
             opaque.color.get(),
             opaque.normal.get(),

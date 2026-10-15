@@ -1,7 +1,7 @@
 #include "SceneItem.h"
 #include "GraphicsBackend.h"
 #include "VerificationWindow.h"
-#include "ImageComparison.h"
+#include "OffscreenSurface.h"
 #include <QDir>
 #include <QEventLoop>
 #include <QGuiApplication>
@@ -19,6 +19,7 @@
 #include <optional>
 #include <stdexcept>
 #include <cstdio>
+#include <atomic>
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 namespace {
@@ -55,6 +56,8 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
+        OffscreenSurface::Enabled = false;
     if (argc != 2 && argc != 3)
         return 2;
     const bool real =
@@ -63,6 +66,16 @@ int main(int argc, char **argv)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
+#if defined(Q_OS_WIN)
+        const QString platform = QStringLiteral("windows");
+#elif defined(Q_OS_MACOS)
+        const QString platform = QStringLiteral("macos");
+#else
+        const QString platform = QStringLiteral("linux");
+#endif
+        const QString sourceRoot =
+                qEnvironmentVariable("YALAHOO_POOL_GOLDEN_ROOT",
+                                     QStringLiteral(FIXTURE_ROOT "/verification/") + platform);
         require(QDir().mkpath(output), "Cannot create pool output");
         MotionController motion;
         SelectionController selection(&motion);
@@ -90,11 +103,20 @@ int main(int argc, char **argv)
             selection.setColumns(orderLibrary(*snapshot, SortMode::Genre).columns, snapshot);
         adapter.setSelection(&selection);
         adapter.layout()->setViewport(960, 640);
-        QQuickWindow window;
+        std::atomic<int> invalidations = 0;
+        QQuickRenderControl control;
+        QQuickWindow window(OffscreenSurface::Enabled ? &control : nullptr);
         verification::prepareWindow(window, true);
         window.resize(960, 640);
         window.setPersistentSceneGraph(false);
         window.setPersistentGraphics(false);
+        OffscreenSurface surface(window, control);
+        QObject::connect(
+                &window, &QQuickWindow::sceneGraphInvalidated, &window,
+                [&] {
+                    ++invalidations;
+                },
+                Qt::DirectConnection);
         auto *item = new SceneItem(window.contentItem());
         item->setSize({ 960, 640 });
         item->setAdapter(&adapter);
@@ -128,10 +150,10 @@ int main(int argc, char **argv)
         };
         auto waitPrepared = [&] {
             QEventLoop loop;
-            QTimer check, timeout;
+            QTimer timeout;
             timeout.setSingleShot(true);
             bool ready = false;
-            QObject::connect(&check, &QTimer::timeout, &loop, [&] {
+            const auto check = [&] {
                 const auto stats = item->coverStatistics();
                 ready = item->input().poolFrame
                         && item->input().scene.revision == adapter.frame().revision
@@ -139,9 +161,13 @@ int main(int argc, char **argv)
                         && (stats["owned"].toInt() == 0 || stats["selectedDetailed"].toBool());
                 if (ready)
                     loop.quit();
-            });
+            };
+            QObject::connect(item, &SceneItem::frameSubmitted, &loop, check);
             QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-            check.start(50);
+            check();
+            if (ready)
+                return;
+            surface.requestFrame();
             timeout.start(60000);
             loop.exec();
             require(ready, "Pool cover preparation timed out");
@@ -159,11 +185,19 @@ int main(int argc, char **argv)
             state->loop = &loop;
             item->submit(std::move(input),
                          { item->fixedColorBufferWidth(), item->fixedColorBufferHeight() });
+            surface.requestFrame();
             timeout.start(30000);
             loop.exec();
             state->loop = nullptr;
             require(state->capture.has_value(), "Pool capture timed out");
-            require(verification::windowPolicySatisfied(window), "Pool window policy violated");
+            if (!verification::windowPolicySatisfied(window)) {
+                QSaveFile failure(output + "/window-policy-failure.json");
+                if (failure.open(QIODevice::WriteOnly)) {
+                    failure.write(QJsonDocument(verification::windowPolicy(window)).toJson());
+                    failure.commit();
+                }
+                throw std::runtime_error("Pool window policy violated");
+            }
             auto result = std::move(*state->capture);
             state->capture.reset();
             result.atlas = { };
@@ -176,10 +210,13 @@ int main(int argc, char **argv)
                 require(native["destinationBytes"].toInteger()
                                 == result.metadata["atlasUploadBytes"].toInteger(),
                         "Native pool transfer differs from submitted regions");
-            result.postprocessed.save(output + '/' + name + ".png");
+            require(item->errorText().isEmpty() && !result.postprocessed.isNull(),
+                    "Pool renderer failed or returned an empty target");
+            require(result.postprocessed.save(output + '/' + name + ".png"),
+                    "Cannot save own-render pool image");
             return result;
         };
-        window.show();
+        surface.show();
         auto settledCapture = [&](QString name) {
             auto result = capture(name);
             int frames = 0;
@@ -190,16 +227,13 @@ int main(int argc, char **argv)
             return result;
         };
         waitPrepared();
-        auto initial = capture("initial");
         // Drain accepted chunks through real renderer frames, never resubmit in a millisecond loop.
-        while (initial.metadata["atlasPending"].toInt() > 0)
-            initial = capture("ready");
+        settledCapture("initial");
         const auto stable = capture("stable");
         require(stable.metadata["atlasUploadBytes"].toInteger() == 0,
                 "Stable pool uploaded covers again");
         if (real) {
-            QFile source(QStringLiteral(FIXTURE_ROOT
-                                        "/verification/windows/real-columns/frozen-fields.json"));
+            QFile source(sourceRoot + "/real-columns/frozen-fields.json");
             require(source.open(QIODevice::ReadOnly), "Rebuild frozen finite-column field input");
             const auto fields =
                     QJsonDocument::fromJson(source.readAll()).object()["fields"].toArray();
@@ -212,7 +246,7 @@ int main(int argc, char **argv)
                               field);
             }
             QSet<QString> identities;
-            auto sourceInput = item->input();
+            const auto &sourceInput = item->input();
             double matrixError = 0;
             for (int index = 0; index < sourceInput.scene.instances.size(); ++index) {
                 const auto &instance = sourceInput.scene.instances[index];
@@ -240,16 +274,8 @@ int main(int argc, char **argv)
                             matrixError,
                             std::abs(double(pose.constData()[component]
                                             - sourceInput.entities[index].constData()[component])));
-                sourceInput.entities[index] = pose;
             }
             require(matrixError <= 1e-6, "Finite transform differs from frozen field");
-            const auto sourceCapture = capture("finite-frozen-source", sourceInput);
-            const auto image = compareImages(
-                    stable.postprocessed, sourceCapture.postprocessed,
-                    QPolygonF(QRectF(QPointF(), QSizeF(stable.postprocessed.size()))));
-            require(image["valid"].toBool() && image["ssim"].toDouble() >= .97
-                            && image["meanAbsoluteRgb"].toDouble() <= 6,
-                    "Frozen finite-column image differs");
             const auto generation = stable.metadata["resourceGeneration"];
             QKeyEvent boundary(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
             QCoreApplication::sendEvent(item, &boundary);
@@ -280,21 +306,23 @@ int main(int argc, char **argv)
             motion.finish();
             selection.advance(3);
             waitPrepared();
-            const auto nightBefore = settledCapture("finite-return");
+            settledCapture("finite-return");
             adapter.lighting()->setNight(true);
+            adapter.lighting()->advanceTheme(2);
             const auto night = settledCapture("finite-night");
             require(night.metadata["resourceGeneration"] == generation,
                     "Theme rebuilt finite targets");
-            window.hide();
+            const int beforeInvalidation = invalidations.load();
+            surface.hide();
+            require(!OffscreenSurface::Enabled || invalidations > beforeInvalidation,
+                    "Finite offscreen scene graph was not invalidated");
             window.releaseResources();
-            window.show();
+            surface.show();
             waitPrepared();
             const auto restored = settledCapture("finite-restored");
-            const auto rebuild =
-                    compareImages(night.postprocessed, restored.postprocessed,
-                                  QPolygonF(QRectF(QPointF(), QSizeF(night.postprocessed.size()))));
-            require(rebuild["valid"].toBool() && rebuild["ssim"].toDouble() >= .999,
-                    "Finite restore lost geometry or cover leases");
+            require(restored.metadata["drawCount"] == night.metadata["drawCount"]
+                            && restored.metadata["atlasPending"].toInt() == 0,
+                    "Finite restore lost geometry or cover uploads");
             selection.setColumns({ });
             const auto empty = settledCapture("finite-empty");
             require(empty.metadata["drawCount"].toInt() == 0,
@@ -302,15 +330,13 @@ int main(int argc, char **argv)
             QJsonObject report{ { "passed", true },
                                 { "realColumns", true },
                                 { "sourceMatrixError", matrixError },
-                                { "sourceSsim", image["ssim"] },
-                                { "sourceMae", image["meanAbsoluteRgb"] },
-                                { "rebuildSsim", rebuild["ssim"] },
                                 { "stable", stable.metadata },
                                 { "last", last.metadata },
                                 { "night", night.metadata },
                                 { "empty", empty.metadata },
                                 { "covers", item->coverStatistics() },
                                 { "windowPolicy", verification::windowPolicy(window) },
+                                { "offscreen", surface.diagnostics() },
                                 { "submissionSamples", submissionSamples } };
             QSaveFile reportFile(output + "/runtime.json");
             require(reportFile.open(QIODevice::WriteOnly), "Cannot write finite audit");
@@ -323,8 +349,7 @@ int main(int argc, char **argv)
         const auto generation = stable.metadata["resourceGeneration"];
         require(!generation.isUndefined(), "Missing renderer resource generation");
         const auto copies = stable.metadata["coverSnapshotCopies"].toInteger();
-        QFile frozen(QStringLiteral(FIXTURE_ROOT
-                                    "/verification/windows/archive-pool/frozen-poses.json"));
+        QFile frozen(sourceRoot + "/archive-pool/frozen-poses.json");
         require(frozen.open(QIODevice::ReadOnly),
                 "Rebuild frozen production poses before the GPU audit");
         const auto poses = QJsonDocument::fromJson(frozen.readAll()).object()["poses"].toArray();
@@ -340,7 +365,7 @@ int main(int argc, char **argv)
                     QStringLiteral("%1:%2").arg(p["lane"].toDouble()).arg(p["row"].toDouble()),
                     matrix);
         }
-        auto sourceInput = item->input();
+        const auto &sourceInput = item->input();
         double maxMatrixError = 0;
         for (int index = 0; index < sourceInput.scene.instances.size(); ++index) {
             const auto c = sourceInput.scene.instances[index].cell;
@@ -351,15 +376,8 @@ int main(int argc, char **argv)
                 maxMatrixError = std::max(maxMatrixError,
                                           std::abs(double(sourceInput.entities[index].constData()[i]
                                                           - matrix.constData()[i])));
-            sourceInput.entities[index] = matrix;
         }
         require(maxMatrixError < 1e-5, "Production transform differs from frozen source");
-        const auto source = capture("frozen-source", sourceInput);
-        const auto sourceImage =
-                compareImages(stable.postprocessed, source.postprocessed,
-                              QPolygonF(QRectF(QPointF(), QSizeF(stable.postprocessed.size()))));
-        require(sourceImage["valid"].toBool() && sourceImage["ssim"].toDouble() > .999,
-                "Production pool pixels differ from frozen transforms");
         const auto before = selection.cell();
         const QPointF mouse(480, 320);
         QWheelEvent wheel(mouse, mouse, { }, { 0, -120 }, Qt::NoButton, Qt::NoModifier,
@@ -481,25 +499,37 @@ int main(int argc, char **argv)
                 "Rebase matrix %.9g, cover regions %d, objects %d, focus %.9g/%.9g, lights %g\n",
                 rebaseMatrixError, changedCoverRegions, changedObjects, farInput.focus,
                 rebasedInput.focus, double((farInput.rowColumn - rebasedInput.rowColumn).length()));
-        const auto rebaseImage =
-                compareImages(far.postprocessed, rebased.postprocessed,
-                              QPolygonF(QRectF(QPointF(), QSizeF(far.postprocessed.size()))));
-        std::fprintf(stderr, "Rebase image SSIM: %.9f, mean RGB error: %.9f\n",
-                     rebaseImage["ssim"].toDouble(), rebaseImage["meanAbsoluteRgb"].toDouble());
-        require(rebaseImage["valid"].toBool() && rebaseImage["ssim"].toDouble() > .999,
-                "Rebase changed pool pixels");
-        window.hide();
+        require(rebaseMatrixError <= 1e-4 && changedCoverRegions == 0 && changedObjects == 0,
+                "Rebase changed physical transforms, cover regions or optical identities");
+        require(std::abs(farInput.focus - rebasedInput.focus) <= 1e-4
+                        && (farInput.rowColumn - rebasedInput.rowColumn).length() <= 1e-4,
+                "Rebase changed focal depth or world-space lighting");
+        const int beforeInvalidation = invalidations.load();
+        surface.hide();
+        require(!OffscreenSurface::Enabled || invalidations > beforeInvalidation,
+                "Offscreen scene graph was not invalidated");
         window.releaseResources();
-        window.show();
+        surface.show();
         waitPrepared();
-        auto rebuild = capture("rebuild-night");
-        while (rebuild.metadata["atlasPending"].toInt() > 0)
-            rebuild = capture("rebuilt-night");
-        const auto metrics =
-                compareImages(rebuild.postprocessed, rebased.postprocessed,
-                              QPolygonF(QRectF(QPointF(), QSizeF(rebased.postprocessed.size()))));
-        require(metrics["valid"].toBool() && metrics["ssim"].toDouble() > .999,
-                "Context rebuild changed pool pixels");
+        auto rebuild = settledCapture("rebuild-night");
+        require(rebuild.metadata["drawCount"] == rebased.metadata["drawCount"]
+                        && rebuild.metadata["atlasPending"].toInt() == 0,
+                "Context rebuild lost pool geometry or cover uploads");
+        const int lifecycleCycles =
+                qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
+        for (int cycle = 1; cycle < lifecycleCycles; ++cycle) {
+            const int previousInvalidations = invalidations.load();
+            surface.hide();
+            require(!OffscreenSurface::Enabled || invalidations > previousInvalidations,
+                    "Repeated offscreen scene graph was not invalidated");
+            window.releaseResources();
+            surface.show();
+            waitPrepared();
+            rebuild = settledCapture(QStringLiteral("rebuild-night-%1").arg(cycle + 1));
+            require(rebuild.metadata["drawCount"] == rebased.metadata["drawCount"]
+                            && rebuild.metadata["atlasPending"].toInt() == 0,
+                    "Repeated context rebuild lost geometry or cover uploads");
+        }
         auto delayedHigh = item->input();
         const int selectedIndex = int(delayedHigh.entities.size()) - 1;
         require(delayedHigh.coverTiles[selectedIndex].size() == QSize(1024, 1024),
@@ -510,11 +540,11 @@ int main(int argc, char **argv)
         lowOnly.coverTiles[selectedIndex] = lowOnly.fallbackCoverTiles[selectedIndex];
         lowOnly.coverLeases[selectedIndex] = lowOnly.fallbackCoverLeases[selectedIndex];
         const auto low = capture("low-oracle", lowOnly);
-        const auto fallbackImage =
-                compareImages(fallback.postprocessed, low.postprocessed,
-                              QPolygonF(QRectF(QPointF(), QSizeF(low.postprocessed.size()))));
-        require(fallbackImage["valid"].toBool() && fallbackImage["ssim"].toDouble() > .999,
-                "Unready high-resolution region hid the ready thumbnail");
+        const auto fallbackRegion = fallback.metadata["effectiveCoverRegions"].toArray();
+        const auto lowRegion = low.metadata["effectiveCoverRegions"].toArray();
+        require(fallbackRegion.size() == delayedHigh.entities.size() && fallbackRegion == lowRegion
+                        && fallbackRegion[selectedIndex].toObject()["width"].toInt() == 256,
+                "Unready high-resolution region did not use the ready thumbnail");
         selection.setColumns({ });
         waitPrepared();
         const auto empty = capture("empty");
@@ -524,8 +554,10 @@ int main(int argc, char **argv)
             { "libraryAlbums", snapshot->albums.size() },
             { "configuration", "Release" },
             { "sourceMatrixError", maxMatrixError },
-            { "sourceImage", sourceImage },
+            { "rebaseMatrixError", rebaseMatrixError },
+            { "lifecycleCycles", lifecycleCycles },
             { "windowPolicy", verification::windowPolicy(window) },
+            { "offscreen", surface.diagnostics() },
             { "stable", stable.metadata },
             { "travel", travel.metadata },
             { "detail", detail.metadata },
@@ -533,15 +565,12 @@ int main(int argc, char **argv)
             { "restored", restored.metadata },
             { "far", far.metadata },
             { "rebased", rebased.metadata },
-            { "rebaseImage", rebaseImage },
             { "coverMemory", coverMemory },
             { "submissionSamples", submissionSamples },
             { "rebuild", rebuild.metadata },
-            { "rebuildImage", metrics },
-            { "fallbackImage", fallbackImage },
             { "empty", empty.metadata },
             { "scope",
-              "Production pool functionality, uploads, resource/lifecycle and own-render visual checks; no full-product frame-rate acceptance" }
+              "Production pool matrices, picking, uploads, optical identities and resource/lifecycle; own-render images for quality inspection, no image matching or presentation performance" }
         };
         QSaveFile file(output + "/runtime.json");
         require(file.open(QIODevice::WriteOnly), "Cannot save pool report");

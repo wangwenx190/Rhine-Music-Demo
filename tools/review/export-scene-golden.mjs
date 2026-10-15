@@ -220,6 +220,70 @@ for (const fps of [20, 30, 60, 120]) {
     }
     sequences.push({fps, samples});
 }
+// Exercise the actual target block with navigation enabled. The original static
+// cases deliberately use zero speed and cannot detect orbit/real-column drift.
+const navigation = [];
+for (const [width, height, coarse] of [[960, 640, false],
+                                       [1920, 1080, false],
+                                       [390, 844, false],
+                                       [945, 900, false],
+                                       [944, 900, false],
+                                       [1400, 500, true],
+]) {
+    const metrics = layout.viewportLayout(width, height, coarse);
+    const fixture = {
+        container: {
+            clientWidth: width,
+            clientHeight: height,
+            closest: () => ({dataset: {layout: metrics.kind}}),
+        },
+        columnCamera: {velocity: 0},
+        rail: {velocity: 0},
+        musicCamera: new music.MusicCameraMotion(),
+    };
+    const samples = [];
+    for (const [dt, detail, laneSpeed, rowSpeed, realistic,
+                reduced] of [[.05, 0, 3, 4, false, false],
+                             [.15, .35, -2, -3, false, false],
+                             [.0125, .7, .4, 2, true, false],
+                             [0, 1, 0, 0, false, false],
+                             [.05, 0, 3, 4, false, true],
+                             [.05, 0, 0, 0, false, false],
+    ]) {
+        fixture.columnCamera.velocity = laneSpeed * columnSpacing;
+        fixture.rail.velocity = rowSpeed * rowSpacing;
+        fixture.musicArrayMode = realistic ? 'realistic' : 'filled';
+        fixture.reduced = reduced;
+        const pose = target.call(
+            fixture,
+            THREE,
+            motion.smooth,
+            motion.settlingWave,
+            music.musicArchiveOffset,
+            layout.archiveFraming,
+            music.musicCinematicPose,
+            music.musicExtractionAnchor,
+            () => ({distance: 172}),
+            modelInfo,
+            20 * Math.PI / 180,
+            3.47,
+            dt,
+            detail,
+        );
+        samples.push({
+            dt,
+            detail,
+            laneSpeed,
+            rowSpeed,
+            realistic,
+            reduced,
+            position: pose.position.toArray(),
+            aim: pose.aim.toArray(),
+            span: pose.span
+        });
+    }
+    navigation.push({width, height, coarse, samples});
+}
 const output = path.join(root, 'tests/fixtures/scene');
 mkdirSync(output, {recursive: true});
 writeFileSync(
@@ -231,6 +295,7 @@ writeFileSync(
             authority: 'Frozen source targets and THREE projection; debug geometry only',
             cases,
             sequences,
+            navigation,
         },
         null,
         2,

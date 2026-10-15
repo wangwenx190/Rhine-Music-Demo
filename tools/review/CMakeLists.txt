@@ -48,8 +48,8 @@ qt_add_shaders(ui-audit navigation_shaders PREFIX /assets/shaders
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag")
 if(YALAHOO_REVIEW)
-    qt_add_executable(archive-pool-audit ArchivePoolAudit.cpp)
-    target_link_libraries(archive-pool-audit PRIVATE YalahooRhi YalahooImageComparison)
+    qt_add_executable(archive-pool-audit ArchivePoolAudit.cpp OffscreenSurface.h)
+    target_link_libraries(archive-pool-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(archive-pool-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
     target_compile_definitions(archive-pool-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
     set_target_properties(archive-pool-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY

@@ -27,3 +27,5 @@ ctest --preset qt-release -R verification-window-policy
 旧原图/浏览器witness与功能资源耦合的入口先保留`legacy-image-gate`标签并显式disabled，所有preset排除；裸CTest也不会运行，由R19A–R19H逐组件分离后恢复其中必要的非像素检查。不得直接调用工具恢复这些原图匹配。源码数学、投影、文字/字体身份、实际质量、功能与资源门禁保留；图像算法工具的合成输入单元测试不读取或拟合旧实机图。
 
 未通过检查不能通过改标签藏起；现行变化调整的是执行时机与范围，不改功能断言或数值门槛。最终报告注明选择/复用/未运行项目及原因；格式、两组官方qmllint按改动范围执行，生成输出保持忽略。
+
+R19B 的 Review 配置新增两个可选择的隐藏项：`archive-pool-gpu` 与 `real-columns-gpu`。macOS 默认使用 RenderControl，完整自动 preset 会选入；其他平台仍使用原生窗口并标为 native-visible。它们不再调用 SSIM/RGB 比较，检查源矩阵/拾取/身份/cover fallback、上传及真实 scene graph 失效后的重放。运行前用对应源码导出器在当前系统目录生成 `frozen-poses.json` / `frozen-fields.json`；这些是忽略的开发输入，普通构建不依赖它们。`YALAHOO_REVIEW=OFF` 时不注册这两个开发测试。

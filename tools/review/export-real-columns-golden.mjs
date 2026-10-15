@@ -8,6 +8,9 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
 const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const platform = process.platform === 'win32'    ? 'windows'
+                 : process.platform === 'darwin' ? 'macos'
+                                                 : 'linux';
 const sources = [];
 const modules = new Map();
 function load(name) {
@@ -81,7 +84,7 @@ for (const fps of [2, 20, 30, 60, 120]) {
 mkdirSync(path.join(root, 'tests/fixtures/real-columns'), {recursive: true});
 writeFileSync(path.join(root, 'tests/fixtures/real-columns/trajectories.json'),
               JSON.stringify({baseline, sources, counts, cases}) + '\n');
-const output = path.join(root, 'verification/windows/real-columns');
+const output = path.join(root, 'verification', platform, 'real-columns');
 mkdirSync(output, {recursive: true});
 writeFileSync(path.join(output, 'full-trajectories.json'),
               JSON.stringify({baseline, sources, counts, cases: fullCases}) + '\n');
