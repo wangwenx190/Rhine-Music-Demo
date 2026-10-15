@@ -1,9 +1,11 @@
 
 vec3 musicBRDF(vec3 n, vec3 v, vec3 l, float r, vec3 f0, bool multiscatter)
 {
+    float nl = clamp(dot(n, l), 0.0, 1.0), nv = clamp(dot(n, v), 0.0, 1.0);
+    if (nl == 0.0)
+        return vec3(0);
     vec3 h = normalize(l + v);
-    float nl = max(dot(n, l), 0.0), nv = max(dot(n, v), 0.0), nh = max(dot(n, h), 0.0),
-          vh = max(dot(v, h), 0.0);
+    float nh = clamp(dot(n, h), 0.0, 1.0), vh = clamp(dot(v, h), 0.0, 1.0);
     float a = r * r, aa = a * a;
     float gv = nl * sqrt(aa + (1.0 - aa) * nv * nv), gl = nv * sqrt(aa + (1.0 - aa) * nl * nl);
     float visibility = .5 / max(gv + gl, 1e-6), d = nh * nh * (aa - 1.0) + 1.0;

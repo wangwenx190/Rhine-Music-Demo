@@ -113,45 +113,15 @@ if(YALAHOO_REVIEW)
         set_tests_properties(rhi-postprocess-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
-    add_test(
-        NAME
-        runtime-rhi-shell-quick3d
-        COMMAND
-        Yalahoo
-        --verify-materials
+    add_test(NAME rhi-shell-gpu COMMAND rhi-shell-audit
         "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
-        --material-report
-        "${CMAKE_BINARY_DIR}/verification/rhi-shell-quick3d/runtime.json"
-    )
-    add_test(
-        NAME
-        rhi-shell-gpu
-        COMMAND
-        rhi-shell-audit
-        "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
-        "${CMAKE_BINARY_DIR}/verification/rhi-shell"
-        "${CMAKE_BINARY_DIR}/verification/rhi-shell-quick3d"
-    )
-    set_tests_properties(
-        runtime-rhi-shell-quick3d
-        rhi-shell-gpu
-        PROPERTIES
-        TIMEOUT
-        240
-        ENVIRONMENT
-        "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION
-        "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel"
-    )
-    set_tests_properties(rhi-shell-gpu PROPERTIES DEPENDS runtime-rhi-shell-quick3d)
+        "${CMAKE_BINARY_DIR}/verification/rhi-shell")
+    set_tests_properties(rhi-shell-gpu PROPERTIES TIMEOUT 240
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     if(WIN32)
-        set_tests_properties(
-            runtime-rhi-shell-quick3d
-            rhi-shell-gpu
-            PROPERTIES
-            ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-        )
+        set_tests_properties(rhi-shell-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
     add_test(NAME rhi-opaque-gpu COMMAND rhi-audit "${CMAKE_BINARY_DIR}/verification/rhi")
     set_tests_properties(

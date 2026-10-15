@@ -7,7 +7,7 @@ qsb = Path(kit) / 'bin' / ('qsb.exe' if sys.platform == 'win32' else 'qsb')
 work = root / 'build/material-shaders'
 work.mkdir(parents=True, exist_ok=True)
 block = """layout(std140,binding=0) uniform Params {
- mat4 MODEL_MATRIX; mat4 MODELVIEWPROJECTION_MATRIX; mat4 VIEWPROJECTION_MATRIX; mat3 NORMAL_MATRIX;
+ mat4 MODEL_MATRIX; mat4 VIEW_MATRIX; mat4 MODELVIEWPROJECTION_MATRIX; mat4 VIEWPROJECTION_MATRIX; mat3 NORMAL_MATRIX;
  vec3 CAMERA_POSITION; int surface; vec4 nightTint; vec4 dayTint; vec4 nightAttenuation; vec4 dayAttenuation;
  float warmth;float roughness;float coatRoughness;float environmentIntensity;float thickness;float attenuationDistance;
  float transmission;float clearcoat;float exposure;vec3 paperIrradiance;vec3 backgroundSrgb;

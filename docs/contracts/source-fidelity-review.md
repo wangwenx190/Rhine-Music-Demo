@@ -250,3 +250,21 @@ COMMON-01–05/PERF-01–07与平台逐项符号/hash由`audit-rhi-opaque.py`写
 已确认的跨轮差异：冻结scene.ts真实生产Fog按rendered camera distance及detail更新near/far，材质fog=true；当前原生SceneFrame/RhiItem/shader无fog输入或合成。近距B1 fixture在源fog前，不能关闭该缺口。具体参数、生产调用和Three颜色/雾次序已写入R19D明确修复任务，保持R20前主线，不当作BLUR-01正常设计或将缺陷移到R34。目标D3D11/OpenGL、原生窗口与设备实机边界见R34/R19C2B1-P。
 
 普通Release最终恢复Review OFF、可见测试OFF，构建与25/25快速CTest（含source-format/隐藏窗口策略）通过。生成器默认写入+Qt格式化后纸面shader与提交版本逐字一致，未改变已验证的C++/shader语义，因此复用上面的33项完整结果；PowerShell入口当前主机仅静态核对，目标解析/格式要求仍在R34。所有运行输出保持忽略，只有源码/工具和必要契约进入本轮提交。
+
+
+## R19C2B2 光学算法、捕获与有效门禁复查
+
+起点`3c90d2d`。恢复R10B原任务及`1f2352a`，沿R07/R08、R10A/B、R10C/D、R11–13、`5625d73`、`d03527e`、`75775b3`、`f7e423a`、`e98c798`、R19B/C1检查当前生产shader、uniform、附件与绘制。资产沿R03/R06追到锁定GLB、Three Room/DFG/LTC；历史manifest只保留来源，不以其中旧fixedOptics、uniform大小或shader hash覆盖现行源码。不重算旧截图、PMREM witness或ROI。
+
+| 历史对象 / 当前调用链 | 源码判定及修改 | 有效验证 |
+| --- | --- | --- |
+| R07物理材质→case-glass / 四RHI shell变体 | 对照锁定Three BRDF_GGX_Multiscatter、DFG能量补偿、间接single/multi、diffuse守恒、clearcoat和反射pow4；系数/源材质不变。修复geometryRoughness：Three nonPerturbedNormal为view-space，max分量导数不具旋转不变性，必须先乘VIEW_MATRIX。 | 真正GPU调用生产helper；已知屏幕normal梯度在相机roll=0/45度分别应为.319984/.226263，实际.319824/.226196。旧world-space算法在45度仍为.319984，不能通过该独立数学门禁。 |
+| R08音乐光场→direct/LTC | saturate点积与源一致；零入射先退出，避免相反light/view的零半向量。LTC正视时切向量为零，只有此奇点选择最不平行坐标轴构造有限正交基，其余算法不变；不称其为已确认阵列闪烁根因。 | 正视矩形LTC独立解析form factor误差.00041549≤.001；GGX、DFG多散射、shadow=0/1的diffuse/specular、相反向量共八项数值状态通过。非LTC容差max(1e-6,期望绝对值×.001)，实际最大.00019465，覆盖半精度附件量化，不读取旧渲染图。 |
+| R07/R10B环境、透射、磨砂与色彩 | PMREM源生成器实际HalfFloatType，原生RGBA16F保持源类型；资产RGBA32F是序列化展开，不要求GPU字节相同。保留CubeUV方向、LTC查表、bicubic、IOR1.46及roughness×.92、局部zone .16、Beer、ACES/sRGB和paper toneMapped=false。 | 当前生产模型只有旋转/位移、scale=1，Three transmission ray的modelScale在此为恒等；未来引入缩放须重审。LOD来自实际捕获像素尺寸和源公式，是有意磨砂，不证明BLUR-01已解决。fog缺口仍R19D。 |
+| R10B capture/resolve/壳体、R10C硬件depth适配 | 从实际QRhi对象检查采样binding4恰为opaque resolve和mip sampler、composite独立、同hardware depth且PreserveDepthStencilContents。真实命令记录opaque→resolve→mips→copy→visibility→shading；visibility写depth/LessOrEqual，颜色Equal只读、Back cull、无blend。 | 61源状态、两主题/视角/封面/邻盒/抽取/九实例，2捕获隔离和6倒序稳定键通过；没有把两图相同当门禁。法向/深度有限及投影≤2px；同深度ID及重复ID拒绝保留。 |
+| R10B透明封面、R10D MSAA | 保留contain/inset、centroid、预乘滤波恢复、alphaTest .025；无模糊/阈值/透明度调参。 | 合成输入1×/4×：中心误差.00134241≤1/255，透明洞depth=1，4×真实部分覆盖1560点，黑边0。最初测试误将连续值界限与整数RGBA8比较，原48点错误失败；改用原门禁的整数码值qRound(expected×255)-1后通过，产品shader和一代码值容差均未改，失败日志留本地。 |
+| R11–13实例/封面、R18生命周期、macOS后补适配 | 新诊断只在显式capture读取已提交有界uniform及真实pipeline/RT值；Review探针用保留paperSize.w，生产拒绝selector且不打包probe。最多2批pending，原读回去重/别名共享保持。 | 十次同item真实SG失效/重建恢复正常光学；数学模式/相机变化resourceGeneration不变。完整阵列/真实列/封面/详情/总览回归通过；单独稳定状态不能关闭连续闪烁。 |
+
+事件驱动RhiCaptureHarness复用B1隐藏入口；61状态和十次重建没有processEvents轮询、Quick3D替代renderer、浏览器GPU witness或图像差分。工具新OpticsProbe只在构建目录将生产函数与测试main组合；qsb不支持此次尝试的绝对include，改为CMake显式内联两个受configure-depends跟踪的公共头，所有五目标编译通过。生成器现在同时维护early/basic四变体，生成+Qt格式化与提交shader完全一致，避免未来生成倒退修复。
+
+COMMON-01–05/PERF-01–07及三平台符号/hash矩阵由`python3 tools/audit/audit-rhi-optics.py`生成，人工展开了实际生产函数、附件依赖、资源所有权与回调。无新增生产逐帧JSON/readback/队列，probe使用现有float读回、在RGBA8转换前解码；不以功能运行耗时宣称产品性能。当前macOS/arm64/Apple M4、最新自动发现Qt6.12.0、AppleClang21、Release、真正隐藏Metal/DPR1完整34/34、两组qmllint/check-format、六材质五目标qsb及四变体重建通过。普通配置已恢复Review OFF/可见OFF，构建及25/25快速回归通过。Windows/D3D11、Linux/OpenGL实机与PowerShell解析未执行，交R34/R19C2B2-P；正常VSYNC/窗口恢复仍按原专项。VIS-ARRAY-FLICKER-01连续定位紧随R19C2C，BLUR-01及后处理/fog仍R19D，不能用本轮通过销项。

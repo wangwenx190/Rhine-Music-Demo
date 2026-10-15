@@ -49,6 +49,7 @@ mapping = {
     'areaIntensity': 'f.areaPosition.w',
     'CAMERA_POSITION': 'f.camera.xyz',
     'VIEWPROJECTION_MATRIX': 'f.nativeVP',
+    'VIEW_MATRIX': 'f.view',
     'FRAGCOORD': 'gl_FragCoord',
     'SCREEN_MIP_TEXTURE': 'captureMap',
     'worldPosition': 'world',
@@ -129,3 +130,9 @@ float keyShadow;
 (directory / 'shell-basic.frag').write_text(prefix.replace('#define AREA_ENABLED 1',
                                                          '#define AREA_ENABLED 0') + source,
                                           encoding='utf-8', newline='\n')
+
+for name in ['shell', 'shell-basic']:
+    regular = (directory / (name + '.frag')).read_text()
+    early = regular.replace('#extension GL_GOOGLE_include_directive : require',
+                            '#extension GL_GOOGLE_include_directive : require\nlayout(early_fragment_tests) in;')
+    (directory / (name + '-early.frag')).write_text(early, newline='\n')

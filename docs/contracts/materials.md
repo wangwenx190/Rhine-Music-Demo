@@ -39,7 +39,7 @@ ctest --preset qt-release -R '^(rhi-material-parameters|lighting)$' --output-on-
 ctest --preset qt-release-render -R '^(archive-pool-gpu|real-columns-gpu)$' --output-on-failure
 ```
 
-`calibrate-materials.py` 已退役，执行即报错且不写文件；MaterialReview拒绝calibration/factors输入，参数核对不再将expected乘同一拟合系数。MaterialReview及`verify-r07.ps1`/`verify-r08.ps1`已在R19C2A移除原图/ROI/标定依赖。两个PowerShell入口转交跨平台`tools/build/verify-material-review.py materials|lighting`，只验证当前源参数/投影、自己的输出及资源；Windows入口仍先进入MSVC环境，进程退出由Python真实等待。RhiShellAudit/RhiAudit的原图/环境witness仍待R19C2B拆耦，不能执行。R07曾使用90个双主题/视角/封面/分层状态及9项纸面探针；历史采集与像素分数仅保留原事实，不再执行或据此调参。
+`calibrate-materials.py` 已退役，执行即报错且不写文件；MaterialReview拒绝calibration/factors输入，参数核对不再将expected乘同一拟合系数。MaterialReview及`verify-r07.ps1`/`verify-r08.ps1`已在R19C2A移除原图/ROI/标定依赖。两个PowerShell入口转交跨平台`tools/build/verify-material-review.py materials|lighting`，只验证当前源参数/投影、自己的输出及资源；Windows入口仍先进入MSVC环境，进程退出由Python真实等待。RhiAudit/RhiShellAudit已由R19C2B1/B2拆耦，当前源数学/graph门禁可执行，旧原图/环境witness不再执行。R07曾使用90个双主题/视角/封面/分层状态及9项纸面探针；历史采集与像素分数仅保留原事实，不再执行或据此调参。
 
 参数通过不证明光学捕获、磨砂LOD、连续闪烁或最终缩放已正确；这些检查分别由R19C2/R19D执行，用户问题保持开放。Windows/D3D11与Linux/OpenGL目标回归按迁移计划R34移交，本机Metal结果不外推。完整逐项历史归属、PERF与验证范围见 [source-fidelity-review.md](source-fidelity-review.md)。
 
@@ -63,4 +63,4 @@ python3 tools/audit/audit-material-review.py
 python3 tools/build/verify-material-review.py materials
 ```
 
-一体入口最后恢复Review OFF并构建/运行普通Release快速回归；日常Review ON的完整隐藏preset包含这两个测试，快速preset不包含。报告`validation=source-state-and-own-output`、`imageComparison=false`，保存warnings、实际后端/DPR、窗口策略及Offscreen附件估算；未知driver分配保持null。检查只证明有限Review场景源状态、纸面公式、有效输出与完整root重建，不能证明RHI光学等价、连续透明闪烁、正常VSYNC或完整性能。原SSIM/RGB/ROI历史数据不再重算，R19C2B/C、R19D继续处理光学与用户问题。
+一体入口最后恢复Review OFF并构建/运行普通Release快速回归；日常Review ON的完整隐藏preset包含这两个测试，快速preset不包含。报告`validation=source-state-and-own-output`、`imageComparison=false`，保存warnings、实际后端/DPR、窗口策略及Offscreen附件估算；未知driver分配保持null。检查只证明有限Review场景源状态、纸面公式、有效输出与完整root重建，不能证明RHI光学等价、连续透明闪烁、正常VSYNC或完整性能。原SSIM/RGB/ROI历史数据不再重算；光学源公式与graph复查见R19C2B2，连续用户问题仍由R19C2C/R19D处理。

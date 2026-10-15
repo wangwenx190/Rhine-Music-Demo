@@ -41,7 +41,15 @@ vec3 LTC_Evaluate(const in vec3 N, const in vec3 V, const in vec3 P, const in ma
 
     // construct orthonormal basis around N
     vec3 T1, T2;
-    T1 = normalize(V - N * dot(V, N));
+    vec3 tangent = V - N * dot(V, N);
+    if (dot(tangent, tangent) == 0.0) {
+        // At normal incidence the tangent orientation is arbitrary; choose a finite basis.
+        vec3 axis = abs(N.x) <= abs(N.y) && abs(N.x) <= abs(N.z) ? vec3(1, 0, 0)
+                : abs(N.y) <= abs(N.z)                           ? vec3(0, 1, 0)
+                                                                 : vec3(0, 0, 1);
+        tangent = cross(axis, N);
+    }
+    T1 = normalize(tangent);
     T2 = -cross(
             N,
             T1); // negated from paper; possibly due to a different handedness of world coordinate system

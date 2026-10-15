@@ -78,8 +78,8 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-shell-audit RhiShellAudit.cpp)
-    target_link_libraries(rhi-shell-audit PRIVATE YalahooRhi YalahooImageComparison)
+    qt_add_executable(rhi-shell-audit RhiShellAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    target_link_libraries(rhi-shell-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(rhi-shell-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
     target_compile_definitions(rhi-shell-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
     set_target_properties(

@@ -18,10 +18,19 @@
 
 Frame std140 扩展到 752 bytes：前 560 bytes 保留原块，nativeVP 在 560，camera 在 624，scatter 在 736。C++ static_assert、设备动态 offset 与 qsb reflection 共同核对。capture / composite 的三个颜色附件独立，target reset 先释放 pipelines/bindings，再释放 RT/pass/depth/MSAA/resolve 纹理。读回拥有独立结果存储，销毁和 Kit/RHI 替换前 finish；GUI 回调 QPointer 排队，不保留 GUI 对象到 render。float 资产从小端转为本机字节序；所有资源经 qrc 解析，无系统盘或当前目录依赖。
 
-R10B历史复建入口`tools/build/verify-r10b.ps1 -Python <本机Python>`，R10C为`tools/build/verify-r10c.ps1`，均需对应验收提交并在隔离checkout保存输出，不能用维护后源码覆盖历史证据。当前维护验证和来源索引按`performance.md`及`verification/windows/performance-review/`执行；开发依赖不进入产品运行路径。冻结源码捕获使用已有Node、锁定Web依赖与本机浏览器，只访问隔离本地harness并阻止外网请求；相同源/fixture/image hash可复用已有对照。先format/check-format，再执行受影响的Release Review CTest/qmllint，最后关闭Review执行生产Release构建和CTest。
+R10B历史实现只能在对应隔离checkout复建。当前`verify-r10b.ps1`已退役并显式拒绝旧图像工作流，避免误运行ROI/环境witness。当前入口如下，不读取旧截图：
+
+```sh
+cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+cmake --build --preset qt-release
+ctest --preset qt-release-render -R '^rhi-shell-gpu$' --output-on-failure
+python3 tools/audit/audit-rhi-optics.py
+```
+
+R19C2B2恢复非像素`rhi-shell-gpu`门禁，macOS为真正隐藏Metal，其他系统暂为置底/拒绝焦点原生窗口。当前实际管线及数值公式、61源状态、6稳定排序、2捕获隔离、1×/4×透明输入、十次重建详见[source-fidelity-review.md](source-fidelity-review.md)的R19C2B2节。geometry roughness已按源view-space修正；LTC零切线和零光半向量采用有限奇点处理，未调物理参数。源磨砂/LOD保留；连续透明闪烁由R19C2C处理，fog/后处理/非预期模糊由R19D处理。下述R10B描述与分数只作历史记录，旧MAE/SSIM/图像相等不再执行，也不保留为待达门槛。
 
 `tests/fixtures/rhi-shell/visual.json` 保留 R10 `sourceIndex`、源参数和独立投影；61 状态覆盖原 2、4–57、60–65，三种封面、双主题、前/低角度、邻盒、抽取中间位置、三档阴影与九实例。普通场景采集源码 pre-AO/Bokeh/SMAA 的线性输出，三个 direct-material 例外继续按原单盒路径采集；R10B Quick3D 与 RHI 使用完全相同输入和颜色域比较。原 R10 0/1/3 的画质、Bokeh 和 320px SSAA 诊断已纳入当前 R10C final-output 重放；R10B 历史证据仍只代表 pre-stage。原 58/59 另按真实 GPU 法线/深度和原 source 图检查，RGB24 线性深度还原为 canonical OpenGL depth 后对比；R10A 的已知平面、角点、九尺寸与读回生命周期也执行回归。
 
 五个 ROI 全部计分，MAE/SSIM/edge 和等权损失不屏蔽边缘、侧脊或背景。退出使用迁移计划的“全部材质 ROI 通过或残差进一步缩小”分支；整体损失降低不宣称每个 ROI 都达到 .97/6。逐项残差保留于 `verification/windows/rhi-shell/release-runtime.json`，源/Quick3D/RHI/差分与 4× 局部图位于 `docs/media/rhi-shell/`。较窄 rim 的 SSIM 无完整窗口时明确为 null，仍保留 MAE 和轮廓，不删除该区域。R10D 成对重放时必须复验这些具体 sourceIndex/ROI 和 `verification/windows/rhi-postprocess/` 的当前 pre-stage/final 残差，不能用整体平均数覆盖。
 
-以下为R10B历史GPU门槛，尚待R19C2拆出非像素功能检查，不在当前执行：两场景开启/关闭壳体的不透明捕获逐像素一致；六场景倒序提交颜色/深度完全一致；相同深度使用固定 ID、重复 ID 拒绝；合成透明留白的 1×/4× resolve 只改变边缘覆盖，中心印刷不变且透明区不写法线/深度。阴影 on/off 用壳体实际深度掩码统计有效像素。R10B 历史图集传输字节仍未知；当前 R10C 的上传预算与性能证据独立保存于 `verification/windows/rhi-postprocess/`。
+以下为R10B历史图像门槛，已由R19C2B2上面的源公式/实际graph及资源门禁替代，不在当前执行：两场景开启/关闭壳体的不透明捕获逐像素一致；六场景倒序提交颜色/深度完全一致；相同深度使用固定 ID、重复 ID 拒绝；合成透明留白的 1×/4× resolve 只改变边缘覆盖，中心印刷不变且透明区不写法线/深度。阴影 on/off 用壳体实际深度掩码统计有效像素。R10B 历史图集传输字节仍未知；当前 R10C 的上传预算与性能证据独立保存于 `verification/windows/rhi-postprocess/`。

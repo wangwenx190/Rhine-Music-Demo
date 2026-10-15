@@ -93,3 +93,24 @@ qt_add_resources(
     "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-area.png"
     "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-search.png"
 )
+
+if(YALAHOO_REVIEW)
+    # Build-only wrapper executes production GLSL functions with independent math inputs.
+    set(optics_source "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell.frag")
+    set(optics_tail "${PROJECT_SOURCE_DIR}/tools/review/OpticsProbe.frag")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${optics_source}" "${optics_tail}")
+    file(READ "${optics_source}" optics_body)
+    string(REPLACE "void main()" "void productionShellMain()" optics_body "${optics_body}")
+    foreach(header frame shadow-filter)
+        set(optics_header_path "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/${header}.glsl")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${optics_header_path}")
+        file(READ "${optics_header_path}" optics_header)
+        string(REPLACE "#include \"${header}.glsl\"" "${optics_header}"
+            optics_body "${optics_body}")
+    endforeach()
+    file(READ "${optics_tail}" optics_probe_tail)
+    set(optics_generated "${CMAKE_CURRENT_BINARY_DIR}/optics-probe.frag")
+    file(WRITE "${optics_generated}" "${optics_body}\n${optics_probe_tail}")
+    qt_add_shaders(YalahooRhi review_optics PREFIX /rhi BASE "${CMAKE_CURRENT_BINARY_DIR}"
+        GLSL "330,300 es" HLSL 50 MSL 12 FILES "${optics_generated}")
+endif()

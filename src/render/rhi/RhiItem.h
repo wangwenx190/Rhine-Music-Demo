@@ -42,6 +42,7 @@ struct Input
           environmentIntensity = .25f;
     int shadowSize = 2048;
     int captureSamples = 1;
+    int opticalProbe = 0; // Review-only selector, rejected by production builds.
     float warmth = 1, clarity = 0, exposure = 1.05f, scatterStrength = 1, areaIntensity = 0;
     QVector3D scatterColor, areaPosition, areaTarget;
     bool shells = false, showPaper = true, rawOutput = false;

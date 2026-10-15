@@ -103,6 +103,7 @@ struct Pending
     std::array<int, 13> readbackOwner;
     int drainFrames = 0;
     bool yUp = false;
+    int opticalProbe = 0;
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
 {
@@ -345,7 +346,7 @@ private:
     QSize targetSize;
     int shadowSize = 0, uniformStride = 0, captureSamples = 0;
     bool targetsHaveShells = false;
-    bool areaShader = false;
+    bool areaShader = false, opticsProbeShader = false;
     bool diagnosticTargets = false;
     std::array<Uniform, 7> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
@@ -551,6 +552,10 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
         if (api->backend() != QRhi::OpenGLES2 || api->isFeatureSupported(QRhi::Compute))
             fragment += "-early";
         fragment += ".frag.qsb";
+#ifdef YALAHOO_RHI_AUDIT
+        if (input.opticalProbe > 0)
+            fragment = ":/rhi/optics-probe.frag.qsb";
+#endif
     }
     p->setShaderStages({ { QRhiShaderStage::Vertex,
                            shader(isShadow ? (instanced ? ":/rhi/shadow-instanced.vert.qsb"
@@ -875,6 +880,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(shellBindings->create(), "Shell bindings failed");
             shellPipeline = pipeline(composite, shellBindings.get(), false, true);
             areaShader = input.areaIntensity > 0;
+            opticsProbeShader = input.opticalProbe > 0;
             // The visibility pass writes the exact source front-surface depth first.
             // Equal/read-only depth allows early rejection before expensive optical shading.
             shellPipeline->setDepthOp(QRhiGraphicsPipeline::Equal);
@@ -926,12 +932,15 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(copyPipeline->create(), "Opaque copy pipeline failed");
         }
     }
-    if (input.shells && areaShader != (input.areaIntensity > 0)) {
+    if (input.shells
+        && (areaShader != (input.areaIntensity > 0)
+            || opticsProbeShader != (input.opticalProbe > 0))) {
         shellPipeline = pipeline(composite, shellBindings.get(), false, true);
         shellPipeline->setDepthOp(QRhiGraphicsPipeline::Equal);
         shellPipeline->setDepthWrite(false);
         require(shellPipeline->create(), "Shell area specialization failed");
         areaShader = input.areaIntensity > 0;
+        opticsProbeShader = input.opticalProbe > 0;
     }
     const QSize aoSize(std::max(1, int(targetSize.width() * input.aoResolution)),
                        std::max(1, int(targetSize.height() * input.aoResolution)));
@@ -1051,7 +1060,8 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.coverUv, QVector4D(0, 0, 1, 1));
     const QSize pixels = input.atlasGeneration ? QSize(256, 256) : input.cover.size();
     copy(u.paperSize,
-         QVector4D(float(pixels.width()), float(pixels.height()), input.coverPainted ? 1 : 0, 0));
+         QVector4D(float(pixels.width()), float(pixels.height()), input.coverPainted ? 1 : 0,
+                   float(input.opticalProbe)));
     return u;
 }
 Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
@@ -1386,42 +1396,61 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     } else {
         cb->resourceUpdate(updates);
     }
+    const bool recordCapture = deliver && input.request != capturedRequest && pending.size() < 2;
+    QJsonArray captureKinds, opticalEvents;
+    const auto recordOpaque = [&](quint32 offset) {
+        if (recordCapture) {
+            Uniform submitted;
+            std::memcpy(&submitted, bytes.constData() + offset, sizeof(submitted));
+            captureKinds.append(submitted.draw[0]);
+        }
+    };
+    const auto opaqueMeshDraw = [&](QRhiGraphicsPipeline *pipeline, Mesh mesh, quint32 offset) {
+        drawMesh(cb, pipeline, geometryBindings.get(), mesh, offset);
+        recordOpaque(offset);
+    };
+    const auto opaqueInstanceDraw = [&](Mesh mesh, quint32 offset) {
+        drawInstances(cb, opaqueInstances.get(), geometryBindings.get(), mesh, offset,
+                      visibleCount);
+        recordOpaque(offset);
+    };
     auto drawOpaque = [&](Target &target) {
         cb->beginPass(target.rt.get(), Qt::black, { 1, 0 });
         cb->setViewport({ 0, 0, float(targetSize.width()), float(targetSize.height()) });
-        drawMesh(cb, backgroundPipeline.get(), geometryBindings.get(), backgroundTriangle,
-                 bgOffset);
+        if (recordCapture)
+            opticalEvents.append("opaque");
+        opaqueMeshDraw(backgroundPipeline.get(), backgroundTriangle, bgOffset);
         if (input.shadowDiagnostic)
-            drawMesh(cb, opaquePipeline.get(), geometryBindings.get(), floor, floorOffset);
+            opaqueMeshDraw(opaquePipeline.get(), floor, floorOffset);
         if ((!input.shadowDiagnostic || input.shells) && batched) {
             if (input.geometryDiagnostic)
                 for (auto mesh : { lid, spine, tray })
-                    drawInstances(cb, opaqueInstances.get(), geometryBindings.get(), mesh,
-                                  batchGeometryOffset, visibleCount);
+                    opaqueInstanceDraw(mesh, batchGeometryOffset);
             if (input.showPaper)
-                drawInstances(cb, opaqueInstances.get(), geometryBindings.get(), paper,
-                              input.geometryDiagnostic ? batchGeometryOffset : batchPaperOffset,
-                              visibleCount);
+                opaqueInstanceDraw(
+                        paper, input.geometryDiagnostic ? batchGeometryOffset : batchPaperOffset);
         } else if (!input.shadowDiagnostic || input.shells)
             for (int i : opaqueOrder) {
                 if (!visible[i])
                     continue;
                 if (input.geometryDiagnostic)
                     for (auto mesh : { lid, spine, tray })
-                        drawMesh(cb, opaquePipeline.get(), geometryBindings.get(), mesh,
-                                 opaqueOffsets[i]);
+                        opaqueMeshDraw(opaquePipeline.get(), mesh, opaqueOffsets[i]);
                 if (input.showPaper)
-                    drawMesh(cb, opaquePipeline.get(), geometryBindings.get(), paper,
-                             opaqueOffsets[i]);
+                    opaqueMeshDraw(opaquePipeline.get(), paper, opaqueOffsets[i]);
             }
     };
     drawOpaque(opaque);
     cb->endPass();
+    if (recordCapture)
+        opticalEvents.append("opaque-resolved");
     if (input.shells) {
         // Resolve ends before generateMips; capture never contains transmission shells.
         auto *mips = api->nextResourceUpdateBatch();
         mips->generateMips(opaque.color.get());
         cb->resourceUpdate(mips);
+        if (recordCapture)
+            opticalEvents.append("capture-mips");
         // Load retained opaque depth and copy resolved color into the independent destination.
         // Both MRT layouts/sample counts are compatible; no sampled attachment aliases this target.
         cb->beginPass(composite.rt.get(), Qt::black, { 1, 0 });
@@ -1429,7 +1458,11 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->setGraphicsPipeline(copyPipeline.get());
         cb->setShaderResources(copyBindings.get());
         cb->draw(3);
+        if (recordCapture)
+            opticalEvents.append("composite-copy");
         if (!input.geometryDiagnostic) {
+            if (recordCapture)
+                opticalEvents.append("visibility");
             if (batched) {
                 Mesh combined{ lid.start, lid.count + spine.count + tray.count };
                 drawInstances(cb, coverageInstances.get(), geometryBindings.get(), combined,
@@ -1440,6 +1473,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                         drawMesh(cb, coveragePipeline.get(), geometryBindings.get(), it->mesh,
                                  it->offset);
         }
+        if (recordCapture && !input.geometryDiagnostic)
+            opticalEvents.append("shell-shading");
         if (!input.geometryDiagnostic)
             for (const auto &draw : shells)
                 if (visible[draw.entity])
@@ -1490,6 +1525,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         auto p = std::make_shared<Pending>();
         p->drainFrames = api->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1;
         p->capture.request = input.request;
+        p->opticalProbe = input.opticalProbe;
         p->deliver = deliver;
         p->yUp = api->isYUpInFramebuffer();
         p->capture.metadata = {
@@ -1526,6 +1562,37 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 passNames.append(name);
             passNames.append("ACES-sRGB-output");
             p->capture.metadata["passes"] = passNames;
+        }
+        if (input.shells) {
+            const auto expectedBinding = QRhiShaderResourceBinding::sampledTexture(
+                    4, QRhiShaderResourceBinding::FragmentStage, opaque.color.get(),
+                    mipLinear.get());
+            bool noBlend = true;
+            for (auto blend = shellPipeline->cbeginTargetBlends();
+                 blend != shellPipeline->cendTargetBlends(); ++blend)
+                noBlend = noBlend && !blend->enable;
+            p->capture.metadata["opticalGraph"] = QJsonObject{
+                { "captureBindingMatches",
+                  std::find(shellBindings->cbeginBindings(), shellBindings->cendBindings(),
+                            expectedBinding)
+                          != shellBindings->cendBindings() },
+                { "captureSeparateFromComposite", opaque.color.get() != composite.color.get() },
+                { "sharedOpaqueDepth",
+                  opaque.rt->description().depthStencilBuffer()
+                          == composite.rt->description().depthStencilBuffer() },
+                { "depthContentsPreserved",
+                  composite.rt->flags().testFlag(
+                          QRhiTextureRenderTarget::PreserveDepthStencilContents) },
+                { "captureMips", opaque.color->flags().testFlag(QRhiTexture::MipMapped) },
+                { "colorDepthTest", shellPipeline->hasDepthTest() },
+                { "colorDepthWrite", shellPipeline->hasDepthWrite() },
+                { "colorDepthEqual", shellPipeline->depthOp() == QRhiGraphicsPipeline::Equal },
+                { "colorCullBack", shellPipeline->cullMode() == QRhiGraphicsPipeline::Back },
+                { "colorBlendingDisabled", noBlend },
+                { "visibilityDepthWrite", coveragePipeline->hasDepthWrite() },
+                { "visibilityDepthLessEqual",
+                  coveragePipeline->depthOp() == QRhiGraphicsPipeline::LessOrEqual }
+            };
         }
         p->capture.metadata["atlasGeneration"] = qint64(atlasGeneration);
         p->capture.metadata["atlasUploadBytes"] = frameUploadBytes;
@@ -1606,6 +1673,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                  { "tint", array(submitted.tint, 3) },
                                  { "attenuation", array(submitted.attenuation, 3) } });
         }
+        p->capture.metadata["captureDrawKinds"] = captureKinds;
+        p->capture.metadata["opticalEvents"] = opticalEvents;
         p->capture.metadata["sortedShells"] = sorted;
         p->capture.metadata["submittedShellUniforms"] = opticalUniforms;
         p->readbackOwner.fill(-1);
@@ -1625,6 +1694,29 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
                     const auto image = imageOf(state->results[i], state->yUp, i == 8);
+                    if (i == 4 && state->opticalProbe > 0) {
+                        const auto &readback = state->results[i];
+                        const int components = readback.format == QRhiTexture::RGBA16F ? 2 : 4;
+                        const int x = readback.pixelSize.width() / 2;
+                        const int y = readback.pixelSize.height() / 2;
+                        const int offset = (y * readback.pixelSize.width() + x) * 4 * components;
+                        QJsonArray values;
+                        for (int channel = 0; channel < 3; ++channel) {
+                            float value;
+                            if (components == 2) {
+                                qfloat16 half;
+                                std::memcpy(&half, readback.data.constData() + offset + channel * 2,
+                                            2);
+                                value = float(half);
+                            } else {
+                                std::memcpy(&value,
+                                            readback.data.constData() + offset + channel * 4, 4);
+                            }
+                            require(std::isfinite(value), "Nonfinite optical math probe");
+                            values.append(value);
+                        }
+                        state->capture.metadata["opticalProbeSample"] = values;
+                    }
                     const std::array<QImage *, 13> outputs{
                         &state->capture.color,          &state->capture.normal,
                         &state->capture.depth,          &state->capture.shadow,
@@ -1812,6 +1904,12 @@ void RhiItem::submit(Input input, QSize target)
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");
     require(input.captureSamples > 0, "Invalid RHI sample count");
+    require(input.opticalProbe >= 0 && input.opticalProbe <= 9
+                    && (input.opticalProbe == 0 || input.shells),
+            "Invalid optical math probe");
+#ifndef YALAHOO_RHI_AUDIT
+    require(input.opticalProbe == 0, "Optical math probes require a Review build");
+#endif
     if (input.shells && !input.entities.isEmpty()) {
         require(input.entities.size() == 1 || input.entityIds.size() == input.entities.size(),
                 "Shell instances require stable IDs");

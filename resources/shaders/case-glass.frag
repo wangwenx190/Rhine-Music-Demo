@@ -123,7 +123,15 @@ vec3 LTC_Evaluate(const in vec3 N, const in vec3 V, const in vec3 P, const in ma
 
     // construct orthonormal basis around N
     vec3 T1, T2;
-    T1 = normalize(V - N * dot(V, N));
+    vec3 tangent = V - N * dot(V, N);
+    if (dot(tangent, tangent) == 0.0) {
+        // At normal incidence the tangent orientation is arbitrary; choose a finite basis.
+        vec3 axis = abs(N.x) <= abs(N.y) && abs(N.x) <= abs(N.z) ? vec3(1, 0, 0)
+                : abs(N.y) <= abs(N.z)                           ? vec3(0, 1, 0)
+                                                                 : vec3(0, 0, 1);
+        tangent = cross(axis, N);
+    }
+    T1 = normalize(tangent);
     T2 = -cross(
             N,
             T1); // negated from paper; possibly due to a different handedness of world coordinate system
@@ -196,9 +204,11 @@ void musicArea(vec3 n, vec3 v, vec3 position, float r, vec3 f0, out vec3 diffuse
 
 vec3 musicBRDF(vec3 n, vec3 v, vec3 l, float r, vec3 f0, bool multiscatter)
 {
+    float nl = clamp(dot(n, l), 0.0, 1.0), nv = clamp(dot(n, v), 0.0, 1.0);
+    if (nl == 0.0)
+        return vec3(0);
     vec3 h = normalize(l + v);
-    float nl = max(dot(n, l), 0.0), nv = max(dot(n, v), 0.0), nh = max(dot(n, h), 0.0),
-          vh = max(dot(v, h), 0.0);
+    float nh = clamp(dot(n, h), 0.0, 1.0), vh = clamp(dot(v, h), 0.0, 1.0);
     float a = r * r, aa = a * a;
     float gv = nl * sqrt(aa + (1.0 - aa) * nv * nv), gl = nv * sqrt(aa + (1.0 - aa) * nl * nl);
     float visibility = .5 / max(gv + gl, 1e-6), d = nh * nh * (aa - 1.0) + 1.0;
@@ -545,16 +555,22 @@ vec3 environmentBRDF(float dotNV, float r, vec3 f0)
     vec2 fab = texture(dfgMap, vec2(r, dotNV)).rg;
     return f0 * fab.x + fab.y;
 }
+float musicGeometryRoughness(vec3 normal)
+{
+    // Three nonPerturbedNormal is in view space; max-component derivatives are not rotation invariant.
+    vec3 geometryNormal = normalize(mat3(VIEW_MATRIX) * normal);
+    vec3 dxy = max(abs(dFdx(geometryNormal)), abs(dFdy(geometryNormal)));
+    return max(dxy.x, max(dxy.y, dxy.z));
+}
 void MAIN()
 {
     vec3 n = normalize(worldNormal);
     vec3 v = normalize(CAMERA_POSITION - worldPosition);
-    float nv = max(0.0, dot(n, v));
+    float nv = clamp(dot(n, v), 0.0, 1.0);
     vec3 tint = mix(nightTint.rgb, dayTint.rgb, warmth);
     vec3 attenuation = mix(nightAttenuation.rgb, dayAttenuation.rgb, warmth);
     vec3 f0 = vec3(pow((1.46 - 1.0) / (1.46 + 1.0), 2.0));
-    vec3 dxy = max(abs(dFdx(n)), abs(dFdy(n)));
-    float geometryRoughness = max(dxy.x, max(dxy.y, dxy.z));
+    float geometryRoughness = musicGeometryRoughness(n);
     float r = min(1.0, max(roughness, 0.0525) + geometryRoughness);
     float cr = min(1.0, max(coatRoughness, 0.0525) + geometryRoughness);
     vec3 reflectDir = normalize(mix(reflect(-v, n), n, pow(r, 4.0)));
