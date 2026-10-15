@@ -226,3 +226,27 @@ Release完整隐藏回归32/32通过，两组官方qmllint与check-format/source
 审计还发现共用驱动无条件创建R10的2048²/16MiB探针atlas，即使材质/灯光不使用它。现只在backendReview路径构造，普通两入口报告probe payload/submission为0；这是删除无效准备工作，不改实际封面/环境/透射捕获，也不声称产品显存或FPS改进。
 
 移除无关atlas后，材质99状态/十次root重建和灯光48状态/一次root重建均补验通过，probe payload/submission均为0；一体Python入口实际完整执行成功，恢复Review OFF、可见测试OFF，生产Release构建与25/25快速CTest（含source-format及默认隐藏窗口策略）通过，生产程序拒绝Review CLI返回1。未重跑不受该无用分配移除影响的整套32项，复用上面的完整隐藏结果。首次一体入口在收尾编辑后正确拒绝未格式化的MaterialReview，格式化后的最终流程通过；不将首次失败改写为通过。
+
+## R19C2B1 不透明RHI源数学、资源与门禁复查
+
+起点`75b5543`。实施前将B分为B1不透明通道和B2光学壳体，紧随的C仍负责连续闪烁。逐项恢复`52f1278`的R10A原任务，沿`5625d73`、`1f2352a`、`d03527e`、`75775b3`、`f7e423a`、`b7f73d4`、`e98c798`、`ed5aaef`及R19B/C1追至当前同步、uniform、绘制、读回路径。仅复审下列不透明/采集边界，不冒充R10B光学算法或R19D后处理全量复审。
+
+| 原轮次 / 实际审查对象 | 源码依据、适配及判定 | 验证与边界 |
+| --- | --- | --- |
+| R07：`createAlbumPrintMaterial`→`opaque.frag` | 源Lambert无specular/emission，alphaTest .025、toneMapped=false、先限制原图颜色。sRGBDecode、预乘滤波后恢复颜色、contain/inset与源3.06纸面几何保持；没有ROI系数。 | 16个黑/灰/彩/白×关闭灯光/0/.25/2入射探针独立推导线性结果，最大约.001792≤1/255；三种真实封面另有36状态，不以均匀墨色证明细节质量。 |
+| R08：`shadePrint`、锁定Three Lambert/hemisphere/IBL→`paper-lighting.glsl`与CPU原点场 | 对照生产shadePrint替换顺序、Three `lights_lambert_pars_fragment`、hemi及getIBLIrradiance：direct/hemi除PI，IBL自身PI与Lambert BRDF相消；print field最后乘原曝光。entityLight0.xy提升只依赖origin/frame，C1源场核和轨迹独立回归保留。 | 全共享helper逐token核对uniform映射/原点提升，未拟合环境字节或图像。原PS生成器遗漏后续提升、会恢复逐片元重复计算，改为Python共同生成器；实际生成+格式化与提交shader逐字一致。 |
+| R10A：`RhiAudit`的Quick3D/浏览器oracle、平面/法向、source shadow witness | 移除Quick3D实例化、原图载入/MAE及source shadow image比较；保留数学源位置/法向/深度、receiver已知strength。旧QML只留历史源码，不再链接或打包；旧verify-r10a历史流水线退役，当前独立CTest恢复。 | 36双主题/前低视角/三封面/三通道；深度约1.59e-8<2e-6，normal约.001961≤1/255，四角约1.822≤2px，六shadow最低.678431。近距fixture不触发源雾，不声称远景完整。 |
+| R10B：RhiItem异步capture的重复纹理与值交接 | 显式capture原13字段经fallback常多次指向同一texture，却重复GPU readback和imageOf转换。现在按真实纹理指针去重、每唯一texture转换一次，字段共享不可变QImage；最后一组真实回调才deliver。没有改变pass/格式/采样。 | 无shell/post且captureAtlas=false时12字段=4真实readback；constBits验证别名共享；仍最多2批pending、按backend读回上限排空、QPointer排队、过期request丢弃。透明捕获与排序仍归B2。 |
+| R10C：RGBA16F/法线与RGB24深度RGBA8、资源清单 | 浮点线性颜色与独立normal/depth、hardware depth保持实际Kit支持；读回解码有限值、Y方向/字节序与原语义一致。capture附加实际对象inventory，未知driver内存仍null，不用描述估算冒充显存测量。 | 每状态核对真实格式、1×、无mips及目标尺寸，full回归同时覆盖带shell/atlas的采集别名路径；完整AO/Bokeh/SMAA仍R19D。 |
+| R10D：生产SceneItem/RhiItem共享边界 | 只在显式capture分支增加inventory/去重诊断；request=0生产不执行这些JSON或readback。新的RhiCaptureHarness是工具，不改变生产帧源、选型或输入状态。 | 同一次完整隐藏回归含材质、阵列、真实列、封面和界面；不宣称产品threaded/VSYNC或FPS提升。 |
+| R11：cover snapshot/lease及same-request revision | 保留按cover cacheKey/content revision共享/隔离一次，不把更新绑定capture request。独立driver以同request替换纯红/蓝，检查自己最终输出各自响应；不是两幅源图趋同。 | sameRequestCoverReplacement通过；完整cover-cache/atlas queue/真实阵列GPU回归通过，个人音乐没有读取。 |
+| R12：阵列/后续优化中的批次与读回所有权 | 采集只访问有界实体和最多13个字段，实际读回组按指针有界合并；无全库遍历或无界队列。resize旧资源的最后使用由QRhi完成约束，结果只持有值。 | 12有序尺寸/九种不同尺寸、30个真实帧驱动resize、过期回调及最终尺寸通过；逐帧只发一次状态，无processEvents手动pump。 |
+| R13：有限列共享renderer采集 | 去重不改变实例ID/矩阵/封面区域、同深度键或真实列状态；generic字段通过Qt隐式共享保留相同语义图像。 | real-columns-gpu随完整33项通过；本项不新增有限列运动算法结论。 |
+| R18：详情/归位及renderer重建 | 不改owned材质或快照；同RhiItem跨十次实际invalidation重建，当前renderer的局部generation仅作描述，实际SG事件作为生命周期证据。 | 十次隐藏同item重建及有效depth通过；原生窗口hide/restore和正常呈现仍R34。 |
+| R16 macOS可见补验：`e98c798`→Target MSAA fallback/有界drain | 实际GL能力探测选择同格式renderbuffer代替不可用multisample texture，不减样本数或颜色精度；readback按MaxAsyncReadbackFrames+1继续真实帧。保留必要API适配，不因旧图分数回退。 | 本轮Metal隐藏同item/尺寸/有界读回实际通过；GL/MSAA跨后端及可见drawable完整验收仍R19D/R34，未宣称本轮执行。 |
+
+COMMON-01–05/PERF-01–07与平台逐项符号/hash由`audit-rhi-opaque.py`写忽略目录，人工展开了源Lambert/场核、GLB/normal/clip转换、实际附件、唯一读回的命令/回调边和销毁顺序；字符串guard不替代推演/运行。当前macOS/arm64/Apple M4、最新自动Kit Qt6.12.0、AppleClang 21、Release、Metal/DPR1隐藏：独立入口9.57秒为一次功能运行耗时，不能作为性能比较；完整隐藏33/33、两组官方qmllint/check-format及paper/shared helper检查通过。没有像素配对、旧图评分或浏览器GPU witness。生成图仅为自身线性诊断目标，未据此调参或宣称抗锯齿/完整颜色输出达标。
+
+已确认的跨轮差异：冻结scene.ts真实生产Fog按rendered camera distance及detail更新near/far，材质fog=true；当前原生SceneFrame/RhiItem/shader无fog输入或合成。近距B1 fixture在源fog前，不能关闭该缺口。具体参数、生产调用和Three颜色/雾次序已写入R19D明确修复任务，保持R20前主线，不当作BLUR-01正常设计或将缺陷移到R34。目标D3D11/OpenGL、原生窗口与设备实机边界见R34/R19C2B1-P。
+
+普通Release最终恢复Review OFF、可见测试OFF，构建与25/25快速CTest（含source-format/隐藏窗口策略）通过。生成器默认写入+Qt格式化后纸面shader与提交版本逐字一致，未改变已验证的C++/shader语义，因此复用上面的33项完整结果；PowerShell入口当前主机仅静态核对，目标解析/格式要求仍在R34。所有运行输出保持忽略，只有源码/工具和必要契约进入本轮提交。

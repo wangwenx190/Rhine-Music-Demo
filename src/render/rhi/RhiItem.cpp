@@ -99,7 +99,8 @@ struct Pending
     std::array<QRhiReadbackResult, 13> results;
     Capture capture;
     std::function<void(Capture)> deliver;
-    int remaining = 13;
+    int remaining = 0;
+    std::array<int, 13> readbackOwner;
     int drainFrames = 0;
     bool yUp = false;
 };
@@ -1508,6 +1509,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                          "capture-resolve-mips", "sorted-shell", "review-output" }
                            : QJsonArray{ "shadow", "opaque-color-normal-depth", "review-output" } },
             { "msaaSamples", captureSamples },
+            { "resources", resourceInventory() },
             { "recursiveGlassCapture", false },
             { "shellDepthWrite", true },
             { "shellColorDepthWrite", false },
@@ -1606,46 +1608,43 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         }
         p->capture.metadata["sortedShells"] = sorted;
         p->capture.metadata["submittedShellUniforms"] = opticalUniforms;
+        p->readbackOwner.fill(-1);
         for (int i = 0; i < 13; ++i) {
-            if (i == 8 && !input.captureAtlas) {
-                --p->remaining;
+            if (i == 8 && !input.captureAtlas)
                 continue;
-            }
+            int owner = i;
+            for (int prior = 0; prior < i; ++prior)
+                if (p->readbackOwner[prior] >= 0 && textures[prior] == textures[i]) {
+                    owner = p->readbackOwner[prior];
+                    break;
+                }
+            p->readbackOwner[i] = owner;
+            if (owner != i)
+                continue;
+            ++p->remaining;
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
-                    auto img = imageOf(state->results[i], state->yUp, i == 8);
-                    if (i == 0)
-                        state->capture.color = img;
-                    else if (i == 1)
-                        state->capture.normal = img;
-                    else if (i == 2)
-                        state->capture.depth = img;
-                    else if (i == 3)
-                        state->capture.shadow = img;
-                    else if (i == 4)
-                        state->capture.composite = img;
-                    else if (i == 5)
-                        state->capture.compositeNormal = img;
-                    else if (i == 6)
-                        state->capture.compositeDepth = img;
-                    else if (i == 7)
-                        state->capture.postprocessed = img;
-                    else if (i == 8)
-                        state->capture.atlas = img;
-                    else if (i == 9)
-                        state->capture.rawAo = img;
-                    else if (i == 10)
-                        state->capture.blurredAo = img;
-                    else if (i == 11)
-                        state->capture.aoNormal = img;
-                    else
-                        state->capture.aoDepth = img;
+                    const auto image = imageOf(state->results[i], state->yUp, i == 8);
+                    const std::array<QImage *, 13> outputs{
+                        &state->capture.color,          &state->capture.normal,
+                        &state->capture.depth,          &state->capture.shadow,
+                        &state->capture.composite,      &state->capture.compositeNormal,
+                        &state->capture.compositeDepth, &state->capture.postprocessed,
+                        &state->capture.atlas,          &state->capture.rawAo,
+                        &state->capture.blurredAo,      &state->capture.aoNormal,
+                        &state->capture.aoDepth
+                    };
+                    for (int field = 0; field < 13; ++field)
+                        if (state->readbackOwner[field] == i)
+                            *outputs[field] = image;
                     if (--state->remaining == 0)
                         state->deliver(std::move(state->capture));
                 }
             };
             reads->readBackTexture(QRhiReadbackDescription(textures[i]), &p->results[i]);
         }
+        p->capture.metadata["uniqueReadbackTextures"] = p->remaining;
+        p->capture.metadata["readbackFieldSlots"] = input.captureAtlas ? 13 : 12;
         pending.push_back(p);
         cb->resourceUpdate(reads);
     }

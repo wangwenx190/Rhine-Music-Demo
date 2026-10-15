@@ -1,6 +1,6 @@
 # RHI 场景快照、目标与不透明通道
 
-`YalahooRhi` 的 `src/render/rhi/RhiItem` 实现真实 QQuickRhiItem/Renderer；独立 Review 由 `rhi-audit` / `rhi-shell-audit` 使用，生产接入由 `SceneItem` 绑定同一 SceneAdapter，见 [rhi-integration.md](rhi-integration.md)。Quick3D oracle 只在 Review 构建提供，产品只打包 RHI。
+`YalahooRhi` 的 `src/render/rhi/RhiItem` 实现真实 QQuickRhiItem/Renderer；独立 Review 由 `rhi-audit` / `rhi-shell-audit` 使用，生产接入由 `SceneItem` 绑定同一 SceneAdapter，见 [rhi-integration.md](rhi-integration.md)。R19C2B1的不透明Review已移除Quick3D图像oracle依赖，产品只打包RHI；旧RhiOracle.qml只保留历史源码，不再链接或加载。
 
 GUI 调用 `submit(Input, targetSize)`；Input 含 SceneAdapter 的不可变 SceneFrame、实体矩阵、纸面图像及 SelectionLighting 的值快照。targetSize 由调用者的 RenderQuality 有效尺寸提供；Review 明确使用 DPR1、100% 尺寸。Renderer 在 synchronize 拷贝值、独立持有图像，render 不访问 GUI 对象。Renderer 独占 QRhi 资源；读回按 request 标识，回调持有独立结果存储，GUI 使用受保护的排队投递和过期 request 检查。目标重建先释放 pipeline/binding，再释放 target/pass/attachments；读回存活到 QRhi 完成，销毁前 finish。30 次连续替换与恢复由实机检查覆盖。
 
@@ -21,3 +21,29 @@ R10A 原始 frame.glsl std140 block 为 560 bytes；R10B 保留其前缀并扩�
 R10A 历史复建入口固定六个基础 shader，按对应验收提交重建；R10B 历史入口固定七个，均按对应验收提交重建。当前源树以 `verify-r10c.ps1` 复建 24 个 shader 并同时执行不透明基础回归，历史 hash 不回写。R10A 的 readback 数字与 RGBA32F/整图 cover 提交只用于通道验证，不作为图集传输字节或最终性能预算证据。当前实际 tile destination regions/bytes 与性能各自证据见 `verification/windows/rhi-postprocess/`；不得从 R10A 的 CPU 数据量推导 GPU 上传预算。
 
 接口语义依据：[QQuickRhiItem](https://doc.qt.io/qt-6/qquickrhiitem.html)、[QRhi](https://doc.qt.io/qt-6/qrhi.html)、[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)。升级后以最新 Kit 头文件和实际探针为准。
+
+## 当前不透明通道验证（R19C2B1）
+
+`rhi-audit`不再读取或生成原图/Quick3D配对、RGB/MAE/SSIM、浏览器shadow witness；`verify-r10a.ps1`的历史报告流水线直接报退役，不能用它写当前通过结论。使用：
+
+```sh
+python3 tools/assets/prepare-rhi-paper.py --check
+python3 tools/assets/expand-lighting-shaders.py --check
+python3 tools/audit/audit-rhi-opaque.py
+cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+cmake --build --preset qt-release
+ctest --preset qt-release-render -R '^rhi-opaque-gpu$' --output-on-failure
+# 其他系统当前用qt-release-visible选择同名项，遵守窗口契约。
+```
+
+`RhiCaptureHarness`以正常帧/读回事件串行推进；每次只提交一个状态，等待实际request对应的值结果，有界timeout，无手动processEvents/轮询或额外定时帧。macOS默认真正隐藏Metal，renderThreadDistinct如实为false；这不是产品threaded loop/VSYNC性能。其他系统暂走原生置底拒绝焦点窗口，目标实机仍待R34。
+
+36个双主题×前/低视角×三封面×三通道状态保留独立数学检查：已知前平面线性RGB24深度误差<2e-6，view normal按8位编码精度（1/255），源几何四角投影≤2物理px（本入口实际DPR1）。四角只对数学投影与自身合成几何位置，不读取参考图。16个均匀墨色/入射探针直接按sRGBDecode与源Lambert diffuse clamp推导；半球同色并取`intensity=irradiance*PI`隔离已知入射，关闭环境/spot/key/fill并令print exposure=1，覆盖关闭灯光及0/.25/2入射，不据结果拟合参数。
+
+实际附件inventory来自QRhi对象：不透明RGBA16F、法线/线性RGB24深度RGBA8、1×/无mips及真实尺寸；driver分配仍为null。显式采集按实际纹理指针去重，12个语义字段对应4张真实纹理时只读回和转换4次，别名字段共享QImage存储；captured回调仍最多2批，只有显式采集有这项工作，不改产品pass/格式/采样。十次重建由真实sceneGraphInvalidated确认，不靠renderer局部generation递增证明。
+
+保留12个有序尺寸（九种必测尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
+
+本机Release/Qt6.12.0/Apple M4/Metal隐藏通过：深度最大约1.59e-8、法向约.001961、四角最大约1.822px；16墨色公式误差最大约.001792（线性归一化8位），阴影minimum约.678431。完整隐藏回归33/33、两组官方qmllint和格式通过。数据仅代表该源数学/资源范围；BRDF/捕获/透明重叠、远阵列fog、景深和最终抗锯齿仍按R19C2B2/C/D处理，BLUR-01/FLICKER-01没有关闭。
+
+纸面helper生成入口改为跨平台`prepare-rhi-paper.py`，PowerShell旧入口转交它；生成完整共享body后显式保留entityLight0.xy的原点项提升。`--check`逐token核对共享数学+声明映射+提升适配，实际生成并经Qt格式化可逐字复现当前shader。旧生成器会撤销该提升、重复逐片元计算，已修正；没有改变源纸面数学或提交一份新的派生shader。
