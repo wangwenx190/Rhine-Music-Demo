@@ -1631,6 +1631,55 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             { "shellBlend", false },
             { "shellCull", "Back" }
         };
+#ifdef YALAHOO_RHI_AUDIT
+        QJsonArray resolveGraph;
+        for (const auto &[name, target] :
+             { std::pair{ "opaque", &opaque }, std::pair{ "composite", &composite } }) {
+            if (!target->rt)
+                continue;
+            QJsonArray attachments;
+            const auto &description = target->rt->description();
+            for (auto it = description.cbeginColorAttachments();
+                 it != description.cendColorAttachments(); ++it) {
+                const auto *texture = it->texture();
+                const auto *buffer = it->renderBuffer();
+                const auto *resolved = it->resolveTexture();
+                const auto size = texture ? texture->pixelSize() : buffer->pixelSize();
+                attachments.append(QJsonObject{
+                        { "storage", texture ? "texture" : "renderbuffer" },
+                        { "format", int(texture ? texture->format() : buffer->backingFormat()) },
+                        { "samples", texture ? texture->sampleCount() : buffer->sampleCount() },
+                        { "width", size.width() },
+                        { "height", size.height() },
+                        { "resolveFormat", resolved ? int(resolved->format()) : 0 },
+                        { "resolveSamples", resolved ? resolved->sampleCount() : 0 },
+                        { "resolveWidth", resolved ? resolved->pixelSize().width() : 0 },
+                        { "resolveHeight", resolved ? resolved->pixelSize().height() : 0 },
+                        { "separateResolve", resolved && resolved != texture } });
+            }
+            resolveGraph.append(
+                    QJsonObject{ { "name", name },
+                                 { "samples", target->rt->sampleCount() },
+                                 { "pipelineSamples",
+                                   name == QString("opaque") ? opaquePipeline->sampleCount()
+                                                             : shellPipeline->sampleCount() },
+                                 { "depthSamples", target->z->sampleCount() },
+                                 { "attachments", attachments } });
+        }
+        p->capture.metadata["resolveGraph"] = resolveGraph;
+        p->capture.metadata["postprocessGraph"] = input.postprocess
+                ? post.graph(input.shells ? composite.color.get() : opaque.color.get())
+                : QJsonObject();
+        const auto expectedOutput = QRhiShaderResourceBinding::sampledTexture(
+                0, QRhiShaderResourceBinding::FragmentStage, outputSource, linear.get());
+        p->capture.metadata["outputBindingMatches"] = outputSource
+                        == (input.postprocess
+                                    ? post.output()
+                                    : (input.shells ? composite.color.get() : opaque.color.get()))
+                && std::find(outputBindings->cbeginBindings(), outputBindings->cendBindings(),
+                             expectedOutput)
+                        != outputBindings->cendBindings();
+#endif
         auto *reads = api->nextResourceUpdateBatch();
         if (input.postprocess) {
             p->capture.metadata["submittedBokeh"] = post.submittedBokeh();
@@ -1699,11 +1748,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         QJsonArray effectiveRegions;
         for (int i = 0; i < effectiveCoverTiles.size(); ++i) {
             const auto tile = effectiveCoverTiles[i];
-            effectiveRegions.append(QJsonObject{ { "x", tile.x() },
-                                                 { "y", tile.y() },
-                                                 { "width", tile.width() },
-                                                 { "height", tile.height() },
-                                                 { "lease", qint64(effectiveCoverLeases[i]) } });
+            effectiveRegions.append(
+                    QJsonObject{ { "x", tile.x() },
+                                 { "y", tile.y() },
+                                 { "width", tile.width() },
+                                 { "height", tile.height() },
+                                 { "lease",
+                                   effectiveCoverLeases.isEmpty()
+                                           ? QJsonValue()
+                                           : QJsonValue(qint64(effectiveCoverLeases[i])) } });
         }
         p->capture.metadata["effectiveCoverRegions"] = effectiveRegions;
         const std::array<QRhiTexture *, 14> textures{
@@ -2044,7 +2097,8 @@ void RhiItem::submit(Input input, QSize target)
 {
     require(input.fallbackCoverTiles.isEmpty()
                     || (input.fallbackCoverTiles.size() == input.entities.size()
-                        && input.fallbackCoverLeases.size() == input.entities.size()),
+                        && input.fallbackCoverLeases.size() == input.entities.size()
+                        && input.coverLeases.size() == input.entities.size()),
             "Atlas fallback/entity mismatch");
     for (const auto &tile : input.fallbackCoverTiles)
         require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.size() == QSize(256, 256)

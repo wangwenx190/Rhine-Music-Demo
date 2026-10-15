@@ -16,16 +16,16 @@
 | R03B | `598c4a8`；`c7e9b61` | 真 SVG 主/小稿、揭示映射、平台容器；原创品牌与小尺寸光学校准来自用户明确要求，保留。衍生资产 hash/容器检查有效，R19A 审查；页眉/开场容器归 R19E/R20。 |
 | R04 | `739ee97`；`d03527e`、`b7f73d4`、`0d06b7b`、`1a082f2`、`2ee2294`、`2abb4f6`、`33e8260`、`1c9b8c6` | `MusicTypes`、`LibraryModels`、`LibrarySession`、`OfflineMetadataProvider`；保留本地 URL、字段/稳定 ID、排序/搜索、导航与播放隔离和异步离线结果。R19A 审查；布局/导航状态消费者归 R19B/E/G。 |
 | R05 | `ec0af92`；`d03527e`、`ed5aaef` | `FrameClock`、阻尼/五次轨迹、改速/减少动态与 `cancelTravel`；R19B 已按原公式和实际调用顺序审查，结论见下节。 |
-| R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，MSAA/resolve及目标尺度分别待R19D4B2/C。 |
+| R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，MSAA/resolve由R19D4B2确认，目标尺度仍待R19D4C。 |
 | R07 | `1556a55`；`52f1278`、`5625d73`、`ed5aaef` | `ShellMaterial`、主盖/侧脊参数和有效override由R19C1复查，ROI系数移除；shader/捕获/LOD剩余项归R19C2。 |
 | R08 | `178ca45`；`52f1278`、`5625d73`、`e98c798` | `MusicLighting`的主题/单位/轨迹参数由R19C1复查；Room/PMREM/BRDF/方向的shader实现与平台采样归R19C2。 |
 | R09 | `3fc6a39`；`1f2352a`、`75775b3` | SSAO/depth/normal、核/box与数据边由R19D1复查；阴影/偏置/滤波由R19D3A/B复查。 |
-| R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh→R19D4A，SMAA→R19D4B1，MSAA/旧门禁→R19D4B2，尺度→R19D4C；颜色→R19D2。 |
-| R10 | `d06e5f3` | Quick3D/RHI 能力探测和历史选型理由待R19D4B2；不恢复旧图像分数门禁。 |
+| R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh→R19D4A，SMAA→R19D4B1，MSAA/旧门禁由R19D4B2复查并完成覆盖映射，尺度→R19D4C；颜色→R19D2。 |
+| R10 | `d06e5f3` | Quick3D/RHI 能力与历史选型由R19D4B2按可控阴影/全局排序/独立捕获边界确认；不恢复旧图像分数门禁。 |
 | R10A | `52f1278`；`5b2df80`、`d03527e` | opaque/纸面的入射参数与toneMapped接口由R19C1复查；最终shader语义归R19C2，阴影/资源图/采样归R19D。 |
 | R10B | `5625d73`；`d03527e`、`e98c798` | 材质参数迁移及R18独立clarity由R19C1复查；透明捕获/排序和完整R10B归R19C2，MSAA/平台附件归R19D。 |
-| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约由R19A确认，光学capture/mips由R19C2B/C复查，AO及常量数据由R19D1复查；剩余MSAA/旧门禁/尺度归D4B2/C。 |
-| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；目标/其余集成归D4B2/C，历史性能只记录的用户边界保留。 |
+| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约由R19A确认，光学capture/mips由R19C2B/C复查，AO及常量数据由R19D1复查；MSAA/旧门禁由D4B2确认，剩余尺度归D4C。 |
+| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；MSAA/组合/旧门禁由D4B2确认，目标尺度仍归D4C，历史性能只记录的用户边界保留。 |
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
 | R12 | `b7f73d4`；`0d06b7b`、`e98c798`、`ed5aaef` | 432 实例、波浪/rebase、选中/归位坐标与稳定物理格 ID 由 R19B 审查；合并图集来源见 R19A，透明与后处理仍待 R19C/D。 |
 | R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
@@ -163,7 +163,7 @@
 | R10D：RGBA16F→标量R16F及诊断解码 | R16F生产raw/blur数学精度和消费者.r等价性保留。查明此前OpenGL错误发生在读回边：本机GL_PACK_ALIGNMENT=4，奇数宽R16F行需填充；当前Qt GL readPixels按紧密纹理字节数分配，未修改PACK_ALIGNMENT，可能越过逻辑缓冲边界。非有限字节不证明产品AO shader生成NaN。 |
 | R10C/D及后续capture：行跨度、资源/别名 | 显式捕获且仅未对齐的GL R16F，通过QRhi同格式copy到缓存的补齐宽纹理；原区域逐值保留。按实际storage stride解码且只消费逻辑区域，未初始化尾列不扫描。最多2个AO缓存槽，实际清单含capture-aligned-scalar；同尺寸复用、renderer reset清理。只查询GL状态，不全局改pixel-store，不锁定旧Qt。 |
 | R10C/D：PostUniform及重复kernel上传 | RHI已把samplesMap改为uniform索引，却仍分配/上传未读取的kernel texture；每个pass还复制/上传整个1104-byte块。删除闲置纹理及资源计划条目，kernel只在SSAO pass创建时一次上传；每帧只更新80-byte变化前缀，保留1104-byte std140 ABI及kernel offset80。 |
-| macOS GL能力、窗口及目标平台 | 保留原MSAA等价renderbuffer及真实标准透视/行方向。bake-occlusion-shaders改用实际host的qsb路径/输出，Windows脚本未在本机执行。原生窗口策略未决问题归计划R34，不将本机结果外推目标平台。 |
+| macOS GL能力、窗口及目标平台 | 保留原MSAA等价renderbuffer及真实标准透视/行方向。bake-occlusion-shaders改用实际host的qsb路径/输出，Windows脚本未在本机执行。前台PID误报的源码判定及监测修正见R19D4B2；原生窗口/目标实机要求仍归R34，不将本机结果外推目标平台。 |
 
 ## R19D2 生产雾、颜色域及捕获次序
 
@@ -217,6 +217,33 @@
 
 | 历史对象 / 来源 | 判定 |
 | --- | --- |
-| 冻结scene.ts / RenderQuality → SceneItem → Postprocess | 保留源启用条件及Bokeh→SMAA→Output次序；生产组合完整闭包归后续任务。 |
+| 冻结scene.ts / RenderQuality → SceneItem → Postprocess | 保留源启用条件及Bokeh→SMAA→Output次序；生产组合实际RT/PSO/SRB闭包由R19D4B2确认。 |
 | SMAAShader edges / weights / blend；SMAAPass lookup | 保留源Medium、lookup行序/过滤、gamma及alpha语义；源float(ivec2)取首分量后广播，数学期望按真实GLSL展开。 |
 | Postprocess资源 / 上传 / Review | 三个生产pass直接离屏执行源数学检查；Review中间目标访问不改变普通构建ABI，不新增产品读回或队列。源适配/历史入口为audit-rhi-smaa.py。 |
+
+## R19D4B2 MSAA/resolve与旧门禁覆盖
+
+技术规范与入口归[postprocess.md](postprocess.md)、[rhi-postprocess.md](rhi-postprocess.md)和[test-gates.md](test-gates.md)。以下按旧工具的实际断言映射；历史图像残差仍是历史事实，不改成通过或复跑。
+
+| 历史对象 / 引入来源 | 源码判定及现行覆盖 |
+| --- | --- |
+| R09B `522a3f3`：GeometryScene MSAA/SSAA诊断、Bokeh/SMAA组合 | 冻结scene构造WebGLRenderer antialias=true，quality.antialias只控制SMAA。保留生产四样本及高/极高SMAA；旧SSAA为Review诊断，不能作为产品预设或与源图评分。三个固定Quick3D Effect的原生调度适配保留；生产组合以RHI显式资源图验证。 |
+| R10 `d06e5f3`：后端能力选择 | Quick3D公开接口无法控制源shadow/跨实体透明表面全局排序/独立捕获resolve，RHI具明确控制边界，因此保留唯一RHI生产路径。旧残差是否非空、平均损失是否缩小和Quick3D/浏览器谁更接近不是选型或通过条件。 |
+| R10C `1f2352a` / R10D `75775b3` / `b7f73d4`：附件与生产接线 | 保留RGBA16F颜色、RGBA8法线/RGB24距离、相同采样的depth、独立resolve与共享保留depth。实际RT/PSO/SRB逐项检查，不以设置值或名称证明。源算法不变；图集/数值更新不重建兼容目标。 |
+| `e98c798`：macOS GL MSAA renderbuffer fallback | 仅当实际context缺多样本texture storage时使用同格式、同样本renderbuffer，resolve仍单样本。属于必要API适配，不降到RGBA8或少样本；真实GL检查读取backingFormat/样本/目标和解析部分覆盖，Metal仍使用texture。 |
+| 默认隐藏策略的前台PID误报 | 初始/当前PID均为其他进程且无自身激活/焦点历史时，旧foregroundUnchanged仍阻断采集。沿AppKit自身通知增加NSWorkspace工作区激活历史监测；任一初始/当前PID属于验证进程、任一自身激活/焦点均继续失败。外部应用切换单列计数和原布尔值；回归覆盖未知PID、切入验证进程及切出后保留失败，不屏蔽自身短暂抢前台。 |
+| `RhiPostprocessAudit`恢复后的可选租约采集 | 空primary lease是既有合法输入，诊断原先无条件索引导致越界。缺租约的metadata现在为null；带fallback必须有完整primary/fallback lease，提交边界先拒绝。该修正不改变生产采样/图集预算。 |
+
+| 退役入口及原断言 | 独立非像素覆盖 / 明确边界 |
+| --- | --- |
+| `postprocess-audit`：105状态完整性、backend/DPR、focus/aperture、启用条件、目标尺寸/上限 | 不再依赖旧runtime/image文件完整性。`render-quality`核对源四预设、归一化、DPR/尺寸限制；`rhi-bokeh-gpu`核对实际核/参数，`rhi-flicker-gpu`核对SceneItem实际Bokeh上传及original/high的SMAA启用/组合图；`rhi-postprocess-gpu`覆盖三尺寸×1/4样本×八组合、单样本后处理/实际绑定/80-byte前缀/关闭释放。九尺寸与真实DPR/最终合成缩放的集成复核仍为R19D4C，输入保持`postprocess/visual*.json`和匿名库，出口为同输入各物理附件/像素保护/最终缩放与实际质量正确。 |
+| `postprocess-audit`：23组AA off/MSAA/SSAA差异、至少六组边缘分数改善、Bokeh/SMAA changedPixels、background ROI、MAE/SSIM、已知残差白名单及放大strip | 源图评分/改善数/SSAA排名/残差白名单/放大拼图全部退役。`rhi-shell-gpu`以解析线性墨色、透明洞不写depth、原一码值黑边上界和四样本partial>100验证实际覆盖；`rhi-bokeh-gpu`/`rhi-smaa-gpu`用独立公式验证效果而非“像素有变化”。背景/最终色变换由`rhi-fog-gpu`的84源helper状态和`rhi-postprocess-gpu`实际最终合成的独立公式/原一码值上界核验，生产输出绑定/开关由实际graph/outputOptions核验。自身正常输出仅供真实质量检查。 |
+| `occlusion-audit`：88旧文件/固定尺寸、normal/depth全图误差、单盒四ROI、SSIM、AO背景白/接触非白、阴影开关changedPixels | 文件数/截图误差/源GPU witness退役。`render-quality`维护尺寸保护；`rhi-ao-gpu`验证RGB24背景恒1、三核/倍率/奇偶尺寸、243接触点、5×5/.22和缓存/重建；`rhi-opaque-gpu`/`rhi-shell-gpu`验证解析投影/normal/depth；`rhi-shadow-gpu`验证源投射/偏置/PCF、实际接收阴影occluded>0和地面/AO/DOF。不是以背景全白掩盖无接触。 |
+| `RenderBackendAudit`：70旧文件/hash/backend/DPR/frames、sourceParameterMatch、projection≤2、normal/depth、阴影开关、排序组、atlas替换/静止/归还 | 旧文件/GPU来源/hash完整性不再作为产品门槛。冻结输入来源由各源审计维护；`scene`/`rhi-opaque-gpu`/`rhi-shell-gpu`检查实际投影/通道/稳定排序，`rhi-shadow-gpu`检查阴影，`rhi-postprocess-gpu`保留atlas GPU区域/还原、上传、稳定复用和容量检查。目标API实际执行仍按R34，不接受仅字符串命中。 |
+| `RenderBackendAudit`：残差必须非空、equalWeightLoss、五ROI/edgeDistance、浏览器变化与拼图 | 全部退役。后端能力的技术判定见上表；材料/光场、输出和连续透明质量分别归R19C/D各独立测试及真实输出，不据图调参数。 |
+| `RhiPostprocessAudit`：50组最终图/Quick3D/浏览器平均损失、AO81/82/84源GPU oracle、效果changedPixels | 图像评分及GPU oracle删除。源SMAA/Bokeh/AO/颜色分别由独立公式门禁验证；新组合检查读取真正RT/PSO/SRB，核对resolve→AO→Bokeh→SMAA→一次output绑定，无反馈或跨帧旧目标。`rhi-flicker-gpu`覆盖完整SceneItem匿名9×64连续输入，不能用孤立三pass替代。 |
+| `RhiPostprocessAudit`：cover副本、64tile初始化、432实例、1/7/8/31/32/33/64/432容量、全可见池、单tile/还原/逆序、resize、generation拒绝、九tile背压 | 原非像素断言保留到新`rhi-postprocess-gpu`，读回只比较自身可控RGBA数据/更新区域/稳定状态，拒绝浏览器图像oracle。D3D11另要求实际native transfer boxes/bytes；其他后端仅QRhi请求与自身读回。元数据明确未知实测显存为null。 |
+| `RhiPostprocessAudit`：手动processEvents等待、profile/120秒、frameSwapped/CPU/GPU、record-only | 等待改为正常事件循环和有界实际帧回调；`--profile`保留三次独立局部分通道CPU提交诊断，不把RenderControl完成当物理呈现或GPU完成。原Windows18.35/20.98ms及record-only事实不变；完整产品120秒/VSYNC/设备测量由R28/R34原任务承担，未运行不标通过。旧`--record-performance`/`--diagnostics`不再接受。 |
+| `prepare-{postprocess,occlusion}-capture.py`及其旧visual/render-backend导出器、verify-r09/r09b/r10/r10c | Fail-closed兼容入口在任何采集/改写之前拒绝执行；算法输入导出器`tools/assets/`保持。三套旧聚合C++入口只返回退役说明，CTest保持disabled；只恢复已独立的`rhi-postprocess-gpu`。 |
+
+MSAA/resolve和组合资源图当前可靠检查不关闭VIS-ARRAY-BLUR-01。R19D4C继续承担源resizeQuality/真实DPR/显示缩放、封面LOD与景深尺度；原生同窗口hide/restore、物理输入/显示、正常VSYNC、最终产品性能与缺目标后端按既有R34专项和本轮目标移交执行。

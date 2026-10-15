@@ -23,4 +23,4 @@ RenderQuality保留render-quality.ts四预设/归一化：scale50–200/步长5�
 
 GL未对齐R16F显式读回按实际PACK_ALIGNMENT同格式复制到补齐存储宽后解码，产品尺寸不变。核仅创建时上传，动态前缀80bytes/通道，三个AO pass常态240bytes；无闲置kernel纹理。
 
-入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`、`python3 tools/audit/audit-rhi-ao.py`、`python3 tools/audit/bake-occlusion-shaders.py`；选择实际测试分组见test-gates.md。旧verify-r09/occlusion-audit中的图像oracle不运行，非像素覆盖迁移归R19D4B2，目标欠验归R34。
+入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`、`python3 tools/audit/audit-rhi-ao.py`、`python3 tools/audit/bake-occlusion-shaders.py`；选择实际测试分组见test-gates.md。旧verify-r09/occlusion-audit中的图像oracle不运行，非像素覆盖映射见source-fidelity-review.md的R19D4B2，目标欠验归R34。

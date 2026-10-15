@@ -1,3 +1,5 @@
+throw new Error(
+    'Historical GPU image capture retired; see docs/contracts/source-fidelity-review.md.');
 // Reuse the R09B source harness, without modifying it or its artifacts.
 import fs from 'node:fs/promises';
 import path from 'node:path';

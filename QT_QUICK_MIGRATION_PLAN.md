@@ -18,7 +18,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R19D4B2 → R19D4C → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。一次只执行一个轮次，不跳轮；R01–R19历史复查全部收口后才能进入R20。R17–R33的“依赖R16”等指实现与阶段交接，不等待R34，避免循环依赖。
+- 当前主线：`R19D4C → R19E → R19F → R19G → R19H → R20 → … → R33 → R34`。一次只执行一个轮次，不跳轮；R01–R19历史复查全部收口后才能进入R20。R17–R33的“依赖R16”等指实现与阶段交接，不等待R34，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -131,6 +131,7 @@
 - PowerShell启动WIN32 GUI读到陈旧LASTEXITCODE → 用Process对象等待并读取本次ExitCode，同时检查真实报告；console工具仍单独核对退出码。
 - headless CDP的页面Runtime请求在受限环境不返回 → 使用独立页面连接并在具原生服务权限的环境运行同一导出入口，保持headless/外部请求拦截，不改产品算法。
 - 标题恢复仍沿用超宽页眉root而停帧 → 恢复前明确设置标题window/root尺寸，以正常Qt事件与单个有界在途读回驱动。
+- 隐藏验证期间其他应用切换导致foregroundUnchanged=false → 同时记录初始/当前/自身PID并监测AppKit/NSWorkspace自身激活与窗口焦点历史，只将验证进程占据前台/激活/焦点判为干扰，外部切换单独计数，未知PID继续失败。
 - macOS验证窗口仅Qt flags仍可能激活 → QGuiApplication前设置启动策略；默认Prohibited、原生低层级/拒key/忽略输入并观察重建，授权前台则预先Regular，统一走VerificationWindow。
 - RenderControl的高DPR图像占错误区域或隐藏控件不消费状态 → 显式设置target DPR，Title/Header/Transport/Canvas接offscreenRendering，仍消费生产FrameClock。
 - Metal静态场景异步读回无后续帧 → 显式采集按MaxAsyncReadbackFrames+1有界续帧、最多两批在途，不重复submit或轮询；无采集回调时不增加生产工作。
@@ -188,15 +189,10 @@
 - **VIS-ARRAY-FLICKER-01：大量专辑半透明重叠闪烁。** R19C2C已确认并修正visibility/Equal颜色pass位置不变性问题，R19H仍须核对代表性正常光学连续运行及目标欠验，不能以静态图/零warnings关闭用户问题。D4B2/C继续查resolve/后处理/跨帧资源，G查总览转换。
 - 两项均为进入R20前硬退出条件：保留明确复现输入、源依据、已确认根因/修复与设计效果边界和受影响回归；静止/波浪/浏览/总览进退/重叠关系正常、无异常模糊/闪烁，当前可靠检查真实通过。独立缺环境目标回归可交R34，不能以移交替代本机调查或通过降低数量/冻结动效/关效果掩盖。
 
-### R19D4B2 · MSAA/resolve 与旧门禁覆盖闭包
-
-- 依赖R19D4B1。输入为R09B/R10/R10C/D与后续Metal/OpenGL修改，以及B1独立SMAA门禁；核对MSAA/resolve真实格式、样本数与几何覆盖、无错误合成及缓存/重建，保持源几何AA及SMAA阈值/搜索步数。
-- 分离postprocess-audit/occlusion-audit/RenderBackendAudit/RhiPostprocessAudit旧GPU oracle/浏览器witness/像素分数，恢复必要数学/格式/资源/上传/功能与质量门禁；旧入口被独立源测试等价覆盖的检查可退役，但必须逐项映射，不删除未覆盖边界。保持未覆盖项为具体测试输入/修复对象与出口，不以旧分数换栈。
-- 退出为MSAA/resolve真实输出与旧工具非像素覆盖闭包、局部成本/共享Release/两组qmllint/格式通过；目标缺环境项完整交R34。B1的孤立SMAA不能替代真实SceneItem集成、scene-graph或原生窗口恢复；BLUR-01仍R19D4C，R19D4C依赖A/B1/B2。
-
 ### R19D4C · 目标尺度、BLUR-01 与渲染集成收口
 
 - 依赖R19D4A/B1/B2。沿冻结resizeQuality的实际生产调用、Qt RenderQuality/SceneItem/合成与封面租约，使用相同匿名库/相机/运动/画质控制小大窗口、实际DPR/render scale；记录逻辑与物理目标/所有附件、像素保护及最终显示缩放，明确源码设计景深/磨砂与非预期缩放/采样，修复后者。不得锐化、关闭效果或无依据提高全局分辨率。
+- 复用`tests/fixtures/postprocess/visual*.json`的九尺寸/代表DPR及R19D4B2已恢复的组合入口，完成同输入真实物理附件/像素保护/最终显示缩放的集成复核；旧GPU图像分数不执行。
 - 主责收口VIS-ARRAY-BLUR-01；协查FLICKER-01的resolve/后处理/跨帧资源，不能以零warnings代替连续质量。逐轮复审绘制路径选择，以源码等价、质量/资源/成本确认，补D1–D4完整历史矩阵与必要源码/数学/真实渲染回归，不执行原实机截图分数。
 - 退出须无漏画/异常模糊/错误合成且轮廓平滑、正常设计效果保留、资源/生命周期/局部成本/共享Release回归通过；120秒完整产品性能和缺环境目标保留R28/R34。R19E依赖本节，BLUR-01仍须在进入R20前可靠收口。
 
@@ -462,8 +458,6 @@
 
 #### 各平台最终实机矩阵与专项退出
 
-- 窗口策略偶见foregroundUnchanged=false而native visible/active/activation/focus均false，原因未确认；保留原失败，复现时记录initial/current/verification PID定位，不凭布尔值归因或放宽策略。
-
 - 输入为同源匿名fixture、冻结生产源码、当前Release源码/二进制及具体产品失败/暂缓记录。先核对系统/Kit/后端/设备/入口/窗口策略，未具可靠环境的项目继续保留，不能把“已安排”写成“已执行”。
 - 窗口：Windows/Linux验证首次show、hide/restore、minimize、flags/surface重建与退出；按当轮授权选择前台或默认策略。macOS已验收前台窗口边界不重复列欠验，默认隐藏策略持续回归；未授权模式遮挡/节流样本不可用，不提升Z顺序。
 - 图形/输入：对尚欠D3D11、Metal/Retina、OpenGL及实际Vulkan，覆盖九尺寸/双主题/DPR1/1.5/2、浏览/详情/总览/片头、文字/彩色字体/滑尺、玻璃/纸面/透明合成、键鼠/触摸板/快捷键与焦点。核对源码效果与真实产品质量，不做逐像素、SSIM/RGB/ROI或边缘带匹配；发现锯齿、异常模糊等问题时定位实际原因并修复，保留缓存/资源差异。
@@ -526,3 +520,11 @@
 - `python3 tools/audit/audit-rhi-smaa.py`核对冻结生产调用者/锁定hash、三个完整helper、.1阈值/八步/源标量crossing偏移/gamma2.2、lookup原PNG、历史及COMMON-01–05/PERF-01–07/平台symbol/hash。目标同Kit真实构建/qsb仍须执行，跨目标翻译不代替目标GPU。
 - Release Review ON执行`ctest --preset qt-release-render -R '^rhi-smaa-gpu$' --output-on-failure`。入口直接QRhi真正离屏，不创建可见窗口；34状态包含64×64/129×73/73×129、两个斜向/相交/矩形/低对比/局部对比抑制/静态清零、HDR/alpha及十次Postprocess真实重建。每后端277610个解析点分别检查三个实际生产pass：edges≤1/255，weights/blend≤既有颜色公式3/255、值有限、无反馈，八项资源的RGBA16F/RGBA8/单采样/无mip和240-byte实际uniform前缀/缓存/关闭释放通过。不得降低门槛或恢复源图分数。
 - 共享修正回归主力平台SMAA/Bokeh/AO/光学/完整隐藏集。此项不代替B2的SceneItem/MSAA/resolve/旧门禁覆盖闭包或C的尺度/BLUR-01；scene-graph/native窗口恢复、正常VSYNC及完整产品性能按原专项。
+
+#### R19D4B2-P · MSAA/resolve、组合资源图与恢复门禁的目标平台回归
+
+- 输入为R19D4B2交付、冻结基线映射、R09B/R10/R10C/D/e98c798源码及`render-backend/visual.json`、`rhi-shell/visual.json`和匿名9×64生产库。依赖R33及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境；当前主力macOS隐藏验证不替代目标运行。
+- 静态入口`python3 tools/audit/audit-rhi-resolve.py`输出COMMON-01–05/PERF-01–07、历史symbol/hash和三平台矩阵；目标须实际构建/qsb及解析本轮四个PowerShell退役入口，不能以主机翻译或字符串命中代替。三套旧图像聚合入口始终disabled且直接执行拒绝，覆盖映射见source-fidelity-review.md。
+- Release Review ON按test-window-policy选择当前可靠入口：先执行`ctest --preset qt-release-visible -R '^rhi-(postprocess|shell|flicker|ao|fog|shadow|opaque)-gpu$' --output-on-failure`，能可靠隐藏时重新分类并用对应render preset；另执行真正离屏`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`。postprocess预期48状态（三尺寸×1/4样本×八组合）、实际RT/PSO样本/颜色RGBA16F及normal/depth RGBA8/独立单样本resolve、后处理SRB链/无反馈/关闭释放/缓存/80-byte前缀与十次真实SG失效通过；Shell原解析alpha/部分覆盖/黑边门槛不变。
+- 保留64tile初始化16MiB、单tile262144bytes、稳态2MiB/第九tile延期、432实例与全可见容量、1/7/8/31/32/33/64/432边界、cover副本/atlas自身GPU读回/还原/逆序/resize/generation拒绝；Windows额外要求真实native UpdateSubresource boxes/bytes，其他后端不伪造native证明。实际SceneItem original/high双主题/大小/静止/波浪/浏览/总览/详情1200帧，真实组合图和输出无漏画/错误合成，保持源数量/动效/效果。
+- 两组官方qmllint、check-format、source-format和适用完整Release通过；共享修正回归主力平台完整隐藏集。`rhi-postprocess-audit 新目录 --profile`仅三批局部CPU提交诊断，GPU完成/显示时刻/driver显存未知保留null。原生同窗口hide/restore、正常VSYNC和完整产品120秒/最终设备仍按既有专项；目标尺度/BLUR-01继续主线R19D4C，不以移交豁免本机调查。

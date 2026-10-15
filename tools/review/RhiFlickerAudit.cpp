@@ -6,6 +6,7 @@
 #include "OverviewController.h"
 #include "PresentationController.h"
 #include "GraphicsBackend.h"
+#include "PostprocessChecks.h"
 #include <QGuiApplication>
 #include <QFile>
 #include <QJsonDocument>
@@ -123,6 +124,7 @@ int main(int argc, char **argv)
             overview.bind(&adapter, &selection, &presentation);
             adapter.layout()->setViewport(size.width(), size.height());
             adapter.snapToTarget();
+            adapter.quality()->setPreset(size.width() == 1280 ? "high" : "original");
             RhiCaptureHarness driver([](QQuickItem *parent) {
                 return new SceneItem(parent);
             });
@@ -193,6 +195,7 @@ int main(int argc, char **argv)
                         const QSize target(item->fixedColorBufferWidth(),
                                            item->fixedColorBufferHeight());
                         auto result = driver.capture(input, target);
+                        checkPostprocessGraph(input, result);
                         checkSubmittedFog(input, result);
                         checkSubmittedShadow(input, result);
                         if (input.bokeh) {
@@ -292,7 +295,7 @@ int main(int argc, char **argv)
                                                          input.background.z() };
                         frames.append(sample);
                         if (frame % 15 == 1 && input.opticalProbe == 0)
-                            check((opticsOnly ? result.composite : result.postprocessed)
+                            check((opticsOnly ? result.composite : driver.surface.grab())
                                           .save(output
                                                 + QString("/production-%1-%2-%3-%4.png")
                                                           .arg(size.width())

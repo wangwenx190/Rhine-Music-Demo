@@ -3,6 +3,14 @@
 #include <QJsonObject>
 
 namespace yalahoo::verification {
+// External app switches do not establish interference by this verification process.
+// Both snapshots and activation/focus history must exclude our own process.
+inline bool foregroundOwnershipSafe(qint64 initial, qint64 current, qint64 verificationPid,
+                                    bool activation, bool focus)
+{
+    return initial > 0 && current > 0 && verificationPid > 0 && initial != verificationPid
+            && current != verificationPid && !activation && !focus;
+}
 inline bool foregroundVerification()
 {
     return qEnvironmentVariableIntValue("YALAHOO_VERIFY_FOREGROUND") == 1;

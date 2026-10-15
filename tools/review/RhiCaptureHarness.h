@@ -56,7 +56,7 @@ public:
         surface.hide();
         window.releaseResources();
     }
-    rhi::Capture capture(rhi::Input input, QSize size)
+    rhi::Capture capture(rhi::Input input, QSize size, bool captureAtlas = false)
     {
         require(!state->loop, "Concurrent Review capture");
         QEventLoop loop;
@@ -64,7 +64,7 @@ public:
         timeout.setSingleShot(true);
         QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
         input.request = ++state->request;
-        input.captureAtlas = false;
+        input.captureAtlas = captureAtlas;
         state->capture.reset();
         state->error.clear();
         state->loop = &loop;

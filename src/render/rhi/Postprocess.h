@@ -30,6 +30,7 @@ public:
     QRhiTexture *smaaEdges() const;
     QRhiTexture *smaaWeights() const;
     QJsonArray passes() const;
+    QJsonObject graph(QRhiTexture *expectedSource) const;
     QJsonObject submittedBokeh() const;
     QRhiTexture *rawAo() const;
     QRhiTexture *blurredAo() const;

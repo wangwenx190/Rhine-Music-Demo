@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QtEndian>
 #include <array>
+#include <algorithm>
 #include <cstring>
 
 namespace yalahoo::rhi {
@@ -287,6 +288,69 @@ QJsonArray Postprocess::passes() const
         for (const auto &pass : m_state->passes)
             result.append(pass.name);
     return result;
+}
+QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
+{
+#ifdef YALAHOO_RHI_AUDIT
+    if (m_state) {
+        const auto &p = *m_state;
+        QJsonArray passes;
+        auto *currentColor = p.source;
+        for (const auto &pass : p.passes) {
+            auto *expectedInput = currentColor;
+            auto *expectedAuxiliary = p.source;
+            if (pass.name == "ssao-blur")
+                expectedInput = p.rawAo.texture.get();
+            if (pass.name == "ssao-composite")
+                expectedAuxiliary = p.blur.texture.get();
+            if (pass.name == "smaa-weights")
+                expectedInput = p.edges.texture.get();
+            if (pass.name == "smaa-blend")
+                expectedAuxiliary = p.weights.texture.get();
+            auto matches = [&](int slot, QRhiTexture *texture, QRhiSampler *sampler) {
+                const auto expected = QRhiShaderResourceBinding::sampledTexture(
+                        slot, QRhiShaderResourceBinding::FragmentStage, texture, sampler);
+                return std::find(pass.bindings->cbeginBindings(), pass.bindings->cendBindings(),
+                                 expected)
+                        != pass.bindings->cendBindings();
+            };
+            const bool chainMatches = matches(0, expectedInput, p.linear.get())
+                    && matches(6, expectedAuxiliary, p.linear.get())
+                    && matches(2, pass.name == "bokeh" ? p.dofDepth : p.aoDepth, p.nearest.get());
+            bool feedback = false;
+            const auto *target = pass.target->texture.get();
+            for (int binding : { 0, 2, 3, 4, 5, 6, 7, 8 }) {
+                for (auto *sampler : { p.linear.get(), p.nearest.get(), p.repeat.get() }) {
+                    const auto candidate = QRhiShaderResourceBinding::sampledTexture(
+                            binding, QRhiShaderResourceBinding::FragmentStage,
+                            pass.target->texture.get(), sampler);
+                    feedback |= std::find(pass.bindings->cbeginBindings(),
+                                          pass.bindings->cendBindings(), candidate)
+                            != pass.bindings->cendBindings();
+                }
+            }
+            passes.append(QJsonObject{ { "name", pass.name },
+                                       { "feedback", feedback },
+                                       { "chainMatches", chainMatches },
+                                       { "format", int(target->format()) },
+                                       { "samples", target->sampleCount() },
+                                       { "width", target->pixelSize().width() },
+                                       { "height", target->pixelSize().height() },
+                                       { "pipelineSamples", pass.pipeline->sampleCount() } });
+            if (pass.name == "ssao-composite" || pass.name == "bokeh" || pass.name == "smaa-blend")
+                currentColor = pass.target->texture.get();
+        }
+        return { { "sourceMatches", p.source == expectedSource },
+                 { "revision", qint64(m_revision) },
+                 { "sourceSamples", p.source->sampleCount() },
+                 { "sourceFormat", int(p.source->format()) },
+                 { "outputSamples", p.output->sampleCount() },
+                 { "passes", passes } };
+    }
+#else
+    Q_UNUSED(expectedSource);
+#endif
+    return { };
 }
 QJsonObject Postprocess::submittedBokeh() const
 {

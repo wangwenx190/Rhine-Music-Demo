@@ -11,6 +11,8 @@ pid_t foregroundPid = 0;
 bool activationObserved = false;
 bool focusObserved = false;
 id activationObserver = nil;
+id workspaceActivationObserver = nil;
+int externalForegroundChanges = 0;
 }
 
 // Observe public Cocoa properties synchronously: Qt can reset the level or replace
@@ -156,6 +158,19 @@ void yalahoo::verification::prepareNativeApplication()
                         usingBlock:^(NSNotification *) {
                             activationObserved = true;
                         }];
+        workspaceActivationObserver = [NSWorkspace.sharedWorkspace.notificationCenter
+                addObserverForName:NSWorkspaceDidActivateApplicationNotification
+                            object:nil
+                             queue:nil
+                        usingBlock:^(NSNotification *notification) {
+                            NSRunningApplication *activated =
+                                    notification.userInfo[NSWorkspaceApplicationKey];
+                            if (activated.processIdentifier
+                                == NSProcessInfo.processInfo.processIdentifier)
+                                activationObserved = true;
+                            else
+                                ++externalForegroundChanges;
+                        }];
         [application setActivationPolicy:foregroundVerification()
                              ? NSApplicationActivationPolicyRegular
                              : NSApplicationActivationPolicyProhibited];
@@ -186,6 +201,9 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
     const pid_t currentForegroundPid =
             NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
     const bool foregroundUnchanged = foregroundPid && currentForegroundPid == foregroundPid;
+    const bool foregroundOwnershipPassed = foregroundOwnershipSafe(
+            foregroundPid, currentForegroundPid, NSProcessInfo.processInfo.processIdentifier,
+            activationObserved, focusObserved);
     const bool safe = foregroundVerification()
             ? NSApp.activationPolicy == NSApplicationActivationPolicyRegular
                     && (!window.handle() || (native && native.level == NSNormalWindowLevel))
@@ -193,7 +211,7 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
                || (native.level == VerificationLevel && !native.canBecomeKeyWindow
                    && native.ignoresMouseEvents && !native.keyWindow && !native.mainWindow))
                     && prohibited && launchActivationDisabled && !NSApp.active
-                    && foregroundUnchanged && !activationObserved && !focusObserved;
+                    && foregroundOwnershipPassed;
     bool onScreen = false;
     if (native) {
         const auto info = CGWindowListCopyWindowInfo(kCGWindowListOptionIncludingWindow,
@@ -224,6 +242,8 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
              { "launchActivationDisabled", launchActivationDisabled },
              { "ignoresMouseEvents", !native || bool(native.ignoresMouseEvents) },
              { "foregroundUnchanged", foregroundUnchanged },
+             { "foregroundOwnershipPassed", foregroundOwnershipPassed },
+             { "externalForegroundChanges", externalForegroundChanges },
              { "initialForegroundPid", int(foregroundPid) },
              { "currentForegroundPid", int(currentForegroundPid) },
              { "verificationPid", int(NSProcessInfo.processInfo.processIdentifier) } };

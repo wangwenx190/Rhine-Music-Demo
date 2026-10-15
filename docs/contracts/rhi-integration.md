@@ -24,4 +24,4 @@
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
 - `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进输入/尺寸/画质/重建，等待各步提交确认；FrameAnimation仍唯一帧源，无processEvents/msleep轮询。检查九尺寸/四画质/双主题/十次恢复，报告实际覆盖，短单盒输入不能冒充完整产品。
-- `rhi-postprocess-audit --profile`是独立分通道GPU诊断，不能混入正常120秒性能样本；旧工具非像素迁移归R19D4B2。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。
+- `rhi-postprocess-audit --profile`是独立分通道GPU诊断，不能混入正常120秒性能样本；当前非像素入口和范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。

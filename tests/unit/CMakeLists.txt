@@ -45,7 +45,7 @@ target_link_libraries(VerificationWindowTest PRIVATE Qt6::Quick Qt6::Test)
 target_compile_definitions(VerificationWindowTest PRIVATE
     VISIBLE_WINDOW_REPORT="${CMAKE_BINARY_DIR}/verification/native-window-visible.json")
 yalahoo_platform(VerificationWindowTest)
-add_test(NAME verification-window-policy COMMAND VerificationWindowTest hiddenNativeWindow)
+add_test(NAME verification-window-policy COMMAND VerificationWindowTest foregroundOwnership hiddenNativeWindow)
 set_tests_properties(verification-window-policy PROPERTIES ENVIRONMENT "YALAHOO_VERIFY_FOREGROUND=0")
 if(NOT APPLE OR YALAHOO_MACOS_VISIBLE_TESTS)
     add_test(NAME verification-window-visible COMMAND VerificationWindowTest visibleNativeWindow)
@@ -100,14 +100,10 @@ if(YALAHOO_REVIEW)
         set_tests_properties(cover-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
-    set(rhi_performance_arguments)
-    if(YALAHOO_PERFORMANCE_RECORD_ONLY)
-        list(APPEND rhi_performance_arguments --record-performance)
-    endif()
     add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
-        "${CMAKE_BINARY_DIR}/verification/rhi-postprocess" ${rhi_performance_arguments})
-    set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 420
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC=1"
+        "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
+    set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 180
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     if(WIN32)
         set_tests_properties(rhi-postprocess-gpu PROPERTIES ENVIRONMENT_MODIFICATION

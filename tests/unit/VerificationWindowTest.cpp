@@ -11,6 +11,18 @@ class VerificationWindowTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void foregroundOwnership()
+    {
+        using yalahoo::verification::foregroundOwnershipSafe;
+        QVERIFY(foregroundOwnershipSafe(10, 10, 42, false, false));
+        QVERIFY(foregroundOwnershipSafe(10, 11, 42, false, false));
+        QVERIFY(!foregroundOwnershipSafe(42, 11, 42, false, false));
+        QVERIFY(!foregroundOwnershipSafe(10, 42, 42, false, false));
+        QVERIFY(!foregroundOwnershipSafe(10, 11, 42, true, false));
+        QVERIFY(!foregroundOwnershipSafe(10, 10, 42, false, true));
+        QVERIFY(!foregroundOwnershipSafe(0, 11, 42, false, false));
+        QVERIFY(!foregroundOwnershipSafe(10, 0, 42, false, false));
+    }
     void visibleNativeWindow()
     {
         if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") != 1)
@@ -101,7 +113,7 @@ private slots:
         QVERIFY(native["ignoresMouseEvents"].toBool());
         QVERIFY(!native["canBecomeKey"].toBool());
         QVERIFY(!native["canBecomeMain"].toBool());
-        QVERIFY(native["foregroundUnchanged"].toBool());
+        QVERIFY(native["foregroundOwnershipPassed"].toBool());
 #endif
 #if defined(Q_OS_WIN)
         const auto handle = reinterpret_cast<HWND>(window.winId());

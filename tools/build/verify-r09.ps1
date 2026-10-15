@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([switch]$SkipWebCapture)
 $ErrorActionPreference = 'Stop'
+throw 'Historical image verification retired. Use source math, rhi-postprocess-gpu and the coverage map in docs/contracts/source-fidelity-review.md.'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $evidence = Join-Path $repository 'verification/windows/occlusion'
 $preview = Join-Path $repository 'docs/media/occlusion/qt'

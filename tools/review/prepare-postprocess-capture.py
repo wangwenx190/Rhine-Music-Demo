@@ -1,4 +1,5 @@
 """Extend the frozen single-case source harness with the production compositor."""
+raise SystemExit("Historical GPU image capture generator retired; see docs/contracts/source-fidelity-review.md and the source-math export tools.")
 from pathlib import Path
 from source_text import SourceText
 root = Path(__file__).resolve().parents[2]

@@ -1,5 +1,5 @@
 {
-  "revision": 4,
+  "revision": 5,
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
   "selectedBackend": "rhi",
   "implementationReady": true,
@@ -12,17 +12,17 @@
     "samples": 1,
     "sourceShadowFilter": "Frozen PCFSoftShadowMap request aliases to PCFShadowMap in locked Three: IGN-rotated 5-point Vogel disk with bilinear depth compare",
     "evidence": "verification/windows/rhi-opaque/release-runtime.json",
-    "rebuild": "tools/build/verify-r10a.ps1"
+    "rebuild": "ctest --preset qt-release-render -R '^rhi-opaque-gpu$'"
   },
   "rhiShell": {
     "contract": "docs/contracts/rhi-shell.md",
     "implementation": "src/render/rhi/RhiItem: opaque MSAA resolve/mips, independent color attachments/shared retained hardware depth, source shell optics/comparison shadow and global stable identity sort",
     "productEnabled": true,
     "captureSamples": 4,
-    "uniformBytes": 816,
+    "uniformBytes": 832,
     "sourceStage": "61 original R10 inputs before AO/Bokeh/SMAA; original direct-material exceptions unchanged; neighbor depth/normal 58/59 checked separately",
     "evidence": "verification/windows/rhi-postprocess/release-prestage.json",
-    "rebuild": "tools/build/verify-r10c.ps1",
+    "rebuild": "ctest --preset qt-release-render -R '^rhi-shell-gpu$'",
     "historicalEvidence": "verification/windows/rhi-shell/release-runtime.json"
   },
   "input": {
@@ -97,33 +97,16 @@
     "docs/media/render-backend/",
     "verification/windows/render-backend/evidence-index.json"
   ],
-  "tasks": [
-    {
-      "id": "material-residual-replay",
-      "round": "R10D",
-      "input": "verification/windows/rhi-postprocess/release-prestage.json and release-runtime.json residuals: retain each sourceIndex/region or ROI, including final 2/3/32/57 background; 7/25/37 spine; 22/50 rim; 28/30/31/32/45/46/48/49/50 paper; 62-65 margin",
-      "object": "Preserve current source optics/capture/global identity ordering, tile isolation and independent postprocess while connecting the selected product backend",
-      "acceptance": "Retain all five equal-weight MAE/SSIM/edge metrics and explicit narrow-ROI null SSIM/absent-edge null. Compare same pre-stage to current R10C and final stage to original R10; never erase individual residuals with aggregate improvement. Keep source normal/depth <.05 full-image MAE, projection <=2px and real shadow/alpha/no-fringe/order witnesses. Re-run R10 0/1/3 final-output/quality/Bokeh and R09B nine sizes/DPR; validate product/compositor cadence separately from unthrottled renderer throughput."
-    },
-    {
-      "id": "unique-product-backend",
-      "round": "R10D",
-      "input": "R06-R10 same-hash fixtures and SceneAdapter API",
-      "object": "replace Quick3D bootstrap with selected RHI path and update implementationReady/activeImplementation",
-      "acceptance": "Windows D3D11 plus available OpenGL replay; no second production state/path; Metal/Linux shader and resource audit, runtime pending user"
-    }
-  ],
   "rhiPostprocess": {
     "contract": "docs/contracts/rhi-postprocess.md",
     "implementation": "src/render/rhi/AtlasUpload + Postprocess: generation/lease/serial tile queue, 112-byte geometry instances, independent AO/DOF geometry, RGBA16F ping-pong color, source SSAO/Bokeh41/SMAA/ACES-sRGB",
-    "productEnabled": false,
-    "frameUniformBytes": 816,
+    "productEnabled": true,
+    "frameUniformBytes": 832,
     "postUniformBytes": 1104,
     "geometryInstanceBytes": 112,
-    "shaderPrograms": 24,
     "aoSampleExecution": "Fixed 16/32/64 indices retain all seed=417 samples and accumulation order; radius is loop-invariant",
     "nativeAtlasProof": "Actual D3D11 UpdateSubresource destination boxes/row pitch plus completed whole-page GPU reads; physical bus traffic not measured",
-    "performanceScope": "120s 432-instance 1920x1080 original-quality unthrottled native presentation; CPU submission separate, GPU timestamps unavailable in the accepted run; compositor/product interaction remains R10D",
+    "performanceScope": "Historical Windows R10C renderer-only 120s throughput evidence; not current source acceptance. Local CPU diagnostics use rhi-postprocess-audit --profile; full product/VSYNC remains R28/R34.",
     "evidence": "verification/windows/rhi-postprocess/release-runtime.json",
     "regressions": [
       "verification/windows/rhi-postprocess/release-prestage.json",
@@ -131,15 +114,16 @@
     ],
     "manifest": "resources/manifests/rhi-postprocess.json",
     "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
-    "rebuild": "tools/build/verify-r10c.ps1",
-    "macos": "静态审计通过，实机待用户验证",
-    "linux": "静态审计通过，实机待用户验证"
+    "rebuild": "ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'",
+    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix remain R34.",
+    "linux": "Target latest-Kit build and actual OpenGL execution remain R34.",
+    "coverage": "docs/contracts/source-fidelity-review.md#r19d4b2-msaaresolve与旧门禁覆盖"
   },
   "productIntegration": {
     "contract": "docs/contracts/rhi-integration.md",
     "implementation": "App.qml -> SceneItem -> SceneAdapter/SelectionLighting/RenderQuality -> RhiItem",
     "evidence": "verification/windows/rhi-integration/",
     "rebuild": "tools/build/verify-r10d.ps1",
-    "research": "Review-only ResearchApp/Quick3D oracle; not linked or packaged in production"
+    "research": "Review-only ResearchApp/Quick3D capability studies; not linked or packaged in production. Historical image oracles are retired."
   }
 }
