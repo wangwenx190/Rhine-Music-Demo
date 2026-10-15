@@ -183,8 +183,9 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
     const bool prohibited = NSApp.activationPolicy == NSApplicationActivationPolicyProhibited;
     const bool launchActivationDisabled =
             !qgetenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM").isEmpty();
-    const bool foregroundUnchanged = foregroundPid
-            && NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier == foregroundPid;
+    const pid_t currentForegroundPid =
+            NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
+    const bool foregroundUnchanged = foregroundPid && currentForegroundPid == foregroundPid;
     const bool safe = foregroundVerification()
             ? NSApp.activationPolicy == NSApplicationActivationPolicyRegular
                     && (!window.handle() || (native && native.level == NSNormalWindowLevel))
@@ -222,5 +223,8 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
              { "focusObserved", focusObserved },
              { "launchActivationDisabled", launchActivationDisabled },
              { "ignoresMouseEvents", !native || bool(native.ignoresMouseEvents) },
-             { "foregroundUnchanged", foregroundUnchanged } };
+             { "foregroundUnchanged", foregroundUnchanged },
+             { "initialForegroundPid", int(foregroundPid) },
+             { "currentForegroundPid", int(currentForegroundPid) },
+             { "verificationPid", int(NSProcessInfo.processInfo.processIdentifier) } };
 }

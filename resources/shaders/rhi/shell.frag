@@ -17,6 +17,7 @@ layout(location = 2) in vec3 worldNormal;
 layout(location = 3) in vec3 viewNormal;
 layout(location = 4) in float viewDepth;
 layout(location = 5) in vec3 localPosition;
+layout(location = 9) in vec4 shadowCoord;
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normalOut;
 layout(location = 2) out vec4 depthOut;

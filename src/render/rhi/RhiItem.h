@@ -31,6 +31,8 @@ struct Input
     bool profile = false;
     bool poolFrame = false;
     bool captureAtlas = true;
+    bool captureShadowDepth =
+            false; // Explicit Review capture; shares existing R32F readback bytes.
     bool postprocess = false, bokeh = false, smaa = false;
     int aoSamples = 0;
     float aoResolution = 1, focus = 25, aperture = .0003f;
@@ -58,6 +60,7 @@ struct Capture
     QImage composite, compositeNormal, compositeDepth;
     QImage postprocessed, atlas;
     QImage rawAo, blurredAo, aoNormal, aoDepth;
+    QByteArray shadowDepth;
     QJsonObject metadata;
 };
 // Native render boundary, shared by production and isolated Review tools.

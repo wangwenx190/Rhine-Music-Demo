@@ -47,3 +47,16 @@ ctest --preset qt-release-render -R '^rhi-opaque-gpu$' --output-on-failure
 本机Release/Qt6.12.0/Apple M4/Metal隐藏通过：深度最大约1.59e-8、法向约.001961、四角最大约1.822px；16墨色公式误差最大约.001792（线性归一化8位），阴影minimum约.678431。完整隐藏回归33/33、两组官方qmllint和格式通过。数据仅代表该源数学/资源范围；BRDF/捕获/透明重叠、远阵列fog、景深和最终抗锯齿仍按R19C2B2/C/D处理，BLUR-01/FLICKER-01没有关闭。
 
 纸面helper生成入口改为跨平台`prepare-rhi-paper.py`，PowerShell旧入口转交它；生成完整共享body后显式保留entityLight0.xy的原点项提升。`--check`逐token核对共享数学+声明映射+提升适配，实际生成并经Qt格式化可逐字复现当前shader。旧生成器会撤销该提升、重复逐片元计算，已修正；没有改变源纸面数学或提交一份新的派生shader。
+
+
+## R19D3A 阴影投射、偏置与过滤
+
+当前产品阴影为单采样 D32F 硬件比较深度，另有 R32F canonical-depth 诊断颜色附件；不是本契约上文 R10A 的历史 RGBA32F 布局。过滤在 R10C 已改为 Linear/LessOrEqual 硬件 PCF，保留源五点 Vogel + IGN，而非继续执行上文历史四 fetch 手工比较。正交矩阵、Front cull、Optical_Diffuser 唯一 caster、radius=4、normalBias=.035、bias=-.0003 和音乐入口 strength=.32 均取自冻结源码有效路径。
+
+`geometry.vert` 与实例化变体在每顶点按归一化世界法向偏移，再投影并插值 shadowCoord；片元只做透视除法、canonical→UV、depth bias、frustum 和 PCF。不能在片元重新归一化插值法向后投影。当前三个源 mesh 每个三角形内部法向恒定，因此该修正恢复求值阶段并减少片元工作，不将它描述为已定位的用户闪烁/模糊根因。GL/Metal 的 UV、disk offset、IGN 原点翻转继续按实际 QRhi 能力执行；原生 clipSpaceCorrMatrix 只用于 raster。
+
+`rhi-shadow-gpu` 独立执行本次 R32F 深度上的标量源 PCF 数学，覆盖三种 map 尺寸、1/7/8/9 实体批量边界、开关/运动/接收相机与灯色变化、十次真实 SG 重建。`Input.captureShadowDepth` 默认 false，只在显式 Review 捕获时共享已有不可变 QByteArray，不增加 GPU readback 或深复制；QImage 仍按历史诊断格式输出。每次捕获检查真正上传的 paper/shell 参数、比较 sampler、cull 和两个附件的格式/尺寸；生产 `request=0` 不做这些诊断。无变化 caster 复用 map，并跳过非批量caster专用uniform生成/复制/上传，实体变换/开启/尺寸或 renderer 重建失效；固定灯相机不依赖接收相机、主题色或封面。
+
+诊断receiver是12×12、y=-.05的白色乘数平面，不代表产品地面。冻结产品为200×200、y=-4.63、roughness=.95的 MeshStandardMaterial 地面；原生缺失，必须由下一轮 R19D3B 接入主题、PBR/雾、不透明捕获及 AO/Bokeh geometry。不能用本专项通过关闭该缺口、BLUR-01、剩余后处理或窗口/VSYNC验收。
+
+复现：开启 Review、保持可见测试 OFF，Release 构建后执行 `ctest --preset qt-release-render -R '^rhi-shadow-gpu$' --output-on-failure`；显式 `QSG_RHI_BACKEND=opengl` 切换本机 GL。COMMON-01–05/PERF-01–07 符号/hash 矩阵由 `python3 tools/audit/audit-rhi-shadow.py` 写入本地忽略目录；源代码矩阵不能冒充目标硬件通过。

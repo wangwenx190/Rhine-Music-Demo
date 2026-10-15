@@ -1,6 +1,7 @@
 #include "RhiCaptureHarness.h"
 #include "RhiReviewInput.h"
 #include "RhiFogAudit.h"
+#include "RhiShadowAudit.h"
 #include "SceneItem.h"
 #include "OverviewController.h"
 #include "PresentationController.h"
@@ -193,6 +194,7 @@ int main(int argc, char **argv)
                                            item->fixedColorBufferHeight());
                         auto result = driver.capture(input, target);
                         checkSubmittedFog(input, result);
+                        checkSubmittedShadow(input, result);
                         check(input.fogEnabled, "Production scene did not enable authored fog");
                         const double distance =
                                 (input.scene.camera.position - input.scene.camera.aim).length();

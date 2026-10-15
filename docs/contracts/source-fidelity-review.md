@@ -339,3 +339,32 @@ Qt读回边界依据[当前Qt GL实现](https://github.com/qt/qtbase/blob/6.12/s
 当前macOS/arm64/Apple M4、自动发现最新Qt6.12.0、AppleClang21、Release、真实隐藏DPR1：Metal完整37/37（包括1200帧生产回放）通过；补入雾启用的十次SG重建后，Metal单独fog门禁通过，OpenGL的fog与1200帧两项均通过。两后端84状态最大数学误差均为.000471473<.001，无异常覆盖/非有限值；fog参数变化不重建目标。已检查自身最终输出和生产颜色目标，未用源实机图或图像分数调参；最终输出探针与生产线性颜色捕获分别标明，不混称屏幕采集。两组官方qmllint/check-format通过，四个shell生成+format可逐字重现。最初受限进程无法连接WindowServer而无screens，原生会话下隐藏验证通过，未显示或激活测试窗口。Windows/D3D11、Linux/OpenGL目标检查静态通过、实机未执行，完整输入/入口/门槛交R34/R19D2-P；本机离屏不证明窗口/VSYNC/设备或完整产品性能。
 
 已恢复普通Release的Review OFF、YALAHOO_MACOS_VISIBLE_TESTS=OFF；生产构建、最终25/25快速CTest（含source-format和默认隐藏窗口策略）、两组官方qmllint/check-format通过。验证生成物保持忽略，暂存仅源码/测试/必要契约；下一主线为R19D3。
+
+
+## R19D3A 阴影投射、normalBias 与 PCF
+
+起点`2f50812`。实施前发现源产品地面缺失：冻结 scene 构造 floor 为200×200、y=-4.63的 MeshStandardMaterial，原生只在 shadowDiagnostic 绘制12×12白色receiver。其 PBR、主题、fog、AO/DOF 依赖超出单一过滤修复边界，因此先将R19D3拆为连续A/B；本节不代表地面已实现，R19D3B保留完整实现和原接收验收。
+
+| 历史轮次 / 实际路径 | 源码判断与处理 | 验证范围 |
+| --- | --- | --- |
+| R09 `3fc6a39`：GeometryScene公开 DirectionalLight / shadow probe | PCF16、shadowFactor32、shadowBias.035属于当时Quick3D公开hook的近似，不能作为源等价生产阴影。实际生产早由R10D替换；保留独立Review语义与局限，不把该诊断灯叠加到生产RHI。 | 核对CaseGeometry仅diffuser casts；Quick3D旧图耦合入口仍由D4拆解。 |
+| R10A `52f1278`：RhiApi / caster / opaque receiver | 灯(-6,14,-5)→原点，ortho[-16,16,-15,15,.1,45]；FrontSide材质在source shadow pass用BackSide，故RHI Front cull正确。只有Optical_Diffuser/tray投射，纸面/壳体接收；源music入口将strength设为.32，不沿用默认1。 | 独立灯矩阵/已知接收平面和本次float depth的PCF数学；实际附件和提交参数检查。 |
+| R10A `52f1278`：normalBias投影阶段 | 原在fragment对插值法向normalize后计算投影；源shadowmap_vertex按每顶点归一化世界法向偏移后插值。两个geometry变体增加shadowCoord，四shell变体及opaque共享消费，移除片元重复矩阵/normalize。 | 当前三源mesh所有三角形内部法向恒定，记录此边界；恢复源阶段，不声称它导致此前阵列闪烁。shader生成器同步。 |
+| R10B `5625d73`：共享shadow-filter与physical/Lambert接收 | 壳体keyShadow作用于key diffuse/specular，纸面仅减去被遮挡key diffuse；其他灯/环境不受影响，保留nl>0后采样。radius4、.035 normalBias、-.0003 depthBias、frustum及.32强度没有图像拟合来源。 | 1200帧实际生产paper/shell上传值逐帧检查，原光学/覆盖/雾检查保持。 |
+| R10C `1f2352a`：手动PCF→硬件sampler2DShadow，RGBA32F→R32F+D32F | 锁定Three0.183.2运行时将PCFSoft转为PCF；五Vogel点各硬件bilinear comparison。保留原生适配和R32F单通道诊断，不退回旧手动采样或降低精度。 | 当前深度上独立compare→bilinear→五点→mix数学，包含PCF边缘；检查真正D32F/R32F、single sample、Linear/LessOrEqual。 |
+| R10D `75775b3`：SceneItem与缓存/计划 | 画质供给0/1024/2048/4096；变化实体/开关/尺寸/renderer generation失效，固定光相机无需随接收相机/颜色变动重绘。保留离屏caster，不用相机可见性裁掉可能投影到画面的盒体。 | 1/7/8/9批量边界、重复捕获、相机/灯色变化不重建，单caster变换重绘、关闭清空/重新开启及十次真实重建。 |
+| 后续PERF/Metal/OpenGL及 `e98c798` | 固定有界pool、同Kit qsb、canonical/raster矩阵分离、UV/offset/IGN一致翻转和GL真实入口探测/renderbuffer保留；不新增depth offset、epsilon或阴影图像补偿。 | COMMON-01–05/PERF-01–07与三平台symbol/hash由audit-rhi-shadow.py生成；目标硬件与呈现结论分开。 |
+
+PCF数值是同次真实几何深度上的独立源公式，非源实机图/浏览器GPU字节配对。显式捕获共享现有R32F QByteArray，不新增readback或生产图像分析；实际paper/shell uniform数值与receiver上传块分别核对。产品地面仍R19D3B；景深/AA/缩放/BLUR-01仍D4，正式产品性能仍R28/R34。
+
+
+性能补修：未失效或关闭阴影时，非批量路径不再append/复制专用caster uniform；batch几何块仍供既有prepass/几何使用。原cursor范围上传随之缩短，map/光学/材质不变；实际separateCasterUniforms为0的检查与矩阵变化重绘一起验证，不把API请求字节节省写成FPS或物理总线带宽结论。
+
+新增几何探针从源GLB的backface三角形计算light投影和同次R32F深度：最初将恒深纸面的2e-6直接用于倾斜面时失败约3.81e-6；源运算顺序/gl_FragCoord.z控制实验未消除差异，均未作为产品修复保留。全部已选采样继续保留，用解析平面每纹素depth梯度换算既有≤2物理像素投影门槛，恒深面仍depth<2e-6，同时报告未换算的depth误差；Metal最大约.00184纹素，不假定具体GPU子像素位数。
+
+
+最终实际环境为macOS27.0.1/arm64/Apple M4、自动发现最新Qt6.12.0、AppleClang21、Release，真实隐藏DPR1。Metal最终完整38/38通过，包括1200帧生产回放；新增最终报告字段后的shadow专项单独通过。OpenGL实际backend=2，shadow/flicker/shell三项通过，包含相同1200帧；两后端各9组shadow/十次真实SG重建，PCF最大误差.00244663≤2/255，几何投影最大分别.00183449/.00184885阴影纹素≤2。自有接收图和代表性正常生产输出已检查；没有源实机图配对、present/VSYNC或正式性能结论。
+
+实际API uniform请求：单caster首次6144、缓存5120 bytes；7caster首次18432、缓存11264 bytes，分别消除1024/7168 bytes专用阴影块；≥8实例复用既有batch几何块，此项为4096→4096。数值包含原其他draw，属于API请求范围而非驱动物理传输/显存或FPS。两组官方qmllint、check-format、四shell与instanced vertex生成+format逐字复现通过。COMMON-01–05/PERF-01–07/三平台symbol/hash及清单仅本地生成。Windows/D3D11、Linux/OpenGL实机未运行，R34/R19D3A-P保留；受限服务最初no-screens及两次仅foregroundUnchanged=false的失败与数值探针旧协议失败均保留，未宣称根因已修复、未放宽窗口断言。产品地面仍R19D3B，DOF/AA/尺度与BLUR-01仍D4。
+
+已恢复普通Release的Review OFF、可见测试OFF配置；生产构建、最终25/25快速CTest（含source-format/默认隐藏窗口策略）、check-format及两组官方qmllint通过。采集生成物保持忽略，下一未完成主线为R19D3B。

@@ -106,6 +106,7 @@ struct Pending
     int drainFrames = 0;
     bool yUp = false;
     int opticalProbe = 0;
+    bool captureShadowDepth = false;
     std::array<QSize, 13> logicalReadbackSizes;
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
@@ -1240,6 +1241,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         entities.append(input.scene.caseTransform);
     const auto visible = visibleEntities(input, entities);
     require(entities.size() <= 436, "RHI visible pool capacity exceeded");
+    shadowDirty = shadowDirty || shadowEntities != entities || cachedShadows != input.shadows;
     const bool batched = entities.size() >= 8;
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
@@ -1324,7 +1326,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             return ia < ib;
         });
     }
-    if (!batched)
+    if (!batched && shadowDirty && input.shadows)
         for (const auto &m : entities)
             shadowOffsets.append(append(m, 1));
     const auto bgOffset = append({ }, -1);
@@ -1415,7 +1417,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         input.exposure
     };
     updates->updateDynamicBuffer(outputUniform.get(), 0, 16, out);
-    shadowDirty = shadowDirty || shadowEntities != entities || cachedShadows != input.shadows;
+    const bool shadowRendered = shadowDirty;
     if (shadowDirty) {
         cb->beginPass(shadow.rt.get(), Qt::white, { 1, 0 }, updates);
         cb->setViewport({ 0, 0, float(shadowSize), float(shadowSize) });
@@ -1440,6 +1442,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     const auto recordFog = [&](const Uniform &submitted) {
         fogUniforms.append(QJsonObject{
                 { "kind", submitted.draw[0] },
+                { "shadow",
+                  QJsonArray{ submitted.draw[1], submitted.draw[2], submitted.draw[3],
+                              submitted.optics[1], submitted.optics[2], submitted.optics[3] } },
                 { "range", QJsonArray{ submitted.fog[0], submitted.fog[1], submitted.fog[2] } },
                 { "color",
                   QJsonArray{ submitted.background[0], submitted.background[1],
@@ -1574,6 +1579,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->drainFrames = api->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1;
         p->capture.request = input.request;
         p->opticalProbe = input.opticalProbe;
+        p->captureShadowDepth = input.captureShadowDepth;
         p->deliver = deliver;
         p->yUp = api->isYUpInFramebuffer();
         p->capture.metadata = {
@@ -1723,6 +1729,31 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                  { "tint", array(submitted.tint, 3) },
                                  { "attenuation", array(submitted.attenuation, 3) } });
         }
+        // Inspect the same receiver bytes uploaded above, rather than restating Input defaults.
+        Uniform receiver;
+        std::memcpy(&receiver, bytes.constData() + floorOffset, sizeof(receiver));
+        QJsonArray lightMatrix;
+        for (float value : receiver.lightVP)
+            lightMatrix.append(value);
+        p->capture.metadata["shadowState"] = QJsonObject{
+            { "rendered", shadowRendered },
+            { "separateCasterUniforms", shadowOffsets.size() },
+            { "casters", input.shadows ? entities.size() : 0 },
+            { "batched", batched },
+            { "enabled", receiver.draw[1] },
+            { "size", receiver.draw[2] },
+            { "radius", receiver.draw[3] },
+            { "strength", receiver.optics[1] },
+            { "normalBias", receiver.optics[2] },
+            { "bias", receiver.optics[3] },
+            { "lightVP", lightMatrix },
+            { "framebufferYUp", api->isYUpInFramebuffer() },
+            { "frontCull", shadowPipeline->cullMode() == QRhiGraphicsPipeline::Front },
+            { "lessEqual", shadowCompare->textureCompareOp() == QRhiSampler::LessOrEqual },
+            { "linearCompare",
+              shadowCompare->minFilter() == QRhiSampler::Linear
+                      && shadowCompare->magFilter() == QRhiSampler::Linear }
+        };
         p->capture.metadata["submittedFogUniforms"] = fogUniforms;
         p->capture.metadata["outputOptions"] = QJsonArray{ out[0], out[1], out[2], out[3] };
         p->capture.metadata["captureDrawKinds"] = captureKinds;
@@ -1757,6 +1788,11 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 if (auto state = weak.lock()) {
                     const auto image = imageOf(state->results[i], state->yUp, i == 8,
                                                state->logicalReadbackSizes[i]);
+                    if (i == 3 && state->captureShadowDepth) {
+                        require(state->results[i].format == QRhiTexture::R32F,
+                                "Shadow math capture must retain R32F precision");
+                        state->capture.shadowDepth = state->results[i].data;
+                    }
                     if (i == 4 && state->opticalProbe > 0) {
                         const auto &readback = state->results[i];
                         const int components = readback.format == QRhiTexture::RGBA16F ? 2 : 4;

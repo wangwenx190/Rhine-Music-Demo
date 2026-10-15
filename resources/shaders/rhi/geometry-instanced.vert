@@ -15,6 +15,7 @@ layout(location = 5) out vec3 localPosition;
 layout(location = 6) flat out vec4 entityLight0;
 layout(location = 7) flat out vec4 entityLight1;
 layout(location = 8) flat out vec4 entityCoverUv;
+layout(location = 9) out vec4 shadowCoord;
 layout(location = 3) in vec4 model0;
 layout(location = 4) in vec4 model1;
 layout(location = 5) in vec4 model2;
@@ -41,6 +42,8 @@ void main()
     vec4 p = model * vec4(rasterPosition, 1);
     world = p.xyz;
     worldNormal = normalize(transpose(inverse(mat3(model))) * normal);
+    // Three shadowmap_vertex biases each vertex before perspective interpolation.
+    shadowCoord = f.lightVP * (p + vec4(worldNormal * f.optics.z, 0));
     viewNormal = normalize(mat3(f.view) * worldNormal);
     viewDepth = -(f.view * p).z;
     localPosition = position;

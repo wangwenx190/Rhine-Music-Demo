@@ -8,8 +8,7 @@ float shadowFactor()
 {
     if (f.draw.y < .5)
         return 1.0;
-    vec4 p = f.lightVP * vec4(world + normalize(worldNormal) * f.optics.z, 1);
-    vec3 coord = p.xyz / p.w * .5 + .5;
+    vec3 coord = shadowCoord.xyz / shadowCoord.w * .5 + .5;
     coord.z += f.optics.w;
     if (any(lessThan(coord.xy, vec2(0))) || any(greaterThan(coord.xy, vec2(1))) || coord.z > 1)
         return 1.0;

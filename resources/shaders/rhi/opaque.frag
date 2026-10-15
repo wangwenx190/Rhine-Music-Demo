@@ -10,6 +10,7 @@ layout(location = 2) in vec3 worldNormal;
 layout(location = 3) in vec3 viewNormal;
 layout(location = 4) in float viewDepth;
 layout(location = 5) in vec3 localPosition;
+layout(location = 9) in vec4 shadowCoord;
 layout(location = 6) flat in vec4 entityLight0;
 layout(location = 7) flat in vec4 entityLight1;
 layout(location = 8) flat in vec4 entityCoverUv;
