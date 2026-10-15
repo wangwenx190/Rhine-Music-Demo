@@ -33,3 +33,5 @@ R10C历史Release复建工具为`tools/build/verify-r10c.ps1`，只在对应验�
 R19D1对源SSAO、R16F诊断行跨度、常量数据及27状态/数学/重建门禁的现行结论见[occlusion.md](occlusion.md)。OpenGL实际PACK_ALIGNMENT=4时，奇数宽R16F显式捕获使用同格式缓存补齐存储宽，逻辑宽和产品附件保持；不是扩大生产目标或改变AO精度。旧raw图/witness分数不再执行，Bokeh/SMAA/尺度/总体旧工具继续R19D4复查。
 
 生产雾与颜色域按[source-fidelity-review.md](source-fidelity-review.md)的R19D2执行：SceneAdapter按实际相机距离/详情生成范围；纸面在透射capture前、壳体在自身着色后分别应用线性smoothstep雾，然后才后处理与一次ACES/sRGB。独立Review默认fogEnabled=false，生产SceneItem正常路径始终true；不新增图形资源或将雾变化加入资源兼容键。
+
+R19D4A的Bokeh源数学/真实offscreen/实际上传与资源门禁见[postprocess.md](postprocess.md)末节。普通生产Postprocess的41点shader与采样参数未改，新增实际前缀诊断仅编入Review；独立测试直接执行同一生产qsb而非另一套shader。SMAA/目标尺度与旧工具拆耦仍由R19D4B/C承担，不把Bokeh单通道通过当作BLUR-01已关闭。

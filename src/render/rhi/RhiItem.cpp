@@ -1633,6 +1633,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         };
         auto *reads = api->nextResourceUpdateBatch();
         if (input.postprocess) {
+            p->capture.metadata["submittedBokeh"] = post.submittedBokeh();
             auto passNames = p->capture.metadata["passes"].toArray();
             passNames.removeLast();
             for (const auto &name : post.passes())

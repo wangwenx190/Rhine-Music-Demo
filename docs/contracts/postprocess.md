@@ -28,10 +28,20 @@ raw linearColor 诊断显式追加 identity ShaderPass，把 RenderPass 留在 c
 
 纸面留白始终使用原 contain、1/64 内缩、采样钳制和 alphaTest；盖内局部 LOD 不变。075 使用原 R07 的精确相机、主题、clarity 和直接材质路径，避免混用生产灯光/composer 条件。公开屏幕透射捕获的边界残差和非边缘 ROI 超目标项必须保留完整指标与局部放大图，作为 R10 的具体输入，不能以整体模糊或修改几何/封面/光照掩盖。
 
-## 重建与验收资产
+## 历史重建与验收资产（旧图像门禁停用）
 
 Windows：`./tools/build/verify-r09b.ps1 -Python <可用的 Python 可执行文件>`。已有同 hash 的冻结图时可加 `-SkipWebCapture`。脚本只构建/运行 `qt-release`，自动发现最高原生 Kit，Review 与 production 都执行 CTest/qmllint；production 拒绝 Review CLI。Node/浏览器只用于隔离基线采集，Qt 产品运行不依赖它们。
 
 105 个状态包含九尺寸×双主题的 NoAA/MSAA/SSAA、四预设×三种封面、前后景深开关、SMAA 开关、final/raw 输出、精确 075 和真实 DPR 1/1.5/2。Qt 窗口与源码相机共用 fixture，固定四个提交帧后抓取；C++ 比较器保留五个等权 ROI 的 RGB MAE/11×11 Gaussian SSIM、全图差分、投影、焦距与资源尺寸。geometry AA、Bokeh、SMAA 均有实际像素开关检查。业务状态保持由 RenderQualityTest 检查。
 
 Windows 实机证据在 `verification/windows/postprocess/`，全图、差分与局部放大图在 `docs/media/postprocess/`。macOS/Linux 的新增调用链、资源、shader 与错误路径审计在各平台 `postprocess/`：**静态审计通过，实机待用户验证**。完整部署与平台运行仍按后续 R30–R32 执行。
+
+## R19D4A 当前 Bokeh 门禁
+
+Bokeh生产算法未发现需要补偿的源码差异：focus取真实view矩阵中的`entityOrigin+(0,2,0)`，aperture按detail与强度更新，RGB24深度线性恢复near/far；41点、正负CoC/±.011、aspect、线性颜色采样及alpha=1均保持。`export-bokeh-kernel.py --check`核对锁定Three文件的既有manifest hash、公共/生产shader数学体及最小41点测试输入；普通构建和测试只读提交的JSON，不依赖Node或node_modules。
+
+Release Review ON下执行`ctest --preset qt-release-render -R '^rhi-bokeh-gpu$'`。入口直接创建真实QRhi offscreen frame，运行生产Postprocess与同一qsb，不创建swapchain/可见窗口；Windows/D3D11、macOS/Metal、OpenGL由本机能力选择，GL fallback surface保持到QRhi销毁之后。36组包含129×73、257×193、193×257、focus20/25/30、aperture0/.0003/.0008/.0012，另十次真正Postprocess reset/recreate以near=.1/far=1000验证恢复。解析HDR色/不连续RGB24深度以独立double双线性及锁定源41点求和核对全部输出，包含焦平面、前后景、限幅及clamp-to-edge。颜色公式采用既有3/255绝对门槛，不从实机图评分或调参；最终alpha必须精确1且值有限。自身预览是线性HDR裁到显示范围的诊断图，不是最终tone-map画面。
+
+Bokeh-only实际资源为一个全尺寸RGBA16F ping目标及一个uniform，常态API前缀上传80 bytes；焦点/aperture变化不得重建，关闭后目标全部释放。`Postprocess::submittedBokeh`仅Review保存真正交给updateDynamicBuffer的前缀，显式request才序列化；生产不增加采集、缓存或逐帧JSON。`rhi-flicker-gpu`的1200帧真实生产回放进一步对上传focus/aperture/maxblur/near/far/aspect及绑定的完整DOF附件尺寸核对，覆盖详情/相机变化与原光学连续门禁。
+
+本节不恢复历史postprocess/occlusion/RenderBackend/RhiPostprocess原图入口；AA与旧门禁覆盖映射属R19D4B，最终窗口/DPR/render scale/BLUR-01属R19D4C。Postprocess资源重建不等于Qt scene-graph或原生窗口恢复。正式性能/正常VSYNC及目标设备按原R28/R34任务；当前实际运行结论见source-fidelity-review.md。

@@ -50,6 +50,9 @@ struct Postprocess::State
 {
     QRhi *api = nullptr;
     PostSettings settings;
+#ifdef YALAHOO_RHI_AUDIT
+    PostPrefix submittedBokeh{ };
+#endif
     std::array<ColorTarget, 2> ping;
     ColorTarget rawAo, blur, edges, weights;
     Owned<QRhiTexture> noise, area, search;
@@ -231,6 +234,10 @@ void Postprocess::render(QRhiCommandBuffer *cb)
                                          p.kernelValues.data());
             p.uniformUploadBytes += bytes;
         }
+#ifdef YALAHOO_RHI_AUDIT
+        if (pass.name == "bokeh")
+            p.submittedBokeh = u;
+#endif
         updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u);
         p.uniformUploadBytes += sizeof(u);
     }
@@ -264,6 +271,26 @@ QJsonArray Postprocess::passes() const
         for (const auto &pass : m_state->passes)
             result.append(pass.name);
     return result;
+}
+QJsonObject Postprocess::submittedBokeh() const
+{
+#ifdef YALAHOO_RHI_AUDIT
+    if (m_state && m_state->settings.bokeh) {
+        const auto &p = *m_state;
+        const auto &u = p.submittedBokeh;
+        return { { "focus", u.dof[0] },
+                 { "aperture", u.dof[1] },
+                 { "maxblur", u.dof[2] },
+                 { "aspect", u.dof[3] },
+                 { "near", u.clip[0] },
+                 { "far", u.clip[1] },
+                 { "width", u.size[0] },
+                 { "height", u.size[1] },
+                 { "depthWidth", p.dofDepth->pixelSize().width() },
+                 { "depthHeight", p.dofDepth->pixelSize().height() } };
+    }
+#endif
+    return { };
 }
 qint64 Postprocess::uniformUploadBytes() const
 {

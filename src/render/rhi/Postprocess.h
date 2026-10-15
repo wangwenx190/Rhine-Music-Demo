@@ -1,6 +1,7 @@
 #pragma once
 #include "RhiApi.h"
 #include <QJsonArray>
+#include <QJsonObject>
 #include <memory>
 #include <vector>
 
@@ -26,6 +27,7 @@ public:
     void render(QRhiCommandBuffer *cb);
     QRhiTexture *output() const;
     QJsonArray passes() const;
+    QJsonObject submittedBokeh() const;
     QRhiTexture *rawAo() const;
     QRhiTexture *blurredAo() const;
     quint64 revision() const;

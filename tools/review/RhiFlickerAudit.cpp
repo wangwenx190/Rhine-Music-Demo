@@ -195,6 +195,28 @@ int main(int argc, char **argv)
                         auto result = driver.capture(input, target);
                         checkSubmittedFog(input, result);
                         checkSubmittedShadow(input, result);
+                        if (input.bokeh) {
+                            const auto uploaded = result.metadata["submittedBokeh"].toObject();
+                            const float focus =
+                                    -(input.scene.view
+                                      * QVector4D(adapter.casePosition() + QVector3D(0, 2, 0), 1))
+                                             .z();
+                            const float aperture = float(
+                                    (.0003 + .0005 * adapter.detail())
+                                    * adapter.quality()->values()["depthOfField"].toDouble() / 100);
+                            check(uploaded["focus"].toDouble() == focus
+                                          && uploaded["aperture"].toDouble() == aperture
+                                          && uploaded["maxblur"].toDouble() == double(.011f)
+                                          && uploaded["near"].toDouble()
+                                                  == float(input.scene.nearPlane)
+                                          && uploaded["far"].toDouble()
+                                                  == float(input.scene.farPlane)
+                                          && uploaded["aspect"].toDouble()
+                                                  == float(target.width()) / target.height()
+                                          && uploaded["depthWidth"].toInt() == target.width()
+                                          && uploaded["depthHeight"].toInt() == target.height(),
+                                  "Actual production Bokeh uniform/depth differs from frozen source");
+                        }
                         const auto floor = result.metadata["productFloor"].toObject();
                         check(input.productFloor && floor["enabled"].toBool()
                                       && floor["opaqueIndices"].toInt() == 6

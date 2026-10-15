@@ -390,3 +390,22 @@ PCF数值是同次真实几何深度上的独立源公式，非源实机图/浏�
 本轮实际环境为macOS/arm64/Apple M4、自动发现Qt6.12.0、AppleClang21、Release、真正隐藏DPR1。Metal/OpenGL地面14组源数学各通过，最大PBR/fog误差均.00239867≤3/255、平面投影最大分别.00123643/.00119814物理px≤2，原始depth差最大约5.45e-5/5.11e-5世界单位；每个开启阴影的源数学场景均有真实遮挡点。十次地面SG重建、AO/full DOF附件、缓存/三map检查及两后端各1200帧生产回放通过；本机GL实际backend=2。自身地面/实际生产输出已检查，不进行源图比较，也未关闭BLUR-01。
 
 完整Metal隐藏集首次36/38通过：source-format因最后补充探针尚未格式化失败，修正后按原门禁复验；shell仅前台PID变化触发策略失败，记录native visible/active/activationObserved=false，原因未确认，保留失败且不放宽策略。最终相同策略的Metal shadow/shell均通过；OpenGL shadow/flicker/shell三项通过。其余未受收尾影响的完整隐藏结果复用，不重复整套矩阵。三平台严格静态审计及helper等价、两组官方qmllint/check-format通过。最后恢复Review OFF/可见OFF，普通生产Release构建与25/25快速门禁实际通过（含source-format和默认隐藏窗口策略）；原始输出、失败及自有采集仅保存在本地忽略目录。
+
+## R19D4A Bokeh 源码与真实生产采样
+
+起点`f4e1610`。按实施前规模评估将原D4拆成连续A（Bokeh）、B（SMAA/MSAA及旧入口拆耦）、C（尺度/BLUR-01与集成收口），本轮仅A。冻结来源经history-rewrite读取且匹配原manifest；锁定Three0.183.2/BokehShader的SHA256为`bd8525158e3574a803f2e2ce5d5e263349a80ee41bf789e71446b9caa256aa9a`，MIT署名/许可证继续保留。R09B `522a3f3`、R10C `1f2352a`、R10D `75775b3`、e98c798的实际Bokeh数学体与当前一致（仅忽略格式空白）；无需增加补偿或更换RHI绘制路径。
+
+| 生产边界 | 源码结论与本轮验证 |
+| --- | --- |
+| scene.ts → SceneAdapter → SceneItem | focalPoint为entity+(0,2,0)经实际view变换，focus=-viewZ；aperture=(.0003+.0005×detail)×强度/100，构造期.0018不是有效帧常量。1200帧真实SceneItem中，逐帧核对真正上传前缀与源公式、完整DOF depth尺寸、near/far/aspect/maxblur。 |
+| R09B公共Effect → R10C/D生产Postprocess | RGB24线性depth、nearest深度/linear颜色、41点与.9/.7/.4环、±.011及aspect全部保留。独立double双线性/source求和读取最小源坐标JSON，直接执行生产qsb；不使用浏览器GPU数据或源截图。 |
+| 缓存、资源与上传 | Bokeh-only一个RGBA16F ping目标及一个1104-byte容量uniform，实际每帧只上传80-byte前缀；改focus/aperture不重建，无input/output反馈，关闭释放目标。十次Postprocess真实reset/recreate验证恢复与另一组near/far；这是后处理资源生命周期，不是scene-graph/native窗口恢复。 |
+| PERF-01–07与平台 | O(41×目标像素)，固定可见池不随全库增长；既有render所有权/预载缓存，不增加生产读回、队列、I/O或时钟。Review实际前缀保存仅在Review编译，序列化仅显式request。COMMON/PERF/三平台symbol/hash及历史matrix由audit-rhi-bokeh.py输出到本地忽略目录。未采用另一套渲染器，当前没有效果或成本依据要求替换。 |
+
+当前实际macOS/arm64/Apple M4、自动最新Qt6.12.0、AppleClang21、Release：Metal与本机OpenGL（backend分别4/2）各46状态通过，含36组focus/强度/横竖/奇数目标和十次资源重建，每后端1799438个解析像素；最大绝对颜色误差均约.001953125≤既有颜色公式3/255门槛。输入含HDR>1与不连续RGB24深度，输出有限、alpha精确1、色域/尺寸/资源断言通过，实际topLevelWindows=0/visibleWindows=0且无focusWindow。自身线性裁幅预览与生产暖昼/深夜输出已查看，只用于质量检查，不以小目标缩略图关闭BLUR-01。
+
+共享Metal Release完整隐藏39/39通过，包含1200帧生产回放及既有AO/阴影/光学/覆盖/资源/二维回归；两组官方qmllint与check-format通过。生产Bokeh qsb实际保留SPIR-V/GLSL330/ES300/HLSL50/MSL12五目标，跨目标翻译不等于目标GPU执行。没有改生产shader/采样/资源图，不声称FPS提升；本轮局部成本只验证80-byte API上传与附件/缓存，不将offscreen等待当作CPU提交或呈现性能。
+
+受限进程最初无法获得MTLDevice，原生执行环境下真正隐藏验证通过，原失败日志保留本地；没有通过显示窗口绕过。Windows/D3D11、Linux/OpenGL缺实际系统/Kit/设备，只做严格静态审计，原门槛和生产回归交R34/R19D4A-P。AA、旧图像入口覆盖映射与目标尺度仍D4B/C；BLUR-01尚未关闭，正常VSYNC/物理输入/完整性能仍R28/R34。生成图/日志/逐帧与matrix不入Git。
+
+最终普通Release已恢复Review OFF/可见OFF；生产构建、25/25快速CTest（含source-format/默认隐藏窗口策略）、两组官方qmllint及check-format通过。GL本轮实际执行独立46状态；没有修改生产shader/目标/事件驱动，GL生产1200帧与scene-graph边界复用R19D3B的有效事实，不将新增实际前缀断言记作本轮已在GL生产回放运行。原生可见窗口/正常VSYNC/物理设备矩阵本轮未选择，按原任务保留。Git仅新增最小41点数学输入、验证源码和必要契约。
