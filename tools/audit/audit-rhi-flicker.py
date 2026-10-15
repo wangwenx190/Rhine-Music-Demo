@@ -8,7 +8,7 @@ CHECKS = [
     ("COMMON-01", "src/render/rhi/CMakeLists.txt", "MSL 21",
      "The two shared geometry shaders emit invariant position on all five qsb targets. MSL 2.1 "
      "is needed for the invariant attribute; other fragments remain MSL 1.2. Latest Kit is discovered."),
-    ("COMMON-02", "tools/review/RhiFlickerAudit.cpp", "Snapshot library()",
+    ("COMMON-02", "tools/review/RhiProductionFixture.h", "Snapshot productionLibrary()",
      "Anonymous 9x64 local albums reference three qrc demo covers; actual SceneItem prepares "
      "production atlas leases and publishes immutable states. No private music or network input."),
     ("COMMON-03", "resources/shaders/rhi/geometry-instanced.vert", "f.nativeVP * p",

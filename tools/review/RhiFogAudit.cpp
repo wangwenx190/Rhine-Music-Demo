@@ -106,7 +106,7 @@ int main(int argc, char **argv)
             auto ordinary = driver.capture(input, { 960, 720 });
             checkSubmittedFog(input, ordinary);
             RhiCaptureHarness::require(
-                    driver.surface.grab().save(output + (night ? "/night.png" : "/day.png")),
+                    driver.surface->grab().save(output + (night ? "/night.png" : "/day.png")),
                     "Cannot save own fog output");
             last = input;
         }
@@ -129,9 +129,9 @@ int main(int argc, char **argv)
                                                 { "rebuilds", rebuilds },
                                                 { "maxError", maxError },
                                                 { "cases", results },
-                                                { "offscreen", driver.surface.diagnostics() },
+                                                { "offscreen", driver.surface->diagnostics() },
                                                 { "windowPolicy",
-                                                  verification::windowPolicy(driver.window) } })
+                                                  verification::windowPolicy(*driver.window) } })
                              .toJson());
         RhiCaptureHarness::require(report.commit(), "Cannot write fog report");
         std::printf("Fog/color source math passed %lld states, max error %.9f\n", results.size(),

@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         const QString output = QString::fromLocal8Bit(argv[1]);
         QDir().mkpath(output);
         RhiCaptureHarness driver;
-        check(driver.window.devicePixelRatio() == 1, "Opaque diagnostics require actual DPR1");
+        check(driver.window->devicePixelRatio() == 1, "Opaque diagnostics require actual DPR1");
         QJsonArray cases, sizes, shadows, rebuilds, inkProbes;
         double worstDepth = 0, worstNormal = 0, worstProjection = 0;
         for (bool night : { false, true })
@@ -237,11 +237,11 @@ int main(int argc, char **argv)
         changed.cover.fill(Qt::red);
         driver.submitWithoutCapture(changed, baseSize);
         driver.replay(3);
-        const auto red = driver.surface.grab().pixelColor(480, 360);
+        const auto red = driver.surface->grab().pixelColor(480, 360);
         changed.cover.fill(Qt::blue);
         driver.submitWithoutCapture(changed, baseSize);
         driver.replay(3);
-        const auto blue = driver.surface.grab().pixelColor(480, 360);
+        const auto blue = driver.surface->grab().pixelColor(480, 360);
         check(red.red() > red.blue() + 20 && blue.blue() > blue.red() + 20,
               "Same-request cover revision was ignored");
         for (bool night : { false, true })
@@ -299,8 +299,8 @@ int main(int argc, char **argv)
                                   { "validation", "source-math-and-own-output" },
                                   { "imageComparison", false },
                                   { "qt", qVersion() },
-                                  { "offscreen", driver.surface.diagnostics() },
-                                  { "windowPolicy", verification::windowPolicy(driver.window) },
+                                  { "offscreen", driver.surface->diagnostics() },
+                                  { "windowPolicy", verification::windowPolicy(*driver.window) },
                                   { "cases", cases },
                                   { "resize", sizes },
                                   { "resizeBurst", 30 },

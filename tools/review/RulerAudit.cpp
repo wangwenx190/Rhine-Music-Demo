@@ -16,6 +16,7 @@
 #include <QJsonArray>
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QMutex>
 #include <QMutexLocker>
 #include <rhi/qrhi.h>
@@ -63,19 +64,40 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     clock.setActive(true);
     clock.advance(0);
     QQmlEngine engine;
-    QQuickRenderControl renderControl;
-    QQuickWindow window(OffscreenSurface::Enabled ? &renderControl : nullptr);
-    OffscreenSurface surface(window, renderControl);
-    yalahoo::verification::prepareWindow(window, true);
-    window.setPersistentSceneGraph(false);
-    window.setPersistentGraphics(false);
-    window.resize(136, 100);
+    std::unique_ptr<QQuickRenderControl> renderControl;
+    std::unique_ptr<QQuickWindow> window;
+    std::unique_ptr<OffscreenSurface> surface;
+    quint64 windowEpoch = 0;
+    const bool quitOnClose = app.quitOnLastWindowClosed();
+    app.setQuitOnLastWindowClosed(false);
+    const auto makeWindow = [&] {
+        ++windowEpoch;
+        renderControl = std::make_unique<QQuickRenderControl>();
+        window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? renderControl.get()
+                                                                          : nullptr);
+        surface = std::make_unique<OffscreenSurface>(*window, *renderControl);
+        yalahoo::verification::prepareWindow(*window, true);
+        window->setPersistentSceneGraph(false);
+        window->setPersistentGraphics(false);
+        window->resize(136, 100);
+    };
+    makeWindow();
+    QJsonObject finalPolicy, finalSurface;
+    qreal finalDpr = window->devicePixelRatio();
+    qint64 peakSurfaceBytes = 0;
+    const auto retainSurfacePlan = [&] {
+        auto plan = surface->diagnostics();
+        peakSurfaceBytes =
+                qMax(peakSurfaceBytes, plan["attachmentPeakBytesUpperBound"].toInteger());
+        plan.insert("attachmentPeakBytesUpperBound", peakSurfaceBytes);
+        finalSurface = plan;
+    };
     bool hasDensity = false;
     for (const auto &value : cases)
         hasDensity |=
-                std::abs(value.toObject()["dpr"].toDouble() - window.devicePixelRatio()) <= .001;
+                std::abs(value.toObject()["dpr"].toDouble() - window->devicePixelRatio()) <= .001;
     if (!hasDensity) {
-        qWarning() << "Frozen ruler states have no matching DPR" << window.devicePixelRatio();
+        qWarning() << "Frozen ruler states have no matching DPR" << window->devicePixelRatio();
         return 3;
     }
     std::unique_ptr<yalahoo::RulerController> controller;
@@ -88,12 +110,6 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     double maximumStateError = 0;
     bool passed = true;
     int initialized = 0, invalidated = 0;
-    QObject::connect(&window, &QQuickWindow::sceneGraphInitialized, &app, [&] {
-        ++initialized;
-    });
-    QObject::connect(&window, &QQuickWindow::sceneGraphInvalidated, &app, [&] {
-        ++invalidated;
-    });
     bool stationaryPending = false;
     int stationaryWarmup = 2;
     double ordinalError = 0;
@@ -124,70 +140,93 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     QImage image;
     QMutex imageMutex;
     std::function<void()> next, consumeImage, requestLifecycle;
-    QObject::connect(
-            &window, &QQuickWindow::beforeSynchronizing, &window,
-            [&] {
-                syncStart = elapsed.nsecsElapsed();
-            },
-            Qt::DirectConnection);
-    QObject::connect(
-            &window, &QQuickWindow::afterSynchronizing, &window,
-            [&] {
-                syncNs += elapsed.nsecsElapsed() - syncStart;
-            },
-            Qt::DirectConnection);
-    QObject::connect(
-            &window, &QQuickWindow::beforeRendering, &window,
-            [&] {
-                renderStart = elapsed.nsecsElapsed();
-            },
-            Qt::DirectConnection);
-    QObject::connect(
-            &window, &QQuickWindow::afterRendering, &window,
-            [&] {
-                renderNs += elapsed.nsecsElapsed() - renderStart;
-                if (!requested || inFlight)
-                    return;
-                auto *rhi = surface.rhi();
-                auto *commandBuffer = surface.commandBuffer();
-                if (!rhi || !commandBuffer)
-                    return;
-                requested = false;
-                inFlight = true;
-                const bool flip = rhi->isYUpInFramebuffer();
-                QMetaObject::invokeMethod(
-                        &app, [&, frames = rhi->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1] {
-                            drain = frames;
-                        });
-                readback.completed = [&, flip] {
-                    const auto format = readback.format == QRhiTexture::BGRA8
-                            ? QImage::Format_ARGB32
-                            : QImage::Format_RGBA8888;
-                    QImage pixels(reinterpret_cast<const uchar *>(readback.data.constData()),
-                                  readback.pixelSize.width(), readback.pixelSize.height(), format);
-                    {
-                        const QMutexLocker lock(&imageMutex);
-                        image = flip ? pixels.flipped(Qt::Vertical) : pixels.copy();
-                    }
-                    inFlight = false;
-                    QMetaObject::invokeMethod(&app, [&] {
-                        consumeImage();
-                    });
-                };
-                auto *batch = rhi->nextResourceUpdateBatch();
-                batch->readBackTexture(surface.readbackDescription(), &readback);
-                commandBuffer->resourceUpdate(batch);
-            },
-            Qt::DirectConnection);
-    surface.connectFrames(&app, [&] {
-        if (inFlight && drain-- > 0 && root) {
-            root->setProperty("marker", root->property("marker").toInt() + 1);
-            surface.requestFrame();
-        }
-    });
+    QObject reviewLifetime;
+    const auto bindWindow = [&] {
+        const auto epoch = windowEpoch;
+        QObject::connect(window.get(), &QQuickWindow::sceneGraphInitialized, &reviewLifetime, [&] {
+            ++initialized;
+        });
+        QObject::connect(window.get(), &QQuickWindow::sceneGraphInvalidated, &reviewLifetime, [&] {
+            ++invalidated;
+        });
+        QObject::connect(
+                window.get(), &QQuickWindow::beforeSynchronizing, window.get(),
+                [&] {
+                    syncStart = elapsed.nsecsElapsed();
+                },
+                Qt::DirectConnection);
+        QObject::connect(
+                window.get(), &QQuickWindow::afterSynchronizing, window.get(),
+                [&] {
+                    syncNs += elapsed.nsecsElapsed() - syncStart;
+                },
+                Qt::DirectConnection);
+        QObject::connect(
+                window.get(), &QQuickWindow::beforeRendering, window.get(),
+                [&] {
+                    renderStart = elapsed.nsecsElapsed();
+                },
+                Qt::DirectConnection);
+        QObject::connect(
+                window.get(), &QQuickWindow::afterRendering, window.get(),
+                [&, epoch, targetSurface = surface.get()] {
+                    renderNs += elapsed.nsecsElapsed() - renderStart;
+                    if (!requested || inFlight)
+                        return;
+                    auto *rhi = targetSurface->rhi();
+                    auto *commandBuffer = targetSurface->commandBuffer();
+                    if (!rhi || !commandBuffer)
+                        return;
+                    requested = false;
+                    inFlight = true;
+                    const bool flip = rhi->isYUpInFramebuffer();
+                    QMetaObject::invokeMethod(
+                            &reviewLifetime,
+                            [&, epoch,
+                             frames = rhi->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1] {
+                                if (epoch == windowEpoch)
+                                    drain = frames;
+                            },
+                            Qt::QueuedConnection);
+                    readback.completed = [&, epoch, flip] {
+                        const auto format = readback.format == QRhiTexture::BGRA8
+                                ? QImage::Format_ARGB32
+                                : QImage::Format_RGBA8888;
+                        QImage pixels(reinterpret_cast<const uchar *>(readback.data.constData()),
+                                      readback.pixelSize.width(), readback.pixelSize.height(),
+                                      format);
+                        {
+                            const QMutexLocker lock(&imageMutex);
+                            image = flip ? pixels.flipped(Qt::Vertical) : pixels.copy();
+                        }
+                        inFlight = false;
+                        // RenderControl can complete readback inside endFrame().
+                        // Retire windows only after the current RHI frame has returned.
+                        QMetaObject::invokeMethod(
+                                &reviewLifetime,
+                                [&, epoch] {
+                                    if (epoch == windowEpoch)
+                                        consumeImage();
+                                },
+                                Qt::QueuedConnection);
+                    };
+                    auto *batch = rhi->nextResourceUpdateBatch();
+                    batch->readBackTexture(targetSurface->readbackDescription(), &readback);
+                    commandBuffer->resourceUpdate(batch);
+                },
+                Qt::DirectConnection);
+        surface->connectFrames(&reviewLifetime, [&, epoch] {
+            if (epoch != windowEpoch)
+                return;
+            if (inFlight && drain-- > 0 && root) {
+                root->setProperty("marker", root->property("marker").toInt() + 1);
+                surface->requestFrame();
+            }
+        });
+    };
+    bindWindow();
     const auto finish = [&] {
-        passed &= yalahoo::verification::windowPolicySatisfied(window) && initialized >= 11
-                && invalidated >= 10;
+        passed &= finalPolicy["passed"].toBool() && initialized >= 11 && invalidated >= 10;
         QSaveFile file(output + "/report.json");
         if (!file.open(QIODevice::WriteOnly)) {
             app.exit(8);
@@ -199,7 +238,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                         QJsonObject{
                                 { "passed", passed },
                                 { "offscreen", OffscreenSurface::Enabled },
-                                { "offscreenResourcePlan", surface.diagnostics() },
+                                { "offscreenResourcePlan", finalSurface },
                                 { "maximumStateError", maximumStateError },
                                 { "ordinalError", ordinalError },
                                 { "initialized", initialized },
@@ -207,9 +246,9 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                                 { "captures", captures },
                                 { "lifecycle", lifecycleChecks },
                                 { "invariants", invariants },
-                                { "dpr", window.devicePixelRatio() },
+                                { "dpr", finalDpr },
                                 { "qtVersion", qVersion() },
-                                { "windowPolicy", yalahoo::verification::windowPolicy(window) },
+                                { "windowPolicy", finalPolicy },
                                 { "canvasPaints", qint64(stats.paints) },
                                 { "canvasSyncs", qint64(stats.syncs) },
                                 { "canvasPaintCpuNs", qint64(stats.paintNs) },
@@ -230,17 +269,17 @@ int reviewRuler(QGuiApplication &app, const QString &output)
         }
         if (stationaryPending) {
             if (stationaryWarmup-- > 0) {
-                QTimer::singleShot(60, &app, [&] {
+                QTimer::singleShot(60, &reviewLifetime, [&] {
                     requested = true;
                     root->setProperty("marker", root->property("marker").toInt() + 1);
-                    surface.requestFrame();
+                    surface->requestFrame();
                 });
                 return;
             }
             stationaryPending = false;
             stationaryPaints = yalahoo::rulerInkStats().paints;
             controller->advance(.05);
-            QTimer::singleShot(120, &app, [&] {
+            QTimer::singleShot(120, &reviewLifetime, [&] {
                 const quint64 paints = yalahoo::rulerInkStats().paints;
                 invariants.append(QJsonObject{ { "name", "stationary-paint" },
                                                { "before", qint64(stationaryPaints) },
@@ -269,14 +308,14 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             passed &= digitState;
             if (lifecycle == 0)
                 passed &= captured.save(output + QString("/digits-%1.png").arg(lifecycleMode));
-            const double dpr = window.devicePixelRatio();
+            const double dpr = window->devicePixelRatio();
             captured = captured.copy(0, 0, qRound(134 * dpr), qRound(34 * dpr));
             const bool valid = !captured.isNull()
                     && captured.size() == QSize(qRound(134 * dpr), qRound(34 * dpr))
                     && captured.save(
                             output
                             + QString("/restored-%1-%2.png").arg(lifecycle).arg(lifecycleMode))
-                    && yalahoo::verification::windowPolicySatisfied(window)
+                    && yalahoo::verification::windowPolicySatisfied(*window)
                     && yalahoo::rulerInkStats().renderers <= 1;
             passed &= valid;
             lifecycleChecks.append(
@@ -292,35 +331,92 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             }
             lifecycleMode = 0;
             if (++lifecycle <= 10) {
-                surface.hide();
                 controller->setActive(false);
-                window.releaseResources();
-                QTimer::singleShot(60, &app, [&] {
-                    const auto hidden = controller->state();
-                    controller->advance(.05);
-                    const bool unchanged = hidden == controller->state();
-                    invariants.append(QJsonObject{ { "name", "hidden-state" },
-                                                   { "cycle", lifecycle },
-                                                   { "passed", unchanged } });
-                    passed &= unchanged;
-                    window.resize(lifecycle % 2 ? QSize(140, 104) : QSize(136, 100));
-                    controller->setActive(true);
-                    surface.show();
-                    requestLifecycle();
-                });
-            } else {
+                const bool night = root->property("night").toBool();
+                root->setParentItem(nullptr);
                 object.reset();
                 root = nullptr;
-                surface.hide();
-                window.releaseResources();
-                QTimer::singleShot(60, &app, [&] {
-                    const int remaining = yalahoo::rulerInkStats().renderers;
-                    invariants.append(QJsonObject{ { "name", "renderer-release" },
-                                                   { "remaining", remaining },
-                                                   { "passed", remaining == 0 } });
-                    passed &= remaining == 0;
-                    finish();
-                });
+                const auto restoreWindow = [&, night] {
+                    surface->hide();
+                    window->releaseResources();
+                    retainSurfacePlan();
+                    auto oldSurface = std::move(surface);
+                    window.reset();
+                    oldSurface.reset();
+                    renderControl.reset();
+                    makeWindow();
+                    bindWindow();
+                    QQmlComponent component(&engine,
+                                            QUrl("qrc:/qt/qml/Yalahoo/Music/RulerReview.qml"));
+                    object.reset(component.createWithInitialProperties(
+                            { { "controller", QVariant::fromValue(controller.get()) },
+                              { "clock", QVariant::fromValue(&clock) },
+                              { "night", night },
+                              { "physicalDpr", window->devicePixelRatio() },
+                              { "offscreenRendering", OffscreenSurface::Enabled } }));
+                    root = qobject_cast<QQuickItem *>(object.get());
+                    if (!root) {
+                        qWarning() << component.errors();
+                        app.exit(4);
+                        return;
+                    }
+                    root->setParentItem(window->contentItem());
+                    root->setProperty("overflow", true);
+                    QTimer::singleShot(60, &reviewLifetime, [&] {
+                        const auto hidden = controller->state();
+                        controller->advance(.05);
+                        const bool unchanged = hidden == controller->state();
+                        invariants.append(QJsonObject{ { "name", "hidden-state" },
+                                                       { "cycle", lifecycle },
+                                                       { "passed", unchanged } });
+                        passed &= unchanged;
+                        window->resize(lifecycle % 2 ? QSize(140, 104) : QSize(136, 100));
+                        controller->setActive(true);
+                        surface->show();
+                        requestLifecycle();
+                    });
+                };
+                if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic") {
+                    QObject::connect(
+                            window.get(), &QQuickWindow::frameSwapped, &reviewLifetime,
+                            restoreWindow,
+                            Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+                    surface->requestFrame();
+                } else {
+                    restoreWindow();
+                }
+            } else {
+                root->setParentItem(nullptr);
+                object.reset();
+                root = nullptr;
+                const auto releaseWindow = [&] {
+                    surface->hide();
+                    window->releaseResources();
+                    finalPolicy = yalahoo::verification::windowPolicy(*window);
+                    retainSurfacePlan();
+                    finalDpr = window->devicePixelRatio();
+                    auto oldSurface = std::move(surface);
+                    window.reset();
+                    oldSurface.reset();
+                    renderControl.reset();
+                    QTimer::singleShot(200, &reviewLifetime, [&] {
+                        const int remaining = yalahoo::rulerInkStats().renderers;
+                        invariants.append(QJsonObject{ { "name", "renderer-release" },
+                                                       { "remaining", remaining },
+                                                       { "passed", remaining == 0 } });
+                        passed &= remaining == 0;
+                        finish();
+                    });
+                };
+                if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic") {
+                    QObject::connect(
+                            window.get(), &QQuickWindow::frameSwapped, &reviewLifetime,
+                            releaseWindow,
+                            Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+                    surface->requestFrame();
+                } else {
+                    releaseWindow();
+                }
             }
             return;
         }
@@ -328,7 +424,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
         const auto state = test["states"].toArray()[stateIndex - 1].toObject();
         const QString name =
                 QString("native-%1-%2-%3.png").arg(caseIndex).arg(stateIndex - 1).arg(mode);
-        const double dpr = window.devicePixelRatio();
+        const double dpr = window->devicePixelRatio();
         captured = captured.copy(0, 0, qRound(134 * dpr), qRound(34 * dpr));
         int visibleInk = 0;
         if (!captured.isNull()) {
@@ -367,10 +463,10 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             root->setProperty("mode", mode);
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
-            QTimer::singleShot(60, &app, [&] {
+            QTimer::singleShot(60, &reviewLifetime, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
-                surface.requestFrame();
+                surface->requestFrame();
             });
         } else {
             mode = 0;
@@ -381,7 +477,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     next = [&] {
         while (caseIndex < cases.size()) {
             const auto test = cases[caseIndex].toObject();
-            if (std::abs(test["dpr"].toDouble() - window.devicePixelRatio()) > .001) {
+            if (std::abs(test["dpr"].toDouble() - window->devicePixelRatio()) > .001) {
                 ++caseIndex;
                 continue;
             }
@@ -394,7 +490,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                         { { "controller", QVariant::fromValue(controller.get()) },
                           { "clock", QVariant::fromValue(&clock) },
                           { "night", test["night"].toBool() },
-                          { "physicalDpr", window.devicePixelRatio() },
+                          { "physicalDpr", window->devicePixelRatio() },
                           { "offscreenRendering", OffscreenSurface::Enabled } }));
                 root = qobject_cast<QQuickItem *>(object.get());
                 if (!root) {
@@ -402,7 +498,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                     app.exit(4);
                     return;
                 }
-                root->setParentItem(window.contentItem());
+                root->setParentItem(window->contentItem());
             }
             const auto states = test["states"].toArray();
             if (stateIndex == states.size()) {
@@ -438,10 +534,10 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 continue;
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
-            QTimer::singleShot(60, &app, [&] {
+            QTimer::singleShot(60, &reviewLifetime, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
-                surface.requestFrame();
+                surface->requestFrame();
             });
             return;
         }
@@ -451,27 +547,49 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             controller->advance(1.0 / 120);
         root->setProperty("overflow", true);
         stationaryPending = true;
-        QTimer::singleShot(60, &app, [&] {
+        QTimer::singleShot(60, &reviewLifetime, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
-            surface.requestFrame();
+            surface->requestFrame();
         });
     };
     requestLifecycle = [&] {
         root->setProperty("mode", lifecycleMode);
         root->setProperty("ordinal", lifecycleMode == 0 ? 123 : lifecycleMode == 1 ? 907 : 42);
-        QTimer::singleShot(60, &app, [&] {
+        QTimer::singleShot(60, &reviewLifetime, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
-            surface.requestFrame();
+            surface->requestFrame();
         });
     };
-    QTimer::singleShot(60000, &app, [&] {
+    QTimer::singleShot(60000, &reviewLifetime, [&] {
         app.exit(10);
     });
-    surface.show();
-    QTimer::singleShot(0, &app, [&] {
+    surface->show();
+    QTimer::singleShot(0, &reviewLifetime, [&] {
         next();
     });
-    return app.exec();
+    const int result = app.exec();
+    if (window) {
+        ++windowEpoch;
+        requested = false;
+        if (root)
+            root->setParentItem(nullptr);
+        object.reset();
+        root = nullptr;
+        if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic") {
+            QEventLoop cleanup;
+            QObject::connect(window.get(), &QQuickWindow::frameSwapped, &cleanup, &QEventLoop::quit,
+                             Qt::QueuedConnection);
+            QTimer::singleShot(1000, &cleanup, &QEventLoop::quit);
+            surface->requestFrame();
+            cleanup.exec();
+        }
+        surface->hide();
+        auto oldSurface = std::move(surface);
+        window.reset();
+        oldSurface.reset();
+    }
+    app.setQuitOnLastWindowClosed(quitOnClose);
+    return result;
 }

@@ -24,7 +24,7 @@
 - cpuSubmitMs只含renderFrame到最后输出命令，synchronizationMs单列最近快照同步；静态复用不解释为每帧重复同步。遥测组装自身开销不混入提交数字，GPU timestamp不可用null。
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
-- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进输入/尺寸/画质/重建，等待各步提交确认；FrameAnimation仍唯一帧源，无processEvents/msleep轮询。检查九尺寸/四画质/双主题/十次恢复，报告实际覆盖，短单盒输入不能冒充完整产品。
+- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进输入/尺寸/画质/重建，等待各步提交确认；FrameAnimation仍唯一帧源，无processEvents/msleep轮询。检查九尺寸/四画质/双主题/十次完整QML根窗口重建；重建后重新绑定输入/遥测，旧窗口回调按epoch拒绝，核对新renderer首批封面上传与资源回落，报告实际覆盖，短单盒输入不能冒充完整产品。
 - `rhi-postprocess-audit --profile`是独立分通道GPU诊断，不能混入正常120秒性能样本；当前非像素入口和范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。
 
 ## 目标尺度与生产阵列检查
@@ -33,4 +33,4 @@
 
 独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单、limited和最终缩放。核对实际线性/clamp封面无mip、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；256缩略图与1024独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集generation与稳态零上传保持。普通产品不增加读回或诊断遍历。
 
-`python3 tools/audit/audit-rhi-scale.py`输出冻结生产调用/最终CSS、D1–D4历史及COMMON/PERF/三平台符号hash矩阵。与`rhi-flicker-gpu`连续静止/波浪/浏览/总览进退/详情输出、组合资源/十次SG重建共同覆盖本轮；自身输出另检查实际轮廓/清晰度/合成，不运行图像分数。CPU提交/driver显存/物理屏幕及完整产品性能的边界见performance与迁移计划。
+`python3 tools/audit/audit-rhi-scale.py`输出冻结生产调用/最终CSS、D1–D4历史及COMMON/PERF/三平台符号hash矩阵。尺度检查与`rhi-flicker-gpu`的连续静止/波浪/浏览/总览进退/详情输出、组合资源及十次SG重建共同覆盖生产闭包。连续入口在读取当次输入前执行生产item的ensurePolished并核对SceneFrame revision，避免native queued frameSwapped对应旧帧。自身输出另检查实际轮廓/清晰度/合成，不运行图像分数。CPU提交/driver显存/物理屏幕及完整产品性能的边界见performance与迁移计划。

@@ -3,7 +3,6 @@ target_link_libraries(YalahooImageComparison PUBLIC Qt6::Gui)
 target_include_directories(YalahooImageComparison PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 yalahoo_platform(YalahooImageComparison)
 qt_add_executable(compare-images CompareImages.cpp)
-target_link_libraries(compare-images PRIVATE YalahooImageComparison)
 set_target_properties(
     compare-images
     PROPERTIES
@@ -19,7 +18,7 @@ qt_add_executable(ui-audit UiAudit.cpp OverviewAudit.cpp OverviewAudit.h Present
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooImageComparison
+target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText
     Qt6::CanvasPainter Qt6::QuickControls2 Qt6::Svg Qt6::Test Qt6::GuiPrivate)
 set_target_properties(ui-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
     WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
@@ -62,7 +61,7 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
     qt_add_executable(cover-audit CoverAudit.cpp)
-    target_link_libraries(cover-audit PRIVATE YalahooRhi YalahooImageComparison)
+    target_link_libraries(cover-audit PRIVATE YalahooRhi)
     target_include_directories(cover-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
     set_target_properties(cover-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
         "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
@@ -195,7 +194,7 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
     qt_add_executable(render-backend-audit RenderBackendAudit.cpp)
-    target_link_libraries(render-backend-audit PRIVATE YalahooImageComparison Qt6::Quick)
+    target_link_libraries(render-backend-audit PRIVATE Qt6::Quick)
     set_target_properties(
         render-backend-audit
         PROPERTIES

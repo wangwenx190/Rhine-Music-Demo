@@ -35,3 +35,11 @@ IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独�
 - 纸面输入`tests/fixtures/materials/paper-probe.png`为RGBA(96,160,208,255)，0/.25/2入射按`sRGBEncode(min(sRGBDecode(ink)*irradiance,sRGBDecode(ink)))`核对，≤3码值；正式三形状封面另验contain/细节。
 - 每状态真实事件驱动四个准备帧后采一次自身texture，核对request/warnings/有效输出。材质十次、灯光一次完整QML root+资源重建；报告区分root重建与同一View3D恢复。只invalidate/initialize后漏画时按计划对应经验重建拥有场景的root。
 - 入口`python3 tools/build/verify-material-review.py materials|lighting`；薄包装verify-r07.ps1/verify-r08.ps1转交该驱动。矩阵工具audit-material-parameters.py/audit-material-review.py只输出本地。状态/公式通过不能替代生产RHI光学/连续质量/最终尺度检查。
+
+## Quick3D Review 的 OpenGL MSAA 适配
+
+`src/render/rhi/ReviewGlCapabilities.h`只由Review材料入口使用，私有API由`YALAHOO_REVIEW_MSAA_API`按本机最新Kit实际编译探测。Cocoa OpenGL缺少`glTexStorage2DMultisample`时，Qt的纹理MSAA能力标志与该后端实际分配入口不一致；在`sceneGraphInitialized`且上下文有效时，仅校正该标志，令Quick3D采用其既有renderbuffer＋resolve分支。该分支依据[Qt Quick3D源实现](https://github.com/qt/qtquick3d/blob/dev/src/quick3d/qquick3dscenerenderer.cpp)；不修改Kit文件、全局GL函数或产品渲染器。
+
+实际render线程在`afterRendering`读取Quick3D主pass的采样数与真实颜色附件/resolve描述符，仅以加锁值快照交给GUI报告。适配启用且请求MSAA时，必须核对4×采样、renderbuffer、独立resolve及颜色格式一致；每次真实SG重建重新探测。无相关缺口的平台不修改能力，不能关AA、降采样或改颜色精度规避失败。
+
+Review的原生“重建”销毁完整QQuickWindow及QML根；RenderControl仍以完整QML根＋control失效重建。两者都要求实际sceneGraphInvalidated递增并恢复正常输出。新窗口重新应用窗口策略/能力探测，旧帧按window epoch拒绝；同对象surface恢复由窗口/产品专项另行检查。

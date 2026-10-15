@@ -46,6 +46,6 @@ RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、loo
 
 ## 检查入口
 
-`CoverCacheTest`覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
+`CoverCacheTest`覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 
 目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码审计`tools/audit/audit-r11.ps1`。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R34。

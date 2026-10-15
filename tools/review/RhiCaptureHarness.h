@@ -3,6 +3,7 @@
 #include "RhiItem.h"
 #include "VerificationWindow.h"
 #include <QEventLoop>
+#include <QGuiApplication>
 #include <QPointer>
 #include <QJsonDocument>
 #include <QTimer>
@@ -17,44 +18,15 @@ class RhiCaptureHarness
 {
 public:
     RhiCaptureHarness(const std::function<rhi::RhiItem *(QQuickItem *)> &create = { })
-        : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
+        : m_create(create), m_quitOnClose(QGuiApplication::quitOnLastWindowClosed())
     {
-        verification::prepareWindow(window, true);
-        window.setPersistentGraphics(false);
-        window.setPersistentSceneGraph(false);
-        QObject::connect(
-                &window, &QQuickWindow::sceneGraphInvalidated, &window,
-                [this] {
-                    ++invalidations;
-                },
-                Qt::DirectConnection);
-        item = create ? create(window.contentItem()) : new rhi::RhiItem(window.contentItem());
-        QObject::connect(item, &rhi::RhiItem::renderFailed, &window,
-                         [state = state](const QString &message) {
-                             state->error = message;
-                             if (state->loop)
-                                 state->loop->quit();
-                         });
-        const QPointer<QQuickWindow> guard(&window);
-        item->captured = [state = state, guard](rhi::Capture capture) {
-            if (guard)
-                QMetaObject::invokeMethod(
-                        guard,
-                        [state, capture = std::move(capture)]() mutable {
-                            if (state->loop && capture.request == state->request) {
-                                state->capture = std::move(capture);
-                                state->loop->quit();
-                            }
-                        },
-                        Qt::QueuedConnection);
-        };
-        surface.show();
+        QGuiApplication::setQuitOnLastWindowClosed(false);
+        createWindow();
     }
     ~RhiCaptureHarness()
     {
-        item->captured = { };
-        surface.hide();
-        window.releaseResources();
+        destroyWindow();
+        QGuiApplication::setQuitOnLastWindowClosed(m_quitOnClose);
     }
     rhi::Capture capture(rhi::Input input, QSize size, bool captureAtlas = false)
     {
@@ -74,9 +46,9 @@ public:
         state->loop = nullptr;
         require(state->error.isEmpty(), "RHI render failed");
         require(state->capture.has_value(), "RHI capture timed out");
-        if (!verification::windowPolicySatisfied(window)) {
+        if (!verification::windowPolicySatisfied(*window)) {
             qWarning("Review policy failure: %s",
-                     QJsonDocument(verification::windowPolicy(window))
+                     QJsonDocument(verification::windowPolicy(*window))
                              .toJson(QJsonDocument::Compact)
                              .constData());
             throw std::runtime_error("Review window policy failed");
@@ -105,20 +77,28 @@ public:
         timeout.setSingleShot(true);
         QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
         int frames = 0;
-        surface.connectFrames(&loop, [&] {
+        surface->connectFrames(&loop, [&] {
+            // quit() does not stop delivery of the current queued event batch.
+            // Admit exactly the requested prefix and never prepare another state after it.
+            if (frames >= count)
+                return;
             if (++frames == count)
                 loop.quit();
             else {
                 if (prepare)
                     prepare(frames);
-                surface.requestFrame();
+                surface->requestFrame();
             }
         });
         if (prepare)
             prepare(0);
-        surface.requestFrame();
+        surface->show();
+        surface->requestFrame();
         timeout.start(30000);
         loop.exec();
+        if (frames != count || !state->error.isEmpty())
+            qWarning() << "Replay state" << frames << count << state->error << window->size()
+                       << window->isVisible() << window->isExposed();
         require(frames == count && state->error.isEmpty(), "RHI replay failed or timed out");
     }
     void submitBurst(rhi::Input input, QSize size)
@@ -129,12 +109,22 @@ public:
     }
     void rebuild()
     {
-        const auto previous = invalidations.load();
-        surface.hide();
-        window.releaseResources();
-        surface.show();
-        // The next capture checks actual invalidation after native render-thread retirement.
-        previousInvalidations = previous;
+        require(!state->loop, "Cannot rebuild during a Review capture");
+        previousInvalidations = invalidations.load();
+        if (OffscreenSurface::Enabled) {
+            surface->hide();
+            window->releaseResources();
+            surface->show();
+        } else {
+            // A basic-loop surface can keep its scene graph alive. A real window
+            // lifetime boundary guarantees retirement on every native backend.
+            const auto size = window->size();
+            const auto itemSize = item->size();
+            destroyWindow();
+            createWindow();
+            window->resize(size);
+            item->setSize(itemSize);
+        }
     }
     bool rebuilt() const
     {
@@ -147,6 +137,52 @@ public:
     }
 
 private:
+    void createWindow()
+    {
+        window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? &control : nullptr);
+        surface = std::make_unique<OffscreenSurface>(*window, control);
+        verification::prepareWindow(*window, true);
+        window->setPersistentGraphics(false);
+        window->setPersistentSceneGraph(false);
+        QObject::connect(
+                window.get(), &QQuickWindow::sceneGraphInvalidated, window.get(),
+                [this] {
+                    ++invalidations;
+                },
+                Qt::DirectConnection);
+        item = m_create ? m_create(window->contentItem()) : new rhi::RhiItem(window->contentItem());
+        QObject::connect(item, &rhi::RhiItem::renderFailed, window.get(),
+                         [state = state](const QString &message) {
+                             state->error = message;
+                             if (state->loop)
+                                 state->loop->quit();
+                         });
+        const QPointer<QQuickWindow> guard(window.get());
+        item->captured = [state = state, guard](rhi::Capture capture) {
+            if (guard)
+                QMetaObject::invokeMethod(
+                        guard,
+                        [state, capture = std::move(capture)]() mutable {
+                            if (state->loop && capture.request == state->request) {
+                                state->capture = std::move(capture);
+                                state->loop->quit();
+                            }
+                        },
+                        Qt::QueuedConnection);
+        };
+    }
+    void destroyWindow()
+    {
+        if (!window)
+            return;
+        item->captured = { };
+        surface->hide();
+        window->releaseResources();
+        auto oldSurface = std::move(surface);
+        window.reset();
+        oldSurface.reset();
+        item = nullptr;
+    }
     struct State
     {
         quint64 request = 0;
@@ -157,21 +193,24 @@ private:
     void setInput(rhi::Input input, QSize size)
     {
         if (manageGeometry) {
-            window.resize(size);
+            window->resize(size);
             item->setSize(size);
         }
         item->submit(std::move(input), size);
-        surface.requestFrame();
+        surface->show();
+        surface->requestFrame();
     }
     std::shared_ptr<State> state = std::make_shared<State>();
     std::atomic<int> invalidations = 0;
     int previousInvalidations = 0;
+    const std::function<rhi::RhiItem *(QQuickItem *)> m_create;
+    const bool m_quitOnClose;
     QQuickRenderControl control;
 
 public:
     bool manageGeometry = true;
-    QQuickWindow window;
-    OffscreenSurface surface;
+    std::unique_ptr<QQuickWindow> window;
+    std::unique_ptr<OffscreenSurface> surface;
     rhi::RhiItem *item = nullptr;
 };
 }

@@ -1737,6 +1737,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["atlasGeneration"] = qint64(atlasGeneration);
         p->capture.metadata["atlasUploadBytes"] = frameUploadBytes;
         p->capture.metadata["selectedUploadBytes"] = selectedUploadBytes;
+        p->capture.metadata["selectedCoverWidth"] = cover->pixelSize().width();
+        p->capture.metadata["selectedCoverHeight"] = cover->pixelSize().height();
         p->capture.metadata["selectedTotalUploadBytes"] = selectedTotalUploadBytes;
         p->capture.metadata["atlasTotalUploadBytes"] = totalUploadBytes;
         p->capture.metadata["atlasRegions"] = uploadRegions;

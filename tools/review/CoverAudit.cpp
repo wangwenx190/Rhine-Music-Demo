@@ -2,7 +2,6 @@
 #include "RhiItem.h"
 #include "SceneAdapter.h"
 #include "GraphicsBackend.h"
-#include "ImageComparison.h"
 #include "VerificationWindow.h"
 #include <QDir>
 #include <QEventLoop>
@@ -123,26 +122,20 @@ int main(int argc, char **argv)
             auto raw = base;
             raw.cover = QImage(size, QImage::Format_RGBA8888_Premultiplied);
             raw.cover.fill(QColor(220, 40, 80));
-            const auto before = capture(raw);
             raw.cover = CoverCache::paint(raw.cover, 256, { });
             raw.coverPainted = true;
             const auto painted = capture(raw);
             require(painted.metadata["resourceGeneration"] == empty.metadata["resourceGeneration"],
                     "Cover resolution rebuilt unrelated render targets/pipelines");
-            QPolygonF region;
-            for (const auto &corner :
-                 { QVector3D(-1.36f, .32f, .027f), QVector3D(1.7f, .32f, .027f),
-                   QVector3D(1.7f, 3.38f, .027f), QVector3D(-1.36f, 3.38f, .027f) }) {
-                const auto clip = raw.scene.projection * raw.scene.view * raw.scene.caseTransform
-                        * QVector4D(corner, 1);
-                require(clip.w() > 0, "Cover ROI lies behind camera");
-                region.append({ (clip.x() / clip.w() + 1) * 480, (1 - clip.y() / clip.w()) * 360 });
-            }
-            const auto metric = compareImages(painted.color, before.color, region);
-            require(metric["ssim"].toDouble() >= .98,
-                    "Painted cover differs from source contain/inset");
-            shapes.append(QJsonObject{
-                    { "width", size.width() }, { "height", size.height() }, { "metric", metric } });
+            require(painted.metadata["selectedCoverWidth"].toInt() == 256
+                            && painted.metadata["selectedCoverHeight"].toInt() == 256
+                            && painted.metadata["selectedUploadBytes"].toInteger() == 256 * 256 * 4,
+                    "Painted cover did not reach the actual GPU upload at the declared size");
+            // Contain/inset is checked analytically by CoverCacheTest and source UV formulas.
+            // Own output is retained for quality inspection, never scored against another image.
+            shapes.append(QJsonObject{ { "width", size.width() },
+                                       { "height", size.height() },
+                                       { "uploaded", painted.metadata } });
             painted.color.save(output
                                + QString("/shape-%1-%2.png").arg(size.width()).arg(size.height()));
         }

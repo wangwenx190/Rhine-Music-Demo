@@ -110,11 +110,12 @@ int main(int argc, char **argv)
                 return new SceneItem(parent);
             });
             driver.manageGeometry = false;
-            driver.window.resize(size);
+            driver.window->resize(size);
             auto *item = static_cast<SceneItem *>(driver.item);
             item->setSize(size);
             item->setAdapter(&adapter);
             item->setProperty("_yalahooReviewOpticsOnly", opticsOnly);
+            item->ensurePolished();
             driver.replay(1);
             {
                 QEventLoop wait;
@@ -128,12 +129,12 @@ int main(int argc, char **argv)
                     if (ready)
                         wait.quit();
                 };
-                driver.surface.connectFrames(&wait, checkReady);
+                driver.surface->connectFrames(&wait, checkReady);
                 QObject::connect(&timeout, &QTimer::timeout, &wait, &QEventLoop::quit);
                 checkReady();
                 if (!ready) {
                     timeout.start(60000);
-                    driver.surface.requestFrame();
+                    driver.surface->requestFrame();
                     wait.exec();
                 }
                 if (!ready)
@@ -165,7 +166,12 @@ int main(int argc, char **argv)
                             motion.clock()->advance(1.0 / 60);
                         // The production SceneItem publishes the real source state/cover leases.
                         driver.replay(1);
+                        // A queued native frameSwapped may describe the previous frame.
+                        // Publish the current production snapshot before taking its oracle.
+                        item->ensurePolished();
                         auto input = item->input();
+                        check(input.scene.revision == adapter.frame().revision,
+                              "Production snapshot is stale after polish");
                         input.opticalProbe = frame < 30 ? 10 : 0;
                         if (opticsOnly) {
                             input.postprocess = false;
@@ -188,17 +194,22 @@ int main(int argc, char **argv)
                             const float aperture = float(
                                     (.0003 + .0005 * adapter.detail())
                                     * adapter.quality()->values()["depthOfField"].toDouble() / 100);
-                            check(uploaded["focus"].toDouble() == focus
-                                          && uploaded["aperture"].toDouble() == aperture
-                                          && uploaded["maxblur"].toDouble() == double(.011f)
-                                          && uploaded["near"].toDouble()
-                                                  == float(input.scene.nearPlane)
-                                          && uploaded["far"].toDouble()
-                                                  == float(input.scene.farPlane)
-                                          && uploaded["aspect"].toDouble()
-                                                  == float(target.width()) / target.height()
-                                          && uploaded["depthWidth"].toInt() == target.width()
-                                          && uploaded["depthHeight"].toInt() == target.height(),
+                            const bool bokehMatches = uploaded["focus"].toDouble() == focus
+                                    && uploaded["aperture"].toDouble() == aperture
+                                    && uploaded["maxblur"].toDouble() == double(.011f)
+                                    && uploaded["near"].toDouble() == float(input.scene.nearPlane)
+                                    && uploaded["far"].toDouble() == float(input.scene.farPlane)
+                                    && uploaded["aspect"].toDouble()
+                                            == float(target.width()) / target.height()
+                                    && uploaded["depthWidth"].toInt() == target.width()
+                                    && uploaded["depthHeight"].toInt() == target.height();
+                            if (!bokehMatches)
+                                qWarning() << "Bokeh submission mismatch" << size << night << stage
+                                           << frame << "focus" << focus << input.focus
+                                           << uploaded["focus"] << "aperture" << aperture
+                                           << input.aperture << uploaded["aperture"] << "uploaded"
+                                           << uploaded;
+                            check(bokehMatches,
                                   "Actual production Bokeh uniform/depth differs from frozen source");
                         }
                         const auto floor = result.metadata["productFloor"].toObject();
@@ -276,7 +287,7 @@ int main(int argc, char **argv)
                                                          input.background.z() };
                         frames.append(sample);
                         if (frame % 15 == 1 && input.opticalProbe == 0)
-                            check((opticsOnly ? result.composite : driver.surface.grab())
+                            check((opticsOnly ? result.composite : driver.surface->grab())
                                           .save(output
                                                 + QString("/production-%1-%2-%3-%4.png")
                                                           .arg(size.width())
@@ -292,9 +303,9 @@ int main(int argc, char **argv)
                             { "height", size.height() },
                             { "night", night },
                             { "stage", stage },
-                            { "devicePixelRatio", driver.window.devicePixelRatio() },
-                            { "offscreen", driver.surface.diagnostics() },
-                            { "windowPolicy", verification::windowPolicy(driver.window) },
+                            { "devicePixelRatio", driver.window->devicePixelRatio() },
+                            { "offscreen", driver.surface->diagnostics() },
+                            { "windowPolicy", verification::windowPolicy(*driver.window) },
                             { "frames", frames } });
                 }
             }

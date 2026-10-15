@@ -1,5 +1,6 @@
 #include "MaterialReview.h"
 #include "OffscreenSurface.h"
+#include "ReviewGlCapabilities.h"
 #include "RenderProbe.h"
 #include "VerificationWindow.h"
 #include <QQmlComponent>
@@ -16,6 +17,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMetaObject>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSaveFile>
@@ -76,18 +79,45 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         OffscreenSurface::Enabled = false;
     QQuickRenderControl control;
     std::atomic<int> invalidations = 0;
-    QQuickWindow window(OffscreenSurface::Enabled ? &control : nullptr);
-    verification::prepareWindow(window, true);
-    window.resize(960, 720);
-    window.setPersistentSceneGraph(false);
-    window.setPersistentGraphics(false);
-    const auto invalidationConnection = QObject::connect(
-            &window, &QQuickWindow::sceneGraphInvalidated, &app,
-            [&] {
-                ++invalidations;
-            },
-            Qt::DirectConnection);
-    OffscreenSurface surface(window, control);
+    std::atomic<bool> multisampleBufferAdaptation = false;
+    QMutex targetMutex;
+    QJsonObject latestQuick3DTarget;
+    std::unique_ptr<QQuickWindow> window;
+    std::unique_ptr<OffscreenSurface> surface;
+    quint64 windowEpoch = 0;
+    const bool quitOnClose = app.quitOnLastWindowClosed();
+    app.setQuitOnLastWindowClosed(false);
+    const auto makeWindow = [&] {
+        ++windowEpoch;
+        window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? &control : nullptr);
+        verification::prepareWindow(*window, true);
+        window->resize(960, 720);
+        window->setPersistentSceneGraph(false);
+        window->setPersistentGraphics(false);
+        surface = std::make_unique<OffscreenSurface>(*window, control);
+        QObject::connect(
+                window.get(), &QQuickWindow::sceneGraphInvalidated, &app,
+                [&] {
+                    ++invalidations;
+                },
+                Qt::DirectConnection);
+        QObject::connect(
+                window.get(), &QQuickWindow::afterRendering, window.get(),
+                [&, targetWindow = window.get()] {
+                    const auto target = review::quick3DTarget(*targetWindow);
+                    const QMutexLocker lock(&targetMutex);
+                    latestQuick3DTarget = target;
+                },
+                Qt::DirectConnection);
+        QObject::connect(
+                window.get(), &QQuickWindow::sceneGraphInitialized, window.get(),
+                [&, targetSurface = surface.get()] {
+                    multisampleBufferAdaptation =
+                            review::useReviewGlMultisampleBuffers(targetSurface->rhi());
+                },
+                Qt::DirectConnection);
+    };
+    makeWindow();
     QStringList warnings;
     QQmlEngine engine;
     QObject::connect(&engine, &QQmlEngine::warnings, &app, [&](const QList<QQmlError> &errors) {
@@ -103,8 +133,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         qWarning() << component.errors();
         return 12;
     }
-    view->setParent(window.contentItem());
-    view->setParentItem(window.contentItem());
+    view->setParent(window->contentItem());
+    view->setParentItem(window->contentItem());
     const QString output = QFileInfo(report).absolutePath();
     QDir().mkpath(output);
     int frames = 0;
@@ -125,7 +155,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             return 12;
         }
         auto *node = qobject_cast<QQuick3DObject *>(pool.get());
-        node->setParentItem(window.findChild<QQuick3DObject *>("inspectionCase")->parentItem());
+        node->setParentItem(window->findChild<QQuick3DObject *>("inspectionCase")->parentItem());
         node->setProperty("visible", false);
         qInfo() << "R10: instance probe ready";
     }
@@ -173,7 +203,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         view->setProperty("reviewDisableSmaa", c["disableSmaa"].toBool());
         view->setProperty("reviewAntialiasing", c.value("aaMode").toInt(1));
         const int w = c.value("width").toInt(960), h = c.value("height").toInt(720);
-        window.resize(w, h);
+        window->resize(w, h);
         view->setProperty("shadowsEnabled",
                           (occlusionReview || backendReview) && c.value("shadows").toBool());
         view->setProperty("occlusionChannel", c.value("channel").toInt());
@@ -211,7 +241,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                       0);
         if (occlusionReview || postprocessReview)
             scene.quality()->resize(c.value("width").toInt(960), c.value("height").toInt(720), 1,
-                                    window.devicePixelRatio(), 4096);
+                                    window->devicePixelRatio(), 4096);
         if (lightingReview) {
             const auto offset = scene.cameraRotation().rotatedVector({ -48, -17.6f, 36 });
             RowLightingInput i;
@@ -225,24 +255,33 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                           QVariant::fromValue(QVector3D(float(light), float(light), float(light))));
         view->setSize(QSizeF(w, h));
         start = frames;
-        surface.requestFrame();
+        surface->requestFrame();
     };
     const auto next = [&] {
         ++index;
         applyState();
     };
-    surface.connectFrames(&app, [&] {
+    std::function<void()> collectFrame;
+    QObject reviewLifetime;
+    const auto bindFrames = [&] {
+        const auto epoch = windowEpoch;
+        surface->connectFrames(&reviewLifetime, [&, epoch] {
+            if (epoch == windowEpoch)
+                collectFrame();
+        });
+    };
+    collectFrame = [&] {
         ++frames;
         if (frames - start < 4) {
-            surface.requestFrame();
+            surface->requestFrame();
             return;
         }
         const auto c = cases[index].toObject();
         const bool paperProbe = c["paperProbe"].toBool();
         const QString name = restore == 0 ? QString("case-%1.png").arg(index)
                                           : QString("restore-%1.png").arg(restore);
-        const auto actual = surface.grab().convertToFormat(QImage::Format_RGB32);
-        if (actual.isNull() || actual.size() != window.size() * window.devicePixelRatio()) {
+        const auto actual = surface->grab().convertToFormat(QImage::Format_RGB32);
+        if (actual.isNull() || actual.size() != window->size() * window->devicePixelRatio()) {
             qWarning() << "Material output/readback size mismatch" << actual.size();
             app.exit(15);
             return;
@@ -262,8 +301,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                               * (l <= .0031308 ? 12.92 * l : 1.055 * std::pow(l, 1 / 2.4) - .055));
             };
             const auto actualCenter =
-                    actual.pixelColor(qRound(center.x() * window.devicePixelRatio()),
-                                      qRound(center.y() * window.devicePixelRatio()));
+                    actual.pixelColor(qRound(center.x() * window->devicePixelRatio()),
+                                      qRound(center.y() * window->devicePixelRatio()));
             paperProbeError = std::max({ std::abs(actualCenter.red() - channel(sample.red())),
                                          std::abs(actualCenter.green() - channel(sample.green())),
                                          std::abs(actualCenter.blue() - channel(sample.blue())) });
@@ -302,7 +341,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                         : p["surface"] == "Ivory_Edges"         ? 1
                                                                 : 2;
                 const auto *material =
-                        window.findChild<QObject *>(QString("caseMaterial%1").arg(surface));
+                        window->findChild<QObject *>(QString("caseMaterial%1").arg(surface));
                 if (!material) {
                     parameters = false;
                     continue;
@@ -329,14 +368,25 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             valid = valid
                     && view->property("effectiveTextureSize").toSize()
                             == scene.quality()->targetSize();
-        const auto *bokeh = window.findChild<QObject *>("bokehEffect");
+        const auto *bokeh = window->findChild<QObject *>("bokehEffect");
         const double focus = bokeh->property("focus").toDouble(),
                      aperture = bokeh->property("aperture").toDouble();
         if (postprocessReview)
             valid = valid && std::abs(focus - c["focus"].toDouble()) < 1e-4
                     && std::abs(aperture - c["aperture"].toDouble()) < 1e-10;
+        QJsonObject quick3DTarget;
+        {
+            const QMutexLocker lock(&targetMutex);
+            quick3DTarget = latestQuick3DTarget;
+        }
+        if (multisampleBufferAdaptation.load() && view->property("reviewAntialiasing").toInt() == 1)
+            valid = valid && quick3DTarget["samples"].toInt() == 4
+                    && quick3DTarget["renderbuffer"].toBool() && quick3DTarget["resolved"].toBool()
+                    && quick3DTarget["formatPreserved"].toBool();
         pass = pass && valid;
         QJsonObject result{
+            { "quick3DTarget", quick3DTarget },
+            { "multisampleBufferAdaptation", multisampleBufferAdaptation.load() },
             { "instancePool", c["instancePool"] },
             { "depthSort", c["depthSort"] },
             { "atlas", c["atlas"] },
@@ -351,8 +401,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             { "bokehActive", view->property("bokehActive").toBool() },
             { "smaaActive", view->property("smaaActive").toBool() },
             { "aaMode", c.value("aaMode").toInt(1) },
-            { "width", window.width() },
-            { "height", window.height() },
+            { "width", window->width() },
+            { "height", window->height() },
             { "channel", c["channel"] },
             { "shadows", c["shadows"] },
             { "quality", c["quality"] },
@@ -397,8 +447,15 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             pool.reset();
             view->setParentItem(nullptr);
             object.reset();
-            surface.hide();
-            window.releaseResources();
+            surface->hide();
+            window->releaseResources();
+            if (!OffscreenSurface::Enabled) {
+                auto previousSurface = std::move(surface);
+                window.reset();
+                previousSurface.reset();
+                makeWindow();
+                bindFrames();
+            }
             object.reset(component.createWithInitialProperties(
                     { { "adapter", QVariant::fromValue(&scene) }, { "materialReview", true } }));
             view = qobject_cast<QQuickItem *>(object.get());
@@ -406,13 +463,13 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                 app.exit(12);
                 return;
             }
-            view->setParent(window.contentItem());
-            view->setParentItem(window.contentItem());
+            view->setParent(window->contentItem());
+            view->setParentItem(window->contentItem());
             applyState();
-            surface.show();
+            surface->show();
             return;
         }
-        pass = pass && warnings.isEmpty() && verification::windowPolicySatisfied(window);
+        pass = pass && warnings.isEmpty() && verification::windowPolicySatisfied(*window);
         QSaveFile file(report);
         bool saved = file.open(QIODevice::WriteOnly);
         if (saved) {
@@ -425,14 +482,14 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                                     { "validation", "source-state-and-own-output" },
                                     { "imageComparison", false },
                                     { "warnings", QJsonArray::fromStringList(warnings) },
-                                    { "offscreen", surface.diagnostics() },
-                                    { "windowPolicy", verification::windowPolicy(window) },
+                                    { "offscreen", surface->diagnostics() },
+                                    { "windowPolicy", verification::windowPolicy(*window) },
                                     { "qtVersion", qVersion() },
                                     { "graphicsApi",
-                                      int(window.rendererInterface()->graphicsApi()) },
-                                    { "dpr", window.devicePixelRatio() },
-                                    { "width", window.width() },
-                                    { "height", window.height() },
+                                      int(window->rendererInterface()->graphicsApi()) },
+                                    { "dpr", window->devicePixelRatio() },
+                                    { "width", window->width() },
+                                    { "height", window->height() },
                                     { "baseline", oracle["baseline"] },
                                     { "fixtureSha256",
                                       QString::fromLatin1(QCryptographicHash::hash(
@@ -445,18 +502,24 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             saved = file.commit();
         }
         app.exit(pass && saved ? 0 : 13);
-    });
+    };
     QTimer timeout;
     timeout.setSingleShot(true);
     QObject::connect(&timeout, &QTimer::timeout, &app, [&] {
         app.exit(14);
     });
+    bindFrames();
     next();
     timeout.start(postprocessReview ? 600000 : 120000);
-    surface.show();
+    surface->show();
     const int code = app.exec();
-    surface.hide();
-    QObject::disconnect(invalidationConnection);
+    surface->hide();
+    pool.reset();
+    object.reset();
+    auto previousSurface = std::move(surface);
+    window.reset();
+    previousSurface.reset();
+    app.setQuitOnLastWindowClosed(quitOnClose);
     return code;
 }
 }

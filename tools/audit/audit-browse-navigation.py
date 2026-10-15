@@ -52,7 +52,7 @@ CHECKS = [
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'navigation-ruler-color', 'Existing 3D -> reading veils -> UI/ordinal/ruler composition. Fixed single-sample transparent Canvas attachment and bounded digit layers; actual-DPR descriptor budget, driver VRAM unknown.'),
     ('PERF-05', 'src/render/navigation/RulerInk.cpp', 'removePathGroup', 'Three renderer-owned actual-size paths removed only on geometry change; moving heights use rects, full ticks clipped by Quick, source continuous alpha mask.'),
     ('PERF-06', 'qml/Yalahoo/Music/components/OrdinalReel.qml', 'root.tokens.offscreenRendering', 'Unique FrameClock, effective visibility/Review-only offscreen switch; production hidden window remains inactive. Fixed button pool, disabled invisible overscan and focus handoff.'),
-    ('PERF-07', 'tools/review/RulerAudit.cpp', 'surface.hide()', 'One asynchronous readback with backend-bounded drain; actual surface invalidation/resize/restore and renderer release. No production readback or timer added.'),
+    ('PERF-07', 'tools/review/RulerAudit.cpp', 'surface->hide()', 'One asynchronous readback with backend-bounded drain; actual full-window/graph invalidation, resize/restore and renderer release; an owned epoch rejects old callbacks and a basic-loop cleanup frame retires queued renderer deletions. No production readback or timer added.'),
 ]
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []

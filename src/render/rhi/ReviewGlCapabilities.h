@@ -1,0 +1,82 @@
+#pragma once
+// Review-only private Qt adaptation; never linked or called by the product renderer.
+#include <QJsonObject>
+#include <QOpenGLContext>
+#include <QQuickWindow>
+#include <QtQuick3D/private/qquick3dscenemanager_p.h>
+#include <QtQuick3DRuntimeRender/ssg/qssgrendercontextcore.h>
+#include <QtQuick3DRuntimeRender/ssg/qssgrhicontext.h>
+#include <rhi/qrhi.h>
+#include <memory>
+#if defined(Q_OS_MACOS)
+#  include <QtGui/private/qrhigles2_p.h>
+#endif
+
+namespace yalahoo::review {
+#if defined(Q_OS_MACOS)
+class ReviewRhiResourceAccess : public QRhiResource
+{
+public:
+    static QRhiImplementation *implementation(const QRhiResource &resource)
+    {
+        // A protected member pointer accesses the actual base subobject, without
+        // assuming QRhi layout, casting a base object to a derived one, or patching code.
+        return resource.*&ReviewRhiResourceAccess::m_rhi;
+    }
+};
+#endif
+inline bool useReviewGlMultisampleBuffers(QRhi *api)
+{
+    if (!api)
+        qFatal("Review capability check requires the initialized RHI");
+#if defined(Q_OS_MACOS)
+    if (api && api->backend() == QRhi::OpenGLES2) {
+        auto *context = QOpenGLContext::currentContext();
+        if (!context)
+            qFatal("Review OpenGL capability check requires the current RHI context");
+        if (!context->getProcAddress("glTexStorage2DMultisample")) {
+            // Quick3D already has a same-format, same-sample renderbuffer+resolve
+            // path. Qt's GL backend advertises texture MSAA even when its storage
+            // entry point is absent on Cocoa GL 4.1; correct only that capability.
+            std::unique_ptr<QRhiTexture> descriptor(api->newTexture(QRhiTexture::RGBA8, { 1, 1 }));
+            auto *backend =
+                    static_cast<QRhiGles2 *>(ReviewRhiResourceAccess::implementation(*descriptor));
+            if (backend->q != api || !api->isFeatureSupported(QRhi::MultisampleRenderBuffer))
+                qFatal("Review OpenGL cannot preserve multisample rendering");
+            backend->caps.multisampledTexture = false;
+            return true;
+        }
+    }
+#else
+    Q_UNUSED(api);
+#endif
+    return false;
+}
+// Called only on the scene graph thread, after the actual View3D has rendered.
+inline QJsonObject quick3DTarget(QQuickWindow &window)
+{
+    QJsonObject result;
+    if (auto *attachment = QQuick3DSceneManager::getOrSetWindowAttachment(window)) {
+        if (attachment->rci()) {
+            const auto &context = attachment->rci()->rhiContext();
+            result.insert("samples", context->mainPassSampleCount());
+            if (auto *target = context->renderTarget();
+                target && target->resourceType() == QRhiResource::TextureRenderTarget) {
+                const auto description =
+                        static_cast<QRhiTextureRenderTarget *>(target)->description();
+                if (description.colorAttachmentCount() > 0) {
+                    const auto *color = description.colorAttachmentAt(0);
+                    result.insert("renderbuffer", color->renderBuffer() != nullptr);
+                    result.insert("resolved", color->resolveTexture() != nullptr);
+                    if (color->renderBuffer() && color->resolveTexture())
+                        result.insert("formatPreserved",
+                                      color->renderBuffer()->backingFormat()
+                                              == color->resolveTexture()->format());
+                }
+            }
+        }
+    }
+    return result;
+}
+
+}

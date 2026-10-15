@@ -50,6 +50,8 @@
 #include <atomic>
 #include <algorithm>
 #include <cstdio>
+#include <memory>
+#include <utility>
 
 namespace {
 QMutex diagnosticsMutex;
@@ -468,7 +470,10 @@ int main(int argc, char **argv)
             QCoreApplication::sendEvent(window, &press);
             QCoreApplication::sendEvent(window, &release);
         });
-        QTimer::singleShot(2500, window, [&, report] {
+        auto reportWritten = std::make_shared<bool>(false);
+        auto writeRuntimeReport = [&, report, reportWritten] {
+            if (std::exchange(*reportWritten, true))
+                return;
             const QImage image = window->grabWindow();
             const QRawFont raw = QRawFont::fromFont(QGuiApplication::font());
             const QString chinese = QStringLiteral("一张一张，慢慢听");
@@ -532,6 +537,9 @@ int main(int argc, char **argv)
                 const QMutexLocker lock(&diagnosticsMutex);
                 recorded = diagnostics;
             }
+            motionEvidence.insert("finalWindowVisibility", int(window->visibility()));
+            motionEvidence.insert("clockActive", motion.clock()->active());
+            motionEvidence.insert("applicationVisible", motion.clock()->applicationVisible());
             const bool motionPassed = !parser.isSet(QStringLiteral("verify-motion"))
                     || (motionEvidence.value("hiddenPaused").toBool()
                         && motionEvidence.value("minimizedPaused").toBool() && resumeDiscarded
@@ -620,7 +628,18 @@ int main(int argc, char **argv)
             output.write(QJsonDocument(reportData).toJson());
             const bool committed = output.commit();
             app.exit(passed && committed ? 0 : 5);
-        });
+        };
+        if (parser.isSet(QStringLiteral("verify-motion"))) {
+            QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, window,
+                             [&, writeRuntimeReport](double, double) {
+                                 if (resumeSamples == 2 && motion.reducedMotion()
+                                     && scene.settled())
+                                     QTimer::singleShot(0, window, writeRuntimeReport);
+                             });
+            QTimer::singleShot(10000, window, writeRuntimeReport);
+        } else {
+            QTimer::singleShot(2500, window, writeRuntimeReport);
+        }
     }
     return app.exec();
 }

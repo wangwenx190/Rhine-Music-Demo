@@ -232,8 +232,8 @@ int main(int argc, char **argv)
                                                 { "cases", results },
                                                 { "sourceMath", mathematics },
                                                 { "windowPolicy",
-                                                  verification::windowPolicy(driver.window) },
-                                                { "offscreen", driver.surface.diagnostics() } })
+                                                  verification::windowPolicy(*driver.window) },
+                                                { "offscreen", driver.surface->diagnostics() } })
                              .toJson());
         RhiCaptureHarness::require(report.commit(), "Cannot save AO report");
         return 0;

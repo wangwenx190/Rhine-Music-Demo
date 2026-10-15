@@ -1,4 +1,5 @@
 #include "VerificationWindow.h"
+#include "GraphicsBackend.h"
 #include <QtTest>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -135,6 +136,8 @@ private slots:
 int main(int argc, char **argv)
 {
     yalahoo::verification::prepareApplication();
+    if (!yalahoo::selectGraphicsBackend())
+        return 2;
     QGuiApplication app(argc, argv);
     VerificationWindowTest test;
     return QTest::qExec(&test, argc, argv);

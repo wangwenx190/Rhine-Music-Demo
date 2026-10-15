@@ -86,12 +86,12 @@ void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
         if (ready)
             loop.quit();
     };
-    driver.surface.connectFrames(&loop, inspect);
+    driver.surface->connectFrames(&loop, inspect);
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     inspect();
     if (!ready) {
         timeout.start(60000);
-        driver.surface.requestFrame();
+        driver.surface->requestFrame();
         loop.exec();
     }
     check(ready, "Anonymous production covers did not become ready");
@@ -117,18 +117,18 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
         return new SceneItem(parent);
     });
     driver.manageGeometry = false;
-    driver.window.resize(logical);
+    driver.window->resize(logical);
     if (OffscreenSurface::Enabled)
-        driver.surface.setDevicePixelRatio(requestedDpr);
+        driver.surface->setDevicePixelRatio(requestedDpr);
     auto *item = static_cast<SceneItem *>(driver.item);
     item->setSize(logical);
     item->setAdapter(&adapter);
     driver.replay(2);
     waitForCovers(driver, item);
-    const double dpr = driver.window.effectiveDevicePixelRatio();
+    const double dpr = driver.window->effectiveDevicePixelRatio();
     check(!OffscreenSurface::Enabled || dpr == requestedDpr,
           "Actual target DPR differs from request");
-    const int maximum = driver.surface.rhi()->resourceLimit(QRhi::TextureSizeMax);
+    const int maximum = driver.surface->rhi()->resourceLimit(QRhi::TextureSizeMax);
     const auto expected = sourceTarget(logical, dpr, values, maximum);
     const QSize displayPixels = logical * dpr;
     QJsonArray themes;
@@ -184,7 +184,7 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
         }
         check(found.contains("opaque-color-resolve") && found.contains("qt-item-color"),
               "Actual target inventory is missing");
-        const auto finalImage = driver.surface.grab();
+        const auto finalImage = driver.surface->grab();
         check(finalImage.size() == displayPixels, "Final compositor ignored actual target DPR");
         const QString filename = QString("/state-%1-%2.png").arg(index).arg(night);
         check(finalImage.save(output + filename), "Cannot save own final compositor output");
@@ -209,8 +209,8 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
              { "finalScaleX", double(displayPixels.width()) / expected.width() },
              { "finalScaleY", double(displayPixels.height()) / expected.height() },
              { "limited", quality->limited() },
-             { "offscreen", driver.surface.diagnostics() },
-             { "windowPolicy", verification::windowPolicy(driver.window) },
+             { "offscreen", driver.surface->diagnostics() },
+             { "windowPolicy", verification::windowPolicy(*driver.window) },
              { "themes", themes } };
 }
 QJsonArray dprTransitions()
@@ -230,7 +230,7 @@ QJsonArray dprTransitions()
         return new SceneItem(parent);
     });
     driver.manageGeometry = false;
-    driver.window.resize(640, 480);
+    driver.window->resize(640, 480);
     auto *item = static_cast<SceneItem *>(driver.item);
     item->setSize({ 640, 480 });
     item->setAdapter(&adapter);
@@ -239,19 +239,19 @@ QJsonArray dprTransitions()
     const quint64 atlasGeneration = item->input().atlasGeneration;
     const auto originalState = sourceState(item->input());
     for (double dpr : { 1., 2., 1.5, 1. }) {
-        driver.surface.setDevicePixelRatio(dpr);
+        driver.surface->setDevicePixelRatio(dpr);
         driver.replay(2);
         const auto expected =
                 sourceTarget({ 640, 480 }, dpr, adapter.quality()->values(),
-                             driver.surface.rhi()->resourceLimit(QRhi::TextureSizeMax));
+                             driver.surface->rhi()->resourceLimit(QRhi::TextureSizeMax));
         std::fprintf(
                 stderr,
                 "DPR transition requested=%.2f effective=%.2f quality=%dx%d fixed=%dx%d expected=%dx%d\n",
-                dpr, driver.window.effectiveDevicePixelRatio(),
+                dpr, driver.window->effectiveDevicePixelRatio(),
                 adapter.quality()->targetSize().width(), adapter.quality()->targetSize().height(),
                 item->fixedColorBufferWidth(), item->fixedColorBufferHeight(), expected.width(),
                 expected.height());
-        check(driver.window.effectiveDevicePixelRatio() == dpr
+        check(driver.window->effectiveDevicePixelRatio() == dpr
                       && adapter.quality()->targetSize() == expected
                       && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
                               == expected,
@@ -263,10 +263,10 @@ QJsonArray dprTransitions()
               "Same-window DPR transition changed source geometry, camera or optics");
         check(input.atlasGeneration == atlasGeneration
                       && result.metadata["atlasUploadBytes"].toInteger() == 0
-                      && driver.surface.grab().size() == QSize(640, 480) * dpr,
+                      && driver.surface->grab().size() == QSize(640, 480) * dpr,
               "DPR change retransmitted the atlas or used stale final compositor dimensions");
         states.append(QJsonObject{ { "dpr", dpr },
-                                   { "actualDpr", driver.window.effectiveDevicePixelRatio() },
+                                   { "actualDpr", driver.window->effectiveDevicePixelRatio() },
                                    { "target", pair(expected) },
                                    { "metadata", result.metadata } });
     }

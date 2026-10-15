@@ -7,12 +7,12 @@ ROOT = Path(__file__).resolve().parents[2]
 # Guards detect drift, not correctness. These conclusions cover the review driver only.
 CHECKS = [
     ("COMMON-01", "src/app/CMakeLists.txt", "OffscreenSurface.h",
-     "Review-only Quick3D/GuiPrivate/qrc and executable registration use the selected native Kit; "
+     "Review-only Quick3D/Quick3DPrivate/RuntimeRenderPrivate/GuiPrivate/qrc use the selected native Kit and a real configure-time API probe; "
      "C++23/platform requirements remain shared. No new runtime dependency is introduced."),
     ("COMMON-02", "src/app/MaterialReview.cpp", 'component.loadFromModule',
      "GeometryScene, constant test ink, meshes and environments come from qrc. Committed "
      "source-state fixtures replace browser screenshots; no disk music, network or browser is read."),
-    ("COMMON-03", "src/app/MaterialReview.cpp", 'actual.size() != window.size()',
+    ("COMMON-03", "src/app/MaterialReview.cpp", 'actual.size() != window->size()',
      "Actual physical dimensions are checked against logical size times real target DPR. "
      "Independent Quick3D/CPU/source projections retain the two-logical-pixel bound."),
     ("COMMON-04", "src/app/main.cpp", 'reviewMaterials(app, scene',
@@ -24,10 +24,10 @@ CHECKS = [
     ("PERF-01", "src/app/MaterialReview.cpp", 'actual.constScanLine(y)',
      "A finite fixture runs serially. Each explicit capture scans its own physical target once, "
      "without Gaussian ROI scoring, edge search or pairwise image comparisons; no library traversal."),
-    ("PERF-02", "src/app/MaterialReview.cpp", 'surface.connectFrames',
+    ("PERF-02", "src/app/MaterialReview.cpp", 'surface->connectFrames',
      "Normal frame-completion events advance four preparation frames per state. There is no polling, "
      "nested event pumping or unbounded capture queue. GPU wait/readback is explicit Review only."),
-    ("PERF-03", "src/app/MaterialReview.cpp", 'surface.grab()',
+    ("PERF-03", "src/app/MaterialReview.cpp", 'surface->grab()',
      "One own-output readback per finite state is consumed synchronously and released. "
      "Only JSON/image outputs accumulate; production Input/SceneFrame/atlas paths are unchanged."),
     ("PERF-04-ATLAS", "src/app/MaterialReview.cpp", "std::make_unique<RenderProbeAtlas>()",
@@ -45,7 +45,7 @@ CHECKS = [
     ("PERF-07", "src/app/MaterialReview.cpp", 'qmlRootRecreated',
      "Ten full QML/scene-graph rebuilds for material and one for lighting reapply the same source "
      "state and validate output and real invalidation. Same-View3D resume is not claimed. "
-     "Root/object/engine die before the owning surface/window/control; invalidation counter is atomic."),
+     "The old QML root is released before native window destruction; the surface is hidden/invalidated first, old frames are epoch-rejected and descriptors cross threads as locked values. The invalidation counter is atomic."),
 ]
 for host, platform_guard in {
     "windows": ("WIN-01", "cmake/Platform.cmake", "WIN32"),
@@ -56,7 +56,7 @@ for host, platform_guard in {
     check_id, path, symbol = platform_guard
     entries = CHECKS + [(check_id, path, symbol,
                         "Native platform build/window/GPU branches remain real implementations; "
-                        "macOS uses the existing true hidden Metal helper. Windows/D3D11 and "
+                        "macOS uses the true hidden Metal/OpenGL helper; missing Cocoa multisample-texture storage selects the stock same-format 4x buffer/resolve path. Windows/D3D11 and "
                         "Linux/OpenGL target execution remains R34, not proved by macOS.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()

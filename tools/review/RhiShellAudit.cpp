@@ -114,7 +114,7 @@ int main(int argc, char **argv)
         check(cases.size() == 61, "Incomplete source shell states");
         QDir().mkpath(output);
         RhiCaptureHarness driver;
-        check(driver.window.devicePixelRatio() == 1, "Shell diagnostics require actual DPR1");
+        check(driver.window->devicePixelRatio() == 1, "Shell diagnostics require actual DPR1");
         QJsonArray results, sorting, isolation, channels, probes, rebuilds, alpha;
         double worstProjection = 0;
         for (const auto &value : cases) {
@@ -138,7 +138,7 @@ int main(int argc, char **argv)
                 check(std::isfinite(error) && error <= 2, "Source projection changed");
                 worstProjection = std::max(worstProjection, error);
             }
-            const auto image = input.rawOutput ? gpu.composite : driver.surface.grab();
+            const auto image = input.rawOutput ? gpu.composite : driver.surface->grab();
             check(!image.isNull() && image.save(output + QString("/state-%1.png").arg(sourceIndex)),
                   "Missing own shell output");
             if (sourceIndex == 22 || sourceIndex == 25 || sourceIndex >= 62) {
@@ -336,8 +336,8 @@ int main(int argc, char **argv)
                                   { "opticalMath", probes },
                                   { "rebuilds", rebuilds },
                                   { "maxProjectionPixels", worstProjection },
-                                  { "offscreen", driver.surface.diagnostics() },
-                                  { "windowPolicy", verification::windowPolicy(driver.window) } };
+                                  { "offscreen", driver.surface->diagnostics() },
+                                  { "windowPolicy", verification::windowPolicy(*driver.window) } };
         QSaveFile file(output + "/runtime.json");
         check(file.open(QIODevice::WriteOnly), "Cannot open shell report");
         file.write(QJsonDocument(report).toJson());

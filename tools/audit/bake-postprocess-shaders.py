@@ -1,9 +1,9 @@
 """Compile public Effect snippets with the selected Kit for all native targets."""
 from pathlib import Path
-import json, hashlib, subprocess
+import json, hashlib, subprocess, sys
 root = Path(__file__).resolve().parents[2]
 chain = json.loads((root / 'build/release/toolchain.json').read_text(encoding='utf-8'))
-qsb = Path(chain['qtKit']) / 'bin/qsb.exe'
+qsb = Path(chain['qtKit']) / 'bin' / ('qsb.exe' if sys.platform == 'win32' else 'qsb')
 work = root / 'build/postprocess-shaders'
 work.mkdir(parents=True, exist_ok=True)
 header = '''#version 440
@@ -57,10 +57,11 @@ for name in [
         'passed': True,
         'diagnostics': r.stderr
     })
-out = root / 'verification/windows/postprocess'
+platform = 'windows' if sys.platform == 'win32' else ('macos' if sys.platform == 'darwin' else 'linux')
+out = root / 'verification' / platform / 'postprocess'
 out.mkdir(parents=True, exist_ok=True)
 (out / 'shader-variants.json').write_text(
-    json.dumps({'qtVersion': chain['qtVersion'], 'shaders': records}, indent=2) + '\n',
+    json.dumps({'qtVersion': chain['qtVersion'], 'shaders': records, 'scope': 'Static Effect-wrapper translation; target GPU runtime is checked separately'}, indent=2) + '\n',
     encoding='utf-8',
     newline='\n'
 )

@@ -136,7 +136,7 @@ int main(int argc, char **argv)
         input.rawOutput = false;
         const auto finalCapture = driver.capture(input, { 640, 480 });
         checkPostprocessGraph(input, finalCapture);
-        const auto finalImage = driver.surface.grab();
+        const auto finalImage = driver.surface->grab();
         check(!finalImage.isNull() && finalImage.save(output + "/final-output.png"),
               "Final compositor output missing");
         const auto expectedOutput = outputReference(input.background, input.exposure);
@@ -435,8 +435,8 @@ int main(int argc, char **argv)
               "CPU submission only; renderer-only anonymous pool. Three independent batches per stage; no GPU/display/VSYNC or full-product performance claim." },
             { "gpuCompletedMs", QJsonValue() },
             { "displayLatencyMs", QJsonValue() },
-            { "offscreen", driver.surface.diagnostics() },
-            { "windowPolicy", verification::windowPolicy(driver.window) }
+            { "offscreen", driver.surface->diagnostics() },
+            { "windowPolicy", verification::windowPolicy(*driver.window) }
         };
         QSaveFile file(output + "/runtime.json");
         check(file.open(QIODevice::WriteOnly), "Cannot write report");

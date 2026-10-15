@@ -132,10 +132,22 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         const auto rgb = image.convertToFormat(QImage::Format_RGB32);
         // Diagnostic labels must not stand in for missing mesh pixels.
         const int inset = qRound(40 * window.devicePixelRatio());
+        const auto background = image.isNull() ? QColor() : image.pixelColor(image.width() - 1, 0);
         for (int y = inset; y < rgb.height() - inset; ++y)
             for (int x = 0; x < rgb.width(); ++x) {
                 const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
-                if (qGreen(color) > qRed(color) + 8 && qGreen(color) < 165 && qRed(color) > 15)
+                // geometryDiagnostic writes a packed unit view normal for every face.
+                // A green-only test loses valid purple/front-facing normals during the dolly.
+                const double nx = 2.0 * qRed(color) / 255 - 1;
+                const double ny = 2.0 * qGreen(color) / 255 - 1;
+                const double nz = 2.0 * qBlue(color) / 255 - 1;
+                const int difference = std::abs(qRed(color) - background.red())
+                        + std::abs(qGreen(color) - background.green())
+                        + std::abs(qBlue(color) - background.blue());
+                constexpr double packedNormalTolerance =
+                        2 * 1.7320508075688772 / 255 + 3.0 / (255 * 255);
+                if (difference > 9
+                    && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
                     ++pixels;
             }
         const QString file = QString("case-%1-%2x%3-detail-%4.png")

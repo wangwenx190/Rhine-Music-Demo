@@ -312,9 +312,9 @@ int main(int argc, char **argv)
                                                 { "cases", results },
                                                 { "floors", floors },
                                                 { "rebuilds", lifecycle },
-                                                { "offscreen", driver.surface.diagnostics() },
+                                                { "offscreen", driver.surface->diagnostics() },
                                                 { "windowPolicy",
-                                                  verification::windowPolicy(driver.window) } })
+                                                  verification::windowPolicy(*driver.window) } })
                              .toJson());
         check(report.commit(), "Cannot write shadow report");
         std::printf("Shadow source math/cache passed %lld states and ten rebuilds\n",

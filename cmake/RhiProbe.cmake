@@ -132,3 +132,17 @@ if(WIN32 AND YALAHOO_REVIEW)
         message(FATAL_ERROR "Latest Qt D3D11 command audit API changed. Adapt the isolated Review probe; do not substitute CPU byte counters.")
     endif()
 endif()
+if(YALAHOO_REVIEW)
+    set(CMAKE_REQUIRED_LIBRARIES Qt6::Quick3DPrivate Qt6::Quick3DRuntimeRenderPrivate Qt6::GuiPrivate)
+    set(CMAKE_REQUIRED_INCLUDES "${PROJECT_SOURCE_DIR}/src/render/rhi")
+    unset(YALAHOO_REVIEW_MSAA_API CACHE)
+    check_cxx_source_compiles(
+        "#include \"ReviewGlCapabilities.h\"\n#include <QtQuick3D/private/qquick3dscenemanager_p.h>\n#include <QtQuick3DRuntimeRender/ssg/qssgrendercontextcore.h>\n#include <QtQuick3DRuntimeRender/ssg/qssgrhicontext.h>\nint main() { auto function = &yalahoo::review::useReviewGlMultisampleBuffers; auto attachment = &QQuick3DSceneManager::getOrSetWindowAttachment; auto samples = &QSSGRhiContext::mainPassSampleCount; (void)function; (void)attachment; (void)samples; return 0; }"
+        YALAHOO_REVIEW_MSAA_API
+    )
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    if(NOT YALAHOO_REVIEW_MSAA_API)
+        message(FATAL_ERROR "Latest Qt Review MSAA capability/descriptor API changed. Adapt src/render/rhi/ReviewGlCapabilities.h; do not reduce sample count or color precision.")
+    endif()
+endif()

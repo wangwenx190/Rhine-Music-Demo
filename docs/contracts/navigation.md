@@ -48,3 +48,5 @@ renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不�
 - Canvas2D比较项显式rect/fill，antialias保持Qt默认1，与C++路径同值，DPR由所属目标处理；不足一像素露出仍绘完整刻线后裁切。
 - `yalahoo --verify-navigation 输出目录`通过真实App发送pixelDelta/反向/切列/编辑焦点/有限端点/滑尺/主题/触摸/隐藏恢复事件，核对导航与播放隔离、input与实际提交revision。
 - Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`复用非像素检查；源码审计统一为`python3 tools/audit/audit-browse-navigation.py`。共享测试分组见[test-gates.md](test-gates.md)，欠验只归计划R34的R19E-P。
+
+滑尺Review的十次重建销毁并重建完整窗口/根，保留controller源状态，重新绑定同一有界读回链；旧回调按window epoch拒绝；读回完成始终排队到GUI，不能在RenderControl的endFrame内部销毁RHI。basic在有效context中提交清理帧，再释放窗口/renderer。报告真实initialized/invalidated、跨窗口附件峰值估算与最终renderer归零；同对象surface恢复另由产品窗口专项检查。
