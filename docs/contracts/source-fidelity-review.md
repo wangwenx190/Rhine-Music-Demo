@@ -19,13 +19,13 @@
 | R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，最终采样与目标尺度仍待 R19D。 |
 | R07 | `1556a55`；`52f1278`、`5625d73`、`ed5aaef` | `ShellMaterial`、主盖/侧脊参数和有效override由R19C1复查，ROI系数移除；shader/捕获/LOD剩余项归R19C2。 |
 | R08 | `178ca45`；`52f1278`、`5625d73`、`e98c798` | `MusicLighting`的主题/单位/轨迹参数由R19C1复查；Room/PMREM/BRDF/方向的shader实现与平台采样归R19C2。 |
-| R09 | `3fc6a39`；`1f2352a`、`75775b3` | shadow/SSAO/depth/normal、偏置与核/滤波待 R19D。 |
+| R09 | `3fc6a39`；`1f2352a`、`75775b3` | SSAO/depth/normal、核/box与数据边由R19D1复查；阴影/偏置/滤波仍R19D3。 |
 | R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh/SMAA/MSAA、曝光/ACES/sRGB 与目标尺度待 R19D。 |
 | R10 | `d06e5f3` | Quick3D/RHI 能力探测和历史选型理由待 R19D；不恢复旧图像分数门禁。 |
 | R10A | `52f1278`；`5b2df80`、`d03527e` | opaque/纸面的入射参数与toneMapped接口由R19C1复查；最终shader语义归R19C2，阴影/资源图/采样归R19D。 |
 | R10B | `5625d73`；`d03527e`、`e98c798` | 材质参数迁移及R18独立clarity由R19C1复查；透明捕获/排序和完整R10B归R19C2，MSAA/平台附件归R19D。 |
-| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约事实由 R19A 确认；capture/mips/postprocess/render graph 待 R19D。 |
-| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`/RHI 产品提交、目标/资源回归待 R19D；历史性能只记录的用户边界保留。 |
+| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约由R19A确认，光学capture/mips由R19C2B/C复查，AO及常量数据由R19D1复查；剩余postprocess/集成仍D2–D4。 |
+| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；目标/其他资源仍D2–D4，历史性能只记录的用户边界保留。 |
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
 | R12 | `b7f73d4`；`0d06b7b`、`e98c798`、`ed5aaef` | 432 实例、波浪/rebase、选中/归位坐标与稳定物理格 ID 由 R19B 审查；合并图集来源见 R19A，透明与后处理仍待 R19C/D。 |
 | R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
@@ -291,3 +291,26 @@ OpenGL最初的optics-only尝试曾在后半程又读回AO：SceneItem异步poli
 本机隐藏OpenGL最终optics-only 960帧通过，覆盖/有限值均0；另以正常`rhi-shell-gpu`入口执行61源状态、数学探针及十次重建通过（11.46秒为该功能运行耗时，不是性能结论）。完整OpenGL生产AO失败仍未销项。Metal默认完整路径在最终诊断分段方式下另跑连续门禁，其他未改共享项复用上述35/35；所有采集物只留本地忽略目录。
 
 最终默认Metal连续门禁72.52秒通过；恢复Review OFF/可见OFF后，普通Release构建和25/25快速CTest通过，source-format与隐藏窗口策略通过。所有日志/图像/矩阵输出保持忽略，未提交采集产物。
+
+
+## R19D1 SSAO 算法、标量读回与常量数据复查
+
+起点`2d3c9b1`。实施前按规模将R19D拆为D1（本节SSAO）、D2（fog/颜色）、D3（阴影）和D4（景深/AA/尺度/整体门禁），保持顺序和R20前全部完成约束。恢复R09 `3fc6a39`、R09B `522a3f3`、R10C `1f2352a`、R10D `75775b3`，沿`5b2df80`、`e98c798`及后续捕获/缓存修正追到实际生产。下列判断只覆盖SSAO及共享数据边，不表示Bokeh/SMAA、fog、shadow或BLUR-01完成。
+
+| 历史对象 / 实际调用 | 源码依据与处理 | 验证 |
+| --- | --- | --- |
+| R09：scene构造→enableSelectionLighting→softenMusicContactShadows→setQuality再次soften | 实际半径.18、normalized orthographic depth min/max .001/.035、.22乘数；构造.38/.44与.09不覆盖最终音乐入口。完整壳体及纸面normal override保持，不受纸面透明contain裁切。 | 生产值保持；额外算法压力状态明确使用原fixture .1/100、radius .38，不改产品参数。 |
+| R09：锁定Three SSAOShader、SSAOBlurShader→共享ssao及三RHI展开变体 | 源只unpackRGBToNormal，删除额外normalize；源depth==1哨兵改为存储RGB24三通道精确white判断，删除扩大的1e-6范围，并避免背景normal多余fetch。保留透视标量重建、view normal、scalar noise复制、TBN、全部样本与严格delta判定、5×5 box及.22合成。 | 三核各81个固定数值点从同次真实normal/depth输入执行独立源公式；有接触遮蔽点，raw最大误差≤.000491、blur≤.002059（均≤1/255）、composite≤.003137（≤2/255）。不删难点，不读取旧GPU图；合成容差含输入/输出两次RGBA8诊断量化及half rounding。 |
+| R09/R10C：kernel/noise输入与固定索引 | 按计划seed417直接执行锁定SSAOPass/SimplexNoise生成16/32/64六份输入，临时目录与已有资产完全一致；只比较数学输入数据，不是GPU byte witness。RHI半径basis提升与固定索引展开保留，原累加顺序/样本数量不变。 | 无浏览器/GL上下文的源输入重建、三变体生成+格式化一致；公共Effect四snippet五目标qsb和RHI三变体编译。 |
+| R10D：RGBA16F→标量R16F及诊断解码 | R16F生产raw/blur数学精度和消费者.r等价性保留。查明此前OpenGL错误发生在读回边：本机GL_PACK_ALIGNMENT=4，奇数宽R16F行需填充；当前Qt GL readPixels按紧密纹理字节数分配，未修改PACK_ALIGNMENT，可能越过逻辑缓冲边界。非有限字节不证明产品AO shader生成NaN。 | 原背景恒1输入在213×159出现错误，修复后奇偶宽/三倍率/三核27状态均为1，尺寸/格式仍为原R16F；没有通过RGBA8或R32F降格替代。原R19C2C失败保留。 |
+| R10C/D及后续capture：行跨度、资源/别名 | 显式捕获且仅未对齐的GL R16F，通过QRhi同格式copy到缓存的补齐宽纹理；原区域逐值保留。按实际storage stride解码且只消费逻辑区域，未初始化尾列不扫描。最多2个AO缓存槽，实际清单含capture-aligned-scalar；同尺寸复用、renderer reset清理。只查询GL状态，不全局改pixel-store，不锁定旧Qt。 | 实际pack=4；213→214、129→130的诊断存储宽不改变产品目标、采样或清晰度。复采alignedReadbackRevision不变，真实十次SG失效/重建恢复。pending最多2、唯一纹理读回和GUI值交接保持。 |
+| R10C/D：PostUniform及重复kernel上传 | RHI已把samplesMap改为uniform索引，却仍分配/上传未读取的kernel texture；每个pass还复制/上传整个1104-byte块。删除闲置纹理及资源计划条目，kernel只在SSAO pass创建时一次上传；每帧只更新80-byte变化前缀，保留1104-byte std140 ABI及kernel offset80。 | 真实命令计数postUniformUploadBytes：AO三pass常态240，原3312；不代表后端物理传输字节或FPS。三核源数学/重复捕获/长回放验证部分更新保留常量；无新增生产GPU读回，driver实际带宽/显存未知。 |
+| macOS GL能力、窗口及目标平台 | 保留原MSAA等价renderbuffer及真实标准透视/行方向。bake-occlusion-shaders改用实际host的qsb路径/输出，Windows脚本未在本机执行。一次最终GL回放在14/16序列后报window policy failed，未报AO非有限；当时缺原生失败快照，原因未确认。 | 失败保留、不归因于Qt主动激活或用户操作；共享harness补失败时原生策略JSON且不放宽门禁，用相同非前台策略重跑。D3D11/Linux目标继续R34。 |
+
+Qt读回边界依据[当前Qt GL实现](https://github.com/qt/qtbase/blob/6.12/src/gui/rhi/qrhigles2.cpp)的ReadPixels路径和实际pack查询；不是以Qt版本名决定退回其他Kit。补齐诊断只增加显式capture的同精度copy，正常request=0不会查询/分配/复制；持久缓存计入实际descriptor inventory，与生产preallocation plan范围区分。COMMON-01–05/PERF-01–07及目标平台逐符号/hash由`tools/audit/audit-rhi-ao.py`生成；人工核对源公式、same-format copy、弱pending、缓存销毁/Kit重建及GL/D3D/Metal路径。
+
+当前macOS/arm64/Apple M4、自动最新Qt6.12.0、AppleClang21、Release、Metal/OpenGL真正隐藏DPR1。源SSAO/box/合成点与27状态/十次重建用`rhi-ao-gpu`执行；完整生产双主题/大小/静止/波浪/浏览/总览960帧由默认`rhi-flicker-gpu`执行。前一版完整Metal36/36通过；常量上传优化后执行最终完整回归。公共Effect只是五目标静态编译，不冒称独立Quick3D AO已实机通过，旧图像耦合入口仍由D4拆解。正常窗口/VSYNC/最终产品性能与不同设备按原专项；所有生成物保持本地忽略。
+
+最终常量上传优化后的Metal完整隐藏36/36通过，OpenGL的27状态/源数学/十次重建与默认完整960帧两项均通过；未出现AO非有限或光学漏画，窗口策略亦通过。先前一次window-policy失败原样保留，未放宽断言，未确认该次前台变化原因。耗时与此前不同仅记录为功能运行事实，没有控制正常VSYNC/环境噪声，不能据此作性能优劣结论。最后恢复普通Review OFF、可见OFF配置并运行生产Release构建/快速回归。
+
+最终已恢复Review OFF/可见OFF，普通Release构建及25/25快速CTest通过；最终check-format/两组官方qmllint与四公共Effect五目标bake通过，三RHI SSAO变体重建逐字一致，六源输入无需GPU重建一致。Windows/D3D11与Linux/OpenGL实机按R34/R19D1-P保留，不外推本机通过；下一主线R19D2继续生产fog/颜色，BLUR-01仍未销项。

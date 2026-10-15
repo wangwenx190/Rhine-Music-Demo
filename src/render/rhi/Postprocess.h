@@ -29,6 +29,7 @@ public:
     QRhiTexture *rawAo() const;
     QRhiTexture *blurredAo() const;
     quint64 revision() const;
+    qint64 uniformUploadBytes() const;
     void inventory(ResourceInventory &inventory) const;
 
 private:

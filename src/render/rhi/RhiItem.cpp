@@ -18,6 +18,7 @@
 #include <QFloat16>
 #include <QElapsedTimer>
 #include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <cstring>
 #include <algorithm>
 #include <cstdio>
@@ -104,6 +105,7 @@ struct Pending
     int drainFrames = 0;
     bool yUp = false;
     int opticalProbe = 0;
+    std::array<QSize, 13> logicalReadbackSizes;
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
 {
@@ -111,16 +113,18 @@ QByteArray floatTextureBytes(const char *path, qsizetype expected)
     require(bytes.size() == expected, "Invalid RHI float lookup bytes");
     return bytes;
 }
-QImage imageOf(const QRhiReadbackResult &r, bool yUp, bool uploaded = false)
+QImage imageOf(const QRhiReadbackResult &r, bool yUp, bool uploaded = false,
+               QSize logicalSize = { })
 {
     if (r.format == QRhiTexture::R16F) {
-        QImage image(r.pixelSize, QImage::Format_RGBA8888);
-        require(r.data.size() == image.width() * image.height() * 2, "Invalid R16F readback");
+        QImage image(logicalSize.isValid() ? logicalSize : r.pixelSize, QImage::Format_RGBA8888);
+        require(r.data.size() == r.pixelSize.width() * r.pixelSize.height() * 2,
+                "Invalid R16F readback");
         for (int y = 0; y < image.height(); ++y)
             for (int x = 0; x < image.width(); ++x) {
                 qfloat16 half;
                 const int sourceY = yUp ? image.height() - 1 - y : y;
-                std::memcpy(&half, r.data.constData() + (sourceY * image.width() + x) * 2, 2);
+                std::memcpy(&half, r.data.constData() + (sourceY * r.pixelSize.width() + x) * 2, 2);
                 const float value = float(half);
                 require(std::isfinite(value), "Nonfinite scalar AO pixel");
                 const int gray = std::clamp(int(std::lround(value * 255)), 0, 255);
@@ -329,6 +333,9 @@ private:
     Owned<QRhiBuffer> vertices, indices, uniforms, outputUniform;
     Owned<QRhiBuffer> instanceBuffer;
     Owned<QRhiTexture> cover, environment, dfg, ltc1, ltc2;
+    std::array<Owned<QRhiTexture>, 13> alignedReadbacks;
+    int readbackPackAlignment = 0;
+    quint64 alignedReadbackRevision = 0;
     Owned<QRhiSampler> linear, nearest, mipLinear, shadowCompare;
     Owned<QRhiShaderResourceBindings> geometryBindings, shadowBindings, outputBindings;
     Owned<QRhiGraphicsPipeline> shadowPipeline, opaquePipeline, backgroundPipeline, outputPipeline;
@@ -406,6 +413,10 @@ void Renderer::enqueueAtlas()
 }
 void Renderer::reset()
 {
+    for (auto &texture : alignedReadbacks)
+        texture.reset();
+    readbackPackAlignment = 0;
+    alignedReadbackRevision = 0;
     post.reset();
     prepassPipeline.reset();
     prepassBackgroundPipeline.reset();
@@ -1569,7 +1580,6 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                          "capture-resolve-mips", "sorted-shell", "review-output" }
                            : QJsonArray{ "shadow", "opaque-color-normal-depth", "review-output" } },
             { "msaaSamples", captureSamples },
-            { "resources", resourceInventory() },
             { "recursiveGlassCapture", false },
             { "shellDepthWrite", true },
             { "shellColorDepthWrite", false },
@@ -1635,6 +1645,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["geometryInstanced"] = batched;
         p->capture.metadata["visibleEntities"] = visibleCount;
         p->capture.metadata["uniformBytes"] = int(sizeof(Uniform));
+        p->capture.metadata["postUniformUploadBytes"] =
+                input.postprocess ? post.uniformUploadBytes() : 0;
         p->capture.metadata["uniformUploadBytes"] = qint64(cursor);
         p->capture.metadata["uniformCapacityBytes"] = qint64(uniforms->size());
         p->capture.metadata["coverSnapshotCopies"] = qint64(coverSnapshotCopies);
@@ -1701,6 +1713,16 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["opticalEvents"] = opticalEvents;
         p->capture.metadata["sortedShells"] = sorted;
         p->capture.metadata["submittedShellUniforms"] = opticalUniforms;
+        if (api->backend() == QRhi::OpenGLES2 && readbackPackAlignment == 0) {
+            auto *context = QOpenGLContext::currentContext();
+            require(context, "No current GL context for readback alignment");
+            context->functions()->glGetIntegerv(GL_PACK_ALIGNMENT, &readbackPackAlignment);
+            require(readbackPackAlignment == 1 || readbackPackAlignment == 2
+                            || readbackPackAlignment == 4 || readbackPackAlignment == 8,
+                    "Invalid GL pack alignment");
+        }
+        p->capture.metadata["readbackPackAlignment"] = readbackPackAlignment;
+        QJsonArray alignedCopies;
         p->readbackOwner.fill(-1);
         for (int i = 0; i < 13; ++i) {
             if (i == 8 && !input.captureAtlas)
@@ -1717,7 +1739,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             ++p->remaining;
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
-                    const auto image = imageOf(state->results[i], state->yUp, i == 8);
+                    const auto image = imageOf(state->results[i], state->yUp, i == 8,
+                                               state->logicalReadbackSizes[i]);
                     if (i == 4 && state->opticalProbe > 0) {
                         const auto &readback = state->results[i];
                         const int components = readback.format == QRhiTexture::RGBA16F ? 2 : 4;
@@ -1757,8 +1780,36 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                         state->deliver(std::move(state->capture));
                 }
             };
-            reads->readBackTexture(QRhiReadbackDescription(textures[i]), &p->results[i]);
+            auto *readTexture = textures[i];
+            const auto logical = readTexture->pixelSize();
+            if (api->backend() == QRhi::OpenGLES2 && readTexture->format() == QRhiTexture::R16F
+                && logical.width() * 2 % readbackPackAlignment != 0) {
+                const int rowBytes = (logical.width() * 2 + readbackPackAlignment - 1)
+                        / readbackPackAlignment * readbackPackAlignment;
+                const QSize padded(rowBytes / 2, logical.height());
+                auto &texture = alignedReadbacks[i];
+                if (!texture || texture->pixelSize() != padded) {
+                    texture.reset(api->newTexture(QRhiTexture::R16F, padded, 1,
+                                                  QRhiTexture::UsedAsTransferSource));
+                    require(texture->create(), "Aligned scalar readback texture failed");
+                    ++alignedReadbackRevision;
+                    cachedInventory = { };
+                }
+                QRhiTextureCopyDescription copy;
+                copy.setPixelSize(logical);
+                reads->copyTexture(texture.get(), readTexture, copy);
+                readTexture = texture.get();
+                p->logicalReadbackSizes[i] = logical;
+                alignedCopies.append(QJsonObject{ { "field", i },
+                                                  { "logicalWidth", logical.width() },
+                                                  { "storageWidth", padded.width() },
+                                                  { "height", logical.height() } });
+            }
+            reads->readBackTexture(QRhiReadbackDescription(readTexture), &p->results[i]);
         }
+        p->capture.metadata["alignedScalarCopies"] = alignedCopies;
+        p->capture.metadata["alignedReadbackRevision"] = qint64(alignedReadbackRevision);
+        p->capture.metadata["resources"] = resourceInventory();
         p->capture.metadata["uniqueReadbackTextures"] = p->remaining;
         p->capture.metadata["readbackFieldSlots"] = input.captureAtlas ? 13 : 12;
         pending.push_back(p);
@@ -1840,6 +1891,8 @@ QJsonObject Renderer::resourceInventory()
     inventory.texture("dfg", dfg.get());
     inventory.texture("ltc1", ltc1.get());
     inventory.texture("ltc2", ltc2.get());
+    for (int i = 0; i < int(alignedReadbacks.size()); ++i)
+        inventory.texture(QString("capture-aligned-scalar-%1").arg(i), alignedReadbacks[i].get());
     inventory.buffer("geometry-vertices", vertices.get());
     inventory.buffer("geometry-indices", indices.get());
     inventory.buffer("bounded-draw-uniforms", uniforms.get());

@@ -113,6 +113,14 @@ if(YALAHOO_REVIEW)
         set_tests_properties(rhi-postprocess-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
+    add_test(NAME rhi-ao-gpu COMMAND rhi-ao-audit "${CMAKE_BINARY_DIR}/verification/rhi-ao")
+    set_tests_properties(rhi-ao-gpu PROPERTIES TIMEOUT 120
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
+        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
+    if(APPLE)
+        set_tests_properties(rhi-ao-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
+    endif()
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420

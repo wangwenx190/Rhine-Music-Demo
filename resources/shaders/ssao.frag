@@ -8,22 +8,28 @@ vec3 viewPosition(vec2 uv, float depth)
     float z = -mix(cameraNear, cameraFar, depth);
     return vec3(ndc * projectionPlane.xy * (-z), z);
 }
+float decodeDepth(vec3 code)
+{
+    return dot(code, vec3(65536.0, 256.0, 1.0) / 65793.0);
+}
 float linearDepth(vec2 uv)
 {
-    return dot(texture(depthMap, uv).rgb, vec3(65536.0, 256.0, 1.0) / 65793.0);
+    return decodeDepth(texture(depthMap, uv).rgb);
 }
 void MAIN()
 {
     vec2 uv = INPUT_UV;
-    vec4 geometry = texture(geometryMap, uv);
-    float depth = linearDepth(uv);
-    // RGB24 reconstruction can round white to 1-ulp on some backends.
-    if (kernelSize == 0 || depth >= 1.0 - 1e-6) {
+    vec3 depthCode = texture(depthMap, uv).rgb;
+    // The source depth==1 background sentinel is exact in the stored RGB24 domain.
+    if (kernelSize == 0 || all(equal(depthCode, vec3(1)))) {
         FRAGCOLOR = vec4(1.0);
         return;
     }
+    float depth = decodeDepth(depthCode);
+    vec4 geometry = texture(geometryMap, uv);
     vec3 position = viewPosition(uv, depth);
-    vec3 normal = normalize(geometry.rgb * 2.0 - 1.0);
+    // SSAOShader unpacks the stored normal without renormalizing it.
+    vec3 normal = geometry.rgb * 2.0 - 1.0;
     vec2 sourceUv = uv;
     if (FRAMEBUFFER_Y_UP < 0.0)
         sourceUv.y = 1.0 - sourceUv.y;

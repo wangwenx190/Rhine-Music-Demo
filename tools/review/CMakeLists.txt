@@ -78,6 +78,18 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
+    qt_add_executable(rhi-ao-audit RhiAoAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    target_link_libraries(rhi-ao-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
+    target_include_directories(rhi-ao-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+    target_compile_definitions(rhi-ao-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+    set_target_properties(rhi-ao-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(rhi-ao-audit)
+    qt_add_resources(rhi-ao-audit ao_covers PREFIX /assets
+        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
+        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
     qt_add_executable(rhi-flicker-audit RhiFlickerAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
     target_link_libraries(rhi-flicker-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(rhi-flicker-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

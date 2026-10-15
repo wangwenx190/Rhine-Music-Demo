@@ -34,11 +34,16 @@ struct Pass
     Owned<QRhiShaderResourceBindings> bindings;
     Owned<QRhiGraphicsPipeline> pipeline;
 };
-struct alignas(16) PostUniform
+struct alignas(16) PostPrefix
 {
     float size[4], clip[4], ao[4], dof[4], options[4];
+};
+struct alignas(16) PostUniform
+{
+    PostPrefix prefix;
     float kernel[64][4];
 };
+static_assert(sizeof(PostPrefix) == 80);
 static_assert(sizeof(PostUniform) == 1104 && offsetof(PostUniform, kernel) == 80);
 }
 struct Postprocess::State
@@ -47,11 +52,12 @@ struct Postprocess::State
     PostSettings settings;
     std::array<ColorTarget, 2> ping;
     ColorTarget rawAo, blur, edges, weights;
-    Owned<QRhiTexture> kernel, noise, area, search;
+    Owned<QRhiTexture> noise, area, search;
     Owned<QRhiSampler> linear, nearest, repeat;
     QRhiTexture *source = nullptr, *normal = nullptr, *aoDepth = nullptr, *dofDepth = nullptr;
     QRhiTexture *output = nullptr;
     bool upload = true;
+    qint64 uniformUploadBytes = 0;
     std::array<float, 256> kernelValues{ };
     std::vector<Pass> passes;
     void add(const char *name, ColorTarget &target, QRhiTexture *input, QRhiTexture *auxiliary)
@@ -70,8 +76,7 @@ struct Postprocess::State
                   QRhiShaderResourceBinding::sampledTexture(
                           2, fragment, p.name == "bokeh" ? dofDepth : aoDepth, nearest.get()),
                   QRhiShaderResourceBinding::sampledTexture(3, fragment, normal, nearest.get()),
-                  QRhiShaderResourceBinding::sampledTexture(
-                          4, fragment, kernel ? kernel.get() : source, nearest.get()),
+                  QRhiShaderResourceBinding::sampledTexture(4, fragment, source, nearest.get()),
                   QRhiShaderResourceBinding::sampledTexture(
                           5, fragment, noise ? noise.get() : source, repeat.get()),
                   QRhiShaderResourceBinding::sampledTexture(6, fragment, auxiliary, linear.get()),
@@ -149,7 +154,6 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
         require(dest->create(), "Postprocess lookup failed");
     };
     if (s.samples) {
-        texture(p.kernel, QRhiTexture::RGBA32F, { s.samples, 1 });
         texture(p.noise, QRhiTexture::RGBA32F, { 4, 4 });
     }
     if (s.smaa) {
@@ -183,6 +187,8 @@ void Postprocess::render(QRhiCommandBuffer *cb)
     auto &p = *m_state;
     const auto &s = p.settings;
     auto *updates = p.api->nextResourceUpdateBatch();
+    const bool firstUpload = p.upload;
+    p.uniformUploadBytes = 0;
     if (p.upload) {
         auto floats = [&](QRhiTexture *texture, const QString &name) {
             const auto bytes =
@@ -192,11 +198,12 @@ void Postprocess::render(QRhiCommandBuffer *cb)
                     "Invalid AO lookup size");
             updates->uploadTexture(texture,
                                    { { 0, 0, QRhiTextureSubresourceUploadDescription(bytes) } });
-            if (name.startsWith("ssao-kernel-"))
-                std::memcpy(p.kernelValues.data(), bytes.constData(), bytes.size());
         };
         if (s.samples) {
-            floats(p.kernel.get(), "ssao-kernel-" + QString::number(s.samples));
+            const auto bytes = preparedAssets().bytes.value(
+                    ":/rhi/environment/ssao-kernel-" + QString::number(s.samples) + ".rgba32f");
+            require(bytes.size() == s.samples * 16, "Invalid source AO kernel size");
+            std::memcpy(p.kernelValues.data(), bytes.constData(), bytes.size());
             floats(p.noise.get(), "ssao-noise-" + QString::number(s.samples));
         }
         for (const auto &entry : { std::pair{ p.area.get(), "smaa-area" },
@@ -212,13 +219,20 @@ void Postprocess::render(QRhiCommandBuffer *cb)
     }
     for (const auto &pass : p.passes) {
         const auto size = pass.target->texture->pixelSize();
-        PostUniform u{ { float(size.width()), float(size.height()), s.projectionX, s.projectionY },
-                       { s.nearPlane, s.farPlane, p.api->isYUpInFramebuffer() ? 1.0f : -1.0f, 0 },
-                       { float(s.samples), s.radius, .001f, .035f },
-                       { s.focus, s.aperture, .011f, float(s.size.width()) / s.size.height() },
-                       { .22f, 0, 0, 0 } };
-        std::memcpy(u.kernel, p.kernelValues.data(), sizeof(u.kernel));
+        PostPrefix u{ { float(size.width()), float(size.height()), s.projectionX, s.projectionY },
+                      { s.nearPlane, s.farPlane, p.api->isYUpInFramebuffer() ? 1.0f : -1.0f, 0 },
+                      { float(s.samples), s.radius, .001f, .035f },
+                      { s.focus, s.aperture, .011f, float(s.size.width()) / s.size.height() },
+                      { .22f, 0, 0, 0 } };
+        if (firstUpload
+            && (pass.name == "ssao" || pass.name == "ssao16" || pass.name == "ssao64")) {
+            const int bytes = s.samples * 16;
+            updates->updateDynamicBuffer(pass.uniform.get(), offsetof(PostUniform, kernel), bytes,
+                                         p.kernelValues.data());
+            p.uniformUploadBytes += bytes;
+        }
         updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u);
+        p.uniformUploadBytes += sizeof(u);
     }
     cb->resourceUpdate(updates);
     for (const auto &pass : p.passes) {
@@ -251,6 +265,10 @@ QJsonArray Postprocess::passes() const
             result.append(pass.name);
     return result;
 }
+qint64 Postprocess::uniformUploadBytes() const
+{
+    return m_state ? m_state->uniformUploadBytes : 0;
+}
 quint64 Postprocess::revision() const
 {
     return m_revision;
@@ -266,7 +284,6 @@ void Postprocess::inventory(ResourceInventory &inventory) const
     inventory.texture("post-ao-blur", p.blur.texture.get());
     inventory.texture("smaa-edges", p.edges.texture.get());
     inventory.texture("smaa-weights", p.weights.texture.get());
-    inventory.texture("ao-kernel", p.kernel.get());
     inventory.texture("ao-noise", p.noise.get());
     inventory.texture("smaa-area", p.area.get());
     inventory.texture("smaa-search", p.search.get());

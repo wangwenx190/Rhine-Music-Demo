@@ -4,6 +4,7 @@
 #include "VerificationWindow.h"
 #include <QEventLoop>
 #include <QPointer>
+#include <QJsonDocument>
 #include <QTimer>
 #include <atomic>
 #include <functional>
@@ -73,7 +74,13 @@ public:
         state->loop = nullptr;
         require(state->error.isEmpty(), "RHI render failed");
         require(state->capture.has_value(), "RHI capture timed out");
-        require(verification::windowPolicySatisfied(window), "Review window policy failed");
+        if (!verification::windowPolicySatisfied(window)) {
+            qWarning("Review policy failure: %s",
+                     QJsonDocument(verification::windowPolicy(window))
+                             .toJson(QJsonDocument::Compact)
+                             .constData());
+            throw std::runtime_error("Review window policy failed");
+        }
         auto result = std::move(*state->capture);
         state->capture.reset();
         require(result.color.size() == size && result.normal.size() == size

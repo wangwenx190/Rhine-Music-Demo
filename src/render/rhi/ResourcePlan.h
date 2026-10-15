@@ -79,7 +79,6 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
             geometry("ao", ao);
             plan.plannedTexture("ao-raw", ao, QRhiTexture::R16F);
             plan.plannedTexture("ao-blur", ao, QRhiTexture::R16F);
-            plan.plannedTexture("ao-kernel", { in.aoSamples, 1 }, QRhiTexture::RGBA32F);
             plan.plannedTexture("ao-noise", { 4, 4 }, QRhiTexture::RGBA32F);
             passes += 3;
         }

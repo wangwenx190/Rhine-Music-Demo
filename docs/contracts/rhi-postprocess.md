@@ -20,7 +20,7 @@ Frame std140 为 816 bytes：R10B 的前 752 bytes 保留，coverUv 在 752，pa
 
 不透明捕获不包含透射壳体。合成颜色附件独立，复用非重叠通道的硬件 depth/stencil，preserve/load 后复制已 resolve 的不透明输出；禁止采样正在写入的附件。壳体先写精确 front-surface depth，再用 Equal/read-only depth 着色，保留 source alpha=1、无 blending 和整体深度写入语义。阴影在 caster 矩阵/开关/目标变化时重绘；相机变化不重画不变的世界空间阴影。主灯贡献为零的表面跳过零贡献计算，同一片元复用同一阴影值。
 
-SSAO 的独立几何覆盖包含完整纸面，原始 32/极高 64 个 seed=417 样本、半径 .18、min/max .001/.035、5×5 box、强度 .22 不变。核按同一 RGBA32F little-endian 资产加载到 std140 表，数值不变；16/32/64 样本各自使用固定索引展开，保留所有样本与原累加顺序，将半径乘法移到循环外；noise 保留 scalar xyz 复制与原采样方向。Bokeh 使用独立完整几何深度，AO 为全分辨率时共用同一覆盖结果，降分辨率时另建完整深度。关闭的通道不分配其目标。颜色 ping/pong 复用非重叠生命周期；每个 pass 有独立 uniform/SRB/目标，输入不与输出反馈。
+SSAO 的独立几何覆盖包含完整纸面，原始 32/极高 64 个 seed=417 样本、半径 .18、min/max .001/.035、5×5 box、强度 .22 不变。核按同一 RGBA32F little-endian 资产加载到 std140 表，数值不变；R19D1移除了未使用的kernel GPU纹理，并将核改为创建时一次写入，逐帧只更新80-byte前缀（1104-byte块和offset80保留）；16/32/64 样本各自使用固定索引展开，保留所有样本与原累加顺序，将半径乘法移到循环外；noise 保留 scalar xyz 复制与原采样方向。Bokeh 使用独立完整几何深度，AO 为全分辨率时共用同一覆盖结果，降分辨率时另建完整深度。关闭的通道不分配其目标。颜色 ping/pong 复用非重叠生命周期；每个 pass 有独立 uniform/SRB/目标，输入不与输出反馈。
 
 SMAA 使用既有 Medium/area/search 和 gamma 2.2；framebuffer 的后端行方向转换与 lookup PNG 行序分开。几何顶点／片元签名使用连续 location 前缀，保留未使用输入占位，避免原生 stage linkage 改变材质参数位置。qsb 由最新同一 Kit 生成 SPIR-V、GLSL330/ES300、HLSL50、MSL12。
 
@@ -29,3 +29,5 @@ SMAA 使用既有 Medium/area/search 和 gamma 2.2；framebuffer 的后端行方
 所有窗口遵循 [测试窗口契约](test-window-policy.md)。本平台运行和跨平台静态审计结果以对应 `verification/` 产物为准；实际运行范围和纯静态待验证项分别记录，后者完整保留到R34；不按平台名称固定验证方式。
 
 R10C历史Release复建工具为`tools/build/verify-r10c.ps1`，只在对应验收版本的隔离checkout重建，不作为维护后源码覆盖历史目录的默认入口。原Windows产物在`verification/windows/rhi-postprocess/`，pre-stage/final图片在`docs/media/rhi-postprocess/`；来源与算法适配hash见`resources/manifests/rhi-postprocess.json`，历史证据不回写。维护后源码按`performance.md`执行Release格式/CTest/qmllint、`rhi-postprocess-gpu`及逐项静态审计，新证据在`verification/windows/performance-review/`及对应静态目录，后续维护继续使用独立目录。性能门槛使用`QSG_NO_VSYNC=1`的真实frameSwapped间隔，仅为未限速原生渲染吞吐；系统compositor/vsync节奏与完整产品交互仍需R10D/R28实际验证。
+
+R19D1对源SSAO、R16F诊断行跨度、常量数据及27状态/数学/重建门禁的现行结论见[occlusion.md](occlusion.md)。OpenGL实际PACK_ALIGNMENT=4时，奇数宽R16F显式捕获使用同格式缓存补齐存储宽，逻辑宽和产品附件保持；不是扩大生产目标或改变AO精度。旧raw图/witness分数不再执行，Bokeh/SMAA/尺度/总体旧工具继续R19D4复查。
