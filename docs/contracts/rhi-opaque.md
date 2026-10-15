@@ -57,6 +57,13 @@ ctest --preset qt-release-render -R '^rhi-opaque-gpu$' --output-on-failure
 
 `rhi-shadow-gpu` 独立执行本次 R32F 深度上的标量源 PCF 数学，覆盖三种 map 尺寸、1/7/8/9 实体批量边界、开关/运动/接收相机与灯色变化、十次真实 SG 重建。`Input.captureShadowDepth` 默认 false，只在显式 Review 捕获时共享已有不可变 QByteArray，不增加 GPU readback 或深复制；QImage 仍按历史诊断格式输出。每次捕获检查真正上传的 paper/shell 参数、比较 sampler、cull 和两个附件的格式/尺寸；生产 `request=0` 不做这些诊断。无变化 caster 复用 map，并跳过非批量caster专用uniform生成/复制/上传，实体变换/开启/尺寸或 renderer 重建失效；固定灯相机不依赖接收相机、主题色或封面。
 
-诊断receiver是12×12、y=-.05的白色乘数平面，不代表产品地面。冻结产品为200×200、y=-4.63、roughness=.95的 MeshStandardMaterial 地面；原生缺失，必须由下一轮 R19D3B 接入主题、PBR/雾、不透明捕获及 AO/Bokeh geometry。不能用本专项通过关闭该缺口、BLUR-01、剩余后处理或窗口/VSYNC验收。
+诊断receiver是12×12、y=-.05的白色乘数平面，不代表产品地面。冻结产品为200×200、y=-4.63、roughness=.95的 MeshStandardMaterial 地面；现由 R19D3B 接入真实 SceneItem 的主题、Standard PBR/雾、不透明捕获及 AO/Bokeh geometry；独立诊断receiver仍保留。本专项不关闭BLUR-01、剩余后处理或窗口/VSYNC验收。
 
 复现：开启 Review、保持可见测试 OFF，Release 构建后执行 `ctest --preset qt-release-render -R '^rhi-shadow-gpu$' --output-on-failure`；显式 `QSG_RHI_BACKEND=opengl` 切换本机 GL。COMMON-01–05/PERF-01–07 符号/hash 矩阵由 `python3 tools/audit/audit-rhi-shadow.py` 写入本地忽略目录；源代码矩阵不能冒充目标硬件通过。
+
+
+## 产品地面
+
+生产 SceneItem 正常路径始终 productFloor=true；geometryOnly 与独立 Review 默认关闭。线性 floorColor 属于 SelectionLighting palette，原源色及.65秒主题曲线随现有 FrameClock 更新。地面kind=6复用opaque管线，使用Standard dielectric/roughness=.95，不使用纸面限亮和壳体光场调制；它接收既有key阴影、参与capture/resolve/mips、AO和完整Bokeh depth，但不进入caster池。着色后线性fog先于后处理与统一输出。
+
+地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。source-fidelity-review.md的R19D3B记录源公式、来源与实际范围。验证入口为rhi-shadow-gpu的地面数学/附件/十次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。

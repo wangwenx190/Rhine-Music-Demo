@@ -12,6 +12,40 @@ class LightingTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void floorThemeUsesLinearAuthoredColorsAndInterruptedTransition()
+    {
+        const auto decode = [](int value) {
+            const double s = value / 255.;
+            return s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
+        };
+        for (const auto &theme :
+             { QStringLiteral("day"), QStringLiteral("night"), QStringLiteral("dusk") }) {
+            const QColor source(theme == "day"             ? "#d8c9b9"
+                                        : theme == "night" ? "#0b1828"
+                                                           : "#a6b8c0");
+            const auto actual = LightingPalette::floorColor(theme);
+            QVERIFY(std::abs(actual.x - decode(source.red())) < 1e-7);
+            QVERIFY(std::abs(actual.y - decode(source.green())) < 1e-7);
+            QVERIFY(std::abs(actual.z - decode(source.blue())) < 1e-7);
+        }
+        SelectionLighting light;
+        const auto day = light.palette().floor;
+        light.setNight(true);
+        light.advanceTheme(.325);
+        const auto middle = light.palette().floor;
+        const auto night = LightingPalette::floorColor(u"night");
+        const auto expected = day * (1 - SelectionLighting::themeProgress(.5))
+                + night * SelectionLighting::themeProgress(.5);
+        QVERIFY((middle - expected).length() < 1e-12);
+        light.setNight(false);
+        QVERIFY((light.palette().floor - middle).length() < 1e-12);
+        light.advanceTheme(.325);
+        const auto reverse = middle * (1 - SelectionLighting::themeProgress(.5))
+                + day * SelectionLighting::themeProgress(.5);
+        QVERIFY((light.palette().floor - reverse).length() < 1e-12);
+        light.setReducedMotion(true);
+        QVERIFY((light.palette().floor - day).length() < 1e-12);
+    }
     void frozenGolden()
     {
         QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/lighting/golden.json"));

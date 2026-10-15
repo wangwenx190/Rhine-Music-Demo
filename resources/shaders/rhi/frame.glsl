@@ -19,7 +19,7 @@ layout(std140, binding = 0) uniform Frame
     vec4 lightIntensities;
     vec4 settings; // printAmbient, rowDetail, rowFill, environmentIntensity
     vec4 clip; // near, far, framebuffer Y up, clip depth zero to one
-    vec4 draw; // kind (-1 background, 0 paper, 1 geometry, 2 receiver), shadow enabled, size, radius
+    vec4 draw; // kind (-1 background, 0 paper, 1 geometry, 2 receiver, 6 product floor), shadow enabled, size, radius
     vec4 optics; // spotIntensity, shadow strength, normalBias, depth bias
     mat4 nativeVP;
     vec4 camera; // world position, exposure

@@ -368,3 +368,25 @@ PCF数值是同次真实几何深度上的独立源公式，非源实机图/浏�
 实际API uniform请求：单caster首次6144、缓存5120 bytes；7caster首次18432、缓存11264 bytes，分别消除1024/7168 bytes专用阴影块；≥8实例复用既有batch几何块，此项为4096→4096。数值包含原其他draw，属于API请求范围而非驱动物理传输/显存或FPS。两组官方qmllint、check-format、四shell与instanced vertex生成+format逐字复现通过。COMMON-01–05/PERF-01–07/三平台symbol/hash及清单仅本地生成。Windows/D3D11、Linux/OpenGL实机未运行，R34/R19D3A-P保留；受限服务最初no-screens及两次仅foregroundUnchanged=false的失败与数值探针旧协议失败均保留，未宣称根因已修复、未放宽窗口断言。产品地面仍R19D3B，DOF/AA/尺度与BLUR-01仍D4。
 
 已恢复普通Release的Review OFF、可见测试OFF配置；生产构建、最终25/25快速CTest（含source-format/默认隐藏窗口策略）、check-format及两组官方qmllint通过。采集生成物保持忽略，下一未完成主线为R19D3B。
+
+## R19D3B 产品地面与接收闭包
+
+起点 `e9360b7`。冻结来源 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 经历史映射读取 `scene.ts`，地面构造与工作树相同。以下仅关闭缺失地面的确定遗漏，BLUR-01、景深/AA/目标尺度总体审计仍属 R19D4。
+
+| 原职责 / 有效调用 | 实现与判断 | 验证边界 |
+| --- | --- | --- |
+| R09/R10A：scene 构造与 shadow 接收 | 恢复 200×200 PlaneGeometry、rotation.x=-PI/2、y=-4.63、向上法向、FrontSide、receiveShadow=true/castShadow=false；保留旧12×12诊断receiver，两者独立。 | 解析相机射线、实际normal/RGB24 depth与原≤2物理px投影要求；caster数量仍仅盒体diffuser。 |
+| R07/R08/R19D2：主题/光场/雾 | SelectionLighting 的不可变线性 palette 增加 floor，day/night/dusk原色分别为#d8c9b9/#0b1828/#a6b8c0。产品双主题沿原.65秒bezier、途中反向和减少动态更新；dusk只验证已有源颜色，不新增产品主题。 | 源色sRGB解码与中断状态单元检查；SceneItem实际提交颜色逐帧匹配当前palette，不从warmth反推地面颜色。 |
+| R10A/B：不透明与透射capture | opaque kind=6执行Standard PBR：roughness=.95、metalness=0、dielectric f0=.04，无clearcoat/transmission/emission；方向/补光/半球/spot、LTC area、DFG multiscatter及Room PMREM按锁定Three源公式。地面不用musicShell、纸面限亮或printExposure。 | 独立CPU Standard BRDF、DFG/PMREM采样、同次R32F上的PCF与线性fog；地面写normal/depth，fog后resolve/mips供玻璃采样，后处理及ACES/sRGB顺序保持。 |
+| R09B/R10C/D：AO与Bokeh几何 | 产品地面同时进入独立normal/depth几何pass。AO全分辨率时Bokeh复用；半分辨率AO时单独完整DOF depth也覆盖地面。 | 新captureFloorDepth仅显式Review读取实际DOF附件；最多14语义字段/2在途批，按唯一纹理读回及QImage隐式共享交付。产品默认关闭此读回。 |
+| 后续性能/Metal/OpenGL | 地面共用既有opaque PSO/SRB及DFG/LTC纹理，增加4顶点+6索引共152 bytes的一次初始化上传；复用既有receiver uniform槽、每个适用pass一次O(1) draw，无新生产目标/纹理/队列。 | 颜色变化不重建目标或shadow，三map尺寸/开关、1×/4×MSAA、十次真实SG重建；资源描述与partial uniform规则保持，不将API字节或离屏耗时当作VSYNC性能。 |
+
+有限参考 REFDB-01：读取外部 `Qt/src/RhiScene.cpp` 的 plane/prepare/render 与 `Resources/runtime.ts` 的floor分类/材质状态。仅确认“单个静态平面随不透明几何进入通道”的遗漏检查价值；本项目已有固定网格、输入值和SRB，未复制代码/架构/协议或数值，不迁入外部作者/许可未确定的自维护片段。实际读取SHA256分别为 `b2f21e3f7a4dc4e8268041ac3ff543dbcb8dc41615aa2fe78ada89c2fa8a0081`、`c86bdf93febae6a93fae2b2c4b195cedfdb822cf8ee99677c00c568e455a3fd5`；原文件保持原署名。新增floor helper沿既有Three MIT派生公式，许可证仍在resources/licenses/three-LICENSE；`audit-rhi-floor.py`独立核对LTC/GGX与现有源派生实现的token等价，未修改壳体shader。
+
+复现：Review ON的Release构建后运行 `rhi-shadow-gpu`（内含地面专项）、`rhi-flicker-gpu`（真实SceneItem匿名9×64库、双主题/640×480与1280×720/静止/波浪/浏览/总览进退/详情共1200帧），再跑受影响完整隐藏回归。地面专项320×240/960×720，14组颜色/map数学场景及同状态缓存/改色/阴影关闭，另覆盖1×/4×采样、全/半AO、实际DOF附件和十次重建。小视口只是覆盖地面接入，不代替D4同状态/DPR/render scale的BLUR-01调查。
+
+三平台COMMON-01–05/PERF-01–07与平台符号/hash/清单由 `python3 tools/audit/audit-rhi-floor.py` 生成到本地忽略目录。Windows/D3D11、Linux/OpenGL缺目标系统/设备，只能严格静态审计，实机任务在R34/R19D3B-P；本机离屏不证明原生窗口、正常VSYNC、物理输入或完整产品性能。验证产物与失败诊断均不提交。
+
+本轮实际环境为macOS/arm64/Apple M4、自动发现Qt6.12.0、AppleClang21、Release、真正隐藏DPR1。Metal/OpenGL地面14组源数学各通过，最大PBR/fog误差均.00239867≤3/255、平面投影最大分别.00123643/.00119814物理px≤2，原始depth差最大约5.45e-5/5.11e-5世界单位；每个开启阴影的源数学场景均有真实遮挡点。十次地面SG重建、AO/full DOF附件、缓存/三map检查及两后端各1200帧生产回放通过；本机GL实际backend=2。自身地面/实际生产输出已检查，不进行源图比较，也未关闭BLUR-01。
+
+完整Metal隐藏集首次36/38通过：source-format因最后补充探针尚未格式化失败，修正后按原门禁复验；shell仅前台PID变化触发策略失败，记录native visible/active/activationObserved=false，原因未确认，保留失败且不放宽策略。最终相同策略的Metal shadow/shell均通过；OpenGL shadow/flicker/shell三项通过。其余未受收尾影响的完整隐藏结果复用，不重复整套矩阵。三平台严格静态审计及helper等价、两组官方qmllint/check-format通过。最后恢复Review OFF/可见OFF，普通生产Release构建与25/25快速门禁实际通过（含source-format和默认隐藏窗口策略）；原始输出、失败及自有采集仅保存在本地忽略目录。

@@ -19,6 +19,10 @@ void followVector(SceneVector &value, SceneVector &velocity, SceneVector target,
     velocity = (velocity - impulse * (5 * dt)) * decay;
 }
 }
+SceneVector LightingPalette::floorColor(QStringView theme)
+{
+    return linear(theme == u"night" ? "#0b1828" : theme == u"dusk" ? "#a6b8c0" : "#d8c9b9");
+}
 LightingPalette LightingPalette::theme(bool night)
 {
     LightingPalette p;
@@ -37,6 +41,7 @@ LightingPalette LightingPalette::theme(bool night)
     p.spotColor = linear(night ? "#dbe9ff" : "#ffe3b2");
     p.scatterColor = linear(night ? "#cee5ff" : "#ffdba3");
     p.background = linear(night ? "#07111f" : "#eae5e1");
+    p.floor = floorColor(night ? u"night" : u"day");
     return p;
 }
 SelectionLighting::SelectionLighting(QObject *parent)
@@ -115,6 +120,7 @@ void SelectionLighting::advanceTheme(double dt)
     COLOR(spotColor);
     COLOR(scatterColor);
     COLOR(background);
+    COLOR(floor);
 #undef NUMBER
 #undef COLOR
 }

@@ -98,16 +98,16 @@ struct Target
 };
 struct Pending
 {
-    std::array<QRhiReadbackResult, 13> results;
+    std::array<QRhiReadbackResult, 14> results;
     Capture capture;
     std::function<void(Capture)> deliver;
     int remaining = 0;
-    std::array<int, 13> readbackOwner;
+    std::array<int, 14> readbackOwner;
     int drainFrames = 0;
     bool yUp = false;
     int opticalProbe = 0;
     bool captureShadowDepth = false;
-    std::array<QSize, 13> logicalReadbackSizes;
+    std::array<QSize, 14> logicalReadbackSizes;
 };
 QByteArray floatTextureBytes(const char *path, qsizetype expected)
 {
@@ -335,7 +335,7 @@ private:
     Owned<QRhiBuffer> vertices, indices, uniforms, outputUniform;
     Owned<QRhiBuffer> instanceBuffer;
     Owned<QRhiTexture> cover, environment, dfg, ltc1, ltc2;
-    std::array<Owned<QRhiTexture>, 13> alignedReadbacks;
+    std::array<Owned<QRhiTexture>, 14> alignedReadbacks;
     int readbackPackAlignment = 0;
     quint64 alignedReadbackRevision = 0;
     Owned<QRhiSampler> linear, nearest, mipLinear, shadowCompare;
@@ -350,14 +350,14 @@ private:
     Owned<QRhiGraphicsPipeline> prepassBackgroundPipeline;
     Owned<QRhiGraphicsPipeline> opaqueInstances, shadowInstances, prepassInstances,
             coverageInstances;
-    Mesh lid, spine, tray, paper, floor, backgroundTriangle;
+    Mesh lid, spine, tray, paper, floor, productFloor, backgroundTriangle;
     QByteArray vertexBytes, indexBytes;
     QSize targetSize;
     int shadowSize = 0, uniformStride = 0, captureSamples = 0;
     bool targetsHaveShells = false;
     bool areaShader = false, opticsProbeShader = false, visibilityProbeShader = false;
     bool diagnosticTargets = false;
-    std::array<Uniform, 7> uniformBases;
+    std::array<Uniform, 8> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
     QVector<QMatrix4x4> lightEntities;
     QByteArray uniformScratch;
@@ -659,7 +659,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 "Requested resource plan exceeds GPU dimensions or target pixel protection");
         require(api->supportedSampleCounts().contains(input.captureSamples),
                 "Requested resource plan uses unsupported MSAA");
-        qint64 geometryBytes = 11 * 32 + 15 * 4;
+        qint64 geometryBytes = 15 * 32 + 21 * 4;
         for (const auto &batch : preparedAssets().geometry)
             geometryBytes += batch.vertices.size() * 32 + batch.indices.size() * 4;
         allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
@@ -703,6 +703,13 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                           { { 6, -.05f, -6, 0, 1, 0, 1, 1 } },
                           { { -6, -.05f, -6, 0, 1, 0, 0, 1 } } };
         floor = append(quad);
+        // PlaneGeometry(200, 200), rotation.x=-PI/2, position.y=-4.63.
+        // Baked once into the shared immutable geometry; never a shadow caster.
+        quad.vertices = { { { -100, -4.63f, 100, 0, 1, 0, 0, 0 } },
+                          { { 100, -4.63f, 100, 0, 1, 0, 1, 0 } },
+                          { { 100, -4.63f, -100, 0, 1, 0, 1, 1 } },
+                          { { -100, -4.63f, -100, 0, 1, 0, 0, 1 } } };
+        productFloor = append(quad);
         quad.vertices = { { { -1, -1, 0, 0, 0, 1, 0, 0 } },
                           { { 3, -1, 0, 0, 0, 1, 2, 0 } },
                           { { -1, 3, 0, 0, 0, 1, 0, 2 } } };
@@ -855,7 +862,13 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                           linear.get()),
                   QRhiShaderResourceBinding::sampledTexture(
                           3, QRhiShaderResourceBinding::FragmentStage, shadow.hardwareDepth.get(),
-                          shadowCompare.get()) });
+                          shadowCompare.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          5, QRhiShaderResourceBinding::FragmentStage, dfg.get(), linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          6, QRhiShaderResourceBinding::FragmentStage, ltc1.get(), linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          7, QRhiShaderResourceBinding::FragmentStage, ltc2.get(), linear.get()) });
         require(geometryBindings->create(), "Geometry bindings failed");
         shadowBindings.reset(api->newShaderResourceBindings());
         shadowBindings->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
@@ -1088,12 +1101,18 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.optics, QVector4D(input.spotIntensity, .32f, .035f, -.0003f));
     copy(u.nativeVP, nativeVP);
     copy(u.camera, input.scene.camera.position.qt(), input.exposure);
-    const auto material = shellMaterial(std::clamp(kind - 3, 0, 2), input.warmth, input.clarity,
-                                        input.environmentIntensity);
-    copy(u.tint, material.tint);
-    copy(u.attenuation, material.attenuation);
-    copy(u.material, material.transport);
-    copy(u.coat, material.coat);
+    if (kind == 6) {
+        copy(u.tint, input.floorColor);
+        copy(u.material, QVector4D(0, .95f, 0, 0));
+        copy(u.coat, QVector4D(0, 0, 0, input.environmentIntensity));
+    } else {
+        const auto material = shellMaterial(std::clamp(kind - 3, 0, 2), input.warmth, input.clarity,
+                                            input.environmentIntensity);
+        copy(u.tint, material.tint);
+        copy(u.attenuation, material.attenuation);
+        copy(u.material, material.transport);
+        copy(u.coat, material.coat);
+    }
     copy(u.areaPosition, input.areaPosition, input.areaIntensity);
     copy(u.areaTarget, input.areaTarget, input.lightingEnabled ? 1 : 0);
     copy(u.scatter, input.scatterColor, input.scatterStrength);
@@ -1246,7 +1265,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
     nativeLightVP = api->clipSpaceCorrMatrix() * canonicalLightVP;
-    for (int kind = -1; kind <= 5; ++kind)
+    for (int kind = -1; kind <= 6; ++kind)
         uniformBases[kind + 1] = uniformTemplate(kind);
     const QVector4D printSettings(input.printAmbient, input.rowDetail, input.rowFill, 0);
     if (lightEntities != entities || cachedRowSettings != input.rowSettings
@@ -1333,7 +1352,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (!batched)
         for (int i = 0; i < entities.size(); ++i)
             opaqueOffsets.append(append(entities[i], input.geometryDiagnostic ? 1 : 0, i));
-    const auto floorOffset = append({ }, 2);
+    const auto floorOffset = append({ }, input.productFloor ? 6 : 2);
     struct ShellDraw
     {
         Mesh mesh;
@@ -1473,7 +1492,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         if (recordCapture)
             opticalEvents.append("opaque");
         opaqueMeshDraw(backgroundPipeline.get(), backgroundTriangle, bgOffset);
-        if (input.shadowDiagnostic)
+        if (input.productFloor)
+            opaqueMeshDraw(opaquePipeline.get(), productFloor, floorOffset);
+        else if (input.shadowDiagnostic)
             opaqueMeshDraw(opaquePipeline.get(), floor, floorOffset);
         if ((!input.shadowDiagnostic || input.shells) && batched) {
             if (input.geometryDiagnostic)
@@ -1541,6 +1562,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
             drawMesh(cb, prepassBackgroundPipeline.get(), geometryBindings.get(),
                      backgroundTriangle, bgOffset);
+            if (input.productFloor)
+                drawMesh(cb, prepassPipeline.get(), geometryBindings.get(), productFloor,
+                         floorOffset);
             if (batched) {
                 Mesh combined{ lid.start,
                                lid.count + spine.count + tray.count
@@ -1681,7 +1705,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                                  { "lease", qint64(effectiveCoverLeases[i]) } });
         }
         p->capture.metadata["effectiveCoverRegions"] = effectiveRegions;
-        const std::array<QRhiTexture *, 13> textures{
+        const std::array<QRhiTexture *, 14> textures{
             opaque.color.get(),
             opaque.normal.get(),
             opaque.depth.get(),
@@ -1695,7 +1719,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             input.postprocess && input.aoSamples ? post.rawAo() : opaque.color.get(),
             input.postprocess && input.aoSamples ? post.blurredAo() : opaque.color.get(),
             input.postprocess && input.aoSamples ? aoGeometry.normal.get() : opaque.normal.get(),
-            input.postprocess && input.aoSamples ? aoGeometry.depth.get() : opaque.depth.get()
+            input.postprocess && input.aoSamples ? aoGeometry.depth.get() : opaque.depth.get(),
+            input.postprocess && input.bokeh
+                    ? (dofTargets ? dofGeometry.depth.get() : aoGeometry.depth.get())
+                    : opaque.depth.get()
         };
         QJsonArray sorted;
         QJsonArray opticalUniforms;
@@ -1732,6 +1759,21 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         // Inspect the same receiver bytes uploaded above, rather than restating Input defaults.
         Uniform receiver;
         std::memcpy(&receiver, bytes.constData() + floorOffset, sizeof(receiver));
+        p->capture.metadata["productFloor"] = QJsonObject{
+            { "enabled", input.productFloor },
+            { "color", QJsonArray{ receiver.tint[0], receiver.tint[1], receiver.tint[2] } },
+            { "roughness", receiver.material[1] },
+            { "environment", receiver.settings[3] },
+            { "kind", receiver.draw[0] },
+            { "opaqueIndices", input.productFloor ? int(productFloor.count) : 0 },
+            { "aoIndices",
+              input.productFloor && input.postprocess && input.aoSamples ? int(productFloor.count)
+                                                                         : 0 },
+            { "dofIndices",
+              input.productFloor && input.postprocess && input.bokeh ? int(productFloor.count)
+                                                                     : 0 },
+            { "castsShadow", false }
+        };
         QJsonArray lightMatrix;
         for (float value : receiver.lightVP)
             lightMatrix.append(value);
@@ -1771,8 +1813,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["readbackPackAlignment"] = readbackPackAlignment;
         QJsonArray alignedCopies;
         p->readbackOwner.fill(-1);
-        for (int i = 0; i < 13; ++i) {
-            if (i == 8 && !input.captureAtlas)
+        for (int i = 0; i < 14; ++i) {
+            if ((i == 8 && !input.captureAtlas) || (i == 13 && !input.captureFloorDepth))
                 continue;
             int owner = i;
             for (int prior = 0; prior < i; ++prior)
@@ -1816,16 +1858,16 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                         }
                         state->capture.metadata["opticalProbeSample"] = values;
                     }
-                    const std::array<QImage *, 13> outputs{
+                    const std::array<QImage *, 14> outputs{
                         &state->capture.color,          &state->capture.normal,
                         &state->capture.depth,          &state->capture.shadow,
                         &state->capture.composite,      &state->capture.compositeNormal,
                         &state->capture.compositeDepth, &state->capture.postprocessed,
                         &state->capture.atlas,          &state->capture.rawAo,
                         &state->capture.blurredAo,      &state->capture.aoNormal,
-                        &state->capture.aoDepth
+                        &state->capture.aoDepth,        &state->capture.dofDepth
                     };
-                    for (int field = 0; field < 13; ++field)
+                    for (int field = 0; field < 14; ++field)
                         if (state->readbackOwner[field] == i)
                             *outputs[field] = image;
                     if (--state->remaining == 0)
@@ -1863,7 +1905,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata["alignedReadbackRevision"] = qint64(alignedReadbackRevision);
         p->capture.metadata["resources"] = resourceInventory();
         p->capture.metadata["uniqueReadbackTextures"] = p->remaining;
-        p->capture.metadata["readbackFieldSlots"] = input.captureAtlas ? 13 : 12;
+        p->capture.metadata["readbackFieldSlots"] =
+                (input.captureAtlas ? 13 : 12) + int(input.captureFloorDepth);
         pending.push_back(p);
         cb->resourceUpdate(reads);
     }

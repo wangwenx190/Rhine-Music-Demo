@@ -31,6 +31,7 @@ struct Input
     bool profile = false;
     bool poolFrame = false;
     bool captureAtlas = true;
+    bool captureFloorDepth = false; // Explicit Review readback only; production remains off.
     bool captureShadowDepth =
             false; // Explicit Review capture; shares existing R32F readback bytes.
     bool postprocess = false, bokeh = false, smaa = false;
@@ -49,6 +50,8 @@ struct Input
     QVector3D scatterColor, areaPosition, areaTarget;
     bool shells = false, showPaper = true, rawOutput = false;
     bool lightingEnabled = true;
+    bool productFloor = false; // SceneItem enables the source ground, independent Review opts in.
+    QVector3D floorColor; // Linear working color, owned by the theme controller.
     bool fogEnabled = false; // Independent Review fixtures opt in; production always enables fog.
     bool shadows = true, geometryDiagnostic = false, shadowDiagnostic = false;
     quint64 request = 0;
@@ -59,7 +62,7 @@ struct Capture
     QImage color, normal, depth, shadow;
     QImage composite, compositeNormal, compositeDepth;
     QImage postprocessed, atlas;
-    QImage rawAo, blurredAo, aoNormal, aoDepth;
+    QImage rawAo, blurredAo, aoNormal, aoDepth, dofDepth;
     QByteArray shadowDepth;
     QJsonObject metadata;
 };

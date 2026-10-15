@@ -24,6 +24,7 @@ vec3 srgbToLinear(vec3 c)
     return mix(c / 12.92, pow((c + .055) / 1.055, vec3(2.4)), step(vec3(.04045), c));
 }
 #include "shadow-filter.glsl"
+#include "floor-lighting.glsl"
 void main()
 {
     if (f.draw.x < -.5) {
@@ -34,6 +35,11 @@ void main()
     }
     normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);
     depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);
+    if (f.draw.x > 5.5) {
+        vec3 outgoing = floorRadiance(normalize(worldNormal), normalize(f.camera.xyz - world));
+        color = vec4(sceneFog(outgoing, viewDepth), 1);
+        return;
+    }
     if (f.draw.x > 1.5) {
         color = vec4(vec3(shadowFactor()), 1);
         return;

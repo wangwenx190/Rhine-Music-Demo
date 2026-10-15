@@ -195,6 +195,17 @@ int main(int argc, char **argv)
                         auto result = driver.capture(input, target);
                         checkSubmittedFog(input, result);
                         checkSubmittedShadow(input, result);
+                        const auto floor = result.metadata["productFloor"].toObject();
+                        check(input.productFloor && floor["enabled"].toBool()
+                                      && floor["opaqueIndices"].toInt() == 6
+                                      && (opticsOnly
+                                          || (floor["aoIndices"].toInt() == 6
+                                              && floor["dofIndices"].toInt() == 6)),
+                              "Production floor omitted from capture or post geometry");
+                        for (int c = 0; c < 3; ++c)
+                            check(floor["color"].toArray()[c].toDouble()
+                                          == adapter.lighting()->palette().floor.qt()[c],
+                                  "Production floor uses stale theme color");
                         check(input.fogEnabled, "Production scene did not enable authored fog");
                         const double distance =
                                 (input.scene.camera.position - input.scene.camera.aim).length();

@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
+#include <QtEndian>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -158,6 +159,7 @@ double shadowReference(const Capture &capture, QVector3D world, int x, int y, QS
     }
     return 1 - .32 + .32 * sum * .2;
 }
+#include "RhiFloorAudit.h"
 QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
 {
     const int map = input.shadowSize;
@@ -222,6 +224,7 @@ int main(int argc, char **argv)
         c["clipFar"] = 100;
         c["layer"] = "paper";
         RhiCaptureHarness driver;
+        const auto floors = runFloorAudit(driver, c, output);
         QJsonArray results, lifecycle;
         Input last;
         const QSize size(640, 480);
@@ -307,6 +310,7 @@ int main(int argc, char **argv)
                                                 { "qt", qVersion() },
                                                 { "imageComparison", false },
                                                 { "cases", results },
+                                                { "floors", floors },
                                                 { "rebuilds", lifecycle },
                                                 { "offscreen", driver.surface.diagnostics() },
                                                 { "windowPolicy",

@@ -2,6 +2,7 @@
 #include "RowLightController.h"
 #include "FrameClock.h"
 #include <QColor>
+#include <QStringView>
 #include <QVector4D>
 namespace yalahoo {
 struct LightingPalette
@@ -9,6 +10,8 @@ struct LightingPalette
     double warmth = 1, environment = .25, key = .45, hemisphere = .32, fill = .045;
     double spot = 180 * 64, area = 34, scatter = 1, printAmbient = .5, exposure = 1.05;
     SceneVector keyColor, skyColor, groundColor, spotColor, scatterColor, background;
+    SceneVector floor;
+    static SceneVector floorColor(QStringView theme);
     static LightingPalette theme(bool night);
 };
 class SelectionLighting : public QObject

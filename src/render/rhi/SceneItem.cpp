@@ -609,6 +609,8 @@ void SceneItem::updatePolish()
     in.immutableCover = true;
     in.geometryDiagnostic = m_geometryOnly;
     in.fogEnabled = !m_geometryOnly;
+    in.productFloor = !m_geometryOnly;
+    in.floorColor = l.palette().floor.qt();
     in.shells = !m_geometryOnly;
     in.showPaper = !m_geometryOnly;
     in.captureSamples = 4;
@@ -668,6 +670,7 @@ void SceneItem::updatePolish()
             && target == QSize(fixedColorBufferWidth(), fixedColorBufferHeight())
             && in.geometryDiagnostic == old.geometryDiagnostic && in.shells == old.shells
             && in.fogEnabled == old.fogEnabled && in.profile == old.profile
+            && in.productFloor == old.productFloor && in.floorColor == old.floorColor
             && in.shadows == old.shadows && in.shadowSize == old.shadowSize
             && in.captureSamples == old.captureSamples && in.aoSamples == old.aoSamples
             && in.aoResolution == old.aoResolution && in.postprocess == old.postprocess
