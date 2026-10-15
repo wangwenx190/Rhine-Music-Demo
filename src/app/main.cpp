@@ -13,6 +13,9 @@
 #include "BrowseReview.h"
 #include "NavigationReview.h"
 #include "DetailReview.h"
+#include "OverviewController.h"
+#include "OverviewReview.h"
+
 #include "InputRouter.h"
 #include "RulerController.h"
 #ifdef YALAHOO_REVIEW
@@ -78,6 +81,9 @@ int main(int argc, char **argv)
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native music archive"));
     parser.addHelpOption();
+    parser.addOption({ QStringLiteral("verify-overview"),
+                       QStringLiteral("Verify production overview and exit"),
+                       QStringLiteral("directory") });
     parser.addOption({ QStringLiteral("verify-detail"),
                        QStringLiteral("Verify production detail motion and exit"),
                        QStringLiteral("directory") });
@@ -125,6 +131,10 @@ int main(int argc, char **argv)
                        QStringLiteral("report") });
 #endif
     parser.process(app);
+    const bool appVerification = parser.isSet(QStringLiteral("verify-browse"))
+            || parser.isSet(QStringLiteral("verify-navigation"))
+            || parser.isSet(QStringLiteral("verify-detail"))
+            || parser.isSet(QStringLiteral("verify-overview"));
     if (parser.isSet(QStringLiteral("verify-filled"))
         && (!parser.isSet(QStringLiteral("verify-runtime"))
             || parser.isSet(QStringLiteral("verify-library"))
@@ -133,10 +143,7 @@ int main(int argc, char **argv)
     if (parser.isSet(QStringLiteral("verify-shading"))
         && !parser.isSet(QStringLiteral("verify-runtime")))
         return 7;
-    if (parser.isSet(QStringLiteral("verify-runtime"))
-        || parser.isSet(QStringLiteral("verify-browse"))
-        || (parser.isSet(QStringLiteral("verify-navigation"))
-            || parser.isSet(QStringLiteral("verify-detail")))
+    if (parser.isSet(QStringLiteral("verify-runtime")) || appVerification
 #ifdef YALAHOO_REVIEW
         || parser.isSet(QStringLiteral("verify-materials"))
 #endif
@@ -173,6 +180,7 @@ int main(int argc, char **argv)
                                     QStringLiteral("introduction"));
     }
     yalahoo::MotionController motion;
+    yalahoo::OverviewController overview(&motion);
     yalahoo::SelectionController selection(&motion);
     yalahoo::SceneAdapter scene(motion.clock());
     yalahoo::InputRouter inputRouter(&selection);
@@ -205,10 +213,7 @@ int main(int argc, char **argv)
     bool resumeDiscarded = true;
     int resumeSamples = 0;
     QJsonArray completionRevisions;
-    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime"))
-            || parser.isSet(QStringLiteral("verify-browse"))
-            || (parser.isSet(QStringLiteral("verify-navigation"))
-                || parser.isSet(QStringLiteral("verify-detail")))
+    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime")) || appVerification
 #ifdef YALAHOO_REVIEW
             || parser.isSet(QStringLiteral("verify-materials"))
             || parser.isSet(QStringLiteral("verify-scene"))
@@ -231,10 +236,7 @@ int main(int argc, char **argv)
         QObject::connect(&selection, &yalahoo::SelectionController::arrayModeChanged,
                          preferences.get(), saveNavigation);
     }
-    if (!verificationRun || parser.isSet(QStringLiteral("verify-filled"))
-        || parser.isSet(QStringLiteral("verify-browse"))
-        || (parser.isSet(QStringLiteral("verify-navigation"))
-            || parser.isSet(QStringLiteral("verify-detail")))) {
+    if (!verificationRun || parser.isSet(QStringLiteral("verify-filled")) || appVerification) {
         // Local resource-only demonstration until the scanner is delivered in R21.
         yalahoo::LibrarySnapshot demo;
         const QStringList covers{ "square", "portrait", "landscape" };
@@ -288,19 +290,24 @@ int main(int argc, char **argv)
     QObject::connect(&selection, &yalahoo::SelectionController::libraryChanged, &presentation,
                      &yalahoo::PresentationController::reset);
     presentation.setReducedMotion(motion.reducedMotion());
+    overview.bind(&scene, &selection, &presentation);
+    QObject::connect(&inputRouter, &yalahoo::InputRouter::overviewToggleRequested, &overview,
+                     &yalahoo::OverviewController::toggle);
+    QObject::connect(&inputRouter, &yalahoo::InputRouter::overviewReturnRequested, &overview, [&] {
+        overview.setActive(false);
+    });
+    QObject::connect(&inputRouter, &yalahoo::InputRouter::inputReceived, &overview,
+                     &yalahoo::OverviewController::collapse);
     QQmlApplicationEngine engine;
-    const bool usesApp = !verificationRun || parser.isSet(QStringLiteral("verify-browse"))
-            || (parser.isSet(QStringLiteral("verify-navigation"))
-                || parser.isSet(QStringLiteral("verify-detail")));
+    const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
         presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
+        presentationProperties.insert("overviewController", QVariant::fromValue(&overview));
     }
     auto initialProperties = presentationProperties;
-    const bool verificationFrameless = parser.isSet(QStringLiteral("verify-browse"))
-            || (parser.isSet(QStringLiteral("verify-navigation"))
-                || parser.isSet(QStringLiteral("verify-detail")))
+    const bool verificationFrameless = appVerification
 #ifdef YALAHOO_REVIEW
             || parser.isSet(QStringLiteral("verify-integration"))
 #endif
@@ -330,19 +337,11 @@ int main(int argc, char **argv)
 #ifdef YALAHOO_REVIEW
     engine.loadFromModule("Yalahoo.Music",
                           parser.isSet(QStringLiteral("verify-materials")) ? "ResearchApp"
-                                  : verificationRun
-                                          && !parser.isSet(QStringLiteral("verify-browse"))
-                                          && !(parser.isSet(QStringLiteral("verify-navigation"))
-                                               || parser.isSet(QStringLiteral("verify-detail")))
-                                  ? "BootstrapProbe"
-                                  : "App");
+                                  : verificationRun && !appVerification    ? "BootstrapProbe"
+                                                                           : "App");
 #else
     engine.loadFromModule("Yalahoo.Music",
-                          verificationRun && !parser.isSet(QStringLiteral("verify-browse"))
-                                          && !(parser.isSet(QStringLiteral("verify-navigation"))
-                                               || parser.isSet(QStringLiteral("verify-detail")))
-                                  ? "BootstrapProbe"
-                                  : "App");
+                          verificationRun && !appVerification ? "BootstrapProbe" : "App");
 #endif
     if (engine.rootObjects().isEmpty())
         return 2;
@@ -360,6 +359,9 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
+    if (parser.isSet(QStringLiteral("verify-overview")))
+        return yalahoo::reviewOverview(app, *window, scene, overview, presentation, library, motion,
+                                       parser.value(QStringLiteral("verify-overview")));
     if (parser.isSet(QStringLiteral("verify-detail")))
         return yalahoo::reviewDetail(app, *window, scene, library, presentation, motion,
                                      parser.value(QStringLiteral("verify-detail")));

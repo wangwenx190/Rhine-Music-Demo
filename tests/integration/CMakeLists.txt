@@ -135,3 +135,23 @@ if(WIN32)
     set_tests_properties(runtime-detail PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+add_test(NAME runtime-overview COMMAND Yalahoo --verify-overview
+    "${CMAKE_BINARY_DIR}/verification/overview-product")
+set_tests_properties(runtime-overview PROPERTIES TIMEOUT 150
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_NO_VSYNC="
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(runtime-overview PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+
+add_test(NAME overview-qml COMMAND ui-audit --overview
+    "${CMAKE_BINARY_DIR}/verification/overview-qml")
+set_tests_properties(overview-qml PROPERTIES TIMEOUT 120
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(overview-qml PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

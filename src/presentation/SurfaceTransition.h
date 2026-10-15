@@ -3,6 +3,7 @@
 #include <QEasingCurve>
 #include <QObject>
 #include <functional>
+#include <optional>
 
 namespace yalahoo {
 // Frozen ui-transitions.ts: one replaceable animation, driven by the shared clock.
@@ -32,6 +33,10 @@ public:
     {
         return m_running;
     }
+    void setEnterCurve(const QEasingCurve &curve)
+    {
+        m_enterCurve = curve;
+    }
     void show(bool reduced);
     void hide(bool reduced, std::function<void()> finished = { });
     void advance(double seconds);
@@ -48,6 +53,7 @@ private:
     double m_elapsed = 0, m_duration = 0;
     bool m_right, m_browse, m_shown = false, m_running = false, m_show = false;
     QEasingCurve m_ease;
+    std::optional<QEasingCurve> m_enterCurve;
     quint64 m_revision = 0;
     std::function<void()> m_finished;
 };

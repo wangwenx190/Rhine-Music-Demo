@@ -48,21 +48,7 @@ enable_testing()
 include(cmake/SourceFormat.cmake)
 add_subdirectory(tests/unit)
 add_subdirectory(tests/integration)
-if(APPLE)
-    foreach(directory IN ITEMS tests/unit tests/integration)
-        get_property(native_tests DIRECTORY "${directory}" PROPERTY TESTS)
-        set_property(TEST ${native_tests} DIRECTORY "${directory}" APPEND PROPERTY ENVIRONMENT
-            "QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM=1")
-        if(NOT YALAHOO_MACOS_VISIBLE_TESTS)
-            foreach(test IN LISTS native_tests)
-                if(test MATCHES "^runtime|.*-gpu$|^render-backend-gpu-audit$|^postprocess-gpu-audit$|^occlusion-gpu-audit$")
-                    set_property(TEST "${test}" DIRECTORY "${directory}" PROPERTY DISABLED TRUE)
-                    set_property(TEST "${test}" DIRECTORY "${directory}" APPEND PROPERTY LABELS macos-visible-deferred)
-                endif()
-            endforeach()
-        endif()
-    endforeach()
-endif()
+include(cmake/TestPolicy.cmake)
 
 file(
     WRITE

@@ -126,6 +126,7 @@ private:
     QQuaternion m_caseRotation;
     bool m_explicitLightingInput = false;
     SceneFrame m_frame;
+    QMatrix4x4 m_viewProjection;
     std::array<ScalarSpring, 3> m_position, m_aim;
     ScalarSpring m_span, m_yaw, m_elevation;
     double m_detail = 0, m_laneSpeed = 0, m_rowSpeed = 0, m_pointerX = 0, m_pointerY = 0;

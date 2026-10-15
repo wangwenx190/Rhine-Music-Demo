@@ -156,7 +156,9 @@ void yalahoo::verification::prepareNativeApplication()
                         usingBlock:^(NSNotification *) {
                             activationObserved = true;
                         }];
-        [application setActivationPolicy:NSApplicationActivationPolicyProhibited];
+        [application setActivationPolicy:foregroundVerification()
+                             ? NSApplicationActivationPolicyRegular
+                             : NSApplicationActivationPolicyProhibited];
     }
 }
 

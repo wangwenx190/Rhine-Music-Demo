@@ -9,8 +9,10 @@
 #include "ReturningCasePool.h"
 #include "PointerDragController.h"
 #include <QPointer>
+#include <limits>
 
 namespace yalahoo {
+class OverviewController;
 class SelectionController : public QObject
 {
     Q_OBJECT
@@ -42,6 +44,11 @@ public:
     bool canMovePrevious() const;
     bool canMoveNext() const;
     double browseRow(int lane) const;
+    void setOverview(OverviewController *overview);
+    double overviewProgress() const;
+    double centerLane() const;
+    double columnExtent(double lane) const;
+    void overviewAlbumClicked();
     const RealColumns &realColumns() const;
     bool selectCell(ArchiveCell cell, bool guided = false);
     void setLift(double lift);
@@ -112,7 +119,16 @@ private:
     std::optional<ArchiveCell> selectionCell(const QString &id) const;
     using Copy = ReturningCase;
     std::array<double, 2> displayOffset() const;
-    QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0) const;
+    QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0,
+                         bool folded = true) const;
+    struct ExtentCache
+    {
+        double lane = std::numeric_limits<double>::infinity();
+        double extent = 1;
+    };
+    mutable std::array<ExtentCache, ArchivePool::lanes> m_extentCache;
+    mutable double m_extentCenter = 0, m_extentProgress = -1;
+    QPointer<OverviewController> m_overview;
     QPointer<MotionController> m_motion;
     ArchivePool m_pool;
     RealColumns m_realColumns;

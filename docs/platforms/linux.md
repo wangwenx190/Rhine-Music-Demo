@@ -271,3 +271,9 @@ QSG_RHI_BACKEND=opengl build/release/bin/yalahoo --verify-browse build/release/v
 ```
 
 对 DPR 1/1.5/2 应先查询 `ui-audit --native-dpr`，将 QT_SCALE_FACTOR 设为目标 DPR / 查询值，并核对报告的实际 DPR。检查九尺寸双主题、短屏滚动、SVG 与字体/emoji 回退、主题按钮输入、无焦点窗口策略，以及双 API 静止、hide/restore/resize/十次重建结果。PNG 只采集自身渲染或提交的 swapchain，禁止桌面截屏或激活窗口。窗口管理器不支持置底/拒绝焦点时须报告实际失败；目标平台的颜色、GPU 时间及呈现不能由 Windows 成绩代替。此处实际结果：待用户填写。
+
+## 总览源码与目标平台回归
+
+总览的源码/状态、局部模糊资源、数学输入、实际产品与隐藏UI入口见[overview.md](../contracts/overview.md)。外观以迁移计划置顶规则为准，禁止原实机图逐像素比较；旧章节的图像相似度/ROI/边缘带门禁不再执行。后续历史源码复查必须紧接R19执行，再进入R20。
+
+当前缺少本平台原生Kit、窗口管理器与GPU运行环境，状态为“静态审计通过，实机待验证（R34/R19-P）”。在本平台Release构建/完整CTest/两组官方qmllint后，按总览契约运行`verify-overview.py --backend opengl`产品三次与`--visual`九尺寸双主题/十次重建；分别记录xcb与Wayland。核对真实DPR、两步进入、V/Esc/专辑返回、标签碰撞/折叠拾取、播放隔离、物理输入/焦点与资源回落。只用本平台真实质量与状态验收，不沿用其他平台结果。

@@ -1,4 +1,5 @@
 #include "SceneAdapter.h"
+#include "OverviewController.h"
 #include "MotionFunctions.h"
 #include <QVector4D>
 #include <algorithm>
@@ -125,12 +126,15 @@ CameraPose SceneAdapter::target() const
                                                : 560.0 / 1080;
     detailAim = detailAim + right * ((.5 - detailX) * w * span / h) + up * ((detailY - .5) * span);
     aim = aim * (1 - d) + detailAim * d;
-    auto position = aim + direction * (140 + (72 - 140) * d);
+    auto pose =
+            OverviewController::framing({ aim + direction * (140 + (72 - 140) * d), aim, span }, w,
+                                        h, m_selection ? m_selection->overviewProgress() : 0);
+    auto position = pose.position;
     if (!m_reduced && d == 0) {
         position.x += m_pointerX * .12;
         position.y -= m_pointerY * .12;
     }
-    return { position, aim, span };
+    return { position, pose.aim, pose.span };
 }
 void SceneAdapter::requestDetail(bool detail)
 {
@@ -284,6 +288,7 @@ void SceneAdapter::publish()
     m_frame.projection.perspective(float(m_frame.fieldOfView),
                                    float(m_frame.width / m_frame.height), float(clipNear()),
                                    float(clipFar()));
+    m_viewProjection = m_frame.projection * m_frame.view;
     m_frame.casePosition = caseOrigin;
     m_frame.caseTransform.setToIdentity();
     m_frame.caseTransform.translate(casePosition());
@@ -325,7 +330,7 @@ double SceneAdapter::focalDepth(QVector3D origin) const
 }
 QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
 {
-    const auto clip = m_frame.projection * m_frame.view * QVector4D(world, 1);
+    const auto clip = m_viewProjection * QVector4D(world, 1);
     if (clip.w() <= 0)
         return { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
                  -1 };

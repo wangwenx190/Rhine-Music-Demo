@@ -9,6 +9,12 @@ Item {
     property string playingTitle: ""
     property bool playing: false
     property FrameClock clock: null
+    property OverviewController overviewController: null
+    readonly property real chromeOpacity: overviewController ? overviewController.navigationOpacity :
+                                                               1
+    readonly property real chromeOffset: overviewController ? overviewController.navigationOffset :
+                                                              0
+    readonly property bool chromeEnabled: !overviewController || !overviewController.active
     readonly property TitleReelMotion transportController: song.reelController
     signal actionRequested(string action)
     signal themeRequested(bool night)
@@ -59,6 +65,11 @@ Item {
         spacing: root.navGap
         height: root.metrics.portrait ? 32 : root.narrow ? 30 : 31
         ArchiveButton {
+            opacity: root.chromeOpacity
+            enabled: root.chromeEnabled
+            transform: Translate {
+                y: root.chromeOffset
+            }
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2
@@ -70,6 +81,11 @@ Item {
             onClicked: root.actionRequested("library")
         }
         ArchiveButton {
+            opacity: root.chromeOpacity
+            enabled: root.chromeEnabled
+            transform: Translate {
+                y: root.chromeOffset
+            }
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2
@@ -82,6 +98,11 @@ Item {
         }
         ThemeSwitch {
             objectName: "themeSwitch"
+            opacity: root.chromeOpacity
+            enabled: root.chromeEnabled
+            transform: Translate {
+                y: root.chromeOffset
+            }
             tokens: root.tokens
             width: root.metrics.portrait ? 104 : root.narrow ? 100 : 108
             height: root.metrics.portrait || !root.narrow ? 31 : 30
@@ -89,6 +110,11 @@ Item {
             onThemeRequested: night => root.themeRequested(night)
         }
         ArchiveButton {
+            opacity: root.chromeOpacity
+            enabled: root.chromeEnabled
+            transform: Translate {
+                y: root.chromeOffset
+            }
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2

@@ -434,8 +434,10 @@ bool SceneItem::selectAt(QPointF point)
     m_adapter->recordInput();
     const bool selected = m_adapter->selection()->selectCell(
             { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true);
-    if (selected)
+    if (selected) {
+        m_adapter->selection()->overviewAlbumClicked();
         m_adapter->recordNavigationCommit(m_adapter->selection()->revision());
+    }
     return selected;
 }
 void SceneItem::mousePressEvent(QMouseEvent *event)

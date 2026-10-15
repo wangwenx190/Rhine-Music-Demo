@@ -205,6 +205,12 @@ bool InputRouter::key(QKeyEvent *event, QQuickWindow *window)
         || event->modifiers().testFlag(Qt::AltModifier))
         return false;
     switch (event->key()) {
+    case Qt::Key_V:
+        emit overviewToggleRequested();
+        return true;
+    case Qt::Key_Escape:
+        emit overviewReturnRequested();
+        return false;
     case Qt::Key_Up:
         commit(-1, false);
         return true;

@@ -55,3 +55,8 @@ Windows 取得目标环境后运行上述 Release 命令，再以 `--backend d3d
 回放实测峰值为三个 CPU 封面 owner/两个 returning，最终每次 owner=1、解码 active/pending=0，单批最大图集上传 2,097,152 bytes，运动期间 target/postprocess generation 不变；严格容量仍为选中加三个副本，满池/原位回收由专项与阵列压力入口覆盖。当前资源描述符最大值在 257,590,132–341,319,396 bytes，属于估算且不代表实测 VRAM。逻辑窗口 1280×720，正常画质的内部三维目标遵守原 RenderQuality 比例及上限，实际 DPR2 不等于三维目标未受限地渲染二倍分辨率；各目标尺寸、Qt 输出与上传/CPU租约分别保留在原始报告。
 
 最终回放在本地 verification/macos/detail/r18/final-materials/，失败/中断及前置诊断目录均保留。原始图像、逐帧状态、机器矩阵和 hash 清单不进入 Git。默认配置恢复 YALAHOO_MACOS_VISIBLE_TESTS=OFF、YALAHOO_REVIEW=OFF，授权环境开关只用于已退出的验证子进程；恢复后完整 Release CTest 的 26 项启用测试全部通过，包含 verification-window-policy，另 5 项可见测试明确禁用。
+
+
+## 门禁分层修订
+
+现行门禁按[测试门禁契约](test-gates.md)执行：`verify-detail.py`默认`--runs 1`的普通功能回放，保持抽取/换片/反向/打断/拖动/改速/减少动态及播放隔离；三十次追加换片、十次surface及十次完整QML窗口重建只在显式`--lifecycle`时执行。普通回放报告`lifecycleStressRequested=false`和实际零重建，不能当作压力通过；历史完整压力事实仍按其原模式/版本保留。正式性能/成本或具体噪声复核才使用`--runs 3`，不为每个功能/DPR重复所有压力序列。原图逐像素门禁受迁移计划禁止，历史源码复查按R19A–R19H追溯实际适配依据。

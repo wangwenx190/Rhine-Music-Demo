@@ -2,7 +2,7 @@
 
 本契约由用户明确要求，适用于本轮、所有后续 session，以及原生单元/集成/GPU/视觉/性能测试、品牌验证、冻结 Web harness 和证据重建工具。普通用户主动启动的播放器窗口保持正常行为。
 
-用户明确要求某轮次进行可见窗口验证，即授权该轮次验证窗口抢前台、前置和获得焦点，无需重复确认。该例外只覆盖指定轮次与验证用途；显式设置 `YALAHOO_VERIFY_FOREGROUND=1`，macOS 可见 CTest 同时以 `YALAHOO_MACOS_VISIBLE_TESTS=ON` 配置。`VerificationWindow` 在该进程中使用普通窗口 flags 与 macOS Regular/正常窗口层级，报告 `mode=user-authorized-foreground`、`nonInterferenceEnforced=false`，按实际策略验收，不冒充置底无激活通过。自身图像采集、Release、匿名输入及串行采样要求仍适用；不得截取用户桌面。轮次结束必须清除进程开关，恢复可见测试 OFF，并真实回归默认隐藏窗口策略。后续轮次/session 不继承此前授权。
+用户明确要求某轮次进行可见窗口验证，即授权该轮次验证窗口抢前台、前置和获得焦点，无需重复确认。该例外只覆盖指定轮次与验证用途；显式设置 `YALAHOO_VERIFY_FOREGROUND=1`，macOS 可见 CTest 同时以 `YALAHOO_MACOS_VISIBLE_TESTS=ON` 配置。`VerificationWindow` 在该进程创建 QGuiApplication 之前即使用 macOS Regular，随后使用普通窗口 flags 与正常窗口层级，报告 `mode=user-authorized-foreground`、`nonInterferenceEnforced=false`，按实际策略验收，不冒充置底无激活通过。自身图像采集、Release、匿名输入及串行采样要求仍适用；不得截取用户桌面。轮次结束必须清除进程开关，恢复可见测试 OFF，并真实回归默认隐藏窗口策略。后续轮次/session 不继承此前授权。
 
 验证方式按迁移计划逐项核对实际可靠能力，不按平台名称固定为实机或静态。当前macOS尚未建立可靠的非激活可见验证入口，默认`YALAHOO_MACOS_VISIBLE_TESTS=OFF`；用户授权轮次可使用上述前台入口，未获授权且仍不可靠的对应runtime/GPU检查暂缓到最后R34，不把disabled写成通过；已有可靠隐藏/离屏入口必须真实运行。当前二维Review优先使用`OffscreenSurface`：QQuickRenderControl在隐藏QQuickWindow上渲染真实Metal单采样RGBA8+depth/stencil目标，显式设置目标DPR，有界合并render请求；只读回自己的texture，不调用macOS原生show、不依赖exposure或swapchain呈现。offscreenRendering只由Review tokens启用，生产默认false。native窗口恢复与显示效果不由离屏生命周期推断，离屏局部成本不代表呈现性能；当前无法可靠验证的窗口/VSYNC等项目严格审计并保留R34实机任务。
 

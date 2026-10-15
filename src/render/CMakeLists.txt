@@ -3,6 +3,10 @@ qt_add_library(
     STATIC
     LayoutMetrics.cpp
     LayoutMetrics.h
+    OverviewController.cpp
+    OverviewController.h
+    OverviewLabelsModel.cpp
+    OverviewLabelsModel.h
     SceneAdapter.cpp
     SceneAdapter.h
     SceneFrame.h

@@ -35,6 +35,8 @@ signals:
     void directionChanged();
     void inputReceived();
     void navigationCommitted(quint64 revision);
+    void overviewToggleRequested();
+    void overviewReturnRequested();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;

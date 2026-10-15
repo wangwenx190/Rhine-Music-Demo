@@ -8,7 +8,7 @@ PresentationPorts detailPorts(SceneAdapter &scene, SelectionController &selectio
 {
     PresentationPorts ports;
     ports.archiveReady = [&selection] {
-        return selection.archiveReady();
+        return selection.overviewProgress() < .02 && selection.archiveReady();
     };
     ports.archiveInteractive = [&selection] {
         return selection.archiveInteractive();

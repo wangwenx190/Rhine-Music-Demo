@@ -45,6 +45,16 @@
       },
       "execution": {
         "noTestsAction": "error"
+      },
+      "filter": {
+        "exclude": {
+          "label": "native-visible|render-integration|legacy-image-gate"
+        }
+      },
+      "environment": {
+        "YALAHOO_VERIFY_VISIBLE": "0",
+        "YALAHOO_VERIFY_FOREGROUND": "0",
+        "YALAHOO_VERIFY_LIFECYCLE": "0"
       }
     },
     {
@@ -55,6 +65,58 @@
       },
       "execution": {
         "noTestsAction": "error"
+      },
+      "filter": {
+        "exclude": {
+          "label": "native-visible|render-integration|legacy-image-gate"
+        }
+      },
+      "environment": {
+        "YALAHOO_VERIFY_VISIBLE": "0",
+        "YALAHOO_VERIFY_FOREGROUND": "0",
+        "YALAHOO_VERIFY_LIFECYCLE": "0"
+      }
+    },
+    {
+      "name": "qt-release-full",
+      "displayName": "Release automatic regression (no visible windows)",
+      "inherits": "qt-release",
+      "filter": {
+        "exclude": {
+          "label": "native-visible|legacy-image-gate"
+        }
+      }
+    },
+    {
+      "name": "qt-release-render",
+      "displayName": "Release hidden rendering integration",
+      "inherits": "qt-release",
+      "filter": {
+        "include": {
+          "label": "hidden-render"
+        },
+        "exclude": {
+          "label": "native-visible|legacy-image-gate"
+        }
+      }
+    },
+    {
+      "name": "qt-release-visible",
+      "displayName": "Release explicit native window verification",
+      "configurePreset": "qt-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      },
+      "filter": {
+        "include": {
+          "label": "native-visible"
+        },
+        "exclude": {
+          "label": "legacy-image-gate"
+        }
       }
     }
   ]

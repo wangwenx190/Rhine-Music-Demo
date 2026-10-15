@@ -337,3 +337,10 @@ R17详情检查使用真正隐藏Metal入口，Release的`presentation`和`prese
 OpenGL当前AppKit要求drawable在主线程，故采用basic；MSAA纹理入口不存在时用同采样/颜色格式的renderbuffer+resolve，不降低效果。该后端没有Metal/threaded的线程隔离语义。完整三维同输入Room参照、旧oracle/后处理ROI、120秒三次正式呈现/吞吐与产品运动/焦点/媒体/部署仍按R34明确任务执行，不能用上述功能矩阵或12秒单盒探针写成最终通过。
 
 默认策略恢复后的最终Release配置为Review/可见测试/性能记录开关均OFF；25项实际执行CTest全部通过，4项默认可见runtime按策略disabled（本轮授权前台已另行执行通过），check-format和两个官方qmllint targets通过。没有提交验证输出。
+
+
+## 总览源码与目标平台回归
+
+总览的源码/状态、局部模糊资源、数学输入、实际产品与隐藏UI入口见[overview.md](../contracts/overview.md)。外观以迁移计划置顶规则为准，禁止原实机图逐像素比较；旧章节的图像相似度/ROI/边缘带门禁不再执行。后续历史源码复查必须紧接R19执行，再进入R20。
+
+本机采用Release/arm64，Metal/threaded与OpenGL/basic分别验证实际DPR1/1.5/2，授权前台产品回放与真正隐藏RenderControl分开记录。该轮授权不继承；日常保持`YALAHOO_MACOS_VISIBLE_TESTS=OFF`和默认窗口策略。具体运行覆盖与结论按总览契约保留，不由自身PNG或Qt事件推断屏幕扫描、物理设备和完整120秒产品性能。

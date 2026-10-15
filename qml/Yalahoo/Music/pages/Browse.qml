@@ -11,6 +11,10 @@ Item {
     property InputRouter inputRouter: null
     property FrameClock clock: null
     property SelectionController selection: null
+    property OverviewController overviewController: null
+    function focusOverviewToggle() {
+        overviewToggle.forceActiveFocus(Qt.OtherFocusReason);
+    }
     property var album: ({})
     property int albumCount: 0
     property string playingTitle: ""
@@ -23,7 +27,8 @@ Item {
     signal themeRequested(bool night)
     ReadingVeil {
         opacity: root.surface ? root.surface.opacity : 1
-        enabled: root.contentEnabled
+        enabled: root.contentEnabled && (!root.overviewController ||
+                                         !root.overviewController.active)
         visible: !root.surface || root.surface.shown
 
         anchors.fill: parent
@@ -32,19 +37,46 @@ Item {
         calloutTop: info.y
         calloutHeight: info.height
     }
+    ArchiveButton {
+        id: overviewToggle
+        objectName: "overviewToggle"
+        tokens: root.tokens
+        x: root.metrics.width <= 600 ? 22 : 40
+        y: (root.metrics.width <= 600 ? 164 : 150) + (root.overviewController
+                                                      ? root.overviewController.navigationOffset :
+                                                        0)
+        text: "缩略图模式     V"
+        iconName: "overview"
+        cssPixelSize: 12
+        height: 37
+        visible: root.overviewController !== null && root.albumCount > 0 && root.overviewController.navigationOpacity
+                 > 0
+        enabled: root.contentEnabled && root.overviewController !== null &&
+                 !root.overviewController.active
+        opacity: root.overviewController ? root.overviewController.navigationOpacity : 1
+        onClicked: root.overviewController.toggle()
+        Rectangle {
+            y: parent.height - 1
+            width: parent.width
+            height: 1
+            color: root.tokens.line
+        }
+    }
     Header {
         id: header
         metrics: root.metrics
         tokens: root.tokens
         clock: root.clock
         playingTitle: root.playingTitle
+        overviewController: root.overviewController
         onActionRequested: action => root.actionRequested(action)
         onThemeRequested: night => root.themeRequested(night)
     }
     BrowseInfo {
         id: info
         opacity: root.surface ? root.surface.opacity : 1
-        enabled: root.contentEnabled
+        enabled: root.contentEnabled && (!root.overviewController ||
+                                         !root.overviewController.active)
         visible: !root.surface || root.surface.shown
         metrics: root.metrics
         tokens: root.tokens
@@ -57,7 +89,8 @@ Item {
     }
     Footer {
         opacity: root.surface ? root.surface.opacity : 1
-        enabled: root.contentEnabled
+        enabled: root.contentEnabled && (!root.overviewController ||
+                                         !root.overviewController.active)
         visible: !root.surface || root.surface.shown
 
         metrics: root.metrics
@@ -67,7 +100,8 @@ Item {
     NavigationFrame {
         id: navigation
         opacity: root.surface ? root.surface.opacity : 1
-        enabled: root.contentEnabled
+        enabled: root.contentEnabled && (!root.overviewController ||
+                                         !root.overviewController.active)
         metrics: root.metrics
         tokens: root.tokens
         albumCount: root.album.columnCount || root.albumCount

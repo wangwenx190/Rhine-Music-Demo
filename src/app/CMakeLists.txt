@@ -5,6 +5,8 @@ qt_add_executable(
     AssetCatalog.h
     BrowseReview.cpp
     BrowseReview.h
+    OverviewReview.cpp
+    OverviewReview.h
     DetailReview.cpp
     DetailReview.h
     NavigationReview.cpp
@@ -184,6 +186,7 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
 )
 target_link_libraries(
     Yalahoo

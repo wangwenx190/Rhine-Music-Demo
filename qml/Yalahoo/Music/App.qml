@@ -13,7 +13,9 @@ ApplicationWindow {
     property RulerController rulerController: null
     required property SceneAdapter sceneAdapter
     property PresentationController presentationController: null
+    property string reviewPlayingTitle: ""
     property DetailModel detailModel: null
+    property OverviewController overviewController: null
     property Item presentationReturnFocus: null
     property bool verificationRun: false
     property int verificationFlags: Qt.Window
@@ -56,8 +58,10 @@ ApplicationWindow {
         anchors.fill: parent
         metrics: window.sceneAdapter.layout
         tokens: design
+        playingTitle: window.reviewPlayingTitle
         album: window.librarySession.browseInfo
         albumCount: window.librarySession.albums.count
+        overviewController: window.overviewController
         rulerController: window.rulerController
         inputRouter: window.inputRouter
         clock: window.motionController.clock
@@ -72,6 +76,23 @@ ApplicationWindow {
         onThemeRequested: night => {
             window.sceneAdapter.recordInput();
             window.sceneAdapter.lighting.night = night;
+        }
+    }
+    Loader {
+        anchors.fill: parent
+        active: window.overviewController !== null
+        sourceComponent: Overview {
+            sceneSource: nativeScene
+            controller: window.overviewController
+            tokens: design
+            inputRouter: window.inputRouter
+        }
+    }
+    Connections {
+        target: window.overviewController
+        function onFocusRequested(overview: bool) {
+            if (!overview)
+                browse.focusOverviewToggle();
         }
     }
     Loader {

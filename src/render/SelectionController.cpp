@@ -1,4 +1,5 @@
 #include "SelectionController.h"
+#include "OverviewController.h"
 #include "MotionFunctions.h"
 #include <QVector4D>
 #include <algorithm>
@@ -86,9 +87,44 @@ const RealColumns &SelectionController::realColumns() const
 }
 double SelectionController::browseRow(int lane) const
 {
-    return m_realistic ? m_realColumns.row(lane)
+    return m_realistic ? m_realColumns.row(lane, overviewProgress())
             : m_motion ? (-m_motion->rail() - 2.17) / .62 + 15.5
                        : m_cell.row;
+}
+void SelectionController::setOverview(OverviewController *overview)
+{
+    m_overview = overview;
+}
+double SelectionController::overviewProgress() const
+{
+    return m_overview ? m_overview->progress() : 0;
+}
+double SelectionController::centerLane() const
+{
+    return m_motion ? m_motion->column() / 5.2 + 2 : m_cell.lane;
+}
+double SelectionController::columnExtent(double lane) const
+{
+    const double progress = overviewProgress();
+    if (progress == 0)
+        return 1;
+    const double center = centerLane();
+    if (center != m_extentCenter || progress != m_extentProgress) {
+        m_extentCenter = center;
+        m_extentProgress = progress;
+        m_extentCache.fill({ });
+    }
+    auto &entry = m_extentCache[ArchivePool::wrap(lane, ArchivePool::lanes)];
+    if (entry.lane != lane) {
+        entry.lane = lane;
+        entry.extent = OverviewController::columnExtent(lane, center, progress);
+    }
+    return entry.extent;
+}
+void SelectionController::overviewAlbumClicked()
+{
+    if (m_overview)
+        m_overview->albumClicked();
 }
 bool SelectionController::rememberColumnPosition() const
 {
@@ -460,7 +496,9 @@ double SelectionController::field(double row, double lane) const
                             musicSelectionWave(std::abs(row - pulse.cell.row), m_time - pulse.time);
             height += std::clamp(ripple, -.24, .24) * m_pulseGain * activity;
         }
-        return height + settlingWave(row - m_realColumns.row(int(lane)), 26.56) * activity;
+        return height
+                + settlingWave(row - m_realColumns.row(int(lane), overviewProgress()), 26.56)
+                * activity;
     }
     double height = 0;
     if (m_scanBlend != 0)
@@ -479,17 +517,21 @@ double SelectionController::field(double row, double lane) const
     return height
             + settlingWave(row - springs[2].value, 26.56) * columnStrength(lane, springs[3].value);
 }
-QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation) const
+QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
+                                          bool folded) const
 {
     QMatrix4x4 matrix;
     if (!m_motion)
         return matrix;
     const double slope = field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane);
     const auto offset = displayOffset();
-    matrix.translate(float((cell.lane - m_cell.lane) * 5.2 - offset[1]),
-                     float(-4.6 + field(cell.row, cell.lane) + lift),
-                     float(m_realistic ? (cell.row - m_realColumns.row(int(cell.lane))) * .62 - 2.17
-                                       : (cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
+    matrix.translate(
+            float((cell.lane - m_cell.lane) * 5.2 - offset[1]),
+            float(-4.6 + field(cell.row, cell.lane) + lift),
+            float(m_realistic
+                          ? (cell.row - m_realColumns.row(int(cell.lane), overviewProgress())) * .62
+                                  - 2.17
+                          : (cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
     const double quality = smooth(lift / .4);
     const double pitch = slope * .024 * (1 - m_detail) * (1 - quality);
     // Evaluate Three's XYZ rotation in double, then round each matrix element once.
@@ -507,6 +549,13 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     orientation(2, 1) = float(sx);
     orientation(2, 2) = float(cx * cy);
     matrix *= orientation;
+    const double extent = folded ? columnExtent(cell.lane) : 1;
+    if (extent <= 0) {
+        matrix.scale(0);
+    } else if (extent != 1) {
+        matrix.translate(0, float(.175 * (1 - extent)), 0);
+        matrix.scale(1, float(extent), 1);
+    }
     return matrix;
 }
 std::array<double, 2> SelectionController::displayOffset() const
@@ -536,7 +585,7 @@ SceneVector SelectionController::selectedPosition() const
 QQuaternion SelectionController::selectedRotation() const
 {
     return QQuaternion::fromRotationMatrix(
-            transform(m_cell, m_lift.value, m_rotation).normalMatrix());
+            transform(m_cell, m_lift.value, m_rotation, false).normalMatrix());
 }
 ArchiveCell SelectionController::rebase()
 {
@@ -683,7 +732,8 @@ void SelectionController::publish()
     if (m_realistic)
         for (int index = 0; index < ArchivePool::lanes; ++index)
             rows[index] = m_realColumns.row(
-                    int(ArchivePool::visibleCell(index * ArchivePool::rows, center).lane));
+                    int(ArchivePool::visibleCell(index * ArchivePool::rows, center).lane),
+                    overviewProgress());
     m_pool.update(center, m_realistic ? &rows : nullptr);
     QVector<ArchiveInstance> next;
     next.reserve(ArchivePool::capacity + 4);
@@ -734,6 +784,8 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
     double nearest = 2;
     QVariantMap hit;
     for (const auto &instance : frame.instances) {
+        if (columnExtent(instance.cell.lane) <= .12)
+            continue;
         const auto localInverse = instance.transform.inverted(&valid);
         if (!valid)
             continue;

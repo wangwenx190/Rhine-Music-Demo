@@ -57,6 +57,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
     QElapsedTimer time;
     time.start();
     int stage = 0, switches = 0, stress = 0, rebuilds = 0, contexts = 0, fullRebuilds = 0;
+    const bool lifecycleStress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1;
     quint64 windowEpoch = 0;
     const bool quitOnClose = app.quitOnLastWindowClosed();
     app.setQuitOnLastWindowClosed(false);
@@ -128,15 +129,19 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
             return;
         finished = true;
         check("stage-completed", stage == 17);
-        check("ten-full-qml-window-rebuilds", fullRebuilds == 10);
-        check("ten-product-context-restores", rebuilds == 10 && contexts >= 11);
+        if (lifecycleStress) {
+            check("ten-full-qml-window-rebuilds", fullRebuilds == 10);
+            check("ten-product-context-restores", rebuilds == 10 && contexts >= 11);
+        } else {
+            check("smoke-keeps-original-window", fullRebuilds == 0 && rebuilds == 0);
+        }
         check("render-error-empty", native->errorText().isEmpty());
         check("qml-warnings-empty", warnings.isEmpty());
         check("playback-independent", library.playbackTrackId() == playback);
         check("window-policy", verification::windowPolicySatisfied(*window));
         check("bounded-owners", peakOwned <= 4 && peakReturning <= 3);
         check("normal-three-switches-and-reverse", switches == 4);
-        check("thirty-additional-switches", stress == 30);
+        check("requested-additional-switches", stress == (lifecycleStress ? 30 : 0));
         QSet<qint64> generations, postRevisions;
         qint64 peakUpload = 0, resourceBytes = 0;
         for (const auto &value : samples) {
@@ -175,6 +180,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
             { "lifecycle", lifecycle },
             { "contexts", contexts },
             { "fullWindowRebuilds", fullRebuilds },
+            { "lifecycleStressRequested", lifecycleStress },
             { "nativeInputSubmission", qint64(native->submission()) },
             { "nativeInputFrameRevision", qint64(native->input().scene.revision) },
             { "nativeItemVisible", native->isVisible() },
@@ -395,6 +401,10 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                             return;
                         check("reduced-complete-and-release",
                               selection->returningCases().size() == 0);
+                        if (!lifecycleStress) {
+                            ++stage;
+                            break;
+                        }
                         if (++stress <= 30) {
                             presentation.stepAlbum(1);
                             // A reduced switch is synchronously ready on the next shared frame.
@@ -424,6 +434,12 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                     case 12:
                         if (!ready())
                             return;
+                        if (!lifecycleStress) {
+                            expected = selection->adjacentAlbum({ }, 1);
+                            button("detailNext");
+                            stage = 16;
+                            break;
+                        }
                         samplesBeforeRebuild = samples.size();
                         window->hide();
                         window->releaseResources();

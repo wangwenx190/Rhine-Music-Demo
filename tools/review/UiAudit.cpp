@@ -5,6 +5,7 @@
 #include "RulerAudit.h"
 #include "TitleAudit.h"
 #include "PresentationAudit.h"
+#include "OverviewAudit.h"
 #include "GraphicsBackend.h"
 #include "ImageComparison.h"
 #include "LayoutMetrics.h"
@@ -82,6 +83,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--overview"))
+        return argc == 3 ? reviewOverviewVisual(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--presentation"))
         return argc == 3 ? reviewPresentation(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--ruler"))

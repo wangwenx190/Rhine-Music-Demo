@@ -1,4 +1,5 @@
 #pragma once
+#include "OverviewController.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
 #include "LayoutMetrics.h"
@@ -112,4 +113,19 @@ struct DetailModelQml
     QML_FOREIGN(yalahoo::DetailModel)
     QML_NAMED_ELEMENT(DetailModel)
     QML_UNCREATABLE("Owned by application")
+};
+
+struct OverviewControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OverviewController)
+    QML_NAMED_ELEMENT(OverviewController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct OverviewLabelsModelQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OverviewLabelsModel)
+    QML_NAMED_ELEMENT(OverviewLabelsModel)
+    QML_UNCREATABLE("Owned by OverviewController")
 };

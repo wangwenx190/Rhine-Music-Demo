@@ -36,6 +36,8 @@ void SurfaceTransition::run(bool show, bool reduced, std::function<void()> finis
     m_ease = QEasingCurve(QEasingCurve::BezierSpline);
     if (!show) {
         m_ease.addCubicBezierSegment({ .4, 0 }, { 1, 1 }, { 1, 1 });
+    } else if (m_enterCurve) {
+        m_ease = *m_enterCurve;
     } else if (m_browse) {
         m_ease.addCubicBezierSegment({ .45, 0 }, { .25, 1 }, { 1, 1 });
     } else {
