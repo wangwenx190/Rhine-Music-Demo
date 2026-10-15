@@ -32,6 +32,30 @@ private slots:
         oracle = QJsonDocument::fromJson(input.readAll()).object();
         QCOMPARE(oracle["cases"].toArray().size(), 48);
     }
+    void fogTracksRenderedCameraAndDetail()
+    {
+        SceneAdapter scene;
+        for (double detail : { 0.0, .25, .5, 1.0, .3, 0.0 }) {
+            scene.setDetail(detail);
+            // Observe an entry pose far from the target, including interrupted dolly motion.
+            scene.observe({ { -62.26, 35.98, 43.28 }, { -.5, 1.1, .4 }, 12 }, 0);
+            for (int step = 0; step < 20; ++step) {
+                scene.advance(1.0 / 120);
+                const auto &frame = scene.frame();
+                const double distance = (frame.camera.position - frame.camera.aim).length();
+                QVERIFY(std::abs(frame.fogNear - (distance + 5 * (1 - detail) - detail)) < 1e-12);
+                QVERIFY(std::abs(frame.fogFar - (distance + 25 * (1 - detail) + 12 * detail))
+                        < 1e-12);
+                QVERIFY(frame.fogFar > frame.fogNear);
+            }
+        }
+        // A detail-only change must publish fog even before the camera moves.
+        const auto previous = scene.frame();
+        scene.setDetail(.5);
+        QVERIFY(scene.frame().revision > previous.revision);
+        QCOMPARE(scene.frame().camera.position, previous.camera.position);
+        QVERIFY(scene.frame().fogNear != previous.fogNear);
+    }
     void frozenTargetsAndProjection()
     {
         SceneAdapter scene;

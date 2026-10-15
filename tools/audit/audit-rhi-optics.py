@@ -29,7 +29,7 @@ CHECKS = [
      "All source states and diagnostic readbacks run serially via real event completion. "
      "No polling or repeated GUI submit; at most two native pending batches stay bounded."),
     ("PERF-03", "src/render/rhi/RhiItem.cpp", "float(input.opticalProbe)",
-     "Review selector uses the reserved std140 paperSize.w; the 816-byte layout and existing "
+     "Review selector uses the reserved std140 paperSize.w; existing std140 offsets (832 bytes after R19D2 fog) and "
      "per-frame/instance uploads remain. Math values and view changes do not rebuild targets; "
      "the driver checks real resourceGeneration across these states."),
     ("PERF-04", "src/render/rhi/RhiItem.cpp", "opticalEvents.append(\"capture-mips\");",

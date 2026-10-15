@@ -263,12 +263,16 @@ bool SceneAdapter::settled() const
 void SceneAdapter::publish()
 {
     const SceneVector position = values(m_position), aim = values(m_aim);
+    const double renderedDistance = (position - aim).length();
+    const double fogNear = renderedDistance + 5 * (1 - m_detail) - m_detail;
+    const double fogFar = renderedDistance + 25 * (1 - m_detail) + 12 * m_detail;
     const SceneVector caseOrigin = m_selection
             ? m_selection->selectedPosition()
             : SceneVector{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail, -2.17 };
     if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
         && m_frame.hasArchivePool == bool(m_selection) && m_frame.camera.position == position
         && m_frame.camera.aim == aim && m_frame.camera.span == m_span.value
+        && m_frame.fogNear == fogNear && m_frame.fogFar == fogFar
         && m_frame.casePosition == caseOrigin
         && m_frame.individualMaterials == (m_managedDetail && bool(m_selection))
         && m_selectionRevision == (m_selection ? m_selection->revision() : 0))
@@ -278,8 +282,10 @@ void SceneAdapter::publish()
     m_frame.width = m_layout.width();
     m_frame.height = m_layout.height();
     m_frame.portrait = m_layout.portrait();
-    m_frame.camera = { values(m_position), values(m_aim), m_span.value };
-    const double distance = std::max(1.0, (m_frame.camera.position - m_frame.camera.aim).length());
+    m_frame.camera = { position, aim, m_span.value };
+    m_frame.fogNear = fogNear;
+    m_frame.fogFar = fogFar;
+    const double distance = std::max(1.0, renderedDistance);
     m_frame.fieldOfView = 2 * std::atan(std::max(.1, m_span.value) / (2 * distance)) / radians;
     m_frame.view.setToIdentity();
     m_frame.view.lookAt(cameraPosition(), cameraAim(), { 0, 1, 0 });

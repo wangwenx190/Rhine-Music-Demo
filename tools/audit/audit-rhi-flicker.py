@@ -23,7 +23,7 @@ CHECKS = [
      "image-reference mismatch; nonfinite output has a separate green sentinel."),
     ("PERF-01", "src/render/rhi/RhiItem.cpp", "mvp remains reserved",
      "Remove now-unused CPU nativeVP*model per-uniform work. GPU reuses world position already "
-     "needed for lighting, keeping std140 layout/816 bytes and bounded instance uploads."),
+     "needed for lighting, keeping existing std140 offsets and bounded instance uploads (832 bytes with R19D2 fog)."),
     ("PERF-02", "tools/review/RhiCaptureHarness.h", "Concurrent Review capture",
      "Readbacks are serial and event-driven, pending native batches remain at most two. Cover "
      "readiness waits on frame events with timeout, not a fast synthetic retry/poll loop."),
@@ -37,10 +37,10 @@ CHECKS = [
      "Formal floating-point invariance corrects multi-pass raster position, without degrading "
      "normal material BRDF, transparency, animation, active album count or source quality settings."),
     ("PERF-06", "tools/review/RhiFlickerAudit.cpp", "motion.clock()->advance(1.0 / 60);",
-     "Source FrameClock drives waves, navigation and overview in ordinary ordering. Static alone "
+     "Source FrameClock drives waves, navigation, overview and detail in ordinary ordering. Static alone "
      "holds simulation time; active tests keep speed=1 and reduced motion off. No QML flow changes."),
     ("PERF-07", "tools/review/RhiFlickerAudit.cpp", "frame < 60",
-     "16 sequences cover two viewport sizes, two themes, four states and 960 samples, half with "
+     "20 sequences cover two viewport sizes, two themes, five states and 1200 samples, half with "
      "unmodified optics output and half finite/coverage diagnostics. Prior 10-cycle graph and "
      "resize gates run in the same final hidden regression; normal VSYNC is not measured."),
 ]
@@ -50,7 +50,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Native backend/compiler/window integration remains intact. Runtime is "
-                        "macOS Metal hidden; D3D11/Linux OpenGL target execution remains R34.")]
+                        "macOS Metal/OpenGL hidden; D3D11/Linux OpenGL target execution remains R34.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

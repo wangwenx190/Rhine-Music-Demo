@@ -1,10 +1,18 @@
 // Appended to the generated Review-only copy of the production shell shader.
+#include "color-output.glsl"
 // This executes the same functions with exact mathematical inputs, not reference images.
 void main()
 {
     vec3 result;
     int probe = int(f.paperSize.w);
-    if (probe == 10) {
+    if (probe >= 11) {
+        // Fixed linear radiance: test real fog, then the production output helpers.
+        result = sceneFog(vec3(.18, .42, .73), viewDepth);
+        if (probe == 12)
+            result = aces(result, f.camera.w);
+        if (probe == 13)
+            result = linearToSrgb(aces(result, f.camera.w));
+    } else if (probe == 10) {
         productionShellMain();
         color = any(isnan(color)) || any(isinf(color)) ? vec4(0, 1, 0, 1) : vec4(1);
         return;

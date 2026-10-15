@@ -4,6 +4,7 @@
 #endif
 #extension GL_GOOGLE_include_directive : require
 #include "frame.glsl"
+#include "fog.glsl"
 layout(binding = 2) uniform sampler2D environmentMap;
 layout(binding = 3) uniform sampler2DShadow shadowMap;
 layout(binding = 4) uniform sampler2D captureMap;
@@ -629,7 +630,9 @@ void main()
     if ((f.areaTarget.w > .5))
         outgoing = musicShell(outgoing, f.model[3].xyz, localPosition, n, v, int(f.coat.z));
     // RenderPass into a linear target does not tone-map individual materials.
-    color = vec4((f.areaTarget.w > .5) ? outgoing : ACESFilmicToneMapping(outgoing), 1.0);
+    color = vec4(
+            sceneFog((f.areaTarget.w > .5) ? outgoing : ACESFilmicToneMapping(outgoing), viewDepth),
+            1.0);
     normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);
     depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);
 }

@@ -47,6 +47,7 @@ struct Input
     QVector3D scatterColor, areaPosition, areaTarget;
     bool shells = false, showPaper = true, rawOutput = false;
     bool lightingEnabled = true;
+    bool fogEnabled = false; // Independent Review fixtures opt in; production always enables fog.
     bool shadows = true, geometryDiagnostic = false, shadowDiagnostic = false;
     quint64 request = 0;
 };

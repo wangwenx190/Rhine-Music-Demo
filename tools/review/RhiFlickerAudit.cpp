@@ -1,5 +1,6 @@
 #include "RhiCaptureHarness.h"
 #include "RhiReviewInput.h"
+#include "RhiFogAudit.h"
 #include "SceneItem.h"
 #include "OverviewController.h"
 #include "PresentationController.h"
@@ -163,7 +164,7 @@ int main(int argc, char **argv)
                 // Settle the authored theme transition without reducing scene motion.
                 for (int i = 0; i < 45; ++i)
                     motion.clock()->advance(1.0 / 60);
-                for (int stage = 0; stage < 4; ++stage) {
+                for (int stage = 0; stage < 5; ++stage) {
                     overview.setActive(false);
                     if (stage == 2)
                         selection.moveRow(1);
@@ -172,6 +173,8 @@ int main(int argc, char **argv)
                     QJsonArray frames;
                     qint64 generation = -1;
                     for (int frame = 0; frame < 60; ++frame) {
+                        if (stage == 4)
+                            adapter.setDetail(frame < 20 ? .5 : frame < 40 ? 1 : 0);
                         if (stage == 3 && frame == 30)
                             overview.setActive(false);
                         if (stage != 0)
@@ -189,6 +192,18 @@ int main(int argc, char **argv)
                         const QSize target(item->fixedColorBufferWidth(),
                                            item->fixedColorBufferHeight());
                         auto result = driver.capture(input, target);
+                        checkSubmittedFog(input, result);
+                        check(input.fogEnabled, "Production scene did not enable authored fog");
+                        const double distance =
+                                (input.scene.camera.position - input.scene.camera.aim).length();
+                        check(std::abs(input.scene.fogNear
+                                       - (distance + 5 * (1 - adapter.detail()) - adapter.detail()))
+                                              < 1e-10
+                                      && std::abs(input.scene.fogFar
+                                                  - (distance + 25 * (1 - adapter.detail())
+                                                     + 12 * adapter.detail()))
+                                              < 1e-10,
+                              "Production fog is not anchored to the rendered camera");
                         check(item->errorText().isEmpty(), "Production renderer failed");
                         check(result.metadata.contains("opticalProbeSample")
                                       == (input.opticalProbe != 0),
@@ -235,6 +250,11 @@ int main(int argc, char **argv)
                         sample["visibleEntities"] = result.metadata["visibleEntities"];
                         sample["shells"] = result.metadata["sortedShells"].toArray().size();
                         sample["overview"] = overview.progress();
+                        sample["detail"] = adapter.detail();
+                        sample["fogNear"] = input.scene.fogNear;
+                        sample["fogFar"] = input.scene.fogFar;
+                        sample["fogColor"] = QJsonArray{ input.background.x(), input.background.y(),
+                                                         input.background.z() };
                         frames.append(sample);
                         if (frame % 15 == 1 && input.opticalProbe == 0)
                             check((opticsOnly ? result.composite : result.postprocessed)

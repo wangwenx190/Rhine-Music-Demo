@@ -4,7 +4,7 @@
 
 算法/架构审计与性能结论按 [performance.md](performance.md) 执行。封面按来源cacheKey保存一次拥有像素的快照，重复同步复用；调用者发布后不经外部指针改写图像，内容变化发布新revision。图集在generation/lease/serial校验后才转换并detach一次，转换已有独立存储时不追加无效copy；队列拥有像素，GUI对象不跨同步边界。
 
-uniform采用固定上界`uniformStride*(432*3+6)`，涵盖三个壳体逐draw、共享批次和小于8实体的普通路径；可见/实体数量变化不重建渲染图。CPU暂存复用，只上传已写入的aligned前缀，不逐帧清零/传输容量余量；容量与提交字节分别报告。深度键每实体预计算一次，保留原矩阵运算顺序和stable ID；112-byte实例记录直接填model/UV/origin light，不计算被丢弃的整份816-byte材质uniform。阴影绘制仍包含需要的非相机可见caster。
+uniform采用固定上界`uniformStride*(432*3+6)`，涵盖三个壳体逐draw、共享批次和小于8实体的普通路径；可见/实体数量变化不重建渲染图。CPU暂存复用，只上传已写入的aligned前缀，不逐帧清零/传输容量余量；容量与提交字节分别报告。深度键每实体预计算一次，保留原矩阵运算顺序和stable ID；112-byte实例记录直接填model/UV/origin light，不计算被丢弃的整份832-byte材质uniform。阴影绘制仍包含需要的非相机可见caster。
 
 `updateDynamicBuffer`的指针重载在返回前复制载荷，因此CPU暂存可以跨帧复用；后端buffer轮换仍由QRhi负责，不能保存或改写其内部native storage。接口依据：[QRhiResourceUpdateBatch](https://doc.qt.io/qt-6/qrhiresourceupdatebatch.html#updateDynamicBuffer)。
 
@@ -14,7 +14,7 @@ uniform采用固定上界`uniformStride*(432*3+6)`，涵盖三个壳体逐draw�
 
 Review 的 `TransferAudit` 检查所选 Qt 的实际 D3D11 命令列表，按目标原生纹理筛选 `UpdateSubresource`，记录 destination box、row pitch 和 destination bytes。随后完成整页 GPU 读回，逐像素核对初始化、区域之外不变、稳定帧与还原。这是原生命令的目标写入量，不是物理总线流量；其他平台不伪造原生 D3D11 测量。
 
-Frame std140 为 816 bytes：R10B 的前 752 bytes 保留，coverUv 在 752，paperSize 在 768，originLight0/1 在 784/800。仅依赖实体 origin/既有光场设置的源码函数在 CPU 每实体计算并缓存；局部几何、法向、视线、材质、光照、透射和滤波仍在 shader 执行。几何实例记录为 112 bytes，四列 model、tile UV 和两组 origin light；近到远纸面、阴影和几何覆盖共享几何批次，壳体按全局 depth、稳定 ID、surface 顺序提交。壳体彩色通道保留逐 draw 的全局顺序和各自材质 uniform，不跨表面重排。
+Frame std140 为 832 bytes：R10B 的前 752 bytes 保留，coverUv 在 752，paperSize 在 768，originLight0/1 在 784/800，fog在816（near/far/enabled，color共用线性background）。仅依赖实体 origin/既有光场设置的源码函数在 CPU 每实体计算并缓存；局部几何、法向、视线、材质、光照、透射和滤波仍在 shader 执行。几何实例记录为 112 bytes，四列 model、tile UV 和两组 origin light；近到远纸面、阴影和几何覆盖共享几何批次，壳体按全局 depth、稳定 ID、surface 顺序提交。壳体彩色通道保留逐 draw 的全局顺序和各自材质 uniform，不跨表面重排。
 
 生产顺序为阴影、线性不透明捕获、MSAA resolve/mips、独立壳体合成、SSAO、41 点 Bokeh、按设置 SMAA、一次 ACES/精确 sRGB。颜色及颜色中间目标使用与源码 composer 对应的 RGBA16F；R10D 将仅保存 `(r,r,r,1)` 且消费者只读 `.r` 的 raw/blur AO 标量改为 R16F，保留相同 half 精度、采样与顺序，诊断读回重建不变量通道；逐图等价证据在 `verification/windows/rhi-integration/diagnostics/scalar-ao/visual-equivalence.json`。view normal/RGB24 depth 为 RGBA8，阴影比较使用 D32F 和源码同样的硬件双线性 comparison sampler。五点 IGN/Vogel、偏置、强度不变。Room PMREM 上传为 RGBA16F，逐值验证导出的 RGBA32F 数值本来就能被 half 精确表示；没有量化拟合。
 
@@ -31,3 +31,5 @@ SMAA 使用既有 Medium/area/search 和 gamma 2.2；framebuffer 的后端行方
 R10C历史Release复建工具为`tools/build/verify-r10c.ps1`，只在对应验收版本的隔离checkout重建，不作为维护后源码覆盖历史目录的默认入口。原Windows产物在`verification/windows/rhi-postprocess/`，pre-stage/final图片在`docs/media/rhi-postprocess/`；来源与算法适配hash见`resources/manifests/rhi-postprocess.json`，历史证据不回写。维护后源码按`performance.md`执行Release格式/CTest/qmllint、`rhi-postprocess-gpu`及逐项静态审计，新证据在`verification/windows/performance-review/`及对应静态目录，后续维护继续使用独立目录。性能门槛使用`QSG_NO_VSYNC=1`的真实frameSwapped间隔，仅为未限速原生渲染吞吐；系统compositor/vsync节奏与完整产品交互仍需R10D/R28实际验证。
 
 R19D1对源SSAO、R16F诊断行跨度、常量数据及27状态/数学/重建门禁的现行结论见[occlusion.md](occlusion.md)。OpenGL实际PACK_ALIGNMENT=4时，奇数宽R16F显式捕获使用同格式缓存补齐存储宽，逻辑宽和产品附件保持；不是扩大生产目标或改变AO精度。旧raw图/witness分数不再执行，Bokeh/SMAA/尺度/总体旧工具继续R19D4复查。
+
+生产雾与颜色域按[source-fidelity-review.md](source-fidelity-review.md)的R19D2执行：SceneAdapter按实际相机距离/详情生成范围；纸面在透射capture前、壳体在自身着色后分别应用线性smoothstep雾，然后才后处理与一次ACES/sRGB。独立Review默认fogEnabled=false，生产SceneItem正常路径始终true；不新增图形资源或将雾变化加入资源兼容键。

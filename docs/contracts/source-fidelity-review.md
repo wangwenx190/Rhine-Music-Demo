@@ -247,7 +247,7 @@ Release完整隐藏回归32/32通过，两组官方qmllint与check-format/source
 
 COMMON-01–05/PERF-01–07与平台逐项符号/hash由`audit-rhi-opaque.py`写忽略目录，人工展开了源Lambert/场核、GLB/normal/clip转换、实际附件、唯一读回的命令/回调边和销毁顺序；字符串guard不替代推演/运行。当前macOS/arm64/Apple M4、最新自动Kit Qt6.12.0、AppleClang 21、Release、Metal/DPR1隐藏：独立入口9.57秒为一次功能运行耗时，不能作为性能比较；完整隐藏33/33、两组官方qmllint/check-format及paper/shared helper检查通过。没有像素配对、旧图评分或浏览器GPU witness。生成图仅为自身线性诊断目标，未据此调参或宣称抗锯齿/完整颜色输出达标。
 
-已确认的跨轮差异：冻结scene.ts真实生产Fog按rendered camera distance及detail更新near/far，材质fog=true；当前原生SceneFrame/RhiItem/shader无fog输入或合成。近距B1 fixture在源fog前，不能关闭该缺口。具体参数、生产调用和Three颜色/雾次序已写入R19D明确修复任务，保持R20前主线，不当作BLUR-01正常设计或将缺陷移到R34。目标D3D11/OpenGL、原生窗口与设备实机边界见R34/R19C2B1-P。
+已确认的跨轮差异：冻结scene.ts真实生产Fog按rendered camera distance及detail更新near/far，材质fog=true；B1复查时原生SceneFrame/RhiItem/shader无fog输入或合成，近距B1 fixture在源fog前不能关闭该缺口；现行修复与验证见下文R19D2，仍不作为BLUR-01正常设计或完整清晰度结论。目标D3D11/OpenGL、原生窗口与设备实机边界见R34/R19C2B1-P。
 
 普通Release最终恢复Review OFF、可见测试OFF，构建与25/25快速CTest（含source-format/隐藏窗口策略）通过。生成器默认写入+Qt格式化后纸面shader与提交版本逐字一致，未改变已验证的C++/shader语义，因此复用上面的33项完整结果；PowerShell入口当前主机仅静态核对，目标解析/格式要求仍在R34。所有运行输出保持忽略，只有源码/工具和必要契约进入本轮提交。
 
@@ -260,7 +260,7 @@ COMMON-01–05/PERF-01–07与平台逐项符号/hash由`audit-rhi-opaque.py`写
 | --- | --- | --- |
 | R07物理材质→case-glass / 四RHI shell变体 | 对照锁定Three BRDF_GGX_Multiscatter、DFG能量补偿、间接single/multi、diffuse守恒、clearcoat和反射pow4；系数/源材质不变。修复geometryRoughness：Three nonPerturbedNormal为view-space，max分量导数不具旋转不变性，必须先乘VIEW_MATRIX。 | 真正GPU调用生产helper；已知屏幕normal梯度在相机roll=0/45度分别应为.319984/.226263，实际.319824/.226196。旧world-space算法在45度仍为.319984，不能通过该独立数学门禁。 |
 | R08音乐光场→direct/LTC | saturate点积与源一致；零入射先退出，避免相反light/view的零半向量。LTC正视时切向量为零，只有此奇点选择最不平行坐标轴构造有限正交基，其余算法不变；不称其为已确认阵列闪烁根因。 | 正视矩形LTC独立解析form factor误差.00041549≤.001；GGX、DFG多散射、shadow=0/1的diffuse/specular、相反向量共八项数值状态通过。非LTC容差max(1e-6,期望绝对值×.001)，实际最大.00019465，覆盖半精度附件量化，不读取旧渲染图。 |
-| R07/R10B环境、透射、磨砂与色彩 | PMREM源生成器实际HalfFloatType，原生RGBA16F保持源类型；资产RGBA32F是序列化展开，不要求GPU字节相同。保留CubeUV方向、LTC查表、bicubic、IOR1.46及roughness×.92、局部zone .16、Beer、ACES/sRGB和paper toneMapped=false。 | 当前生产模型只有旋转/位移、scale=1，Three transmission ray的modelScale在此为恒等；未来引入缩放须重审。LOD来自实际捕获像素尺寸和源公式，是有意磨砂，不证明BLUR-01已解决。fog缺口仍R19D。 |
+| R07/R10B环境、透射、磨砂与色彩 | PMREM源生成器实际HalfFloatType，原生RGBA16F保持源类型；资产RGBA32F是序列化展开，不要求GPU字节相同。保留CubeUV方向、LTC查表、bicubic、IOR1.46及roughness×.92、局部zone .16、Beer、ACES/sRGB和paper toneMapped=false。 | 当前生产模型只有旋转/位移、scale=1，Three transmission ray的modelScale在此为恒等；未来引入缩放须重审。LOD来自实际捕获像素尺寸和源公式，是有意磨砂，不证明BLUR-01已解决。fog缺口当时交R19D，现见下文R19D2。 |
 | R10B capture/resolve/壳体、R10C硬件depth适配 | 从实际QRhi对象检查采样binding4恰为opaque resolve和mip sampler、composite独立、同hardware depth且PreserveDepthStencilContents。真实命令记录opaque→resolve→mips→copy→visibility→shading；visibility写depth/LessOrEqual，颜色Equal只读、Back cull、无blend。 | 61源状态、两主题/视角/封面/邻盒/抽取/九实例，2捕获隔离和6倒序稳定键通过；没有把两图相同当门禁。法向/深度有限及投影≤2px；同深度ID及重复ID拒绝保留。 |
 | R10B透明封面、R10D MSAA | 保留contain/inset、centroid、预乘滤波恢复、alphaTest .025；无模糊/阈值/透明度调参。 | 合成输入1×/4×：中心误差.00134241≤1/255，透明洞depth=1，4×真实部分覆盖1560点，黑边0。最初测试误将连续值界限与整数RGBA8比较，原48点错误失败；改用原门禁的整数码值qRound(expected×255)-1后通过，产品shader和一代码值容差均未改，失败日志留本地。 |
 | R11–13实例/封面、R18生命周期、macOS后补适配 | 新诊断只在显式capture读取已提交有界uniform及真实pipeline/RT值；Review探针用保留paperSize.w，生产拒绝selector且不打包probe。最多2批pending，原读回去重/别名共享保持。 | 十次同item真实SG失效/重建恢复正常光学；数学模式/相机变化resourceGeneration不变。完整阵列/真实列/封面/详情/总览回归通过；单独稳定状态不能关闭连续闪烁。 |
@@ -314,3 +314,28 @@ Qt读回边界依据[当前Qt GL实现](https://github.com/qt/qtbase/blob/6.12/s
 最终常量上传优化后的Metal完整隐藏36/36通过，OpenGL的27状态/源数学/十次重建与默认完整960帧两项均通过；未出现AO非有限或光学漏画，窗口策略亦通过。先前一次window-policy失败原样保留，未放宽断言，未确认该次前台变化原因。耗时与此前不同仅记录为功能运行事实，没有控制正常VSYNC/环境噪声，不能据此作性能优劣结论。最后恢复普通Review OFF、可见OFF配置并运行生产Release构建/快速回归。
 
 最终已恢复Review OFF/可见OFF，普通Release构建及25/25快速CTest通过；最终check-format/两组官方qmllint与四公共Effect五目标bake通过，三RHI SSAO变体重建逐字一致，六源输入无需GPU重建一致。Windows/D3D11与Linux/OpenGL实机按R34/R19D1-P保留，不外推本机通过；下一主线R19D2继续生产fog/颜色，BLUR-01仍未销项。
+
+## R19D2 生产雾、颜色域及捕获次序
+
+起点`4ab1e73`。逐项恢复R07/R08材质与光场、R09B `522a3f3`、R10A `52f1278`、R10B `5625d73`、R10C `1f2352a`、R10D `75775b3`，沿 `f7e423a`、`e98c798` 与R19C1/C2修正追到生产SceneItem。锁定Three 0.183.2的源码来自冻结依赖，不以某次浏览器输出为依据。
+
+| 原轮次 / 生产调用 | 源码判断与原生处理 | 门禁与边界 |
+| --- | --- | --- |
+| R07：MeshPhysical/meshlambert及颜色输出 | `meshphysical/meshlambert` 都按opaque→tonemapping→colorspace→fog顺序；`WebGLRenderer::setProgram` 对普通render target关闭逐材质tone mapping，输出域为LinearSRGB。Quick3D独立材质Review的本地ACES只服务非compositor探针，生产RHI的lightingEnabled始终为true、壳体只输出线性radiance。 | 保留独立Review兼容分支，不将它解释成生产逐物体ACES；生产最终统一输出。 |
+| R08：纸面、光场及主题 | `createAlbumPrintMaterial` 的toneMapped=false/fog=true、Lambert限幅与printExposure保持；scene.setTheme同时过渡fog/background，实际音乐入口覆盖曝光为昼1.05/夜1.08。`WebGLMaterials::refreshFogUniforms` 在普通RT使用workingColorSpace。 | 直接复用SelectionLighting的线性background作fogColor，保留主题过渡而非读取静态常量；纸面toneMapped=false仍受到最后OutputPass影响。 |
+| R09B：scene.ts的EffectComposer→RenderPass→SSAO→Bokeh→SMAA→OutputPass | composer及透射RT都是线性half颜色，颜色shader后的fog仍在线性域；最终OutputPass执行一次ACES/sRGB。保留原native输出系数和exposure/.6，不添加gamma、白雾或截图补偿。 | `color-output.glsl` 从现有output.frag原样抽取，Review直接执行同一生产helper与独立double数学比较；没有改变后处理顺序或采样。 |
+| R10A：opaque与纸面捕获 | 此前遗漏fog。新增source `smoothstep(near,far,viewDepth)`，Lambert/场核完成后混入线性fogColor。background不再额外fog，normal/depth不fog，diagnostic shadow receiver不代表音乐产品floor。 | 实际提交字节记录paper kind=0的range/enable/color；保留RGBA16F、透明alpha测试、MSAA和resolve。 |
+| R10B：透射capture、壳体及材质输出 | `renderTransmissionPass` 的opaque capture已含源fog，resolve→mips后供壳体采样；壳体完成BRDF/透射/Beer/场核后，再按自身viewDepth执行fog。两次发生在不同表面，不能为避免所谓“重复雾”删除任何一处。 | 四个shell变体与生成器同步；实际绑定/捕获隔离、Equal深度、源透明度和材质参数保持。 |
+| R10C：后处理与输出 | production shader不执行逐物体ACES，fog先于SSAO/Bokeh/SMAA与最终ACES；outputOptions取自真正上传的数组。rawOutput仅供独立Review，生产false。 | 生产纸面和壳体提交uniform与snapshot逐项匹配；共享完整隐藏回归涵盖后处理、封面、资料/场景与二维界面，不执行旧图像分数。 |
+| R10D：SceneItem→SceneFrame→RhiItem及缓存 | `SceneAdapter::publish` 依据实际rendered camera position/aim计算near=distance+lerp(5,-1,detail)、far=distance+lerp(25,12,detail)。新增detail-only失效，避免同相机姿态时沿用旧雾；SceneItem正常路径始终启用。 | 一次O(1)计算；std140末尾追加fog vec4到832 bytes，既有offset不变；只增加既有uniform前缀载荷，不建新纹理/pass/SRB/PSO，不增加生产readback或队列。 |
+| 后续格式、平台、R19C修正 | `5b2df80`仅格式；`e98c798`必要GL多采样renderbuffer/上下文适配保持；R19C1删除的拟合材质系数没有恢复。geometry的现有负view-Z直接复用，位置不变性及相同计算顺序保持。 | Metal/本机OpenGL可隐藏验证，Windows/D3D11与Linux/OpenGL目标硬件不由本机推断；完整产品VSYNC/设备任务仍R34。 |
+
+`scene`新增观察远离target的entry pose、连续详情/反向中断、detail-only发布测试；`rhi-fog-gpu`固定线性radiance在七个深度分数（含起止外侧）、启用/禁用、双主题下，共84个实际GPU数学状态，分别核对fog、fog→ACES、fog→ACES→sRGB。数值读取为RGBA16F原值，期望由独立公式与同次RGB24几何深度计算，容差.001覆盖half舍入和depth量化；这不是来源截图、浏览器GPU字节或图像拟合。
+
+`rhi-flicker-gpu`使用真实SceneItem、匿名9×64库及实际封面，双主题/640×480与1280×720、静止/波浪/浏览/总览进退/详情.5→1→0共1200帧；逐帧核对生产fog开启、实际相机/详情公式及paper/shell真正上传range/color/outputOptions。独立`rhi-fog-gpu`还执行十次真实SG失效重建，确认有效几何与雾状态恢复。COMMON-01–05/PERF-01–07三平台符号/hash由`tools/audit/audit-rhi-fog.py`写本地忽略目录。
+
+源码雾是有意的远距离颜色衰减，不改变纹理分辨率、LOD、景深或目标尺寸；不将它视作VIS-ARRAY-BLUR-01的结论或修复。剩余景深/抗锯齿/缩放/整体门禁继续R19D4，阴影继续R19D3；不以本轮有限值或源码通过关闭用户问题。
+
+当前macOS/arm64/Apple M4、自动发现最新Qt6.12.0、AppleClang21、Release、真实隐藏DPR1：Metal完整37/37（包括1200帧生产回放）通过；补入雾启用的十次SG重建后，Metal单独fog门禁通过，OpenGL的fog与1200帧两项均通过。两后端84状态最大数学误差均为.000471473<.001，无异常覆盖/非有限值；fog参数变化不重建目标。已检查自身最终输出和生产颜色目标，未用源实机图或图像分数调参；最终输出探针与生产线性颜色捕获分别标明，不混称屏幕采集。两组官方qmllint/check-format通过，四个shell生成+format可逐字重现。最初受限进程无法连接WindowServer而无screens，原生会话下隐藏验证通过，未显示或激活测试窗口。Windows/D3D11、Linux/OpenGL目标检查静态通过、实机未执行，完整输入/入口/门槛交R34/R19D2-P；本机离屏不证明窗口/VSYNC/设备或完整产品性能。
+
+已恢复普通Release的Review OFF、YALAHOO_MACOS_VISIBLE_TESTS=OFF；生产构建、最终25/25快速CTest（含source-format和默认隐藏窗口策略）、两组官方qmllint/check-format通过。验证生成物保持忽略，暂存仅源码/测试/必要契约；下一主线为R19D3。

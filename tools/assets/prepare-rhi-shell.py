@@ -24,7 +24,7 @@ source = source.replace('keyColor * lightIntensities.x',
 source = source.replace('vec3 direct = lightingEnabled ? musicIrradiance(worldPosition, n) : paperIrradiance;',
                         'vec3 direct = lightingEnabled ? musicIrradiance(worldPosition, n) : vec3(1);')
 source = source.replace('    FRAGCOLOR = vec4(compositorOutput ? outgoing : ACESFilmicToneMapping(outgoing), 1.0);',
-                        '    color = vec4(lightingEnabled ? outgoing : ACESFilmicToneMapping(outgoing), 1.0);\n'
+                        '    color = vec4(sceneFog(lightingEnabled ? outgoing : ACESFilmicToneMapping(outgoing), viewDepth), 1.0);\n'
                         '    normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);\n'
                         '    depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);')
 mapping = {
@@ -108,6 +108,7 @@ prefix = '''#version 440
 #endif
 #extension GL_GOOGLE_include_directive : require
 #include "frame.glsl"
+#include "fog.glsl"
 layout(binding = 2) uniform sampler2D environmentMap;
 layout(binding = 3) uniform sampler2DShadow shadowMap;
 layout(binding = 4) uniform sampler2D captureMap;

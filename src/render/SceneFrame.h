@@ -62,6 +62,7 @@ struct SceneFrame
     QMatrix4x4 view, projection, caseTransform;
     double width = 960, height = 640, fieldOfView = 0;
     double nearPlane = 5, farPlane = 300;
+    double fogNear = 0, fogFar = 0;
     bool portrait = false;
     bool hasArchivePool = false;
     bool individualMaterials = false;

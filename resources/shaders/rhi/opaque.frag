@@ -17,6 +17,7 @@ layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 normalOut;
 layout(location = 2) out vec4 depthOut;
 #include "paper-lighting.glsl"
+#include "fog.glsl"
 vec3 srgbToLinear(vec3 c)
 {
     return mix(c / 12.92, pow((c + .055) / 1.055, vec3(2.4)), step(vec3(.04045), c));
@@ -54,7 +55,7 @@ void main()
     ink.rgb /= ink.a;
     vec3 source = srgbToLinear(ink.rgb), n = normalize(worldNormal);
     if (f.areaTarget.w < .5) {
-        color = vec4(source, 1);
+        color = vec4(sceneFog(source, viewDepth), 1);
         return;
     }
     vec3 irradiance =
@@ -63,6 +64,7 @@ void main()
     if (keyCosine > 0.0)
         irradiance -= f.keyColor.rgb * f.lightIntensities.x * keyCosine * (1.0 - shadowFactor())
                 / 3.141592653589793;
-    color = vec4(
-            min(source * max(irradiance, vec3(0)), source) * musicPrintExposure(f.model[3].xyz), 1);
+    vec3 outgoing =
+            min(source * max(irradiance, vec3(0)), source) * musicPrintExposure(f.model[3].xyz);
+    color = vec4(sceneFog(outgoing, viewDepth), 1);
 }

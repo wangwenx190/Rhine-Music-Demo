@@ -39,11 +39,12 @@ struct alignas(16) Uniform
     float keyColor[4], skyColor[4], groundColor[4], lightIntensities[4], settings[4], clip[4],
             draw[4], optics[4];
     float nativeVP[16], camera[4], tint[4], attenuation[4], material[4], coat[4], areaPosition[4],
-            areaTarget[4], scatter[4], coverUv[4], paperSize[4], originLight0[4], originLight1[4];
+            areaTarget[4], scatter[4], coverUv[4], paperSize[4], originLight0[4], originLight1[4],
+            fog[4];
 };
-static_assert(sizeof(Uniform) == 816 && offsetof(Uniform, background) == 320
+static_assert(sizeof(Uniform) == 832 && offsetof(Uniform, background) == 320
               && offsetof(Uniform, optics) == 544 && offsetof(Uniform, nativeVP) == 560
-              && offsetof(Uniform, scatter) == 736);
+              && offsetof(Uniform, scatter) == 736 && offsetof(Uniform, fog) == 816);
 void copy(float *to, const QMatrix4x4 &m)
 {
     std::memcpy(to, m.constData(), 64);
@@ -1064,6 +1065,9 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.view, input.scene.view);
     copy(u.lightVP, canonicalLightVP);
     copy(u.background, input.background);
+    copy(u.fog,
+         QVector4D(float(input.scene.fogNear), float(input.scene.fogFar), input.fogEnabled ? 1 : 0,
+                   0));
     copy(u.rowSettings, input.rowSettings);
     copy(u.rowColumn, input.rowColumn);
     copy(u.lightColumn, input.lightColumn);
@@ -1432,12 +1436,21 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->resourceUpdate(updates);
     }
     const bool recordCapture = deliver && input.request != capturedRequest && pending.size() < 2;
-    QJsonArray captureKinds, opticalEvents;
+    QJsonArray captureKinds, opticalEvents, fogUniforms;
+    const auto recordFog = [&](const Uniform &submitted) {
+        fogUniforms.append(QJsonObject{
+                { "kind", submitted.draw[0] },
+                { "range", QJsonArray{ submitted.fog[0], submitted.fog[1], submitted.fog[2] } },
+                { "color",
+                  QJsonArray{ submitted.background[0], submitted.background[1],
+                              submitted.background[2] } } });
+    };
     const auto recordOpaque = [&](quint32 offset) {
         if (recordCapture) {
             Uniform submitted;
             std::memcpy(&submitted, bytes.constData() + offset, sizeof(submitted));
             captureKinds.append(submitted.draw[0]);
+            recordFog(submitted);
         }
     };
     const auto opaqueMeshDraw = [&](QRhiGraphicsPipeline *pipeline, Mesh mesh, quint32 offset) {
@@ -1695,6 +1708,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                     result.append(values[i]);
                 return result;
             };
+            recordFog(submitted);
             const double clarity =
                     input.scene.individualMaterials && draw.entity < input.scene.instances.size()
                     ? input.scene.instances[draw.entity].clarity
@@ -1709,6 +1723,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                  { "tint", array(submitted.tint, 3) },
                                  { "attenuation", array(submitted.attenuation, 3) } });
         }
+        p->capture.metadata["submittedFogUniforms"] = fogUniforms;
+        p->capture.metadata["outputOptions"] = QJsonArray{ out[0], out[1], out[2], out[3] };
         p->capture.metadata["captureDrawKinds"] = captureKinds;
         p->capture.metadata["opticalEvents"] = opticalEvents;
         p->capture.metadata["sortedShells"] = sorted;
@@ -1981,7 +1997,11 @@ void RhiItem::submit(Input input, QSize target)
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");
     require(input.captureSamples > 0, "Invalid RHI sample count");
-    require(input.opticalProbe >= 0 && input.opticalProbe <= 10
+    require(!input.fogEnabled
+                    || (std::isfinite(input.scene.fogNear) && std::isfinite(input.scene.fogFar)
+                        && input.scene.fogFar > input.scene.fogNear),
+            "Invalid scene fog range");
+    require(input.opticalProbe >= 0 && input.opticalProbe <= 13
                     && (input.opticalProbe == 0 || input.shells),
             "Invalid optical math probe");
 #ifndef YALAHOO_RHI_AUDIT

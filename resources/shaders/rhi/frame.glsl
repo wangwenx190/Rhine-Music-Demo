@@ -34,5 +34,6 @@ layout(std140, binding = 0) uniform Frame
     vec4 paperSize; // xy: cover pixels, z: painted cover, w: Review-only optical math selector
     vec4 originLight0; // row field, print exposure, lane light, guided light (per entity)
     vec4 originLight1; // hot ribbon; remaining components reserved
+    vec4 fog; // near, far, enabled; color shares the authored linear background
 }
 f;
