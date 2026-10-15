@@ -111,10 +111,14 @@ SceneItem::SceneItem(QQuickItem *parent)
     connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
         disconnect(m_visibilityConnection);
         disconnect(m_activeConnection);
+        disconnect(m_dprConnection);
+        disconnect(m_screenConnection);
         mouseUngrabEvent();
         if (window) {
-            connect(window, &QWindow::screenChanged, this, &SceneItem::schedule,
-                    Qt::UniqueConnection);
+            m_screenConnection =
+                    connect(window, &QWindow::screenChanged, this, &SceneItem::schedule);
+            m_dprConnection = connect(window, &QQuickWindow::devicePixelRatioChanged, this,
+                                      &SceneItem::schedule);
             m_visibilityConnection =
                     connect(window, &QWindow::visibleChanged, this, [this](bool visible) {
                         if (!visible)
@@ -588,9 +592,10 @@ void SceneItem::updatePolish()
         }
     }
     auto &quality = *adapter.quality();
-    quality.resize(width(), height(), m_geometryOnly ? 1 : qMin(width() / 1920, height() / 1080),
-                   window()->effectiveDevicePixelRatio(), std::numeric_limits<int>::max(),
-                   m_geometryOnly);
+    // The item already fills the displayed viewport (music.css: transform: none).
+    // Applying the reference-stage scale again undersamples compact windows.
+    quality.resize(width(), height(), 1, window()->effectiveDevicePixelRatio(),
+                   std::numeric_limits<int>::max(), m_geometryOnly);
     const auto &l = *adapter.lighting();
     const auto settings = quality.values();
     Input in;

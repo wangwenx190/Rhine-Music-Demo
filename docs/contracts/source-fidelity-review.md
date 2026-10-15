@@ -16,16 +16,16 @@
 | R03B | `598c4a8`；`c7e9b61` | 真 SVG 主/小稿、揭示映射、平台容器；原创品牌与小尺寸光学校准来自用户明确要求，保留。衍生资产 hash/容器检查有效，R19A 审查；页眉/开场容器归 R19E/R20。 |
 | R04 | `739ee97`；`d03527e`、`b7f73d4`、`0d06b7b`、`1a082f2`、`2ee2294`、`2abb4f6`、`33e8260`、`1c9b8c6` | `MusicTypes`、`LibraryModels`、`LibrarySession`、`OfflineMetadataProvider`；保留本地 URL、字段/稳定 ID、排序/搜索、导航与播放隔离和异步离线结果。R19A 审查；布局/导航状态消费者归 R19B/E/G。 |
 | R05 | `ec0af92`；`d03527e`、`ed5aaef` | `FrameClock`、阻尼/五次轨迹、改速/减少动态与 `cancelTravel`；R19B 已按原公式和实际调用顺序审查，结论见下节。 |
-| R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，MSAA/resolve由R19D4B2确认，目标尺度仍待R19D4C。 |
+| R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，MSAA/resolve由R19D4B2确认，目标尺度由R19D4C按最终音乐宿主复查。 |
 | R07 | `1556a55`；`52f1278`、`5625d73`、`ed5aaef` | `ShellMaterial`、主盖/侧脊参数和有效override由R19C1复查，ROI系数移除；shader/捕获/LOD剩余项归R19C2。 |
 | R08 | `178ca45`；`52f1278`、`5625d73`、`e98c798` | `MusicLighting`的主题/单位/轨迹参数由R19C1复查；Room/PMREM/BRDF/方向的shader实现与平台采样归R19C2。 |
 | R09 | `3fc6a39`；`1f2352a`、`75775b3` | SSAO/depth/normal、核/box与数据边由R19D1复查；阴影/偏置/滤波由R19D3A/B复查。 |
-| R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh→R19D4A，SMAA→R19D4B1，MSAA/旧门禁由R19D4B2复查并完成覆盖映射，尺度→R19D4C；颜色→R19D2。 |
+| R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh→R19D4A，SMAA→R19D4B1，MSAA/旧门禁由R19D4B2复查并完成覆盖映射，尺度由R19D4C复查；颜色→R19D2。 |
 | R10 | `d06e5f3` | Quick3D/RHI 能力与历史选型由R19D4B2按可控阴影/全局排序/独立捕获边界确认；不恢复旧图像分数门禁。 |
 | R10A | `52f1278`；`5b2df80`、`d03527e` | opaque/纸面的入射参数与toneMapped接口由R19C1复查；最终shader语义归R19C2，阴影/资源图/采样归R19D。 |
 | R10B | `5625d73`；`d03527e`、`e98c798` | 材质参数迁移及R18独立clarity由R19C1复查；透明捕获/排序和完整R10B归R19C2，MSAA/平台附件归R19D。 |
-| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约由R19A确认，光学capture/mips由R19C2B/C复查，AO及常量数据由R19D1复查；MSAA/旧门禁由D4B2确认，剩余尺度归D4C。 |
-| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；MSAA/组合/旧门禁由D4B2确认，目标尺度仍归D4C，历史性能只记录的用户边界保留。 |
+| R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约由R19A确认，光学capture/mips由R19C2B/C复查，AO及常量数据由R19D1复查；MSAA/旧门禁由D4B2确认，尺度由D4C复查。 |
+| R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`透明重叠由R19C2C复查，标量AO/读回由R19D1复查；MSAA/组合/旧门禁由D4B2确认，目标尺度由D4C复查，历史性能只记录的用户边界保留。 |
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
 | R12 | `b7f73d4`；`0d06b7b`、`e98c798`、`ed5aaef` | 432 实例、波浪/rebase、选中/归位坐标与稳定物理格 ID 由 R19B 审查；合并图集来源见 R19A，透明与后处理仍待 R19C/D。 |
 | R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
@@ -236,7 +236,7 @@
 
 | 退役入口及原断言 | 独立非像素覆盖 / 明确边界 |
 | --- | --- |
-| `postprocess-audit`：105状态完整性、backend/DPR、focus/aperture、启用条件、目标尺寸/上限 | 不再依赖旧runtime/image文件完整性。`render-quality`核对源四预设、归一化、DPR/尺寸限制；`rhi-bokeh-gpu`核对实际核/参数，`rhi-flicker-gpu`核对SceneItem实际Bokeh上传及original/high的SMAA启用/组合图；`rhi-postprocess-gpu`覆盖三尺寸×1/4样本×八组合、单样本后处理/实际绑定/80-byte前缀/关闭释放。九尺寸与真实DPR/最终合成缩放的集成复核仍为R19D4C，输入保持`postprocess/visual*.json`和匿名库，出口为同输入各物理附件/像素保护/最终缩放与实际质量正确。 |
+| `postprocess-audit`：105状态完整性、backend/DPR、focus/aperture、启用条件、目标尺寸/上限 | 不再依赖旧runtime/image文件完整性。`render-quality`核对源四预设、归一化、DPR/尺寸限制；`rhi-bokeh-gpu`核对实际核/参数，`rhi-flicker-gpu`核对SceneItem实际Bokeh上传及original/high的SMAA启用/组合图；`rhi-postprocess-gpu`覆盖三尺寸×1/4样本×八组合、单样本后处理/实际绑定/80-byte前缀/关闭释放。九尺寸与真实DPR/最终合成缩放由R19D4C的`rhi-scale-gpu`接续，输入保持`postprocess/visual*.json`和匿名库；具体规范归rhi-integration.md。 |
 | `postprocess-audit`：23组AA off/MSAA/SSAA差异、至少六组边缘分数改善、Bokeh/SMAA changedPixels、background ROI、MAE/SSIM、已知残差白名单及放大strip | 源图评分/改善数/SSAA排名/残差白名单/放大拼图全部退役。`rhi-shell-gpu`以解析线性墨色、透明洞不写depth、原一码值黑边上界和四样本partial>100验证实际覆盖；`rhi-bokeh-gpu`/`rhi-smaa-gpu`用独立公式验证效果而非“像素有变化”。背景/最终色变换由`rhi-fog-gpu`的84源helper状态和`rhi-postprocess-gpu`实际最终合成的独立公式/原一码值上界核验，生产输出绑定/开关由实际graph/outputOptions核验。自身正常输出仅供真实质量检查。 |
 | `occlusion-audit`：88旧文件/固定尺寸、normal/depth全图误差、单盒四ROI、SSIM、AO背景白/接触非白、阴影开关changedPixels | 文件数/截图误差/源GPU witness退役。`render-quality`维护尺寸保护；`rhi-ao-gpu`验证RGB24背景恒1、三核/倍率/奇偶尺寸、243接触点、5×5/.22和缓存/重建；`rhi-opaque-gpu`/`rhi-shell-gpu`验证解析投影/normal/depth；`rhi-shadow-gpu`验证源投射/偏置/PCF、实际接收阴影occluded>0和地面/AO/DOF。不是以背景全白掩盖无接触。 |
 | `RenderBackendAudit`：70旧文件/hash/backend/DPR/frames、sourceParameterMatch、projection≤2、normal/depth、阴影开关、排序组、atlas替换/静止/归还 | 旧文件/GPU来源/hash完整性不再作为产品门槛。冻结输入来源由各源审计维护；`scene`/`rhi-opaque-gpu`/`rhi-shell-gpu`检查实际投影/通道/稳定排序，`rhi-shadow-gpu`检查阴影，`rhi-postprocess-gpu`保留atlas GPU区域/还原、上传、稳定复用和容量检查。目标API实际执行仍按R34，不接受仅字符串命中。 |
@@ -246,4 +246,17 @@
 | `RhiPostprocessAudit`：手动processEvents等待、profile/120秒、frameSwapped/CPU/GPU、record-only | 等待改为正常事件循环和有界实际帧回调；`--profile`保留三次独立局部分通道CPU提交诊断，不把RenderControl完成当物理呈现或GPU完成。原Windows18.35/20.98ms及record-only事实不变；完整产品120秒/VSYNC/设备测量由R28/R34原任务承担，未运行不标通过。旧`--record-performance`/`--diagnostics`不再接受。 |
 | `prepare-{postprocess,occlusion}-capture.py`及其旧visual/render-backend导出器、verify-r09/r09b/r10/r10c | Fail-closed兼容入口在任何采集/改写之前拒绝执行；算法输入导出器`tools/assets/`保持。三套旧聚合C++入口只返回退役说明，CTest保持disabled；只恢复已独立的`rhi-postprocess-gpu`。 |
 
-MSAA/resolve和组合资源图当前可靠检查不关闭VIS-ARRAY-BLUR-01。R19D4C继续承担源resizeQuality/真实DPR/显示缩放、封面LOD与景深尺度；原生同窗口hide/restore、物理输入/显示、正常VSYNC、最终产品性能与缺目标后端按既有R34专项和本轮目标移交执行。
+R19D4B2的MSAA/resolve和组合资源图检查本身不关闭VIS-ARRAY-BLUR-01。R19D4C的独立尺度判定见下节；原生同窗口hide/restore、物理输入/显示、正常VSYNC、最终产品性能与缺目标后端按既有R34专项和本轮目标移交执行。
+
+## R19D4C 目标尺度、封面与景深单位
+
+| 历史对象 / 生产来源 | 源码判定 |
+| --- | --- |
+| 冻结music-app → fit/scene.resize → resizeQuality；music.css最终override | `#stage.music-app`宽高100%、`transform:none`，实际host bounding/client比例为1。archive-main的参考舞台缩放属于另一入口，不能套入当前音乐产品。 |
+| R09 `3fc6a39` RenderQuality；R09B `522a3f3` GeometryScene | RenderQuality的源DPR cap、scale归一化、floor与像素保护保留；直接使用显示逻辑尺寸的View3D移除重复参考舞台缩放。它仍是Review，不改变生产RHI选型。 |
+| R10D `75775b3` SceneItem；`e98c798`诊断保护 | product以实际item尺寸再乘`min(width/1920,height/1080)`造成非预期降采样，小窗口最终放大。修正为源宿主比例1；geometryOnly的真实DPR及像素保护保留。960×640/DPR1原先请求480×320，源音乐入口应为960×640；此为调用链推导，非截图追分。原用户所见窗口未能追溯，复现明确使用新的匿名生产阵列入口。 |
+| R10C `1f2352a`、R10D补丁`b7f73d4`、`e98c798` | 显式物理附件、MSAA/resolve、独立全尺寸DOF、传输捕获mip和有界资源所有权是必要原生适配，保留；没有引入整体倍采样、锐化或新模糊。窗口DPR变化重新提交，换窗口断开旧信号。 |
+| 封面解码 → pool/atlas → opaque/shell | 保留256缩略图、1024选中独立租约、contain/留白与无跨格mip；linear/clamp采样及透射独立trilinear捕获各有用途。封面高清不由小窗口降级；源磨砂/粗糙度与传输LOD保留。 |
+| R19D1 `4ab1e73`；D2 `2f50812`；D3A `f45024d`/`e9360b7`；D3B `f4e1610` | D1的三核/标量精度/常量前缀、D2线性雾/最终颜色次序、D3投射偏置/过滤和产品地面均继续使用既有生产资源图；尺寸修正只改变源公式应有的物理目标。逐项数学与实际附件规范引用对应组件，完整历史hash由audit-rhi-scale输出。 |
+| D4A `704a99d`；D4B1 `5e333ec`；D4B2 `4e86136` | 保留view空间focus、完整RGB24 depth、nearest深度/linear颜色、41点UV CoC/.011与aspect；核本身不随窗口像素加倍。保留SMAA源核/lookup、4×几何与单样本resolve/后处理，不以关效果改善清晰度。 |
+| 质量/资源/绘制路径选择 | RHI继续承担源全局透明排序/阴影与显式捕获，Quick3D只Review。新独立入口检查实际DPR/物理附件/最终合成和源数学，连续入口保留数量/动效/重叠与恢复；运行结果留本地，物理屏幕、正常VSYNC、完整产品性能及缺设备平台按原专项。 |

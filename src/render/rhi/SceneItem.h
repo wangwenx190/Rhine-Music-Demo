@@ -101,6 +101,7 @@ private:
     quint64 m_activeObject = 0;
     QPointer<SelectionController> m_poolSelection;
     QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;
+    QMetaObject::Connection m_dprConnection, m_screenConnection;
     bool m_poolMode = false;
     quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;

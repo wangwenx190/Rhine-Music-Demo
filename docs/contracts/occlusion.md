@@ -13,7 +13,7 @@
 
 ## 画质边界
 
-RenderQuality保留render-quality.ts四预设/归一化：scale50–200/步长5、DPR cap1/1.5/2/3、shadow0/1024/2048/4096、AO0/16/32/64及倍率.5/.75/1。全目标≤8294400像素且受当前设备尺寸限制，limited公开、不改用户偏好；stageScale按源窗口公式，独立Review明确用1。画质不改变相机/导航/播放或业务对象。
+RenderQuality保留render-quality.ts四预设/归一化：scale50–200/步长5、DPR cap1/1.5/2/3、shadow0/1024/2048/4096、AO0/16/32/64及倍率.5/.75/1。全目标≤8294400像素且受当前设备尺寸限制，limited公开、不改用户偏好；stageScale只表达宿主已有的外层变换；冻结音乐主界面`music.css`最终override为`transform:none`，原生SceneItem/View3D已使用显示逻辑尺寸，调用方传1，不能再乘`min(width/1920,height/1080)`。画质不改变相机/导航/播放或业务对象。
 
 0 samples释放对应通道；AO按倍率，Bokeh完整深度独立，全分辨率兼容时才共用。诊断通道raw AO/blur/depth/normal/linearColor跳过输出转换。生产clip5/300/radius.18与明确压力输入.1/100/radius.38分别标记。
 

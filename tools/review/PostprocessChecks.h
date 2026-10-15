@@ -12,6 +12,8 @@ inline void checkPostprocessGraph(const rhi::Input &input, const rhi::Capture &c
         require(graph.isEmpty(), "Disabled postprocess retained an active graph");
         return;
     }
+    require(graph["colorLinearClamp"].toBool() && graph["depthNearestClamp"].toBool(),
+            "Postprocess color/depth filtering differs from source");
     QJsonArray expected;
     if (input.aoSamples) {
         expected.append(input.aoSamples == 32 ? "ssao" : QString("ssao%1").arg(input.aoSamples));

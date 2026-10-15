@@ -1666,6 +1666,19 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                  { "depthSamples", target->z->sampleCount() },
                                  { "attachments", attachments } });
         }
+        p->capture.metadata["sampling"] =
+                QJsonObject{ { "coverLinearClampNoMip",
+                               linear->magFilter() == QRhiSampler::Linear
+                                       && linear->minFilter() == QRhiSampler::Linear
+                                       && linear->mipmapMode() == QRhiSampler::None
+                                       && linear->addressU() == QRhiSampler::ClampToEdge
+                                       && linear->addressV() == QRhiSampler::ClampToEdge },
+                             { "captureTrilinearClamp",
+                               mipLinear->magFilter() == QRhiSampler::Linear
+                                       && mipLinear->minFilter() == QRhiSampler::Linear
+                                       && mipLinear->mipmapMode() == QRhiSampler::Linear
+                                       && mipLinear->addressU() == QRhiSampler::ClampToEdge
+                                       && mipLinear->addressV() == QRhiSampler::ClampToEdge } };
         p->capture.metadata["resolveGraph"] = resolveGraph;
         p->capture.metadata["postprocessGraph"] = input.postprocess
                 ? post.graph(input.shells ? composite.color.get() : opaque.color.get())

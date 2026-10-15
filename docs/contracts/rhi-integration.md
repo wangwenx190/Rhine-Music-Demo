@@ -6,6 +6,7 @@
 
 - `App.qml → SceneItem → SceneAdapter::frame/SelectionLighting/RenderQuality → RhiItem::submit → synchronize/renderFrame`。SceneAdapter独占相机/实体/投影/拾取/focalDepth；QML不维护后端专属状态。生产实体由填充/真实列和有限选中/归位池提供，封面消费者见archive-pool.md。
 - 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册ResearchApp及隔离材质入口。几何验证使用生产提交矩阵。
+- SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；尺寸/scale/保护规则归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，源画质缩放或像素保护导致的比例须显式记录。
 - 相机/布局/实体实际变化才更新几何revision，输入revision独立。polish合并同帧相机/灯光/画质/封面；相同submission不重复复制。封面owned immutable像素共享，外部Review输入隔离一次，cacheKey变化才交接。
 - PreparedAssets在首个RhiItem的GUI构造/show前一次预载固定qrc GLB/qsb/PMREM half/lookup，进程内有界不可变；render/同步不读盘或解码。
 - 目标兼容键含尺寸/阴影/MSAA/布局，封面有独立revision；后处理键含AO尺寸/核/DOF/SMAA/实际附件身份。相机、焦点、主题数值和实体数量不得重建无关目标/PSO/SRB。buffer容量/上传边界只在rhi-postprocess.md维护。
@@ -25,3 +26,11 @@
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
 - `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进输入/尺寸/画质/重建，等待各步提交确认；FrameAnimation仍唯一帧源，无processEvents/msleep轮询。检查九尺寸/四画质/双主题/十次恢复，报告实际覆盖，短单盒输入不能冒充完整产品。
 - `rhi-postprocess-audit --profile`是独立分通道GPU诊断，不能混入正常120秒性能样本；当前非像素入口和范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。
+
+## 目标尺度与生产阵列检查
+
+`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵归R34。
+
+独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单、limited和最终缩放。核对实际线性/clamp封面无mip、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；256缩略图与1024独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集generation与稳态零上传保持。普通产品不增加读回或诊断遍历。
+
+`python3 tools/audit/audit-rhi-scale.py`输出冻结生产调用/最终CSS、D1–D4历史及COMMON/PERF/三平台符号hash矩阵。与`rhi-flicker-gpu`连续静止/波浪/浏览/总览进退/详情输出、组合资源/十次SG重建共同覆盖本轮；自身输出另检查实际轮廓/清晰度/合成，不运行图像分数。CPU提交/driver显存/物理屏幕及完整产品性能的边界见performance与迁移计划。

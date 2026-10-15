@@ -340,7 +340,19 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
             if (pass.name == "ssao-composite" || pass.name == "bokeh" || pass.name == "smaa-blend")
                 currentColor = pass.target->texture.get();
         }
-        return { { "sourceMatches", p.source == expectedSource },
+        return { { "colorLinearClamp",
+                   p.linear->magFilter() == QRhiSampler::Linear
+                           && p.linear->minFilter() == QRhiSampler::Linear
+                           && p.linear->mipmapMode() == QRhiSampler::None
+                           && p.linear->addressU() == QRhiSampler::ClampToEdge
+                           && p.linear->addressV() == QRhiSampler::ClampToEdge },
+                 { "depthNearestClamp",
+                   p.nearest->magFilter() == QRhiSampler::Nearest
+                           && p.nearest->minFilter() == QRhiSampler::Nearest
+                           && p.nearest->mipmapMode() == QRhiSampler::None
+                           && p.nearest->addressU() == QRhiSampler::ClampToEdge
+                           && p.nearest->addressV() == QRhiSampler::ClampToEdge },
+                 { "sourceMatches", p.source == expectedSource },
                  { "revision", qint64(m_revision) },
                  { "sourceSamples", p.source->sampleCount() },
                  { "sourceFormat", int(p.source->format()) },

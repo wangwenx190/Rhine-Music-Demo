@@ -33,4 +33,4 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 
 原始antialias=off只关闭后期SMAA，几何MSAA仍开启；高/极高追加SMAA。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
 
-Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。旧三套图像聚合入口保持停用并拒绝直接执行；逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；尺度/BLUR-01归R19D4C。
+Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。旧三套图像聚合入口保持停用并拒绝直接执行；逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。

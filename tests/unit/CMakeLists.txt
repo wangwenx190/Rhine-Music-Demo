@@ -170,6 +170,18 @@ if(YALAHOO_REVIEW)
         set_tests_properties(rhi-flicker-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
     endif()
+    add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit
+        "${CMAKE_BINARY_DIR}/verification/rhi-scale")
+    set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT 600
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
+        FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
+    if(WIN32)
+        set_tests_properties(rhi-scale-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    elseif(APPLE)
+        set_tests_properties(rhi-scale-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
+    endif()
     add_test(NAME rhi-shell-gpu COMMAND rhi-shell-audit
         "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
         "${CMAKE_BINARY_DIR}/verification/rhi-shell")

@@ -309,10 +309,9 @@ View3D {
         }
     }
     function updateQuality(): void {
-        adapter.quality.resize(Math.max(1, width), Math.max(1, height), materialReview ? 1 : Math.min(
-                                                                                             width / 1920,
-                                                                                             height / 1080),
-                               reviewDpr > 0 ? reviewDpr : currentDpr, 4096);
+        // View3D dimensions already use displayed logical pixels, with no CSS stage transform.
+        adapter.quality.resize(Math.max(1, width), Math.max(1, height), 1, reviewDpr > 0
+                               ? reviewDpr : currentDpr, 4096);
     }
     onWidthChanged: updateQuality()
     onHeightChanged: updateQuality()

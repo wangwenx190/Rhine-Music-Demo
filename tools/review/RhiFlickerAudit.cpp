@@ -3,6 +3,7 @@
 #include "RhiFogAudit.h"
 #include "RhiShadowAudit.h"
 #include "SceneItem.h"
+#include "RhiProductionFixture.h"
 #include "OverviewController.h"
 #include "PresentationController.h"
 #include "GraphicsBackend.h"
@@ -36,27 +37,7 @@ QJsonObject coverage(const Capture &capture)
     }
     return { { "missing", missing }, { "shaded", shaded }, { "nonfinite", nonfinite } };
 }
-Snapshot library()
-{
-    LibrarySnapshot result;
-    for (int lane = 0; lane < 9; ++lane) {
-        Genre genre;
-        genre.id = QString::number(lane);
-        genre.name = genre.id;
-        result.genres.append(genre);
-        for (int row = 0; row < 64; ++row) {
-            Album album;
-            album.id = QString("%1:%2").arg(lane).arg(row);
-            album.genreId = QString::number(lane);
-            album.title = QString("Anonymous album %1").arg(row);
-            album.coverUrl =
-                    QUrl(QString("qrc:/assets/demo-covers/%1.png")
-                                 .arg(QStringList{ "square", "portrait", "landscape" }[row % 3]));
-            result.albums.append(album);
-        }
-    }
-    return std::make_shared<const LibrarySnapshot>(std::move(result));
-}
+
 }
 int main(int argc, char **argv)
 {
@@ -118,7 +99,7 @@ int main(int argc, char **argv)
             SelectionController selection(&motion);
             SceneAdapter adapter(motion.clock());
             PresentationController presentation(motion.clock(), { });
-            auto snapshot = library();
+            auto snapshot = productionLibrary();
             selection.setColumns(orderLibrary(*snapshot, SortMode::Genre).columns, snapshot);
             adapter.setSelection(&selection);
             overview.bind(&adapter, &selection, &presentation);
