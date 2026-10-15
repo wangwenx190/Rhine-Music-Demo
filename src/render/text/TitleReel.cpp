@@ -635,8 +635,8 @@ void TitleReel::publishResources()
     QList<QSize> sizes;
     for (const auto *slot : m_slots)
         if (slot->shown())
-            sizes.append(QSize(int(std::ceil(slot->capacityWidth * m_dpr * 2)),
-                               int(std::ceil(slot->capacityHeight * m_dpr * 2))));
+            sizes.append(QSize(int(std::ceil(slot->capacityWidth * m_dpr)),
+                               int(std::ceil(slot->capacityHeight * m_dpr))));
     if (sizes != m_resourceSizes) {
         m_resourceSizes = sizes;
         emit resourcesChanged();
@@ -650,8 +650,8 @@ QVariantMap TitleReel::diagnostics() const
         active += slot->active;
         faces += slot->faces.size();
         if (slot->shown())
-            layerBytes += qint64(std::ceil(slot->capacityWidth * m_dpr * 2))
-                    * qint64(std::ceil(slot->capacityHeight * m_dpr * 2)) * 4;
+            layerBytes += qint64(std::ceil(slot->capacityWidth * m_dpr))
+                    * qint64(std::ceil(slot->capacityHeight * m_dpr)) * 4;
     }
     return { { "slots", slotCount() },
              { "activeSlots", active },

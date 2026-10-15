@@ -16,7 +16,6 @@ Item {
     property real bottomPadding: 0
     property TitleReelMotion sharedController: null
     property bool quickTextCandidate: false
-    property real rasterScale: 2
     readonly property TitleReelMotion controller: sharedController || motion
     readonly property real naturalWidth: controller.naturalWidth
     implicitHeight: controller.layoutHeight + bottomPadding
@@ -47,7 +46,20 @@ Item {
                                                            !root.Window.window
                                                            || root.Window.window.visible)
     }
+    function layerSizes() {
+        const sizes = [];
+        for (let i = 0; i < cells.count; ++i) {
+            const cell = cells.itemAt(i);
+            if (cell && cell.layer.enabled)
+                sizes.push({
+                               width: cell.layer.textureSize.width,
+                               height: cell.layer.textureSize.height
+                           });
+        }
+        return sizes;
+    }
     Repeater {
+        id: cells
         model: root.controller
         delegate: Item {
             id: cell
@@ -64,13 +76,12 @@ Item {
                                                        || root.Window.window.visible)
 
             layer.smooth: true
-            layer.textureSize: Qt.size(Math.ceil(width * root.controller.dpr * root.rasterScale),
-                                       Math.ceil(height * root.controller.dpr * root.rasterScale))
+            layer.textureSize: Qt.size(Math.ceil(width * root.controller.dpr), Math.ceil(height
+                                                                                         * root.controller.dpr))
 
             layer.effect: ShaderEffect {
                 readonly property real sourceHeight: cell.height
-                readonly property real textureHeight: Math.ceil(cell.height * root.controller.dpr
-                                                                * root.rasterScale)
+                readonly property real textureHeight: Math.ceil(cell.height * root.controller.dpr)
                 readonly property real blurAmount: root.transport && cell.slot
                                                    ? cell.slot.blurOpacity : 0
                 readonly property real viewportHeight: cell.slot ? cell.slot.viewportHeight : 0

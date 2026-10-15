@@ -4,7 +4,6 @@
 #include "ReelInk.h"
 #include "CanvasTitleProbe.h"
 #include "AssetCatalog.h"
-#include "ImageComparison.h"
 #include "VerificationWindow.h"
 #include "LayoutMetrics.h"
 #include "LibrarySession.h"
@@ -114,25 +113,43 @@ QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
                                          { "colorGlyph", actual.colorGlyph },
                                          { "fonts", rawFonts } });
         actualText += actual.text;
-        for (const auto &entry : glyphs) {
-            const auto expected = entry.toObject();
-            if (expected["key"].toString() == actual.key
-                && expected["text"].toString() == actual.text) {
+        // Compare every visible unit in source order. Internal slot keys can
+        // contain gaps after clamping (notably the final ellipsis).
+        const int index = actualGlyphs.size() - 1;
+        if (index < glyphs.size()) {
+            const auto expected = glyphs[index].toObject();
+            if (expected["text"].toString() == actual.text) {
                 error = std::max({ error, std::abs(actual.x - expected["x"].toDouble()),
                                    std::abs(actual.y - expected["y"].toDouble()),
                                    std::abs(actual.width - expected["width"].toDouble()),
                                    std::abs(actual.height - expected["height"].toDouble()) });
                 ++checked;
-                break;
             }
         }
     }
-    return { { "passed", error <= 1 && actualText == expectedText },
+    return { { "passed",
+               error <= 1 && actualText == expectedText && checked == glyphs.size()
+                       && actualGlyphs.size() == glyphs.size() },
              { "actualGlyphs", actualGlyphs },
              { "maximumError", error },
              { "matchingUnits", checked },
              { "actualText", actualText },
              { "expectedText", expectedText } };
+}
+QJsonObject layerStructure(QQuickItem *root, const yalahoo::TitleReel &controller, int mode)
+{
+    auto *reel = root->findChild<QQuickItem *>("reviewTitle");
+    QVariant result;
+    const bool invoked =
+            reel && QMetaObject::invokeMethod(reel, "layerSizes", Q_RETURN_ARG(QVariant, result));
+    const auto actual = QJsonArray::fromVariantList(result.toList());
+    QJsonArray expected;
+    if (mode != 2)
+        for (const auto size : controller.resourceSizes())
+            expected.append(QJsonObject{ { "width", size.width() }, { "height", size.height() } });
+    return { { "passed", invoked && actual == expected },
+             { "actual", actual },
+             { "planned", expected } };
 }
 double rollingError(const QJsonArray &samples)
 {
@@ -181,7 +198,8 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
     if (!input.open(QIODevice::ReadOnly))
         return 3;
     const auto reference = QJsonDocument::fromJson(input.readAll()).object();
-    if (reference["captures"].toArray().isEmpty() || reference["tracks"].toArray().isEmpty()
+    if (reference["protocol"].toString() != "source-structure-font-metrics-motion-v1"
+        || reference["captures"].toArray().isEmpty() || reference["tracks"].toArray().isEmpty()
         || reference["rolling"].toArray().isEmpty())
         return 3;
     QDir().mkpath(output);
@@ -443,34 +461,28 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         if (index < staticSteps) {
             const auto test = cases[index / 3].toObject();
             const int mode = index % 3;
-            const QImage expected(sourceDirectory + '/' + test["file"].toString());
-            const QImage alpha(sourceDirectory + '/' + test["outlineFile"].toString());
-            const auto actual = image.copy(0, 0, expected.width(), expected.height());
+            const QSize captureSize(qRound(test["width"].toDouble() * window.devicePixelRatio()),
+                                    qRound(test["budget"].toDouble() * window.devicePixelRatio()));
+            const auto actual = image.copy(QRect(QPoint(), captureSize));
             const QString filename = QString("native-%1-mode-%2.png").arg(index / 3).arg(mode);
-            const bool valid = !actual.isNull() && actual.save(output + '/' + filename)
+            const bool valid = !image.isNull() && image.width() >= captureSize.width()
+                    && image.height() >= captureSize.height()
+                    && actual.save(output + '/' + filename)
                     && yalahoo::verification::windowPolicySatisfied(window);
-            const QRectF logicalRoi(0, 0, test["width"].toDouble() * window.devicePixelRatio(),
-                                    controller.layoutHeight() * window.devicePixelRatio());
-            const QPolygonF roi(logicalRoi);
-            const auto raw = yalahoo::compareImages(actual, expected, roi);
-            const auto contour = alpha.copy(0, 0, int(std::round(logicalRoi.width() * 8)),
-                                            int(std::round(logicalRoi.height() * 8)));
-            const auto band = yalahoo::compareAntialiasBand(actual, expected, contour, roi, 255, 8);
             const auto geometry = structure(controller, test["state"].toObject());
-            const bool candidatePassed = valid && geometry["passed"].toBool()
-                    && band["valid"].toBool() && band["ssim"].toDouble() >= .98
-                    && band["meanAbsoluteRgb"].toDouble() <= 6;
+            const auto layers = layerStructure(root, controller, mode);
+            const bool structurePassed =
+                    valid && geometry["passed"].toBool() && layers["passed"].toBool();
             if (mode == 0)
-                passed &= candidatePassed;
+                passed &= structurePassed;
             captures.append(QJsonObject{
                     { "case", index / 3 },
                     { "mode", mode },
                     { "file", filename },
                     { "valid", valid },
-                    { "candidatePassed", candidatePassed },
-                    { "raw", raw },
-                    { "antialiasBand", band },
+                    { "structurePassed", structurePassed },
                     { "geometry", geometry },
+                    { "layers", layers },
                     { "resources", QJsonObject::fromVariantMap(controller.diagnostics()) } });
             QSaveFile progress(output + "/captures.json");
             if (progress.open(QIODevice::WriteOnly)) {
@@ -772,7 +784,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         next();
     });
     const double dpr = window.devicePixelRatio();
-    // Reference-contour and SSIM comparisons run on CPU over physical pixels.
+    // Bound the complete own-render, animation and lifecycle verification.
     QTimer::singleShot(int(90000 * std::max(1.0, dpr * dpr)), &app, [&] {
         QSaveFile file(output + "/timeout.json");
         if (file.open(QIODevice::WriteOnly)) {

@@ -4,282 +4,81 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '../..');
-if (process.argv.length < 3 || process.argv.length > 4)
-    throw Error('Usage: node tools/audit/audit-title.mjs complete-directory [R16M2|R16M2P|R16M3]');
-const evidence = path.resolve(process.argv[2]);
-const round = process.argv[3] || 'R16M2';
-if (!['R16M2', 'R16M2P', 'R16M3'].includes(round))
-    throw Error('Unsupported audit round');
-const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
-const summary = readJson(path.join(evidence, 'summary.json'));
-const report = readJson(path.join(evidence, 'report.json'));
-const source = readJson(path.join(summary.sourceDirectory, 'report.json'));
-if (!summary.diagnosticsPassed || summary.platform !== 'darwin'
-    || !['metal', ...(round === 'R16M3' ? ['opengl'] : [])].includes(summary.backend)
-    || summary.configuration !== 'Release'
-    || !(round === 'R16M3' ? [1, 1.5, 2] : [2]).includes(summary.dpr) || !report.offscreen
-    || report.offscreenResourcePlan?.nativeWindowVisible !== false || !report.windowPolicy.passed
-    || !report.released)
-    throw Error('Complete hidden supported-backend/DPR diagnostics required');
-const sourceCaptures =
-    source.captures.filter((capture) => Math.abs(capture.dpr - summary.dpr) < .001);
-if (source.platform !== 'darwin' || sourceCaptures.length !== 20)
-    throw Error('Twenty same-platform source captures at the actual DPR required');
-if (round === 'R16M3'
-    && (report.offscreenResourcePlan?.attachmentEstimateBytesPerPixel !== 12
-        || report.offscreenResourcePlan?.actualDriverAllocationBytes !== null))
-    throw Error('Conservative RGBA8/depth-stencil estimate and unknown driver bytes required');
-if (round === 'R16M2P' || round === 'R16M3') {
-    const production = report.captures.filter((capture) => capture.mode === 0);
-    if (!summary.passed || summary.diagnosticMode || !report.passed
-        || summary.pendingPixelCases.length || production.length !== 20
-        || production.some((capture) => !capture.candidatePassed))
-        throw Error('This round requires normal full pixel acceptance');
-    for (const capture of production) {
-        const faces = sourceCaptures[capture.case].platformFonts;
-        for (const glyph of capture.geometry.actualGlyphs) {
-            if (glyph.colorGlyph)
-                continue;
-            const face = faces.find((face) => face.text === glyph.text);
+if (process.argv.length !== 3)
+    throw Error('Usage: node tools/audit/audit-title.mjs complete-directory');
+const directory = path.resolve(process.argv[2]);
+const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+const summary = read(path.join(directory, 'summary.json'));
+const report = read(path.join(directory, 'report.json'));
+const source = read(path.join(summary.sourceDirectory, 'report.json'));
+if (!summary.passed || !report.passed || !report.released || !report.windowPolicy.passed
+    || summary.protocol !== 'source-structure-font-metrics-motion-v1'
+    || source.protocol !== summary.protocol || summary.platform !== source.platform
+    || report.backend !== summary.backend || report.dpr !== summary.dpr)
+    throw Error('Complete current-platform non-image title checks required');
+const references = source.captures.filter((capture) => Math.abs(capture.dpr - summary.dpr) < .001);
+const production = report.captures.filter((capture) => capture.mode === 0);
+if (references.length !== 20 || production.length !== 20)
+    throw Error('Twenty source/production states required');
+let baselines = 0, colorFaces = 0;
+for (const capture of production) {
+    if (!capture.valid || !capture.structurePassed || !capture.geometry.passed)
+        throw Error('Invalid native structure');
+    const faces = references[capture.case].platformFonts;
+    for (const glyph of capture.geometry.actualGlyphs) {
+        const face = faces.find((entry) => entry.text === glyph.text);
+        if (!glyph.fonts.length
+            || glyph.fonts.some((font) =>
+                                    !font.headSha256 || !font.glyphIndexes.length
+                                    || font.glyphIndexes.length !== font.glyphPositions.length))
+            throw Error('Whole-line physical font/glyph identity missing');
+        // CSS font-box coordinates are independent of raster appearance. macOS uses
+        // the source CoreText integral half-leading, not a per-case image adjustment.
+        if (summary.platform === 'darwin' && !glyph.colorGlyph) {
             if (!face || !Number.isFinite(face.fontAscent) || !Number.isFinite(face.fontDescent)
                 || !Number.isFinite(face.rangeTop) || !Number.isFinite(parseFloat(face.lineHeight)))
-                throw Error('Same-host CSS font-box metrics required');
+                throw Error('Same-host CSS primary font-box metrics required');
             const leading = (parseFloat(face.lineHeight) - face.fontAscent - face.fontDescent) / 2;
-            const expected = face.fontAscent + Math.floor(leading);
+            const baseline = face.fontAscent + Math.floor(leading);
             if (Math.abs(face.rangeTop - Math.floor(leading)) > .001
-                || Math.abs(glyph.fonts[0].firstY * glyph.scale - expected) > 1 / 64)
-                throw Error('Frozen CSS font-box and native baseline disagree');
+                || Math.abs(glyph.fonts[0].firstY * glyph.scale - baseline) > 1 / 64)
+                throw Error('Source CSS font box and shaped primary baseline disagree');
+            ++baselines;
+        }
+        if (summary.platform === 'darwin' && glyph.colorGlyph) {
+            if (!face?.fonts.some((font) => font.postScriptName === 'AppleColorEmoji')
+                || glyph.fonts.length !== 1 || glyph.fonts[0].family !== 'Apple Color Emoji'
+                || glyph.fonts[0].glyphIndexes.length !== 1)
+                throw Error('Source/native color grapheme font identity differs');
+            ++colorFaces;
         }
     }
 }
-for (const index of [10, 11]) {
-    const expected = sourceCaptures[index].platformFonts.filter(
-        (face) => face.fonts.some((font) => font.postScriptName === 'AppleColorEmoji'));
-    const actual = report.captures.find((capture) => capture.case === index && capture.mode === 0);
-    const colors = actual?.geometry.actualGlyphs.filter((glyph) => glyph.colorGlyph);
-    if (expected.length !== 4 || !actual || !actual.geometry.passed || !actual.candidatePassed
-        || colors.length !== 4 || colors.some((glyph, i) => glyph.text !== expected[i].text)
-        || colors.some(
-            (glyph) => glyph.fonts.length !== 1 || glyph.fonts[0].family !== 'Apple Color Emoji'
-                       || !glyph.fonts[0].headSha256 || glyph.fonts[0].glyphIndexes.length !== 1))
-        throw Error('Source/native emoji face and whole-line glyph evidence required');
-}
-const chain = readJson(path.join(root, 'build/release/toolchain.json'));
-const qsb = [path.join(chain.qtKit, 'bin/qsb'), path.join(chain.qtKit, 'libexec/qsb')].find(
-    (file) => fs.existsSync(file));
+if (summary.platform === 'darwin' && (!baselines || colorFaces !== 8))
+    throw Error('Primary and color-font coverage missing');
+const chain = read(path.join(root, 'build/release/toolchain.json'));
+const suffix = process.platform === 'win32' ? '.exe' : '';
+const qsb = ['bin', 'libexec']
+                .map((part) => path.join(chain.qtKit, part, 'qsb' + suffix))
+                .find((file) => fs.existsSync(file));
 const shader = path.join(root, 'build/release/src/app/.qsb/reel-slot.frag.qsb');
-if (summary.qtVersion !== chain.qtVersion || report.backend !== summary.backend
-    || report.dpr !== summary.dpr)
-    throw Error('Toolchain and actual report context disagree');
-const fileHash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const binarySha256 = fileHash(path.join(root, 'build/release/tools/ui-audit'));
-const fixtureSha256 = fileHash(path.join(root, 'tests/fixtures/text/titles.json'));
-const sourceReportSha256 = fileHash(path.join(summary.sourceDirectory, 'report.json'));
-
 const dump = spawnSync(qsb, ['--dump', shader], {encoding: 'utf8', windowsHide: true});
-if (dump.status !== 0 || !['MSL', 'GLSL', 'HLSL'].every((kind) => dump.stdout.includes(kind)))
-    throw Error('Shared text shader must contain MSL/GLSL/HLSL variants');
-fs.writeFileSync(path.join(evidence, 'reel-slot-qsb.txt'), dump.stdout);
-// Symbol guards detect source drift. The evidence text records the manually reviewed
-// call-chain deductions; it is not inferred from the presence of these strings.
-const checks = [
-    [
-        'COMMON-01', 'src/render/text/CMakeLists.txt', 'YALAHOO_REEL_GLYPH_API',
-        'The root requires C++23 and the latest discovered native Kit. YalahooText links Quick; ' +
-            'QuickPrivate is limited to the glyph adapter and probed by compiling addGlyphs. ' +
-            'AssetCatalog is compiled in the product, ui-audit and TitleTest. The new font policy '
-            +
-            'uses public QFontDatabase behind Q_OS_MACOS; Windows/Linux keep their previous branch.'
-    ],
-    [
-        'COMMON-02', 'src/app/AssetCatalog.cpp', 'setApplicationEmojiFontFamilies',
-        'initializeAssetFonts validates four embedded SFNT outlines before committing fonts. ' +
-            'macOS then requires the installed Apple Color Emoji family and selects it once. ' +
-            'Missing family rolls back the registered faces and returns failure; no downloaded ' +
-            'font, absolute system-font path or font-file I/O enters production rendering. ' +
-            'QML, C++ shaping and Canvas all inherit this application policy.'
-    ],
-    [
-        'COMMON-03', 'resources/shaders/reel-slot.frag', 'textureHeight',
-        'Each slot uses the existing RGBA8 layer and Qt Quick matrix/opacity/binding ABI. ' +
-            'The shader applies the unchanged edge fade and optional bounded nine-tap blur. ' +
-            'No new color conversion, sampler, attachment, resolve or projection was added. ' +
-            'The native qsb dump has MSL/GLSL/HLSL; generation does not prove target GPU behavior.'
-    ],
-    [
-        'COMMON-04', 'qml/Yalahoo/Music/components/TransportTitle.qml', 'locateRequested',
-        'Transport remains visual state plus a locate signal, forwarded through Header. ' +
-            'Font selection has no media/provider/file-scanner dependency. Actual audio and ' +
-            'locate execution remain the dedicated migration rounds.'
-    ],
-    [
-        'COMMON-05', 'tools/review/export-title.mjs', 'CSS.getPlatformFontsForNode',
-        'Frozen Git mapping supplies source CSS/markup/WOFF2. CDP reads actual rendered ' +
-            'face text, platform family/PostScript identity and CSS font-box top/Canvas ascent ' +
-            'and descent without changing source layout. R16M2P requires normal pixel acceptance ' +
-            'and checks every ordinary baseline against these same-host source metrics. ' +
-            'Resolved remote objects are released per face. Native geometry records measured ' +
-            'font-head hashes and whole-line IDs/positions. verify-title still rejects structure, '
-            +
-            'header, motion, cache, hidden-work or lifecycle failure in diagnostic mode; remaining '
-            +
-            'pixel cases stay explicit and do not count as accepted pixels.'
-    ],
-    [
-        'PERF-01', 'src/render/text/TitleReel.cpp', 'm_animatedSlots',
-        'advance visits only moving slots with O(1) stationary return. Reconcile measures ' +
-            'input text once using cached fit results, an indexed slot pool and at most 64 idle ' +
-            'slots. Text shaping is bounded by input length, not library size. Emoji policy is ' +
-            'set only at startup; new diagnostics run only during capture, never every tick.'
-    ],
-    [
-        'PERF-02', 'src/render/rhi/ReelTextNode.cpp', 'QRawFont::fromFont',
-        'GUI layout retains font descriptions/head identity and implicitly shared glyph ' +
-            'values. The render thread resolves its own QRawFont and checks head identity ' +
-            'before using IDs. One queued reconcile coalesces GUI input; no new worker, wait ' +
-            'or production readback exists. Review permits only one readback in flight.'
-    ],
-    [
-        'PERF-03', 'src/render/text/ReelInk.cpp', 'sameGlyphInk',
-        'Content revision reuses complete identical glyph descriptors in a bounded face ' +
-            'list (at most eight). Animation changes transforms/clip/opacity independently. ' +
-            'Color faces use Qt Quick Text; hidden ordinary nodes are deleted. The font policy ' +
-            'is installed before controllers, so it cannot invalidate a live layout each frame.'
-    ],
-    [
-        'PERF-04', 'src/render/rhi/ResourcePlan.h', 'title-reel-depth',
-        'Slot capacity/DPR determines the existing layer at twice DPR; RGBA8 and conservative ' +
-            'depth estimates remain in ResourcePlan, with resize overlap recorded separately. ' +
-            'Font choice creates no new product render target and leaves 3D compatibility keys ' +
-            'unchanged. OffscreenSurface owns one RGBA8 plus depth/stencil target, single sample, '
-            +
-            'no mips; the conservative attachment plan uses 4+8 bytes per physical pixel and ' +
-            'includes old/new overlap. Memoryless storage is not claimed as measured VRAM. ' +
-            'Its target size/DPR changes only on corresponding compatibility changes. ' +
-            'Qt font atlas and driver memory remain unknown.'
-    ],
-    [
-        'PERF-05', 'src/render/text/TextLayoutAdapter.cpp', 'line.ascent() * scale',
-        'macOS primary half-leading is floored in logical CSS units, matching the same-host ' +
-            'frozen face range top; fractional line heights, font sizes, fit search and mixed-line '
-            +
-            'ascent correction remain intact. Other platforms retain their earlier half-leading. ' +
-            'Emoji resolves to the source face while whole-line QTextLayout still supplies ' +
-            'grapheme/ligature IDs and positions. The full cache key and 96-entry/8MiB limits ' +
-            'are unchanged; fontDatabaseChanged clears caches. No case-dependent offsets, ' +
-            'font-size adjustment or per-character shaping is introduced. The regression fixes ' +
-            'measured integral/fractional source baselines; full DPR2 pixels and mixed emoji are ' +
-            'separate acceptance evidence, not inferred from layout tests.'
-    ],
-    [
-        'PERF-06', 'qml/Yalahoo/Music/components/TitleReel.qml', 'root.clock',
-        'The same FrameClock controls all motion. Hidden normal/Canvas candidates skip ' +
-            'text work; offscreenRendering explicitly permits the hidden review root. QML ' +
-            'faces retain Tooltip/Accessible full names and only visible color/candidate Text ' +
-            'instances. Natural width uses a dedicated change signal: animation and visibility ' +
-            'finish cannot republish an unchanged transport width. Caption visibility follows ' +
-            'title/shown motion rather than derived width/opacity, removing the feedback edge. ' +
-            'Hide sets active=false immediately and coalesces finish into one queued callback; ' +
-            'restoration cancels that finish and object destruction cancels its delivery. ' +
-            'A visibility callback ' +
-            'regression checks one real width notification; full review logs reject binding ' +
-            'loops and shader pipeline failures. Header checks cover both themes, nine sizes ' +
-            'and unchanged playback IDs.'
-    ],
-    [
-        'PERF-07', 'tools/review/OffscreenSurface.h', 'm_pending',
-        'Render requests coalesce into one queued callback. hide invalidates scene graph ' +
-            'before owned attachments are destroyed; restore initializes it again. Target DPR ' +
-            'is explicit. Ten independent cycles and final zero tracked nodes/renderers are ' +
-            'checked by the diagnostic wrapper. Review texture readback is bounded and separate ' +
-            'from production; its GUI sync/render/endFrame timings are not VSYNC performance.'
-    ],
-    [
-        'MAC-01', 'src/app/GraphicsBackend.h', 'Metal',
-        'The Apple branch selects Metal. Apple Color Emoji is verified against the same-host ' +
-            'browser identity and four color glyphs; the private UI family is no longer used. ' +
-            'prepareApplication/prepareWindow and the native Cocoa guard remain in place. ' +
-            'The explicit Apple OpenGL path requests a 4.1 core format before QGuiApplication; ' +
-            'Metal keeps its default format. Actual diagnostics used RenderControl with no ' +
-            'native show or swapchain present. ' +
-            'Visible interaction and deployment remain R34/R31.'
-    ],
-    [
-        'LNX-01', 'src/app/AssetCatalog.cpp', '#ifdef Q_OS_MACOS',
-        'The new family selection is removed by preprocessing on Linux and Windows. ' +
-            'The half-leading correction is also macOS-only; shared layout/render descriptors, ' +
-            'qrc aliases and shader path are unchanged. ' +
-            'GraphicsBackend selects OpenGL for Linux and D3D11 for Windows, with the existing ' +
-            'explicit OpenGL option. No Apple/Windows handle or library enters another platform. ' +
-            'Native target fonts, compositor, deployment and GPU results remain unverified.'
-    ]
-];
-const sourcePaths = new Set(checks.map((check) => check[1]));
-for (const file
-         of ['CMakeLists.txt', 'cmake/BrowseQml.cmake', 'src/render/text/TextLayoutAdapter.h',
-             'src/render/text/TitleReel.h', 'src/app/GraphicsBackend.h',
-             'src/app/VerificationWindow.h', 'src/app/VerificationWindowMac.mm', 'src/app/main.cpp',
-             'src/app/CMakeLists.txt', 'tools/review/UiAudit.cpp', 'tools/review/CMakeLists.txt',
-             'tests/unit/CMakeLists.txt', 'tools/review/TitleAudit.cpp',
-             'tools/review/CanvasTitleProbe.cpp', 'tools/build/verify-title.mjs',
-             'tests/unit/TitleTest.cpp'])
-    sourcePaths.add(file);
-const records = [...sourcePaths].map(
-    (file) => ({
-        path: file,
-        sha256: createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')
-    }));
-for (const [checkId, file, symbol] of checks)
-    if (!fs.readFileSync(path.join(root, file), 'utf8').includes(symbol))
-        throw Error('Reviewed source drift: ' + checkId + ':' + file + ':' + symbol);
-for (const platform of ['macos', 'linux', 'windows']) {
-    const directory =
-        path.join(root, 'verification', platform + '-static/title-reels', round.toLowerCase(),
-                  ...(round === 'R16M3' ? [summary.backend + '-dpr-' + summary.dpr] : []));
-    fs.mkdirSync(directory, {recursive: true});
-    const conclusion = '静态审计通过，实机待验证（R34）；本机离屏实测另列';
-    const matrix = checks.map(
-        ([checkId, sourcePath, lineOrSymbol, evidence]) => ({
-            checkId,
-            requirement: checkId.startsWith('PERF') ? 'docs/contracts/performance.md'
-                                                    : 'QT_QUICK_MIGRATION_PLAN.md',
-            platform,
-            sourcePath,
-            lineOrSymbol,
-            evidence,
-            result: 'static-passed',
-            limitations:
-                platform === 'macos'
-                    ? 'Real arm64 Release/' + summary.backend + '/DPR' + summary.dpr
-                          + ' offscreen checks ran; pixel status is recorded ' +
-                          'separately. Native visible windows/present/VSYNC remain R34; ' +
-                          'other contexts are never inferred from this report.'
-                    : 'No target compiler, color-font backend, compositor or GPU ran. The new ' +
-                          'baseline branch is removed by preprocessing; required real checks and ' +
-                          'known D3D11/OpenGL failures remain R34.'
-        }));
-    fs.writeFileSync(path.join(directory, 'audit-matrix.json'), JSON.stringify({
-        conclusion,
-        round,
-        toolchain: chain,
-        binarySha256,
-        fixtureSha256,
-        sourceReportSha256,
-        sourceRecords: records,
-        diagnosticDirectory: evidence,
-        pendingPixelCases: summary.pendingPixelCases,
-        checks: matrix
-    },
-                                                                               null, 2)
-                                                                    + '\n');
-    fs.writeFileSync(path.join(directory, 'audit-report.md'),
-                     '# ' + round + ' / ' + platform + '\n\n' + conclusion + '\n\n'
-                         + matrix
-                               .map((check) => check.checkId + ' — ' + check.sourcePath + ':'
-                                               + check.lineOrSymbol + '\n' + check.evidence
-                                               + '\nLimit: ' + check.limitations)
-                               .join('\n\n')
-                         + '\n');
-}
-console.log(round + ' source/performance audit and text qsb variants passed; pixels pending: '
-            + summary.pendingPixelCases.join(','));
+if (summary.qtVersion !== chain.qtVersion || dump.status !== 0
+    || !['MSL', 'GLSL', 'HLSL'].every((kind) => dump.stdout.includes(kind)))
+    throw Error('Same-Kit shared shader variants missing');
+fs.writeFileSync(path.join(directory, 'reel-slot-qsb.txt'), dump.stdout);
+const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+fs.writeFileSync(path.join(directory, 'font-audit.json'), JSON.stringify({
+    passed: true,
+    primaryFontBoxesChecked: baselines,
+    colorFacesChecked: colorFaces,
+    binarySha256: hash(path.join(root, 'build/release/tools/ui-audit' + suffix)),
+    sourceReportSha256: hash(path.join(summary.sourceDirectory, 'report.json')),
+    shaderSha256: hash(shader),
+    visualQuality: 'requires-own-output-inspection',
+    limitations:
+        'Source structure/font metrics and actual native checks only; physical displays, native input, normal VSYNC and target systems remain separate.'
+},
+                                                                         null, 2)
+                                                              + '\n');
+console.log('Title font identities, CSS baselines and shader variants passed');

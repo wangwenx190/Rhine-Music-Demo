@@ -2,7 +2,7 @@
 
 本文只保存历史轮次/提交→实际对象→适配或补偿判定；具体接口、算法参数、组件检查入口各归迁移计划职责索引中的组件契约。未完成任务/平台回归/BLUR与FLICKER退出条件只在迁移计划维护；运行数据、实验过程和成绩不在此追加。
 
-冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，尚未存在的R19F/G/H仍为待执行。
+冻结身份及Git映射由web-baseline.md维护。表中R19编号表示复查责任归属，不能仅凭索引行判为通过；当前结论须读对应专题，尚未存在的R19G/H仍为待执行。
 
 ## R19A 范围与来源
 
@@ -31,17 +31,17 @@
 | R13 | `0d06b7b`；`2ee2294`、`1c9b8c6` | 真实列/填充、列记忆、库替换与导航目标由 R19B 审查；R19 的总览插值消费者仍待 R19G。 |
 | R14 | `1a082f2`；`2abb4f6`、`e98c798` | R19E已逐对象复查品牌容器/控件/运输信息、遮罩及Canvas合成；移除四倍图标采样，恢复最终竖屏歌名cap。 |
 | R15 | `2ee2294`；`2abb4f6` | R19E已复查滑尺/数字轨迹和Pointer/InputRouter；保留源数学与有界所有权，移除全部浏览器图像门禁。 |
-| R16 | `2abb4f6` | 全部标题字轮、整行 shaping、CSS/字体/布局和候选路径；待 R19F。 |
-| R16B1 | `6636ddb` | 普通 glyph 节点复用、隐藏工作、页眉测量；待 R19F。 |
-| R16B2 | `509afe8` | Canvas 隐藏绘制、按组成本与高 DPR 超时；待 R19F。 |
-| R16B2V | `07514a5` | 混合字体 baseline、恢复场景尺寸、已撤回的采样改动；待 R19F。 |
+| R16 | `2abb4f6` | R19F确认整行shaping/分数缩放/源拟合，移除无独立必要性的两倍DPR槽层及图像门禁。 |
+| R16B1 | `6636ddb` | R19F保留完整字形描述符复用、隐藏停止和polish后页眉测量；inkEnd同时截文字与advance。 |
+| R16B2 | `509afe8` | R19F保留Canvas有效可见性/窗口断连和三次成本采样；候选逐面重shaping的语义限制明确。 |
+| R16B2V | `07514a5` | R19F以QTextLine实际混合ascent确认主字体基线修正；恢复标题尺寸保留，撤回的采样不恢复。 |
 | R16B2V-P | 任务见 `07514a5`；未找到独立完成提交 | Windows 未收口像素任务已被后续契约替代；共享字体/基线代码由 R19F 追踪，不恢复原图门禁。 |
 | R16B2W | 任务见 `509afe8`；未找到独立完成提交 | 没有独立生产选型；已有共享 DPR/生命周期和工具改动归 R19F，D3D11 目标实机仍归 R34。 |
 | R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R34。 |
-| R16M1 | `c7e9b61`；前置 `6740abc` | 真正离屏、DPR、隐藏依赖、字体物理面识别；待 R19F。 |
-| R16M2 | `b9a5ea7` | `AssetCatalog` 的 AppleColorEmoji 物理字体身份为独立依据，资产选择保留；整行 advance/回退及实际质量待 R19F。 |
-| R16M2P | `9470126` | macOS 半行距 floor 来自生产字面采集；不能仅凭旧分数保留，字体框/平台规则和源码语义待 R19F 重新证明。 |
-| R16M3 | `2840110` | OpenGL 4.1、绑定重入、有界隐藏完成与离屏资源估算；待 R19F，图形共享分支联动 R19D。 |
+| R16M1 | `c7e9b61`；前置 `6740abc` | R19F保留RenderControl真实target DPR、Review隐藏状态消费和字体head身份；不外推屏幕呈现。 |
+| R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
+| R16M2P | `9470126` | R19F用DOM rangeTop与Canvas字体框独立核对主基线至1/64逻辑px，保留macOS floor；不依赖旧分数。 |
+| R16M3 | `2840110` | R19F保留GL4.1/CoreProfile、宽度changed-only、对象所属合并finish及恢复取消；离屏保守资源估算保留。 |
 | R17 | `33e8260`；`e98c798`、`ed5aaef` | ListView 模型/复用/顶部定位、详情展示与排版；待 R19G。 |
 | R18 | `ed5aaef` | 详情抽取/旋转/归位、副本 clarity、封面 ready 身份和完整根窗口重建；待 R19G。 |
 | R19 | `1c9b8c6` | 总览相机/居中/折叠/标签及两步进入；待 R19G，产品渲染质量联动 R19C/D。 |
@@ -72,7 +72,7 @@
 | R19C | `verify-r07.ps1`/`verify-r08.ps1`、`calibrate-materials.py`、`RhiShellAudit`/`RhiAudit` 的原图/ROI/环境 witness | 源公式、有效 override、真实格式/通道/透明合成、双主题质量和资源 |
 | R19D | `postprocess-audit`/`occlusion-audit`、`RenderBackendAudit`、`RhiPostprocessAudit`、`prepare-*-capture.py` 与 render/RHI witness 耦合 | 真实附件/采样/resolve、shader 执行、实际质量、上传、生命周期与局部成本 |
 | R19E | `compare-browse-ui.ps1`、`verify-r14.ps1`/`verify-r15.ps1`、`UiAudit`/`RulerAudit` 的旧图门槛 | 控件几何/状态/交互、Canvas 隐藏工作、数字轨迹及合成质量 |
-| R19F | `verify-title.mjs`/`TitleAudit`、`verify-r16.ps1`/`audit-title.mjs` 的旧 SSIM/RGB/边缘带及逐 case 采样补偿 | 字体物理身份、整行 shaping/布局、时序/宽度、真实清晰度、隐藏绘制/生命周期与成本 |
+| R19F | `verify-title.mjs`/`TitleAudit`、`verify-r16.ps1`/`audit-title.mjs` 的旧 SSIM/RGB/边缘带及两倍DPR槽层 | 字体物理身份、整行 shaping/布局、时序/宽度、真实清晰度、隐藏绘制/生命周期与成本 |
 | R19G | presentation/detail/overview Review 及导出器中的原图/ROI 残留 | 展示布局/虚拟化、场景轨迹、相机/投影/状态、资源及实际质量 |
 
 ## R19B 运动、相机与阵列复查
@@ -277,3 +277,18 @@ R19D4B2的MSAA/resolve和组合资源图检查本身不关闭VIS-ARRAY-BLUR-01�
 | R14/R15 Review、`c7e9b61`隐藏适配、`e98c798`窗口适配 | 删除跨API/浏览器SSIM、RGB、边缘、coverage envelope及恢复图像分数，导出器仅交付最终CSS结构与冻结数学。保留自身纹理、revision、有内容、固定位置/键盘路由、静止/隐藏零paint、真实surface失效/恢复/释放及CPU成本。滑尺复用OffscreenSurface，单读回/有界续帧；不把离屏frameRendered当VSYNC或物理输入。PowerShell审计改为共同源码入口，产品GUI包装读取Process.ExitCode及报告。 |
 
 Canvas Painter的采用依据为源矩形/路径表达、固定值同步、renderer所有权和三份路径缓存；API间像素相似度与旧benchmark成绩不参与选型。实际隐藏质量检查保留正常轮廓/裁切/渐变/文本/图标输出；物理屏幕、正常VSYNC和缺少目标设备的项目只在R34维护。
+
+## R19F 标题字轮、字体与采样复查
+
+技术规范与检查入口：[title-reels.md](title-reels.md)。
+
+| 原轮次 / 来源与当前符号 | 判定与必要性 |
+| --- | --- |
+| R16 `2abb4f6`：`music-title.ts`/最终CSS → `TextLayoutAdapter` | 原MiSans字重、粗搜/细搜、主标题两行/译名比例、line-height、下伸留白和省略保留。整数Qt字号加局部矢量scale保留分数字号，整行QTextLayout的string index合并连字/组合字，避免拆字破坏上下文。歌名源flex grapheme宽度可能不同于整行kerning；原生优先保留整行字形语义，以真实自然宽度省略，并保持源slot cap与退出保宽。 |
+| R16/R16B1：`TitleReel.qml`/`ReelTextNode`/`ArchiveText` | CurveRendering提交矢量普通glyph，Qt Quick Text承担系统彩色字体，未发现现行NativeRendering或逐case渲染分支。两倍DPR层没有独立源调用/技术必要性，移除并同步ResourcePlan；保留实际DPR向上取整容量、线性过滤、逐面/槽裁切和源边缘淡化。歌名局部速度blur为有界Gaussian采样适配，不用于掩盖整行清晰度。 |
+| R16B1 `6636ddb` / B2 `509afe8` | 同字体head/ID/位置/scale/框才复用节点，inkEnd截尾部空白，字体数据库变化清缓存，均有语义依据。GUI值描述符到render独立QRawFont、隐藏停止/窗口替换断连、固定容量和缓存上界保留；Canvas/Quick Text候选重shaping不能凭共用controller认作等价。 |
+| R16B2V `07514a5` / M2P `9470126` | 混合fallback不应移动主字体，按实际QTextLine.ascent定位；彩色字面保留其inline字体基线。macOS半行距floor由相同主字体的DOM rangeTop/Canvas ascent/descent独立证明，字体框而非图像偏移；分数字号、行高、整行shaping及其他平台分支不改。 |
+| R16M1 `c7e9b61` / M2 `b9a5ea7` | 实际源AppleColorEmoji与Qt默认UI面不同；公开应用emoji选择、Regular回退及缺字体回滚保留。RenderControl、target DPR、Review隐藏消费与字体物理表身份检查是线程/平台适配；不能证明原生屏幕/跨屏事件。 |
+| R16M3 `2840110` / `e98c798`、R17字体失效接线 | naturalWidth仅变化通知、内容/退出motion决定caption可见性、hide立即停advance并合并queued finish，restore取消陈旧完成，避免绑定重入且保留退出宽度。GL4.1/CoreProfile/basic、后端有界readback drain和有效context释放保留，不改源时间。 |
+| B2V-P/B2W/B3及`6740abc`/`b08e94e`交接 | Git中无独立完成的生产实现；现有共享GL/DPR/候选/生命周期代码已按上述归属审查，不能用未完旧任务掩盖遗漏。旧高DPR像素失败保留历史，目标D3D11/Linux GL、真实显示及最终选型仍由R34原专项处理。 |
+| `TitleAudit`/`export-title`/`verify-title`与两个PowerShell审计入口 | 删除SSIM/RGB/边缘带、八倍轮廓导出、候选pixelPassed及诊断容错。按可见次序覆盖全部字面（含裁切后的省略号），不因内部slot key间断跳过几何；保留自身真实输出、结构≤1逻辑px、数值轨迹≤1e-6、字体框/物理身份、18页眉、三路径三次成本、隐藏零工作、十次恢复和最终释放；自动通过不替代实际质量检查。 |

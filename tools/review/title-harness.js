@@ -14,33 +14,6 @@ html,body,#stage { background: var(--page-bg, #e8e5e1); }
 `;
 document.head.append(style);
 let title;
-let alphaStyle;
-let outline;
-window.mountOutline = async () => {
-    outline = document.createElement('div');
-    outline.id = 'stage';
-    outline.className = stage.className;
-    outline.dataset.theme = stage.dataset.theme;
-    outline.dataset.layout = stage.dataset.layout;
-    outline.style.cssText =
-        'position:fixed;left:0;top:0;z-index:999;transform:scale(8);transform-origin:0 0;pointer-events:none';
-    const clone = callout.cloneNode(true);
-    clone.querySelector('.music-title-probe')?.remove();
-    outline.append(clone);
-    document.body.append(outline);
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-};
-window.removeOutline = () => outline.remove();
-window.setAlpha = async (enabled) => {
-    if (enabled) {
-        alphaStyle = document.createElement('style');
-        alphaStyle.textContent = 'html,body,#stage {background:transparent!important}';
-        document.head.append(alphaStyle);
-    } else {
-        alphaStyle.remove();
-    }
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-};
 window.renderCase = async (input) => {
     title?.destroy();
     stage.innerHTML = initialMarkup;

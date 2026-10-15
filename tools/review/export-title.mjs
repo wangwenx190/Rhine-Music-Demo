@@ -30,6 +30,13 @@ for (let i = 0; i < args.length; i += 2) {
         output = path.resolve(value);
     }
 }
+try {
+    await fs.access(path.join(output, 'report.json'));
+    throw Error('Use a fresh source directory to retain earlier evidence');
+} catch (error) {
+    if (error.code !== 'ENOENT')
+        throw error;
+}
 await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
@@ -226,43 +233,7 @@ try {
                     platformFonts.push({...description.result.value, fonts: fonts.fonts});
                     await page.send('Runtime.releaseObject', {objectId: object.objectId});
                 }
-                const file = 'title-' + captures.length + '.png';
-                const png = await page.send('Page.captureScreenshot', {
-                    format: 'png',
-                    clip: {x: 0, y: 0, width: input.width, height: input.budget, scale: 1}
-                });
-                await fs.writeFile(path.join(output, file), Buffer.from(png.data, 'base64'));
-                captures.push({...input, dpr, night, state, file, platformFonts});
-                await page.send('Emulation.setDefaultBackgroundColorOverride',
-                                {color: {r: 0, g: 0, b: 0, a: 0}});
-                await page.evaluate('window.setAlpha(true)');
-                const alphaFile = 'alpha-' + file;
-                const alpha = await page.send('Page.captureScreenshot', {
-                    format: 'png',
-                    clip: {x: 0, y: 0, width: input.width, height: input.budget, scale: 1}
-                });
-                await fs.writeFile(path.join(output, alphaFile), Buffer.from(alpha.data, 'base64'));
-                captures.at(-1).alphaFile = alphaFile;
-                await page.send('Emulation.setDeviceMetricsOverride', {
-                    width: Math.max(1280, input.width * 8 + 4),
-                    height: Math.max(720, input.budget * 8 + 4),
-                    deviceScaleFactor: dpr,
-                    mobile: false
-                });
-                await page.evaluate('window.mountOutline()');
-                const outlineFile = 'outline-' + file;
-                const outline = await page.send('Page.captureScreenshot', {
-                    format: 'png',
-                    clip: {x: 0, y: 0, width: input.width * 8, height: input.budget * 8, scale: 1}
-                });
-                await fs.writeFile(path.join(output, outlineFile),
-                                   Buffer.from(outline.data, 'base64'));
-                captures.at(-1).outlineFile = outlineFile;
-                await page.evaluate('window.removeOutline()');
-                await page.send('Emulation.setDeviceMetricsOverride',
-                                {width: 1280, height: 720, deviceScaleFactor: dpr, mobile: false});
-                await page.evaluate('window.setAlpha(false)');
-                await page.send('Emulation.setDefaultBackgroundColorOverride', {});
+                captures.push({...input, dpr, night, state, platformFonts});
             }
         }
     }
@@ -306,9 +277,8 @@ try {
         tracks,
         rolling,
         probeRefresh:
-            'Fresh source probe root with identical inline styles prevents Chromium contain/style returning a prior coarse font after a fine-size write. Raw unrefreshed evidence stays in web-raw; no algorithm, parameter or product style is changed.',
-        contour:
-            'Reference-only eightfold source clone for a fixed one-physical-pixel glyph contour, including color-font layer boundaries.'
+            'Fresh source probe root with identical inline styles prevents Chromium contain/style returning a prior coarse font after a fine-size write. No fit algorithm, parameter or product style is changed.',
+        protocol: 'source-structure-font-metrics-motion-v1'
     },
                                                                         null, 2)
                                                              + '\n');

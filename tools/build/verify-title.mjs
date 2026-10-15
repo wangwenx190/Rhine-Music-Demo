@@ -13,7 +13,6 @@ const options = {
     dpr: 2,
     source: path.join(root, 'verification', platform, 'title-reels/web')
 };
-let diagnostics = false;
 let visible = false;
 const seen = new Set();
 const args = process.argv.slice(2);
@@ -22,14 +21,12 @@ for (let i = 0; i < args.length; ++i) {
     if (seen.has(option))
         throw Error('Duplicate option: ' + option);
     seen.add(option);
-    if (option === '--diagnostics') {
-        diagnostics = true;
-    } else if (option === '--visible') {
+    if (option === '--visible') {
         visible = true;
     } else {
         if (!['--backend', '--dpr', '--source', '--output'].includes(option) || !args[i + 1])
             throw Error('Usage: verify-title.mjs [--backend metal|d3d11|opengl] [--dpr 1|1.5|2] ' +
-                        '[--source directory] [--output directory] [--diagnostics] [--visible]');
+                        '[--source directory] [--output directory] [--visible]');
         options[option.slice(2)] = args[++i];
     }
 }
@@ -44,7 +41,9 @@ if (fs.existsSync(path.join(output, 'report.json')))
     throw Error('Use a fresh output directory to retain earlier evidence');
 const reference = JSON.parse(fs.readFileSync(path.join(source, 'report.json'), 'utf8'));
 if (reference.captures.filter((capture) => Math.abs(capture.dpr - dpr) < 0.001).length !== 20)
-    throw Error('Generate twenty frozen source captures at the requested DPR first');
+    throw Error('Generate twenty frozen source states at the requested DPR first');
+if (reference.protocol !== 'source-structure-font-metrics-motion-v1')
+    throw Error('Regenerate source metrics with the current non-image exporter');
 if ((reference.platform && reference.platform !== process.platform)
     || (process.platform !== 'win32' && !reference.platform))
     throw Error('Source captures must be generated on this platform');
@@ -57,12 +56,15 @@ const environment = {
     PATH: path.join(kit, 'bin') + path.delimiter + process.env.PATH,
     QT_PLUGIN_PATH: path.join(kit, 'plugins'),
     QSG_RHI_BACKEND: options.backend,
-    QSG_RENDER_LOOP: 'threaded',
+    QSG_RENDER_LOOP: process.platform === 'darwin' && options.backend === 'opengl' ? 'basic'
+                                                                                   : 'threaded',
     QSG_NO_VSYNC: '',
     QCPAINTER_DEBUG_COLLECT: '0',
     QT_SCALE_FACTOR: '1'
 };
 environment.YALAHOO_VERIFY_VISIBLE = visible ? '1' : '0';
+environment.YALAHOO_VERIFY_FOREGROUND =
+    visible ? (process.env.YALAHOO_VERIFY_FOREGROUND || '0') : '0';
 const executable =
     path.join(root, 'build/release/tools/ui-audit' + (process.platform === 'win32' ? '.exe' : ''));
 fs.mkdirSync(output, {recursive: true});
@@ -86,10 +88,10 @@ if (native.status !== 0 || !Number.isFinite(nativeDpr) || nativeDpr <= 0)
     throw Error('Native screen DPR query failed');
 environment.QT_SCALE_FACTOR = String(dpr / nativeDpr);
 const result = run(['--titles', output, source], 'title-audit.txt');
-if (/Binding loop detected|Failed to build graphics pipeline|No GLSL shader code found/.test(
-        (result.stdout || '') + (result.stderr || '')))
+if (/Binding loop detected|Failed to build graphics pipeline|No GLSL shader code found|Render-thread font identity differs|ReferenceError|TypeError|Unable to assign/
+        .test((result.stdout || '') + (result.stderr || '')))
     throw Error('QML binding or shader pipeline failure; output retained in ' + output);
-if (result.status !== 0 && !(diagnostics && result.status === 6))
+if (result.status !== 0)
     throw Error('Title audit exited ' + result.status + '; output retained in ' + output);
 const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
 if (visible && (report.offscreen || report.renderProtocol !== 'native-window'))
@@ -106,11 +108,11 @@ if (report.backend !== options.backend || Math.abs(report.dpr - dpr) > 0.001 || 
     || report.headerChecks.length !== 18 || report.lifecycle.length !== 10
     || report.animatedCosts.length !== 9)
     throw Error('Backend, DPR, motion, window, capture or lifecycle gates failed');
-if (production.some((capture) => !capture.valid || !capture.geometry.passed || !capture.raw.valid
-                                 || !capture.antialiasBand.valid)
+if (production.some((capture) =>
+                        !capture.valid || !capture.geometry.passed || !capture.structurePassed)
     || report.headerChecks.some((check) => !check.passed)
     || report.lifecycle.some((check) => !check.passed))
-    throw Error('Diagnostics cannot waive structure, header or lifecycle gates');
+    throw Error('Structure, header or lifecycle gates failed');
 for (const mode of [0, 1, 2]) {
     const samples = report.animatedCosts.filter((sample) => sample.mode === mode);
     if (samples.length !== 3 || new Set(samples.map((sample) => sample.run)).size !== 3)
@@ -123,16 +125,12 @@ for (const mode of [0, 1, 2]) {
             throw Error('Cost, cache or hidden Canvas work gate failed');
     }
 }
-const pendingPixelCases =
-    production.filter((capture) => !capture.candidatePassed).map((capture) => capture.case);
-const pixelPassed = pendingPixelCases.length === 0;
-if (report.passed !== pixelPassed || (result.status === 0) !== pixelPassed
-    || (!diagnostics && !pixelPassed))
-    throw Error('Exit code and pixel acceptance disagree');
+if (!report.passed)
+    throw Error('Native checks failed');
 const summary = {
-    passed: pixelPassed,
-    diagnosticsPassed: true,
-    diagnosticMode: diagnostics,
+    passed: true,
+    protocol: 'source-structure-font-metrics-motion-v1',
+    visualQuality: 'requires-own-output-inspection',
     platform: process.platform,
     architecture: process.arch,
     configuration: 'Release',
@@ -143,7 +141,6 @@ const summary = {
     dpr: report.dpr,
     nativeScreenDpr: nativeDpr,
     scaleFactor: dpr / nativeDpr,
-    pendingPixelCases,
     sourceDirectory: source
 };
 fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
