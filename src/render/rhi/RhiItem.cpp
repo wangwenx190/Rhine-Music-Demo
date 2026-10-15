@@ -1042,13 +1042,8 @@ Uniform Renderer::uniformTemplate(int kind) const
                                         input.environmentIntensity);
     copy(u.tint, material.tint);
     copy(u.attenuation, material.attenuation);
-    // Fixed R07 shared-theme calibration; no per-scene fitting.
-    copy(u.material,
-         QVector4D(material.transport.x(), std::clamp(material.transport.y() * 1.01f, 0.0f, 1.0f),
-                   material.transport.z() * .91809f, material.transport.w() * 1.0201f));
-    auto coat = material.coat;
-    coat.setW(coat.w() * 1.01f);
-    copy(u.coat, coat);
+    copy(u.material, material.transport);
+    copy(u.coat, material.coat);
     copy(u.areaPosition, input.areaPosition, input.areaIntensity);
     copy(u.areaTarget, input.areaTarget, input.lightingEnabled ? 1 : 0);
     copy(u.scatter, input.scatterColor, input.scatterStrength);
@@ -1079,9 +1074,9 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
         && entity < input.scene.instances.size()) {
         // Only the lid roughness depends on clarity. Preserve the cached material
         // template and all other optical parameters; no QColor or resource rebuild.
-        u.material[1] = std::clamp(
-                lidRoughness(input.warmth, float(input.scene.instances[entity].clarity)) * 1.01f,
-                0.0f, 1.0f);
+        u.material[1] =
+                std::clamp(lidRoughness(input.warmth, float(input.scene.instances[entity].clarity)),
+                           0.0f, 1.0f);
     }
     if (entity >= 0) {
         copy(u.originLight0, entityLight0[entity]);
@@ -1579,11 +1574,38 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             input.postprocess && input.aoSamples ? aoGeometry.depth.get() : opaque.depth.get()
         };
         QJsonArray sorted;
-        for (const auto &draw : shells)
+        QJsonArray opticalUniforms;
+        for (const auto &draw : shells) {
             sorted.append(QJsonObject{ { "id", qint64(draw.identity) },
                                        { "surface", draw.surface },
                                        { "depth", draw.depth } });
+            if (!visible[draw.entity])
+                continue;
+            // Inspect the exact bytes sent to updateDynamicBuffer, only on capture.
+            Uniform submitted;
+            std::memcpy(&submitted, bytes.constData() + draw.offset, sizeof(submitted));
+            const auto array = [](const float *values, int size) {
+                QJsonArray result;
+                for (int i = 0; i < size; ++i)
+                    result.append(values[i]);
+                return result;
+            };
+            const double clarity =
+                    input.scene.individualMaterials && draw.entity < input.scene.instances.size()
+                    ? input.scene.instances[draw.entity].clarity
+                    : input.clarity;
+            opticalUniforms.append(
+                    QJsonObject{ { "surface", draw.surface },
+                                 { "warmth", input.warmth },
+                                 { "clarity", clarity },
+                                 { "environment", input.environmentIntensity },
+                                 { "transport", array(submitted.material, 4) },
+                                 { "coat", array(submitted.coat, 4) },
+                                 { "tint", array(submitted.tint, 3) },
+                                 { "attenuation", array(submitted.attenuation, 3) } });
+        }
         p->capture.metadata["sortedShells"] = sorted;
+        p->capture.metadata["submittedShellUniforms"] = opticalUniforms;
         for (int i = 0; i < 13; ++i) {
             if (i == 8 && !input.captureAtlas) {
                 --p->remaining;

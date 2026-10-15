@@ -17,13 +17,13 @@
 | R04 | `739ee97`；`d03527e`、`b7f73d4`、`0d06b7b`、`1a082f2`、`2ee2294`、`2abb4f6`、`33e8260`、`1c9b8c6` | `MusicTypes`、`LibraryModels`、`LibrarySession`、`OfflineMetadataProvider`；保留本地 URL、字段/稳定 ID、排序/搜索、导航与播放隔离和异步离线结果。R19A 审查；布局/导航状态消费者归 R19B/E/G。 |
 | R05 | `ec0af92`；`d03527e`、`ed5aaef` | `FrameClock`、阻尼/五次轨迹、改速/减少动态与 `cancelTravel`；R19B 已按原公式和实际调用顺序审查，结论见下节。 |
 | R06 | `5102cb0`；`5b2df80`、`e98c798` | GLB 坐标/UV 的资产事实由 R19A 确认；`LayoutMetrics`、相机/投影/拾取由 R19B 审查；geometryOnly 像素保护属于设备分配适配，最终采样与目标尺度仍待 R19D。 |
-| R07 | `1556a55`；`52f1278`、`5625d73`、`ed5aaef` | `ShellMaterial`、主盖/侧脊/纸面、校准来源与有效 override 待 R19C；不能因历史 ROI 通过保留数值。 |
-| R08 | `178ca45`；`52f1278`、`5625d73`、`e98c798` | `MusicLighting`、Room/PMREM、灯光方向/单位和平台导出差异待 R19C。 |
+| R07 | `1556a55`；`52f1278`、`5625d73`、`ed5aaef` | `ShellMaterial`、主盖/侧脊参数和有效override由R19C1复查，ROI系数移除；shader/捕获/LOD剩余项归R19C2。 |
+| R08 | `178ca45`；`52f1278`、`5625d73`、`e98c798` | `MusicLighting`的主题/单位/轨迹参数由R19C1复查；Room/PMREM/BRDF/方向的shader实现与平台采样归R19C2。 |
 | R09 | `3fc6a39`；`1f2352a`、`75775b3` | shadow/SSAO/depth/normal、偏置与核/滤波待 R19D。 |
 | R09B | `522a3f3`；`1f2352a`、`75775b3`、`e98c798` | Bokeh/SMAA/MSAA、曝光/ACES/sRGB 与目标尺度待 R19D。 |
 | R10 | `d06e5f3` | Quick3D/RHI 能力探测和历史选型理由待 R19D；不恢复旧图像分数门禁。 |
-| R10A | `52f1278`；`5b2df80`、`d03527e` | opaque/纸面/阴影的材质和 RHI 适配待 R19C，资源图/采样待 R19D。 |
-| R10B | `5625d73`；`d03527e`、`e98c798` | 透明壳体捕获/排序与材质待 R19C；MSAA、平台附件、窗口生命周期待 R19D。 |
+| R10A | `52f1278`；`5b2df80`、`d03527e` | opaque/纸面的入射参数与toneMapped接口由R19C1复查；最终shader语义归R19C2，阴影/资源图/采样归R19D。 |
+| R10B | `5625d73`；`d03527e`、`e98c798` | 材质参数迁移及R18独立clarity由R19C1复查；透明捕获/排序和完整R10B归R19C2，MSAA/平台附件归R19D。 |
 | R10C | `1f2352a`；`d03527e`、`f7e423a` | 图集租约事实由 R19A 确认；capture/mips/postprocess/render graph 待 R19D。 |
 | R10D | `75775b3`；`b7f73d4`、`e98c798` | `SceneItem`/RHI 产品提交、目标/资源回归待 R19D；历史性能只记录的用户边界保留。 |
 | R11 | `f7e423a`；`b7f73d4`、`ed5aaef` | `CoverCache`/`AtlasAllocator`/`SelectedCoverPool`/`AtlasUploadQueue`；尺寸、颜色、所有权与有界工作有效；修正缺图脚注字重。R19A 审查；最终采样/合成待 R19C/D。 |
@@ -158,3 +158,45 @@ ctest --preset qt-release --output-on-failure
 ```
 
 本轮自己的输出仍可见背景/阵列模糊；相机和几何数值通过不关闭 BLUR-01，也不证明半透明重叠无连续闪烁。静止几何深度/ID 的 rebase 没有跳变；FLICKER-01 的最早异常透明 pass、材质/捕获顺序和跨帧资源仍由 R19C/D 调查。R19D 继续控制同一库/状态的小大逻辑尺寸、真实 DPR 与实际 target scale，R19G 继续核对 overview；R19H 在 R20 前核销。独立目标平台回归见 R34 的 R19B-P。
+
+## R19C1 材质与光场参数复查
+
+复查起点为`ae60ff8`。先按规模契约将R19C拆为参数边界R19C1和紧随的光学合成/连续质量R19C2，未将用户闪烁问题移出复查阶段。恢复`1556a55`、`178ca45`、`52f1278`之前的原计划及实现diff，并追踪`5625d73`、`5b2df80`、`d03527e`、`e98c798`、`ed5aaef`的有效参数修改。`e98c798`未改动ShellMaterial/SelectionLighting/GlassMaterial参数，附件等修改仍归R19D。下表只覆盖参数边界，不能视作R10B或环境shader已全部复审。
+
+| 原轮次 / 源生产路径 → 当前符号 | 判定与历史依据 | 验证及边界 |
+| --- | --- | --- |
+| R07：`scene.ts::configureMusicGlass → CardAppearance.register/setTheme → setMusicGlassTheme/setMusicGlassClarity` → `GlassMaterial.qml`、`ShellMaterial` | 三表面transport、coat、线性tint/attenuation及IOR=1.46均有冻结源码。R07在`1556a55`通过ROI坐标搜索引入environment/roughness=1.01、thickness=.91809、distance=1.0201；没有灯强单位或BRDF接口依据，现全部移除。主盖clarity独立，侧脊/后托保持原finish。 | 新导出器直接执行冻结完整模块及实际CardAppearance主题调用，45组连续主题/clarity输入核对真正QML和C++，保留原210组端点检查。没有浏览器/图片输入。 |
+| R08：`scene.ts::setTheme`与`MusicSelectionLighting.setTheme/update` → `LightingPalette::theme`、`SelectionLighting`、`RowLightController` | 音乐有效环境.25/.16覆盖隔离R07的.48/.68；Three在material.envMap为空时以scene.environmentIntensity更新uniform，不额外乘configure的.65。key .45/.30、hemi .32/.21、fill .045、spot 180/130×64、area 34/24与曝光1.05/1.08保留；GLSL沿用源单位，没有Qt内置brightness换算。650ms曲线、double follow/同一FrameClock与相机局部offset保持。 | 924个运动/主题样本与392个场核输入实际通过；误差见下文。显式给核测试传mode/fill，但源sampleRowLighting不依赖两者，不能据此声称shader四模式合成已验收，仍归R19C2。 |
+| R10A：`createAlbumPrintMaterial`及`MusicSelectionLighting.shadePrint` → `opaque.frag/paper-lighting.glsl`的参数接口 | 纸面alphaTest=.025、Lambert无specular/emission、先限制source再乘fieldExposure、最终toneMapped=false及线性入射接口有源码依据；qrc/GLB/UV/原生clip适配保留。当前参数变更不改纸面shader、颜色转换、附件或采样。 | 本机真实Metal阵列及封面/图集/资源回归通过，只证明当前输入范围；完整纸面shader/环境算法复查归R19C2，阴影/后处理归R19D。 |
+| R10B参数迁移：`5625d73::Renderer::uniformTemplate`、R18 `ed5aaef::Renderer::uniform` | 两处把R07 ROI系数再次施加到实际uniform：基础transport/coat及逐实体lid roughness。现在transport/coat直接复制；lid按实体clarity计算后直接提交，其余缓存和材质不变。原R10B manifest及旧审计脚本的fixedOptics只描述历史实现，不能覆盖当前源码。 | 采集从本帧真正传给updateDynamicBuffer的uniformScratch按draw.offset读取；ArchivePoolAudit逐可见壳体检查tint/attenuation/transport/coat。稳定498、详情/归位240、有限列夜间123组实际uniform通过。 |
+
+`calibrate-materials.py`执行即失败且无写入，MaterialReview在show/采集前拒绝calibration或任何factors字段；同时删除Review将expected乘拟合系数的自洽检查。真实负向运行两种输入均退出12。旧verify-r07/r08、RhiShellAudit/RhiAudit与MaterialReview完整ROI/原图拆耦留给R19C2，不运行旧分数。没有将历史ROI失败改写为通过。
+
+PERF-01–07和COMMON-01–05逐项矩阵由`python3 tools/audit/audit-material-parameters.py`绑定实际符号及SHA-256，在`verification/{windows,macos,linux}-static/material-parameters/`生成。人工展开了ShellMaterial→uniformTemplate→逐实体lid→有界buffer上传、QML→SelectionLighting属性、平台CMake/QRhi分支与qrc资源路径；矩阵中的符号guard只检测源码漂移，不代替上述推演或实测。
+
+- GUI只发布已有不可变Input/SceneFrame，render每帧七份模板和最多432+4实体，不遍历曲库；没有新增计时器、worker、I/O、纹理复制/上传、资源或PSO重建。移除系数不改变缓存键与失效条件。
+- 仅显式capture构造最多3×436份值tuple，并从已提交CPU缓冲区复制小型uniform；不读取GPU、不新增等待。现有最多两个在途capture及正常事件驱动保持；采集回调不持有临时buffer指针。生产request=0没有这些JSON工作。
+- Windows的D3D11枚举/API仍在Q_OS_WIN内；三平台共用无OS分支的标量/颜色/材质，816-byte std140与绑定保持。Kit/C++23/qrc检查实际通过，six-shader公共wrapper输出SPIR-V/GLSL330/ES300/HLSL50/MSL12，只是静态翻译。`bake-material-shaders.py`现从所选Kit按主机选qsb程序名、报告写实际平台，不将macOS结果写进Windows目录。Windows/Linux编译器、原生GPU及窗口管理器本机不可用；对应实机保持R34的R19C1-P。
+
+本机为macOS/arm64、Apple M4、自动发现Qt6.12.0、AppleClang 21.0.0.21000334（本轮toolchain.json）、Release。参数/光场测试通过：轨迹误差约1.14e-12、palette约2.73e-8、GPU uniform位置转换约1.53e-5、场核约1.12e-16。首次受限完整回归22/30，其余8项在原生服务初始化出现`no screens available`/中止；负向产品入口也在受限服务环境中止。原日志分别保存，未改用软件平台或显示窗口。原生服务权限下，同二进制、相同隐藏preset的30/30完整回归通过，负向产品入口退出12；两组官方qmllint、check-format/source-format通过。最后恢复Review OFF、可见测试OFF的普通Release构建和25/25快速回归通过，默认隐藏原生窗口策略保持。
+
+隐藏实际质量检查读取本机自身渲染的stable/detail/returning-night/finite-night；没有原图比较或评分。参数修正后无空白目标、主题丢失或材质整体白化，但低分辨率阵列仍可见模糊/轮廓阶梯，本轮不宣称其正确或消失。该入口逻辑960×640、内部真实目标480×320、4×捕获采样，RenderControl输出RGBA8单采样；明确区分目标与窗口大小，没有据图增分辨率、锐化或关闭Bokeh。BLUR-01仍由R19D控制小大尺寸/DPR/缩放定位；FLICKER-01的连续重叠与最早异常pass仍由R19C2调查。本轮的静态图/功能通过不能反证闪烁。窗口visible/active均false，前台未变，未知driver分配仍为null；本轮没有可见窗口、正常VSYNC、物理输入或性能采样。
+
+复现：
+
+```sh
+node tools/review/export-material-parameters.mjs
+node tools/review/check-web-baseline.mjs
+python3 tools/audit/audit-material-parameters.py
+python3 tools/audit/bake-material-shaders.py
+python3 tools/assets/expand-lighting-shaders.py --check
+cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+cmake --build --preset qt-release
+ctest --preset qt-release-full --output-on-failure
+cmake --build --preset qt-release --target check-format Yalahoo_qmllint ui-audit_qmllint
+cmake --preset qt-release -DYALAHOO_REVIEW=OFF -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
+cmake --build --preset qt-release
+ctest --preset qt-release --output-on-failure
+```
+
+已有参数/资源重建执行一次，相关十次隐藏资源压力复用R19B同一所有权实现，不把本轮一次重建称为十次。所有新输出保持忽略；入库的45组参数为直接执行冻结代码得到的测试输入，不是运行报告。

@@ -1,4 +1,5 @@
 #include "SceneItem.h"
+#include "ShellMaterial.h"
 #include "GraphicsBackend.h"
 #include "VerificationWindow.h"
 #include "OffscreenSurface.h"
@@ -212,6 +213,27 @@ int main(int argc, char **argv)
                         "Native pool transfer differs from submitted regions");
             require(item->errorText().isEmpty() && !result.postprocessed.isNull(),
                     "Pool renderer failed or returned an empty target");
+            const auto uniforms = result.metadata["submittedShellUniforms"].toArray();
+            require(result.metadata["visibleEntities"].toInt() == 0 || !uniforms.isEmpty(),
+                    "Visible shells have no submitted material uniforms");
+            for (const auto &value : uniforms) {
+                const auto sample = value.toObject();
+                const auto expected =
+                        shellMaterial(sample["surface"].toInt(), float(sample["warmth"].toDouble()),
+                                      float(sample["clarity"].toDouble()),
+                                      float(sample["environment"].toDouble()));
+                const auto check = [&](const char *key, const auto &vector, int size) {
+                    const auto actual = sample[key].toArray();
+                    require(actual.size() == size, "Missing material uniform channels");
+                    for (int i = 0; i < size; ++i)
+                        require(std::abs(actual[i].toDouble() - vector[i]) <= 2e-6,
+                                "Submitted material uniform differs from effective source parameter");
+                };
+                check("transport", expected.transport, 4);
+                check("coat", expected.coat, 4);
+                check("tint", expected.tint, 3);
+                check("attenuation", expected.attenuation, 3);
+            }
             require(result.postprocessed.save(output + '/' + name + ".png"),
                     "Cannot save own-render pool image");
             return result;

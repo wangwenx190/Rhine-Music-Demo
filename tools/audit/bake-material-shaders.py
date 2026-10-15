@@ -3,6 +3,7 @@ import json, re, subprocess, hashlib, sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 kit = json.loads((root / 'build/release/toolchain.json').read_text())['qtKit']
+qsb = Path(kit) / 'bin' / ('qsb.exe' if sys.platform == 'win32' else 'qsb')
 work = root / 'build/material-shaders'
 work.mkdir(parents=True, exist_ok=True)
 block = """layout(std140,binding=0) uniform Params {
@@ -57,7 +58,7 @@ for name in [
     input.write_text(header + source + tail, encoding='utf-8', newline='\n')
     output = work / (name + '.qsb')
     command = [
-        str(Path(kit) / 'bin/qsb.exe'),
+        str(qsb),
         '--glsl',
         '330,300 es',
         '--hlsl',
@@ -72,7 +73,7 @@ for name in [
     if r.returncode:
         raise RuntimeError(r.stdout + r.stderr)
     dump = subprocess.run(
-        [str(Path(kit) / 'bin/qsb.exe'), '--dump', str(output)],
+        [str(qsb), '--dump', str(output)],
         capture_output=True,
         text=True,
         check=True
@@ -86,9 +87,13 @@ for name in [
         'targets': ['SPIR-V', 'GLSL 330', 'GLSL ES 300', 'HLSL 50', 'MSL 12'],
         'passed': True,
         'diagnostics': r.stderr,
-        'scope': 'public-uniform wrapper of unchanged snippets; actual Qt generated D3D11 shaders also compiled by Windows runtime'
+        'scope': 'Static translation of public-uniform wrappers; no target GPU execution inferred'
     })
-(root / ('verification/windows/occlusion/material-shader-variants.json' if '--occlusion' in sys.argv else 'verification/windows/lighting/shader-variants.json' if '--lighting' in sys.argv else 'verification/windows/materials/shader-variants.json')).write_text(
+platform = 'windows' if sys.platform == 'win32' else 'macos' if sys.platform == 'darwin' else 'linux'
+component = 'occlusion' if '--occlusion' in sys.argv else 'lighting' if '--lighting' in sys.argv else 'materials'
+report = root / 'verification' / platform / component / 'shader-variants.json'
+report.parent.mkdir(parents=True, exist_ok=True)
+report.write_text(
     json.dumps({'qtKitVersion': json.loads((root / 'build/release/toolchain.json').read_text())['qtVersion'], 'shaders': reports}, indent=2) + '\n',
     encoding='utf-8',
     newline='\n'

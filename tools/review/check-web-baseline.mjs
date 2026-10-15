@@ -146,7 +146,8 @@ assert.equal(search.cases.length, 216);
 for (const file
          of ['tests/fixtures/motion/kernel-golden.json', 'tests/fixtures/scene/camera-golden.json',
              'tests/fixtures/archive-pool/golden.json',
-             'tests/fixtures/real-columns/trajectories.json']) {
+             'tests/fixtures/real-columns/trajectories.json',
+             'tests/fixtures/materials/parameters.json']) {
     const input = await read(file);
     assert.equal(input.baseline, expected, file);
     for (const source of input.sources) {
@@ -154,6 +155,10 @@ for (const file
                      source.sha256, file + ': ' + source.path);
     }
 }
+const lighting = await read('tests/fixtures/lighting/golden.json');
+assert.equal(lighting.baseline, expected);
+for (const [file, sha256] of Object.entries(lighting.sources))
+    assert.equal(hash(execFrozenGit(['show', expected + ':' + file], {cwd: root})), sha256, file);
 const reviewedImplementation = [];
 for (const file of ['tools/assets/PrepareAssets.cpp',
                     'tools/assets/GeometryAudit.cpp',
@@ -179,6 +184,13 @@ for (const file of ['tools/assets/PrepareAssets.cpp',
                     'src/render/RealColumns.cpp',
                     'src/render/ColumnMemory.cpp',
                     'src/render/rhi/RhiItem.cpp',
+                    'src/render/rhi/ShellMaterial.cpp',
+                    'src/render/SelectionLighting.cpp',
+                    'src/render/RowLightController.cpp',
+                    'qml/Yalahoo/Music/scene/GlassMaterial.qml',
+                    'qml/Yalahoo/Music/scene/LightingMaterial.qml',
+                    'resources/shaders/lighting-field.glsl',
+                    'resources/shaders/rhi/frame.glsl',
                     'tools/review/ArchivePoolAudit.cpp',
 ]) {
     reviewedImplementation.push({file, sha256: hash(await fs.readFile(path.join(root, file)))});

@@ -12,14 +12,14 @@
 
 主题在650ms内按 cubic-bezier(.4,0,.2,1) 解横坐标并在线性RGB空间插值。反向请求以当前已显示 palette 为起点，相同目标不重启；减少动态直接完成。warmth 驱动既有材质数值与线性 tint 插值；背景和未来阅读层共用同一个 palette/backgroundColor。QML 不另用 Behavior/ColorAnimation 重算主题时间。
 
-灯光通过公有 CustomMaterial uniform 在 GLSL 中计算，保留源 Lambert、GGX/Smith 多次散射、LTC 面光与固定 PMREM；没有使用 Qt 内置灯的不同 brightness 单位，因此无需以不相同的单位抄数或搜索换算因子。灯/面积光计算因子均为1，暖昼与深夜相同，未按主题调参。保留 R07 的已有材质标定系数；本轮无需新增坐标搜索，源码修复后图像目标已通过。LTC 两张64×64原始表经已有锁定依赖导出为 qrc RGBA32F；原 MIT 许可与来源保留。
+灯光通过公有 CustomMaterial uniform 在 GLSL 中计算，保留源 Lambert、GGX/Smith 多次散射、LTC 面光与固定 PMREM；没有使用 Qt 内置灯的不同 brightness 单位，因此无需以不相同的单位抄数或搜索换算因子。灯/面积光计算因子均为1，暖昼与深夜相同，未按主题调参。材质参数不乘图像标定系数；R19C1已移除R07遗留的ROI搜索补偿。LTC 两张64×64原始表经已有锁定依赖导出为 qrc RGBA32F；原 MIT 许可与来源保留。
 
 `lighting-field.glsl` 是纸面和壳体唯一的光场源码，开发工具展开成两个独立 Qt shader，`expand-lighting-shaders.py --check` 校验一致性。row field 以实体 world origin 的x/z计算，排除纸面局部位置、y高度和相机；源 CoverAtlas 的纸面偏移烘焙在几何中，Qt 的独立 Rectangle 反向消去本地偏移得到同一实体原点。主盖/侧脊接入边缘输运与角度 glint，后托只接入源曝光规则；纸面只乘已有漫反射和 fieldExposure，原图上限限制先于光场乘法，不加白/自发光。纸面环境漫反射按原 Lambert PMREM 参与，Lambert 不接收 area 的合成照明。面积光沿用原 LTC 面积积分，不能再额外除π。
 
 当前单盒、抽取和归位可共用同一世界原点函数；后续 R12 的实例表须提供同一每实例实体原点并使用 Qt 仅在实例绘制时可用的实例矩阵关键词。当前非实例 shader 使用 MODEL_MATRIX，不提前实现阵列。R18 可通过 `setLightingInput` 提供真实旋转和绝对坐标；接口不改变 SceneAdapter 的产品导航边界。
 
-Windows 复建：`./tools/build/verify-r08.ps1`，仅 qt-release；匿名冻结源码 golden 含20/30/60/120fps、1/120秒完整轨迹、重复/反向输入、长短独立列、rebase、改速、开场/跳过、隐藏/恢复、减少动态与主题反向。48个 GPU 场景为双主题×四模式×正视/低角度×三行位置；五区域用 Qt/C++ 计算 MAE≤6/255、11×11 Gaussian SSIM≥.97，独立 Web 投影≤2px。Web/Qt成对PNG及差分在 docs/media/lighting，诊断在 verification/windows/lighting。Web 复建只使用冻结 archive 与隔离浏览器，禁止外部HTTP，不读取真实曲库。
+当前光场数值复建入口为 `node tools/review/export-lighting-golden.mjs`，直接执行冻结MusicSelectionLighting/ThemeTransition/music-row-lighting并生成20/30/60/120fps轨迹、主题反向/减少动态/隐藏/rebase和392组光场采样。`ctest --preset qt-release -R '^lighting$' --output-on-failure` 检查其数值，不需要原图。sampleRowLighting的核本身不依赖mode/fill，测试仍显式传入两者；灯光shader的模式合成另由R19C2复查，不能用核测试代替。
 
-macOS/Linux 的本轮扩展按 COMMON-01–05 展开公共构建、QML、纹理、输出与生命周期。qsb 用同一最新 Kit 生成 GLSL/HLSL/MSL；这不代表目标 GPU 已运行。平台结论为“静态审计通过，实机待用户验证”，见对应 verification 目录和 docs/platforms 清单。
+旧 `verify-r08.ps1` 的48场景ROI比较已失去门禁效力，等待R19C2完成独立功能入口，不运行旧图追分。光强沿用Three源码GLSL单位，无Qt内置灯换算。R19C1本机隐藏生产场景及目标平台交接见 [source-fidelity-review.md](source-fidelity-review.md)，静态与目标实机结论分开。
 
 公开 API 依据：[CustomMaterial](https://doc.qt.io/qt-6/qml-qtquick3d-custommaterial.html)、[TextureData](https://doc.qt.io/qt-6/qquick3dtexturedata.html)。

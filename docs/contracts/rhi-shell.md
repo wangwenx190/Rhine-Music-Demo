@@ -8,7 +8,7 @@
 
 `captureSamples` 是调用者提供的真实采样数，设备不支持时明确失败。R10B 的材质输入使用 4×（冻结 Three transmission pass 至少 4×），R10A 独立通道仍使用 1×。RGBA32F MRT 的 MSAA attachments 只用于 raster，采样和读回只使用单采样 resolve 纹理。R10D 将 RenderQuality 的有效大小与产品画质规则接入，不保存更低设置。qsb 同 Kit 生成 SPIR-V、GLSL330/ES300、HLSL50、MSL12；实际 GPU 验证为 Windows D3D11，其他系统仅静态审计。
 
-壳体复用源 GLB 三批次。模型矩阵只应用一次，法向用 inverse transpose；局部纸面 LOD 使用原 `.17/1.85/1.53`、`.015/.15` 和 `.16`。IOR 固定 1.46，源 tint/attenuation、transmission/roughness/thickness/distance、clearcoat 与 clarity 由 `ShellMaterial` 计算；`rhi-material-parameters` 对冻结 R10 的全部 210 个表面参数核对。R07 已有共享双主题校准保持 environment/roughness=1.01、thickness=.91809、attenuation distance=1.0201，其他系数=1；没有按场景拟合。原 GGX/DFG 多次散射、LTC、PMREM、bicubic、ACES/sRGB 与世界空间音乐光场通过 `prepare-rhi-shell.py` 适配为显式 binding。许可证/来源在 `resources/manifests/rhi-shell.json`、`resources/licenses/materials-NOTICE.md`。
+壳体复用源 GLB 三批次。模型矩阵只应用一次，法向用 inverse transpose；局部纸面 LOD 使用原 `.17/1.85/1.53`、`.015/.15` 和 `.16`。IOR 固定 1.46，源 tint/attenuation、transmission/roughness/thickness/distance、clearcoat 与 clarity 由 `ShellMaterial` 计算；`rhi-material-parameters` 对冻结 R10 的全部 210 个表面参数核对。R19C1移除了R07的ROI拟合系数，transport/coat直接按冻结源码提交，逐实体lid clarity也不乘系数；历史R10B manifest的fixedOptics仅表示当时实现，不能覆盖当前源码。原 GGX/DFG 多次散射、LTC、PMREM、bicubic、ACES/sRGB 与世界空间音乐光场通过 `prepare-rhi-shell.py` 适配为显式 binding。许可证/来源在 `resources/manifests/rhi-shell.json`、`resources/licenses/materials-NOTICE.md`。
 
 纸面保持原 3.06 几何、中心与 UV 映射。实际印刷 pass 在顶点阶段按同一 contain 和 1/64 inset 裁出可见矩形，同时反向映射 UV，使用 centroid 插值，使真实几何 MSAA 覆盖印刷边缘；不再仅在片元阶段丢弃矩形外部而绕过 MSAA。图片自身透明区仍按 .025 alphaTest 丢弃。上传预乘 RGBA8，在 shader 滤波后恢复未预乘颜色，再执行 sRGB 解码，避免透明黑 texel 混入印刷形成黑边。几何诊断保持完整原平面，封面中心、采样比例、颜色和清晰度不变，不增加整体模糊。
 
@@ -24,4 +24,4 @@ R10B历史复建入口`tools/build/verify-r10b.ps1 -Python <本机Python>`，R10
 
 五个 ROI 全部计分，MAE/SSIM/edge 和等权损失不屏蔽边缘、侧脊或背景。退出使用迁移计划的“全部材质 ROI 通过或残差进一步缩小”分支；整体损失降低不宣称每个 ROI 都达到 .97/6。逐项残差保留于 `verification/windows/rhi-shell/release-runtime.json`，源/Quick3D/RHI/差分与 4× 局部图位于 `docs/media/rhi-shell/`。较窄 rim 的 SSIM 无完整窗口时明确为 null，仍保留 MAE 和轮廓，不删除该区域。R10D 成对重放时必须复验这些具体 sourceIndex/ROI 和 `verification/windows/rhi-postprocess/` 的当前 pre-stage/final 残差，不能用整体平均数覆盖。
 
-额外 GPU 门槛包含：两场景开启/关闭壳体的不透明捕获逐像素一致；六场景倒序提交颜色/深度完全一致；相同深度使用固定 ID、重复 ID 拒绝；合成透明留白的 1×/4× resolve 只改变边缘覆盖，中心印刷不变且透明区不写法线/深度。阴影 on/off 用壳体实际深度掩码统计有效像素。R10B 历史图集传输字节仍未知；当前 R10C 的上传预算与性能证据独立保存于 `verification/windows/rhi-postprocess/`。
+以下为R10B历史GPU门槛，尚待R19C2拆出非像素功能检查，不在当前执行：两场景开启/关闭壳体的不透明捕获逐像素一致；六场景倒序提交颜色/深度完全一致；相同深度使用固定 ID、重复 ID 拒绝；合成透明留白的 1×/4× resolve 只改变边缘覆盖，中心印刷不变且透明区不写法线/深度。阴影 on/off 用壳体实际深度掩码统计有效像素。R10B 历史图集传输字节仍未知；当前 R10C 的上传预算与性能证据独立保存于 `verification/windows/rhi-postprocess/`。

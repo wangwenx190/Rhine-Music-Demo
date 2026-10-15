@@ -61,6 +61,12 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
                occlusionReview = oracle["occlusion"].toBool(),
                lightingReview = oracle["lighting"].toBool() || occlusionReview || postprocessReview;
     auto cases = oracle["cases"].toArray();
+    // Historical ROI fitting is forbidden, including hand-authored factor fixtures.
+    if (calibration)
+        return 12;
+    for (const auto &value : cases)
+        if (value.toObject().contains("factors"))
+            return 12;
     if (cases.isEmpty() || (!calibration && !lightingReview && cases.size() != 90))
         return 12;
     if (!calibration && !lightingReview)
@@ -205,14 +211,6 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
         double light = c.value("paperLight").toDouble(1.0);
         view->setProperty("paperIrradiance",
                           QVariant::fromValue(QVector3D(float(light), float(light), float(light))));
-        const auto factors = c["factors"].toObject();
-        for (int surface = 0; surface < 3; ++surface) {
-            auto *material = window.findChild<QObject *>(QString("caseMaterial%1").arg(surface));
-            for (auto name : { "exposureScale", "environmentScale", "transmissionScale",
-                               "roughnessScale", "thicknessScale", "attenuationScale" })
-                if (factors.contains(name))
-                    material->setProperty(name, factors.value(name).toDouble());
-        }
         start = frames->load();
         window.update();
     };
@@ -299,16 +297,10 @@ int reviewMaterials(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sc
                                                                 : 2;
                 const auto *material =
                         window.findChild<QObject *>(QString("caseMaterial%1").arg(surface));
-                for (auto pair : { std::pair{ "transmission", "transmissionScale" },
-                                   std::pair{ "roughness", "roughnessScale" },
-                                   std::pair{ "thickness", "thicknessScale" },
-                                   std::pair{ "attenuationDistance", "attenuationScale" } }) {
-                    double expectedValue =
-                            p[pair.first].toDouble() * material->property(pair.second).toDouble();
-                    if (QString(pair.first) == "transmission" || QString(pair.first) == "roughness")
-                        expectedValue = std::clamp(expectedValue, 0.0, 1.0);
+                for (auto name :
+                     { "transmission", "roughness", "thickness", "attenuationDistance" }) {
                     parameters = parameters
-                            && std::abs(material->property(pair.first).toDouble() - expectedValue)
+                            && std::abs(material->property(name).toDouble() - p[name].toDouble())
                                     <= 1e-6;
                 }
             }

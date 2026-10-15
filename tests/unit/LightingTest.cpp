@@ -92,6 +92,8 @@ private slots:
         for (auto value : data["fields"].toArray()) {
             const auto field = value.toObject();
             RowLightController light;
+            light.settings.mode = RowLightingMode(field["mode"].toInt());
+            light.settings.fill = field["fill"].toDouble();
             fieldError = std::max(
                     fieldError,
                     std::abs(light.sample({ field["dx"].toDouble(), 0, field["dz"].toDouble() })
