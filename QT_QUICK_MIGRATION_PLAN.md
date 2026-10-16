@@ -21,7 +21,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R30 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
+- 当前主线：`R31 → R32 → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；本轮受影响范围内能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -73,7 +73,7 @@
 | [test-gates.md](docs/contracts/test-gates.md) / [test-window-policy.md](docs/contracts/test-window-policy.md) / [verification-artifacts.md](docs/contracts/verification-artifacts.md) | 门禁分组；验证窗口；输出/Git边界 |
 | [source-defect-exceptions.md](docs/contracts/source-defect-exceptions.md) | 原项目缺陷/不合理行为的预期判定与跳过记录 |
 | [source-fidelity-review.md](docs/contracts/source-fidelity-review.md) | 逐历史轮次来源、适配/补偿判定与覆盖索引，非实施规范或运行日志 |
-| `docs/platforms/{macos,linux}.md` | 平台操作/部署差异与执行入口；欠验归属和门槛集中在本计划后置专项 |
+| `docs/platforms/{windows,macos,linux}.md` | 平台操作/部署差异与执行入口；欠验归属和门槛集中在本计划后置专项 |
 
 ### 工具链与目录
 
@@ -176,17 +176,6 @@
 
 ## 待执行轮次
 
-### R30 · Windows部署实现与动态阶段验收
-
-- 依赖R29。交付Windows部署脚本、根普通启动器及Qt使用说明；真实Release目录/干净环境运行按能力判断，当前macOS无法执行的Windows构建、windeployqt与实机部分移交R34，不作为R31的前置。源码/脚本可确定缺陷必须本轮修复。
-- `tools/deploy/` 使用 windeployqt，`--qmldir` 指向根 `qml/`，按生产导入与链接闭包部署 Qt Quick、Multimedia 及 Qt 随附媒体依赖，生产不打包 Quick3D 研究场景/插件；打包 qrc 资产与 MSVC 运行库要求到 `out/windows/`，不复制整个 Qt 安装目录。
-- 纳入实际 Canvas Painter 生产闭包：部署 Qt6::CanvasPainter 运行库及 Canvas2D 被采用时的 QtCanvas2D QML 模块/插件与其真实依赖；即便主界面使用 C++ 注册绘制项，也要核对打包后资源/shader 与 RHI 初始化。脱离开发 Kit 运行滑尺及二维序章，检查无缺失模块/插件、正确透明合成和重建行为，不把 Review 探针或未采用的比较实现一起打包。
-- 接入 R03B 原创 ICO 到 Windows 可执行资源，Qt 窗口图标及关于页使用同源 SVG/PNG；显示名 `yalahOO!!!`、输出文件 `yalahoo.exe`。实机检查 Explorer、窗口/任务栏及大/小尺寸图标；macOS ICNS/bundle 和 Linux desktop 图标由R31/R32按同一品牌清单接入，并按各自实际可执行能力验收。
-- 用无Qt开发PATH、无Node/FFmpeg路径的临时环境运行；验证离线启动、demo、unicode音乐路径、设备列表、可支持样本和字体加载。
-- 普通启动器只找合法安装/构建产物并启动Qt程序，不后台启动Web服务；演示/光照启动器继续在tools/launchers/。
-- 性能设计与验证：部署Release通过正常启动路径复核主要性能/输入场景、冷启动和资源峰值，区分开发Review/产品开销，记录实际尺寸/DPR/刷新/VSYNC，不转抄旧benchmark。
-- 退出：Windows部署/入口/资源/数据路径实现和严格审计通过；有可靠Windows环境时执行并通过真实Release干净环境、GUI/音频/设备/尺寸/DPR检查，否则把完整要求和已知问题逐项移交R34。实际运行记录OS/GPU/Kit/后端，包不含私人库/缓存/调试基线；静态交接不得写为实机通过。
-
 ### R31 · macOS完整实现、部署与动态阶段验收
 
 - 依赖R30的部署实现与阶段交接，不依赖后置Windows实机检查。交付同一 C++23/Qt 源码的 macOS CMake 分支、`tools/build/` 与 `tools/deploy/` macOS 脚本、根普通 `.command`、`verification/macos-static/` 审计产物及 `docs/platforms/macos.md`。使用该开发机安装的最新原生 Qt Kit，不固定版本；当前macOS主力环境可可靠执行的configure/build/test、macdeployqt与bundle脱离Kit检查必须真实执行，其他项目逐项移交R34。
@@ -234,6 +223,7 @@
 
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
+| R30-P | Windows原生MSVC/最新Kit构建、windeployqt/PE/运行库与干净环境部署、D3D11产品GUI/媒体/性能 | Windows部署包的OpenGL图形/窗口/输入/性能回归 |
 | UI-CONTROLS-P | Windows/D3D11与macOS/Metal原生控件/物理输入、输入法/无障碍/跨屏；三平台目标构建与模块闭包 | 三平台OpenGL控件与宿主窗口/输入回归 |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
 | R27-P | Windows/D3D11与macOS/Metal的物理实验控件输入、原生恢复/跨屏DPR和播放中改速；三平台非图形参数/启动器/构建 | 三平台OpenGL实验面板、参数上传、采样和生命周期回归 |
@@ -250,6 +240,14 @@
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### R30-P · Windows生产部署与干净环境实机验证
+
+- 依赖R33阶段交接、R30部署实现及可靠原生Windows/MSVC/最新完整Qt Kit、D3D11 GPU/显示会话、匿名音乐输入和实际音频设备。当前缺Windows系统/编译器/Kit/PE执行能力；macOS已实际执行共享Release/生产Review OFF构建、官方qmllint、品牌/模块/qsb/资源及隐藏Metal设置回归、PowerShell解析/格式/非Windows拒绝分支，均不能替代Windows结果。无已知未修复的共享产品失败，目标脚本成功路径尚未执行。
+- 输入为`cmake/WindowsDeployment.cmake`生成的实际应用QML清单、`cmake/yalahoo.rc.in`、R03B品牌manifest及ICO/PNG/SVG、qrc资产、匿名库/可支持媒体样本；源码审计入口`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`，输出COMMON-01–05/WIN-01/PERF-01–07的symbol/hash矩阵。核对完整CMake/C++23/最新Kit/RC/PE入口、生产Review OFF及Quick3D隔离、QtQuick/Templates/Dialogs/Multimedia/CanvasPainter/Qt随附媒体依赖/字体/shader、Unicode与可写数据根、三路公开媒体与设备/错误/退出调用链。源码可确定或目标运行发现的缺陷必须修复，不以本机qsb翻译或脚本解析宣称目标通过。
+- 准确入口及用户清单为`docs/platforms/windows.md`：先以`pwsh -NoProfile -File tools/deploy/windows.ps1`真实configure/build/windeployqt生成`out/windows/`，核对同Kit工具版本、dumpbin import/delay-import解析、架构匹配官方VC Redistributable、相对qt.conf、许可证及包清单。核对失败保留旧包、无私人库/缓存/PDB/研究工具/比较模块、不复制整个Kit；实际检查PE GUI资源与Explorer/窗口/任务栏大小图标。审计PowerShell成功/错误/空格Unicode参数/Process.ExitCode及包优先/开发回退启动器，不仅检查文件存在。
+- 在无Qt开发PATH/Node/外部FFmpeg的临时环境执行`out/windows/verify-windows.ps1`的help、browse/navigation/detail/overview、demo和normal，自动验证要求当前退出码与当前report均成功；再在未安装Qt/开发工具的干净Windows上重复，安装随包官方运行库，排除机器依赖掩盖。正常启动检查离线/空库/匿名demo/Unicode音乐目录、字体、设备列表、支持样本、播放/暂停/seek/切歌/输出设备变化、错误恢复及后台继续播放；滑尺和二维序章实际CanvasPainter透明合成/裁切/shader/重建必须有效，不能仅凭导入成功。原生物理输入、正常呈现/VSYNC、尺寸/DPR/跨屏及听感分别证明；窗口策略沿test-window-policy，不未经当轮授权提升前台。
+- 正式产品路径按performance.md及R28入口验证主要场景、冷启动/准备/输入时延和资源峰值，保留原画质/1080p/预热后每场景120秒/至少三次串行、p95/p99/长帧与资源原门槛，记录实际OS/GPU/Qt/D3D11/逻辑物理尺寸/DPR/刷新/VSYNC/窗口策略；Review工具单独构建，不混入产品、不转抄历史benchmark或macOS结果。Windows OpenGL同项动态运行归R35。适用格式/官方qmllint与受影响回归按test-gates选择；共享修正回归当前主力平台对应入口。退出须上述目标实际检查通过，缺环境或有效样本保留本任务，不以阶段交接销项。
 
 #### R29-P · 整场GUI目标与原生呈现回归
 

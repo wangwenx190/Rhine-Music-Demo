@@ -12,7 +12,12 @@ $vsDev = Join-Path $vsInstall 'Common7/Tools/VsDevCmd.bat'
 if (-not (Test-Path -LiteralPath $vsDev)) {
     throw 'VsDevCmd.bat not found.'
 }
-$nativeArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+$systemArch = if ($env:PROCESSOR_ARCHITEW6432) {
+    $env:PROCESSOR_ARCHITEW6432
+} else {
+    $env:PROCESSOR_ARCHITECTURE
+}
+$nativeArch = if ($systemArch -eq 'ARM64') {
     'arm64'
 } else {
     'x64'

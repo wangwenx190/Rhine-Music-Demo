@@ -60,7 +60,11 @@ set_target_properties(
     "${CMAKE_BINARY_DIR}/bin"
 )
 if(WIN32)
-    set_target_properties(Yalahoo PROPERTIES WIN32_EXECUTABLE TRUE)
+    enable_language(RC)
+    configure_file("${PROJECT_SOURCE_DIR}/cmake/yalahoo.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/yalahoo.rc" @ONLY)
+    target_sources(Yalahoo PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/yalahoo.rc")
+    set_target_properties(Yalahoo PROPERTIES WIN32_EXECUTABLE TRUE
+        QT_WINDOWS_APP_PROJECT_IDENTIFIER "yalahoo.music")
 elseif(APPLE)
     set_target_properties(
         Yalahoo
@@ -86,6 +90,9 @@ set_source_files_properties("${bootstrap_qml}" PROPERTIES QT_RESOURCE_ALIAS Boot
 qt_add_resources(Yalahoo branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
     FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
     "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
+file(GLOB application_icons "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/png/yalahoo-*.png")
+qt_add_resources(Yalahoo application_icons PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
+    FILES ${application_icons})
 set(review_qml_files)
 set(review_sources)
 set(review_dependencies)
@@ -224,3 +231,4 @@ install(TARGETS Yalahoo BUNDLE DESTINATION . RUNTIME DESTINATION bin)
 if(YALAHOO_REVIEW)
     target_link_libraries(Yalahoo PRIVATE Qt6::Quick3D Qt6::Quick3DPrivate Qt6::Quick3DRuntimeRenderPrivate)
 endif()
+include("${PROJECT_SOURCE_DIR}/cmake/WindowsDeployment.cmake")

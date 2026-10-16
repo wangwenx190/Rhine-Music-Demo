@@ -1,5 +1,6 @@
 function(yalahoo_add_assets target)
     include("${PROJECT_SOURCE_DIR}/resources/manifests/assets.cmake")
+    list(APPEND YALAHOO_ASSET_FILES "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/yalahoo.svg")
     if(target STREQUAL "Yalahoo" AND NOT YALAHOO_REVIEW)
         list(FILTER YALAHOO_ASSET_FILES EXCLUDE REGEX "/models/(meshes/|Music_case_v040\\.qml)")
         list(APPEND YALAHOO_ASSET_FILES

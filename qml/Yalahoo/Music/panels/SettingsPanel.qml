@@ -624,6 +624,17 @@ ArchiveScrollView {
             tokens: root.tokens
             last: true
 
+            Image {
+                objectName: "settingsBrandIcon"
+                width: 48
+                height: 48
+                source: "qrc:/assets/icons/yalahoo/yalahoo.svg"
+                sourceSize.width: width * Screen.devicePixelRatio
+                sourceSize.height: height * Screen.devicePixelRatio
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                Accessible.ignored: true
+            }
             ArchiveText {
                 tokens: root.tokens
                 width: parent.width

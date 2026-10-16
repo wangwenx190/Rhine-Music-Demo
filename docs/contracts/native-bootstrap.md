@@ -20,7 +20,7 @@ C++23 required、无扩展，并实际编译 `std::to_underlying` 和 `std::opti
 
 ## 构建、测试与运行
 
-Windows 在 PowerShell 中执行：
+Windows 在 PowerShell 7.2 或更新版本中执行：
 
 ```powershell
 ./tools/build/build.ps1 -Preset qt-release
@@ -35,7 +35,7 @@ cmake --build --preset qt-release
 ctest --preset qt-release -R '对应受影响测试' --output-on-failure
 ```
 
-本阶段开发运行使用选中 Kit 的 DLL/插件，不是独立部署包。从 cache 获取已选择前缀后启动：
+开发运行使用选中 Kit 的 DLL/插件。独立Windows部署与干净环境入口见[Windows平台操作](../platforms/windows.md)；普通启动器优先选择完整部署包。手动开发启动可从cache获取前缀：
 
 ```powershell
 $selectedKit = (Get-Content build/release/CMakeCache.txt | Select-String '^YALAHOO_SELECTED_QT:PATH=(.*)$').Matches.Groups[1].Value
@@ -54,6 +54,6 @@ Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于�
 
 ## 启动入口
 
-根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；PowerShell使用Process对象等待GUI进程。开发启动器不自动构建或发布。
+根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；Windows优先选择完整生产部署包，PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
 
 `--demo`与`--lighting-lab`只创建九列二十七张匿名qrc封面专辑，不读取/保存偏好或真实库，不扫描、不自动启动歌曲/BGM/音效；后者额外展开实验容器。不能与数据根、扫描/导入或验证参数组合。普通入口的设置按钮仍可打开同一调节面板。启动模式不改变渲染后端、普通片头或已有播放接口；演示曲目为空，不能伪装真实歌曲来源。
