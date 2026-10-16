@@ -95,10 +95,8 @@ struct Walker
         album.id = id;
         album.folder = QUrl::fromLocalFile(folder);
         album.folderLabel = folder;
-        album.fields.insert("_root", root);
         album.fields.insert("_singleFile", single);
         album.offline = false;
-        album.fields.remove("_coverCandidate");
         QJsonArray candidates;
         for (const auto &image : images) {
             if (!single
@@ -121,9 +119,8 @@ struct Walker
             Track track = unchanged ? *oldTrack : Track{ };
             if (oldTrack && !unchanged) {
                 track.fields = oldTrack->fields;
-                for (const auto *key :
-                     { "_metadataVersion", "_embeddedCover", "_common", "_qtProbeVersion",
-                       "_probeStatus", "_probeError", "_artworkError" })
+                for (const auto *key : { "_embeddedCover", "_common", "_qtProbeVersion",
+                                         "_probeStatus", "_probeError", "_artworkError" })
                     track.fields.remove(QLatin1String(key));
             }
             const QFileInfo info(file);
@@ -132,7 +129,6 @@ struct Walker
             track.sourceUrl = QUrl::fromLocalFile(file);
             track.relativePath = QDir(root).relativeFilePath(file);
             track.format = info.suffix().toUpper();
-            track.fields.insert("_path", file);
             track.fields.insert("_fingerprint", stamp);
             if (!unchanged) {
                 track.title = info.completeBaseName();
@@ -357,7 +353,6 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
                 for (auto album : previous->albums)
                     if (within(album.folder.toLocalFile(), root)) {
                         album.offline = true;
-                        album.fields.insert("_root", root);
                         next.albums.append(std::move(album));
                     }
         }

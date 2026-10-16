@@ -101,7 +101,7 @@ checks = [
     ("COMMON-02", pass_path, "flipY = false", "Exact embedded PNG bytes, numeric RGBA8, no color transform/mips; lookup UV independent from framebuffer Y conversion."),
     ("COMMON-03", "resources/shaders/rhi/smaa-weights.frag", "textureLod(areaTex, texcoord, 0.0)", "Frame reads adapt Y; area linear and search nearest remain decoded row order. HDR pipeline precedes one final output transform."),
     ("COMMON-04", "tools/review/SmaaReference.h", "Independent double-precision", "Independent pixel-coordinate source equations cover local contrast, search ends/crossings, area lookup and gamma/alpha blend; half quantization matches authored attachments."),
-    ("COMMON-05", "tools/review/RhiSmaaAudit.cpp", "edgeError <= 1.0 / 255", "Actual three production pass outputs tested against analytic formulas; no browser GPU, images or ROI score oracle. Scene/MSAA/legacy mapping remains B2/C."),
+    ("COMMON-05", "tools/review/RhiSmaaAudit.cpp", "edgeError <= 1.0 / 255", "Actual three production pass outputs tested against analytic formulas; no browser GPU, images or ROI score oracle. Scene/MSAA coverage remains B2/C."),
     ("PERF-01", "tools/review/SmaaReference.h", "i < 8", "Three fixed screen passes, maximum eight steps per search; O(target pixels), no dependence on library cardinality."),
     ("PERF-02", "src/render/rhi/Postprocess.cpp", "preparedAssets().images.value", "Immutable preloaded process cache; render owns all targets/SRB/uniforms. No runtime disk decode, worker wait or production readback."),
     ("PERF-03", "src/render/rhi/Postprocess.cpp", "updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u)", "Exactly three 80-byte prefixes per render; lookup only on graph creation, no unused kernel upload or pixel recopy each frame."),
@@ -122,7 +122,7 @@ for platform, symbol in [("windows", "QRhiD3D11InitParams"), ("macos", "QRhiMeta
         rows.append(dict(checkId=identity, sourcePath=path, lineOrSymbol=symbol,
                          sourceSha256=hashlib.sha256(data).hexdigest(), evidence=evidence,
                          platform=platform, result="static-audit-passed",
-                         limitations="Backend execution separate; no MSAA/resolve/legacy-gate/BLUR-01/VSYNC closure."))
+                         limitations="Backend execution separate; no MSAA/resolve/BLUR-01/VSYNC closure."))
     output = ROOT / "verification" / f"{platform}-static" / "rhi-smaa"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")

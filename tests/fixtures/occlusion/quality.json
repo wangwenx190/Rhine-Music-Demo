@@ -3,39 +3,6 @@
   "normalized": [
     {
       "input": null,
-      "legacyHigh": true,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 1.5,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "original"
-    },
-    {
-      "input": null,
-      "legacyHigh": false,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 0,
-        "aoResolution": 1,
-        "depthOfField": 0,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "custom"
-    },
-    {
-      "input": {},
-      "legacyHigh": true,
       "expected": {
         "scale": 100,
         "pixelRatio": 1.5,
@@ -51,19 +18,18 @@
     },
     {
       "input": {},
-      "legacyHigh": false,
       "expected": {
         "scale": 100,
-        "pixelRatio": 1,
+        "pixelRatio": 1.5,
         "antialias": "off",
         "shadows": 2048,
-        "aoSamples": 0,
+        "aoSamples": 32,
         "aoResolution": 1,
-        "depthOfField": 0,
+        "depthOfField": 100,
         "transmission": 1,
         "anisotropy": 16
       },
-      "preset": "custom"
+      "preset": "original"
     },
     {
       "input": {
@@ -77,33 +43,6 @@
         "transmission": 0.5,
         "anisotropy": 4
       },
-      "legacyHigh": true,
-      "expected": {
-        "scale": 80,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 1024,
-        "aoSamples": 0,
-        "aoResolution": 0.5,
-        "depthOfField": 0,
-        "transmission": 0.5,
-        "anisotropy": 4
-      },
-      "preset": "performance"
-    },
-    {
-      "input": {
-        "scale": 80,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 1024,
-        "aoSamples": 0,
-        "aoResolution": 0.5,
-        "depthOfField": 0,
-        "transmission": 0.5,
-        "anisotropy": 4
-      },
-      "legacyHigh": false,
       "expected": {
         "scale": 80,
         "pixelRatio": 1,
@@ -129,33 +68,6 @@
         "transmission": 1,
         "anisotropy": 16
       },
-      "legacyHigh": true,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 1.5,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "original"
-    },
-    {
-      "input": {
-        "scale": 100,
-        "pixelRatio": 1.5,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "legacyHigh": false,
       "expected": {
         "scale": 100,
         "pixelRatio": 1.5,
@@ -181,33 +93,6 @@
         "transmission": 1,
         "anisotropy": 16
       },
-      "legacyHigh": true,
-      "expected": {
-        "scale": 125,
-        "pixelRatio": 2,
-        "antialias": "smaa",
-        "shadows": 4096,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "high"
-    },
-    {
-      "input": {
-        "scale": 125,
-        "pixelRatio": 2,
-        "antialias": "smaa",
-        "shadows": 4096,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "legacyHigh": false,
       "expected": {
         "scale": 125,
         "pixelRatio": 2,
@@ -233,33 +118,6 @@
         "transmission": 1,
         "anisotropy": 16
       },
-      "legacyHigh": true,
-      "expected": {
-        "scale": 150,
-        "pixelRatio": 2,
-        "antialias": "smaa",
-        "shadows": 4096,
-        "aoSamples": 64,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "ultra"
-    },
-    {
-      "input": {
-        "scale": 150,
-        "pixelRatio": 2,
-        "antialias": "smaa",
-        "shadows": 4096,
-        "aoSamples": 64,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "legacyHigh": false,
       "expected": {
         "scale": 150,
         "pixelRatio": 2,
@@ -278,7 +136,6 @@
         "scale": 53,
         "depthOfField": 148
       },
-      "legacyHigh": true,
       "expected": {
         "scale": 55,
         "pixelRatio": 1.5,
@@ -294,32 +151,12 @@
     },
     {
       "input": {
-        "scale": 53,
-        "depthOfField": 148
-      },
-      "legacyHigh": false,
-      "expected": {
-        "scale": 55,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 0,
-        "aoResolution": 1,
-        "depthOfField": 150,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "custom"
-    },
-    {
-      "input": {
         "scale": "150",
         "pixelRatio": 3,
         "shadows": 0,
         "aoSamples": 16,
         "aoResolution": 0.75
       },
-      "legacyHigh": true,
       "expected": {
         "scale": 100,
         "pixelRatio": 3,
@@ -335,34 +172,11 @@
     },
     {
       "input": {
-        "scale": "150",
-        "pixelRatio": 3,
-        "shadows": 0,
-        "aoSamples": 16,
-        "aoResolution": 0.75
-      },
-      "legacyHigh": false,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 3,
-        "antialias": "off",
-        "shadows": 0,
-        "aoSamples": 16,
-        "aoResolution": 0.75,
-        "depthOfField": 0,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "custom"
-    },
-    {
-      "input": {
         "scale": -1,
         "depthOfField": 1000,
         "shadows": 3000,
         "aoSamples": 99
       },
-      "legacyHigh": true,
       "expected": {
         "scale": 50,
         "pixelRatio": 1.5,
@@ -378,69 +192,9 @@
     },
     {
       "input": {
-        "scale": -1,
-        "depthOfField": 1000,
-        "shadows": 3000,
-        "aoSamples": 99
-      },
-      "legacyHigh": false,
-      "expected": {
-        "scale": 50,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 0,
-        "aoResolution": 1,
-        "depthOfField": 150,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "custom"
-    },
-    {
-      "input": {
         "scale": true,
         "aoResolution": "0.5"
       },
-      "legacyHigh": true,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 1.5,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 32,
-        "aoResolution": 1,
-        "depthOfField": 100,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "original"
-    },
-    {
-      "input": {
-        "scale": true,
-        "aoResolution": "0.5"
-      },
-      "legacyHigh": false,
-      "expected": {
-        "scale": 100,
-        "pixelRatio": 1,
-        "antialias": "off",
-        "shadows": 2048,
-        "aoSamples": 0,
-        "aoResolution": 1,
-        "depthOfField": 0,
-        "transmission": 1,
-        "anisotropy": 16
-      },
-      "preset": "custom"
-    },
-    {
-      "input": {
-        "scale": null,
-        "depthOfField": null
-      },
-      "legacyHigh": true,
       "expected": {
         "scale": 100,
         "pixelRatio": 1.5,
@@ -459,19 +213,18 @@
         "scale": null,
         "depthOfField": null
       },
-      "legacyHigh": false,
       "expected": {
         "scale": 100,
-        "pixelRatio": 1,
+        "pixelRatio": 1.5,
         "antialias": "off",
         "shadows": 2048,
-        "aoSamples": 0,
+        "aoSamples": 32,
         "aoResolution": 1,
-        "depthOfField": 0,
+        "depthOfField": 100,
         "transmission": 1,
         "anisotropy": 16
       },
-      "preset": "custom"
+      "preset": "original"
     }
   ],
   "dimensions": [

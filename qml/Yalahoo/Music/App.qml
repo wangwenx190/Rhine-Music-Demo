@@ -14,6 +14,8 @@ ApplicationWindow {
     property RulerController rulerController: null
     property PresentationController presentationController: null
     property PlaybackController playbackController: null
+    property BackgroundMusicController backgroundMusicController: null
+    property InterfaceSoundController interfaceSoundController: null
     property TrackFocusController trackFocusController: null
     property PanelController panelController: null
     property LibraryStore libraryStore: null
@@ -42,6 +44,8 @@ ApplicationWindow {
         rulerController: window.rulerController
         presentationController: window.presentationController
         playbackController: window.playbackController
+        backgroundMusicController: window.backgroundMusicController
+        interfaceSoundController: window.interfaceSoundController
         trackFocusController: window.trackFocusController
         panelController: window.panelController
         libraryStore: window.libraryStore

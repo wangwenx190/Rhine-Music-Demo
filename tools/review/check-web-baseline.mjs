@@ -28,10 +28,6 @@ for (const library of Object.values(fixture.libraries)) {
     for (const album of library.albums) {
         assert.equal(album.folder, 'Generated fixture');
         assert.match(album.coverUrl, /^\/demo-covers\/(square|portrait|landscape)\.png$/);
-        for (const track of album.tracks) {
-            assert.equal(track.audioUrl, '');
-            assert.equal(track.browserPlayable, false);
-        }
     }
 }
 const source = await read('docs/contracts/source-map.json');

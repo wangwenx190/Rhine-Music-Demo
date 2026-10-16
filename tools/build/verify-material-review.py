@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def validate_report(path, fixture, count):
     report = json.loads(path.read_text())
     cases = report.get("cases", [])
-    if (not report.get("passed") or report.get("imageComparison") is not False
+    if (not report.get("passed")
             or report.get("validation") != "source-state-and-own-output"
             or report.get("warnings") or len(cases) != count
             or report.get("fixtureSha256") != hashlib.sha256(fixture.read_bytes()).hexdigest()
@@ -27,8 +27,7 @@ def validate_report(path, fixture, count):
                 or case.get("foregroundPixels", 0) <= 100 or case.get("frames", 0) < 4
                 or case.get("paperProbeError", float("inf")) > 3
                 or case.get("atlasCpuPayloadBytes") != 0
-                or case.get("atlasSubmissions") != 0
-                or "roi" in case or "factors" in case):
+                or case.get("atlasSubmissions") != 0):
             raise RuntimeError(f"Invalid material state: {case.get('index')}")
         if not (path.parent / case["screenshot"]).is_file():
             raise RuntimeError("Missing own-output image")

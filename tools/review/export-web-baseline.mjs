@@ -122,8 +122,6 @@ const makeLibrary = (counts) => {
                                                         trackNumber: j + 1,
                                                         duration: 180 + j,
                                                         format: 'fixture',
-                                                        browserPlayable: false,
-                                                        audioUrl: '',
                                                         relativePath: `synthetic/${j}`,
                                                     })),
                     producers: [],

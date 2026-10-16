@@ -1,5 +1,7 @@
 #pragma once
 #include "LibrarySession.h"
+#include "BackgroundMusicController.h"
+#include <QPointer>
 #include <QAudioDevice>
 #include <QAudioOutput>
 #include <QMediaDevices>
@@ -33,6 +35,7 @@ class PlaybackController final : public QObject
 public:
     explicit PlaybackController(LibrarySession *library, QObject *parent = nullptr);
     ~PlaybackController() override;
+    void setBackgroundMusic(BackgroundMusicController *background);
     Q_INVOKABLE bool playTrack(const QString &albumId, const QString &trackId);
     Q_INVOKABLE bool playAlbum(const QString &albumId);
     Q_INVOKABLE void toggle();
@@ -136,6 +139,7 @@ private:
         Paused,
         Playing
     };
+    void setIntent(Intent intent);
     void clearConnections();
     void load(qint64 restore = 0);
     void ready();
@@ -146,6 +150,8 @@ private:
     void start(int index);
     void setSupport(MediaSupport support);
     const Track *track() const;
+    QPointer<BackgroundMusicController> m_background;
+    QMetaObject::Connection m_silenceConnection;
     LibrarySession *m_library;
     QMediaDevices m_devices;
     QAudioOutput m_output;

@@ -1,19 +1,3 @@
-qt_add_library(YalahooImageComparison STATIC ImageComparison.cpp ImageComparison.h)
-target_link_libraries(YalahooImageComparison PUBLIC Qt6::Gui)
-target_include_directories(YalahooImageComparison PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-yalahoo_platform(YalahooImageComparison)
-qt_add_executable(compare-images CompareImages.cpp)
-set_target_properties(
-    compare-images
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY
-    "${CMAKE_BINARY_DIR}/tools"
-    WIN32_EXECUTABLE
-    FALSE
-    MACOSX_BUNDLE
-    FALSE
-)
-yalahoo_platform(compare-images)
 qt_add_executable(ui-audit UiAudit.cpp LibraryAudit.cpp LibraryAudit.h OpeningAudit.cpp OpeningAudit.h OverviewAudit.cpp OverviewAudit.h PresentationAudit.cpp PresentationAudit.h RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
@@ -197,17 +181,4 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(render-backend-audit RenderBackendAudit.cpp)
-    target_link_libraries(render-backend-audit PRIVATE Qt6::Quick)
-    set_target_properties(
-        render-backend-audit
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools"
-        WIN32_EXECUTABLE
-        FALSE
-        MACOSX_BUNDLE
-        FALSE
-    )
-    yalahoo_platform(render-backend-audit)
 endif()

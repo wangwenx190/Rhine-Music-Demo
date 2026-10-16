@@ -224,6 +224,9 @@ quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &n
     const RequestToken token{ ++m_requestId, m_generation, albumId };
     m_pending.insert(token.requestId, { token, kind });
     AlbumQuery query;
+    query.configuration = m_snapshot->fields.value("metadataConfiguration").toObject();
+    query.contact = query.configuration.value("musicBrainzContact").toString();
+    query.enabled = false;
     query.albumId = albumId;
     query.title = album->title;
     query.artist = album->artist;

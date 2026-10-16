@@ -49,25 +49,21 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     const auto oracle = QJsonDocument::fromJson(bytes).object();
     const bool backendReview = oracle["renderBackend"].toBool();
     const bool postprocessReview = oracle["postprocess"].toBool();
-    const bool calibration = oracle["calibration"].toBool(),
-               occlusionReview = oracle["occlusion"].toBool(),
+    const bool occlusionReview = oracle["occlusion"].toBool(),
                lightingReview = oracle["lighting"].toBool() || occlusionReview || postprocessReview;
     auto cases = oracle["cases"].toArray();
-    // Historical ROI fitting is forbidden, including hand-authored factor fixtures.
-    if (calibration)
-        return 12;
     for (const auto &value : cases) {
         const auto state = value.toObject();
-        if (state.contains("factors") || state["position"].toArray().size() != 3)
+        if (state["position"].toArray().size() != 3)
             return 12;
         if (!backendReview && !occlusionReview && !postprocessReview
             && (state["parameters"].toArray().size() != 3
                 || state["projections"].toArray().size() != 5))
             return 12;
     }
-    if (cases.isEmpty() || (!calibration && !lightingReview && cases.size() != 90))
+    if (cases.isEmpty() || (!lightingReview && cases.size() != 90))
         return 12;
-    if (!calibration && !lightingReview)
+    if (!lightingReview)
         for (int coverIndex : { 1, 6, 11 })
             for (double light : { 0.0, 0.25, 2.0 }) {
                 auto c = cases[coverIndex].toObject();
@@ -334,25 +330,23 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         }
         valid = valid && webProjection <= 2;
         bool parameters = true;
-        if (!calibration)
-            for (auto value : c["parameters"].toArray()) {
-                const auto p = value.toObject();
-                int surface = p["surface"] == "Frosted_Polymer" ? 0
-                        : p["surface"] == "Ivory_Edges"         ? 1
-                                                                : 2;
-                const auto *material =
-                        window->findChild<QObject *>(QString("caseMaterial%1").arg(surface));
-                if (!material) {
-                    parameters = false;
-                    continue;
-                }
-                for (auto name :
-                     { "transmission", "roughness", "thickness", "attenuationDistance" }) {
-                    parameters = parameters
-                            && std::abs(material->property(name).toDouble() - p[name].toDouble())
-                                    <= 1e-6;
-                }
+        for (auto value : c["parameters"].toArray()) {
+            const auto p = value.toObject();
+            int surface = p["surface"] == "Frosted_Polymer" ? 0
+                    : p["surface"] == "Ivory_Edges"         ? 1
+                                                            : 2;
+            const auto *material =
+                    window->findChild<QObject *>(QString("caseMaterial%1").arg(surface));
+            if (!material) {
+                parameters = false;
+                continue;
             }
+            for (auto name : { "transmission", "roughness", "thickness", "attenuationDistance" }) {
+                parameters = parameters
+                        && std::abs(material->property(name).toDouble() - p[name].toDouble())
+                                <= 1e-6;
+            }
+        }
         valid = valid && parameters;
         // Compare independent CPU/Quick3D projections, never image edges or ROI scores.
         for (const auto point :
@@ -480,7 +474,6 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                                       QJsonObject::fromVariantMap(scene.renderBackendContract()) },
                                     { "passed", pass },
                                     { "validation", "source-state-and-own-output" },
-                                    { "imageComparison", false },
                                     { "warnings", QJsonArray::fromStringList(warnings) },
                                     { "offscreen", surface->diagnostics() },
                                     { "windowPolicy", verification::windowPolicy(*window) },

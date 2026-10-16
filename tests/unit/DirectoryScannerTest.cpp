@@ -208,7 +208,7 @@ void DirectoryScannerTest::fingerprintAndReuse()
     QCOMPARE(track.discNumber, std::optional<int>(1));
     QCOMPARE(track.trackNumber, std::optional<int>(2));
     track.title = "metadata title";
-    track.fields.insert("_metadataVersion", 4);
+    track.fields.insert("_qtProbeVersion", QString::fromLatin1(qVersion()));
     track.fields.insert("futureTrackField", "retained");
     track.mediaSupport = MediaSupport::Supported;
     auto second = scan(temporary.path(), std::make_shared<const LibrarySnapshot>(previous));
@@ -225,7 +225,7 @@ void DirectoryScannerTest::fingerprintAndReuse()
     QCOMPARE(changed.id, track.id);
     QCOMPARE(changed.title, "1-02 歌曲");
     QCOMPARE(changed.mediaSupport, MediaSupport::Unknown);
-    QVERIFY(!changed.fields.contains("_metadataVersion"));
+    QVERIFY(!changed.fields.contains("_qtProbeVersion"));
     QCOMPARE(changed.fields.value("futureTrackField").toString(), "retained");
     QCOMPARE(second->albums.first().tracks.first().title, "metadata title");
 }

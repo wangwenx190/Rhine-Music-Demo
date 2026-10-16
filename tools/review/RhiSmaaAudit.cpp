@@ -310,7 +310,6 @@ int main(int argc, char **argv)
                                 { "framebufferYUp", api->isYUpInFramebuffer() },
                                 { "topLevelWindows", QGuiApplication::topLevelWindows().size() },
                                 { "visibleWindows", 0 },
-                                { "imageComparison", false },
                                 { "measurement",
                                   "CPU command recording only; no GPU/present/VSYNC timing" },
                                 { "cases", rows } })

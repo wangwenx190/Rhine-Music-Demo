@@ -17,8 +17,7 @@ enum class MediaSupport {
 struct Track
 {
     QString id, albumId, title, artist, format, codec, relativePath;
-    std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate,
-            numberOfChannels;
+    std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate;
     std::optional<bool> lossless;
     double duration = 0;
     MediaSupport mediaSupport = MediaSupport::Unknown;

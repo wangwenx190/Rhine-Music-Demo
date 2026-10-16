@@ -209,8 +209,6 @@ void MediaMetadataTest::publicMetadataAndPriority()
     for (const auto &album : result->albums) {
         const auto &track = album.tracks.first();
         QCOMPARE(track.title, "标题 Unicode");
-        QVERIFY(track.fields.value("indexable").toBool());
-        QVERIFY(!track.fields.value("playbackVerified").toBool());
         QCOMPARE(track.duration, 1.234);
         QCOMPARE(track.trackNumber.value(), 4);
         QCOMPARE(track.mediaSupport, MediaSupport::Unknown);
@@ -443,22 +441,39 @@ void MediaMetadataTest::legacy()
     album.fields.insert(
             "_cover", QJsonObject{ { "path", source + "/artwork/old.png" }, { "embedded", true } });
     auto &track = album.tracks.first();
-    track.fields.insert("_metadataVersion", version);
     track.fields.insert("_embeddedCover", album.fields.value("_cover"));
     track.fields.insert("_common", QJsonObject{ { "producer", "保留" } });
-    track.fields.insert("browserPlayable", true);
-    track.fields.insert("decodedAudioUrl", "/api/decoded-audio/old");
     track.fields.insert("futureTrack", 7);
     auto json = toJson(next);
+    auto inputAlbums = json.value("albums").toArray();
+    auto inputAlbum = inputAlbums.first().toObject();
+    auto inputTracks = inputAlbum.value("tracks").toArray();
+    auto inputTrack = inputTracks.first().toObject();
+    inputTrack.insert("_metadataVersion", version);
+    inputTrack.insert("_path", track.sourceUrl.toLocalFile());
+    inputTracks[0] = inputTrack;
+    inputAlbum.insert("tracks", inputTracks);
+    inputAlbum.insert("_cover", album.fields.value("_cover"));
+    inputAlbum.insert("_root", music);
+    inputAlbums[0] = inputAlbum;
+    json.insert("albums", inputAlbums);
     json.insert("version", 1);
     json.insert("futureIndex", 42);
     QVERIFY(put(source + "/library-index.json", QJsonDocument(json).toJson()));
     const auto before = get(source + "/library-index.json");
+    QVERIFY(put(source + "/genre-rules.json",
+                QJsonDocument(
+                        QJsonObject{ { "genres",
+                                       QJsonArray{ QJsonObject{ { "id", "manual" },
+                                                                { "name", "Manual" } } } },
+                                     { "albumOverrides", QJsonObject{ { album.id, "manual" } } } })
+                        .toJson()));
     QVERIFY(put(source + "/config.json",
                 QJsonDocument(QJsonObject{ { "version", 1 },
                                            { "roots", QJsonArray{ music } },
                                            { "onlineEnabled", true },
-                                           { "futureConfig", 8 } })
+                                           { "futureConfig", 8 },
+                                           { "musicBrainzContact", "project@example.invalid" } })
                         .toJson()));
     QVERIFY(put(source + "/pcm-cache/private", "DO NOT COPY"));
     const auto imported = LegacyImporter::read(source, native, { });
@@ -471,8 +486,12 @@ void MediaMetadataTest::legacy()
     QCOMPARE(actual.tracks.first().fields.value("futureTrack").toInt(), 7);
     QCOMPARE(actual.tracks.first().mediaSupport, MediaSupport::Unknown);
     QCOMPARE(actual.tracks.first().sourceUrl, track.sourceUrl);
-    QCOMPARE(actual.tracks.first().fields.value("decodedAudioUrl").toString(),
-             "/api/decoded-audio/old");
+    const auto configuration = imported.snapshot->fields.value("metadataConfiguration").toObject();
+    QCOMPARE(configuration.value("futureConfig").toInt(), 8);
+    QCOMPARE(configuration.value("musicBrainzContact").toString(),
+             QString("project@example.invalid"));
+    for (const auto &key : { "version", "roots" })
+        QVERIFY(!configuration.contains(key));
     QVERIFY(actual.coverUrl.toLocalFile().startsWith(native + "/artwork/"));
     QVERIFY(!QFileInfo::exists(native + "/pcm-cache"));
     QVERIFY(!imported.snapshot->onlineEnabled);

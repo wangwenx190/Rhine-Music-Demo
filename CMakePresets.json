@@ -48,7 +48,7 @@
       },
       "filter": {
         "exclude": {
-          "label": "native-visible|render-integration|legacy-image-gate"
+          "label": "native-visible|render-integration"
         }
       },
       "environment": {
@@ -68,7 +68,7 @@
       },
       "filter": {
         "exclude": {
-          "label": "native-visible|render-integration|legacy-image-gate"
+          "label": "native-visible|render-integration"
         }
       },
       "environment": {
@@ -83,7 +83,7 @@
       "inherits": "qt-release",
       "filter": {
         "exclude": {
-          "label": "native-visible|legacy-image-gate"
+          "label": "native-visible"
         }
       }
     },
@@ -96,7 +96,7 @@
           "label": "hidden-render"
         },
         "exclude": {
-          "label": "native-visible|legacy-image-gate"
+          "label": "native-visible"
         }
       }
     },
@@ -113,9 +113,6 @@
       "filter": {
         "include": {
           "label": "native-visible"
-        },
-        "exclude": {
-          "label": "legacy-image-gate"
         }
       }
     }

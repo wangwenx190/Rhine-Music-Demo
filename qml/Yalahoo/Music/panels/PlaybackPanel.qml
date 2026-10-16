@@ -6,8 +6,11 @@ import "../components"
 
 ScrollView {
     id: root
+    objectName: "audioSettingsPanel"
     required property DesignTokens tokens
     required property PlaybackController playback
+    property BackgroundMusicController backgroundMusic: null
+    property InterfaceSoundController interfaceSound: null
     property Component heading: null
     property bool navigationInputOwner: true
     contentWidth: availableWidth
@@ -21,7 +24,7 @@ ScrollView {
     palette.highlight: tokens.accent
     palette.highlightedText: tokens.surface
     function focusControl() {
-        output.forceActiveFocus();
+        playToggle.forceActiveFocus();
     }
     Column {
         width: root.availableWidth
@@ -59,6 +62,7 @@ ScrollView {
         Row {
             spacing: 20
             ArchiveButton {
+                id: playToggle
                 tokens: root.tokens
                 text: root.playback.requested ? "暂停" : "播放"
                 onClicked: root.playback.toggle()
@@ -81,6 +85,82 @@ ScrollView {
             value: root.playback.volume
             onMoved: root.playback.volume = value
             Accessible.name: "歌曲音量"
+        }
+        Column {
+            width: parent.width
+            spacing: 14
+            visible: root.backgroundMusic !== null
+            CheckBox {
+                objectName: "bgmEnabled"
+                text: "氛围 BGM"
+                checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
+                onToggled: if (root.backgroundMusic)
+                               root.backgroundMusic.enabled = checked
+            }
+            ArchiveText {
+                tokens: root.tokens
+                width: parent.width
+                text: "歌曲开始前淡出；暂停保持安静，停止或队列结束后恢复。"
+                cssPixelSize: 11
+                wrapMode: Text.Wrap
+                color: root.tokens.muted
+            }
+            Slider {
+                objectName: "bgmVolume"
+                width: parent.width
+                from: 0
+                to: 1
+                value: root.backgroundMusic ? root.backgroundMusic.volume : 0
+                onMoved: if (root.backgroundMusic)
+                             root.backgroundMusic.volume = value
+                Accessible.name: "BGM 音量"
+            }
+            ArchiveText {
+                tokens: root.tokens
+                width: parent.width
+                text: root.backgroundMusic ? root.backgroundMusic.error : ""
+                visible: text.length > 0
+                cssPixelSize: 11
+                wrapMode: Text.WrapAnywhere
+                color: root.tokens.accent
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: 14
+            visible: root.interfaceSound !== null
+            CheckBox {
+                objectName: "interfaceSoundEnabled"
+                text: "界面音效"
+                checked: root.interfaceSound ? root.interfaceSound.enabled : false
+                onToggled: if (root.interfaceSound)
+                               root.interfaceSound.enabled = checked
+            }
+            Slider {
+                objectName: "interfaceSoundVolume"
+                width: parent.width
+                from: 0
+                to: 1
+                value: root.interfaceSound ? root.interfaceSound.volume : 0
+                onMoved: if (root.interfaceSound)
+                             root.interfaceSound.volume = value
+                Accessible.name: "界面音效音量"
+            }
+            ArchiveButton {
+                tokens: root.tokens
+                text: "试听界面音效 ↗"
+                enabled: root.interfaceSound !== null && root.interfaceSound.enabled
+                         && root.interfaceSound.available
+                onClicked: root.interfaceSound.preview()
+            }
+            ArchiveText {
+                tokens: root.tokens
+                width: parent.width
+                text: "缺少独立短音频的事件保持静音。BGM 与音效使用系统默认输出，音量分别控制。"
+                cssPixelSize: 11
+                wrapMode: Text.Wrap
+                color: root.tokens.muted
+            }
         }
         ArchiveText {
             tokens: root.tokens

@@ -11,11 +11,12 @@ Popup {
     required property PanelController controller
     required property TrackFocusController trackFocus
     property PlaybackController playback: null
+    property BackgroundMusicController backgroundMusic: null
+    property InterfaceSoundController interfaceSound: null
     property LibraryStore store: null
     required property Item sceneSource
     property string pendingAlbum: ""
     property string pendingTrack: ""
-    property Item returnFocus: null
     readonly property bool narrow: width <= 700
     readonly property real outerPadding: narrow ? 12 : 28
     readonly property real insetX: narrow ? 21 : 35
@@ -153,10 +154,12 @@ Popup {
                     sourceComponent: PlaybackPanel {
                         tokens: root.tokens
                         playback: root.playback
+                        backgroundMusic: root.backgroundMusic
+                        interfaceSound: root.interfaceSound
                         heading: PanelHeading {
                             width: playbackLoader.width
                             tokens: root.tokens
-                            title: "歌曲播放与输出"
+                            title: "播放与声音"
                             subtitle: "PLAYBACK"
                             bottomSpacing: 5
                             narrow: root.narrow
@@ -184,7 +187,8 @@ Popup {
                 }
             }
             Accessible.role: Accessible.Dialog
-            Accessible.name: root.controller.panel === "search" ? "搜索专辑与歌曲" : "本地音乐库"
+            Accessible.name: root.controller.panel === "search" ? "搜索专辑与歌曲" : root.controller.panel
+                                                                  === "playback" ? "播放与声音" : "本地音乐库"
         }
     }
     Connections {

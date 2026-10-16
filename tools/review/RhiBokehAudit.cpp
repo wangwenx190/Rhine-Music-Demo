@@ -307,7 +307,6 @@ int main(int argc, char **argv)
                                 { "visibleWindows", visibleWindows },
                                 { "measurement",
                                   "production Postprocess in real QRhi offscreen frames; no presentation timing" },
-                                { "imageComparison", false },
                                 { "cases", results } })
                         .toJson());
         require(report.commit(), "Cannot save Bokeh report");

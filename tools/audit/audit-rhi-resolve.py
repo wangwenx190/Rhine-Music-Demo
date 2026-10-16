@@ -1,4 +1,4 @@
-"""Record the traced MSAA/resolve and retired-gate coverage boundary, without image oracles."""
+"""Record the traced MSAA/resolve and component coverage boundary, without image oracles."""
 import hashlib
 import json
 import subprocess
@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
     ("COMMON-01", "tools/review/CMakeLists.txt", "RhiPostprocessAudit.cpp",
-     "Review links production RHI, GuiPrivate and the event-driven capture driver. TestPolicy restores only the independent non-image gate; three image compatibility entries remain fail-closed."),
+     "Review links production RHI, GuiPrivate and the event-driven capture driver. TestPolicy classifies actual independent component entry points."),
     ("COMMON-02", "tools/review/RhiPostprocessAudit.cpp", "Fallback without primary leases was accepted",
      "Anonymous fixtures and generated RGBA tiles only. Atlas primary leases may be absent, but fallback readiness requires both lease vectors; submission rejects malformed input before render access."),
     ("COMMON-03", "src/render/rhi/RhiItem.cpp", "attachment.setResolveTexture(resolves[i]);",
@@ -36,7 +36,6 @@ CHECKS = [
 history = []
 for revision, path in [
     ("522a3f3", "qml/Yalahoo/Music/scene/GeometryScene.qml"),
-    ("d06e5f3", "tools/review/RenderBackendAudit.cpp"),
     ("1f2352a", "src/render/rhi/RhiItem.cpp"),
     ("75775b3", "src/render/rhi/SceneItem.cpp"),
     ("b7f73d4", "src/render/rhi/RhiItem.cpp"),
@@ -44,7 +43,7 @@ for revision, path in [
 ]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
     history.append(dict(revision=revision, path=path, sha256=hashlib.sha256(data).hexdigest(),
-                        conclusion="Source/adapter review recorded in source-fidelity-review.md; historical image metrics are retired, not rerun or relabeled as passed."))
+                        conclusion="Source/adapter review in source-fidelity-review.md binds current format, resolve and lifecycle behavior; target runtime is separate."))
 for platform, marker in [("windows", "WIN32"), ("macos", "YalahooVerification"),
                           ("linux", "UNIX AND NOT APPLE")]:
     rows = []
@@ -63,4 +62,4 @@ for platform, marker in [("windows", "WIN32"), ("macos", "YalahooVerification"),
     output = ROOT / "verification" / f"{platform}-static" / "rhi-resolve"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")
-print("MSAA/resolve, retired-gate coverage and COMMON/PERF/platform matrices verified")
+print("MSAA/resolve, component coverage and COMMON/PERF/platform matrices verified")

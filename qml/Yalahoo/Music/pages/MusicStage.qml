@@ -19,6 +19,8 @@ Item {
     property PresentationController presentationController: null
     property string reviewPlayingTitle: ""
     property PlaybackController playbackController: null
+    property BackgroundMusicController backgroundMusicController: null
+    property InterfaceSoundController interfaceSoundController: null
     property TrackFocusController trackFocusController: null
     property PanelController panelController: null
     property LibraryStore libraryStore: null
@@ -226,6 +228,8 @@ Item {
             controller: stage.panelController
             trackFocus: stage.trackFocusController
             playback: stage.playbackController
+            backgroundMusic: stage.backgroundMusicController
+            interfaceSound: stage.interfaceSoundController
             store: stage.libraryStore
             sceneSource: visualContent
         }

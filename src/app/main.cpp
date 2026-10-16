@@ -2,6 +2,8 @@
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
 #include "PlaybackController.h"
+#include "BackgroundMusicController.h"
+#include "InterfaceSoundController.h"
 #include "LibraryStore.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
@@ -176,9 +178,15 @@ int main(int argc, char **argv)
     std::atomic<int> api{ QSGRendererInterface::Unknown };
     yalahoo::OfflineMetadataProvider provider;
     yalahoo::LibrarySession library(&provider);
+    yalahoo::BackgroundMusicController background;
+    yalahoo::InterfaceSoundController sounds;
     yalahoo::PlaybackController playback(&library);
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, &playback,
-                     &yalahoo::PlaybackController::stop);
+    playback.setBackgroundMusic(&background);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &playback, [&] {
+        playback.stop();
+        background.stop();
+        sounds.stop();
+    });
     if (parser.isSet(QStringLiteral("verify-library"))) {
         if (!parser.isSet(QStringLiteral("verify-runtime")))
             return 7;
@@ -252,6 +260,30 @@ int main(int argc, char **argv)
             return 7;
         }
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
+        const auto applyAudio = [&] {
+            const auto audio = preferences->audio();
+            playback.setVolume(audio.value("volume").toDouble(.65));
+            background.setVolume(audio.value("bgmVolume").toDouble(.18));
+            background.setEnabled(audio.value("bgm").toBool(true));
+            sounds.setVolume(audio.value("soundVolume").toDouble(.22));
+            sounds.setEnabled(audio.value("sound").toBool(true));
+        };
+        applyAudio();
+        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::imported, &background,
+                         applyAudio);
+        const auto saveAudio = [&] {
+            preferences->setAudio({ { "volume", playback.volume() },
+                                    { "bgm", background.enabled() },
+                                    { "bgmVolume", background.volume() },
+                                    { "sound", sounds.enabled() },
+                                    { "soundVolume", sounds.volume() } });
+        };
+        QObject::connect(&playback, &yalahoo::PlaybackController::volumeChanged, preferences.get(),
+                         saveAudio);
+        QObject::connect(&background, &yalahoo::BackgroundMusicController::settingsChanged,
+                         preferences.get(), saveAudio);
+        QObject::connect(&sounds, &yalahoo::InterfaceSoundController::settingsChanged,
+                         preferences.get(), saveAudio);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &library,
                          [&library](yalahoo::Snapshot snapshot) {
@@ -407,6 +439,26 @@ int main(int argc, char **argv)
         presentation.reset();
         updateOpeningInput();
     });
+    if (!verificationRun) {
+        auto soundCell = std::make_shared<yalahoo::ArchiveCell>(selection.cell());
+        QObject::connect(&selection, &yalahoo::SelectionController::selectionChanged, &sounds,
+                         [&, soundCell] {
+                             const auto cell = selection.cell();
+                             sounds.trigger(cell.lane != soundCell->lane ? QStringLiteral("column")
+                                                                         : QStringLiteral("tick"));
+                             *soundCell = cell;
+                         });
+        QObject::connect(&panels, &yalahoo::PanelController::changed, &sounds, [&] {
+            sounds.trigger(panels.panel().isEmpty() ? QStringLiteral("page-close")
+                                                    : QStringLiteral("page-open"));
+        });
+        QObject::connect(&presentation, &yalahoo::PresentationController::focusRequested, &sounds,
+                         [&](bool detail) {
+                             sounds.trigger(detail ? QStringLiteral("open")
+                                                   : QStringLiteral("back"));
+                         });
+        background.start();
+    }
     QQmlApplicationEngine engine;
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
@@ -415,6 +467,9 @@ int main(int argc, char **argv)
             presentationProperties.insert("openingController", QVariant::fromValue(&opening));
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
         presentationProperties.insert("playbackController", QVariant::fromValue(&playback));
+        presentationProperties.insert("backgroundMusicController",
+                                      QVariant::fromValue(&background));
+        presentationProperties.insert("interfaceSoundController", QVariant::fromValue(&sounds));
         presentationProperties.insert("trackFocusController", QVariant::fromValue(&trackFocus));
         presentationProperties.insert("panelController", QVariant::fromValue(&panels));
         presentationProperties.insert("libraryStore", QVariant::fromValue(libraryStore.get()));

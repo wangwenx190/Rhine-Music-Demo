@@ -419,7 +419,6 @@ int main(int argc, char **argv)
             { "qt", qVersion() },
             { "configuration", "Release" },
             { "passed", true },
-            { "imageComparison", false },
             { "states", states },
             { "rebuilds", rebuilds },
             { "atlas", atlasReport },

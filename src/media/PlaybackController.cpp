@@ -33,6 +33,25 @@ PlaybackController::~PlaybackController()
     m_player.setSource({ });
     m_player.setAudioOutput(nullptr);
 }
+void PlaybackController::setBackgroundMusic(BackgroundMusicController *background)
+{
+    disconnect(m_silenceConnection);
+    m_background = background;
+    if (background)
+        m_silenceConnection = connect(background, &BackgroundMusicController::silenceReached, this,
+                                      &PlaybackController::ready);
+    setIntent(m_intent);
+}
+void PlaybackController::setIntent(Intent intent)
+{
+    m_intent = intent;
+    if (m_background) {
+        using Activity = BackgroundMusicController::SongActivity;
+        m_background->setSongActivity(intent == Intent::Playing          ? Activity::Playing
+                                              : intent == Intent::Paused ? Activity::Paused
+                                                                         : Activity::Stopped);
+    }
+}
 const Track *PlaybackController::track() const
 {
     return m_index >= 0 && m_index < m_queue.size() ? &m_queue[m_index] : nullptr;
@@ -129,7 +148,7 @@ void PlaybackController::start(int index)
     }
     m_index = index;
     m_source = track()->sourceUrl;
-    m_intent = Intent::Playing;
+    setIntent(Intent::Playing);
     m_error.clear();
     m_duration = m_position = m_lastPosition = 0;
     m_dragging = false;
@@ -167,7 +186,7 @@ void PlaybackController::load(qint64 restore)
         return;
     if (!m_player.isAvailable()) {
         m_error = QStringLiteral("Qt 媒体播放服务不可用。");
-        m_intent = Intent::Paused;
+        setIntent(Intent::Paused);
         emit stateChanged();
         return;
     }
@@ -226,7 +245,7 @@ void PlaybackController::load(qint64 restore)
                                      m_error = reason.isEmpty()
                                              ? QStringLiteral("Qt 媒体错误：%1").arg(int(error))
                                              : reason;
-                                     m_intent = Intent::Paused;
+                                     setIntent(Intent::Paused);
                                      if (error == QMediaPlayer::FormatError)
                                          setSupport(MediaSupport::Unsupported);
                                      emit stateChanged();
@@ -242,7 +261,7 @@ void PlaybackController::ready()
         return;
     if (!m_player.hasAudio()) {
         m_error = QStringLiteral("Qt 未检测到音轨。");
-        m_intent = Intent::Paused;
+        setIntent(Intent::Paused);
         m_player.pause();
         setSupport(MediaSupport::Unsupported);
         emit stateChanged();
@@ -261,6 +280,8 @@ void PlaybackController::ready()
             m_player.setPosition(target);
         emit positionChanged();
     }
+    if (requested() && m_background && !m_background->silent())
+        return;
     if (requested() && !m_player.isPlaying())
         m_player.play();
     else if (m_intent == Intent::Paused)
@@ -290,7 +311,7 @@ void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revisio
         setSupport(MediaSupport::Unsupported);
         m_error = m_player.errorString().isEmpty() ? QStringLiteral("Qt 媒体状态：InvalidMedia")
                                                    : m_player.errorString();
-        m_intent = Intent::Paused;
+        setIntent(Intent::Paused);
     } else if (value == QMediaPlayer::LoadedMedia || value == QMediaPlayer::BufferedMedia) {
         ready();
     }
@@ -313,7 +334,7 @@ void PlaybackController::toggle()
         playAlbum(m_library->navigationAlbumId());
         return;
     }
-    m_intent = Intent::Playing;
+    setIntent(Intent::Playing);
     m_error.clear();
     if (m_source.isEmpty()) {
         m_source = track()->sourceUrl;
@@ -328,18 +349,18 @@ void PlaybackController::toggle()
 }
 void PlaybackController::pause()
 {
-    m_intent = Intent::Paused;
+    setIntent(Intent::Paused);
     m_player.pause();
     emit stateChanged();
 }
 void PlaybackController::stop()
 {
-    m_intent = Intent::Stopped;
     ++m_revision;
     clearConnections();
     m_player.stop();
     m_player.setSource({ });
     m_source.clear();
+    setIntent(Intent::Stopped);
     setSupport(MediaSupport::Unknown);
     m_error.clear();
     m_position = m_lastPosition = m_preview = 0;
@@ -377,7 +398,7 @@ void PlaybackController::retry()
     if (!track())
         return;
     m_source = track()->sourceUrl;
-    m_intent = Intent::Playing;
+    setIntent(Intent::Playing);
     m_error.clear();
     load(position());
     emit stateChanged();

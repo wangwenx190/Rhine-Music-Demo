@@ -69,8 +69,7 @@ QJsonObject copyCover(QJsonObject cover, const QString &legacyRoot, const QStrin
     const auto copied = ArtworkStore::copy(canonical, dataRoot, &error);
     if (copied.isEmpty())
         return { };
-    cover.insert("path", copied.toLocalFile());
-    return cover;
+    return QJsonObject{ { "path", copied.toLocalFile() } };
 }
 }
 ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRoot,
@@ -173,8 +172,6 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
             track.insert("albumId", albumId);
             track.insert("sourceUrl", QUrl::fromLocalFile(path).toString());
             track.insert("mediaSupport", "Unknown");
-            track.insert("indexable", true);
-            track.insert("playbackVerified", false);
             track.remove("_qtProbeVersion");
             QString coverError;
             const auto cover = copyCover(track.value("_embeddedCover").toObject(), sourceRoot, root,
@@ -205,7 +202,6 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
                 copyCover(album.value("_cover").toObject(), sourceRoot, root, dataRoot, coverError);
         album.remove("coverUrl");
         if (!cover.isEmpty()) {
-            album.insert("_cover", cover);
             album.insert("coverUrl",
                          QUrl::fromLocalFile(cover.value("path").toString()).toString());
         } else if (!coverError.isEmpty()) {
@@ -242,8 +238,11 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
     index.insert("albums", albums);
     index.insert("genres", genres);
     index.insert("roots", roots);
-    index.insert("_legacyConfig", config);
-    index.insert("_legacyGenreRules", rules);
+    QJsonObject metadataConfiguration = config;
+    for (const auto &key : { "version", "roots" })
+        metadataConfiguration.remove(key);
+    index.insert("metadataConfiguration", metadataConfiguration);
+    index.insert("genreOverrides", overrides);
     index.insert("onlineEnabled", false);
     LibrarySnapshot next;
     if (!readLibrary(index, next, &result.error))

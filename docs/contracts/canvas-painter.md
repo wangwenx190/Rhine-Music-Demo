@@ -20,4 +20,4 @@
 
 ## 检查入口
 
-`ui-audit 输出目录 [--representative]`使用360×160固定内容，覆盖两API和Quick的路径/文字、透明合成、静态零重绘、420×200恢复、十次Loader卸载/renderer释放。保留实际DPR、revision、资源/计数与QML/shader错误检查；跨API和恢复图像评分已移除；自身纹理用于内容及实际质量检查，结构/数值、功能和资源分别断言。实际序章接入与退出条件见[opening.md](opening.md)，不能用此探针替代产品验证。
+`ui-audit 输出目录 [--representative]`使用360×160固定内容，覆盖两API和Quick的路径/文字、透明合成、静态零重绘、420×200恢复、十次Loader卸载/renderer释放。保留实际DPR、revision、资源/计数与QML/shader错误检查；自身纹理用于内容及实际质量检查，结构/数值、功能和资源分别断言。实际序章接入与退出条件见[opening.md](opening.md)，不能用此探针替代产品验证。

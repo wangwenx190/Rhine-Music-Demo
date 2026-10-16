@@ -3,6 +3,8 @@
 #pragma once
 #include "LibrarySession.h"
 #include "PlaybackController.h"
+#include "BackgroundMusicController.h"
+#include "InterfaceSoundController.h"
 #include "LibraryStore.h"
 #include "TrackFocusController.h"
 #include "PanelController.h"
@@ -239,5 +241,21 @@ struct PlaybackControllerQml
     Q_GADGET
     QML_FOREIGN(yalahoo::PlaybackController)
     QML_NAMED_ELEMENT(PlaybackController)
+    QML_UNCREATABLE("Owned by application")
+};
+
+struct BackgroundMusicControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::BackgroundMusicController)
+    QML_NAMED_ELEMENT(BackgroundMusicController)
+    QML_UNCREATABLE("Owned by application")
+};
+
+struct InterfaceSoundControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::InterfaceSoundController)
+    QML_NAMED_ELEMENT(InterfaceSoundController)
     QML_UNCREATABLE("Owned by application")
 };

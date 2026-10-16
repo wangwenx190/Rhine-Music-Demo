@@ -297,7 +297,6 @@ int main(int argc, char **argv)
                                   { "configuration", "Release" },
                                   { "passed", true },
                                   { "validation", "source-math-and-own-output" },
-                                  { "imageComparison", false },
                                   { "qt", qVersion() },
                                   { "offscreen", driver.surface->diagnostics() },
                                   { "windowPolicy", verification::windowPolicy(*driver.window) },

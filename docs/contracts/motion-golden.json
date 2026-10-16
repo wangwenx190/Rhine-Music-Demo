@@ -46577,7 +46577,7 @@
       "output": 0.14
     }
   ],
-  "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+  "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
   "inputs": {
     "frameOrder": "Apply events at nominal sample time, then update by dt (zero for frame 0); timestamps label input frames.",
     "spring": {

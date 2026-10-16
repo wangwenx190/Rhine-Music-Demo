@@ -315,7 +315,6 @@ int main(int argc, char **argv)
         check(report.open(QIODevice::WriteOnly), "Cannot write report");
         report.write(QJsonDocument(QJsonObject{ { "round", "R19C2C" },
                                                 { "passed", true },
-                                                { "imageComparison", false },
                                                 { "opticsOnly", opticsOnly },
                                                 { "qt", qVersion() },
                                                 { "isolated", isolated },

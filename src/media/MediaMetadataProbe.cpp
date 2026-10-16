@@ -76,10 +76,7 @@ void resolveGenres(LibrarySnapshot &snapshot)
                 names.insert(key, genre.id);
         }
     }
-    const auto overrides = snapshot.fields.value("_legacyGenreRules")
-                                   .toObject()
-                                   .value("albumOverrides")
-                                   .toObject();
+    const auto overrides = snapshot.fields.value("genreOverrides").toObject();
     QHash<QString, int> counts;
     for (auto &album : snapshot.albums) {
         const auto overrideId = overrides.value(album.id).toString();
@@ -158,8 +155,6 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
                         || (value.status == MediaObservation::Loaded && !value.hasAudio))
             ? MediaSupport::Unsupported
             : MediaSupport::Unknown;
-    track.fields.insert("indexable", true);
-    track.fields.insert("playbackVerified", false);
     track.fields.insert("_probeStatus",
                         timeout ? "timeout"
                                 : value.status == MediaObservation::Loaded ? "loaded"

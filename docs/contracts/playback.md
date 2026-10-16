@@ -30,10 +30,24 @@ REFDB-04只采用公开API的无输出/意图/恢复位置隔离思路和事件�
 
 ## 界面与检查
 
-Header沿用原播放/停止/当前歌名容器，歌名定位复用TrackFocusController。播放与输出面板集中提供上一/下一、进度/时间、系统默认/实际Qt设备、歌曲音量及Qt错误/重试，保留详情静态排版。Space复用InputRouter的输入所有权判定，编辑器/滑块/Popup及修饰快捷键保留自身输入；进入库/搜索或定位不调用媒体命令。音频面板是本轮入口，完整设置与其他声音控制仍归对应后续轮次。
+Header沿用原播放/停止/当前歌名容器，歌名定位复用TrackFocusController。播放与输出面板集中提供上一/下一、进度/时间、系统默认/实际Qt设备、歌曲音量及Qt错误/重试，保留详情静态排版。Space复用InputRouter的输入所有权判定，编辑器/滑块/Popup及修饰快捷键保留自身输入；进入库/搜索或定位不调用媒体命令。音频面板提供本契约的三路独立声音控制；完整非音频设置归后续设置轮次。
 
 `playback`使用现场生成的匿名RIFF/WAV和损坏样本，真实执行Qt播放/暂停/seek/停止、自然结束/换曲与错误；另用真实Qt设备对象或空列表通知覆盖无输出待播、加载替换、暂停/停止重连、最后有效位置、显式选择回退及重复/晚到事件。通知注入仅验证状态分支，不作为物理拔插证据，禁止伪造QAudioDevice私有句柄。
 
 `playback-qml` / `ui-audit --playback 输出目录`通过实际MusicStage播放按钮启动低音量匿名样本，回放九尺寸、双主题、DPR1/1.5/2、输出面板与播放进度、搜索/库替换/定位播放隔离及默认隐藏策略；记录实际GPU/Qt/系统/音频设备和输入/二进制hash。测试输入生成器只在tests/support，产品没有PCM路径。自身输出只用于实际质量检查，不做图像评分，不代替正常VSYNC、物理输入/设备拔插、格式全集或听感。
 
 `python3 tools/audit/audit-playback.py`绑定COMMON-01–05/PERF-01–07、三平台源码/hash和冻结/REFDB来源；目标欠验与原门槛只在迁移计划R24-P维护。共享测试选择与复用见test-gates.md，窗口与产物边界沿公共契约。
+
+## 氛围音乐与界面音效
+
+`BackgroundMusicController`在GUI线程长期拥有独立QMediaPlayer/QAudioOutput，使用现有`qrc:/assets/audio/atmosphere.ogg`和公开Infinite循环。默认开关/音量取冻结偏好（BGM true/.18，界面音效true/.22，歌曲.65）。普通产品准备后启动氛围，验证入口不会自动启动。BGM/音效跟随系统默认输出，歌曲面板的显式设备选择仅作用于歌曲。
+
+所有歌曲Playing意图（新曲、继续、重试、上下曲）先同步给BGM，再经PlaybackController::ready检查真实输出已静音后才调用歌曲play。停止与队列最后结束恢复BGM，曲间不经过Stopped；暂停/媒体错误保持安静。BGM下降220ms、上升650ms，按实际当前音量和单调elapsed线性插值；用户音量与淡变输出分开。新目标替换旧目标，不累积完成回调。BGM控制器只保留一个24ms淡变定时器，稳定/静音后停止，不用视觉FrameClock，也不改变歌曲音量、速率或样本。
+
+BGM格式错误显示Qt原因、静音并放行歌曲；重新开关可重试。默认输出消失时取消淡变/暂停并放行歌曲，输出恢复按当前活动/开关/歌曲意图重新协调。设备通知合并为一个所属QObject queued操作。关闭按歌曲→BGM→音效顺序，销毁停止timer/player并清source/output；QML/窗口隐藏不拥有媒体生命周期。
+
+`InterfaceSoundController`启动只读取一次既有嵌入事件映射。只有enabled且真实存在的qrc短资产才进入哈希；没有可用资源时不创建音效实例。有资源时固定最多四个QSoundEffect，复用source，满池/加载中不排队、不扩容。trigger(event)保留17个事件名的入口；当前全部缺独立短资产，所有事件与试听静音，试听按钮禁用。已接入选片tick/column、面板page-open/page-close与详情open/back事件；其他事件保留给对应产品入口，不恢复合成器或旧typing PCM。
+
+音频设置沿用PreferencesStore的单worker、一次在途及最新值合并、QSaveFile原子保存，保留未知字段。仅消费volume/bgm/bgmVolume/sound/soundVolume。设置与GUI重建不重建媒体对象。
+
+`audio-ambience`真实执行Ogg循环配置/播放与匿名WAV的歌曲静音门、暂停/停止/队列结束/快速反向、独立音量、隐藏无视觉时钟进度及缺资源静音；测试专用短WAV验证四槽QSoundEffect与满池丢弃。`playback-qml`沿原九尺寸/双主题/DPR检查实际生产音频控件与导航隔离，正常输出只作质量检查。`python3 tools/audit/audit-audio-ambience.py`绑定COMMON/PERF/平台源码与hash。Qt进度和隐藏输出不代替听感、物理设备或原生最小化，欠验只在计划R25-P维护；执行范围沿test-gates.md。

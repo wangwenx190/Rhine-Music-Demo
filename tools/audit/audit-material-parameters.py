@@ -17,8 +17,8 @@ checks = [
      "Transport and coat now enter std140 unchanged; the entity lid override changes roughness only. "
      "The 816-byte layout, bindings, clip/Y correction, capture and pipeline formats are unchanged. "
      "Native shell algorithms/LOD/sorting are still R19C2/D, not inferred from parameter equality."),
-    ("COMMON-04", "src/app/MaterialReview.cpp", "if (calibration)",
-     "ROI calibration/factor fixtures return before any show/capture. No player, output device, "
+    ("COMMON-04", "src/app/MaterialReview.cpp", 'state["position"].toArray().size() != 3',
+     "Source cases validate world positions before any show/capture. No player, output device, "
      "worker cancellation or music path is modified; Qt/renderer ownership and teardown are retained."),
     ("COMMON-05", "tests/unit/RhiMaterialTest.cpp", "continuousSourceAndQmlParameters",
      "45 frozen material samples check C++ and real QML properties; 210 earlier endpoint samples "
@@ -37,8 +37,7 @@ checks = [
      "At most 3*(432+4) material tuples are serialized only for capture. No product attachment, "
      "MSAA/resolve edge, PSO/SRB compatibility key or resource lifetime changes with optics values."),
     ("PERF-05", "src/render/rhi/ShellMaterial.cpp", "ShellMaterial shellMaterial",
-     "Analytic source theme/clarity interpolation remains; image-derived factors are removed rather "
-     "than approximated. Environment override is supplied once, without the base .65 multiplier."),
+     "Analytic source theme/clarity interpolation supplies the authored environment override exactly once."),
     ("PERF-06", "qml/Yalahoo/Music/scene/GlassMaterial.qml", "property real environmentIntensity",
      "QML keeps the same bindings and shared SelectionLighting clock with fewer dependencies; "
      "there are no new ticks, delegates, input events or hidden animation work."),

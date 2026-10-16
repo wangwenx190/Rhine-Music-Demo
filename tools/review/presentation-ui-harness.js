@@ -37,8 +37,7 @@ const album = {
         artist: '匿名音乐人',
         duration: 185,
         format: 'FLAC',
-        discNumber: 1,
-        browserPlayable: true
+        discNumber: 1
     }]
 };
 album.tracks = Array.from({length: 10000}, (_, i) => ({

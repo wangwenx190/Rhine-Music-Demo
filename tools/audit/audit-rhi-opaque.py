@@ -6,8 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
     ("COMMON-01", "tools/review/CMakeLists.txt", "qt_add_executable(rhi-audit",
-     "Opaque Review uses the same YalahooRhi/Qt native Kit; the retired Quick3D oracle is no "
-     "longer linked or loaded. GuiPrivate stays selected by the existing capability probe."),
+     "Opaque Review uses the same YalahooRhi/Qt native Kit. GuiPrivate is selected by the existing capability probe."),
     ("COMMON-02", "tools/review/RhiAudit.cpp", "Input fixture",
      "Only committed demo artwork and source-derived scene values enter the driver. Models, "
      "environment/lookups and qsb stay qrc resources. No browser PNG, user music or network input."),

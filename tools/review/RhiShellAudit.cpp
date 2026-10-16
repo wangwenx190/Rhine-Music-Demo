@@ -322,7 +322,6 @@ int main(int argc, char **argv)
                                   { "configuration", "Release" },
                                   { "passed", true },
                                   { "validation", "source-optics-graph-and-own-output" },
-                                  { "imageComparison", false },
                                   { "qt", qVersion() },
                                   { "fixture", fixturePath },
                                   { "baseline", source["baseline"] },

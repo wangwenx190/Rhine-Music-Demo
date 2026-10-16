@@ -21,15 +21,6 @@ foreach ($name in $names) {
 }
 try {
     . (Join-Path $PSScriptRoot 'enter-msvc.ps1')
-    if (-not (Test-Path -LiteralPath docs/media/occlusion/web/081.png) -or -not (Test-Path -LiteralPath docs/media/occlusion/web/082.png) -or -not (Test-Path -LiteralPath docs/media/occlusion/web/084.png)) {
-        $fixtureBackup = Join-Path $evidence 'occlusion-fixture-before-capture.json'
-        Copy-Item -LiteralPath tests/fixtures/occlusion/visual.json -Destination $fixtureBackup
-        try {
-            Run 'frozen-occlusion.txt' { node tools/review/export-occlusion-visual.mjs }
-        } finally {
-            Copy-Item -LiteralPath $fixtureBackup -Destination tests/fixtures/occlusion/visual.json
-        }
-    }
     Run 'configure.txt' { cmake --preset qt-release -DYALAHOO_REVIEW=ON -DYALAHOO_PERFORMANCE_RECORD_ONLY=OFF }
     Run 'format.txt' { cmake --build --preset qt-release --target format }
     Run 'check-format.txt' { cmake --build --preset qt-release --target check-format }

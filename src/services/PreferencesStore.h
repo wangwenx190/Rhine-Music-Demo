@@ -15,6 +15,8 @@ public:
     bool rememberColumnPosition() const;
     bool realistic() const;
     QString error() const;
+    QJsonObject audio() const;
+    void setAudio(const QJsonObject &audio);
     bool importJson(const QUrl &file);
     void setNavigation(bool remember, bool realistic);
 signals:

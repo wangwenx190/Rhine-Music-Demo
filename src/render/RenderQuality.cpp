@@ -41,14 +41,9 @@ void RenderQuality::setPreset(const QString &name)
     if (name == "performance" || name == "original" || name == "high" || name == "ultra")
         configure(authoredPreset(name));
 }
-void RenderQuality::configure(const QVariantMap &input, bool legacyHigh)
+void RenderQuality::configure(const QVariantMap &input)
 {
     auto result = authoredPreset("original");
-    if (!legacyHigh) {
-        result["pixelRatio"] = 1;
-        result["aoSamples"] = 0;
-        result["depthOfField"] = 0;
-    }
     auto number = [&](const char *key) {
         const auto v = input.value(key);
         bool ok = false;

@@ -23,7 +23,7 @@ public:
     }
     QString preset() const;
     void setPreset(const QString &name);
-    Q_INVOKABLE void configure(const QVariantMap &values, bool legacyHigh = true);
+    Q_INVOKABLE void configure(const QVariantMap &values);
     Q_INVOKABLE void resize(double width, double height, double stageScale, double dpr,
                             int maxTextureSize, bool nativeDpr = false);
     int shadows() const

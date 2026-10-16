@@ -312,7 +312,6 @@ int main(int argc, char **argv)
                         QJsonObject{
                                 { "round", "R19D4C" },
                                 { "passed", true },
-                                { "imageComparison", false },
                                 { "states", states },
                                 { "dprTransitions", transitions },
                                 { "nativeDprMatrixPending", !OffscreenSurface::Enabled },

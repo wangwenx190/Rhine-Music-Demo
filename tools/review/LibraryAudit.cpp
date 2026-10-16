@@ -1,5 +1,7 @@
 #include "LibraryAudit.h"
 #include "PlaybackController.h"
+#include "BackgroundMusicController.h"
+#include "InterfaceSoundController.h"
 #include "AudioFixture.h"
 #include <QTemporaryDir>
 #include "OffscreenSurface.h"
@@ -109,10 +111,14 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     QObject::connect(&presentation, &PresentationController::changed, &input, updateInput);
     QQmlEngine engine;
     QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+    BackgroundMusicController background;
+    InterfaceSoundController sounds;
     std::unique_ptr<PlaybackController> song;
     if (playbackVerification) {
         song = std::make_unique<PlaybackController>(&library);
         song->setVolume(.01);
+        background.setEnabled(false);
+        song->setBackgroundMusic(&background);
     }
     QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"));
     QVariantMap properties{ { "librarySession", QVariant::fromValue(&library) },
@@ -125,8 +131,11 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                             { "inputRouter", QVariant::fromValue(&input) },
                             { "rulerController", QVariant::fromValue(&ruler) },
                             { "overviewController", QVariant::fromValue(&overview) } };
-    if (song)
+    if (song) {
         properties.insert("playbackController", QVariant::fromValue(song.get()));
+        properties.insert("backgroundMusicController", QVariant::fromValue(&background));
+        properties.insert("interfaceSoundController", QVariant::fromValue(&sounds));
+    }
     std::unique_ptr<QObject> object(component.createWithInitialProperties(properties));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
@@ -305,8 +314,40 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 if (song) {
                     panels.open("playback");
                     check("playback-panel-render", render());
+                    for (const auto &name : { "bgmEnabled", "bgmVolume", "interfaceSoundEnabled",
+                                              "interfaceSoundVolume" })
+                        check(QString("audio-setting-%1").arg(name),
+                              visual(window.contentItem(), name) != nullptr);
+                    check("audio-independent-values",
+                          background.volume() == .18 && sounds.volume() == .22
+                                  && song->volume() == double(.01f) && !sounds.available());
                     auto *outputs = visual(window.contentItem(), "songOutputDevices");
                     check("output-device-control", outputs && outputs->isVisible());
+                    auto *settings = visual(window.contentItem(), "audioSettingsPanel");
+                    auto *scroll = settings
+                            ? settings->property("contentItem").value<QQuickItem *>()
+                            : nullptr;
+                    const double previousY = scroll ? scroll->property("contentY").toDouble() : 0;
+                    if (scroll)
+                        scroll->setProperty("contentY",
+                                            std::max(0.,
+                                                     scroll->property("contentHeight").toDouble()
+                                                             - scroll->height()));
+                    check("audio-settings-scroll-render", scroll && render());
+                    check("audio-output-reachable",
+                          settings && outputs
+                                  && settings->contains(settings->mapFromItem(
+                                          outputs,
+                                          QPointF(outputs->width() / 2, outputs->height() / 2))));
+                    if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
+                        check("audio-output-own-image",
+                              surface.grab().save(output
+                                                  + QString("/audio-output-%1-%2.png")
+                                                            .arg(size.width())
+                                                            .arg(night)));
+                    if (scroll)
+                        scroll->setProperty("contentY", previousY);
+                    check("audio-settings-top-render", render());
                     auto *progress = visual(window.contentItem(), "songProgress");
                     check("playback-progress-control",
                           progress && progress->isVisible() && progress->isEnabled());

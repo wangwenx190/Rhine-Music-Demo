@@ -40,7 +40,7 @@ private slots:
         RenderQuality q;
         for (auto value : oracle["normalized"].toArray()) {
             auto c = value.toObject();
-            q.configure(c["input"].toObject().toVariantMap(), c["legacyHigh"].toBool());
+            q.configure(c["input"].toObject().toVariantMap());
             const auto expected = c["expected"].toObject().toVariantMap();
             for (auto i = expected.begin(); i != expected.end(); ++i)
                 QCOMPARE(q.values()[i.key()], i.value());

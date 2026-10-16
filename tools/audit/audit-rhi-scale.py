@@ -42,7 +42,7 @@ for revision, path, conclusion in [
     ('f4e1610', 'src/render/rhi/RhiItem.cpp', 'R19D3B: keep full ground in capture/AO/DOF, no artificial sharpness compensation.'),
     ('704a99d', 'src/render/rhi/Postprocess.cpp', 'R19D4A: keep 41-tap signed UV CoC, full RGB24 depth and focus in view units.'),
     ('5e333ec', 'src/render/rhi/Postprocess.cpp', 'R19D4B1: keep source SMAA at actual target size and original lookup.'),
-    ('4e86136', 'src/render/rhi/RhiItem.cpp', 'R19D4B2: keep actual MSAA/resolve, combination graph and retired image gates.'),
+    ('4e86136', 'src/render/rhi/RhiItem.cpp', 'R19D4B2: actual MSAA/resolve and combination resource graph.'),
 ]:
     _, row = historical(revision, path)
     row['evidence'] = conclusion

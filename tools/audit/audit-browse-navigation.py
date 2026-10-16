@@ -30,11 +30,11 @@ frozen = [historical(BASELINE, 'src/' + name, reason) for name, reason in [
 history = [historical(rev, path, reason) for rev, path, reason in [
     ('1a082f2', 'qml/Yalahoo/Music/components/ArchiveText.qml', 'R14: retain local fractional vector scale, CSS line-box metrics and explicit Basic padding; detailed title font semantics are R19F.'),
     ('1a082f2', 'qml/Yalahoo/Music/components/ArchiveButton.qml', 'R14: remove image-driven fourfold SVG raster size; preserve source geometry and actual output DPR.'),
-    ('1a082f2', 'tools/review/UiAudit.cpp', 'R14: remove cross-API SSIM/RGB and restore image scores; preserve own output, CPU diagnostics and lifecycle.'),
+    ('1a082f2', 'tools/review/UiAudit.cpp', 'R14: own output, CPU diagnostics and lifecycle.'),
     ('2ee2294', 'src/render/navigation/RulerController.cpp', 'R15: retain source exact springs, bounded slot matching and existing single clock.'),
     ('2ee2294', 'src/render/navigation/InputRouter.cpp', 'R15: preserve Qt unit/sign/ownership adapters and one replaceable destination for four-cover backpressure.'),
     ('2ee2294', 'src/render/navigation/OrdinalMotion.cpp', 'R15: retain 49-point 460ms dependency track, occurrence direction and bounded faces.'),
-    ('2ee2294', 'tools/review/RulerAudit.cpp', 'R15: remove browser contour/coverage envelope, SSIM/RGB/edge and pairwise API scores; frozen states remain <=1e-6; remove preview-only 1/DPR antialias compensation and use the same Qt default as C++.'),
+    ('2ee2294', 'tools/review/RulerAudit.cpp', 'R15: frozen states remain <=1e-6; Canvas2D and C++ use Qt default antialiasing at actual target DPR.'),
     ('2abb4f6', 'qml/Yalahoo/Music/components/Header.qml', 'R16: restore final portrait CSS song-cap precedence; preserve transport exit width controller pending R19F font audit.'),
     ('c7e9b61', 'tools/review/UiAudit.cpp', 'Apple Silicon: retain actual RenderControl surface; no frontmost window is required for Canvas checks.'),
     ('e98c798', 'tools/review/UiAudit.cpp', 'macOS followup: retain opt-in native visible path and default hidden window policy.'),

@@ -17,7 +17,7 @@
 
 保留12个有序尺寸（九种必测尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
 
-`rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`和`audit-rhi-opaque.py`为现行入口。旧verify-r10a流水线已退役；未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
+`rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`和`audit-rhi-opaque.py`为现行入口。未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
 
 ## 阴影
 

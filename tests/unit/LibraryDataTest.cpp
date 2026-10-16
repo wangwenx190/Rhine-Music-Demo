@@ -17,22 +17,26 @@ public:
     using IMetadataProvider::IMetadataProvider;
     QList<RequestToken> requests, cancelled;
     QList<MetadataKind> kinds;
+    QList<AlbumQuery> queries;
     ProviderCapabilities capabilities() const override
     {
         return { };
     }
-    void requestIntroduction(AlbumQuery, RequestToken token) override
+    void requestIntroduction(AlbumQuery query, RequestToken token) override
     {
+        queries.append(query);
         requests.append(token);
         kinds.append(MetadataKind::Introduction);
     }
-    void requestCredits(AlbumQuery, RequestToken token) override
+    void requestCredits(AlbumQuery query, RequestToken token) override
     {
+        queries.append(query);
         requests.append(token);
         kinds.append(MetadataKind::Credits);
     }
-    void requestEnrichment(AlbumQuery, RequestToken token) override
+    void requestEnrichment(AlbumQuery query, RequestToken token) override
     {
+        queries.append(query);
         requests.append(token);
         kinds.append(MetadataKind::Enrichment);
     }
@@ -66,6 +70,24 @@ class LibraryDataTest : public QObject
         return result;
     }
 private slots:
+    void metadataConfigurationUsesNativeQueryBoundary()
+    {
+        TestProvider provider;
+        LibrarySession session(&provider);
+        auto snapshot = library("mixed");
+        snapshot.fields.insert("metadataConfiguration",
+                               QJsonObject{ { "musicBrainzContact", "project@example.invalid" },
+                                            { "futureProviderOption", 7 } });
+        session.setSnapshot(snapshot);
+        const auto id = snapshot.albums.first().id;
+        QVERIFY(session.requestMetadata(id, "introduction") > 0);
+        QCOMPARE(provider.queries.size(), 1);
+        const auto &query = provider.queries.first();
+        QCOMPARE(query.contact, QString("project@example.invalid"));
+        QCOMPARE(query.configuration["futureProviderOption"].toInt(), 7);
+        QVERIFY(!query.enabled);
+        QVERIFY(!session.providerCapabilities()["networkEnabled"].toBool());
+    }
     void browseSnapshotReplacementPreservesPlayback()
     {
         OfflineMetadataProvider provider;
@@ -304,7 +326,6 @@ private slots:
         auto tracks = album.value("tracks").toArray();
         auto track = tracks.first().toObject();
         track.insert("customTrack", 7);
-        track.insert("browserPlayable", true);
         track.insert("sourceUrl",
                      QUrl::fromLocalFile(QDir::tempPath() + QStringLiteral("/音乐 # 1.FLAC"))
                              .toString());

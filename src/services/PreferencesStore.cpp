@@ -49,6 +49,33 @@ bool PreferencesStore::realistic() const
 {
     return m_document.value("arrayMode").toString() == QLatin1String("realistic");
 }
+QJsonObject PreferencesStore::audio() const
+{
+    QJsonObject result;
+    for (const auto &key : { "volume", "bgm", "bgmVolume", "sound", "soundVolume" })
+        if (m_document.contains(key))
+            result.insert(key, m_document.value(key));
+    return result;
+}
+void PreferencesStore::setAudio(const QJsonObject &audio)
+{
+    if (!m_writable) {
+        emit saveError(m_error);
+        return;
+    }
+    bool changed = false;
+    for (const auto &key : { "volume", "bgm", "bgmVolume", "sound", "soundVolume" }) {
+        if (audio.contains(key) && m_document.value(key) != audio.value(key)) {
+            m_document.insert(key, audio.value(key));
+            changed = true;
+        }
+    }
+    if (changed) {
+        ++m_revision;
+        m_dirty = true;
+        schedule();
+    }
+}
 QString PreferencesStore::error() const
 {
     return m_error;
@@ -100,7 +127,7 @@ bool PreferencesStore::importJson(const QUrl &url)
         if (bytes.size() > 1024 * 1024 || file.error() != QFileDevice::NoError
             || parse.error != QJsonParseError::NoError || !document.isObject())
             return Result{ { }, QStringLiteral("偏好 JSON 无效，原文件已保留。") };
-        const auto object = document.object();
+        auto object = document.object();
         if ((object.contains("rememberColumnPosition")
              && !object.value("rememberColumnPosition").isBool())
             || (object.contains("arrayMode") && object.value("arrayMode") != "realistic"

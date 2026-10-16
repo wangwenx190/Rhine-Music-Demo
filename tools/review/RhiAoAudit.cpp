@@ -228,7 +228,6 @@ int main(int argc, char **argv)
         RhiCaptureHarness::require(report.open(QIODevice::WriteOnly), "Cannot write AO report");
         report.write(QJsonDocument(QJsonObject{ { "round", "R19D1" },
                                                 { "passed", true },
-                                                { "imageComparison", false },
                                                 { "cases", results },
                                                 { "sourceMath", mathematics },
                                                 { "windowPolicy",

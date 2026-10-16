@@ -26,7 +26,7 @@ TransferAudit在适用D3D11目标命令列表按原生纹理筛UpdateSubresource
 
 ## MSAA/resolve与组合门禁
 
-`rhi-postprocess-gpu`只运行源数学/实际资源/上传/功能检查；旧图像聚合入口的逐项覆盖与退役理由见source-fidelity-review.md的R19D4B2，不能启用旧oracle。具体算法和预算分别归occlusion/postprocess/performance契约。
+`rhi-postprocess-gpu`只运行源数学/实际资源/上传/功能检查。具体算法和预算分别归occlusion/postprocess/performance契约。
 
 - `ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'`：macOS真正隐藏RenderControl；其他系统按test-gates.md选择native入口。321×241、241×321、640×480，各1×/4×及AO/Bokeh/SMAA八组合共48状态；读真实RT/PSO/SRB核对颜色RGBA16F、诊断RGBA8、geometry/depth样本一致、同尺寸同格式单样本独立resolve、后处理逐pass单样本/无反馈/正确绑定及最终输出绑定；真实最终合成背景与独立ACES/sRGB公式误差≤1/255且alpha=1。
 - 稳态图像/代次复用、每pass80-byte前缀、focus/aperture/exposure更新不重建，关闭释放AO/DOF/后处理；十次真实SG失效后组合资源及输出恢复。实际alpha几何部分覆盖、透明洞/黑边的解析门槛归rhi-shell.md，不用截图边缘分数。

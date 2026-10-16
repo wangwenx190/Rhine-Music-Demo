@@ -84,34 +84,17 @@ missing -= set(re.findall(r"\bR\d+[A-Z0-9]*(?:-[A-Z0-9]+)?\b", plan))
 if missing:
     raise SystemExit(f"Unclassified historical task headings: {sorted(missing)}")
 
-# Review each current caller, not just the historic implementation filenames.
-for folder in ("src", "tools/review"):
-    for path in (ROOT / folder).rglob("*"):
-        if path.suffix not in (".cpp", ".h") or path.name in ("ImageComparison.cpp", "ImageComparison.h"):
-            continue
-        if re.search(r"\b(compareImages|compareAntialiasBand|edgeDistance|absoluteDifference)\s*\(", path.read_text()):
-            raise SystemExit(f"Source-image scoring still callable: {path.relative_to(ROOT)}")
-for path in ("src/app/CMakeLists.txt", "tools/review/CMakeLists.txt"):
-    for match in re.finditer(r"target_link_libraries\s*\((.*?)\)", (ROOT / path).read_text(), re.S):
-        arguments = match[1].split()
-        if "YalahooImageComparison" in arguments and arguments[0] != "YalahooImageComparison":
-            raise SystemExit(f"Image scoring linked to runtime: {path}: {match[0]}")
-for name in ("audit-r12.ps1", "audit-r13.ps1"):
-    text = (ROOT / "tools/audit" / name).read_text()
-    if re.search(r"(?i)\.(ssim|sourceSsim|sourceMae|rebuildSsim)\b", text):
-        raise SystemExit(f"Historical image score remains a gate: {name}")
-
 CHECKS = [
-    ("COMMON-01", "cmake/TestPolicy.cmake", "legacy-image-gate",
-     "Root module/Review closure and native Kit are retained; retired image tests are disabled in all presets. Synthetic ImageComparison is unit-only; compare-images rejects before reading files."),
+    ("COMMON-01", "cmake/TestPolicy.cmake", "hidden-render",
+     "Root module/Review closure and native Kit are retained; source math/structure and actual hidden component rendering are independently classified."),
     ("COMMON-02", "src/app/ApplicationIdentity.h", "yalahoo",
      "Identity is initialized before application/standard paths. Source assets remain qrc aliases and explicit local URLs; no user library input or output in this review."),
     ("COMMON-03", "src/render/rhi/RhiItem.cpp", "clipSpaceCorrMatrix",
      "Shared immutable matrices reach geometry, shadow, shell and pick. Explicit resolve/capture and complete DOF/AO preserve source color/depth; independent component probes establish formulas, never source PNGs."),
     ("COMMON-03-REVIEW", "src/render/rhi/ReviewGlCapabilities.h", "caps.multisampledTexture = false",
      "Review-only Cocoa GL function capability correction chooses Qt's existing same-format 4x renderbuffer/resolve path. Latest-Kit private APIs are compiled at configure time; actual descriptors are read on the render thread, value snapshots alone reach GUI. No Kit patch, lower AA or product renderer change."),
-    ("COMMON-04", "src/app/main.cpp", "media.source().isEmpty()",
-     "Anonymous runtime/detail/overview replays preserve navigation/playback separation. Public QtMultimedia bootstrap is exercised; future song/device/media behavior remains R24/R34."),
+    ("COMMON-04", "src/app/main.cpp", "playback.source().isEmpty()",
+     "Anonymous runtime/detail/overview replays preserve navigation/playback separation. Public QtMultimedia source ownership remains separate from visual state; target media/device execution follows the current platform handoff."),
     ("COMMON-05", "tools/review/CoverAudit.cpp", "selectedUploadBytes",
      "Cover contain points and UV formulas are checked separately from actual GPU upload/lease/rebuild. Old report generators reject before evidence mutation. Runtime failure and source audit remain distinct."),
     ("PERF-01", "src/render/SelectionController.cpp", "SelectionController::publish",

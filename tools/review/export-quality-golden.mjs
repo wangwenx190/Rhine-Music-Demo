@@ -24,11 +24,10 @@ for (const input of [null,
                      {scale: -1, depthOfField: 1000, shadows: 3000, aoSamples: 99},
                      {scale: true, aoResolution: '0.5'},
                      {scale: NaN, depthOfField: Infinity},
-])
-    for (const legacyHigh of [true, false]) {
-        const actual = normalizeQuality(input, legacyHigh);
-        normalized.push({input, legacyHigh, expected: actual, preset: matchingPreset(actual)});
-    }
+]) {
+    const actual = normalizeQuality(input);
+    normalized.push({input, expected: actual, preset: matchingPreset(actual)});
+}
 const dimensions = [];
 for (const name of Object.keys(qualityPresets))
     for (const [w, h] of [[1920, 1080],

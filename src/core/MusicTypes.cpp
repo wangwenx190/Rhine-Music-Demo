@@ -98,6 +98,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         return fail(QStringLiteral("Library roots must be an array"));
     LibrarySnapshot library;
     library.fields = json;
+    for (const auto &key : { "albums", "genres", "roots" })
+        library.fields.remove(key);
     library.scan = json.value("scan").toObject();
     library.enrich = json.value("enrich").toObject();
     library.introductions = json.value("introductions").toObject();
@@ -121,6 +123,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             || (object.contains("producers") && !object.value("producers").isArray()))
             return fail(QStringLiteral("Album tracks/producers must be arrays"));
         album.fields = object;
+        album.fields.remove("tracks");
+        album.fields.remove("producers");
         album.id = object.value("id").toString();
         if (album.id.isEmpty() || albumIds.contains(album.id))
             return fail(QStringLiteral("Invalid or duplicate album ID"));
@@ -142,7 +146,6 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         album.folder = localUrl(object.value("folderUrl").toString(album.folderLabel));
         const QString cover = object.value("coverUrl").toString();
         album.coverUrl = cover.startsWith(QLatin1String("qrc:/")) ? QUrl(cover) : localUrl(cover);
-        // Legacy HTTP / decoded routes remain opaque fields for explicit R22 import.
         for (const auto &entry : object.value("tracks").toArray()) {
             const auto trackObject = entry.toObject();
             Track track;
@@ -163,7 +166,6 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             track.bitsPerSample = integer(trackObject, "bitsPerSample");
             track.sampleRate = integer(trackObject, "sampleRate");
             track.bitrate = integer(trackObject, "bitrate");
-            track.numberOfChannels = integer(trackObject, "numberOfChannels");
             if (trackObject.value("lossless").isBool())
                 track.lossless = trackObject.value("lossless").toBool();
             track.sourceUrl = localUrl(trackObject.value("sourceUrl").toString());
@@ -211,7 +213,6 @@ QJsonObject toJson(const Track &track)
     put(json, "bitsPerSample", track.bitsPerSample);
     put(json, "sampleRate", track.sampleRate);
     put(json, "bitrate", track.bitrate);
-    put(json, "numberOfChannels", track.numberOfChannels);
     if (track.lossless)
         json.insert("lossless", *track.lossless);
     else

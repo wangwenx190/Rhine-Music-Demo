@@ -1,6 +1,6 @@
 {
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-  "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+  "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
   "sourceEasings": [
     "cubic-bezier(0.22, 1, 0.36, 1)",
     "cubic-bezier(0.4, 0, 1, 1)",
@@ -19,7 +19,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-1920x1080.png",
         "sha256": "d2efdaa7fb32b38de97a644075a7297fbf543f5c8cb3b5a95574f997b4793188",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -103,7 +103,7 @@
         "file": "docs/media/web-baseline/detail-day-filled.png",
         "sha256": "49f5fb553d107690ed2ae7a8a991140f767d39cb20eb0bd18e5db9c625d0feb3",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -192,7 +192,7 @@
         "file": "docs/media/web-baseline/overview-day-filled.png",
         "sha256": "60c58b79d802822a39888f27fe68212d674dd73332391b85f6ade64f8af9fcfd",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -286,7 +286,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-1280x720.png",
         "sha256": "e693840b8993719556e54c26ad21822766db4355d5f15ce045b66e45ec2dca8f",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -370,7 +370,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-995x858.png",
         "sha256": "81b3cf75a1e51a0517f476b6d82bb5276a018b6d5604bb7bb7126387673316c0",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -454,7 +454,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-960x900.png",
         "sha256": "901da9934c788c2eabf2174ee288ecbe36af7b79625760b06b33bf658c7d73dd",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -538,7 +538,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-930x900.png",
         "sha256": "d037007399fa84c01ca18682a05bace80899b6a3e5494f55af79ac8d99f33a74",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -622,7 +622,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-390x844.png",
         "sha256": "434211dde0905e28fa2c9d569790fb3668211eeb06c28318ad46aa3dbfa54fec",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -706,7 +706,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-320x720.png",
         "sha256": "401587163ef9a5dbe9af65cd0e188b389fd4f9f88caa3bdf55d45783c04791a3",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -790,7 +790,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-2560x1080.png",
         "sha256": "589cc229b71471d362fd8ed37cdf05a207dd98ee98f046757367bb046073bac4",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -874,7 +874,7 @@
         "file": "docs/media/web-baseline/browse-day-filled-3440x1440.png",
         "sha256": "3dae74385ee93b8b29b5f5a6a356c202061fd1e5b72d43fbb57f82affdcd196c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -958,7 +958,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-1920x1080.png",
         "sha256": "6945ff61d31515e3c3425b3c1245197d386363fd692f25ac0422292bae56415c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1042,7 +1042,7 @@
         "file": "docs/media/web-baseline/detail-day-realistic.png",
         "sha256": "4b944f6ef8eea7f77fef4113329a09c9ee5165657b92c1da23c4248a7924311f",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1131,7 +1131,7 @@
         "file": "docs/media/web-baseline/overview-day-realistic.png",
         "sha256": "da02ea237a30e6ea61f787ad0ac3572d21e1609d65de531cb68aafa9358e6297",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1225,7 +1225,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-1280x720.png",
         "sha256": "a11d669a3f08f030278c2914cecebfcb0a65b193dc025b3c5940eea79c4041ed",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1309,7 +1309,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-995x858.png",
         "sha256": "b2c1e72511f0371eccc18cd4966f8420b46e5ad416b3d0cf133c97f89af6385d",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1393,7 +1393,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-960x900.png",
         "sha256": "793bb474ea58b4da0878f0893d21b7b6af5d76ebd5ad3ea54eac0d1fa548cbb3",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1477,7 +1477,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-930x900.png",
         "sha256": "d15f4f7a7b0de2cab38ad1d9d19fd33deeeca468b03636f370a12cd815b46c5d",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1561,7 +1561,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-390x844.png",
         "sha256": "4e37e8ae689a5192bce33767d8d17e5900d8d981b6546514ceb0d75d1a9e04da",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1645,7 +1645,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-320x720.png",
         "sha256": "e973e82b41aab4c16189de0fe372f00fa3e6ff673a98337211cc2958c790ddfa",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1729,7 +1729,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-2560x1080.png",
         "sha256": "61c6b0a9035009e6a01962ebd19d4043e4cf5b4b45c38ca6ebfb3e6b670f769c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1813,7 +1813,7 @@
         "file": "docs/media/web-baseline/browse-day-realistic-3440x1440.png",
         "sha256": "32d73285c7e17814a62e8d30703f86545ac39ba7ab7dd79378280a078996e386",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1897,7 +1897,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-1920x1080.png",
         "sha256": "0f3ef035dd2eb66be29cf4896c30c2a6c5f171970f616f8dd0e1a3b0e8293d19",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -1981,7 +1981,7 @@
         "file": "docs/media/web-baseline/detail-night-filled.png",
         "sha256": "9b2474323b4d965880beeae2d1e53c8bf167ac06978f374ec16489f91e75b5b4",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2070,7 +2070,7 @@
         "file": "docs/media/web-baseline/overview-night-filled.png",
         "sha256": "e1b4342d328af5c1fd801ebb21f79513e2eec0448806b8b9b3556b47a1fd2769",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2164,7 +2164,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-1280x720.png",
         "sha256": "bfb81d008347a0131270df3b029c940e1eaea359ebeb8ce12865023fa4cc21e6",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2248,7 +2248,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-995x858.png",
         "sha256": "8860bc6e318a16f7b624caa739648006b278b8c27324529816045152d5740716",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2332,7 +2332,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-960x900.png",
         "sha256": "d1f47577643b65875c50627bfe7c5e101e36a6710b8c5e331061152a3243a46b",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2416,7 +2416,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-930x900.png",
         "sha256": "a06ed97cf1a07b2f9f2dc0727e87cd7f0ce4727d5a04f2f8f8159dc5ef4ec58a",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2500,7 +2500,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-390x844.png",
         "sha256": "3c2e852bfdf97ce1b16ebcd600d51dc9e7b0424868387a6b210e39de028fc759",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2584,7 +2584,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-320x720.png",
         "sha256": "44c1393e16bbaeebc3eb08bedf3c4df2d8ae22a85c4f6a3869dfaa3620e71a24",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2668,7 +2668,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-2560x1080.png",
         "sha256": "f22fccac4f7660f7612f202552b0e3852d4fad2166430ba962c95ee8631197d2",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2752,7 +2752,7 @@
         "file": "docs/media/web-baseline/browse-night-filled-3440x1440.png",
         "sha256": "43749e165a15facaa53ee9199a5f42e514ceec128329b7aabae3debde3c68c8c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2836,7 +2836,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-1920x1080.png",
         "sha256": "e3c5a129f8f56e937bac0e9ada392716ecbf66ded97083820bba19dd0d7baa0c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -2920,7 +2920,7 @@
         "file": "docs/media/web-baseline/detail-night-realistic.png",
         "sha256": "6da2737f2adfe990e20e61e18ec4d99df1c992494d466043828b121958daa3f6",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3009,7 +3009,7 @@
         "file": "docs/media/web-baseline/overview-night-realistic.png",
         "sha256": "062ce33917b1e9fd9481846771729857e4a87976cda3ec8f5186648fe1bcc4cd",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3103,7 +3103,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-1280x720.png",
         "sha256": "f4745e6a78fa5691c21b9949b061ccf9e60852d4ebf0a0a2bcb962c27ae9190f",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3187,7 +3187,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-995x858.png",
         "sha256": "e41006707c88a69fe2f16680bdb62341c056c2182b6c9a68aec79420b52f16d2",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3271,7 +3271,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-960x900.png",
         "sha256": "537ebafd817b723c0405d6701318e082869c46e3139a35e036553bab043cea56",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3355,7 +3355,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-930x900.png",
         "sha256": "2db5e73961c931e62e4d18437740a7105fe681113abe33c1b89e3de64c44bb77",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3439,7 +3439,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-390x844.png",
         "sha256": "d307af0385d96d279b543728bb526eb569c4ad73a4be22a009bb2f607ef8892a",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3523,7 +3523,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-320x720.png",
         "sha256": "88fc30c5462766eb1b054eb9c77c1d46b85ca1d77fead4c9af124a69dca7528f",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3607,7 +3607,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-2560x1080.png",
         "sha256": "c7b78701497baa66a4cdc919c009243e2b785114e55689996877c49508d24c26",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3691,7 +3691,7 @@
         "file": "docs/media/web-baseline/browse-night-realistic-3440x1440.png",
         "sha256": "a0e98e054296e8b7060a23284498113385e467bf25f283016eb4e088e617de8e",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3775,7 +3775,7 @@
         "file": "docs/media/web-baseline/browse-dpr-1.5.png",
         "sha256": "76723eae20f07630f84726ed92abda13d7a5d9e86cfe364311ab6248acb5b790",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3859,7 +3859,7 @@
         "file": "docs/media/web-baseline/browse-dpr-2.png",
         "sha256": "994f589e96b6fdee7bab0a2be94bc1bcdbc497df8269bae41bd8fd82a7d25d4f",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -3943,7 +3943,7 @@
         "file": "docs/media/web-baseline/fixture-empty.png",
         "sha256": "acc794f0d95422236e469b42714cc7488bce69e74e3bd42b6de949adb8d99405",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4026,7 +4026,7 @@
         "file": "docs/media/web-baseline/fixture-single.png",
         "sha256": "592eeba8b042821da38efda60ba7e28a2a95018a14827659591ea70c9d931c3b",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4110,7 +4110,7 @@
         "file": "docs/media/web-baseline/fixture-even.png",
         "sha256": "120933e36771378e0c123e1400bcef5d186f53d185246f1a01194f76d303571c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4194,7 +4194,7 @@
         "file": "docs/media/web-baseline/fixture-odd.png",
         "sha256": "b7371f2bb6546bc2681b081c736b4216d41e3d407f638bff9816b70e1c00a5a7",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4278,7 +4278,7 @@
         "file": "docs/media/web-baseline/fixture-large.png",
         "sha256": "947185c5b4cee2c43fd2ae0f3240293a461bde7df59a861b498b0723f8d5f792",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4362,7 +4362,7 @@
         "file": "docs/media/web-baseline/opening-day-0.24.png",
         "sha256": "cfcbdd194f348f2235eac0f4eec9cd1d8039c945549d40df7726939a8600ba14",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4470,7 +4470,7 @@
         "file": "docs/media/web-baseline/opening-day-1.64.png",
         "sha256": "a2fd479b0c4a03ab781fa5b9a824986dab37b5854cca5cdb121b72545b3fbeab",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4578,7 +4578,7 @@
         "file": "docs/media/web-baseline/opening-day-3.58.png",
         "sha256": "5a1277e3a30d0283984a2bc0c13a5421b28136f9a4eaa0ea5d3d76a0aa73847a",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4686,7 +4686,7 @@
         "file": "docs/media/web-baseline/opening-day-6.32.png",
         "sha256": "d680563de0a682a61026fd422790438f01046ff85e73a5535657ff7c1df2f0b8",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4794,7 +4794,7 @@
         "file": "docs/media/web-baseline/opening-day-6.4.png",
         "sha256": "085b61dee7eef2da9415917caad1ab2ffc704643d6773c672294af1e32f07e22",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -4902,7 +4902,7 @@
         "file": "docs/media/web-baseline/opening-day-8.png",
         "sha256": "8e30a04ed68ebb9042562ea4dd46d2aead74b88638b9a3d9cdcaa319031ae127",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5010,7 +5010,7 @@
         "file": "docs/media/web-baseline/opening-day-11.6.png",
         "sha256": "65618e713fdb80c38c0ed96749621fe0778b6a720ac5d9ad48cd54e6fe10d2cb",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5118,7 +5118,7 @@
         "file": "docs/media/web-baseline/opening-night-0.24.png",
         "sha256": "512c00815b29ed9750b238c296addad6852b31cde145df3a4368e5d581f9cc75",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5226,7 +5226,7 @@
         "file": "docs/media/web-baseline/opening-night-1.64.png",
         "sha256": "af4ec68eed87163b80a9342e2222ee923ea93243e6c931a75f14ecfdf5b0cc00",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5334,7 +5334,7 @@
         "file": "docs/media/web-baseline/opening-night-3.58.png",
         "sha256": "83df67db168603685269445b4fa3879970f74aacceaec2c353a960f97f31d037",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5442,7 +5442,7 @@
         "file": "docs/media/web-baseline/opening-night-6.32.png",
         "sha256": "6d743664e59cb2607b2e066d326134c450ec625f4e42944e8ec0b978e3afc184",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5550,7 +5550,7 @@
         "file": "docs/media/web-baseline/opening-night-6.4.png",
         "sha256": "bb12983efe365918da73444b79984cb41cd692d5688e4ef5750ce12bd07550f1",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5658,7 +5658,7 @@
         "file": "docs/media/web-baseline/opening-night-8.png",
         "sha256": "f3bb68f401a1ed1a6fa71e885ed02dbc86838d0cb7b47f7c1323bb3571d1b826",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5766,7 +5766,7 @@
         "file": "docs/media/web-baseline/opening-night-11.6.png",
         "sha256": "dffff4763b525f3c1009454a36bac383fdf28bbcb35d223d222332c6911d704c",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5874,7 +5874,7 @@
         "file": "docs/media/web-baseline/switch-0.png",
         "sha256": "15c95a78a787ee5ad478d9807764096ce6cb8113b5eebab7b3ca106a882dd5c2",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -5996,7 +5996,7 @@
         "file": "docs/media/web-baseline/switch-18.png",
         "sha256": "7ed75b5acad86eb2c95a0e2c7129a691851cd8342b55e0175d3233cf9fe1c3d8",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6118,7 +6118,7 @@
         "file": "docs/media/web-baseline/switch-120.png",
         "sha256": "a97de5d4d805f1473df9370452c76752d58556fe13dacc9ad5c6cbd7bbbdd419",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6240,7 +6240,7 @@
         "file": "docs/media/web-baseline/switch-240.png",
         "sha256": "5fd95496b7953c287d27be1c89b3ea1c657b5552fab4320b844f7603b01c6cab",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6362,7 +6362,7 @@
         "file": "docs/media/web-baseline/switch-360.png",
         "sha256": "b30facffe0a82baa7805ce76b7c3f798603b874a099b69b727ee865938112ae6",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6484,7 +6484,7 @@
         "file": "docs/media/web-baseline/switch-480.png",
         "sha256": "6abe5a25f52ad3ae2ea6502725bb9566126d50837702195607b23e3fa40cb8cf",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6606,7 +6606,7 @@
         "file": "docs/media/web-baseline/switch-600.png",
         "sha256": "48bfc9fff3831f527ff1b9e5571957c39bbddc9a97a6f55ab399ed3152a6c7a8",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6728,7 +6728,7 @@
         "file": "docs/media/web-baseline/switch-720.png",
         "sha256": "8a1a0b06ae536e67308214500b79e562fdf58cf79dad757227ce0c93e8d824fc",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {
@@ -6850,7 +6850,7 @@
         "file": "docs/media/web-baseline/switch-1080.png",
         "sha256": "e592a2e38ee80224ea9a642586c64fe357b979c65662aa8779d05469fafbb5bb",
         "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
-        "fixtureHash": "c7370c7d1d2714b1b8bd77e1a0c8a7b3fa6b83bae14a5af71ffe9af9bb4e36f6",
+        "fixtureHash": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
         "browser": "Edg/154.0.4258.62",
         "graphics": [
           {

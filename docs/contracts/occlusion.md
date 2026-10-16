@@ -13,7 +13,7 @@
 
 ## 画质边界
 
-RenderQuality保留render-quality.ts四预设/归一化：scale50–200/步长5、DPR cap1/1.5/2/3、shadow0/1024/2048/4096、AO0/16/32/64及倍率.5/.75/1。全目标≤8294400像素且受当前设备尺寸限制，limited公开、不改用户偏好；stageScale只表达宿主已有的外层变换；冻结音乐主界面`music.css`最终override为`transform:none`，原生SceneItem/View3D已使用显示逻辑尺寸，调用方传1，不能再乘`min(width/1920,height/1080)`。画质不改变相机/导航/播放或业务对象。
+RenderQuality保留render-quality.ts四预设及显式字段归一化：scale50–200/步长5、DPR cap1/1.5/2/3、shadow0/1024/2048/4096、AO0/16/32/64及倍率.5/.75/1。全目标≤8294400像素且受当前设备尺寸限制，limited公开、不改用户偏好；stageScale只表达宿主已有的外层变换；冻结音乐主界面`music.css`最终override为`transform:none`，原生SceneItem/View3D已使用显示逻辑尺寸，调用方传1，不能再乘`min(width/1920,height/1080)`。画质不改变相机/导航/播放或业务对象。
 
 0 samples释放对应通道；AO按倍率，Bokeh完整深度独立，全分辨率兼容时才共用。诊断通道raw AO/blur/depth/normal/linearColor跳过输出转换。生产clip5/300/radius.18与明确压力输入.1/100/radius.38分别标记。
 
@@ -23,4 +23,4 @@ RenderQuality保留render-quality.ts四预设/归一化：scale50–200/步长5�
 
 GL未对齐R16F显式读回按实际PACK_ALIGNMENT同格式复制到补齐存储宽后解码，产品尺寸不变。核仅创建时上传，动态前缀80bytes/通道，三个AO pass常态240bytes；无闲置kernel纹理。
 
-入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`、`python3 tools/audit/audit-rhi-ao.py`、`python3 tools/audit/bake-occlusion-shaders.py`；选择实际测试分组见test-gates.md。旧verify-r09/occlusion-audit中的图像oracle不运行，非像素覆盖映射见source-fidelity-review.md的R19D4B2，目标欠验归R34。
+入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`、`python3 tools/audit/audit-rhi-ao.py`、`python3 tools/audit/bake-occlusion-shaders.py`；选择实际测试分组见test-gates.md。目标欠验归R34。

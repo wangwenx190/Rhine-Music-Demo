@@ -47,7 +47,7 @@ CHECKS = [
     ('COMMON-02', 'src/app/AssetCatalog.cpp', 'setApplicationEmojiFontFamilies', 'Embedded original SFNT physical table selection and public macOS emoji face policy precede QML. No user data, absolute font path or network in text pipeline.'),
     ('COMMON-03', 'resources/shaders/reel-slot.frag', 'qt_Opacity', 'Qt Quick RGBA8 layer at ceil(capacity*actual DPR), linear filter, local source fade/blur and premultiplied output; no extra projection/resolve/conversion.'),
     ('COMMON-04', 'qml/Yalahoo/Music/components/TransportTitle.qml', 'locateRequested', 'Visual song button only emits locate-song. Playback IDs stay independent; real media and locate execution remain R24/R23.'),
-    ('COMMON-05', 'tools/review/export-title.mjs', 'source-structure-font-metrics-motion-v1', 'Frozen source states, DOM font boxes, physical font identity and exact numeric tracks replace image gates. Own native output inspected separately. Legacy evidence is not rewritten.'),
+    ('COMMON-05', 'tools/review/export-title.mjs', 'source-structure-font-metrics-motion-v1', 'Frozen source states, DOM font boxes, physical font identity and exact numeric tracks are checked independently of own-output quality.'),
     ('PERF-01', 'src/render/text/TitleReel.cpp', 'm_animatedSlots', 'Stationary advance O(1), active slots only; indexed pool <=64 idle. Fit <=25 line measurements, final glyph grouping O(n log n), independent of library size.'),
     ('PERF-02', 'src/render/rhi/ReelTextNode.cpp', 'QRawFont::fromFont', 'GUI sends implicitly shared value descriptors, not GUI QRawFont. Render resolves and verifies head before glyph IDs. One coalesced reconcile; no hot-path IO/wait/readback.'),
     ('PERF-03', 'src/render/text/ReelInk.cpp', 'sameGlyphInk', 'At most eight faces per slot matched locally, O(f squared); whole-run context/font/position invalidates content. Animation updates transform/clip/color without rebuilding text.'),
@@ -70,13 +70,6 @@ current_paths = {row[1] for row in CHECKS} | {
 }
 current = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
            for path in sorted(current_paths)]
-for path in ['tools/review/TitleAudit.cpp', 'tools/build/verify-title.mjs',
-             'tools/build/verify-r16.ps1', 'tools/audit/audit-title.mjs',
-             'tools/review/export-title.mjs', 'tools/review/title-harness.js']:
-    text = (ROOT / path).read_text()
-    if any(token in text for token in ['compareImages', 'compareAntialiasBand', 'pendingPixelCases',
-                                      'candidatePassed', 'captureScreenshot', 'mountOutline']):
-        raise SystemExit(f'Retired image gate in title pipeline: {path}')
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []
     for identity, path, symbol, reason in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native platform compiler/backend/resources preserved; cross-target shader generation is not target runtime.')]:

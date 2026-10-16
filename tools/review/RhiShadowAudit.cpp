@@ -308,7 +308,6 @@ int main(int argc, char **argv)
         report.write(QJsonDocument(QJsonObject{ { "round", "R19D3A" },
                                                 { "passed", true },
                                                 { "qt", qVersion() },
-                                                { "imageComparison", false },
                                                 { "cases", results },
                                                 { "floors", floors },
                                                 { "rebuilds", lifecycle },

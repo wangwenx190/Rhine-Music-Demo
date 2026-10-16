@@ -23,31 +23,3 @@ set_target_properties(
     "${CMAKE_BINARY_DIR}/tools"
 )
 set_target_properties(export-branding PROPERTIES WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-if(YALAHOO_REVIEW)
-    qt_add_executable(postprocess-audit PostprocessAudit.cpp)
-    target_link_libraries(postprocess-audit PRIVATE Qt6::Gui Qt6::Quick)
-    yalahoo_platform(postprocess-audit)
-    set_target_properties(
-        postprocess-audit
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools"
-        WIN32_EXECUTABLE
-        FALSE
-        MACOSX_BUNDLE
-        FALSE
-    )
-    qt_add_executable(occlusion-audit OcclusionAudit.cpp)
-    target_link_libraries(occlusion-audit PRIVATE Qt6::Gui Qt6::Quick)
-    yalahoo_platform(occlusion-audit)
-    set_target_properties(
-        occlusion-audit
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools"
-        WIN32_EXECUTABLE
-        FALSE
-        MACOSX_BUNDLE
-        FALSE
-    )
-endif()

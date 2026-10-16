@@ -30,7 +30,6 @@ IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独�
 ## 参数与独立Review检查
 
 - `node tools/review/export-material-parameters.mjs`执行冻结configure/CardAppearance/theme/clarity，生成45连续输入；`rhi-material-parameters`核对真正加载的QML/C++及210端点，生产显式采集检查每实体实际uniform，不能仅测helper。
-- 标定工具calibrate-materials.py退役且无写入；MaterialReview拒绝calibration/factors。历史判定归source-fidelity-review.md。
 - `runtime-materials`在独立QQuickWindow加载GeometryScene，macOS默认RenderControl，其他平台按test-gates选择实际入口。源90状态与9纸面探针共99项，三表面参数≤1e-6、独立CPU/源/Quick3D投影≤2逻辑px。
 - 纸面输入`tests/fixtures/materials/paper-probe.png`为RGBA(96,160,208,255)，0/.25/2入射按`sRGBEncode(min(sRGBDecode(ink)*irradiance,sRGBDecode(ink)))`核对，≤3码值；正式三形状封面另验contain/细节。
 - 每状态真实事件驱动四个准备帧后采一次自身texture，核对request/warnings/有效输出。材质十次、灯光一次完整QML root+资源重建；报告区分root重建与同一View3D恢复。只invalidate/initialize后漏画时按计划对应经验重建拥有场景的root。

@@ -2,9 +2,9 @@
 
 冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts`、`data.ts:setMusicAlbums`及`scripts/music-library.mjs`。本文管理值模型、身份/排序/搜索、本地扫描/存储序列化与Provider协议；媒体/UI消费者按计划对应轮次接入。
 
-`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留原 JSON，写回时覆盖已知字段，其余未知字段不丢失。`readLibrary` 使用临时值解析，重复/错配 ID 或非法集合返回错误，原快照不变。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
+`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留未知扩展与当前元数据，写回时覆盖已知字段。已由值模型持有的子数组不再重复存入扩展对象。`readLibrary` 使用临时值解析，重复/错配 ID 或非法集合返回错误，原快照不变。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
 
-歌曲 `sourceUrl`、目录 `folder` 和 roots.path 使用本地 QUrl；绝对 Unicode 原生路径用 `QUrl::fromLocalFile`，不从当前目录猜相对音乐路径。歌曲 URL 只接受本地文件；封面额外允许 qrc。来源/候选链接保留文本。旧 browserPlayable、audioUrl、decodedAudioUrl 与 localDecodable 仅作为原始 JSON 字段留存，不转换为播放能力或原生媒体来源；显式旧目录导入见下节。`MediaSupport` 为 Unknown/Supported/Unsupported，只有实际媒体状态才能更新；无声标签加载不证明可解码播放，不按扩展名猜测。
+歌曲 `sourceUrl`、目录 `folder` 和 roots.path 使用本地 QUrl；绝对 Unicode 原生路径用 `QUrl::fromLocalFile`，不从当前目录猜相对音乐路径。歌曲 URL 只接受本地文件；封面额外允许 qrc。来源/候选链接保留文本。显式目录导入见下节。`MediaSupport` 为 Unknown/Supported/Unsupported，只有实际媒体状态才能更新；无声标签加载不证明可解码播放，不按扩展名猜测。
 
 排序使用 zh_CN QCollator、numericMode、CaseInsensitive；文本 NFKC、合并空白、trim、lowercase。相等时按规范化字符串、ID 稳定排序。流派模式保持快照顺序，列顺序为已使用的配置流派、再按首次出现补充未配置流派；列用流派 ID 分组，重名不合并。歌手模式用规范化 key 分组，显示原始歌手经空白整理的名称，空歌手为“未知歌手”。专辑模式每列 12 张，标签为 01–12 等；slotStride=max(32, 最大列长+12)。QCollator 平台后端可能与浏览器 ICU 排列细节不同；视觉 fixture 的既有列顺序仍以 `library-order.json` 固定。API 依据：[QCollator](https://doc.qt.io/qt-6/qcollator.html)。
 
@@ -40,13 +40,13 @@ OfflineMetadataProvider 对不可变本地缓存快照进行事件循环异步�
 
 `src/media/MediaMetadataProbe`拥有一个带事件循环的专用QThread。生产后端只构造并复用两个QMediaPlayer，不接QAudioOutput、不调用play；每槽以独立任务serial、整批generation和取消token处理LoadedMedia/metadata/duration/InvalidMedia及8秒异步超时。更换来源先断开旧连接、停止计时器、清空source，再排队下一任务；取消立即释放任务描述和媒体来源，退出时在所属线程销毁player。只有析构允许等待线程。游标直接遍历已去重的不可变扫描快照，不额外排入逐曲QObject/GUI回调；纯缓存路径每64条让出事件循环。LibraryStore同时只运行扫描/导入/保存或一个探测批次，`probing`与`scanning`暴露实际阶段；整批完成后核对generation，只应用一次GUI快照并保存。
 
-公开映射为Title、AlbumTitle、AlbumArtist、ContributingArtist、TrackNumber、Date、Genre、Duration、AudioBitRate与CoverArtImage。依据所选Kit的QMediaMetaData公开头文件；[Qt元数据文档](https://doc.qt.io/qt-6/qmediametadata.html)明确CoverArtImage语义，不使用弃用的ThumbnailImage。毫秒duration转换为秒；无值不覆盖旧技术参数、制作信息、备注、来源及未知字段。`_common`只合并实际可得标签；曲目按disc/track稳定排序，专辑取首曲可得标签。流派沿冻结resolveGenre的NFKC/去空白标点符号匹配，以名称/ID/alias索引查找，保留导入人工override，未知流派按源hash建立列。
+公开映射为Title、AlbumTitle、AlbumArtist、ContributingArtist、TrackNumber、Date、Genre、Duration、AudioBitRate与CoverArtImage。依据所选Kit的QMediaMetaData公开头文件；[Qt元数据文档](https://doc.qt.io/qt-6/qmediametadata.html)明确CoverArtImage语义。毫秒duration转换为秒；无值不覆盖旧技术参数、制作信息、备注、来源及未知字段。`_common`只合并实际可得标签；曲目按disc/track稳定排序，专辑取首曲可得标签。流派沿冻结resolveGenre的NFKC/去空白标点符号匹配，以名称/ID/alias索引查找，保留导入人工override，未知流派按源hash建立列。
 
-曲目仍可索引时`indexable=true`；`_probeStatus`为loaded/invalid/timeout，原Qt错误保留在`_probeError`。Loaded不等于解码/设备播放已验证，因此`playbackVerified=false`且mediaSupport保持Unknown；明确InvalidMedia/无音轨为Unsupported，超时为Unknown，不删除歌曲。Supported提升属于R24真实播放路径。`_qtProbeVersion`加扫描fingerprint复用完成的探测，文件或Qt版本变化重新探测；目录图移除后若尚无嵌入图判定，或嵌入缓存已丢失，也重新探测；超时下次显式扫描可重试。旧browserPlayable/localDecodable/PCM URL不能提升能力。
+`_probeStatus`为loaded/invalid/timeout，原Qt错误保留在`_probeError`。Loaded不等于解码/设备播放已验证，因此mediaSupport保持Unknown；明确InvalidMedia/无音轨为Unsupported，超时为Unknown，不删除歌曲。Supported提升属于R24真实播放路径。`_qtProbeVersion`加扫描fingerprint复用完成的探测，文件或Qt版本变化重新探测；目录图移除后若尚无嵌入图判定，或嵌入缓存已丢失，也重新探测；超时下次显式扫描可重试。
 
 目录图片候选按cover、folder、front、其他图片排序；根直属单曲只取同名图片。无效优先图片继续尝试下一候选；目录图片优先于嵌入图，直属单曲的嵌入图优先于同名图。ArtworkStore在worker中读取PNG/JPEG/WebP，压缩文件≤30MiB、尺寸已知且≤4,194,304像素才完整验证解码；内容SHA256决定新dataDir的`artwork/`文件名，QSaveFile按owner权限原子保存，拒绝缓存目录/文件符号链接，不改原图/歌曲。相同内容复用，内容变化产生新URL供现有租约定向失效。Qt公开CoverArtImage返回的QImage已由Qt解码，原生侧再检查像素上限、保存PNG及30MiB输出上限；原始嵌入压缩字节和Qt后端内部解码峰值公开API不可观测，不冒充已在分配前检查它们。缓存/图集/归位所有权按[covers.md](covers.md)。
 
-`--import-legacy /绝对/music-data-v3 --data-dir /独立/原生数据`显式读取旧`library-index.json`（version:1，曲目_metadataVersion:3或4）、可选config.json/genre-rules.json，不扫描用户目录或触碰浏览器数据库。新旧目录含符号链接解析后互不嵌套。索引上限256MiB，配置/规则各1MiB；旧字段保留在值模型，配置/规则分别留在_legacyConfig/_legacyGenreRules，产品始终离线。以本机绝对直属路径重建稳定ID并重映射已知制作人员/人工流派引用，不猜测跨平台路径。只复制被引用且位于允许音乐根或旧artwork内的封面，不复制PCM、整棵缓存或歌曲；坏图只记录_coverImportError并回退缺图，索引/路径/schema错误不发布快照、不改旧文件或现有缓存。导入通过LibraryStore唯一worker和一次换代提交，不逐条重建模型；下一次显式重扫再按fingerprint补齐Qt标签。
+`--import-legacy /绝对/music-data-v3 --data-dir /独立/原生数据`显式读取旧`library-index.json`（version:1，曲目_metadataVersion:3或4）、可选config.json/genre-rules.json，不扫描用户目录或触碰浏览器数据库。新旧目录含符号链接解析后互不嵌套。索引上限256MiB，配置/规则各1MiB；本机URL、rawGenres和封面路径提供原生值；查询配置存metadataConfiguration，人工流派引用存genreOverrides，产品始终离线。以本机绝对直属路径重建稳定ID并重映射已知制作人员/人工流派引用，不猜测跨平台路径。只复制被引用且位于允许音乐根或旧artwork内的封面，不复制PCM、整棵缓存或歌曲；坏图只记录_coverImportError并回退缺图，索引/路径/schema错误不发布快照、不改旧文件或现有缓存。导入通过LibraryStore唯一worker和一次换代提交，不逐条重建模型；下一次显式重扫再按fingerprint补齐Qt标签。
 
 `--import-preferences /绝对/浏览器导出.json`或`PreferencesStore::importJson`只读用户明确提供的对象JSON（≤1MiB），在worker解析后合并未知字段并原子保存。导航字段类型校验，单个在途导入；期间有新的导航偏好写入时按revision拒绝旧导入。全偏好schema及设置控件仍按R26实施。导入/扫描命令互斥，普通数据根要求绝对路径；它们不与Review读取私人数据的隔离规则混用。
 
