@@ -223,3 +223,14 @@ if(WIN32)
     set_tests_properties(startup-qml PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+if(APPLE)
+    qt_add_executable(MacApplicationMenuTest MacApplicationMenuTest.mm
+        "${PROJECT_SOURCE_DIR}/src/platform/macos/ApplicationMenu.mm")
+    target_include_directories(MacApplicationMenuTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
+        "${PROJECT_SOURCE_DIR}/src/platform/macos")
+    target_link_libraries(MacApplicationMenuTest PRIVATE Qt6::Quick Qt6::Test "-framework AppKit")
+    yalahoo_platform(MacApplicationMenuTest)
+    add_test(NAME macos-application-menu COMMAND MacApplicationMenuTest)
+    set_tests_properties(macos-application-menu PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+endif()

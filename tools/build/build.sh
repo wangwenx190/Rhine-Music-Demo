@@ -18,4 +18,4 @@ if [ "$#" -gt 0 ]; then
 fi
 cmake --preset "$preset" "$@"
 cmake --build --preset "$preset"
-ctest --preset "$preset" --output-on-failure
+# Select affected tests explicitly according to docs/contracts/test-gates.md.

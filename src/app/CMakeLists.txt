@@ -1,6 +1,8 @@
 qt_add_executable(
     Yalahoo
     main.cpp
+    DeploymentProbe.cpp
+    DeploymentProbe.h
     AssetCatalog.cpp
     AssetCatalog.h
     BrowseReview.cpp
@@ -66,6 +68,13 @@ if(WIN32)
     set_target_properties(Yalahoo PROPERTIES WIN32_EXECUTABLE TRUE
         QT_WINDOWS_APP_PROJECT_IDENTIFIER "yalahoo.music")
 elseif(APPLE)
+    target_sources(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/macos/ApplicationMenu.mm")
+    target_include_directories(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/macos")
+    target_link_libraries(Yalahoo PRIVATE "-framework AppKit")
+    set(bundle_icon "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/yalahoo.icns")
+    target_sources(Yalahoo PRIVATE "${bundle_icon}")
+    set_source_files_properties("${bundle_icon}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(Yalahoo PROPERTIES MACOSX_BUNDLE_ICON_FILE yalahoo.icns)
     set_target_properties(
         Yalahoo
         PROPERTIES
@@ -231,4 +240,4 @@ install(TARGETS Yalahoo BUNDLE DESTINATION . RUNTIME DESTINATION bin)
 if(YALAHOO_REVIEW)
     target_link_libraries(Yalahoo PRIVATE Qt6::Quick3D Qt6::Quick3DPrivate Qt6::Quick3DRuntimeRenderPrivate)
 endif()
-include("${PROJECT_SOURCE_DIR}/cmake/WindowsDeployment.cmake")
+include("${PROJECT_SOURCE_DIR}/cmake/Deployment.cmake")

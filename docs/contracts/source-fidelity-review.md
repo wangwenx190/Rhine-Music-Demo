@@ -438,3 +438,13 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 冻结style.css/music.css的继承字体、输入框/选择器/checkbox/range/progress以及music-lighting-lab.css最终按钮/滑杆覆盖映射至Archive控件；来源框与文字行高按[controls.md](controls.md)显式设置。QtQuick.Templates仅提供公开输入/焦点/Accessible行为，所有产品/研究/Review视觉由项目组件与DesignTokens绘制。浏览器原生内部装饰映射为明确的项目几何，原生弹出菜单/滚动条空间由项目限定，不宣称其装饰是源CSS常量。FolderDialog保留操作系统目录选择。
 
 控件自身双主题输出、来源几何/行高与Qt编辑事件和宿主集成分别验证；源码COMMON/PERF/平台审计由audit-controls.py绑定当前QML清单/调用链及冻结hash。物理输入、系统辅助技术/输入法、原生窗口与其他目标环境按UI-CONTROLS-P保留，技术规范不在此重复。
+
+## macOS部署与原生应用边界
+
+| 生产调用链 | 判定与覆盖 |
+| --- | --- |
+| CMake APPLE → Info.plist/ICNS → Deployment实际QML → macdeployqt → Mach-O/签名 → 包外产品探针 | 原生适配，保留既有品牌与qrc资产；最新Kit的生产Release/Review OFF独立包实际加载Qt/QML/媒体。中文/空格重定位、启动器参数与清洁查找路径分别核对，动态映像限bundle/系统，不依赖开发Kit。 |
+| main → ApplicationMenu → PanelController / 当前Qt编辑器 / 系统原生对话框 | 系统菜单使用公开AppKit，Command设置尊重片头锁；编辑能力沿焦点/只读/选区与撤销状态判定，原生对话框沿系统responder。QPointer与RAII保证菜单不持有重建后的视觉对象；关闭/退出沿既有Qt媒体停止链。 |
+| MusicStage.visualActive → FrameClock/SceneItem/封面；独立媒体会话 | 后台视觉停止、媒体意图与来源独立；部署不改变渲染图、源材质/运动/Canvas透明合成或缓存。现有R28正式隐藏成本及未受影响组件结果仍有效。 |
+
+本机已实际执行Release资源/模块/shader/公开媒体/隐藏窗口与AppKit菜单检查，以及Metal绘制、滑尺、完整片头和设置自身输出；实际轮廓/裁切/合成与状态、资源断言分开。部署包的隐藏加载不证明GPU呈现、物理菜单输入、跨屏、设备听感或正常VSYNC。其余目标与完整产品物理/性能验收保留R31-P/R28-P及公共后置分工，技术入口只在macOS平台文档和组件契约维护。

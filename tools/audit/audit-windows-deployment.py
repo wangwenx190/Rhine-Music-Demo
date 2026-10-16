@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
     ("COMMON-01", "CMakeLists.txt", "CMAKE_CXX_STANDARD 23",
      "Root enforces C++23 and runs real compiler/Qt ABI and module probes. QtKit re-enumerates the highest native Kit; missing newest modules fail without downgrade. App links YalahooCore/Scene/Rhi/Navigation/Text/Opening and public Qt modules; static qrc initializers and qsb outputs are linked into the executable. Production has Review OFF; no Quick3D target link, research QML, or research material resources."),
-    ("COMMON-02", "cmake/WindowsDeployment.cmake", "set(deployment_qml",
+    ("COMMON-02", "cmake/Deployment.cmake", "set(deployment_qml",
      "file(GENERATE) serializes the actual application QML list and selected target/Kit. The deployer copies each listed relative path from root qml to an owned scan root, preserving directory imports; no source mutation. Product C++ types stay statically registered. windeployqt scans that root and the real PE, then qt.conf resolves QML/plugins relative to the deployed executable. Fonts, shaders, lookup/geometry/audio and branding use qrc, not the working directory."),
     ("COMMON-03", "src/app/GraphicsBackend.h", "QSGRendererInterface::Direct3D11",
      "Windows ordinary startup explicitly selects D3D11; explicit OpenGL remains supported and is deferred to R35. Deployed shaders are the same qt_add_shaders multi-target qsb linked into Rhi/Opening/Navigation/Text/App. Deployment does not change clip/Y/depth, formats, MSAA/resolve, capture ordering, effects or sampling. CanvasPainter remains linked in the product and is required in the output closure."),
@@ -45,7 +45,7 @@ CHECKS = [
 ]
 DEPENDENCIES = {
     "CMakeLists.txt", "cmake/Cxx23.cmake", "cmake/QtKit.cmake", "cmake/Platform.cmake",
-    "cmake/WindowsDeployment.cmake", "cmake/yalahoo.rc.in", "cmake/Assets.cmake",
+    "cmake/Deployment.cmake", "cmake/yalahoo.rc.in", "cmake/Assets.cmake",
     "cmake/BrowseQml.cmake", "src/app/CMakeLists.txt", "src/app/main.cpp",
     "src/app/GraphicsBackend.h", "src/app/AssetCatalog.cpp", "src/app/QmlTypes.h",
     "src/core/AppIdentity.cpp", "src/library/LibraryStore.cpp", "src/library/DirectoryScanner.cpp",

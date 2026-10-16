@@ -44,7 +44,7 @@ $env:QT_PLUGIN_PATH = "$selectedKit/plugins"
 & ./build/release/bin/yalahoo.exe
 ```
 
-macOS/Linux 使用 `sh tools/build/build.sh qt-release`；详见平台实机清单。原生程序不依赖 Node、浏览器或 HTTP 服务。旧 Web 参照仍在 `legacy-web/` 使用冻结依赖；新构建不写入归档。
+macOS 使用 `sh tools/build/macos.sh`，Linux 使用 `sh tools/build/build.sh qt-release`；构建脚本不隐式运行测试，按test-gates.md选择受影响项。独立macOS部署使用 `sh tools/deploy/macos.sh`；详见对应平台操作。原生程序不依赖 Node、浏览器或 HTTP 服务。旧 Web 参照仍在 `legacy-web/` 使用冻结依赖；新构建不写入归档。
 
 Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于隔离的Review MSAA能力与真实附件探针；`YALAHOO_REVIEW_MSAA_API`配置期按实际头文件编译，缺失时明确失败，不降级Kit。普通产品不链接这些Review模块。
 
@@ -54,6 +54,6 @@ Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于�
 
 ## 启动入口
 
-根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；Windows优先选择完整生产部署包，PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
+根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；Windows/macOS优先选择完整生产部署包；开发回退核对Release产物与Kit，部署运行清除外部Qt/QML查找覆盖。PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
 
 `--demo`与`--lighting-lab`只创建九列二十七张匿名qrc封面专辑，不读取/保存偏好或真实库，不扫描、不自动启动歌曲/BGM/音效；后者额外展开实验容器。不能与数据根、扫描/导入或验证参数组合。普通入口的设置按钮仍可打开同一调节面板。启动模式不改变渲染后端、普通片头或已有播放接口；演示曲目为空，不能伪装真实歌曲来源。

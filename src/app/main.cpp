@@ -22,6 +22,10 @@
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
+#include "DeploymentProbe.h"
+#ifdef Q_OS_MACOS
+#  include "ApplicationMenu.h"
+#endif
 #include "BrowseReview.h"
 #include "NavigationReview.h"
 #include "DetailReview.h"
@@ -111,6 +115,10 @@ int main(int argc, char **argv)
     parser.addOption(
             { QStringLiteral("lighting-lab"),
               QStringLiteral("Open lighting/motion controls with the anonymous demonstration") });
+    parser.addOption(
+            { QStringLiteral("verify-deployment"),
+              QStringLiteral("Verify hidden product resources and media loading, then exit"),
+              QStringLiteral("report") });
     parser.addOption({ QStringLiteral("verify-overview"),
                        QStringLiteral("Verify production overview and exit"),
                        QStringLiteral("directory") });
@@ -188,7 +196,8 @@ int main(int argc, char **argv)
             }
         }
     }
-    const bool appVerification = parser.isSet(QStringLiteral("verify-browse"))
+    const bool appVerification = parser.isSet(QStringLiteral("verify-deployment"))
+            || parser.isSet(QStringLiteral("verify-browse"))
             || parser.isSet(QStringLiteral("verify-navigation"))
             || parser.isSet(QStringLiteral("verify-detail"))
             || parser.isSet(QStringLiteral("verify-overview"));
@@ -465,7 +474,15 @@ int main(int argc, char **argv)
                          });
         background.start();
     }
+    QStringList deploymentWarnings;
     QQmlApplicationEngine engine;
+    if (parser.isSet(QStringLiteral("verify-deployment"))) {
+        QObject::connect(&engine, &QQmlEngine::warnings, &engine,
+                         [&](const QList<QQmlError> &warnings) {
+                             for (const auto &warning : warnings)
+                                 deploymentWarnings.append(warning.toString());
+                         });
+    }
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
@@ -534,6 +551,19 @@ int main(int argc, char **argv)
         return 3;
     if (verificationRun)
         yalahoo::verification::prepareWindow(*window, verificationFrameless);
+#ifdef Q_OS_MACOS
+    std::unique_ptr<yalahoo::ApplicationMenu> applicationMenu;
+    if (!verificationRun) {
+        applicationMenu = std::make_unique<yalahoo::ApplicationMenu>(
+                *window,
+                [&] {
+                    panels.open(QStringLiteral("settings"));
+                },
+                [&] {
+                    return !opening.active();
+                });
+    }
+#endif
     inputRouter.attach(window);
     if (!verificationRun)
         opening.replay();
@@ -550,6 +580,10 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
+    if (parser.isSet(QStringLiteral("verify-deployment")))
+        return yalahoo::verifyDeployment(app, *window,
+                                         parser.value(QStringLiteral("verify-deployment")),
+                                         deploymentWarnings);
     if (parser.isSet(QStringLiteral("verify-overview")))
         return yalahoo::reviewOverview(app, *window, scene, overview, presentation, library, motion,
                                        parser.value(QStringLiteral("verify-overview")));
