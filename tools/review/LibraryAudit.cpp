@@ -240,17 +240,43 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             Qt::DirectConnection);
     input.attach(&window);
     QSignalSpy rendered(&surface, &OffscreenSurface::frameRendered);
-    QSignalSpy swapped(&window, &QQuickWindow::frameSwapped);
+    struct NativeFrames
+    {
+        std::atomic<quint64> synchronized{ 0 };
+        std::atomic<quint64> presented{ 0 };
+    };
+    const auto nativeFrames = std::make_shared<NativeFrames>();
+    QObject::connect(
+            &window, &QQuickWindow::afterSynchronizing, &window,
+            [nativeFrames] {
+                ++nativeFrames->synchronized;
+            },
+            Qt::DirectConnection);
+    QObject::connect(
+            &window, &QQuickWindow::frameSwapped, &window,
+            [nativeFrames] {
+                nativeFrames->presented.store(nativeFrames->synchronized.load());
+            },
+            Qt::DirectConnection);
     QSignalSpy playback(&library, &LibrarySession::playbackChanged);
     const auto render = [&] {
-        const int before = OffscreenSurface::Enabled ? rendered.size() : swapped.size();
+        if (!OffscreenSurface::Enabled) {
+            // A swap from an already synchronized frame cannot acknowledge a new GUI change.
+            const auto before = nativeFrames->synchronized.load();
+            surface.requestFrame();
+            return QTest::qWaitFor(
+                    [&] {
+                        return nativeFrames->presented.load() > before;
+                    },
+                    5000);
+        }
+        const int before = rendered.size();
         surface.requestFrame();
         QElapsedTimer wait;
         wait.start();
-        while ((OffscreenSurface::Enabled ? rendered.size() : swapped.size()) == before
-               && wait.elapsed() < 5000)
+        while (rendered.size() == before && wait.elapsed() < 5000)
             QTest::qWait(5);
-        return (OffscreenSurface::Enabled ? rendered.size() : swapped.size()) > before;
+        return rendered.size() > before;
     };
     const auto renderSettingsTarget = [&] {
         if (!settingsScene)
@@ -571,14 +597,41 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 check("scene-error-free", sceneItem && sceneItem->errorText().isEmpty());
                 check("panel-descriptor", sceneItem && sceneItem->input().panelLayerSize == size);
                 if (dpr == 1 && size == QSize(1280, 720) && !night) {
+                    QPointer<QQuickItem> first =
+                            visual(window.contentItem(), "librarySearchResult-0");
+                    check("search-first-row",
+                          first && first->property("trackId").toString().isEmpty());
+                    const QPoint press = first
+                            ? first->mapToScene(QPointF(first->width() / 2, first->height() / 2))
+                                      .toPoint()
+                            : QPoint();
+                    QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, press);
+                    check("search-row-pressed", first && first->property("pressed").toBool());
                     query->setProperty("text", "Song");
                     render();
+                    check("search-row-reused",
+                          first && first == visual(window.contentItem(), "librarySearchResult-0")
+                                  && first->property("trackId").toString() == "track-0");
+                    QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, press);
+                    check("search-replaced-press-canceled",
+                          render() && panels.surface()->shown() && presentation.archiveEnabled());
                     check("large-results", library.searchResults()->rowCount() == 4000);
                     int live = 0;
                     for (auto *item : results->childItems())
                         live += item->childItems().size();
                     check("large-result-virtualization", live < 100);
+                    query->forceActiveFocus();
+                    QTest::keyClick(&window, Qt::Key_Down);
+                    for (int i = 0; i < 6; ++i)
+                        QTest::keyClick(&window, Qt::Key_Down);
+                    check("search-keyboard-row-selected",
+                          results->property("currentIndex").toInt() > 0);
+                    query->forceActiveFocus();
+                    query->setProperty("text", "Song 199");
+                    check("new-query-discards-old-keyboard-target",
+                          render() && results->property("currentIndex").toInt() <= 0);
                     query->setProperty("text", "");
+                    query->forceActiveFocus();
                 }
                 check("search-focus-and-modal", query->hasActiveFocus() && !input.enabled());
                 for (const auto character : QByteArray("Song 199"))

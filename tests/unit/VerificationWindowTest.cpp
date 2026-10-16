@@ -33,6 +33,7 @@ private slots:
         window.setPersistentSceneGraph(false);
         window.resize(640, 360);
         yalahoo::verification::prepareWindow(window, true);
+        QCOMPARE(window.requestedFormat().swapInterval(), 1);
         QSignalSpy swaps(&window, &QQuickWindow::frameSwapped);
         QJsonArray stages;
         bool passed = true;
@@ -49,14 +50,17 @@ private slots:
             const auto before = swaps.size();
             window.show();
             window.update();
-            if (swaps.size() == before)
-                swaps.wait(3000);
-            QTest::qWait(100);
-            bool visible = swaps.size() > before && window.isExposed();
+            const bool visible = QTest::qWaitFor(
+                    [&] {
+                        bool presented = swaps.size() > before && window.isExposed();
 #if defined(Q_OS_MACOS)
-            visible = visible
-                    && yalahoo::verification::nativeWindowPolicy(window)["onScreen"].toBool();
+                        presented = presented
+                                && yalahoo::verification::nativeWindowPolicy(window)["onScreen"]
+                                           .toBool();
 #endif
+                        return presented;
+                    },
+                    5000);
             record(name, visible);
         };
         record("before-show");
@@ -76,8 +80,19 @@ private slots:
                     break;
             }
             window.showMinimized();
-            QTest::qWait(100);
-            record("minimize", window.windowState() == Qt::WindowMinimized);
+            const bool minimized = QTest::qWaitFor(
+                    [&] {
+                        bool hidden =
+                                window.windowState() == Qt::WindowMinimized && !window.isExposed();
+#if defined(Q_OS_MACOS)
+                        hidden = hidden
+                                && yalahoo::verification::nativeWindowPolicy(window)["miniaturized"]
+                                           .toBool();
+#endif
+                        return hidden;
+                    },
+                    5000);
+            record("minimize", minimized);
             window.showNormal();
             show("show-normal");
         }
@@ -90,6 +105,8 @@ private slots:
                                   { "qtVersion", qVersion() },
                                   { "graphicsApi", int(window.rendererInterface()->graphicsApi()) },
                                   { "devicePixelRatio", window.devicePixelRatio() },
+                                  { "requestedSwapInterval",
+                                    window.requestedFormat().swapInterval() },
                                   { "stages", stages },
                                   { "desktopCaptured", false } };
         QVERIFY(output.write(QJsonDocument(report).toJson()) > 0);

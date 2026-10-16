@@ -38,8 +38,8 @@ CHECKS = [
      "N/A for new GPU resources/passes. CPU live data is prior/current implicit-shared library, worker-built snapshot/index/frontier and one coalesced accepted save; serialize buffer exists only during single worker write. No new render allocation/upload path."),
     ("PERF-05", "src/library/DirectoryScanner.cpp", 'oldTrack->fields.value("_fingerprint") == stamp',
      "Existing metadata reused only by path and exact size:mtimeMs; change resets support/probe token while preserving unknown fields. IDs use native separators/UTF-8 SHA256, verified against frozen Node semantics without hashing audio contents."),
-    ("PERF-06", "src/app/main.cpp", "library.setSnapshot(*snapshot)",
-     "One GUI LibrarySession application triggers existing model/order/selection pipeline; no window reload, per-file sorting or hot-path disk work. 1500-album test records event-loop heartbeat during worker scan and one model reset; full product input/presentation cost remains R28."),
+    ("PERF-06", "src/render/StartupCoordinator.cpp", "m_library->setSnapshot(*snapshot)",
+     "LibraryStore snapshotReady routes through main to StartupCoordinator::receive; the GUI retains one latest immutable snapshot and applies it once through LibrarySession when visual admission allows. Hidden/preparation/Film states preserve the coordinator gates. No window reload, per-file sorting or hot-path disk work; full product input/presentation cost remains R28-P."),
     ("PERF-07", "src/library/LibraryStore.cpp", "m_worker.waitForDone()",
      "Wait only at destruction; cancel unfinished scan, never persist unaccepted result, finish accepted coalesced save. Qt connections own callback lifetime. Source mutations/old cache destruction are absent; native Windows/Linux filesystem/ACL/junction checks remain R21-P."),
 ]
@@ -65,7 +65,8 @@ for platform, platform_check in platform_checks.items():
                          limitations="Markers bind the manual source review; actual test/build execution is separate. R21-P retains missing target checks."))
     dependencies = []
     for path in ["src/library/CMakeLists.txt", "src/library/LibraryStore.h", "src/library/DirectoryScanner.h",
-                 "src/services/LibrarySession.cpp", "tests/unit/DirectoryScannerTest.cpp",
+                 "src/services/LibrarySession.cpp", "src/app/main.cpp", "src/render/StartupCoordinator.h",
+                 "tests/unit/DirectoryScannerTest.cpp",
                  "tests/unit/CMakeLists.txt", "tools/review/verify-scan-fingerprint.mjs"]:
         dependencies.append(dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()))
     output = ROOT / "verification" / f"{platform}-static" / "library-scan"

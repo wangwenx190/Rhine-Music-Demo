@@ -123,7 +123,7 @@ try {
     $env:QT_SCALE_FACTOR = '1'
     $env:QT_ENABLE_HIGHDPI_SCALING = '0'
     $env:QSG_RENDER_LOOP = 'threaded'
-    $env:QSG_NO_VSYNC = ''
+    Remove-Item Env:QSG_NO_VSYNC -ErrorAction SilentlyContinue
     $env:QSG_RHI_BACKEND = 'd3d11'
     if (-not $ContinueAfterRegression) {
         Run 'release-ctest.txt' { ctest --preset qt-release --output-on-failure }

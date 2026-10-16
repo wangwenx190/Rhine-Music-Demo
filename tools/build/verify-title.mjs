@@ -58,10 +58,10 @@ const environment = {
     QSG_RHI_BACKEND: options.backend,
     QSG_RENDER_LOOP: process.platform === 'darwin' && options.backend === 'opengl' ? 'basic'
                                                                                    : 'threaded',
-    QSG_NO_VSYNC: '',
     QCPAINTER_DEBUG_COLLECT: '0',
     QT_SCALE_FACTOR: '1'
 };
+delete environment.QSG_NO_VSYNC;
 environment.YALAHOO_VERIFY_VISIBLE = visible ? '1' : '0';
 environment.YALAHOO_VERIFY_FOREGROUND =
     visible ? (process.env.YALAHOO_VERIFY_FOREGROUND || '0') : '0';

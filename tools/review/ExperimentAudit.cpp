@@ -62,6 +62,8 @@ int reviewExperiments(const QString &output)
     }
     QQuickRenderControl control;
     QQuickWindow window(OffscreenSurface::Enabled ? &control : nullptr);
+    window.setPersistentGraphics(false);
+    window.setPersistentSceneGraph(false);
     verification::prepareWindow(window, true);
     OffscreenSurface surface(window, control);
     root->setParentItem(window.contentItem());
@@ -290,7 +292,13 @@ int reviewExperiments(const QString &output)
     surface.hide();
     root->setParentItem(nullptr);
     object.reset();
-    check("renderers-released", rhi::sceneSubmissionStats().renderers.load() == 0);
+    window.releaseResources();
+    check("renderers-released",
+          QTest::qWaitFor(
+                  [] {
+                      return rhi::sceneSubmissionStats().renderers.load() == 0;
+                  },
+                  5000));
     QSaveFile file(output + "/report.json");
     if (!file.open(QIODevice::WriteOnly))
         return 4;

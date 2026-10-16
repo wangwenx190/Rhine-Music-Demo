@@ -143,15 +143,72 @@ Snapshot fixture(const QString &directory)
     }
     return std::make_shared<const LibrarySnapshot>(std::move(library));
 }
+class AuditWindow final : public QQuickWindow
+{
+public:
+    using QQuickWindow::QQuickWindow;
+    QJsonArray events;
+    bool eventOverflow = false;
+    void record(const QString &kind)
+    {
+        if (!events.isEmpty() && kind != "sampling-start") {
+            const auto previous = events.last().toObject();
+            if (previous["exposed"].toBool() == isExposed()
+                && previous["visible"].toBool() == isVisible()
+                && previous["state"].toInt() == int(windowState())
+                && previous["applicationState"].toInt() == int(QGuiApplication::applicationState()))
+                return;
+        }
+        if (events.size() == 512) {
+            eventOverflow = true;
+            return;
+        }
+        events.append(
+                QJsonObject{ { "kind", kind },
+                             { "atNs", nowNs() },
+                             { "exposed", isExposed() },
+                             { "visible", isVisible() },
+                             { "state", int(windowState()) },
+                             { "applicationState", int(QGuiApplication::applicationState()) } });
+    }
+
+protected:
+    bool event(QEvent *event) override
+    {
+        const bool result = QQuickWindow::event(event);
+        switch (event->type()) {
+        case QEvent::Expose:
+            record("expose");
+            break;
+        case QEvent::Show:
+            record("show");
+            break;
+        case QEvent::Hide:
+            record("hide");
+            break;
+        case QEvent::WindowStateChange:
+            record("state");
+            break;
+        default:
+            break;
+        }
+        return result;
+    }
+};
 class Driver
 {
 public:
     Driver(Snapshot input)
         : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
     {
-        verification::prepareWindow(window, true);
+        verification::prepareWindow(window,
+                                    qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") != 1);
         window.setPersistentGraphics(false);
         window.setPersistentSceneGraph(false);
+        QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &engine,
+                         [&](Qt::ApplicationState) {
+                             window.record("application-state");
+                         });
         window.resize(1280, 720);
         surface.measurementEnabled = true;
         QObject::connect(&surface, &OffscreenSurface::frameMeasured, &window,
@@ -323,7 +380,7 @@ public:
             if (predicate()) {
                 done = true;
                 loop.quit();
-            } else if (advance || forceFrames) {
+            } else if ((advance && OffscreenSurface::Enabled) || forceFrames) {
                 if (advance && OffscreenSurface::Enabled)
                     motion.clock()->advance(1.0 / 60);
                 surface.requestFrame();
@@ -348,11 +405,18 @@ public:
             QObject::connect(&opening, &OpeningController::changed, &loop, schedule);
             QObject::connect(&playback, &PlaybackController::stateChanged, &loop, schedule);
             QObject::connect(&library, &LibrarySession::snapshotChanged, &loop, schedule);
+            QObject::connect(motion.clock(), &FrameClock::activeChanged, &loop, schedule);
+            QObject::connect(motion.clock(), &FrameClock::workPendingChanged, &loop, schedule);
         }
         QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
         deadline.start(timeoutMs);
         surface.requestFrame();
         loop.exec();
+        if (!done)
+            qWarning() << "Lifecycle wait state:" << stage << "clock-active"
+                       << motion.clock()->active() << "pending" << motion.clock()->workPending()
+                       << "opening" << opening.active() << "phase" << presentation.phase()
+                       << "failure" << failure;
         require(done, "Product lifecycle deadline");
     }
     void frames(int count, bool advance = false)
@@ -362,7 +426,7 @@ public:
                 [&] {
                     return ++rendered > count;
                 },
-                advance);
+                advance, 60000, false, true);
     }
     void ready()
     {
@@ -382,6 +446,23 @@ public:
                 motion.clock()->advance(1.0 / 60);
         }
         ready();
+        // Continuous native animation can supersede preparation's exact submission token.
+        // A fresh action receipt instead proves actual zero-upload submission without freezing it.
+        if (!OffscreenSurface::Enabled && !motion.reducedMotion()) {
+            scene.recordInput();
+            const auto receipt = qint64(scene.frame().inputRevision);
+            wait([&] {
+                if (samples.isEmpty())
+                    return false;
+                const auto sample = samples.last().toObject();
+                return sample["inputRevision"].toInteger() == receipt
+                        && sample["atlasPending"].toInt(-1) == 0
+                        && sample["atlasUploadBytes"].toInteger(-1) == 0
+                        && sample["selectedUploadBytes"].toInteger(-1) == 0;
+            });
+            frames(3);
+            return;
+        }
         // A static item's last telemetry may be the final nonzero upload. A real preparation
         // acknowledgement proves the queue is empty, then yields a fresh zero-upload sample.
         bool acknowledged = false;
@@ -412,7 +493,7 @@ public:
         loop.exec();
     }
     QQuickRenderControl control;
-    QQuickWindow window;
+    AuditWindow window;
     OffscreenSurface surface;
     MotionController motion;
     LibrarySession library{ nullptr };
@@ -537,6 +618,12 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             };
         };
         resources.append(resourceSnapshot());
+        if (!OffscreenSurface::Enabled)
+            d.wait(
+                    [&] {
+                        return !d.motion.clock()->active() && !d.motion.clock()->workPending();
+                    },
+                    false, 5000);
         const auto idle = counters();
         const auto idleSubmission = d.native->submission();
         const auto idleFrames = d.motion.clock()->frameCount();
@@ -615,6 +702,94 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     && (requested ? d.playback.playing() : !d.playback.playing());
         };
         check("hidden-preserves-current-media-and-intent", preservesMedia());
+        if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1) {
+            require(!OffscreenSurface::Enabled, "Native lifecycle requires a visible window");
+            auto *const retainedRoot = d.root.get();
+            auto *const retainedScene = d.native;
+            for (const bool playing : { false, true }) {
+                if (playing) {
+                    d.playback.toggle();
+                    d.wait([&] {
+                        return d.playback.playing();
+                    });
+                    requested = true;
+                }
+                for (const bool minimize : { false, true }) {
+                    d.setStage(QString("native-%1-%2")
+                                       .arg(playing ? "playing" : "paused",
+                                            minimize ? "minimize" : "hide"));
+                    if (minimize)
+                        d.window.showMinimized();
+                    else
+                        d.surface.hide();
+                    const bool hidden = QTest::qWaitFor(
+                            [&] {
+                                bool stopped = !d.window.isExposed()
+                                        && !d.root->property("visualActive").toBool()
+                                        && !d.motion.clock()->active();
+                                if (minimize) {
+                                    stopped &= d.window.windowState() == Qt::WindowMinimized;
+#if defined(Q_OS_MACOS)
+                                    stopped &= verification::nativeWindowPolicy(
+                                                       d.window)["miniaturized"]
+                                                       .toBool();
+#endif
+                                } else {
+                                    stopped &= !d.window.isVisible();
+                                }
+                                return stopped;
+                            },
+                            5000);
+                    check("native-window-stops-visuals", hidden);
+                    require(hidden, "Native window did not become hidden/minimized");
+                    d.window.releaseResources();
+                    check("same-root-sg-invalidation",
+                          QTest::qWaitFor(
+                                  [&] {
+                                      return rhi::sceneSubmissionStats().renderers.load() == 0;
+                                  },
+                                  5000));
+                    d.quiet(150);
+                    const auto stoppedFrames = d.motion.clock()->frameCount();
+                    const auto stoppedRenders = rhi::sceneSubmissionStats().rendered.load();
+                    const auto position = d.playback.position();
+                    if (playing)
+                        check("native-hidden-song-advances",
+                              QTest::qWaitFor(
+                                      [&] {
+                                          return d.playback.position() > position;
+                                      },
+                                      2000));
+                    else
+                        d.quiet(200);
+                    check("native-hidden-no-visual-work",
+                          d.motion.clock()->frameCount() == stoppedFrames
+                                  && rhi::sceneSubmissionStats().rendered.load() == stoppedRenders);
+                    check("native-hidden-preserves-media", preservesMedia());
+                    if (!playing)
+                        check("native-hidden-paused-position", d.playback.position() == position);
+                    d.window.showNormal();
+                    d.surface.show();
+                    require(QTest::qWaitFor(
+                                    [&] {
+                                        return d.window.isExposed()
+                                                && d.root->property("visualActive").toBool();
+                                    },
+                                    5000),
+                            "Native window did not restore");
+                    d.settle();
+                    check("native-restore-retains-root-and-scene",
+                          d.root.get() == retainedRoot && d.native == retainedScene);
+                    check("native-restore-current-render",
+                          d.native->input().scene.revision == d.scene.frame().revision
+                                  && !d.surface.grab().isNull());
+                    check("native-restore-preserves-media", preservesMedia());
+                }
+            }
+            d.playback.pause();
+            requested = false;
+            report["nativeWindowTransitions"] = 4;
+        }
         d.setStage("switch-stress");
         d.presentation.open();
         d.wait(
@@ -783,8 +958,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                                       Qt::NoModifier);
                         QCoreApplication::sendEvent(&d.window, &key);
                     } else if (local == 3 && d.presentation.detailEnabled()) {
+                        d.scene.recordInput();
                         d.presentation.select(d.library.snapshot()->albums[event % 2 + 1].id, true);
                     } else if (local == 5) {
+                        d.scene.recordInput();
                         d.library.search(event % 3 == 0           ? ""
                                                  : event % 3 == 1 ? "匿名"
                                                                   : "匿名专辑 2");
@@ -803,6 +980,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             const auto startSample = d.samples.size(), startTiming = d.timings.size();
             sampling.restart();
             report["samplingStartedNs"] = nowNs();
+            d.window.record("sampling-start");
             d.wait(
                     [&] {
                         return replay(seconds);
@@ -835,9 +1013,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         }
         report["processFixedAssets"] = rhi::preparedAssetStatistics();
         report["refreshHz"] = d.window.screen() ? d.window.screen()->refreshRate() : 0;
-        report["swapIntervalRequested"] = d.window.format().swapInterval();
-        report["qsgNoVsyncRequested"] = qEnvironmentVariable("QSG_NO_VSYNC");
-        report["normalPresentationMeasured"] = !OffscreenSurface::Enabled;
+        report["swapIntervalRequested"] = d.window.requestedFormat().swapInterval();
+        report["qsgNoVsyncRequested"] = qEnvironmentVariableIsSet("QSG_NO_VSYNC");
+        report["normalPresentationMeasured"] =
+                !OffscreenSurface::Enabled && d.window.requestedFormat().swapInterval() > 0;
         report["measurementScope"] = OffscreenSurface::Enabled
                 ? "Production MusicStage into hidden RenderControl; manual shared-clock event replay at requested 60Hz; GUI polish, sync, Quick render, endFrame wait and RHI submission are separate local costs. No native presentation or physical input measurement."
                 : "Production MusicStage native FrameAnimation; actual frameSwapped event timestamps; physical display/input-to-photon and compositor latency unavailable.";
@@ -851,7 +1030,9 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             if (sample["gpuFrameMs"].isDouble())
                 gpu[name].append(sample["gpuFrameMs"].toDouble());
             const auto revision = quint64(sample["inputRevision"].toInteger());
-            if (revision && !inputs.contains(revision)) {
+            if (revision && !inputs.contains(revision)
+                && sample["inputReceivedNs"].toInteger() >= report["samplingStartedNs"].toInteger()
+                && sample["submittedNs"].toInteger() <= report["samplingEndedNs"].toInteger()) {
                 inputs.insert(revision);
                 inputLatency[name].append(
                         (sample["submittedNs"].toInteger() - sample["inputReceivedNs"].toInteger())
@@ -909,6 +1090,28 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         bool nativeValid = !OffscreenSurface::Enabled && seconds == 120
                 && report["samplingSeconds"].toDouble() >= 120 && scenario != "matrix"
                 && presentation.size() == 1;
+        QJsonArray presentationTimes;
+        {
+            const QMutexLocker lock(&d.swapMutex);
+            for (const auto timestamp : d.swapped)
+                if (timestamp >= report["samplingStartedNs"].toInteger()
+                    && timestamp <= report["samplingEndedNs"].toInteger())
+                    presentationTimes.append(timestamp);
+        }
+        report["qtPresentationTimestampsNs"] = presentationTimes;
+        report["nativeWindowEvents"] = d.window.events;
+        report["nativeWindowEventOverflow"] = d.window.eventOverflow;
+        bool continuouslyExposed = !d.window.eventOverflow;
+        for (const auto &event : d.window.events) {
+            const auto value = event.toObject();
+            if (value["atNs"].toInteger() >= report["samplingStartedNs"].toInteger()
+                && value["atNs"].toInteger() <= report["samplingEndedNs"].toInteger())
+                continuouslyExposed &= value["exposed"].toBool();
+        }
+        report["continuouslyExposedDuringSampling"] = OffscreenSurface::Enabled || seconds == 0
+                ? QJsonValue::Null
+                : QJsonValue(continuouslyExposed);
+        nativeValid &= continuouslyExposed;
         bool numericPass = true;
         int stableOver50 = 0;
         QJsonObject presentationStages;
@@ -928,7 +1131,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         report["steadyWarmupSecondsPerStage"] = 1;
         report["qtPresentationByStage"] = presentationStages;
         report["performanceGateEnforced"] = !OffscreenSurface::Enabled
-                && qEnvironmentVariableIntValue("QSG_NO_VSYNC") != 1
+                && d.window.requestedFormat().swapInterval() > 0
                 && d.window.effectiveDevicePixelRatio() == 1;
         report["performanceGatePassed"] = OffscreenSurface::Enabled
                 ? QJsonValue::Null
@@ -1029,6 +1232,7 @@ int reviewGui(const QString &output, bool narrowOnly)
         const auto capture = [&](const QString &phase) {
             d.setStage(context + "-" + phase);
             d.frames(2);
+            d.native->ensurePolished();
             check("no-render-error", d.native->errorText().isEmpty());
             const auto &frame = d.native->input().scene;
             check("current-production-snapshot",

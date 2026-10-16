@@ -76,9 +76,16 @@ void MotionController::observe(const ArchiveSprings &springs, const ArchiveValue
 {
     if (moving())
         return;
+    bool changed = false;
+    for (size_t i = 0; i < springs.size(); ++i) {
+        changed |= m_springs[i].value != springs[i].value
+                || m_springs[i].velocity != springs[i].velocity
+                || m_springs[i].acceleration != springs[i].acceleration;
+    }
     m_springs = springs;
     m_archive.observe(springs, targets, rates);
-    emit stateChanged();
+    if (changed)
+        emit stateChanged();
 }
 bool MotionController::retarget(const ArchiveValues &targets)
 {

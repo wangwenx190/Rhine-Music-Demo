@@ -21,7 +21,7 @@ CHECKS = [
     ("PERF-02", "src/presentation/TrackFocusController.cpp", "void TrackFocusController::cancel()",
      "One revision and one destination replace old requests; stale layout callbacks cannot begin scrolling. Store retains one worker and one latest scan. Reveal/paint hot paths do not read files, wait for workers or read GPU data. QML result covers are asynchronous and decoder-sized, with virtual visible delegates."),
     ("PERF-03", "src/core/LibraryModels.cpp", "beginRemoveRows",
-     "Query updates retain the common prefix/suffix and issue at most one remove/insert range; no query reset, no per-row insertion loop. Snapshot reset is transactional for changed role ownership. Search does not reorder library columns or mutate selection."),
+     "Query updates retain the common prefix/suffix, update overlapping rows in one dataChanged batch and issue one range for only the size delta; no query reset, no per-row notification loop. Snapshot reset is transactional for changed role ownership. Search does not reorder library columns or mutate selection."),
     ("PERF-04", "src/render/rhi/ResourcePlan.h", "panel-blur-%1-color",
      "Two logical viewport-sized RGBA8 filter textures and conservative D32FS8 attachments join the cumulative descriptor plan while visible; Popup Loader destroys them on close. No mips/MSAA/production readback, and panel values do not change 3D PSO/target keys. Resize overlap includes old plus new plans; Qt internal/driver memory remains unknown."),
     ("PERF-05", "src/presentation/TrackFocusController.cpp", "void TrackFocusController::advance",

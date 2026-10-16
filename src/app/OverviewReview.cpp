@@ -12,6 +12,7 @@
 #include <QKeyEvent>
 #include <QDir>
 #include <QTimer>
+#include <QScopeGuard>
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -218,6 +219,12 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
             [&] {
                 if (finished)
                     return;
+                // The finite probe also advances through static reduced-motion states.
+                // Request its next actual Qt frame without adding a product clock or timer.
+                const auto nextFrame = qScopeGuard([&] {
+                    if (!finished && window.isVisible())
+                        window.update();
+                });
                 ++frames;
                 states.append(QJsonObject{ { "stage", stage },
                                            { "progress", overview.progress() },

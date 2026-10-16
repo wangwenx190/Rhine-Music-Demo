@@ -39,9 +39,9 @@ environment.update({
     "YALAHOO_VERIFY_FOREGROUND": "1" if args.foreground else "0",
     "YALAHOO_VERIFY_NIGHT": "1" if args.night else "0",
     "YALAHOO_VERIFY_LIFECYCLE": "1" if args.lifecycle else "0",
-    "QSG_NO_VSYNC": "",
     "QSG_RENDER_LOOP": "threaded",
 })
+environment.pop("QSG_NO_VSYNC", None)
 manifest = {
     "binarySha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
     "sourceRevision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),

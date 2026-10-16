@@ -50,13 +50,14 @@ set_tests_properties(verification-window-policy PROPERTIES ENVIRONMENT "YALAHOO_
 if(NOT APPLE OR YALAHOO_MACOS_VISIBLE_TESTS)
     add_test(NAME verification-window-visible COMMAND VerificationWindowTest visibleNativeWindow)
     set_tests_properties(verification-window-visible PROPERTIES TIMEOUT 60
-        ENVIRONMENT "YALAHOO_VERIFY_VISIBLE=1;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC=")
+        ENVIRONMENT "YALAHOO_VERIFY_VISIBLE=1;QSG_RENDER_LOOP=threaded"
+        ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:")
 endif()
 if(WIN32)
     target_link_libraries(VerificationWindowTest PRIVATE user32)
-    set_tests_properties(
-        verification-window-policy
-        PROPERTIES
+    set_property(
+        TEST verification-window-policy verification-window-visible
+        APPEND PROPERTY
         ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
     )
@@ -635,10 +636,11 @@ if(YALAHOO_REVIEW)
     add_test(NAME runtime-rhi-integration COMMAND Yalahoo --verify-integration
         "${CMAKE_BINARY_DIR}/verification/rhi-integration/ctest")
     set_tests_properties(runtime-rhi-integration PROPERTIES TIMEOUT 90
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded;QSG_NO_VSYNC="
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
+        ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     if(WIN32)
-        set_tests_properties(runtime-rhi-integration PROPERTIES ENVIRONMENT_MODIFICATION
+        set_property(TEST runtime-rhi-integration APPEND PROPERTY ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
     endif()
 endif()

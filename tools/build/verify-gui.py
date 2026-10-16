@@ -12,8 +12,12 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--backend', required=True, choices=('metal', 'd3d11', 'opengl', 'vulkan'))
 parser.add_argument('--narrow', action='store_true', help='Regress only viewports <=700 after a narrow-layout change')
+parser.add_argument('--visible', action='store_true', help='Use a native window on macOS')
+parser.add_argument('--foreground', action='store_true', help="Use this round's authorized foreground policy")
 parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
+if args.foreground and not args.visible:
+    parser.error('--foreground requires --visible')
 if args.output.exists():
     parser.error('Choose a fresh output directory; preserve failed runs')
 cache = dict(line.split('=', 1) for line in (ROOT / 'build/release/CMakeCache.txt').read_text(encoding='utf-8').splitlines()
@@ -25,9 +29,10 @@ if cache.get('CMAKE_BUILD_TYPE:STRING') != 'Release' or not executable.is_file()
 args.output.mkdir(parents=True)
 env = os.environ.copy()
 env.update(QSG_RHI_BACKEND=args.backend, QT_SCALE_FACTOR='1',
-           QT_PLUGIN_PATH=str(kit / 'plugins'), YALAHOO_VERIFY_FOREGROUND='0',
-           YALAHOO_VERIFY_VISIBLE='0', QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM='1',
+           QT_PLUGIN_PATH=str(kit / 'plugins'), YALAHOO_VERIFY_FOREGROUND='1' if args.foreground else '0',
+           YALAHOO_VERIFY_VISIBLE='1' if args.visible else '0', QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM='1',
            QSG_RENDER_LOOP='basic' if platform.system() == 'Darwin' and args.backend == 'opengl' else 'threaded')
+env.pop('QSG_NO_VSYNC', None)
 if platform.system() == 'Windows':
     env['PATH'] = str(kit / 'bin') + os.pathsep + env.get('PATH', '')
 files = [*ROOT.glob('src/**/*'), *ROOT.glob('qml/**/*.qml'), *ROOT.glob('resources/**/*'),
@@ -40,7 +45,7 @@ manifest = dict(system=platform.platform(), backend=args.backend,
                 sourceSha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                               for p in sorted(files) if p.is_file()},
                 fixture='576 invented albums, qrc portrait/landscape/square covers, no user data or media commands',
-                narrowOnly=args.narrow,
+                narrowOnly=args.narrow, nativeWindowRequested=args.visible, foreground=args.foreground,
                 scope='Production-stage matrix; GUI events/geometry/resources and own output checkpoints. Source structure, numeric motion and visual inspection remain separate.',
                 completed=False, passed=False)
 manifest_path = args.output / 'manifest.json'

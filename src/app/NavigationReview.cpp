@@ -63,20 +63,27 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     bool passed = true;
     QJsonArray samples, checks, inputs;
     int step = 0;
+    QObject scope;
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    bool waiting = false, queued = false;
+    qint64 restoreStartedNs = 0;
     std::function<void()> next;
+    std::function<void()> advanceWhenReady;
     const auto now = [] {
         return qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
                               std::chrono::steady_clock::now().time_since_epoch())
                               .count());
     };
-    QObject::connect(&input, &InputRouter::navigationCommitted, &app, [&](quint64 revision) {
+    QObject::connect(&input, &InputRouter::navigationCommitted, &scope, [&](quint64 revision) {
         inputs.append(QJsonObject{ { "navigationRevision", qint64(revision) },
                                    { "inputRevision", qint64(scene.frame().inputRevision) },
                                    { "inputReceivedNs", scene.frame().inputReceivedNs },
                                    { "navigationCommittedNs", now() } });
     });
-    QObject::connect(native, &rhi::SceneItem::frameSubmitted, &app, [&](QJsonObject sample) {
+    QObject::connect(native, &rhi::SceneItem::frameSubmitted, &scope, [&](QJsonObject sample) {
         samples.append(sample);
+        advanceWhenReady();
     });
     const auto check = [&](const QString &name, bool value) {
         passed &= value;
@@ -85,24 +92,72 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
                                    { "albumId", selection->albumId() },
                                    { "rulerSelected", ruler.state()["selected"].toDouble() } });
     };
-    const auto checkSubmission = [&](const QString &name) {
+    const auto hasSubmission = [&] {
         const auto frame = scene.frame();
-        bool matched = false;
         for (const auto &value : samples) {
             const auto sample = value.toObject();
-            if (sample["navigationRevision"].toInteger() == qint64(frame.navigationRevision)
-                && sample["navigationInputRevision"].toInteger()
-                        == qint64(frame.navigationInputRevision)
+            if (sample["navigationRevision"].toInteger() > 0
+                && sample["inputRevision"].toInteger() == qint64(frame.inputRevision)
+                && sample["navigationInputRevision"].toInteger() == qint64(frame.inputRevision)
                 && sample["navigationCommittedNs"].toInteger()
                         >= sample["inputReceivedNs"].toInteger()
                 && sample["submittedNs"].toInteger()
                         >= sample["navigationCommittedNs"].toInteger()) {
-                matched = true;
-                break;
+                return frame.inputRevision > 0;
             }
         }
-        check(name, matched && frame.navigationRevision > 0);
+        return false;
     };
+    const auto checkSubmission = [&](const QString &name) {
+        check(name, hasSubmission());
+    };
+    const auto finish = [&] {
+        QSaveFile file(output + "/report.json");
+        if (!file.open(QIODevice::WriteOnly)) {
+            app.exit(7);
+            return;
+        }
+        file.write(
+                QJsonDocument(
+                        QJsonObject{
+                                { "passed", passed },
+                                { "checks", checks },
+                                { "inputs", inputs },
+                                { "frames", samples },
+                                { "windowPolicy", verification::windowPolicy(window) },
+                                { "coverStatistics", native->coverStatistics() },
+                                { "scope",
+                                  "Actual Release App path. Event-driven input receipt, navigation commit and corresponding Qt frame submission are distinct; screen display time is unavailable." } })
+                        .toJson());
+        app.exit(file.commit() && passed ? 0 : 8);
+    };
+    advanceWhenReady = [&] {
+        if (!waiting || queued)
+            return;
+        const bool ready = step == 0 ? window.isExposed() && !samples.isEmpty()
+                : step == 7          ? !window.isVisible() && !ruler.active()
+                : step == 8          ? window.isExposed() && ruler.active() && !samples.isEmpty()
+                        && samples.last().toObject()["submittedNs"].toInteger() >= restoreStartedNs
+                            : hasSubmission() && (step != 4 || !ruler.state()["moving"].toBool());
+        if (!ready)
+            return;
+        waiting = false;
+        queued = true;
+        deadline.stop();
+        QMetaObject::invokeMethod(
+                &scope,
+                [&] {
+                    queued = false;
+                    next();
+                },
+                Qt::QueuedConnection);
+    };
+    QObject::connect(&window, &QQuickWindow::frameSwapped, &scope, advanceWhenReady);
+    QObject::connect(&window, &QWindow::visibleChanged, &scope, advanceWhenReady);
+    QObject::connect(&deadline, &QTimer::timeout, &scope, [&] {
+        check("native-window-or-submission-deadline", false);
+        finish();
+    });
     const auto key = [&](int code) {
         QKeyEvent event(QEvent::KeyPress, code, Qt::NoModifier);
         QCoreApplication::sendEvent(&window, &event);
@@ -195,6 +250,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
         case 7:
             check("hidden-ruler-no-input", !ruler.active());
             window.releaseResources();
+            restoreStartedNs = now();
             window.show();
             break;
         case 8: {
@@ -204,34 +260,18 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
             check("real-input-frame-submissions", !samples.isEmpty() && !inputs.isEmpty());
             const auto image = window.grabWindow();
             check("own-render-capture", !image.isNull() && image.save(output + "/restored.png"));
-            QSaveFile file(output + "/report.json");
-            if (!file.open(QIODevice::WriteOnly)) {
-                app.exit(7);
-                return;
-            }
-            file.write(
-                    QJsonDocument(
-                            QJsonObject{
-                                    { "passed", passed },
-                                    { "checks", checks },
-                                    { "inputs", inputs },
-                                    { "frames", samples },
-                                    { "windowPolicy", verification::windowPolicy(window) },
-                                    { "coverStatistics", native->coverStatistics() },
-                                    { "scope",
-                                      "Actual Release App path. Input receipt, navigation commit and corresponding Qt frame submission are distinct; screen display time is unavailable." } })
-                            .toJson());
-            app.exit(file.commit() && passed ? 0 : 8);
+            finish();
             return;
         }
         }
-        QTimer::singleShot(750, &app, [&] {
-            next();
-        });
+        waiting = true;
+        deadline.start(10000);
+        window.update();
+        advanceWhenReady();
     };
+    waiting = true;
+    deadline.start(10000);
     window.show();
-    QTimer::singleShot(800, &app, [&] {
-        next();
-    });
+    window.update();
     return app.exec();
 }

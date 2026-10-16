@@ -368,7 +368,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             { "qtVersion", qVersion() },
             { "graphicsApi", int(window->rendererInterface()->graphicsApi()) },
             { "windowPolicy", verification::windowPolicy(*window) },
-            { "vsyncDisabled", !qgetenv("QSG_NO_VSYNC").isEmpty() },
+            { "vsyncDisabled", window->requestedFormat().swapInterval() == 0 },
             { "refreshPeriodMs", period },
             { "durationSeconds", seconds },
             { "width", window->width() },

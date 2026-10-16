@@ -37,7 +37,7 @@
 | R16B2V | `07514a5` | R19F以QTextLine实际混合ascent确认主字体基线修正；恢复标题尺寸保留，撤回的采样不恢复。 |
 | R16B2V-P | 任务见 `07514a5`；未找到独立完成提交 | Windows 未收口像素任务已被后续契约替代；共享字体/基线代码由 R19F 追踪，不恢复原图门禁。 |
 | R16B2W | 任务见 `509afe8`；未找到独立完成提交 | 没有独立生产选型；已有共享 DPR/生命周期和工具改动归 R19F，D3D11 目标实机仍归 R34。 |
-| R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R34。 |
+| R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R35。 |
 | R16M1 | `c7e9b61`；前置 `6740abc` | R19F保留RenderControl真实target DPR、Review隐藏状态消费和字体head身份；不外推屏幕呈现。 |
 | R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
 | R16M2P | `9470126` | R19F用DOM rangeTop与Canvas字体框独立核对主基线至1/64逻辑px，使用macOS floor。 |
@@ -161,7 +161,7 @@
 | R10D：RGBA16F→标量R16F及诊断解码 | R16F生产raw/blur数学精度和消费者.r等价性保留。查明此前OpenGL错误发生在读回边：本机GL_PACK_ALIGNMENT=4，奇数宽R16F行需填充；当前Qt GL readPixels按紧密纹理字节数分配，未修改PACK_ALIGNMENT，可能越过逻辑缓冲边界。非有限字节不证明产品AO shader生成NaN。 |
 | R10C/D及后续capture：行跨度、资源/别名 | 显式捕获且仅未对齐的GL R16F，通过QRhi同格式copy到缓存的补齐宽纹理；原区域逐值保留。按实际storage stride解码且只消费逻辑区域，未初始化尾列不扫描。最多2个AO缓存槽，实际清单含capture-aligned-scalar；同尺寸复用、renderer reset清理。只查询GL状态，不全局改pixel-store，不锁定旧Qt。 |
 | R10C/D：PostUniform | kernel在SSAO pass创建时一次上传；动态状态只更新80-byte前缀，std140 ABI为1104bytes、kernel offset为80。 |
-| macOS GL能力、窗口及目标平台 | 保留原MSAA等价renderbuffer及真实标准透视/行方向。bake-occlusion-shaders改用实际host的qsb路径/输出，Windows脚本未在本机执行。前台PID误报的源码判定及监测修正见R19D4B2；原生窗口/目标实机要求仍归R34，不将本机结果外推目标平台。 |
+| macOS GL能力、窗口及目标平台 | 保留原MSAA等价renderbuffer及真实标准透视/行方向。bake-occlusion-shaders改用实际host的qsb路径/输出，Windows脚本未在本机执行。前台PID误报的源码判定及监测修正见R19D4B2；原生窗口/目标实机要求仍按计划后置专项分工，不将本机结果外推目标平台。 |
 
 ## R19D2 生产雾、颜色域及捕获次序
 
@@ -262,7 +262,7 @@
 | R15 InputRouter→SelectionController→SceneFrame、OrdinalMotion→OrdinalReel | Qt像素/角度单位与Y反号、控件/祖先所有权和窗口内焦点是输入API适配；源48px/三张/200ms、36px/1.3/1400ms边界保留。最多一个可替换目标服务既有四封面背压，真实提交revision与新输入receipt分开。49点/460ms轨迹来自锁定rolling-number实际函数，保留重定向速度/方向/终点归一、十位/两面和唯一FrameClock；RenderControl专用offscreen开关接通数字/滑尺，普通隐藏窗口仍停进度。 |
 | R14/R15 Review与窗口适配 | 导出器交付最终CSS结构与冻结数学；实际纹理、revision、固定位置/键盘路由、静止/隐藏零paint、surface失效/恢复/释放和CPU成本分别验证。滑尺使用OffscreenSurface与有界读回；产品GUI包装读取Process.ExitCode及报告。 |
 
-Canvas Painter的采用依据为源矩形/路径表达、固定值同步、renderer所有权和三份路径缓存；API间像素相似度与旧benchmark成绩不参与选型。实际隐藏质量检查保留正常轮廓/裁切/渐变/文本/图标输出；物理屏幕、正常VSYNC和缺少目标设备的项目只在R34维护。
+Canvas Painter的采用依据为源矩形/路径表达、固定值同步、renderer所有权和三份路径缓存；API间像素相似度与旧benchmark成绩不参与选型。实际隐藏质量检查保留正常轮廓/裁切/渐变/文本/图标输出；物理屏幕、正常VSYNC和缺少目标设备的项目只在计划后置专项维护。
 
 ## R19F 标题字轮、字体与采样复查
 
@@ -276,7 +276,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | R16B2V `07514a5` / M2P `9470126` | 混合fallback不应移动主字体，按实际QTextLine.ascent定位；彩色字面保留其inline字体基线。macOS半行距floor由相同主字体的DOM rangeTop/Canvas ascent/descent独立证明，字体框而非图像偏移；分数字号、行高、整行shaping及其他平台分支不改。 |
 | R16M1 `c7e9b61` / M2 `b9a5ea7` | 实际源AppleColorEmoji与Qt默认UI面不同；公开应用emoji选择、Regular回退及缺字体回滚保留。RenderControl、target DPR、Review隐藏消费与字体物理表身份检查是线程/平台适配；不能证明原生屏幕/跨屏事件。 |
 | R16M3 `2840110` / `e98c798`、R17字体失效接线 | naturalWidth仅变化通知、内容/退出motion决定caption可见性、hide立即停advance并合并queued finish，restore取消陈旧完成，避免绑定重入且保留退出宽度。GL4.1/CoreProfile/basic、后端有界readback drain和有效context释放保留，不改源时间。 |
-| B2V-P/B2W/B3及`6740abc`/`b08e94e`交接 | Git中无独立完成的生产实现；现有共享GL/DPR/候选/生命周期代码已按上述归属审查，不能用未完旧任务掩盖遗漏。旧高DPR像素失败保留历史，目标D3D11/Linux GL、真实显示及最终选型仍由R34原专项处理。 |
+| B2V-P/B2W/B3及`6740abc`/`b08e94e`交接 | Git中无独立完成的生产实现；现有共享GL/DPR/候选/生命周期代码已按上述归属审查，不能用未完旧任务掩盖遗漏。旧高DPR像素失败保留历史，目标D3D11/Linux GL、真实显示及最终选型仍按计划后置专项处理。 |
 | `TitleAudit`/`export-title`/`verify-title`与PowerShell入口 | 按可见次序覆盖全部字面及省略号；核对结构≤1逻辑px、轨迹≤1e-6、物理字体/字体框、18页眉、三路径成本、隐藏零工作、十次恢复与最终释放；实际质量独立检查。 |
 
 
@@ -294,7 +294,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | R19E/F Header / ArchiveText及后续R19C/D | 页眉各兄弟层独立透明度保持运输按钮位置，字体框/向量字形沿共有实现。全局透明排序/深度一致性、四样本resolve、DOF/雾/AA和尺度由既有专题维护；总览未降低数量/冻结动效/关闭效果。 |
 | R18/R19 Review与新结构入口 | 原数值golden直接执行冻结类/生产表达式；新增冻结CSS/DOM结构及同输入visibleOverviewLabels准入。自身Qt事件、投影/纹理/退场/重建与正常输出质量分别证明。320px某输入源函数可准入零标签，不伪造展开成功；没有呈现样本的原生回放保留无效结论。 |
 
-此范围未发现需要按旧截图保留的外观补偿。背景模糊与盒体磨砂/景深属于源设计；物理屏幕、正常VSYNC、原生同窗口恢复和缺目标平台仍按R34原任务，G1不关闭用户两个阵列问题的全历史退出条件。
+此范围未发现需要按旧截图保留的外观补偿。背景模糊与盒体磨砂/景深属于源设计；物理屏幕、正常VSYNC、原生同窗口恢复和缺目标平台仍按计划后置专项，G1不关闭用户两个阵列问题的全历史退出条件。
 
 ## R19G2 详情展示来源复查
 
@@ -325,12 +325,12 @@ macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构�
 | `4ab1e73` R19D1、`2f50812` R19D2 | AO核/标量读回跨度、80byte动态常量前缀和雾/线性颜色顺序；精度与通道适配不改变源算法。 |
 | `f45024d` R19D3A、`f4e1610` R19D3B | 源阴影caster/normalBias/PCF与产品地面接收，诊断相机仅Review；不改变生产取景。 |
 | `704a99d` R19D4A、`5e333ec` R19D4B1 | 源41点Bokeh及SMAA标量转换完整展开，独立解析输入验证，无浏览器GPU oracle。 |
-| `d268570` | 文档唯一职责和经验去重，未变生产代码；被精简的有效门槛仍由对应组件及R34承接。 |
+| `d268570` | 文档唯一职责和经验去重，未变生产代码；被精简的有效门槛仍由对应组件及计划后置专项承接。 |
 | `4e86136` R19D4B2、`5454fb2` R19D4C | 组合资源图/resolve及生产显示viewport→DPR闭包；去除重复参考舞台缩放；见D4B2/C专题。 |
 | `cfce597` R19E、`a04db48` R19F | 浏览最终CSS、矢量实际DPR/滑尺、整行字体shaping与自然基线。 |
 | `3b1f89b` R19G1、`dd5f959` R19G2 | 详情运动/总览状态与详情最终CSS/虚拟列表/本地资料；判定见G1/G2专题。 |
 
-R19C、R19C2、R19C2B、R19D、R19D3、R19D4、R19D4B、R19G是历史拆分父任务，由上列实际子轮次覆盖；没有额外完成的生产提交。R16B2V-P/B2W/B3及R16M3-S等目标交接继续按R34原项验收，不把计划标题当作实机通过。
+R19C、R19C2、R19C2B、R19D、R19D3、R19D4、R19D4B、R19G是历史拆分父任务，由上列实际子轮次覆盖；没有额外完成的生产提交。R16B2V-P/B2W/B3及R16M3-S等目标交接继续按计划后置专项验收，不把计划标题当作实机通过。
 
 跨组件提交额外核对：`5b2df80`按词法/字面量与分支顺序检查格式整理，展开短句未改变算法；`d03527e`的预排序键、可见实体/深度预计算与generation先拒绝保留，比较器/帧路径不读盘或遍历曲库。`e98c798`的Cocoa窗口策略、GL4.1/basic、MSAA renderbuffer、RenderControl/DPR、surface恢复与清理均有平台API/资源依据；恢复输出与原生物理呈现继续分开证明。其后生产覆写由B–G专题逐项追踪。
 
@@ -354,7 +354,7 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 
 本机实际质量边界：BLUR-01的额外降采样来自生产viewport重复舞台比例，D4C已按最终宿主CSS消除；目标尺寸、DPR与附件链由独立源公式验证。FLICKER-01的已确认根因为visibility/Equal颜色pass位置不一致，C2C统一顶点顺序及invariant；当前正常光学与诊断连续覆盖静止、波浪、浏览、总览进退和详情转换，保留原实体数量、源透明度、景深/磨砂及后处理。本机Metal/OpenGL正常输出未见漏画、额外模糊或重叠闪烁；结构/数学、实际输出和资源恢复分别验证，没有用图像相似度关闭问题。Windows/D3D11、Linux/OpenGL、物理屏幕/输入及后续完整播放器范围按计划后置专项分工验收，不能外推为全平台理想渲染或完整产品性能通过。
 
-正常VSYNC补验覆盖现有R10D单盒生产bootstrap：两后端各三次独立120秒、双主题/输入提交、九尺寸/四画质与十次完整窗口重建，原始序列和各次分布只留本地；采样完整性、资源回落与正常输出分别检查。该入口明确不覆盖完整阵列/搜索/展示/扫描，不能据此宣称完整播放器预算、GPU完成、物理显示或实测显存已通过；后续入口扩展与正式产品矩阵仍归R28及计划后置专项。
+R10D的`IntegrationReview`只覆盖单盒生产bootstrap；完整阵列/搜索/展示/扫描使用`StartupAudit`的MusicStage入口。VSYNC请求按performance.md移除禁用变量并核对requestedFormat，Qt呈现事件不等于屏幕显示；单盒样本不能推断完整播放器预算、GPU完成或实测显存。
 
 ## R20 · 序章与交接来源
 

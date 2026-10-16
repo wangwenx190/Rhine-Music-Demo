@@ -345,13 +345,18 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
         ++suffix;
     const int removed = int(m_results.size()) - prefix - suffix;
     const int inserted = int(results.size()) - prefix - suffix;
-    if (removed) {
-        beginRemoveRows({ }, prefix, prefix + removed - 1);
-        m_results.remove(prefix, removed);
+    const int reused = std::min(removed, inserted);
+    for (int i = 0; i < reused; ++i)
+        m_results[prefix + i] = results[prefix + i];
+    if (reused)
+        emit dataChanged(index(prefix), index(prefix + reused - 1));
+    if (removed > reused) {
+        beginRemoveRows({ }, prefix + reused, prefix + removed - 1);
+        m_results.remove(prefix + reused, removed - reused);
         endRemoveRows();
     }
-    if (inserted) {
-        beginInsertRows({ }, prefix, prefix + inserted - 1);
+    if (inserted > reused) {
+        beginInsertRows({ }, prefix + reused, prefix + inserted - 1);
         m_results = std::move(results);
         endInsertRows();
     }

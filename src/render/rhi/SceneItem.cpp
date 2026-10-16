@@ -457,7 +457,8 @@ void SceneItem::configureDiagnostics()
                             { "decodeStarts", cache.value("decodeStarts").toVariant() },
                             { "decodeActive", cache.value("active").toVariant() },
                             { "decodePending", cache.value("pending").toVariant() },
-                            { "requestedSwapInterval", guard->window()->format().swapInterval() }
+                            { "requestedSwapInterval",
+                              guard->window()->requestedFormat().swapInterval() }
                         };
                         emit guard->diagnosticValuesChanged();
                     },

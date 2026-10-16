@@ -340,6 +340,7 @@ QVariantMap RulerController::state() const
 {
     return { { "scroll", m_scroll.value }, { "scrollVelocity", m_scroll.velocity },
              { "width", width() },         { "selected", m_selected },
-             { "time", m_time },           { "slots", slotStates() } };
+             { "moving", m_moving },       { "time", m_time },
+             { "slots", slotStates() } };
 }
 }

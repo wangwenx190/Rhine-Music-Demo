@@ -39,7 +39,7 @@
 
 ## 整场GUI重放
 
-`python3 tools/build/verify-gui.py --backend metal|d3d11|opengl|vulkan --output 全新目录`运行Review的`ui-audit --gui`。它复用StartupAudit的生产MusicStage驱动、唯一FrameClock、实际SceneItem与匿名576专辑库，仅使用qrc横/竖/方封面。后端执行分工与默认窗口策略由test-gates.md和迁移计划管理。
+`python3 tools/build/verify-gui.py --backend metal|d3d11|opengl|vulkan --output 全新目录`运行Review的`ui-audit --gui`。macOS当轮获可见授权时添加`--visible --foreground`运行原生窗口；默认保持隐藏。它复用StartupAudit的生产MusicStage驱动、唯一FrameClock、实际SceneItem与匿名576专辑库，仅使用qrc横/竖/方封面。后端执行分工与默认窗口策略由test-gates.md和迁移计划管理。
 
 九尺寸×双主题×填充/真实列共36状态，隐藏目标按尺寸轮换代表DPR1/1.5/2；native入口只记录实际屏幕DPR。每状态以自身Qt键鼠事件核对正反导航、总览进退、详情打开/返回，连选最后意图、搜索模态隔离及浏览播放隔离；采集浏览/总览/详情/搜索，填充模式另采完整片头的二维与三维检查点，共180份自身输出。详情须等入场透明度达到1，完全遮挡期检查clear提交语义，不能要求重新上传被遮挡的三维快照。运动数值、CSS结构、连续渲染质量与这些检查点分别验收。
 

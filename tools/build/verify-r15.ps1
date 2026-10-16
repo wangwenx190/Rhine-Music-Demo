@@ -29,7 +29,7 @@ try {
     $env:PATH = "$($chain.qtKit)/bin;$env:PATH"
     $env:QT_PLUGIN_PATH = "$($chain.qtKit)/plugins"
     $env:QSG_RENDER_LOOP = 'threaded'
-    $env:QSG_NO_VSYNC = ''
+    Remove-Item Env:QSG_NO_VSYNC -ErrorAction SilentlyContinue
     $env:QT_SCALE_FACTOR = '1'
     $nativeDpr = [double](& ./build/release/tools/ui-audit.exe --native-dpr)
     if ($LASTEXITCODE -ne 0 -or $nativeDpr -le 0) {

@@ -40,7 +40,9 @@ R10D/R11 须给出产品资源清单：每个目标、图集、选中/归位纹�
 2. 局部诊断：分离 GUI/同步、CPU 提交、GPU pass、上传、解码、分配/重建及等待。只回答具体瓶颈，不宣称完整播放器达标；微基准不能替代真实通道。关闭某个效果只能用于成本诊断，不能用该结果验收生产画质。
 3. 产品验收：真实 Release 产品路径、事件重放、真实画质和实际封面就绪行为，验证呈现节奏、输入响应、资源峰值和生命周期。RHI Review 的轻微相机运动不能替代浏览/抽取/换片/搜索/加载。
 
-CPU 提交不包含同步阶段或 GPU 完成时，报告必须明确。GPU timestamp 不可用写 null/不可用，不能写 0 或用 CPU 值替代。frameSwapped 是 Qt 呈现事件，不是屏幕实际扫描时刻；关闭 VSYNC 的吞吐、正常 VSYNC 下的节奏与系统 compositor/显示延迟分别报告。窗口置底、遮挡或系统节流导致无样本时判定测量无效，不伪造性能失败或提高窗口 Z 顺序。
+正常VSYNC采样须从子进程环境移除`QSG_NO_VSYNC`；Qt按变量存在性处理该开关，空字符串同样禁用VSYNC。未限速采样才设置它，并记录`QWindow::requestedFormat().swapInterval()`；请求值不能证明实际显示同步。[Qt实现依据](https://github.com/qt/qtdeclarative/blob/dev/src/quick/scenegraph/qsgdefaultcontext.cpp)。
+
+CPU 提交不包含同步阶段或 GPU 完成时，报告必须明确。GPU timestamp 不可用写 null/不可用，不能写 0 或用 CPU 值替代。frameSwapped 是 Qt 呈现事件，不是屏幕实际扫描时刻；输入延迟仅统计采样期间实际收到的事件，静止场景无新输入时保留空分布；原始单调时刻与自身窗口曝光/可见/状态变化分别保留，采样期间失去曝光判为无效；关闭 VSYNC 的吞吐、正常 VSYNC 下的节奏与系统 compositor/显示延迟分别报告。窗口置底、遮挡或系统节流导致无样本时判定测量无效，不伪造性能失败或提高窗口 Z 顺序。
 
 ## 门禁与统计规则
 
@@ -91,5 +93,7 @@ R10D依用户要求为record-only：20ms仅参考，不阻止其完成/提交，
 `startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效；`startup-qml`（`ui-audit --startup 新目录 [12..120秒] [matrix或固定场景名]`）加载真实MusicStage。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音播放的合成WAV；禁止换为私人库。检查30次换片、缓存回选、十次完整视觉root/SG重建、暂停及播放意图/源revision保留、renderer释放及描述符资源回落；滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize走真实组件。`audit-startup.py`输出COMMON/PERF三平台调用链与来源hash矩阵；本机结果与目标实机分开。
 
 串行采样使用`python3 tools/build/verify-startup.py --backend metal --mode offscreen --seconds 120 --runs 3 --output verification/全新目录`。本机RenderControl报告GUI polish、beginFrame、sync、Quick render、endFrame等待以及RHI CPU/GPU成本，异步就绪等待由真实事件唤醒，手工事件回放按请求60Hz推进既有FrameClock；不声称产品threaded或正常呈现。每段原始样本、实际资源清单、缓存/Canvas/文字计数、准备时延及失败日志保留本地；真实driver显存/物理输入/屏幕扫描保持null。
+
+原生入口加`--lifecycle`时，额外保留同一MusicStage/root/SceneItem，分别在暂停和播放中执行hide与minimize、SG失效及恢复；检查隐藏无视觉工作、暂停位置保留、播放位置继续和源revision/意图不变。此检查使用匿名静音WAV，不证明实际听感或设备路由。
 
 有可靠原生窗口环境时，按对应后端以`--mode vsync`和`--mode uncapped`及明确的`--scenario 场景名`分别串行至少三次；窗口/前台权限仍执行test-window-policy.md。固定场景名为`day/night`各自的`wave/ruler/detail/switch/overview/search`（例如`day-wave`）；每个场景先暖机再采满120秒，两模式/场景各用独立新目录，单列p95/p99、超周期/50ms及连续长帧。默认`matrix`把十二段混在120秒内，仅作局部诊断，每段首秒归过渡；不能据短分段宣称正式目标通过。原生frameSwapped在实际发出点计时，样本不足/溢出显式无效；正常VSYNC请求下按本契约门槛执行，未限速结果仅作吞吐。物理显示/输入与全目标压力矩阵仍按迁移计划后置任务验收，不能以隐藏成本通过冲销。

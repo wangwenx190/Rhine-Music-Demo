@@ -108,6 +108,33 @@ private slots:
         QVERIFY(!clock.openingRunning());
         QVERIFY(clock.workPending());
     }
+    void reducedArchiveDrainsVisualDemand()
+    {
+        Fixture f;
+        f.library.setSnapshot(demonstrationLibrary());
+        f.selection.setColumns(f.library.albums()->order().columns, f.library.snapshot());
+        f.scene.setSelection(&f.selection);
+        connect(&f.motion, &MotionController::stateChanged, f.motion.clock(),
+                &FrameClock::requestVisualFrame);
+        connect(&f.scene, &SceneAdapter::frameChanged, f.motion.clock(),
+                &FrameClock::requestVisualFrame);
+        f.motion.setReducedMotion(true);
+        f.scene.setReducedMotion(true);
+        f.motion.clock()->setActive(true);
+        for (int i = 0; i < 3 && f.motion.clock()->workPending(); ++i)
+            f.motion.clock()->advance(1.0 / 60);
+        QVERIFY(!f.motion.clock()->workPending());
+        const auto revision = f.scene.frameRevision();
+        f.motion.clock()->advance(1.0 / 60);
+        QCOMPARE(f.scene.frameRevision(), revision);
+        QVERIFY(!f.motion.clock()->workPending());
+        f.selection.moveRow(1);
+        QVERIFY(f.motion.clock()->workPending());
+        for (int i = 0; i < 3 && f.motion.clock()->workPending(); ++i)
+            f.motion.clock()->advance(1.0 / 60);
+        QVERIFY(!f.motion.clock()->workPending());
+        QVERIFY(f.scene.frameRevision() > revision);
+    }
     void invalidationDuringFrameSurvivesSleep()
     {
         FrameClock clock;

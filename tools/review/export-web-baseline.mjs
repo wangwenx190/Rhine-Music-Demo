@@ -1,3 +1,4 @@
+import {destination, serviceDestination} from './native-source-map.mjs';
 import {execFrozenGit} from './frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -205,61 +206,6 @@ const visit = (name) => {
     imports(name).forEach(visit);
 };
 visit('src/music-app.ts');
-function destination(name) {
-    const base = path.posix.basename(name);
-    if (/music-(browser-gapless|song-transition|player)|audio/.test(base))
-        return [
-            'src/media/',
-            'Ordinary public QtMultimedia playback; PCM/gapless/native bridge omitted',
-        ];
-    if (/^pwa|^archive-main|^document-|^decryption|^boot-(tracks|orbit|logo|motion)|^boot\.ts|^glass-reveal|^inspection|^typing|^archive-lighting|^internal-optics/
-            .test(
-                base,
-                ))
-        return [
-            null,
-            'Archive/reference only; shared rendering facts extracted where music uses them',
-        ];
-    if (/^music-types|^music-order|^music-search|^data/.test(base))
-        return ['src/core/', 'Stable IDs, immutable library/model, ordering/search'];
-    if (/motion|camera|real-columns|overview-edge|archive-loop|boot-timing|^music-opening/.test(
-            base,
-            )
-        && !/css$/.test(base))
-        return ['src/motion/', 'Analytical frame-driven motion and shared coordinates'];
-    if (/scene|model|cover-atlas|quality-renderer|render-quality|music-lighting|row-lighting|cd-asset|viewer-theme/
-            .test(
-                base,
-                )
-        && !/css$/.test(base))
-        return [
-            'src/render/',
-            'Shared geometry, materials, light field, texture and postprocessing',
-        ];
-    if (/^music-app|^main\.ts/.test(base))
-        return [
-            'src/app/ + qml/Yalahoo/Music/App.qml',
-            'Composition/lifecycle only; split controllers and view',
-        ];
-    if (/demo-library/.test(base))
-        return ['tests/fixtures/', 'Anonymous review input only'];
-    if (/brand|asset-url/.test(base))
-        return [
-            'resources/ + src/render/',
-            'Functional assets retained; original brand replaced by R03B',
-        ];
-    if (/music-(presentation|track-focus)/.test(base))
-        return ['src/core/ + qml/Yalahoo/Music/pages/', 'Navigation independent of playback'];
-    if (/settings|lab|theme/.test(base))
-        return [
-            'qml/Yalahoo/Music/panels/ + src/core/',
-            'Settings/state, disabled offline metadata slots',
-        ];
-    return [
-        'qml/Yalahoo/Music/components/ + pages/',
-        'Layout, typography, controls and Qt text shaping',
-    ];
-}
 await json(path.join(contracts, 'source-map.json'), {
     baseline: BASELINE,
     entry: 'src/main.ts → src/music-app.ts (without original=1)',
@@ -273,7 +219,9 @@ await json(path.join(contracts, 'source-map.json'), {
             musicReachable: reachable.has(name),
             role: !reachable.has(name) || !target ? 'reference-only' : 'migrate',
             target: !reachable.has(name) ? null : target,
-            responsibility,
+            responsibility: reachable.has(name)
+                                ? responsibility
+                                : 'Frozen reference only; no native product implementation',
             imports: imports(name),
         };
     }),
@@ -287,14 +235,10 @@ await json(path.join(contracts, 'source-map.json'), {
                              n,
                              ),
                 )
-            .map((name) => ({
-                     sourcePath: 'legacy-web/' + name,
-                     target: /introductions|credits/.test(name) ? 'src/services/'
-                                                                : 'src/library/ + src/media/',
-                     policy: /audio|launch/.test(name)
-                                 ? 'No external PCM/native/Web server in product'
-                                 : 'Scanner/cache fields retained; network execution deferred',
-                 })),
+            .map((name) => {
+                const [target, policy] = serviceDestination(name);
+                return {sourcePath: 'legacy-web/' + name, target, policy};
+            }),
 });
 
 const checks = [

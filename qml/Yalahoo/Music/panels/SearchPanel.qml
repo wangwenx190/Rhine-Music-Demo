@@ -61,6 +61,7 @@ Item {
         if (!visible)
             return;
         librarySession.search(queryInput ? queryInput.text : "", genreId);
+        results.currentIndex = -1;
         results.positionViewAtBeginning();
     }
     component SearchHeader: Column {
@@ -180,6 +181,7 @@ Item {
         }
         delegate: T.Button {
             id: result
+            objectName: "librarySearchResult-" + index
             focusPolicy: Qt.StrongFocus
             hoverEnabled: true
             required property int index
@@ -190,6 +192,9 @@ Item {
             required property string artist
             required property string subtitle
             required property url coverUrl
+            property bool pendingPress: false
+            property string pressedAlbumId: ""
+            property string pressedTrackId: ""
             width: results.width
             height: Math.max(72, copy.implicitHeight + 22)
             padding: 0
@@ -269,7 +274,19 @@ Item {
                     cssPixelSize: 17
                 }
             }
-            onClicked: root.resultRequested(albumId, trackId)
+            onPressed: {
+                pendingPress = true;
+                pressedAlbumId = albumId;
+                pressedTrackId = trackId;
+            }
+            onCanceled: pendingPress = false
+            onClicked: {
+                const unchanged = !pendingPress || (pressedAlbumId === albumId && pressedTrackId
+                                                    === trackId);
+                pendingPress = false;
+                if (unchanged)
+                    root.resultRequested(albumId, trackId);
+            }
             Accessible.name: (kind === "track" ? "定位歌曲 " : "定位专辑 ") + title + "，" + subtitle
         }
         T.ScrollBar.vertical: ArchiveScrollBar {

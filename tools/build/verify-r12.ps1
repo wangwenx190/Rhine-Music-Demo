@@ -30,7 +30,7 @@ try {
     $env:PATH = "$($chain.qtKit)/bin;$env:PATH"
     $env:QT_PLUGIN_PATH = "$($chain.qtKit)/plugins"
     $env:QSG_RENDER_LOOP = 'threaded'
-    $env:QSG_NO_VSYNC = ''
+    Remove-Item Env:QSG_NO_VSYNC -ErrorAction SilentlyContinue
     $env:QT_SCALE_FACTOR = '1'
     $env:QT_ENABLE_HIGHDPI_SCALING = '0'
     $env:QSG_RHI_BACKEND = 'd3d11'

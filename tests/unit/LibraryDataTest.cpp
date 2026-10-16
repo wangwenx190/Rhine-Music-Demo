@@ -269,9 +269,22 @@ private slots:
         QPersistentModelIndex first(model.index(0));
         model.update(data, "collection", "");
         QCOMPARE(first.data(SearchListModel::AlbumId).toString(), QString("album-0"));
+        QSignalSpy removed(&model, &QAbstractItemModel::rowsRemoved);
+        model.update(data, "song", "");
+        QVERIFY(first.isValid());
+        QCOMPARE(first.data(SearchListModel::TrackId).toString(), QString("track"));
+        QCOMPARE(removed.size(), 0);
         for (const auto &query :
-             { "s", "so", "son", "song", "song 1", "song 10", "", "missing", "" })
+             { "s", "so", "son", "song", "song 1", "song 10", "", "missing", "" }) {
             model.update(data, query, "");
+            const auto expected = searchLibrary(snapshot, query, "");
+            QCOMPARE(model.rowCount(), expected.size());
+            for (int row = 0; row < model.rowCount(); ++row) {
+                const auto actual = model.resultAt(row);
+                QCOMPARE(actual.value("albumId").toString(), expected[row].albumId);
+                QCOMPARE(actual.value("trackId").toString(), expected[row].trackId);
+            }
+        }
         QCOMPARE(reset.size(), 0);
         QCOMPARE(model.rowCount(), 1024);
     }

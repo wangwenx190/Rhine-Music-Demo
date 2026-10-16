@@ -50,6 +50,14 @@ for (const entry of source.modules) {
     if (entry.role === 'migrate')
         assert.ok(entry.target);
 }
+for (const entry of [...source.modules, ...source.services]) {
+    if (entry.target) {
+        for (const target of entry.target.split(' + ')) {
+            assert.ok(!path.isAbsolute(target) && !target.split('/').includes('..'), target);
+            assert.ok(await fs.stat(path.join(root, target)), target);
+        }
+    }
+}
 // Resource hashes establish provenance; no screenshots, GPU witnesses or scene dumps.
 const assets = await read('resources/manifests/assets.json');
 assert.equal(assets.baselineCommit, expected);

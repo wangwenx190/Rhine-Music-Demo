@@ -19,6 +19,7 @@ parser.add_argument("--seconds", type=int, default=120)
 parser.add_argument("--runs", type=int, default=3)
 parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
 parser.add_argument("--foreground", action="store_true")
+parser.add_argument("--lifecycle", action="store_true")
 parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
 if not 12 <= args.seconds <= 120 or not 1 <= args.runs <= 10:
@@ -34,6 +35,8 @@ if args.mode == "offscreen" and platform.system() != "Darwin":
     parser.error("The current genuine hidden RenderControl entry is implemented on macOS only")
 if args.mode == "offscreen" and args.foreground:
     parser.error("Offscreen sampling has no foreground window")
+if args.mode == "offscreen" and args.lifecycle:
+    parser.error("Native hide/minimize lifecycle requires a native mode")
 if args.output.exists():
     parser.error("Choose a fresh output directory; failed and raw runs must be retained")
 cache_path = root / "build/release/CMakeCache.txt"
@@ -49,10 +52,14 @@ environment.update({"QSG_RHI_BACKEND": args.backend, "QT_SCALE_FACTOR": str(args
                     "QT_PLUGIN_PATH": str(kit / "plugins"),
                     "YALAHOO_VERIFY_VISIBLE": "0" if args.mode == "offscreen" else "1",
                     "YALAHOO_VERIFY_FOREGROUND": "1" if args.foreground else "0",
+                    "YALAHOO_VERIFY_LIFECYCLE": "1" if args.lifecycle else "0",
                     "QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM": "1",
                     "QSG_RENDER_LOOP": "basic" if platform.system() == "Darwin" and args.backend == "opengl" else "threaded",
-                    "QSG_NO_VSYNC": "1" if args.mode == "uncapped" else "",
                     "QCPAINTER_DEBUG_COLLECT": "0"})
+if args.mode == "uncapped":
+    environment["QSG_NO_VSYNC"] = "1"
+else:
+    environment.pop("QSG_NO_VSYNC", None)
 if platform.system() == "Windows":
     environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
 source_files = [*root.glob("src/**/*.cpp"), *root.glob("src/**/*.h"), *root.glob("qml/**/*.qml"),
@@ -64,7 +71,7 @@ manifest = dict(system=platform.platform(), compiler=cache.get("CMAKE_CXX_COMPIL
                               for p in sorted(source_files) if p.is_file()},
                 fixture="StartupAudit::fixture: generated 576 albums/96 distinct 2048-square JPEGs; test::wave(600000), no private library",
                 backend=args.backend, dpr=args.dpr, mode=args.mode, scenario=args.scenario, seconds=args.seconds,
-                foreground=args.foreground, requestedRuns=args.runs, runs=[], completed=False, passed=False)
+                foreground=args.foreground, lifecycle=args.lifecycle, requestedRuns=args.runs, runs=[], completed=False, passed=False)
 manifest_path = args.output / "manifest.json"
 def save():
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
@@ -87,7 +94,11 @@ for index in range(1, args.runs + 1):
              and report.get("backend") == backend_ids[args.backend] and report.get("dpr") == args.dpr
              and report.get("switches") == 30 and report.get("rebuilds") == 10)
     if args.mode != "offscreen":
-        valid = valid and report.get("nativeSamplingValid")
+        valid = (valid and report.get("nativeSamplingValid")
+                 and report.get("swapIntervalRequested") == (0 if args.mode == "uncapped" else 1)
+                 and report.get("qsgNoVsyncRequested") == (args.mode == "uncapped"))
+        if args.lifecycle:
+            valid = valid and report.get("nativeWindowTransitions") == 4
         if args.mode == "vsync" and args.dpr == 1:
             valid = valid and report.get("performanceGatePassed")
     manifest["runs"].append(dict(index=index, exitCode=code, passed=bool(valid), report=str(report_path),
