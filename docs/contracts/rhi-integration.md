@@ -36,3 +36,13 @@
 独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单、limited和最终缩放。核对实际线性/clamp封面无mip、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；256缩略图与1024独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集generation与稳态零上传保持。普通产品不增加读回或诊断遍历。
 
 `python3 tools/audit/audit-rhi-scale.py`输出冻结生产调用/最终CSS、D1–D4历史及COMMON/PERF/三平台符号hash矩阵。尺度检查与`rhi-flicker-gpu`的连续静止/波浪/浏览/总览进退/详情输出、组合资源及十次SG重建共同覆盖生产闭包。连续入口在读取当次输入前执行生产item的ensurePolished并核对SceneFrame revision，避免native queued frameSwapped对应旧帧。自身输出另检查实际轮廓/清晰度/合成，不运行图像分数。CPU提交/driver显存/物理屏幕及完整产品性能的边界见performance与迁移计划。
+
+## 整场GUI重放
+
+`python3 tools/build/verify-gui.py --backend metal|d3d11|opengl|vulkan --output 全新目录`运行Review的`ui-audit --gui`。它复用StartupAudit的生产MusicStage驱动、唯一FrameClock、实际SceneItem与匿名576专辑库，仅使用qrc横/竖/方封面。后端执行分工与默认窗口策略由test-gates.md和迁移计划管理。
+
+九尺寸×双主题×填充/真实列共36状态，隐藏目标按尺寸轮换代表DPR1/1.5/2；native入口只记录实际屏幕DPR。每状态以自身Qt键鼠事件核对正反导航、总览进退、详情打开/返回，连选最后意图、搜索模态隔离及浏览播放隔离；采集浏览/总览/详情/搜索，填充模式另采完整片头的二维与三维检查点，共180份自身输出。详情须等入场透明度达到1，完全遮挡期检查clear提交语义，不能要求重新上传被遮挡的三维快照。运动数值、CSS结构、连续渲染质量与这些检查点分别验收。
+
+报告保留实际viewport/DPR、有限矩阵、实体/清晰封面容量、renderer代次、资源描述符与旧新重叠估算、独立GUI/同步/提交成本和最终释放；显式读回发生在帧完成后的检查点，不计入帧成本。manifest保存源码/资产/二进制/图像hash和失败退出状态，不覆盖已有目录。此入口没有原生呈现、物理输入或显存实测，不替代performance.md的正式产品矩阵。
+
+`--narrow`只重放≤700逻辑px的尺寸，另核对长列名界限与单专辑恢复单行，用于小屏布局改动后的定向回归；原完整矩阵中的未受影响状态按test-gates.md复用。`python3 tools/audit/audit-gui.py --report 完整目录/matrix/report.json --report 后续定向目录/matrix/report.json`按输入顺序覆盖同状态/阶段记录，要求合并后完整矩阵齐全且各报告自身通过，然后复核各组件唯一来源审计，并输出本地COMMON/PERF/三平台调用链矩阵。正常输出由实际查看检查清晰度、轮廓、裁切和合成，不生成图像评分；源码数学和结构仍使用各组件既有导出/比较入口。

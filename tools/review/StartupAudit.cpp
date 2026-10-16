@@ -31,7 +31,10 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QKeyEvent>
+#include <QTest>
+#include <QScopeGuard>
 #include <algorithm>
+#include <span>
 #include <chrono>
 #include <stdexcept>
 using namespace yalahoo;
@@ -957,6 +960,302 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     report["functionalPassed"] = passed;
     report["checks"] = checks;
     report["resourceCheckpoints"] = resources;
+    QSaveFile file(output + "/report.json");
+    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
+        || !file.commit())
+        return 2;
+    return passed ? 0 : 1;
+}
+
+int reviewGui(const QString &output, bool narrowOnly)
+{
+    // The same driver and production stage serve cold-start and integrated GUI checks.
+    // Captures are explicit checkpoints; their readback cost is excluded from local timings.
+    if (QFileInfo::exists(output) || !QDir().mkpath(output))
+        return 2;
+    QJsonObject report{
+        { "qtVersion", qVersion() },
+        { "os", QSysInfo::prettyProductName() },
+        { "architecture", QSysInfo::currentCpuArchitecture() },
+        { "measurementScope",
+          "Production MusicStage checkpoint replay; component source mathematics and continuous trajectories are verified separately. No physical input, native presentation, normal VSYNC or driver residency measurement." },
+        { "normalVsync", QJsonValue::Null },
+        { "inputToPhotonMs", QJsonValue::Null },
+        { "measuredVramBytes", QJsonValue::Null }
+    };
+    QJsonArray checks, captures;
+    QString context;
+    bool passed = true;
+    const auto check = [&](const char *name, bool value) {
+        checks.append(QJsonObject{ { "state", context }, { "name", name }, { "passed", value } });
+        passed &= value;
+        if (!value)
+            qWarning().noquote() << "GUI check failed:" << context << name;
+    };
+    try {
+        QTemporaryDir anonymous;
+        require(anonymous.isValid(), "Cannot create GUI fixture");
+        auto input = *fixture(anonymous.path());
+        const QStringList covers{ "portrait.png", "landscape.png", "square.png" };
+        for (int i = 0; i < input.albums.size(); ++i)
+            input.albums[i].coverUrl = QUrl("qrc:/assets/demo-covers/" + covers[i % covers.size()]);
+        Driver d(std::make_shared<const LibrarySnapshot>(std::move(input)));
+        const auto saveDiagnostics = qScopeGuard([&] {
+            report["warnings"] = QJsonArray::fromStringList(d.warnings);
+            report["samples"] = d.samples;
+            report["quickTimings"] = d.timings;
+            report["lastStage"] = d.stage;
+        });
+        d.opening.replay();
+        d.wait([&] {
+            return d.opening.film();
+        });
+        d.opening.skip();
+        d.settle();
+        const auto advance = [&](double seconds) {
+            for (int i = 0; i < qCeil(seconds * 60); ++i)
+                d.motion.clock()->advance(1.0 / 60);
+            d.frames(2);
+        };
+        const auto click = [&](const QString &name) {
+            auto *item = find(d.root.get(), name);
+            require(item && item->isVisible() && item->isEnabled(),
+                    "GUI action target unavailable");
+            const auto point = item->mapToScene({ item->width() / 2, item->height() / 2 });
+            require(QRectF(QPointF(), d.window.size()).contains(point),
+                    "GUI action outside viewport");
+            QTest::mouseClick(&d.window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
+        };
+        const auto capture = [&](const QString &phase) {
+            d.setStage(context + "-" + phase);
+            d.frames(2);
+            check("no-render-error", d.native->errorText().isEmpty());
+            const auto &frame = d.native->input().scene;
+            check("current-production-snapshot",
+                  (d.opening.sceneOccluded() ? d.native->input().sceneOccluded
+                                             : frame.revision == d.scene.frame().revision)
+                          && frame.width == d.window.width() && frame.height == d.window.height());
+            bool finite = true;
+            for (float value : std::span(frame.projection.constData(), 16))
+                finite &= std::isfinite(value);
+            for (const auto &instance : frame.instances)
+                for (float value : std::span(instance.transform.constData(), 16))
+                    finite &= std::isfinite(value);
+            check("finite-bounded-geometry",
+                  finite && frame.instances.size() <= ArchivePool::capacity + 4);
+            check("bounded-owned-covers", d.native->coverStatistics()["owned"].toInt() <= 4);
+            const auto image = d.surface.grab();
+            const auto file = context + "-" + phase + ".png";
+            require(!image.isNull() && image.save(output + "/" + file),
+                    "Cannot capture own GUI output");
+            const auto dpr = d.window.effectiveDevicePixelRatio();
+            check("actual-output-dimensions", image.size() == d.window.size() * dpr);
+            captures.append(QJsonObject{ { "state", context },
+                                         { "phase", phase },
+                                         { "image", file },
+                                         { "width", d.window.width() },
+                                         { "height", d.window.height() },
+                                         { "dpr", dpr },
+                                         { "night", d.scene.lighting()->night() },
+                                         { "realistic", d.selection.realistic() },
+                                         { "selection", d.selection.albumId() },
+                                         { "instances", frame.instances.size() },
+                                         { "covers", d.native->coverStatistics() },
+                                         { "resources", d.lastResources },
+                                         { "submission", qint64(d.native->submission()) } });
+        };
+        const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
+                                  { 960, 900 },   { 930, 900 },   { 390, 844 },
+                                  { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
+        for (qsizetype index = 0; index < sizes.size(); ++index) {
+            const auto size = sizes[index];
+            if (narrowOnly && size.width() > 700)
+                continue;
+            const double dpr = OffscreenSurface::Enabled ? (index % 3 == 0           ? 1.0
+                                                                    : index % 3 == 1 ? 1.5
+                                                                                     : 2.0)
+                                                         : d.window.devicePixelRatio();
+            d.resize(size, dpr);
+            for (bool night : { false, true }) {
+                for (bool realistic : { false, true }) {
+                    context = QString("%1x%2-%3-%4")
+                                      .arg(size.width())
+                                      .arg(size.height())
+                                      .arg(night ? "night" : "day")
+                                      .arg(realistic ? "real" : "fill");
+                    qInfo().noquote() << "GUI state:" << context;
+                    d.scene.lighting()->setNight(night);
+                    d.selection.setRealistic(realistic);
+                    d.selection.select("album-0-2");
+                    advance(3);
+                    d.ready();
+                    d.root->forceActiveFocus(Qt::OtherFocusReason);
+                    const auto selected = d.selection.albumId();
+                    const auto revision = d.scene.frame().inputRevision;
+                    QTest::keyClick(&d.window, Qt::Key_Down);
+                    advance(1);
+                    check("qt-navigation-commits",
+                          d.selection.albumId() != selected
+                                  && d.scene.frame().inputRevision > revision);
+                    QTest::keyClick(&d.window, Qt::Key_Up);
+                    advance(1);
+                    check("reverse-navigation", d.selection.albumId() == selected);
+                    d.ready();
+                    check("archive-overview-control-visible",
+                          find(d.root.get(), "overviewToggle")->isVisible());
+                    auto *albumStepper = find(d.root.get(), "albumStepper");
+                    auto *genreStepper = find(d.root.get(), "genreStepper");
+                    require(albumStepper && genreStepper, "Navigation groups missing");
+                    const auto albumBounds =
+                            albumStepper->mapRectToScene(albumStepper->boundingRect());
+                    const auto genreBounds =
+                            genreStepper->mapRectToScene(genreStepper->boundingRect());
+                    const QRectF viewport(QPointF(), d.window.size());
+                    check("navigation-groups-fit",
+                          viewport.contains(albumBounds) && viewport.contains(genreBounds)
+                                  && !albumBounds.intersects(genreBounds));
+                    capture("browse");
+                    const QJsonValue targetGeneration =
+                            d.samples.last().toObject()["resourceGeneration"];
+                    click("overviewToggle");
+                    advance(4);
+                    check("qt-overview-enters", d.overview.active() && d.overview.ready());
+                    capture("overview");
+                    click("overviewReturn");
+                    advance(4);
+                    check("qt-overview-returns",
+                          !d.overview.active() && d.presentation.archiveEnabled());
+                    click("openAlbumButton");
+                    d.wait(
+                            [&] {
+                                return d.presentation.detailEnabled();
+                            },
+                            true);
+                    d.ready();
+                    advance(.5);
+                    check("detail-content-fully-shown",
+                          d.presentation.detailSurface()->opacity() == 1);
+                    check("detail-hides-archive-overview-control",
+                          !find(d.root.get(), "overviewToggle")->isVisible());
+                    auto *back = find(d.root.get(), "detailBack");
+                    auto *navigation = find(d.root.get(), "headerNavigation");
+                    require(back && navigation, "Detail/header layout missing");
+                    check("portrait-back-below-header",
+                          !d.scene.layout()->portrait()
+                                  || back->mapRectToScene(back->boundingRect()).top()
+                                          >= navigation->mapRectToScene(navigation->boundingRect())
+                                                     .bottom());
+                    capture("detail");
+                    // Latest intent wins while the shared state machine is retiring prior text/case.
+                    for (const auto &id : { "album-0-3", "album-0-4", "album-0-2" })
+                        d.presentation.select(id, true);
+                    d.wait(
+                            [&] {
+                                return d.presentation.detailEnabled()
+                                        && !d.presentation.pendingSelection();
+                            },
+                            true);
+                    check("interrupted-selection-last-intent", d.selection.albumId() == selected);
+                    click("detailBack");
+                    d.wait(
+                            [&] {
+                                return d.presentation.archiveEnabled();
+                            },
+                            true);
+                    d.root->forceActiveFocus(Qt::OtherFocusReason);
+                    d.panels.open("search");
+                    advance(.5);
+                    auto *search = find(d.window.contentItem(), "librarySearchInput");
+                    require(search, "Search input missing");
+                    search->setProperty("text", "匿名专辑 2");
+                    const auto isolated = d.selection.albumId();
+                    QTest::keyClick(&d.window, Qt::Key_Down);
+                    advance(.2);
+                    check("modal-navigation-isolated", d.selection.albumId() == isolated);
+                    capture("search");
+                    d.panels.close();
+                    advance(.5);
+                    check("panel-releases", !d.panels.surface()->shown());
+                    check("browse-does-not-play",
+                          d.playback.source().isEmpty() && !d.playback.requested());
+                    // Generation comparisons use renderer telemetry, not the GUI snapshot revision.
+                    check("ui-preserves-target-generation",
+                          targetGeneration.isDouble()
+                                  && d.samples.last().toObject()["resourceGeneration"]
+                                          == targetGeneration);
+                    if (!realistic) {
+                        d.opening.replay();
+                        d.wait([&] {
+                            return d.opening.film();
+                        });
+                        advance(2);
+                        capture("opening-mark");
+                        advance(5);
+                        capture("opening-scene");
+                        advance(6);
+                        check("full-opening-handoff",
+                              !d.opening.active() && d.presentation.archiveEnabled());
+                    }
+                }
+            }
+        }
+        if (narrowOnly) {
+            context = "navigation-label-boundaries";
+            d.resize({ 390, 844 }, 2);
+            auto replacement = *d.library.snapshot();
+            replacement.genres[0].name = QString(200, QChar(0x957F));
+            d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
+            d.frames(2);
+            advance(3);
+            auto *navigation = find(d.root.get(), "navigationFrame");
+            auto *label = find(d.root.get(), "navigationColumnLabel");
+            require(navigation && label, "Navigation boundary items missing");
+            check("long-label-wraps-and-bounds",
+                  navigation->property("wrapped").toBool()
+                          && label->property("text").toString().size() == 200
+                          && label->width() <= navigation->width());
+            require(d.surface.grab().save(output + "/long-column.png"),
+                    "Cannot save long-column output");
+            replacement.genres[0].name = "A";
+            replacement.albums.resize(1);
+            d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
+            d.frames(2);
+            advance(3);
+            check("short-pool-restores-single-row", !navigation->property("wrapped").toBool());
+            require(d.surface.grab().save(output + "/single-album.png"),
+                    "Cannot save single-album output");
+        }
+        report["backend"] = int(d.window.rendererInterface()->graphicsApi());
+        report["adapters"] = rhi::adapterInventory();
+        report["windowPolicy"] = verification::windowPolicy(d.window);
+        report["offscreen"] = d.surface.diagnostics();
+        if (auto *api = d.surface.rhi()) {
+            const auto info = api->driverInfo();
+            report["driver"] = QJsonObject{ { "deviceName", QString::fromUtf8(info.deviceName) },
+                                            { "deviceId", qint64(info.deviceId) },
+                                            { "vendorId", qint64(info.vendorId) },
+                                            { "deviceType", int(info.deviceType) } };
+        }
+        report["peakDescriptorReplacementBytes"] = d.peakBytes;
+        report["warnings"] = QJsonArray::fromStringList(d.warnings);
+        report["samples"] = d.samples;
+        report["quickTimings"] = d.timings;
+        check("no-qml-warnings", d.warnings.isEmpty());
+        check("bounded-samples", !d.overflow);
+        check("window-policy", verification::windowPolicySatisfied(d.window));
+        d.destroyRoot();
+        check("released-owned-renderers",
+              rhi::sceneSubmissionStats().renderers.load() == 0
+                      && rulerInkStats().renderers.load() == 0
+                      && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
+    } catch (const std::exception &error) {
+        passed = false;
+        report["error"] = QString::fromUtf8(error.what());
+        qWarning("GUI replay failed: %s", error.what());
+    }
+    report["passed"] = passed;
+    report["checks"] = checks;
+    report["captures"] = captures;
     QSaveFile file(output + "/report.json");
     if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
         || !file.commit())

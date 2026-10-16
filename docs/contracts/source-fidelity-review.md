@@ -420,6 +420,19 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 
 本机Release已实际执行启动/帧源/封面/开场/实验状态和隐藏Metal生产图集、片头、诊断与完整舞台生命周期回归；三次串行120秒隐藏成本回放保留独立原始样本。初始化、准备时延、GUI/同步/Quick提交/endFrame等待、RHI提交及资源描述符分别记账；不将其解释为原生VSYNC、物理输入/显示或driver显存验收。
 
+## R29 · 整场GUI来源与状态闭包
+
+| 生产范围 | 来源与当前判定 |
+| --- | --- |
+| Header / BrowseInfo / 字轮 / 滑尺 | 冻结music-app及最终music/theme/transport/navigation CSS、music-title/text-motion/ruler；布局、字体整行shaping、数字与唯一帧源的逐项依据沿R19E/F及共用控件契约，不以截图反推数值。 |
+| 阵列 / 盒体 / 光带 / 背景 | SceneAdapter/SelectionController发布源相机与实体，RowLighting/LightingPalette提供世界光场；材质、透明排序、雾/AO/Bokeh/MSAA/SMAA和最终颜色依据沿R19B–D。整场采集保留相同生产RHI，不设置辅助相机、降画质或取消设计模糊。 |
+| 详情 / 总览 / 片头 | PresentationController/OverviewController/OpeningController沿R19G与R20的状态、布局和源数学；整场重放只编排现有控制器与窗口内Qt事件，不建立另一套运动算法或产品输入路径。 |
+| Detail::detailBack | 冻结music-theme-switch.css最终竖屏left22/top118优先于music.css早期宽度断点，显式响应式字号按SDE-01的正常预期。Detail的位置/字号遵守该优先级与预期，返回按钮纳入独立DOM/CSS结构采集与≤1逻辑px比较。 |
+| NavigationFrame | 冻结CSS Grid在空间不足时横向溢出。按SDE-02以操作组自然宽度判定换行并限制长列名显示，保留源字号/滑尺/间距，可容纳时走原单行算法。 |
+| Browse::overviewToggle | 冻结music-overview.css的`data-mode="detail"`规则同时隐藏并禁用总览入口。visible与收藏架交互准入一致，详情及其进退期间不绘制该入口。该状态映射遵守正常源规则，无冻结源缺陷例外。 |
+
+本机Release隐藏Metal使用完整生产舞台覆盖九尺寸、双主题、两阵列与代表target DPR，分别核对Qt交互、结构/运动、正常自身输出、资源与释放；入口和断言归rhi-integration.md及各组件契约。数值与布局合格不代替实际清晰度/轮廓/裁切/合成检查；显式读回不进入帧成本。已有且未受本轮改动影响的单项材料/后处理/字体/面板/生命周期与R28正式隐藏成本结果按test-gates.md复用。未运行目标、物理输入/跨屏、原生窗口/正常VSYNC与完整产品正式性能仍由迁移计划R29-P及既有专项管理。
+
 ## 共用控件来源
 
 冻结style.css/music.css的继承字体、输入框/选择器/checkbox/range/progress以及music-lighting-lab.css最终按钮/滑杆覆盖映射至Archive控件；来源框与文字行高按[controls.md](controls.md)显式设置。QtQuick.Templates仅提供公开输入/焦点/Accessible行为，所有产品/研究/Review视觉由项目组件与DesignTokens绘制。浏览器原生内部装饰映射为明确的项目几何，原生弹出菜单/滚动条空间由项目限定，不宣称其装饰是源CSS常量。FolderDialog保留操作系统目录选择。

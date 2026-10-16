@@ -26,6 +26,7 @@ def record(revision, path, reason):
     return dict(revision=revision, sourcePath=path, sourceSha256=hashlib.sha256(data).hexdigest(), evidence=reason)
 frozen = [record(mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"], "src/" + name, reason) for name, reason in [
     ("music-app.ts", "Production renderDetail, trackList, albumAbout, groupProducers, lookup states, setTab and sticky indicator."),
+    ("music-theme-switch.css", "Final portrait back-button position overrides; explicit responsive font intent follows SDE-01."),
     ("music.css", "Final aspect and width rules, title override, facts, track borders and typography, offline badge and sticky sigma18 backdrop."),
     ("music-title.ts", "Actual title/translation split and markup, no synthetic face."),
     ("music-presentation.ts", "Actual state/ports, ready and focus lifetime."),

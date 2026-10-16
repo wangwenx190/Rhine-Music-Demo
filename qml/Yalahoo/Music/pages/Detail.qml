@@ -104,10 +104,24 @@ FocusScope {
     ArchiveButton {
         objectName: "detailBack"
         tokens: root.tokens
-        x: root.width <= 700 ? 22 : root.width >= 1700 ? 62 : root.width <= 1100 ? 27 : 42
-        y: root.width <= 700 ? 87 : root.width >= 1700 ? 144 : root.width <= 1100 ? 91 : 112
+        x: {
+            if (root.metrics.portrait || root.width <= 700)
+                return 22;
+            if (root.width >= 1700)
+                return 62;
+            return root.width <= 1100 ? 27 : 42;
+        }
+        y: {
+            if (root.metrics.portrait)
+                return 118;
+            if (root.width <= 700)
+                return 87;
+            if (root.width >= 1700)
+                return 144;
+            return root.width <= 1100 ? 91 : 112;
+        }
         text: "← 返回收藏架     Esc"
-        cssPixelSize: root.width >= 1700 ? 12 : 10
+        cssPixelSize: root.width <= 700 ? 9 : root.width >= 1700 ? 12 : 10
         onClicked: root.backRequested()
     }
     Column {

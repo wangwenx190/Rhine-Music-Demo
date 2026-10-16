@@ -10,6 +10,7 @@ for capture in native['captures']:
                   if all(c[k] == capture[k] for k in ['width', 'height', 'night', 'dpr']))
     for name, keys in {
         'article': ['x', 'y', 'width', 'height'], 'caption': ['x', 'y', 'height'],
+        'back': ['x', 'y', 'fontSize'],
         'title': ['x', 'y', 'width', 'height', 'fontSize'],
         'artist': ['x', 'y', 'width'], 'facts': ['x', 'y', 'width', 'height', 'gap', 'rowGap'],
         'factLabel': ['x', 'y', 'width', 'height', 'fontSize'],

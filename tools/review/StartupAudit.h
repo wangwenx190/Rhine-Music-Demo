@@ -4,3 +4,5 @@
 class QGuiApplication;
 int reviewStartup(QGuiApplication &app, const QString &output, double seconds,
                   const QJsonObject &bootstrap, const QString &scenario = QStringLiteral("matrix"));
+
+int reviewGui(const QString &output, bool narrowOnly = false);

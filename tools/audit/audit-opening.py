@@ -15,7 +15,7 @@ CHECKS = [
     ('COMMON-05', 'tools/review/OpeningAudit.cpp', 'first-3d-frame-after-opaque-rebuild', 'Actual MusicStage/SceneItem readiness and ten scene graph rebuilds check resumed 3D work. Own output quality, source math, state, resource and platform evidence remain separate.'),
     ('PERF-01', 'src/render/opening/OpeningInk.cpp', 'paths.size() != 19', 'Exactly 17 reveal centerlines plus two final decorations; constant dash ring and at most 432+4 scene instances. Preparation and film never scan the full library.'),
     ('PERF-02', 'src/render/rhi/SceneItem.cpp', 'token != guard->m_preparationToken', 'Async preparation receipts reject stale token/submission and require current cover readiness and drained uploads. GUI/render hot paths perform no IO/decode/wait/readback; prepare updates only continue a nonempty bounded atlas queue.'),
-    ('PERF-03', 'src/render/rhi/SceneItem.cpp', 'if (m_sceneOccluded ||', 'Opaque film stops pool preparation and GUI submission. Immutable RHI values and cached paths persist; normal frame uploads retain existing tile budget. No model/material/texture rebuild from film time.'),
+    ('PERF-03', 'src/render/rhi/SceneItem.cpp', 'if (m_sceneOccluded)', 'Opaque film stops pool preparation and GUI submission. Immutable RHI values and cached paths persist; normal frame uploads retain existing tile budget. No model/material/texture rebuild from film time.'),
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'opening-canvas-color-upper-bound', 'Bounded Canvas RGBA8+depth/stencil and two skip blur crops join the resource descriptor plan; scene targets remain owned by existing renderer. Opening plan changes only recalculate descriptors, not PSO/targets; unknown driver VRAM stays null.'),
     ('PERF-05', 'src/render/opening/OpeningInk.cpp', 'brandTransform.map', 'Paths/round caps are mapped to logical coordinates once per size; no cached stroke state scale, preserving authored width and device AA. Arc-length trimming uses cached QPainterPath, no tessellated polyline approximation.'),
     ('PERF-06', 'qml/Yalahoo/Music/pages/MusicStage.qml', 'FrameAnimation', 'One production FrameAnimation; Opening consumes unscaled dt. Same Header brand remains; hidden chrome and scene input disable during film, actual 720ms stagger endpoints unlock once and restore a valid item.'),
@@ -34,6 +34,14 @@ if stage.count('FrameAnimation {') != 1 or 'FrameAnimation {' in app:
     raise SystemExit('Production stage must own exactly one frame source')
 if 'MusicStage {' not in app or 'MusicStage.qml' not in (ROOT / 'tools/review/OpeningAudit.cpp').read_text():
     raise SystemExit('Review must instantiate the actual production stage')
+scene_item = (ROOT / 'src/render/rhi/SceneItem.cpp').read_text()
+polish = scene_item[scene_item.index('void SceneItem::updatePolish()'):]
+occluded = polish.index('if (m_sceneOccluded)')
+resumed = polish.index('auto &adapter = *m_adapter;')
+opaque = polish[occluded:resumed]
+if (polish.index('!m_renderingActive') >= occluded or 'return;' not in opaque
+        or 'next.sceneOccluded = true;' not in opaque or 'preparePool(' in opaque):
+    raise SystemExit('Hidden/opaque polish must return before pool preparation with a clear-only input')
 renderer = (ROOT / 'src/render/rhi/RhiItem.cpp').read_text()
 start = renderer.index('    void render(QRhiCommandBuffer *cb) override')
 end = renderer.index('\nprivate:', start)

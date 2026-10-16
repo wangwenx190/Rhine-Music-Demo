@@ -209,6 +209,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                 };
                 QJsonObject fields{ { "article", bounds(list, root) },
                                     { "caption", bounds(find("detailCaption"), root) },
+                                    { "back", bounds(find("detailBack"), root) },
                                     { "title", bounds(title, list) },
                                     { "artist", bounds(find("detailArtist"), list) },
                                     { "facts", bounds(find("detailFacts"), list) },

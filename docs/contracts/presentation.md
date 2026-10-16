@@ -10,7 +10,7 @@ DetailModel 持有不可变库快照及索引取得的当前专辑指针。prepa
 
 ## 排版、tab与离线资料
 
-Detail使用冻结最终CSS的宽度断点与aspect布局，content与caption分别锚定。事实网格、标题/译名、离线badge、分碟/曲目边框均按真实字体框与border-box布局；CSS normal曲名按整行fallback的ascent/descent分别取整，不能用固定主字体行高截断emoji。文本/字体键的行高缓存采用256KiB计费上限（字符串载荷及每项64bytes元数据估算），超大键不入缓存；不把计费值当allocator实占。长内容的thin scrollbar占11逻辑px；占位在布局后合并更新，避免宽度/高度绑定循环。
+Detail使用冻结最终CSS的宽度断点与aspect布局，content与caption分别锚定。返回按钮须先应用music-theme-switch.css最终竖屏覆盖（left22/top118），其余宽度断点与窄屏9px字号沿music.css；不能只读取较早的compact/mobile规则。返回按钮的显式字号遵守[source-defect-exceptions.md的SDE-01](source-defect-exceptions.md#sde-01--详情返回按钮字号被通用reset覆盖)，不复刻通用reset意外覆盖。事实网格、标题/译名、离线badge、分碟/曲目边框均按真实字体框与border-box布局；CSS normal曲名按整行fallback的ascent/descent分别取整，不能用固定主字体行高截断emoji。文本/字体键的行高缓存采用256KiB计费上限（字符串载荷及每项64bytes元数据估算），超大键不入缓存；不把计费值当allocator实占。长内容的thin scrollbar占11逻辑px；占位在布局后合并更新，避免宽度/高度绑定循环。
 
 Tabs从滚动header的自然位置吸附到content顶部；两个类型稳定的列表保留同一滚动距离，内容变短时钳到有效末端。prepare才恢复顶部，用户滚动/切tab不触发prepare定位。指示条的180ms和内容的150ms/.35起始透明度沿冻结Bezier，由现有FrameClock一次缩放；打断从当前值继续，减少动态走相同终点，隐藏不推进时钟。所有tab均有Qt焦点/Accessible状态与左右键切换，退出期共同禁用。指示条在实际按钮x/width变化及prepared时同步布局，初始未构造完的按钮暂不读取；延后的焦点/定位使用所属对象方法与当前revision，视觉树销毁后不保留引用旧页签的闭包。
 
@@ -26,4 +26,4 @@ TrackList准备期保持header位于可视顶部；header高度/polish变化只�
 
 `presentation`覆盖双ready门禁、退字连选/四种archiveRoute/取消重开/reset/速度/减少动态与10,000曲目。`presentation-qml`/`ui-audit --presentation 输出目录`使用生产Detail/TrackList，九尺寸双主题及隐藏target DPR1/1.5/2共54结构（native入口只记录真实屏幕DPR的18结构）、跳第8000曲目、真实Qt tab点击/滚动距离钳制、介绍切换/快速重开、退出禁用、十次恢复/最终释放；委托门槛0<数量<100，不把某次31个当固定值。结构≤1逻辑px，时序≤一个60Hz帧，warnings为空。
 
-`node tools/review/export-browse-ui.mjs --presentation`从冻结生产renderDetail/trackList/albumAbout及最终CSS导出独立结构；只读取DOM/字体框，外部请求被拦截。`python3 tools/review/compare-presentation-structure.py 原生report.json 冻结report.json 输出.json`核对content/caption/标题/facts/tabs/曲目锚点与字号至≤1逻辑px。CSS采集先交付viewport及布局属性变更，再读取新DOM，不用上一次样式状态。源码审计`python3 tools/audit/audit-presentation.py [原生report.json [冻结report.json]]`要求这些实际结果并输出冻结/逐历史符号hash及COMMON-01–05/PERF-01–07三平台矩阵；门禁分组/窗口授权见公共契约。运动ports与播放隔离消费边界分别见detail-motion.md及计划R23/R24；目标系统/物理输入/焦点/窗口欠验只在R34/R17-P维护。
+`node tools/review/export-browse-ui.mjs --presentation`从冻结生产renderDetail/trackList/albumAbout及最终CSS导出独立结构；只读取DOM/字体框，外部请求被拦截。`python3 tools/review/compare-presentation-structure.py 原生report.json 冻结report.json 输出.json`核对content/caption/返回按钮/标题/facts/tabs/曲目锚点与字号至≤1逻辑px。CSS采集先交付viewport及布局属性变更，再读取新DOM，不用上一次样式状态。源码审计`python3 tools/audit/audit-presentation.py [原生report.json [冻结report.json]]`要求这些实际结果并输出冻结/逐历史符号hash及COMMON-01–05/PERF-01–07三平台矩阵；门禁分组/窗口授权见公共契约。运动ports与播放隔离消费边界分别见detail-motion.md及计划R23/R24；目标系统/物理输入/焦点/窗口欠验只在R34/R17-P维护。

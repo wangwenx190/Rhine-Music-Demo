@@ -37,7 +37,9 @@ Item {
     objectName: "navigationFrame"
     x: metrics.width <= 700 ? 23 : metrics.width <= 1100 ? 27 : metrics.width >= 1700 ? 62 : 42
     width: metrics.width - x - (metrics.width <= 700 ? 23 : metrics.width * 0.062)
-    height: labelRowHeight + 6 + Math.max(numberSize, total.y + total.height)
+    readonly property real counterHeight: labelRowHeight + 6 + Math.max(numberSize, total.y
+                                                                        + total.height)
+    height: counterHeight + (wrapped ? gridGap + genreStepper.height : 0)
     y: metrics.height - bottomGap - height
     FontMetrics {
         id: strut
@@ -118,12 +120,24 @@ Item {
     readonly property real middleWidth: (width - firstColumnWidth - 2 * gridGap) / (metrics.width
                                                                                     <= 1100 ? 2 :
                                                                                               2.1)
+    readonly property real naturalColumnWidth: Math.max(metrics.width <= 700 ? 64 : 118,
+                                                        columnName.implicitWidth, position.width)
+    readonly property real naturalGenreWidth: previousColumn.implicitWidth
+                                              + nextColumn.implicitWidth + 2 * genreStepper.spacing
+                                              + naturalColumnWidth
+    readonly property bool wrapped: rulerController !== null && inputRouter !== null
+                                    && firstColumnWidth + 2 * gridGap + stepper.width
+                                    + naturalGenreWidth > width
     Row {
         id: stepper
+        objectName: "albumStepper"
         visible: Boolean(root.rulerController)
         spacing: root.metrics.width <= 700 ? 14 : 21
-        x: root.firstColumnWidth + root.gridGap + (root.middleWidth - width) / 2
-        anchors.verticalCenter: parent.verticalCenter
+        x: root.firstColumnWidth + root.gridGap + ((root.wrapped ? root.width
+                                                                   - root.firstColumnWidth
+                                                                   - root.gridGap :
+                                                                   root.middleWidth) - width) / 2
+        y: (root.counterHeight - height) / 2
         ArchiveButton {
             tokens: root.tokens
             text: "↑"
@@ -147,15 +161,16 @@ Item {
         }
     }
     Row {
+        id: genreStepper
+        objectName: "genreStepper"
         visible: Boolean(root.inputRouter)
-        x: root.firstColumnWidth + root.gridGap * 2 + root.middleWidth + (root.width
-                                                                          - root.firstColumnWidth
-                                                                          - root.gridGap * 2
-                                                                          - root.middleWidth
-                                                                          - width) / 2
+        x: root.wrapped ? (root.width - width) / 2 : root.firstColumnWidth + root.gridGap * 2
+                          + root.middleWidth + (root.width - root.firstColumnWidth - root.gridGap
+                                                * 2 - root.middleWidth - width) / 2
         spacing: root.metrics.width <= 700 ? 10 : root.metrics.width <= 1100 ? 15 : 28
-        anchors.verticalCenter: parent.verticalCenter
+        y: root.wrapped ? root.counterHeight + root.gridGap : (root.counterHeight - height) / 2
         ArchiveButton {
+            id: previousColumn
             tokens: root.tokens
             text: "←"
             cssPixelSize: root.metrics.width <= 700 ? 20 : 25
@@ -163,9 +178,14 @@ Item {
             onClicked: root.inputRouter.lane(-1)
         }
         Column {
+            id: columnLabels
             spacing: 5
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(root.metrics.width <= 700 ? 64 : 118, columnName.width, position.width)
+            width: root.wrapped ? Math.min(root.naturalColumnWidth, Math.max(0, root.width
+                                                                             - previousColumn.width
+                                                                             - nextColumn.width - 2
+                                                                             * genreStepper.spacing)) :
+                                  root.naturalColumnWidth
             Row {
                 id: position
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -206,6 +226,12 @@ Item {
             }
             ArchiveText {
                 id: columnName
+                objectName: "navigationColumnLabel"
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+                width: columnLabels.width
+                elide: Text.ElideRight
+                horizontalAlignment: Text.AlignHCenter
                 tokens: root.tokens
                 text: root.columnLabel
                 cssPixelSize: root.metrics.width <= 700 ? 11 : 14
@@ -214,6 +240,7 @@ Item {
             }
         }
         ArchiveButton {
+            id: nextColumn
             tokens: root.tokens
             text: "→"
             cssPixelSize: root.metrics.width <= 700 ? 20 : 25

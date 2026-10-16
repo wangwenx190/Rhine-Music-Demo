@@ -118,6 +118,10 @@ int main(int argc, char **argv)
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
     if (app.arguments().contains("--library"))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2])) : 2;
+    if (app.arguments().contains("--gui"))
+        return argc == 3 || (argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow")
+                ? reviewGui(QString::fromLocal8Bit(argv[2]), argc == 4)
+                : 2;
     if (app.arguments().contains("--startup")) {
         bool validSeconds = true;
         const double seconds =

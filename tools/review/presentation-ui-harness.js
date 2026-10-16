@@ -65,6 +65,27 @@ const bounds = (element, origin) => {
 const articleReset = () => {
     $('#album-detail-content').scrollTop = 0;
 };
+// SDE-01: use the explicit responsive back-button typography, which the generic
+// .music-app button font shorthand unintentionally shadows in the frozen page.
+const declaredBackFontSize = element => {
+    let value;
+    const visit = rules => {
+        for (const rule of rules) {
+            if (rule instanceof CSSMediaRule) {
+                if (matchMedia(rule.conditionText).matches)
+                    visit(rule.cssRules);
+            } else if (rule instanceof CSSStyleRule && rule.selectorText.includes('.music-back')
+                       && element.matches(rule.selectorText) && rule.style.fontSize) {
+                value = parseFloat(rule.style.fontSize);
+            }
+        }
+    };
+    for (const sheet of document.styleSheets)
+        visit(sheet.cssRules);
+    if (!Number.isFinite(value))
+        throw Error('Frozen responsive back-button font declaration missing');
+    return value;
+};
 window.renderCase = async input => {
     stage.dataset.layout = input.width / input.height < 1.05 ? 'portrait' : 'desktop';
     stage.dataset.theme = input.night ? 'night' : 'day';
@@ -81,6 +102,7 @@ window.renderCase = async input => {
     const fields = {
         article: bounds(article, stage),
         caption: bounds($('.card-caption'), stage),
+        back: bounds($('.music-back'), stage),
         title: bounds(article.querySelector('h1'), article),
         artist: bounds($('.detail-artist'), article),
         facts: bounds($('.album-facts'), article),
@@ -91,6 +113,9 @@ window.renderCase = async input => {
         trackTitle: bounds($('.track-name strong'), article),
         trackArtist: bounds($('.track-name small'), article)
     };
+    fields.back.resetFontSize = fields.back.fontSize;
+    fields.back.fontSize = declaredBackFontSize($('.music-back'));
+    fields.back.sourceDefect = 'SDE-01';
     article.scrollTop = article.scrollHeight;
     await new Promise(resolve => requestAnimationFrame(resolve));
     fields.stickyTop =

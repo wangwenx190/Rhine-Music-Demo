@@ -54,8 +54,8 @@ Item {
         iconName: "overview"
         cssPixelSize: 12
         height: 37
-        visible: (!root.opening || root.opening.revealTime > 0) && root.overviewController !== null
-                 && root.albumCount > 0 && root.overviewController.navigationOpacity > 0
+        visible: root.contentEnabled && (!root.opening || root.opening.revealTime > 0) && root.overviewController
+                 !== null && root.albumCount > 0 && root.overviewController.navigationOpacity > 0
         enabled: root.contentEnabled && root.overviewController !== null &&
                  !root.overviewController.active
         opacity: (root.overviewController ? root.overviewController.navigationOpacity : 1) * (

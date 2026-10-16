@@ -50,3 +50,6 @@ renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不�
 - Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`复用非像素检查；源码审计统一为`python3 tools/audit/audit-browse-navigation.py`。共享测试分组见[test-gates.md](test-gates.md)，欠验只归计划R34的R19E-P。
 
 滑尺Review的十次重建销毁并重建完整窗口/根，保留controller源状态，重新绑定同一有界读回链；旧回调按window epoch拒绝；读回完成始终排队到GUI，不能在RenderControl的endFrame内部销毁RHI。basic在有效context中提交清理帧，再释放窗口/renderer。报告真实initialized/invalidated、跨窗口附件峰值估算与最终renderer归零；同对象surface恢复另由产品窗口专项检查。
+
+
+导航行的自适应布局遵守[source-defect-exceptions.md的SDE-02](source-defect-exceptions.md)：按计数器固定列宽、两个操作组自然宽度及既有grid gap判断是否容纳。不足时列选择移到下一行并增加NavigationFrame高度；长列名在扣除两侧箭头与间距后省略，完整名称交Accessible。正常单行位置、字号、滑尺尺寸、帧源及输入语义保持来源定义，不能按均分列宽让操作组相交。
