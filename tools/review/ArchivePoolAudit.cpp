@@ -1,3 +1,5 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "SceneItem.h"
 #include "ShellMaterial.h"
 #include "GraphicsBackend.h"
@@ -57,6 +59,9 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
     if (argc != 2 && argc != 3)

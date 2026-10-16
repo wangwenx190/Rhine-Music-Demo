@@ -4,6 +4,7 @@
 #include <QQuickWindow>
 #include <QTimer>
 #include <QJsonObject>
+#include <QElapsedTimer>
 #include <rhi/qrhi.h>
 #include <functional>
 #include <memory>
@@ -15,6 +16,7 @@ class OffscreenSurface : public QObject
 {
     Q_OBJECT
 public:
+    bool measurementEnabled = false;
     static inline bool Enabled =
 #if defined(Q_OS_MACOS)
             true;
@@ -146,6 +148,7 @@ public:
                  { "includesQtLayersOrFontAtlas", false } };
     }
 signals:
+    void frameMeasured(QJsonObject costs);
     void frameRendered();
 
 private:
@@ -214,11 +217,24 @@ private:
                 QCoreApplication::sendEvent(&m_window, &change);
             }
         }
+        QElapsedTimer timer;
+        if (measurementEnabled)
+            timer.start();
         m_control.polishItems();
+        const qint64 polished = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.beginFrame();
+        const qint64 begun = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.sync();
+        const qint64 synced = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.render();
+        const qint64 rendered = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.endFrame();
+        if (measurementEnabled)
+            emit frameMeasured({ { "polishMs", polished / 1e6 },
+                                 { "beginFrameMs", (begun - polished) / 1e6 },
+                                 { "syncMs", (synced - begun) / 1e6 },
+                                 { "quickRenderMs", (rendered - synced) / 1e6 },
+                                 { "endFrameMs", (timer.nsecsElapsed() - rendered) / 1e6 } });
         emit frameRendered();
     }
     QQuickWindow &m_window;

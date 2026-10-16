@@ -102,10 +102,6 @@ SceneItem::SceneItem(QQuickItem *parent)
             schedule();
         }
     });
-    m_covers.request(QStringLiteral("demo-square"),
-                     QStringLiteral(":/assets/demo-covers/square.png"), 256);
-    m_covers.request(QStringLiteral("demo-square"),
-                     QStringLiteral(":/assets/demo-covers/square.png"), 1024);
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::heightChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::schedule);
@@ -380,13 +376,14 @@ void SceneItem::setDiagnosticsEnabled(bool enabled)
 }
 void SceneItem::configureDiagnostics()
 {
+    ++m_callbackRevision;
     const auto epoch = ++m_diagnosticsEpoch;
     diagnosed = { };
     disconnect(m_presentedConnection);
     m_diagnosticValues.clear();
     emit diagnosticValuesChanged();
     // Explicit Review targets can submit while the native window stays hidden.
-    if (!m_diagnosticsEnabled || !isVisible() || !window()
+    if (!m_renderingActive || !m_diagnosticsEnabled || !isVisible() || !window()
         || QGuiApplication::applicationState() == Qt::ApplicationHidden
         || QGuiApplication::applicationState() == Qt::ApplicationSuspended
         || (!window()->isVisible() && window()->renderTarget().isNull())
@@ -473,8 +470,16 @@ void SceneItem::setTelemetryEnabled(bool enabled)
     if (m_telemetryEnabled == enabled)
         return;
     m_telemetryEnabled = enabled;
+    configureTelemetry();
+    schedule();
+    emit telemetryEnabledChanged();
+}
+void SceneItem::configureTelemetry()
+{
+    ++m_callbackRevision;
+    const auto epoch = ++m_telemetryEpoch;
     profiled = { };
-    if (enabled) {
+    if (m_telemetryEnabled && m_renderingActive) {
         struct Mailbox
         {
             QMutex mutex;
@@ -484,7 +489,7 @@ void SceneItem::setTelemetryEnabled(bool enabled)
         };
         auto mailbox = std::make_shared<Mailbox>();
         QPointer<SceneItem> guard(this);
-        profiled = [mailbox, guard](QJsonObject sample) {
+        profiled = [mailbox, guard, epoch](QJsonObject sample) {
             const QMutexLocker lock(&mailbox->mutex);
             if (mailbox->samples.size() == 128) {
                 mailbox->samples.removeFirst();
@@ -497,7 +502,7 @@ void SceneItem::setTelemetryEnabled(bool enabled)
             if (guard)
                 QMetaObject::invokeMethod(
                         guard,
-                        [mailbox, guard] {
+                        [mailbox, guard, epoch] {
                             QVector<QJsonObject> batch;
                             quint64 dropped = 0;
                             {
@@ -506,7 +511,8 @@ void SceneItem::setTelemetryEnabled(bool enabled)
                                 dropped = mailbox->coalesced;
                                 mailbox->queued = false;
                             }
-                            if (guard && guard->telemetryEnabled())
+                            if (guard && epoch == guard->m_telemetryEpoch
+                                && guard->m_renderingActive && guard->telemetryEnabled())
                                 for (auto &sample : batch) {
                                     sample["coalescedSamples"] = qint64(dropped);
                                     emit guard->frameSubmitted(std::move(sample));
@@ -515,8 +521,6 @@ void SceneItem::setTelemetryEnabled(bool enabled)
                         Qt::QueuedConnection);
         };
     }
-    schedule();
-    emit telemetryEnabledChanged();
 }
 QVector3D SceneItem::qtProjection(QVector3D world) const
 {
@@ -565,18 +569,28 @@ QJsonObject SceneItem::coverStatistics() const
              { "tiledBytes", tiledBytes },
              { "atlasSize", QJsonArray{ 5632, 6656 } } };
 }
+void SceneItem::setRenderingActive(bool active)
+{
+    if (m_renderingActive == active)
+        return;
+    m_renderingActive = active;
+    m_covers.setSuspended(!active);
+    configureTelemetry();
+    configureDiagnostics();
+    if (active) {
+        schedule();
+        update();
+    } else {
+        mouseUngrabEvent();
+    }
+    emit renderingActiveChanged();
+}
 void SceneItem::setSceneOccluded(bool value)
 {
     if (m_sceneOccluded == value)
         return;
     m_sceneOccluded = value;
-    if (value) {
-        auto next = input();
-        next.sceneOccluded = true;
-        next.preparationToken = 0;
-        submit(std::move(next), QSize(fixedColorBufferWidth(), fixedColorBufferHeight()));
-    } else
-        schedule();
+    schedule();
     emit openingChanged();
 }
 void SceneItem::restartPreparation()
@@ -599,7 +613,8 @@ void SceneItem::setPreparing(bool value)
             QMetaObject::invokeMethod(
                     guard,
                     [guard, token, submission, uploaded] {
-                        if (!guard || !guard->m_preparing || token != guard->m_preparationToken
+                        if (!guard || !guard->m_renderingActive || !guard->m_preparing
+                            || token != guard->m_preparationToken
                             || submission != guard->submission() || !uploaded)
                             return;
                         const auto covers = guard->coverStatistics();
@@ -634,7 +649,8 @@ void SceneItem::setOpeningLayerSize(QSize value)
 void SceneItem::schedule()
 {
     // Qt coalesces polish: camera, lighting and quality notifications publish once per frame.
-    polish();
+    if (m_renderingActive)
+        polish();
 }
 bool SceneItem::event(QEvent *event)
 {
@@ -797,8 +813,23 @@ void SceneItem::touchEvent(QTouchEvent *event)
 }
 void SceneItem::updatePolish()
 {
-    if (m_sceneOccluded || !m_adapter || !window() || !isVisible() || width() <= 0 || height() <= 0)
+    if (!m_renderingActive || !m_adapter || !window() || !isVisible() || width() <= 0
+        || height() <= 0)
         return;
+    if (m_sceneOccluded) {
+        if (!input().sceneOccluded) {
+            auto next = input();
+            next.sceneOccluded = true;
+            next.preparationToken = 0;
+            if (next.cover.isNull())
+                next.cover = m_cover;
+            auto target = QSize(fixedColorBufferWidth(), fixedColorBufferHeight());
+            if (target.isEmpty())
+                target = m_adapter->quality()->targetSize();
+            submit(std::move(next), target.expandedTo(QSize(1, 1)));
+        }
+        return;
+    }
     auto &adapter = *m_adapter;
     if (m_poolSelection != adapter.selection()) {
         disconnect(m_poolResetConnection);
@@ -810,8 +841,18 @@ void SceneItem::updatePolish()
                                             this, &SceneItem::refreshPool);
         else {
             m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
-            m_covers.request(QStringLiteral("demo-square"),
-                             QStringLiteral(":/assets/demo-covers/square.png"), 1024);
+        }
+    }
+    if (!m_poolMode && m_selectedCover
+        && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution != 1024)) {
+        const auto identity = QStringLiteral("demo-square");
+        const auto path = QStringLiteral(":/assets/demo-covers/square.png");
+        if (auto pixels = m_covers.lookup(identity, path, 1024)) {
+            if (m_coverPool.upgrade(m_selectedCover, pixels))
+                m_cover = pixels->image;
+        } else {
+            m_covers.request(identity, path, 256);
+            m_covers.request(identity, path, 1024);
         }
     }
     auto &quality = *adapter.quality();
@@ -892,7 +933,8 @@ void SceneItem::updatePolish()
     in.exposure = float(l.exposure());
     const auto target = quality.targetSize();
     const auto &old = input();
-    const bool unchanged = !old.sceneOccluded && in.preparationToken == old.preparationToken
+    const bool unchanged = m_callbackRevision == m_publishedCallbackRevision && !old.sceneOccluded
+            && in.preparationToken == old.preparationToken
             && in.openingLayerSize == old.openingLayerSize
             && in.panelLayerSize == old.panelLayerSize && in.scene.revision == old.scene.revision
             && in.scene.navigationRevision == old.scene.navigationRevision
@@ -926,6 +968,7 @@ void SceneItem::updatePolish()
             && in.exposure == old.exposure;
     if (unchanged)
         return;
+    m_publishedCallbackRevision = m_callbackRevision;
     m_publishedCoverRevision = m_coverRevision;
     in.entities = { in.scene.caseTransform };
     in.entityIds = { 1 };

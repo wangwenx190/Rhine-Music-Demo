@@ -1,3 +1,5 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "RhiCaptureHarness.h"
 #include "RhiReviewInput.h"
 #include "RhiFogAudit.h"
@@ -45,6 +47,9 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
     const bool opticsOnly = argc == 3 && QString::fromLocal8Bit(argv[2]) == "--optics-only";
     if (argc != 2 && !opticsOnly)
         return 2;

@@ -1,3 +1,5 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "AtlasAllocator.h"
 #include "RhiItem.h"
 #include "SceneAdapter.h"
@@ -37,6 +39,9 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
     if (argc != 2)
         return 2;
     try {

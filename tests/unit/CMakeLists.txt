@@ -775,3 +775,13 @@ if(WIN32)
     set_tests_properties(experiments PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(StartupTest StartupTest.cpp)
+target_link_libraries(StartupTest PRIVATE YalahooScene Qt6::Test)
+yalahoo_platform(StartupTest)
+add_test(NAME startup COMMAND StartupTest)
+set_tests_properties(startup PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(startup PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

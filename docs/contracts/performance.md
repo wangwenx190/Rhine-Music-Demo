@@ -85,3 +85,11 @@ R10D依用户要求为record-only：20ms仅参考，不阻止其完成/提交，
 每类保留最近256个样本，以nearest-rank计算p50/p95/p99，超容量计数单列；每至少500ms形成一批，固定邮箱仅保留最新批和一个GUI通知。GUI按批读取解码启动累计/活跃/等待计数并更新小型显示值，不序列化全库或逐帧JSON。原生`frameSwapped`发出时直接记录单调时刻至同一有界邮箱，不能用GUI排队到达时间当作呈现事件间隔。隐藏/最小化/关闭/换窗口清空基线、断开事件并用epoch拒绝旧结果；Review显式RenderControl目标可采提交，但没有原生呈现样本。
 
 面板的“提交吞吐”是该批间隔数/时间，反映当前调度与等待，不宣称未限速benchmark；CPU同步与提交分别列出，不相加分位；GPU范围为QRhi后端提供的已完成帧，缺样本显示不可用。VSYNC只显示请求swapInterval，实际VSYNC、屏幕扫描时刻及input-to-photon均不可用；零上传是有效计数，空时间样本不能显示为0。
+
+## 冷启动与产品压力入口
+
+`startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效；`startup-qml`（`ui-audit --startup 新目录 [12..120秒] [matrix或固定场景名]`）加载真实MusicStage。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音播放的合成WAV；禁止换为私人库。检查30次换片、缓存回选、十次完整视觉root/SG重建、暂停及播放意图/源revision保留、renderer释放及描述符资源回落；滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize走真实组件。`audit-startup.py`输出COMMON/PERF三平台调用链与来源hash矩阵；本机结果与目标实机分开。
+
+串行采样使用`python3 tools/build/verify-startup.py --backend metal --mode offscreen --seconds 120 --runs 3 --output verification/全新目录`。本机RenderControl报告GUI polish、beginFrame、sync、Quick render、endFrame等待以及RHI CPU/GPU成本，异步就绪等待由真实事件唤醒，手工事件回放按请求60Hz推进既有FrameClock；不声称产品threaded或正常呈现。每段原始样本、实际资源清单、缓存/Canvas/文字计数、准备时延及失败日志保留本地；真实driver显存/物理输入/屏幕扫描保持null。
+
+有可靠原生窗口环境时，按对应后端以`--mode vsync`和`--mode uncapped`及明确的`--scenario 场景名`分别串行至少三次；窗口/前台权限仍执行test-window-policy.md。固定场景名为`day/night`各自的`wave/ruler/detail/switch/overview/search`（例如`day-wave`）；每个场景先暖机再采满120秒，两模式/场景各用独立新目录，单列p95/p99、超周期/50ms及连续长帧。默认`matrix`把十二段混在120秒内，仅作局部诊断，每段首秒归过渡；不能据短分段宣称正式目标通过。原生frameSwapped在实际发出点计时，样本不足/溢出显式无效；正常VSYNC请求下按本契约门槛执行，未限速结果仅作吞吐。物理显示/输入与全目标压力矩阵仍按迁移计划后置任务验收，不能以隐藏成本通过冲销。

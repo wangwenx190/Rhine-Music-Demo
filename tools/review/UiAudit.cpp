@@ -1,4 +1,7 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "OpeningAudit.h"
+#include "StartupAudit.h"
 #include "ExperimentAudit.h"
 #include "ControlsAudit.h"
 #include "LibraryAudit.h"
@@ -83,11 +86,17 @@ QJsonObject bounds(QQuickItem *root, const QString &name)
 }
 int main(int argc, char **argv)
 {
+    QElapsedTimer bootstrapTimer;
+    bootstrapTimer.start();
     yalahoo::verification::prepareApplication();
     if (!yalahoo::selectGraphicsBackend())
         return 2;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
+    const auto applicationNs = bootstrapTimer.nsecsElapsed();
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
     if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--native-dpr") {
@@ -96,6 +105,7 @@ int main(int argc, char **argv)
     }
     if (argc < 2 || !yalahoo::initializeAssetFonts())
         return 2;
+    const auto fontsNs = bootstrapTimer.nsecsElapsed();
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
     if (app.arguments().contains("--controls"))
@@ -108,6 +118,20 @@ int main(int argc, char **argv)
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
     if (app.arguments().contains("--library"))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2])) : 2;
+    if (app.arguments().contains("--startup")) {
+        bool validSeconds = true;
+        const double seconds =
+                argc >= 4 ? QString::fromLocal8Bit(argv[3]).toDouble(&validSeconds) : 0;
+        return (argc == 3 || argc == 4 || argc == 5) && validSeconds
+                ? reviewStartup(
+                          app, QString::fromLocal8Bit(argv[2]), seconds,
+                          { { "applicationSetupMs", applicationNs / 1e6 },
+                            { "fontAndArgumentSetupMs", (fontsNs - applicationNs) / 1e6 },
+                            { "scope",
+                              "Review main entry through QGuiApplication and embedded font/argument setup; excludes pre-main loader, anonymous fixture generation, model/cover/render preparation and native presentation." } },
+                          argc == 5 ? QString::fromLocal8Bit(argv[4]) : QStringLiteral("matrix"))
+                : 2;
+    }
     if (app.arguments().contains("--opening"))
         return argc == 3 ? reviewOpening(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--overview"))

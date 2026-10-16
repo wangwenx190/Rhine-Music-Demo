@@ -1,6 +1,8 @@
 qt_add_library(
     YalahooScene
     STATIC
+    StartupCoordinator.cpp
+    StartupCoordinator.h
     LayoutMetrics.cpp
     LayoutMetrics.h
     OverviewController.cpp

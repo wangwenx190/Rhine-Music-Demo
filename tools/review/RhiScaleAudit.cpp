@@ -1,3 +1,5 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "RhiCaptureHarness.h"
 #include "RhiProductionFixture.h"
 #include "PostprocessChecks.h"
@@ -279,6 +281,9 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
     if (argc != 2)
         return 2;
     try {

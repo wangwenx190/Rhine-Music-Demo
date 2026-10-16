@@ -1,4 +1,5 @@
 #include "OpeningController.h"
+#include "StartupCoordinator.h"
 #include "OpeningInk.h"
 #include "TextAreaFormat.h"
 #pragma once
@@ -275,4 +276,12 @@ struct TextAreaFormatQml
     Q_GADGET
     QML_FOREIGN(yalahoo::TextAreaFormat)
     QML_NAMED_ELEMENT(TextAreaFormat)
+};
+
+struct StartupCoordinatorQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::StartupCoordinator)
+    QML_NAMED_ELEMENT(StartupCoordinator)
+    QML_UNCREATABLE("Owned by application")
 };

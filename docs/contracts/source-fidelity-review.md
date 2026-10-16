@@ -412,6 +412,14 @@ REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检�
 
 诊断用实际单调提交/原生Qt呈现事件和既有上传/解码计数，统计范围以performance.md为准。`audit-experiments.py`绑定上述冻结来源hash及当前COMMON/PERF/三平台符号；数学/参数、隐藏输出和缺目标环境的原生输入/呈现分别验收，后者归R27-P。
 
+## R28 · 启动快照与异步生命周期
+
+StartupCoordinator把异步扫描/模型快照与既有OpeningController的真实渲染就绪事件相接；Preparing重确认最新快照，Film到handedOff之间固定展示状态。它是原生快照/线程交接适配，开场数学、片长、材质、画质和普通媒体语义沿原契约。减少动态静止时由同一FrameClock消费失效，帧内/片尾回调产生的新失效保留；普通波浪和活动过渡继续使用原时间数学。隐藏解码/提交门槛、剩余tile续帧与退出前decoder join属于原生所有权收口。
+
+REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回选和重建保留歌曲的场景意图；作者LBEILC、MIT，实际读取文件hash/符号与采用边界由audit-startup.py记录到本地矩阵。未复制实现/素材、其资源释放策略或截图比较。具体启动状态、资源边界、统计与入口分别由opening.md、covers.md、rhi-integration.md和performance.md维护；目标欠验集中在迁移计划R28-P。
+
+本机Release已实际执行启动/帧源/封面/开场/实验状态和隐藏Metal生产图集、片头、诊断与完整舞台生命周期回归；三次串行120秒隐藏成本回放保留独立原始样本。初始化、准备时延、GUI/同步/Quick提交/endFrame等待、RHI提交及资源描述符分别记账；不将其解释为原生VSYNC、物理输入/显示或driver显存验收。
+
 ## 共用控件来源
 
 冻结style.css/music.css的继承字体、输入框/选择器/checkbox/range/progress以及music-lighting-lab.css最终按钮/滑杆覆盖映射至Archive控件；来源框与文字行高按[controls.md](controls.md)显式设置。QtQuick.Templates仅提供公开输入/焦点/Accessible行为，所有产品/研究/Review视觉由项目组件与DesignTokens绘制。浏览器原生内部装饰映射为明确的项目几何，原生弹出菜单/滚动条空间由项目限定，不宣称其装饰是源CSS常量。FolderDialog保留操作系统目录选择。

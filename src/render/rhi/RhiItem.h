@@ -11,6 +11,7 @@
 
 namespace yalahoo::rhi {
 QJsonArray adapterInventory();
+QJsonObject preparedAssetStatistics();
 // Values only. No QObject or QRhi ownership crosses the synchronization boundary.
 struct SceneSubmissionStats
 {

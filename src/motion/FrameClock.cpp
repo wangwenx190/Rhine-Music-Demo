@@ -3,6 +3,13 @@
 #include <cmath>
 
 namespace yalahoo {
+void FrameClock::requestVisualFrame()
+{
+    if (m_workPending)
+        return;
+    m_workPending = true;
+    emit workPendingChanged();
+}
 void FrameClock::setApplicationVisible(bool visible)
 {
     if (m_applicationVisible == visible)
@@ -32,6 +39,8 @@ void FrameClock::advance(double frameSeconds)
 {
     if (!m_active || !std::isfinite(frameSeconds))
         return;
+    // Consume before callbacks so invalidation raised during this frame survives sleep.
+    m_workPending = false;
     double dt = std::clamp(frameSeconds, 0.0, .05);
     if (m_discardNext) {
         dt = 0;
@@ -47,6 +56,8 @@ void FrameClock::advance(double frameSeconds)
     ++m_frameCount;
     emit frame(dt, motionDt);
     emit advanced();
+    if (!m_workPending)
+        emit workPendingChanged();
 }
 void FrameClock::startOpening()
 {

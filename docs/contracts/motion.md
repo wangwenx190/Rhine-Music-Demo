@@ -2,6 +2,7 @@
 
 时间单位为秒，计算使用 double。`src/motion/` 编入 `YalahooCore`，不依赖 Qt Quick、媒体或操作系统 API；仅时钟和组合控制器使用 QObject。`App.qml`内唯一`MusicStage.qml`的一个`FrameAnimation` 向注入的 `MotionController.clock` 提交 `frameTime`，其 `frame(dt, motionDt)` 是后续生产视觉系统的统一输入。禁止再建 QTimer、另一个 FrameAnimation 或媒体驱动的视觉循环。
 
+- 减少动态且无呈现过渡/歌曲定位高亮时，唯一FrameAnimation仅消费待处理帧；SceneAdapter、运动请求和InputRouter失效唤醒同一时钟。待处理标记在frame回调前消费，帧内晚到失效保留到下一帧；正常波浪与活动动画仍连续推进。
 - `FrameClock` 在入口钳制 `dt` 到 0–0.05 秒，忽略非有限输入；`motionDt=dt*speed`，速度钳制到 0.25–3，只在这里缩放。改速不修改任何轨迹的起点或已用时间。普通 `visualTime` 积累 motionDt。
 - `startOpening()` 重置独立开场时间，从相同 dt 积累至 11.6 秒；不受 speed 影响。`finishOpening()` 在运行时到达终点并发出一次完成通知。开场UI与交接由[opening.md](opening.md)的OpeningController消费。
 - 窗口隐藏、最小化，或应用进入 Hidden/Suspended 时停止唯一帧源并停用时钟。恢复后丢弃首个帧间隔，避免后台时间消耗轨迹；不保留积压，不改变媒体对象。

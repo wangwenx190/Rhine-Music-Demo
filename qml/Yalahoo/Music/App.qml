@@ -9,6 +9,7 @@ T.ApplicationWindow {
     required property LibrarySession librarySession
     required property MotionController motionController
     required property SceneAdapter sceneAdapter
+    property StartupCoordinator startupCoordinator: null
     property OpeningController openingController: null
     property InputRouter inputRouter: null
     property RulerController rulerController: null
@@ -44,6 +45,7 @@ T.ApplicationWindow {
             librarySession: window.librarySession
             motionController: window.motionController
             sceneAdapter: window.sceneAdapter
+            startupCoordinator: window.startupCoordinator
             openingController: window.openingController
             inputRouter: window.inputRouter
             rulerController: window.rulerController

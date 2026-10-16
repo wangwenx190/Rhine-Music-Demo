@@ -5,6 +5,7 @@ namespace yalahoo {
 class FrameClock : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool workPending READ workPending NOTIFY workPendingChanged)
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(bool applicationVisible READ applicationVisible WRITE setApplicationVisible NOTIFY applicationVisibleChanged)
     Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
@@ -44,6 +45,11 @@ public:
     {
         return m_frameCount;
     }
+    bool workPending() const
+    {
+        return m_workPending;
+    }
+    Q_INVOKABLE void requestVisualFrame();
     void setActive(bool active);
     void setApplicationVisible(bool visible);
     void setSpeed(double speed);
@@ -51,6 +57,7 @@ public:
     Q_INVOKABLE void startOpening();
     Q_INVOKABLE void finishOpening();
 signals:
+    void workPendingChanged();
     void frame(double dt, double motionDt);
     void advanced();
     void activeChanged();
@@ -60,7 +67,7 @@ signals:
     void openingFinished();
 
 private:
-    bool m_active = false;
+    bool m_active = false, m_workPending = true;
     bool m_applicationVisible = true;
     bool m_discardNext = true;
     bool m_openingRunning = false;

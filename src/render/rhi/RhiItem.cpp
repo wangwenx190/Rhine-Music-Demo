@@ -2024,11 +2024,11 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (drain)
         update();
     ++submissionStats.rendered;
-    if (input.preparationToken && prepared) {
+    if (input.preparationToken && prepared)
         prepared(input.preparationToken, synchronizedSubmission, atlasQueue.pending() == 0);
-        if (atlasQueue.pending() > 0)
-            update();
-    }
+    // A reduced-motion scene may have no subsequent state mutation to drain the upload budget.
+    if (atlasQueue.pending() > 0)
+        update();
     if (diagnose) {
         const auto gpu = cb->lastCompletedGpuTime();
         diagnose({ std::chrono::duration<double, std::milli>(
@@ -2064,6 +2064,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { "coverSnapshotShares", qint64(coverSnapshotShares) },
                 { "postprocessRevision", qint64(post.revision()) },
                 { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
+                { "atlasPending", atlasQueue.pending() },
                 { "atlasUploadBytes", frameUploadBytes },
                 { "selectedUploadBytes", selectedUploadBytes },
                 { "selectedCoverWidth", input.cover.width() },
@@ -2158,6 +2159,27 @@ QJsonArray adapterInventory()
     }
 #endif
     return result;
+}
+QJsonObject preparedAssetStatistics()
+{
+    const auto &fixed = preparedAssets();
+    qint64 bytePayload = 0, imagePayload = 0, meshPayload = 0;
+    for (const auto &bytes : fixed.bytes)
+        bytePayload += bytes.size();
+    for (const auto &image : fixed.images)
+        imagePayload += image.sizeInBytes();
+    for (const auto &mesh : fixed.geometry)
+        meshPayload += mesh.vertices.size() * sizeof(std::array<float, 8>)
+                + mesh.indices.size() * sizeof(quint32);
+    return {
+        { "bytePayloadBytes", bytePayload },
+        { "imagePayloadBytes", imagePayload },
+        { "meshPayloadBytes", meshPayload },
+        { "shaderObjects", fixed.shaders.size() },
+        { "allocatedHeapBytes", QJsonValue::Null },
+        { "scope",
+          "Immutable process cache payload; Qt container, shader internal storage and allocator overhead unknown. Separate from GPU descriptors and live cover/cache/lease/checkpoint counters." }
+    };
 }
 void RhiItem::submit(Input input, QSize target)
 {

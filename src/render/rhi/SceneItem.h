@@ -10,6 +10,7 @@ namespace yalahoo::rhi {
 class SceneItem : public RhiItem
 {
     Q_OBJECT
+    Q_PROPERTY(bool renderingActive READ renderingActive WRITE setRenderingActive NOTIFY renderingActiveChanged)
     Q_PROPERTY(bool sceneOccluded READ sceneOccluded WRITE setSceneOccluded NOTIFY openingChanged)
     Q_PROPERTY(bool preparing READ preparing WRITE setPreparing NOTIFY openingChanged)
     Q_PROPERTY(QSize panelLayerSize READ panelLayerSize WRITE setPanelLayerSize NOTIFY openingChanged)
@@ -26,6 +27,11 @@ class SceneItem : public RhiItem
     Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged)
 public:
     explicit SceneItem(QQuickItem *parent = nullptr);
+    bool renderingActive() const
+    {
+        return m_renderingActive;
+    }
+    void setRenderingActive(bool active);
     bool sceneOccluded() const
     {
         return m_sceneOccluded;
@@ -89,6 +95,7 @@ public:
     TitleReel *transportReel() const;
     void setTransportReel(TitleReel *reel);
 signals:
+    void renderingActiveChanged();
     void openingChanged();
     void scenePrepared();
     void adapterChanged();
@@ -145,7 +152,7 @@ private:
     QPointer<SelectionController> m_poolSelection;
     QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;
     QMetaObject::Connection m_dprConnection, m_screenConnection;
-    bool m_poolMode = false;
+    bool m_poolMode = false, m_renderingActive = true;
     bool m_sceneOccluded = false, m_preparing = false;
     quint64 m_preparationToken = 0;
     QSize m_openingLayerSize, m_panelLayerSize;
@@ -159,7 +166,9 @@ private:
     QString m_errorText;
     bool m_geometryOnly = false, m_inspectionEnabled = true;
     bool m_telemetryEnabled = false, m_diagnosticsEnabled = false;
-    quint64 m_diagnosticsEpoch = 0;
+    void configureTelemetry();
+    quint64 m_diagnosticsEpoch = 0, m_telemetryEpoch = 0;
+    quint64 m_callbackRevision = 0, m_publishedCallbackRevision = 0;
     QVariantMap m_diagnosticValues;
     QMetaObject::Connection m_presentedConnection, m_windowStateConnection;
     std::optional<QPointF> m_mouseStart;

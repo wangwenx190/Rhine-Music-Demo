@@ -28,10 +28,13 @@ class CoverCache : public QObject
 public:
     explicit CoverCache(QObject *parent = nullptr);
     ~CoverCache() override;
+    // Final process teardown only, while QGuiApplication/font services still exist.
+    static void finishDecoders();
     bool request(QString identity, QString path, int resolution, QString title = { });
     CoverSnapshot lookup(const QString &identity, const QString &path, int resolution,
                          const QString &title = { });
     void reset();
+    void setSuspended(bool suspended);
     void cancel(const QString &identity);
     void invalidate(const QString &identity);
     quint64 generation() const;
@@ -74,6 +77,7 @@ private:
     QHash<QString, Job> m_running;
     QHash<QString, Entry> m_cache;
     qint64 m_bytes = 0;
+    bool m_suspended = false;
     int m_active = 0, m_peakActive = 0, m_peakPending = 0;
     quint64 m_clock = 0, m_decodes = 0, m_rejected = 0, m_stale = 0;
     qint64 m_peakReaderBytes = 0;

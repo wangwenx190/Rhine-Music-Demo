@@ -9,6 +9,7 @@ Item {
     id: stage
     required property LibrarySession librarySession
     required property MotionController motionController
+    property StartupCoordinator startupCoordinator: null
     property OpeningController openingController: null
     property Item openingReturnFocus: null
     property bool offscreenRendering: false
@@ -55,10 +56,54 @@ Item {
         reducedMotion: stage.motionController.reducedMotion
         motionSpeed: stage.motionController.clock.speed
     }
+    readonly property bool visualActive: stage.motionController.clock.applicationVisible && (
+                                             stage.offscreenRendering || (stage.Window.window
+                                                                          !== null
+                                                                          && stage.Window.window.visible
+                                                                          && stage.Window.window.visibility
+                                                                          !== Window.Minimized))
+    Connections {
+        target: stage.sceneAdapter
+        function onFrameChanged() {
+            stage.motionController.clock.requestVisualFrame();
+        }
+    }
+    Connections {
+        target: stage.motionController
+        function onStateChanged() {
+            stage.motionController.clock.requestVisualFrame();
+        }
+        function onReducedMotionChanged() {
+            stage.motionController.clock.requestVisualFrame();
+        }
+    }
+    Connections {
+        target: stage.inputRouter
+        function onInputReceived() {
+            stage.motionController.clock.requestVisualFrame();
+        }
+    }
+    Binding {
+        target: stage.startupCoordinator
+        property: "visualActive"
+        value: stage.visualActive
+        when: stage.startupCoordinator !== null
+    }
+    Connections {
+        target: stage.startupCoordinator
+        function onPreparationInvalidated() {
+            nativeScene.restartPreparation();
+        }
+    }
     FrameAnimation {
-        running: !stage.offscreenRendering && stage.Window.window !== null
-                 && stage.Window.window.visible && stage.Window.window.visibility
-                 !== Window.Minimized && stage.motionController.clock.applicationVisible
+        running: !stage.offscreenRendering && stage.visualActive && (
+                     !stage.motionController.reducedMotion
+                     || stage.motionController.clock.workPending || (stage.trackFocusController
+                                                                     && stage.trackFocusController.active)
+                     || (stage.presentationController && stage.presentationController.phase
+                         !== "archive" && stage.presentationController.phase !== "detail") || (
+                         stage.openingController && stage.openingController.active &&
+                         !stage.openingController.preparing))
         onRunningChanged: stage.motionController.clock.active = running
         Component.onCompleted: stage.motionController.clock.active = running
         onTriggered: stage.motionController.clock.advance(frameTime)
@@ -74,6 +119,7 @@ Item {
                                                                 !stage.openingController.active)
             anchors.fill: parent
             adapter: stage.sceneAdapter
+            renderingActive: stage.visualActive
             enabled: (!stage.openingController || !stage.openingController.active) && (
                          !stage.panelController || !stage.panelController.surface.shown)
             sceneOccluded: stage.openingController !== null && stage.openingController.sceneOccluded
@@ -85,7 +131,9 @@ Item {
                                                                                                    0)
             openingLayerSize: stage.openingOverlay ? stage.openingOverlay.canvasSize : Qt.size(0, 0)
             onScenePrepared: {
-                if (stage.openingController)
+                if (stage.startupCoordinator)
+                    stage.startupCoordinator.scenePrepared();
+                else if (stage.openingController)
                     stage.openingController.scenePrepared();
             }
             inputRouter: stage.inputRouter

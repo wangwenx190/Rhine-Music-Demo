@@ -42,6 +42,10 @@ CoverCache::~CoverCache()
     m_state->receiver = nullptr;
     ++m_state->generation;
 }
+void CoverCache::finishDecoders()
+{
+    decodePool().waitForDone();
+}
 QString CoverCache::key(const QString &identity, const QString &path, int resolution,
                         const QString &title)
 {
@@ -126,8 +130,20 @@ void CoverCache::invalidate(const QString &identity)
         }
     }
 }
+void CoverCache::setSuspended(bool suspended)
+{
+    if (m_suspended == suspended)
+        return;
+    m_suspended = suspended;
+    if (suspended)
+        m_retry.stop();
+    else
+        pump();
+}
 void CoverCache::pump()
 {
+    if (m_suspended)
+        return;
     while (m_active < concurrency && !m_pending.isEmpty()) {
         const auto job = m_pending.first();
         const auto state = m_state;
@@ -274,6 +290,7 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 QJsonObject CoverCache::statistics() const
 {
     return { { "generation", qint64(generation()) },
+             { "suspended", m_suspended },
              { "pending", m_pending.size() },
              { "active", m_active },
              { "peakPending", m_peakPending },

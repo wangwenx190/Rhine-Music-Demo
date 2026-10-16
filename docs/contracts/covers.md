@@ -35,14 +35,19 @@ atlas 无 mip 链、使用线性 clamp 采样，无跨格各向异性。当前 Q
 | 待解码描述符 | 96；identity≤1024、path≤32768、title≤256 字符 | cancel/reset；入池后移除；满时拒绝 |
 | 全局解码与每 cache 未消费结果 | 3；每 worker 源像素按 32 bytes/pixel 保守展开/转向估算，加 12MiB conversion/paint scratch，合计 140MiB/worker、420MiB reservation 峰值 | generation/wanted 取消；GUI completion 释放 reservation；不是进程 RSS 实测 |
 | 完成 CPU LRU | 16MiB，即最多 64 个 256² 或四个 1024²；按实际 sizeInBytes 计费 | 有界 LRU 淘汰/reset；外部合法租约单独计费 |
-| AtlasAllocator retained tile | 432×256²×4=108MiB；dirty 引用共享 retained 图，不另复制 | release/reset |
+| AtlasAllocator retained tile | 436×256²×4=109MiB（432阵列加最多4个独立身份）；dirty 引用共享 retained 图，不另复制 | release/reset |
 | 单页 render 待上传/GUI replay | 最多该页 64 tile=16MiB；生产共享 retained 图，外部输入的隔离副本另有相同上界 | take/替代/重建；稳定帧零上传 |
 | 单页上传批次 | 常态≤8 tile=2MiB；初始化≤64 tile=16MiB，剩余跨真实帧 | command buffer 消费；不把 QImage 调用次数当 GPU 流量 |
+| selected/returning GUI高清tile | 四槽×16个256² tile≤16MiB，与原1024² lease为独立载荷；生产render replay共享这些immutable图 | owned槽释放/内容revision替换 |
 | selected/returning CPU leases | 四个×1024²×4≤16MiB，低清晰度先复用，不与 LRU 共享载荷重复解释为实际占用 | lease owner 释放；reset 后仍计入四槽容量 |
 | GPU atlas pages | 典型七页×2048²×4=112MiB，无 mip；其他设备为 pages×实际 pageSize×4 | renderer/page owner 释放；每页各自预算，完整阵列由 R12 汇总调度 |
 | GPU selected/returning | 四个1024² RGBA8≤16MiB，无 mip；单个最新 selected 上传≤4MiB | 独立 renderer 释放；与 atlas tile 2MiB 统计分开 |
 
-RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、lookup、geometry/uniform/instance buffer 和 Qt item 输出仍由 ResourcePlan/ResourceInventory 按实际尺寸计算，见 rhi-integration.md；不再另建整页 CPU atlas 或 tile GPU staging texture。按保守独立所有者相加，新增 CPU reservation/完成缓存/retained/单页外部隔离/租约像素 reservation/载荷小计上界为 576MiB；生产隐式共享实际载荷通常更低。这些数值不包含库模型、固定资产、opaque codec scratch、驱动/PSO/SRB、Qt swapchain/compositor。旧/新封面或页面更换同时存活的 descriptor 上界为两套 cover 载荷，其他兼容资源不重建；现有报告的全场景 old+new 是更保守的 descriptor 对上界，非 VRAM 驻留峰值。measuredVramBytes 保持 null。
+RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、lookup、geometry/uniform/instance buffer 和 Qt item 输出仍由 ResourcePlan/ResourceInventory 按实际尺寸计算，见 rhi-integration.md；不再另建整页 CPU atlas 或 tile GPU staging texture。按保守独立所有者相加，CPU reservation/完成缓存/retained/高清租约/高清tile的保守独立上界为577MiB；外部Review输入单页隔离另加16MiB时为593MiB；生产隐式共享实际载荷通常更低。这些数值不包含库模型、固定资产、opaque codec scratch、驱动/PSO/SRB、Qt swapchain/compositor。旧/新封面或页面更换同时存活的 descriptor 上界为两套 cover 载荷，其他兼容资源不重建；现有报告的全场景 old+new 是更保守的 descriptor 对上界，非 VRAM 驻留峰值。measuredVramBytes 保持 null。
+
+- 原生主入口/使用SceneItem的Review在QGuiApplication之后建立退出scope guard：局部QObject先销毁并取消generation，再以finishDecoders等待全局三worker结束，最后销毁Qt应用/字体服务。此等待仅用于最终退出；普通cache/视觉树销毁仍不等待worker。
+- CoverCache暂停时保留有界待解码队列/缓存/合法租约，停止retry和新worker准入；最多三个在途结果仍按generation/wanted验收。恢复继续有界队列，不重复已命中解码。
+- AtlasUploadQueue尚有待上传tile时沿真实渲染续帧排空，每批仍遵守初始化/稳态原预算；静止/减少动态不依赖下一次用户输入完成封面。
 
 ## 检查入口
 

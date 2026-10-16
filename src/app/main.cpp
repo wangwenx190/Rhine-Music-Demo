@@ -1,3 +1,5 @@
+#include "CoverCache.h"
+#include <QScopeGuard>
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
@@ -12,6 +14,7 @@
 #include "DetailPorts.h"
 #include "MotionController.h"
 #include "OpeningController.h"
+#include "StartupCoordinator.h"
 #include "OfflineMetadataProvider.h"
 #include "PreferencesStore.h"
 #include "SettingsController.h"
@@ -83,6 +86,9 @@ int main(int argc, char **argv)
         return 22;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    const auto coverShutdown = qScopeGuard([] {
+        yalahoo::CoverCache::finishDecoders();
+    });
     if (!yalahoo::initializeAssetFonts()) {
         std::fprintf(stderr, "Embedded MiSans font registration failed\n");
         return 6;
@@ -228,10 +234,20 @@ int main(int argc, char **argv)
             library.requestMetadata(library.snapshot()->albums.first().id,
                                     QStringLiteral("introduction"));
     }
+    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime")) || appVerification
+#ifdef YALAHOO_REVIEW
+            || parser.isSet(QStringLiteral("verify-materials"))
+            || parser.isSet(QStringLiteral("verify-scene"))
+            || parser.isSet(QStringLiteral("verify-integration"))
+#endif
+            ;
     yalahoo::MotionController motion;
     yalahoo::OverviewController overview(&motion);
     yalahoo::SelectionController selection(&motion);
     yalahoo::SceneAdapter scene(motion.clock());
+    yalahoo::OpeningController opening(&motion, &scene, &selection);
+    yalahoo::StartupCoordinator startup(&library, &opening, motion.clock(),
+                                        !verificationRun && !demonstration);
     yalahoo::InputRouter inputRouter(&selection);
     yalahoo::RulerController rulerController(&motion, &selection);
     rulerController.setInputRouter(&inputRouter);
@@ -262,13 +278,6 @@ int main(int argc, char **argv)
     bool resumeDiscarded = true;
     int resumeSamples = 0;
     QJsonArray completionRevisions;
-    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime")) || appVerification
-#ifdef YALAHOO_REVIEW
-            || parser.isSet(QStringLiteral("verify-materials"))
-            || parser.isSet(QStringLiteral("verify-scene"))
-            || parser.isSet(QStringLiteral("verify-integration"))
-#endif
-            ;
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
     if (!verificationRun && !demonstration) {
@@ -305,12 +314,12 @@ int main(int argc, char **argv)
         QObject::connect(&sounds, &yalahoo::InterfaceSoundController::settingsChanged,
                          preferences.get(), saveAudio);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &library,
-                         [&library](yalahoo::Snapshot snapshot) {
-                             library.setSnapshot(*snapshot);
-                         });
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &startup,
+                         &yalahoo::StartupCoordinator::receive);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
-                         [](const QString &error) {
+                         [&](const QString &error) {
+                             if (!startup.statistics()["initialReady"].toBool())
+                                 startup.receive(libraryStore->snapshot());
                              qWarning().noquote() << error;
                          });
         if (parser.isSet(QStringLiteral("import-preferences")))
@@ -411,7 +420,6 @@ int main(int argc, char **argv)
     });
     QObject::connect(&inputRouter, &yalahoo::InputRouter::inputReceived, &overview,
                      &yalahoo::OverviewController::collapse);
-    yalahoo::OpeningController opening(&motion, &scene, &selection);
     const auto updateOpeningInput = [&] {
         inputRouter.setEnabled(!opening.active() && presentation.archiveEnabled()
                                && !panels.surface()->shown());
@@ -453,8 +461,10 @@ int main(int argc, char **argv)
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
-        if (!verificationRun)
+        if (!verificationRun) {
             presentationProperties.insert("openingController", QVariant::fromValue(&opening));
+            presentationProperties.insert("startupCoordinator", QVariant::fromValue(&startup));
+        }
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
         presentationProperties.insert("playbackController", QVariant::fromValue(&playback));
         presentationProperties.insert("backgroundMusicController",

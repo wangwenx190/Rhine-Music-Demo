@@ -25,6 +25,12 @@ public:
 class CoverCacheTest : public QObject
 {
     Q_OBJECT
+public:
+    ~CoverCacheTest() override
+    {
+        CoverCache::finishDecoders();
+    }
+
 private:
     static CoverSnapshot pixels(QString id, int resolution = 256, quint64 generation = 1)
     {
@@ -37,6 +43,77 @@ private:
         return p;
     }
 private slots:
+    void closingCacheBeforeFinalDecoderJoin()
+    {
+        auto cache = std::make_unique<CoverCache>();
+        QSignalSpy ready(cache.get(), &CoverCache::ready);
+        for (int i = 0; i < CoverCache::concurrency; ++i)
+            QVERIFY(cache->request(QString::number(i), { }, 1024, "anonymous"));
+        cache.reset();
+        CoverCache::finishDecoders();
+        QCoreApplication::sendPostedEvents();
+        QCOMPARE(ready.size(), 0);
+    }
+    void coldHiddenAndOpaqueRootDoesNotDecode()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns({ { "column", "column", { "a", "b" } } });
+        SceneAdapter adapter;
+        adapter.setSelection(&selection);
+        QQuickWindow window;
+        HiddenSceneItem item(window.contentItem());
+        item.setSize({ 640, 480 });
+        item.setAdapter(&adapter);
+        QCOMPARE(item.coverStatistics()["cache"].toObject()["decodeStarts"].toInt(), 0);
+        item.setRenderingActive(false);
+        item.setSceneOccluded(true);
+        item.publishNow();
+        QCOMPARE(item.submission(), 0);
+        item.setRenderingActive(true);
+        item.publishNow();
+        QVERIFY(item.input().sceneOccluded);
+        QCOMPARE(item.coverStatistics()["cache"].toObject()["decodeStarts"].toInt(), 0);
+        item.setSceneOccluded(false);
+        item.publishNow();
+        QVERIFY(item.input().poolFrame);
+        QVERIFY(!item.input().sceneOccluded);
+        QVERIFY(item.coverStatistics()["cache"].toObject()["decodeStarts"].toInt() > 0);
+    }
+    void telemetryFromPreviousVisibilityIsRejected()
+    {
+        SceneItem item;
+        item.setTelemetryEnabled(true);
+        const auto previous = item.profiled;
+        QVERIFY(bool(previous));
+        QSignalSpy submitted(&item, &SceneItem::frameSubmitted);
+        previous({ { "submission", 1 } });
+        item.setRenderingActive(false);
+        QVERIFY(!item.profiled);
+        item.setRenderingActive(true);
+        QCoreApplication::sendPostedEvents();
+        QCOMPARE(submitted.size(), 0);
+        item.profiled({ { "submission", 2 } });
+        QTRY_COMPARE(submitted.size(), 1);
+        QCOMPARE(submitted[0][0].toJsonObject()["submission"].toInt(), 2);
+    }
+    void suspendedQueueDoesNotStartWorkers()
+    {
+        CoverCache cache;
+        cache.setSuspended(true);
+        QSignalSpy ready(&cache, &CoverCache::ready);
+        for (int i = 0; i < 20; ++i)
+            QVERIFY(cache.request(QString::number(i), { }, 256, "anonymous"));
+        QCoreApplication::sendPostedEvents();
+        QCOMPARE(cache.statistics()["decodeStarts"].toInt(), 0);
+        QCOMPARE(cache.statistics()["pending"].toInt(), 20);
+        cache.setSuspended(false);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 20, 10000);
+        QCOMPARE(cache.statistics()["pending"].toInt(), 0);
+        QCOMPARE(cache.statistics()["active"].toInt(), 0);
+        QVERIFY(cache.statistics()["peakActive"].toInt() <= CoverCache::concurrency);
+    }
+
     void adapterDestroyedDuringDecode()
     {
         MotionController motion;
