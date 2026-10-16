@@ -408,6 +408,64 @@ QJsonObject SceneItem::coverStatistics() const
              { "tiledBytes", tiledBytes },
              { "atlasSize", QJsonArray{ 5632, 6656 } } };
 }
+void SceneItem::setSceneOccluded(bool value)
+{
+    if (m_sceneOccluded == value)
+        return;
+    m_sceneOccluded = value;
+    if (value) {
+        auto next = input();
+        next.sceneOccluded = true;
+        next.preparationToken = 0;
+        submit(std::move(next), QSize(fixedColorBufferWidth(), fixedColorBufferHeight()));
+    } else
+        schedule();
+    emit openingChanged();
+}
+void SceneItem::restartPreparation()
+{
+    setPreparing(false);
+    setPreparing(true);
+}
+void SceneItem::setPreparing(bool value)
+{
+    if (m_preparing == value)
+        return;
+    m_preparing = value;
+    ++m_preparationToken;
+    prepared = { };
+    if (value) {
+        QPointer<SceneItem> guard(this);
+        prepared = [guard](quint64 token, quint64 submission, bool uploaded) {
+            if (!guard)
+                return;
+            QMetaObject::invokeMethod(
+                    guard,
+                    [guard, token, submission, uploaded] {
+                        if (!guard || !guard->m_preparing || token != guard->m_preparationToken
+                            || submission != guard->submission() || !uploaded)
+                            return;
+                        const auto covers = guard->coverStatistics();
+                        if (covers.value("ready").toInt() != covers.value("identities").toInt()
+                            || (covers.value("owned").toInt() > 0
+                                && !covers.value("selectedDetailed").toBool()))
+                            return;
+                        emit guard->scenePrepared();
+                    },
+                    Qt::QueuedConnection);
+        };
+    }
+    schedule();
+    emit openingChanged();
+}
+void SceneItem::setOpeningLayerSize(QSize value)
+{
+    if (m_openingLayerSize == value)
+        return;
+    m_openingLayerSize = value;
+    schedule();
+    emit openingChanged();
+}
 void SceneItem::schedule()
 {
     // Qt coalesces polish: camera, lighting and quality notifications publish once per frame.
@@ -574,7 +632,7 @@ void SceneItem::touchEvent(QTouchEvent *event)
 }
 void SceneItem::updatePolish()
 {
-    if (!m_adapter || !window() || !isVisible() || width() <= 0 || height() <= 0)
+    if (m_sceneOccluded || !m_adapter || !window() || !isVisible() || width() <= 0 || height() <= 0)
         return;
     auto &adapter = *m_adapter;
     if (m_poolSelection != adapter.selection()) {
@@ -599,6 +657,10 @@ void SceneItem::updatePolish()
     const auto &l = *adapter.lighting();
     const auto settings = quality.values();
     Input in;
+    in.preparationToken = m_preparing ? m_preparationToken : 0;
+    in.openingLayerSize = QSize(
+            int(std::ceil(m_openingLayerSize.width() * window()->effectiveDevicePixelRatio())),
+            int(std::ceil(m_openingLayerSize.height() * window()->effectiveDevicePixelRatio())));
     // Review capture tokens survive a coalesced camera/cover polish before synchronization.
     in.request = input().request;
 #ifdef YALAHOO_RHI_AUDIT
@@ -664,7 +726,9 @@ void SceneItem::updatePolish()
     in.exposure = float(l.exposure());
     const auto target = quality.targetSize();
     const auto &old = input();
-    const bool unchanged = in.scene.revision == old.scene.revision
+    const bool unchanged = !old.sceneOccluded && in.preparationToken == old.preparationToken
+            && in.openingLayerSize == old.openingLayerSize
+            && in.scene.revision == old.scene.revision
             && in.scene.navigationRevision == old.scene.navigationRevision
             && in.scene.navigationCommittedNs == old.scene.navigationCommittedNs
             && in.navigationDpr == old.navigationDpr

@@ -323,7 +323,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；这是当前离线产品边界，联网实现仍归R26。 |
 | 原生文字/资源适配 | 公共ArchiveText分数字号/整行shaping保留；曲目CSS normal以实际resolved ascent/descent分别取整，缓存有界，不加按截图调出的偏移。局部backdrop附件随可见Loader销毁，尺寸/DPR不改变3D目标键。 |
 
-macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11、Linux/OpenGL的目标补验仍归R34/R17-P，不外推为全平台通过。
+macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R34/R17-P，Linux/OpenGL归R35的R17-P，不外推为全平台通过。
 
 ## R19H 全历史闭包与保留适配
 
@@ -366,6 +366,17 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 
 滑尺三路径的生命周期同样使用完整窗口/根重建，controller保留源状态；basic先用有效上下文清理帧退役旧renderer。读回完成强制queued交付，避免同线程RenderControl在endFrame内部销毁自身RHI；每次重新绑定帧/读回且以epoch拒绝旧结果，保留初始化/失效门槛、33次数字/输出恢复、隐藏零工作及最终renderer归零。共享RHI采集器的native rebuild改为完整窗口所有权边界，并重绑item/读回guard；RenderControl仍直接失效。两者都按真实失效事件验收，不以surface复用冒充。
 
-本机实际质量边界：BLUR-01的额外降采样来自生产viewport重复舞台比例，D4C已按最终宿主CSS消除；目标尺寸、DPR与附件链由独立源公式验证。FLICKER-01的已确认根因为visibility/Equal颜色pass位置不一致，C2C统一顶点顺序及invariant；当前正常光学与诊断连续覆盖静止、波浪、浏览、总览进退和详情转换，保留原实体数量、源透明度、景深/磨砂及后处理。本机Metal/OpenGL正常输出未见漏画、额外模糊或重叠闪烁；结构/数学、实际输出和资源恢复分别验证，没有用图像相似度关闭问题。Windows/D3D11、Linux/OpenGL、物理屏幕/输入及后续完整播放器范围仍按R34原项验收，不能外推为全平台理想渲染或完整产品性能通过。
+本机实际质量边界：BLUR-01的额外降采样来自生产viewport重复舞台比例，D4C已按最终宿主CSS消除；目标尺寸、DPR与附件链由独立源公式验证。FLICKER-01的已确认根因为visibility/Equal颜色pass位置不一致，C2C统一顶点顺序及invariant；当前正常光学与诊断连续覆盖静止、波浪、浏览、总览进退和详情转换，保留原实体数量、源透明度、景深/磨砂及后处理。本机Metal/OpenGL正常输出未见漏画、额外模糊或重叠闪烁；结构/数学、实际输出和资源恢复分别验证，没有用图像相似度关闭问题。Windows/D3D11、Linux/OpenGL、物理屏幕/输入及后续完整播放器范围按计划后置专项分工验收，不能外推为全平台理想渲染或完整产品性能通过。
 
-正常VSYNC补验覆盖现有R10D单盒生产bootstrap：两后端各三次独立120秒、双主题/输入提交、九尺寸/四画质与十次完整窗口重建，原始序列和各次分布只留本地；采样完整性、资源回落与正常输出分别检查。该入口明确不覆盖完整阵列/搜索/展示/扫描，不能据此宣称完整播放器预算、GPU完成、物理显示或实测显存已通过；后续入口扩展与正式产品矩阵仍归R28/R34。
+正常VSYNC补验覆盖现有R10D单盒生产bootstrap：两后端各三次独立120秒、双主题/输入提交、九尺寸/四画质与十次完整窗口重建，原始序列和各次分布只留本地；采样完整性、资源回落与正常输出分别检查。该入口明确不覆盖完整阵列/搜索/展示/扫描，不能据此宣称完整播放器预算、GPU完成、物理显示或实测显存已通过；后续入口扩展与正式产品矩阵仍归R28及计划后置专项。
+
+## R20 · 序章与交接来源
+
+| 冻结生产来源 | 原生归属与判定 |
+| --- | --- |
+| music-opening.ts / music-boot.css | OpeningFrame逐参数采样，Opening.qml保留容器/字幕/圆环/纸面/跳过按钮；原创品牌几何只来自branding清单。二维cubic smooth独立于三维quintic ease。 |
+| music-boot-timing.ts / music-boot.ts | FrameClock独立片钟、OpeningController事件准备/跳过/重播与720ms错峰；不引入CSS动画或第二帧源，Header复用原品牌节点。 |
+| scene.ts的musicIntro / music-camera / viewport-layout | OpeningCamera与SelectionController消费同一shot，覆盖响应式相机、重定位波浪、entryZ/lift及row-light intro；末段保留精确浏览姿态后交给既有弹簧。 |
+| REFDB-02 ItemRenderer::render | 采用完全遮挡期在生产提交入口早退的思路；本项目按自身准备/遮挡状态、计数和token接线，未复制参考代码、时间阈值、素材或调度器。 |
+
+原生实际路径与缺环境目标分别由opening.md及迁移计划R20-P管理；OpenGL动态验证归R35。无新增冻结源缺陷例外。

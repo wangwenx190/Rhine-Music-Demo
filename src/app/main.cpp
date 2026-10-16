@@ -5,6 +5,7 @@
 #include "DetailModel.h"
 #include "DetailPorts.h"
 #include "MotionController.h"
+#include "OpeningController.h"
 #include "OfflineMetadataProvider.h"
 #include "PreferencesStore.h"
 #include "SceneAdapter.h"
@@ -300,10 +301,25 @@ int main(int argc, char **argv)
     });
     QObject::connect(&inputRouter, &yalahoo::InputRouter::inputReceived, &overview,
                      &yalahoo::OverviewController::collapse);
+    yalahoo::OpeningController opening(&motion, &scene, &selection);
+    const auto updateOpeningInput = [&] {
+        inputRouter.setEnabled(!opening.active() && presentation.archiveEnabled());
+    };
+    QObject::connect(&opening, &yalahoo::OpeningController::changed, &inputRouter,
+                     updateOpeningInput);
+    QObject::connect(&presentation, &yalahoo::PresentationController::changed, &inputRouter,
+                     updateOpeningInput);
+    QObject::connect(&opening, &yalahoo::OpeningController::started, &presentation, [&] {
+        overview.setActive(false);
+        presentation.reset();
+        updateOpeningInput();
+    });
     QQmlApplicationEngine engine;
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
+        if (!verificationRun)
+            presentationProperties.insert("openingController", QVariant::fromValue(&opening));
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
         presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
         presentationProperties.insert("overviewController", QVariant::fromValue(&overview));
@@ -355,6 +371,8 @@ int main(int argc, char **argv)
     if (verificationRun)
         yalahoo::verification::prepareWindow(*window, verificationFrameless);
     inputRouter.attach(window);
+    if (!verificationRun)
+        opening.replay();
     if (preferences)
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,
                          [window](const QString &error) {

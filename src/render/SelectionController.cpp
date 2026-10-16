@@ -484,6 +484,16 @@ double SelectionController::field(double row, double lane) const
     if (!m_motion)
         return 0;
     const bool reduced = m_motion->reducedMotion();
+    if (m_openingTime) {
+        const double intro = smooth((*m_openingTime - 25.3) / 1.42);
+        const double opening =
+                cinematicField(row - m_cell.row + 12, lane - m_cell.lane + 2, *m_openingTime);
+        const double resting = m_realistic
+                ? settlingWave(row - m_realColumns.row(int(lane)), 26.56)
+                        * m_realColumns.activity(int(lane))
+                : settlingWave(row - m_cell.row, 26.56) * columnStrength(lane, m_cell.lane);
+        return opening * (1 - intro) + resting * intro;
+    }
     if (m_realistic) {
         const double activity = m_realColumns.activity(int(lane));
         double height =
@@ -525,13 +535,16 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
         return matrix;
     const double slope = field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane);
     const auto offset = displayOffset();
+    const double entryZ = m_openingTime
+            ? -23 * std::pow(1 - std::clamp((*m_openingTime - 21.92) / .75, 0.0, 1.0), 2)
+            : 0;
     matrix.translate(
             float((cell.lane - m_cell.lane) * 5.2 - offset[1]),
             float(-4.6 + field(cell.row, cell.lane) + lift),
             float(m_realistic
                           ? (cell.row - m_realColumns.row(int(cell.lane), overviewProgress())) * .62
-                                  - 2.17
-                          : (cell.row - m_cell.row) * .62 - 2.17 + offset[0]));
+                                  - 2.17 + entryZ
+                          : (cell.row - m_cell.row) * .62 - 2.17 + offset[0] + entryZ));
     const double quality = smooth(lift / .4);
     const double pitch = slope * .024 * (1 - m_detail) * (1 - quality);
     // Evaluate Three's XYZ rotation in double, then round each matrix element once.
@@ -617,8 +630,36 @@ ArchiveCell SelectionController::rebase()
     publish();
     return shift;
 }
+void SelectionController::setOpeningTime(std::optional<double> time)
+{
+    const bool entering = time && !m_openingTime;
+    m_openingTime = time;
+    m_scanBlend = m_idleGain = 0;
+    m_pulses.clear();
+    m_lastInteraction = m_time;
+    if (time) {
+        m_returning.clear();
+        m_rotation = m_detail = 0;
+        m_returnY.reset();
+        m_managedDetail = m_navigationLift = false;
+        m_detailMotion.reset();
+        m_clarity.select();
+        const double intro = smooth((*time - 25.3) / 1.42);
+        m_lift.finish(extraction(*time) * (1 - intro) + .9 * intro);
+        m_liftTarget = .9;
+        if (entering && m_motion) {
+            m_motion->travel(-2.17 - (m_cell.row - 15.5) * .62, (m_cell.lane - 2) * 5.2, m_cell.row,
+                             m_cell.lane);
+            m_motion->finish();
+        }
+        m_realColumns.update(0, true);
+    }
+    publish();
+}
 void SelectionController::advance(double dt)
 {
+    if (m_openingTime)
+        return;
     if (!m_motion || m_pool.columnCount() == 0 || !std::isfinite(dt) || dt < 0)
         return;
     rebase();

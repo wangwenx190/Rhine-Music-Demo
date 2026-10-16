@@ -1,3 +1,4 @@
+#include "OpeningAudit.h"
 #include "OffscreenSurface.h"
 #include "AssetCatalog.h"
 #include "AppIdentity.h"
@@ -94,6 +95,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--opening"))
+        return argc == 3 ? reviewOpening(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--overview"))
         return argc == 3 ? reviewOverviewVisual(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--presentation"))

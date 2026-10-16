@@ -1,3 +1,5 @@
+#include "OpeningController.h"
+#include "OpeningInk.h"
 #pragma once
 #include "LibrarySession.h"
 #include "PresentationController.h"
@@ -190,4 +192,18 @@ struct OverviewLabelsModelQml
     QML_FOREIGN(yalahoo::OverviewLabelsModel)
     QML_NAMED_ELEMENT(OverviewLabelsModel)
     QML_UNCREATABLE("Owned by OverviewController")
+};
+
+struct OpeningControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OpeningController)
+    QML_NAMED_ELEMENT(OpeningController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct OpeningInkQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OpeningInk)
+    QML_NAMED_ELEMENT(OpeningInk)
 };

@@ -28,6 +28,7 @@
 
 namespace yalahoo::rhi {
 namespace {
+SceneSubmissionStats submissionStats;
 template <class T>
 using Owned = std::unique_ptr<T>;
 // Exactly matches frame.glsl; avoid compiler-dependent QVector3D/std140 packing.
@@ -211,8 +212,13 @@ QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &ent
 class Renderer final : public QQuickRhiItemRenderer
 {
 public:
+    Renderer()
+    {
+        ++submissionStats.renderers;
+    }
     ~Renderer() override
     {
+        --submissionStats.renderers;
         if (api && !pending.empty())
             api->finish();
     }
@@ -224,6 +230,12 @@ public:
         if (source->submission() == synchronizedSubmission)
             return;
         synchronizedSubmission = source->submission();
+        if (source->input().sceneOccluded) {
+            input.sceneOccluded = true;
+            input.preparationToken = 0;
+            return;
+        }
+        prepared = source->prepared;
         const auto &sourceCover = source->input().cover;
         if (coverSourceKey != sourceCover.cacheKey()) {
             coverSourceKey = sourceCover.cacheKey();
@@ -258,7 +270,7 @@ public:
     }
     void initialize(QRhiCommandBuffer *cb) override
     {
-        if (failedRenderer)
+        if (failedRenderer || input.sceneOccluded)
             return;
         try {
             prepareResources(cb);
@@ -270,6 +282,12 @@ public:
     {
         if (failedRenderer)
             return;
+        if (input.sceneOccluded) {
+            cb->beginPass(renderTarget(), Qt::transparent, { 1, 0 });
+            cb->endPass();
+            ++submissionStats.occluded;
+            return;
+        }
         try {
             renderFrame(cb);
         } catch (const std::exception &error) {
@@ -289,6 +307,7 @@ private:
             failed(QString::fromUtf8(message));
     }
     std::function<void(QString)> failed;
+    std::function<void(quint64, quint64, bool)> prepared;
     bool failedRenderer = false;
     qint64 previousResourceBytes = 0;
     quint64 inventoryGeneration = 0, inventoryPostRevision = 0, inventoryCoverRevision = 0;
@@ -305,6 +324,7 @@ private:
         bool operator==(const AllocationKey &) const = default;
     };
     AllocationKey allocationKey;
+    QSize plannedOpeningLayer;
     void reset();
     void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
@@ -641,7 +661,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                              input.smaa,
                              input.navigationDpr,
                              input.textResourceRevision };
-    if (key != allocationKey || !vertices) {
+    if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize || !vertices) {
         for (const auto format :
              { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
             require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
@@ -665,6 +685,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
                                       api->ubufAligned(sizeof(Uniform)), geometryBytes);
         allocationKey = key;
+        plannedOpeningLayer = input.openingLayerSize;
+        cachedInventory = { };
     }
     if (!vertices) {
         vertexBytes.clear();
@@ -1184,7 +1206,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     QElapsedTimer cpu;
     cpu.start();
     // initialize may precede synchronize in Qt; defer resource-size changes to a fresh frame.
-    if (!api || (input.cover.isNull() && !input.atlasGeneration))
+    if (input.cover.isNull() && !input.atlasGeneration)
         return;
     prepareResources(cb);
     pending.erase(std::remove_if(pending.begin(), pending.end(),
@@ -1990,6 +2012,12 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     }
     if (drain)
         update();
+    ++submissionStats.rendered;
+    if (input.preparationToken && prepared) {
+        prepared(input.preparationToken, synchronizedSubmission, atlasQueue.pending() == 0);
+        if (atlasQueue.pending() > 0)
+            update();
+    }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{
@@ -2084,6 +2112,10 @@ QJsonObject Renderer::resourceInventory()
     return cachedInventory;
 }
 
+}
+SceneSubmissionStats &sceneSubmissionStats()
+{
+    return submissionStats;
 }
 RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {

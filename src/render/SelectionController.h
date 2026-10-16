@@ -94,6 +94,7 @@ public:
         return m_returning;
     }
     void advance(double dt);
+    void setOpeningTime(std::optional<double> time);
     ArchiveCell rebase();
     double field(double row, double lane) const;
     QVariantMap hitTest(const SceneFrame &frame, double x, double y) const;
@@ -148,6 +149,7 @@ private:
     double m_time = 0, m_scanTime = 26.56, m_scanBlend = 0;
     double m_lastInteraction = 0, m_idleGain = 0, m_pulseGain = 1, m_rotation = 0;
     double m_liftTarget = .9, m_detail = 0;
+    std::optional<double> m_openingTime;
     std::optional<double> m_returnY;
     quint64 m_revision = 0, m_objectSerial = ArchivePool::capacity;
     quint64 m_selectedObject = ++m_objectSerial;

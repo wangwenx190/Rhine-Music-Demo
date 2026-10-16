@@ -10,6 +10,10 @@ qt_add_library(
     SceneAdapter.cpp
     SceneAdapter.h
     SceneFrame.h
+    opening/OpeningFrame.cpp
+    opening/OpeningFrame.h
+    opening/OpeningController.cpp
+    opening/OpeningController.h
     ArchivePool.cpp
     ArchivePool.h
     CaseClarity.cpp
@@ -42,3 +46,10 @@ yalahoo_platform(YalahooScene)
 add_subdirectory(navigation)
 add_subdirectory(text)
 add_subdirectory(rhi)
+qt_add_library(YalahooOpening STATIC opening/OpeningInk.cpp opening/OpeningInk.h opening/BrandPaths.h)
+target_include_directories(YalahooOpening PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/opening")
+target_link_libraries(YalahooOpening PUBLIC YalahooScene Qt6::Quick Qt6::CanvasPainter)
+yalahoo_platform(YalahooOpening)
+qt_add_resources(YalahooOpening opening_brand PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
+    FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
+    "${PROJECT_SOURCE_DIR}/resources/branding/reveal-map.json")

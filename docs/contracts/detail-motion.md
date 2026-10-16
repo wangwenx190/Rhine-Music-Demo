@@ -20,7 +20,7 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 ## 检查入口
 
 - `node tools/review/export-detail-golden.mjs`生成冻结数学；`detail-motion`比较598轨迹帧、50旋转点、1200材质帧，x/v/a≤1e-6。覆盖20/30/60/120fps、1/120秒打断、三次换片/反向回收、满池最后目标、返回/搜索替换、拖动取消、隐藏/换库/九尺寸拾取和真实列边界。
-- `python3 tools/build/verify-detail.py --backend metal|opengl|d3d11 --dpr 1|1.5|2 --runs 1 --output 全新目录`通过真实App/FrameAnimation回放；夜间`--night`，前台仅授权轮次加`--foreground`。
+- `python3 tools/build/verify-detail.py --backend <目标后端> --dpr 1|1.5|2 --runs 1 --output 全新目录`通过真实App/FrameAnimation回放；夜间`--night`，前台仅授权轮次加`--foreground`。
 - 普通功能保持lifecycleStressRequested=false，不能称压力通过。`--lifecycle`另执行三十次换片、十次surface及十次完整App/QML根窗口重建，重绑输入并检查重建后换片；basic允许surface复用context，记录实际context初始化数。
 - ready核对同revision实体身份/CPU封面租约集合，最终owner回落且active/pending为0、运动不改target/postprocess代次、单批≤2MiB。旧窗口回调核对epoch；清理帧在有效context交付后再hide/destroy。
-- `audit-detail.py --report 报告路径`检查来源/实际覆盖；共享变更回归scene/archive-pool/real-columns/presentation/navigation/title-reels。macOS已完成两后端有效三DPR产品回放；尚欠目标系统、物理设备、系统焦点和R23/R24真实播放集成统一归计划R34/R18-P。
+- `audit-detail.py --report 报告路径`检查来源/实际覆盖；共享变更回归scene/archive-pool/real-columns/presentation/navigation/title-reels。macOS已完成两后端有效三DPR产品回放；尚欠目标系统、物理设备、系统焦点和R23/R24真实播放集成按计划R34/R35分工归R18-P。

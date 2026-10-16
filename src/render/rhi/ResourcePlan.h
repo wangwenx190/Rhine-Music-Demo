@@ -57,6 +57,19 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
             plan.plannedTexture(QString("navigation-small-wheel-%1-upper-bound").arg(i),
                                 scaled(160, 12), QRhiTexture::RGBA8);
     }
+    if (!in.openingLayerSize.isEmpty()) {
+        // Skip backdrop has two bounded logical-pixel textures, including 3 sigma padding.
+        for (int i = 0; i < 2; ++i) {
+            plan.plannedTexture(QString("opening-skip-blur-%1-color-upper-bound").arg(i),
+                                { 220, 120 }, QRhiTexture::RGBA8);
+            plan.plannedTexture(QString("opening-skip-blur-%1-depth-upper-bound").arg(i),
+                                { 220, 120 }, QRhiTexture::D32FS8);
+        }
+        plan.plannedTexture("opening-canvas-color-upper-bound", in.openingLayerSize,
+                            QRhiTexture::RGBA8);
+        plan.plannedTexture("opening-canvas-depth-upper-bound", in.openingLayerSize,
+                            QRhiTexture::D32FS8);
+    }
     for (int i = 0; i < in.textLayerSizes.size(); ++i)
         plan.plannedTexture(QString("title-reel-layer-%1").arg(i), in.textLayerSizes[i],
                             QRhiTexture::RGBA8);

@@ -6,12 +6,22 @@
 #include <QJsonObject>
 #include <functional>
 #include <memory>
+#include <atomic>
 
 namespace yalahoo::rhi {
 QJsonArray adapterInventory();
 // Values only. No QObject or QRhi ownership crosses the synchronization boundary.
+struct SceneSubmissionStats
+{
+    std::atomic<quint64> rendered{ 0 }, occluded{ 0 };
+    std::atomic<int> renderers{ 0 };
+};
+SceneSubmissionStats &sceneSubmissionStats();
 struct Input
 {
+    bool sceneOccluded = false;
+    quint64 preparationToken = 0;
+    QSize openingLayerSize;
     SceneFrame scene;
     double navigationDpr = 0;
     QList<QSize> textLayerSizes;
@@ -80,6 +90,7 @@ public:
     // The callable is copied during synchronize; callers use a guarded GUI receiver.
     std::function<void(Capture)> captured;
     std::function<void(QJsonObject)> profiled;
+    std::function<void(quint64, quint64, bool)> prepared;
 signals:
     void renderFailed(QString message);
 

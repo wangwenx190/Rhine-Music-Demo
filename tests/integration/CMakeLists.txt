@@ -163,3 +163,9 @@ if(WIN32)
     set_tests_properties(overview-qml PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+add_test(NAME opening-qml COMMAND ui-audit --opening "${CMAKE_BINARY_DIR}/verification/opening")
+set_tests_properties(opening-qml PROPERTIES TIMEOUT 900 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QCPAINTER_DEBUG_COLLECT=0")
+if(WIN32)
+    set_tests_properties(opening-qml PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

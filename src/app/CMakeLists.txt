@@ -189,6 +189,8 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/opening-paper.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/opening-blur.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
@@ -202,6 +204,7 @@ target_link_libraries(
     YalahooRhi
     YalahooNavigation
     YalahooText
+    YalahooOpening
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick

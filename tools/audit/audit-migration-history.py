@@ -124,7 +124,7 @@ CHECKS = [
      "Attachment format/size/MSAA/resolve/mips and simultaneous old/new descriptors are validated before allocation. Camera/theme/focus retain compatible targets; driver VRAM remains unknown."),
     ("PERF-05", "src/render/rhi/SceneItem.cpp", "SceneItem::updatePolish",
      "Dirty frame/content revisions coalesce polish. Source math, local text shaping and constant shader data are cached with full keys; no source-less sampling scale retained."),
-    ("PERF-06", "qml/Yalahoo/Music/App.qml", "FrameAnimation",
+    ("PERF-06", "qml/Yalahoo/Music/pages/MusicStage.qml", "FrameAnimation",
      "One active visible frame clock; bounded text slots and virtual lists, latest navigation/drag and finite returning copies. Hidden activity stops; restore first interval is discarded."),
     ("PERF-07", "src/app/VerificationWindowMac.mm", "NSNormalWindowLevel",
      "Verification lifecycle uses actual native visibility/surface behavior. Default hidden policy is restored after authorized tests; native window, RenderControl, GPU rebuild and physical input evidence stay separate."),

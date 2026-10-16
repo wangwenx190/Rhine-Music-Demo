@@ -8,6 +8,7 @@ Item {
     required property DesignTokens tokens
     property string playingTitle: ""
     property bool playing: false
+    property OpeningController opening: null
     property FrameClock clock: null
     property OverviewController overviewController: null
     readonly property real chromeOpacity: overviewController ? overviewController.navigationOpacity :
@@ -62,6 +63,8 @@ Item {
     Row {
         id: nav
         objectName: "headerNavigation"
+        visible: !root.opening || root.opening.revealTime > 0
+        opacity: root.opening ? root.opening.chrome(root.opening.revealTime, 0) : 1
         x: root.metrics.portrait ? 0 : root.width - width
         y: root.metrics.portrait ? brand.height + 12 : root.narrow ? 3 : 7
         spacing: root.navGap

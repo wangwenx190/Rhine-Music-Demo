@@ -115,7 +115,7 @@
     "manifest": "resources/manifests/rhi-postprocess.json",
     "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
     "rebuild": "ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'",
-    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix remain R34.",
+    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: non-OpenGL R34, OpenGL R35.",
     "linux": "Target latest-Kit build and actual OpenGL execution remain R34.",
     "coverage": "docs/contracts/source-fidelity-review.md#r19d4b2-msaaresolve与旧门禁覆盖"
   },

@@ -97,6 +97,7 @@ public:
     // Called with the already speed-scaled motionDt from the single FrameClock.
     void advance(double motionDt);
     void observe(CameraPose pose, double motionDt);
+    void setOpeningTime(std::optional<double> time, double dt = 0);
     bool settled() const;
     CameraPose target() const;
     void setNavigation(double laneSpeed, double rowSpeed, bool realColumns = false);
@@ -131,5 +132,6 @@ private:
     ScalarSpring m_span, m_yaw, m_elevation;
     double m_detail = 0, m_laneSpeed = 0, m_rowSpeed = 0, m_pointerX = 0, m_pointerY = 0;
     bool m_reduced = false, m_managedDetail = false;
+    std::optional<double> m_openingTime;
 };
 }

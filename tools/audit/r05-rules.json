@@ -31,7 +31,7 @@
       "checkId":"COMMON-03",
       "requirement":"One production frame source, background gating and unchanged render backend/resource closure",
       "sources":[
-        {"path":"qml/Yalahoo/Music/App.qml","symbol":"FrameAnimation {"},
+        {"path":"qml/Yalahoo/Music/pages/MusicStage.qml","symbol":"FrameAnimation {"},
         {"path":"src/motion/FrameClock.cpp","symbol":"m_discardNext = true"},
         {"path":"src/app/main.cpp","symbol":"QGuiApplication::applicationStateChanged"},
         {"path":"src/app/main.cpp","symbol":"QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal)"},

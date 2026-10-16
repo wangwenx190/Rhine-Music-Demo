@@ -27,9 +27,9 @@ PNG、ICO 的 16/24/32 使用小稿；48 及以上使用主稿。iconset 按**�
 
 `logo-reveal.svg` 提供与生产字标相同的 17 条中心线路径（内圈装饰不参与中心线揭示）。`reveal-map.json` 记录每段 d、组、strokeWidth、Qt QPainterPath 测得的长度、offset 和总长度归一化 start/end。输入整体 `contourProgress` 后，段进度为 `clamp((progress-start)/(end-start),0,1)`，沿弧长绘制；不能直接把贝塞尔参数 t 当成弧长。零长点以 0.01 单位短线加圆端绘制，长度进度有限且确定。
 
-R20 继续使用冻结 `musicOpeningFrame` 的 `settle(unit(t,0.24,1.64))`，accents 另受原 symbols 包络控制；揭示完成时显示同节点的完整生产稿，补齐细内纹。减少动态直接显示完整生产 Logo。保留 2.72–6.32s 标语、6.40s 三维交接与后续解锁时序，品牌内容不增加时长。
+OpeningInk按reveal-map的分组与弧长绘制；揭示完成时在同节点补齐完整生产稿的细内纹。时间包络、减少动态及序章交接由[opening.md](opening.md)维护，品牌内容不增加片长。
 
-冻结开场来自 `music-boot.css`：mark 容器 left 50%、top 48%，宽 `clamp(155px,17vw,235px)`；原 SVG 坐标为 310×145。后续保留此容器和子槽比例，让新字标 contain 居中适配，subtitle 保留原 17px 间距；新字标不能以自己的长宽比收缩整个容器、改变标题/标语锚点。1280px 时宽为 217.6px，235px 上限及155px下限另检查；完整开场交互与容器差异由R20验收。
+冻结开场来自 `music-boot.css`：mark 容器 left 50%、top 48%，宽 `clamp(155px,17vw,235px)`；原 SVG 坐标为 310×145。Opening.qml保留此容器和子槽比例，让新字标 contain 居中适配，subtitle 保留原 17px 间距；新字标不能以自己的长宽比收缩整个容器、改变标题/标语锚点。1280px 时宽为 217.6px，235px 上限及155px下限另检查；完整开场交互与容器验证入口见opening.md。
 
 ## 导出、平台文件与验证
 

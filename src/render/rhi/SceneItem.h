@@ -10,6 +10,9 @@ namespace yalahoo::rhi {
 class SceneItem : public RhiItem
 {
     Q_OBJECT
+    Q_PROPERTY(bool sceneOccluded READ sceneOccluded WRITE setSceneOccluded NOTIFY openingChanged)
+    Q_PROPERTY(bool preparing READ preparing WRITE setPreparing NOTIFY openingChanged)
+    Q_PROPERTY(QSize openingLayerSize READ openingLayerSize WRITE setOpeningLayerSize NOTIFY openingChanged)
     Q_PROPERTY(yalahoo::InputRouter *inputRouter READ inputRouter WRITE setInputRouter NOTIFY inputRouterChanged)
     Q_PROPERTY(yalahoo::SceneAdapter* adapter READ adapter WRITE setAdapter NOTIFY adapterChanged)
     Q_PROPERTY(bool inspectionEnabled READ inspectionEnabled WRITE setInspectionEnabled NOTIFY inspectionEnabledChanged)
@@ -20,6 +23,22 @@ class SceneItem : public RhiItem
     Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged)
 public:
     explicit SceneItem(QQuickItem *parent = nullptr);
+    bool sceneOccluded() const
+    {
+        return m_sceneOccluded;
+    }
+    void setSceneOccluded(bool value);
+    bool preparing() const
+    {
+        return m_preparing;
+    }
+    void setPreparing(bool value);
+    Q_INVOKABLE void restartPreparation();
+    QSize openingLayerSize() const
+    {
+        return m_openingLayerSize;
+    }
+    void setOpeningLayerSize(QSize value);
     SceneAdapter *adapter() const
     {
         return m_adapter;
@@ -53,6 +72,8 @@ public:
     TitleReel *transportReel() const;
     void setTransportReel(TitleReel *reel);
 signals:
+    void openingChanged();
+    void scenePrepared();
     void adapterChanged();
     void inputRouterChanged();
     void geometryOnlyChanged();
@@ -103,6 +124,9 @@ private:
     QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;
     QMetaObject::Connection m_dprConnection, m_screenConnection;
     bool m_poolMode = false;
+    bool m_sceneOccluded = false, m_preparing = false;
+    quint64 m_preparationToken = 0;
+    QSize m_openingLayerSize;
     quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;
     QPointer<InputRouter> m_inputRouter;

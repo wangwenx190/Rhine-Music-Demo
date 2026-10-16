@@ -2,154 +2,45 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import Yalahoo.Music
-import "components"
 import "pages"
 
 ApplicationWindow {
     id: window
     required property LibrarySession librarySession
     required property MotionController motionController
+    required property SceneAdapter sceneAdapter
+    property OpeningController openingController: null
     property InputRouter inputRouter: null
     property RulerController rulerController: null
-    required property SceneAdapter sceneAdapter
     property PresentationController presentationController: null
-    property string reviewPlayingTitle: ""
     property DetailModel detailModel: null
     property OverviewController overviewController: null
-    property Item presentationReturnFocus: null
+    property string reviewPlayingTitle: ""
+    property string preferencesError: ""
+    property bool geometryProbe: false
     property bool verificationRun: false
     property int verificationFlags: Qt.Window
-    property bool geometryProbe: false
-    property string preferencesError: ""
     width: 1280
     height: 720
     minimumWidth: 320
     minimumHeight: 240
     visible: !verificationRun
     flags: verificationRun ? verificationFlags : Qt.Window
-    title: design.displayName
-    color: design.page
-    DesignTokens {
-        id: design
-        night: window.sceneAdapter.lighting.night
-        reducedMotion: window.motionController.reducedMotion
-        motionSpeed: window.motionController.clock.speed
-    }
-    FrameAnimation {
-        running: window.visible && window.visibility !== Window.Minimized
-                 && window.motionController.clock.applicationVisible
-        onRunningChanged: window.motionController.clock.active = running
-        Component.onCompleted: window.motionController.clock.active = running
-        onTriggered: window.motionController.clock.advance(frameTime)
-    }
-    SceneItem {
-        id: nativeScene
-        objectName: "nativeScene"
+    title: "yalahOO!!!"
+    color: sceneAdapter.lighting.night ? "#08121f" : "#e8e5e1"
+    MusicStage {
         anchors.fill: parent
-        adapter: window.sceneAdapter
+        librarySession: window.librarySession
+        motionController: window.motionController
+        sceneAdapter: window.sceneAdapter
+        openingController: window.openingController
         inputRouter: window.inputRouter
-        inspectionEnabled: window.presentationController !== null
-                           && window.presentationController.detailEnabled
-        titleReel: browse.titleController
-        transportReel: browse.transportController
-    }
-    Browse {
-        id: browse
-        anchors.fill: parent
-        metrics: window.sceneAdapter.layout
-        tokens: design
-        playingTitle: window.reviewPlayingTitle
-        album: window.librarySession.browseInfo
-        albumCount: window.librarySession.albums.count
-        overviewController: window.overviewController
         rulerController: window.rulerController
-        inputRouter: window.inputRouter
-        clock: window.motionController.clock
-        surface: window.presentationController ? window.presentationController.browseSurface : null
-        contentEnabled: !window.presentationController
-                        || window.presentationController.archiveEnabled
-        selection: window.sceneAdapter.selection
-        onActionRequested: action => {
-            if (action === "open" && window.presentationController)
-                window.presentationController.open();
-        }
-        onThemeRequested: night => {
-            window.sceneAdapter.recordInput();
-            window.sceneAdapter.lighting.night = night;
-        }
+        presentationController: window.presentationController
+        detailModel: window.detailModel
+        overviewController: window.overviewController
+        reviewPlayingTitle: window.reviewPlayingTitle
+        preferencesError: window.preferencesError
+        geometryProbe: window.geometryProbe
     }
-    Loader {
-        anchors.fill: parent
-        active: window.overviewController !== null
-        sourceComponent: Overview {
-            sceneSource: nativeScene
-            controller: window.overviewController
-            tokens: design
-            inputRouter: window.inputRouter
-        }
-    }
-    Connections {
-        target: window.overviewController
-        function onFocusRequested(overview: bool) {
-            if (!overview)
-                browse.focusOverviewToggle();
-        }
-    }
-    Loader {
-        anchors.fill: parent
-        active: window.presentationController !== null && window.detailModel !== null
-        sourceComponent: Detail {
-            sceneSource: nativeScene
-            metrics: window.sceneAdapter.layout
-            tokens: design
-            presentation: window.presentationController
-            detailModel: window.detailModel
-            playingTrackId: window.librarySession.playbackTrackId
-            onBackRequested: window.presentationController.back()
-        }
-    }
-    Connections {
-        target: window.presentationController
-        function onPrepared() {
-            if (window.presentationController.phase === "opening" &&
-                    !window.presentationReturnFocus)
-                window.presentationReturnFocus = window.activeFocusItem;
-        }
-        function onFocusRequested(detail) {
-            if (!detail) {
-                Qt.callLater(() => {
-                    if (window.presentationController.archiveEnabled) {
-                        const target = window.presentationReturnFocus;
-                        if (target && target.visible && target.enabled)
-                            target.forceActiveFocus(Qt.OtherFocusReason);
-                        else
-                            browse.forceActiveFocus(Qt.OtherFocusReason);
-                        window.presentationReturnFocus = null;
-                    }
-                });
-            }
-        }
-    }
-    Shortcut {
-        sequence: "Escape"
-        enabled: window.presentationController !== null &&
-                 !window.presentationController.archiveEnabled
-        onActivated: window.presentationController.back()
-    }
-    ArchiveText {
-        tokens: design
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.margins: 24
-        visible: window.preferencesError.length > 0 || nativeScene.errorText.length > 0
-                 || window.sceneAdapter.quality.limited
-        text: window.preferencesError.length > 0 ? window.preferencesError :
-                                                   nativeScene.errorText.length > 0 ? "图形配置不可用："
-                                                                                      + nativeScene.errorText :
-                                                                                      "输出达到尺寸保护上限，画质设置保持原值。"
-        color: design.accent
-    }
-    onWidthChanged: sceneAdapter.layout.setViewport(width, height)
-    onHeightChanged: sceneAdapter.layout.setViewport(width, height)
-    Component.onCompleted: sceneAdapter.layout.setViewport(width, height)
 }

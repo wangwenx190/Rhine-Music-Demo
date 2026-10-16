@@ -1,5 +1,6 @@
 #include "SceneAdapter.h"
 #include "OverviewController.h"
+#include "opening/OpeningFrame.h"
 #include "MotionFunctions.h"
 #include <QVector4D>
 #include <algorithm>
@@ -85,15 +86,19 @@ SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
     snapToTarget();
     updateLighting(0);
     connect(&m_layout, &LayoutMetrics::changed, this, [this] {
-        if (m_reduced)
+        if (m_openingTime)
+            setOpeningTime(m_openingTime);
+        else if (m_reduced)
             snapToTarget();
         else
             publish();
     });
     if (clock)
         connect(clock, &FrameClock::frame, this, [this](double, double motionDt) {
-            advance(motionDt);
-            updateLighting(motionDt);
+            if (!m_openingTime) {
+                advance(motionDt);
+                updateLighting(motionDt);
+            }
         });
 }
 CameraPose SceneAdapter::target() const
@@ -195,7 +200,7 @@ void SceneAdapter::setPointer(double x, double y)
 }
 void SceneAdapter::advance(double dt)
 {
-    if (!std::isfinite(dt) || dt < 0)
+    if (m_openingTime || !std::isfinite(dt) || dt < 0)
         return;
     if (m_selection) {
         const auto speeds = m_selection->navigationSpeeds();
@@ -227,9 +232,25 @@ void SceneAdapter::advance(double dt)
     if (m_managedDetail && m_selection)
         m_selection->updateDetailReadiness(dt, settled());
 }
+void SceneAdapter::setOpeningTime(std::optional<double> time, double dt)
+{
+    m_openingTime = time;
+    m_managedDetail = false;
+    m_detail = 0;
+    m_yaw.finish(0);
+    m_elevation.finish(0);
+    if (time) {
+        observe(openingCamera(*time, m_layout.width(), m_layout.height(),
+                              m_selection ? m_selection->selectedPosition() : SceneVector{ }),
+                dt);
+    } else {
+        observe(m_frame.camera, 0);
+    }
+    updateLighting(dt);
+}
 void SceneAdapter::observe(CameraPose pose, double dt)
 {
-    // Preserve opening velocity for the later R20 handoff; no opening timeline here.
+    // Observe authored poses in the existing browse springs; the final hold clears velocity.
     const auto p = components(pose.position), a = components(pose.aim);
     for (int i = 0; i < 3; ++i) {
         m_position[i].velocity = dt > 0 ? (p[i] - m_position[i].value) / dt : 0;
@@ -325,6 +346,8 @@ void SceneAdapter::updateLighting(double dt)
         input.lane = input.origin.x / 5.2;
     }
     input.reduced = m_reduced || input.reduced;
+    input.cinematic = m_openingTime.has_value();
+    input.introTime = m_openingTime;
     const auto localAim = m_caseRotation.rotatedVector({ -2.085f, 2.252f, 0 });
     const auto offset = cameraRotation().rotatedVector({ -48, -17.6f, 36 });
     m_lighting.update(input, input.origin + SceneVector{ localAim.x(), localAim.y(), localAim.z() },

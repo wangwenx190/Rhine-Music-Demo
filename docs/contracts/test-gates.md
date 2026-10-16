@@ -12,6 +12,7 @@
 - `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/legacy-image-gate，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
 - fast/full清YALAHOO_VERIFY_VISIBLE/FOREGROUND/LIFECYCLE并排除native-visible/legacy-image-gate，fast另排除render-integration。macOS默认可见OFF，disabled如实暂缓；默认窗口策略只调用hiddenNativeWindow槽。
 - 正常功能一次有效回放；同二进制/同环境有效结果复用。三次仅正式性能/成本或具体不稳定复核；十次重建/三十次换片仅相关所有权/缓存/上下文压力，verify-detail/overview用显式--lifecycle并报告实际次数。
+- OpenGL动态检查统一由迁移计划R35执行，R20–R34只运行适用的非OpenGL生产后端；Linux默认OpenGL动态入口同样后置。算法/源码/模块/构建和qsb跨目标静态检查照常执行；这不减少R35的原门槛。
 - 按风险选尺寸/主题/DPR，字体/采样/布局/共享后端变化覆盖对应完整范围；缩小日常门禁不取消最终目标矩阵。报告区分实际、复用、未选、暂缓及原因。
 - 旧图像入口disabled并由全部preset排除，裸CTest也不能运行；R19各组件逐项恢复非像素检查，合成输入的ImageComparison单元测试不等于运行源图评分。
 

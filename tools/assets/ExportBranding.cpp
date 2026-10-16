@@ -1,3 +1,4 @@
+#include "../../src/render/opening/BrandPaths.h"
 #include <QGuiApplication>
 #include <QSvgRenderer>
 #include <QImage>
@@ -279,57 +280,7 @@ QJsonArray verifyContainers(const QString &directory)
     return result;
 }
 // Only the actual authoring grammar is accepted: absolute M/L/Q/C/V/Z.
-// No Qt private SVG parser or external geometry dependency.
-QPainterPath parseCenterline(const QString &d)
-{
-    const QRegularExpression token("[MLQCVZ]|[-+]?(?:[0-9]*\\.)?[0-9]+");
-    QStringList tokens;
-    auto matches = token.globalMatch(d);
-    while (matches.hasNext())
-        tokens.append(matches.next().captured());
-    QString residue = d;
-    residue.remove(token);
-    residue.remove(QRegularExpression("[ ,\\t\\r\\n]"));
-    require(residue.isEmpty(), "Unsupported reveal path grammar");
-    int at = 0;
-    QPainterPath p;
-    auto number = [&]() {
-        require(at < tokens.size(), "Truncated reveal coordinate");
-        bool ok = false;
-        double n = tokens[at++].toDouble(&ok);
-        require(ok, "Invalid reveal coordinate");
-        return n;
-    };
-    auto point = [&]() {
-        const double x = number();
-        const double y = number();
-        return QPointF(x, y);
-    };
-    while (at < tokens.size()) {
-        const QString command = tokens[at++];
-        if (command == "M")
-            p.moveTo(point());
-        else if (command == "L")
-            p.lineTo(point());
-        else if (command == "V") {
-            const double y = number();
-            p.lineTo(p.currentPosition().x(), y);
-        } else if (command == "Q") {
-            const auto a = point();
-            const auto b = point();
-            p.quadTo(a, b);
-        } else if (command == "C") {
-            const auto a = point();
-            const auto b = point();
-            const auto c = point();
-            p.cubicTo(a, b, c);
-        } else if (command == "Z")
-            p.closeSubpath();
-        else
-            require(false, "Invalid reveal command");
-    }
-    return p;
-}
+using yalahoo::parseBrandCenterline;
 QJsonObject revealMapping()
 {
     QXmlStreamReader xml(read(repository + "/resources/branding/logo-reveal.svg"));
@@ -346,7 +297,7 @@ QJsonObject revealMapping()
             continue;
         const auto id = xml.attributes().value("id").toString();
         const auto d = xml.attributes().value("d").toString();
-        const auto path = parseCenterline(d);
+        const auto path = parseBrandCenterline(d);
         const double length = path.length();
         require(!id.isEmpty() && length > 0, "Empty reveal segment");
         paths.append(QJsonObject{ { "id", id },
@@ -389,7 +340,7 @@ void paintReveal(QPainter &p, const QJsonObject &mapping, double progress, const
                                     0.0, 1.0);
         if (t <= 0)
             continue;
-        auto path = parseCenterline(entry["d"].toString());
+        auto path = parseBrandCenterline(entry["d"].toString());
         const double length = path.length() * t;
         QPainterPath partial;
         partial.moveTo(path.pointAtPercent(0));
