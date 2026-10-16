@@ -197,7 +197,8 @@ private slots:
         QSignalSpy spy(&cache, &CoverCache::ready);
         QVERIFY(cache.request("oversized", path, 256));
         QVERIFY(cache.request("missing", directory.filePath("missing.png"), 256, "Missing album"));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, 10000);
+        QVERIFY(cache.request("absent", "", 256, "No cover album"));
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 3, 10000);
         for (const auto &call : spy) {
             const auto p = qvariant_cast<CoverSnapshot>(call.first());
             QVERIFY(!p->error.isEmpty());

@@ -57,6 +57,16 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
             plan.plannedTexture(QString("navigation-small-wheel-%1-upper-bound").arg(i),
                                 scaled(160, 12), QRhiTexture::RGBA8);
     }
+    if (!in.panelLayerSize.isEmpty()) {
+        // CSS sigma=8 logical-pixel blur uses two logical-pixel RGBA8 filter surfaces.
+        // Their owners are the visible Popup Loader; closing destroys both captures.
+        for (int i = 0; i < 2; ++i) {
+            plan.plannedTexture(QString("panel-blur-%1-color").arg(i), in.panelLayerSize,
+                                QRhiTexture::RGBA8);
+            plan.plannedTexture(QString("panel-blur-%1-depth-upper-bound").arg(i),
+                                in.panelLayerSize, QRhiTexture::D32FS8);
+        }
+    }
     if (!in.openingLayerSize.isEmpty()) {
         // Skip backdrop has two bounded logical-pixel textures, including 3 sigma padding.
         for (int i = 0; i < 2; ++i) {

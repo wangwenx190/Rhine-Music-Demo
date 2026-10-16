@@ -9,6 +9,13 @@ Item {
     property real contentOpacity: 1
     required property DesignTokens tokens
     required property DetailModel detailModel
+    property TrackFocusController trackFocus: null
+    property real revealOrigin: 0
+    property int revealIndex: -1
+    property real revealTargetRelative: 0
+    property real revealLow: 0
+    property real revealHigh: 0
+    property real revealGeometryOffset: 0
     property bool about: false
     property real viewportWidth: width
     readonly property real columnGap: viewportWidth <= 1100 ? 6 : 9
@@ -66,6 +73,117 @@ Item {
         if (currentView)
             currentView.positionViewAtIndex(index, mode);
     }
+    function settleLayout(item: Item): void {
+        for (const child of item.children)
+            root.settleLayout(child);
+        item.ensurePolished();
+    }
+    function reveal(revision, index) {
+        if (!trackFocus || revision !== trackFocus.revision || !currentView || about)
+            return;
+        preserveBeginning = false;
+        currentView.forceLayout();
+        root.settleLayout(root);
+        currentView.forceLayout();
+        // Native virtual lists may rebase originY as variable-height rows are realized.
+        // Query their actual extents, then animate in the same origin-relative space.
+        const startRelative = currentView.contentY - currentView.originY;
+        currentView.positionViewAtBeginning();
+        currentView.forceLayout();
+        root.settleLayout(root);
+        currentView.forceLayout();
+        const low = currentView.contentY - currentView.originY;
+        currentView.positionViewAtEnd();
+        currentView.forceLayout();
+        root.settleLayout(root);
+        currentView.forceLayout();
+        const high = currentView.contentY - currentView.originY;
+        currentView.positionViewAtIndex(index, ListView.Center);
+        currentView.forceLayout();
+        root.settleLayout(root);
+        currentView.forceLayout();
+        const row = currentView.itemAtIndex(index) as TrackRow;
+        if (!row) {
+            trackFocus.cancel();
+            return;
+        }
+        const tabHeight = layoutHeader ? layoutHeader.tabsHeight : 0;
+        const offset = tabHeight + Math.max(0, (height - tabHeight - row.trackHeight) / 2);
+        revealOrigin = currentView.originY;
+        const target = Math.max(low, Math.min(high, row.y - revealOrigin + row.trackTop - offset))
+              + revealOrigin;
+        revealIndex = index;
+        revealLow = low;
+        revealHigh = high;
+        revealTargetRelative = target - revealOrigin;
+        revealGeometryOffset = 0;
+        const start = startRelative + revealOrigin;
+        currentView.contentY = start;
+        trackFocus.beginReveal(revision, start, target);
+    }
+    function applyRevealScroll() {
+        if (!trackFocus || !currentView)
+            return;
+        currentView.forceLayout();
+        const row = currentView.itemAtIndex(revealIndex) as TrackRow;
+        if (row) {
+            const tabHeight = layoutHeader ? layoutHeader.tabsHeight : 0;
+            const offset = tabHeight + Math.max(0, (height - tabHeight - row.trackHeight) / 2);
+            const last = currentView.itemAtIndex(detailModel.count - 1) as TrackRow;
+            const high = last ? last.y + last.height - height - currentView.originY : revealHigh;
+            const relative = row.y + row.trackTop - offset - currentView.originY;
+            // Keep the authored cubic distance to the target invariant when the
+            // native list refines estimates outside the realized row pool.
+            revealGeometryOffset = Math.max(revealLow, Math.min(high, relative))
+                    - revealTargetRelative;
+        }
+        currentView.contentY = trackFocus.scrollY + currentView.originY - revealOrigin
+                + revealGeometryOffset;
+    }
+    function cancelReveal() {
+        if (trackFocus)
+            trackFocus.cancel();
+    }
+    onWidthChanged: if (trackFocus && trackFocus.revealing)
+                        cancelReveal()
+    onHeightChanged: if (trackFocus && trackFocus.revealing)
+                         cancelReveal()
+    onVisibleChanged: if (!visible && trackFocus && trackFocus.revealing)
+                          cancelReveal()
+    Keys.onPressed: event => {
+        cancelReveal();
+        event.accepted = false;
+    }
+    WheelHandler {
+        onWheel: event => {
+            root.cancelReveal();
+            event.accepted = false;
+        }
+    }
+    TapHandler {
+        onPressedChanged: if (pressed)
+                              root.cancelReveal()
+        gesturePolicy: TapHandler.DragThreshold
+    }
+    Connections {
+        target: root.trackFocus
+        function onScrollChanged() {
+            root.applyRevealScroll();
+        }
+        function onFocusRequested(index) {
+            const revision = root.trackFocus.revision;
+            Qt.callLater(() => {
+                if (!root.trackFocus || revision !== root.trackFocus.revision || !root.currentView)
+                    return;
+                root.currentView.forceLayout();
+                root.applyRevealScroll();
+                root.currentView.forceLayout();
+                const row = root.currentView.itemAtIndex(index);
+                if (row)
+                    row.forceActiveFocus(Qt.OtherFocusReason);
+            });
+        }
+    }
     Loader {
         id: view
         anchors.fill: parent
@@ -83,7 +201,10 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             model: root.detailModel
             header: root.header
-            onMovementStarted: root.preserveBeginning = false
+            onMovementStarted: {
+                root.preserveBeginning = false;
+                root.cancelReveal();
+            }
             onCurrentIndexChanged: if (currentIndex > 0)
                                        root.preserveBeginning = false
             delegate: trackDelegate
@@ -105,7 +226,10 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             model: Math.ceil(root.producerGroups.length / root.creditColumns)
             header: root.header
-            onMovementStarted: root.preserveBeginning = false
+            onMovementStarted: {
+                root.preserveBeginning = false;
+                root.cancelReveal();
+            }
             onCurrentIndexChanged: if (currentIndex > 0)
                                        root.preserveBeginning = false
             delegate: creditDelegate
@@ -118,114 +242,136 @@ Item {
     }
     Component {
         id: trackDelegate
-        Item {
-            id: row
-            objectName: "trackDelegate"
-            opacity: root.contentOpacity
-            required property int index
-            required property string trackId
-            required property string number
-            required property string trackTitle
-            required property string artist
-            required property string format
-            required property string duration
-            required property int disc
-            required property bool discHeading
-            width: root.contentWidth
-            height: names.implicitHeight + (root.viewportWidth >= 1700 ? 28 : 22) + 1 + (
-                        discHeading ? discLabel.implicitHeight + 28 : 0)
-            ArchiveText {
-                id: discLabel
-                tokens: root.tokens
-                visible: row.discHeading
-                text: "DISC " + row.disc.toString().padStart(2, "0")
-                cssPixelSize: 8
-                color: root.tokens.muted
-                y: 20
-            }
+        TrackRow {}
+    }
+    component TrackRow: Item {
+        id: row
+        objectName: "trackDelegate"
+        opacity: root.contentOpacity
+        required property int index
+        required property string trackId
+        required property string number
+        required property string trackTitle
+        required property string artist
+        required property string format
+        required property string duration
+        required property int disc
+        readonly property real trackTop: discHeading ? discLabel.implicitHeight + 28 : 0
+        readonly property real trackHeight: height - trackTop - 1
+        required property bool discHeading
+        activeFocusOnTab: true
+        Keys.onReturnPressed: root.trackRequested(trackId)
+        Keys.onSpacePressed: root.trackRequested(trackId)
+        Accessible.role: Accessible.ListItem
+        Accessible.name: number + " " + trackTitle + " " + duration
+        width: root.contentWidth
+        height: names.implicitHeight + (root.viewportWidth >= 1700 ? 28 : 22) + 1 + (discHeading
+                                                                                     ? discLabel.implicitHeight
+                                                                                       + 28 : 0)
+        ArchiveText {
+            id: discLabel
+            tokens: root.tokens
+            visible: row.discHeading
+            text: "DISC " + row.disc.toString().padStart(2, "0")
+            cssPixelSize: 8
+            color: root.tokens.muted
+            y: 20
+        }
+        Rectangle {
+            y: row.discHeading ? discLabel.implicitHeight + 28 : 0
+            width: parent.width
+            height: parent.height - y - 1
+            color: row.trackId === (root.trackFocus ? root.trackFocus.trackId : "") ? Qt.rgba(
+                                                                                          root.tokens.accent.r,
+                                                                                          root.tokens.accent.g,
+                                                                                          root.tokens.accent.b,
+                                                                                          .2 * root.trackFocus.highlight) :
+                                                                                      hit.hovered
+                                                                                      ? root.tokens.veil :
+                                                                                        "transparent"
             Rectangle {
-                y: row.discHeading ? discLabel.implicitHeight + 28 : 0
-                width: parent.width
-                height: parent.height - y - 1
-                color: hit.hovered ? root.tokens.veil : "transparent"
+                width: 3
+                height: parent.height
+                color: root.tokens.accent
+                opacity: root.trackFocus && row.trackId === root.trackFocus.trackId
+                         ? root.trackFocus.highlight : 0
+            }
+            ArchiveText {
+                tokens: root.tokens
+                x: 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.number
+                cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
+                color: root.tokens.muted
+            }
+            Column {
+                id: names
+                x: root.numberWidth + root.columnGap
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(0, parent.width - x - root.formatWidth - root.durationWidth - root.columnGap
+                                * 2)
+                spacing: 5
                 ArchiveText {
+                    id: trackTitleText
                     tokens: root.tokens
-                    x: 0
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: row.number
-                    cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
-                    color: root.tokens.muted
-                }
-                Column {
-                    id: names
-                    x: root.numberWidth + root.columnGap
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - x - root.formatWidth - root.durationWidth
-                                    - root.columnGap * 2)
-                    spacing: 5
-                    ArchiveText {
-                        id: trackTitleText
-                        tokens: root.tokens
-                        width: parent.width
-                        objectName: "detailTrackTitle"
-                        text: row.trackTitle
-                        cssPixelSize: root.viewportWidth >= 1700 ? 14 : root.viewportWidth <= 1100
-                                                                   && root.viewportWidth > 700 ? 10 :
-                                                                                                 11
-                        cssLineHeight: root.detailModel.normalLineHeight(row.trackTitle, font)
-                                       * fontScale
-                        elide: Text.ElideRight
-                        color: row.trackId === root.playingTrackId ? root.tokens.accent :
-                                                                     root.tokens.ink
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        objectName: "detailTrackArtist"
-                        text: row.artist
-                        cssPixelSize: root.viewportWidth >= 1700 ? 10 : 8
-                        color: root.tokens.muted
-                        elide: Text.ElideRight
-                    }
+                    width: parent.width
+                    objectName: "detailTrackTitle"
+                    text: row.trackTitle
+                    cssPixelSize: root.viewportWidth >= 1700 ? 14 : root.viewportWidth <= 1100
+                                                               && root.viewportWidth > 700 ? 10 : 11
+                    cssLineHeight: root.detailModel.normalLineHeight(row.trackTitle, font)
+                                   * fontScale
+                    elide: Text.ElideRight
+                    color: row.trackId === root.playingTrackId ? root.tokens.accent :
+                                                                 root.tokens.ink
                 }
                 ArchiveText {
                     tokens: root.tokens
-                    x: parent.width - root.durationWidth - root.columnGap - root.formatWidth
-                    width: root.formatWidth
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: row.format
-                    cssPixelSize: 7
-                    horizontalAlignment: Text.AlignRight
+                    width: parent.width
+                    objectName: "detailTrackArtist"
+                    text: row.artist
+                    cssPixelSize: root.viewportWidth >= 1700 ? 10 : 8
                     color: root.tokens.muted
                     elide: Text.ElideRight
                 }
-                ArchiveText {
-                    tokens: root.tokens
-                    x: parent.width - root.durationWidth
-                    width: root.durationWidth
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: row.duration
-                    cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
-                    horizontalAlignment: Text.AlignRight
-                    color: root.tokens.muted
-                }
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: -1
-                    width: parent.width
-                    height: 1
-                    color: root.tokens.line
-                }
-                HoverHandler {
-                    id: hit
-                }
-                TapHandler {
-                    enabled: !root.detailModel.album.offline
-                    onTapped: root.trackRequested(row.trackId)
-                }
-                Accessible.role: Accessible.ListItem
-                Accessible.name: row.number + " " + row.trackTitle + " " + row.duration
             }
+            ArchiveText {
+                tokens: root.tokens
+                x: parent.width - root.durationWidth - root.columnGap - root.formatWidth
+                width: root.formatWidth
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.format
+                cssPixelSize: 7
+                horizontalAlignment: Text.AlignRight
+                color: root.tokens.muted
+                elide: Text.ElideRight
+            }
+            ArchiveText {
+                tokens: root.tokens
+                x: parent.width - root.durationWidth
+                width: root.durationWidth
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.duration
+                cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
+                horizontalAlignment: Text.AlignRight
+                color: root.tokens.muted
+            }
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: -1
+                width: parent.width
+                height: 1
+                color: root.tokens.line
+            }
+            HoverHandler {
+                id: hit
+            }
+            TapHandler {
+                enabled: !root.detailModel.album.offline
+                onTapped: root.trackRequested(row.trackId)
+            }
+            Accessible.role: Accessible.ListItem
+            Accessible.name: row.number + " " + row.trackTitle + " " + row.duration
         }
     }
     Component {

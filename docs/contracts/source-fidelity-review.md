@@ -394,3 +394,9 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 REFDB-03只参考`Qt/tests/UiChecks.cpp::cachedSelection`附近三个断言的意图：重复命中资源稳定、同封面换曲不重传、仅更新实际采样绑定。实际读取文件SHA256为`b7a3878617aab8125dd43b0978d9c3bc0b29ad2501c445b5b21092a3538e56af`；仓库LICENSE为MIT、Copyright (c) 2026 LBEILC，未把NOTICE视为全部代码授权。没有复制其实现、测试代码、资产、24MiB预算或逐draw纹理架构；本项目的CoverCache/AtlasAllocator/SelectedCoverPool及生产SceneItem自行补齐同封面、内容revision、阵列/选中/归位覆盖。单身份失效由不可变内容URL和有界池对比触发，无关图集/目标保持原所有权；原来的整池重置属于原生遗漏，未判为冻结源缺陷。
 
 本机macOS/Apple Silicon已实际通过Release无声媒体/封面/导入与缓存检查、默认隐藏Metal生产图集/光学回归；收尾只重跑受影响项，其余有效结果复用。入口由library-data.md/covers.md维护；Windows/Linux实际媒体后端和导入文件系统欠验集中于R22-P，OpenGL共享图形回归仍归R35。无新增冻结源缺陷例外。
+
+## R23 · 音乐库面板与歌曲定位来源
+
+冻结music-app的renderLibraryPanel/renderSearchPanel/revealAlbum、music-search、music-track-focus、music.css与ui-transitions映射至LibraryPanel/SearchPanel/PanelController/TrackFocusController。搜索预处理与增量结果、模态Qt焦点、异步目录选择及虚拟化是原生所有权/工作量适配；匹配语义、稳定ID、面板几何/逻辑像素模糊、归架定位、同专辑复用、滚动与高亮算法不取截图参数。大流派列表保留源换行宽度并在有限区域虚拟滚动，避免源DOM数量随曲库增长；没有加入网络、播放副作用或第二取消机制。
+
+Release本机Metal隐藏入口分别验证模型/状态/实际MusicStage输出；修正缺封面直接走占位，避免空路径文件探测。结构/搜索/焦点与自身输出分开，正常VSYNC、物理输入/原生目录对话框与跨屏DPR仍由R23-P及既有产品实机专项验收。具体接口/资源/检查入口只在library-data.md维护；平台审计与原始报告留本地。

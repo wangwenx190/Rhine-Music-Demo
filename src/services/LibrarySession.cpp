@@ -2,6 +2,7 @@
 #include "OfflineMetadataProvider.h"
 #include <utility>
 #include <QThread>
+#include <QSet>
 
 namespace yalahoo {
 LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
@@ -22,6 +23,39 @@ LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
             emit providerCapabilitiesChanged();
         });
     }
+}
+QVariantList LibrarySession::genres() const
+{
+    QVariantList result;
+    QSet<QString> used;
+    for (const auto &entry : m_snapshot->albums)
+        used.insert(entry.genreId);
+    for (const auto &genre : m_snapshot->genres)
+        if (used.contains(genre.id))
+            result.append(QVariantMap{ { "id", genre.id }, { "name", genre.name } });
+    return result;
+}
+QVariantMap LibrarySession::summary() const
+{
+    int tracks = 0;
+    QStringList offline;
+    for (const auto &entry : m_snapshot->albums)
+        tracks += int(entry.tracks.size());
+    for (const auto &root : m_snapshot->roots)
+        if (root.status == "offline")
+            offline.append(root.path.toLocalFile() + QStringLiteral(" 暂时离线，原索引已保留。"));
+    return { { "albums", m_snapshot->albums.size() },
+             { "tracks", tracks },
+             { "genres", genres().size() },
+             { "offline", offline.join('\n') } };
+}
+int LibrarySession::trackIndex(const QString &albumId, const QString &trackId) const
+{
+    return int(m_trackIndices.value(albumId).value(trackId, -1));
+}
+bool LibrarySession::contains(const QString &albumId, const QString &trackId) const
+{
+    return album(albumId) && (trackId.isEmpty() || track(albumId, trackId));
 }
 LibrarySession::~LibrarySession()
 {
@@ -73,6 +107,7 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     m_metadata.clear();
     emit metadataChanged();
     emit browseInfoChanged();
+    emit snapshotChanged();
 }
 void LibrarySession::search(const QString &query, const QString &genreId)
 {

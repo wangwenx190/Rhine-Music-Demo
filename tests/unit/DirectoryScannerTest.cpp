@@ -50,6 +50,7 @@ class DirectoryScannerTest : public QObject
     Q_OBJECT
 private slots:
     void rootValidation();
+    void panelRootPaths();
     void layoutAndIdentity();
     void symlinks();
     void fingerprintAndReuse();
@@ -62,6 +63,22 @@ private slots:
     void atomicSaveFailure();
     void destruction();
 };
+void DirectoryScannerTest::panelRootPaths()
+{
+    QTemporaryDir temporary;
+    const QString music = temporary.path() + QStringLiteral("/音乐 目录 #1");
+    QVERIFY(QDir().mkpath(music));
+    LibraryStore store(temporary.path() + "/data");
+    QVERIFY(!store.setRootPaths("relative/path"));
+    QVERIFY(store.setRootPaths("\n" + music + "\n" + music + "\n"));
+    QCOMPARE(store.rootPaths(), QStringList{ music });
+    QCOMPARE(store.localPath(QUrl::fromLocalFile(music)), music);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QCOMPARE(store.roots().size(), 1);
+    QVERIFY(store.setRootPaths(""));
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QVERIFY(store.rootPaths().isEmpty());
+}
 void DirectoryScannerTest::rootValidation()
 {
     QTemporaryDir temporary;

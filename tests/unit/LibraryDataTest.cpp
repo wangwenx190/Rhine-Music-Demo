@@ -223,12 +223,43 @@ private slots:
         QCOMPARE(model.rowCount(), 0);
         QVERIFY(!model.data(model.index(0), SearchListModel::Title).isValid());
     }
+    void incrementalSearchNotifications()
+    {
+        LibrarySnapshot snapshot;
+        for (int i = 0; i < 1024; ++i) {
+            Album album;
+            album.id = QString("album-%1").arg(i);
+            album.title = QString("Collection %1").arg(i);
+            Track track;
+            track.id = "track";
+            track.albumId = album.id;
+            track.title = QString("Song %1").arg(i);
+            album.tracks.append(track);
+            snapshot.albums.append(album);
+        }
+        SearchListModel model;
+        QAbstractItemModelTester tester(&model,
+                                        QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy reset(&model, &QAbstractItemModel::modelReset);
+        const auto data = std::make_shared<const LibrarySnapshot>(snapshot);
+        model.update(data, "", "");
+        reset.clear();
+        QPersistentModelIndex first(model.index(0));
+        model.update(data, "collection", "");
+        QCOMPARE(first.data(SearchListModel::AlbumId).toString(), QString("album-0"));
+        for (const auto &query :
+             { "s", "so", "son", "song", "song 1", "song 10", "", "missing", "" })
+            model.update(data, query, "");
+        QCOMPARE(reset.size(), 0);
+        QCOMPARE(model.rowCount(), 1024);
+    }
     void frozenSearch()
     {
         QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/core/search-golden.json"));
         QVERIFY(file.open(QIODevice::ReadOnly));
         const auto cases =
                 QJsonDocument::fromJson(file.readAll()).object().value("cases").toArray();
+        SearchListModel model;
         for (const auto &entry : cases) {
             const auto object = entry.toObject();
             const auto actual = searchLibrary(library(object.value("library").toString()),
@@ -238,6 +269,13 @@ private slots:
             for (const auto &hit : actual)
                 ids.append(QJsonObject{ { "albumId", hit.albumId }, { "trackId", hit.trackId } });
             QCOMPARE(ids, object.value("results").toArray());
+            model.update(std::make_shared<const LibrarySnapshot>(
+                                 library(object.value("library").toString())),
+                         object.value("query").toString(), object.value("genreId").toString());
+            QJsonArray indexed;
+            for (int row = 0; row < model.rowCount(); ++row)
+                indexed.append(QJsonObject::fromVariantMap(model.resultAt(row)));
+            QCOMPARE(indexed, ids);
         }
     }
     void roundTripAndLocalUrls()

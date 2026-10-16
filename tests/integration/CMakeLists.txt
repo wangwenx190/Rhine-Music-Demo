@@ -169,3 +169,12 @@ set_tests_properties(opening-qml PROPERTIES TIMEOUT 900 ENVIRONMENT "QT_PLUGIN_P
 if(WIN32)
     set_tests_properties(opening-qml PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+add_test(NAME library-panels-qml COMMAND ui-audit --library "${CMAKE_BINARY_DIR}/verification/library-panels")
+set_tests_properties(library-panels-qml PROPERTIES TIMEOUT 240
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(library-panels-qml PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

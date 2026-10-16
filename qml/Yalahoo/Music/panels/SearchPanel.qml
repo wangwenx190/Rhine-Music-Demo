@@ -1,0 +1,296 @@
+pragma ComponentBehavior: Bound
+import QtQuick
+import QtQuick.Controls.Basic
+import Yalahoo.Music
+import "../components"
+
+Item {
+    id: root
+    required property DesignTokens tokens
+    required property LibrarySession librarySession
+    property Component heading: null
+    readonly property SearchHeader searchHeader: results.headerItem as SearchHeader
+    readonly property TextField queryInput: searchHeader ? searchHeader.queryInput : null
+    property string genreId: ""
+    signal resultRequested(string albumId, string trackId)
+    implicitHeight: 560
+    FontMetrics {
+        id: genreFont
+        font.family: root.tokens.regular.family
+        font.pixelSize: 10
+    }
+    readonly property var genreRows: {
+        const rows = [];
+        let row = [];
+        let used = 0;
+        for (const genre of [
+                 {
+                     id: "",
+                     name: "全部"
+                 }
+             ].concat(librarySession.genres)) {
+            const size = Math.min(width, Math.ceil(genreFont.advanceWidth(genre.name)) + 22);
+            if (row.length && used + 7 + size > width) {
+                rows.push(row);
+                row = [];
+                used = 0;
+            }
+            row.push({
+                         id: genre.id,
+                         name: genre.name,
+                         size: size
+                     });
+            used += (used ? 7 : 0) + size;
+        }
+        if (row.length)
+            rows.push(row);
+        return rows;
+    }
+    function prepare() {
+        if (queryInput)
+            queryInput.clear();
+        results.currentIndex = -1;
+    }
+    function focusSearch() {
+        results.forceLayout();
+        results.positionViewAtBeginning();
+        if (queryInput)
+            queryInput.forceActiveFocus();
+    }
+    function refresh() {
+        if (!visible)
+            return;
+        librarySession.search(queryInput ? queryInput.text : "", genreId);
+        results.positionViewAtBeginning();
+    }
+    component SearchHeader: Column {
+        id: filters
+        property alias queryInput: query
+        width: results.width
+        bottomPadding: 16
+        spacing: 16
+        Loader {
+            width: parent.width
+            sourceComponent: root.heading
+        }
+        TextField {
+            id: query
+            objectName: "librarySearchInput"
+            width: parent.width
+            font.family: root.tokens.regular.family
+            font.pixelSize: 12
+            color: root.tokens.ink
+            placeholderText: "专辑、歌曲、歌手、流派…"
+            placeholderTextColor: root.tokens.muted
+            padding: 13
+            selectByMouse: true
+            background: Rectangle {
+                color: root.tokens.surface
+                border.color: root.tokens.line
+            }
+            Accessible.name: "搜索专辑与歌曲"
+            onTextChanged: root.refresh()
+            Keys.onDownPressed: {
+                if (results.count) {
+                    results.currentIndex = 0;
+                    results.forceActiveFocus();
+                }
+            }
+            onAccepted: if (results.count)
+                            results.activate(Math.max(0, results.currentIndex))
+        }
+        ListView {
+            id: genreList
+            objectName: "libraryGenreFilters"
+            width: parent.width
+            height: Math.min(contentHeight, Math.max(27, root.height * .25))
+            clip: true
+            reuseItems: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: root.genreRows
+            spacing: 7
+            delegate: Row {
+                id: genreRow
+                required property var modelData
+                spacing: 7
+                height: 27
+                Repeater {
+                    model: genreRow.modelData
+                    delegate: Button {
+                        id: filter
+                        required property var modelData
+                        text: modelData.name
+                        width: modelData.size
+                        height: 27
+                        font.family: root.tokens.regular.family
+                        font.pixelSize: 10
+                        padding: 5
+                        checked: root.genreId === modelData.id
+                        background: Rectangle {
+                            color: filter.checked ? root.tokens.ink : "transparent"
+                            border.color: root.tokens.line
+                        }
+                        contentItem: Text {
+                            text: filter.text
+                            font: filter.font
+                            color: filter.checked ? root.tokens.surface : root.tokens.ink
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+                        }
+                        onClicked: {
+                            root.genreId = modelData.id;
+                            root.refresh();
+                        }
+                        Accessible.role: Accessible.RadioButton
+                        Accessible.checked: checked
+                    }
+                }
+            }
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
+        }
+    }
+    ListView {
+        id: results
+        objectName: "librarySearchResults"
+        anchors.fill: parent
+        clip: true
+        reuseItems: true
+        cacheBuffer: 100
+        boundsBehavior: Flickable.StopAtBounds
+        model: root.librarySession.searchResults
+        currentIndex: -1
+        header: SearchHeader {}
+        function activate(index) {
+            const item = root.librarySession.searchResults.resultAt(index);
+            if (item.albumId)
+                root.resultRequested(item.albumId, item.trackId);
+        }
+        Keys.onReturnPressed: activate(currentIndex)
+        Keys.onEnterPressed: activate(currentIndex)
+        Keys.onUpPressed: {
+            if (currentIndex <= 0)
+                root.focusSearch();
+            else
+                decrementCurrentIndex();
+        }
+        delegate: Button {
+            id: result
+            required property int index
+            required property string kind
+            required property string albumId
+            required property string trackId
+            required property string title
+            required property string artist
+            required property string subtitle
+            required property url coverUrl
+            width: results.width
+            height: Math.max(72, copy.implicitHeight + 22)
+            padding: 0
+            background: Rectangle {
+                color: result.hovered || result.activeFocus || (results.activeFocus
+                                                                && results.currentIndex
+                                                                === result.index)
+                       ? root.tokens.veil : "transparent"
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 1
+                    color: root.tokens.line
+                }
+            }
+            contentItem: Item {
+                Rectangle {
+                    width: 49
+                    height: 49
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: root.tokens.surface
+                    border.color: root.tokens.line
+                    Image {
+                        id: artwork
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        source: result.coverUrl
+                        sourceSize: Qt.size(98, 98)
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                    }
+                    ArchiveText {
+                        anchors.centerIn: parent
+                        tokens: root.tokens
+                        visible: result.coverUrl.toString().length === 0 || artwork.status
+                                 === Image.Error
+
+                        text: "♪"
+                        cssPixelSize: 16
+                    }
+                }
+                Column {
+                    id: copy
+                    x: 62
+                    width: Math.max(0, parent.width - x - 62)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+                    ArchiveText {
+                        width: parent.width
+                        tokens: root.tokens
+                        text: result.title
+                        cssPixelSize: 12
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    ArchiveText {
+                        width: parent.width
+                        tokens: root.tokens
+                        text: result.artist + " · " + result.subtitle
+                        cssPixelSize: 10
+                        color: root.tokens.muted
+                        wrapMode: Text.WrapAnywhere
+                    }
+                }
+                ArchiveText {
+                    x: parent.width - 49
+                    anchors.verticalCenter: parent.verticalCenter
+                    tokens: root.tokens
+                    text: result.kind === "track" ? "歌曲" : "专辑"
+                    cssPixelSize: 10
+                    color: root.tokens.muted
+                }
+                ArchiveText {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    tokens: root.tokens
+                    text: "↗"
+                    cssPixelSize: 17
+                }
+            }
+            onClicked: root.resultRequested(albumId, trackId)
+            Accessible.name: (kind === "track" ? "定位歌曲 " : "定位专辑 ") + title + "，" + subtitle
+        }
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+        }
+        ArchiveText {
+            anchors.centerIn: parent
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            tokens: root.tokens
+            visible: results.count === 0
+            text: "没有找到专辑或歌曲。"
+            cssPixelSize: 12
+            color: root.tokens.muted
+        }
+    }
+    Connections {
+        target: root.librarySession
+        function onSnapshotChanged() {
+            if (root.genreId && !root.librarySession.genres.some(g => g.id === root.genreId))
+                root.genreId = "";
+            root.refresh();
+        }
+    }
+    onVisibleChanged: if (visible)
+                          refresh()
+    Component.onCompleted: if (visible)
+                               refresh()
+}

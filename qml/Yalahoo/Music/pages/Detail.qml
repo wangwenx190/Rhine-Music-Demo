@@ -9,14 +9,20 @@ FocusScope {
     required property DesignTokens tokens
     required property PresentationController presentation
     required property DetailModel detailModel
+    property TrackFocusController trackFocus: null
     property string playingTrackId: ""
     property Item sceneSource: null
     property int activeTab: 0
     property int queuedLayoutRevision: -1
     property bool layoutPending: false
     function setTab(tab) {
+        changeTab(tab, false);
+    }
+    function changeTab(tab, reveal) {
         if (activeTab === tab)
             return;
+        if (!reveal && trackFocus)
+            trackFocus.cancel();
         tracks.saveScroll();
         presentation.revealTabContent();
         activeTab = tab;
@@ -64,6 +70,16 @@ FocusScope {
                         root.forceActiveFocus(Qt.OtherFocusReason);
                 });
             }
+        }
+    }
+    Connections {
+        target: root.trackFocus
+        function onRevealRequested(revision, index) {
+            root.changeTab(0, true);
+            Qt.callLater(() => {
+                if (root.trackFocus && revision === root.trackFocus.revision)
+                    tracks.reveal(revision, index);
+            });
         }
     }
     Rectangle {
@@ -116,6 +132,7 @@ FocusScope {
         objectName: "detailTrackList"
         tokens: root.tokens
         detailModel: root.detailModel
+        trackFocus: root.trackFocus
         viewportWidth: root.width
         playingTrackId: root.playingTrackId
         about: root.activeTab === 1
@@ -133,6 +150,7 @@ FocusScope {
         header: Column {
             width: tracks.contentWidth
             property real tabsY: tabSpace.y
+            property real tabsHeight: tabBar.height
             spacing: 0
             onHeightChanged: {
                 if (tracks.preserveBeginning)

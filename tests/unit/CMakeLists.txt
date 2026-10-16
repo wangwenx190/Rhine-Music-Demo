@@ -800,3 +800,13 @@ if(WIN32)
     set_tests_properties(media-metadata PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(TrackFocusTest TrackFocusTest.cpp)
+target_link_libraries(TrackFocusTest PRIVATE YalahooScene Qt6::Test)
+yalahoo_platform(TrackFocusTest)
+add_test(NAME track-focus COMMAND TrackFocusTest)
+set_tests_properties(track-focus PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(track-focus PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

@@ -235,11 +235,9 @@ int SearchListModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> SearchListModel::roleNames() const
 {
-    return { { Kind, "kind" },
-             { AlbumId, "albumId" },
-             { TrackId, "trackId" },
-             { Title, "title" },
-             { Artist, "artist" } };
+    return { { Kind, "kind" },        { AlbumId, "albumId" }, { TrackId, "trackId" },
+             { Title, "title" },      { Artist, "artist" },   { CoverUrl, "coverUrl" },
+             { Subtitle, "subtitle" } };
 }
 QVariant SearchListModel::data(const QModelIndex &index, int role) const
 {
@@ -265,19 +263,38 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
         return track ? track->title : album.title;
     case Artist:
         return track ? track->artist : album.artist;
+    case CoverUrl:
+        return album.coverUrl;
+    case Subtitle:
+        if (track)
+            return album.title;
+        return m_genreNames.value(album.genreId, QStringLiteral("未分类"));
     default:
         return { };
     }
 }
+QVariantMap SearchListModel::resultAt(int row) const
+{
+    if (row < 0 || row >= rowCount())
+        return { };
+    return { { "albumId", m_results[row].albumId }, { "trackId", m_results[row].trackId } };
+}
 void SearchListModel::update(Snapshot snapshot, const QString &query, const QString &genreId)
 {
-    beginResetModel();
     if (!snapshot)
         snapshot = std::make_shared<const LibrarySnapshot>();
-    if (m_snapshot != snapshot) {
+    const bool replaced = m_snapshot != snapshot;
+    const int oldCount = rowCount();
+    if (replaced) {
+        beginResetModel();
         m_snapshot = std::move(snapshot);
         m_albumIndices.clear();
         m_trackIndices.clear();
+        m_entries.clear();
+        m_genreNames.clear();
+        for (const auto &genre : m_snapshot->genres)
+            if (!genre.name.isEmpty())
+                m_genreNames.insert(genre.id, genre.name);
         m_albumIndices.reserve(m_snapshot->albums.size());
         m_trackIndices.reserve(m_snapshot->albums.size());
         for (qsizetype i = 0; i < m_snapshot->albums.size(); ++i) {
@@ -285,6 +302,16 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
             if (m_albumIndices.contains(album.id))
                 continue;
             m_albumIndices.insert(album.id, i);
+            const QString genre = m_genreNames.value(album.genreId, QStringLiteral("未分类"));
+            m_entries.append({ { album.id, { } },
+                               album.genreId,
+                               (album.title + ' ' + album.artist + ' ' + genre).toLower(),
+                               true });
+            for (const auto &track : album.tracks)
+                m_entries.append({ { album.id, track.id },
+                                   album.genreId,
+                                   (track.title + ' ' + track.artist).toLower(),
+                                   false });
             QHash<QString, qsizetype> tracks;
             tracks.reserve(album.tracks.size());
             for (qsizetype j = 0; j < album.tracks.size(); ++j)
@@ -293,8 +320,42 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
             m_trackIndices.insert(album.id, std::move(tracks));
         }
     }
-    m_results = searchLibrary(*m_snapshot, query, genreId);
-    endResetModel();
-    emit countChanged();
+    const QString needle = query.trimmed().toLower();
+    QList<SearchResult> results;
+    for (const auto &entry : m_entries) {
+        if (!genreId.isEmpty() && entry.genreId != genreId)
+            continue;
+        if (needle.isEmpty() ? entry.album : entry.text.contains(needle))
+            results.append(entry.result);
+    }
+    if (replaced) {
+        m_results = std::move(results);
+        endResetModel();
+        if (oldCount != rowCount())
+            emit countChanged();
+        return;
+    }
+    int prefix = 0;
+    while (prefix < m_results.size() && prefix < results.size()
+           && m_results[prefix] == results[prefix])
+        ++prefix;
+    int suffix = 0;
+    while (suffix < m_results.size() - prefix && suffix < results.size() - prefix
+           && m_results[m_results.size() - 1 - suffix] == results[results.size() - 1 - suffix])
+        ++suffix;
+    const int removed = int(m_results.size()) - prefix - suffix;
+    const int inserted = int(results.size()) - prefix - suffix;
+    if (removed) {
+        beginRemoveRows({ }, prefix, prefix + removed - 1);
+        m_results.remove(prefix, removed);
+        endRemoveRows();
+    }
+    if (inserted) {
+        beginInsertRows({ }, prefix, prefix + inserted - 1);
+        m_results = std::move(results);
+        endInsertRows();
+    }
+    if (oldCount != rowCount())
+        emit countChanged();
 }
 }

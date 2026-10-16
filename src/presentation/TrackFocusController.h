@@ -1,0 +1,74 @@
+#pragma once
+#include "LibrarySession.h"
+#include "PresentationController.h"
+
+namespace yalahoo {
+// One replaceable reveal; all navigation stays in PresentationController.
+class TrackFocusController final : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(quint64 revision READ revision NOTIFY changed)
+    Q_PROPERTY(int row READ row NOTIFY changed)
+    Q_PROPERTY(QString trackId READ trackId NOTIFY changed)
+    Q_PROPERTY(double scrollY READ scrollY NOTIFY scrollChanged)
+    Q_PROPERTY(double highlight READ highlight NOTIFY changed)
+    Q_PROPERTY(bool revealing READ revealing NOTIFY changed)
+    Q_PROPERTY(bool active READ active NOTIFY changed)
+public:
+    TrackFocusController(LibrarySession *library, PresentationController *presentation,
+                         FrameClock *clock, QObject *parent = nullptr);
+    Q_INVOKABLE bool request(const QString &albumId, const QString &trackId = { });
+    Q_INVOKABLE bool locatePlayback();
+    Q_INVOKABLE void cancel();
+    Q_INVOKABLE void beginReveal(quint64 revision, double start, double target);
+    void setReducedMotion(bool reduced);
+    void advance(double dt);
+    quint64 revision() const
+    {
+        return m_revision;
+    }
+    int row() const
+    {
+        return m_row;
+    }
+    QString trackId() const
+    {
+        return m_trackId;
+    }
+    double scrollY() const
+    {
+        return m_scrollY;
+    }
+    double highlight() const
+    {
+        return m_highlight;
+    }
+    bool revealing() const
+    {
+        return m_scrolling || m_pulsing;
+    }
+    bool active() const
+    {
+        return !m_albumId.isEmpty();
+    }
+signals:
+    void navigationRequested();
+    void changed();
+    void scrollChanged();
+    void revealRequested(quint64 revision, int row);
+    void focusRequested(int row);
+    void rejected(const QString &message);
+
+private:
+    void ready();
+    void startHighlight();
+    LibrarySession *m_library;
+    PresentationController *m_presentation;
+    QString m_albumId, m_trackId;
+    quint64 m_revision = 0;
+    int m_row = -1;
+    bool m_reduced = false, m_requested = false, m_scrolling = false, m_pulsing = false;
+    double m_scrollY = 0, m_start = 0, m_target = 0, m_duration = 0, m_elapsed = 0;
+    double m_highlight = 0;
+};
+}

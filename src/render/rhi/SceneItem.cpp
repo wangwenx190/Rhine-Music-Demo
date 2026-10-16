@@ -506,6 +506,14 @@ void SceneItem::setPreparing(bool value)
     schedule();
     emit openingChanged();
 }
+void SceneItem::setPanelLayerSize(QSize value)
+{
+    if (m_panelLayerSize == value)
+        return;
+    m_panelLayerSize = value;
+    schedule();
+    emit openingChanged();
+}
 void SceneItem::setOpeningLayerSize(QSize value)
 {
     if (m_openingLayerSize == value)
@@ -716,6 +724,7 @@ void SceneItem::updatePolish()
 #endif
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
+    in.panelLayerSize = m_panelLayerSize;
     in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
     in.textLayerSizes = m_textSizes;
     in.textResourceRevision = m_textRevision;
@@ -776,7 +785,7 @@ void SceneItem::updatePolish()
     const auto &old = input();
     const bool unchanged = !old.sceneOccluded && in.preparationToken == old.preparationToken
             && in.openingLayerSize == old.openingLayerSize
-            && in.scene.revision == old.scene.revision
+            && in.panelLayerSize == old.panelLayerSize && in.scene.revision == old.scene.revision
             && in.scene.navigationRevision == old.scene.navigationRevision
             && in.scene.navigationCommittedNs == old.scene.navigationCommittedNs
             && in.navigationDpr == old.navigationDpr

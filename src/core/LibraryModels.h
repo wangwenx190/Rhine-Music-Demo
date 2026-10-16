@@ -26,6 +26,7 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode);
 struct SearchResult
 {
     QString albumId, trackId;
+    bool operator==(const SearchResult &) const = default;
 };
 QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString &query,
                                   const QString &genreId = { });
@@ -95,19 +96,30 @@ public:
         AlbumId,
         TrackId,
         Title,
-        Artist
+        Artist,
+        CoverUrl,
+        Subtitle
     };
     Q_ENUM(Role)
     explicit SearchListModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
+    Q_INVOKABLE QVariantMap resultAt(int row) const;
     void update(Snapshot snapshot, const QString &query, const QString &genreId);
 signals:
     void countChanged();
 
 private:
+    struct SearchEntry
+    {
+        SearchResult result;
+        QString genreId, text;
+        bool album = false;
+    };
     Snapshot m_snapshot;
+    QList<SearchEntry> m_entries;
+    QHash<QString, QString> m_genreNames;
     QList<SearchResult> m_results;
     QHash<QString, qsizetype> m_albumIndices;
     QHash<QString, QHash<QString, qsizetype>> m_trackIndices;

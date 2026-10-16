@@ -2,6 +2,9 @@
 #include "OpeningInk.h"
 #pragma once
 #include "LibrarySession.h"
+#include "LibraryStore.h"
+#include "TrackFocusController.h"
+#include "PanelController.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
 #include "MotionController.h"
@@ -206,4 +209,26 @@ struct OpeningInkQml
     Q_GADGET
     QML_FOREIGN(yalahoo::OpeningInk)
     QML_NAMED_ELEMENT(OpeningInk)
+};
+
+struct LibraryStoreQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::LibraryStore)
+    QML_NAMED_ELEMENT(LibraryStore)
+    QML_UNCREATABLE("Owned by application")
+};
+struct TrackFocusControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::TrackFocusController)
+    QML_NAMED_ELEMENT(TrackFocusController)
+    QML_UNCREATABLE("Owned by application")
+};
+struct PanelControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::PanelController)
+    QML_NAMED_ELEMENT(PanelController)
+    QML_UNCREATABLE("Owned by application")
 };

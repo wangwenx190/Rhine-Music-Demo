@@ -83,6 +83,21 @@ void LibraryStore::load()
     m_loadPending = true;
     schedule();
 }
+QStringList LibraryStore::rootPaths() const
+{
+    QStringList result;
+    for (const auto &root : m_roots)
+        result.append(root.toLocalFile());
+    return result;
+}
+bool LibraryStore::setRootPaths(const QString &paths)
+{
+    QList<QUrl> roots;
+    for (const auto &line : paths.split('\n'))
+        if (!line.trimmed().isEmpty())
+            roots.append(QUrl::fromLocalFile(line.trimmed()));
+    return setRoots(roots);
+}
 bool LibraryStore::setRoots(const QList<QUrl> &roots)
 {
     Q_ASSERT(QThread::currentThread() == thread());

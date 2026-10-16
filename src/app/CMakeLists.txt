@@ -195,6 +195,8 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-shadow.frag"
 )
 target_link_libraries(
     Yalahoo

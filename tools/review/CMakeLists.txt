@@ -14,7 +14,7 @@ set_target_properties(
     FALSE
 )
 yalahoo_platform(compare-images)
-qt_add_executable(ui-audit UiAudit.cpp OpeningAudit.cpp OpeningAudit.h OverviewAudit.cpp OverviewAudit.h PresentationAudit.cpp PresentationAudit.h RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
+qt_add_executable(ui-audit UiAudit.cpp LibraryAudit.cpp LibraryAudit.h OpeningAudit.cpp OpeningAudit.h OverviewAudit.cpp OverviewAudit.h PresentationAudit.cpp PresentationAudit.h RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
@@ -30,7 +30,7 @@ qt_add_resources(ui-audit ui_branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}
     "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
 include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
 yalahoo_browse_qml(ui_qml_files)
-foreach(name UiReview Canvas2DProbe Quick2DProbe RulerReview TitleReview DetailReview OverviewVisual OpeningComparison)
+foreach(name UiReview Canvas2DProbe Quick2DProbe RulerReview TitleReview DetailReview OverviewVisual OpeningComparison LibraryReview)
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/${name}.qml"
         PROPERTIES QT_RESOURCE_ALIAS "${name}.qml")
     list(APPEND ui_qml_files "${CMAKE_CURRENT_SOURCE_DIR}/${name}.qml")
@@ -48,7 +48,9 @@ qt_add_shaders(ui-audit navigation_shaders PREFIX /assets/shaders
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag")
+    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-blur.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-shadow.frag")
 if(YALAHOO_REVIEW)
     qt_add_executable(archive-pool-audit ArchivePoolAudit.cpp OffscreenSurface.h)
     target_link_libraries(archive-pool-audit PRIVATE YalahooRhi Qt6::GuiPrivate)

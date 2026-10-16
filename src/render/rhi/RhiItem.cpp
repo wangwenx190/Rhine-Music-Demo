@@ -324,7 +324,7 @@ private:
         bool operator==(const AllocationKey &) const = default;
     };
     AllocationKey allocationKey;
-    QSize plannedOpeningLayer;
+    QSize plannedOpeningLayer, plannedPanelLayer;
     void reset();
     void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
@@ -661,7 +661,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                              input.smaa,
                              input.navigationDpr,
                              input.textResourceRevision };
-    if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize || !vertices) {
+    if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize
+        || plannedPanelLayer != input.panelLayerSize || !vertices) {
         for (const auto format :
              { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
             require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
@@ -682,10 +683,16 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         qint64 geometryBytes = 15 * 32 + 21 * 4;
         for (const auto &batch : preparedAssets().geometry)
             geometryBytes += batch.vertices.size() * 32 + batch.indices.size() * 4;
+        const qint64 previousPlanBytes =
+                allocationPlan.value("estimatedBytesUpperBound").toInteger();
         allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
                                       api->ubufAligned(sizeof(Uniform)), geometryBytes);
+        allocationPlan.insert(
+                "replacementOldPlusNewUpperBoundBytes",
+                previousPlanBytes + allocationPlan.value("estimatedBytesUpperBound").toInteger());
         allocationKey = key;
         plannedOpeningLayer = input.openingLayerSize;
+        plannedPanelLayer = input.panelLayerSize;
         cachedInventory = { };
     }
     if (!vertices) {
@@ -2103,7 +2110,7 @@ QJsonObject Renderer::resourceInventory()
         { "resizeOldPlusNewUpperBoundBytes", current + previousResourceBytes },
         { "measuredVramBytes", QJsonValue() },
         { "scope",
-          "Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency." }
+          "Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency. Qt UI attachment estimates and their full old+new plan are separate in preallocationPlan." }
     };
     previousResourceBytes = current;
     inventoryGeneration = generation;

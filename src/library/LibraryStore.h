@@ -20,6 +20,12 @@ public:
     explicit LibraryStore(QString dataRoot, QObject *parent = nullptr);
     ~LibraryStore() override;
     void load();
+    Q_INVOKABLE bool setRootPaths(const QString &paths);
+    Q_INVOKABLE QStringList rootPaths() const;
+    Q_INVOKABLE QString localPath(const QUrl &url) const
+    {
+        return url.toLocalFile();
+    }
     Q_INVOKABLE bool setRoots(const QList<QUrl> &roots);
     Q_INVOKABLE void rescan();
     Q_INVOKABLE bool importLegacy(const QUrl &directory);

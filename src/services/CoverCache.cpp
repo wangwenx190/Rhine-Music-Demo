@@ -210,22 +210,28 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     pixels->generation = job.generation;
     pixels->resolution = job.resolution;
     QImage source;
-    QImageReader reader(job.path);
-    reader.setAutoTransform(true);
-    pixels->sourceSize = reader.size();
-    pixels->decoderScaling = reader.supportsOption(QImageIOHandler::ScaledSize);
-    const auto size = pixels->sourceSize;
-    // Source size is checked even for scaling plugins: their internal scratch is not observable.
-    if (!size.isValid() || qint64(size.width()) * size.height() > sourcePixelLimit) {
-        pixels->error =
-                QStringLiteral("Missing/unknown cover dimensions or source exceeds 4M pixels");
-    } else if (job.generation == state->generation.load() && job.wanted->load()) {
-        if (qMax(size.width(), size.height()) > job.resolution)
-            reader.setScaledSize(size.scaled(job.resolution, job.resolution, Qt::KeepAspectRatio));
-        source = reader.read();
-        pixels->readerReturnedBytes = source.sizeInBytes();
-        if (source.isNull())
-            pixels->error = reader.errorString();
+    // A known absent cover goes straight to the authored placeholder, without opening an empty URL.
+    if (job.path.isEmpty()) {
+        pixels->error = QStringLiteral("Missing cover");
+    } else {
+        QImageReader reader(job.path);
+        reader.setAutoTransform(true);
+        pixels->sourceSize = reader.size();
+        pixels->decoderScaling = reader.supportsOption(QImageIOHandler::ScaledSize);
+        const auto size = pixels->sourceSize;
+        // Source size is checked even for scaling plugins: their internal scratch is not observable.
+        if (!size.isValid() || qint64(size.width()) * size.height() > sourcePixelLimit) {
+            pixels->error =
+                    QStringLiteral("Missing/unknown cover dimensions or source exceeds 4M pixels");
+        } else if (job.generation == state->generation.load() && job.wanted->load()) {
+            if (qMax(size.width(), size.height()) > job.resolution)
+                reader.setScaledSize(
+                        size.scaled(job.resolution, job.resolution, Qt::KeepAspectRatio));
+            source = reader.read();
+            pixels->readerReturnedBytes = source.sizeInBytes();
+            if (source.isNull())
+                pixels->error = reader.errorString();
+        }
     }
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };

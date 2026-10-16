@@ -22,6 +22,7 @@ struct Input
     bool sceneOccluded = false;
     quint64 preparationToken = 0;
     QSize openingLayerSize;
+    QSize panelLayerSize;
     SceneFrame scene;
     double navigationDpr = 0;
     QList<QSize> textLayerSizes;

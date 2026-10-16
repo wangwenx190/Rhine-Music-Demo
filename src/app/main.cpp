@@ -4,6 +4,8 @@
 #include "LibraryStore.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
+#include "TrackFocusController.h"
+#include "PanelController.h"
 #include "DetailPorts.h"
 #include "MotionController.h"
 #include "OpeningController.h"
@@ -363,6 +365,21 @@ int main(int argc, char **argv)
     QObject::connect(&selection, &yalahoo::SelectionController::libraryChanged, &presentation,
                      &yalahoo::PresentationController::reset);
     presentation.setReducedMotion(motion.reducedMotion());
+    yalahoo::TrackFocusController trackFocus(&library, &presentation, motion.clock());
+    yalahoo::PanelController panels(motion.clock());
+    const auto updatePanelMotion = [&] {
+        trackFocus.setReducedMotion(motion.reducedMotion());
+        panels.setReducedMotion(motion.reducedMotion());
+    };
+    updatePanelMotion();
+    QObject::connect(&motion, &yalahoo::MotionController::reducedMotionChanged, &panels,
+                     updatePanelMotion);
+    QObject::connect(&panels, &yalahoo::PanelController::changed, &trackFocus,
+                     &yalahoo::TrackFocusController::cancel);
+    QObject::connect(&trackFocus, &yalahoo::TrackFocusController::navigationRequested, &overview,
+                     [&] {
+                         overview.setActive(false);
+                     });
     overview.bind(&scene, &selection, &presentation);
     QObject::connect(&inputRouter, &yalahoo::InputRouter::overviewToggleRequested, &overview,
                      &yalahoo::OverviewController::toggle);
@@ -373,13 +390,18 @@ int main(int argc, char **argv)
                      &yalahoo::OverviewController::collapse);
     yalahoo::OpeningController opening(&motion, &scene, &selection);
     const auto updateOpeningInput = [&] {
-        inputRouter.setEnabled(!opening.active() && presentation.archiveEnabled());
+        inputRouter.setEnabled(!opening.active() && presentation.archiveEnabled()
+                               && !panels.surface()->shown());
     };
+    QObject::connect(panels.surface(), &yalahoo::SurfaceTransition::changed, &inputRouter,
+                     updateOpeningInput);
     QObject::connect(&opening, &yalahoo::OpeningController::changed, &inputRouter,
                      updateOpeningInput);
     QObject::connect(&presentation, &yalahoo::PresentationController::changed, &inputRouter,
                      updateOpeningInput);
     QObject::connect(&opening, &yalahoo::OpeningController::started, &presentation, [&] {
+        panels.close();
+        trackFocus.cancel();
         overview.setActive(false);
         presentation.reset();
         updateOpeningInput();
@@ -391,6 +413,9 @@ int main(int argc, char **argv)
         if (!verificationRun)
             presentationProperties.insert("openingController", QVariant::fromValue(&opening));
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
+        presentationProperties.insert("trackFocusController", QVariant::fromValue(&trackFocus));
+        presentationProperties.insert("panelController", QVariant::fromValue(&panels));
+        presentationProperties.insert("libraryStore", QVariant::fromValue(libraryStore.get()));
         presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
         presentationProperties.insert("overviewController", QVariant::fromValue(&overview));
     }

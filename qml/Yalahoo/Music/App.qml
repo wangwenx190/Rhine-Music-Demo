@@ -13,6 +13,9 @@ ApplicationWindow {
     property InputRouter inputRouter: null
     property RulerController rulerController: null
     property PresentationController presentationController: null
+    property TrackFocusController trackFocusController: null
+    property PanelController panelController: null
+    property LibraryStore libraryStore: null
     property DetailModel detailModel: null
     property OverviewController overviewController: null
     property string reviewPlayingTitle: ""
@@ -37,6 +40,9 @@ ApplicationWindow {
         inputRouter: window.inputRouter
         rulerController: window.rulerController
         presentationController: window.presentationController
+        trackFocusController: window.trackFocusController
+        panelController: window.panelController
+        libraryStore: window.libraryStore
         detailModel: window.detailModel
         overviewController: window.overviewController
         reviewPlayingTitle: window.reviewPlayingTitle

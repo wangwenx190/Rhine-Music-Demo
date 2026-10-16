@@ -20,7 +20,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R23 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
+- 当前主线：`R24 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；本轮受影响范围内能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -149,6 +149,8 @@
 - 新renderer的resourceGeneration从1重置 → 用真实sceneGraphInvalidated事件及恢复输出/上传证明重建，不把局部代次当全局身份。
 - 几何探针绕过像素保护或把错误提示算作模型 → 共用RenderQuality保护、记录limited/实际尺寸，要求renderError为空并排除提示区域。
 - Offscreen附件估算漏D32FS8或resize重叠 → RGBA8颜色4bytes加depth/stencil8bytes保守上界并计旧/新同时存活；估算与driver实分配分开。
+- Qt Quick Popup在统一退出状态结束后仍保留模态焦点/捕获 → 关闭样式默认enter/exit，仅由既有SurfaceTransition控制可见生命周期。
+- 虚拟歌单远距离滚动的originY或高度估计变化 → 读取原生首尾范围，在有界已实现项polish后按实际目标行转换坐标，保持源cubic目标距离，并按revision排队聚焦。
 
 ### 三维与数值实现
 
@@ -179,15 +181,6 @@
 | REFDB-06 休眠唤醒与资源恢复用例 | R28 | `Qt/tests/UiChecks.cpp` 中静止零 step/三维 render、绘制中晚到失效、隐藏期间失效、恢复最新状态、缓存命中资源稳定和重建保留当前歌曲等场景 | 仅补已有生命周期覆盖的缺口；沿本项目 dirty revision、生产计数器和有界缓存实现，不搬用逐帧 JSON/缓冲比较来判静止，不照搬隐藏即清空所有资源、固定等待时长、窗口截图相等或 JS 状态机 |
 
 ## 待执行轮次
-
-### R23 · 音乐库/搜索面板与歌曲定位
-
-- 依赖R16–R19、R22。交付LibraryPanel、SearchPanel、TrackFocusController。
-- 复刻音乐库目录/扫描状态、搜索框/结果/空状态/流派过滤；结果按稳定ID，匹配规则沿music-search.ts，不添加网络搜索。
-- 搜索目标路径：必要时退详情→归架→五次定位→打开→滚到曲目，目标行高亮按music-track-focus.ts；当前专辑直接滚动，不重抽盒。
-- 点击当前播放歌名走同一定位接口；任何定位不调用play/pause/setSource。搜索替换只提交最后目标。
-- 性能设计与验证：按快照revision建立有界搜索预处理/ID索引，按library-data.md维护索引归一化并保持冻结music-search.ts的查询匹配语义；结果合并/增量通知，避免每次按键重复归一化全库和全界面重置，验证连续输入与取消代价。
-- 退出：搜索中连续输入/取消、切原歌手列、当前曲目定位和无结果状态无跳变，焦点/快捷键正确。
 
 ### R24 · 普通歌曲播放、队列、进度与输出设备
 
@@ -307,6 +300,7 @@
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
+| R23-P | Windows/D3D11与macOS/Metal的原生目录选择、物理输入/焦点、跨屏DPR及播放定位集成；三平台非图形构建/模型 | 三平台OpenGL的面板/定位/资源恢复与Linux窗口/输入 |
 | R22-P | Windows/Linux公开媒体无声探测、封面与显式导入/偏好JSON | 仅共享封面变更受影响的OpenGL图形回归 |
 | R19A/B/C/D/E各`-P`、R16M3-S、R17-P/R18-P/R19-P、R20-P | Windows/D3D11；macOS/Metal尚欠的产品集成；各平台不创建OpenGL上下文的源码/算法/构建检查 | Windows/macOS OpenGL受影响回归；Linux/OpenGL全部目标GPU、X11/Wayland窗口、输入及生命周期 |
 | R16B2W | Windows/D3D11文字 | — |
@@ -314,6 +308,13 @@
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### R23-P · 音乐库面板、搜索与歌曲定位的目标平台回归
+
+- 输入为LibraryPanel/SearchPanel/LibraryPanels、PanelController/TrackFocusController、LibraryModels、LibraryStore与生产MusicStage，冻结music-app/music-search/music-track-focus/music.css/ui-transitions及TrackFocusTest/LibraryAudit匿名库（跨歌手列、200曲目专辑/4000命中、1024专辑查询）。本机Metal隐藏执行范围见source-fidelity-review.md；缺Windows/Linux目标系统/最新Kit，物理输入/原生目录对话框、真实屏幕DPR及正常呈现不由离屏替代。
+- 目标Release真实构建、`check-format`、官方`Yalahoo_qmllint`/`ui-audit_qmllint`及`ctest --preset qt-release -R '^(track-focus|library-data|library-qml|directory-scanner|cover-cache|presentation|detail-motion|navigation|source-format|verification-window-policy)$'`，运行`python3 tools/audit/audit-library-panels.py`绑定COMMON/PERF/平台符号/hash。保留冻结216例、trim/lowercase语义、按快照一次预处理、查询增量通知、专辑内曲目身份和一次最后目标/无播放副作用。
+- 图形入口`ui-audit --library 全新目录`/CTest `library-panels-qml`按窗口契约与当前可靠能力分类：九尺寸/双主题/实际或显式DPR1/1.5/2，面板宽/边距/全内容滚动、4000结果/大量流派虚拟化、输入取消/无结果、模态焦点/Find/Escape/箭头与Enter、跨歌手列退详情→归架→五次定位→打开→目标居中高亮、同专辑不重抽盒、关闭背景附件释放/Descriptor回落。布局≤1逻辑px；滚动/高亮按源函数与1100ms减少动态，不能恢复图像评分。D3D11/Metal归R34，三平台OpenGL及Linux native窗口归R35。
+- 实机普通产品用临时匿名目录通过文件夹选择/多根保存/重扫/取消/离线错误检查Unicode/空格/#/Windows UNC，任何目录保存不写歌曲。真实键鼠/触控板、编辑焦点、面板滚动与场景输入隔离、窗口隐藏恢复/跨屏和当前播放歌名定位逐项验证；R24接线后核对播放/暂停/source/音量不因定位变化。共享修正仅回归受影响范围；正常VSYNC、120秒完整产品成本与实际显存按R28和最终实机矩阵，不用局部隐藏提交推断通过。
 
 #### R22-P · 无声元数据、封面与旧数据的目标平台回归
 

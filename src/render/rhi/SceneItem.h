@@ -12,6 +12,7 @@ class SceneItem : public RhiItem
     Q_OBJECT
     Q_PROPERTY(bool sceneOccluded READ sceneOccluded WRITE setSceneOccluded NOTIFY openingChanged)
     Q_PROPERTY(bool preparing READ preparing WRITE setPreparing NOTIFY openingChanged)
+    Q_PROPERTY(QSize panelLayerSize READ panelLayerSize WRITE setPanelLayerSize NOTIFY openingChanged)
     Q_PROPERTY(QSize openingLayerSize READ openingLayerSize WRITE setOpeningLayerSize NOTIFY openingChanged)
     Q_PROPERTY(yalahoo::InputRouter *inputRouter READ inputRouter WRITE setInputRouter NOTIFY inputRouterChanged)
     Q_PROPERTY(yalahoo::SceneAdapter* adapter READ adapter WRITE setAdapter NOTIFY adapterChanged)
@@ -34,6 +35,11 @@ public:
     }
     void setPreparing(bool value);
     Q_INVOKABLE void restartPreparation();
+    QSize panelLayerSize() const
+    {
+        return m_panelLayerSize;
+    }
+    void setPanelLayerSize(QSize value);
     QSize openingLayerSize() const
     {
         return m_openingLayerSize;
@@ -128,7 +134,7 @@ private:
     bool m_poolMode = false;
     bool m_sceneOccluded = false, m_preparing = false;
     quint64 m_preparationToken = 0;
-    QSize m_openingLayerSize;
+    QSize m_openingLayerSize, m_panelLayerSize;
     quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;
     QPointer<InputRouter> m_inputRouter;
