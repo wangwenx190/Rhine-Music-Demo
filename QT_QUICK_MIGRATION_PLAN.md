@@ -20,7 +20,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R21 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；R01–R20历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
+- 当前主线：`R22 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -54,7 +54,7 @@
 | [native-bootstrap.md](docs/contracts/native-bootstrap.md) | 最新原生Kit发现、C++23探测、构建与模块加载 |
 | [web-baseline.md](docs/contracts/web-baseline.md) | 冻结来源解析、匿名输入和基线重建 |
 | [assets.md](docs/contracts/assets.md) / [branding.md](docs/contracts/branding.md) | 导入资产/字体/图标/音频来源；原创品牌资产 |
-| [library-data.md](docs/contracts/library-data.md) | 稳定身份、排序/搜索、存储与离线Provider接口 |
+| [library-data.md](docs/contracts/library-data.md) | 稳定身份、本地扫描/存储、排序/搜索与离线Provider接口 |
 | [motion.md](docs/contracts/motion.md) / [scene.md](docs/contracts/scene.md) | 唯一帧源/运动数学；布局/相机/坐标/拾取 |
 | [opening.md](docs/contracts/opening.md) | 二维序章/三维开场、事件就绪、遮挡提交与交互交接 |
 | [materials.md](docs/contracts/materials.md) / [lighting.md](docs/contracts/lighting.md) | 源材质/纸面语义；世界光场/主题/源单位 |
@@ -180,15 +180,6 @@
 | REFDB-06 休眠唤醒与资源恢复用例 | R28 | `Qt/tests/UiChecks.cpp` 中静止零 step/三维 render、绘制中晚到失效、隐藏期间失效、恢复最新状态、缓存命中资源稳定和重建保留当前歌曲等场景 | 仅补已有生命周期覆盖的缺口；沿本项目 dirty revision、生产计数器和有界缓存实现，不搬用逐帧 JSON/缓冲比较来判静止，不照搬隐藏即清空所有资源、固定等待时长、窗口截图相等或 JS 状态机 |
 
 ## 待执行轮次
-
-### R21 · 本地扫描、身份规则与缓存写入
-
-- 依赖R04。交付DirectoryScanner、LibraryStore、原子JSON缓存和扫描取消。
-- 保留原扩展名集合、根目录直属文件各自单曲、子目录含曲即专辑、多CD子目录分别识别；不跟随目录符号链接造成重复/循环，隐藏目录沿原规则忽略。
-- 原生绝对路径UTF-8哈希与原fingerprint规则测试；根目录最多64，嵌套根去重，离线根保留旧索引。扫描只读文件，不上传内容。
-- worker形成不可变快照，GUI一次应用增量/重置；保存串行，扫描中切根使旧结果失效；不重载整个窗口。
-- 性能设计与验证：worker维护稳定ID/路径索引，扫描通知合并有界，GUI不随每文件重排全库；序列化/缓存写入不占帧热路径，取消释放在途任务，记录扫描期间输入响应。
-- 退出：合成目录测试覆盖重扫/重命名/删除/离线/取消，UI保持响应，源文件hash不变。
 
 ### R22 · Qt元数据探测、封面优先级与旧数据导入
 
@@ -327,12 +318,20 @@
 
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
+| R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
 | R19A/B/C/D/E各`-P`、R16M3-S、R17-P/R18-P/R19-P、R20-P | Windows/D3D11；macOS/Metal尚欠的产品集成；各平台不创建OpenGL上下文的源码/算法/构建检查 | Windows/macOS OpenGL受影响回归；Linux/OpenGL全部目标GPU、X11/Wayland窗口、输入及生命周期 |
 | R16B2W | Windows/D3D11文字 | — |
 | R16B3 | — | Windows/Linux OpenGL文字选型及macOS受影响回归 |
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### R21-P · 本地扫描的目标文件系统回归
+
+- 输入为`src/library/DirectoryScanner.*`、`LibraryStore.*`、原生main的`--music-root`/`--rescan-library`接线和`DirectoryScannerTest`运行时生成的匿名目录；来源为冻结`scripts/music-library.mjs::safeRootList/walkAlbums/readAlbum`。macOS当前原生Kit可执行非图形扫描/模型/缓存检查；Windows/Linux缺目标系统、原生Kit和文件系统环境，不记作目标运行通过。
+- R34在目标最新原生Kit真实Release构建后执行`ctest --preset qt-release -R '^(directory-scanner|library-data|library-qml|source-format)$'`、`node tools/review/verify-scan-fingerprint.mjs`（仅开发验证）及`python3 tools/audit/audit-library-scan.py`；保留16扩展名、64根上限/嵌套去重、原生路径UTF-8 ID、size:mtimeMs、重扫/改名/删除/离线、最后切根/取消、一次GUI模型重置、坏缓存保留/原子写入失败和源hash不变门槛。
+- Windows额外核对真实Unicode/空格/大小写盘符/UNC、目录junction/符号链接循环与重复、ACL读取拒绝及缓存替换拒绝；Linux核对大小写区分、目录权限拒绝和只读缓存。使用目标临时匿名目录，符号链接能力缺失不能冒充该项通过。修复对象是nativePath/qtPath/normalizeRoots/fingerprint和QSaveFile错误路径；不引入目录监视、网络或媒体解码。
+- 扫描期间事件循环/输入响应记录实际worker阶段与GUI快照应用间隔，完整产品呈现/扫描快照交接性能继续归R28；无声元数据/封面/旧数据导入归R22。共享修正回归主力平台directory-scanner/library-data/library-qml及适用完整隐藏Release。
 
 #### R20-P · 序章目标平台与实机交接
 

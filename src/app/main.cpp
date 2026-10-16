@@ -1,6 +1,7 @@
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
+#include "LibraryStore.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
 #include "DetailPorts.h"
@@ -98,6 +99,13 @@ int main(int argc, char **argv)
                        QStringLiteral("directory") });
     parser.addOption({ QStringLiteral("data-dir"), QStringLiteral("Override the native data root"),
                        QStringLiteral("directory") });
+    parser.addOption(
+            { QStringLiteral("music-root"),
+              QStringLiteral(
+                      "Scan a local absolute music directory (repeatable, replaces saved roots)"),
+              QStringLiteral("directory") });
+    parser.addOption({ QStringLiteral("rescan-library"),
+                       QStringLiteral("Rescan saved local music directories") });
     parser.addOption({ QStringLiteral("verify-runtime"),
                        QStringLiteral("Write runtime evidence and exit"),
                        QStringLiteral("report") });
@@ -224,11 +232,42 @@ int main(int argc, char **argv)
 #endif
             ;
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
+    std::unique_ptr<yalahoo::LibraryStore> libraryStore;
     if (!verificationRun) {
         const QString dataRoot = parser.isSet(QStringLiteral("data-dir"))
                 ? parser.value(QStringLiteral("data-dir"))
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
+        libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &library,
+                         [&library](yalahoo::Snapshot snapshot) {
+                             library.setSnapshot(*snapshot);
+                         });
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
+                         [](const QString &error) {
+                             qWarning().noquote() << error;
+                         });
+        libraryStore->load();
+        if (parser.isSet(QStringLiteral("music-root"))) {
+            QList<QUrl> roots;
+            for (const auto &path : parser.values(QStringLiteral("music-root"))) {
+                if (!QDir::isAbsolutePath(path)) {
+                    qWarning("--music-root requires absolute paths");
+                    return 7;
+                }
+                roots.append(QUrl::fromLocalFile(path));
+            }
+            if (!libraryStore->setRoots(roots))
+                return 7;
+        } else if (parser.isSet(QStringLiteral("rescan-library"))) {
+            const auto once = std::make_shared<QMetaObject::Connection>();
+            *once = QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady,
+                                     libraryStore.get(),
+                                     [store = libraryStore.get(), once](yalahoo::Snapshot) {
+                                         QObject::disconnect(*once);
+                                         store->rescan();
+                                     });
+        }
         selection.setRememberColumnPosition(preferences->rememberColumnPosition());
         selection.setRealistic(preferences->realistic());
         const auto saveNavigation = [&] {
@@ -240,26 +279,28 @@ int main(int argc, char **argv)
                          preferences.get(), saveNavigation);
     }
     if (!verificationRun || parser.isSet(QStringLiteral("verify-filled")) || appVerification) {
-        // Local resource-only demonstration until the scanner is delivered in R21.
-        yalahoo::LibrarySnapshot demo;
-        const QStringList covers{ "square", "portrait", "landscape" };
-        for (int lane = 0; lane < 9; ++lane) {
-            const auto genreId = QStringLiteral("demo-genre-%1").arg(lane);
-            yalahoo::Genre genre;
-            genre.id = genreId;
-            genre.name = QStringLiteral("演示收藏 %1").arg(lane + 1);
-            demo.genres.append(genre);
-            for (int row = 0; row < 3; ++row) {
-                yalahoo::Album album;
-                album.id = QStringLiteral("demo-album-%1-%2").arg(lane).arg(row);
-                album.title = QStringLiteral("演示专辑 %1").arg(row + 1);
-                album.genreId = genreId;
-                album.coverUrl =
-                        QUrl(QStringLiteral("qrc:/assets/demo-covers/%1.png").arg(covers[row]));
-                demo.albums.append(album);
+        // Verification fixtures stay isolated from the user's persistent library.
+        if (verificationRun) {
+            yalahoo::LibrarySnapshot demo;
+            const QStringList covers{ "square", "portrait", "landscape" };
+            for (int lane = 0; lane < 9; ++lane) {
+                const auto genreId = QStringLiteral("demo-genre-%1").arg(lane);
+                yalahoo::Genre genre;
+                genre.id = genreId;
+                genre.name = QStringLiteral("演示收藏 %1").arg(lane + 1);
+                demo.genres.append(genre);
+                for (int row = 0; row < 3; ++row) {
+                    yalahoo::Album album;
+                    album.id = QStringLiteral("demo-album-%1-%2").arg(lane).arg(row);
+                    album.title = QStringLiteral("演示专辑 %1").arg(row + 1);
+                    album.genreId = genreId;
+                    album.coverUrl =
+                            QUrl(QStringLiteral("qrc:/assets/demo-covers/%1.png").arg(covers[row]));
+                    demo.albums.append(album);
+                }
             }
+            library.setSnapshot(std::move(demo));
         }
-        library.setSnapshot(std::move(demo));
         const auto updatePool = [&] {
             selection.setColumns(library.albums()->order().columns, library.snapshot());
         };

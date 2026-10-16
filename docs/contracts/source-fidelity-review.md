@@ -380,3 +380,9 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 | REFDB-02 ItemRenderer::render | 采用完全遮挡期在生产提交入口早退的思路；本项目按自身准备/遮挡状态、计数和token接线，未复制参考代码、时间阈值、素材或调度器。 |
 
 原生实际路径与缺环境目标分别由opening.md及迁移计划R20-P管理；OpenGL动态验证归R35。无新增冻结源缺陷例外。
+
+## R21 · 本地扫描与缓存来源
+
+冻结`scripts/music-library.mjs`的`AUDIO_EXTENSIONS/safeRootList/walkAlbums/albumEntryId/readAlbum`提供扩展名、根限制/分组、路径哈希与size:mtimeMs语义；`writeJsonAtomic/scan`提供原子替换、整根失败保留旧索引和只读源文件边界。原生实现使用DirectoryScanner的ID/路径索引、可取消迭代遍历及LibraryStore的单worker/最后意图合并；GUI接受const快照后一次应用到LibrarySession，JSON用QSaveFile提交，不迁入Web服务、在线补全或旧PCM路线。相同fingerprint保留已有字段，元数据/封面交R22；具体存储和检查入口归library-data.md，目标文件系统欠验归R21-P。
+
+本机macOS/Apple Silicon已真实执行Release扫描/缓存/模型、默认隐藏窗口策略及适用Metal隐藏回归。扫描事件循环心跳不代替完整产品输入/呈现性能；Windows/Linux原生文件系统和编译器回归仍按R21-P执行。

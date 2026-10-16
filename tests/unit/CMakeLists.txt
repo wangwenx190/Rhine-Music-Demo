@@ -617,6 +617,15 @@ set_tests_properties(
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
 qt_add_executable(LibraryDataTest LibraryDataTest.cpp)
+qt_add_executable(DirectoryScannerTest DirectoryScannerTest.cpp)
+target_link_libraries(DirectoryScannerTest PRIVATE YalahooCore Qt6::Test)
+yalahoo_platform(DirectoryScannerTest)
+add_test(NAME directory-scanner COMMAND DirectoryScannerTest)
+set_tests_properties(directory-scanner PROPERTIES TIMEOUT 90)
+if(WIN32)
+    set_tests_properties(directory-scanner PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 target_link_libraries(LibraryDataTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
 target_compile_definitions(LibraryDataTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 yalahoo_platform(LibraryDataTest)
