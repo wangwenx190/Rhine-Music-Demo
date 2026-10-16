@@ -26,3 +26,15 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/deployment.json" CONTENT
   ]
 }
 ")
+
+# Qt's native deployment API follows the compiled production imports, including
+# Templates/Dialogs/Multimedia. Never install a Review executable as a product.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT YALAHOO_REVIEW)
+    qt_generate_deploy_qml_app_script(TARGET Yalahoo OUTPUT_SCRIPT linux_deploy_script
+        EXCLUDE_PLUGIN_TYPES sqldrivers)
+    install(SCRIPT "${linux_deploy_script}")
+    install(FILES "${PROJECT_SOURCE_DIR}/resources/branding/yalahoo.desktop"
+        DESTINATION share/applications)
+    install(FILES "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/yalahoo.svg"
+        DESTINATION share/icons/hicolor/scalable/apps)
+endif()

@@ -1,4 +1,5 @@
 #pragma once
+#include "../render/rhi/BackendCapabilities.h"
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QSurfaceFormat>
@@ -30,7 +31,11 @@ inline bool selectGraphicsBackend()
     if (!requested.isEmpty() && requested != "metal")
         return false;
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal);
-#else
+#elif defined(Q_OS_LINUX)
+    if (requested == "vulkan") {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Vulkan);
+        return true;
+    }
     if (!requested.isEmpty() && requested != "opengl")
         return false;
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);

@@ -155,7 +155,7 @@ def main():
                                             if platform == 'macos' else
                                             'macOS bundle/menu branch is N/A on this platform; '
                                             'shared metadata/probe/launcher source impact reviewed. '
-                                            'Target execution remains R30-P/R32 and R34/R35.')))
+                                            'Target execution remains R30-P/R32-P and R34/R35.')))
         output = ROOT / 'verification' / f'{platform}-static' / 'macos-deployment'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'source-matrix.json').write_text(json.dumps(dict(checks=checks, sourceSha256=hashes,

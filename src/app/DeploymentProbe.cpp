@@ -15,6 +15,8 @@
 #include <QTimer>
 #ifdef Q_OS_MACOS
 #  include <mach-o/dyld.h>
+#elif defined(Q_OS_LINUX)
+#  include <link.h>
 #endif
 
 int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const QString &reportPath,
@@ -41,6 +43,36 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
                     QJsonObject{ { "path", path }, { "bundled", bundled }, { "system", system } });
             selfContained &= system || bundled;
         }
+#elif defined(Q_OS_LINUX)
+        const QString package =
+                QFileInfo(QCoreApplication::applicationDirPath() + "/..").canonicalFilePath() + '/';
+        QStringList paths{ QCoreApplication::applicationFilePath() };
+        dl_iterate_phdr(
+                [](dl_phdr_info *info, size_t, void *data) {
+                    if (info->dlpi_name && info->dlpi_name[0]
+                        && QByteArray(info->dlpi_name) != "linux-vdso.so.1"
+                        && QByteArray(info->dlpi_name) != "linux-gate.so.1")
+                        static_cast<QStringList *>(data)->append(
+                                QString::fromUtf8(info->dlpi_name));
+                    return 0;
+                },
+                &paths);
+        paths.removeDuplicates();
+        for (const auto &path : paths) {
+            const QString resolved = QFileInfo(path).canonicalFilePath();
+            const QString name = QFileInfo(resolved).fileName();
+            const bool bundled = !resolved.isEmpty() && resolved.startsWith(package);
+            const bool qtOrMedia = name.startsWith("libQt6") || name.startsWith("libavcodec")
+                    || name.startsWith("libavformat") || name.startsWith("libavutil")
+                    || name.startsWith("libswresample") || name.startsWith("libswscale")
+                    || name.startsWith("libavfilter") || name.startsWith("libavdevice");
+            const bool system = !qtOrMedia
+                    && (resolved.startsWith("/usr/lib/") || resolved.startsWith("/usr/lib64/")
+                        || resolved.startsWith("/lib/") || resolved.startsWith("/lib64/"));
+            images.append(QJsonObject{
+                    { "path", resolved }, { "bundled", bundled }, { "system", system } });
+            selfContained &= bundled || system;
+        }
 #endif
         QJsonArray resources;
         bool assets = true;
@@ -59,6 +91,7 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
         QJsonObject report{
             { "passed", passed },
             { "qtVersion", qVersion() },
+            { "platformPlugin", QGuiApplication::platformName() },
             { "qmlInstantiated", true },
             { "qmlWarnings", QJsonArray::fromStringList(qmlWarnings) },
             { "mediaLoadedWithoutOutput", loaded },

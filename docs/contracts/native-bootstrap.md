@@ -6,7 +6,7 @@
 - QML URI：`Yalahoo.Music`；入口：`loadFromModule("Yalahoo.Music", "App")`；资源：`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。
 - 非 QML shader：`resources/shaders/probe.frag` → 同 Kit `qsb` → `:/assets/shaders/probe.frag.qsb`。Qt 标准默认变体包含 SPIR-V、GLSL、HLSL、MSL。
 - organization/applicationName 均为 `yalahoo`，display/title 为 `yalahOO!!!`。身份设置在 QGuiApplication、引擎与 QStandardPaths 之前；更改展示名不改数据目录。探针不创建或读取用户音乐库。
-- Windows 仅在自己的分支选择 D3D11，macOS 选择 Metal，Linux 选择 OpenGL；全平台采用逻辑像素和 Qt 公开 API。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
+- 默认API与Linux可选Vulkan的探测/回退由[render-backend.md](render-backend.md)维护；全平台采用逻辑像素和Qt公开API。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
 
 ## 最新 Kit 与编译器
 
@@ -44,7 +44,7 @@ $env:QT_PLUGIN_PATH = "$selectedKit/plugins"
 & ./build/release/bin/yalahoo.exe
 ```
 
-macOS 使用 `sh tools/build/macos.sh`，Linux 使用 `sh tools/build/build.sh qt-release`；构建脚本不隐式运行测试，按test-gates.md选择受影响项。独立macOS部署使用 `sh tools/deploy/macos.sh`；详见对应平台操作。原生程序不依赖 Node、浏览器或 HTTP 服务。旧 Web 参照仍在 `legacy-web/` 使用冻结依赖；新构建不写入归档。
+macOS 使用 `sh tools/build/macos.sh`，Linux 使用 `sh tools/build/linux.sh`；构建脚本不隐式运行测试，按test-gates.md选择受影响项。独立macOS部署使用 `sh tools/deploy/macos.sh`；详见对应平台操作。原生程序不依赖 Node、浏览器或 HTTP 服务。旧 Web 参照仍在 `legacy-web/` 使用冻结依赖；新构建不写入归档。
 
 Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于隔离的Review MSAA能力与真实附件探针；`YALAHOO_REVIEW_MSAA_API`配置期按实际头文件编译，缺失时明确失败，不降级Kit。普通产品不链接这些Review模块。
 
@@ -54,6 +54,6 @@ Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于�
 
 ## 启动入口
 
-根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；Windows/macOS优先选择完整生产部署包；开发回退核对Release产物与Kit，部署运行清除外部Qt/QML查找覆盖。PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
+根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；三平台优先选择完整生产部署包；开发回退核对Release产物与Kit，部署运行清除外部Qt/QML查找覆盖。PowerShell使用Process对象等待GUI进程且只修改子进程环境。开发启动器不自动构建或发布。
 
 `--demo`与`--lighting-lab`只创建九列二十七张匿名qrc封面专辑，不读取/保存偏好或真实库，不扫描、不自动启动歌曲/BGM/音效；后者额外展开实验容器。不能与数据根、扫描/导入或验证参数组合。普通入口的设置按钮仍可打开同一调节面板。启动模式不改变渲染后端、普通片头或已有播放接口；演示曲目为空，不能伪装真实歌曲来源。

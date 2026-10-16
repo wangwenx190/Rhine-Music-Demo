@@ -1,6 +1,8 @@
 qt_add_library(
     YalahooRhi
     STATIC
+    BackendCapabilities.cpp
+    BackendCapabilities.h
     RhiItem.cpp
     RhiItem.h
     SceneItem.cpp

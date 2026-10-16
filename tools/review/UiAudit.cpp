@@ -93,6 +93,7 @@ int main(int argc, char **argv)
         return 2;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    yalahoo::probeOptionalGraphicsBackend();
     const auto coverShutdown = qScopeGuard([] {
         yalahoo::CoverCache::finishDecoders();
     });

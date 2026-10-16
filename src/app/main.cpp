@@ -91,6 +91,7 @@ int main(int argc, char **argv)
         return 22;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    yalahoo::probeOptionalGraphicsBackend();
     QIcon applicationIcon;
     for (const int size : { 16, 24, 32, 48, 64, 128, 256, 512, 1024 }) {
         applicationIcon.addFile(

@@ -3,6 +3,9 @@
 #include "ResourceInventory.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+#  include <QVulkanInstance>
+#endif
 #include <rhi/qrhi_platform.h>
 #include <QOffscreenSurface>
 #include <QGuiApplication>
@@ -178,6 +181,7 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
+    yalahoo::probeOptionalGraphicsBackend();
     if (argc != 2)
         return 2;
     try {
@@ -189,11 +193,11 @@ int main(int argc, char **argv)
         require(taps.size() == 41, "Wrong source tap count");
         preparedAssets();
         std::unique_ptr<QOffscreenSurface> fallback;
-        std::unique_ptr<QRhi> api;
-        bool useOpenGl = qgetenv("QSG_RHI_BACKEND") == "opengl";
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
-        useOpenGl = true;
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+        QVulkanInstance vulkan;
 #endif
+        std::unique_ptr<QRhi> api;
+        const bool useOpenGl = QQuickWindow::graphicsApi() == QSGRendererInterface::OpenGL;
         if (useOpenGl) {
 #if QT_CONFIG(opengl)
             QRhiGles2InitParams params;
@@ -210,6 +214,13 @@ int main(int argc, char **argv)
 #elif defined(Q_OS_WIN)
             QRhiD3D11InitParams params;
             api.reset(QRhi::create(QRhi::D3D11, &params));
+#elif defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+            vulkan.setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
+            vulkan.setApiVersion(QVersionNumber(1, 1));
+            require(vulkan.create(), "Cannot create Vulkan instance");
+            QRhiVulkanInitParams params;
+            params.inst = &vulkan;
+            api.reset(QRhi::create(QRhi::Vulkan, &params));
 #endif
         }
         require(bool(api), "Cannot create real offscreen RHI backend");

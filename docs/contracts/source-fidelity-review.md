@@ -448,3 +448,13 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 | MusicStage.visualActive → FrameClock/SceneItem/封面；独立媒体会话 | 后台视觉停止、媒体意图与来源独立；部署不改变渲染图、源材质/运动/Canvas透明合成或缓存。现有R28正式隐藏成本及未受影响组件结果仍有效。 |
 
 本机已实际执行Release资源/模块/shader/公开媒体/隐藏窗口与AppKit菜单检查，以及Metal绘制、滑尺、完整片头和设置自身输出；实际轮廓/裁切/合成与状态、资源断言分开。部署包的隐藏加载不证明GPU呈现、物理菜单输入、跨屏、设备听感或正常VSYNC。其余目标与完整产品物理/性能验收保留R31-P/R28-P及公共后置分工，技术入口只在macOS平台文档和组件契约维护。
+
+## Linux部署与后端边界
+
+| 生产调用链 | 判定与覆盖 |
+| --- | --- |
+| Linux CMake生产目标 → Qt QML部署API → ELF闭包/相对RPATH/qt.conf → 包外产品探针 | 原生平台适配，沿实际编译QML清单部署；补齐xcb/Wayland会话集成、Qt随附媒体和C++ CanvasPainter运行库，品牌/字体/模型/shader/音频仍由既有qrc提供。独立目录包不修改系统、驱动或音频配置；原包仅在依赖/完整性/实际加载通过后替换。 |
+| GraphicsBackend → QGuiApplication → BackendCapabilities → Qt生产场景图 | Linux默认OpenGL；显式Vulkan的一次初始化/附件格式探测有明确回退，探测资源不进入生产render线程。源渲染图/效果/相机/运动/控制器不变，Vulkan初始化不代表窗口/swapchain或完整产品验收。 |
+| 根sh/演示/实验启动器 → 包优先/Release开发回退 | 保留参数、Unicode/空格和退出码，包内查找路径不借外部Qt/媒体库；显示会话、XDG及音频路由保持调用者选择。播放器不引入Python/ELF工具等开发运行依赖。 |
+
+COMMON/LNX/PERF源码审计覆盖非Windows路径、大小写/权限/数据根、媒体状态/关闭、触控板、字体和Canvas缓存/线程/资源图；实际产品导入闭包与qsb跨目标变体由同Kit检查。主机macOS的Release、官方产品qmllint、默认隐藏策略与Metal独立后处理、生产包加载回归只证明受影响共享入口。Linux原生编译/打包/ELF与真实媒体成功路径、Vulkan编译/设备及xcb/Wayland图形/窗口/输入/性能尚需目标环境，完整保留于R32-P并按R34/R35分工；无新增冻结源效果例外。
