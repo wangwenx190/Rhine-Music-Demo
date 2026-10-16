@@ -65,6 +65,31 @@ QList<QUrl> LibraryStore::roots() const
 {
     return m_roots;
 }
+bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
+{
+    if (!m_initialized || busy() || !m_writable) {
+        report(QStringLiteral("请等待音乐库准备完成后保存资料设置。"));
+        return false;
+    }
+    auto snapshot = *m_snapshot;
+    auto object = snapshot.fields.value("metadataConfiguration").toObject();
+    const auto patch = QJsonObject::fromVariantMap(configuration);
+    if ((patch.contains("musicBrainzContact") && !patch.value("musicBrainzContact").isString())
+        || (patch.contains("onlineEnabled") && !patch.value("onlineEnabled").isBool())) {
+        report(QStringLiteral("资料配置字段类型无效。"));
+        return false;
+    }
+    for (auto it = patch.begin(); it != patch.end(); ++it)
+        object.insert(it.key(), it.value());
+    if (object == snapshot.fields.value("metadataConfiguration").toObject())
+        return true;
+    snapshot.fields.insert("metadataConfiguration", object);
+    m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
+    m_savePending = m_snapshot;
+    emit snapshotReady(m_snapshot);
+    schedule();
+    return true;
+}
 Snapshot LibraryStore::snapshot() const
 {
     return m_snapshot;

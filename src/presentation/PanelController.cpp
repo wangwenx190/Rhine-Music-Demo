@@ -8,7 +8,7 @@ PanelController::PanelController(FrameClock *clock, QObject *parent) : QObject(p
 }
 void PanelController::open(const QString &panel)
 {
-    if (panel != "search" && panel != "library" && panel != "playback")
+    if (panel != "search" && panel != "library" && panel != "playback" && panel != "settings")
         return;
     m_panel = panel;
     emit changed();
@@ -21,6 +21,11 @@ void PanelController::close()
         emit changed();
         emit closed();
     });
+}
+void PanelController::reset()
+{
+    close();
+    m_surface.finish();
 }
 void PanelController::setReducedMotion(bool reduced)
 {

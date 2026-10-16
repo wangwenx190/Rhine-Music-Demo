@@ -17,6 +17,9 @@ class LibrarySession final : public QObject
     Q_PROPERTY(QVariantList genres READ genres NOTIFY snapshotChanged)
     Q_PROPERTY(QVariantMap summary READ summary NOTIFY snapshotChanged)
     Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged)
+    Q_PROPERTY(quint64 metadataRevision READ metadataRevision NOTIFY metadataChanged)
+    Q_PROPERTY(QVariantMap metadataProgress READ metadataProgress NOTIFY metadataProgressChanged)
+    Q_PROPERTY(QVariantMap metadataConfiguration READ metadataConfiguration NOTIFY snapshotChanged)
     Q_PROPERTY(QVariantMap browseInfo READ browseInfo NOTIFY browseInfoChanged)
     Q_PROPERTY(QVariantMap providerCapabilities READ providerCapabilities NOTIFY providerCapabilitiesChanged)
 public:
@@ -50,6 +53,12 @@ public:
     bool setPlaybackIds(const QString &albumId, const QString &trackId);
     Q_INVOKABLE quint64 requestMetadata(const QString &albumId, const QString &kind);
     Q_INVOKABLE void cancelMetadata(quint64 requestId);
+    Q_INVOKABLE void cancelAllMetadata();
+    Q_INVOKABLE bool requestMetadataBatch(const QString &kind);
+    Q_INVOKABLE QVariantMap metadataFor(const QString &albumId, const QString &kind,
+                                        quint64 revision = 0) const;
+    QVariantMap metadataConfiguration() const;
+    QVariantMap metadataProgress() const;
     QString navigationAlbumId() const
     {
         return m_navigationAlbumId;
@@ -66,6 +75,10 @@ public:
     {
         return m_playbackTrackId;
     }
+    quint64 metadataRevision() const
+    {
+        return m_metadataRevision;
+    }
     QVariantMap metadata() const
     {
         return m_metadata;
@@ -78,6 +91,7 @@ signals:
     void browseInfoChanged();
     void playbackChanged();
     void metadataChanged();
+    void metadataProgressChanged();
     void providerCapabilitiesChanged();
     void metadataDelivered(const yalahoo::ProviderResult &result);
 
@@ -91,6 +105,7 @@ private:
     };
     void invalidate();
     void rebuildBrowsePositions();
+    void advanceBatch();
     void receive(const ProviderResult &result);
     const Album *album(const QString &id) const;
     const Track *track(const QString &albumId, const QString &trackId) const;
@@ -108,9 +123,14 @@ private:
     QHash<QString, BrowsePosition> m_browsePositions;
     QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
     QHash<quint64, Pending> m_pending;
-    quint64 m_generation = 0, m_requestId = 0;
+    quint64 m_generation = 0, m_requestId = 0, m_metadataRevision = 0;
     QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,
             m_playbackTrackId;
     QVariantMap m_metadata;
+    QStringList m_batchAlbums;
+    QString m_batchKind, m_batchStatus;
+    quint64 m_batchRequest = 0;
+    int m_batchNext = 0, m_batchCompleted = 0, m_batchErrors = 0;
+    bool m_batchActive = false;
 };
 }

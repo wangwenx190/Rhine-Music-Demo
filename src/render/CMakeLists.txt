@@ -36,6 +36,8 @@ qt_add_library(
     RowLightController.h
     SelectionLighting.cpp
     SelectionLighting.h
+    SettingsController.cpp
+    SettingsController.h
     RenderQuality.cpp
     RenderQuality.h
 )

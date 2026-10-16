@@ -20,6 +20,7 @@ public:
     explicit LibraryStore(QString dataRoot, QObject *parent = nullptr);
     ~LibraryStore() override;
     void load();
+    Q_INVOKABLE bool setMetadataConfiguration(const QVariantMap &configuration);
     Q_INVOKABLE bool setRootPaths(const QString &paths);
     Q_INVOKABLE QStringList rootPaths() const;
     Q_INVOKABLE QString localPath(const QUrl &url) const

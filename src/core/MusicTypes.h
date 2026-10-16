@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QList>
 #include <QMetaType>
 #include <QStringList>
@@ -68,6 +69,7 @@ using Snapshot = std::shared_ptr<const LibrarySnapshot>;
 
 // Transactional parsing: malformed input never replaces the caller's snapshot.
 bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *error = nullptr);
+QJsonArray producerData(const QList<Producer> &producers);
 QJsonObject toJson(const Track &track);
 QJsonObject toJson(const Album &album);
 QJsonObject toJson(const LibrarySnapshot &library);

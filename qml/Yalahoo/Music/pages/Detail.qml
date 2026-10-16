@@ -27,6 +27,14 @@ FocusScope {
         presentation.revealTabContent();
         activeTab = tab;
     }
+    function focusDetailIfReady() {
+        if (presentation.detailEnabled)
+            forceActiveFocus(Qt.OtherFocusReason);
+    }
+    function revealAfterLayout(revision, index) {
+        if (trackFocus && revision === trackFocus.revision)
+            tracks.reveal(revision, index);
+    }
     function finishLayout() {
         const revision = queuedLayoutRevision;
         layoutPending = false;
@@ -65,10 +73,7 @@ FocusScope {
         }
         function onFocusRequested(detail) {
             if (detail) {
-                Qt.callLater(() => {
-                    if (root.presentation.detailEnabled)
-                        root.forceActiveFocus(Qt.OtherFocusReason);
-                });
+                Qt.callLater(root.focusDetailIfReady);
             }
         }
     }
@@ -76,10 +81,7 @@ FocusScope {
         target: root.trackFocus
         function onRevealRequested(revision, index) {
             root.changeTab(0, true);
-            Qt.callLater(() => {
-                if (root.trackFocus && revision === root.trackFocus.revision)
-                    tracks.reveal(revision, index);
-            });
+            Qt.callLater(root.revealAfterLayout, revision, index);
         }
     }
     Rectangle {
@@ -452,6 +454,8 @@ FocusScope {
                 spacing: root.width <= 1100 ? 14 : 22
                 ArchiveButton {
                     id: trackTab
+                    onXChanged: tabBar.syncIndicator(false)
+                    onWidthChanged: tabBar.syncIndicator(false)
                     objectName: "detailTracksTab"
                     tokens: root.tokens
                     text: "歌单"
@@ -485,6 +489,8 @@ FocusScope {
                 }
                 ArchiveButton {
                     id: aboutTab
+                    onXChanged: tabBar.syncIndicator(false)
+                    onWidthChanged: tabBar.syncIndicator(false)
                     objectName: "detailAboutTab"
                     tokens: root.tokens
                     text: "专辑介绍"
@@ -531,10 +537,12 @@ FocusScope {
                 color: root.tokens.ink
             }
             function syncIndicator(animate) {
+                if (!root.presentation || !trackTab || !aboutTab)
+                    return;
                 const button = root.activeTab === 0 ? trackTab : aboutTab;
                 root.presentation.setTabIndicator(button.x, button.width, animate);
             }
-            onWidthChanged: Qt.callLater(() => syncIndicator(false))
+            onWidthChanged: syncIndicator(false)
             Connections {
                 target: root
                 function onActiveTabChanged() {
@@ -544,7 +552,7 @@ FocusScope {
             Connections {
                 target: root.presentation
                 function onPrepared() {
-                    Qt.callLater(() => tabBar.syncIndicator(false));
+                    tabBar.syncIndicator(false);
                 }
             }
         }

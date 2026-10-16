@@ -306,7 +306,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | R17状态机、`e98c798` ListView拆分/顶部保持 | 双surface时序、layoutRevision/场景双ready、完成revision、一次pending及退出禁用均保留；类型稳定的两ListView是必要原生适配，保留可见复用池。prepare保持顶部；切tab保留并钳制当前距离。 |
 | `ed5aaef` 详情导航与满池backpressure；`1c9b8c6` optional enter curve | 保留实际navigationEnabled/canSelect到原ports，不能越过副本净空。overline按真实按钮字体框居中；共享SurfaceTransition新曲线不改变详情原时序。运动、材质与总览来源由G1负责。 |
 | sticky tabs/indicator、ContentTransition | 原实现只有普通header按钮/下划线，缺源sticky/背景/动态indicator。恢复自然位置吸附、Accessible/左右键与原Bezier数字插值，沿唯一FrameClock；局部sigma18高斯由Qt材质适配，不对正文或三维整体模糊。 |
-| albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；这是当前离线产品边界，联网实现仍归R26。 |
+| albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；联网执行保持暂缓；设置与资料异步路由见library-data.md。 |
 | 原生文字/资源适配 | 公共ArchiveText分数字号/整行shaping保留；曲目CSS normal以实际resolved ascent/descent分别取整，缓存有界，不加按截图调出的偏移。局部backdrop附件随可见Loader销毁，尺寸/DPR不改变3D目标键。 |
 
 macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R34/R17-P，Linux/OpenGL归R35的R17-P，不外推为全平台通过。
@@ -392,3 +392,11 @@ Release本机Metal隐藏入口分别验证模型/状态/实际MusicStage输出�
 冻结music-app的playAlbum/按钮/Space及music-player的toggle/previous/next/stop/seek映射至PlaybackController与实际MusicStage控件。按用户指定差异使用单个公开Qt歌曲player/output，保留队列、>3秒上一首归零、暂停/停止/定位隔离；原无缝、歌曲淡变、浏览器/桥接输出不进入产品。REFDB-04只适配公开API的待播/意图/有效位置思路，正常切设备不重建会话，未引入私有声道补丁、在线规则或模拟描述符；hash/作者/MIT随包保留。
 
 本机Release实际Qt匿名WAV播放/进度/暂停/seek/停止、自然换曲/格式错误，以及Metal隐藏MusicStage/输出面板/定位隔离分别验证。空设备列表/重复与晚到通知只验证状态分支，不冒充物理拔插或实际听感；其他系统/后端、真实输入/设备与格式覆盖按R24-P及公共后置分工保留。当前运行支持状态与无声元数据历史索引分开，不以Loaded或扩展名宣称播放能力；技术规范与检查入口只在playback.md维护。
+
+## R26 · 设置与离线资料来源
+
+冻结music-app::renderSettingsPanel、music.css最终theme-cards/settings-row/quality覆盖、quality-settings及music-motion-settings分别映射至SettingsPanel/ThemeCard/SettingChoice/SettingRange、既有RenderQuality和唯一FrameClock。主题卡保持两列，精细画质和MusicBrainz可折叠，设置面板沿用既有源几何/遮罩/背景；原生Qt控件负责编辑/焦点/Accessible。来源中的联网执行与页面reload按用户固定差异改为禁用查询和只重建视觉树，普通媒体对象/用户画质保留；已排除的产品能力不进入设置。
+
+REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检查的局部思路；既有LibrarySession的requestId/generation已足够，补齐不同代订阅者晚到、批量串行与能力通知，未采用其Host、网络、账号或队列架构。实际读取文件hash/作者/MIT随包参考NOTICE保留；设置和资料技术规范仅由library-data.md维护。产品只注册OfflineMetadataProvider，测试注入不产生网络请求。
+
+本机Release偏好/Provider/配置及Metal隐藏设置输出按对应入口验证；Qt事件、显式target DPR与隐藏App视觉树重建分别陈述，不外推物理输入、跨屏、正常呈现或听感。其余目标与原生产品事项集中保留于R26-P及最终矩阵。

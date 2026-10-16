@@ -61,6 +61,7 @@ public:
     virtual void requestEnrichment(AlbumQuery query, RequestToken token) = 0;
     virtual void cancel(RequestToken token) = 0;
 signals:
+    void capabilitiesChanged();
     void resultReady(const yalahoo::ProviderResult &result);
 };
 }

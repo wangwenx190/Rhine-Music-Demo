@@ -2,6 +2,7 @@
 #include "OpeningInk.h"
 #pragma once
 #include "LibrarySession.h"
+#include "SettingsController.h"
 #include "PlaybackController.h"
 #include "BackgroundMusicController.h"
 #include "InterfaceSoundController.h"
@@ -257,5 +258,13 @@ struct InterfaceSoundControllerQml
     Q_GADGET
     QML_FOREIGN(yalahoo::InterfaceSoundController)
     QML_NAMED_ELEMENT(InterfaceSoundController)
+    QML_UNCREATABLE("Owned by application")
+};
+
+struct SettingsControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SettingsController)
+    QML_NAMED_ELEMENT(SettingsController)
     QML_UNCREATABLE("Owned by application")
 };

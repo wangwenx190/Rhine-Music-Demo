@@ -12,7 +12,7 @@ DetailModel 持有不可变库快照及索引取得的当前专辑指针。prepa
 
 Detail使用冻结最终CSS的宽度断点与aspect布局，content与caption分别锚定。事实网格、标题/译名、离线badge、分碟/曲目边框均按真实字体框与border-box布局；CSS normal曲名按整行fallback的ascent/descent分别取整，不能用固定主字体行高截断emoji。文本/字体键的行高缓存采用256KiB计费上限（字符串载荷及每项64bytes元数据估算），超大键不入缓存；不把计费值当allocator实占。长内容的thin scrollbar占11逻辑px；占位在布局后合并更新，避免宽度/高度绑定循环。
 
-Tabs从滚动header的自然位置吸附到content顶部；两个类型稳定的列表保留同一滚动距离，内容变短时钳到有效末端。prepare才恢复顶部，用户滚动/切tab不触发prepare定位。指示条的180ms和内容的150ms/.35起始透明度沿冻结Bezier，由现有FrameClock一次缩放；打断从当前值继续，减少动态走相同终点，隐藏不推进时钟。所有tab均有Qt焦点/Accessible状态与左右键切换，退出期共同禁用。
+Tabs从滚动header的自然位置吸附到content顶部；两个类型稳定的列表保留同一滚动距离，内容变短时钳到有效末端。prepare才恢复顶部，用户滚动/切tab不触发prepare定位。指示条的180ms和内容的150ms/.35起始透明度沿冻结Bezier，由现有FrameClock一次缩放；打断从当前值继续，减少动态走相同终点，隐藏不推进时钟。所有tab均有Qt焦点/Accessible状态与左右键切换，退出期共同禁用。指示条在实际按钮x/width变化及prepared时同步布局，初始未构造完的按钮暂不读取；延后的焦点/定位使用所属对象方法与当前revision，视觉树销毁后不保留引用旧页签的闭包。
 
 源backdrop blur(18px)使用sigma18、半径54的归一化高斯，两pass成对线性采样。先将滚动内容按预乘alpha合到场景/竖屏背景，再水平/竖直过滤，最后叠veil和原生DPR文字。一个可见Loader拥有三张RGBA8逻辑网格附件（两crop、一水平结果），每张为(contentWidth+108)×(tabHeight+108)；竖直结果直接合成，退出或完全裁切时释放Loader，不改三维资源键。该局部设计模糊不参与整场清晰度补偿。
 

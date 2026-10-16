@@ -14,6 +14,7 @@
 #include "OpeningController.h"
 #include "OfflineMetadataProvider.h"
 #include "PreferencesStore.h"
+#include "SettingsController.h"
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
@@ -293,10 +294,6 @@ int main(int argc, char **argv)
                          [](const QString &error) {
                              qWarning().noquote() << error;
                          });
-        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::imported, &selection, [&] {
-            selection.setRememberColumnPosition(preferences->rememberColumnPosition());
-            selection.setRealistic(preferences->realistic());
-        });
         if (parser.isSet(QStringLiteral("import-preferences")))
             if (!preferences->importJson(
                         QUrl::fromLocalFile(parser.value(QStringLiteral("import-preferences")))))
@@ -332,16 +329,8 @@ int main(int argc, char **argv)
                                          store->rescan();
                                      });
         }
-        selection.setRememberColumnPosition(preferences->rememberColumnPosition());
-        selection.setRealistic(preferences->realistic());
-        const auto saveNavigation = [&] {
-            preferences->setNavigation(selection.rememberColumnPosition(), selection.realistic());
-        };
-        QObject::connect(&selection, &yalahoo::SelectionController::memoryChanged,
-                         preferences.get(), saveNavigation);
-        QObject::connect(&selection, &yalahoo::SelectionController::arrayModeChanged,
-                         preferences.get(), saveNavigation);
     }
+    yalahoo::SettingsController settings(preferences.get(), &library, &motion, &scene, &selection);
     if (!verificationRun || parser.isSet(QStringLiteral("verify-filled")) || appVerification) {
         // Verification fixtures stay isolated from the user's persistent library.
         if (verificationRun) {
@@ -506,6 +495,8 @@ int main(int argc, char **argv)
                                         parser.value(QStringLiteral("material-report")));
     }
 #endif
+    if (!verificationRun || appVerification)
+        initialProperties.insert("settingsController", QVariant::fromValue(&settings));
     engine.setInitialProperties(initialProperties);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -529,6 +520,11 @@ int main(int argc, char **argv)
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::saveError, window,
                          [window](const QString &error) {
                              window->setProperty("preferencesError", error);
+                         });
+    if (preferences)
+        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::errorChanged, window,
+                         [window, store = preferences.get()] {
+                             window->setProperty("preferencesError", store->error());
                          });
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))

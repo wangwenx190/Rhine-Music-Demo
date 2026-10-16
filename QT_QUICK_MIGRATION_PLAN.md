@@ -21,7 +21,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R26 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
+- 当前主线：`R27 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；本轮受影响范围内能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -151,6 +151,7 @@
 - 新renderer的resourceGeneration从1重置 → 用真实sceneGraphInvalidated事件及恢复输出/上传证明重建，不把局部代次当全局身份。
 - 几何探针绕过像素保护或把错误提示算作模型 → 共用RenderQuality保护、记录limited/实际尺寸，要求renderError为空并排除提示区域。
 - Offscreen附件估算漏D32FS8或resize重叠 → RGBA8颜色4bytes加depth/stencil8bytes保守上界并计旧/新同时存活；估算与driver实分配分开。
+- QML视觉树重建时延迟闭包引用已销毁上下文 → 延后动作绑定所属对象方法并核对revision；页签指示条沿实际按钮几何变化同步，不排捕获旧页签的闭包。
 - Qt Quick Popup在统一退出状态结束后仍保留模态焦点/捕获 → 关闭样式默认enter/exit，仅由既有SurfaceTransition控制可见生命周期。
 - 虚拟歌单远距离滚动的originY或高度估计变化 → 读取原生首尾范围，在有界已实现项polish后按实际目标行转换坐标，保持源cubic目标距离，并按revision排队聚焦。
 
@@ -183,17 +184,6 @@
 | REFDB-06 休眠唤醒与资源恢复用例 | R28 | `Qt/tests/UiChecks.cpp` 中静止零 step/三维 render、绘制中晚到失效、隐藏期间失效、恢复最新状态、缓存命中资源稳定和重建保留当前歌曲等场景 | 仅补已有生命周期覆盖的缺口；沿本项目 dirty revision、生产计数器和有界缓存实现，不搬用逐帧 JSON/缓冲比较来判静止，不照搬隐藏即清空所有资源、固定等待时长、窗口截图相等或 JS 状态机 |
 
 ## 待执行轮次
-
-### R26 · 完整设置、离线资料占位与未来联网插槽
-
-- 依赖R04、R09B、R13、R23、R25。完善已有PreferencesStore，交付SettingsPanel和Provider注入集成。
-- 按 REFDB-05 查漏取消/换代后晚到结果、合并请求中不同代订阅者和重载/退出后的回调；在现有 requestId/generation 上实现，只用测试 Provider，确认旧结果不更新新选择/缓存归属且不发网络请求。不因参考 Host 引入账号/在线业务或第二套调度系统。
-- 复刻设置排版/控件/折叠/画质/主题/音量/排列/列记忆/减少动态/速度/重播；偏好schemaVersion固定迁移，未知字段保留，新JSON原子提交。
-- 资料区域保留介绍/制作信息/MusicBrainz的标题、来源、查询状态与配置模型；已有缓存内容正常展示，执行按钮禁用并提示暂未启用。不返回伪查询成功/无结果。
-- 接上IMetadataProvider异步结果路由、requestId取消、批量进度模型与ProviderCapabilities；用测试Provider注入Matched/Uncertain/Error证明UI无需改动即可接入未来实现，产品只注册OfflineProvider。
-- 原设置重载只重建视觉树，不重建正在播放的媒体对象，不清除用户画质或数据；偏好与会话列记忆仍分开。
-- 性能设计与验证：偏好按变化字段路由，原子保存合并且不占GUI帧；主题/速度只更新uniform/状态，画质只改对应资源，审计缓存失效与分配峰值。
-- 退出：持久化/导入/坏文件处理、设置反向打开、测试Provider过期结果和零网络请求断言通过。
 
 ### R27 · 光照/速度调节面板与演示入口
 
@@ -282,6 +272,7 @@
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
+| R26-P | Windows/D3D11与macOS/Metal的原生设置输入/焦点/跨屏DPR、实际播放中视觉重载；三平台非图形偏好/Provider/配置与构建 | 三平台OpenGL设置GUI、滚动/焦点/DPR与窗口/视觉重载回归 |
 | R25-P | Windows/Linux原生BGM/音效/偏好与三平台物理音频路由、听感、最小化播放、非OpenGL音频面板 | 三平台OpenGL声音设置GUI/窗口/输入回归 |
 | R24-P | Windows/Linux原生媒体与三平台物理设备/听感、非OpenGL播放器/输入集成 | 三平台OpenGL播放器GUI/窗口/输入回归 |
 | R23-P | Windows/D3D11与macOS/Metal的原生目录选择、物理输入/焦点、跨屏DPR及播放定位集成；三平台非图形构建/模型 | 三平台OpenGL的面板/定位/资源恢复与Linux窗口/输入 |
@@ -292,6 +283,13 @@
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### R26-P · 完整设置与资料路由的目标平台/实机回归
+
+- 输入为SettingsController/PreferencesStore、SettingsPanel/MetadataSection、LibrarySession批次/能力/代次、LibraryStore::setMetadataConfiguration及实际App视觉重载；冻结music-app::renderSettingsPanel、music.css、quality-settings和motion-settings经历史映射。匿名库/公开Qt合成WAV、SampleProvider的Matched/Uncertain/Error及不同代订阅者只用于测试；产品仅OfflineMetadataProvider，零网络。接口/来源边界见library-data.md和source-fidelity-review.md。缺Windows/Linux系统、最新原生Kit与目标窗口/音频环境；本机隐藏Metal与Qt事件不代替物理输入、跨屏或正常VSYNC。
+- Release目标真实构建后执行`ctest --preset qt-release -R '^(settings|library-data|library-qml|media-metadata|audio-ambience|real-columns|render-quality|verification-window-policy|source-format)$'`、官方Yalahoo_qmllint/ui-audit_qmllint及`python3 tools/audit/audit-settings.py`。保留schemaVersion1/未知字段、对象JSON≤1MiB/只读源/坏文件保护、原子保存合并、变更字段路由、八个独立请求/一个批次请求、requestId/generation/album/kind拒绝和取消/换库/退出门槛；不以禁用实现代替目标编译。
+- 当前可靠窗口策略运行`ui-audit --settings 全新目录`/`settings-qml`，九尺寸/双主题/DPR1/1.5/2：两列主题、排序/阵列/列记忆、画质/折叠精细、减少动态/.25–3速度、三路声音/设备、MusicBrainz配置及整页滚动；查询按钮禁用且说明离线，缓存内容/来源/原状态正常，注入三种状态与能力变化不改UI。实际Qt输入、关闭/反向打开/模态隔离、面板与背景释放、真实App十次视觉树重建保留同一媒体对象/音源/意图/用户画质。macOS用隐藏Metal；Windows/D3D11归R34，全部OpenGL归R35，目标有可靠隐藏能力先重新分类；不将显式target DPR当物理屏幕。
+- 原生产品还须以真实键鼠/触控板核对设置控件滚动不导航、重新打开反映当前状态、全屏/片头重播/界面重载，并在实际播放/暂停时确认媒体连续、三路音量与设备意图保留；原生同对象hide/restore和跨屏DPR归既有最终矩阵。正常VSYNC/正式性能按R28及最终矩阵；隐藏场景重载只证明视觉所有权，听感/物理输出及缺目标执行保留，不能写通过。共享修正仅回归本机受影响路径。
 
 #### R25-P · 三路声音与原生数据的目标平台/实机回归
 

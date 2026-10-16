@@ -219,6 +219,21 @@ QJsonObject toJson(const Track &track)
         json.remove("lossless");
     return json;
 }
+QJsonArray producerData(const QList<Producer> &entries)
+{
+    QJsonArray result;
+    for (const auto &p : entries) {
+        auto object = p.fields;
+        object.insert("name", p.name);
+        object.insert("role", p.role);
+        object.insert("source", p.source);
+        object.insert("trackId", p.trackId);
+        object.insert("trackTitle", p.trackTitle);
+        object.insert("url", p.url);
+        result.append(object);
+    }
+    return result;
+}
 QJsonObject toJson(const Album &album)
 {
     QJsonObject json = album.fields;
@@ -242,21 +257,11 @@ QJsonObject toJson(const Album &album)
     putObject(json, "introduction", album.introduction);
     putObject(json, "creditsLookup", album.creditsLookup);
     putObject(json, "online", album.online);
-    QJsonArray tracks, producers;
+    QJsonArray tracks;
     for (const auto &track : album.tracks)
         tracks.append(toJson(track));
-    for (const auto &p : album.producers) {
-        auto object = p.fields;
-        object.insert("name", p.name);
-        object.insert("role", p.role);
-        object.insert("source", p.source);
-        object.insert("trackId", p.trackId);
-        object.insert("trackTitle", p.trackTitle);
-        object.insert("url", p.url);
-        producers.append(object);
-    }
     json.insert("tracks", tracks);
-    json.insert("producers", producers);
+    json.insert("producers", producerData(album.producers));
     return json;
 }
 QJsonObject toJson(const LibrarySnapshot &library)

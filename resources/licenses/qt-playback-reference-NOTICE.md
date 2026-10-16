@@ -29,3 +29,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+异步结果隔离另参考同项目 `Qt/src/Host.cpp::acceptCookies` 与 `cover` 完成回调中的 epoch/订阅者检查思路；本项目沿既有 requestId/generation 自行实现测试与批量调度，没有复制 Host、账号、网络或封面队列代码。实际读取 `Qt/src/Host.cpp` SHA256：`b9bb74b1595e640531722d741f84f5730c5deaf5bbfcff0e458e4a890599a71f`。作者与 MIT 许可同上。

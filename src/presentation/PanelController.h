@@ -18,6 +18,7 @@ public:
     }
     Q_INVOKABLE void open(const QString &panel);
     Q_INVOKABLE void close();
+    Q_INVOKABLE void reset();
     void setReducedMotion(bool reduced);
 signals:
     void changed();

@@ -465,6 +465,48 @@ private slots:
         delete temporary;
         QCoreApplication::processEvents();
     }
+    void batchGenerationAndMergedLateSubscribers()
+    {
+        TestProvider provider;
+        LibrarySession session(&provider);
+        auto snapshot = library("mixed");
+        snapshot.albums = snapshot.albums.mid(0, 3);
+        session.setSnapshot(snapshot);
+        QSignalSpy delivered(&session, &LibrarySession::metadataDelivered);
+        QVERIFY(session.requestMetadataBatch("introduction"));
+        QCOMPARE(provider.requests.size(), 1);
+        QVERIFY(session.metadataProgress()["active"].toBool());
+        provider.deliver(0, ProviderStatus::Matched);
+        QTRY_COMPARE(provider.requests.size(), 2);
+        QCOMPARE(session.metadataProgress()["completed"].toInt(), 1);
+        session.cancelAllMetadata();
+        QVERIFY(session.requestMetadataBatch("introduction"));
+        QCOMPARE(provider.requests.size(), 3);
+        // A coalescing provider can finish the old and new subscription together.
+        provider.deliver(1, ProviderStatus::Error);
+        provider.deliver(2, ProviderStatus::Uncertain);
+        QTRY_COMPARE(provider.requests.size(), 4);
+        QCOMPARE(delivered.size(), 2);
+        QCOMPARE(session.metadataProgress()["completed"].toInt(), 1);
+        QCOMPARE(session.metadataFor(snapshot.albums[0].id, "introduction")["status"].toString(),
+                 "Uncertain");
+        provider.deliver(3, ProviderStatus::Error);
+        QTRY_COMPARE(provider.requests.size(), 5);
+        provider.deliver(4, ProviderStatus::Matched);
+        QTRY_VERIFY(!session.metadataProgress()["active"].toBool());
+        QCOMPARE(session.metadataProgress()["completed"].toInt(), 3);
+        QCOMPARE(session.metadataProgress()["errors"].toInt(), 1);
+        QCOMPARE(delivered.size(), 4);
+        QVERIFY(session.requestMetadataBatch("credits"));
+        session.setSnapshot(snapshot);
+        provider.deliver(5, ProviderStatus::Matched);
+        QCoreApplication::processEvents();
+        QCOMPARE(delivered.size(), 4);
+        QVERIFY(session.metadata().isEmpty());
+        QVERIFY(!session.metadataProgress()["active"].toBool());
+        QVERIFY(session.playbackTrackId().isEmpty());
+        QVERIFY(session.navigationAlbumId().isEmpty());
+    }
     void injectedProviderStaleResults()
     {
         TestProvider provider;

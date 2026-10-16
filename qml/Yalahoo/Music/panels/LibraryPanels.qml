@@ -13,6 +13,9 @@ Popup {
     property PlaybackController playback: null
     property BackgroundMusicController backgroundMusic: null
     property InterfaceSoundController interfaceSound: null
+    property SettingsController settings: null
+    signal replayRequested
+    signal fullscreenRequested
     property LibraryStore store: null
     required property Item sceneSource
     property string pendingAlbum: ""
@@ -39,6 +42,8 @@ Popup {
             search.focusSearch();
         else if (controller.panel === "library")
             library.focusEditor();
+        else if (settingsLoader.item)
+            (settingsLoader.item as SettingsPanel).focusControl();
         else if (playbackLoader.item)
             (playbackLoader.item as PlaybackPanel).focusControl();
     }
@@ -167,6 +172,31 @@ Popup {
                         }
                     }
                 }
+                Loader {
+                    id: settingsLoader
+                    anchors.fill: parent
+                    active: root.controller.panel === "settings" && root.settings !== null
+                    sourceComponent: SettingsPanel {
+                        narrow: root.narrow
+                        tokens: root.tokens
+                        settings: root.settings
+                        librarySession: root.librarySession
+                        store: root.store
+                        playback: root.playback
+                        backgroundMusic: root.backgroundMusic
+                        interfaceSound: root.interfaceSound
+                        onReplayRequested: root.replayRequested()
+                        onFullscreenRequested: root.fullscreenRequested()
+                        heading: PanelHeading {
+                            width: settingsLoader.width
+                            tokens: root.tokens
+                            title: "播放与画质"
+                            subtitle: "SYSTEM SETTINGS"
+                            narrow: root.narrow
+                            onCloseRequested: root.dismiss()
+                        }
+                    }
+                }
                 LibraryPanel {
                     id: library
                     anchors.fill: parent
@@ -187,8 +217,12 @@ Popup {
                 }
             }
             Accessible.role: Accessible.Dialog
-            Accessible.name: root.controller.panel === "search" ? "搜索专辑与歌曲" : root.controller.panel
-                                                                  === "playback" ? "播放与声音" : "本地音乐库"
+            Accessible.name: root.controller.panel === "settings" ? "播放与画质" : root.controller.panel
+                                                                    === "search" ? "搜索专辑与歌曲" :
+                                                                                   root.controller.panel
+                                                                                   === "playback"
+                                                                                   ? "播放与声音" :
+                                                                                     "本地音乐库"
         }
     }
     Connections {

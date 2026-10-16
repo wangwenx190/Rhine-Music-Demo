@@ -19,6 +19,9 @@ foreach(name UiReview Canvas2DProbe Quick2DProbe RulerReview TitleReview DetailR
         PROPERTIES QT_RESOURCE_ALIAS "${name}.qml")
     list(APPEND ui_qml_files "${CMAKE_CURRENT_SOURCE_DIR}/${name}.qml")
 endforeach()
+set(settings_app "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
+set_source_files_properties("${settings_app}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
+list(APPEND ui_qml_files "${settings_app}")
 qt_add_qml_module(ui-audit URI Yalahoo.Music VERSION 1.0 RESOURCE_PREFIX /qt/qml
     DEPENDENCIES QtQuick QtCanvas2D
     QML_FILES ${ui_qml_files}

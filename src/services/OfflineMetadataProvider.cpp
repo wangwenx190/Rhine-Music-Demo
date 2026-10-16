@@ -113,7 +113,7 @@ void OfflineMetadataProvider::request(AlbumQuery query, RequestToken token, Meta
                 break;
             case MetadataKind::Credits:
                 state = album->creditsLookup;
-                result.payload = { { "producers", toJson(*album).value("producers") },
+                result.payload = { { "producers", producerData(album->producers) },
                                    { "creditsLookup", state } };
                 result.source = { { "name", state.value("source") } };
                 result.status = cachedStatus(state);

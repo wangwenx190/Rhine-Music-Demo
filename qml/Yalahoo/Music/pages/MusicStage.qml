@@ -22,6 +22,7 @@ Item {
     property BackgroundMusicController backgroundMusicController: null
     property InterfaceSoundController interfaceSoundController: null
     property TrackFocusController trackFocusController: null
+    property SettingsController settingsController: null
     property PanelController panelController: null
     property LibraryStore libraryStore: null
     property DetailModel detailModel: null
@@ -123,9 +124,8 @@ Item {
                     stage.playbackController.toggle();
                 } else if (stage.playbackController && action === "stop") {
                     stage.playbackController.stop();
-                } else if (stage.playbackController && action === "settings"
-                           && stage.panelController) {
-                    stage.panelController.open("playback");
+                } else if (action === "settings" && stage.panelController) {
+                    stage.panelController.open(stage.settingsController ? "settings" : "playback");
                 } else if ((action === "search" || action === "library") && stage.panelController) {
                     stage.panelController.open(action);
                 } else if (action === "locate-song" && stage.trackFocusController) {
@@ -230,6 +230,21 @@ Item {
             playback: stage.playbackController
             backgroundMusic: stage.backgroundMusicController
             interfaceSound: stage.interfaceSoundController
+            settings: stage.settingsController
+            onReplayRequested: {
+                stage.panelController.close();
+                if (stage.openingController)
+                    stage.openingController.replay();
+            }
+            onFullscreenRequested: {
+                const window = stage.Window.window;
+                if (window) {
+                    if (window.visibility === Window.FullScreen)
+                        window.showNormal();
+                    else
+                        window.showFullScreen();
+                }
+            }
             store: stage.libraryStore
             sceneSource: visualContent
         }
