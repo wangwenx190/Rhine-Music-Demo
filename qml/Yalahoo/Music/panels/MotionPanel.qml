@@ -21,6 +21,8 @@ Column {
         spacing: 10
         visible: root.expanded
         SettingRange {
+            stacked: true
+            captionSize: 10
             objectName: "motionSpeed"
             tokens: root.tokens
             label: "动画速度"

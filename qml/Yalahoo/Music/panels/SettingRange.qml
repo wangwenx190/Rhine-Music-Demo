@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
@@ -19,25 +18,44 @@ Item {
     property real captionSize: 12
     signal moved(real value)
     width: parent ? parent.width : 300
-    implicitHeight: stacked ? caption.implicitHeight + slider.implicitHeight + 4 : Math.max(caption.implicitHeight,
-                                                                                            slider.implicitHeight)
+    implicitHeight: stacked ? 40 : Math.max(caption.implicitHeight, slider.implicitHeight + 4)
     ArchiveText {
         id: caption
         tokens: root.tokens
         anchors.verticalCenter: root.stacked ? undefined : parent.verticalCenter
-        width: root.stacked ? parent.width : Math.max(0, parent.width - slider.width - 20)
-        text: root.label + " · " + (root.value * root.displayFactor).toFixed(root.decimals)
-              + root.suffix
+        y: root.stacked ? 5 : 0
+        width: root.stacked ? parent.width - output.implicitWidth - 8 : Math.max(0, parent.width
+                                                                                 - slider.width
+                                                                                 - 20)
+        text: root.label + (root.stacked ? "" : " · " + (root.value * root.displayFactor).toFixed(
+                                               root.decimals) + root.suffix)
         cssPixelSize: root.captionSize
+        cssLineHeight: root.stacked ? 15 : Math.round(cssAscent) + Math.round(cssDescent)
         wrapMode: Text.Wrap
     }
-    Slider {
+    ArchiveText {
+        id: output
+        tokens: root.tokens
+        anchors.right: parent.right
+        y: 5
+        visible: root.stacked
+        text: (root.value * root.displayFactor).toFixed(root.decimals) + root.suffix
+        cssPixelSize: 10
+        cssLineHeight: 15
+        color: root.tokens.muted
+    }
+    ArchiveSlider {
         id: slider
+        implicitHeight: root.stacked ? 20 : 16
+        disabledOpacity: root.stacked ? .3 : .38
+        tokens: root.tokens
         objectName: root.objectName + "Control"
         anchors.right: parent.right
         anchors.verticalCenter: root.stacked ? undefined : parent.verticalCenter
         anchors.bottom: root.stacked ? parent.bottom : undefined
-        width: root.stacked ? parent.width : Math.min(150, parent.width * .48)
+        y: root.stacked ? 5 : 0
+        width: root.stacked ? parent.width - output.implicitWidth - 8 : Math.min(150, parent.width
+                                                                                 * .48)
         from: root.minimum
         to: root.maximum
         stepSize: root.step

@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
@@ -46,21 +45,15 @@ Rectangle {
         if (!visible)
             diagnostics = false;
     }
-    ScrollView {
+    ArchiveScrollView {
         id: scroll
+        tokens: root.tokens
         objectName: "experimentScroll"
         anchors.fill: parent
         anchors.margins: 12
         contentWidth: availableWidth
         font.family: root.tokens.regular.family
-        palette.window: root.tokens.surface
-        palette.base: root.tokens.surface
-        palette.button: root.tokens.surface
-        palette.buttonText: root.tokens.ink
-        palette.text: root.tokens.ink
-        palette.windowText: root.tokens.ink
-        palette.highlight: root.tokens.accent
-        palette.highlightedText: root.tokens.surface
+
         Column {
             width: scroll.availableWidth
             spacing: 16
@@ -82,7 +75,8 @@ Rectangle {
                 tokens: root.tokens
                 lighting: root.lighting
             }
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 objectName: "diagnosticsToggle"
                 text: "采样运行诊断"
                 checked: root.diagnostics

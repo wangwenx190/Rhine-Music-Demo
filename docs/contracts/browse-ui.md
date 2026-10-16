@@ -8,7 +8,7 @@
 
 - `LayoutMetrics` 是二维和相机共用的逻辑尺寸源，1.05 分界、信息区 x/right 不复制到第二个控制器。
 - `LibrarySession::browseInfo` 按稳定导航 ID 查询已有专辑索引和新建的类型名索引，交付标题/艺术家/类型/年份/曲数。快照替换即使 ID 不变也通知；搜索、排序和浏览不发出播放命令。类型索引仅在快照替换构建；全局/列内序号索引在快照或排序列变化时一次构建，读取不扫描集合。
-- `ArchiveText` 按同源字体度量提供 CSS 行框与上下留白：normal 行框使用分别取整的 ascent/descent，小数字号以相邻整数的未 hint 矢量文字加局部比例变换保持精确尺寸/字距，不扩大字形缓存，也不增加 layer/FBO。眉题的 1.7 行高、两个 span 的4px边距和空格 advance 分别建模；打开按钮按实际 CSS 级联继承16px，并显式清除 Basic 默认内边距；`NavigationFrame` 保留父级 16px 的 inline strut，并按 ascent/descent 和 inline span 的半行距计算字行盒。这解释浏览信息底边，不能用一张截图反推常量。导航输入/刻线/数字序号由 R15 的 InputRouter/RulerController/OrdinalReel 接管；R16 接管完整文字测量缓存及标题字轮。
+- `ArchiveText` 按同源字体度量提供 CSS 行框与上下留白：normal 行框使用分别取整的 ascent/descent，小数字号以相邻整数的未 hint 矢量文字加局部比例变换保持精确尺寸/字距，不扩大字形缓存，也不增加 layer/FBO。眉题的 1.7 行高、两个 span 的4px边距和空格 advance 分别建模；打开按钮按实际 CSS 级联继承16px，并显式设置源码内边距；`NavigationFrame` 保留父级 16px 的 inline strut，并按 ascent/descent 和 inline span 的半行距计算字行盒。这解释浏览信息底边，不能用一张截图反推常量。导航输入/刻线/数字序号由 R15 的 InputRouter/RulerController/OrdinalReel 接管；R16 接管完整文字测量缓存及标题字轮。
 - 当前歌名为 `Header.playingTitle`，宽度上限按冻结竖屏优先320px及横屏760/610/340px规则；播放/停止按钮始终锚定最右侧。主题请求和其他按钮通过 `themeRequested` / `actionRequested` 交付，不修改音乐队列。减少动态与速度从已有 `MotionController` / `FrameClock` 注入。
 - 七种颜色和 nightMix 的过渡保持 650ms、源 cubic-bezier(.4,0,.2,1)；选择 pill 保持 380ms、(.22,1,.36,1)。夜间侧向遮罩横屏为 32/58/78%，竖屏在 650ms 内消退；阅读层位于页眉之前，不覆盖顶栏。
 

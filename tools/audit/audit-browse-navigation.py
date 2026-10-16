@@ -28,7 +28,7 @@ frozen = [historical(BASELINE, 'src/' + name, reason) for name, reason in [
     ('viewport-layout.ts', 'Logical viewport and 1.05 portrait division.'),
 ]]
 history = [historical(rev, path, reason) for rev, path, reason in [
-    ('1a082f2', 'qml/Yalahoo/Music/components/ArchiveText.qml', 'R14: retain local fractional vector scale, CSS line-box metrics and explicit Basic padding; detailed title font semantics are R19F.'),
+    ('1a082f2', 'qml/Yalahoo/Music/components/ArchiveText.qml', 'R14: retain local fractional vector scale, CSS line-box metrics and explicit source padding; detailed title font semantics are R19F.'),
     ('1a082f2', 'qml/Yalahoo/Music/components/ArchiveButton.qml', 'R14: remove image-driven fourfold SVG raster size; preserve source geometry and actual output DPR.'),
     ('1a082f2', 'tools/review/UiAudit.cpp', 'R14: own output, CPU diagnostics and lifecycle.'),
     ('2ee2294', 'src/render/navigation/RulerController.cpp', 'R15: retain source exact springs, bounded slot matching and existing single clock.'),

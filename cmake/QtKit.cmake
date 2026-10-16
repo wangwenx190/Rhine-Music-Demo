@@ -6,7 +6,7 @@ set(
     Gui
     Qml
     Quick
-    QuickControls2
+    QuickTemplates2
     QuickDialogs2
     Quick3D
     Multimedia

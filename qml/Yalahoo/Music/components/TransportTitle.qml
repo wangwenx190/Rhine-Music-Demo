@@ -1,10 +1,12 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 
-Button {
+T.Button {
     id: root
+    focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
     required property DesignTokens tokens
     property FrameClock clock: null
     property string title: ""
@@ -22,8 +24,12 @@ Button {
     opacity: transition.opacity
     Accessible.name: "定位歌曲：" + title
     Accessible.ignored: !enabled
-    ToolTip.text: title
-    ToolTip.visible: hovered && enabled
+    ArchiveToolTip {
+        parent: root
+        tokens: root.tokens
+        text: root.title
+        visible: root.visible && root.hovered && root.enabled
+    }
     background: Item {}
     contentItem: Item {
         TitleReel {

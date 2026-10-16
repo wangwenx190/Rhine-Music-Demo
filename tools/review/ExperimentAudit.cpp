@@ -190,8 +190,7 @@ int reviewExperiments(const QString &output)
                 }
                 check("bottom-render", render());
                 auto *toggle = visual(root, "diagnosticsToggle");
-                auto *label =
-                        toggle ? toggle->property("contentItem").value<QQuickItem *>() : nullptr;
+                auto *label = toggle ? visual(toggle, "checkBoxCaption") : nullptr;
                 check("theme-control-text",
                       label
                               && label->property("color").value<QColor>()

@@ -1,13 +1,11 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import Yalahoo.Music
 import "../components"
 
-ScrollView {
+ArchiveScrollView {
     id: root
-    required property DesignTokens tokens
     required property LibrarySession librarySession
     property Component heading: null
     property LibraryStore store: null
@@ -48,15 +46,15 @@ ScrollView {
             text: "音乐文件夹 · 多个目录各占一行"
             cssPixelSize: 11
         }
-        TextArea {
+        ArchiveTextArea {
             id: roots
+            tokens: root.tokens
             objectName: "libraryRootsEditor"
             width: parent.width
-            height: Math.max(100, implicitHeight)
+            height: implicitHeight
             font.family: root.tokens.regular.family
             font.pixelSize: 12
             color: root.tokens.ink
-            padding: 13
             selectByMouse: true
             wrapMode: TextEdit.WrapAnywhere
             placeholderText: "输入本地绝对路径，或选择文件夹"

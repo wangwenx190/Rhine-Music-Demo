@@ -49,7 +49,6 @@
 #include <QMouseEvent>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
-#include <QQuickStyle>
 #include <QQuickWindow>
 #include <QRawFont>
 #include <QSaveFile>
@@ -88,7 +87,6 @@ int main(int argc, char **argv)
         std::fprintf(stderr, "Embedded MiSans font registration failed\n");
         return 6;
     }
-    QQuickStyle::setStyle(QStringLiteral("Basic"));
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native music archive"));
     parser.addHelpOption();
@@ -754,7 +752,7 @@ int main(int argc, char **argv)
                 { "displayName", app.applicationDisplayName() },
                 { "dataDirectory",
                   QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) },
-                { "controlsStyle", QQuickStyle::name() },
+                { "controlRendering", "project-quick-templates" },
                 { "interactionCount", interactions },
                 { "chineseGlyphs", chineseSupported },
                 { "font", raw.familyName() },

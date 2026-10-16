@@ -1,11 +1,13 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "../components"
 
-Button {
+T.Button {
     id: root
+    focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
     required property DesignTokens tokens
     required property bool night
     required property bool selected

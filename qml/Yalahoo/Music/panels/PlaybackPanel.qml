@@ -1,29 +1,18 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
-ScrollView {
+ArchiveScrollView {
     id: root
     objectName: "audioSettingsPanel"
-    required property DesignTokens tokens
     required property PlaybackController playback
     property BackgroundMusicController backgroundMusic: null
     property InterfaceSoundController interfaceSound: null
     property Component heading: null
     property bool navigationInputOwner: true
     contentWidth: availableWidth
-    palette.window: tokens.surface
-    palette.base: tokens.surface
-    palette.dark: tokens.muted
-    palette.mid: tokens.line
-    palette.button: tokens.surface
-    palette.buttonText: tokens.ink
-    palette.text: tokens.ink
-    palette.windowText: tokens.ink
-    palette.highlight: tokens.accent
-    palette.highlightedText: tokens.surface
+
     function focusControl() {
         playToggle.forceActiveFocus();
     }
@@ -79,7 +68,8 @@ ScrollView {
             text: "歌曲音量"
             cssPixelSize: 12
         }
-        Slider {
+        ArchiveSlider {
+            tokens: root.tokens
             width: parent.width
             from: 0
             to: 1
@@ -91,7 +81,8 @@ ScrollView {
             width: parent.width
             spacing: 14
             visible: root.backgroundMusic !== null
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 objectName: "bgmEnabled"
                 text: "氛围 BGM"
                 checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
@@ -106,7 +97,8 @@ ScrollView {
                 wrapMode: Text.Wrap
                 color: root.tokens.muted
             }
-            Slider {
+            ArchiveSlider {
+                tokens: root.tokens
                 objectName: "bgmVolume"
                 width: parent.width
                 from: 0
@@ -130,14 +122,16 @@ ScrollView {
             width: parent.width
             spacing: 14
             visible: root.interfaceSound !== null
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 objectName: "interfaceSoundEnabled"
                 text: "界面音效"
                 checked: root.interfaceSound ? root.interfaceSound.enabled : false
                 onToggled: if (root.interfaceSound)
                                root.interfaceSound.enabled = checked
             }
-            Slider {
+            ArchiveSlider {
+                tokens: root.tokens
                 objectName: "interfaceSoundVolume"
                 width: parent.width
                 from: 0
@@ -168,8 +162,9 @@ ScrollView {
             text: "输出设备"
             cssPixelSize: 12
         }
-        ComboBox {
+        ArchiveComboBox {
             id: output
+            tokens: root.tokens
             objectName: "songOutputDevices"
             width: parent.width
             model: root.playback.devices

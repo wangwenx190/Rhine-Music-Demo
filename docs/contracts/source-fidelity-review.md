@@ -255,7 +255,7 @@
 | 实际历史对象与调用链 | 来源与判定 |
 | --- | --- |
 | R14 `1a082f2` Header/品牌容器、ArchiveButton、ThemeSwitch | 源`music.css`及最后加载的`music-theme-switch.css`定义容器锚点、竖屏网格、17px SVG/圆端点、主题pill；新品牌图形由用户差异替换，容器位置保留。设置图标的两条线/两个圆用Curve Shape保留原矢量几何/层级，原生可访问焦点框是必要交互适配。SVG与play/pause按所属窗口实际DPR栅格化，动画scale独立应用。 |
-| R14 BrowseInfo/ArchiveText/NavigationFrame/Footer、R15数字接入 | 源最终callout CSS覆盖早期57%定位，采用68.633333%与竖屏clamp；navigation高度驱动callout-bottom。保留CSS normal ascent/descent分别取整、16px父inline strut、1.7行高、眉题span边距/空格advance、按钮继承16px及Basic padding清零；这些是文字度量和盒模型适配，分数字号使用局部矢量scale而非增加缓存字号/离屏层。`ArchiveText`通用文字语义及标题专用基线进一步由R19F复查，不能由本节静态锚点关闭。 |
+| R14 BrowseInfo/ArchiveText/NavigationFrame/Footer、R15数字接入 | 源最终callout CSS覆盖早期57%定位，采用68.633333%与竖屏clamp；navigation高度驱动callout-bottom。保留CSS normal ascent/descent分别取整、16px父inline strut、1.7行高、眉题span边距/空格advance、按钮继承16px及显式源码padding；这些是文字度量和盒模型适配，分数字号使用局部矢量scale而非增加缓存字号/离屏层。`ArchiveText`通用文字语义及标题专用基线进一步由R19F复查，不能由本节静态锚点关闭。 |
 | R14 DesignTokens/ReadingVeil、R19 `1c9b8c6`界面连接 | 650ms颜色/.4,0,.2,1、380ms pill/.22,1,.36,1及源渐变停点有明确CSS依据。直接Quick渐变节点按原层级位于三维与页眉之间，无额外全屏采样；稳定透明层停绘。R19的overview opacity/offset/enabled只是状态委托，实际总览时序由R19G1复查。 |
 | R16 `2abb4f6` Header/TransportTitle接入 | song slot增长推动前置控件而右侧play/stop不动，退出保宽由既有TransportMotion管理。该提交将竖屏cap误替换为横屏宽度断点，现恢复最后生产CSS的`clamp(0,width-320,280)`优先级；横屏760/610/340规则及间距保留。标题shaping、退字与采样归R19F。 |
 | R15 `2ee2294` RulerController→RulerInk/Quick clip→固定Button池 | 12+2×2槽、anchor5、rate18、560ms ripple/24ms展开及完整刻线/边缘alpha均来自`music-ruler.ts`/CSS；nearest槽匹配与循环occurrence保留。三份actual-size路径按geometry失效，动画高度用rect而不拉伸AA fringe；透明单采样附件固定130×30/96×21，动画宽度仅改变Quick clip。两API使用[Qt默认antialias=1](https://doc.qt.io/qt-6/qcanvaspainter.html#setAntialias)，DPR由所属目标处理，不取浏览器栅格损失为目标。 |
@@ -407,7 +407,13 @@ REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检�
 | --- | --- |
 | `music-lighting-lab.ts`/`music-row-lighting.ts` → `LightingPanel`、`SelectionLighting::configure/setComparing/resetSettings` | 保留四模式、五参数范围、guided预设、按住原版/释放恢复、窄屏折叠与输入隔离；只更新已有光场参数，保持跟随x/v。Qt控件承担焦点与无障碍，不引入浏览器URL状态。 |
 | `music-motion-lab.ts`/`music-motion-settings.ts` → `MotionPanel`、SettingsController/FrameClock | 保留.25–3倍率、.05步进与1×复位；沿唯一时钟保持轨迹与片头/歌曲独立。 |
-| `music-lighting-lab.css` → `MusicStage`实验容器/共享ScrollView | 保留左侧响应式位置、272/254/248宽度、页眉/底栏避让；源文字主题色映射到Qt控件的windowText；窗口太窄时限定可用宽度，滚动限于实验面板。 |
+| `music-lighting-lab.css` → `MusicStage`实验容器/共享ScrollView | 保留左侧响应式位置、272/254/248宽度、页眉/底栏避让；源文字主题色直接绑定项目自绘控件；窗口太窄时限定可用宽度，滚动限于实验面板。 |
 | 音乐生产入口 → 原生启动参数与run-native脚本 | 普通入口、匿名demo和匿名lighting-lab分别路由；用户指定演示不读取真实库/自动播放优先，产品资产和匿名标题不带私人路径。 |
 
 诊断用实际单调提交/原生Qt呈现事件和既有上传/解码计数，统计范围以performance.md为准。`audit-experiments.py`绑定上述冻结来源hash及当前COMMON/PERF/三平台符号；数学/参数、隐藏输出和缺目标环境的原生输入/呈现分别验收，后者归R27-P。
+
+## 共用控件来源
+
+冻结style.css/music.css的继承字体、输入框/选择器/checkbox/range/progress以及music-lighting-lab.css最终按钮/滑杆覆盖映射至Archive控件；来源框与文字行高按[controls.md](controls.md)显式设置。QtQuick.Templates仅提供公开输入/焦点/Accessible行为，所有产品/研究/Review视觉由项目组件与DesignTokens绘制。浏览器原生内部装饰映射为明确的项目几何，原生弹出菜单/滚动条空间由项目限定，不宣称其装饰是源CSS常量。FolderDialog保留操作系统目录选择。
+
+控件自身双主题输出、来源几何/行高与Qt编辑事件和宿主集成分别验证；源码COMMON/PERF/平台审计由audit-controls.py绑定当前QML清单/调用链及冻结hash。物理输入、系统辅助技术/输入法、原生窗口与其他目标环境按UI-CONTROLS-P保留，技术规范不在此重复。

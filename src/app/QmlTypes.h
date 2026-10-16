@@ -1,5 +1,6 @@
 #include "OpeningController.h"
 #include "OpeningInk.h"
+#include "TextAreaFormat.h"
 #pragma once
 #include "LibrarySession.h"
 #include "SettingsController.h"
@@ -267,4 +268,11 @@ struct SettingsControllerQml
     QML_FOREIGN(yalahoo::SettingsController)
     QML_NAMED_ELEMENT(SettingsController)
     QML_UNCREATABLE("Owned by application")
+};
+
+struct TextAreaFormatQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::TextAreaFormat)
+    QML_NAMED_ELEMENT(TextAreaFormat)
 };

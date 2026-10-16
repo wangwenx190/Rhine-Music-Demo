@@ -1,10 +1,10 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "../components"
 
-Popup {
+T.Popup {
     id: root
     required property DesignTokens tokens
     required property LibrarySession librarySession
@@ -29,11 +29,12 @@ Popup {
     width: parent ? parent.width : 1280
     height: parent ? parent.height : 720
     padding: 0
+    popupType: T.Popup.Item
     modal: true
     dim: false
     focus: true
     visible: controller.surface.shown
-    closePolicy: Popup.NoAutoClose
+    closePolicy: T.Popup.NoAutoClose
     enter: null
     exit: null
     background: Item {}

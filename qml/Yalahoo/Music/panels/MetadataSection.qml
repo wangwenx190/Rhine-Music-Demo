@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
@@ -86,14 +85,19 @@ Column {
         wrapMode: Text.WrapAnywhere
     }
     ArchiveButton {
+        id: queryButton
         objectName: root.kind + "MetadataQuery"
         tokens: root.tokens
         text: root.kind === "introduction" ? "查询 / 更新专辑介绍 ↗" : root.kind === "credits"
                                              ? "查询缺失的制作信息 ↗" : "补充缺失的在线资料 ↗"
         enabled: root.queryEnabled && !root.progress.active
         onClicked: root.librarySession.requestMetadataBatch(root.kind)
-        ToolTip.visible: hovered && !enabled
-        ToolTip.text: "联网资料功能暂未启用"
+        ArchiveToolTip {
+            parent: queryButton
+            tokens: root.tokens
+            visible: queryButton.hovered && !queryButton.enabled
+            text: "联网资料功能暂未启用"
+        }
         Accessible.description: enabled ? "" : "联网资料功能暂未启用"
     }
     ArchiveText {
@@ -105,7 +109,9 @@ Column {
         cssPixelSize: 11
         color: root.tokens.muted
     }
-    ProgressBar {
+    ArchiveProgressBar {
+        tokens: root.tokens
+        implicitHeight: root.kind === "introduction" ? 3 : 16
         width: parent.width
         visible: root.progress.kind === root.kind && root.progress.total > 0
         from: 0

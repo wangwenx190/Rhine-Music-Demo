@@ -1,11 +1,18 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Templates as T
 import QtQuick.Layouts
 import QtMultimedia
+import "components"
 import "scene"
 
-ApplicationWindow {
+T.ApplicationWindow {
     id: window
+    DesignTokens {
+        id: design
+        night: window.sceneAdapter.lighting.night
+        reducedMotion: window.motionController.reducedMotion
+        motionSpeed: window.motionController.clock.speed
+    }
     required property LibrarySession librarySession
     required property MotionController motionController
     property InputRouter inputRouter: null
@@ -52,39 +59,47 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 20
         spacing: 18
-        Label {
+        ArchiveText {
+            tokens: design
             text: "yalahOO!!!"
             font.family: MusicFonts.bold.family
             font.styleName: MusicFonts.bold.styleName
             font.weight: MusicFonts.bold.weight
-            font.pixelSize: 36
+            cssPixelSize: 36
             color: "#253e37"
             Layout.alignment: Qt.AlignHCenter
         }
-        Label {
+        ArchiveText {
+            tokens: design
             text: "一张一张，慢慢听"
-            font.pixelSize: 22
+            cssPixelSize: 22
             color: "#3d544c"
             Layout.alignment: Qt.AlignHCenter
         }
-        Label {
+        ArchiveText {
+            tokens: design
             text: "Qt 原生运行探针 · QML / 3D / ShaderTools / Multimedia"
-            font.pixelSize: 14
+            cssPixelSize: 14
             color: "#526259"
             Layout.alignment: Qt.AlignHCenter
         }
-        Label {
+        ArchiveText {
+            tokens: design
             objectName: "libraryDataProbe"
             text: "匿名库模型 · " + window.librarySession.albums.count + " 张专辑"
             color: "#526259"
             Layout.alignment: Qt.AlignHCenter
         }
-        Button {
+        ArchiveButton {
+            tokens: design
+            framed: true
             objectName: "themeProbe"
             text: window.sceneAdapter.lighting.night ? "暖昼" : "深夜"
             onClicked: window.sceneAdapter.lighting.night = !window.sceneAdapter.lighting.night
         }
-        Button {
+        ArchiveButton {
+            tokens: design
+            framed: true
             objectName: "interactionProbe"
             text: window.interactionCount === 0 ? "验证窗口交互" : "交互已响应 " + window.interactionCount
             Layout.alignment: Qt.AlignHCenter
@@ -92,10 +107,11 @@ ApplicationWindow {
                 window.interactionCount++;
                 window.sceneAdapter.detail = window.sceneAdapter.detail === 0 ? 1 : 0;
             }
-            icon.source: "qrc:/assets/icons/play-day.svg"
+            iconName: "play"
         }
     }
-    Label {
+    ArchiveText {
+        tokens: design
         objectName: "layoutProbe"
         visible: window.sceneReview
         anchors.left: parent.left

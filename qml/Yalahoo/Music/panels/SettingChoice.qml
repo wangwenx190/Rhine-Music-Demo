@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
@@ -25,23 +24,19 @@ Item {
         cssPixelSize: 12
         wrapMode: Text.Wrap
     }
-    ComboBox {
+    ArchiveComboBox {
         id: choice
+        tokens: root.tokens
         objectName: root.objectName + "Control"
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(180, parent.width * .52)
+        width: Math.min(choice.implicitWidth, parent.width * .52)
         model: root.choices
         textRole: "label"
         valueRole: "value"
         currentIndex: root.choices.findIndex(entry => entry.value === root.selected)
         onActivated: root.chosen(currentValue)
         Accessible.name: root.label
-        delegate: ItemDelegate {
-            required property var modelData
-            width: choice.width
-            text: modelData.label
-            enabled: modelData.value !== "custom"
-        }
+        disabledValue: "custom"
     }
 }

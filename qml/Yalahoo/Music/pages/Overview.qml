@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "../components"
 
@@ -140,8 +140,10 @@ Item {
                     height: 22
                     color: root.tokens.line
                 }
-                AbstractButton {
+                T.AbstractButton {
                     id: label
+                    focusPolicy: Qt.StrongFocus
+                    hoverEnabled: true
                     objectName: "overviewLabel-" + anchor.lane
                     y: 1
                     width: root.labelWidth
@@ -150,8 +152,12 @@ Item {
                     activeFocusOnTab: enabled
                     Accessible.name: "展开" + root.columnKind + "入口：" + anchor.columnName
                     Accessible.description: anchor.expanded ? "已展开" : "已折叠"
-                    ToolTip.text: anchor.columnName
-                    ToolTip.visible: hovered
+                    ArchiveToolTip {
+                        parent: label
+                        tokens: root.tokens
+                        text: anchor.columnName
+                        visible: label.visible && label.hovered
+                    }
                     background: Rectangle {
                         color: "transparent"
                         border.width: label.visualFocus ? 1 : 0
@@ -194,8 +200,10 @@ Item {
                     height: parent.height - 1
                     clip: true
                     opacity: anchor.entryOpacity
-                    AbstractButton {
+                    T.AbstractButton {
                         id: enter
+                        focusPolicy: Qt.StrongFocus
+                        hoverEnabled: true
                         objectName: "overviewEnter-" + anchor.lane
                         x: anchor.entryOffset
                         width: 76

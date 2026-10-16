@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 
 Flickable {
@@ -39,8 +39,10 @@ Flickable {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     flickableDirection: Flickable.VerticalFlick
-    ScrollBar.vertical: ScrollBar {
+    T.ScrollBar.vertical: ArchiveScrollBar {
+        tokens: root.tokens
         width: 3
+        padding: 0
         background: Item {}
         contentItem: Rectangle {
             color: root.tokens.muted

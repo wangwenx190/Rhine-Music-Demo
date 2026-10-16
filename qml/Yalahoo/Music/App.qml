@@ -1,10 +1,10 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "pages"
 
-ApplicationWindow {
+T.ApplicationWindow {
     id: window
     required property LibrarySession librarySession
     required property MotionController motionController

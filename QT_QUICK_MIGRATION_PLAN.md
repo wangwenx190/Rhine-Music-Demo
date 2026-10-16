@@ -61,6 +61,7 @@
 | [opening.md](docs/contracts/opening.md) | 二维序章/三维开场、事件就绪、遮挡提交与交互交接 |
 | [materials.md](docs/contracts/materials.md) / [lighting.md](docs/contracts/lighting.md) | 源材质/纸面语义；世界光场/主题/源单位 |
 | [canvas-painter.md](docs/contracts/canvas-painter.md) / [browse-ui.md](docs/contracts/browse-ui.md) | 两种绘制API共用能力与选型；浏览静态布局/遮罩/图标合成 |
+| [controls.md](docs/contracts/controls.md) | 项目自绘控件、来源尺寸、输入行为与控件检查入口 |
 | [navigation.md](docs/contracts/navigation.md) / [title-reels.md](docs/contracts/title-reels.md) | 滑尺/数字/输入；标题字轮/字体/文字缓存 |
 | [presentation.md](docs/contracts/presentation.md) / [detail-motion.md](docs/contracts/detail-motion.md) / [overview.md](docs/contracts/overview.md) | 详情展示；抽取/换片/拖动；总览取景/折叠/标签 |
 | [covers.md](docs/contracts/covers.md) / [archive-pool.md](docs/contracts/archive-pool.md) / [real-columns.md](docs/contracts/real-columns.md) | 封面解码/图集/租约；填充池/选择坐标；真实列/会话记忆 |
@@ -83,6 +84,8 @@
 - 提交前依次执行`format`、`check-format`及适用Release检查，`source-format`必须通过；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
 
 ### 架构与产品接线
+
+- 全部现有及新增QML控件遵守[controls.md的长期强制规则](docs/contracts/controls.md)：禁止QQC预制控件，完全自绘并按冻结来源理论值显式设置视觉属性；产品、探针、研究与Review同样适用。具体边界只在该契约维护。
 
 - AppController组合模型、选择/展示/运动、媒体、偏好与Provider，禁止巨型业务类；稳定ID操作，导航与播放独立。模型通知在GUI，GUI→render仅不可变SceneFrame，render不访问QML/LibraryStore/IO；扫描/解码用受限worker，媒体探测用有事件循环的专用线程，异步按requestId/generation/entityId淘汰陈旧结果。
 - 数据根/JSON/排序/搜索/Provider协议以library-data契约为准。专辑/曲目ID固定为`album-/track-`加原生绝对目录/直属单曲/文件路径UTF-8的SHA256前24位；跨系统不猜映射。旧数据仅显式只读导入，不移动原目录或导入PCM缓存，不写源歌曲标签。
@@ -262,6 +265,7 @@
 
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
+| UI-CONTROLS-P | Windows/D3D11与macOS/Metal原生控件/物理输入、输入法/无障碍/跨屏；三平台目标构建与模块闭包 | 三平台OpenGL控件与宿主窗口/输入回归 |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
 | R27-P | Windows/D3D11与macOS/Metal的物理实验控件输入、原生恢复/跨屏DPR和播放中改速；三平台非图形参数/启动器/构建 | 三平台OpenGL实验面板、参数上传、采样和生命周期回归 |
 | R26-P | Windows/D3D11与macOS/Metal的原生设置输入/焦点/跨屏DPR、实际播放中视觉重载；三平台非图形偏好/Provider/配置与构建 | 三平台OpenGL设置GUI、滚动/焦点/DPR与窗口/视觉重载回归 |
@@ -275,6 +279,12 @@
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### UI-CONTROLS-P · 自绘控件的目标系统与原生输入
+
+- 输入为controls.md定义的Archive控件、TextAreaFormat、全项目QML视觉树与ControlsReview/ControlsAudit；冻结music.css/style.css/music-lighting-lab.css按历史映射。匿名控件与既有面板fixture不读取私人库。缺Windows/Linux最新原生Kit及目标GPU/窗口，本机隐藏Metal只证明Qt对象输入/自身输出，不能证明物理输入/系统输入法/辅助技术或跨屏。
+- 目标Release构建、官方Yalahoo_qmllint/ui-audit_qmllint、check-format/source-format、kit-selection/bootstrap与`python3 tools/audit/audit-controls.py`；按可靠窗口策略执行`controls-qml`及settings-qml/experiments-qml/library-panels-qml/playback-qml，保留来源尺寸/行高、双主题九尺寸/显式DPR1/1.5/2与各宿主输入隔离/关闭释放原门槛。改变环境主题后绘制仍取项目token，模块/qrc/字体和QuickTemplates2在真实目标部署闭包可解析。
+- 物理键鼠/触控板、Tab/ShiftTab、方向键/Space/Enter/Escape、失焦/外部点击关闭、滚动条拖动与下拉虚拟滚动、系统中英文/emoji组合输入、选择/剪贴板菜单/撤销重做、readOnly/disabled、屏幕阅读器角色/名称、目录选择与跨屏DPR/原生hide/minimize/restore按目标系统验收。D3D11/Metal归R34，全部OpenGL及Linux窗口归R35；不以隐藏事件或显式target DPR替代原生事实。共享修正只回归受影响的本机控件/宿主与窗口策略，完整性能仍依R28和最终矩阵。
 
 #### R27-P · 光照/速度实验与匿名启动的目标平台/实机回归
 

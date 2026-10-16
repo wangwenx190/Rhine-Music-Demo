@@ -19,7 +19,7 @@ unset(CMAKE_REQUIRED_LIBRARIES)
 if(NOT YALAHOO_REEL_GLYPH_API)
     message(FATAL_ERROR "Latest native Qt Quick glyph API needs adaptation at the RHI text boundary")
 endif()
-qt_add_library(YalahooText STATIC TextLayoutAdapter.cpp TextLayoutAdapter.h
+qt_add_library(YalahooText STATIC TextAreaFormat.cpp TextAreaFormat.h TextLayoutAdapter.cpp TextLayoutAdapter.h
     TitleReel.cpp TitleReel.h ReelInk.cpp ReelInk.h TransportMotion.cpp TransportMotion.h
     "${PROJECT_SOURCE_DIR}/src/render/rhi/ReelTextNode.cpp")
 target_include_directories(YalahooText PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"

@@ -1,9 +1,9 @@
-qt_add_executable(ui-audit UiAudit.cpp ExperimentAudit.cpp ExperimentAudit.h LibraryAudit.cpp LibraryAudit.h OpeningAudit.cpp OpeningAudit.h OverviewAudit.cpp OverviewAudit.h PresentationAudit.cpp PresentationAudit.h RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
+qt_add_executable(ui-audit UiAudit.cpp ControlsAudit.cpp ControlsAudit.h ExperimentAudit.cpp ExperimentAudit.h LibraryAudit.cpp LibraryAudit.h OpeningAudit.cpp OpeningAudit.h OverviewAudit.cpp OverviewAudit.h PresentationAudit.cpp PresentationAudit.h RulerAudit.cpp RulerAudit.h CanvasProbe.cpp CanvasProbe.h OffscreenSurface.h
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/support")
 target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooOpening YalahooRhi
-    Qt6::CanvasPainter Qt6::QuickControls2 Qt6::Svg Qt6::Test Qt6::GuiPrivate)
+    Qt6::CanvasPainter Qt6::QuickTemplates2 Qt6::Svg Qt6::Test Qt6::GuiPrivate)
 set_target_properties(ui-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
     WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
 yalahoo_platform(ui-audit)
@@ -14,7 +14,7 @@ qt_add_resources(ui-audit ui_branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}
     "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
 include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
 yalahoo_browse_qml(ui_qml_files)
-foreach(name UiReview Canvas2DProbe Quick2DProbe RulerReview TitleReview DetailReview OverviewVisual OpeningComparison LibraryReview)
+foreach(name UiReview Canvas2DProbe Quick2DProbe RulerReview TitleReview DetailReview OverviewVisual OpeningComparison LibraryReview ControlsReview)
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/${name}.qml"
         PROPERTIES QT_RESOURCE_ALIAS "${name}.qml")
     list(APPEND ui_qml_files "${CMAKE_CURRENT_SOURCE_DIR}/${name}.qml")

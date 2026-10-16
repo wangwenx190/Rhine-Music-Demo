@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 
 Item {
@@ -26,8 +26,9 @@ Item {
         Repeater {
             id: tickPool
             model: 16
-            delegate: Button {
+            delegate: T.Button {
                 id: button
+                hoverEnabled: true
                 required property int index
                 readonly property var slotState: root.controller
                                                  ? root.controller.slotStates[index] : ({})

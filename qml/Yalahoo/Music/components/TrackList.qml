@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 
 Item {
@@ -208,8 +208,9 @@ Item {
             onCurrentIndexChanged: if (currentIndex > 0)
                                        root.preserveBeginning = false
             delegate: trackDelegate
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+            T.ScrollBar.vertical: ArchiveScrollBar {
+                tokens: root.tokens
+                policy: T.ScrollBar.AsNeeded
                 onPressedChanged: if (pressed)
                                       root.preserveBeginning = false
             }
@@ -233,8 +234,9 @@ Item {
             onCurrentIndexChanged: if (currentIndex > 0)
                                        root.preserveBeginning = false
             delegate: creditDelegate
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+            T.ScrollBar.vertical: ArchiveScrollBar {
+                tokens: root.tokens
+                policy: T.ScrollBar.AsNeeded
                 onPressedChanged: if (pressed)
                                       root.preserveBeginning = false
             }
@@ -459,8 +461,9 @@ Item {
                             bottomPadding: 12
                             wrapMode: Text.WrapAnywhere
                         }
-                        ScrollBar.vertical: ScrollBar {
-                            policy: ScrollBar.AsNeeded
+                        T.ScrollBar.vertical: ArchiveScrollBar {
+                            tokens: root.tokens
+                            policy: T.ScrollBar.AsNeeded
                         }
                     }
                     ArchiveText {

@@ -68,7 +68,7 @@
         {"path": "cmake/Platform.cmake", "symbol": "elseif(APPLE)"},
         {"path": "cmake/QtKit.cmake", "symbol": "macx-clang"}
       ],
-      "evidence": "APPLE builds an actual MACOSX_BUNDLE target with executable output yalahoo, bundle display/name yalahOO!!!, identifier yalahoo.music, configured CFBundleExecutable and APPL package. install places bundle at prefix root. HighResolutionCapable enables Retina while QML sizes remain logical pixels. Darwin Kit selection requires native arch and clang, rejects non-native/universal overrides in bootstrap; tools come from selected Kit. Basic controls use native Qt window close. No menus/shortcuts/product background behavior exist in this minimal window. macdeployqt and ordinary launchers remain R31 deliveries and are not faked here.",
+      "evidence": "APPLE builds an actual MACOSX_BUNDLE target with executable output yalahoo, bundle display/name yalahOO!!!, identifier yalahoo.music, configured CFBundleExecutable and APPL package. install places bundle at prefix root. HighResolutionCapable enables Retina while QML sizes remain logical pixels. Darwin Kit selection requires native arch and clang, rejects non-native/universal overrides in bootstrap; tools come from selected Kit. Native Qt windows retain platform window close. No menus/shortcuts/product background behavior exist in this minimal window. macdeployqt and ordinary launchers remain R31 deliveries and are not faked here.",
       "limitations": "Bundle creation, Retina and Metal require user macOS execution. Deployment, menu shortcuts and full product lifecycle are future rounds."
     },
     {

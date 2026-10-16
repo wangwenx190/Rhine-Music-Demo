@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "../components"
 
@@ -10,7 +10,7 @@ Item {
     required property LibrarySession librarySession
     property Component heading: null
     readonly property SearchHeader searchHeader: results.headerItem as SearchHeader
-    readonly property TextField queryInput: searchHeader ? searchHeader.queryInput : null
+    readonly property ArchiveTextField queryInput: searchHeader ? searchHeader.queryInput : null
     property string genreId: ""
     signal resultRequested(string albumId, string trackId)
     implicitHeight: 560
@@ -73,8 +73,9 @@ Item {
             width: parent.width
             sourceComponent: root.heading
         }
-        TextField {
+        ArchiveTextField {
             id: query
+            tokens: root.tokens
             objectName: "librarySearchInput"
             width: parent.width
             font.family: root.tokens.regular.family
@@ -82,7 +83,6 @@ Item {
             color: root.tokens.ink
             placeholderText: "专辑、歌曲、歌手、流派…"
             placeholderTextColor: root.tokens.muted
-            padding: 13
             selectByMouse: true
             background: Rectangle {
                 color: root.tokens.surface
@@ -116,8 +116,10 @@ Item {
                 height: 27
                 Repeater {
                     model: genreRow.modelData
-                    delegate: Button {
+                    delegate: T.Button {
                         id: filter
+                        focusPolicy: Qt.StrongFocus
+                        hoverEnabled: true
                         required property var modelData
                         text: modelData.name
                         width: modelData.size
@@ -146,8 +148,9 @@ Item {
                     }
                 }
             }
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+            T.ScrollBar.vertical: ArchiveScrollBar {
+                tokens: root.tokens
+                policy: T.ScrollBar.AsNeeded
             }
         }
     }
@@ -175,8 +178,10 @@ Item {
             else
                 decrementCurrentIndex();
         }
-        delegate: Button {
+        delegate: T.Button {
             id: result
+            focusPolicy: Qt.StrongFocus
+            hoverEnabled: true
             required property int index
             required property string kind
             required property string albumId
@@ -267,8 +272,9 @@ Item {
             onClicked: root.resultRequested(albumId, trackId)
             Accessible.name: (kind === "track" ? "定位歌曲 " : "定位专辑 ") + title + "，" + subtitle
         }
-        ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
+        T.ScrollBar.vertical: ArchiveScrollBar {
+            tokens: root.tokens
+            policy: T.ScrollBar.AsNeeded
         }
         ArchiveText {
             anchors.centerIn: parent

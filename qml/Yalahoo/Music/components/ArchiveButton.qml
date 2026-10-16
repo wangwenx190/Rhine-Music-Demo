@@ -1,12 +1,13 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import QtQuick.Shapes
 
-Button {
+T.Button {
     id: control
     required property DesignTokens tokens
+    property bool framed: false
     property string glyph: ""
     property string iconName: ""
     property real iconSize: 17
@@ -18,19 +19,26 @@ Button {
     font.weight: tokens.regular.weight
     font.pixelSize: Math.round(cssPixelSize)
     padding: 0
-    leftPadding: 0
-    rightPadding: 0
-    topPadding: 0
-    bottomPadding: 0
+    leftPadding: framed ? 10 : 0
+    rightPadding: framed ? 10 : 0
+    topPadding: framed ? 6 : 0
+    bottomPadding: framed ? 6 : 0
     spacing: 7
-    implicitWidth: contentItem.implicitWidth
-    implicitHeight: 29
+    implicitWidth: contentItem.implicitWidth + leftPadding + rightPadding
+    implicitHeight: framed ? cssPixelSize * 1.5 + topPadding + bottomPadding + 2 : 29
+    focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
     opacity: enabled ? 1 : 0.38
     Accessible.name: text
     background: Rectangle {
-        color: "transparent"
-        border.color: control.activeFocus ? control.tokens.accent : "transparent"
-        border.width: 2
+        color: control.framed && control.pressed ? Qt.rgba(control.tokens.accent.r, control.tokens.accent.g,
+                                                           control.tokens.accent.b, .08) :
+                                                   "transparent"
+        radius: control.framed ? 2 : 0
+        border.color: control.activeFocus || control.pressed ? control.tokens.accent :
+                                                               control.framed ? control.tokens.line :
+                                                                                "transparent"
+        border.width: control.framed ? 1 : 2
         Rectangle {
             anchors.bottom: parent.bottom
             width: parent.width
@@ -131,7 +139,10 @@ Button {
                 anchors.verticalCenter: parent.verticalCenter
                 text: control.showText ? control.text : ""
                 cssPixelSize: control.cssPixelSize
-                color: control.hovered ? control.tokens.accent : control.tokens.ink
+                cssLineHeight: control.framed ? control.cssPixelSize * 1.5 : Math.round(cssAscent)
+                                                + Math.round(cssDescent)
+                color: control.hovered || (control.framed && control.pressed)
+                       ? control.tokens.accent : control.tokens.ink
             }
             ArchiveText {
                 tokens: control.tokens

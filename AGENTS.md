@@ -7,6 +7,7 @@
 - 源码风格与格式化/qmllint入口按[code-style.md](docs/contracts/code-style.md)；四空格、展开语句，提交前`check-format`及Release `source-format`必须通过。
 - Kit发现/C++23/模块闭包按[native-bootstrap.md](docs/contracts/native-bootstrap.md)，不得固定Qt minor/patch/安装目录或降级。
 - 外观按冻结生产源码理论效果及用户固定差异实现；禁止截图像素追分和复制锯齿/异常模糊。数学/状态、实际质量与功能分别证明。
+- 全部QML控件必须遵守[自绘控件强制规则](docs/contracts/controls.md)：预制控件禁用边界、来源理论值、显式视觉属性与行为基础仅由该契约维护，后续session同样适用。
 - PERF-01–07、预算与测量语义按[performance.md](docs/contracts/performance.md)，设计缺陷不能用benchmark通过豁免。
 - 常规仅Release；只有明确需要堆栈才用Debug。检查范围与复用按[test-gates.md](docs/contracts/test-gates.md)，不能将暂缓写为通过。
 - 所有验证窗口/采集遵守[test-window-policy.md](docs/contracts/test-window-policy.md)。用户指定轮次可见验证即授权该轮前台，无需再确认；结束清开关并恢复默认隐藏策略，授权不跨轮次。

@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 
 Item {
@@ -35,8 +34,9 @@ Item {
             onClicked: root.playback.next()
         }
     }
-    Slider {
+    ArchiveSlider {
         id: progress
+        tokens: root.tokens
         objectName: "songProgress"
         x: buttons.width + 12
         width: Math.max(0, root.width - x - 88)
@@ -47,7 +47,7 @@ Item {
         enabled: root.playback.seekable && root.playback.duration > 0
         live: true
         stepSize: 1000
-        palette.highlight: root.tokens.accent
+
         Keys.onEscapePressed: root.playback.cancelSeek()
         onPressedChanged: {
             if (pressed)

@@ -1,13 +1,11 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 import "../components"
 
-ScrollView {
+ArchiveScrollView {
     id: root
     objectName: "settingsPanel"
-    required property DesignTokens tokens
     required property SettingsController settings
     required property LibrarySession librarySession
     property LibraryStore store: null
@@ -23,14 +21,7 @@ ScrollView {
     signal experimentsRequested
     signal fullscreenRequested
     contentWidth: availableWidth
-    palette.window: tokens.surface
-    palette.base: tokens.surface
-    palette.button: tokens.surface
-    palette.buttonText: tokens.ink
-    palette.text: tokens.ink
-    palette.windowText: tokens.ink
-    palette.highlight: tokens.accent
-    palette.highlightedText: tokens.surface
+
     function focusControl() {
         themeChoice.forceActiveFocus();
     }
@@ -163,7 +154,8 @@ ScrollView {
                 selected: root.settings.values.arrayMode
                 onChosen: value => root.settings.update("arrayMode", value)
             }
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 objectName: "settingsRemember"
                 text: "保留每列浏览位置"
                 checked: root.settings.values.rememberColumnPosition
@@ -427,7 +419,8 @@ ScrollView {
                 text: "动效与显示"
                 cssPixelSize: 12
             }
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 objectName: "settingsReduced"
                 text: "减少动态效果"
                 checked: root.settings.values.reduced
@@ -483,7 +476,8 @@ ScrollView {
                         root.playback.volume = value;
                 }
             }
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 text: "界面音效"
                 visible: root.interfaceSound !== null
                 checked: root.interfaceSound ? root.interfaceSound.enabled : false
@@ -505,7 +499,8 @@ ScrollView {
                         root.interfaceSound.volume = value;
                 }
             }
-            CheckBox {
+            ArchiveCheckBox {
+                tokens: root.tokens
                 text: "氛围 BGM"
                 visible: root.backgroundMusic !== null
                 checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
@@ -577,16 +572,18 @@ ScrollView {
                     title: "MusicBrainz"
                     explanation: "本机缓存保留专辑名称、艺术家、流派、制作人员及来源，人工分类优先。"
                 }
-                TextField {
+                ArchiveTextField {
                     id: contact
+                    tokens: root.tokens
                     objectName: "settingsMetadataContact"
                     width: parent.width
                     text: root.librarySession.metadataConfiguration.musicBrainzContact || ""
                     placeholderText: "联系邮箱或公开项目网址"
                     Accessible.name: "MusicBrainz 联系邮箱或项目网址"
                 }
-                CheckBox {
+                ArchiveCheckBox {
                     id: onlineEnabled
+                    tokens: root.tokens
                     text: "扫描后自动补充新专辑资料（联网暂未启用）"
                     checked: root.librarySession.metadataConfiguration.onlineEnabled || false
                     enabled: root.librarySession.providerCapabilities.networkEnabled && root.store

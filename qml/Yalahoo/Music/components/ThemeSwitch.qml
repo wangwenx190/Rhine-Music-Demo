@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 
 Rectangle {
     id: root
@@ -30,8 +30,10 @@ Rectangle {
     }
     Repeater {
         model: ["暖昼", "深夜"]
-        delegate: Button {
+        delegate: T.Button {
             id: option
+            focusPolicy: Qt.StrongFocus
+            hoverEnabled: true
             required property string modelData
             required property int index
             objectName: index === 0 ? "dayButton" : "nightButton"

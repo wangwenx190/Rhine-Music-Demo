@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
 import Yalahoo.Music
 
 Item {
@@ -24,8 +23,12 @@ Item {
     Accessible.role: Accessible.StaticText
     Accessible.name: text
     Accessible.ignored: transport
-    ToolTip.text: text
-    ToolTip.visible: hover.hovered && text.length > 0
+    ArchiveToolTip {
+        parent: root
+        tokens: root.tokens
+        text: root.text
+        visible: root.visible && hover.hovered && root.text.length > 0
+    }
     HoverHandler {
         id: hover
     }

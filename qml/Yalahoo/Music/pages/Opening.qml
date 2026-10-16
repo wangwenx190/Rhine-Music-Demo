@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls.Basic
+import QtQuick.Templates as T
 import Yalahoo.Music
 import "../components"
 
@@ -136,8 +136,12 @@ FocusScope {
             }
         }
     }
-    Button {
+    T.Button {
         id: skip
+        focusPolicy: Qt.StrongFocus
+        hoverEnabled: true
+        implicitWidth: implicitContentWidth + leftPadding + rightPadding
+        implicitHeight: implicitContentHeight + topPadding + bottomPadding
         objectName: "openingSkip"
         x: root.width - width - (root.width <= 700 ? 20 : 40)
         y: root.width <= 700 ? 23 : 33

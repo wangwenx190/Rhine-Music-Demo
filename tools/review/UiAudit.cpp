@@ -1,5 +1,6 @@
 #include "OpeningAudit.h"
 #include "ExperimentAudit.h"
+#include "ControlsAudit.h"
 #include "LibraryAudit.h"
 #include "OffscreenSurface.h"
 #include "AssetCatalog.h"
@@ -97,6 +98,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--controls"))
+        return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--experiments"))
         return argc == 3 ? reviewExperiments(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--settings"))
