@@ -790,3 +790,13 @@ add_test(NAME opening COMMAND OpeningTest)
 if(WIN32)
     set_tests_properties(opening PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(MediaMetadataTest MediaMetadataTest.cpp)
+target_link_libraries(MediaMetadataTest PRIVATE YalahooCore Qt6::Test)
+yalahoo_platform(MediaMetadataTest)
+add_test(NAME media-metadata COMMAND MediaMetadataTest)
+set_tests_properties(media-metadata PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
+if(WIN32)
+    set_tests_properties(media-metadata PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

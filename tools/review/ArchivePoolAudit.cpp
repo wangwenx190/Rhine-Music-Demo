@@ -552,6 +552,68 @@ int main(int argc, char **argv)
                             && rebuild.metadata["atlasPending"].toInt() == 0,
                     "Repeated context rebuild lost geometry or cover uploads");
         }
+        // R22: exercise revision changes through the actual production atlas/renderer.
+        const auto columns = orderLibrary(*snapshot, SortMode::Genre).columns;
+        selection.setColumns(columns, snapshot);
+        waitPrepared();
+        settledCapture("cover-reuse-baseline");
+        const auto reuseBaseline = capture("cover-reuse-stable");
+        const auto decodedBefore =
+                item->coverStatistics().value("cache").toObject().value("decodeStarts");
+        auto changedLibrary = *snapshot;
+        auto changed = std::find_if(changedLibrary.albums.begin(), changedLibrary.albums.end(),
+                                    [&](const Album &album) {
+                                        return album.id == selection.albumId();
+                                    });
+        require(changed != changedLibrary.albums.end(), "Selected cover identity missing");
+        Track track;
+        track.id = "anonymous-other-song";
+        track.albumId = changed->id;
+        changed->tracks.append(track);
+        const auto albumIndex = std::distance(changedLibrary.albums.begin(), changed);
+        qint64 revisionBytes = 0;
+        const auto observe = QObject::connect(
+                item, &SceneItem::frameSubmitted, &app, [&](const QJsonObject &sample) {
+                    revisionBytes += sample.value("atlasUploadBytes").toInteger();
+                });
+        selection.setColumns(columns, std::make_shared<const LibrarySnapshot>(changedLibrary));
+        waitPrepared();
+        const auto sameAlbum = capture("same-album-other-song");
+        require(sameAlbum.metadata["atlasUploadBytes"].toInteger() == 0 && revisionBytes == 0,
+                "Same album song change uploaded unchanged covers");
+        require(item->coverStatistics().value("cache").toObject().value("decodeStarts")
+                        == decodedBefore,
+                "Same album song change decoded unchanged covers");
+        auto &changedAlbum = changedLibrary.albums[albumIndex];
+        changedAlbum.coverUrl = changedAlbum.coverUrl.path().endsWith("square.png")
+                ? QUrl("qrc:/assets/demo-covers/portrait.png")
+                : QUrl("qrc:/assets/demo-covers/square.png");
+        selection.setColumns(columns,
+                             std::make_shared<const LibrarySnapshot>(std::move(changedLibrary)));
+        waitPrepared();
+        settledCapture("changed-cover-revision");
+        const auto changedCover = capture("changed-cover-stable");
+        QObject::disconnect(observe);
+        if (revisionBytes != 17 * AtlasUploadQueue::tileBytes)
+            std::fprintf(stderr,
+                         "Cover revision bytes: %lld; expected %lld; selected detailed: %d\n",
+                         static_cast<long long>(revisionBytes),
+                         static_cast<long long>(17 * AtlasUploadQueue::tileBytes),
+                         item->coverStatistics().value("selectedDetailed").toBool());
+        require(revisionBytes == 17 * AtlasUploadQueue::tileBytes,
+                "Cover revision must upload only one array tile plus its sixteen selected tiles");
+        require(changedCover.metadata["atlasUploadBytes"].toInteger() == 0,
+                "Changed cover did not settle to zero uploads");
+        for (const auto *result : { &sameAlbum, &changedCover }) {
+            require(result->metadata["resourceGeneration"]
+                                    == reuseBaseline.metadata["resourceGeneration"]
+                            && result->metadata["coverResourceRevision"]
+                                    == reuseBaseline.metadata["coverResourceRevision"],
+                    "Content revision rebuilt compatible render/cover resources");
+        }
+        QJsonObject coverReuse{ { "sameAlbum", sameAlbum.metadata },
+                                { "changedCover", changedCover.metadata },
+                                { "revisionUploadBytes", revisionBytes } };
         auto delayedHigh = item->input();
         const int selectedIndex = int(delayedHigh.entities.size()) - 1;
         require(delayedHigh.coverTiles[selectedIndex].size() == QSize(1024, 1024),
@@ -588,6 +650,7 @@ int main(int argc, char **argv)
             { "far", far.metadata },
             { "rebased", rebased.metadata },
             { "coverMemory", coverMemory },
+            { "coverReuse", coverReuse },
             { "submissionSamples", submissionSamples },
             { "rebuild", rebuild.metadata },
             { "empty", empty.metadata },

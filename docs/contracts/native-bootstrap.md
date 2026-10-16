@@ -32,7 +32,7 @@ Windows 在 PowerShell 中执行：
 . ./tools/build/enter-msvc.ps1
 cmake --preset qt-release
 cmake --build --preset qt-release
-ctest --preset qt-release --output-on-failure
+ctest --preset qt-release -R '对应受影响测试' --output-on-failure
 ```
 
 本阶段开发运行使用选中 Kit 的 DLL/插件，不是独立部署包。从 cache 获取已选择前缀后启动：

@@ -101,6 +101,7 @@ private:
     bool selectAt(QPointF point);
     void preparePool(Input &input);
     void resetPool();
+    void refreshPool();
     void refreshTextResources();
     QPointer<TitleReel> m_titleReel, m_transportReel;
     QMetaObject::Connection m_titleConnection, m_transportConnection;
@@ -116,6 +117,7 @@ private:
     };
     AtlasAllocator m_atlas{ 8192, 436, 22 };
     QHash<QString, AtlasLease> m_poolLeases;
+    QHash<QString, QPair<QString, QString>> m_poolSources;
     QSet<QString> m_readyCovers;
     std::array<OwnedCover, 4> m_ownedCovers;
     quint64 m_ownedSerial = 0;

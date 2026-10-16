@@ -87,7 +87,7 @@ struct Walker
         return order == 0 ? a < b : order < 0;
     }
     bool appendAlbum(const QString &root, const QString &folder, const QStringList &files,
-                     bool single, QString &error)
+                     bool single, const QStringList &images, QString &error)
     {
         const auto id = DirectoryScanner::stableId("album", single ? files.first() : folder);
         const Album *old = albums.value(id);
@@ -98,6 +98,16 @@ struct Walker
         album.fields.insert("_root", root);
         album.fields.insert("_singleFile", single);
         album.offline = false;
+        album.fields.remove("_coverCandidate");
+        QJsonArray candidates;
+        for (const auto &image : images) {
+            if (!single
+                || QFileInfo(image).completeBaseName().compare(
+                           QFileInfo(files.first()).completeBaseName(), Qt::CaseInsensitive)
+                        == 0)
+                candidates.append(image);
+        }
+        album.fields.insert("_coverCandidates", candidates);
         album.tracks.clear();
         album.tracks.reserve(files.size());
         for (const auto &file : files) {
@@ -111,7 +121,9 @@ struct Walker
             Track track = unchanged ? *oldTrack : Track{ };
             if (oldTrack && !unchanged) {
                 track.fields = oldTrack->fields;
-                for (const auto *key : { "_metadataVersion", "_embeddedCover", "_common" })
+                for (const auto *key :
+                     { "_metadataVersion", "_embeddedCover", "_common", "_qtProbeVersion",
+                       "_probeStatus", "_probeError", "_artworkError" })
                     track.fields.remove(QLatin1String(key));
             }
             const QFileInfo info(file);
@@ -162,7 +174,7 @@ struct Walker
             error = fileError(folder, ec);
             return false;
         }
-        QStringList files, directories;
+        QStringList files, directories, images;
         for (; it != end; it.increment(ec)) {
             if (ec)
                 break;
@@ -181,6 +193,10 @@ struct Walker
                 ++filesVisited;
                 if (audioExtensions.contains(QFileInfo(name).suffix().toLower()))
                     files.append(path);
+                const auto extension = QFileInfo(name).suffix().toLower();
+                if (extension == "png" || extension == "jpg" || extension == "jpeg"
+                    || extension == "webp")
+                    images.append(path);
             }
         }
         if (ec) {
@@ -194,11 +210,28 @@ struct Walker
                   [this](const QString &a, const QString &b) {
                       return less(a, b);
                   });
+        const QStringList preferred{ "cover", "folder", "front" };
+        QHash<QString, int> imageRanks;
+        for (const auto &image : images) {
+            const auto rank = preferred.indexOf(QFileInfo(image).completeBaseName().toLower());
+            imageRanks.insert(image, rank < 0 ? 3 : int(rank));
+        }
+        std::sort(images.begin(), images.end(),
+                  [this, &imageRanks](const QString &a, const QString &b) {
+                      const int first = imageRanks.value(a), second = imageRanks.value(b);
+                      return first == second ? less(a, b) : first < second;
+                  });
         if (folder == root) {
-            for (const auto &file : files)
-                if (!appendAlbum(root, folder, { file }, true, error))
+            QHash<QString, QStringList> singleImages;
+            for (const auto &image : images)
+                singleImages[QFileInfo(image).completeBaseName().toCaseFolded()].append(image);
+            for (const auto &file : files) {
+                const auto matching =
+                        singleImages.value(QFileInfo(file).completeBaseName().toCaseFolded());
+                if (!appendAlbum(root, folder, { file }, true, matching, error))
                     return false;
-        } else if (!files.isEmpty() && !appendAlbum(root, folder, files, false, error))
+            }
+        } else if (!files.isEmpty() && !appendAlbum(root, folder, files, false, images, error))
             return false;
         // Do not recurse on the native stack; the caller drains one bounded path frontier.
         for (auto it = directories.crbegin(); it != directories.crend(); ++it)

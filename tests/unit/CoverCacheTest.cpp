@@ -290,6 +290,124 @@ private slots:
         QCOMPARE(small.pages(), 108);
         QVERIFY_THROWS_EXCEPTION(std::invalid_argument, AtlasAllocator(255));
     }
+    void missingCoverTitleRevision()
+    {
+        CoverCache cache;
+        QSignalSpy ready(&cache, &CoverCache::ready);
+        QVERIFY(cache.request("a", { }, 256, "Old title"));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 10000);
+        const auto old = cache.lookup("a", { }, 256, "Old title");
+        QVERIFY(old);
+        QVERIFY(!cache.lookup("a", { }, 256, "New title"));
+        QVERIFY(cache.request("a", { }, 256, "New title"));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 10000);
+        const auto changed = cache.lookup("a", { }, 256, "New title");
+        QVERIFY(changed && changed != old);
+        QCOMPARE(cache.lookup("a", { }, 256, "Old title"), old);
+    }
+    void targetedContentInvalidation()
+    {
+        QTemporaryDir directory;
+        QImage image(32, 32, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        const auto path = directory.filePath("same-path.png");
+        QVERIFY(image.save(path));
+        CoverCache cache;
+        QSignalSpy ready(&cache, &CoverCache::ready);
+        QVERIFY(cache.request("a", path, 256));
+        QVERIFY(cache.request("b", path, 256));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 10000);
+        const auto stable = cache.lookup("b", path, 256);
+        const auto old = cache.lookup("a", path, 256);
+        SelectedCoverPool owners;
+        const auto selected = owners.acquire("a", old);
+        const auto returning = owners.fork(selected);
+        image.fill(Qt::blue);
+        QVERIFY(image.save(path));
+        cache.invalidate("a");
+        QVERIFY(!cache.lookup("a", path, 256));
+        QCOMPARE(cache.lookup("b", path, 256), stable);
+        QVERIFY(cache.request("a", path, 256));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 3, 10000);
+        const auto changed = cache.lookup("a", path, 256);
+        QVERIFY(changed != old);
+        QVERIFY(owners.upgrade(selected, changed));
+        QCOMPARE(returning->pixels, old);
+        QCOMPARE(returning->pixels->image.pixelColor(128, 128), QColor(Qt::red));
+        QCOMPARE(selected->pixels->image.pixelColor(128, 128), QColor(Qt::blue));
+        const auto decodes = cache.statistics().value("decodeStarts");
+        for (int i = 0; i < 20; ++i)
+            QVERIFY(cache.request("b", path, 256));
+        QCOMPARE(cache.statistics()["decodeStarts"], decodes);
+    }
+    void snapshotPreservesUnchangedAtlas()
+    {
+        QTemporaryDir directory;
+        LibrarySnapshot library;
+        LibraryColumn column;
+        QImage image(32, 32, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        for (const auto &id : { "a", "b" }) {
+            const auto path = directory.filePath(QString(id) + ".png");
+            QVERIFY(image.save(path));
+            Album album;
+            album.id = id;
+            album.title = id;
+            album.coverUrl = QUrl::fromLocalFile(path);
+            library.albums.append(album);
+            column.albumIds.append(id);
+        }
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
+        SceneAdapter adapter;
+        adapter.setSelection(&selection);
+        QQuickWindow window;
+        HiddenSceneItem item(window.contentItem());
+        item.setSize({ 960, 640 });
+        item.setAdapter(&adapter);
+        item.publishNow();
+        QTRY_VERIFY_WITH_TIMEOUT((item.publishNow(),
+                                  item.coverStatistics()["ready"].toInt() == 2
+                                          && item.coverStatistics()["selectedDetailed"].toBool()),
+                                 10000);
+        const auto before = item.input();
+        const auto decodes = item.coverStatistics().value("cache").toObject().value("decodeStarts");
+        // A different song in the same album does not alter cover identity or pixels.
+        library.albums[0].tracks.append(Track{ });
+        selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
+        item.publishNow();
+        QCOMPARE(item.input().atlasGeneration, before.atlasGeneration);
+        QCOMPARE(item.input().coverLeases, before.coverLeases);
+        QCOMPARE(item.coverStatistics()["cache"].toObject()["decodeStarts"], decodes);
+        // Change only a's source revision; b's slot and pixel serial remain stable.
+        const auto changedPath = directory.filePath("a-new.png");
+        image.fill(Qt::blue);
+        QVERIFY(image.save(changedPath));
+        library.albums[0].coverUrl = QUrl::fromLocalFile(changedPath);
+        selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
+        item.publishNow();
+        QTRY_VERIFY_WITH_TIMEOUT((item.publishNow(), item.coverStatistics()["ready"].toInt() == 2),
+                                 10000);
+        const auto after = item.input();
+        QCOMPARE(after.atlasGeneration, before.atlasGeneration);
+        int changed = 0, stable = 0;
+        for (qsizetype i = 0; i < after.coverLeases.size(); ++i) {
+            if (before.coverLeases[i] == after.coverLeases[i])
+                ++stable;
+            else
+                ++changed;
+        }
+        QVERIFY(changed > 0);
+        QVERIFY(stable > 0);
+        for (const auto &upload : before.atlasUploads) {
+            if (upload.slot >= 484)
+                continue;
+            for (const auto &next : after.atlasUploads)
+                if (next.slot == upload.slot && next.lease == upload.lease)
+                    QCOMPARE(next.serial, upload.serial);
+        }
+    }
     void selectedAndReturning()
     {
         SelectedCoverPool pool;

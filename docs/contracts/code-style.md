@@ -13,14 +13,13 @@
 
 ## 格式化与提交门槛
 
-配置 Release 后执行：
+源码改动后按需格式化；提交前确认相关格式结果有效。功能测试及结果复用范围按[test-gates.md](test-gates.md)选择，不能将以下格式入口扩展为默认全套测试。配置Release后的入口为：
 
 ```sh
 cmake --build --preset qt-release --target format
 cmake --build --preset qt-release --target check-format
 cmake --build --preset qt-release
-ctest --preset qt-release --output-on-failure
-cmake --build --preset qt-release --target Yalahoo_qmllint
+ctest --preset qt-release -R '^source-format$' --output-on-failure
 git diff --check
 ```
 
@@ -33,8 +32,8 @@ Windows 维护 PowerShell 时另执行：
 ./tools/format/FormatTools.ps1 -Check
 ```
 
-该入口复用已安装的 PSScriptAnalyzer（包括 VS Code/Cursor PowerShell 扩展所带模块），不自动下载。它先解析源码，保留字符串和非分隔 token，再格式化并复核；检查模式只报告差异。Python/CMake/shell 修改必须人工复核布局并执行语法检查；涉及源码生成器时，还须验证生成结果的语义，不可只检查脚本能否解析。
+该入口复用已安装的 PSScriptAnalyzer（包括 VS Code/Cursor PowerShell 扩展所带模块），不自动下载。它先解析源码，保留字符串和非分隔 token，再格式化并复核；检查模式只报告差异。Python/CMake/shell的逻辑或语法结构变化时，人工复核布局并执行对应语法检查；不影响行为的注释/文档类修改按test-gates.md复用结果，不触发额外测试；涉及源码生成器时，还须验证生成结果的语义，不可只检查脚本能否解析。
 
-QML 静态诊断必须通过 Qt/CMake 自动生成的 `Yalahoo_qmllint`、`ui-audit_qmllint` 等对应 target 执行；不自行组装命令行或直接调用 qmllint 程序。QQmlEngine 运行时 warnings 与日志检查独立保留，不能替代官方 target。
+QML或其实际类型/导入依赖变化时，静态诊断通过 Qt/CMake 自动生成的 `Yalahoo_qmllint`、`ui-audit_qmllint` 等对应 target 执行；不自行组装命令行或直接调用 qmllint 程序。QQmlEngine 运行时 warnings 与日志检查独立保留，不能替代官方 target。
 
-未通过上述适用门槛，不得宣告轮次完成或提交。禁止关闭检查、临时覆盖风格配置或添加压缩代码豁免。历史证据中的文件 hash 对应其原验收版本；本次格式整理不回写历史结果。
+上述适用门槛须有仍有效的通过结果才可宣告轮次完成或提交；不影响行为或格式结果的改动直接复用已有结果，无需专门重跑。禁止关闭检查、临时覆盖风格配置或添加压缩代码豁免。历史证据中的文件 hash 对应其原验收版本；本次格式整理不回写历史结果。

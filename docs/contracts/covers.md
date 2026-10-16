@@ -8,7 +8,7 @@ R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量
 
 ## 请求、像素与失效
 
-CoverCache 仅在 GUI 线程调用。键为稳定 identity、完整本地/qrc path、resolution，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须 reset 缓存 generation，重新获取对应租约；不能仅用相同路径复用旧 revision。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
+CoverCache 仅在 GUI 线程调用。键为稳定identity、完整本地/qrc path、resolution，缺图还含标题，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须`invalidate(identity)`并重新获取对应租约；完整场景更换才reset generation。原生扫描封面使用内容寻址URL携带revision，SceneItem在libraryChanged时只比较有界可见池的来源（缺图另含标题），释放变化身份的图集/选中租约，保留其余槽位和serial；不能仅用相同路径复用旧revision。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
 
 QImageReader 在 worker 中读取尺寸、缩放能力和错误，设置 autoTransform，仅在原图超过目标最长边 256/1024 时设置 scaledSize，小图直接绘制到目标画布，避免先放大再缩小。插件不支持解码缩放时允许 Qt 有界的完整解码再缩放；带有效 ICC 配置的图像先在 worker 转换到 sRGB，与 shader 的颜色空间一致。未知尺寸或原图超过 4,194,304 像素时显式返回 error 与缺图画面，不尝试无界展开。该限制是本实现的输入资源保护，并非声称 Qt 不能读取更大的图像。PNG/JPEG 插件内部缓冲、字体及 Qt 分配器开销不冒充可测的 QImage 像素。
 
@@ -46,6 +46,8 @@ RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、loo
 
 ## 检查入口
 
-`CoverCacheTest`覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
+`CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 
 目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码审计`tools/audit/audit-r11.ps1`。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R34。
+
+`archive-pool-gpu`额外沿生产SceneItem→AtlasUploadQueue→QRhi提交验证快照中的同专辑换曲零解码/上传，以及单封面revision恰好一个256²阵列tile加16个高清tile的实际上传；兼容render/cover资源generation不变，收敛后零上传。选中/归位旧像素隔离另由上述租约单元检查证明，不用源图评分替代资源事实。

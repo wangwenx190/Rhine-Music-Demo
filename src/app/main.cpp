@@ -104,6 +104,13 @@ int main(int argc, char **argv)
               QStringLiteral(
                       "Scan a local absolute music directory (repeatable, replaces saved roots)"),
               QStringLiteral("directory") });
+    parser.addOption(
+            { QStringLiteral("import-legacy"),
+              QStringLiteral("Read a legacy music-data-v3 directory into the native cache"),
+              QStringLiteral("directory") });
+    parser.addOption({ QStringLiteral("import-preferences"),
+                       QStringLiteral("Import an explicitly exported browser preferences JSON"),
+                       QStringLiteral("file") });
     parser.addOption({ QStringLiteral("rescan-library"),
                        QStringLiteral("Rescan saved local music directories") });
     parser.addOption({ QStringLiteral("verify-runtime"),
@@ -237,6 +244,10 @@ int main(int argc, char **argv)
         const QString dataRoot = parser.isSet(QStringLiteral("data-dir"))
                 ? parser.value(QStringLiteral("data-dir"))
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        if (!QDir::isAbsolutePath(dataRoot)) {
+            qWarning("--data-dir requires an absolute path");
+            return 7;
+        }
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &library,
@@ -247,8 +258,26 @@ int main(int argc, char **argv)
                          [](const QString &error) {
                              qWarning().noquote() << error;
                          });
+        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::imported, &selection, [&] {
+            selection.setRememberColumnPosition(preferences->rememberColumnPosition());
+            selection.setRealistic(preferences->realistic());
+        });
+        if (parser.isSet(QStringLiteral("import-preferences")))
+            if (!preferences->importJson(
+                        QUrl::fromLocalFile(parser.value(QStringLiteral("import-preferences")))))
+                return 7;
+        if (parser.isSet(QStringLiteral("import-legacy"))
+            && (parser.isSet(QStringLiteral("music-root"))
+                || parser.isSet(QStringLiteral("rescan-library")))) {
+            qWarning("--import-legacy cannot be combined with scan options");
+            return 7;
+        }
         libraryStore->load();
-        if (parser.isSet(QStringLiteral("music-root"))) {
+        if (parser.isSet(QStringLiteral("import-legacy"))) {
+            if (!libraryStore->importLegacy(
+                        QUrl::fromLocalFile(parser.value(QStringLiteral("import-legacy")))))
+                return 7;
+        } else if (parser.isSet(QStringLiteral("music-root"))) {
             QList<QUrl> roots;
             for (const auto &path : parser.values(QStringLiteral("music-root"))) {
                 if (!QDir::isAbsolutePath(path)) {

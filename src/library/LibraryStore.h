@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DirectoryScanner.h"
+#include "MediaMetadataProbe.h"
 #include <QFutureWatcher>
 #include <QObject>
 #include <QThreadPool>
@@ -12,6 +13,7 @@ class LibraryStore final : public QObject
     Q_OBJECT
     Q_PROPERTY(bool busy READ busy NOTIFY statusChanged)
     Q_PROPERTY(bool scanning READ scanning NOTIFY statusChanged)
+    Q_PROPERTY(bool probing READ probing NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(QList<QUrl> roots READ roots NOTIFY statusChanged)
 public:
@@ -20,9 +22,11 @@ public:
     void load();
     Q_INVOKABLE bool setRoots(const QList<QUrl> &roots);
     Q_INVOKABLE void rescan();
+    Q_INVOKABLE bool importLegacy(const QUrl &directory);
     Q_INVOKABLE void cancel();
     bool busy() const;
     bool scanning() const;
+    bool probing() const;
     QString error() const;
     QList<QUrl> roots() const;
     Snapshot snapshot() const;
@@ -38,6 +42,8 @@ private:
         None,
         Load,
         Scan,
+        Probe,
+        Import,
         Save
     };
     struct JobResult
@@ -51,10 +57,14 @@ private:
     static JobResult write(const QString &path, Snapshot snapshot);
     void schedule();
     void complete();
+    void accept(JobResult result, Kind kind, quint64 generation);
     void report(const QString &error);
     QString m_path, m_error;
     QList<QUrl> m_roots;
     Snapshot m_snapshot, m_savePending;
+    QString m_dataRoot, m_importPending;
+    quint64 m_filesVisited = 0;
+    MediaMetadataProbe m_probe;
     QThreadPool m_worker;
     QFutureWatcher<JobResult> m_job;
     ScanCancellation m_cancel;

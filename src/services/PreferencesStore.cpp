@@ -59,18 +59,69 @@ void PreferencesStore::setNavigation(bool remember, bool realistic)
         emit saveError(m_error);
         return;
     }
+    ++m_revision;
     m_document.insert("rememberColumnPosition", remember);
     m_document.insert("arrayMode", realistic ? "realistic" : "filled");
     m_dirty = true;
     schedule();
 }
+bool PreferencesStore::importJson(const QUrl &url)
+{
+    if (!m_writable || m_import.isRunning() || !url.isLocalFile()
+        || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery() || url.hasFragment()) {
+        emit saveError(QStringLiteral("偏好导入需要可写原生数据和一个本地绝对 JSON 路径。"));
+        return false;
+    }
+    const auto revision = ++m_revision;
+    disconnect(&m_import, nullptr, this, nullptr);
+    connect(&m_import, &QFutureWatcher<QPair<QJsonObject, QString>>::finished, this,
+            [this, revision] {
+                if (revision != m_revision)
+                    return;
+                const auto result = m_import.result();
+                if (!result.second.isEmpty()) {
+                    emit saveError(result.second);
+                    return;
+                }
+                for (auto it = result.first.begin(); it != result.first.end(); ++it)
+                    m_document.insert(it.key(), it.value());
+                m_dirty = true;
+                schedule();
+                emit imported();
+            });
+    m_import.setFuture(QtConcurrent::run(&m_worker, [path = url.toLocalFile()] {
+        using Result = QPair<QJsonObject, QString>;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly) || file.size() > 1024 * 1024)
+            return Result{ { }, QStringLiteral("偏好 JSON 无法读取或超过 1MiB。") };
+        const auto bytes = file.read(1024 * 1024 + 1);
+        QJsonParseError parse;
+        const auto document = QJsonDocument::fromJson(bytes, &parse);
+        if (bytes.size() > 1024 * 1024 || file.error() != QFileDevice::NoError
+            || parse.error != QJsonParseError::NoError || !document.isObject())
+            return Result{ { }, QStringLiteral("偏好 JSON 无效，原文件已保留。") };
+        const auto object = document.object();
+        if ((object.contains("rememberColumnPosition")
+             && !object.value("rememberColumnPosition").isBool())
+            || (object.contains("arrayMode") && object.value("arrayMode") != "realistic"
+                && object.value("arrayMode") != "filled"))
+            return Result{ { }, QStringLiteral("偏好导航字段类型无效。") };
+        return Result{ object, { } };
+    }));
+    return true;
+}
 QString PreferencesStore::write(const QString &path, const QJsonObject &document)
 {
     if (!QDir().mkpath(QFileInfo(path).absolutePath()))
         return QStringLiteral("无法创建偏好目录。");
+    if (QFileInfo(path).isSymLink())
+        return QStringLiteral("原生偏好缓存不能通过符号链接覆盖其他文件。");
     QSaveFile file(path);
+    file.setDirectWriteFallback(false);
     const auto bytes = QJsonDocument(document).toJson();
-    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
+    if (!file.open(QIODevice::WriteOnly)
+        || !file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)
+        || file.write(bytes) != bytes.size() || !file.commit())
         return QStringLiteral("无法保存偏好：") + file.errorString();
     return { };
 }

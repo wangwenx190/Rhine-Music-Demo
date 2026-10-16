@@ -1,4 +1,8 @@
 target_sources(YalahooCore PRIVATE
+    ArtworkStore.h
+    ArtworkStore.cpp
+    LegacyImporter.h
+    LegacyImporter.cpp
     DirectoryScanner.h
     DirectoryScanner.cpp
     LibraryStore.h

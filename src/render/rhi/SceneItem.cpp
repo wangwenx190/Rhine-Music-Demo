@@ -176,10 +176,37 @@ void SceneItem::resetPool()
     m_coverPool.reset();
     m_selectedCover.reset();
     m_poolLeases.clear();
+    m_poolSources.clear();
     m_readyCovers.clear();
     m_atlas.reset();
     m_ownedCovers = { };
     m_activeObject = 0;
+    ++m_coverRevision;
+    schedule();
+}
+void SceneItem::refreshPool()
+{
+    if (!m_poolSelection)
+        return;
+    // Only the bounded visible pool is reconciled; content-addressed native paths
+    // carry revisions, while missing artwork also depends on its fallback title.
+    for (auto it = m_poolSources.begin(); it != m_poolSources.end();) {
+        auto next = m_poolSelection->coverSource(it.key());
+        if (!next.first.isEmpty())
+            next.second.clear();
+        if (it.value() == next) {
+            ++it;
+            continue;
+        }
+        const auto id = it.key();
+        m_covers.invalidate(id);
+        m_atlas.release(m_poolLeases.take(id));
+        m_readyCovers.remove(id);
+        for (auto &owned : m_ownedCovers)
+            if (owned.pixels && owned.pixels->identity == id)
+                owned = { };
+        it = m_poolSources.erase(it);
+    }
     ++m_coverRevision;
     schedule();
 }
@@ -208,13 +235,28 @@ void SceneItem::preparePool(Input &in)
             m_covers.cancel(it.key());
             m_atlas.release(it.value());
             m_readyCovers.remove(it.key());
+            m_poolSources.remove(it.key());
             it = m_poolLeases.erase(it);
         } else
             ++it;
     }
-    for (auto &owned : m_ownedCovers)
-        if (owned.objectId && !ownedIds.contains(owned.objectId))
+    for (auto &owned : m_ownedCovers) {
+        if (!owned.objectId || ownedIds.contains(owned.objectId))
+            continue;
+        if (in.scene.instances.isEmpty()) {
             owned = { };
+            continue;
+        }
+        const auto &active = in.scene.instances.last();
+        if (active.owned && owned.pixels && owned.pixels->identity == active.albumId
+            && std::none_of(m_ownedCovers.begin(), m_ownedCovers.end(),
+                            [&](const OwnedCover &other) {
+                                return other.objectId == active.objectId;
+                            }))
+            owned.objectId = active.objectId;
+        else
+            owned = { };
+    }
     // Source descriptors are indexed at library/sort boundaries, outside the frame path.
     for (int offset = 0; offset < count; ++offset) {
         // Admit the selected cover first, without changing the instance/sort ordering.
@@ -222,15 +264,20 @@ void SceneItem::preparePool(Input &in)
         const auto &instance = in.scene.instances[index];
         const auto &id = instance.albumId;
         const auto source = selection->coverSource(id);
-        if (!m_poolLeases.contains(id))
+        if (!m_poolLeases.contains(id)) {
             m_poolLeases.insert(id, m_atlas.acquire(id, m_covers.generation()));
+            auto key = source;
+            if (!key.first.isEmpty())
+                key.second.clear();
+            m_poolSources.insert(id, key);
+        }
         const auto lease = m_poolLeases.value(id);
         auto tile = m_atlas.tile(lease);
         auto coverLease = lease.lease;
         in.fallbackCoverTiles[index] = tile;
         in.fallbackCoverLeases[index] = coverLease;
         if (!m_readyCovers.contains(id)) {
-            if (auto pixels = m_covers.lookup(id, source.first, 256)) {
+            if (auto pixels = m_covers.lookup(id, source.first, 256, source.second)) {
                 if (m_atlas.publish(lease, pixels))
                     m_readyCovers.insert(id);
             } else if (m_covers.hasPendingCapacity())
@@ -249,14 +296,15 @@ void SceneItem::preparePool(Input &in)
                 if (it != m_ownedCovers.end()) {
                     it->objectId = instance.objectId;
                     it->lease = ++m_ownedSerial;
-                    it->pixels = m_coverPool.acquire(id, m_covers.lookup(id, source.first, 256),
-                                                     m_covers.generation());
+                    it->pixels = m_coverPool.acquire(
+                            id, m_covers.lookup(id, source.first, 256, source.second),
+                            m_covers.generation());
                 }
             }
             if (it != m_ownedCovers.end() && it->pixels) {
                 if (instance.objectId == m_activeObject
                     && (!it->pixels->pixels || it->pixels->pixels->resolution != 1024)) {
-                    if (auto pixels = m_covers.lookup(id, source.first, 1024))
+                    if (auto pixels = m_covers.lookup(id, source.first, 1024, source.second))
                         m_coverPool.upgrade(it->pixels, pixels);
                     else if (m_covers.hasPendingCapacity())
                         m_covers.request(id, source.first, 1024, source.second);
@@ -642,7 +690,7 @@ void SceneItem::updatePolish()
         resetPool();
         if (m_poolSelection)
             m_poolResetConnection = connect(m_poolSelection, &SelectionController::libraryChanged,
-                                            this, &SceneItem::resetPool);
+                                            this, &SceneItem::refreshPool);
         else {
             m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
             m_covers.request(QStringLiteral("demo-square"),

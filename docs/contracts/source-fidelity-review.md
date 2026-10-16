@@ -386,3 +386,11 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 冻结`scripts/music-library.mjs`的`AUDIO_EXTENSIONS/safeRootList/walkAlbums/albumEntryId/readAlbum`提供扩展名、根限制/分组、路径哈希与size:mtimeMs语义；`writeJsonAtomic/scan`提供原子替换、整根失败保留旧索引和只读源文件边界。原生实现使用DirectoryScanner的ID/路径索引、可取消迭代遍历及LibraryStore的单worker/最后意图合并；GUI接受const快照后一次应用到LibrarySession，JSON用QSaveFile提交，不迁入Web服务、在线补全或旧PCM路线。相同fingerprint保留已有字段，元数据/封面交R22；具体存储和检查入口归library-data.md，目标文件系统欠验归R21-P。
 
 本机macOS/Apple Silicon已真实执行Release扫描/缓存/模型、默认隐藏窗口策略及适用Metal隐藏回归。扫描事件循环心跳不代替完整产品输入/呈现性能；Windows/Linux原生文件系统和编译器回归仍按R21-P执行。
+
+## R22 · 无声元数据、封面优先级与旧数据
+
+冻结`scripts/music-library.mjs::readAlbum/walkAlbums/resolveGenre/init`提供目录图/单曲内嵌图优先级、元数据回退、v3/v4兼容、制作与未知字段保留的来源。原生通过Qt公开元数据API、两个复用player的专用事件线程、原生稳定ID和一次快照交接接入；旧browserPlayable/decodedAudioUrl保持原始字段，未引入旧PCM、网络服务或外部解码器。Loaded与可实际播放分开，具体状态与资源保护仅由library-data.md维护。
+
+REFDB-03只参考`Qt/tests/UiChecks.cpp::cachedSelection`附近三个断言的意图：重复命中资源稳定、同封面换曲不重传、仅更新实际采样绑定。实际读取文件SHA256为`b7a3878617aab8125dd43b0978d9c3bc0b29ad2501c445b5b21092a3538e56af`；仓库LICENSE为MIT、Copyright (c) 2026 LBEILC，未把NOTICE视为全部代码授权。没有复制其实现、测试代码、资产、24MiB预算或逐draw纹理架构；本项目的CoverCache/AtlasAllocator/SelectedCoverPool及生产SceneItem自行补齐同封面、内容revision、阵列/选中/归位覆盖。单身份失效由不可变内容URL和有界池对比触发，无关图集/目标保持原所有权；原来的整池重置属于原生遗漏，未判为冻结源缺陷。
+
+本机macOS/Apple Silicon已实际通过Release无声媒体/封面/导入与缓存检查、默认隐藏Metal生产图集/光学回归；收尾只重跑受影响项，其余有效结果复用。入口由library-data.md/covers.md维护；Windows/Linux实际媒体后端和导入文件系统欠验集中于R22-P，OpenGL共享图形回归仍归R35。无新增冻结源缺陷例外。

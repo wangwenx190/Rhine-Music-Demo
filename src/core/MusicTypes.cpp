@@ -231,6 +231,8 @@ QJsonObject toJson(const Album &album)
     json.insert("folderUrl", album.folder.toString());
     if (!album.coverUrl.isEmpty())
         json.insert("coverUrl", album.coverUrl.toString());
+    else
+        json.remove("coverUrl");
     json.insert("offline", album.offline);
     json.insert("rawGenres", QJsonArray::fromStringList(album.rawGenres));
     put(json, "year", album.year);

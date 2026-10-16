@@ -42,19 +42,24 @@ CoverCache::~CoverCache()
     m_state->receiver = nullptr;
     ++m_state->generation;
 }
-QString CoverCache::key(const QString &identity, const QString &path, int resolution)
+QString CoverCache::key(const QString &identity, const QString &path, int resolution,
+                        const QString &title)
 {
+    // Missing-image pixels depend on title, including after an identity leaves the visible pool.
+    const auto fallback = path.isEmpty() ? title : QString();
     // Length prefixes avoid ambiguous identities/paths containing separators.
     return QString::number(identity.size()) + ':' + identity + QString::number(path.size()) + ':'
-            + path + ':' + QString::number(resolution);
+            + path + ':' + QString::number(resolution) + ':' + QString::number(fallback.size())
+            + ':' + fallback;
 }
 quint64 CoverCache::generation() const
 {
     return m_state->generation.load();
 }
-CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, int resolution)
+CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, int resolution,
+                                 const QString &title)
 {
-    auto it = m_cache.find(key(identity, path, resolution));
+    auto it = m_cache.find(key(identity, path, resolution, title));
     if (it == m_cache.end())
         return { };
     it->used = ++m_clock;
@@ -67,8 +72,8 @@ bool CoverCache::request(QString identity, QString path, int resolution, QString
         ++m_rejected;
         return false;
     }
-    const auto cacheKey = key(identity, path, resolution);
-    if (lookup(identity, path, resolution))
+    const auto cacheKey = key(identity, path, resolution, title);
+    if (lookup(identity, path, resolution, title))
         return true;
     const auto running = m_running.constFind(cacheKey);
     if (running != m_running.cend() && running->generation == generation()
@@ -107,6 +112,18 @@ void CoverCache::cancel(const QString &identity)
     for (const auto &job : m_running) {
         if (job.identity == identity)
             job.wanted->store(false);
+    }
+}
+void CoverCache::invalidate(const QString &identity)
+{
+    cancel(identity);
+    for (auto it = m_cache.begin(); it != m_cache.end();) {
+        if (it->pixels->identity == identity) {
+            m_bytes -= it->pixels->image.sizeInBytes();
+            it = m_cache.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 void CoverCache::pump()

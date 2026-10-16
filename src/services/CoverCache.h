@@ -29,9 +29,11 @@ public:
     explicit CoverCache(QObject *parent = nullptr);
     ~CoverCache() override;
     bool request(QString identity, QString path, int resolution, QString title = { });
-    CoverSnapshot lookup(const QString &identity, const QString &path, int resolution);
+    CoverSnapshot lookup(const QString &identity, const QString &path, int resolution,
+                         const QString &title = { });
     void reset();
     void cancel(const QString &identity);
+    void invalidate(const QString &identity);
     quint64 generation() const;
     QJsonObject statistics() const;
     bool hasPendingCapacity() const;
@@ -61,7 +63,8 @@ private:
         quint64 used = 0;
     };
     static CoverSnapshot decode(const Job &job, const std::shared_ptr<State> &state);
-    static QString key(const QString &identity, const QString &path, int resolution);
+    static QString key(const QString &identity, const QString &path, int resolution,
+                       const QString &title);
     void pump();
     void complete(const Job &job, CoverSnapshot pixels);
     std::shared_ptr<State> m_state;
