@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
-    ("COMMON-01", "cmake/BrowseQml.cmake", "foreach(name SearchPanel LibraryPanel LibraryPanels PanelHeading)",
+    ("COMMON-01", "cmake/BrowseQml.cmake", "foreach(name SearchPanel LibraryPanel LibraryPanels PanelHeading",
      "Both product and Review compile the same panels, foreign C++ types and qsb resources. No web process or new dependency; Qt Quick Dialogs was already in the native closure."),
     ("COMMON-02", "src/library/LibraryStore.cpp", "bool LibraryStore::setRootPaths",
      "Editor paths become local URLs in C++; the existing lexical absolute-path/64-root validation, worker scanner, immutable snapshot handoff and atomic data-root persistence remain authoritative. FolderDialog URLs round-trip through toLocalFile; no JavaScript URL decoding or source music writes."),

@@ -21,7 +21,7 @@
 | 实际入口 | 分类 |
 | --- | --- |
 | rhi-bokeh-gpu、rhi-smaa-gpu | 直接QRhi offscreen，各平台入口均无可见窗口；实际后端能力另验 |
-| ui-drawing、ruler-drawing、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
+| playback-qml、library-panels-qml、ui-drawing、ruler-drawing、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
 | render-backend-gpu-audit、postprocess-gpu-audit、occlusion-gpu-audit | legacy-image-gate，disabled且直接运行也拒绝；逐项覆盖映射见source-fidelity-review.md的R19D4B2 |
 
 Review OFF不注册相应开发测试。archive/real-columns/ruler源数学输入用对应导出器生成frozen-poses/frozen-fields至本地；普通构建不依赖它们。组件具体状态数/门槛只在组件契约维护。

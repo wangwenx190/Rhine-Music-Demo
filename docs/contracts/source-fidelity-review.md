@@ -400,3 +400,9 @@ REFDB-03只参考`Qt/tests/UiChecks.cpp::cachedSelection`附近三个断言的�
 冻结music-app的renderLibraryPanel/renderSearchPanel/revealAlbum、music-search、music-track-focus、music.css与ui-transitions映射至LibraryPanel/SearchPanel/PanelController/TrackFocusController。搜索预处理与增量结果、模态Qt焦点、异步目录选择及虚拟化是原生所有权/工作量适配；匹配语义、稳定ID、面板几何/逻辑像素模糊、归架定位、同专辑复用、滚动与高亮算法不取截图参数。大流派列表保留源换行宽度并在有限区域虚拟滚动，避免源DOM数量随曲库增长；没有加入网络、播放副作用或第二取消机制。
 
 Release本机Metal隐藏入口分别验证模型/状态/实际MusicStage输出；修正缺封面直接走占位，避免空路径文件探测。结构/搜索/焦点与自身输出分开，正常VSYNC、物理输入/原生目录对话框与跨屏DPR仍由R23-P及既有产品实机专项验收。具体接口/资源/检查入口只在library-data.md维护；平台审计与原始报告留本地。
+
+## R24 · 普通歌曲播放与设备来源
+
+冻结music-app的playAlbum/按钮/Space及music-player的toggle/previous/next/stop/seek映射至PlaybackController与实际MusicStage控件。按用户指定差异使用单个公开Qt歌曲player/output，保留队列、>3秒上一首归零、暂停/停止/定位隔离；原无缝、歌曲淡变、浏览器/桥接输出不进入产品。REFDB-04只适配公开API的待播/意图/有效位置思路，正常切设备不重建会话，未引入私有声道补丁、在线规则或模拟描述符；hash/作者/MIT随包保留。
+
+本机Release实际Qt匿名WAV播放/进度/暂停/seek/停止、自然换曲/格式错误，以及Metal隐藏MusicStage/输出面板/定位隔离分别验证。空设备列表/重复与晚到通知只验证状态分支，不冒充物理拔插或实际听感；其他系统/后端、真实输入/设备与格式覆盖按R24-P及公共后置分工保留。当前运行支持状态与无声元数据历史索引分开，不以Loaded或扩展名宣称播放能力；技术规范与检查入口只在playback.md维护。

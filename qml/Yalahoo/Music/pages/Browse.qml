@@ -18,6 +18,7 @@ Item {
     }
     property var album: ({})
     property int albumCount: 0
+    property bool playing: false
     property string playingTitle: ""
     property bool showNavigation: true
     property bool contentEnabled: true
@@ -74,6 +75,7 @@ Item {
         opening: root.opening
         clock: root.clock
         playingTitle: root.playingTitle
+        playing: root.playing
         overviewController: root.overviewController
         onActionRequested: action => root.actionRequested(action)
         onThemeRequested: night => root.themeRequested(night)

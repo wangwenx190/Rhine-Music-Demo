@@ -810,3 +810,14 @@ if(WIN32)
     set_tests_properties(track-focus PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(PlaybackTest PlaybackTest.cpp)
+target_include_directories(PlaybackTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
+target_link_libraries(PlaybackTest PRIVATE YalahooCore Qt6::Test)
+yalahoo_platform(PlaybackTest)
+add_test(NAME playback COMMAND PlaybackTest)
+set_tests_properties(playback PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
+if(WIN32)
+    set_tests_properties(playback PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

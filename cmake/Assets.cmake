@@ -7,6 +7,7 @@ function(yalahoo_add_assets target)
             "${PROJECT_SOURCE_DIR}/resources/licenses/materials-NOTICE.md"
         )
     endif()
+    list(APPEND YALAHOO_ASSET_FILES "${PROJECT_SOURCE_DIR}/resources/licenses/qt-playback-reference-NOTICE.md")
     qt_add_resources(
         ${target}
         yalahoo_assets

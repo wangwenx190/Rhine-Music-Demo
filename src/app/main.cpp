@@ -1,6 +1,7 @@
 #include "AppIdentity.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
+#include "PlaybackController.h"
 #include "LibraryStore.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
@@ -173,11 +174,11 @@ int main(int argc, char **argv)
     // Outlive the engine and its render-thread callbacks during teardown.
     std::atomic<int> frames{ 0 };
     std::atomic<int> api{ QSGRendererInterface::Unknown };
-    QAudioOutput audio;
-    QMediaPlayer media;
-    media.setAudioOutput(&audio);
     yalahoo::OfflineMetadataProvider provider;
     yalahoo::LibrarySession library(&provider);
+    yalahoo::PlaybackController playback(&library);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &playback,
+                     &yalahoo::PlaybackController::stop);
     if (parser.isSet(QStringLiteral("verify-library"))) {
         if (!parser.isSet(QStringLiteral("verify-runtime")))
             return 7;
@@ -413,6 +414,7 @@ int main(int argc, char **argv)
         if (!verificationRun)
             presentationProperties.insert("openingController", QVariant::fromValue(&opening));
         presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
+        presentationProperties.insert("playbackController", QVariant::fromValue(&playback));
         presentationProperties.insert("trackFocusController", QVariant::fromValue(&trackFocus));
         presentationProperties.insert("panelController", QVariant::fromValue(&panels));
         presentationProperties.insert("libraryStore", QVariant::fromValue(libraryStore.get()));
@@ -598,7 +600,7 @@ int main(int argc, char **argv)
             const bool qmlAvailable =
                     QFile::exists(QStringLiteral(":/qt/qml/Yalahoo/Music/App.qml"));
             const int interactions = window->property("interactionCount").toInt();
-            const bool mediaAvailable = media.isAvailable();
+            const bool mediaAvailable = playback.isAvailable();
             bool backend = QSGRendererInterface::isApiRhiBased(
                     static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
 #if defined(Q_OS_WIN)
@@ -661,7 +663,7 @@ int main(int argc, char **argv)
                         && !completionRevisions.isEmpty()
                         && completionRevisions.last().toInteger() == qint64(motion.revision())
                         && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
-                        && media.source().isEmpty());
+                        && playback.source().isEmpty());
             const bool shaderDiagnostics =
                     std::any_of(recorded.cbegin(), recorded.cend(), [](const QString &s) {
                         return s.contains("Failed to compile") || s.contains("QSpirvCompiler")
@@ -676,12 +678,12 @@ int main(int argc, char **argv)
                     && (!parser.isSet(QStringLiteral("verify-filled"))
                         || (scene.selection() == &selection && scene.frame().instances.size() == 432
                             && library.albums()->rowCount() == 27
-                            && library.playbackTrackId().isEmpty() && media.source().isEmpty()))
+                            && library.playbackTrackId().isEmpty() && playback.source().isEmpty()))
                     && (!parser.isSet(QStringLiteral("verify-library"))
                         || (library.albums()->rowCount() == 21
                             && library.searchResults()->rowCount() == 28
                             && library.metadata().size() == 1 && library.playbackTrackId().isEmpty()
-                            && media.source().isEmpty()
+                            && playback.source().isEmpty()
                             && libraryText == QStringLiteral("匿名库模型 · 21 张专辑")));
             const QJsonObject evidence{
                 { "passed", passed },
@@ -722,7 +724,7 @@ int main(int argc, char **argv)
                 motionEvidence.insert("completionRevisions", completionRevisions);
                 motionEvidence.insert("finalRevision", qint64(motion.revision()));
                 motionEvidence.insert("openingTime", motion.clock()->openingTime());
-                motionEvidence.insert("mediaSourceEmpty", media.source().isEmpty());
+                motionEvidence.insert("mediaSourceEmpty", playback.source().isEmpty());
                 reportData.insert("motion", motionEvidence);
             }
             reportData.insert("libraryAlbums", library.albums()->rowCount());

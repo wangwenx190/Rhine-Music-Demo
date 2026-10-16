@@ -178,3 +178,12 @@ if(WIN32)
     set_tests_properties(library-panels-qml PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+add_test(NAME playback-qml COMMAND ui-audit --playback "${CMAKE_BINARY_DIR}/verification/playback-qml")
+set_tests_properties(playback-qml PROPERTIES TIMEOUT 240
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(playback-qml PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

@@ -96,6 +96,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--playback"))
+        return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
     if (app.arguments().contains("--library"))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--opening"))

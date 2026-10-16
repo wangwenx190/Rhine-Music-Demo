@@ -18,6 +18,7 @@ Item {
     required property SceneAdapter sceneAdapter
     property PresentationController presentationController: null
     property string reviewPlayingTitle: ""
+    property PlaybackController playbackController: null
     property TrackFocusController trackFocusController: null
     property PanelController panelController: null
     property LibraryStore libraryStore: null
@@ -30,6 +31,16 @@ Item {
     focus: true
     width: 1280
     height: 720
+    Keys.onSpacePressed: event => {
+        if (stage.playbackController && event.modifiers === Qt.NoModifier && (
+                    !stage.panelController || !stage.panelController.surface.shown) && (
+                    !stage.openingController || !stage.openingController.active) && (
+                    !stage.inputRouter || !stage.inputRouter.ownsFocus())) {
+            stage.playbackController.toggle();
+            event.accepted = true;
+        } else
+            event.accepted = false;
+    }
     DesignTokens {
         id: design
         offscreenRendering: stage.offscreenRendering
@@ -91,7 +102,9 @@ Item {
             tokens: design
             opening: stage.openingController
             enabled: !stage.openingController || !stage.openingController.active
-            playingTitle: stage.reviewPlayingTitle
+            playingTitle: stage.playbackController && stage.playbackController.trackId
+                          ? stage.playbackController.title : stage.reviewPlayingTitle
+            playing: stage.playbackController ? stage.playbackController.playing : false
             album: stage.librarySession.browseInfo
             albumCount: stage.librarySession.albums.count
             overviewController: stage.overviewController
@@ -104,7 +117,14 @@ Item {
                             || stage.presentationController.archiveEnabled
             selection: stage.sceneAdapter.selection
             onActionRequested: action => {
-                if ((action === "search" || action === "library") && stage.panelController) {
+                if (stage.playbackController && action === "play-pause") {
+                    stage.playbackController.toggle();
+                } else if (stage.playbackController && action === "stop") {
+                    stage.playbackController.stop();
+                } else if (stage.playbackController && action === "settings"
+                           && stage.panelController) {
+                    stage.panelController.open("playback");
+                } else if ((action === "search" || action === "library") && stage.panelController) {
                     stage.panelController.open(action);
                 } else if (action === "locate-song" && stage.trackFocusController) {
                     stage.trackFocusController.locatePlayback();
@@ -162,8 +182,15 @@ Item {
                 presentation: stage.presentationController
                 detailModel: stage.detailModel
                 trackFocus: stage.trackFocusController
-                playingTrackId: stage.librarySession.playbackTrackId
+                playingTrackId: stage.detailModel && stage.detailModel.album.id
+                                === stage.librarySession.playbackAlbumId
+                                ? stage.librarySession.playbackTrackId : ""
                 onBackRequested: stage.presentationController.back()
+                onTrackRequested: trackId => {
+                    if (stage.playbackController)
+                        stage.playbackController.playTrack(stage.librarySession.navigationAlbumId,
+                                                           trackId);
+                }
             }
         }
         Connections {
@@ -198,8 +225,18 @@ Item {
             librarySession: stage.librarySession
             controller: stage.panelController
             trackFocus: stage.trackFocusController
+            playback: stage.playbackController
             store: stage.libraryStore
             sceneSource: visualContent
+        }
+    }
+    Connections {
+        target: stage.playbackController
+        function onRejected(message) {
+            stage.navigationError = message;
+        }
+        function onCurrentChanged() {
+            stage.navigationError = "";
         }
     }
     Connections {

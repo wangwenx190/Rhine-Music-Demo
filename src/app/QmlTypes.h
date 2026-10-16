@@ -2,6 +2,7 @@
 #include "OpeningInk.h"
 #pragma once
 #include "LibrarySession.h"
+#include "PlaybackController.h"
 #include "LibraryStore.h"
 #include "TrackFocusController.h"
 #include "PanelController.h"
@@ -230,5 +231,13 @@ struct PanelControllerQml
     Q_GADGET
     QML_FOREIGN(yalahoo::PanelController)
     QML_NAMED_ELEMENT(PanelController)
+    QML_UNCREATABLE("Owned by application")
+};
+
+struct PlaybackControllerQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::PlaybackController)
+    QML_NAMED_ELEMENT(PlaybackController)
     QML_UNCREATABLE("Owned by application")
 };

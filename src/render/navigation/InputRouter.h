@@ -22,6 +22,7 @@ public:
     bool wheel(QWheelEvent *event, QQuickWindow *window);
     bool key(QKeyEvent *event, QQuickWindow *window);
     bool swipe(QPointF delta, double milliseconds);
+    Q_INVOKABLE bool ownsFocus() const;
     Q_INVOKABLE bool row(int direction);
     Q_INVOKABLE bool lane(int direction);
     bool selectRow(double row);

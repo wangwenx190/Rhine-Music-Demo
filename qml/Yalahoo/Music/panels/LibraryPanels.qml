@@ -10,6 +10,7 @@ Popup {
     required property LibrarySession librarySession
     required property PanelController controller
     required property TrackFocusController trackFocus
+    property PlaybackController playback: null
     property LibraryStore store: null
     required property Item sceneSource
     property string pendingAlbum: ""
@@ -35,8 +36,10 @@ Popup {
     function focusContent() {
         if (controller.panel === "search")
             search.focusSearch();
-        else
+        else if (controller.panel === "library")
             library.focusEditor();
+        else if (playbackLoader.item)
+            (playbackLoader.item as PlaybackPanel).focusControl();
     }
     function dismiss() {
         pendingAlbum = "";
@@ -143,6 +146,24 @@ Popup {
                     librarySession: root.librarySession
                     onResultRequested: (albumId, trackId) => root.selectResult(albumId, trackId)
                 }
+                Loader {
+                    id: playbackLoader
+                    anchors.fill: parent
+                    active: root.controller.panel === "playback" && root.playback !== null
+                    sourceComponent: PlaybackPanel {
+                        tokens: root.tokens
+                        playback: root.playback
+                        heading: PanelHeading {
+                            width: playbackLoader.width
+                            tokens: root.tokens
+                            title: "歌曲播放与输出"
+                            subtitle: "PLAYBACK"
+                            bottomSpacing: 5
+                            narrow: root.narrow
+                            onCloseRequested: root.dismiss()
+                        }
+                    }
+                }
                 LibraryPanel {
                     id: library
                     anchors.fill: parent
@@ -174,7 +195,7 @@ Popup {
                 root.trackFocus.cancel();
                 if (root.controller.panel === "library")
                     library.loadRoots();
-                else
+                else if (root.controller.panel === "search")
                     search.prepare();
                 Qt.callLater(root.focusContent);
             }

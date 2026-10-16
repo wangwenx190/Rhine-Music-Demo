@@ -1,4 +1,7 @@
 #include "LibraryAudit.h"
+#include "PlaybackController.h"
+#include "AudioFixture.h"
+#include <QTemporaryDir>
 #include "OffscreenSurface.h"
 #include "DetailPorts.h"
 #include "DetailModel.h"
@@ -39,7 +42,7 @@ QQuickItem *visual(QQuickItem *item, const QString &name)
     return nullptr;
 }
 }
-int reviewLibrary(QGuiApplication &, const QString &output)
+int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerification)
 {
     QDir().mkpath(output);
     MotionController motion;
@@ -47,6 +50,14 @@ int reviewLibrary(QGuiApplication &, const QString &output)
     SceneAdapter scene(motion.clock());
     OfflineMetadataProvider provider;
     LibrarySession library(&provider);
+    QTemporaryDir audioDirectory;
+    QUrl audioSource;
+    if (playbackVerification) {
+        QFile audioFile(audioDirectory.path() + QStringLiteral("/匿名 歌曲 #.wav"));
+        if (!audioFile.open(QIODevice::WriteOnly) || audioFile.write(test::wave(30000)) <= 0)
+            return 2;
+        audioSource = QUrl::fromLocalFile(audioFile.fileName());
+    }
     LibrarySnapshot snapshot;
     snapshot.genres = { { "g", "流派一", { }, { }, { } }, { "h", "流派二", { }, { }, { } } };
     for (int i = 0; i < 20; ++i) {
@@ -61,6 +72,7 @@ int reviewLibrary(QGuiApplication &, const QString &output)
             track.albumId = album.id;
             track.title = QString("Song %1 · 收藏曲目 🎵").arg(j);
             track.artist = album.artist;
+            track.sourceUrl = audioSource;
             track.duration = 185;
             track.discNumber = j < 100 ? 1 : 2;
             album.tracks.append(track);
@@ -97,18 +109,25 @@ int reviewLibrary(QGuiApplication &, const QString &output)
     QObject::connect(&presentation, &PresentationController::changed, &input, updateInput);
     QQmlEngine engine;
     QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+    std::unique_ptr<PlaybackController> song;
+    if (playbackVerification) {
+        song = std::make_unique<PlaybackController>(&library);
+        song->setVolume(.01);
+    }
     QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"));
-    std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { "librarySession", QVariant::fromValue(&library) },
-              { "motionController", QVariant::fromValue(&motion) },
-              { "sceneAdapter", QVariant::fromValue(&scene) },
-              { "presentationController", QVariant::fromValue(&presentation) },
-              { "detailModel", QVariant::fromValue(&detail) },
-              { "trackFocusController", QVariant::fromValue(&focus) },
-              { "panelController", QVariant::fromValue(&panels) },
-              { "inputRouter", QVariant::fromValue(&input) },
-              { "rulerController", QVariant::fromValue(&ruler) },
-              { "overviewController", QVariant::fromValue(&overview) } }));
+    QVariantMap properties{ { "librarySession", QVariant::fromValue(&library) },
+                            { "motionController", QVariant::fromValue(&motion) },
+                            { "sceneAdapter", QVariant::fromValue(&scene) },
+                            { "presentationController", QVariant::fromValue(&presentation) },
+                            { "detailModel", QVariant::fromValue(&detail) },
+                            { "trackFocusController", QVariant::fromValue(&focus) },
+                            { "panelController", QVariant::fromValue(&panels) },
+                            { "inputRouter", QVariant::fromValue(&input) },
+                            { "rulerController", QVariant::fromValue(&ruler) },
+                            { "overviewController", QVariant::fromValue(&overview) } };
+    if (song)
+        properties.insert("playbackController", QVariant::fromValue(song.get()));
+    std::unique_ptr<QObject> object(component.createWithInitialProperties(properties));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
         qWarning() << component.errors();
@@ -172,6 +191,34 @@ int reviewLibrary(QGuiApplication &, const QString &output)
             qWarning() << "Library audit failed:" << name;
         passed = okay && passed;
     };
+    if (song) {
+        window.resize(1280, 720);
+        root->setSize({ 1280, 720 });
+        render();
+        auto *button = visual(window.contentItem(), "playButton");
+        if (!button)
+            return 4;
+        QTest::mouseClick(
+                &window, Qt::LeftButton, Qt::NoModifier,
+                button->mapToScene({ button->width() / 2, button->height() / 2 }).toPoint());
+        QElapsedTimer loaded;
+        loaded.start();
+        while (!song->playing() && loaded.elapsed() < 10000)
+            QTest::qWait(5);
+        check("reference-license-resource",
+              QFile::exists(":/assets/licenses/qt-playback-reference-NOTICE.md"));
+        check("actual-play-button", song->playing() && song->trackId() == "track-0");
+        root->forceActiveFocus(Qt::OtherFocusReason);
+        QTest::keyClick(&window, Qt::Key_Space);
+        check("space-pauses", !song->requested());
+        QTest::keyClick(&window, Qt::Key_Space);
+        QElapsedTimer resumed;
+        resumed.start();
+        while (!song->playing() && resumed.elapsed() < 5000)
+            QTest::qWait(5);
+        check("space-resumes", song->playing());
+        playback.clear();
+    }
     const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                               { 960, 900 },   { 930, 900 },   { 390, 844 },
                               { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
@@ -220,6 +267,8 @@ int reviewLibrary(QGuiApplication &, const QString &output)
                 for (const auto character : QByteArray("Song 199"))
                     QTest::keyClick(&window, character);
                 check("continuous-input", library.searchResults()->rowCount() == 20);
+                if (song)
+                    check("search-space-keeps-intent", song->requested());
                 query->setProperty("text", "unmatched");
                 check("empty-results", library.searchResults()->rowCount() == 0);
                 query->setProperty("text", "");
@@ -253,6 +302,48 @@ int reviewLibrary(QGuiApplication &, const QString &output)
                           surface.grab().save(output + QString("/library-%1.png").arg(night)));
                 panels.close();
                 render();
+                if (song) {
+                    panels.open("playback");
+                    check("playback-panel-render", render());
+                    auto *outputs = visual(window.contentItem(), "songOutputDevices");
+                    check("output-device-control", outputs && outputs->isVisible());
+                    auto *progress = visual(window.contentItem(), "songProgress");
+                    check("playback-progress-control",
+                          progress && progress->isVisible() && progress->isEnabled());
+                    if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
+                        check("playback-own-image",
+                              surface.grab().save(output
+                                                  + QString("/playback-%1-%2.png")
+                                                            .arg(size.width())
+                                                            .arg(night)));
+                    if (dpr == 1 && size == QSize(1280, 720) && !night && progress) {
+                        song->pause();
+                        const auto before = song->position();
+                        progress->forceActiveFocus();
+                        QTest::keyClick(&window, Qt::Key_Right);
+                        check("progress-key-seeks",
+                              song->position() > before && !song->requested());
+                        QTest::keyClick(&window, Qt::Key_Space);
+                        check("slider-space-owned", !song->requested());
+                        const auto point = [&](double ratio) {
+                            return progress
+                                    ->mapToScene(
+                                            { progress->width() * ratio, progress->height() / 2 })
+                                    .toPoint();
+                        };
+                        QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, point(.4));
+                        QTest::mouseMove(&window, point(.5));
+                        check("progress-pointer-preview",
+                              song->dragging() && song->position() > 5000 && !song->requested());
+                        QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, point(.5));
+                        check("progress-pointer-commit",
+                              !song->dragging() && song->position() > 5000 && !song->requested());
+                        song->seek(1000);
+                        song->toggle();
+                    }
+                    panels.close();
+                    render();
+                }
             }
         }
     }
@@ -370,6 +461,18 @@ int reviewLibrary(QGuiApplication &, const QString &output)
         QMetaObject::invokeMethod(tracks, "cancelReveal");
     check("user-cancel", !focus.active());
     check("playback-unchanged", playback.isEmpty() && library.playbackTrackId() == "track-0");
+    if (song) {
+        check("playback-seekable", song->seekable());
+        song->pause();
+        song->beginSeek();
+        song->previewSeek(1000);
+        song->commitSeek();
+
+        check("navigation-keeps-real-source",
+              song->trackId() == "track-0" && song->source() == audioSource);
+        song->stop();
+        check("playback-stop", !song->requested() && song->source().isEmpty());
+    }
     check("qml-warnings", warnings.isEmpty());
     const auto policy = verification::windowPolicy(window);
     check("window-policy", policy.value("passed").toBool());
@@ -397,6 +500,15 @@ int reviewLibrary(QGuiApplication &, const QString &output)
         { "scope",
           "source geometry, normal output, Qt focus/input, virtual delegates and track reveal; no image scoring or display latency claims" }
     };
+    if (song)
+        report.insert(
+                "audio",
+                QJsonObject{
+                        { "available", song->outputAvailable() },
+                        { "device", song->outputName() },
+                        { "deviceCount", song->devices().size() - 1 },
+                        { "scope",
+                          "actual public Qt playback and controls; no physical unplug or listening claim" } });
     QSaveFile file(output + "/report.json");
     if (!file.open(QIODevice::WriteOnly))
         return 5;

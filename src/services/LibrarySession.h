@@ -82,6 +82,8 @@ signals:
     void metadataDelivered(const yalahoo::ProviderResult &result);
 
 private:
+    friend class PlaybackController;
+    void adoptPlaybackIds(const QString &albumId, const QString &trackId);
     struct Pending
     {
         RequestToken token;

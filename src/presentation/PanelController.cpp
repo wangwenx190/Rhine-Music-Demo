@@ -8,7 +8,7 @@ PanelController::PanelController(FrameClock *clock, QObject *parent) : QObject(p
 }
 void PanelController::open(const QString &panel)
 {
-    if (panel != "search" && panel != "library")
+    if (panel != "search" && panel != "library" && panel != "playback")
         return;
     m_panel = panel;
     emit changed();

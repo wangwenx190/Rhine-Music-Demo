@@ -181,12 +181,16 @@ bool LibrarySession::setPlaybackIds(const QString &albumId, const QString &track
 {
     if (!(albumId.isEmpty() && trackId.isEmpty()) && !track(albumId, trackId))
         return false;
+    adoptPlaybackIds(albumId, trackId);
+    return true;
+}
+void LibrarySession::adoptPlaybackIds(const QString &albumId, const QString &trackId)
+{
     if (m_playbackAlbumId == albumId && m_playbackTrackId == trackId)
-        return true;
+        return;
     m_playbackAlbumId = albumId;
     m_playbackTrackId = trackId;
     emit playbackChanged();
-    return true;
 }
 QVariantMap LibrarySession::providerCapabilities() const
 {

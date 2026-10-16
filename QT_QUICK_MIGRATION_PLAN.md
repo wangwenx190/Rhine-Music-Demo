@@ -20,7 +20,7 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R24 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
+- 当前主线：`R25 → … → R33 → R34 → R35`。一次只执行一个轮次，不跳轮；历史来源与收口结论见source-fidelity-review.md。R17–R33的“依赖R16”等指实现与阶段交接，不等待后置实机专项，避免循环依赖。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入、采集入口和窗口策略判断能力。当前主力macOS/Apple Silicon优先真正离屏；本轮受影响范围内能可靠执行的构建/测试/渲染/媒体/部署必须执行。缺常规工具先补齐；源码可确认的缺陷、本机可靠检查失败或本轮应提供的入口缺失必须修复。
@@ -54,6 +54,7 @@
 | [native-bootstrap.md](docs/contracts/native-bootstrap.md) | 最新原生Kit发现、C++23探测、构建与模块加载 |
 | [web-baseline.md](docs/contracts/web-baseline.md) | 冻结来源解析、匿名输入和基线重建 |
 | [assets.md](docs/contracts/assets.md) / [branding.md](docs/contracts/branding.md) | 导入资产/字体/图标/音频来源；原创品牌资产 |
+| [playback.md](docs/contracts/playback.md) | 普通歌曲Qt播放、保留队列、进度与输出设备/恢复 |
 | [library-data.md](docs/contracts/library-data.md) | 稳定身份、本地扫描/存储、排序/搜索与离线Provider接口 |
 | [motion.md](docs/contracts/motion.md) / [scene.md](docs/contracts/scene.md) | 唯一帧源/运动数学；布局/相机/坐标/拾取 |
 | [opening.md](docs/contracts/opening.md) | 二维序章/三维开场、事件就绪、遮挡提交与交互交接 |
@@ -182,17 +183,6 @@
 
 ## 待执行轮次
 
-### R24 · 普通歌曲播放、队列、进度与输出设备
-
-- 依赖R04、R17、R22。交付PlaybackController和QtMultimedia集成测试。
-- 按 REFDB-04 适配可独立复用的公开 API 设备恢复逻辑与事件序列；覆盖无设备时待播、暂停/停止后重连、加载中换曲/换设备和晚到状态，恢复音量/有效位置但不得恢复已撤销播放意图。保留明确选择设备与默认设备的不同策略，按真实后端需求决定会话重建；私有补丁和模拟设备描述符不进入产品。
-- 单个歌曲QMediaPlayer+QAudioOutput；本地文件QUrl::fromLocalFile，上一/下一首由C++队列维护，EndOfMedia只处理一次。无曲时Space播放当前专辑；暂停/停止行为沿原产品。
-- 重建source操作使用递增revision；来源替换先断开旧操作连接，延迟事件核对当前source/待播放意图，暂停/停止不能被晚到LoadedMedia恢复播放。
-- position/duration/seekable来自公开信号，用户拖动时暂时保持拖动值，提交setPosition后恢复跟随；不可seek禁用进度拖动。playbackRate固定1，动效速度不修改歌曲。
-- QMediaDevices列设备，QAudioOutput::setDevice切换；设备消失回系统默认并提示。错误只显示Qt原因和可操作的换曲/重试，不增加外部解码后备。
-- 性能设计与验证：媒体信号只更新相关状态/传输控件；导航/逐帧渲染不查询或重建媒体对象，拖动seek只提交必要请求，不为图形优化改音频路线。
-- 退出：支持格式的本地样本实际播/暂停/seek/停止/换曲/设备变化通过；不支持格式明确提示，没有任何PCM、无缝或专业输出代码。
-
 ### R25 · 氛围音乐、界面音效与音频设置简化
 
 - 依赖R03、R24。交付BackgroundMusicController、InterfaceSoundController、音频设置UI。
@@ -300,6 +290,7 @@
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
+| R24-P | Windows/Linux原生媒体与三平台物理设备/听感、非OpenGL播放器/输入集成 | 三平台OpenGL播放器GUI/窗口/输入回归 |
 | R23-P | Windows/D3D11与macOS/Metal的原生目录选择、物理输入/焦点、跨屏DPR及播放定位集成；三平台非图形构建/模型 | 三平台OpenGL的面板/定位/资源恢复与Linux窗口/输入 |
 | R22-P | Windows/Linux公开媒体无声探测、封面与显式导入/偏好JSON | 仅共享封面变更受影响的OpenGL图形回归 |
 | R19A/B/C/D/E各`-P`、R16M3-S、R17-P/R18-P/R19-P、R20-P | Windows/D3D11；macOS/Metal尚欠的产品集成；各平台不创建OpenGL上下文的源码/算法/构建检查 | Windows/macOS OpenGL受影响回归；Linux/OpenGL全部目标GPU、X11/Wayland窗口、输入及生命周期 |
@@ -308,6 +299,13 @@
 | MAC-VISIBLE-3D、各平台最终实机矩阵 | Metal/D3D11/实际Vulkan的图形、显示、输入、正常VSYNC/性能；非OpenGL媒体与部署 | 三平台OpenGL的同项动态矩阵和部署启动 |
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
+
+#### R24-P · 普通歌曲播放与设备的目标平台/实机回归
+
+- 输入为PlaybackController、MusicStage/Header/Detail/PlaybackControls/PlaybackPanel、LibrarySession受控播放ID同步、PlaybackTest/AudioFixture及`ui-audit --playback`匿名WAV/损坏输入。来源为冻结music-player/music-app和REFDB-04公开函数/事件序列，实际读取hash/作者/MIT见随包参考NOTICE。缺Windows/Linux目标系统、最新Kit与音频后端；本机真实Qt播放和Metal隐藏结果不代表物理拔插/默认路由切换、听感、物理输入/跨屏或其他格式全集通过。
+- 目标真实Release构建、format/check-format、官方Yalahoo_qmllint/ui-audit_qmllint、`ctest --preset qt-release -R '^(playback|library-data|library-qml|track-focus|navigation|presentation|source-format|verification-window-policy)$'`及`python3 tools/audit/audit-playback.py`，保留单个歌曲player/output、公开API、local URL、rate=1、source revision/断旧连接、暂停/停止意图、一次EndOfMedia、保留孤立队列和导航播放隔离。不得迁入私有设备补丁、模拟描述符或PCM/外部解码后备。
+- 当前可靠窗口策略运行`playback-qml`/`ui-audit --playback 全新目录`：九尺寸/双主题/实际或显式DPR1/1.5/2，真实播放按钮、歌名/图标、播放进度/单次seek、音量/系统默认与设备选择、格式错误/重试、搜索/库替换/定位不改音源及关闭面板/隐藏恢复。D3D11/Metal归R34，三平台OpenGL和Linux native图形/输入归R35；正常VSYNC与完整产品性能按R28/最终矩阵，不从离屏或局部媒体事件推断。
+- 真正设备分别执行：默认输出改选、明确选择仍在时不随默认、显式设备消失回默认并提示、全部输出消失时待播、同设备/新设备重连、加载中换曲/换设备、暂停/停止后重连、有效位置/音量保留、最小化歌曲继续及退出停止。PlaybackTest空列表/真实描述符通知仅为竞态分支证据，不能冲销实物门槛。Windows/Linux用本机Qt实际支持格式验证播放/暂停/seek/停止/自然队列结束；覆盖不可seek/未知duration、损坏/无音轨/不支持格式的Qt原因，不按扩展名假定能力。无声加载、Qt播放进度、实际出声/听感分别记录；缺格式/设备条件仍未通过，修正共享代码只回归受影响范围。
 
 #### R23-P · 音乐库面板、搜索与歌曲定位的目标平台回归
 

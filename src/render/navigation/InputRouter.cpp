@@ -196,6 +196,10 @@ bool InputRouter::wheel(QWheelEvent *event, QQuickWindow *window)
         reset();
     return true;
 }
+bool InputRouter::ownsFocus() const
+{
+    return m_window && ownsInput(m_window->activeFocusItem(), false);
+}
 bool InputRouter::key(QKeyEvent *event, QQuickWindow *window)
 {
     reset();
