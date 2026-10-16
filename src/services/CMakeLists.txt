@@ -1,6 +1,8 @@
 target_sources(
     YalahooCore
     PRIVATE
+    DemoLibrary.h
+    DemoLibrary.cpp
     IMetadataProvider.h
     OfflineMetadataProvider.h
     OfflineMetadataProvider.cpp

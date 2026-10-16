@@ -24,6 +24,7 @@ ApplicationWindow {
     property OverviewController overviewController: null
     property string reviewPlayingTitle: ""
     property string preferencesError: ""
+    property bool lightingLab: false
     property bool geometryProbe: false
     property bool verificationRun: false
     property int verificationFlags: Qt.Window
@@ -58,6 +59,8 @@ ApplicationWindow {
             overviewController: window.overviewController
             reviewPlayingTitle: window.reviewPlayingTitle
             preferencesError: window.preferencesError
+            experimentsVisible: window.lightingLab
+            onExperimentsVisibilityRequested: shown => window.lightingLab = shown
             geometryProbe: window.geometryProbe
         }
     }

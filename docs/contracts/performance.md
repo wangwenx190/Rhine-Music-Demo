@@ -77,3 +77,11 @@ R10D依用户要求为record-only：20ms仅参考，不阻止其完成/提交，
 - [Qt Quick 3D 实例化](https://www.qt.io/blog/qtquick3d-instanced-rendering)：批处理收益与排序/overdraw 的适用条件分别判断。
 
 执行时核对所选最新 Kit API；上述链接不锁定 Qt minor/patch。
+
+## 实验面板的运行诊断
+
+`SceneItem.diagnosticsEnabled`独立于Review的完整`telemetryEnabled`；面板仅开启前者。render每次正常提交记录固定标量：从资源准备到提交尾部的CPU耗时、同步CPU耗时、QRhi最近完成GPU帧时间、三类请求上传字节与单调提交时刻。关闭时不启动相关计时；没有额外render/readback/GPU finish。帧间隔使用未钳制的单调时间，不使用FrameClock的运动dt。
+
+每类保留最近256个样本，以nearest-rank计算p50/p95/p99，超容量计数单列；每至少500ms形成一批，固定邮箱仅保留最新批和一个GUI通知。GUI按批读取解码启动累计/活跃/等待计数并更新小型显示值，不序列化全库或逐帧JSON。原生`frameSwapped`发出时直接记录单调时刻至同一有界邮箱，不能用GUI排队到达时间当作呈现事件间隔。隐藏/最小化/关闭/换窗口清空基线、断开事件并用epoch拒绝旧结果；Review显式RenderControl目标可采提交，但没有原生呈现样本。
+
+面板的“提交吞吐”是该批间隔数/时间，反映当前调度与等待，不宣称未限速benchmark；CPU同步与提交分别列出，不相加分位；GPU范围为QRhi后端提供的已完成帧，缺样本显示不可用。VSYNC只显示请求swapInterval，实际VSYNC、屏幕扫描时刻及input-to-photon均不可用；零上传是有效计数，空时间样本不能显示为0。

@@ -19,6 +19,8 @@ class SceneItem : public RhiItem
     Q_PROPERTY(bool inspectionEnabled READ inspectionEnabled WRITE setInspectionEnabled NOTIFY inspectionEnabledChanged)
     Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged)
     Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged)
+    Q_PROPERTY(bool diagnosticsEnabled READ diagnosticsEnabled WRITE setDiagnosticsEnabled NOTIFY diagnosticsChanged)
+    Q_PROPERTY(QVariantMap diagnosticValues READ diagnosticValues NOTIFY diagnosticValuesChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
     Q_PROPERTY(yalahoo::TitleReel *titleReel READ titleReel WRITE setTitleReel NOTIFY textReelsChanged)
     Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged)
@@ -67,6 +69,15 @@ public:
         return m_telemetryEnabled;
     }
     void setTelemetryEnabled(bool enabled);
+    bool diagnosticsEnabled() const
+    {
+        return m_diagnosticsEnabled;
+    }
+    void setDiagnosticsEnabled(bool enabled);
+    QVariantMap diagnosticValues() const
+    {
+        return m_diagnosticValues;
+    }
     QString errorText() const
     {
         return m_errorText;
@@ -86,6 +97,8 @@ signals:
     void inspectionEnabledChanged();
     void telemetryEnabledChanged();
     void frameSubmitted(QJsonObject sample);
+    void diagnosticsChanged();
+    void diagnosticValuesChanged();
     void errorTextChanged();
     void textReelsChanged();
 
@@ -104,6 +117,7 @@ protected:
 
 private:
     void schedule();
+    void configureDiagnostics();
     bool selectAt(QPointF point);
     void preparePool(Input &input);
     void resetPool();
@@ -144,7 +158,10 @@ private:
     std::shared_ptr<SelectedCoverLease> m_selectedCover;
     QString m_errorText;
     bool m_geometryOnly = false, m_inspectionEnabled = true;
-    bool m_telemetryEnabled = false;
+    bool m_telemetryEnabled = false, m_diagnosticsEnabled = false;
+    quint64 m_diagnosticsEpoch = 0;
+    QVariantMap m_diagnosticValues;
+    QMetaObject::Connection m_presentedConnection, m_windowStateConnection;
     std::optional<QPointF> m_mouseStart;
     bool m_mouseMoved = false, m_restorePending = false;
     std::optional<QPointF> m_touchStart;

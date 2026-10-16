@@ -15,6 +15,7 @@ Popup {
     property InterfaceSoundController interfaceSound: null
     property SettingsController settings: null
     signal replayRequested
+    signal experimentsRequested
     signal fullscreenRequested
     property LibraryStore store: null
     required property Item sceneSource
@@ -186,6 +187,7 @@ Popup {
                         backgroundMusic: root.backgroundMusic
                         interfaceSound: root.interfaceSound
                         onReplayRequested: root.replayRequested()
+                        onExperimentsRequested: root.experimentsRequested()
                         onFullscreenRequested: root.fullscreenRequested()
                         heading: PanelHeading {
                             width: settingsLoader.width

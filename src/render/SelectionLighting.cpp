@@ -81,19 +81,80 @@ void SelectionLighting::setReducedMotion(bool reduced)
         emit changed();
     }
 }
+QVariantMap SelectionLighting::settings() const
+{
+    const QStringList modes{ "baseline", "area", "guided", "hybrid" };
+    return { { "mode", modes[int(m_settings.mode)] },
+             { "strength", m_settings.strength },
+             { "width", m_settings.width },
+             { "offset", m_settings.offset },
+             { "fill", m_settings.fill },
+             { "transitionDuration", m_settings.transitionDuration } };
+}
 void SelectionLighting::setSettings(RowLightingSettings s)
 {
     auto valid = [](double n, double previous, double lo, double hi) {
         return std::isfinite(n) ? std::clamp(n, lo, hi) : previous;
     };
     if (int(s.mode) < 0 || int(s.mode) > 3)
-        s.mode = ribbon.settings.mode;
-    s.strength = valid(s.strength, ribbon.settings.strength, 0, 2);
-    s.width = valid(s.width, ribbon.settings.width, .6, 2.5);
-    s.offset = valid(s.offset, ribbon.settings.offset, -6, 6);
-    s.fill = valid(s.fill, ribbon.settings.fill, 0, 1);
-    s.transitionDuration = valid(s.transitionDuration, ribbon.settings.transitionDuration, .4, 2.4);
+        s.mode = m_settings.mode;
+    s.strength = valid(s.strength, m_settings.strength, 0, 2);
+    s.width = valid(s.width, m_settings.width, .6, 2.5);
+    s.offset = valid(s.offset, m_settings.offset, -6, 6);
+    s.fill = valid(s.fill, m_settings.fill, 0, 1);
+    s.transitionDuration = valid(s.transitionDuration, m_settings.transitionDuration, .4, 2.4);
+    const auto before = settings();
+    m_settings = s;
     ribbon.settings = s;
+    if (m_comparing)
+        ribbon.settings.mode = RowLightingMode::Baseline;
+    if (settings() != before) {
+        emit settingsChanged();
+        emit changed();
+    }
+}
+bool SelectionLighting::configure(const QVariantMap &patch)
+{
+    auto next = m_settings;
+    const QStringList modes{ "baseline", "area", "guided", "hybrid" };
+    for (auto it = patch.cbegin(); it != patch.cend(); ++it) {
+        if (it.key() == "mode") {
+            const auto index = modes.indexOf(it.value().toString());
+            if (index < 0)
+                return false;
+            next.mode = RowLightingMode(index);
+            continue;
+        }
+        double *target = it.key() == "strength"    ? &next.strength
+                : it.key() == "width"              ? &next.width
+                : it.key() == "offset"             ? &next.offset
+                : it.key() == "fill"               ? &next.fill
+                : it.key() == "transitionDuration" ? &next.transitionDuration
+                                                   : nullptr;
+        const auto &value = it.value();
+        if (!target || value.metaType().id() == QMetaType::QString
+            || value.metaType().id() == QMetaType::Bool || !value.canConvert<double>()
+            || !std::isfinite(value.toDouble()))
+            return false;
+        *target = value.toDouble();
+    }
+    setSettings(next);
+    return true;
+}
+void SelectionLighting::resetSettings()
+{
+    setComparing(false);
+    setSettings({ });
+}
+void SelectionLighting::setComparing(bool value)
+{
+    if (m_comparing == value)
+        return;
+    m_comparing = value;
+    ribbon.settings = m_settings;
+    if (value)
+        ribbon.settings.mode = RowLightingMode::Baseline;
+    emit comparingChanged();
     emit changed();
 }
 void SelectionLighting::advanceTheme(double dt)

@@ -31,6 +31,10 @@ Item {
     property bool geometryProbe: false
     property string preferencesError: ""
     property string navigationError: ""
+    readonly property ExperimentPanels experimentPanel: experiments.item as ExperimentPanels
+    property bool experimentsVisible: false
+    signal experimentsVisibilityRequested(bool shown)
+    onExperimentsVisibilityRequested: shown => experimentsVisible = shown
     focus: true
     width: 1280
     height: 720
@@ -65,6 +69,9 @@ Item {
         SceneItem {
             id: nativeScene
             objectName: "nativeScene"
+            diagnosticsEnabled: stage.experimentPanel !== null && stage.experimentPanel.diagnostics
+                                && stage.experimentsVisible && (!stage.openingController ||
+                                                                !stage.openingController.active)
             anchors.fill: parent
             adapter: stage.sceneAdapter
             enabled: (!stage.openingController || !stage.openingController.active) && (
@@ -231,6 +238,10 @@ Item {
             backgroundMusic: stage.backgroundMusicController
             interfaceSound: stage.interfaceSoundController
             settings: stage.settingsController
+            onExperimentsRequested: {
+                stage.panelController.close();
+                stage.experimentsVisibilityRequested(true);
+            }
             onReplayRequested: {
                 stage.panelController.close();
                 if (stage.openingController)
@@ -247,6 +258,32 @@ Item {
             }
             store: stage.libraryStore
             sceneSource: visualContent
+        }
+    }
+    Loader {
+        id: experiments
+        objectName: "experimentsLoader"
+        x: stage.width <= 540 ? 20 : stage.width <= 1100 ? 25 : 40
+        y: stage.width / stage.height < 1.05 ? 150 : stage.width >= 1800 ? 190 : stage.width <= 540
+                                                                           ? 125 : stage.width
+                                                                             <= 1100 ? 140 : 160
+        width: Math.max(0, Math.min(stage.width <= 760 || stage.height <= 650 ? 248 : stage.width
+                                                                                <= 1100 ? 254 : 272,
+                                    stage.width - 2 * x))
+        height: Math.max(0, stage.height - y - (stage.width / stage.height < 1.05 ? 85 : 100))
+        active: stage.experimentsVisible && stage.settingsController !== null
+        visible: active && (!stage.openingController || !stage.openingController.active) && (
+                     !stage.panelController || !stage.panelController.surface.shown)
+        sourceComponent: ExperimentPanels {
+            compact: stage.width <= 760 || stage.height <= 650
+            tokens: design
+            settings: stage.settingsController
+            lighting: stage.sceneAdapter.lighting
+            sceneSource: nativeScene
+            onCloseRequested: {
+                stage.experimentsVisibilityRequested(false);
+                browse.forceActiveFocus(Qt.OtherFocusReason);
+            }
         }
     }
     Connections {

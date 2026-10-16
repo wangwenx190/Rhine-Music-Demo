@@ -15,6 +15,7 @@
 #include "OfflineMetadataProvider.h"
 #include "PreferencesStore.h"
 #include "SettingsController.h"
+#include "DemoLibrary.h"
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
@@ -91,6 +92,13 @@ int main(int argc, char **argv)
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("yalahOO!!! native music archive"));
     parser.addHelpOption();
+    parser.addOption(
+            { QStringLiteral("demo"),
+              QStringLiteral(
+                      "Use anonymous albums without reading saved data or starting audio") });
+    parser.addOption(
+            { QStringLiteral("lighting-lab"),
+              QStringLiteral("Open lighting/motion controls with the anonymous demonstration") });
     parser.addOption({ QStringLiteral("verify-overview"),
                        QStringLiteral("Verify production overview and exit"),
                        QStringLiteral("directory") });
@@ -155,6 +163,19 @@ int main(int argc, char **argv)
                        QStringLiteral("report") });
 #endif
     parser.process(app);
+    const bool demonstration =
+            parser.isSet(QStringLiteral("demo")) || parser.isSet(QStringLiteral("lighting-lab"));
+    if (demonstration) {
+        for (const auto &option : parser.optionNames()) {
+            if (option.startsWith(QStringLiteral("verify-"))
+                || QStringList{ "data-dir", "music-root", "import-legacy", "import-preferences",
+                                "rescan-library" }
+                           .contains(option)) {
+                qWarning("Demonstration cannot be combined with data or verification options");
+                return 7;
+            }
+        }
+    }
     const bool appVerification = parser.isSet(QStringLiteral("verify-browse"))
             || parser.isSet(QStringLiteral("verify-navigation"))
             || parser.isSet(QStringLiteral("verify-detail"))
@@ -252,7 +273,7 @@ int main(int argc, char **argv)
             ;
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
-    if (!verificationRun) {
+    if (!verificationRun && !demonstration) {
         const QString dataRoot = parser.isSet(QStringLiteral("data-dir"))
                 ? parser.value(QStringLiteral("data-dir"))
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
@@ -333,26 +354,8 @@ int main(int argc, char **argv)
     yalahoo::SettingsController settings(preferences.get(), &library, &motion, &scene, &selection);
     if (!verificationRun || parser.isSet(QStringLiteral("verify-filled")) || appVerification) {
         // Verification fixtures stay isolated from the user's persistent library.
-        if (verificationRun) {
-            yalahoo::LibrarySnapshot demo;
-            const QStringList covers{ "square", "portrait", "landscape" };
-            for (int lane = 0; lane < 9; ++lane) {
-                const auto genreId = QStringLiteral("demo-genre-%1").arg(lane);
-                yalahoo::Genre genre;
-                genre.id = genreId;
-                genre.name = QStringLiteral("演示收藏 %1").arg(lane + 1);
-                demo.genres.append(genre);
-                for (int row = 0; row < 3; ++row) {
-                    yalahoo::Album album;
-                    album.id = QStringLiteral("demo-album-%1-%2").arg(lane).arg(row);
-                    album.title = QStringLiteral("演示专辑 %1").arg(row + 1);
-                    album.genreId = genreId;
-                    album.coverUrl =
-                            QUrl(QStringLiteral("qrc:/assets/demo-covers/%1.png").arg(covers[row]));
-                    demo.albums.append(album);
-                }
-            }
-            library.setSnapshot(std::move(demo));
+        if (verificationRun || demonstration) {
+            library.setSnapshot(yalahoo::demonstrationLibrary());
         }
         const auto updatePool = [&] {
             selection.setColumns(library.albums()->order().columns, library.snapshot());
@@ -428,7 +431,7 @@ int main(int argc, char **argv)
         presentation.reset();
         updateOpeningInput();
     });
-    if (!verificationRun) {
+    if (!verificationRun && !demonstration) {
         auto soundCell = std::make_shared<yalahoo::ArchiveCell>(selection.cell());
         QObject::connect(&selection, &yalahoo::SelectionController::selectionChanged, &sounds,
                          [&, soundCell] {
@@ -495,6 +498,8 @@ int main(int argc, char **argv)
                                         parser.value(QStringLiteral("material-report")));
     }
 #endif
+    if (usesApp)
+        initialProperties.insert("lightingLab", parser.isSet(QStringLiteral("lighting-lab")));
     if (!verificationRun || appVerification)
         initialProperties.insert("settingsController", QVariant::fromValue(&settings));
     engine.setInitialProperties(initialProperties);

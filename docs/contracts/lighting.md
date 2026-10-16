@@ -20,3 +20,11 @@
 
 
 `runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。`python3 tools/audit/audit-material-parameters.py`与`audit-material-review.py`分别检查实际参数链与Review生命周期，目标欠验归计划R34。
+
+## 实验控制
+
+`LightingPanel`在`ExperimentPanels`的共享滚动容器中提供四种模式与既有五项参数。紧凑窗口初始折叠，控件范围与冻结`music-lighting-lab`一致。`SelectionLighting.settings`只发布已确认参数；`configure`原子校验字段/数值后沿`setSettings`钳制，不重置跟随位置/速度，不创建材质或实例。`settingsChanged`经SettingsController写入现有偏好worker，保留未知嵌套扩展；逐帧`changed`不保存。
+
+`comparing`仅临时将实际模式设为baseline；按键/指针释放、失焦、窗口隐藏、折叠或销毁面板均恢复最新已确认参数，不写偏好。重置关闭临时对照并恢复本契约的guided固定预设。面板从设置入口开启，关闭保留效果；`--lighting-lab`的匿名启动语义归native-bootstrap.md。
+
+`experiments`检查参数原子性、持久化边界、跟随连续性、默认复位与改速轨迹；`ui-audit --experiments 输出目录`/`experiments-qml`检查实际uniform、资源generation稳定、滚动/键盘隔离、双主题九尺寸和显式DPR1/1.5/2、诊断开关与释放。当前macOS入口使用真正隐藏Metal，物理输入/原生呈现与其他后端按计划R27-P补验。诊断统计语义归performance.md。

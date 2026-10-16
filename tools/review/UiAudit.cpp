@@ -1,4 +1,5 @@
 #include "OpeningAudit.h"
+#include "ExperimentAudit.h"
 #include "LibraryAudit.h"
 #include "OffscreenSurface.h"
 #include "AssetCatalog.h"
@@ -96,6 +97,8 @@ int main(int argc, char **argv)
         return 2;
     qputenv("QCPAINTER_DEBUG_COLLECT", "0");
     qInstallMessageHandler(message);
+    if (app.arguments().contains("--experiments"))
+        return argc == 3 ? reviewExperiments(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains("--settings"))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true, true) : 2;
     if (app.arguments().contains("--playback"))

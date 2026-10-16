@@ -225,8 +225,9 @@ public:
     void synchronize(QQuickRhiItem *item) override
     {
         QElapsedTimer sync;
-        sync.start();
         auto *source = static_cast<RhiItem *>(item);
+        if (source->profiled || source->diagnosed)
+            sync.start();
         if (source->submission() == synchronizedSubmission)
             return;
         synchronizedSubmission = source->submission();
@@ -249,6 +250,7 @@ public:
         input = source->input();
         deliver = source->captured;
         profile = source->profiled;
+        diagnose = source->diagnosed;
         QPointer<RhiItem> guard(source);
         failed = [guard](QString message) {
             if (guard)
@@ -266,7 +268,7 @@ public:
         input.cover = detachedCover;
         if (input.atlasGeneration && atlasGeneration == input.atlasGeneration)
             enqueueAtlas();
-        synchronizationMs = sync.nsecsElapsed() / 1e6;
+        synchronizationMs = sync.isValid() ? sync.nsecsElapsed() / 1e6 : 0;
     }
     void initialize(QRhiCommandBuffer *cb) override
     {
@@ -344,6 +346,7 @@ private:
     double synchronizationMs = 0;
     std::function<void(Capture)> deliver;
     std::function<void(QJsonObject)> profile;
+    std::function<void(DiagnosticSample)> diagnose;
     Target shadow, opaque, composite, aoGeometry, dofGeometry;
     Postprocess post;
     AtlasUploadQueue atlasQueue;
@@ -1211,7 +1214,8 @@ void Renderer::drawInstances(QRhiCommandBuffer *cb, QRhiGraphicsPipeline *p,
 void Renderer::renderFrame(QRhiCommandBuffer *cb)
 {
     QElapsedTimer cpu;
-    cpu.start();
+    if (input.profile || diagnose)
+        cpu.start();
     // initialize may precede synchronize in Qt; defer resource-size changes to a fresh frame.
     if (input.cover.isNull() && !input.atlasGeneration)
         return;
@@ -2024,6 +2028,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         prepared(input.preparationToken, synchronizedSubmission, atlasQueue.pending() == 0);
         if (atlasQueue.pending() > 0)
             update();
+    }
+    if (diagnose) {
+        const auto gpu = cb->lastCompletedGpuTime();
+        diagnose({ std::chrono::duration<double, std::milli>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count(),
+                   cpu.nsecsElapsed() / 1e6, synchronizationMs, gpu > 0 ? gpu * 1000 : -1,
+                   frameUploadBytes, selectedUploadBytes, qint64(cursor) });
     }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();

@@ -400,3 +400,14 @@ Release本机Metal隐藏入口分别验证模型/状态/实际MusicStage输出�
 REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检查的局部思路；既有LibrarySession的requestId/generation已足够，补齐不同代订阅者晚到、批量串行与能力通知，未采用其Host、网络、账号或队列架构。实际读取文件hash/作者/MIT随包参考NOTICE保留；设置和资料技术规范仅由library-data.md维护。产品只注册OfflineMetadataProvider，测试注入不产生网络请求。
 
 本机Release偏好/Provider/配置及Metal隐藏设置输出按对应入口验证；Qt事件、显式target DPR与隐藏App视觉树重建分别陈述，不外推物理输入、跨屏、正常呈现或听感。其余目标与原生产品事项集中保留于R26-P及最终矩阵。
+
+## R27 · 光照/速度面板与匿名入口
+
+| 冻结生产来源 → 当前入口 | 判定与边界 |
+| --- | --- |
+| `music-lighting-lab.ts`/`music-row-lighting.ts` → `LightingPanel`、`SelectionLighting::configure/setComparing/resetSettings` | 保留四模式、五参数范围、guided预设、按住原版/释放恢复、窄屏折叠与输入隔离；只更新已有光场参数，保持跟随x/v。Qt控件承担焦点与无障碍，不引入浏览器URL状态。 |
+| `music-motion-lab.ts`/`music-motion-settings.ts` → `MotionPanel`、SettingsController/FrameClock | 保留.25–3倍率、.05步进与1×复位；沿唯一时钟保持轨迹与片头/歌曲独立。 |
+| `music-lighting-lab.css` → `MusicStage`实验容器/共享ScrollView | 保留左侧响应式位置、272/254/248宽度、页眉/底栏避让；源文字主题色映射到Qt控件的windowText；窗口太窄时限定可用宽度，滚动限于实验面板。 |
+| 音乐生产入口 → 原生启动参数与run-native脚本 | 普通入口、匿名demo和匿名lighting-lab分别路由；用户指定演示不读取真实库/自动播放优先，产品资产和匿名标题不带私人路径。 |
+
+诊断用实际单调提交/原生Qt呈现事件和既有上传/解码计数，统计范围以performance.md为准。`audit-experiments.py`绑定上述冻结来源hash及当前COMMON/PERF/三平台符号；数学/参数、隐藏输出和缺目标环境的原生输入/呈现分别验收，后者归R27-P。

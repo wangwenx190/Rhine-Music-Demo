@@ -104,6 +104,19 @@ QString PreferencesStore::validate(const QJsonObject &document)
                 || value.toDouble() > (QString(key) == "motionSpeed" ? 3 : 1)))
             return QStringLiteral("偏好数值无效：") + key;
     }
+    if (document.contains("lighting")) {
+        if (!document.value("lighting").isObject())
+            return QStringLiteral("光照偏好必须是对象。");
+        const auto lighting = document.value("lighting").toObject();
+        const QStringList modes{ "baseline", "area", "guided", "hybrid" };
+        if (lighting.contains("mode") && !modes.contains(lighting.value("mode").toString()))
+            return QStringLiteral("光照模式无效。");
+        for (auto key : { "strength", "width", "offset", "fill", "transitionDuration" })
+            if (lighting.contains(key)
+                && (!lighting.value(key).isDouble()
+                    || !std::isfinite(lighting.value(key).toDouble())))
+                return QStringLiteral("光照数值类型无效：") + key;
+    }
     if (document.contains("renderQuality")) {
         if (!document.value("renderQuality").isObject())
             return QStringLiteral("画质偏好必须是对象。");

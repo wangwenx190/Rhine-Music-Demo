@@ -1,5 +1,6 @@
 #pragma once
 #include "SceneFrame.h"
+#include "DiagnosticSamples.h"
 #include "AtlasUpload.h"
 #include <QQuickRhiItem>
 #include <QImage>
@@ -91,6 +92,7 @@ public:
     // The callable is copied during synchronize; callers use a guarded GUI receiver.
     std::function<void(Capture)> captured;
     std::function<void(QJsonObject)> profiled;
+    std::function<void(DiagnosticSample)> diagnosed;
     std::function<void(quint64, quint64, bool)> prepared;
 signals:
     void renderFailed(QString message);

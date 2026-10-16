@@ -1,4 +1,7 @@
 #include "SceneItem.h"
+#include <QQuickRenderTarget>
+#include <chrono>
+#include <QGuiApplication>
 #include <QQuickWindow>
 #include <QScreen>
 #include <QMutex>
@@ -66,6 +69,8 @@ void SceneItem::refreshTextResources()
 SceneItem::SceneItem(QQuickItem *parent)
     : RhiItem(parent), m_cover(256, 256, QImage::Format_RGBA8888_Premultiplied)
 {
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this,
+            &SceneItem::configureDiagnostics);
     setAcceptedMouseButtons(Qt::LeftButton);
     setAcceptTouchEvents(true);
     setAcceptHoverEvents(true);
@@ -104,11 +109,13 @@ SceneItem::SceneItem(QQuickItem *parent)
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::heightChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::schedule);
+    connect(this, &QQuickItem::visibleChanged, this, &SceneItem::configureDiagnostics);
     connect(this, &RhiItem::renderFailed, this, [this](const QString &message) {
         m_errorText = message;
         emit errorTextChanged();
     });
     connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
+        disconnect(m_windowStateConnection);
         disconnect(m_visibilityConnection);
         disconnect(m_activeConnection);
         disconnect(m_dprConnection);
@@ -121,6 +128,7 @@ SceneItem::SceneItem(QQuickItem *parent)
                                       &SceneItem::schedule);
             m_visibilityConnection =
                     connect(window, &QWindow::visibleChanged, this, [this](bool visible) {
+                        configureDiagnostics();
                         if (!visible)
                             mouseUngrabEvent();
                         schedule();
@@ -141,11 +149,14 @@ SceneItem::SceneItem(QQuickItem *parent)
                                     Qt::QueuedConnection);
                         }
                     });
+            m_windowStateConnection = connect(window, &QWindow::visibilityChanged, this,
+                                              &SceneItem::configureDiagnostics);
             m_activeConnection = connect(window, &QWindow::activeChanged, this, [this, window] {
                 if (!window->isActive())
                     mouseUngrabEvent();
             });
         }
+        configureDiagnostics();
         schedule();
     });
 }
@@ -358,6 +369,104 @@ void SceneItem::setGeometryOnly(bool enabled)
     m_geometryOnly = enabled;
     schedule();
     emit geometryOnlyChanged();
+}
+void SceneItem::setDiagnosticsEnabled(bool enabled)
+{
+    if (m_diagnosticsEnabled == enabled)
+        return;
+    m_diagnosticsEnabled = enabled;
+    configureDiagnostics();
+    emit diagnosticsChanged();
+}
+void SceneItem::configureDiagnostics()
+{
+    const auto epoch = ++m_diagnosticsEpoch;
+    diagnosed = { };
+    disconnect(m_presentedConnection);
+    m_diagnosticValues.clear();
+    emit diagnosticValuesChanged();
+    // Explicit Review targets can submit while the native window stays hidden.
+    if (!m_diagnosticsEnabled || !isVisible() || !window()
+        || QGuiApplication::applicationState() == Qt::ApplicationHidden
+        || QGuiApplication::applicationState() == Qt::ApplicationSuspended
+        || (!window()->isVisible() && window()->renderTarget().isNull())
+        || window()->visibility() == QWindow::Minimized) {
+        schedule();
+        return;
+    }
+    struct Mailbox
+    {
+        QMutex mutex;
+        DiagnosticSamples samples;
+        DiagnosticSeries presented;
+        std::optional<double> previousPresentation;
+        std::optional<DiagnosticBatch> latest;
+        DiagnosticSeries latestPresented;
+        bool queued = false;
+    };
+    auto mailbox = std::make_shared<Mailbox>();
+    m_presentedConnection = connect(
+            window(), &QQuickWindow::frameSwapped, this,
+            [mailbox] {
+                const auto now = std::chrono::duration<double, std::milli>(
+                                         std::chrono::steady_clock::now().time_since_epoch())
+                                         .count();
+                const QMutexLocker lock(&mailbox->mutex);
+                if (mailbox->previousPresentation)
+                    mailbox->presented.add(now - *mailbox->previousPresentation);
+                mailbox->previousPresentation = now;
+            },
+            Qt::DirectConnection);
+    QPointer<SceneItem> guard(this);
+    diagnosed = [mailbox, guard, epoch](DiagnosticSample sample) {
+        const QMutexLocker lock(&mailbox->mutex);
+        auto batch = mailbox->samples.add(sample);
+        if (!batch)
+            return;
+        mailbox->latest = *batch;
+        mailbox->latestPresented = mailbox->presented;
+        mailbox->presented = { };
+        if (mailbox->queued)
+            return;
+        mailbox->queued = true;
+        if (guard)
+            QMetaObject::invokeMethod(
+                    guard,
+                    [mailbox, guard, epoch] {
+                        DiagnosticBatch batch;
+                        DiagnosticSeries presented;
+                        {
+                            const QMutexLocker lock(&mailbox->mutex);
+                            batch = *mailbox->latest;
+                            presented = mailbox->latestPresented;
+                            mailbox->latest.reset();
+                            mailbox->queued = false;
+                        }
+                        if (!guard || epoch != guard->m_diagnosticsEpoch)
+                            return;
+                        const auto cache = guard->m_covers.statistics();
+                        guard->m_diagnosticValues = {
+                            { "cpu", batch.cpu.distribution() },
+                            { "sync", batch.sync.distribution() },
+                            { "gpu", batch.gpu.distribution() },
+                            { "submissionIntervals", batch.intervals.distribution() },
+                            { "qtFrameIntervals", presented.distribution() },
+                            { "submissions", batch.submissions },
+                            { "elapsedMs", batch.elapsedMs },
+                            { "submissionRate", batch.intervals.seen() * 1000.0 / batch.elapsedMs },
+                            { "atlasUploadBytes", batch.atlasBytes },
+                            { "selectedUploadBytes", batch.selectedBytes },
+                            { "uniformUploadBytes", batch.uniformBytes },
+                            { "decodeStarts", cache.value("decodeStarts").toVariant() },
+                            { "decodeActive", cache.value("active").toVariant() },
+                            { "decodePending", cache.value("pending").toVariant() },
+                            { "requestedSwapInterval", guard->window()->format().swapInterval() }
+                        };
+                        emit guard->diagnosticValuesChanged();
+                    },
+                    Qt::QueuedConnection);
+    };
+    schedule();
 }
 void SceneItem::setTelemetryEnabled(bool enabled)
 {

@@ -15,25 +15,29 @@ Item {
     property real minimum: 0
     property real maximum: 1
     property real step: .01
+    property bool stacked: false
+    property real captionSize: 12
     signal moved(real value)
     width: parent ? parent.width : 300
-    implicitHeight: Math.max(caption.implicitHeight, slider.implicitHeight)
+    implicitHeight: stacked ? caption.implicitHeight + slider.implicitHeight + 4 : Math.max(caption.implicitHeight,
+                                                                                            slider.implicitHeight)
     ArchiveText {
         id: caption
         tokens: root.tokens
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.max(0, parent.width - slider.width - 20)
+        anchors.verticalCenter: root.stacked ? undefined : parent.verticalCenter
+        width: root.stacked ? parent.width : Math.max(0, parent.width - slider.width - 20)
         text: root.label + " · " + (root.value * root.displayFactor).toFixed(root.decimals)
               + root.suffix
-        cssPixelSize: 12
+        cssPixelSize: root.captionSize
         wrapMode: Text.Wrap
     }
     Slider {
         id: slider
         objectName: root.objectName + "Control"
         anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(150, parent.width * .48)
+        anchors.verticalCenter: root.stacked ? undefined : parent.verticalCenter
+        anchors.bottom: root.stacked ? parent.bottom : undefined
+        width: root.stacked ? parent.width : Math.min(150, parent.width * .48)
         from: root.minimum
         to: root.maximum
         stepSize: root.step

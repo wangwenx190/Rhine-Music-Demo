@@ -19,6 +19,9 @@ SettingsController::SettingsController(PreferencesStore *preferences, LibrarySes
     connect(scene->lighting(), &SelectionLighting::nightChanged, this, [this] {
         persist("theme", m_scene->lighting()->night() ? "night" : "day");
     });
+    connect(scene->lighting(), &SelectionLighting::settingsChanged, this, [this] {
+        persist("lighting", m_scene->lighting()->settings());
+    });
     connect(scene->quality(), &RenderQuality::changed, this, [this] {
         persist("renderQuality", m_scene->quality()->values());
     });
@@ -59,6 +62,17 @@ void SettingsController::apply()
     m_applying = true;
     const auto values = m_preferences->values();
     m_scene->lighting()->setNight(values.value("theme").toString() == "night");
+    // Unknown nested extensions stay in PreferencesStore, outside the runtime parameter set.
+    auto lighting = values.value("lighting").toMap();
+    const auto fields = m_scene->lighting()->settings();
+    for (auto it = lighting.begin(); it != lighting.end();) {
+        if (!fields.contains(it.key()))
+            it = lighting.erase(it);
+        else
+            ++it;
+    }
+    m_scene->lighting()->resetSettings();
+    m_scene->lighting()->configure(lighting);
     m_motion->setReducedMotion(values.value("reduced").toBool());
     m_motion->clock()->setSpeed(values.value("motionSpeed").toDouble());
     m_sortMode = values.value("sortMode").toString();

@@ -20,6 +20,7 @@ ScrollView {
     property bool qualityExpanded: false
     property bool musicBrainzExpanded: false
     signal replayRequested
+    signal experimentsRequested
     signal fullscreenRequested
     contentWidth: availableWidth
     palette.window: tokens.surface
@@ -27,6 +28,7 @@ ScrollView {
     palette.button: tokens.surface
     palette.buttonText: tokens.ink
     palette.text: tokens.ink
+    palette.windowText: tokens.ink
     palette.highlight: tokens.accent
     palette.highlightedText: tokens.surface
     function focusControl() {
@@ -610,6 +612,15 @@ ScrollView {
                     wrapMode: Text.Wrap
                     text: root.store ? root.store.error : "资料配置由显式导入或原生音乐库保存。"
                 }
+            }
+        }
+        SettingsSection {
+            tokens: root.tokens
+            ArchiveButton {
+                objectName: "settingsExperiments"
+                tokens: root.tokens
+                text: "光照 / 速度调试面板 ↗"
+                onClicked: root.experimentsRequested()
             }
         }
         SettingsSection {

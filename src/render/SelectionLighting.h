@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QStringView>
 #include <QVector4D>
+#include <QVariantMap>
 namespace yalahoo {
 struct LightingPalette
 {
@@ -17,6 +18,8 @@ struct LightingPalette
 class SelectionLighting : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap settings READ settings NOTIFY settingsChanged)
+    Q_PROPERTY(bool comparing READ comparing WRITE setComparing NOTIFY comparingChanged)
     Q_PROPERTY(double warmth READ warmth NOTIFY changed)
     Q_PROPERTY(double environmentIntensity READ environmentIntensity NOTIFY changed)
     Q_PROPERTY(double exposure READ exposure NOTIFY changed)
@@ -52,6 +55,14 @@ public:
     void setNight(bool night);
     void setReducedMotion(bool reduced);
     void setSettings(RowLightingSettings settings);
+    QVariantMap settings() const;
+    Q_INVOKABLE bool configure(const QVariantMap &patch);
+    Q_INVOKABLE void resetSettings();
+    bool comparing() const
+    {
+        return m_comparing;
+    }
+    void setComparing(bool comparing);
     // Receives motionDt, already scaled once by FrameClock. No private timer.
     void update(const RowLightingInput &input, SceneVector aim, SceneVector cameraOffset,
                 double detail, double motionDt);
@@ -153,8 +164,12 @@ public:
 signals:
     void changed();
     void nightChanged();
+    void settingsChanged();
+    void comparingChanged();
 
 private:
+    RowLightingSettings m_settings;
+    bool m_comparing = false;
     LightingPalette m_palette, m_from, m_to;
     double m_elapsed = .65, m_detail = 0;
     SceneVector m_anchor, m_column, m_offset, m_anchorVelocity, m_columnVelocity;

@@ -21,6 +21,7 @@ ScrollView {
     palette.button: tokens.surface
     palette.buttonText: tokens.ink
     palette.text: tokens.ink
+    palette.windowText: tokens.ink
     palette.highlight: tokens.accent
     palette.highlightedText: tokens.surface
     function focusControl() {

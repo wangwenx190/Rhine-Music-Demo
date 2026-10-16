@@ -764,3 +764,14 @@ if(WIN32)
     set_tests_properties(settings PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(ExperimentTest ExperimentTest.cpp)
+target_include_directories(ExperimentTest PRIVATE "${PROJECT_SOURCE_DIR}/src/render/rhi")
+target_link_libraries(ExperimentTest PRIVATE YalahooScene Qt6::Test)
+yalahoo_platform(ExperimentTest)
+add_test(NAME experiments COMMAND ExperimentTest)
+set_tests_properties(experiments PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(experiments PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

@@ -51,3 +51,9 @@ Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于�
 基础CTest覆盖Kit数值排序/平台/架构/ABI/模块/过期覆盖、身份/模块插件和qsb变体；具体选择见test-gates.md，格式命令见code-style.md。
 
 `--verify-runtime 报告路径`为Review基础资源/窗口探针，可组合motion/library/shading参数；不设置歌曲来源或播放音频。它不替代相应生产组件/平台验收。工具输出位置与字段以实现及test-gates为准，不在本契约复制各轮次通过记录。
+
+## 启动入口
+
+根`yalahoo.command`/`yalahoo.sh`/`yalahoo.ps1`启动普通原生音乐入口；`tools/launchers/demo.*`与`lighting-lab.*`分别传`--demo`和`--lighting-lab`。共用run-native脚本相对自身位置解析Release产物与cache中所选Kit，保留参数、Unicode/空格路径及进程退出码；PowerShell使用Process对象等待GUI进程。开发启动器不自动构建或发布。
+
+`--demo`与`--lighting-lab`只创建九列二十七张匿名qrc封面专辑，不读取/保存偏好或真实库，不扫描、不自动启动歌曲/BGM/音效；后者额外展开实验容器。不能与数据根、扫描/导入或验证参数组合。普通入口的设置按钮仍可打开同一调节面板。启动模式不改变渲染后端、普通片头或已有播放接口；演示曲目为空，不能伪装真实歌曲来源。
