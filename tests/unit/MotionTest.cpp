@@ -12,9 +12,11 @@
 #include <cmath>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
-const std::array<const char *, 4> keys{ "rail", "column", "shoulder", "lane" };
+constexpr std::array<QLatin1StringView, 4> keys{ "rail"_L1, "column"_L1, "shoulder"_L1, "lane"_L1 };
 QJsonObject readJson(const QString &path)
 {
     QFile file(path);
@@ -44,16 +46,15 @@ class MotionTest : public QObject
         const double error = std::abs(actual - expected);
         maxError[derivative] = std::max(maxError[derivative], error);
         QVERIFY2(std::isfinite(actual) && error <= 1e-6,
-                 qPrintable(QString("actual %1 expected %2 error %3")
-                                    .arg(actual, 0, 'g', 17)
+                 qPrintable(u"actual %1 expected %2 error %3"_s.arg(actual, 0, 'g', 17)
                                     .arg(expected, 0, 'g', 17)
                                     .arg(error, 0, 'g', 17)));
     }
     void compareState(Kinematics state, const QJsonObject &expected)
     {
-        near(state.value, expected.value("value").toDouble());
-        near(state.velocity, expected.value("velocity").toDouble(), 1);
-        near(state.acceleration, expected.value("acceleration").toDouble(), 2);
+        near(state.value, expected.value(u"value"_s).toDouble());
+        near(state.velocity, expected.value(u"velocity"_s).toDouble(), 1);
+        near(state.acceleration, expected.value(u"acceleration"_s).toDouble(), 2);
     }
     void compareArchive(const ArchiveMotion &motion, const QJsonObject &expected)
     {
@@ -61,22 +62,22 @@ class MotionTest : public QObject
         for (size_t i = 0; i < 4; ++i)
             compareState(state[i], expected.value(keys[i]).toObject());
     }
-private slots:
+private Q_SLOTS:
     void r01Golden()
     {
-        const auto oracle =
-                readJson(QStringLiteral(FIXTURE_ROOT "/docs/contracts/motion-golden.json"));
-        const auto input = oracle.value("inputs").toObject();
-        const auto archiveInput = input.value("quintic").toObject();
+        const auto oracle = readJson(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/docs/contracts/motion-golden.json"_s));
+        const auto input = oracle.value(u"inputs"_s).toObject();
+        const auto archiveInput = input.value(u"quintic"_s).toObject();
         int previousFps = 0;
         ScalarSpring spring;
         ArchiveSprings springs{ };
         ArchiveMotion archive;
         ColumnScalar scalar;
         FrameClock clock;
-        for (const auto sampleValue : oracle.value("samples").toArray()) {
+        for (const auto sampleValue : oracle.value(u"samples"_s).toArray()) {
             const auto sample = sampleValue.toObject();
-            const int fps = sample.value("fps").toInt();
+            const int fps = sample.value(u"fps"_s).toInt();
             if (fps != previousFps) {
                 previousFps = fps;
                 spring = { };
@@ -84,7 +85,7 @@ private slots:
                 springs = { };
                 archive.reset();
                 archive.observe(springs, { }, { 3.7, 3.7, 3.7, 3.7 });
-                archive.retarget(springs, values(archiveInput.value("target").toObject()));
+                archive.retarget(springs, values(archiveInput.value(u"target"_s).toObject()));
                 scalar = ColumnScalar(0);
                 scalar.retarget(18, true, 1.8);
                 clock.setActive(false);
@@ -92,56 +93,56 @@ private slots:
                 clock.startOpening();
                 clock.advance(0);
             }
-            for (const auto eventValue : sample.value("appliedEvents").toArray()) {
-                const auto type = eventValue.toObject().value("type").toString();
-                if (type == "reverse") {
+            for (const auto eventValue : sample.value(u"appliedEvents"_s).toArray()) {
+                const auto type = eventValue.toObject().value(u"type"_s).toString();
+                if (type == "reverse"_L1) {
                     scalar.retarget(-3, true, 1.4);
                     archive.retarget(springs,
-                                     values(archiveInput.value("reverseTarget").toObject()));
-                } else if (type == "rebase") {
-                    const auto offset = values(archiveInput.value("rebase").toObject());
+                                     values(archiveInput.value(u"reverseTarget"_s).toObject()));
+                } else if (type == "rebase"_L1) {
+                    const auto offset = values(archiveInput.value(u"rebase"_s).toObject());
                     archive.translate(offset);
                     for (size_t i = 0; i < 4; ++i)
                         springs[i].translate(offset[i]);
                 }
             }
-            const double dt = sample.value("dt").toDouble();
+            const double dt = sample.value(u"dt"_s).toDouble();
             if (dt > 0) {
                 spring.update(1, 3.7, dt);
                 archive.update(springs, dt);
                 scalar.update(dt);
                 clock.advance(dt);
             }
-            const auto expectedSpring = sample.value("spring").toObject();
-            near(spring.value, expectedSpring.value("value").toDouble());
-            near(spring.velocity, expectedSpring.value("velocity").toDouble(), 1);
-            compareArchive(archive, sample.value("quintic").toObject());
-            compareState(scalar.state(), sample.value("realColumn").toObject());
+            const auto expectedSpring = sample.value(u"spring"_s).toObject();
+            near(spring.value, expectedSpring.value(u"value"_s).toDouble());
+            near(spring.velocity, expectedSpring.value(u"velocity"_s).toDouble(), 1);
+            compareArchive(archive, sample.value(u"quintic"_s).toObject());
+            compareState(scalar.state(), sample.value(u"realColumn"_s).toObject());
             QCOMPARE(scalar.guided(),
-                     sample.value("realColumn").toObject().value("guided").toBool());
+                     sample.value(u"realColumn"_s).toObject().value(u"guided"_s).toBool());
             QCOMPARE(scalar.settled(),
-                     sample.value("realColumn").toObject().value("settled").toBool());
-            near(musicSelectionWave(2, sample.value("time").toDouble()),
-                 sample.value("wave").toDouble());
-            near(clock.openingTime(), sample.value("clock").toDouble());
+                     sample.value(u"realColumn"_s).toObject().value(u"settled"_s).toBool());
+            near(musicSelectionWave(2, sample.value(u"time"_s).toDouble()),
+                 sample.value(u"wave"_s).toDouble());
+            near(clock.openingTime(), sample.value(u"clock"_s).toDouble());
             ++r01Samples;
         }
         clock.startOpening();
         clock.advance(0);
         double previous = 0;
-        for (const auto value : oracle.value("longFrames").toArray()) {
+        for (const auto value : oracle.value(u"longFrames"_s).toArray()) {
             const auto sample = value.toObject();
-            const double now = sample.value("input").toDouble();
+            const double now = sample.value(u"input"_s).toDouble();
             clock.advance(now - previous);
             previous = now;
-            near(clock.openingTime(), sample.value("output").toDouble());
+            near(clock.openingTime(), sample.value(u"output"_s).toDouble());
         }
     }
     void frozenNonzeroAndVariableFrames()
     {
-        const auto oracle =
-                readJson(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/motion/kernel-golden.json"));
-        for (const auto caseValue : oracle.value("cases").toArray()) {
+        const auto oracle = readJson(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/motion/kernel-golden.json"_s));
+        for (const auto caseValue : oracle.value(u"cases"_s).toArray()) {
             const auto testCase = caseValue.toObject();
             ArchiveSprings springs{ };
             const ArchiveValues initialValues{ 2, -1, 4, .5 }, initialVelocity{ .2, -.3, .4, -.5 };
@@ -151,7 +152,7 @@ private slots:
             }
             ArchiveMotion archive;
             archive.observe(springs, { 3, 2, 6, 1 }, { 3.7, 3.7, 9, 6.5 });
-            compareArchive(archive, testCase.value("initial").toObject());
+            compareArchive(archive, testCase.value(u"initial"_s).toObject());
             archive.retarget(springs, { 7.44, 15.6, 12, 3 });
             ColumnScalar scalar(2);
             scalar.retarget(5);
@@ -165,64 +166,66 @@ private slots:
             connect(&clock, &FrameClock::frame, this, [&](double, double motionDt) {
                 deliveredDt = motionDt;
             });
-            for (const auto sampleValue : testCase.value("samples").toArray()) {
+            for (const auto sampleValue : testCase.value(u"samples"_s).toArray()) {
                 const auto sample = sampleValue.toObject();
-                for (const auto eventValue : sample.value("events").toArray()) {
+                for (const auto eventValue : sample.value(u"events"_s).toArray()) {
                     const auto event = eventValue.toString();
-                    if (event == "guide")
+                    if (event == "guide"_L1)
                         scalar.retarget(18, true, 1.8);
-                    if (event == "reverse") {
+                    if (event == "reverse"_L1) {
                         scalar.retarget(-3, true, 1.4);
                         archive.retarget(springs, { -.62, -5.2, -1, -1 });
                     }
-                    if (event == "rebase") {
+                    if (event == "rebase"_L1) {
                         archive.translate({ -.62, -5.2, -1, -1 });
                         const ArchiveValues offset{ -.62, -5.2, -1, -1 };
                         for (size_t i = 0; i < 4; ++i)
                             springs[i].translate(offset[i]);
                     }
-                    if (event == "fast")
+                    if (event == "fast"_L1)
                         scalar.retarget(8, false, 1.4, 9);
-                    if (event == "guide-again")
+                    if (event == "guide-again"_L1)
                         scalar.retarget(-6, true, .9);
                 }
-                clock.setSpeed(sample.value("speed").toDouble());
-                clock.advance(sample.value("rawDt").toDouble());
-                near(deliveredDt, sample.value("dt").toDouble());
+                clock.setSpeed(sample.value(u"speed"_s).toDouble());
+                clock.advance(sample.value(u"rawDt"_s).toDouble());
+                near(deliveredDt, sample.value(u"dt"_s).toDouble());
                 spring.update(1, 3.7, deliveredDt);
-                archive.update(springs, deliveredDt, sample.value("reduced").toBool());
-                scalar.update(deliveredDt, sample.value("reduced").toBool());
-                compareArchive(archive, sample.value("quintic").toObject());
-                compareState(scalar.state(), sample.value("scalar").toObject());
-                near(spring.value, sample.value("spring").toObject().value("value").toDouble());
+                archive.update(springs, deliveredDt, sample.value(u"reduced"_s).toBool());
+                scalar.update(deliveredDt, sample.value(u"reduced"_s).toBool());
+                compareArchive(archive, sample.value(u"quintic"_s).toObject());
+                compareState(scalar.state(), sample.value(u"scalar"_s).toObject());
+                near(spring.value,
+                     sample.value(u"spring"_s).toObject().value(u"value"_s).toDouble());
                 near(spring.velocity,
-                     sample.value("spring").toObject().value("velocity").toDouble(), 1);
+                     sample.value(u"spring"_s).toObject().value(u"velocity"_s).toDouble(), 1);
                 QCOMPARE(scalar.guided(),
-                         sample.value("scalar").toObject().value("guided").toBool());
+                         sample.value(u"scalar"_s).toObject().value(u"guided"_s).toBool());
                 ++extendedSamples;
             }
         }
     }
     void frozenFunctions()
     {
-        const auto oracle =
-                readJson(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/motion/kernel-golden.json"));
-        for (const auto value : oracle.value("functions").toArray()) {
+        const auto oracle = readJson(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/motion/kernel-golden.json"_s));
+        for (const auto value : oracle.value(u"functions"_s).toArray()) {
             const auto s = value.toObject();
-            const double t = s.value("time").toDouble();
-            near(smooth(t), s.value("smooth").toDouble());
-            near(archiveWave(14, 3, t), s.value("archiveWave").toDouble());
-            near(extraction(t), s.value("extraction").toDouble());
-            near(settlingWave(-2, t), s.value("settlingWave").toDouble());
-            near(baselineSelectionWave(-2, t), s.value("baselineSelectionWave").toDouble());
-            near(musicSelectionWave(-2, t), s.value("musicSelectionWave").toDouble());
-            near(selectionWave(-2, t), s.value("selectionWave").toDouble());
-            near(rippleEnvelope(-2, t), s.value("rippleEnvelope").toDouble());
-            near(columnStrength(3, 2, t), s.value("columnStrength").toDouble());
-            near(idleWave(14, 3, t), s.value("idleWave").toDouble());
-            near(cinematicField(14, 3, t), s.value("cinematicField").toDouble());
-            near(returnStep(.3, std::max(0.0, t)), s.value("returnStep").toDouble());
-            near(returnStep(.3, std::max(0.0, t), true), s.value("returnStepReduced").toDouble());
+            const double t = s.value(u"time"_s).toDouble();
+            near(smooth(t), s.value(u"smooth"_s).toDouble());
+            near(archiveWave(14, 3, t), s.value(u"archiveWave"_s).toDouble());
+            near(extraction(t), s.value(u"extraction"_s).toDouble());
+            near(settlingWave(-2, t), s.value(u"settlingWave"_s).toDouble());
+            near(baselineSelectionWave(-2, t), s.value(u"baselineSelectionWave"_s).toDouble());
+            near(musicSelectionWave(-2, t), s.value(u"musicSelectionWave"_s).toDouble());
+            near(selectionWave(-2, t), s.value(u"selectionWave"_s).toDouble());
+            near(rippleEnvelope(-2, t), s.value(u"rippleEnvelope"_s).toDouble());
+            near(columnStrength(3, 2, t), s.value(u"columnStrength"_s).toDouble());
+            near(idleWave(14, 3, t), s.value(u"idleWave"_s).toDouble());
+            near(cinematicField(14, 3, t), s.value(u"cinematicField"_s).toDouble());
+            near(returnStep(.3, std::max(0.0, t)), s.value(u"returnStep"_s).toDouble());
+            near(returnStep(.3, std::max(0.0, t), true),
+                 s.value(u"returnStepReduced"_s).toDouble());
         }
     }
     void exactSpringAndJoins()
@@ -373,14 +376,14 @@ private slots:
     }
     void cleanupTestCase()
     {
-        const QJsonObject report{ { "r01Samples", r01Samples },
-                                  { "extendedSamples", extendedSamples },
-                                  { "fps", QJsonArray{ 20, 30, 60, 120 } },
-                                  { "maxPositionError", maxError[0] },
-                                  { "maxVelocityError", maxError[1] },
-                                  { "maxAccelerationError", maxError[2] },
-                                  { "tolerance", 1e-6 } };
-        QSaveFile output(QStringLiteral(MOTION_REPORT));
+        const QJsonObject report{ { u"r01Samples"_s, r01Samples },
+                                  { u"extendedSamples"_s, extendedSamples },
+                                  { u"fps"_s, QJsonArray{ 20, 30, 60, 120 } },
+                                  { u"maxPositionError"_s, maxError[0] },
+                                  { u"maxVelocityError"_s, maxError[1] },
+                                  { u"maxAccelerationError"_s, maxError[2] },
+                                  { u"tolerance"_s, 1e-6 } };
+        QSaveFile output(QString::fromUtf8(MOTION_REPORT));
         QVERIFY(output.open(QIODevice::WriteOnly));
         output.write(QJsonDocument(report).toJson());
         QVERIFY(output.commit());

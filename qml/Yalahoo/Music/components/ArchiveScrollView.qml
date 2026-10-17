@@ -8,6 +8,7 @@ T.ScrollView {
     required property DesignTokens tokens
     implicitWidth: implicitContentWidth + leftPadding + rightPadding
     implicitHeight: implicitContentHeight + topPadding + bottomPadding
+    padding: 0
     background: Item {}
     clip: true
     T.ScrollBar.vertical: ArchiveScrollBar {

@@ -10,6 +10,9 @@
 #include <cstring>
 #include <cstdio>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
@@ -39,32 +42,32 @@ QPoint project(const Input &input, QVector3D world, QSize size)
 }
 void graph(const Capture &capture)
 {
-    const auto state = capture.metadata["opticalGraph"].toObject();
+    const auto state = capture.metadata[u"opticalGraph"_s].toObject();
     for (const char *field :
          { "captureBindingMatches", "captureSeparateFromComposite", "sharedOpaqueDepth",
            "depthContentsPreserved", "captureMips", "colorDepthTest", "colorDepthEqual",
            "colorCullBack", "colorBlendingDisabled", "visibilityDepthWrite",
            "visibilityDepthLessEqual" })
-        check(state[field].toBool(), field);
-    check(!state["colorDepthWrite"].toBool(), "Optical shading writes visibility depth");
-    check(capture.metadata["opticalEvents"].toArray()
-                  == QJsonArray{ "opaque", "opaque-resolved", "capture-mips", "composite-copy",
-                                 "visibility", "shell-shading" },
+        check(state[QString::fromUtf8(field)].toBool(), field);
+    check(!state[u"colorDepthWrite"_s].toBool(), "Optical shading writes visibility depth");
+    check(capture.metadata[u"opticalEvents"_s].toArray()
+                  == QJsonArray{ u"opaque"_s, u"opaque-resolved"_s, u"capture-mips"_s,
+                                 u"composite-copy"_s, u"visibility"_s, u"shell-shading"_s },
           "Actual optical pass ordering changed");
-    for (const auto &kind : capture.metadata["captureDrawKinds"].toArray())
+    for (const auto &kind : capture.metadata[u"captureDrawKinds"_s].toArray())
         check(kind.toInt() >= -1 && kind.toInt() <= 2,
               "A shell entered opaque transmission capture");
-    const auto sorted = capture.metadata["sortedShells"].toArray();
+    const auto sorted = capture.metadata[u"sortedShells"_s].toArray();
     for (int index = 1; index < sorted.size(); ++index) {
         const auto prior = sorted[index - 1].toObject(), next = sorted[index].toObject();
-        const double a = prior["depth"].toDouble(), b = next["depth"].toDouble();
+        const double a = prior[u"depth"_s].toDouble(), b = next[u"depth"_s].toDouble();
         check(std::isfinite(a) && std::isfinite(b), "Nonfinite sort depth");
-        const auto idA = prior["id"].toInteger(), idB = next["id"].toInteger();
+        const auto idA = prior[u"id"_s].toInteger(), idB = next[u"id"_s].toInteger();
         check(a > b
                       || (a == b
                           && (idA < idB
                               || (idA == idB
-                                  && prior["surface"].toInt() < next["surface"].toInt()))),
+                                  && prior[u"surface"_s].toInt() < next[u"surface"_s].toInt()))),
               "Shell sort is not global depth/stable ID/surface order");
     }
 }
@@ -74,7 +77,7 @@ double directReference(bool multiscatter)
     const double fresnel = f0 + (1 - f0) * std::exp2(-5.55473 - 6.98316);
     double result = fresnel * .25 / (std::acos(-1.0) * std::pow(roughness, 4));
     if (multiscatter) {
-        QFile file(":/rhi/environment/dfg.rgba32f");
+        QFile file(u":/rhi/environment/dfg.rgba32f"_s);
         check(file.open(QIODevice::ReadOnly), "Missing source DFG input");
         const auto bytes = file.readAll();
         check(bytes.size() == 4096, "Unexpected DFG layout");
@@ -111,7 +114,7 @@ int main(int argc, char **argv)
         const QString fixturePath = QString::fromLocal8Bit(argv[1]);
         const QString output = QString::fromLocal8Bit(argv[2]);
         const auto source = read(fixturePath);
-        const auto cases = source["cases"].toArray();
+        const auto cases = source[u"cases"_s].toArray();
         check(cases.size() == 61, "Incomplete source shell states");
         QDir().mkpath(output);
         RhiCaptureHarness driver;
@@ -120,19 +123,19 @@ int main(int argc, char **argv)
         double worstProjection = 0;
         for (const auto &value : cases) {
             const auto state = value.toObject();
-            const QSize size(state["width"].toInt(), state["height"].toInt());
+            const QSize size(state[u"width"_s].toInt(), state[u"height"_s].toInt());
             auto input = fixture(state);
             const auto gpu = driver.capture(input, size);
-            check(gpu.metadata["msaaSamples"].toInt() == input.captureSamples,
+            check(gpu.metadata[u"msaaSamples"_s].toInt() == input.captureSamples,
                   "Capture MSAA silently changed");
             if (input.shells)
                 graph(gpu);
-            const int sourceIndex = state["sourceIndex"].toInt();
-            for (const auto &point : state["projections"].toArray()) {
+            const int sourceIndex = state[u"sourceIndex"_s].toInt();
+            for (const auto &point : state[u"projections"_s].toArray()) {
                 const auto sample = point.toObject();
-                const auto world = vector(sample["world"].toArray());
+                const auto world = vector(sample[u"world"_s].toArray());
                 const auto clip = input.scene.projection * input.scene.view * QVector4D(world, 1);
-                const auto expected = sample["pixel"].toArray();
+                const auto expected = sample[u"pixel"_s].toArray();
                 const double error = std::hypot(
                         (clip.x() / clip.w() + 1) * .5 * size.width() - expected[0].toDouble(),
                         (1 - clip.y() / clip.w()) * .5 * size.height() - expected[1].toDouble());
@@ -140,7 +143,7 @@ int main(int argc, char **argv)
                 worstProjection = std::max(worstProjection, error);
             }
             const auto image = input.rawOutput ? gpu.composite : driver.surface->grab();
-            check(!image.isNull() && image.save(output + QString("/state-%1.png").arg(sourceIndex)),
+            check(!image.isNull() && image.save(output + u"/state-%1.png"_s.arg(sourceIndex)),
                   "Missing own shell output");
             if (sourceIndex == 22 || sourceIndex == 25 || sourceIndex >= 62) {
                 auto reversed = input;
@@ -148,7 +151,7 @@ int main(int argc, char **argv)
                 std::reverse(reversed.entityIds.begin(), reversed.entityIds.end());
                 const auto reverse = driver.capture(reversed, size);
                 graph(reverse);
-                check(reverse.metadata["sortedShells"] == gpu.metadata["sortedShells"],
+                check(reverse.metadata[u"sortedShells"_s] == gpu.metadata[u"sortedShells"_s],
                       "Stable shell identities changed with submission order");
                 sorting.append(sourceIndex);
             }
@@ -156,16 +159,17 @@ int main(int argc, char **argv)
                 auto opaque = input;
                 opaque.shells = false;
                 const auto captured = driver.capture(opaque, size);
-                check(captured.metadata["captureDrawKinds"] == gpu.metadata["captureDrawKinds"],
+                check(captured.metadata[u"captureDrawKinds"_s]
+                              == gpu.metadata[u"captureDrawKinds"_s],
                       "Opaque command kinds depend on optical drawing");
                 isolation.append(sourceIndex);
             }
-            results.append(
-                    QJsonObject{ { "sourceIndex", sourceIndex }, { "metadata", gpu.metadata } });
+            results.append(QJsonObject{ { u"sourceIndex"_s, sourceIndex },
+                                        { u"metadata"_s, gpu.metadata } });
         }
-        const auto original =
-                read(QString(FIXTURE_ROOT) + "/tests/fixtures/render-backend/visual.json")["cases"]
-                        .toArray();
+        const auto original = read((QString::fromUtf8(FIXTURE_ROOT))
+                                   + "/tests/fixtures/render-backend/visual.json"_L1)[u"cases"_s]
+                                      .toArray();
         for (int index : { 58, 59 }) {
             auto input = fixture(original[index].toObject());
             input.geometryDiagnostic = true;
@@ -186,9 +190,9 @@ int main(int argc, char **argv)
                 }
             check(pixels > 100 && normalError <= std::sqrt(3.0) / 255 + 1e-6,
                   "Neighbor normal/depth target is invalid");
-            channels.append(QJsonObject{ { "sourceIndex", index },
-                                         { "normalError", normalError },
-                                         { "foregroundPixels", pixels } });
+            channels.append(QJsonObject{ { u"sourceIndex"_s, index },
+                                         { u"normalError"_s, normalError },
+                                         { u"foregroundPixels"_s, pixels } });
         }
         auto tied = fixture(cases[18].toObject());
         tied.entities = { QMatrix4x4(), QMatrix4x4() };
@@ -199,7 +203,7 @@ int main(int argc, char **argv)
         std::reverse(tied.entities.begin(), tied.entities.end());
         std::reverse(tied.entityIds.begin(), tied.entityIds.end());
         const auto reversedTie = driver.capture(tied, { 960, 720 });
-        check(tie.metadata["sortedShells"] == reversedTie.metadata["sortedShells"],
+        check(tie.metadata[u"sortedShells"_s] == reversedTie.metadata[u"sortedShells"_s],
               "Equal-depth identity tie is unstable");
         auto duplicate = tied;
         duplicate.entityIds = { 10, 10 };
@@ -259,14 +263,14 @@ int main(int argc, char **argv)
                 }
             std::fprintf(stderr, "Alpha samples=%d partial=%d fringe=%d centerError=%g\n", samples,
                          partial, fringe, centerError);
-            gpu.color.save(output + QString("/alpha-%1.png").arg(samples));
+            gpu.color.save(output + u"/alpha-%1.png"_s.arg(samples));
             check(fringe == 0 && (samples == 1 || partial > 100),
                   "Paper resolve lost partial coverage or introduced dark alpha fringe");
-            alpha.append(QJsonObject{ { "samples", samples },
-                                      { "centerError", centerError },
-                                      { "transparentDepthUntouched", true },
-                                      { "partialCoveragePixels", partial },
-                                      { "darkFringePixels", fringe } });
+            alpha.append(QJsonObject{ { u"samples"_s, samples },
+                                      { u"centerError"_s, centerError },
+                                      { u"transparentDepthUntouched"_s, true },
+                                      { u"partialCoveragePixels"_s, partial },
+                                      { u"darkFringePixels"_s, fringe } });
         }
         qint64 opticalGeneration = -1;
         for (int probe = 1; probe <= 9; ++probe) {
@@ -276,12 +280,12 @@ int main(int argc, char **argv)
                 auto input = base;
                 input.scene.view.rotate(rotation * 45.0f, { 0, 0, 1 });
                 const auto gpu = driver.capture(input, { 960, 720 });
-                const auto generation = gpu.metadata["resourceGeneration"].toInteger();
+                const auto generation = gpu.metadata[u"resourceGeneration"_s].toInteger();
                 if (opticalGeneration < 0)
                     opticalGeneration = generation;
                 check(generation == opticalGeneration,
                       "Optical values or camera roll rebuilt unrelated render targets");
-                const auto values = gpu.metadata["opticalProbeSample"].toArray();
+                const auto values = gpu.metadata[u"opticalProbeSample"_s].toArray();
                 check(values.size() == 3, "Missing actual GPU optical math sample");
                 double expected = 0;
                 if (probe == 1) {
@@ -301,12 +305,12 @@ int main(int argc, char **argv)
                 for (const auto &sample : values)
                     error = std::max(error, std::abs(sample.toDouble() - expected));
                 check(error <= tolerance, "Production GLSL optical math differs from source limit");
-                probes.append(QJsonObject{ { "probe", probe },
-                                           { "rotation", rotation * 45 },
-                                           { "value", values },
-                                           { "expected", expected },
-                                           { "error", error },
-                                           { "tolerance", tolerance } });
+                probes.append(QJsonObject{ { u"probe"_s, probe },
+                                           { u"rotation"_s, rotation * 45 },
+                                           { u"value"_s, values },
+                                           { u"expected"_s, expected },
+                                           { u"error"_s, error },
+                                           { u"tolerance"_s, tolerance } });
             }
         }
         base.opticalProbe = 0;
@@ -319,26 +323,27 @@ int main(int argc, char **argv)
             rebuilds.append(gpu.metadata);
         }
         check(sorting.size() == 6 && isolation.size() == 2, "Missing source shell subcases");
-        const QJsonObject report{ { "round", "R19C2B2" },
-                                  { "configuration", "Release" },
-                                  { "passed", true },
-                                  { "validation", "source-optics-graph-and-own-output" },
-                                  { "qt", qVersion() },
-                                  { "fixture", fixturePath },
-                                  { "baseline", source["baseline"] },
-                                  { "cases", results },
-                                  { "sorting", sorting },
-                                  { "captureIsolation", isolation },
-                                  { "neighborChannels", channels },
-                                  { "equalDepthTie", true },
-                                  { "duplicateIdRejected", rejected },
-                                  { "alphaResolve", alpha },
-                                  { "opticalMath", probes },
-                                  { "rebuilds", rebuilds },
-                                  { "maxProjectionPixels", worstProjection },
-                                  { "offscreen", driver.surface->diagnostics() },
-                                  { "windowPolicy", verification::windowPolicy(*driver.window) } };
-        QSaveFile file(output + "/runtime.json");
+        const QJsonObject report{ { u"round"_s, u"R19C2B2"_s },
+                                  { u"configuration"_s, u"Release"_s },
+                                  { u"passed"_s, true },
+                                  { u"validation"_s, u"source-optics-graph-and-own-output"_s },
+                                  { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                  { u"fixture"_s, fixturePath },
+                                  { u"baseline"_s, source[u"baseline"_s] },
+                                  { u"cases"_s, results },
+                                  { u"sorting"_s, sorting },
+                                  { u"captureIsolation"_s, isolation },
+                                  { u"neighborChannels"_s, channels },
+                                  { u"equalDepthTie"_s, true },
+                                  { u"duplicateIdRejected"_s, rejected },
+                                  { u"alphaResolve"_s, alpha },
+                                  { u"opticalMath"_s, probes },
+                                  { u"rebuilds"_s, rebuilds },
+                                  { u"maxProjectionPixels"_s, worstProjection },
+                                  { u"offscreen"_s, driver.surface->diagnostics() },
+                                  { u"windowPolicy"_s,
+                                    verification::windowPolicy(*driver.window) } };
+        QSaveFile file(output + "/runtime.json"_L1);
         check(file.open(QIODevice::WriteOnly), "Cannot open shell report");
         file.write(QJsonDocument(report).toJson());
         check(file.commit(), "Cannot commit shell report");

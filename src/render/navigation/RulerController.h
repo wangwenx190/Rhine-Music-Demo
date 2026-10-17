@@ -42,7 +42,7 @@ public:
     void setInputRouter(InputRouter *router);
     const RulerDrawing &drawing() const;
     QVariantMap state() const;
-signals:
+Q_SIGNALS:
     void changed();
     void geometryChanged();
     void activeChanged();

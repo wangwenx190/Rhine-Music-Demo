@@ -17,7 +17,7 @@ Item {
             id: leftText
             tokens: root.tokens
             renderType: Text.CurveRendering
-            text: "LOCAL COLLECTION "
+            text: qsTr("LOCAL COLLECTION ")
             cssPixelSize: root.metrics.width <= 700 ? 6 : root.metrics.width <= 1100 ? 7 : 8
             font.letterSpacing: 1.1
             color: root.tokens.muted
@@ -30,7 +30,7 @@ Item {
                 x: 8
                 tokens: root.tokens
                 renderType: Text.CurveRendering
-                text: "·"
+                text: "\u00b7"
                 cssPixelSize: leftText.cssPixelSize
                 font.letterSpacing: 1.1
                 color: root.tokens.muted
@@ -39,7 +39,7 @@ Item {
         ArchiveText {
             tokens: root.tokens
             renderType: Text.CurveRendering
-            text: " " + root.albumCount + " ALBUMS"
+            text: qsTr(" %n ALBUMS", "", root.albumCount)
             cssPixelSize: leftText.cssPixelSize
             font.letterSpacing: 1.1
             color: root.tokens.muted
@@ -49,7 +49,7 @@ Item {
         tokens: root.tokens
         renderType: Text.CurveRendering
         anchors.right: parent.right
-        text: "QT / LOCAL"
+        text: qsTr("QT / LOCAL")
 
         cssPixelSize: leftText.cssPixelSize
         font.letterSpacing: 1.1

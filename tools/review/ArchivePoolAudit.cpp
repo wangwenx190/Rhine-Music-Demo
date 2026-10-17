@@ -23,6 +23,9 @@
 #include <stdexcept>
 #include <cstdio>
 #include <atomic>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 namespace {
@@ -41,12 +44,11 @@ Snapshot library(int count)
         result.genres.append(genre);
         for (int row = 0; row < count; ++row) {
             Album album;
-            album.id = QStringLiteral("%1:%2").arg(lane).arg(row);
+            album.id = u"%1:%2"_s.arg(lane).arg(row);
             album.genreId = genre.id;
-            album.title = QStringLiteral("非私人验证专辑 %1").arg(row);
-            const QStringList covers{ "square", "portrait", "landscape" };
-            album.coverUrl =
-                    QUrl(QStringLiteral("qrc:/assets/demo-covers/%1.png").arg(covers[row % 3]));
+            album.title = u"\u975e\u79c1\u4eba\u9a8c\u8bc1\u4e13\u8f91 %1"_s.arg(row);
+            const QStringList covers{ u"square"_s, u"portrait"_s, u"landscape"_s };
+            album.coverUrl = QUrl(u"qrc:/assets/demo-covers/%1.png"_s.arg(covers[row % 3]));
             result.albums.append(album);
         }
     }
@@ -67,22 +69,21 @@ int main(int argc, char **argv)
         OffscreenSurface::Enabled = false;
     if (argc != 2 && argc != 3)
         return 2;
-    const bool real =
-            argc == 3 && QString::fromLocal8Bit(argv[2]) == QLatin1String("--real-columns");
+    const bool real = argc == 3 && QString::fromLocal8Bit(argv[2]) == "--real-columns"_L1;
     if (argc == 3 && !real)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
 #if defined(Q_OS_WIN)
-        const QString platform = QStringLiteral("windows");
+        const QString platform = u"windows"_s;
 #elif defined(Q_OS_MACOS)
-        const QString platform = QStringLiteral("macos");
+        const QString platform = u"macos"_s;
 #else
-        const QString platform = QStringLiteral("linux");
+        const QString platform = u"linux"_s;
 #endif
-        const QString sourceRoot =
-                qEnvironmentVariable("YALAHOO_POOL_GOLDEN_ROOT",
-                                     QStringLiteral(FIXTURE_ROOT "/verification/") + platform);
+        const QString sourceRoot = qEnvironmentVariable(
+                "YALAHOO_POOL_GOLDEN_ROOT",
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/verification/"_s) + platform);
         require(QDir().mkpath(output), "Cannot create pool output");
         MotionController motion;
         SelectionController selection(&motion);
@@ -164,8 +165,9 @@ int main(int argc, char **argv)
                 const auto stats = item->coverStatistics();
                 ready = item->input().poolFrame
                         && item->input().scene.revision == adapter.frame().revision
-                        && stats["identities"].toInt() == stats["ready"].toInt()
-                        && (stats["owned"].toInt() == 0 || stats["selectedDetailed"].toBool());
+                        && stats[u"identities"_s].toInt() == stats[u"ready"_s].toInt()
+                        && (stats[u"owned"_s].toInt() == 0
+                            || stats[u"selectedDetailed"_s].toBool());
                 if (ready)
                     loop.quit();
             };
@@ -198,7 +200,7 @@ int main(int argc, char **argv)
             state->loop = nullptr;
             require(state->capture.has_value(), "Pool capture timed out");
             if (!verification::windowPolicySatisfied(window)) {
-                QSaveFile failure(output + "/window-policy-failure.json");
+                QSaveFile failure(output + "/window-policy-failure.json"_L1);
                 if (failure.open(QIODevice::WriteOnly)) {
                     failure.write(QJsonDocument(verification::windowPolicy(window)).toJson());
                     failure.commit();
@@ -208,28 +210,29 @@ int main(int argc, char **argv)
             auto result = std::move(*state->capture);
             state->capture.reset();
             result.atlas = { };
-            require(result.metadata["drawCount"].toInt() <= 436, "Pool exceeded bounded draw work");
-            require(result.metadata["atlasUploadBytes"].toInteger()
+            require(result.metadata[u"drawCount"_s].toInt() <= 436,
+                    "Pool exceeded bounded draw work");
+            require(result.metadata[u"atlasUploadBytes"_s].toInteger()
                             <= AtlasUploadQueue::steadyBudget,
                     "Pool upload exceeded steady budget");
-            const auto native = result.metadata["nativeAtlasTransfers"].toObject();
-            if (native["available"].toBool())
-                require(native["destinationBytes"].toInteger()
-                                == result.metadata["atlasUploadBytes"].toInteger(),
+            const auto native = result.metadata[u"nativeAtlasTransfers"_s].toObject();
+            if (native[u"available"_s].toBool())
+                require(native[u"destinationBytes"_s].toInteger()
+                                == result.metadata[u"atlasUploadBytes"_s].toInteger(),
                         "Native pool transfer differs from submitted regions");
             require(item->errorText().isEmpty() && !result.postprocessed.isNull(),
                     "Pool renderer failed or returned an empty target");
-            const auto uniforms = result.metadata["submittedShellUniforms"].toArray();
-            require(result.metadata["visibleEntities"].toInt() == 0 || !uniforms.isEmpty(),
+            const auto uniforms = result.metadata[u"submittedShellUniforms"_s].toArray();
+            require(result.metadata[u"visibleEntities"_s].toInt() == 0 || !uniforms.isEmpty(),
                     "Visible shells have no submitted material uniforms");
             for (const auto &value : uniforms) {
                 const auto sample = value.toObject();
-                const auto expected =
-                        shellMaterial(sample["surface"].toInt(), float(sample["warmth"].toDouble()),
-                                      float(sample["clarity"].toDouble()),
-                                      float(sample["environment"].toDouble()));
+                const auto expected = shellMaterial(sample[u"surface"_s].toInt(),
+                                                    float(sample[u"warmth"_s].toDouble()),
+                                                    float(sample[u"clarity"_s].toDouble()),
+                                                    float(sample[u"environment"_s].toDouble()));
                 const auto check = [&](const char *key, const auto &vector, int size) {
-                    const auto actual = sample[key].toArray();
+                    const auto actual = sample[QString::fromUtf8(key)].toArray();
                     require(actual.size() == size, "Missing material uniform channels");
                     for (int i = 0; i < size; ++i)
                         require(std::abs(actual[i].toDouble() - vector[i]) <= 2e-6,
@@ -240,7 +243,7 @@ int main(int argc, char **argv)
                 check("tint", expected.tint, 3);
                 check("attenuation", expected.attenuation, 3);
             }
-            require(result.postprocessed.save(output + '/' + name + ".png"),
+            require(result.postprocessed.save(output + '/'_L1 + name + ".png"_L1),
                     "Cannot save own-render pool image");
             return result;
         };
@@ -248,7 +251,7 @@ int main(int argc, char **argv)
         auto settledCapture = [&](QString name) {
             auto result = capture(name);
             int frames = 0;
-            while (result.metadata["atlasPending"].toInt() > 0) {
+            while (result.metadata[u"atlasPending"_s].toInt() > 0) {
                 require(++frames <= 70, "Bounded pool upload did not drain");
                 result = capture(name);
             }
@@ -256,21 +259,19 @@ int main(int argc, char **argv)
         };
         waitPrepared();
         // Drain accepted chunks through real renderer frames, never resubmit in a millisecond loop.
-        settledCapture("initial");
-        const auto stable = capture("stable");
-        require(stable.metadata["atlasUploadBytes"].toInteger() == 0,
+        settledCapture(u"initial"_s);
+        const auto stable = capture(u"stable"_s);
+        require(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
                 "Stable pool uploaded covers again");
         if (real) {
-            QFile source(sourceRoot + "/real-columns/frozen-fields.json");
+            QFile source(sourceRoot + "/real-columns/frozen-fields.json"_L1);
             require(source.open(QIODevice::ReadOnly), "Rebuild frozen finite-column field input");
             const auto fields =
-                    QJsonDocument::fromJson(source.readAll()).object()["fields"].toArray();
+                    QJsonDocument::fromJson(source.readAll()).object()[u"fields"_s].toArray();
             QHash<QString, QJsonObject> byCell;
             for (auto value : fields) {
                 const auto field = value.toObject();
-                byCell.insert(QStringLiteral("%1:%2")
-                                      .arg(field["lane"].toInt())
-                                      .arg(field["row"].toInt()),
+                byCell.insert(u"%1:%2"_s.arg(field[u"lane"_s].toInt()).arg(field[u"row"_s].toInt()),
                               field);
             }
             QSet<QString> identities;
@@ -280,17 +281,17 @@ int main(int argc, char **argv)
                 const auto &instance = sourceInput.scene.instances[index];
                 require(!identities.contains(instance.albumId), "Finite album repeated");
                 identities.insert(instance.albumId);
-                const auto key = QStringLiteral("%1:%2")
-                                         .arg(int(instance.cell.lane))
-                                         .arg(int(instance.cell.row));
+                const auto key =
+                        u"%1:%2"_s.arg(int(instance.cell.lane)).arg(int(instance.cell.row));
                 require(byCell.contains(key), "Nonexistent finite cell was drawn");
                 const auto field = byCell.value(key);
                 const double lift = instance.owned ? .9 : 0;
                 QMatrix4x4 pose;
-                pose.translate(float((instance.cell.lane - 1) * 5.2),
-                               float(-4.6 + field["height"].toDouble() + lift),
-                               float((instance.cell.row - field["depth"].toDouble()) * .62 - 2.17));
-                const double pitch = lift > 0 ? 0 : field["slope"].toDouble() * .024;
+                pose.translate(
+                        float((instance.cell.lane - 1) * 5.2),
+                        float(-4.6 + field[u"height"_s].toDouble() + lift),
+                        float((instance.cell.row - field[u"depth"_s].toDouble()) * .62 - 2.17));
+                const double pitch = lift > 0 ? 0 : field[u"slope"_s].toDouble() * .024;
                 QMatrix4x4 rotation;
                 rotation(1, 1) = float(std::cos(pitch));
                 rotation(1, 2) = float(-std::sin(pitch));
@@ -304,25 +305,25 @@ int main(int argc, char **argv)
                                             - sourceInput.entities[index].constData()[component])));
             }
             require(matrixError <= 1e-6, "Finite transform differs from frozen field");
-            const auto generation = stable.metadata["resourceGeneration"];
+            const auto generation = stable.metadata[u"resourceGeneration"_s];
             QKeyEvent boundary(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
             QCoreApplication::sendEvent(item, &boundary);
-            require(boundary.isAccepted() && selection.albumId() == QLatin1String("1:0"),
+            require(boundary.isAccepted() && selection.albumId() == "1:0"_L1,
                     "Single-column keyboard boundary wrapped");
             selection.setLift(0);
-            require(selection.select("5:105"), "Cannot select last finite album");
+            require(selection.select(u"5:105"_s), "Cannot select last finite album");
             motion.finish();
             selection.advance(2.4);
             waitPrepared();
-            const auto last = settledCapture("finite-last");
-            require(last.metadata["resourceGeneration"] == generation,
+            const auto last = settledCapture(u"finite-last"_s);
+            require(last.metadata[u"resourceGeneration"_s] == generation,
                     "Finite visibility rebuilt targets");
             require(!selection.moveRow(1) && !selection.navigateRow(118),
                     "Finite tail navigation wrapped");
             QWheelEvent wheel({ 480, 320 }, { 480, 320 }, { }, { 0, -120 }, Qt::NoButton,
                               Qt::NoModifier, Qt::NoScrollPhase, false);
             QCoreApplication::sendEvent(item, &wheel);
-            require(wheel.isAccepted() && selection.albumId() == QLatin1String("5:105"),
+            require(wheel.isAccepted() && selection.albumId() == "5:105"_L1,
                     "Finite wheel boundary wrapped");
             require(selection.moveLane(-1), "Finite column navigation failed");
             selection.advance(.2);
@@ -334,11 +335,11 @@ int main(int argc, char **argv)
             motion.finish();
             selection.advance(3);
             waitPrepared();
-            settledCapture("finite-return");
+            settledCapture(u"finite-return"_s);
             adapter.lighting()->setNight(true);
             adapter.lighting()->advanceTheme(2);
-            const auto night = settledCapture("finite-night");
-            require(night.metadata["resourceGeneration"] == generation,
+            const auto night = settledCapture(u"finite-night"_s);
+            require(night.metadata[u"resourceGeneration"_s] == generation,
                     "Theme rebuilt finite targets");
             const int beforeInvalidation = invalidations.load();
             surface.hide();
@@ -347,57 +348,58 @@ int main(int argc, char **argv)
             window.releaseResources();
             surface.show();
             waitPrepared();
-            const auto restored = settledCapture("finite-restored");
-            require(restored.metadata["drawCount"] == night.metadata["drawCount"]
-                            && restored.metadata["atlasPending"].toInt() == 0,
+            const auto restored = settledCapture(u"finite-restored"_s);
+            require(restored.metadata[u"drawCount"_s] == night.metadata[u"drawCount"_s]
+                            && restored.metadata[u"atlasPending"_s].toInt() == 0,
                     "Finite restore lost geometry or cover uploads");
             selection.setColumns({ });
-            const auto empty = settledCapture("finite-empty");
-            require(empty.metadata["drawCount"].toInt() == 0,
+            const auto empty = settledCapture(u"finite-empty"_s);
+            require(empty.metadata[u"drawCount"_s].toInt() == 0,
                     "Finite empty library retained draws");
-            QJsonObject report{ { "passed", true },
-                                { "realColumns", true },
-                                { "sourceMatrixError", matrixError },
-                                { "stable", stable.metadata },
-                                { "last", last.metadata },
-                                { "night", night.metadata },
-                                { "empty", empty.metadata },
-                                { "covers", item->coverStatistics() },
-                                { "windowPolicy", verification::windowPolicy(window) },
-                                { "offscreen", surface.diagnostics() },
-                                { "submissionSamples", submissionSamples } };
-            QSaveFile reportFile(output + "/runtime.json");
+            QJsonObject report{ { u"passed"_s, true },
+                                { u"realColumns"_s, true },
+                                { u"sourceMatrixError"_s, matrixError },
+                                { u"stable"_s, stable.metadata },
+                                { u"last"_s, last.metadata },
+                                { u"night"_s, night.metadata },
+                                { u"empty"_s, empty.metadata },
+                                { u"covers"_s, item->coverStatistics() },
+                                { u"windowPolicy"_s, verification::windowPolicy(window) },
+                                { u"offscreen"_s, surface.diagnostics() },
+                                { u"submissionSamples"_s, submissionSamples } };
+            QSaveFile reportFile(output + "/runtime.json"_L1);
             require(reportFile.open(QIODevice::WriteOnly), "Cannot write finite audit");
             reportFile.write(QJsonDocument(report).toJson());
             require(reportFile.commit(), "Cannot commit finite audit");
             return 0;
         }
-        require(stable.metadata["drawCount"].toInt() == 432, "Large library changed pool capacity");
-        require(stable.metadata["visibleEntities"].toInt() < 432, "Pool visibility was not culled");
-        const auto generation = stable.metadata["resourceGeneration"];
+        require(stable.metadata[u"drawCount"_s].toInt() == 432,
+                "Large library changed pool capacity");
+        require(stable.metadata[u"visibleEntities"_s].toInt() < 432,
+                "Pool visibility was not culled");
+        const auto generation = stable.metadata[u"resourceGeneration"_s];
         require(!generation.isUndefined(), "Missing renderer resource generation");
-        const auto copies = stable.metadata["coverSnapshotCopies"].toInteger();
-        QFile frozen(sourceRoot + "/archive-pool/frozen-poses.json");
+        const auto copies = stable.metadata[u"coverSnapshotCopies"_s].toInteger();
+        QFile frozen(sourceRoot + "/archive-pool/frozen-poses.json"_L1);
         require(frozen.open(QIODevice::ReadOnly),
                 "Rebuild frozen production poses before the GPU audit");
-        const auto poses = QJsonDocument::fromJson(frozen.readAll()).object()["poses"].toArray();
+        const auto poses = QJsonDocument::fromJson(frozen.readAll()).object()[u"poses"_s].toArray();
         require(poses.size() == 432, "Frozen pool pose count differs");
         QHash<QString, QMatrix4x4> expected;
         for (auto value : poses) {
             const auto p = value.toObject();
-            const auto values = p["matrix"].toArray();
+            const auto values = p[u"matrix"_s].toArray();
             QMatrix4x4 matrix;
             for (int i = 0; i < 16; ++i)
                 matrix(i % 4, i / 4) = float(values[i].toDouble());
-            expected.insert(
-                    QStringLiteral("%1:%2").arg(p["lane"].toDouble()).arg(p["row"].toDouble()),
-                    matrix);
+            expected.insert(u"%1:%2"_s.arg(p[u"lane"_s].toDouble()).arg(p[u"row"_s].toDouble()),
+                            matrix);
         }
         const auto &sourceInput = item->input();
         double maxMatrixError = 0;
         for (int index = 0; index < sourceInput.scene.instances.size(); ++index) {
             const auto c = sourceInput.scene.instances[index].cell;
-            const auto key = QStringLiteral("%1:%2").arg(c.lane).arg(c.row);
+            const auto key = u"%1:%2"_s.arg(c.lane).arg(c.row);
             require(expected.contains(key), "Production cell differs from frozen pool");
             const auto matrix = expected.value(key);
             for (int i = 0; i < 16; ++i)
@@ -417,10 +419,10 @@ int main(int argc, char **argv)
         motion.finish();
         selection.advance(0);
         waitPrepared();
-        const auto travel = capture("travel");
-        require(travel.metadata["resourceGeneration"] == generation,
+        const auto travel = capture(u"travel"_s);
+        require(travel.metadata[u"resourceGeneration"_s] == generation,
                 "Navigation rebuilt render targets");
-        require(travel.metadata["coverSnapshotCopies"].toInteger() == copies,
+        require(travel.metadata[u"coverSnapshotCopies"_s].toInteger() == copies,
                 "Navigation deep-copied renderer covers");
         adapter.setReducedMotion(true);
         adapter.setDetail(1);
@@ -430,7 +432,7 @@ int main(int argc, char **argv)
         const auto pixel = adapter.projectWorldPoint(
                 (selection.selectedPosition() + SceneVector{ 0, 1.85, 0 }).qt());
         const auto hit = adapter.hitTest(pixel.x(), pixel.y());
-        require(hit["albumId"].toString() == selection.albumId(),
+        require(hit[u"albumId"_s].toString() == selection.albumId(),
                 "Pool selection hit differs from rendered coordinates");
         QMouseEvent press(QEvent::MouseButtonPress, QPointF(pixel.x(), pixel.y()),
                           QPointF(pixel.x(), pixel.y()), Qt::LeftButton, Qt::LeftButton,
@@ -442,7 +444,7 @@ int main(int argc, char **argv)
         QCoreApplication::sendEvent(item, &release);
         require(press.isAccepted() && release.isAccepted(),
                 "Production ray click did not accept selected cover");
-        const auto detail = capture("detail");
+        const auto detail = capture(u"detail"_s);
         motion.setReducedMotion(true);
         selection.advance(0);
         motion.setReducedMotion(false);
@@ -456,33 +458,35 @@ int main(int argc, char **argv)
         require(selection.moveRow(1), "Cannot create third returning selection");
         selection.setLift(4.05);
         waitPrepared();
-        const auto returning = capture("returning-night");
-        require(item->coverStatistics()["owned"].toInt() == 4, "Three returning covers not pinned");
-        require(returning.metadata["resourceGeneration"] == generation,
+        const auto returning = capture(u"returning-night"_s);
+        require(item->coverStatistics()[u"owned"_s].toInt() == 4,
+                "Three returning covers not pinned");
+        require(returning.metadata[u"resourceGeneration"_s] == generation,
                 "Visible count changed target/pipeline allocation");
         motion.setReducedMotion(true);
         selection.advance(.2);
         waitPrepared();
-        const auto restored = capture("restored-night");
-        if (item->coverStatistics()["owned"].toInt() != 1) {
+        const auto restored = capture(u"restored-night"_s);
+        if (item->coverStatistics()[u"owned"_s].toInt() != 1) {
             std::fprintf(
                     stderr,
                     "Return mismatch: cases=%lld cpuOwners=%d inputFrame=%llu sceneFrame=%llu\n",
                     qlonglong(selection.returningCases().size()),
-                    item->coverStatistics()["owned"].toInt(),
+                    item->coverStatistics()[u"owned"_s].toInt(),
                     qulonglong(item->input().scene.revision), qulonglong(adapter.frameRevision()));
             for (const auto &copy : selection.returningCases())
                 std::fprintf(stderr, "copy row=%g lift=%g yaw=%g hold=%d\n", copy.cell.row,
                              copy.lift.value, copy.rotation, copy.returnY.has_value());
         }
-        require(item->coverStatistics()["owned"].toInt() == 1, "Returning covers did not release");
+        require(item->coverStatistics()[u"owned"_s].toInt() == 1,
+                "Returning covers did not release");
         const auto coverMemory = item->coverStatistics();
         selection.setLift(0);
         require(selection.selectCell({ 3002, 40997 }, true), "Cannot test far coordinates");
         selection.setLift(4.05);
         adapter.updateLighting(0);
         waitPrepared();
-        const auto far = settledCapture("far-night");
+        const auto far = settledCapture(u"far-night"_s);
         const auto farInput = item->input();
         const auto position = selection.selectedPosition();
         const auto light = adapter.lighting()->rowColumn();
@@ -494,7 +498,7 @@ int main(int argc, char **argv)
         require((adapter.lighting()->rowColumn() - light).length() < 1e-4,
                 "Rebase moved world-space ribbon");
         waitPrepared();
-        const auto rebased = settledCapture("rebased-night");
+        const auto rebased = settledCapture(u"rebased-night"_s);
         const auto rebasedInput = item->input();
         double rebaseMatrixError = 0;
         int changedCoverRegions = 0, changedObjects = 0;
@@ -539,9 +543,9 @@ int main(int argc, char **argv)
         window.releaseResources();
         surface.show();
         waitPrepared();
-        auto rebuild = settledCapture("rebuild-night");
-        require(rebuild.metadata["drawCount"] == rebased.metadata["drawCount"]
-                        && rebuild.metadata["atlasPending"].toInt() == 0,
+        auto rebuild = settledCapture(u"rebuild-night"_s);
+        require(rebuild.metadata[u"drawCount"_s] == rebased.metadata[u"drawCount"_s]
+                        && rebuild.metadata[u"atlasPending"_s].toInt() == 0,
                 "Context rebuild lost pool geometry or cover uploads");
         const int lifecycleCycles =
                 qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
@@ -553,19 +557,19 @@ int main(int argc, char **argv)
             window.releaseResources();
             surface.show();
             waitPrepared();
-            rebuild = settledCapture(QStringLiteral("rebuild-night-%1").arg(cycle + 1));
-            require(rebuild.metadata["drawCount"] == rebased.metadata["drawCount"]
-                            && rebuild.metadata["atlasPending"].toInt() == 0,
+            rebuild = settledCapture(u"rebuild-night-%1"_s.arg(cycle + 1));
+            require(rebuild.metadata[u"drawCount"_s] == rebased.metadata[u"drawCount"_s]
+                            && rebuild.metadata[u"atlasPending"_s].toInt() == 0,
                     "Repeated context rebuild lost geometry or cover uploads");
         }
         // R22: exercise revision changes through the actual production atlas/renderer.
         const auto columns = orderLibrary(*snapshot, SortMode::Genre).columns;
         selection.setColumns(columns, snapshot);
         waitPrepared();
-        settledCapture("cover-reuse-baseline");
-        const auto reuseBaseline = capture("cover-reuse-stable");
+        settledCapture(u"cover-reuse-baseline"_s);
+        const auto reuseBaseline = capture(u"cover-reuse-stable"_s);
         const auto decodedBefore =
-                item->coverStatistics().value("cache").toObject().value("decodeStarts");
+                item->coverStatistics().value(u"cache"_s).toObject().value(u"decodeStarts"_s);
         auto changedLibrary = *snapshot;
         auto changed = std::find_if(changedLibrary.albums.begin(), changedLibrary.albums.end(),
                                     [&](const Album &album) {
@@ -573,97 +577,98 @@ int main(int argc, char **argv)
                                     });
         require(changed != changedLibrary.albums.end(), "Selected cover identity missing");
         Track track;
-        track.id = "anonymous-other-song";
+        track.id = "anonymous-other-song"_L1;
         track.albumId = changed->id;
         changed->tracks.append(track);
         const auto albumIndex = std::distance(changedLibrary.albums.begin(), changed);
         qint64 revisionBytes = 0;
         const auto observe = QObject::connect(
                 item, &SceneItem::frameSubmitted, &app, [&](const QJsonObject &sample) {
-                    revisionBytes += sample.value("atlasUploadBytes").toInteger();
+                    revisionBytes += sample.value(u"atlasUploadBytes"_s).toInteger();
                 });
         selection.setColumns(columns, std::make_shared<const LibrarySnapshot>(changedLibrary));
         waitPrepared();
-        const auto sameAlbum = capture("same-album-other-song");
-        require(sameAlbum.metadata["atlasUploadBytes"].toInteger() == 0 && revisionBytes == 0,
+        const auto sameAlbum = capture(u"same-album-other-song"_s);
+        require(sameAlbum.metadata[u"atlasUploadBytes"_s].toInteger() == 0 && revisionBytes == 0,
                 "Same album song change uploaded unchanged covers");
-        require(item->coverStatistics().value("cache").toObject().value("decodeStarts")
+        require(item->coverStatistics().value(u"cache"_s).toObject().value(u"decodeStarts"_s)
                         == decodedBefore,
                 "Same album song change decoded unchanged covers");
         auto &changedAlbum = changedLibrary.albums[albumIndex];
-        changedAlbum.coverUrl = changedAlbum.coverUrl.path().endsWith("square.png")
-                ? QUrl("qrc:/assets/demo-covers/portrait.png")
-                : QUrl("qrc:/assets/demo-covers/square.png");
+        changedAlbum.coverUrl = changedAlbum.coverUrl.path().endsWith(u"square.png"_s)
+                ? QUrl(u"qrc:/assets/demo-covers/portrait.png"_s)
+                : QUrl(u"qrc:/assets/demo-covers/square.png"_s);
         selection.setColumns(columns,
                              std::make_shared<const LibrarySnapshot>(std::move(changedLibrary)));
         waitPrepared();
-        settledCapture("changed-cover-revision");
-        const auto changedCover = capture("changed-cover-stable");
+        settledCapture(u"changed-cover-revision"_s);
+        const auto changedCover = capture(u"changed-cover-stable"_s);
         QObject::disconnect(observe);
         if (revisionBytes != 17 * AtlasUploadQueue::tileBytes)
             std::fprintf(stderr,
                          "Cover revision bytes: %lld; expected %lld; selected detailed: %d\n",
                          static_cast<long long>(revisionBytes),
                          static_cast<long long>(17 * AtlasUploadQueue::tileBytes),
-                         item->coverStatistics().value("selectedDetailed").toBool());
+                         item->coverStatistics().value(u"selectedDetailed"_s).toBool());
         require(revisionBytes == 17 * AtlasUploadQueue::tileBytes,
                 "Cover revision must upload only one array tile plus its sixteen selected tiles");
-        require(changedCover.metadata["atlasUploadBytes"].toInteger() == 0,
+        require(changedCover.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
                 "Changed cover did not settle to zero uploads");
         for (const auto *result : { &sameAlbum, &changedCover }) {
-            require(result->metadata["resourceGeneration"]
-                                    == reuseBaseline.metadata["resourceGeneration"]
-                            && result->metadata["coverResourceRevision"]
-                                    == reuseBaseline.metadata["coverResourceRevision"],
+            require(result->metadata[u"resourceGeneration"_s]
+                                    == reuseBaseline.metadata[u"resourceGeneration"_s]
+                            && result->metadata[u"coverResourceRevision"_s]
+                                    == reuseBaseline.metadata[u"coverResourceRevision"_s],
                     "Content revision rebuilt compatible render/cover resources");
         }
-        QJsonObject coverReuse{ { "sameAlbum", sameAlbum.metadata },
-                                { "changedCover", changedCover.metadata },
-                                { "revisionUploadBytes", revisionBytes } };
+        QJsonObject coverReuse{ { u"sameAlbum"_s, sameAlbum.metadata },
+                                { u"changedCover"_s, changedCover.metadata },
+                                { u"revisionUploadBytes"_s, revisionBytes } };
         auto delayedHigh = item->input();
         const int selectedIndex = int(delayedHigh.entities.size()) - 1;
         require(delayedHigh.coverTiles[selectedIndex].size() == QSize(1024, 1024),
                 "Selected high-resolution region not ready");
         delayedHigh.coverLeases[selectedIndex] += quint64(1) << 40;
-        const auto fallback = capture("delayed-high-fallback", delayedHigh);
+        const auto fallback = capture(u"delayed-high-fallback"_s, delayedHigh);
         auto lowOnly = delayedHigh;
         lowOnly.coverTiles[selectedIndex] = lowOnly.fallbackCoverTiles[selectedIndex];
         lowOnly.coverLeases[selectedIndex] = lowOnly.fallbackCoverLeases[selectedIndex];
-        const auto low = capture("low-oracle", lowOnly);
-        const auto fallbackRegion = fallback.metadata["effectiveCoverRegions"].toArray();
-        const auto lowRegion = low.metadata["effectiveCoverRegions"].toArray();
+        const auto low = capture(u"low-oracle"_s, lowOnly);
+        const auto fallbackRegion = fallback.metadata[u"effectiveCoverRegions"_s].toArray();
+        const auto lowRegion = low.metadata[u"effectiveCoverRegions"_s].toArray();
         require(fallbackRegion.size() == delayedHigh.entities.size() && fallbackRegion == lowRegion
-                        && fallbackRegion[selectedIndex].toObject()["width"].toInt() == 256,
+                        && fallbackRegion[selectedIndex].toObject()[u"width"_s].toInt() == 256,
                 "Unready high-resolution region did not use the ready thumbnail");
         selection.setColumns({ });
         waitPrepared();
-        const auto empty = capture("empty");
-        require(empty.metadata["drawCount"].toInt() == 0, "Empty library rendered a phantom album");
+        const auto empty = capture(u"empty"_s);
+        require(empty.metadata[u"drawCount"_s].toInt() == 0,
+                "Empty library rendered a phantom album");
         QJsonObject report{
-            { "passed", true },
-            { "libraryAlbums", snapshot->albums.size() },
-            { "configuration", "Release" },
-            { "sourceMatrixError", maxMatrixError },
-            { "rebaseMatrixError", rebaseMatrixError },
-            { "lifecycleCycles", lifecycleCycles },
-            { "windowPolicy", verification::windowPolicy(window) },
-            { "offscreen", surface.diagnostics() },
-            { "stable", stable.metadata },
-            { "travel", travel.metadata },
-            { "detail", detail.metadata },
-            { "returning", returning.metadata },
-            { "restored", restored.metadata },
-            { "far", far.metadata },
-            { "rebased", rebased.metadata },
-            { "coverMemory", coverMemory },
-            { "coverReuse", coverReuse },
-            { "submissionSamples", submissionSamples },
-            { "rebuild", rebuild.metadata },
-            { "empty", empty.metadata },
-            { "scope",
-              "Production pool matrices, picking, uploads, optical identities and resource/lifecycle; own-render images for quality inspection, no image matching or presentation performance" }
+            { u"passed"_s, true },
+            { u"libraryAlbums"_s, snapshot->albums.size() },
+            { u"configuration"_s, u"Release"_s },
+            { u"sourceMatrixError"_s, maxMatrixError },
+            { u"rebaseMatrixError"_s, rebaseMatrixError },
+            { u"lifecycleCycles"_s, lifecycleCycles },
+            { u"windowPolicy"_s, verification::windowPolicy(window) },
+            { u"offscreen"_s, surface.diagnostics() },
+            { u"stable"_s, stable.metadata },
+            { u"travel"_s, travel.metadata },
+            { u"detail"_s, detail.metadata },
+            { u"returning"_s, returning.metadata },
+            { u"restored"_s, restored.metadata },
+            { u"far"_s, far.metadata },
+            { u"rebased"_s, rebased.metadata },
+            { u"coverMemory"_s, coverMemory },
+            { u"coverReuse"_s, coverReuse },
+            { u"submissionSamples"_s, submissionSamples },
+            { u"rebuild"_s, rebuild.metadata },
+            { u"empty"_s, empty.metadata },
+            { u"scope"_s,
+              u"Production pool matrices, picking, uploads, optical identities and resource/lifecycle; own-render images for quality inspection, no image matching or presentation performance"_s }
         };
-        QSaveFile file(output + "/runtime.json");
+        QSaveFile file(output + "/runtime.json"_L1);
         require(file.open(QIODevice::WriteOnly), "Cannot save pool report");
         file.write(QJsonDocument(report).toJson());
         require(file.commit(), "Cannot commit pool report");

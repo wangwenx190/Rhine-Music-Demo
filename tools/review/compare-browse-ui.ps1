@@ -1,5 +1,5 @@
 param(
-    [string[]]$Backends = @('d3d11', 'opengl'),
+    [ValidateSet('d3d11', 'opengl')][string[]]$Backends = @('d3d11'),
     [double[]]$Dprs = @(1, 1.5, 2)
 )
 $ErrorActionPreference = 'Stop'

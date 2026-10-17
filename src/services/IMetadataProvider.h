@@ -56,11 +56,11 @@ class IMetadataProvider : public QObject
 public:
     using QObject::QObject;
     virtual ProviderCapabilities capabilities() const = 0;
-    virtual void requestIntroduction(AlbumQuery query, RequestToken token) = 0;
-    virtual void requestCredits(AlbumQuery query, RequestToken token) = 0;
-    virtual void requestEnrichment(AlbumQuery query, RequestToken token) = 0;
+    [[nodiscard]] virtual bool requestIntroduction(AlbumQuery query, RequestToken token) = 0;
+    [[nodiscard]] virtual bool requestCredits(AlbumQuery query, RequestToken token) = 0;
+    [[nodiscard]] virtual bool requestEnrichment(AlbumQuery query, RequestToken token) = 0;
     virtual void cancel(RequestToken token) = 0;
-signals:
+Q_SIGNALS:
     void capabilitiesChanged();
     void resultReady(const yalahoo::ProviderResult &result);
 };

@@ -13,7 +13,7 @@ Item {
     property FrameClock clock: null
     property SelectionController selection: null
     property OverviewController overviewController: null
-    function focusOverviewToggle() {
+    function focusOverviewToggle(): void {
         overviewToggle.forceActiveFocus(Qt.OtherFocusReason);
     }
     property var album: ({})
@@ -50,7 +50,7 @@ Item {
         y: (root.metrics.width <= 600 ? 164 : 150) + (root.overviewController
                                                       ? root.overviewController.navigationOffset :
                                                         0)
-        text: "缩略图模式     V"
+        text: qsTr("Thumbnail view     V")
         iconName: "overview"
         cssPixelSize: 12
         height: 37

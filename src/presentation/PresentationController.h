@@ -1,4 +1,7 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
+using Qt::StringLiterals::operator""_L1;
 #include "SurfaceTransition.h"
 #include <optional>
 
@@ -47,11 +50,11 @@ public:
     }
     bool archiveEnabled() const
     {
-        return m_phase == "archive";
+        return m_phase == "archive"_L1;
     }
     bool detailEnabled() const
     {
-        return m_phase == "detail";
+        return m_phase == "detail"_L1;
     }
     quint64 layoutRevision() const
     {
@@ -102,7 +105,7 @@ public:
     Q_INVOKABLE void setTabIndicator(double x, double width, bool animate);
 
     void setReducedMotion(bool reduced);
-signals:
+Q_SIGNALS:
     void changed();
     void tabIndicatorChanged();
     void prepared();
@@ -122,7 +125,7 @@ private:
     PresentationPorts m_ports;
     SurfaceTransition m_browse{ 720, 140, false, true, this };
     SurfaceTransition m_detail{ 360, 240, true, false, this };
-    QString m_phase = "archive";
+    QString m_phase = u"archive"_s;
     std::optional<PresentationSelection> m_pending;
     quint64 m_revision = 0, m_layoutRevision = 0;
     bool m_wantsDetail = false, m_browseHidden = false, m_cameraEntered = false;

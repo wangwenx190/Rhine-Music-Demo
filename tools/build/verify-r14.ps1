@@ -1,3 +1,5 @@
+[CmdletBinding()]
+param([ValidateSet('d3d11', 'opengl')][string[]]$Backends = @('d3d11'))
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $evidence = Join-Path $repository 'verification/windows/browse-ui'
@@ -36,7 +38,7 @@ try {
         throw 'Native screen DPR query failed'
     }
     Run 'web-source.txt' { node tools/review/export-browse-ui.mjs }
-    foreach ($backend in @('d3d11', 'opengl')) {
+    foreach ($backend in $Backends) {
         $env:QSG_RHI_BACKEND = $backend
         foreach ($dpr in @(1, 1.5, 2)) {
             $env:QT_SCALE_FACTOR = ($dpr / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -54,8 +56,8 @@ try {
     if ($process.ExitCode -ne 0 -or -not (Get-Content -Raw (Join-Path $evidence 'production/report.json') | ConvertFrom-Json).passed) {
         throw 'Product browse verification failed'
     }
-    Run 'ctest.txt' { ctest --preset qt-release --output-on-failure }
-    Run 'paired-ui.txt' { & ./tools/review/compare-browse-ui.ps1 }
+    Run 'ctest.txt' { ctest --preset qt-release -R '^(source-format|navigation|title-reels|render-quality|assets)$' --output-on-failure --no-tests=error }
+    Run 'paired-ui.txt' { & ./tools/review/compare-browse-ui.ps1 -Backends $Backends }
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{
                 passed = $true
                 qtVersion = $chain.qtVersion

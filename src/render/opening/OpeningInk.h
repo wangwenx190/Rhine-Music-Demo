@@ -5,6 +5,8 @@
 #include <QPainterPath>
 #include <atomic>
 
+using Qt::StringLiterals::operator""_L1;
+
 namespace yalahoo {
 struct OpeningPath
 {
@@ -56,7 +58,7 @@ public:
     }
     Q_INVOKABLE QVariantList comparisonPaths() const;
     QCanvasPainterItemRenderer *createItemRenderer() const override;
-signals:
+Q_SIGNALS:
     void timeChanged();
     void orbitChanged();
     void colorsChanged();
@@ -66,6 +68,6 @@ private:
     QVector<OpeningPath> m_paths;
     double m_time = 0;
     bool m_orbit = false;
-    QColor m_ink{ "#232722" }, m_accent{ "#b56834" };
+    QColor m_ink{ "#232722"_L1 }, m_accent{ "#b56834"_L1 };
 };
 }

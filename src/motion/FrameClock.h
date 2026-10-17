@@ -56,7 +56,7 @@ public:
     Q_INVOKABLE void advance(double frameSeconds);
     Q_INVOKABLE void startOpening();
     Q_INVOKABLE void finishOpening();
-signals:
+Q_SIGNALS:
     void workPendingChanged();
     void frame(double dt, double motionDt);
     void advanced();

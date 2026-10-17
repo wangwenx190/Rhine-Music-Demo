@@ -35,8 +35,12 @@
 #include <QScopeGuard>
 #include <algorithm>
 #include <span>
+#include <memory>
 #include <chrono>
 #include <stdexcept>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 void require(bool value, const char *message)
@@ -62,7 +66,9 @@ QQuickItem *find(QQuickItem *root, const QString &name)
 QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
 {
     if (values.isEmpty())
-        return { { "count", 0 }, { "p95Ms", QJsonValue::Null }, { "p99Ms", QJsonValue::Null } };
+        return { { u"count"_s, 0 },
+                 { u"p95Ms"_s, QJsonValue::Null },
+                 { u"p99Ms"_s, QJsonValue::Null } };
     int consecutive = 0, longest = 0;
     for (double value : values) {
         consecutive = value > 2 * period ? consecutive + 1 : 0;
@@ -77,34 +83,34 @@ QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
             return v > limit;
         }));
     };
-    return { { "count", values.size() },
-             { "p50Ms", percentile(.5) },
-             { "p95Ms", percentile(.95) },
-             { "p99Ms", percentile(.99) },
-             { "maxMs", values.last() },
-             { "over50Ms", over(50) },
-             { "overOnePeriod", over(period) },
-             { "overTwoPeriods", over(2 * period) },
-             { "overThreePeriods", over(3 * period) },
-             { "longestOverTwoPeriods", longest } };
+    return { { u"count"_s, values.size() },
+             { u"p50Ms"_s, percentile(.5) },
+             { u"p95Ms"_s, percentile(.95) },
+             { u"p99Ms"_s, percentile(.99) },
+             { u"maxMs"_s, values.last() },
+             { u"over50Ms"_s, over(50) },
+             { u"overOnePeriod"_s, over(period) },
+             { u"overTwoPeriods"_s, over(2 * period) },
+             { u"overThreePeriods"_s, over(3 * period) },
+             { u"longestOverTwoPeriods"_s, longest } };
 }
 QJsonObject counters()
 {
-    return { { "sceneRenders", qint64(rhi::sceneSubmissionStats().rendered.load()) },
-             { "sceneRenderers", rhi::sceneSubmissionStats().renderers.load() },
-             { "rulerPaints", qint64(rulerInkStats().paints.load()) },
-             { "rulerSyncs", qint64(rulerInkStats().syncs.load()) },
-             { "rulerPaintNs", qint64(rulerInkStats().paintNs.load()) },
-             { "rulerSyncNs", qint64(rulerInkStats().syncNs.load()) },
-             { "rulerRenderers", rulerInkStats().renderers.load() },
-             { "openingPaints", qint64(openingInkStats().paints.load()) },
-             { "openingSyncs", qint64(openingInkStats().syncs.load()) },
-             { "openingPaintNs", qint64(openingInkStats().paintNs.load()) },
-             { "openingSyncNs", qint64(openingInkStats().syncNs.load()) },
-             { "openingRenderers", openingInkStats().renderers.load() },
-             { "textNodes", ReelInk::liveNodes() },
-             { "textGeometryUpdates", qint64(ReelInk::geometryUpdates()) },
-             { "textGeometryReuses", qint64(ReelInk::geometryReuses()) } };
+    return { { u"sceneRenders"_s, qint64(rhi::sceneSubmissionStats().rendered.load()) },
+             { u"sceneRenderers"_s, rhi::sceneSubmissionStats().renderers.load() },
+             { u"rulerPaints"_s, qint64(rulerInkStats().paints.load()) },
+             { u"rulerSyncs"_s, qint64(rulerInkStats().syncs.load()) },
+             { u"rulerPaintNs"_s, qint64(rulerInkStats().paintNs.load()) },
+             { u"rulerSyncNs"_s, qint64(rulerInkStats().syncNs.load()) },
+             { u"rulerRenderers"_s, rulerInkStats().renderers.load() },
+             { u"openingPaints"_s, qint64(openingInkStats().paints.load()) },
+             { u"openingSyncs"_s, qint64(openingInkStats().syncs.load()) },
+             { u"openingPaintNs"_s, qint64(openingInkStats().paintNs.load()) },
+             { u"openingSyncNs"_s, qint64(openingInkStats().syncNs.load()) },
+             { u"openingRenderers"_s, openingInkStats().renderers.load() },
+             { u"textNodes"_s, ReelInk::liveNodes() },
+             { u"textGeometryUpdates"_s, qint64(ReelInk::geometryUpdates()) },
+             { u"textGeometryReuses"_s, qint64(ReelInk::geometryReuses()) } };
 }
 Snapshot fixture(const QString &directory)
 {
@@ -113,29 +119,29 @@ Snapshot fixture(const QString &directory)
     QImage image(2048, 2048, QImage::Format_RGB32);
     for (int i = 0; i < 96; ++i) {
         image.fill(QColor::fromHsv(i * 359 / 96, 140, 210));
-        const auto path = directory + QString("/anonymous-%1.jpg").arg(i);
+        const auto path = directory + u"/anonymous-%1.jpg"_s.arg(i);
         require(image.save(path, "JPEG", 82), "Cannot create anonymous large cover");
         paths.append(path);
     }
     for (int lane = 0; lane < 9; ++lane) {
         Genre genre;
-        genre.id = QString("genre-%1").arg(lane);
-        genre.name = QString("匿名收藏 %1").arg(lane);
+        genre.id = u"genre-%1"_s.arg(lane);
+        genre.name = u"\u533f\u540d\u6536\u85cf %1"_s.arg(lane);
         library.genres.append(genre);
         for (int row = 0; row < 64; ++row) {
             Album album;
-            album.id = QString("album-%1-%2").arg(lane).arg(row);
-            album.title = QString("匿名专辑 %1 / Descender (gyp) 🎵").arg(row);
-            album.artist = "Anonymous";
+            album.id = u"album-%1-%2"_s.arg(lane).arg(row);
+            album.title = u"\u533f\u540d\u4e13\u8f91 %1 / Descender (gyp) \U0001f3b5"_s.arg(row);
+            album.artist = "Anonymous"_L1;
             album.genreId = genre.id;
             const int index = lane * 64 + row;
             album.coverUrl = index < 96 ? QUrl::fromLocalFile(paths[index])
-                                        : QUrl("qrc:/assets/demo-covers/square.png");
+                                        : QUrl(u"qrc:/assets/demo-covers/square.png"_s);
             for (int trackIndex = 0; trackIndex < 3; ++trackIndex) {
                 Track track;
-                track.id = album.id + QString("-track-%1").arg(trackIndex);
-                track.title = QString("匿名曲目 %1").arg(trackIndex);
-                track.sourceUrl = QUrl::fromLocalFile(directory + "/anonymous.wav");
+                track.id = album.id + u"-track-%1"_s.arg(trackIndex);
+                track.title = u"\u533f\u540d\u66f2\u76ee %1"_s.arg(trackIndex);
+                track.sourceUrl = QUrl::fromLocalFile(directory + "/anonymous.wav"_L1);
                 album.tracks.append(track);
             }
             library.albums.append(album);
@@ -151,12 +157,13 @@ public:
     bool eventOverflow = false;
     void record(const QString &kind)
     {
-        if (!events.isEmpty() && kind != "sampling-start") {
+        if (!events.isEmpty() && kind != "sampling-start"_L1) {
             const auto previous = events.last().toObject();
-            if (previous["exposed"].toBool() == isExposed()
-                && previous["visible"].toBool() == isVisible()
-                && previous["state"].toInt() == int(windowState())
-                && previous["applicationState"].toInt() == int(QGuiApplication::applicationState()))
+            if (previous[u"exposed"_s].toBool() == isExposed()
+                && previous[u"visible"_s].toBool() == isVisible()
+                && previous[u"state"_s].toInt() == int(windowState())
+                && previous[u"applicationState"_s].toInt()
+                        == int(QGuiApplication::applicationState()))
                 return;
         }
         if (events.size() == 512) {
@@ -164,12 +171,12 @@ public:
             return;
         }
         events.append(
-                QJsonObject{ { "kind", kind },
-                             { "atNs", nowNs() },
-                             { "exposed", isExposed() },
-                             { "visible", isVisible() },
-                             { "state", int(windowState()) },
-                             { "applicationState", int(QGuiApplication::applicationState()) } });
+                QJsonObject{ { u"kind"_s, kind },
+                             { u"atNs"_s, nowNs() },
+                             { u"exposed"_s, isExposed() },
+                             { u"visible"_s, isVisible() },
+                             { u"state"_s, int(windowState()) },
+                             { u"applicationState"_s, int(QGuiApplication::applicationState()) } });
     }
 
 protected:
@@ -178,16 +185,16 @@ protected:
         const bool result = QQuickWindow::event(event);
         switch (event->type()) {
         case QEvent::Expose:
-            record("expose");
+            record(u"expose"_s);
             break;
         case QEvent::Show:
-            record("show");
+            record(u"show"_s);
             break;
         case QEvent::Hide:
-            record("hide");
+            record(u"hide"_s);
             break;
         case QEvent::WindowStateChange:
-            record("state");
+            record(u"state"_s);
             break;
         default:
             break;
@@ -207,7 +214,7 @@ public:
         window.setPersistentSceneGraph(false);
         QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &engine,
                          [&](Qt::ApplicationState) {
-                             window.record("application-state");
+                             window.record(u"application-state"_s);
                          });
         window.resize(1280, 720);
         surface.measurementEnabled = true;
@@ -216,19 +223,19 @@ public:
                              if (timings.size() >= 40000)
                                  overflow = true;
                              else {
-                                 costs["stage"] = stage;
-                                 costs["atNs"] = nowNs();
+                                 costs[u"stage"_s] = stage;
+                                 costs[u"atNs"_s] = nowNs();
                                  timings.append(costs);
                              }
                          });
         QObject::connect(
                 &window, &QQuickWindow::frameSwapped, &window,
-                [&] {
-                    const QMutexLocker lock(&swapMutex);
-                    if (swapped.size() == 40000)
-                        overflow = true;
+                [samples = presented] {
+                    const QMutexLocker lock(&samples->mutex);
+                    if (samples->times.size() == 40000)
+                        samples->overflow = true;
                     else
-                        swapped.append(nowNs());
+                        samples->times.append(nowNs());
                 },
                 Qt::DirectConnection);
         QObject::connect(&library, &LibrarySession::snapshotChanged, &selection, [&] {
@@ -291,29 +298,29 @@ public:
     }
     void createRoot()
     {
-        QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/pages/MusicStage.qml"));
+        QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/pages/MusicStage.qml"_s));
         root.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
-                { { "librarySession", QVariant::fromValue(&library) },
-                  { "motionController", QVariant::fromValue(&motion) },
-                  { "sceneAdapter", QVariant::fromValue(&scene) },
-                  { "startupCoordinator", QVariant::fromValue(&startup) },
-                  { "openingController", QVariant::fromValue(&opening) },
-                  { "rulerController", QVariant::fromValue(&ruler) },
-                  { "inputRouter", QVariant::fromValue(&router) },
-                  { "presentationController", QVariant::fromValue(&presentation) },
-                  { "detailModel", QVariant::fromValue(&detail) },
-                  { "panelController", QVariant::fromValue(&panels) },
-                  { "trackFocusController", QVariant::fromValue(&focus) },
-                  { "playbackController", QVariant::fromValue(&playback) },
-                  { "settingsController", QVariant::fromValue(&settings) },
-                  { "overviewController", QVariant::fromValue(&overview) },
-                  { "offscreenRendering", OffscreenSurface::Enabled } })));
+                { { u"librarySession"_s, QVariant::fromValue(&library) },
+                  { u"motionController"_s, QVariant::fromValue(&motion) },
+                  { u"sceneAdapter"_s, QVariant::fromValue(&scene) },
+                  { u"startupCoordinator"_s, QVariant::fromValue(&startup) },
+                  { u"openingController"_s, QVariant::fromValue(&opening) },
+                  { u"rulerController"_s, QVariant::fromValue(&ruler) },
+                  { u"inputRouter"_s, QVariant::fromValue(&router) },
+                  { u"presentationController"_s, QVariant::fromValue(&presentation) },
+                  { u"detailModel"_s, QVariant::fromValue(&detail) },
+                  { u"panelController"_s, QVariant::fromValue(&panels) },
+                  { u"trackFocusController"_s, QVariant::fromValue(&focus) },
+                  { u"playbackController"_s, QVariant::fromValue(&playback) },
+                  { u"settingsController"_s, QVariant::fromValue(&settings) },
+                  { u"overviewController"_s, QVariant::fromValue(&overview) },
+                  { u"offscreenRendering"_s, OffscreenSurface::Enabled } })));
         if (!root)
             qWarning() << component.errors();
         require(bool(root), "Cannot create production lifecycle stage");
         root->setParentItem(window.contentItem());
         root->setSize(window.size());
-        native = qobject_cast<rhi::SceneItem *>(find(root.get(), "nativeScene"));
+        native = qobject_cast<rhi::SceneItem *>(find(root.get(), u"nativeScene"_s));
         require(native, "Production scene missing");
         native->setTelemetryEnabled(true);
         QObject::connect(
@@ -322,21 +329,22 @@ public:
                         overflow = true;
                         return;
                     }
-                    if (sample["coalescedSamples"].toInt() != 0)
-                        failure = "Telemetry samples lost";
-                    lastResources = sample["resources"].toObject();
-                    sample.remove("resources");
-                    const auto bytes = lastResources["resizeOldPlusNewUpperBoundBytes"].toInteger();
+                    if (sample[u"coalescedSamples"_s].toInt() != 0)
+                        failure = "Telemetry samples lost"_L1;
+                    lastResources = sample[u"resources"_s].toObject();
+                    sample.remove(u"resources"_s);
+                    const auto bytes =
+                            lastResources[u"resizeOldPlusNewUpperBoundBytes"_s].toInteger();
                     peakBytes = qMax(peakBytes, bytes);
-                    const auto plan = lastResources["preallocationPlan"].toObject();
+                    const auto plan = lastResources[u"preallocationPlan"_s].toObject();
                     if (plan != lastPlan) {
                         lastPlan = plan;
-                        inventories.append(
-                                QJsonObject{ { "stage", stage }, { "resources", lastResources } });
+                        inventories.append(QJsonObject{ { u"stage"_s, stage },
+                                                        { u"resources"_s, lastResources } });
                     }
-                    sample["stage"] = stage;
-                    sample["covers"] = native->coverStatistics();
-                    sample["clockFrame"] = qint64(motion.clock()->frameCount());
+                    sample[u"stage"_s] = stage;
+                    sample[u"covers"_s] = native->coverStatistics();
+                    sample[u"clockFrame"_s] = qint64(motion.clock()->frameCount());
                     samples.append(sample);
                 });
         router.attach(&window);
@@ -434,9 +442,10 @@ public:
             if (!native)
                 return false;
             const auto covers = native->coverStatistics();
-            return covers["identities"].toInt() > 0 && covers["identities"] == covers["ready"]
-                    && covers["selectedDetailed"].toBool() && !samples.isEmpty()
-                    && samples.last().toObject()["atlasPending"].toInt(-1) == 0;
+            return covers[u"identities"_s].toInt() > 0
+                    && covers[u"identities"_s] == covers[u"ready"_s]
+                    && covers[u"selectedDetailed"_s].toBool() && !samples.isEmpty()
+                    && samples.last().toObject()[u"atlasPending"_s].toInt(-1) == 0;
         });
     }
     void settle()
@@ -455,10 +464,10 @@ public:
                 if (samples.isEmpty())
                     return false;
                 const auto sample = samples.last().toObject();
-                return sample["inputRevision"].toInteger() == receipt
-                        && sample["atlasPending"].toInt(-1) == 0
-                        && sample["atlasUploadBytes"].toInteger(-1) == 0
-                        && sample["selectedUploadBytes"].toInteger(-1) == 0;
+                return sample[u"inputRevision"_s].toInteger() == receipt
+                        && sample[u"atlasPending"_s].toInt(-1) == 0
+                        && sample[u"atlasUploadBytes"_s].toInteger(-1) == 0
+                        && sample[u"selectedUploadBytes"_s].toInteger(-1) == 0;
             });
             frames(3);
             return;
@@ -492,6 +501,22 @@ public:
         QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
         loop.exec();
     }
+    // Callback storage outlives the engine, render surface and window teardown.
+    QString stage = u"cold-start"_s;
+    QStringList warnings;
+    QString failure;
+    QJsonArray samples, timings, inventories;
+    QJsonObject lastResources, lastPlan;
+    qint64 peakBytes = 0;
+    struct PresentationSamples
+    {
+        QMutex mutex;
+        QVector<qint64> times;
+        std::atomic_bool overflow{ false };
+    };
+    std::shared_ptr<PresentationSamples> presented = std::make_shared<PresentationSamples>();
+    std::atomic_bool overflow{ false };
+
     QQuickRenderControl control;
     AuditWindow window;
     OffscreenSurface surface;
@@ -513,15 +538,6 @@ public:
     QQmlEngine engine;
     std::unique_ptr<QQuickItem> root;
     rhi::SceneItem *native = nullptr;
-    QString stage = "cold-start";
-    QStringList warnings;
-    QString failure;
-    QJsonArray samples, timings, inventories;
-    QJsonObject lastResources, lastPlan;
-    qint64 peakBytes = 0;
-    QMutex swapMutex;
-    QVector<qint64> swapped;
-    std::atomic_bool overflow{ false };
 };
 }
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
@@ -529,24 +545,26 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
 {
     if (!std::isfinite(seconds) || seconds < 0 || seconds > 120 || (seconds > 0 && seconds < 12))
         return 2;
-    const QStringList allStages{ "day-wave",     "day-ruler",    "day-detail",     "day-switch",
-                                 "day-overview", "day-search",   "night-wave",     "night-ruler",
-                                 "night-detail", "night-switch", "night-overview", "night-search" };
-    if (scenario != "matrix" && !allStages.contains(scenario))
+    const QStringList allStages{ u"day-wave"_s,     u"day-ruler"_s,      u"day-detail"_s,
+                                 u"day-switch"_s,   u"day-overview"_s,   u"day-search"_s,
+                                 u"night-wave"_s,   u"night-ruler"_s,    u"night-detail"_s,
+                                 u"night-switch"_s, u"night-overview"_s, u"night-search"_s };
+    if (scenario != "matrix"_L1 && !allStages.contains(scenario))
         return 2;
     QDir().mkpath(output);
-    QJsonObject report{ { "qtVersion", qVersion() },
-                        { "os", QSysInfo::prettyProductName() },
-                        { "architecture", QSysInfo::currentCpuArchitecture() },
-                        { "normalVsync", QJsonValue::Null },
-                        { "inputToPhotonMs", QJsonValue::Null },
-                        { "measuredVramBytes", QJsonValue::Null } };
-    report["bootstrap"] = bootstrap;
-    report["scenario"] = scenario;
+    QJsonObject report{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                        { u"os"_s, QSysInfo::prettyProductName() },
+                        { u"architecture"_s, QSysInfo::currentCpuArchitecture() },
+                        { u"normalVsync"_s, QJsonValue::Null },
+                        { u"inputToPhotonMs"_s, QJsonValue::Null },
+                        { u"measuredVramBytes"_s, QJsonValue::Null } };
+    report[u"bootstrap"_s] = bootstrap;
+    report[u"scenario"_s] = scenario;
     QJsonArray checks, resources, actions;
     bool passed = true;
     const auto check = [&](const char *name, bool value) {
-        checks.append(QJsonObject{ { "name", name }, { "passed", value } });
+        checks.append(
+                QJsonObject{ { u"name"_s, QString::fromUtf8(name) }, { u"passed"_s, value } });
         passed &= value;
         if (!value)
             qWarning("Startup check failed: %s", name);
@@ -554,7 +572,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     try {
         QTemporaryDir anonymous;
         require(anonymous.isValid(), "Cannot create anonymous fixture directory");
-        QFile audio(anonymous.path() + "/anonymous.wav");
+        QFile audio(anonymous.path() + "/anonymous.wav"_L1);
         require(audio.open(QIODevice::WriteOnly), "Cannot create anonymous audio");
         const auto bytes = test::wave(600000);
         require(audio.write(bytes) == bytes.size(), "Cannot write anonymous audio");
@@ -562,12 +580,12 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         const auto input = fixture(anonymous.path());
         QCryptographicHash inputHash(QCryptographicHash::Sha256);
         for (int i = 0; i < 96; ++i) {
-            QFile file(anonymous.path() + QString("/anonymous-%1.jpg").arg(i));
+            QFile file(anonymous.path() + u"/anonymous-%1.jpg"_s.arg(i));
             require(file.open(QIODevice::ReadOnly), "Cannot hash anonymous input");
             require(inputHash.addData(&file), "Cannot hash cover bytes");
         }
         inputHash.addData(bytes);
-        report["fixtureSha256"] = QString::fromLatin1(inputHash.result().toHex());
+        report[u"fixtureSha256"_s] = QString::fromUtf8(inputHash.result().toHex());
         QElapsedTimer preparation;
         preparation.start();
         Driver d(input);
@@ -579,41 +597,43 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 save();
             }
         } evidence{ [&] {
-            report["samples"] = d.samples;
-            report["quickTimings"] = d.timings;
-            report["inventories"] = d.inventories;
-            report["warnings"] = QJsonArray::fromStringList(d.warnings);
-            report["lastStage"] = d.stage;
+            report[u"samples"_s] = d.samples;
+            report[u"quickTimings"_s] = d.timings;
+            report[u"inventories"_s] = d.inventories;
+            report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
+            report[u"lastStage"_s] = d.stage;
         } };
         d.opening.replay();
         d.wait([&] {
             return d.opening.film();
         });
-        report["preparationMs"] = preparation.nsecsElapsed() / 1e6;
+        report[u"preparationMs"_s] = preparation.nsecsElapsed() / 1e6;
         check("initial-consistent-snapshot",
               d.library.snapshot()->albums.size() == 576
-                      && d.startup.statistics()["appliedSnapshots"].toInt() == 1);
+                      && d.startup.statistics()[u"appliedSnapshots"_s].toInt() == 1);
         check("readiness-does-not-consume-film", d.opening.time() == 0);
         d.opening.skip();
         d.motion.setReducedMotion(true);
         d.settle();
         const auto baselineResources = d.lastResources;
-        report["baselineResources"] = baselineResources;
-        report["initialCovers"] = d.native->coverStatistics();
+        report[u"baselineResources"_s] = baselineResources;
+        report[u"initialCovers"_s] = d.native->coverStatistics();
         const auto releaseCheck = [&] {
             const auto value = counters();
-            return value["sceneRenderers"].toInt() == 0 && value["rulerRenderers"].toInt() == 0
-                    && value["openingRenderers"].toInt() == 0 && value["textNodes"].toInt() == 0;
+            return value[u"sceneRenderers"_s].toInt() == 0
+                    && value[u"rulerRenderers"_s].toInt() == 0
+                    && value[u"openingRenderers"_s].toInt() == 0
+                    && value[u"textNodes"_s].toInt() == 0;
         };
         const auto resourceSnapshot = [&] {
             return QJsonObject{
-                { "stage", d.stage },
-                { "resources", d.lastResources },
-                { "covers", d.native->coverStatistics() },
-                { "counters", counters() },
-                { "startup", d.startup.statistics() },
-                { "title", QJsonObject::fromVariantMap(d.native->titleReel()->diagnostics()) },
-                { "transport",
+                { u"stage"_s, d.stage },
+                { u"resources"_s, d.lastResources },
+                { u"covers"_s, d.native->coverStatistics() },
+                { u"counters"_s, counters() },
+                { u"startup"_s, d.startup.statistics() },
+                { u"title"_s, QJsonObject::fromVariantMap(d.native->titleReel()->diagnostics()) },
+                { u"transport"_s,
                   QJsonObject::fromVariantMap(d.native->transportReel()->diagnostics()) }
             };
         };
@@ -631,8 +651,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         check("idle-zero-scene-submission", d.native->submission() == idleSubmission);
         check("idle-zero-visual-step", d.motion.clock()->frameCount() == idleFrames);
         check("idle-zero-canvas-repaint",
-              counters()["rulerPaints"] == idle["rulerPaints"]
-                      && counters()["openingPaints"] == idle["openingPaints"]);
+              counters()[u"rulerPaints"_s] == idle[u"rulerPaints"_s]
+                      && counters()[u"openingPaints"_s] == idle[u"openingPaints"_s]);
         // Change state from a queued callback after a completed render. Its dirty revision must survive.
         bool late = false;
         QMetaObject::invokeMethod(
@@ -658,17 +678,17 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         const auto sourceRevision = d.playback.sourceRevision();
         const auto source = d.playback.source();
         bool requested = d.playback.requested();
-        d.setStage("hidden-snapshots");
+        d.setStage(u"hidden-snapshots"_s);
         d.motion.clock()->setApplicationVisible(false);
         d.motion.clock()->setActive(false);
         const auto hiddenSubmission = d.native->submission();
         const auto hiddenRenders = rhi::sceneSubmissionStats().rendered.load();
         const QJsonValue hiddenStarts =
-                d.native->coverStatistics()["cache"].toObject()["decodeStarts"];
-        const auto hiddenApplied = d.startup.statistics()["appliedSnapshots"].toInt();
+                d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
+        const auto hiddenApplied = d.startup.statistics()[u"appliedSnapshots"_s].toInt();
         auto replacement = *input;
         for (int i = 0; i < 10; ++i) {
-            replacement.albums[0].title = QString("latest-%1").arg(i);
+            replacement.albums[0].title = u"latest-%1"_s.arg(i);
             d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
         }
         d.selection.moveRow(2);
@@ -676,12 +696,13 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         d.native->ensurePolished();
         d.quiet(150);
         check("hidden-no-snapshot-notifications",
-              d.startup.statistics()["appliedSnapshots"].toInt() == hiddenApplied);
+              d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied);
         check("hidden-no-submit-or-render",
               d.native->submission() == hiddenSubmission
                       && rhi::sceneSubmissionStats().rendered.load() == hiddenRenders);
         check("hidden-no-new-decode",
-              d.native->coverStatistics()["cache"].toObject()["decodeStarts"] == hiddenStarts);
+              d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s]
+                      == hiddenStarts);
         d.motion.clock()->setApplicationVisible(true);
         d.motion.clock()->setActive(true);
         QSignalSpy resumed(d.motion.clock(), &FrameClock::frame);
@@ -691,8 +712,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         d.frames(2);
         d.settle();
         check("resume-one-latest-snapshot",
-              d.startup.statistics()["appliedSnapshots"].toInt() == hiddenApplied + 1
-                      && d.library.snapshot()->albums[0].title == "latest-9");
+              d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied + 1
+                      && d.library.snapshot()->albums[0].title == "latest-9"_L1);
         check("resume-presents-latest-state",
               d.native->input().scene.revision == d.scene.frame().revision);
         const auto preservesMedia = [&] {
@@ -715,9 +736,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     requested = true;
                 }
                 for (const bool minimize : { false, true }) {
-                    d.setStage(QString("native-%1-%2")
-                                       .arg(playing ? "playing" : "paused",
-                                            minimize ? "minimize" : "hide"));
+                    d.setStage(u"native-%1-%2"_s.arg(playing ? "playing"_L1 : "paused"_L1,
+                                                     minimize ? "minimize"_L1 : "hide"_L1));
                     if (minimize)
                         d.window.showMinimized();
                     else
@@ -731,7 +751,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                                     stopped &= d.window.windowState() == Qt::WindowMinimized;
 #if defined(Q_OS_MACOS)
                                     stopped &= verification::nativeWindowPolicy(
-                                                       d.window)["miniaturized"]
+                                                       d.window)[u"miniaturized"_s]
                                                        .toBool();
 #endif
                                 } else {
@@ -788,9 +808,9 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             }
             d.playback.pause();
             requested = false;
-            report["nativeWindowTransitions"] = 4;
+            report[u"nativeWindowTransitions"_s] = 4;
         }
-        d.setStage("switch-stress");
+        d.setStage(u"switch-stress"_s);
         d.presentation.open();
         d.wait(
                 [&] {
@@ -808,10 +828,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             d.settle();
             resources.append(resourceSnapshot());
             check("bounded-switch-pool",
-                  d.native->coverStatistics()["owned"].toInt() <= 4
+                  d.native->coverStatistics()[u"owned"_s].toInt() <= 4
                           && d.native->input().scene.instances.size() <= ArchivePool::capacity + 4);
         }
-        report["switches"] = 30;
+        report[u"switches"_s] = 30;
         d.presentation.back();
         d.wait(
                 [&] {
@@ -819,21 +839,22 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 },
                 true);
         d.settle();
-        const QJsonValue before = d.native->coverStatistics()["cache"].toObject()["decodeStarts"];
-        d.setStage("cache-hit");
+        const QJsonValue before =
+                d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
+        d.setStage(u"cache-hit"_s);
         for (int i = 0; i < 6; ++i) {
             d.selection.select(d.library.snapshot()->albums[i % 2 ? 1 : 2].id);
             d.settle();
         }
         check("cache-hits-no-redecode",
-              d.native->coverStatistics()["cache"].toObject()["decodeStarts"] == before);
+              d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s] == before);
         d.frames(2);
         check("settled-zero-upload",
-              d.samples.last().toObject()["atlasUploadBytes"].toInt() == 0
-                      && d.samples.last().toObject()["selectedUploadBytes"].toInt() == 0);
-        const QJsonValue stableBytes = d.lastResources["estimatedCurrentBytes"];
+              d.samples.last().toObject()[u"atlasUploadBytes"_s].toInt() == 0
+                      && d.samples.last().toObject()[u"selectedUploadBytes"_s].toInt() == 0);
+        const QJsonValue stableBytes = d.lastResources[u"estimatedCurrentBytes"_s];
         for (int cycle = 0; cycle < 10; ++cycle) {
-            d.setStage(QString("rebuild-%1").arg(cycle));
+            d.setStage(u"rebuild-%1"_s.arg(cycle));
             if (cycle == 5) {
                 d.playback.toggle();
                 d.wait([&] {
@@ -850,39 +871,39 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             resources.append(resourceSnapshot());
             check("rebuild-preserves-media-and-intent", preservesMedia());
             check("rebuild-resources-return-to-baseline",
-                  d.lastResources["estimatedCurrentBytes"] == stableBytes);
+                  d.lastResources[u"estimatedCurrentBytes"_s] == stableBytes);
             check("rebuild-retained-cover-budget",
-                  d.native->coverStatistics()["atlasRetainedBytes"].toInteger()
+                  d.native->coverStatistics()[u"atlasRetainedBytes"_s].toInteger()
                           <= qint64(ArchivePool::capacity + 4) * 256 * 256 * 4);
         }
-        report["rebuilds"] = 10;
+        report[u"rebuilds"_s] = 10;
         d.playback.stop();
         d.motion.setReducedMotion(false);
         d.motion.clock()->setActive(true);
         // Exercise real ruler/controller/Quick text, panels, source search, opening and target invalidation.
         const auto drawBefore = counters();
-        d.setStage("ruler-reverse");
+        d.setStage(u"ruler-reverse"_s);
         for (int i = 0; i < 24; ++i) {
             QKeyEvent key(QEvent::KeyPress, i < 12 ? Qt::Key_Down : Qt::Key_Up, Qt::NoModifier);
             QCoreApplication::sendEvent(&d.window, &key);
             d.frames(2, true);
         }
-        d.setStage("overview");
+        d.setStage(u"overview"_s);
         d.overview.setActive(true);
         d.frames(45, true);
         d.overview.setActive(false);
-        d.setStage("search-panels");
-        d.panels.open("search");
-        d.library.search("匿名");
-        d.library.search("匿名专辑 2");
-        d.library.search("");
+        d.setStage(u"search-panels"_s);
+        d.panels.open(u"search"_s);
+        d.library.search(u"\u533f\u540d"_s);
+        d.library.search(u"\u533f\u540d\u4e13\u8f91 2"_s);
+        d.library.search(u""_s);
         d.frames(25, true);
         d.panels.close();
         d.frames(25, true);
         d.selection.setRealistic(true);
         d.frames(10, true);
         d.selection.setRealistic(false);
-        d.setStage("opening-replay");
+        d.setStage(u"opening-replay"_s);
         d.opening.replay();
         d.wait([&] {
             return d.opening.film();
@@ -900,28 +921,28 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         check("opaque-rebuild-submits-only-clear",
               d.native->input().sceneOccluded
                       && rhi::sceneSubmissionStats().rendered.load() == opaqueBefore);
-        report["opaqueRootRebuilds"] = 1;
+        report[u"opaqueRootRebuilds"_s] = 1;
         d.motion.clock()->setActive(true);
         d.motion.clock()->advance(30);
         d.opening.skip();
         d.frames(50, true);
         for (double dpr : { 1.0, 1.5, 2.0 }) {
-            d.setStage("theme-dpr-resize");
+            d.setStage(u"theme-dpr-resize"_s);
             d.scene.lighting()->setNight(!d.scene.lighting()->night());
             d.resize({ 960, 900 }, dpr);
             d.frames(45, true);
         }
         d.resize({ 1280, 720 }, d.window.devicePixelRatio());
         check("actual-ruler-and-opening-drawing",
-              counters()["rulerPaints"].toInteger() > drawBefore["rulerPaints"].toInteger()
-                      && counters()["openingPaints"].toInteger()
-                              > drawBefore["openingPaints"].toInteger());
+              counters()[u"rulerPaints"_s].toInteger() > drawBefore[u"rulerPaints"_s].toInteger()
+                      && counters()[u"openingPaints"_s].toInteger()
+                              > drawBefore[u"openingPaints"_s].toInteger());
         resources.append(resourceSnapshot());
         if (seconds > 0) {
             d.resize({ 1920, 1080 }, d.window.devicePixelRatio());
-            d.scene.quality()->setPreset("original");
+            d.scene.quality()->setPreset(u"original"_s);
             d.settle();
-            const auto stages = scenario == "matrix" ? allStages : QStringList{ scenario };
+            const auto stages = scenario == "matrix"_L1 ? allStages : QStringList{ scenario };
             QElapsedTimer sampling;
             int stageIndex = -1, eventIndex = -1;
             sampling.start();
@@ -944,10 +965,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     if (sourceIndex % 6 == 4)
                         d.overview.setActive(true);
                     if (sourceIndex % 6 == 5)
-                        d.panels.open("search");
-                    actions.append(QJsonObject{ { "stage", d.stage },
-                                                { "elapsedSeconds", elapsed },
-                                                { "atNs", nowNs() } });
+                        d.panels.open(u"search"_s);
+                    actions.append(QJsonObject{ { u"stage"_s, d.stage },
+                                                { u"elapsedSeconds"_s, elapsed },
+                                                { u"atNs"_s, nowNs() } });
                 }
                 const int event = int(elapsed * 3);
                 if (event != eventIndex) {
@@ -962,14 +983,15 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         d.presentation.select(d.library.snapshot()->albums[event % 2 + 1].id, true);
                     } else if (local == 5) {
                         d.scene.recordInput();
-                        d.library.search(event % 3 == 0           ? ""
-                                                 : event % 3 == 1 ? "匿名"
-                                                                  : "匿名专辑 2");
+                        d.library.search(event % 3 == 0 ? u""_s
+                                                 : event % 3 == 1
+                                                 ? u"\u533f\u540d"_s
+                                                 : u"\u533f\u540d\u4e13\u8f91 2"_s);
                     }
                 }
                 return false;
             };
-            if (scenario != "matrix") {
+            if (scenario != "matrix"_L1) {
                 d.wait(
                         [&] {
                             return replay(1);
@@ -979,82 +1001,85 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             }
             const auto startSample = d.samples.size(), startTiming = d.timings.size();
             sampling.restart();
-            report["samplingStartedNs"] = nowNs();
-            d.window.record("sampling-start");
+            report[u"samplingStartedNs"_s] = nowNs();
+            d.window.record(u"sampling-start"_s);
             d.wait(
                     [&] {
                         return replay(seconds);
                     },
                     true, int(seconds * 1000 + 30000), true);
-            report["samplingEndedNs"] = nowNs();
-            report["samplingSeconds"] = sampling.nsecsElapsed() / 1e9;
-            report["sampleStartIndex"] = startSample;
-            report["quickTimingStartIndex"] = startTiming;
-            report["fixedStages"] = QJsonArray::fromStringList(stages);
+            report[u"samplingEndedNs"_s] = nowNs();
+            report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / 1e9;
+            report[u"sampleStartIndex"_s] = startSample;
+            report[u"quickTimingStartIndex"_s] = startTiming;
+            report[u"fixedStages"_s] = QJsonArray::fromStringList(stages);
         }
-        d.setStage("final-release");
+        d.setStage(u"final-release"_s);
         if (OffscreenSurface::Enabled)
-            require(d.surface.grab().save(output + "/product-restored.png"),
+            require(d.surface.grab().save(output + "/product-restored.png"_L1),
                     "Cannot save owned product output");
-        report["finalCovers"] = d.native->coverStatistics();
-        report["peakDescriptorReplacementBytes"] = d.peakBytes;
-        report["startup"] = d.startup.statistics();
-        report["offscreen"] = d.surface.diagnostics();
-        report["windowPolicy"] = verification::windowPolicy(d.window);
-        report["dpr"] = d.window.effectiveDevicePixelRatio();
-        report["backend"] = int(d.window.rendererInterface()->graphicsApi());
-        report["adapters"] = rhi::adapterInventory();
+        report[u"finalCovers"_s] = d.native->coverStatistics();
+        report[u"peakDescriptorReplacementBytes"_s] = d.peakBytes;
+        report[u"startup"_s] = d.startup.statistics();
+        report[u"offscreen"_s] = d.surface.diagnostics();
+        report[u"windowPolicy"_s] = verification::windowPolicy(d.window);
+        report[u"dpr"_s] = d.window.effectiveDevicePixelRatio();
+        report[u"backend"_s] = int(d.window.rendererInterface()->graphicsApi());
+        report[u"adapters"_s] = rhi::adapterInventory();
         if (auto *api = d.surface.rhi()) {
             const auto info = api->driverInfo();
-            report["driver"] = QJsonObject{ { "deviceName", QString::fromUtf8(info.deviceName) },
-                                            { "deviceId", qint64(info.deviceId) },
-                                            { "vendorId", qint64(info.vendorId) },
-                                            { "deviceType", int(info.deviceType) } };
+            report[u"driver"_s] =
+                    QJsonObject{ { u"deviceName"_s, QString::fromUtf8(info.deviceName) },
+                                 { u"deviceId"_s, qint64(info.deviceId) },
+                                 { u"vendorId"_s, qint64(info.vendorId) },
+                                 { u"deviceType"_s, int(info.deviceType) } };
         }
-        report["processFixedAssets"] = rhi::preparedAssetStatistics();
-        report["refreshHz"] = d.window.screen() ? d.window.screen()->refreshRate() : 0;
-        report["swapIntervalRequested"] = d.window.requestedFormat().swapInterval();
-        report["qsgNoVsyncRequested"] = qEnvironmentVariableIsSet("QSG_NO_VSYNC");
-        report["normalPresentationMeasured"] =
+        report[u"processFixedAssets"_s] = rhi::preparedAssetStatistics();
+        report[u"refreshHz"_s] = d.window.screen() ? d.window.screen()->refreshRate() : 0;
+        report[u"swapIntervalRequested"_s] = d.window.requestedFormat().swapInterval();
+        report[u"qsgNoVsyncRequested"_s] = qEnvironmentVariableIsSet("QSG_NO_VSYNC");
+        report[u"normalPresentationMeasured"_s] =
                 !OffscreenSurface::Enabled && d.window.requestedFormat().swapInterval() > 0;
-        report["measurementScope"] = OffscreenSurface::Enabled
-                ? "Production MusicStage into hidden RenderControl; manual shared-clock event replay at requested 60Hz; GUI polish, sync, Quick render, endFrame wait and RHI submission are separate local costs. No native presentation or physical input measurement."
-                : "Production MusicStage native FrameAnimation; actual frameSwapped event timestamps; physical display/input-to-photon and compositor latency unavailable.";
+        report[u"measurementScope"_s] = OffscreenSurface::Enabled
+                ? u"Production MusicStage into hidden RenderControl; manual shared-clock event replay at requested 60Hz; GUI polish, sync, Quick render, endFrame wait and RHI submission are separate local costs. No native presentation or physical input measurement."_s
+                : u"Production MusicStage native FrameAnimation; actual frameSwapped event timestamps; physical display/input-to-photon and compositor latency unavailable."_s;
         QMap<QString, QVector<double>> cpu, sync, gpu, inputLatency;
         QSet<quint64> inputs;
-        for (qsizetype i = report["sampleStartIndex"].toInt(); i < d.samples.size(); ++i) {
+        for (qsizetype i = report[u"sampleStartIndex"_s].toInt(); i < d.samples.size(); ++i) {
             const auto sample = d.samples[i].toObject();
-            const auto name = sample["stage"].toString();
-            cpu[name].append(sample["cpuSubmitMs"].toDouble());
-            sync[name].append(sample["synchronizationMs"].toDouble());
-            if (sample["gpuFrameMs"].isDouble())
-                gpu[name].append(sample["gpuFrameMs"].toDouble());
-            const auto revision = quint64(sample["inputRevision"].toInteger());
+            const auto name = sample[u"stage"_s].toString();
+            cpu[name].append(sample[u"cpuSubmitMs"_s].toDouble());
+            sync[name].append(sample[u"synchronizationMs"_s].toDouble());
+            if (sample[u"gpuFrameMs"_s].isDouble())
+                gpu[name].append(sample[u"gpuFrameMs"_s].toDouble());
+            const auto revision = quint64(sample[u"inputRevision"_s].toInteger());
             if (revision && !inputs.contains(revision)
-                && sample["inputReceivedNs"].toInteger() >= report["samplingStartedNs"].toInteger()
-                && sample["submittedNs"].toInteger() <= report["samplingEndedNs"].toInteger()) {
+                && sample[u"inputReceivedNs"_s].toInteger()
+                        >= report[u"samplingStartedNs"_s].toInteger()
+                && sample[u"submittedNs"_s].toInteger()
+                        <= report[u"samplingEndedNs"_s].toInteger()) {
                 inputs.insert(revision);
-                inputLatency[name].append(
-                        (sample["submittedNs"].toInteger() - sample["inputReceivedNs"].toInteger())
-                        / 1e6);
+                inputLatency[name].append((sample[u"submittedNs"_s].toInteger()
+                                           - sample[u"inputReceivedNs"_s].toInteger())
+                                          / 1e6);
             }
         }
         QJsonObject stages;
         for (auto it = cpu.cbegin(); it != cpu.cend(); ++it)
             stages[it.key()] =
-                    QJsonObject{ { "cpuSubmit", distribution(it.value()) },
-                                 { "sync", distribution(sync[it.key()]) },
-                                 { "gpu", distribution(gpu[it.key()]) },
-                                 { "inputToQtSubmit", distribution(inputLatency[it.key()]) } };
-        report["stages"] = stages;
+                    QJsonObject{ { u"cpuSubmit"_s, distribution(it.value()) },
+                                 { u"sync"_s, distribution(sync[it.key()]) },
+                                 { u"gpu"_s, distribution(gpu[it.key()]) },
+                                 { u"inputToQtSubmit"_s, distribution(inputLatency[it.key()]) } };
+        report[u"stages"_s] = stages;
         QJsonObject quickCosts;
-        const QStringList costNames{ "polishMs", "beginFrameMs", "syncMs", "quickRenderMs",
-                                     "endFrameMs" };
+        const QStringList costNames{ u"polishMs"_s, u"beginFrameMs"_s, u"syncMs"_s,
+                                     u"quickRenderMs"_s, u"endFrameMs"_s };
         QMap<QString, QMap<QString, QVector<double>>> costs;
-        for (qsizetype i = report["quickTimingStartIndex"].toInt(); i < d.timings.size(); ++i) {
+        for (qsizetype i = report[u"quickTimingStartIndex"_s].toInt(); i < d.timings.size(); ++i) {
             const auto timing = d.timings[i].toObject();
             for (const auto &name : costNames)
-                costs[timing["stage"].toString()][name].append(timing[name].toDouble());
+                costs[timing[u"stage"_s].toString()][name].append(timing[name].toDouble());
         }
         for (auto it = costs.cbegin(); it != costs.cend(); ++it) {
             QJsonObject entry;
@@ -1062,53 +1087,53 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 entry[name] = distribution(it.value().value(name));
             quickCosts[it.key()] = entry;
         }
-        report["quickCosts"] = quickCosts;
+        report[u"quickCosts"_s] = quickCosts;
         QVector<double> intervals;
         QMap<QString, QVector<double>> presentation;
         {
-            const QMutexLocker lock(&d.swapMutex);
-            for (qsizetype i = 1; i < d.swapped.size(); ++i) {
-                const auto previous = d.swapped[i - 1], current = d.swapped[i];
-                if (previous < report["samplingStartedNs"].toInteger()
-                    || current > report["samplingEndedNs"].toInteger())
+            const QMutexLocker lock(&d.presented->mutex);
+            for (qsizetype i = 1; i < d.presented->times.size(); ++i) {
+                const auto previous = d.presented->times[i - 1], current = d.presented->times[i];
+                if (previous < report[u"samplingStartedNs"_s].toInteger()
+                    || current > report[u"samplingEndedNs"_s].toInteger())
                     continue;
                 const double dt = (current - previous) / 1e6;
                 intervals.append(dt);
                 for (qsizetype j = actions.size() - 1; j >= 0; --j) {
                     const auto action = actions[j].toObject();
                     // Separate each transition/warmup second from steady target gates.
-                    if (previous >= action["atNs"].toInteger() + 1000000000) {
-                        presentation[action["stage"].toString()].append(dt);
+                    if (previous >= action[u"atNs"_s].toInteger() + 1000000000) {
+                        presentation[action[u"stage"_s].toString()].append(dt);
                         break;
                     }
-                    if (previous >= action["atNs"].toInteger())
+                    if (previous >= action[u"atNs"_s].toInteger())
                         break;
                 }
             }
         }
-        report["qtPresentationIntervals"] = distribution(intervals);
+        report[u"qtPresentationIntervals"_s] = distribution(intervals);
         bool nativeValid = !OffscreenSurface::Enabled && seconds == 120
-                && report["samplingSeconds"].toDouble() >= 120 && scenario != "matrix"
+                && report[u"samplingSeconds"_s].toDouble() >= 120 && scenario != "matrix"_L1
                 && presentation.size() == 1;
         QJsonArray presentationTimes;
         {
-            const QMutexLocker lock(&d.swapMutex);
-            for (const auto timestamp : d.swapped)
-                if (timestamp >= report["samplingStartedNs"].toInteger()
-                    && timestamp <= report["samplingEndedNs"].toInteger())
+            const QMutexLocker lock(&d.presented->mutex);
+            for (const auto timestamp : d.presented->times)
+                if (timestamp >= report[u"samplingStartedNs"_s].toInteger()
+                    && timestamp <= report[u"samplingEndedNs"_s].toInteger())
                     presentationTimes.append(timestamp);
         }
-        report["qtPresentationTimestampsNs"] = presentationTimes;
-        report["nativeWindowEvents"] = d.window.events;
-        report["nativeWindowEventOverflow"] = d.window.eventOverflow;
+        report[u"qtPresentationTimestampsNs"_s] = presentationTimes;
+        report[u"nativeWindowEvents"_s] = d.window.events;
+        report[u"nativeWindowEventOverflow"_s] = d.window.eventOverflow;
         bool continuouslyExposed = !d.window.eventOverflow;
         for (const auto &event : d.window.events) {
             const auto value = event.toObject();
-            if (value["atNs"].toInteger() >= report["samplingStartedNs"].toInteger()
-                && value["atNs"].toInteger() <= report["samplingEndedNs"].toInteger())
-                continuouslyExposed &= value["exposed"].toBool();
+            if (value[u"atNs"_s].toInteger() >= report[u"samplingStartedNs"_s].toInteger()
+                && value[u"atNs"_s].toInteger() <= report[u"samplingEndedNs"_s].toInteger())
+                continuouslyExposed &= value[u"exposed"_s].toBool();
         }
-        report["continuouslyExposedDuringSampling"] = OffscreenSurface::Enabled || seconds == 0
+        report[u"continuouslyExposedDuringSampling"_s] = OffscreenSurface::Enabled || seconds == 0
                 ? QJsonValue::Null
                 : QJsonValue(continuouslyExposed);
         nativeValid &= continuouslyExposed;
@@ -1118,52 +1143,53 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         for (auto it = presentation.cbegin(); it != presentation.cend(); ++it) {
             const auto stats = distribution(it.value());
             nativeValid &= it.value().size() >= 30;
-            stableOver50 += stats["over50Ms"].toInt();
-            numericPass &= stats["p95Ms"].toDouble() <= 20
-                    && stats["p99Ms"].toDouble() <= 1000.0 / 30 && stats["over50Ms"].toInt() <= 1;
+            stableOver50 += stats[u"over50Ms"_s].toInt();
+            numericPass &= stats[u"p95Ms"_s].toDouble() <= 20
+                    && stats[u"p99Ms"_s].toDouble() <= 1000.0 / 30
+                    && stats[u"over50Ms"_s].toInt() <= 1;
             presentationStages[it.key()] = stats;
         }
         numericPass &= stableOver50 <= 1;
-        report["nativeSamplingValid"] = nativeValid;
-        report["targetRefreshHz"] = 60;
-        report["offscreenReplayPeriodMsRequested"] =
+        report[u"nativeSamplingValid"_s] = nativeValid;
+        report[u"targetRefreshHz"_s] = 60;
+        report[u"offscreenReplayPeriodMsRequested"_s] =
                 OffscreenSurface::Enabled ? QJsonValue(1000.0 / 60) : QJsonValue::Null;
-        report["steadyWarmupSecondsPerStage"] = 1;
-        report["qtPresentationByStage"] = presentationStages;
-        report["performanceGateEnforced"] = !OffscreenSurface::Enabled
+        report[u"steadyWarmupSecondsPerStage"_s] = 1;
+        report[u"qtPresentationByStage"_s] = presentationStages;
+        report[u"performanceGateEnforced"_s] = !OffscreenSurface::Enabled
                 && d.window.requestedFormat().swapInterval() > 0
                 && d.window.effectiveDevicePixelRatio() == 1;
-        report["performanceGatePassed"] = OffscreenSurface::Enabled
+        report[u"performanceGatePassed"_s] = OffscreenSurface::Enabled
                 ? QJsonValue::Null
                 : QJsonValue(nativeValid && numericPass);
-        report["samplingComplete"] =
-                !d.overflow && (seconds == 0 || stages.size() >= (scenario == "matrix" ? 12 : 1));
-        report["performanceAcceptance"] = OffscreenSurface::Enabled
-                ? "unavailable-native-presentation"
-                : scenario == "matrix" ? "matrix-local-diagnostic-only"
-                : !nativeValid         ? "invalid-native-sample"
-                : numericPass          ? "native-qt-presentation-targets-met"
-                                       : "native-qt-presentation-targets-failed";
-        report["samples"] = d.samples;
-        report["quickTimings"] = d.timings;
-        report["inventories"] = d.inventories;
-        report["actions"] = actions;
-        check("bounded-telemetry-no-overflow", !d.overflow);
+        report[u"samplingComplete"_s] = (!d.overflow && !d.presented->overflow)
+                && (seconds == 0 || stages.size() >= (scenario == "matrix"_L1 ? 12 : 1));
+        report[u"performanceAcceptance"_s] = OffscreenSurface::Enabled
+                ? u"unavailable-native-presentation"_s
+                : scenario == "matrix"_L1 ? u"matrix-local-diagnostic-only"_s
+                : !nativeValid            ? u"invalid-native-sample"_s
+                : numericPass             ? u"native-qt-presentation-targets-met"_s
+                                          : u"native-qt-presentation-targets-failed"_s;
+        report[u"samples"_s] = d.samples;
+        report[u"quickTimings"_s] = d.timings;
+        report[u"inventories"_s] = d.inventories;
+        report[u"actions"_s] = actions;
+        check("bounded-telemetry-no-overflow", (!d.overflow && !d.presented->overflow));
         check("no-qml-warnings", d.warnings.isEmpty());
-        report["warnings"] = QJsonArray::fromStringList(d.warnings);
+        report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
         check("window-policy", verification::windowPolicySatisfied(d.window));
         d.destroyRoot();
         check("final-release-zero-owned-renderers", releaseCheck());
-        report["releasedCounters"] = counters();
+        report[u"releasedCounters"_s] = counters();
     } catch (const std::exception &error) {
         passed = false;
-        report["error"] = QString::fromUtf8(error.what());
+        report[u"error"_s] = QString::fromUtf8(error.what());
         qWarning("Startup audit failed: %s", error.what());
     }
-    report["functionalPassed"] = passed;
-    report["checks"] = checks;
-    report["resourceCheckpoints"] = resources;
-    QSaveFile file(output + "/report.json");
+    report[u"functionalPassed"_s] = passed;
+    report[u"checks"_s] = checks;
+    report[u"resourceCheckpoints"_s] = resources;
+    QSaveFile file(output + "/report.json"_L1);
     if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
         || !file.commit())
         return 2;
@@ -1177,20 +1203,22 @@ int reviewGui(const QString &output, bool narrowOnly)
     if (QFileInfo::exists(output) || !QDir().mkpath(output))
         return 2;
     QJsonObject report{
-        { "qtVersion", qVersion() },
-        { "os", QSysInfo::prettyProductName() },
-        { "architecture", QSysInfo::currentCpuArchitecture() },
-        { "measurementScope",
-          "Production MusicStage checkpoint replay; component source mathematics and continuous trajectories are verified separately. No physical input, native presentation, normal VSYNC or driver residency measurement." },
-        { "normalVsync", QJsonValue::Null },
-        { "inputToPhotonMs", QJsonValue::Null },
-        { "measuredVramBytes", QJsonValue::Null }
+        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+        { u"os"_s, QSysInfo::prettyProductName() },
+        { u"architecture"_s, QSysInfo::currentCpuArchitecture() },
+        { u"measurementScope"_s,
+          u"Production MusicStage checkpoint replay; component source mathematics and continuous trajectories are verified separately. No physical input, native presentation, normal VSYNC or driver residency measurement."_s },
+        { u"normalVsync"_s, QJsonValue::Null },
+        { u"inputToPhotonMs"_s, QJsonValue::Null },
+        { u"measuredVramBytes"_s, QJsonValue::Null }
     };
     QJsonArray checks, captures;
     QString context;
     bool passed = true;
     const auto check = [&](const char *name, bool value) {
-        checks.append(QJsonObject{ { "state", context }, { "name", name }, { "passed", value } });
+        checks.append(QJsonObject{ { u"state"_s, context },
+                                   { u"name"_s, QString::fromUtf8(name) },
+                                   { u"passed"_s, value } });
         passed &= value;
         if (!value)
             qWarning().noquote() << "GUI check failed:" << context << name;
@@ -1199,15 +1227,16 @@ int reviewGui(const QString &output, bool narrowOnly)
         QTemporaryDir anonymous;
         require(anonymous.isValid(), "Cannot create GUI fixture");
         auto input = *fixture(anonymous.path());
-        const QStringList covers{ "portrait.png", "landscape.png", "square.png" };
+        const QStringList covers{ u"portrait.png"_s, u"landscape.png"_s, u"square.png"_s };
         for (int i = 0; i < input.albums.size(); ++i)
-            input.albums[i].coverUrl = QUrl("qrc:/assets/demo-covers/" + covers[i % covers.size()]);
+            input.albums[i].coverUrl =
+                    QUrl("qrc:/assets/demo-covers/"_L1 + covers[i % covers.size()]);
         Driver d(std::make_shared<const LibrarySnapshot>(std::move(input)));
         const auto saveDiagnostics = qScopeGuard([&] {
-            report["warnings"] = QJsonArray::fromStringList(d.warnings);
-            report["samples"] = d.samples;
-            report["quickTimings"] = d.timings;
-            report["lastStage"] = d.stage;
+            report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
+            report[u"samples"_s] = d.samples;
+            report[u"quickTimings"_s] = d.timings;
+            report[u"lastStage"_s] = d.stage;
         });
         d.opening.replay();
         d.wait([&] {
@@ -1230,7 +1259,7 @@ int reviewGui(const QString &output, bool narrowOnly)
             QTest::mouseClick(&d.window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
         };
         const auto capture = [&](const QString &phase) {
-            d.setStage(context + "-" + phase);
+            d.setStage(context + "-"_L1 + phase);
             d.frames(2);
             d.native->ensurePolished();
             check("no-render-error", d.native->errorText().isEmpty());
@@ -1247,26 +1276,26 @@ int reviewGui(const QString &output, bool narrowOnly)
                     finite &= std::isfinite(value);
             check("finite-bounded-geometry",
                   finite && frame.instances.size() <= ArchivePool::capacity + 4);
-            check("bounded-owned-covers", d.native->coverStatistics()["owned"].toInt() <= 4);
+            check("bounded-owned-covers", d.native->coverStatistics()[u"owned"_s].toInt() <= 4);
             const auto image = d.surface.grab();
-            const auto file = context + "-" + phase + ".png";
-            require(!image.isNull() && image.save(output + "/" + file),
+            const auto file = context + "-"_L1 + phase + ".png"_L1;
+            require(!image.isNull() && image.save(output + "/"_L1 + file),
                     "Cannot capture own GUI output");
             const auto dpr = d.window.effectiveDevicePixelRatio();
             check("actual-output-dimensions", image.size() == d.window.size() * dpr);
-            captures.append(QJsonObject{ { "state", context },
-                                         { "phase", phase },
-                                         { "image", file },
-                                         { "width", d.window.width() },
-                                         { "height", d.window.height() },
-                                         { "dpr", dpr },
-                                         { "night", d.scene.lighting()->night() },
-                                         { "realistic", d.selection.realistic() },
-                                         { "selection", d.selection.albumId() },
-                                         { "instances", frame.instances.size() },
-                                         { "covers", d.native->coverStatistics() },
-                                         { "resources", d.lastResources },
-                                         { "submission", qint64(d.native->submission()) } });
+            captures.append(QJsonObject{ { u"state"_s, context },
+                                         { u"phase"_s, phase },
+                                         { u"image"_s, file },
+                                         { u"width"_s, d.window.width() },
+                                         { u"height"_s, d.window.height() },
+                                         { u"dpr"_s, dpr },
+                                         { u"night"_s, d.scene.lighting()->night() },
+                                         { u"realistic"_s, d.selection.realistic() },
+                                         { u"selection"_s, d.selection.albumId() },
+                                         { u"instances"_s, frame.instances.size() },
+                                         { u"covers"_s, d.native->coverStatistics() },
+                                         { u"resources"_s, d.lastResources },
+                                         { u"submission"_s, qint64(d.native->submission()) } });
         };
         const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                   { 960, 900 },   { 930, 900 },   { 390, 844 },
@@ -1282,15 +1311,14 @@ int reviewGui(const QString &output, bool narrowOnly)
             d.resize(size, dpr);
             for (bool night : { false, true }) {
                 for (bool realistic : { false, true }) {
-                    context = QString("%1x%2-%3-%4")
-                                      .arg(size.width())
+                    context = u"%1x%2-%3-%4"_s.arg(size.width())
                                       .arg(size.height())
-                                      .arg(night ? "night" : "day")
-                                      .arg(realistic ? "real" : "fill");
+                                      .arg(night ? "night"_L1 : "day"_L1)
+                                      .arg(realistic ? "real"_L1 : "fill"_L1);
                     qInfo().noquote() << "GUI state:" << context;
                     d.scene.lighting()->setNight(night);
                     d.selection.setRealistic(realistic);
-                    d.selection.select("album-0-2");
+                    d.selection.select(u"album-0-2"_s);
                     advance(3);
                     d.ready();
                     d.root->forceActiveFocus(Qt::OtherFocusReason);
@@ -1306,9 +1334,9 @@ int reviewGui(const QString &output, bool narrowOnly)
                     check("reverse-navigation", d.selection.albumId() == selected);
                     d.ready();
                     check("archive-overview-control-visible",
-                          find(d.root.get(), "overviewToggle")->isVisible());
-                    auto *albumStepper = find(d.root.get(), "albumStepper");
-                    auto *genreStepper = find(d.root.get(), "genreStepper");
+                          find(d.root.get(), u"overviewToggle"_s)->isVisible());
+                    auto *albumStepper = find(d.root.get(), u"albumStepper"_s);
+                    auto *genreStepper = find(d.root.get(), u"genreStepper"_s);
                     require(albumStepper && genreStepper, "Navigation groups missing");
                     const auto albumBounds =
                             albumStepper->mapRectToScene(albumStepper->boundingRect());
@@ -1318,18 +1346,18 @@ int reviewGui(const QString &output, bool narrowOnly)
                     check("navigation-groups-fit",
                           viewport.contains(albumBounds) && viewport.contains(genreBounds)
                                   && !albumBounds.intersects(genreBounds));
-                    capture("browse");
+                    capture(u"browse"_s);
                     const QJsonValue targetGeneration =
-                            d.samples.last().toObject()["resourceGeneration"];
-                    click("overviewToggle");
+                            d.samples.last().toObject()[u"resourceGeneration"_s];
+                    click(u"overviewToggle"_s);
                     advance(4);
                     check("qt-overview-enters", d.overview.active() && d.overview.ready());
-                    capture("overview");
-                    click("overviewReturn");
+                    capture(u"overview"_s);
+                    click(u"overviewReturn"_s);
                     advance(4);
                     check("qt-overview-returns",
                           !d.overview.active() && d.presentation.archiveEnabled());
-                    click("openAlbumButton");
+                    click(u"openAlbumButton"_s);
                     d.wait(
                             [&] {
                                 return d.presentation.detailEnabled();
@@ -1340,19 +1368,19 @@ int reviewGui(const QString &output, bool narrowOnly)
                     check("detail-content-fully-shown",
                           d.presentation.detailSurface()->opacity() == 1);
                     check("detail-hides-archive-overview-control",
-                          !find(d.root.get(), "overviewToggle")->isVisible());
-                    auto *back = find(d.root.get(), "detailBack");
-                    auto *navigation = find(d.root.get(), "headerNavigation");
+                          !find(d.root.get(), u"overviewToggle"_s)->isVisible());
+                    auto *back = find(d.root.get(), u"detailBack"_s);
+                    auto *navigation = find(d.root.get(), u"headerNavigation"_s);
                     require(back && navigation, "Detail/header layout missing");
                     check("portrait-back-below-header",
                           !d.scene.layout()->portrait()
                                   || back->mapRectToScene(back->boundingRect()).top()
                                           >= navigation->mapRectToScene(navigation->boundingRect())
                                                      .bottom());
-                    capture("detail");
+                    capture(u"detail"_s);
                     // Latest intent wins while the shared state machine is retiring prior text/case.
                     for (const auto &id : { "album-0-3", "album-0-4", "album-0-2" })
-                        d.presentation.select(id, true);
+                        d.presentation.select(QString::fromUtf8(id), true);
                     d.wait(
                             [&] {
                                 return d.presentation.detailEnabled()
@@ -1360,23 +1388,23 @@ int reviewGui(const QString &output, bool narrowOnly)
                             },
                             true);
                     check("interrupted-selection-last-intent", d.selection.albumId() == selected);
-                    click("detailBack");
+                    click(u"detailBack"_s);
                     d.wait(
                             [&] {
                                 return d.presentation.archiveEnabled();
                             },
                             true);
                     d.root->forceActiveFocus(Qt::OtherFocusReason);
-                    d.panels.open("search");
+                    d.panels.open(u"search"_s);
                     advance(.5);
-                    auto *search = find(d.window.contentItem(), "librarySearchInput");
+                    auto *search = find(d.window.contentItem(), u"librarySearchInput"_s);
                     require(search, "Search input missing");
-                    search->setProperty("text", "匿名专辑 2");
+                    search->setProperty("text", u"\u533f\u540d\u4e13\u8f91 2"_s);
                     const auto isolated = d.selection.albumId();
                     QTest::keyClick(&d.window, Qt::Key_Down);
                     advance(.2);
                     check("modal-navigation-isolated", d.selection.albumId() == isolated);
-                    capture("search");
+                    capture(u"search"_s);
                     d.panels.close();
                     advance(.5);
                     check("panel-releases", !d.panels.surface()->shown());
@@ -1385,7 +1413,7 @@ int reviewGui(const QString &output, bool narrowOnly)
                     // Generation comparisons use renderer telemetry, not the GUI snapshot revision.
                     check("ui-preserves-target-generation",
                           targetGeneration.isDouble()
-                                  && d.samples.last().toObject()["resourceGeneration"]
+                                  && d.samples.last().toObject()[u"resourceGeneration"_s]
                                           == targetGeneration);
                     if (!realistic) {
                         d.opening.replay();
@@ -1393,9 +1421,9 @@ int reviewGui(const QString &output, bool narrowOnly)
                             return d.opening.film();
                         });
                         advance(2);
-                        capture("opening-mark");
+                        capture(u"opening-mark"_s);
                         advance(5);
-                        capture("opening-scene");
+                        capture(u"opening-scene"_s);
                         advance(6);
                         check("full-opening-handoff",
                               !d.opening.active() && d.presentation.archiveEnabled());
@@ -1404,48 +1432,49 @@ int reviewGui(const QString &output, bool narrowOnly)
             }
         }
         if (narrowOnly) {
-            context = "navigation-label-boundaries";
+            context = "navigation-label-boundaries"_L1;
             d.resize({ 390, 844 }, 2);
             auto replacement = *d.library.snapshot();
             replacement.genres[0].name = QString(200, QChar(0x957F));
             d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
             d.frames(2);
             advance(3);
-            auto *navigation = find(d.root.get(), "navigationFrame");
-            auto *label = find(d.root.get(), "navigationColumnLabel");
+            auto *navigation = find(d.root.get(), u"navigationFrame"_s);
+            auto *label = find(d.root.get(), u"navigationColumnLabel"_s);
             require(navigation && label, "Navigation boundary items missing");
             check("long-label-wraps-and-bounds",
                   navigation->property("wrapped").toBool()
                           && label->property("text").toString().size() == 200
                           && label->width() <= navigation->width());
-            require(d.surface.grab().save(output + "/long-column.png"),
+            require(d.surface.grab().save(output + "/long-column.png"_L1),
                     "Cannot save long-column output");
-            replacement.genres[0].name = "A";
+            replacement.genres[0].name = "A"_L1;
             replacement.albums.resize(1);
             d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
             d.frames(2);
             advance(3);
             check("short-pool-restores-single-row", !navigation->property("wrapped").toBool());
-            require(d.surface.grab().save(output + "/single-album.png"),
+            require(d.surface.grab().save(output + "/single-album.png"_L1),
                     "Cannot save single-album output");
         }
-        report["backend"] = int(d.window.rendererInterface()->graphicsApi());
-        report["adapters"] = rhi::adapterInventory();
-        report["windowPolicy"] = verification::windowPolicy(d.window);
-        report["offscreen"] = d.surface.diagnostics();
+        report[u"backend"_s] = int(d.window.rendererInterface()->graphicsApi());
+        report[u"adapters"_s] = rhi::adapterInventory();
+        report[u"windowPolicy"_s] = verification::windowPolicy(d.window);
+        report[u"offscreen"_s] = d.surface.diagnostics();
         if (auto *api = d.surface.rhi()) {
             const auto info = api->driverInfo();
-            report["driver"] = QJsonObject{ { "deviceName", QString::fromUtf8(info.deviceName) },
-                                            { "deviceId", qint64(info.deviceId) },
-                                            { "vendorId", qint64(info.vendorId) },
-                                            { "deviceType", int(info.deviceType) } };
+            report[u"driver"_s] =
+                    QJsonObject{ { u"deviceName"_s, QString::fromUtf8(info.deviceName) },
+                                 { u"deviceId"_s, qint64(info.deviceId) },
+                                 { u"vendorId"_s, qint64(info.vendorId) },
+                                 { u"deviceType"_s, int(info.deviceType) } };
         }
-        report["peakDescriptorReplacementBytes"] = d.peakBytes;
-        report["warnings"] = QJsonArray::fromStringList(d.warnings);
-        report["samples"] = d.samples;
-        report["quickTimings"] = d.timings;
+        report[u"peakDescriptorReplacementBytes"_s] = d.peakBytes;
+        report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
+        report[u"samples"_s] = d.samples;
+        report[u"quickTimings"_s] = d.timings;
         check("no-qml-warnings", d.warnings.isEmpty());
-        check("bounded-samples", !d.overflow);
+        check("bounded-samples", (!d.overflow && !d.presented->overflow));
         check("window-policy", verification::windowPolicySatisfied(d.window));
         d.destroyRoot();
         check("released-owned-renderers",
@@ -1454,13 +1483,13 @@ int reviewGui(const QString &output, bool narrowOnly)
                       && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
     } catch (const std::exception &error) {
         passed = false;
-        report["error"] = QString::fromUtf8(error.what());
+        report[u"error"_s] = QString::fromUtf8(error.what());
         qWarning("GUI replay failed: %s", error.what());
     }
-    report["passed"] = passed;
-    report["checks"] = checks;
-    report["captures"] = captures;
-    QSaveFile file(output + "/report.json");
+    report[u"passed"_s] = passed;
+    report[u"checks"_s] = checks;
+    report[u"captures"_s] = captures;
+    QSaveFile file(output + "/report.json"_L1);
     if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
         || !file.commit())
         return 2;

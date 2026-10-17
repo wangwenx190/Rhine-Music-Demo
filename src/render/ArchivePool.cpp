@@ -4,13 +4,15 @@
 #include <numeric>
 #include <QSet>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 int ArchivePool::wrap(double value, int count)
 {
     if (count <= 0 || !std::isfinite(value))
         return 0;
     const auto remainder = std::fmod(value, count);
-    return int(remainder < 0 ? remainder + count : remainder);
+    return remainder < 0 ? count + int(std::floor(remainder)) : int(remainder);
 }
 double ArchivePool::nearestOccurrence(double value, double center, double period)
 {
@@ -36,7 +38,7 @@ void ArchivePool::setColumns(QList<LibraryColumn> columns)
     for (int lane = 0; lane < m_columns.size(); ++lane) {
         auto &column = m_columns[lane];
         if (column.key.isEmpty())
-            column.key = QStringLiteral("lane:%1").arg(lane);
+            column.key = u"lane:%1"_s.arg(lane);
         column.albumIds.removeIf([&](const QString &id) {
             if (id.isEmpty() || identities.contains(id))
                 return true;

@@ -1,3 +1,10 @@
+#include "ReadbackImage.h"
+#include <rhi/qrhi.h>
+#include <stdexcept>
+#include <array>
+#include <QFloat16>
+#include <cstring>
+#include <limits>
 #include "ShellMaterial.h"
 #include "SelectionLighting.h"
 #include <QtTest>
@@ -7,15 +14,60 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo::rhi;
 class RhiMaterialTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void readbackValidationAndHdrSaturation()
+    {
+        QRhiReadbackResult result;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readbackImage(result, false));
+        result.format = QRhiTexture::RGBA32F;
+        result.pixelSize = { 1, 1 };
+        result.data.resize(16);
+        const std::array<float, 4> values{ -1e30f, 1e30f, .5f, 1.f };
+        std::memcpy(result.data.data(), values.data(), sizeof(values));
+        QCOMPARE(readbackImage(result, false).pixelColor(0, 0), QColor(0, 255, 128, 255));
+        result.data.chop(1);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readbackImage(result, false));
+        result.data.resize(16);
+        const std::array<float, 4> invalid{ 0, 0, std::numeric_limits<float>::quiet_NaN(), 1 };
+        std::memcpy(result.data.data(), invalid.data(), sizeof(invalid));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readbackImage(result, false));
+    }
+    void byteOrderedBgraReadback()
+    {
+        QRhiReadbackResult result;
+        result.format = QRhiTexture::BGRA8;
+        result.pixelSize = { 1, 1 };
+        result.data = QByteArray::fromHex("12345678"_ba);
+        QCOMPARE(readbackImage(result, false).pixelColor(0, 0), QColor(0x56, 0x34, 0x12, 0x78));
+    }
+    void paddedScalarReadbackKeepsLogicalRows()
+    {
+        QRhiReadbackResult result;
+        result.format = QRhiTexture::R16F;
+        result.pixelSize = { 4, 2 };
+        const std::array<qfloat16, 8> values{ qfloat16(0.f),  qfloat16(.25f), qfloat16(.5f),
+                                              qfloat16(0.f),  qfloat16(.75f), qfloat16(1.f),
+                                              qfloat16(-1.f), qfloat16(0.f) };
+        result.data.resize(sizeof(values));
+        std::memcpy(result.data.data(), values.data(), sizeof(values));
+        const auto image = readbackImage(result, true, false, { 3, 2 });
+        QCOMPARE(image.size(), QSize(3, 2));
+        QCOMPARE(image.pixelColor(0, 0), QColor(191, 191, 191, 255));
+        QCOMPARE(image.pixelColor(1, 0), QColor(255, 255, 255, 255));
+        QCOMPARE(image.pixelColor(2, 0), QColor(0, 0, 0, 255));
+        QCOMPARE(image.pixelColor(2, 1), QColor(128, 128, 128, 255));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readbackImage(result, false, false, { 5, 2 }));
+    }
     void continuousSourceAndQmlParameters()
     {
         qmlRegisterUncreatableType<yalahoo::SelectionLighting>("Yalahoo.Music", 1, 0,
-                                                               "SelectionLighting", "Injected");
+                                                               "SelectionLighting", u"Injected"_s);
         yalahoo::SelectionLighting lighting;
         QQmlEngine engine;
         QSignalSpy warnings(&engine, &QQmlEngine::warnings);
@@ -30,20 +82,22 @@ private slots:
                 ltc1Texture: Texture {}
                 ltc2Texture: Texture {}
             }
-        )",
-                QUrl::fromLocalFile(QStringLiteral(FIXTURE_ROOT "/tests/unit/parameters.qml")));
+        )"_ba,
+                QUrl::fromLocalFile(
+                        (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/unit/parameters.qml"_s)));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         std::unique_ptr<QObject> material(component.createWithInitialProperties(
-                { { "lighting", QVariant::fromValue(&lighting) } }));
+                { { u"lighting"_s, QVariant::fromValue(&lighting) } }));
         QVERIFY2(material, qPrintable(component.errorString()));
-        QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/materials/parameters.json"));
+        QFile file(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/materials/parameters.json"_s));
         QVERIFY(file.open(QIODevice::ReadOnly));
-        const auto cases = QJsonDocument::fromJson(file.readAll()).object()["cases"].toArray();
+        const auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         QCOMPARE(cases.size(), 45);
         for (const auto &value : cases) {
             const auto c = value.toObject();
-            const int surface = c["surface"].toInt();
-            const double warmth = c["warmth"].toDouble(), clarity = c["clarity"].toDouble();
+            const int surface = c[u"surface"_s].toInt();
+            const double warmth = c[u"warmth"_s].toDouble(), clarity = c[u"clarity"_s].toDouble();
             const auto native = shellMaterial(surface, float(warmth), float(clarity), .25f);
             QVERIFY(material->setProperty("surface", surface));
             QVERIFY(material->setProperty("warmth", warmth));
@@ -51,21 +105,23 @@ private slots:
             const char *fields[] = { "transmission", "roughness", "thickness",
                                      "attenuationDistance" };
             for (int i = 0; i < 4; ++i) {
-                const double expected = c["transport"].toArray()[i].toDouble();
+                const double expected = c[u"transport"_s].toArray()[i].toDouble();
                 QVERIFY2(std::abs(native.transport[i] - expected) < 2e-6, fields[i]);
                 QVERIFY2(std::abs(material->property(fields[i]).toDouble() - expected) < 1e-6,
                          fields[i]);
             }
             for (int i = 0; i < 3; ++i) {
-                QVERIFY(std::abs(native.tint[i] - c["tint"].toArray()[i].toDouble()) < 3e-5);
-                QVERIFY(std::abs(native.attenuation[i] - c["attenuation"].toArray()[i].toDouble())
+                QVERIFY(std::abs(native.tint[i] - c[u"tint"_s].toArray()[i].toDouble()) < 3e-5);
+                QVERIFY(std::abs(native.attenuation[i]
+                                 - c[u"attenuation"_s].toArray()[i].toDouble())
                         < 3e-5);
             }
-            QCOMPARE(native.coat.x(), float(c["coat"].toArray()[0].toDouble()));
-            QCOMPARE(native.coat.y(), float(c["coat"].toArray()[1].toDouble()));
-            QCOMPARE(material->property("clearcoat").toDouble(), c["coat"].toArray()[0].toDouble());
+            QCOMPARE(native.coat.x(), float(c[u"coat"_s].toArray()[0].toDouble()));
+            QCOMPARE(native.coat.y(), float(c[u"coat"_s].toArray()[1].toDouble()));
+            QCOMPARE(material->property("clearcoat").toDouble(),
+                     c[u"coat"_s].toArray()[0].toDouble());
             QCOMPARE(material->property("coatRoughness").toDouble(),
-                     c["coat"].toArray()[1].toDouble());
+                     c[u"coat"_s].toArray()[1].toDouble());
             QCOMPARE(material->property("environmentIntensity").toFloat(), native.coat.w());
         }
         lighting.setNight(true);
@@ -83,23 +139,26 @@ private slots:
     }
     void frozenParameters()
     {
-        QFile f(QString(FIXTURE_ROOT) + "/tests/fixtures/render-backend/visual.json");
+        QFile f((QString::fromUtf8(FIXTURE_ROOT))
+                + "/tests/fixtures/render-backend/visual.json"_L1);
         QVERIFY(f.open(QIODevice::ReadOnly));
-        const auto cases = QJsonDocument::fromJson(f.readAll()).object()["cases"].toArray();
+        const auto cases = QJsonDocument::fromJson(f.readAll()).object()[u"cases"_s].toArray();
         int checked = 0;
         for (auto value : cases) {
             const auto c = value.toObject();
             for (int surface = 0; surface < 3; ++surface) {
-                const auto p = c["parameters"].toArray()[surface].toObject();
-                const auto m = shellMaterial(surface, c["day"].toBool() ? 1 : 0,
-                                             float(c["clarity"].toDouble()), .25f);
+                const auto p = c[u"parameters"_s].toArray()[surface].toObject();
+                const auto m = shellMaterial(surface, c[u"day"_s].toBool() ? 1 : 0,
+                                             float(c[u"clarity"_s].toDouble()), .25f);
                 const char *fields[] = { "transmission", "roughness", "thickness",
                                          "attenuationDistance" };
                 for (int n = 0; n < 4; ++n)
-                    QVERIFY2(std::abs(m.transport[n] - p[fields[n]].toDouble()) < 2e-6, fields[n]);
+                    QVERIFY2(std::abs(m.transport[n] - p[QString::fromUtf8(fields[n])].toDouble())
+                                     < 2e-6,
+                             fields[n]);
                 for (int n = 0; n < 3; ++n) {
-                    QVERIFY(std::abs(m.tint[n] - p["color"].toArray()[n].toDouble()) < 3e-5);
-                    QVERIFY(std::abs(m.attenuation[n] - p["attenuation"].toArray()[n].toDouble())
+                    QVERIFY(std::abs(m.tint[n] - p[u"color"_s].toArray()[n].toDouble()) < 3e-5);
+                    QVERIFY(std::abs(m.attenuation[n] - p[u"attenuation"_s].toArray()[n].toDouble())
                             < 3e-5);
                 }
                 ++checked;

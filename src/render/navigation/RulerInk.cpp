@@ -122,7 +122,7 @@ void RulerInk::setController(RulerController *controller)
             if (isVisible())
                 update();
         });
-    emit controllerChanged();
+    Q_EMIT controllerChanged();
     update();
 }
 QColor RulerInk::ink() const
@@ -134,7 +134,7 @@ void RulerInk::setInk(QColor color)
     if (m_ink == color)
         return;
     m_ink = color;
-    emit colorsChanged();
+    Q_EMIT colorsChanged();
     update();
 }
 QColor RulerInk::accent() const
@@ -146,7 +146,7 @@ void RulerInk::setAccent(QColor color)
     if (m_accent == color)
         return;
     m_accent = color;
-    emit colorsChanged();
+    Q_EMIT colorsChanged();
     update();
 }
 QCanvasPainterItemRenderer *RulerInk::createItemRenderer() const

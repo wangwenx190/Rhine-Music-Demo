@@ -36,7 +36,7 @@ CHECKS = [
      "Only current complete scan becomes const snapshot on GUI; stale result rejected before model replacement/save. Root changes during load retain baseline and cache safety but suppress obsolete display. Model resets once per accepted snapshot, never per file."),
     ("PERF-04", "src/library/DirectoryScanner.h", "Snapshot snapshot",
      "N/A for new GPU resources/passes. CPU live data is prior/current implicit-shared library, worker-built snapshot/index/frontier and one coalesced accepted save; serialize buffer exists only during single worker write. No new render allocation/upload path."),
-    ("PERF-05", "src/library/DirectoryScanner.cpp", 'oldTrack->fields.value("_fingerprint") == stamp',
+    ("PERF-05", "src/library/DirectoryScanner.cpp", 'oldTrack->fields.value(u"_fingerprint"_s) == stamp',
      "Existing metadata reused only by path and exact size:mtimeMs; change resets support/probe token while preserving unknown fields. IDs use native separators/UTF-8 SHA256, verified against frozen Node semantics without hashing audio contents."),
     ("PERF-06", "src/render/StartupCoordinator.cpp", "m_library->setSnapshot(*snapshot)",
      "LibraryStore snapshotReady routes through main to StartupCoordinator::receive; the GUI retains one latest immutable snapshot and applies it once through LibrarySession when visual admission allows. Hidden/preparation/Film states preserve the coordinator gates. No window reload, per-file sorting or hot-path disk work; full product input/presentation cost remains R28-P."),

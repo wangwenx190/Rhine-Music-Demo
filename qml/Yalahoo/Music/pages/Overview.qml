@@ -10,7 +10,7 @@ Item {
     required property DesignTokens tokens
     required property Item sceneSource
     required property InputRouter inputRouter
-    property string columnKind: "流派"
+    property string columnKind: qsTr("Genres")
     readonly property bool narrow: width <= 600
     readonly property real margin: narrow ? 22 : 40
     readonly property real labelWidth: narrow ? 116 : 160
@@ -59,7 +59,7 @@ Item {
         ArchiveText {
             y: Math.round(headingMetrics.ascent) - Math.round(countMetrics.ascent)
             tokens: root.tokens
-            text: "COLLECTION / OVERVIEW"
+            text: qsTr("COLLECTION / OVERVIEW")
             cssPixelSize: 9
             font.letterSpacing: 2.07
             color: root.tokens.muted
@@ -67,14 +67,15 @@ Item {
         ArchiveText {
             y: root.headingLineHeight + 9
             tokens: root.tokens
-            text: root.columnKind + "浏览收藏"
+            text: qsTr("Browse collection by %1").arg(root.columnKind)
             cssPixelSize: root.narrow ? 17 : 19
             font.letterSpacing: cssPixelSize * .12
         }
         ArchiveText {
             y: root.headingLineHeight + 9 + root.headingTitleLineHeight + 11
             tokens: root.tokens
-            text: "点击列名展开入口 · 点击进入回到标准视图"
+            text: qsTr(
+                      "Click a column label to expand its entry. Enter to return to the standard view.")
             cssPixelSize: 11
             color: root.tokens.muted
         }
@@ -150,8 +151,9 @@ Item {
                     height: parent.height - 1
                     enabled: root.controller.ready && anchor.interactive
                     activeFocusOnTab: enabled
-                    Accessible.name: "展开" + root.columnKind + "入口：" + anchor.columnName
-                    Accessible.description: anchor.expanded ? "已展开" : "已折叠"
+                    Accessible.name: qsTr("Expand %1 entry: %2").arg(root.columnKind).arg(
+                                         anchor.columnName)
+                    Accessible.description: anchor.expanded ? qsTr("Expanded") : qsTr("Collapsed")
                     ArchiveToolTip {
                         parent: label
                         tokens: root.tokens
@@ -183,8 +185,8 @@ Item {
                             width: parent.width - x * 2
                             y: (root.narrow ? 8 : 10) + root.labelLineHeight + 5
                             tokens: root.tokens
-                            text: (anchor.lane + 1).toString().padStart(2, "0") + " / "
-                                  + anchor.albumCount + " 张专辑"
+                            text: (anchor.lane + 1).toString().padStart(2, "0") + " / " + qsTr("%n albums",
+                                                                                               "", anchor.albumCount)
                             cssPixelSize: 9
                             cssLineHeight: root.countLineHeight
                             font.letterSpacing: .54
@@ -210,7 +212,7 @@ Item {
                         height: parent.height
                         enabled: anchor.expanded && anchor.interactive && root.controller.ready
                         activeFocusOnTab: enabled
-                        Accessible.name: "进入" + anchor.columnName + "的标准视图"
+                        Accessible.name: qsTr("Enter %1 in standard view").arg(anchor.columnName)
                         background: Rectangle {
                             color: "transparent"
                             border.width: enter.visualFocus ? 1 : 0
@@ -223,7 +225,7 @@ Item {
                         }
                         contentItem: ArchiveText {
                             tokens: root.tokens
-                            text: "进入  →"
+                            text: qsTr("Enter \u2192")
                             cssPixelSize: 11
                             color: root.tokens.accent
                             horizontalAlignment: Text.AlignHCenter
@@ -252,7 +254,7 @@ Item {
         opacity: root.controller.chrome.opacity
         enabled: root.controller.active && opacity > 0
         iconName: "overview-return"
-        text: "返回近景     V"
+        text: qsTr("Return to close view     V")
         cssPixelSize: 12
         height: 37
         onClicked: root.controller.setActive(false)
@@ -272,7 +274,7 @@ Item {
         ArchiveButton {
             objectName: "overviewPrevious"
             tokens: root.tokens
-            text: "←"
+            text: "\u2190"
             width: 36
             height: 32
             onClicked: root.inputRouter.lane(-1)
@@ -286,14 +288,14 @@ Item {
             tokens: root.tokens
             visible: !root.narrow
             y: 8
-            text: "← → 切换" + root.columnKind
+            text: qsTr("\u2190 \u2192 Switch %1").arg(root.columnKind)
             cssPixelSize: 11
             color: root.tokens.muted
         }
         ArchiveButton {
             objectName: "overviewNext"
             tokens: root.tokens
-            text: "→"
+            text: "\u2192"
             width: 36
             height: 32
             onClicked: root.inputRouter.lane(1)

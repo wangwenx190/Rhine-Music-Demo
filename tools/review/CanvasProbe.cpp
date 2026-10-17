@@ -5,6 +5,8 @@
 #include <QCanvasPath>
 #include <QElapsedTimer>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 CanvasProbeStats stats;
 class ProbeRenderer final : public QCanvasPainterItemRenderer
@@ -43,7 +45,7 @@ protected:
         p->setLineCap(QCanvasPainter::LineCap::Round);
         p->stroke(curve, 1);
         QCanvasLinearGradient gradient(136, 20, 232, 80);
-        gradient.setStartColor(QColor("#b56834"));
+        gradient.setStartColor(QColor("#b56834"_L1));
         gradient.setEndColor(QColor(217, 173, 125, 100));
         p->setFillStyle(gradient);
         p->fillRect(136, 20, 96, 60);
@@ -56,7 +58,7 @@ protected:
         p->setFillStyle(ink);
         p->setFont(font);
         p->setTextBaseline(QCanvasPainter::TextBaseline::Alphabetic);
-        p->fillText(QStringLiteral("音乐收藏  gyp  é  🎵"), 16, 128);
+        p->fillText(u"\u97f3\u4e50\u6536\u85cf  gyp  e\u0301  \U0001f3b5"_s, 16, 128);
         stats.imageBytes = p->activeImageMemoryUsage();
         stats.imageCount = p->activeImageCount();
         ++stats.paints;
@@ -88,7 +90,7 @@ void CanvasProbe::setNight(bool night)
     if (m_night == night)
         return;
     m_night = night;
-    emit nightChanged();
+    Q_EMIT nightChanged();
     update();
 }
 QCanvasPainterItemRenderer *CanvasProbe::createItemRenderer() const

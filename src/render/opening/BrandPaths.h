@@ -8,14 +8,16 @@ namespace yalahoo {
 // Grammar of the project's authored reveal centerlines; all coordinates are absolute.
 inline QPainterPath parseBrandCenterline(const QString &d)
 {
-    const QRegularExpression token("[MLQCVZ]|[-+]?(?:[0-9]*\\.)?[0-9]+");
+    using namespace Qt::StringLiterals;
+    static const QRegularExpression token(u"[MLQCVZ]|[-+]?(?:[0-9]*\\.)?[0-9]+"_s);
     QStringList tokens;
     auto matches = token.globalMatch(d);
     while (matches.hasNext())
         tokens.append(matches.next().captured());
     QString residue = d;
     residue.remove(token);
-    residue.remove(QRegularExpression("[ ,\\t\\r\\n]"));
+    static const QRegularExpression separators(u"[ ,\\t\\r\\n]"_s);
+    residue.remove(separators);
     if (!residue.isEmpty())
         throw std::runtime_error("Unsupported reveal path grammar");
     qsizetype at = 0;
@@ -33,19 +35,19 @@ inline QPainterPath parseBrandCenterline(const QString &d)
     QPainterPath path;
     while (at < tokens.size()) {
         const auto command = tokens[at++];
-        if (command == "M")
+        if (command == "M"_L1)
             path.moveTo(point());
-        else if (command == "L")
+        else if (command == "L"_L1)
             path.lineTo(point());
-        else if (command == "V")
+        else if (command == "V"_L1)
             path.lineTo(path.currentPosition().x(), number());
-        else if (command == "Q") {
+        else if (command == "Q"_L1) {
             const auto a = point(), b = point();
             path.quadTo(a, b);
-        } else if (command == "C") {
+        } else if (command == "C"_L1) {
             const auto a = point(), b = point(), c = point();
             path.cubicTo(a, b, c);
-        } else if (command == "Z")
+        } else if (command == "Z"_L1)
             path.closeSubpath();
         else
             throw std::runtime_error("Invalid reveal command");

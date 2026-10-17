@@ -1,6 +1,9 @@
+#include <QCoreApplication>
 #include "BackgroundMusicController.h"
 #include <algorithm>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 BackgroundMusicController::BackgroundMusicController(QObject *parent)
@@ -14,19 +17,22 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
     m_fade.setTimerType(Qt::PreciseTimer);
     connect(&m_fade, &QTimer::timeout, this, &BackgroundMusicController::advanceFade);
     connect(&m_player, &QMediaPlayer::playbackStateChanged, this, [this] {
-        emit stateChanged();
+        Q_EMIT stateChanged();
     });
     connect(&m_player, &QMediaPlayer::errorOccurred, this,
             [this](auto error, const QString &reason) {
                 if (error == QMediaPlayer::NoError || error != m_player.error())
                     return;
-                m_error = reason.isEmpty() ? QStringLiteral("Qt 无法播放氛围音乐。") : reason;
+                m_error = reason.isEmpty()
+                        ? QCoreApplication::translate("Yalahoo",
+                                                      "Qt cannot play the background music.")
+                        : reason;
                 m_fade.stop();
                 m_target = 0;
                 m_output.setVolume(0);
                 m_player.pause();
-                emit silenceReached();
-                emit stateChanged();
+                Q_EMIT silenceReached();
+                Q_EMIT stateChanged();
             });
     connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {
         if (m_refreshPending)
@@ -59,7 +65,7 @@ void BackgroundMusicController::stop()
     m_target = 0;
     m_output.setVolume(0);
     m_player.stop();
-    emit silenceReached();
+    Q_EMIT silenceReached();
 }
 void BackgroundMusicController::setEnabled(bool enabled)
 {
@@ -69,8 +75,8 @@ void BackgroundMusicController::setEnabled(bool enabled)
     if (enabled)
         m_error.clear();
     reconcile();
-    emit settingsChanged();
-    emit stateChanged();
+    Q_EMIT settingsChanged();
+    Q_EMIT stateChanged();
 }
 void BackgroundMusicController::setVolume(double volume)
 {
@@ -81,7 +87,7 @@ void BackgroundMusicController::setVolume(double volume)
         return;
     m_volume = volume;
     reconcile();
-    emit settingsChanged();
+    Q_EMIT settingsChanged();
 }
 void BackgroundMusicController::setSongActivity(SongActivity activity)
 {
@@ -101,7 +107,7 @@ void BackgroundMusicController::refreshOutput()
         m_target = 0;
         m_output.setVolume(0);
         m_player.pause();
-        emit silenceReached();
+        Q_EMIT silenceReached();
     }
     reconcile();
 }
@@ -119,7 +125,7 @@ void BackgroundMusicController::reconcile()
     m_elapsed.start();
     if (target > 0) {
         if (m_player.source().isEmpty() || m_player.error() != QMediaPlayer::NoError)
-            m_player.setSource(QUrl(QStringLiteral("qrc:/assets/audio/atmosphere.ogg")));
+            m_player.setSource(QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
         // A synchronous backend error may already have cancelled this transition.
         if (!m_error.isEmpty())
             return;
@@ -141,7 +147,7 @@ void BackgroundMusicController::advanceFade()
     m_output.setVolume(float(m_target));
     if (m_target == 0) {
         m_player.pause();
-        emit silenceReached();
+        Q_EMIT silenceReached();
     }
 }
 }

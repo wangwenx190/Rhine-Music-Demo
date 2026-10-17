@@ -14,7 +14,7 @@ CHECKS = [
      "Qt logical item geometry maps position/mirroring into explicit source control extents. Rectangle/Shape/Text render through the selected scene graph backend; no shader/pass/format/camera or target precision changes."),
     ("COMMON-04", "qml/Yalahoo/Music/panels/PlaybackPanel.qml", "onMoved: root.playback.volume = value",
      "Volume/seek/device widgets retain existing public PlaybackController routes. Visual replacement adds no audio object, engine, media IO or frame-based playback loop; navigation and panel ownership stay separate."),
-    ("COMMON-05", "tools/review/ControlsAudit.cpp", 'check("unicode-ime-selection"',
+    ("COMMON-05", "tools/review/ControlsAudit.cpp", 'check(u"unicode-ime-selection"_s',
      "ControlsReview checks actual Qt key/IME/selection/undo semantics and source geometry in its own render target. Host panel tests exercise production trees. Hidden results cannot certify physical input, OS accessibility or another target."),
     ("PERF-01", "qml/Yalahoo/Music/components/ArchiveComboBox.qml", "optionsWidth",
      "Natural width measures only the bounded choice model on model/font change. Library result virtual views remain in their existing owners; no library-wide traversal or per-frame text measurement was added."),

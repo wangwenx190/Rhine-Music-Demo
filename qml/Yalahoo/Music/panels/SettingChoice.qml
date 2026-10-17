@@ -12,7 +12,7 @@ Item {
     signal chosen(var value)
     width: parent ? parent.width : 300
     implicitHeight: Math.max(caption.implicitHeight, choice.implicitHeight)
-    function focusControl() {
+    function focusControl(): void {
         choice.forceActiveFocus();
     }
     ArchiveText {
@@ -34,7 +34,7 @@ Item {
         model: root.choices
         textRole: "label"
         valueRole: "value"
-        currentIndex: root.choices.findIndex(entry => entry.value === root.selected)
+        currentValue: root.selected
         onActivated: root.chosen(currentValue)
         Accessible.name: root.label
         disabledValue: "custom"

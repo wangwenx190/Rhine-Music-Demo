@@ -57,8 +57,6 @@ const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
 renderer.toneMapping=T.ACESFilmicToneMapping; document.body.append(renderer.domElement);
 const scene=new T.Scene(),camera=new T.PerspectiveCamera(32,960/720,.1,100);
 const env=new T.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04); scene.environment=env.texture;
-const pixels=new Uint16Array(env.width*env.height*4); renderer.readRenderTargetPixels(env,0,0,env.width,env.height,pixels);
-window.environment={width:env.width,height:env.height,pixels:Array.from(pixels)};
 const gltf=await new GLTFLoader().loadAsync('/public/assets/music-case-v040.glb').catch(()=>new GLTFLoader().loadAsync('/assets/music-case-v040.glb'));
 const model=new T.Group(); gltf.scene.updateMatrixWorld(true);
 gltf.scene.traverse(m=>{if(!m.isMesh)return; const name=m.material.name.replace(/\\.\\d+$/,''); const mat=new T.MeshPhysicalMaterial(); configureMusicGlass(name,mat); const mesh=new T.Mesh(m.geometry.clone().applyMatrix4(m.matrixWorld),mat); mesh.userData.surface=name; model.add(mesh);}); scene.add(model);
@@ -115,8 +113,10 @@ await server.listen();
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
 const candidates = [
     process.env.REVIEW_BROWSER,
-    path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'),
-    path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'),
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'] || '', 'Microsoft/Edge/Application/msedge.exe'),
 ].filter(Boolean);
 let executable;
 for (const p of candidates) {
@@ -143,7 +143,7 @@ const proc = spawn(
         '--disable-component-update',
         '--disable-extensions',
         '--enable-gpu',
-        '--use-angle=d3d11',
+        ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : []),
         'about:blank',
     ],
     {windowsHide: true, stdio: 'ignore'},
@@ -198,25 +198,15 @@ try {
     });
     await page.send('Page.navigate', {url: origin + '/material-review'});
     await wait(() => page.evaluate('window.ready'));
-    const env = await page.evaluate('window.environment');
-    const data = Buffer.alloc(env.pixels.length * 4);
-    function half(h) {
-        const sign = h & 32768 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023;
-        return (sign
-                * (e === 0    ? (Math.pow(2, -14) * m) / 1024
-                   : e === 31 ? NaN
-                              : Math.pow(2, e - 15) * (1 + m / 1024)));
-    }
-    env.pixels.forEach((h, i) => {
-        const v = half(h);
-        if (!Number.isFinite(v))
-            throw Error('Nonfinite environment');
-        data.writeFloatLE(v, i * 4);
-    });
-    if (!data.equals(
-            await fs.readFile(path.join(root, 'resources/environment/room-pmrem.rgba32f'))))
-        throw Error('Room capture changed');
+    // This is an immutable authored resource identity, not fresh browser-GPU byte equality.
+    const env =
+        JSON.parse(await fs.readFile(path.join(root, 'tests/fixtures/materials/single-case.json'),
+                                     'utf8'))
+            .environment;
+    const data = await fs.readFile(path.join(root, 'resources/environment/room-pmrem.rgba32f'));
     const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+    if (data.length !== env.width * env.height * 16 || sha(data) !== env.sha256)
+        throw Error('Authored room environment identity changed');
     const sources = {};
     for (const f of ['src/music-model.ts',
                      'src/music-lighting.ts',

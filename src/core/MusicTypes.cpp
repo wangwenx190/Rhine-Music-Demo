@@ -4,14 +4,37 @@
 #include <QJsonArray>
 #include <QSet>
 #include <QRegularExpression>
+#include <QCoreApplication>
+#include <QTextBoundaryFinder>
+#include <cmath>
+#include <initializer_list>
+#include <limits>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+QString graphemePrefix(const QString &text, qsizetype maxCodeUnits)
+{
+    if (maxCodeUnits <= 0)
+        return { };
+    if (text.size() <= maxCodeUnits)
+        return text;
+    // A complete following scalar is sufficient to classify the cut boundary.
+    // Do not allocate boundary attributes for an arbitrarily long metadata tail.
+    const auto examined = maxCodeUnits + qMin(qsizetype(2), text.size() - maxCodeUnits);
+    QTextBoundaryFinder boundary(QTextBoundaryFinder::Grapheme, text.constData(), examined);
+    if (!boundary.isValid())
+        return { };
+    boundary.setPosition(maxCodeUnits);
+    if (!boundary.isAtBoundary())
+        boundary.toPreviousBoundary();
+    return text.left(qMax(qsizetype(0), boundary.position()));
+}
 QPair<QString, QString> albumTitleParts(const QString &text)
 {
-    static const QRegularExpression pattern(QStringLiteral("^(.+?)[（(]([^（）()]+)[）)]\\s*$"));
-    static const QRegularExpression han(QStringLiteral("\\p{Han}"));
-    static const QRegularExpression latin(QStringLiteral("[a-z]"),
-                                          QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression pattern(u"^(.+?)[\uff08(]([^\uff08\uff09()]+)[\uff09)]\\s*$"_s);
+    static const QRegularExpression han(u"\\p{Han}"_s);
+    static const QRegularExpression latin(u"[a-z]"_s, QRegularExpression::CaseInsensitiveOption);
     const auto match = pattern.match(text.trimmed());
     if (match.hasMatch() && match.captured(1).contains(han) && match.captured(2).contains(latin)
         && !match.captured(2).contains(han))
@@ -20,22 +43,59 @@ QPair<QString, QString> albumTitleParts(const QString &text)
 }
 
 namespace {
-std::optional<int> integer(const QJsonObject &json, const char *key)
+bool validFields(const QJsonObject &json, QJsonValue::Type type,
+                 std::initializer_list<QLatin1StringView> keys)
 {
-    return json.value(QLatin1String(key)).isDouble()
-            ? std::optional(json.value(QLatin1String(key)).toInt())
-            : std::nullopt;
+    for (const auto key : keys) {
+        const auto value = json.value(key);
+        if (!value.isUndefined() && !value.isNull() && value.type() != type)
+            return false;
+    }
+    return true;
+}
+bool validStringArray(const QJsonValue &value)
+{
+    if (value.isUndefined() || value.isNull())
+        return true;
+    if (!value.isArray())
+        return false;
+    for (const auto &entry : value.toArray())
+        if (!entry.isString())
+            return false;
+    return true;
+}
+bool validIntegers(const QJsonObject &json, std::initializer_list<QLatin1StringView> keys)
+{
+    for (const auto key : keys) {
+        const auto value = json.value(key);
+        if (value.isUndefined() || value.isNull())
+            continue;
+        if (!value.isDouble())
+            return false;
+        const double number = value.toDouble();
+        if (!std::isfinite(number) || std::trunc(number) != number
+            || number < std::numeric_limits<int>::min() || number > std::numeric_limits<int>::max())
+            return false;
+    }
+    return true;
+}
+std::optional<int> integer(const QJsonObject &json, QLatin1StringView key)
+{
+    const auto value = json.value(key);
+    return value.isDouble() ? std::optional(value.toInt()) : std::nullopt;
 }
 QUrl localUrl(const QString &value)
 {
-    if (value.isEmpty())
+    if (value.isEmpty() || value.contains(QChar::Null))
         return { };
     const QUrl url(value);
     if (url.isLocalFile())
-        return url;
-    return QDir::isAbsolutePath(value) && !value.startsWith(QLatin1String("//"))
-            ? QUrl::fromLocalFile(value)
-            : QUrl{ };
+        return url.isValid() && !url.hasQuery() && !url.hasFragment()
+                        && QDir::isAbsolutePath(url.toLocalFile())
+                ? url
+                : QUrl{ };
+    return QDir::isAbsolutePath(value) && !value.startsWith("//"_L1) ? QUrl::fromLocalFile(value)
+                                                                     : QUrl{ };
 }
 QStringList strings(const QJsonArray &array)
 {
@@ -44,19 +104,19 @@ QStringList strings(const QJsonArray &array)
         result.append(value.toString());
     return result;
 }
-void put(QJsonObject &json, const char *key, std::optional<int> value)
+void put(QJsonObject &json, QLatin1StringView key, std::optional<int> value)
 {
     if (value)
-        json.insert(QLatin1String(key), *value);
+        json.insert(key, *value);
     else
-        json.remove(QLatin1String(key));
+        json.remove(key);
 }
-void putObject(QJsonObject &json, const char *key, const QJsonObject &value)
+void putObject(QJsonObject &json, QLatin1StringView key, const QJsonObject &value)
 {
     if (!value.isEmpty())
-        json.insert(QLatin1String(key), value);
+        json.insert(key, value);
     else
-        json.remove(QLatin1String(key));
+        json.remove(key);
 }
 }
 const Album *LibrarySnapshot::album(const QString &id) const
@@ -78,11 +138,11 @@ QString supportName(MediaSupport support)
 {
     switch (support) {
     case MediaSupport::Supported:
-        return QStringLiteral("Supported");
+        return u"Supported"_s;
     case MediaSupport::Unsupported:
-        return QStringLiteral("Unsupported");
+        return u"Unsupported"_s;
     default:
-        return QStringLiteral("Unknown");
+        return u"Unknown"_s;
     }
 }
 bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *error)
@@ -92,103 +152,150 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             *error = message;
         return false;
     };
-    if (!json.value("albums").isArray() || !json.value("genres").isArray())
-        return fail(QStringLiteral("Library requires albums and genres arrays"));
-    if (json.contains("roots") && !json.value("roots").isArray())
-        return fail(QStringLiteral("Library roots must be an array"));
+    if (!json.value(u"albums"_s).isArray() || !json.value(u"genres"_s).isArray())
+        return fail(u"Library requires albums and genres arrays"_s);
+    if (json.contains(u"roots"_s) && !json.value(u"roots"_s).isArray())
+        return fail(u"Library roots must be an array"_s);
+    if (!validFields(json, QJsonValue::Object,
+                     { "scan"_L1, "enrich"_L1, "introductions"_L1, "credits"_L1 })
+        || !validFields(json, QJsonValue::Bool, { "onlineEnabled"_L1 }))
+        return fail(u"Invalid library metadata types"_s);
     LibrarySnapshot library;
     library.fields = json;
-    for (const auto &key : { "albums", "genres", "roots" })
+    for (const auto &key : { u"albums"_s, u"genres"_s, u"roots"_s })
         library.fields.remove(key);
-    library.scan = json.value("scan").toObject();
-    library.enrich = json.value("enrich").toObject();
-    library.introductions = json.value("introductions").toObject();
-    library.credits = json.value("credits").toObject();
-    library.onlineEnabled = json.value("onlineEnabled").toBool();
+    library.scan = json.value(u"scan"_s).toObject();
+    library.enrich = json.value(u"enrich"_s).toObject();
+    library.introductions = json.value(u"introductions"_s).toObject();
+    library.credits = json.value(u"credits"_s).toObject();
+    library.onlineEnabled = json.value(u"onlineEnabled"_s).toBool();
     QSet<QString> albumIds, trackIds, genreIds;
-    for (const auto &value : json.value("genres").toArray()) {
+    for (const auto &value : json.value(u"genres"_s).toArray()) {
         const auto object = value.toObject();
-        Genre genre{ object.value("id").toString(), object.value("name").toString(),
-                     strings(object.value("aliases").toArray()), integer(object, "albumCount"),
-                     object };
+        if (!value.isObject() || !validFields(object, QJsonValue::String, { "id"_L1, "name"_L1 })
+            || !validStringArray(object.value("aliases"_L1)))
+            return fail(u"Invalid genre metadata types"_s);
+        if (!validIntegers(object, { "albumCount"_L1 }))
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid genre integer metadata"));
+        Genre genre{ object.value(u"id"_s).toString(), object.value(u"name"_s).toString(),
+                     strings(object.value(u"aliases"_s).toArray()),
+                     integer(object, "albumCount"_L1), object };
         if (genre.id.isEmpty() || genreIds.contains(genre.id))
-            return fail(QStringLiteral("Invalid or duplicate genre ID"));
+            return fail(u"Invalid or duplicate genre ID"_s);
         genreIds.insert(genre.id);
         library.genres.append(genre);
     }
-    for (const auto &value : json.value("albums").toArray()) {
+    for (const auto &value : json.value(u"albums"_s).toArray()) {
         const auto object = value.toObject();
         Album album;
-        if (!object.value("tracks").isArray()
-            || (object.contains("producers") && !object.value("producers").isArray()))
-            return fail(QStringLiteral("Album tracks/producers must be arrays"));
+        if (!value.isObject()
+            || !validFields(object, QJsonValue::String,
+                            { "id"_L1, "title"_L1, "artist"_L1, "genreId"_L1, "description"_L1,
+                              "localNote"_L1, "folder"_L1, "folderUrl"_L1, "coverUrl"_L1 })
+            || !validFields(
+                    object, QJsonValue::Object,
+                    { "descriptionSource"_L1, "introduction"_L1, "creditsLookup"_L1, "online"_L1 })
+            || !validFields(object, QJsonValue::Bool, { "offline"_L1 })
+            || !validStringArray(object.value("rawGenres"_L1)))
+            return fail(u"Invalid album metadata types"_s);
+        if (!object.value(u"tracks"_s).isArray()
+            || (object.contains(u"producers"_s) && !object.value(u"producers"_s).isArray()))
+            return fail(u"Album tracks/producers must be arrays"_s);
         album.fields = object;
-        album.fields.remove("tracks");
-        album.fields.remove("producers");
-        album.id = object.value("id").toString();
+        album.fields.remove(u"tracks"_s);
+        album.fields.remove(u"producers"_s);
+        album.id = object.value(u"id"_s).toString();
         if (album.id.isEmpty() || albumIds.contains(album.id))
-            return fail(QStringLiteral("Invalid or duplicate album ID"));
+            return fail(u"Invalid or duplicate album ID"_s);
         albumIds.insert(album.id);
-        album.title = object.value("title").toString();
-        album.artist = object.value("artist").toString();
-        album.genreId = object.value("genreId").toString();
-        album.year = integer(object, "year");
-        album.discCount = integer(object, "discCount");
-        album.rawGenres = strings(object.value("rawGenres").toArray());
-        album.description = object.value("description").toString();
-        album.localNote = object.value("localNote").toString();
-        album.descriptionSource = object.value("descriptionSource").toObject();
-        album.introduction = object.value("introduction").toObject();
-        album.creditsLookup = object.value("creditsLookup").toObject();
-        album.online = object.value("online").toObject();
-        album.offline = object.value("offline").toBool();
-        album.folderLabel = object.value("folder").toString();
-        album.folder = localUrl(object.value("folderUrl").toString(album.folderLabel));
-        const QString cover = object.value("coverUrl").toString();
-        album.coverUrl = cover.startsWith(QLatin1String("qrc:/")) ? QUrl(cover) : localUrl(cover);
-        for (const auto &entry : object.value("tracks").toArray()) {
+        album.title = object.value(u"title"_s).toString();
+        album.artist = object.value(u"artist"_s).toString();
+        album.genreId = object.value(u"genreId"_s).toString();
+        if (!validIntegers(object, { "year"_L1, "discCount"_L1 }))
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid album integer metadata"));
+        album.year = integer(object, "year"_L1);
+        album.discCount = integer(object, "discCount"_L1);
+        album.rawGenres = strings(object.value(u"rawGenres"_s).toArray());
+        album.description = object.value(u"description"_s).toString();
+        album.localNote = object.value(u"localNote"_s).toString();
+        album.descriptionSource = object.value(u"descriptionSource"_s).toObject();
+        album.introduction = object.value(u"introduction"_s).toObject();
+        album.creditsLookup = object.value(u"creditsLookup"_s).toObject();
+        album.online = object.value(u"online"_s).toObject();
+        album.offline = object.value(u"offline"_s).toBool();
+        album.folderLabel = object.value(u"folder"_s).toString();
+        album.folder = localUrl(object.value(u"folderUrl"_s).toString(album.folderLabel));
+        const QString cover = object.value(u"coverUrl"_s).toString();
+        album.coverUrl = cover.startsWith("qrc:/"_L1) ? QUrl(cover) : localUrl(cover);
+        for (const auto &entry : object.value(u"tracks"_s).toArray()) {
             const auto trackObject = entry.toObject();
             Track track;
+            if (!entry.isObject()
+                || !validFields(trackObject, QJsonValue::String,
+                                { "id"_L1, "albumId"_L1, "title"_L1, "artist"_L1, "format"_L1,
+                                  "codec"_L1, "relativePath"_L1, "sourceUrl"_L1,
+                                  "mediaSupport"_L1 })
+                || !validFields(trackObject, QJsonValue::Bool, { "lossless"_L1 }))
+                return fail(u"Invalid track metadata types"_s);
             track.fields = trackObject;
-            track.id = trackObject.value("id").toString();
-            track.albumId = trackObject.value("albumId").toString(album.id);
+            track.id = trackObject.value(u"id"_s).toString();
+            track.albumId = trackObject.value(u"albumId"_s).toString(album.id);
             if (track.id.isEmpty() || trackIds.contains(track.id) || track.albumId != album.id)
-                return fail(QStringLiteral("Invalid, duplicate or mismatched track ID"));
+                return fail(u"Invalid, duplicate or mismatched track ID"_s);
             trackIds.insert(track.id);
-            track.title = trackObject.value("title").toString();
-            track.artist = trackObject.value("artist").toString();
-            track.format = trackObject.value("format").toString();
-            track.codec = trackObject.value("codec").toString();
-            track.relativePath = trackObject.value("relativePath").toString();
-            track.duration = trackObject.value("duration").toDouble();
-            track.trackNumber = integer(trackObject, "trackNumber");
-            track.discNumber = integer(trackObject, "discNumber");
-            track.bitsPerSample = integer(trackObject, "bitsPerSample");
-            track.sampleRate = integer(trackObject, "sampleRate");
-            track.bitrate = integer(trackObject, "bitrate");
-            if (trackObject.value("lossless").isBool())
-                track.lossless = trackObject.value("lossless").toBool();
-            track.sourceUrl = localUrl(trackObject.value("sourceUrl").toString());
-            const QString support = trackObject.value("mediaSupport").toString();
-            if (support == QLatin1String("Supported"))
+            track.title = trackObject.value(u"title"_s).toString();
+            track.artist = trackObject.value(u"artist"_s).toString();
+            track.format = trackObject.value(u"format"_s).toString();
+            track.codec = trackObject.value(u"codec"_s).toString();
+            track.relativePath = trackObject.value(u"relativePath"_s).toString();
+            if (!validIntegers(trackObject,
+                               { "trackNumber"_L1, "discNumber"_L1, "bitsPerSample"_L1,
+                                 "sampleRate"_L1, "bitrate"_L1 }))
+                return fail(
+                        QCoreApplication::translate("Yalahoo", "Invalid track integer metadata"));
+            const auto duration = trackObject.value(u"duration"_s);
+            if (!duration.isUndefined() && !duration.isNull()
+                && (!duration.isDouble() || !std::isfinite(duration.toDouble())
+                    || duration.toDouble() < 0))
+                return fail(QCoreApplication::translate("Yalahoo", "Invalid track duration"));
+            track.duration = duration.toDouble();
+            track.trackNumber = integer(trackObject, "trackNumber"_L1);
+            track.discNumber = integer(trackObject, "discNumber"_L1);
+            track.bitsPerSample = integer(trackObject, "bitsPerSample"_L1);
+            track.sampleRate = integer(trackObject, "sampleRate"_L1);
+            track.bitrate = integer(trackObject, "bitrate"_L1);
+            if (trackObject.value(u"lossless"_s).isBool())
+                track.lossless = trackObject.value(u"lossless"_s).toBool();
+            track.sourceUrl = localUrl(trackObject.value(u"sourceUrl"_s).toString());
+            const QString support = trackObject.value(u"mediaSupport"_s).toString();
+            if (support == "Supported"_L1)
                 track.mediaSupport = MediaSupport::Supported;
-            else if (support == QLatin1String("Unsupported"))
+            else if (support == "Unsupported"_L1)
                 track.mediaSupport = MediaSupport::Unsupported;
             album.tracks.append(track);
         }
-        for (const auto &entry : object.value("producers").toArray()) {
+        for (const auto &entry : object.value(u"producers"_s).toArray()) {
             const auto p = entry.toObject();
-            album.producers.append({ p.value("name").toString(), p.value("role").toString(),
-                                     p.value("source").toString(), p.value("trackId").toString(),
-                                     p.value("trackTitle").toString(), p.value("url").toString(),
-                                     p });
+            if (!entry.isObject()
+                || !validFields(p, QJsonValue::String,
+                                { "name"_L1, "role"_L1, "source"_L1, "trackId"_L1, "trackTitle"_L1,
+                                  "url"_L1 }))
+                return fail(u"Invalid producer metadata types"_s);
+            album.producers.append(
+                    { p.value(u"name"_s).toString(), p.value(u"role"_s).toString(),
+                      p.value(u"source"_s).toString(), p.value(u"trackId"_s).toString(),
+                      p.value(u"trackTitle"_s).toString(), p.value(u"url"_s).toString(), p });
         }
         library.albums.append(album);
     }
-    for (const auto &entry : json.value("roots").toArray()) {
+    for (const auto &entry : json.value(u"roots"_s).toArray()) {
         const auto r = entry.toObject();
-        library.roots.append({ localUrl(r.value("path").toString()), r.value("status").toString(),
-                               r.value("error").toString(), r });
+        if (!entry.isObject()
+            || !validFields(r, QJsonValue::String, { "path"_L1, "status"_L1, "error"_L1 }))
+            return fail(u"Invalid root metadata types"_s);
+        library.roots.append({ localUrl(r.value(u"path"_s).toString()),
+                               r.value(u"status"_s).toString(), r.value(u"error"_s).toString(),
+                               r });
     }
     output = std::move(library);
     if (error)
@@ -198,25 +305,25 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
 QJsonObject toJson(const Track &track)
 {
     QJsonObject json = track.fields;
-    json.insert("id", track.id);
-    json.insert("albumId", track.albumId);
-    json.insert("title", track.title);
-    json.insert("artist", track.artist);
-    json.insert("format", track.format);
-    json.insert("codec", track.codec);
-    json.insert("relativePath", track.relativePath);
-    json.insert("duration", track.duration);
-    json.insert("sourceUrl", track.sourceUrl.toString());
-    json.insert("mediaSupport", supportName(track.mediaSupport));
-    put(json, "trackNumber", track.trackNumber);
-    put(json, "discNumber", track.discNumber);
-    put(json, "bitsPerSample", track.bitsPerSample);
-    put(json, "sampleRate", track.sampleRate);
-    put(json, "bitrate", track.bitrate);
+    json.insert(u"id"_s, track.id);
+    json.insert(u"albumId"_s, track.albumId);
+    json.insert(u"title"_s, track.title);
+    json.insert(u"artist"_s, track.artist);
+    json.insert(u"format"_s, track.format);
+    json.insert(u"codec"_s, track.codec);
+    json.insert(u"relativePath"_s, track.relativePath);
+    json.insert(u"duration"_s, track.duration);
+    json.insert(u"sourceUrl"_s, track.sourceUrl.toString());
+    json.insert(u"mediaSupport"_s, supportName(track.mediaSupport));
+    put(json, "trackNumber"_L1, track.trackNumber);
+    put(json, "discNumber"_L1, track.discNumber);
+    put(json, "bitsPerSample"_L1, track.bitsPerSample);
+    put(json, "sampleRate"_L1, track.sampleRate);
+    put(json, "bitrate"_L1, track.bitrate);
     if (track.lossless)
-        json.insert("lossless", *track.lossless);
+        json.insert(u"lossless"_s, *track.lossless);
     else
-        json.remove("lossless");
+        json.remove(u"lossless"_s);
     return json;
 }
 QJsonArray producerData(const QList<Producer> &entries)
@@ -224,12 +331,12 @@ QJsonArray producerData(const QList<Producer> &entries)
     QJsonArray result;
     for (const auto &p : entries) {
         auto object = p.fields;
-        object.insert("name", p.name);
-        object.insert("role", p.role);
-        object.insert("source", p.source);
-        object.insert("trackId", p.trackId);
-        object.insert("trackTitle", p.trackTitle);
-        object.insert("url", p.url);
+        object.insert(u"name"_s, p.name);
+        object.insert(u"role"_s, p.role);
+        object.insert(u"source"_s, p.source);
+        object.insert(u"trackId"_s, p.trackId);
+        object.insert(u"trackTitle"_s, p.trackTitle);
+        object.insert(u"url"_s, p.url);
         result.append(object);
     }
     return result;
@@ -237,31 +344,31 @@ QJsonArray producerData(const QList<Producer> &entries)
 QJsonObject toJson(const Album &album)
 {
     QJsonObject json = album.fields;
-    json.insert("id", album.id);
-    json.insert("title", album.title);
-    json.insert("artist", album.artist);
-    json.insert("genreId", album.genreId);
-    json.insert("description", album.description);
-    json.insert("localNote", album.localNote);
-    json.insert("folder", album.folderLabel);
-    json.insert("folderUrl", album.folder.toString());
+    json.insert(u"id"_s, album.id);
+    json.insert(u"title"_s, album.title);
+    json.insert(u"artist"_s, album.artist);
+    json.insert(u"genreId"_s, album.genreId);
+    json.insert(u"description"_s, album.description);
+    json.insert(u"localNote"_s, album.localNote);
+    json.insert(u"folder"_s, album.folderLabel);
+    json.insert(u"folderUrl"_s, album.folder.toString());
     if (!album.coverUrl.isEmpty())
-        json.insert("coverUrl", album.coverUrl.toString());
+        json.insert(u"coverUrl"_s, album.coverUrl.toString());
     else
-        json.remove("coverUrl");
-    json.insert("offline", album.offline);
-    json.insert("rawGenres", QJsonArray::fromStringList(album.rawGenres));
-    put(json, "year", album.year);
-    put(json, "discCount", album.discCount);
-    putObject(json, "descriptionSource", album.descriptionSource);
-    putObject(json, "introduction", album.introduction);
-    putObject(json, "creditsLookup", album.creditsLookup);
-    putObject(json, "online", album.online);
+        json.remove(u"coverUrl"_s);
+    json.insert(u"offline"_s, album.offline);
+    json.insert(u"rawGenres"_s, QJsonArray::fromStringList(album.rawGenres));
+    put(json, "year"_L1, album.year);
+    put(json, "discCount"_L1, album.discCount);
+    putObject(json, "descriptionSource"_L1, album.descriptionSource);
+    putObject(json, "introduction"_L1, album.introduction);
+    putObject(json, "creditsLookup"_L1, album.creditsLookup);
+    putObject(json, "online"_L1, album.online);
     QJsonArray tracks;
     for (const auto &track : album.tracks)
         tracks.append(toJson(track));
-    json.insert("tracks", tracks);
-    json.insert("producers", producerData(album.producers));
+    json.insert(u"tracks"_s, tracks);
+    json.insert(u"producers"_s, producerData(album.producers));
     return json;
 }
 QJsonObject toJson(const LibrarySnapshot &library)
@@ -272,28 +379,28 @@ QJsonObject toJson(const LibrarySnapshot &library)
         albums.append(toJson(album));
     for (const auto &g : library.genres) {
         auto object = g.fields;
-        object.insert("id", g.id);
-        object.insert("name", g.name);
-        object.insert("aliases", QJsonArray::fromStringList(g.aliases));
-        put(object, "albumCount", g.albumCount);
+        object.insert(u"id"_s, g.id);
+        object.insert(u"name"_s, g.name);
+        object.insert(u"aliases"_s, QJsonArray::fromStringList(g.aliases));
+        put(object, "albumCount"_L1, g.albumCount);
         genres.append(object);
     }
     for (const auto &r : library.roots) {
         auto object = r.fields;
         if (!r.path.isEmpty())
-            object.insert("path", r.path.toLocalFile());
-        object.insert("status", r.status);
-        object.insert("error", r.error);
+            object.insert(u"path"_s, r.path.toLocalFile());
+        object.insert(u"status"_s, r.status);
+        object.insert(u"error"_s, r.error);
         roots.append(object);
     }
-    json.insert("albums", albums);
-    json.insert("genres", genres);
-    json.insert("roots", roots);
-    json.insert("scan", library.scan);
-    json.insert("onlineEnabled", library.onlineEnabled);
-    putObject(json, "enrich", library.enrich);
-    putObject(json, "introductions", library.introductions);
-    putObject(json, "credits", library.credits);
+    json.insert(u"albums"_s, albums);
+    json.insert(u"genres"_s, genres);
+    json.insert(u"roots"_s, roots);
+    json.insert(u"scan"_s, library.scan);
+    json.insert(u"onlineEnabled"_s, library.onlineEnabled);
+    putObject(json, "enrich"_L1, library.enrich);
+    putObject(json, "introductions"_L1, library.introductions);
+    putObject(json, "credits"_L1, library.credits);
     return json;
 }
 }

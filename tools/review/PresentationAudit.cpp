@@ -19,6 +19,8 @@
 #include <QTest>
 #include <atomic>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 QQuickItem *findVisual(QQuickItem *item, const QString &name)
@@ -39,41 +41,49 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     LibrarySession library(&provider);
     LibrarySnapshot snapshot;
     Album album;
-    album.id = "anonymous-detail";
-    album.title = "收藏的声音 · Anonymous Archive";
-    album.artist = "匿名音乐人";
-    album.description = "离线收藏中的专辑介绍。";
-    album.localNote = "匿名本地备注";
-    album.introduction = { { "status", "uncertain" } };
-    album.creditsLookup = { { "status", "partial" }, { "matchedTracks", 1 }, { "totalTracks", 2 } };
-    album.descriptionSource = { { "name", "匿名来源" },
-                                { "url", "https://example.invalid/album" },
-                                { "license", "测试输入" } };
-    album.producers.append({ "匿名制作人", "制作", "匿名来源", { }, { }, { }, { } });
+    album.id = "anonymous-detail"_L1;
+    album.title = u"\u6536\u85cf\u7684\u58f0\u97f3 \u00b7 Anonymous Archive"_s;
+    album.artist = u"\u533f\u540d\u97f3\u4e50\u4eba"_s;
+    album.description = u"\u79bb\u7ebf\u6536\u85cf\u4e2d\u7684\u4e13\u8f91\u4ecb\u7ecd\u3002"_s;
+    album.localNote = u"\u533f\u540d\u672c\u5730\u5907\u6ce8"_s;
+    album.introduction = { { u"status"_s, u"uncertain"_s } };
+    album.creditsLookup = { { u"status"_s, u"partial"_s },
+                            { u"matchedTracks"_s, 1 },
+                            { u"totalTracks"_s, 2 } };
+    album.descriptionSource = { { u"name"_s, u"\u533f\u540d\u6765\u6e90"_s },
+                                { u"url"_s, u"https://example.invalid/album"_s },
+                                { u"license"_s, u"\u6d4b\u8bd5\u8f93\u5165"_s } };
+    album.producers.append({ u"\u533f\u540d\u5236\u4f5c\u4eba"_s,
+                             u"\u5236\u4f5c"_s,
+                             u"\u533f\u540d\u6765\u6e90"_s,
+                             { },
+                             { },
+                             { },
+                             { } });
     for (int i = 0; i < 10000; ++i) {
         Track track;
-        track.id = QStringLiteral("anonymous-track-%1").arg(i);
+        track.id = u"anonymous-track-%1"_s.arg(i);
         track.albumId = album.id;
-        track.title = QStringLiteral("收藏曲目 %1 🎵").arg(i + 1);
+        track.title = u"\u6536\u85cf\u66f2\u76ee %1 \U0001f3b5"_s.arg(i + 1);
         track.artist = album.artist;
         track.duration = 185;
-        track.format = "FLAC";
+        track.format = "FLAC"_L1;
         track.discNumber = i < 5000 ? 1 : 2;
         album.tracks.append(track);
     }
-    album.producers.append({ "匿名制作人",
-                             "编曲",
-                             "匿名来源",
-                             "anonymous-track-0",
+    album.producers.append({ u"\u533f\u540d\u5236\u4f5c\u4eba"_s,
+                             u"\u7f16\u66f2"_s,
+                             u"\u533f\u540d\u6765\u6e90"_s,
+                             u"anonymous-track-0"_s,
                              { },
-                             "https://example.invalid/credit/0",
+                             u"https://example.invalid/credit/0"_s,
                              { } });
-    album.producers.append({ "匿名制作人",
-                             "演奏",
-                             "匿名来源",
-                             "anonymous-track-1",
+    album.producers.append({ u"\u533f\u540d\u5236\u4f5c\u4eba"_s,
+                             u"\u6f14\u594f"_s,
+                             u"\u533f\u540d\u6765\u6e90"_s,
+                             u"anonymous-track-1"_s,
                              { },
-                             "https://example.invalid/credit/1",
+                             u"https://example.invalid/credit/1"_s,
                              { } });
     snapshot.albums.append(album);
     library.setSnapshot(std::move(snapshot));
@@ -98,17 +108,18 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     });
     QQmlEngine engine;
     QSignalSpy warnings(&engine, &QQmlEngine::warnings);
-    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/DetailReview.qml"));
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/DetailReview.qml"_s));
     std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { "metrics", QVariant::fromValue(&metrics) },
-              { "presentation", QVariant::fromValue(&presentation) },
-              { "detailModel", QVariant::fromValue(&model) },
-              { "offscreenRendering", OffscreenSurface::Enabled } }));
+            { { u"metrics"_s, QVariant::fromValue(&metrics) },
+              { u"presentation"_s, QVariant::fromValue(&presentation) },
+              { u"detailModel"_s, QVariant::fromValue(&model) },
+              { u"offscreenRendering"_s, OffscreenSurface::Enabled } }));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
         qWarning() << component.errors();
         return 3;
     }
+    std::atomic<quint64> requestedFrame{ 0 }, synchronizedFrame{ 0 }, presentedFrame{ 0 };
     QQuickRenderControl control;
     QQuickWindow window(OffscreenSurface::Enabled ? &control : nullptr);
     window.setPersistentGraphics(false);
@@ -118,7 +129,6 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     root->setParentItem(window.contentItem());
     QSignalSpy frames(&surface, &OffscreenSurface::frameRendered);
     QSignalSpy swaps(&window, &QQuickWindow::frameSwapped);
-    std::atomic<quint64> requestedFrame{ 0 }, synchronizedFrame{ 0 }, presentedFrame{ 0 };
     QObject::connect(
             &window, &QQuickWindow::afterSynchronizing, &window,
             [&] {
@@ -151,11 +161,11 @@ int reviewPresentation(QGuiApplication &, const QString &output)
         if (!item)
             return QJsonObject{ };
         const auto point = item->mapToItem(origin, { 0, 0 });
-        return QJsonObject{ { "x", point.x() },
-                            { "y", point.y() },
-                            { "width", item->width() },
-                            { "height", item->height() },
-                            { "fontSize", item->property("cssPixelSize").toDouble() } };
+        return QJsonObject{ { u"x"_s, point.x() },
+                            { u"y"_s, point.y() },
+                            { u"width"_s, item->width() },
+                            { u"height"_s, item->height() },
+                            { u"fontSize"_s, item->property("cssPixelSize").toDouble() } };
     };
     const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                               { 960, 900 },   { 930, 900 },   { 390, 844 },
@@ -198,48 +208,48 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                         && titleY >= expectedTop && titleY - expectedTop < 60;
                 passed = geometry && presentation.detailEnabled() && page->isEnabled() && passed;
                 const auto image = surface.grab();
-                const auto file = QStringLiteral("detail-%1x%2-%3-dpr%4.png")
-                                          .arg(size.width())
+                const auto file = u"detail-%1x%2-%3-dpr%4.png"_s.arg(size.width())
                                           .arg(size.height())
-                                          .arg(night ? "night" : "day")
+                                          .arg(night ? "night"_L1 : "day"_L1)
                                           .arg(dpr);
                 passed = !image.isNull() && image.save(QDir(output).filePath(file)) && passed;
-                auto find = [&](const char *name) {
-                    return findVisual(root, QString::fromLatin1(name));
+                auto find = [&](const QString &name) {
+                    return findVisual(root, name);
                 };
-                QJsonObject fields{ { "article", bounds(list, root) },
-                                    { "caption", bounds(find("detailCaption"), root) },
-                                    { "back", bounds(find("detailBack"), root) },
-                                    { "title", bounds(title, list) },
-                                    { "artist", bounds(find("detailArtist"), list) },
-                                    { "facts", bounds(find("detailFacts"), list) },
-                                    { "factLabel", bounds(find("detailFactLabel"), list) },
-                                    { "factValue", bounds(find("detailFactValue"), list) },
-                                    { "tabs", bounds(find("detailTabs"), list) },
-                                    { "trackTitle", bounds(find("detailTrackTitle"), list) },
-                                    { "trackArtist", bounds(find("detailTrackArtist"), list) } };
+                QJsonObject fields{ { u"article"_s, bounds(list, root) },
+                                    { u"caption"_s, bounds(find(u"detailCaption"_s), root) },
+                                    { u"back"_s, bounds(find(u"detailBack"_s), root) },
+                                    { u"title"_s, bounds(title, list) },
+                                    { u"artist"_s, bounds(find(u"detailArtist"_s), list) },
+                                    { u"facts"_s, bounds(find(u"detailFacts"_s), list) },
+                                    { u"factLabel"_s, bounds(find(u"detailFactLabel"_s), list) },
+                                    { u"factValue"_s, bounds(find(u"detailFactValue"_s), list) },
+                                    { u"tabs"_s, bounds(find(u"detailTabs"_s), list) },
+                                    { u"trackTitle"_s, bounds(find(u"detailTrackTitle"_s), list) },
+                                    { u"trackArtist"_s,
+                                      bounds(find(u"detailTrackArtist"_s), list) } };
                 // QML list width excludes CSS padding; the scroll box includes it.
-                auto article = fields["article"].toObject();
-                article["width"] = list->width() + (metrics.portrait() ? 5 : 9);
-                fields["article"] = article;
-                auto facts = fields["facts"].toObject();
-                facts["gap"] = find("detailFacts")->property("columnSpacing").toDouble();
-                facts["rowGap"] = find("detailFacts")->property("rowSpacing").toDouble();
+                auto article = fields[u"article"_s].toObject();
+                article[u"width"_s] = list->width() + (metrics.portrait() ? 5 : 9);
+                fields[u"article"_s] = article;
+                auto facts = fields[u"facts"_s].toObject();
+                facts[u"gap"_s] = find(u"detailFacts"_s)->property("columnSpacing").toDouble();
+                facts[u"rowGap"_s] = find(u"detailFacts"_s)->property("rowSpacing").toDouble();
                 // CSS facts includes its two separately drawn borders.
-                facts["y"] = facts["y"].toDouble() - 1;
-                facts["height"] = facts["height"].toDouble() + 2;
-                fields["facts"] = facts;
-                captures.append(QJsonObject{ { "fields", fields },
-                                             { "width", size.width() },
-                                             { "height", size.height() },
-                                             { "night", night },
-                                             { "geometryPassed", geometry },
-                                             { "listX", list->x() },
-                                             { "listY", list->y() },
-                                             { "titleSceneY", titleY },
-                                             { "expectedTop", expectedTop },
-                                             { "image", file },
-                                             { "dpr", window.effectiveDevicePixelRatio() } });
+                facts[u"y"_s] = facts[u"y"_s].toDouble() - 1;
+                facts[u"height"_s] = facts[u"height"_s].toDouble() + 2;
+                fields[u"facts"_s] = facts;
+                captures.append(QJsonObject{ { u"fields"_s, fields },
+                                             { u"width"_s, size.width() },
+                                             { u"height"_s, size.height() },
+                                             { u"night"_s, night },
+                                             { u"geometryPassed"_s, geometry },
+                                             { u"listX"_s, list->x() },
+                                             { u"listY"_s, list->y() },
+                                             { u"titleSceneY"_s, titleY },
+                                             { u"expectedTop"_s, expectedTop },
+                                             { u"image"_s, file },
+                                             { u"dpr"_s, window.effectiveDevicePixelRatio() } });
                 presentation.back();
                 passed = !page->isEnabled() && passed;
                 presentation.update();
@@ -252,13 +262,12 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     presentation.update();
     passed = render() && passed;
     auto *list = root->findChild<QQuickItem *>("detailTrackList");
-    passed = QMetaObject::invokeMethod(list, "positionViewAtIndex", Q_ARG(QVariant, 8000),
-                                       Q_ARG(QVariant, 0))
+    passed = QMetaObject::invokeMethod(list, "positionViewAtIndex", Q_ARG(int, 8000), Q_ARG(int, 0))
             && passed;
     passed = render() && passed;
     int delegates = 0;
     const auto visit = [&](auto &&self, QQuickItem *item) -> void {
-        if (item->objectName() == "trackDelegate")
+        if (item->objectName() == "trackDelegate"_L1)
             ++delegates;
         for (auto *child : item->childItems())
             self(self, child);
@@ -290,38 +299,38 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                                       - aboutView->property("height").toDouble()));
     const bool stayedAtTabs = std::abs(actualScroll - expectedScroll) <= 1;
     const bool switchedBack = click(trackTab) && page->property("activeTab").toInt() == 0;
-    QJsonObject interaction{ { "sticky", sticky },
-                             { "switched", switched },
-                             { "keptScroll", stayedAtTabs },
-                             { "switchedBack", switchedBack } };
+    QJsonObject interaction{ { u"sticky"_s, sticky },
+                             { u"switched"_s, switched },
+                             { u"keptScroll"_s, stayedAtTabs },
+                             { u"switchedBack"_s, switchedBack } };
     passed = sticky && switched && stayedAtTabs && switchedBack && passed;
     QMetaObject::invokeMethod(list, "positionViewAtBeginning");
     passed = render() && passed;
     QSignalSpy trackRequests(page, SIGNAL(trackRequested(QString)));
-    const bool trackInput = click(findVisual(root, "detailTrackTitle")) && trackRequests.size() == 1
-            && trackRequests[0][0].toString() == "anonymous-track-0"
+    const bool trackInput = click(findVisual(root, u"detailTrackTitle"_s))
+            && trackRequests.size() == 1 && trackRequests[0][0].toString() == "anonymous-track-0"_L1
             && library.playbackTrackId().isEmpty();
-    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 1));
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(int, 1));
     passed = render() && passed;
     const bool keyboardStart = page->property("activeTab").toInt() == 1;
     about->forceActiveFocus(Qt::OtherFocusReason);
     QTest::keyClick(&window, Qt::Key_Left);
     const bool keyboard = render() && keyboardStart && page->property("activeTab").toInt() == 0;
-    interaction["trackIntentOnly"] = trackInput;
-    interaction["keyboardTab"] = keyboard;
+    interaction[u"trackIntentOnly"_s] = trackInput;
+    interaction[u"keyboardTab"_s] = keyboard;
     passed = trackInput && keyboard && passed;
-    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 1));
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(int, 1));
     passed = render() && passed;
-    const auto *introStatus = findVisual(root, "detailIntroductionStatus");
-    const auto *creditStatus = findVisual(root, "detailCreditsStatus");
+    const auto *introStatus = findVisual(root, u"detailIntroductionStatus"_s);
+    const auto *creditStatus = findVisual(root, u"detailCreditsStatus"_s);
     const bool localData = introStatus && creditStatus
-            && introStatus->property("text").toString().contains("存疑")
-            && creditStatus->property("text").toString().contains("1 / 2");
-    interaction["offlineLookupReadable"] = localData;
-    auto *expand = findVisual(root, "detailCreditExpand");
+            && introStatus->property("text").toString().contains(u"\u5b58\u7591"_s)
+            && creditStatus->property("text").toString().contains(u"1 / 2"_s);
+    interaction[u"offlineLookupReadable"_s] = localData;
+    auto *expand = findVisual(root, u"detailCreditExpand"_s);
     const bool creditsExpanded =
             expand && click(expand) && expand->parentItem()->property("expanded").toBool();
-    interaction["creditExpansion"] = creditsExpanded;
+    interaction[u"creditExpansion"_s] = creditsExpanded;
     passed = localData && creditsExpanded && passed;
     album.offline = true;
     LibrarySnapshot offlineSnapshot;
@@ -329,13 +338,13 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     library.setSnapshot(std::move(offlineSnapshot));
     library.navigate(album.id);
     model.prepare(library);
-    QMetaObject::invokeMethod(page, "setTab", Q_ARG(QVariant, 0));
+    QMetaObject::invokeMethod(page, "setTab", Q_ARG(int, 0));
     QMetaObject::invokeMethod(list, "positionViewAtBeginning");
     passed = render() && passed;
-    const auto *badge = findVisual(root, "detailOfflineBadge");
+    const auto *badge = findVisual(root, u"detailOfflineBadge"_s);
     const bool offlineInput = badge && badge->isVisible()
-            && click(findVisual(root, "detailTrackTitle")) && trackRequests.size() == 1;
-    interaction["offlineBadgeAndDisabledTrack"] = offlineInput;
+            && click(findVisual(root, u"detailTrackTitle"_s)) && trackRequests.size() == 1;
+    interaction[u"offlineBadgeAndDisabledTrack"_s] = offlineInput;
     passed = offlineInput && passed;
     presentation.setReducedMotion(false);
     presentation.back();
@@ -362,7 +371,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
         const bool rendered = render();
         presentation.update();
         const bool restored = render() && rendered && presentation.detailEnabled();
-        lifecycle.append(QJsonObject{ { "cycle", cycle }, { "passed", restored } });
+        lifecycle.append(QJsonObject{ { u"cycle"_s, cycle }, { u"passed"_s, restored } });
         passed = restored && passed;
     }
     // A fully clipped tab must retire its local sampling layers, including small landscape windows.
@@ -370,30 +379,30 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     root->setSize({ 320, 240 });
     metrics.setViewport(320, 240);
     passed = render() && render() && passed;
-    const auto *blurLoader = findVisual(root, "detailTabsBlurLoader");
+    const auto *blurLoader = findVisual(root, u"detailTabsBlurLoader"_s);
     const bool clippedBackdropRetired = blurLoader && !blurLoader->property("active").toBool();
-    interaction["clippedBackdropRetired"] = clippedBackdropRetired;
+    interaction[u"clippedBackdropRetired"_s] = clippedBackdropRetired;
     passed = clippedBackdropRetired && passed;
     surface.hide();
     root->setParentItem(nullptr);
     const auto policy = verification::windowPolicy(window);
     passed = verification::windowPolicySatisfied(window) && passed;
-    QJsonObject report{ { "passed", passed },
-                        { "qtVersion", qVersion() },
-                        { "platform", QSysInfo::productType() },
-                        { "configuration", "Release" },
-                        { "offscreen", OffscreenSurface::Enabled },
-                        { "graphicsApi", int(window.rendererInterface()->graphicsApi()) },
-                        { "captures", captures },
-                        { "interaction", interaction },
-                        { "trackCount", model.rowCount() },
-                        { "lifecycle", lifecycle },
-                        { "delegates", delegates },
-                        { "qmlWarnings", warnings.size() },
-                        { "windowPolicy", policy },
-                        { "resourcePlan", surface.diagnostics() },
-                        { "presentOrVsyncVerified", false } };
-    QSaveFile file(QDir(output).filePath("report.json"));
+    QJsonObject report{ { u"passed"_s, passed },
+                        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                        { u"platform"_s, QSysInfo::productType() },
+                        { u"configuration"_s, u"Release"_s },
+                        { u"offscreen"_s, OffscreenSurface::Enabled },
+                        { u"graphicsApi"_s, int(window.rendererInterface()->graphicsApi()) },
+                        { u"captures"_s, captures },
+                        { u"interaction"_s, interaction },
+                        { u"trackCount"_s, model.rowCount() },
+                        { u"lifecycle"_s, lifecycle },
+                        { u"delegates"_s, delegates },
+                        { u"qmlWarnings"_s, warnings.size() },
+                        { u"windowPolicy"_s, policy },
+                        { u"resourcePlan"_s, surface.diagnostics() },
+                        { u"presentOrVsyncVerified"_s, false } };
+    QSaveFile file(QDir(output).filePath(u"report.json"_s));
     if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
         || !file.commit())
         return 5;

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 void OrdinalTrack::retarget(double to, bool instant)
 {
@@ -30,6 +32,8 @@ void OrdinalTrack::retarget(double to, bool instant)
 }
 void OrdinalTrack::advance(double dt)
 {
+    if (!std::isfinite(dt) || dt < 0)
+        return;
     elapsed = std::min(.460, elapsed + dt);
     if (elapsed >= std::nextafter(.460, 0.0)) {
         elapsed = .460;
@@ -67,7 +71,7 @@ void OrdinalMotion::setClock(FrameClock *clock)
         m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
             advance(dt);
         });
-    emit clockChanged();
+    Q_EMIT clockChanged();
 }
 int OrdinalMotion::value() const
 {
@@ -82,7 +86,7 @@ void OrdinalMotion::setValue(int value)
     m_value = value;
     retarget(!m_initialized || m_reduced || !m_active);
     m_initialized = true;
-    emit valueChanged();
+    Q_EMIT valueChanged();
 }
 int OrdinalMotion::digits() const
 {
@@ -95,7 +99,7 @@ void OrdinalMotion::setDigits(int digits)
         return;
     m_digits = digits;
     retarget(true);
-    emit digitsChanged();
+    Q_EMIT digitsChanged();
 }
 int OrdinalMotion::direction() const
 {
@@ -107,7 +111,7 @@ void OrdinalMotion::setDirection(int direction)
     if (m_direction == direction)
         return;
     m_direction = direction;
-    emit directionChanged();
+    Q_EMIT directionChanged();
 }
 bool OrdinalMotion::reducedMotion() const
 {
@@ -120,7 +124,7 @@ void OrdinalMotion::setReducedMotion(bool reduced)
     m_reduced = reduced;
     if (reduced)
         retarget(true);
-    emit reducedMotionChanged();
+    Q_EMIT reducedMotionChanged();
 }
 bool OrdinalMotion::active() const
 {
@@ -131,11 +135,11 @@ void OrdinalMotion::setActive(bool active)
     if (m_active == active)
         return;
     m_active = active;
-    emit activeChanged();
+    Q_EMIT activeChanged();
 }
 void OrdinalMotion::retarget(bool instant)
 {
-    const QString text = QString::number(m_value).rightJustified(m_digits, QChar('0'));
+    const QString text = QString::number(m_value).rightJustified(m_digits, '0'_L1);
     m_count = text.size();
     const int direction = m_direction ? m_direction : (m_value > m_previous ? 1 : -1);
     // Tracks use right-aligned decimal identity; only two visible faces are published per digit.
@@ -165,12 +169,12 @@ void OrdinalMotion::publish()
     for (int i = m_count - 1; i >= 0; --i) {
         const double position = m_tracks[i].value;
         const double floor = std::floor(position);
-        faces.append(QVariantMap{ { "upper", ArchivePool::wrap(floor, 10) },
-                                  { "lower", ArchivePool::wrap(floor + 1, 10) },
-                                  { "fraction", position - floor } });
+        faces.append(QVariantMap{ { u"upper"_s, ArchivePool::wrap(floor, 10) },
+                                  { u"lower"_s, ArchivePool::wrap(floor + 1, 10) },
+                                  { u"fraction"_s, position - floor } });
     }
     m_faces = std::move(faces);
-    emit changed();
+    Q_EMIT changed();
 }
 void OrdinalMotion::advance(double dt)
 {

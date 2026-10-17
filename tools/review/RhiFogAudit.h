@@ -1,16 +1,18 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "RhiItem.h"
 #include "RhiCaptureHarness.h"
 #include <QJsonArray>
 namespace yalahoo::review {
 inline void checkSubmittedFog(const rhi::Input &input, const rhi::Capture &capture)
 {
-    const auto uniforms = capture.metadata["submittedFogUniforms"].toArray();
+    const auto uniforms = capture.metadata[u"submittedFogUniforms"_s].toArray();
     RhiCaptureHarness::require(!uniforms.isEmpty(), "No submitted fog uniforms");
     bool paper = false, shell = false;
     for (const auto &value : uniforms) {
         const auto row = value.toObject();
-        const auto range = row["range"].toArray(), color = row["color"].toArray();
+        const auto range = row[u"range"_s].toArray(), color = row[u"color"_s].toArray();
         RhiCaptureHarness::require(range.size() == 3 && color.size() == 3,
                                    "Incomplete submitted fog values");
         RhiCaptureHarness::require(range[0].toDouble() == float(input.scene.fogNear)
@@ -20,12 +22,12 @@ inline void checkSubmittedFog(const rhi::Input &input, const rhi::Capture &captu
         for (int i = 0; i < 3; ++i)
             RhiCaptureHarness::require(color[i].toDouble() == input.background[i],
                                        "Actual draw fog color is not the linear theme color");
-        paper = paper || row["kind"].toInt() == 0;
-        shell = shell || row["kind"].toInt() >= 3;
+        paper = paper || row[u"kind"_s].toInt() == 0;
+        shell = shell || row[u"kind"_s].toInt() >= 3;
     }
     RhiCaptureHarness::require(!input.showPaper || paper, "No paper fog submission");
     RhiCaptureHarness::require(!input.shells || shell, "No shell fog submission");
-    const auto output = capture.metadata["outputOptions"].toArray();
+    const auto output = capture.metadata[u"outputOptions"_s].toArray();
     RhiCaptureHarness::require(output.size() == 4 && output[3].toDouble() == input.exposure,
                                "Output exposure differs from actual uniform");
     if (!input.rawOutput && input.lightingEnabled && input.shells)

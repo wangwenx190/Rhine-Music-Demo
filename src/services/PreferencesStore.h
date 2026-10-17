@@ -24,7 +24,7 @@ public:
     void setAudio(const QJsonObject &audio);
     bool importJson(const QUrl &file);
     void setNavigation(bool remember, bool realistic);
-signals:
+Q_SIGNALS:
     void changed();
     void errorChanged();
     void saveError(const QString &message);

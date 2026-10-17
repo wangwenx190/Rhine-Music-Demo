@@ -1,4 +1,7 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
+using Qt::StringLiterals::operator""_ba;
 #include <QWindow>
 #include <QJsonObject>
 
@@ -21,7 +24,7 @@ void prepareNativeApplication();
 inline void prepareApplication()
 {
 #if defined(Q_OS_MACOS)
-    qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1");
+    qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1"_ba);
     prepareNativeApplication();
 #endif
 }
@@ -54,7 +57,7 @@ inline bool windowPolicySatisfied(const QWindow &window)
             : window.flags().testFlag(Qt::WindowStaysOnBottomHint)
                     && window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) && !window.isActive();
 #if defined(Q_OS_MACOS)
-    return flags && nativeWindowPolicy(window)["passed"].toBool();
+    return flags && nativeWindowPolicy(window)[u"passed"_s].toBool();
 #else
     return flags;
 #endif
@@ -62,18 +65,18 @@ inline bool windowPolicySatisfied(const QWindow &window)
 inline QJsonObject windowPolicy(const QWindow &window)
 {
     QJsonObject result{
-        { "staysOnBottom", window.flags().testFlag(Qt::WindowStaysOnBottomHint) },
-        { "mode",
-          foregroundVerification() ? "user-authorized-foreground" : "nonactivating-bottom" },
-        { "nonInterferenceEnforced", !foregroundVerification() },
-        { "doesNotAcceptFocus", window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) },
-        { "active", window.isActive() },
-        { "visible", window.isVisible() },
-        { "exposed", window.isExposed() },
-        { "passed", windowPolicySatisfied(window) }
+        { u"staysOnBottom"_s, window.flags().testFlag(Qt::WindowStaysOnBottomHint) },
+        { u"mode"_s,
+          foregroundVerification() ? u"user-authorized-foreground"_s : u"nonactivating-bottom"_s },
+        { u"nonInterferenceEnforced"_s, !foregroundVerification() },
+        { u"doesNotAcceptFocus"_s, window.flags().testFlag(Qt::WindowDoesNotAcceptFocus) },
+        { u"active"_s, window.isActive() },
+        { u"visible"_s, window.isVisible() },
+        { u"exposed"_s, window.isExposed() },
+        { u"passed"_s, windowPolicySatisfied(window) }
     };
 #if defined(Q_OS_MACOS)
-    result.insert("native", nativeWindowPolicy(window));
+    result.insert(u"native"_s, nativeWindowPolicy(window));
 #endif
     return result;
 }

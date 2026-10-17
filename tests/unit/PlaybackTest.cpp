@@ -8,6 +8,8 @@
 #include <QTest>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 
@@ -21,23 +23,23 @@ struct Fixture
     {
         LibrarySnapshot snapshot;
         Album album;
-        album.id = "album";
+        album.id = "album"_L1;
         for (int i = 0; i < 3; ++i) {
-            const auto path = directory.path() + QString("/歌曲 #%1.wav").arg(i);
+            const auto path = directory.path() + u"/\u6b4c\u66f2 #%1.wav"_s.arg(i);
             QFile file(path);
             if (file.open(QIODevice::WriteOnly))
-                file.write(i == 2 ? QByteArray("unsupported anonymous file")
+                file.write(i == 2 ? "unsupported anonymous file"_ba
                                   : test::wave(i == 0 ? 5000 : 400));
             Track track;
-            track.id = QString("track-%1").arg(i);
+            track.id = u"track-%1"_s.arg(i);
             track.albumId = album.id;
-            track.title = QString("Song %1").arg(i);
+            track.title = u"Song %1"_s.arg(i);
             track.sourceUrl = QUrl::fromLocalFile(path);
             album.tracks.append(track);
         }
         snapshot.albums.append(album);
         library.setSnapshot(snapshot);
-        library.navigate("album");
+        library.navigate(u"album"_s);
         player.setVolume(.01);
     }
 };
@@ -45,7 +47,7 @@ struct Fixture
 class PlaybackTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void publicPlaybackPauseSeekStopAndNavigation()
     {
         Fixture f;
@@ -56,16 +58,16 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(f.player.position() > 100, 5000);
         QCOMPARE(f.player.mediaSupport(), MediaSupport::Supported);
-        QVERIFY(!f.player.playTrack("missing", "track-0"));
+        QVERIFY(!f.player.playTrack(u"missing"_s, u"track-0"_s));
         QVERIFY(f.player.playing());
         QVERIFY(f.player.error().isEmpty());
-        QCOMPARE(f.library.playbackTrackId(), QString("track-0"));
+        QCOMPARE(f.library.playbackTrackId(), u"track-0"_s);
         const auto revision = f.player.sourceRevision();
-        f.library.search("missing");
-        f.library.sort("artist");
-        f.library.navigate("album", "track-1");
+        f.library.search(u"missing"_s);
+        f.library.sort(u"artist"_s);
+        f.library.navigate(u"album"_s, u"track-1"_s);
         QCOMPARE(f.player.sourceRevision(), revision);
-        QCOMPARE(f.player.trackId(), QString("track-0"));
+        QCOMPARE(f.player.trackId(), u"track-0"_s);
         f.player.pause();
         QTRY_VERIFY(!f.player.playing());
         QVERIFY(!f.player.requested());
@@ -108,14 +110,14 @@ private slots:
     {
         Fixture f;
         QVERIFY(f.player.outputAvailable());
-        QVERIFY(f.player.playTrack("album", "track-0"));
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         const auto old = f.player.sourceRevision();
         f.player.next();
         const auto current = f.player.sourceRevision();
         QVERIFY(current > old);
-        QCOMPARE(f.player.trackId(), QString("track-1"));
+        QCOMPARE(f.player.trackId(), u"track-1"_s);
         f.player.status(QMediaPlayer::EndOfMedia, old);
-        QCOMPARE(f.player.trackId(), QString("track-1"));
+        QCOMPARE(f.player.trackId(), u"track-1"_s);
         f.player.pause();
         f.player.status(QMediaPlayer::LoadedMedia, current);
         QVERIFY(!f.player.requested());
@@ -123,16 +125,16 @@ private slots:
         f.player.status(QMediaPlayer::LoadedMedia, current);
         QVERIFY(f.player.source().isEmpty());
         QVERIFY(!f.player.requested());
-        QVERIFY(f.player.playTrack("album", "track-0"));
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         f.player.pause();
         f.library.setSnapshot({ });
         f.player.next();
-        QCOMPARE(f.player.trackId(), QString("track-1"));
-        QCOMPARE(f.library.playbackTrackId(), QString("track-1"));
+        QCOMPARE(f.player.trackId(), u"track-1"_s);
+        QCOMPARE(f.library.playbackTrackId(), u"track-1"_s);
         // Exactly one end commit for the current source, despite duplicate notifications.
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
-        QTRY_COMPARE(f.player.trackId(), QString("track-2"));
+        QTRY_COMPARE(f.player.trackId(), u"track-2"_s);
         QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), 10000);
         QVERIFY(!f.player.playing());
         f.player.stop();
@@ -147,7 +149,7 @@ private slots:
         QVERIFY(!systemDefault.isNull());
         f.player.applyDevices({ }, { });
         QVERIFY(!f.player.outputAvailable());
-        QVERIFY(f.player.playTrack("album", "track-0"));
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         QVERIFY(f.player.requested());
         QVERIFY(f.player.source().isEmpty());
         f.player.pause();
@@ -177,7 +179,7 @@ private slots:
         f.player.applyDevices(real, systemDefault);
         QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), 10000);
         f.player.pause();
-        const auto id = QString::fromLatin1(real.first().id().toBase64());
+        const auto id = QString::fromUtf8(real.first().id().toBase64());
         QVERIFY(f.player.selectDevice(id));
         QCOMPARE(f.player.selectedDevice(), id);
         f.player.applyDevices({ }, { });
@@ -188,21 +190,21 @@ private slots:
         QVERIFY(!f.player.playing());
         QVERIFY(f.player.source().isEmpty());
         f.player.applyDevices({ }, { });
-        QVERIFY(f.player.playTrack("album", "track-1"));
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
         f.player.stop();
         f.player.applyDevices(real, systemDefault);
         QVERIFY(f.player.source().isEmpty());
         QVERIFY(!f.player.requested());
-        QVERIFY(!f.player.selectDevice("not-a-device"));
-        QVERIFY(f.player.selectDevice(""));
+        QVERIFY(!f.player.selectDevice(u"not-a-device"_s));
+        QVERIFY(f.player.selectDevice(u""_s));
     }
     void realEndAndUnsupportedFormat()
     {
         Fixture f;
         QVERIFY(f.player.outputAvailable());
         QSignalSpy changed(&f.player, &PlaybackController::currentChanged);
-        QVERIFY(f.player.playTrack("album", "track-1"));
-        QTRY_COMPARE_WITH_TIMEOUT(f.player.trackId(), QString("track-2"), 10000);
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
+        QTRY_COMPARE_WITH_TIMEOUT(f.player.trackId(), u"track-2"_s, 10000);
         QCOMPARE(changed.size(), 2);
         QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), 10000);
         QVERIFY(!f.player.playing());
@@ -212,7 +214,7 @@ private slots:
         QVERIFY(!f.player.seekable());
         f.player.seek(2000);
         QCOMPARE(f.player.position(), 0);
-        QVERIFY(!f.player.playTrack("missing", "track-0"));
+        QVERIFY(!f.player.playTrack(u"missing"_s, u"track-0"_s));
         QCOMPARE(f.player.m_player.playbackRate(), 1.);
     }
 };

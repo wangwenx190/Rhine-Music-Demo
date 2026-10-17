@@ -20,7 +20,7 @@ public:
     Q_INVOKABLE void close();
     Q_INVOKABLE void reset();
     void setReducedMotion(bool reduced);
-signals:
+Q_SIGNALS:
     void changed();
     void closed();
 

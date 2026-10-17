@@ -108,8 +108,10 @@ await server.listen();
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
 const candidates = [
     process.env.REVIEW_BROWSER,
-    path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'),
-    path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'),
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'] || '', 'Microsoft/Edge/Application/msedge.exe'),
 ].filter(Boolean);
 let executable;
 for (const p of candidates) {
@@ -136,7 +138,7 @@ const proc = spawn(
         '--disable-component-update',
         '--disable-extensions',
         '--enable-gpu',
-        '--use-angle=d3d11',
+        ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : []),
         'about:blank',
     ],
     {windowsHide: true, stdio: 'ignore'},

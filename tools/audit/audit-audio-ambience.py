@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
     ("COMMON-01", "src/media/CMakeLists.txt", "BackgroundMusicController.cpp BackgroundMusicController.h",
      "Root/Core build and public Multimedia linkage own one BGM player/output and at most four QSoundEffects. Shared QmlTypes/App/MusicStage/LibraryPanels close both application and ui-audit resources; production assets keep existing attribution."),
-    ("COMMON-02", "src/media/InterfaceSoundController.cpp", "source.scheme() == QLatin1String(\"qrc\")",
+    ("COMMON-02", "src/media/InterfaceSoundController.cpp", "source.scheme() == \"qrc\"_L1",
      "BGM uses the embedded atmosphere Ogg; event sources accept existing embedded audio URLs only, no user song writes/network/processes. All seventeen absent short assets stay silent. Preferences use the existing QSaveFile ownership and atomic commit."),
     ("COMMON-03", "qml/Yalahoo/Music/panels/PlaybackPanel.qml", "objectName: \"bgmVolume\"",
      "Fixed controls use existing popup/scroll/render ownership, no shader/attachment/scene quality changes. BGM and effects follow system default, song retains independent Qt device list. No audio objects enter SceneFrame or render thread."),

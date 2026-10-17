@@ -89,7 +89,7 @@ public:
     void cancelTravel();
     Q_INVOKABLE void travel(double rail, double column, double shoulder, double lane);
     Q_INVOKABLE void finish();
-signals:
+Q_SIGNALS:
     void stateChanged();
     void reducedMotionChanged();
     void completed(quint64 revision);

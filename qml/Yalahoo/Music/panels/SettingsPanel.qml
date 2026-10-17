@@ -22,13 +22,8 @@ ArchiveScrollView {
     signal fullscreenRequested
     contentWidth: availableWidth
 
-    function focusControl() {
+    function focusControl(): void {
         themeChoice.forceActiveFocus();
-    }
-    function qualityField(key, value) {
-        const values = Object.assign({}, settings.values.renderQuality);
-        values[key] = value;
-        settings.update("renderQuality", values);
     }
     Column {
         width: root.availableWidth
@@ -42,7 +37,7 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "外观主题"
+                text: qsTr("Theme")
                 cssPixelSize: 12
             }
             Row {
@@ -74,24 +69,24 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "音乐库排列"
+                text: qsTr("Library arrangement")
                 cssPixelSize: 12
             }
             SettingChoice {
                 objectName: "settingsSort"
                 tokens: root.tokens
-                label: "排列方式"
+                label: qsTr("Sort order")
                 choices: [
                     {
-                        label: "按流派",
+                        label: qsTr("By genre"),
                         value: "genre"
                     },
                     {
-                        label: "按歌手",
+                        label: qsTr("By artist"),
                         value: "artist"
                     },
                     {
-                        label: "按专辑名",
+                        label: qsTr("By album title"),
                         value: "album"
                     }
                 ]
@@ -104,7 +99,8 @@ ArchiveScrollView {
                 cssPixelSize: 12
                 color: root.tokens.muted
                 wrapMode: Text.Wrap
-                text: "按歌手时，同一歌手的专辑放在同一列；按专辑名时，每 12 张一列。"
+                text: qsTr(
+                          "Artist sorting puts each artist in one column. Album title sorting puts 12 albums in each column.")
             }
         }
         SettingsSection {
@@ -114,8 +110,9 @@ ArchiveScrollView {
                 tokens: root.tokens
                 librarySession: root.librarySession
                 kind: "introduction"
-                title: "专辑介绍"
-                explanation: "公开百科介绍与资料来源保存在本机。"
+                title: qsTr("Album introductions")
+                explanation: qsTr(
+                                 "Public encyclopedia introductions and their sources are saved locally.")
             }
         }
         SettingsSection {
@@ -125,8 +122,8 @@ ArchiveScrollView {
                 tokens: root.tokens
                 librarySession: root.librarySession
                 kind: "credits"
-                title: "制作信息"
-                explanation: "保留本地标签、参与人员与已有资料来源。"
+                title: qsTr("Credits")
+                explanation: qsTr("Retain local tags, contributors, and existing metadata sources.")
             }
         }
         SettingsSection {
@@ -134,20 +131,20 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "高级设置 · 专辑阵列"
+                text: qsTr("Advanced \u00b7 Album array")
                 cssPixelSize: 12
             }
             SettingChoice {
                 objectName: "settingsArray"
                 tokens: root.tokens
-                label: "专辑列显示"
+                label: qsTr("Album columns")
                 choices: [
                     {
-                        label: "填充画面",
+                        label: qsTr("Fill the view"),
                         value: "filled"
                     },
                     {
-                        label: "真实专辑列",
+                        label: qsTr("Real album columns"),
                         value: "realistic"
                     }
                 ]
@@ -157,7 +154,7 @@ ArchiveScrollView {
             ArchiveCheckBox {
                 tokens: root.tokens
                 objectName: "settingsRemember"
-                text: "保留每列浏览位置"
+                text: qsTr("Remember each column's position")
                 checked: root.settings.values.rememberColumnPosition
                 onToggled: root.settings.update("rememberColumnPosition", checked)
             }
@@ -167,33 +164,33 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "RENDER QUALITY · 渲染画质"
+                text: qsTr("RENDER QUALITY")
                 cssPixelSize: 12
             }
             SettingChoice {
                 objectName: "settingsQuality"
                 tokens: root.tokens
-                label: "画质预设"
+                label: qsTr("Quality preset")
                 choices: [
                     {
-                        label: "性能",
+                        label: qsTr("Performance"),
                         value: "performance"
                     },
                     {
-                        label: "原始",
+                        label: qsTr("Original"),
                         value: "original"
                     },
                     {
-                        label: "高",
+                        label: qsTr("High"),
                         value: "high"
                     },
                     {
-                        label: "极高",
+                        label: qsTr("Ultra"),
                         value: "ultra"
                     }
                 ].concat(root.settings.values.quality === "custom" ? [
                                                                          {
-                                                                             label: "自定义",
+                                                                             label: qsTr("Custom"),
                                                                              value: "custom"
                                                                          }
                                                                      ] : [])
@@ -203,7 +200,8 @@ ArchiveScrollView {
             ArchiveButton {
                 objectName: "settingsQualityExpand"
                 tokens: root.tokens
-                text: (root.qualityExpanded ? "▾ " : "▸ ") + "精细设置 · 清晰度 / 材质 / 阴影"
+                text: (root.qualityExpanded ? "\u25be " : "\u25b8 ") + qsTr(
+                          "Fine settings \u00b7 Clarity / Materials / Shadows")
                 onClicked: root.qualityExpanded = !root.qualityExpanded
             }
             Column {
@@ -213,47 +211,47 @@ ArchiveScrollView {
                 SettingRange {
                     objectName: "settingsscale"
                     tokens: root.tokens
-                    label: "渲染比例"
+                    label: qsTr("Render scale")
                     minimum: 50
                     maximum: 200
                     suffix: "%"
                     decimals: 0
                     step: 5
                     value: root.settings.values.renderQuality.scale
-                    onMoved: value => root.qualityField("scale", value)
+                    onMoved: value => root.settings.updateQuality("scale", value)
                 }
                 SettingChoice {
                     objectName: "settingspixelRatio"
                     tokens: root.tokens
-                    label: "像素密度上限"
+                    label: qsTr("Pixel density limit")
                     choices: [
                         {
-                            label: "1×",
+                            label: "1\u00d7",
                             value: 1
                         },
                         {
-                            label: "1.5×",
+                            label: "1.5\u00d7",
                             value: 1.5
                         },
                         {
-                            label: "2×",
+                            label: "2\u00d7",
                             value: 2
                         },
                         {
-                            label: "3×",
+                            label: "3\u00d7",
                             value: 3
                         }
                     ]
                     selected: root.settings.values.renderQuality.pixelRatio
-                    onChosen: value => root.qualityField("pixelRatio", value)
+                    onChosen: value => root.settings.updateQuality("pixelRatio", value)
                 }
                 SettingChoice {
                     objectName: "settingsantialias"
                     tokens: root.tokens
-                    label: "抗锯齿"
+                    label: qsTr("Antialiasing")
                     choices: [
                         {
-                            label: "原始",
+                            label: qsTr("Original"),
                             value: "off"
                         },
                         {
@@ -262,41 +260,41 @@ ArchiveScrollView {
                         }
                     ]
                     selected: root.settings.values.renderQuality.antialias
-                    onChosen: value => root.qualityField("antialias", value)
+                    onChosen: value => root.settings.updateQuality("antialias", value)
                 }
                 SettingChoice {
                     objectName: "settingsanisotropy"
                     tokens: root.tokens
-                    label: "各向异性过滤"
+                    label: qsTr("Anisotropic filtering")
                     choices: [
                         {
-                            label: "1×",
+                            label: "1\u00d7",
                             value: 1
                         },
                         {
-                            label: "2×",
+                            label: "2\u00d7",
                             value: 2
                         },
                         {
-                            label: "4×",
+                            label: "4\u00d7",
                             value: 4
                         },
                         {
-                            label: "8×",
+                            label: "8\u00d7",
                             value: 8
                         },
                         {
-                            label: "16×",
+                            label: "16\u00d7",
                             value: 16
                         }
                     ]
                     selected: root.settings.values.renderQuality.anisotropy
-                    onChosen: value => root.qualityField("anisotropy", value)
+                    onChosen: value => root.settings.updateQuality("anisotropy", value)
                 }
                 SettingChoice {
                     objectName: "settingstransmission"
                     tokens: root.tokens
-                    label: "透射分辨率"
+                    label: qsTr("Transmission resolution")
                     choices: [
                         {
                             label: "25%",
@@ -316,15 +314,15 @@ ArchiveScrollView {
                         }
                     ]
                     selected: root.settings.values.renderQuality.transmission
-                    onChosen: value => root.qualityField("transmission", value)
+                    onChosen: value => root.settings.updateQuality("transmission", value)
                 }
                 SettingChoice {
                     objectName: "settingsshadows"
                     tokens: root.tokens
-                    label: "阴影精度"
+                    label: qsTr("Shadow resolution")
                     choices: [
                         {
-                            label: "关闭",
+                            label: qsTr("Off"),
                             value: 0
                         },
                         {
@@ -341,37 +339,37 @@ ArchiveScrollView {
                         }
                     ]
                     selected: root.settings.values.renderQuality.shadows
-                    onChosen: value => root.qualityField("shadows", value)
+                    onChosen: value => root.settings.updateQuality("shadows", value)
                 }
                 SettingChoice {
                     objectName: "settingsaoSamples"
                     tokens: root.tokens
-                    label: "环境遮蔽采样"
+                    label: qsTr("Ambient occlusion samples")
                     choices: [
                         {
-                            label: "关闭",
+                            label: qsTr("Off"),
                             value: 0
                         },
                         {
-                            label: "16 采样",
+                            label: qsTr("16 samples"),
                             value: 16
                         },
                         {
-                            label: "32 采样",
+                            label: qsTr("32 samples"),
                             value: 32
                         },
                         {
-                            label: "64 采样",
+                            label: qsTr("64 samples"),
                             value: 64
                         }
                     ]
                     selected: root.settings.values.renderQuality.aoSamples
-                    onChosen: value => root.qualityField("aoSamples", value)
+                    onChosen: value => root.settings.updateQuality("aoSamples", value)
                 }
                 SettingChoice {
                     objectName: "settingsaoResolution"
                     tokens: root.tokens
-                    label: "环境遮蔽分辨率"
+                    label: qsTr("Ambient occlusion resolution")
                     choices: [
                         {
                             label: "50%",
@@ -387,19 +385,19 @@ ArchiveScrollView {
                         }
                     ]
                     selected: root.settings.values.renderQuality.aoResolution
-                    onChosen: value => root.qualityField("aoResolution", value)
+                    onChosen: value => root.settings.updateQuality("aoResolution", value)
                 }
                 SettingRange {
                     objectName: "settingsdepthOfField"
                     tokens: root.tokens
-                    label: "景深强度 · 阵列"
+                    label: qsTr("Array depth of field")
                     minimum: 0
                     maximum: 150
                     suffix: "%"
                     decimals: 0
                     step: 5
                     value: root.settings.values.renderQuality.depthOfField
-                    onMoved: value => root.qualityField("depthOfField", value)
+                    onMoved: value => root.settings.updateQuality("depthOfField", value)
                 }
             }
             ArchiveText {
@@ -408,7 +406,8 @@ ArchiveScrollView {
                 cssPixelSize: 11
                 color: root.tokens.muted
                 wrapMode: Text.Wrap
-                text: "即时生效并自动保存。受设备尺寸及 829 万像素目标上限保护，用户画质偏好保持所选值。"
+                text: qsTr(
+                          "Applies immediately and saves automatically. Device size and the 8.29 megapixel target limit protect output size while preserving your selected quality preferences.")
             }
         }
         SettingsSection {
@@ -416,21 +415,21 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "动效与显示"
+                text: qsTr("Motion and display")
                 cssPixelSize: 12
             }
             ArchiveCheckBox {
                 tokens: root.tokens
                 objectName: "settingsReduced"
-                text: "减少动态效果"
+                text: qsTr("Reduce motion")
                 checked: root.settings.values.reduced
                 onToggled: root.settings.update("reduced", checked)
             }
             SettingRange {
                 objectName: "settingsSpeed"
                 tokens: root.tokens
-                label: "动画速度"
-                suffix: "×"
+                label: qsTr("Animation speed")
+                suffix: "\u00d7"
                 minimum: .25
                 maximum: 3
                 step: .05
@@ -439,19 +438,19 @@ ArchiveScrollView {
             }
             ArchiveButton {
                 tokens: root.tokens
-                text: "切换全屏 ↗"
+                text: qsTr("Toggle fullscreen \u2197")
                 onClicked: root.fullscreenRequested()
             }
             ArchiveButton {
                 objectName: "settingsReplay"
                 tokens: root.tokens
-                text: "重播开场 ↗"
+                text: qsTr("Replay opening \u2197")
                 onClicked: root.replayRequested()
             }
             ArchiveButton {
                 objectName: "settingsReload"
                 tokens: root.tokens
-                text: "重新载入界面 ↻"
+                text: qsTr("Reload interface \u21bb")
                 onClicked: root.settings.reload()
             }
         }
@@ -460,12 +459,12 @@ ArchiveScrollView {
 
             ArchiveText {
                 tokens: root.tokens
-                text: "声音"
+                text: qsTr("Sound")
                 cssPixelSize: 12
             }
             SettingRange {
                 tokens: root.tokens
-                label: "歌曲音量"
+                label: qsTr("Track volume")
                 suffix: "%"
                 decimals: 0
                 displayFactor: 100
@@ -478,7 +477,7 @@ ArchiveScrollView {
             }
             ArchiveCheckBox {
                 tokens: root.tokens
-                text: "界面音效"
+                text: qsTr("Interface sounds")
                 visible: root.interfaceSound !== null
                 checked: root.interfaceSound ? root.interfaceSound.enabled : false
                 onToggled: {
@@ -488,7 +487,7 @@ ArchiveScrollView {
             }
             SettingRange {
                 tokens: root.tokens
-                label: "音效音量"
+                label: qsTr("Sound effect volume")
                 suffix: "%"
                 decimals: 0
                 displayFactor: 100
@@ -501,7 +500,7 @@ ArchiveScrollView {
             }
             ArchiveCheckBox {
                 tokens: root.tokens
-                text: "氛围 BGM"
+                text: qsTr("Background music")
                 visible: root.backgroundMusic !== null
                 checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
                 onToggled: {
@@ -511,7 +510,7 @@ ArchiveScrollView {
             }
             SettingRange {
                 tokens: root.tokens
-                label: "BGM 音量"
+                label: qsTr("BGM volume")
                 suffix: "%"
                 decimals: 0
                 displayFactor: 100
@@ -524,19 +523,16 @@ ArchiveScrollView {
             }
             ArchiveButton {
                 tokens: root.tokens
-                text: "试听界面音效 ↗"
+                text: qsTr("Preview interface sound \u2197")
                 enabled: root.interfaceSound !== null && root.interfaceSound.enabled
                          && root.interfaceSound.available
                 onClicked: root.interfaceSound.preview()
             }
             SettingChoice {
                 tokens: root.tokens
-                label: "歌曲输出设备"
+                label: qsTr("Track output device")
                 visible: root.playback !== null
-                choices: root.playback ? root.playback.devices.map(device => ({
-                    label: device.name,
-                    value: device.id
-                })) : []
+                choices: root.playback ? root.playback.deviceChoices : []
                 selected: root.playback ? root.playback.selectedDevice : ""
                 onChosen: value => {
                     if (root.playback)
@@ -549,7 +545,8 @@ ArchiveScrollView {
                 cssPixelSize: 11
                 color: root.tokens.muted
                 wrapMode: Text.Wrap
-                text: "BGM 和界面音效使用系统默认输出，三路音量独立。缺少独立短音频的事件保持静音。"
+                text: qsTr(
+                          "BGM and interface effects use the system default output. All three volumes are independent. Events without a dedicated short sound remain silent.")
             }
         }
         SettingsSection {
@@ -558,7 +555,8 @@ ArchiveScrollView {
             ArchiveButton {
                 objectName: "settingsMusicBrainzExpand"
                 tokens: root.tokens
-                text: (root.musicBrainzExpanded ? "▾ " : "▸ ") + "高级设置 · MusicBrainz"
+                text: (root.musicBrainzExpanded ? "\u25be " : "\u25b8 ") + qsTr(
+                          "Advanced \u00b7 MusicBrainz")
                 onClicked: root.musicBrainzExpanded = !root.musicBrainzExpanded
             }
             Column {
@@ -570,7 +568,8 @@ ArchiveScrollView {
                     librarySession: root.librarySession
                     kind: "enrichment"
                     title: "MusicBrainz"
-                    explanation: "本机缓存保留专辑名称、艺术家、流派、制作人员及来源，人工分类优先。"
+                    explanation: qsTr(
+                                     "The local cache retains album titles, artists, genres, contributors, and sources. Manual classification takes priority.")
                 }
                 ArchiveTextField {
                     id: contact
@@ -578,13 +577,14 @@ ArchiveScrollView {
                     objectName: "settingsMetadataContact"
                     width: parent.width
                     text: root.librarySession.metadataConfiguration.musicBrainzContact || ""
-                    placeholderText: "联系邮箱或公开项目网址"
-                    Accessible.name: "MusicBrainz 联系邮箱或项目网址"
+                    placeholderText: qsTr("Contact email or public project URL")
+                    Accessible.name: qsTr("MusicBrainz contact email or project URL")
                 }
                 ArchiveCheckBox {
                     id: onlineEnabled
                     tokens: root.tokens
-                    text: "扫描后自动补充新专辑资料（联网暂未启用）"
+                    text: qsTr(
+                              "Automatically enrich new albums after scanning (network access is not enabled yet)")
                     checked: root.librarySession.metadataConfiguration.onlineEnabled || false
                     enabled: root.librarySession.providerCapabilities.networkEnabled && root.store
                              !== null && !root.store.busy
@@ -594,7 +594,7 @@ ArchiveScrollView {
                 }
                 ArchiveButton {
                     tokens: root.tokens
-                    text: "保存资料库设置 ↗"
+                    text: qsTr("Save metadata settings \u2197")
                     enabled: root.store !== null && !root.store.busy
                     onClicked: root.store.setMetadataConfiguration({
                                                                        musicBrainzContact:
@@ -607,7 +607,8 @@ ArchiveScrollView {
                     cssPixelSize: 11
                     color: root.tokens.muted
                     wrapMode: Text.Wrap
-                    text: root.store ? root.store.error : "资料配置由显式导入或原生音乐库保存。"
+                    text: root.store ? root.store.error : qsTr(
+                                           "Metadata configuration is saved through explicit import or the native music library.")
                 }
             }
         }
@@ -616,7 +617,7 @@ ArchiveScrollView {
             ArchiveButton {
                 objectName: "settingsExperiments"
                 tokens: root.tokens
-                text: "光照 / 速度调试面板 ↗"
+                text: qsTr("Lighting / speed tools \u2197")
                 onClicked: root.experimentsRequested()
             }
         }
@@ -640,7 +641,8 @@ ArchiveScrollView {
                 width: parent.width
                 cssPixelSize: 12
                 wrapMode: Text.Wrap
-                text: "开发与资源 · yalahOO!!!\n音乐适配与维护：RonaldDeng\n原版界面：LBEILC / RhineLabUI\n代码 MIT 许可 · 资源与字体许可随应用保留。"
+                text: qsTr(
+                          "Development and assets \u00b7 yalahOO!!!\nMusic adaptation and maintenance: RonaldDeng\nOriginal interface: LBEILC / RhineLabUI\nMIT licensed code. Asset and font licenses are included with the application.")
             }
         }
     }

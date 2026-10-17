@@ -13,6 +13,7 @@ T.Button {
     property string retainedTitle: ""
     property real cap: 240
     property real pixelSize: 12
+    readonly property alias toolTip: titleTip
     readonly property alias motion: transition
     readonly property TitleReelMotion reelController: caption.controller
     signal locateRequested
@@ -22,9 +23,10 @@ T.Button {
     clip: true
     enabled: title.length > 0 && width > 0
     opacity: transition.opacity
-    Accessible.name: "定位歌曲：" + title
+    Accessible.name: qsTr("Locate track: %1").arg(title)
     Accessible.ignored: !enabled
     ArchiveToolTip {
+        id: titleTip
         parent: root
         tokens: root.tokens
         text: root.title

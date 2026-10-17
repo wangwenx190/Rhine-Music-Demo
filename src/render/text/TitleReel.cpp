@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 ReelTrack::Sample ReelTrack::sample() const
 {
@@ -145,17 +147,17 @@ void ReelSlot::writeFaces(const QList<TitleGlyph> &values)
         const double descent = metrics.descent() * face.scale;
         const double baseline =
                 (face.height - std::round(ascent) - std::round(descent)) / 2 + std::round(ascent);
-        m_values.append(QVariantMap{ { "text", face.text },
-                                     { "font", face.font },
-                                     { "scale", face.scale },
-                                     { "offset", offset },
-                                     { "baseline", baseline },
-                                     { "height", face.height },
-                                     { "colored", face.colorGlyph } });
+        m_values.append(QVariantMap{ { u"text"_s, face.text },
+                                     { u"font"_s, face.font },
+                                     { u"scale"_s, face.scale },
+                                     { u"offset"_s, offset },
+                                     { u"baseline"_s, baseline },
+                                     { u"height"_s, face.height },
+                                     { u"colored"_s, face.colorGlyph } });
         offset += face.height;
     }
     ++revision;
-    emit contentChanged();
+    Q_EMIT contentChanged();
 }
 void ReelSlot::rollTo(const TitleGlyph &next, bool instant)
 {
@@ -258,7 +260,7 @@ void ReelSlot::advance(double dt)
         writeFaces({ active || transport ? glyph : TitleGlyph() });
         roll.move(0, true);
     }
-    emit frameChanged();
+    Q_EMIT frameChanged();
 }
 bool ReelSlot::moving() const
 {
@@ -279,14 +281,14 @@ int TitleReel::rowCount(const QModelIndex &parent) const
 }
 QVariant TitleReel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || role != Qt::UserRole || index.row() < 0
-        || index.row() >= m_slots.size())
+    if (!index.isValid() || index.model() != this || index.column() != 0 || role != Qt::UserRole
+        || index.row() < 0 || index.row() >= m_slots.size())
         return { };
     return QVariant::fromValue(m_slots[index.row()]);
 }
 QHash<int, QByteArray> TitleReel::roleNames() const
 {
-    return { { Qt::UserRole, "slotObject" } };
+    return { { Qt::UserRole, "slotObject"_ba } };
 }
 void TitleReel::classBegin()
 {
@@ -310,7 +312,7 @@ void TitleReel::setClock(FrameClock *clock)
         m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
             advance(dt);
         });
-    emit clockChanged();
+    Q_EMIT clockChanged();
 }
 QString TitleReel::text() const
 {
@@ -422,7 +424,7 @@ void TitleReel::setReducedMotion(bool value)
     m_reduced = value;
     if (value)
         finish();
-    emit inputChanged();
+    Q_EMIT inputChanged();
 }
 bool TitleReel::active() const
 {
@@ -446,7 +448,7 @@ void TitleReel::setActive(bool value)
                 },
                 Qt::QueuedConnection);
     }
-    emit inputChanged();
+    Q_EMIT inputChanged();
 }
 int TitleReel::slotCount() const
 {
@@ -480,7 +482,7 @@ void TitleReel::schedule(bool instant)
 {
     m_instant |= instant;
     m_dirty = true;
-    emit inputChanged();
+    Q_EMIT inputChanged();
     if (!m_complete || m_scheduled)
         return;
     m_scheduled = true;
@@ -537,14 +539,14 @@ void TitleReel::reconcile()
         if (changed || instant)
             slot->rollTo(glyph, instant);
         slot->active = true;
-        emit slot->frameChanged();
+        Q_EMIT slot->frameChanged();
     }
     for (auto *slot : m_slots) {
         if (!slot->active || keys.contains(slot->key))
             continue;
         slot->active = false;
         slot->rollTo({ }, instant);
-        emit slot->frameChanged();
+        Q_EMIT slot->frameChanged();
     }
     m_height.move(m_target.height, instant);
     m_animatedSlots.clear();
@@ -554,14 +556,14 @@ void TitleReel::reconcile()
     m_displayed = m_text;
     publishResources();
     if (added)
-        emit slotsChanged();
+        Q_EMIT slotsChanged();
     if (instant)
         finish();
     else if (!moving())
         prune();
     if (previousNaturalWidth != m_target.naturalWidth)
-        emit naturalWidthChanged();
-    emit changed();
+        Q_EMIT naturalWidthChanged();
+    Q_EMIT changed();
 }
 void TitleReel::prune()
 {
@@ -584,12 +586,16 @@ void TitleReel::prune()
         removed = true;
     }
     if (removed)
-        emit slotsChanged();
+        Q_EMIT slotsChanged();
 }
 void TitleReel::finish()
 {
-    if (m_scheduled)
+    if (m_scheduled) {
         reconcile();
+        // An instant reconciliation already completed and published every slot.
+        if (!moving())
+            return;
+    }
     m_height.move(m_height.target, true);
     m_animatedSlots.clear();
     for (auto *slot : m_slots) {
@@ -600,11 +606,11 @@ void TitleReel::finish()
         slot->roll.move(0, true);
         slot->entry.move(0, true);
         slot->alpha.move(slot->active ? 1 : 0, true);
-        emit slot->frameChanged();
+        Q_EMIT slot->frameChanged();
     }
     prune();
     publishResources();
-    emit changed();
+    Q_EMIT changed();
 }
 void TitleReel::advance(double dt)
 {
@@ -624,7 +630,7 @@ void TitleReel::advance(double dt)
         prune();
     if (resourcesDirty)
         publishResources();
-    emit changed();
+    Q_EMIT changed();
 }
 QList<QSize> TitleReel::resourceSizes() const
 {
@@ -639,7 +645,7 @@ void TitleReel::publishResources()
                                int(std::ceil(slot->capacityHeight * m_dpr))));
     if (sizes != m_resourceSizes) {
         m_resourceSizes = sizes;
-        emit resourcesChanged();
+        Q_EMIT resourcesChanged();
     }
 }
 QVariantMap TitleReel::diagnostics() const
@@ -653,13 +659,13 @@ QVariantMap TitleReel::diagnostics() const
             layerBytes += qint64(std::ceil(slot->capacityWidth * m_dpr))
                     * qint64(std::ceil(slot->capacityHeight * m_dpr)) * 4;
     }
-    return { { "slots", slotCount() },
-             { "activeSlots", active },
-             { "faces", faces },
-             { "layoutMisses", QVariant::fromValue(m_layout.misses()) },
-             { "cacheEntries", m_layout.cacheEntries() },
-             { "cacheBytes", m_layout.cacheBytes() },
-             { "layerRgba8Estimate", layerBytes },
-             { "moving", moving() } };
+    return { { u"slots"_s, slotCount() },
+             { u"activeSlots"_s, active },
+             { u"faces"_s, faces },
+             { u"layoutMisses"_s, QVariant::fromValue(m_layout.misses()) },
+             { u"cacheEntries"_s, m_layout.cacheEntries() },
+             { u"cacheBytes"_s, m_layout.cacheBytes() },
+             { u"layerRgba8Estimate"_s, layerBytes },
+             { u"moving"_s, moving() } };
 }
 }

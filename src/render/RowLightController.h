@@ -19,7 +19,7 @@ struct RowLightingInput
     SceneVector origin;
     double row = 0, lane = 0;
     bool independentColumns = false, reduced = false, cinematic = false, visible = true;
-    std::optional<double> introTime;
+    std::optional<double> introTime{ };
 };
 // Absolute logical coordinates; the rendered shelf transform is added only once.
 class RowLightController

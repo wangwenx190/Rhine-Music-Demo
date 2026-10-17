@@ -37,7 +37,7 @@ public:
     QString error() const;
     QList<QUrl> roots() const;
     Snapshot snapshot() const;
-signals:
+Q_SIGNALS:
     void statusChanged();
     void snapshotReady(yalahoo::Snapshot snapshot);
     void saved();

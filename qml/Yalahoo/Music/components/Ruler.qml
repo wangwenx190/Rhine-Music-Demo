@@ -39,7 +39,7 @@ Item {
                 enabled: root.visible && Boolean(slotState.enabled)
                 visible: enabled
                 focusPolicy: enabled ? Qt.StrongFocus : Qt.NoFocus
-                Accessible.name: "选择专辑 " + (slotState.title || "")
+                Accessible.name: qsTr("Select album %1").arg(slotState.title || "")
                 Accessible.checkable: true
                 Accessible.checked: Boolean(slotState.active)
                 contentItem: Item {}
@@ -59,7 +59,7 @@ Item {
             }
         }
     }
-    function restoreFocus() {
+    function restoreFocus(): void {
         let first = null;
         for (let i = 0; i < 16; ++i) {
             const item = tickPool.itemAt(i);

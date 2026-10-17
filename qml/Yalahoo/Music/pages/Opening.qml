@@ -22,14 +22,15 @@ FocusScope {
                                                                                              * 145 / 310
                                                                                              + orbitWidth)) :
                                                                                  Qt.size(0, 0)
-    function focusSkip() {
+    function focusSkip(): void {
         skip.forceActiveFocus(Qt.OtherFocusReason);
     }
     visible: controller.active
     enabled: visible
     Accessible.role: Accessible.Dialog
-    Accessible.name: controller.preparing ? "正在准备音乐库" : controller.film ? "音乐开场：一张一张，慢慢听" :
-                                                                          "正在显示音乐库"
+    Accessible.name: controller.preparing ? qsTr("Preparing the music library") : controller.film
+                                            ? qsTr("Music opening: one album at a time") : qsTr(
+                                                  "Showing the music library")
     Keys.onPressed: event => {
         event.accepted = true;
         if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key
@@ -114,7 +115,7 @@ FocusScope {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: 5 + root.drawing.titleY
                         opacity: root.drawing.title
-                        text: "一张一张，慢慢听"
+                        text: qsTr("One album at a time")
                         cssPixelSize: statement.titleSize
                         cssLineHeight: cssPixelSize * 1.5
                         font.weight: 450
@@ -126,7 +127,7 @@ FocusScope {
                     tokens: root.tokens
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: statement.titleSize * 1.5 + 10 + 24
-                    text: "ONE ALBUM AT A TIME"
+                    text: qsTr("ONE ALBUM AT A TIME")
                     cssPixelSize: 9
                     cssLineHeight: 13.5
                     font.letterSpacing: 2.7
@@ -145,7 +146,7 @@ FocusScope {
         objectName: "openingSkip"
         x: root.width - width - (root.width <= 700 ? 20 : 40)
         y: root.width <= 700 ? 23 : 33
-        text: "跳过开场 ↗"
+        text: qsTr("Skip opening \u2197")
         padding: 10
         horizontalPadding: 14
         font.family: root.tokens.regular.family
@@ -195,7 +196,9 @@ FocusScope {
         tokens: root.tokens
         anchors.centerIn: parent
         visible: root.controller.preparing
-        text: root.errorText.length > 0 ? "图形配置不可用：" + root.errorText : "正在准备音乐库…"
+        text: root.errorText.length > 0 ? qsTr("Graphics configuration unavailable: %1").arg(
+                                              root.errorText) : qsTr(
+                                              "Preparing the music library...")
         color: root.errorText.length > 0 ? root.tokens.accent : root.tokens.muted
         cssPixelSize: 12
     }

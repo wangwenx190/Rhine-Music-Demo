@@ -16,7 +16,7 @@ public:
     void setDocument(QQuickTextDocument *document);
     qreal lineHeight() const;
     void setLineHeight(qreal height);
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

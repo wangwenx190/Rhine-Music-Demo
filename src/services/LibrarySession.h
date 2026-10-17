@@ -43,6 +43,7 @@ public:
         return album(m_navigationAlbumId);
     }
     QVariantList genres() const;
+    Q_INVOKABLE bool hasGenre(const QString &id) const;
     QVariantMap summary() const;
     int trackIndex(const QString &albumId, const QString &trackId) const;
     bool contains(const QString &albumId, const QString &trackId = { }) const;
@@ -85,7 +86,7 @@ public:
     }
     QVariantMap providerCapabilities() const;
     QVariantMap browseInfo() const;
-signals:
+Q_SIGNALS:
     void snapshotChanged();
     void navigationChanged();
     void browseInfoChanged();
@@ -104,6 +105,7 @@ private:
         MetadataKind kind;
     };
     void invalidate();
+    void rebuildSummary();
     void rebuildBrowsePositions();
     void advanceBatch();
     void receive(const ProviderResult &result);
@@ -126,7 +128,9 @@ private:
     quint64 m_generation = 0, m_requestId = 0, m_metadataRevision = 0;
     QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,
             m_playbackTrackId;
+    QVariantList m_genres;
     QVariantMap m_metadata;
+    QVariantMap m_summary;
     QStringList m_batchAlbums;
     QString m_batchKind, m_batchStatus;
     quint64 m_batchRequest = 0;

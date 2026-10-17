@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "PlaybackController.h"
 #include <QDir>
 #include <QSet>
@@ -5,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
@@ -86,14 +89,14 @@ bool PlaybackController::loading() const
 QString PlaybackController::state() const
 {
     if (!m_error.isEmpty())
-        return "error";
+        return u"error"_s;
     if (requested() && m_unavailable)
-        return "waiting-output";
+        return u"waiting-output"_s;
     if (loading())
-        return "loading";
+        return u"loading"_s;
     if (playing())
-        return "playing";
-    return m_intent == Intent::Paused ? "paused" : "stopped";
+        return u"playing"_s;
+    return m_intent == Intent::Paused ? u"paused"_s : u"stopped"_s;
 }
 qint64 PlaybackController::position() const
 {
@@ -103,7 +106,8 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
 {
     const auto *album = m_library->album(albumId);
     if (!album || album->offline) {
-        emit rejected(QStringLiteral("专辑目录暂不可用，请重新扫描或换曲。"));
+        Q_EMIT rejected(QCoreApplication::translate(
+                "Yalahoo", "The album directory is unavailable. Rescan or choose another track."));
         return false;
     }
     int target = -1;
@@ -118,13 +122,16 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
         queue.append(entry);
     }
     if (target < 0) {
-        emit rejected(QStringLiteral("曲目已不在当前音乐库中，请换曲或重新扫描。"));
+        Q_EMIT rejected(QCoreApplication::translate(
+                "Yalahoo",
+                "The track is no longer in the library. Choose another track or rescan."));
         return false;
     }
     const auto &url = queue[target].sourceUrl;
     if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery()
         || url.hasFragment() || url.toLocalFile().contains(QChar::Null)) {
-        emit rejected(QStringLiteral("歌曲需要本地绝对文件路径。"));
+        Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
+                                                    "Tracks require a local absolute file path."));
         return false;
     }
     m_queue = std::move(queue);
@@ -143,7 +150,8 @@ void PlaybackController::start(int index)
     const auto url = m_queue[index].sourceUrl;
     if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery()
         || url.hasFragment() || url.toLocalFile().contains(QChar::Null)) {
-        emit rejected(QStringLiteral("歌曲需要本地绝对文件路径。"));
+        Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
+                                                    "Tracks require a local absolute file path."));
         return;
     }
     m_index = index;
@@ -154,11 +162,11 @@ void PlaybackController::start(int index)
     m_dragging = false;
     m_library->adoptPlaybackIds(albumId(), trackId());
     load();
-    emit currentChanged();
-    emit durationChanged();
-    emit positionChanged();
-    emit seekableChanged();
-    emit stateChanged();
+    Q_EMIT currentChanged();
+    Q_EMIT durationChanged();
+    Q_EMIT positionChanged();
+    Q_EMIT seekableChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::clearConnections()
 {
@@ -178,16 +186,17 @@ void PlaybackController::load(qint64 restore)
     m_player.stop();
     m_player.setSource({ });
     m_seekable = m_dragging = false;
-    emit seekableChanged();
+    Q_EMIT seekableChanged();
     m_restore = std::max<qint64>(0, restore);
     m_position = m_restore;
-    emit positionChanged();
+    Q_EMIT positionChanged();
     if (m_unavailable || m_source.isEmpty())
         return;
     if (!m_player.isAvailable()) {
-        m_error = QStringLiteral("Qt 媒体播放服务不可用。");
+        m_error = QCoreApplication::translate("Yalahoo",
+                                              "The Qt media playback service is unavailable.");
         setIntent(Intent::Paused);
-        emit stateChanged();
+        Q_EMIT stateChanged();
         return;
     }
     const auto source = m_source;
@@ -202,7 +211,7 @@ void PlaybackController::load(qint64 restore)
                 if (!current(revision, source) || value != m_player.isSeekable())
                     return;
                 m_seekable = value;
-                emit seekableChanged();
+                Q_EMIT seekableChanged();
                 ready();
             }));
     m_connections.append(connect(&m_player, &QMediaPlayer::durationChanged, this,
@@ -210,7 +219,7 @@ void PlaybackController::load(qint64 restore)
                                      if (!current(revision, source) || value != m_player.duration())
                                          return;
                                      m_duration = std::max<qint64>(0, value);
-                                     emit durationChanged();
+                                     Q_EMIT durationChanged();
                                  }));
     m_connections.append(connect(
             &m_player, &QMediaPlayer::positionChanged, this, [this, revision, source](qint64) {
@@ -224,7 +233,7 @@ void PlaybackController::load(qint64 restore)
                         setSupport(MediaSupport::Supported);
                 }
                 if (!m_dragging)
-                    emit positionChanged();
+                    Q_EMIT positionChanged();
             }));
     m_connections.append(connect(&m_player, &QMediaPlayer::playbackStateChanged, this,
                                  [this, revision, source](auto value) {
@@ -235,7 +244,7 @@ void PlaybackController::load(qint64 restore)
                                          if (!requested() || m_unavailable)
                                              m_player.pause();
                                      }
-                                     emit stateChanged();
+                                     Q_EMIT stateChanged();
                                  }));
     m_connections.append(connect(&m_player, &QMediaPlayer::errorOccurred, this,
                                  [this, revision, source](auto error, const QString &reason) {
@@ -243,12 +252,14 @@ void PlaybackController::load(qint64 restore)
                                          || m_unavailable || error == QMediaPlayer::NoError)
                                          return;
                                      m_error = reason.isEmpty()
-                                             ? QStringLiteral("Qt 媒体错误：%1").arg(int(error))
+                                             ? QCoreApplication::translate("Yalahoo",
+                                                                           "Qt media error: %1")
+                                                       .arg(int(error))
                                              : reason;
                                      setIntent(Intent::Paused);
                                      if (error == QMediaPlayer::FormatError)
                                          setSupport(MediaSupport::Unsupported);
-                                     emit stateChanged();
+                                     Q_EMIT stateChanged();
                                  }));
     m_player.setPlaybackRate(1);
     m_player.setSource(source);
@@ -260,11 +271,11 @@ void PlaybackController::ready()
         || (value != QMediaPlayer::LoadedMedia && value != QMediaPlayer::BufferedMedia))
         return;
     if (!m_player.hasAudio()) {
-        m_error = QStringLiteral("Qt 未检测到音轨。");
+        m_error = QCoreApplication::translate("Yalahoo", "Qt detected no audio track.");
         setIntent(Intent::Paused);
         m_player.pause();
         setSupport(MediaSupport::Unsupported);
-        emit stateChanged();
+        Q_EMIT stateChanged();
         return;
     }
     m_duration = std::max<qint64>(0, m_player.duration());
@@ -278,7 +289,7 @@ void PlaybackController::ready()
         m_position = m_lastPosition = target;
         if (m_seekable)
             m_player.setPosition(target);
-        emit positionChanged();
+        Q_EMIT positionChanged();
     }
     if (requested() && m_background && !m_background->silent())
         return;
@@ -286,9 +297,9 @@ void PlaybackController::ready()
         m_player.play();
     else if (m_intent == Intent::Paused)
         m_player.pause();
-    emit durationChanged();
-    emit seekableChanged();
-    emit stateChanged();
+    Q_EMIT durationChanged();
+    Q_EMIT seekableChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revision)
 {
@@ -304,25 +315,26 @@ void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revisio
                 next();
             else {
                 stop();
-                emit queueFinished();
+                Q_EMIT queueFinished();
             }
         });
     } else if (value == QMediaPlayer::InvalidMedia) {
         setSupport(MediaSupport::Unsupported);
-        m_error = m_player.errorString().isEmpty() ? QStringLiteral("Qt 媒体状态：InvalidMedia")
-                                                   : m_player.errorString();
+        m_error = m_player.errorString().isEmpty()
+                ? QCoreApplication::translate("Yalahoo", "Qt media status: InvalidMedia")
+                : m_player.errorString();
         setIntent(Intent::Paused);
     } else if (value == QMediaPlayer::LoadedMedia || value == QMediaPlayer::BufferedMedia) {
         ready();
     }
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::setSupport(MediaSupport support)
 {
     if (m_support == support)
         return;
     m_support = support;
-    emit supportChanged(support);
+    Q_EMIT supportChanged(support);
 }
 void PlaybackController::toggle()
 {
@@ -345,13 +357,13 @@ void PlaybackController::toggle()
         load(position());
     else
         ready();
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::pause()
 {
     setIntent(Intent::Paused);
     m_player.pause();
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::stop()
 {
@@ -366,9 +378,9 @@ void PlaybackController::stop()
     m_position = m_lastPosition = m_preview = 0;
     m_restore = -1;
     m_dragging = m_seekable = false;
-    emit positionChanged();
-    emit seekableChanged();
-    emit stateChanged();
+    Q_EMIT positionChanged();
+    Q_EMIT seekableChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::next()
 {
@@ -401,7 +413,7 @@ void PlaybackController::retry()
     setIntent(Intent::Playing);
     m_error.clear();
     load(position());
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void PlaybackController::seek(qint64 value)
 {
@@ -411,7 +423,7 @@ void PlaybackController::seek(qint64 value)
             m_duration > 0 ? std::clamp(value, qint64(0), m_duration) : std::max<qint64>(0, value);
     m_restore = m_unavailable ? m_position : -1;
     m_player.setPosition(m_position);
-    emit positionChanged();
+    Q_EMIT positionChanged();
 }
 void PlaybackController::beginSeek()
 {
@@ -419,14 +431,14 @@ void PlaybackController::beginSeek()
         return;
     m_preview = position();
     m_dragging = true;
-    emit positionChanged();
+    Q_EMIT positionChanged();
 }
 void PlaybackController::previewSeek(qint64 value)
 {
     if (!m_dragging)
         return;
     m_preview = std::clamp(value, qint64(0), m_duration);
-    emit positionChanged();
+    Q_EMIT positionChanged();
 }
 void PlaybackController::commitSeek()
 {
@@ -435,36 +447,51 @@ void PlaybackController::commitSeek()
     const auto target = m_preview;
     m_dragging = false;
     seek(target);
-    emit positionChanged();
+    Q_EMIT positionChanged();
 }
 void PlaybackController::cancelSeek()
 {
     if (!m_dragging)
         return;
     m_dragging = false;
-    emit positionChanged();
+    Q_EMIT positionChanged();
 }
 void PlaybackController::setVolume(double value)
 {
     if (std::isfinite(value))
         m_output.setVolume(float(std::clamp(value, 0., 1.)));
 }
+QVariantList PlaybackController::deviceChoices() const
+{
+    QVariantList choices;
+    choices.reserve(m_outputs.size() + 1);
+    choices.append(
+            QVariantMap{ { u"label"_s, QCoreApplication::translate("Yalahoo", "System default") },
+                         { u"value"_s, QString() } });
+    for (const auto &device : m_outputs)
+        choices.append(QVariantMap{ { u"label"_s, device.description() },
+                                    { u"value"_s, QString::fromUtf8(device.id().toBase64()) } });
+    return choices;
+}
 QVariantList PlaybackController::devices() const
 {
-    QVariantList result{ { QVariantMap{ { "id", "" }, { "name", "系统默认" } } } };
+    QVariantList result{ { QVariantMap{
+            { u"id"_s, u""_s },
+            { u"name"_s, QCoreApplication::translate("Yalahoo", "System default") } } } };
     for (const auto &device : m_outputs)
-        result.append(QVariantMap{ { "id", QString::fromLatin1(device.id().toBase64()) },
-                                   { "name", device.description() } });
+        result.append(QVariantMap{ { u"id"_s, QString::fromUtf8(device.id().toBase64()) },
+                                   { u"name"_s, device.description() } });
     return result;
 }
 bool PlaybackController::selectDevice(const QString &id)
 {
-    const auto decoded = QByteArray::fromBase64(id.toLatin1());
-    if (!id.isEmpty() && decoded.toBase64() != id.toLatin1())
+    const auto decoded = QByteArray::fromBase64(id.toUtf8());
+    if (!id.isEmpty() && decoded.toBase64() != id.toUtf8())
         return false;
-    if (!id.isEmpty() && std::none_of(m_outputs.begin(), m_outputs.end(), [&](const auto &device) {
-            return device.id() == decoded;
-        }))
+    if (!id.isEmpty()
+        && std::none_of(m_outputs.cbegin(), m_outputs.cend(), [&](const auto &device) {
+               return device.id() == decoded;
+           }))
         return false;
     m_preferred = decoded;
     m_notice.clear();
@@ -488,7 +515,9 @@ void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
             selected = *it;
         else {
             m_preferred.clear();
-            m_notice = QStringLiteral("所选输出设备已断开，已切换系统默认。");
+            m_notice = QCoreApplication::translate(
+                    "Yalahoo",
+                    "The selected output device was disconnected. Using the system default.");
         }
     }
     if (selected.isNull()) {
@@ -514,7 +543,7 @@ void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
                 ready();
         }
     }
-    emit devicesChanged();
-    emit stateChanged();
+    Q_EMIT devicesChanged();
+    Q_EMIT stateChanged();
 }
 }

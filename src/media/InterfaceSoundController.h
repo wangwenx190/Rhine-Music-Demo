@@ -34,7 +34,7 @@ public:
     Q_INVOKABLE bool trigger(const QString &event);
     Q_INVOKABLE void preview();
     void stop();
-signals:
+Q_SIGNALS:
     void settingsChanged();
 
 private:

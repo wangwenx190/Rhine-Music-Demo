@@ -43,15 +43,15 @@ public:
     QVector<OverviewColumn> projectColumns() const;
     static double columnExtent(double lane, double centerLane, double progress);
     static CameraPose framing(CameraPose base, double width, double height, double progress);
-signals:
+Q_SIGNALS:
     void changed();
     void focusRequested(bool overview);
 
 private:
     void notify();
     std::array<double, 5> m_notified{ -1, -1, -1, -1, -1 };
-    MotionController *m_motion;
-    FrameClock *m_clock;
+    QPointer<MotionController> m_motion;
+    QPointer<FrameClock> m_clock;
     QPointer<SceneAdapter> m_scene;
     QPointer<SelectionController> m_selection;
     QPointer<PresentationController> m_presentation;

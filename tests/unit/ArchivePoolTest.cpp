@@ -9,6 +9,9 @@
 #include <QTest>
 #include <QSet>
 #include <limits>
+#include <cmath>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
 QList<LibraryColumn> columns(const QList<int> &counts)
@@ -17,21 +20,45 @@ QList<LibraryColumn> columns(const QList<int> &counts)
     for (int lane = 0; lane < counts.size(); ++lane) {
         LibraryColumn c;
         for (int row = 0; row < counts[lane]; ++row)
-            c.albumIds.append(QStringLiteral("%1:%2").arg(lane).arg(row));
+            c.albumIds.append(u"%1:%2"_s.arg(lane).arg(row));
         result.append(c);
     }
     return result;
 }
 ArchiveCell cell(QJsonObject value)
 {
-    return { value["lane"].toDouble(), value["row"].toDouble() };
+    return { value[u"lane"_s].toDouble(), value[u"row"_s].toDouble() };
 }
 }
 class ArchivePoolTest : public QObject
 {
     Q_OBJECT
     QJsonObject golden;
-private slots:
+private Q_SLOTS:
+    void wrappingNeverProducesTheCountAtNegativeBoundary()
+    {
+        const double belowZero = std::nextafter(0., -1.);
+        for (const int count : { 1, 9, 48, 1000000 }) {
+            QCOMPARE(ArchivePool::wrap(belowZero, count), count - 1);
+            QCOMPARE(ArchivePool::wrap(-double(count), count), 0);
+            QCOMPARE(ArchivePool::wrap(-1, count), count - 1);
+            QCOMPARE(ArchivePool::wrap(double(count), count), 0);
+        }
+        ArchivePool pool;
+        pool.setColumns(columns({ 1, 1, 1 }));
+        QCOMPARE(pool.albumAt({ belowZero, 12 }), u"2:0"_s);
+    }
+    void laneCommandRebasesBeforeNarrowingPeriodicCoordinates()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns(columns({ 1, 1, 1 }));
+        QVERIFY(selection.selectCell({ 1e12, 12 }));
+        QCOMPARE(selection.albumId(), u"1:0"_s);
+        QVERIFY(selection.moveLane(1));
+        QCOMPARE(selection.albumId(), u"2:0"_s);
+        QVERIFY(std::abs(selection.cell().lane) < 2048);
+    }
     void reducedFramesReusePublishedInstances()
     {
         MotionController motion;
@@ -65,7 +92,8 @@ private slots:
     }
     void initTestCase()
     {
-        QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/archive-pool/golden.json"));
+        QFile file(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/archive-pool/golden.json"_s));
         QVERIFY(file.open(QIODevice::ReadOnly));
         golden = QJsonDocument::fromJson(file.readAll()).object();
     }
@@ -73,30 +101,29 @@ private slots:
     {
         ArchivePool pool;
         QList<int> counts;
-        for (auto n : golden["counts"].toArray())
+        for (auto n : golden[u"counts"_s].toArray())
             counts.append(n.toInt());
         pool.setColumns(columns(counts));
-        for (auto sample : golden["pool"].toArray()) {
+        for (auto sample : golden[u"pool"_s].toArray()) {
             const auto value = sample.toObject();
-            pool.update(cell(value["center"].toObject()));
+            pool.update(cell(value[u"center"_s].toObject()));
             QSet<QString> physical;
             for (const auto &instance : pool.instances())
-                physical.insert(
-                        QStringLiteral("%1:%2").arg(instance.cell.lane).arg(instance.cell.row));
+                physical.insert(u"%1:%2"_s.arg(instance.cell.lane).arg(instance.cell.row));
             QCOMPARE(physical.size(), 432);
-            for (auto expected : value["cells"].toArray()) {
+            for (auto expected : value[u"cells"_s].toArray()) {
                 const auto e = expected.toObject();
-                const auto &actual = pool.instances()[e["index"].toInt()];
+                const auto &actual = pool.instances()[e[u"index"_s].toInt()];
                 QCOMPARE(actual.cell, cell(e));
-                QCOMPARE(actual.albumId, e["albumId"].toString());
+                QCOMPARE(actual.albumId, e[u"albumId"_s].toString());
             }
         }
-        for (auto sample : golden["nearest"].toArray()) {
+        for (auto sample : golden[u"nearest"_s].toArray()) {
             const auto value = sample.toObject();
-            const auto input = value["input"].toArray();
+            const auto input = value[u"input"_s].toArray();
             QCOMPARE(ArchivePool::nearestOccurrence(input[0].toDouble(), input[1].toDouble(),
                                                     input[2].toDouble()),
-                     value["output"].toDouble());
+                     value[u"output"_s].toDouble());
         }
         MotionController motion;
         SelectionController selection(&motion);
@@ -104,30 +131,30 @@ private slots:
         QVERIFY(selection.selectCell({ 2, 14 }));
         QVERIFY(selection.moveRow(1));
         QCOMPARE(selection.cell(), (ArchiveCell{ 2, 15 }));
-        QCOMPARE(selection.albumId(), QStringLiteral("2:0"));
+        QCOMPARE(selection.albumId(), u"2:0"_s);
         QVERIFY(selection.moveRow(-1));
         QCOMPARE(selection.cell(), (ArchiveCell{ 2, 14 }));
         QVERIFY(selection.moveLane(1));
         QCOMPARE(selection.cell().lane, 3);
-        QVERIFY(selection.select(QStringLiteral("1:0")));
+        QVERIFY(selection.select(u"1:0"_s));
         QCOMPARE(selection.cell().lane, 1);
         QCOMPARE(selection.cell().row, 12);
     }
     void frozenWaveFormulae()
     {
-        for (auto sample : golden["fields"].toArray()) {
+        for (auto sample : golden[u"fields"_s].toArray()) {
             const auto v = sample.toObject();
-            const double t = v["time"].toDouble(), r = v["row"].toDouble(),
-                         l = v["lane"].toDouble();
-            QVERIFY(std::abs(archiveWave(r, l, t) - v["archive"].toDouble()) < 1e-10);
-            QVERIFY(std::abs(idleWave(r, l, t) - v["idle"].toDouble()) < 1e-10);
-            QVERIFY(std::abs(musicSelectionWave(std::abs(r - 12), t) - v["pulse"].toDouble())
+            const double t = v[u"time"_s].toDouble(), r = v[u"row"_s].toDouble(),
+                         l = v[u"lane"_s].toDouble();
+            QVERIFY(std::abs(archiveWave(r, l, t) - v[u"archive"_s].toDouble()) < 1e-10);
+            QVERIFY(std::abs(idleWave(r, l, t) - v[u"idle"_s].toDouble()) < 1e-10);
+            QVERIFY(std::abs(musicSelectionWave(std::abs(r - 12), t) - v[u"pulse"_s].toDouble())
                     < 1e-10);
             QVERIFY(std::abs(settlingWave(r - 12, 26.56) * columnStrength(l, 2)
-                             - v["resting"].toDouble())
+                             - v[u"resting"_s].toDouble())
                     < 1e-10);
-            QVERIFY(std::abs(extraction(t) - v["extraction"].toDouble()) < 1e-10);
-            QVERIFY(std::abs(returnStep(.8, t) - v["returnAngle"].toDouble()) < 1e-10);
+            QVERIFY(std::abs(extraction(t) - v[u"extraction"_s].toDouble()) < 1e-10);
+            QVERIFY(std::abs(returnStep(.8, t) - v[u"returnAngle"_s].toDouble()) < 1e-10);
         }
     }
     void frozenProductionTransforms()
@@ -135,7 +162,7 @@ private slots:
         MotionController motion;
         SelectionController selection(&motion);
         selection.setColumns(columns({ 1, 2, 3, 7, 64, 97, 101, 113, 127 }));
-        for (auto sample : golden["poses"].toArray()) {
+        for (auto sample : golden[u"poses"_s].toArray()) {
             const auto value = sample.toObject();
             const auto targetCell = cell(value);
             const auto it =
@@ -144,41 +171,41 @@ private slots:
                                      return i.cell == targetCell;
                                  });
             QVERIFY(it != selection.instances().cend());
-            QCOMPARE(it->albumId, value["albumId"].toString());
-            const auto expected = value["matrix"].toArray();
+            QCOMPARE(it->albumId, value[u"albumId"_s].toString());
+            const auto expected = value[u"matrix"_s].toArray();
             for (int i = 0; i < 16; ++i)
                 QVERIFY(std::abs(it->transform.constData()[i] - expected[i].toDouble()) < 1e-5);
         }
-        for (auto sample : golden["ownedPoses"].toArray()) {
+        for (auto sample : golden[u"ownedPoses"_s].toArray()) {
             const auto value = sample.toObject();
             auto springs = motion.springs();
-            springs[2].value = value["shoulder"].toDouble();
+            springs[2].value = value[u"shoulder"_s].toDouble();
             motion.observe(
                     springs,
                     { springs[0].value, springs[1].value, springs[2].value, springs[3].value },
                     { 3.7, 3.7, 5, 4 });
-            selection.setLift(value["lift"].toDouble());
-            selection.setRotation(value["rotation"].toDouble());
-            const auto expected = value["matrix"].toArray();
+            selection.setLift(value[u"lift"_s].toDouble());
+            selection.setRotation(value[u"rotation"_s].toDouble());
+            const auto expected = value[u"matrix"_s].toArray();
             const auto &matrix = selection.instances().last().transform;
             for (int i = 0; i < 16; ++i)
                 QVERIFY(std::abs(matrix.constData()[i] - expected[i].toDouble()) < 1e-5);
         }
-        for (auto sample : golden["selection"].toArray()) {
+        for (auto sample : golden[u"selection"_s].toArray()) {
             const auto value = sample.toObject();
             selection.setColumns(columns({ 1, 2, 3, 7, 64, 97, 101, 113, 127 }));
-            QVERIFY(selection.selectCell(cell(value["current"].toObject())));
+            QVERIFY(selection.selectCell(cell(value[u"current"_s].toObject())));
             selection.setLift(0);
-            const auto navigation = value["navigation"].toObject();
-            if (navigation["axis"] == "row")
-                QVERIFY(selection.moveRow(navigation["direction"].toInt()));
-            else if (navigation["axis"] == "lane")
+            const auto navigation = value[u"navigation"_s].toObject();
+            if (navigation[u"axis"_s] == u"row"_s)
+                QVERIFY(selection.moveRow(navigation[u"direction"_s].toInt()));
+            else if (navigation[u"axis"_s] == u"lane"_s)
                 QVERIFY(selection.selectCell(
-                        { selection.cell().lane + navigation["direction"].toDouble(),
-                          std::round(navigation["row"].toDouble()) }));
+                        { selection.cell().lane + navigation[u"direction"_s].toDouble(),
+                          std::round(navigation[u"row"_s].toDouble()) }));
             else
-                QVERIFY(selection.select(value["id"].toString()));
-            QCOMPARE(selection.cell(), cell(value["cell"].toObject()));
+                QVERIFY(selection.select(value[u"id"_s].toString()));
+            QCOMPARE(selection.cell(), cell(value[u"cell"_s].toObject()));
         }
     }
     void ownershipReturnAndReclaim()
@@ -200,7 +227,7 @@ private slots:
         QVERIFY(selection.selectCell({ 0, 12 }));
         QSet<QString> cells;
         for (const auto &i : selection.instances()) {
-            const auto key = QStringLiteral("%1:%2").arg(i.cell.lane).arg(i.cell.row);
+            const auto key = u"%1:%2"_s.arg(i.cell.lane).arg(i.cell.row);
             QVERIFY(!cells.contains(key));
             cells.insert(key);
         }
@@ -274,16 +301,17 @@ private slots:
         scene.setReducedMotion(true);
         scene.setDetail(1);
         scene.snapToTarget();
-        QFile cameraGolden(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/scene/camera-golden.json"));
+        QFile cameraGolden(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/scene/camera-golden.json"_s));
         QVERIFY(cameraGolden.open(QIODevice::ReadOnly));
         const auto cameraCases =
-                QJsonDocument::fromJson(cameraGolden.readAll()).object()["cases"].toArray();
+                QJsonDocument::fromJson(cameraGolden.readAll()).object()[u"cases"_s].toArray();
         bool compared = false;
         for (const auto value : cameraCases) {
             const auto expected = value.toObject();
-            if (expected["detail"].toDouble() != 1)
+            if (expected[u"detail"_s].toDouble() != 1)
                 continue;
-            const auto position = expected["casePosition"].toArray();
+            const auto position = expected[u"casePosition"_s].toArray();
             QVERIFY(std::abs(selection.selectedPosition().y - position[1].toDouble()) < 1e-6);
             compared = true;
             break;
@@ -292,9 +320,9 @@ private slots:
         const auto pixel = scene.projectWorldPoint(
                 (selection.selectedPosition() + SceneVector{ 0, 1.85, 0 }).qt());
         const auto hit = scene.hitTest(pixel.x(), pixel.y());
-        QCOMPARE(hit["albumId"].toString(), selection.albumId());
-        QCOMPARE(hit["lane"].toDouble(), selection.cell().lane);
-        QCOMPARE(hit["row"].toDouble(), selection.cell().row);
+        QCOMPARE(hit[u"albumId"_s].toString(), selection.albumId());
+        QCOMPARE(hit[u"lane"_s].toDouble(), selection.cell().lane);
+        QCOMPARE(hit[u"row"_s].toDouble(), selection.cell().row);
         QVERIFY(scene.hitTest(-1, -1).isEmpty());
         QVERIFY(scene.hitTest(std::numeric_limits<double>::quiet_NaN(), 1).isEmpty());
         QVERIFY(!selection.selectCell({ .5, 1 }));
@@ -307,7 +335,7 @@ private slots:
         selection.setColumns(
                 columns({ 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 }));
         QCOMPARE(selection.instances().size(), 432);
-        QVERIFY(selection.select(QStringLiteral("8:9999")));
+        QVERIFY(selection.select(u"8:9999"_s));
         selection.setColumns(columns({ 97, 101, 103 }));
         QVERIFY(!std::isfinite(selection.pool().rowPeriod()));
         QVERIFY(selection.selectCell({ 0, 9999999 }));
@@ -359,10 +387,10 @@ private slots:
         LibrarySnapshot snapshot;
         for (int index = 0; index < 2; ++index) {
             Album album;
-            album.id = QStringLiteral("album-%1").arg(index);
-            album.title = QStringLiteral("Album %1").arg(index);
+            album.id = u"album-%1"_s.arg(index);
+            album.title = u"Album %1"_s.arg(index);
             Track track;
-            track.id = QStringLiteral("track-%1").arg(index);
+            track.id = u"track-%1"_s.arg(index);
             track.albumId = album.id;
             album.tracks.append(track);
             snapshot.albums.append(album);
@@ -372,14 +400,14 @@ private slots:
         connect(&selection, &SelectionController::selectionChanged, &library, [&] {
             library.navigate(selection.albumId());
         });
-        QVERIFY(library.setPlaybackIds("album-0", "track-0"));
-        QVERIFY(selection.select("album-1"));
-        library.search("Album");
-        QCOMPARE(library.navigationAlbumId(), QStringLiteral("album-1"));
-        QCOMPARE(library.playbackAlbumId(), QStringLiteral("album-0"));
-        QCOMPARE(library.playbackTrackId(), QStringLiteral("track-0"));
+        QVERIFY(library.setPlaybackIds(u"album-0"_s, u"track-0"_s));
+        QVERIFY(selection.select(u"album-1"_s));
+        library.search(u"Album"_s);
+        QCOMPARE(library.navigationAlbumId(), u"album-1"_s);
+        QCOMPARE(library.playbackAlbumId(), u"album-0"_s);
+        QCOMPARE(library.playbackTrackId(), u"track-0"_s);
         selection.setColumns(columns({ 0, 1 }));
-        QCOMPARE(selection.albumId(), QStringLiteral("1:0"));
+        QCOMPARE(selection.albumId(), u"1:0"_s);
     }
 };
 QTEST_GUILESS_MAIN(ArchivePoolTest)

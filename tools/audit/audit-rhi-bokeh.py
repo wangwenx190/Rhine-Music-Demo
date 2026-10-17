@@ -23,7 +23,7 @@ CHECKS = [
      "Render owns resources; preloaded immutable assets, no I/O, worker waits or production readback. Explicit diagnostic uses endOffscreenFrame only, not a product event loop or presentation benchmark."),
     ("PERF-03", "src/render/rhi/Postprocess.cpp", "sizeof(PostPrefix) == 80",
      "Each active Bokeh pass uploads only its actual 80-byte dynamic prefix; unused kernel capacity not uploaded. Actual prefix saved only in Review build; request captures return values."),
-    ("PERF-04", "src/render/rhi/Postprocess.cpp", "p.add(\"bokeh\", p.ping[ping], current, color)",
+    ("PERF-04", "src/render/rhi/Postprocess.cpp", 'p.add(u"bokeh"_s, p.ping[ping], current, color)',
      "AO composite -> distinct RGBA16F Bokeh output -> optional SMAA -> one ACES/sRGB. Full geometry RGB24 DOF depth shares AO only at full resolution. No framebuffer feedback; one Bokeh-only color target and one uniform."),
     ("PERF-05", "src/render/rhi/Postprocess.cpp", "m_state->settings = s",
      "Focus/aperture/near/far are uniform values outside compatibility keys; changed optical values reuse textures/PSO/SRB. All 41 authored samples preserved; no approximate replacement renderer or sharpening."),

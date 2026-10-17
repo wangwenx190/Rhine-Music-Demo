@@ -15,7 +15,7 @@ public:
         return m_asset;
     }
     void setAsset(const QString &asset);
-signals:
+Q_SIGNALS:
     void assetChanged();
 
 private:

@@ -13,6 +13,9 @@
 #include <QQuickWindow>
 #include <QSaveFile>
 #include <QTimer>
+
+using namespace Qt::StringLiterals;
+
 #ifdef Q_OS_MACOS
 #  include <mach-o/dyld.h>
 #elif defined(Q_OS_LINUX)
@@ -33,25 +36,27 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
         bool selfContained = true;
 #ifdef Q_OS_MACOS
         const QString bundle =
-                QFileInfo(QCoreApplication::applicationDirPath() + "/../..").canonicalFilePath()
-                + '/';
+                QFileInfo(QCoreApplication::applicationDirPath() + "/../.."_L1).canonicalFilePath()
+                + '/'_L1;
         for (uint32_t index = 0; index < _dyld_image_count(); ++index) {
             const QString path = QString::fromUtf8(_dyld_get_image_name(index));
-            const bool system = path.startsWith("/System/Library/") || path.startsWith("/usr/lib/");
+            const bool system =
+                    path.startsWith(u"/System/Library/"_s) || path.startsWith(u"/usr/lib/"_s);
             const bool bundled = QFileInfo(path).canonicalFilePath().startsWith(bundle);
-            images.append(
-                    QJsonObject{ { "path", path }, { "bundled", bundled }, { "system", system } });
+            images.append(QJsonObject{
+                    { u"path"_s, path }, { u"bundled"_s, bundled }, { u"system"_s, system } });
             selfContained &= system || bundled;
         }
 #elif defined(Q_OS_LINUX)
         const QString package =
-                QFileInfo(QCoreApplication::applicationDirPath() + "/..").canonicalFilePath() + '/';
+                QFileInfo(QCoreApplication::applicationDirPath() + "/.."_L1).canonicalFilePath()
+                + '/'_L1;
         QStringList paths{ QCoreApplication::applicationFilePath() };
         dl_iterate_phdr(
                 [](dl_phdr_info *info, size_t, void *data) {
                     if (info->dlpi_name && info->dlpi_name[0]
-                        && QByteArray(info->dlpi_name) != "linux-vdso.so.1"
-                        && QByteArray(info->dlpi_name) != "linux-gate.so.1")
+                        && QByteArray(info->dlpi_name) != "linux-vdso.so.1"_ba
+                        && QByteArray(info->dlpi_name) != "linux-gate.so.1"_ba)
                         static_cast<QStringList *>(data)->append(
                                 QString::fromUtf8(info->dlpi_name));
                     return 0;
@@ -62,15 +67,15 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
             const QString resolved = QFileInfo(path).canonicalFilePath();
             const QString name = QFileInfo(resolved).fileName();
             const bool bundled = !resolved.isEmpty() && resolved.startsWith(package);
-            const bool qtOrMedia = name.startsWith("libQt6") || name.startsWith("libavcodec")
-                    || name.startsWith("libavformat") || name.startsWith("libavutil")
-                    || name.startsWith("libswresample") || name.startsWith("libswscale")
-                    || name.startsWith("libavfilter") || name.startsWith("libavdevice");
+            const bool qtOrMedia = name.startsWith(u"libQt6"_s) || name.startsWith(u"libavcodec"_s)
+                    || name.startsWith(u"libavformat"_s) || name.startsWith(u"libavutil"_s)
+                    || name.startsWith(u"libswresample"_s) || name.startsWith(u"libswscale"_s)
+                    || name.startsWith(u"libavfilter"_s) || name.startsWith(u"libavdevice"_s);
             const bool system = !qtOrMedia
-                    && (resolved.startsWith("/usr/lib/") || resolved.startsWith("/usr/lib64/")
-                        || resolved.startsWith("/lib/") || resolved.startsWith("/lib64/"));
+                    && (resolved.startsWith(u"/usr/lib/"_s) || resolved.startsWith(u"/usr/lib64/"_s)
+                        || resolved.startsWith(u"/lib/"_s) || resolved.startsWith(u"/lib64/"_s));
             images.append(QJsonObject{
-                    { "path", resolved }, { "bundled", bundled }, { "system", system } });
+                    { u"path"_s, resolved }, { u"bundled"_s, bundled }, { u"system"_s, system } });
             selfContained &= bundled || system;
         }
 #endif
@@ -83,30 +88,30 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
             QFile file(QString::fromUtf8(path));
             const bool valid = file.open(QIODevice::ReadOnly) && file.size() > 0;
             assets &= valid;
-            resources.append(
-                    QJsonObject{ { "path", QString::fromUtf8(path) }, { "available", valid } });
+            resources.append(QJsonObject{ { u"path"_s, QString::fromUtf8(path) },
+                                          { u"available"_s, valid } });
         }
         const bool policy = !window.isVisible() && verification::windowPolicySatisfied(window);
         const bool passed = loaded && assets && policy && selfContained && qmlWarnings.isEmpty();
         QJsonObject report{
-            { "passed", passed },
-            { "qtVersion", qVersion() },
-            { "platformPlugin", QGuiApplication::platformName() },
-            { "qmlInstantiated", true },
-            { "qmlWarnings", QJsonArray::fromStringList(qmlWarnings) },
-            { "mediaLoadedWithoutOutput", loaded },
-            { "mediaError", media.errorString() },
-            { "resources", resources },
-            { "loadedImages", images },
-            { "selfContained", selfContained },
-            { "pluginPaths", QJsonArray::fromStringList(app.libraryPaths()) },
-            { "qmlPaths",
+            { u"passed"_s, passed },
+            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+            { u"platformPlugin"_s, QGuiApplication::platformName() },
+            { u"qmlInstantiated"_s, true },
+            { u"qmlWarnings"_s, QJsonArray::fromStringList(qmlWarnings) },
+            { u"mediaLoadedWithoutOutput"_s, loaded },
+            { u"mediaError"_s, media.errorString() },
+            { u"resources"_s, resources },
+            { u"loadedImages"_s, images },
+            { u"selfContained"_s, selfContained },
+            { u"pluginPaths"_s, QJsonArray::fromStringList(app.libraryPaths()) },
+            { u"qmlPaths"_s,
               QJsonArray::fromStringList(qmlEngine(&window) ? qmlEngine(&window)->importPathList()
                                                             : QStringList()) },
-            { "qtPrefix", QLibraryInfo::path(QLibraryInfo::PrefixPath) },
-            { "windowPolicy", verification::windowPolicy(window) },
-            { "scope",
-              "Hidden product QML/resources and real media load; no GPU, playback, device, or presentation claim" }
+            { u"qtPrefix"_s, QLibraryInfo::path(QLibraryInfo::PrefixPath) },
+            { u"windowPolicy"_s, verification::windowPolicy(window) },
+            { u"scope"_s,
+              u"Hidden product QML/resources and real media load; no GPU, playback, device, or presentation claim"_s }
         };
         QDir().mkpath(QFileInfo(reportPath).absolutePath());
         QSaveFile output(reportPath);
@@ -130,7 +135,7 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
     QTimer::singleShot(20000, &media, finish);
     QTimer::singleShot(0, &media, [&] {
         // No audio output is attached, and play() is never called.
-        media.setSource(QUrl("qrc:/assets/audio/atmosphere.ogg"));
+        media.setSource(QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
     });
     return app.exec();
 }

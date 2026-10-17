@@ -32,9 +32,9 @@ Item {
     ArchiveButton {
         anchors.right: parent.right
         tokens: root.tokens
-        text: "×"
+        text: "\u00d7"
         cssPixelSize: 29
-        Accessible.name: "关闭"
+        Accessible.name: qsTr("Close")
         onClicked: root.closeRequested()
     }
 }

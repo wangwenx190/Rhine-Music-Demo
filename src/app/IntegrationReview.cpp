@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 qint64 nowNs()
@@ -33,7 +35,7 @@ qint64 nowNs()
 QJsonObject distribution(QVector<double> values, double period)
 {
     if (values.isEmpty())
-        return { { "count", 0 } };
+        return { { u"count"_s, 0 } };
     int consecutive = 0, longest = 0;
     for (double value : values) {
         consecutive = value > 2 * period ? consecutive + 1 : 0;
@@ -48,15 +50,15 @@ QJsonObject distribution(QVector<double> values, double period)
             return v > p;
         }));
     };
-    return { { "longestConsecutiveOverTwoPeriods", longest },
-             { "count", values.size() },
-             { "p50Ms", percentile(.5) },
-             { "p95Ms", percentile(.95) },
-             { "p99Ms", percentile(.99) },
-             { "maxMs", values.last() },
-             { "overOnePeriod", over(period) },
-             { "overTwoPeriods", over(2 * period) },
-             { "overThreePeriods", over(3 * period) } };
+    return { { u"longestConsecutiveOverTwoPeriods"_s, longest },
+             { u"count"_s, values.size() },
+             { u"p50Ms"_s, percentile(.5) },
+             { u"p95Ms"_s, percentile(.95) },
+             { u"p99Ms"_s, percentile(.99) },
+             { u"maxMs"_s, values.last() },
+             { u"overOnePeriod"_s, over(period) },
+             { u"overTwoPeriods"_s, over(2 * period) },
+             { u"overThreePeriods"_s, over(3 * period) } };
 }
 void click(QQuickWindow &window, const QString &name)
 {
@@ -84,7 +86,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     for (const auto *name :
          { "librarySession", "motionController", "inputRouter", "rulerController", "sceneAdapter",
            "verificationRun", "verificationFlags", "geometryProbe" })
-        initialProperties.insert(QString::fromLatin1(name), initialWindow.property(name));
+        initialProperties.insert(QString::fromUtf8(name), initialWindow.property(name));
     std::unique_ptr<QObject> rebuiltRoot;
     const bool quitOnClose = app.quitOnLastWindowClosed();
     app.setQuitOnLastWindowClosed(false);
@@ -131,7 +133,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     QMap<quint64, qint64> firstSubmittedNs;
     QSet<QString> observedSizes;
     QMap<QString, QVector<double>> inputLatency, cpu, sync;
-    QString stage = "day-browse";
+    QString stage = u"day-browse"_s;
     bool passed = true;
     int coalesced = 0;
     qint64 peak = 0;
@@ -145,12 +147,13 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     int rebuilt = 0;
     auto changeStage = [&](int index) {
         stageIndex = index;
-        stage = QStringList{ "day-browse", "day-detail", "night-detail", "night-browse" }[index];
-        click(*window, index == 2 ? "themeProbe" : "interactionProbe");
+        stage = QStringList{ u"day-browse"_s, u"day-detail"_s, u"night-detail"_s,
+                             u"night-browse"_s }[index];
+        click(*window, index == 2 ? u"themeProbe"_s : u"interactionProbe"_s);
         inputStages.insert(scene.frame().inputRevision, stage);
-        actions.append(QJsonObject{ { "stage", stage },
-                                    { "inputRevision", qint64(scene.frame().inputRevision) },
-                                    { "inputReceivedNs", scene.frame().inputReceivedNs } });
+        actions.append(QJsonObject{ { u"stage"_s, stage },
+                                    { u"inputRevision"_s, qint64(scene.frame().inputRevision) },
+                                    { u"inputReceivedNs"_s, scene.frame().inputReceivedNs } });
     };
     bindWindow = [&] {
         const auto epoch = ++windowEpoch;
@@ -163,41 +166,40 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                         passed = false;
                         return;
                     }
-                    const auto revision = quint64(sample["inputRevision"].toInteger());
+                    const auto revision = quint64(sample[u"inputRevision"_s].toInteger());
                     const auto sampleStage = elapsed.elapsed() < (seconds + 1) * 1000
-                            ? inputStages.value(revision, "startup")
+                            ? inputStages.value(revision, u"startup"_s)
                             : stage;
-                    sample["stage"] = sampleStage;
-                    sample["elapsedMs"] = elapsed.elapsed();
-                    observedSizes.insert(QString("%1x%2")
-                                                 .arg(sample["logicalWidth"].toDouble())
-                                                 .arg(sample["logicalHeight"].toDouble()));
-                    const auto inventory = sample["resources"].toObject();
-                    const qint64 bytes = inventory["estimatedCurrentBytes"].toInteger();
-                    peak = qMax(peak, inventory["resizeOldPlusNewUpperBoundBytes"].toInteger());
+                    sample[u"stage"_s] = sampleStage;
+                    sample[u"elapsedMs"_s] = elapsed.elapsed();
+                    observedSizes.insert(u"%1x%2"_s.arg(sample[u"logicalWidth"_s].toDouble())
+                                                 .arg(sample[u"logicalHeight"_s].toDouble()));
+                    const auto inventory = sample[u"resources"_s].toObject();
+                    const qint64 bytes = inventory[u"estimatedCurrentBytes"_s].toInteger();
+                    peak = qMax(peak, inventory[u"resizeOldPlusNewUpperBoundBytes"_s].toInteger());
                     if (lastResources != inventory) {
                         auto entry = inventory;
-                        entry["stage"] = stage;
+                        entry[u"stage"_s] = stage;
                         resources.append(entry);
                         lastResources = inventory;
                     }
-                    if (!baseBytes && bytes > 0 && sample["selectedCoverWidth"].toInt() == 1024)
+                    if (!baseBytes && bytes > 0 && sample[u"selectedCoverWidth"_s].toInt() == 1024)
                         baseBytes = bytes;
                     finalBytes = bytes;
                     const bool acknowledged = awaiting && awaiting(sample);
-                    sample.remove("resources");
-                    coalesced = qMax(coalesced, int(sample["coalescedSamples"].toInteger()));
+                    sample.remove(u"resources"_s);
+                    coalesced = qMax(coalesced, int(sample[u"coalescedSamples"_s].toInteger()));
                     if (revision && !receivedInputs.contains(revision)) {
                         receivedInputs.insert(revision);
-                        firstSubmittedNs.insert(revision, sample["submittedNs"].toInteger());
-                        const double latency = (sample["submittedNs"].toInteger()
-                                                - sample["inputReceivedNs"].toInteger())
+                        firstSubmittedNs.insert(revision, sample[u"submittedNs"_s].toInteger());
+                        const double latency = (sample[u"submittedNs"_s].toInteger()
+                                                - sample[u"inputReceivedNs"_s].toInteger())
                                 / 1e6;
-                        sample["inputToQtSubmitMs"] = latency;
+                        sample[u"inputToQtSubmitMs"_s] = latency;
                         inputLatency[sampleStage].append(latency);
                     }
-                    cpu[sampleStage].append(sample["cpuSubmitMs"].toDouble());
-                    sync[sampleStage].append(sample["synchronizationMs"].toDouble());
+                    cpu[sampleStage].append(sample[u"cpuSubmitMs"_s].toDouble());
+                    sync[sampleStage].append(sample[u"synchronizationMs"_s].toDouble());
                     samples.append(sample);
                     if (acknowledged) {
                         awaiting = { };
@@ -207,7 +209,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                     }
                 });
         QObject::connect(item, &rhi::RhiItem::renderFailed, window, [&](const QString &message) {
-            actions.append(QJsonObject{ { "renderError", message } });
+            actions.append(QJsonObject{ { u"renderError"_s, message } });
             passed = false;
         });
     };
@@ -222,41 +224,41 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     const QVector<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                 { 960, 900 },   { 930, 900 },   { 390, 844 },
                                 { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
-    const QStringList presets{ "high", "ultra", "performance", "original" };
+    const QStringList presets{ u"high"_s, u"ultra"_s, u"performance"_s, u"original"_s };
     // Acknowledge each actual submission before driving the next mutation. Independent coarse
     // timers can expire together and reorder resize/preset/release actions on a busy GUI thread.
     nextAction = [&] {
         const int index = replayIndex++;
         if (index < sizes.size()) {
-            stage = "resize";
+            stage = "resize"_L1;
             const QSize size = sizes[index];
             const auto after = nowNs();
             awaiting = [size, after](const QJsonObject &sample) {
-                return sample["submittedNs"].toInteger() >= after
-                        && sample["logicalWidth"].toDouble() == size.width()
-                        && sample["logicalHeight"].toDouble() == size.height();
+                return sample[u"submittedNs"_s].toInteger() >= after
+                        && sample[u"logicalWidth"_s].toDouble() == size.width()
+                        && sample[u"logicalHeight"_s].toDouble() == size.height();
             };
             window->resize(size);
             item->update();
-            actions.append(QJsonObject{ { "stage", stage },
-                                        { "atNs", after },
-                                        { "width", size.width() },
-                                        { "height", size.height() } });
+            actions.append(QJsonObject{ { u"stage"_s, stage },
+                                        { u"atNs"_s, after },
+                                        { u"width"_s, size.width() },
+                                        { u"height"_s, size.height() } });
         } else if (index < sizes.size() + presets.size()) {
-            stage = "quality";
+            stage = "quality"_L1;
             const auto preset = presets[index - sizes.size()];
             const auto after = nowNs();
             awaiting = [&, preset, after](const QJsonObject &sample) {
                 const auto target = scene.quality()->targetSize();
                 const auto values = RenderQuality::authoredPreset(preset);
-                const bool match = sample["submittedNs"].toInteger() >= after
-                        && sample["logicalWidth"].toDouble() == 1920
-                        && sample["logicalHeight"].toDouble() == 1080
-                        && sample["targetWidth"].toInt() == target.width()
-                        && sample["targetHeight"].toInt() == target.height()
-                        && sample["aoSamples"].toInt() == values["aoSamples"].toInt()
-                        && sample["bokeh"].toBool() == (values["depthOfField"].toInt() > 0)
-                        && sample["smaa"].toBool() == (values["antialias"] == "smaa");
+                const bool match = sample[u"submittedNs"_s].toInteger() >= after
+                        && sample[u"logicalWidth"_s].toDouble() == 1920
+                        && sample[u"logicalHeight"_s].toDouble() == 1080
+                        && sample[u"targetWidth"_s].toInt() == target.width()
+                        && sample[u"targetHeight"_s].toInt() == target.height()
+                        && sample[u"aoSamples"_s].toInt() == values[u"aoSamples"_s].toInt()
+                        && sample[u"bokeh"_s].toBool() == (values[u"depthOfField"_s].toInt() > 0)
+                        && sample[u"smaa"_s].toBool() == (values[u"antialias"_s] == u"smaa"_s);
                 if (match)
                     observedPresets.insert(preset);
                 return match;
@@ -264,16 +266,16 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             window->resize(1920, 1080);
             scene.quality()->setPreset(preset);
             item->update();
-            actions.append(
-                    QJsonObject{ { "stage", stage }, { "preset", preset }, { "atNs", after } });
+            actions.append(QJsonObject{
+                    { u"stage"_s, stage }, { u"preset"_s, preset }, { u"atNs"_s, after } });
         } else if (index < sizes.size() + presets.size() + 10) {
-            stage = "rebuild";
+            stage = "rebuild"_L1;
             const auto after = nowNs();
             awaiting = [&, after](const QJsonObject &sample) {
-                const bool match = sample["submittedNs"].toInteger() >= after
-                        && sample["resourceGeneration"].toInteger() == 1
-                        && sample["selectedUploadBytes"].toInteger() == 1024 * 1024 * 4
-                        && sample["resources"].toObject()["estimatedCurrentBytes"].toInteger()
+                const bool match = sample[u"submittedNs"_s].toInteger() >= after
+                        && sample[u"resourceGeneration"_s].toInteger() == 1
+                        && sample[u"selectedUploadBytes"_s].toInteger() == 1024 * 1024 * 4
+                        && sample[u"resources"_s].toObject()[u"estimatedCurrentBytes"_s].toInteger()
                                 == baseBytes;
                 if (match)
                     ++rebuilt;
@@ -309,9 +311,9 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 router->attach(window);
             bindWindow();
             bindSwaps();
-            actions.append(QJsonObject{ { "stage", stage },
-                                        { "iteration", index - sizes.size() - presets.size() },
-                                        { "policy", verification::windowPolicy(*window) } });
+            actions.append(QJsonObject{ { u"stage"_s, stage },
+                                        { u"iteration"_s, index - sizes.size() - presets.size() },
+                                        { u"policy"_s, verification::windowPolicy(*window) } });
             QTimer::singleShot(200, Qt::PreciseTimer, window, [&] {
                 window->show();
                 passed = passed && verification::windowPolicySatisfied(*window);
@@ -322,14 +324,13 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     };
     finish = [&] {
         const auto screenshot = window->grabWindow();
-        passed = passed && screenshot.save(output + "/integration.png")
+        passed = passed && screenshot.save(output + "/integration.png"_L1)
                 && verification::windowPolicySatisfied(*window) && samples.size() > 100
                 && receivedInputs.size() == 4 && coalesced == 0 && baseBytes == finalBytes
                 && observedPresets.size() == 4 && rebuilt == 10;
         for (const auto &size : sizes)
             passed = passed
-                    && observedSizes.contains(
-                            QString("%1x%2").arg(size.width()).arg(size.height()));
+                    && observedSizes.contains(u"%1x%2"_s.arg(size.width()).arg(size.height()));
         passed = passed && window->width() == 1920 && window->height() == 1080;
         QJsonArray swappedEvents;
         QMap<QString, QVector<double>> cadence;
@@ -340,58 +341,59 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             qint64 normalEnd = std::numeric_limits<qint64>::max();
             for (const auto &value : actions) {
                 const auto action = value.toObject();
-                if (action["stage"].toString() == "resize") {
-                    normalEnd = action["atNs"].toInteger();
+                if (action[u"stage"_s].toString() == "resize"_L1) {
+                    normalEnd = action[u"atNs"_s].toInteger();
                     break;
                 }
             }
             for (auto time : events->swapped) {
-                QString name = "startup";
+                QString name = u"startup"_s;
                 for (auto it = firstSubmittedNs.cbegin(); it != firstSubmittedNs.cend(); ++it)
                     if (time >= it.value())
                         name = inputStages.value(it.key());
-                if (previous && time < normalEnd && name != "startup")
+                if (previous && time < normalEnd && name != "startup"_L1)
                     cadence[name].append((time - previous) / 1e6);
-                swappedEvents.append(QJsonObject{ { "swappedNs", time } });
+                swappedEvents.append(QJsonObject{ { u"swappedNs"_s, time } });
                 previous = time;
             }
         }
         QJsonObject distributions;
         for (const auto &name : cpu.keys())
             distributions[name] =
-                    QJsonObject{ { "cpuSubmit", distribution(cpu[name], period) },
-                                 { "synchronization", distribution(sync[name], period) },
-                                 { "inputToQtSubmit", distribution(inputLatency[name], period) },
-                                 { "frameSwappedIntervals", distribution(cadence[name], period) } };
+                    QJsonObject{ { u"cpuSubmit"_s, distribution(cpu[name], period) },
+                                 { u"synchronization"_s, distribution(sync[name], period) },
+                                 { u"inputToQtSubmit"_s, distribution(inputLatency[name], period) },
+                                 { u"frameSwappedIntervals"_s,
+                                   distribution(cadence[name], period) } };
         const QJsonObject report{
-            { "passed", passed },
-            { "qtVersion", qVersion() },
-            { "graphicsApi", int(window->rendererInterface()->graphicsApi()) },
-            { "windowPolicy", verification::windowPolicy(*window) },
-            { "vsyncDisabled", window->requestedFormat().swapInterval() == 0 },
-            { "refreshPeriodMs", period },
-            { "durationSeconds", seconds },
-            { "width", window->width() },
-            { "height", window->height() },
-            { "dpr", window->effectiveDevicePixelRatio() },
-            { "inputRevisionsSubmitted", receivedInputs.size() },
-            { "coalescedSamples", coalesced },
-            { "observedPresetCount", observedPresets.size() },
-            { "verifiedRebuilds", rebuilt },
-            { "resourceInventories", resources },
-            { "estimatedReplacementPeakBytes", peak },
-            { "estimatedInitialBytes", baseBytes },
-            { "estimatedFinalBytes", finalBytes },
-            { "actions", actions },
-            { "samplingComplete",
+            { u"passed"_s, passed },
+            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+            { u"graphicsApi"_s, int(window->rendererInterface()->graphicsApi()) },
+            { u"windowPolicy"_s, verification::windowPolicy(*window) },
+            { u"vsyncDisabled"_s, window->requestedFormat().swapInterval() == 0 },
+            { u"refreshPeriodMs"_s, period },
+            { u"durationSeconds"_s, seconds },
+            { u"width"_s, window->width() },
+            { u"height"_s, window->height() },
+            { u"dpr"_s, window->effectiveDevicePixelRatio() },
+            { u"inputRevisionsSubmitted"_s, receivedInputs.size() },
+            { u"coalescedSamples"_s, coalesced },
+            { u"observedPresetCount"_s, observedPresets.size() },
+            { u"verifiedRebuilds"_s, rebuilt },
+            { u"resourceInventories"_s, resources },
+            { u"estimatedReplacementPeakBytes"_s, peak },
+            { u"estimatedInitialBytes"_s, baseBytes },
+            { u"estimatedFinalBytes"_s, finalBytes },
+            { u"actions"_s, actions },
+            { u"samplingComplete"_s,
               coalesced == 0 && samples.size() > 100 && receivedInputs.size() == 4 },
-            { "samples", samples },
-            { "frameEvents", swappedEvents },
-            { "distributions", distributions },
-            { "scope",
-              "R10D one-case production bootstrap, both themes, real QML input to Qt command submission. frameSwapped is not scanout; no measured input-to-photon or compositor latency. This probe does not cover the full array/search/presentation/scanning product paths; full product budgets and baseline/noise remain R28. GPU memory values are descriptor estimates, not measured VRAM." }
+            { u"samples"_s, samples },
+            { u"frameEvents"_s, swappedEvents },
+            { u"distributions"_s, distributions },
+            { u"scope"_s,
+              u"R10D one-case production bootstrap, both themes, real QML input to Qt command submission. frameSwapped is not scanout; no measured input-to-photon or compositor latency. This probe does not cover the full array/search/presentation/scanning product paths; full product budgets and baseline/noise remain R28. GPU memory values are descriptor estimates, not measured VRAM."_s }
         };
-        QSaveFile file(output + "/runtime.json");
+        QSaveFile file(output + "/runtime.json"_L1);
         const bool opened = file.open(QIODevice::WriteOnly);
         if (opened)
             file.write(QJsonDocument(report).toJson());
@@ -403,17 +405,18 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     });
     QTimer::singleShot(baseTime + 60000, Qt::PreciseTimer, &reviewLifetime, [&] {
         passed = false;
-        actions.append(QJsonObject{ { "error", "Lifecycle submission acknowledgment timed out" } });
+        actions.append(
+                QJsonObject{ { u"error"_s, u"Lifecycle submission acknowledgment timed out"_s } });
         finish();
     });
     window->show();
     QTimer::singleShot(3000, Qt::PreciseTimer, window, [&] {
-        actions.append(QJsonObject{ { "stage", "first-show" },
-                                    { "windowPolicy", verification::windowPolicy(*window) } });
+        actions.append(QJsonObject{ { u"stage"_s, u"first-show"_s },
+                                    { u"windowPolicy"_s, verification::windowPolicy(*window) } });
         if (samples.isEmpty()) {
             passed = false;
             actions.append(
-                    QJsonObject{ { "error", "No actual production submission after show" } });
+                    QJsonObject{ { u"error"_s, u"No actual production submission after show"_s } });
             finish();
         }
     });

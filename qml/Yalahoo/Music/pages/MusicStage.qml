@@ -12,6 +12,7 @@ Item {
     property StartupCoordinator startupCoordinator: null
     property OpeningController openingController: null
     property Item openingReturnFocus: null
+    readonly property var hostWindow: Window.window
     property bool offscreenRendering: false
     readonly property Opening openingOverlay: openingLoader.item as Opening
     property InputRouter inputRouter: null
@@ -57,11 +58,20 @@ Item {
         motionSpeed: stage.motionController.clock.speed
     }
     readonly property bool visualActive: stage.motionController.clock.applicationVisible && (
-                                             stage.offscreenRendering || (stage.Window.window
-                                                                          !== null
-                                                                          && stage.Window.window.visible
-                                                                          && stage.Window.window.visibility
+                                             stage.offscreenRendering || (stage.hostWindow !== null
+                                                                          && stage.hostWindow.visible
+                                                                          && stage.hostWindow.visibility
                                                                           !== Window.Minimized))
+    function restorePresentationFocus(): void {
+        if (!presentationController || !presentationController.archiveEnabled)
+            return;
+        const target = presentationReturnFocus;
+        if (target && target.visible && target.enabled)
+            target.forceActiveFocus(Qt.OtherFocusReason);
+        else
+            browse.forceActiveFocus(Qt.OtherFocusReason);
+        presentationReturnFocus = null;
+    }
     Connections {
         target: stage.sceneAdapter
         function onFrameChanged() {
@@ -208,8 +218,8 @@ Item {
             function onStarted() {
                 nativeScene.restartPreparation();
                 if (!stage.openingReturnFocus)
-                    stage.openingReturnFocus = (stage.Window.window
-                                                ? stage.Window.window.activeFocusItem : null);
+                    stage.openingReturnFocus = (stage.hostWindow ? stage.hostWindow.activeFocusItem :
+                                                                   null);
                 if (stage.openingOverlay)
                     stage.openingOverlay.focusSkip();
             }
@@ -255,22 +265,12 @@ Item {
             function onPrepared() {
                 if (stage.presentationController.phase === "opening" &&
                         !stage.presentationReturnFocus)
-                    stage.presentationReturnFocus = (stage.Window.window
-                                                     ? stage.Window.window.activeFocusItem : null);
+                    stage.presentationReturnFocus = (stage.hostWindow
+                                                     ? stage.hostWindow.activeFocusItem : null);
             }
             function onFocusRequested(detail) {
-                if (!detail) {
-                    Qt.callLater(() => {
-                        if (stage.presentationController.archiveEnabled) {
-                            const target = stage.presentationReturnFocus;
-                            if (target && target.visible && target.enabled)
-                                target.forceActiveFocus(Qt.OtherFocusReason);
-                            else
-                                browse.forceActiveFocus(Qt.OtherFocusReason);
-                            stage.presentationReturnFocus = null;
-                        }
-                    });
-                }
+                if (!detail)
+                    Qt.callLater(stage.restorePresentationFocus);
             }
         }
     }
@@ -296,12 +296,12 @@ Item {
                     stage.openingController.replay();
             }
             onFullscreenRequested: {
-                const window = stage.Window.window;
-                if (window) {
-                    if (window.visibility === Window.FullScreen)
-                        window.showNormal();
+                const host = stage.hostWindow;
+                if (host) {
+                    if (host.visibility === Window.FullScreen)
+                        host.showNormal();
                     else
-                        window.showFullScreen();
+                        host.showFullScreen();
                 }
             }
             store: stage.libraryStore
@@ -376,9 +376,10 @@ Item {
         text: stage.navigationError.length > 0 ? stage.navigationError :
                                                  stage.preferencesError.length > 0
                                                  ? stage.preferencesError :
-                                                   nativeScene.errorText.length > 0 ? "图形配置不可用："
+                                                   nativeScene.errorText.length > 0 ? qsTr(
+                                                                                          "Graphics configuration unavailable: ")
                                                                                       + nativeScene.errorText :
-                                                                                      "输出达到尺寸保护上限，画质设置保持原值。"
+                                                                                      qsTr("Output reached the size protection limit. Quality preferences are preserved.")
         color: design.accent
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)

@@ -11,15 +11,19 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 namespace {
 QVector<float> values(const QString &name)
 {
-    QFile file(":/rhi/environment/" + name + ".rgba32f");
+    QFile file(":/rhi/environment/"_L1 + name + ".rgba32f"_L1);
     RhiCaptureHarness::require(file.open(QIODevice::ReadOnly), "Missing AO source values");
     const auto bytes = file.readAll();
+    RhiCaptureHarness::require(bytes.size() % 4 == 0, "Malformed AO source floats");
     QVector<float> result;
     for (int offset = 0; offset < bytes.size(); offset += 4) {
         const auto bits = qFromLittleEndian<quint32>(bytes.constData() + offset);
@@ -38,8 +42,10 @@ QJsonObject sourceMath(const Input &input, const Capture &capture)
 {
     const auto &image = capture.rawAo;
     const int width = image.width(), height = image.height(), count = input.aoSamples;
-    const auto kernel = values("ssao-kernel-" + QString::number(count));
-    const auto noise = values("ssao-noise-" + QString::number(count));
+    const auto kernel = values("ssao-kernel-"_L1 + QString::number(count));
+    const auto noise = values("ssao-noise-"_L1 + QString::number(count));
+    RhiCaptureHarness::require(kernel.size() == count * 4 && noise.size() == 64,
+                               "AO source kernel/noise dimensions differ");
     int checked = 0, contacts = 0;
     double maximum = 0, blurError = 0, compositeError = 0;
     for (int row = 1; row < 10; ++row)
@@ -109,11 +115,11 @@ QJsonObject sourceMath(const Input &input, const Capture &capture)
         }
     RhiCaptureHarness::require(blurError <= 1.0 / 255, "Source 5x5 AO blur differs");
     RhiCaptureHarness::require(compositeError <= 2.0 / 255, "Source .22 AO composite differs");
-    return { { "blurError", blurError },
-             { "compositeError", compositeError },
-             { "points", checked },
-             { "contacts", contacts },
-             { "maximumError", maximum } };
+    return { { u"blurError"_s, blurError },
+             { u"compositeError"_s, compositeError },
+             { u"points"_s, checked },
+             { u"contacts"_s, contacts },
+             { u"maximumError"_s, maximum } };
 }
 }
 int main(int argc, char **argv)
@@ -130,9 +136,9 @@ int main(int argc, char **argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         RhiCaptureHarness::require(QDir().mkpath(output), "Cannot create AO output");
-        QFile file(QString(FIXTURE_ROOT) + "/tests/fixtures/rhi-shell/visual.json");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
         RhiCaptureHarness::require(file.open(QIODevice::ReadOnly), "Missing source input");
-        const auto cases = QJsonDocument::fromJson(file.readAll()).object()["cases"].toArray();
+        const auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         auto input = fixture(cases[0].toObject());
         input.poolFrame = true;
         input.entities.clear();
@@ -157,14 +163,14 @@ int main(int argc, char **argv)
                                        std::max(1, int(size.height() * resolution)));
                     int scalarTargets = 0;
                     for (const auto &entry :
-                         capture.metadata["resources"].toObject()["entries"].toArray()) {
+                         capture.metadata[u"resources"_s].toObject()[u"entries"_s].toArray()) {
                         const auto resource = entry.toObject();
-                        if (resource["name"] == "post-ao-raw"
-                            || resource["name"] == "post-ao-blur") {
+                        if (resource[u"name"_s] == u"post-ao-raw"_s
+                            || resource[u"name"_s] == u"post-ao-blur"_s) {
                             RhiCaptureHarness::require(
-                                    resource["format"].toInt() == int(QRhiTexture::R16F)
-                                            && resource["width"].toInt() == aoSize.width()
-                                            && resource["height"].toInt() == aoSize.height(),
+                                    resource[u"format"_s].toInt() == int(QRhiTexture::R16F)
+                                            && resource[u"width"_s].toInt() == aoSize.width()
+                                            && resource[u"height"_s].toInt() == aoSize.height(),
                                     "Product scalar AO attachment changed");
                             ++scalarTargets;
                         }
@@ -181,27 +187,28 @@ int main(int argc, char **argv)
                     }
                     const auto replay = driver.capture(input, size);
                     RhiCaptureHarness::require(
-                            replay.metadata["alignedReadbackRevision"]
-                                    == capture.metadata["alignedReadbackRevision"],
+                            replay.metadata[u"alignedReadbackRevision"_s]
+                                    == capture.metadata[u"alignedReadbackRevision"_s],
                             "Identical scalar capture rebuilt alignment resources");
-                    RhiCaptureHarness::require(replay.metadata["postUniformUploadBytes"].toInteger()
-                                                       == 240,
-                                               "Steady AO passes reupload constant kernels");
+                    RhiCaptureHarness::require(
+                            replay.metadata[u"postUniformUploadBytes"_s].toInteger() == 240,
+                            "Steady AO passes reupload constant kernels");
                     for (const auto &entry :
-                         replay.metadata["resources"].toObject()["entries"].toArray())
-                        RhiCaptureHarness::require(entry.toObject()["name"] != "ao-kernel",
+                         replay.metadata[u"resources"_s].toObject()[u"entries"_s].toArray())
+                        RhiCaptureHarness::require(entry.toObject()[u"name"_s] != u"ao-kernel"_s,
                                                    "Unused GPU kernel texture remains");
                     auto result = capture.metadata;
-                    result["aoResolution"] = resolution;
+                    result[u"aoResolution"_s] = resolution;
                     results.append(result);
                 }
             }
         }
-        QFile contactFile(QString(FIXTURE_ROOT) + "/tests/fixtures/occlusion/visual.json");
+        QFile contactFile((QString::fromUtf8(FIXTURE_ROOT))
+                          + "/tests/fixtures/occlusion/visual.json"_L1);
         RhiCaptureHarness::require(contactFile.open(QIODevice::ReadOnly),
                                    "Missing source AO contact states");
         const auto contactCases =
-                QJsonDocument::fromJson(contactFile.readAll()).object()["cases"].toArray();
+                QJsonDocument::fromJson(contactFile.readAll()).object()[u"cases"_s].toArray();
         QJsonArray mathematics;
         for (int count : { 16, 32, 64 }) {
             auto contact = fixture(contactCases[80].toObject());
@@ -212,9 +219,9 @@ int main(int argc, char **argv)
             contact.captureSamples = 1;
             const auto capture = driver.capture(contact, { 960, 720 });
             auto math = sourceMath(contact, capture);
-            math["samples"] = count;
+            math[u"samples"_s] = count;
             mathematics.append(math);
-            RhiCaptureHarness::require(math["contacts"].toInt() > 0,
+            RhiCaptureHarness::require(math[u"contacts"_s].toInt() > 0,
                                        "Source contact probes missed AO");
         }
         input.aoResolution = 1;
@@ -225,15 +232,15 @@ int main(int argc, char **argv)
                     driver.rebuilt() && restored.rawAo.pixelColor(100, 100) == QColor(Qt::white),
                     "AO readback cache did not survive real graph rebuild");
         }
-        QSaveFile report(output + "/runtime.json");
+        QSaveFile report(output + "/runtime.json"_L1);
         RhiCaptureHarness::require(report.open(QIODevice::WriteOnly), "Cannot write AO report");
-        report.write(QJsonDocument(QJsonObject{ { "round", "R19D1" },
-                                                { "passed", true },
-                                                { "cases", results },
-                                                { "sourceMath", mathematics },
-                                                { "windowPolicy",
+        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19D1"_s },
+                                                { u"passed"_s, true },
+                                                { u"cases"_s, results },
+                                                { u"sourceMath"_s, mathematics },
+                                                { u"windowPolicy"_s,
                                                   verification::windowPolicy(*driver.window) },
-                                                { "offscreen", driver.surface->diagnostics() } })
+                                                { u"offscreen"_s, driver.surface->diagnostics() } })
                              .toJson());
         RhiCaptureHarness::require(report.commit(), "Cannot save AO report");
         return 0;

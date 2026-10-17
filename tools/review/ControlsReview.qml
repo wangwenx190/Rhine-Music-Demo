@@ -23,7 +23,7 @@ Rectangle {
         ArchiveCheckBox {
             objectName: "controlCheck"
             tokens: design
-            text: "真实专辑列"
+            text: qsTr("Real album columns")
         }
         ArchiveSlider {
             objectName: "controlSlider"
@@ -38,15 +38,15 @@ Rectangle {
             tokens: design
             model: [
                 {
-                    label: "按流派",
+                    label: qsTr("By genre"),
                     value: "genre"
                 },
                 {
-                    label: "按歌手",
+                    label: qsTr("By artist"),
                     value: "artist"
                 },
                 {
-                    label: "按专辑名",
+                    label: qsTr("By album title"),
                     value: "album"
                 }
             ]
@@ -57,13 +57,13 @@ Rectangle {
             objectName: "controlField"
             tokens: design
             width: parent.width
-            placeholderText: "搜索专辑与歌曲"
+            placeholderText: qsTr("Search albums and tracks")
         }
         ArchiveTextArea {
             objectName: "controlArea"
             tokens: design
             width: parent.width
-            text: "一行\n第二行"
+            text: "\u4e00\u884c\n\u7b2c\u4e8c\u884c"
         }
         ArchiveProgressBar {
             objectName: "controlProgress"
@@ -76,7 +76,7 @@ Rectangle {
             tokens: design
             framed: true
             cssPixelSize: 10
-            text: "按住看原版"
+            text: qsTr("Hold for original")
         }
     }
 }

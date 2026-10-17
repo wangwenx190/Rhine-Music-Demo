@@ -79,7 +79,7 @@ void TransportMotion::setClock(FrameClock *clock)
         m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
             advance(dt);
         });
-    emit inputChanged();
+    Q_EMIT inputChanged();
 }
 double TransportMotion::targetWidth() const
 {
@@ -125,7 +125,7 @@ void TransportMotion::setReducedMotion(bool reduced)
     m_reduced = reduced;
     if (reduced)
         finish();
-    emit inputChanged();
+    Q_EMIT inputChanged();
 }
 bool TransportMotion::active() const
 {
@@ -136,7 +136,7 @@ void TransportMotion::setActive(bool active)
     if (m_active == active)
         return;
     m_active = active;
-    emit inputChanged();
+    Q_EMIT inputChanged();
 }
 double TransportMotion::width() const
 {
@@ -166,8 +166,8 @@ void TransportMotion::retarget()
     m_alpha.move(m_shown ? 1 : 0, .400, instant);
     m_offset.move(m_shown ? 0 : 18, .640, instant);
     m_icon.move(m_playing ? 1 : 0, .180, instant);
-    emit inputChanged();
-    emit changed();
+    Q_EMIT inputChanged();
+    Q_EMIT changed();
 }
 void TransportMotion::advance(double dt)
 {
@@ -177,7 +177,7 @@ void TransportMotion::advance(double dt)
     m_alpha.advance(dt);
     m_offset.advance(dt);
     m_icon.advance(dt);
-    emit changed();
+    Q_EMIT changed();
 }
 void TransportMotion::finish()
 {
@@ -185,6 +185,6 @@ void TransportMotion::finish()
     m_alpha.move(m_shown ? 1 : 0, .400, true);
     m_offset.move(m_shown ? 0 : 18, .640, true);
     m_icon.move(m_playing ? 1 : 0, .180, true);
-    emit changed();
+    Q_EMIT changed();
 }
 }

@@ -43,7 +43,7 @@ public:
     void setActive(bool active);
     QVariantList faces() const;
     void advance(double dt);
-signals:
+Q_SIGNALS:
     void clockChanged();
     void valueChanged();
     void digitsChanged();

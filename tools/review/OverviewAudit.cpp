@@ -20,6 +20,8 @@
 #include <QSaveFile>
 #include <QMouseEvent>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 QQuickItem *find(QQuickItem *item, const QString &name)
@@ -44,13 +46,21 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
     LibrarySession library(&provider);
     PresentationController presentation(motion.clock(), detailPorts(scene, selection, library));
     QList<LibraryColumn> columns;
-    const QStringList names{ "晚风与留声机", "下伸 gyp (Live)", "一段非常长的收藏列名 · Archive",
-                             "声音与记忆",   "夜色唱片",        "旧日旋律",
-                             "静静聆听",     "收藏里的微光",    "匿名歌手" };
+    const QStringList names{
+        u"\u665a\u98ce\u4e0e\u7559\u58f0\u673a"_s,
+        u"\u4e0b\u4f38 gyp (Live)"_s,
+        u"\u4e00\u6bb5\u975e\u5e38\u957f\u7684\u6536\u85cf\u5217\u540d \u00b7 Archive"_s,
+        u"\u58f0\u97f3\u4e0e\u8bb0\u5fc6"_s,
+        u"\u591c\u8272\u5531\u7247"_s,
+        u"\u65e7\u65e5\u65cb\u5f8b"_s,
+        u"\u9759\u9759\u8046\u542c"_s,
+        u"\u6536\u85cf\u91cc\u7684\u5fae\u5149"_s,
+        u"\u533f\u540d\u6b4c\u624b"_s
+    };
     for (int lane = 0; lane < names.size(); ++lane) {
         LibraryColumn column{ QString::number(lane), names[lane], { } };
         for (int row = 0; row < lane * 3 + 1; ++row)
-            column.albumIds.append(QString("a%1-%2").arg(lane).arg(row));
+            column.albumIds.append(u"a%1-%2"_s.arg(lane).arg(row));
         columns.append(column);
     }
     selection.setColumns(columns);
@@ -64,10 +74,10 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
     presentation.setReducedMotion(true);
     QQmlEngine engine;
     QSignalSpy warnings(&engine, &QQmlEngine::warnings);
-    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/OverviewVisual.qml"));
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/OverviewVisual.qml"_s));
     std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { "overview", QVariant::fromValue(&overview) },
-              { "inputRouter", QVariant::fromValue(&input) } }));
+            { { u"overview"_s, QVariant::fromValue(&overview) },
+              { u"inputRouter"_s, QVariant::fromValue(&input) } }));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
         qWarning() << component.errors();
@@ -100,7 +110,7 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                                    QColor(r, night ? 24 + y / 3 : 145 + y / 3,
                                           night ? 38 + x / 3 : 160 + x / 3));
             }
-        if (!tile.save(output + (night ? "/tile-night.png" : "/tile-day.png")))
+        if (!tile.save(output + (night ? "/tile-night.png"_L1 : "/tile-day.png"_L1)))
             return 4;
     }
     QJsonArray captures, interactions, entries;
@@ -117,7 +127,7 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
             root->setProperty("night", night);
             root->setProperty("backgroundUrl",
                               QUrl::fromLocalFile(QDir(output).absoluteFilePath(
-                                      night ? "tile-night.png" : "tile-day.png")));
+                                      night ? u"tile-night.png"_s : u"tile-day.png"_s)));
             overview.setActive(true);
             selection.advance(0);
             scene.advance(0);
@@ -128,37 +138,37 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                     passed = render() && passed;
                 QJsonArray anchors, rois, structures;
                 for (const auto &c : overview.projectColumns())
-                    anchors.append(QJsonObject{ { "lane", c.lane },
-                                                { "name", c.name },
-                                                { "count", c.count },
-                                                { "x", c.x },
-                                                { "y", c.y },
-                                                { "extent", c.extent },
-                                                { "selected", c.selected } });
+                    anchors.append(QJsonObject{ { u"lane"_s, c.lane },
+                                                { u"name"_s, c.name },
+                                                { u"count"_s, c.count },
+                                                { u"x"_s, c.x },
+                                                { u"y"_s, c.y },
+                                                { u"extent"_s, c.extent },
+                                                { u"selected"_s, c.selected } });
                 for (int row = 0; row < overview.labels()->rowCount(); ++row) {
                     const auto index = overview.labels()->index(row);
                     if (!overview.labels()->data(index, OverviewLabelsModel::Interactive).toBool())
                         continue;
                     const int lane =
                             overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
-                    auto *label = find(root, "overviewLabel-" + QString::number(lane));
+                    auto *label = find(root, "overviewLabel-"_L1 + QString::number(lane));
                     if (!label)
                         return 4;
                     const QString suffix = QString::number(lane);
-                    auto *anchor = find(root, "overviewAnchor-" + suffix);
-                    auto *card = find(root, "overviewCard-" + suffix);
-                    auto *name = find(root, "overviewName-" + suffix);
-                    auto *count = find(root, "overviewCount-" + suffix);
-                    auto *entry = find(root, "overviewEnter-" + suffix);
-                    auto *backdrop = find(root, "overviewBackdrop-" + suffix);
+                    auto *anchor = find(root, "overviewAnchor-"_L1 + suffix);
+                    auto *card = find(root, "overviewCard-"_L1 + suffix);
+                    auto *name = find(root, "overviewName-"_L1 + suffix);
+                    auto *count = find(root, "overviewCount-"_L1 + suffix);
+                    auto *entry = find(root, "overviewEnter-"_L1 + suffix);
+                    auto *backdrop = find(root, "overviewBackdrop-"_L1 + suffix);
                     if (!anchor || !card || !name || !count || !entry || !backdrop)
                         return 4;
                     const auto rectangle = [](QQuickItem *item, QQuickItem *relative) {
                         const auto rect = item->mapRectToItem(relative, item->boundingRect());
-                        return QJsonObject{ { "x", rect.x() },
-                                            { "y", rect.y() },
-                                            { "width", rect.width() },
-                                            { "height", rect.height() } };
+                        return QJsonObject{ { u"x"_s, rect.x() },
+                                            { u"y"_s, rect.y() },
+                                            { u"width"_s, rect.width() },
+                                            { u"height"_s, rect.height() } };
                     };
                     const double labelWidth = size.width() <= 600 ? 116 : 160;
                     const double entryWidth = variant && expanded == lane ? 76 : 0;
@@ -178,51 +188,51 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                     QJsonArray textures;
                     for (const auto &textureName :
                          { "overviewCrop", "overviewHorizontalTexture" }) {
-                        auto *texture = find(backdrop, textureName);
+                        auto *texture = find(backdrop, QString::fromUtf8(textureName));
                         if (!texture)
                             return 4;
                         const auto target = texture->property("textureSize").toSize();
                         structurePassed =
                                 target == QSize(int(labelWidth + 148), 129) && structurePassed;
-                        textures.append(QJsonObject{ { "width", target.width() },
-                                                     { "height", target.height() } });
+                        textures.append(QJsonObject{ { u"width"_s, target.width() },
+                                                     { u"height"_s, target.height() } });
                     }
                     passed = structurePassed && passed;
-                    structures.append(QJsonObject{ { "lane", lane },
-                                                   { "expanded", entryWidth > 0 },
-                                                   { "passed", structurePassed },
-                                                   { "card", rectangle(card, anchor) },
-                                                   { "label", rectangle(label, card) },
-                                                   { "name", rectangle(name, card) },
-                                                   { "count", rectangle(count, card) },
-                                                   { "entry", rectangle(entry, card) },
-                                                   { "blurTextures", textures } });
+                    structures.append(QJsonObject{ { u"lane"_s, lane },
+                                                   { u"expanded"_s, entryWidth > 0 },
+                                                   { u"passed"_s, structurePassed },
+                                                   { u"card"_s, rectangle(card, anchor) },
+                                                   { u"label"_s, rectangle(label, card) },
+                                                   { u"name"_s, rectangle(name, card) },
+                                                   { u"count"_s, rectangle(count, card) },
+                                                   { u"entry"_s, rectangle(entry, card) },
+                                                   { u"blurTextures"_s, textures } });
                     if (expanded < 0)
                         expanded = lane;
                     const auto box = label->mapRectToScene(label->boundingRect());
                     rois.append(QJsonObject{
-                            { "lane", lane },
-                            { "x", box.x() },
-                            { "y", box.y() },
-                            { "width", box.width() + (variant && expanded == lane ? 76 : 0) },
-                            { "height", box.height() } });
+                            { u"lane"_s, lane },
+                            { u"x"_s, box.x() },
+                            { u"y"_s, box.y() },
+                            { u"width"_s, box.width() + (variant && expanded == lane ? 76 : 0) },
+                            { u"height"_s, box.height() } });
                 }
-                const auto file = QString("overview-%1.png").arg(captures.size());
+                const auto file = u"overview-%1.png"_s.arg(captures.size());
                 const auto image = surface.grab();
-                passed = !image.isNull() && image.save(output + '/' + file) && passed;
-                captures.append(QJsonObject{ { "width", size.width() },
-                                             { "height", size.height() },
-                                             { "night", night },
-                                             { "dpr", window.effectiveDevicePixelRatio() },
-                                             { "file", file },
-                                             { "expanded", variant ? expanded : -1 },
-                                             { "columns", anchors },
-                                             { "structures", structures },
-                                             { "rois", rois } });
+                passed = !image.isNull() && image.save(output + '/'_L1 + file) && passed;
+                captures.append(QJsonObject{ { u"width"_s, size.width() },
+                                             { u"height"_s, size.height() },
+                                             { u"night"_s, night },
+                                             { u"dpr"_s, window.effectiveDevicePixelRatio() },
+                                             { u"file"_s, file },
+                                             { u"expanded"_s, variant ? expanded : -1 },
+                                             { u"columns"_s, anchors },
+                                             { u"structures"_s, structures },
+                                             { u"rois"_s, rois } });
                 if (expanded >= 0) {
                     const auto before = selection.albumId();
                     auto *button = find(root,
-                                        (variant ? "overviewEnter-" : "overviewLabel-")
+                                        (variant ? "overviewEnter-"_L1 : "overviewLabel-"_L1)
                                                 + QString::number(expanded));
                     if (!button)
                         return 4;
@@ -258,11 +268,11 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
         window.resize(1280, 720);
         scene.layout()->setViewport(1280, 720);
         object.reset(component.createWithInitialProperties(
-                { { "overview", QVariant::fromValue(&overview) },
-                  { "inputRouter", QVariant::fromValue(&input) },
-                  { "night", true },
-                  { "backgroundUrl",
-                    QUrl::fromLocalFile(QDir(output).absoluteFilePath("tile-night.png")) } }));
+                { { u"overview"_s, QVariant::fromValue(&overview) },
+                  { u"inputRouter"_s, QVariant::fromValue(&input) },
+                  { u"night"_s, true },
+                  { u"backgroundUrl"_s,
+                    QUrl::fromLocalFile(QDir(output).absoluteFilePath(u"tile-night.png"_s)) } }));
         root = qobject_cast<QQuickItem *>(object.get());
         if (!root)
             return 4;
@@ -285,21 +295,21 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
     passed = retired && warnings.isEmpty() && verification::windowPolicySatisfied(window) && passed;
     surface.hide();
     object.reset();
-    QJsonObject report{ { "passed", passed },
-                        { "configuration", "Release" },
-                        { "qtVersion", qVersion() },
-                        { "backend", qEnvironmentVariable("QSG_RHI_BACKEND") },
-                        { "offscreen", OffscreenSurface::Enabled },
-                        { "qmlWarnings", warnings.size() },
-                        { "captures", captures },
-                        { "expansionClicks", interactions },
-                        { "entryClicks", entries },
-                        { "lifecycle", lifecycle },
-                        { "requestedLifecycleCycles", requestedCycles },
-                        { "retired", retired },
-                        { "resourcePlan", surface.diagnostics() },
-                        { "windowPolicy", verification::windowPolicy(window) } };
-    QSaveFile file(output + "/report.json");
+    QJsonObject report{ { u"passed"_s, passed },
+                        { u"configuration"_s, u"Release"_s },
+                        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                        { u"backend"_s, qEnvironmentVariable("QSG_RHI_BACKEND") },
+                        { u"offscreen"_s, OffscreenSurface::Enabled },
+                        { u"qmlWarnings"_s, warnings.size() },
+                        { u"captures"_s, captures },
+                        { u"expansionClicks"_s, interactions },
+                        { u"entryClicks"_s, entries },
+                        { u"lifecycle"_s, lifecycle },
+                        { u"requestedLifecycleCycles"_s, requestedCycles },
+                        { u"retired"_s, retired },
+                        { u"resourcePlan"_s, surface.diagnostics() },
+                        { u"windowPolicy"_s, verification::windowPolicy(window) } };
+    QSaveFile file(output + "/report.json"_L1);
     if (!file.open(QIODevice::WriteOnly))
         return 4;
     file.write(QJsonDocument(report).toJson());

@@ -49,7 +49,7 @@ Item {
                                                            !root.Window.window
                                                            || root.Window.window.visible)
     }
-    function layerSizes() {
+    function layerSizes(): var {
         const sizes = [];
         for (let i = 0; i < cells.count; ++i) {
             const cell = cells.itemAt(i);

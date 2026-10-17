@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "OffscreenSurface.h"
 #include "RhiItem.h"
 #include "VerificationWindow.h"
@@ -58,8 +60,8 @@ public:
         require(result.color.size() == size && result.normal.size() == size
                         && result.depth.size() == size,
                 "Stale RHI target dimensions");
-        require(result.metadata.contains("guiThreadAccessInRender")
-                        && !result.metadata["guiThreadAccessInRender"].toBool(),
+        require(result.metadata.contains(u"guiThreadAccessInRender"_s)
+                        && !result.metadata[u"guiThreadAccessInRender"_s].toBool(),
                 "GUI render access");
         return result;
     }

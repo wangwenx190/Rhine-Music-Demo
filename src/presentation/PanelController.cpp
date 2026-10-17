@@ -1,4 +1,7 @@
 #include "PanelController.h"
+
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 PanelController::PanelController(FrameClock *clock, QObject *parent) : QObject(parent)
 {
@@ -8,18 +11,19 @@ PanelController::PanelController(FrameClock *clock, QObject *parent) : QObject(p
 }
 void PanelController::open(const QString &panel)
 {
-    if (panel != "search" && panel != "library" && panel != "playback" && panel != "settings")
+    if (panel != "search"_L1 && panel != "library"_L1 && panel != "playback"_L1
+        && panel != "settings"_L1)
         return;
     m_panel = panel;
-    emit changed();
+    Q_EMIT changed();
     m_surface.show(m_reduced);
 }
 void PanelController::close()
 {
     m_surface.hide(m_reduced, [this] {
         m_panel.clear();
-        emit changed();
-        emit closed();
+        Q_EMIT changed();
+        Q_EMIT closed();
     });
 }
 void PanelController::reset()

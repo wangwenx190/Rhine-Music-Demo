@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "ApplicationMenu.h"
 #include <QGuiApplication>
 #include <QMetaObject>
@@ -6,6 +7,8 @@
 #include <QVariant>
 #include <utility>
 #import <AppKit/AppKit.h>
+
+using namespace Qt::StringLiterals;
 
 @interface YalahooMenuTarget : NSObject <NSMenuItemValidation> {
 @public
@@ -62,7 +65,7 @@ bool nativeDialog(QQuickWindow *window)
 SEL nativeEditMethod(NSInteger tag)
 {
     const auto *method = editMethod(tag);
-    return method ? NSSelectorFromString(QString::fromLatin1(method).append(':').toNSString())
+    return method ? NSSelectorFromString(QString::fromUtf8(method).append(':'_L1).toNSString())
                   : nil;
 }
 bool nativeEditEnabled(NSMenuItem *item)
@@ -115,7 +118,7 @@ NSMenuItem *addItem(NSMenu *menu, NSString *title, NSString *key, SEL action, id
         return window->isVisible();
     auto *focus = editor(window);
     const auto *method = editMethod(item.tag);
-    if (!focus || !method || focus->metaObject()->indexOfMethod(QByteArray(method) + "()") < 0)
+    if (!focus || !method || focus->metaObject()->indexOfMethod(QByteArray(method) + "()"_ba) < 0)
         return NO;
     if (item.tag == 4)
         return !focus->property("selectedText").toString().isEmpty();
@@ -203,19 +206,32 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
     m_state->target->settingsEnabled = std::move(settingsEnabled);
     m_state->bar = [[NSMenu alloc] initWithTitle:@"yalahOO!!!"];
     auto *application = addMenu(m_state->bar, @"yalahOO!!!");
-    addItem(application, @"设置…", @",", @selector(openSettings:), m_state->target);
+    addItem(application, QCoreApplication::translate("Yalahoo", "Settings...").toNSString(), @",",
+            @selector(openSettings:), m_state->target);
     [application addItem:[NSMenuItem separatorItem]];
-    addItem(application, @"隐藏 yalahOO!!!", @"h", @selector(hide:), NSApp);
+    addItem(application, QCoreApplication::translate("Yalahoo", "Hide yalahOO!!!").toNSString(),
+            @"h", @selector(hide:), NSApp);
     auto *hideOthers =
-            addItem(application, @"隐藏其他", @"h", @selector(hideOtherApplications:), NSApp);
+            addItem(application, QCoreApplication::translate("Yalahoo", "Hide Others").toNSString(),
+                    @"h", @selector(hideOtherApplications:), NSApp);
     hideOthers.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagOption;
-    addItem(application, @"全部显示", @"", @selector(unhideAllApplications:), NSApp);
+    addItem(application, QCoreApplication::translate("Yalahoo", "Show All").toNSString(), @"",
+            @selector(unhideAllApplications:), NSApp);
     [application addItem:[NSMenuItem separatorItem]];
-    addItem(application, @"退出 yalahOO!!!", @"q", @selector(quit:), m_state->target);
-    auto *file = addMenu(m_state->bar, @"文件");
-    addItem(file, @"关闭", @"w", @selector(closeWindow:), m_state->target);
-    auto *edit = addMenu(m_state->bar, @"编辑");
-    const NSArray<NSString *> *titles = @[ @"撤销", @"重做", @"剪切", @"复制", @"粘贴", @"全选" ];
+    addItem(application, QCoreApplication::translate("Yalahoo", "Quit yalahOO!!!").toNSString(),
+            @"q", @selector(quit:), m_state->target);
+    auto *file = addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "File").toNSString());
+    addItem(file, QCoreApplication::translate("Yalahoo", "Close").toNSString(), @"w",
+            @selector(closeWindow:), m_state->target);
+    auto *edit = addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "Edit").toNSString());
+    const NSArray<NSString *> *titles = @[
+        QCoreApplication::translate("Yalahoo", "Undo").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Redo").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Cut").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Copy").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Paste").toNSString(),
+        QCoreApplication::translate("Yalahoo", "Select All").toNSString()
+    ];
     const NSArray<NSString *> *keys = @[ @"z", @"z", @"x", @"c", @"v", @"a" ];
     for (NSInteger index = 0; index < 6; ++index) {
         auto *item = addItem(edit, titles[index], keys[index], @selector(edit:), m_state->target);
@@ -225,9 +241,12 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
         if (index == 1 || index == 4)
             [edit addItem:[NSMenuItem separatorItem]];
     }
-    auto *windowMenu = addMenu(m_state->bar, @"窗口");
-    addItem(windowMenu, @"最小化", @"m", @selector(minimizeWindow:), m_state->target);
-    addItem(windowMenu, @"缩放", @"", @selector(zoomWindow:), m_state->target);
+    auto *windowMenu =
+            addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "Window").toNSString());
+    addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Minimize").toNSString(), @"m",
+            @selector(minimizeWindow:), m_state->target);
+    addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Zoom").toNSString(), @"",
+            @selector(zoomWindow:), m_state->target);
     NSApp.mainMenu = m_state->bar;
 }
 ApplicationMenu::~ApplicationMenu() = default;

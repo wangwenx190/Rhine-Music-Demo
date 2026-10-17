@@ -1,4 +1,6 @@
+#include <QCoreApplication>
 #include "CoverCache.h"
+#include "MusicTypes.h"
 #include <QImageReader>
 #include <QColorSpace>
 #include <QMutex>
@@ -8,6 +10,8 @@
 #include <QPointer>
 #include <QThreadPool>
 #include <stdexcept>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 struct CoverCache::State
@@ -50,11 +54,11 @@ QString CoverCache::key(const QString &identity, const QString &path, int resolu
                         const QString &title)
 {
     // Missing-image pixels depend on title, including after an identity leaves the visible pool.
-    const auto fallback = path.isEmpty() ? title : QString();
+    const auto &fallback = title;
     // Length prefixes avoid ambiguous identities/paths containing separators.
-    return QString::number(identity.size()) + ':' + identity + QString::number(path.size()) + ':'
-            + path + ':' + QString::number(resolution) + ':' + QString::number(fallback.size())
-            + ':' + fallback;
+    return QString::number(identity.size()) + ':'_L1 + identity + QString::number(path.size())
+            + ':'_L1 + path + ':'_L1 + QString::number(resolution) + ':'_L1
+            + QString::number(fallback.size()) + ':'_L1 + fallback;
 }
 quint64 CoverCache::generation() const
 {
@@ -63,6 +67,13 @@ quint64 CoverCache::generation() const
 CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, int resolution,
                                  const QString &title)
 {
+    if (!path.isEmpty()) {
+        auto artwork = m_cache.find(key(identity, path, resolution, { }));
+        if (artwork != m_cache.end() && artwork->pixels->error.isEmpty()) {
+            artwork->used = ++m_clock;
+            return artwork->pixels;
+        }
+    }
     auto it = m_cache.find(key(identity, path, resolution, title));
     if (it == m_cache.end())
         return { };
@@ -192,12 +203,12 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
         constexpr qreal logical = 1024;
         painter.scale(resolution / logical, resolution / logical);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.fillRect(QRectF(16, 16, 992, 992), QColor("#c9c9c4"));
-        painter.setPen(QPen(QColor("#f8f7f1"), logical / 180));
+        painter.fillRect(QRectF(16, 16, 992, 992), QColor("#c9c9c4"_L1));
+        painter.setPen(QPen(QColor("#f8f7f1"_L1), logical / 180));
         painter.drawEllipse(QPointF(logical * .5, logical * .43), logical * .2, logical * .2);
         painter.drawEllipse(QPointF(logical * .5, logical * .43), logical * .04, logical * .04);
-        painter.setPen(QColor("#3f4849"));
-        QFont font("sans-serif");
+        painter.setPen(QColor("#3f4849"_L1));
+        QFont font(u"sans-serif"_s);
         font.setWeight(QFont::Medium);
         auto label = [&](const QString &text, qreal pixels, qreal baseline) {
             font.setPointSizeF(pixels * 72 / painter.device()->logicalDpiY());
@@ -209,10 +220,11 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
             painter.drawText(QPointF(-width / 2, 0), text);
             painter.restore();
         };
-        label(title.isEmpty() ? QStringLiteral("暂无专辑封面") : title.left(256), logical * .045,
-              logical * .8);
+        label(title.isEmpty() ? QCoreApplication::translate("Yalahoo", "No album cover")
+                              : graphemePrefix(title, 256),
+              logical * .045, logical * .8);
         font.setWeight(QFont::Normal);
-        label(QStringLiteral("LOCAL COLLECTION / NO COVER"), logical * .025, logical * .87);
+        label(u"LOCAL COLLECTION / NO COVER"_s, logical * .025, logical * .87);
     }
     return image;
 }
@@ -228,7 +240,7 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     QImage source;
     // A known absent cover goes straight to the authored placeholder, without opening an empty URL.
     if (job.path.isEmpty()) {
-        pixels->error = QStringLiteral("Missing cover");
+        pixels->error = u"Missing cover"_s;
     } else {
         QImageReader reader(job.path);
         reader.setAutoTransform(true);
@@ -237,22 +249,26 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
         const auto size = pixels->sourceSize;
         // Source size is checked even for scaling plugins: their internal scratch is not observable.
         if (!size.isValid() || qint64(size.width()) * size.height() > sourcePixelLimit) {
-            pixels->error =
-                    QStringLiteral("Missing/unknown cover dimensions or source exceeds 4M pixels");
+            pixels->error = u"Missing/unknown cover dimensions or source exceeds 4M pixels"_s;
         } else if (job.generation == state->generation.load() && job.wanted->load()) {
             if (qMax(size.width(), size.height()) > job.resolution)
                 reader.setScaledSize(
                         size.scaled(job.resolution, job.resolution, Qt::KeepAspectRatio));
             source = reader.read();
             pixels->readerReturnedBytes = source.sizeInBytes();
-            if (source.isNull())
+            if (source.isNull()) {
                 pixels->error = reader.errorString();
+                if (pixels->error.isEmpty())
+                    pixels->error = u"Cover decoder returned no image"_s;
+            }
         }
     }
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };
     if (!source.isNull() && source.colorSpace().isValid())
         source.convertToColorSpace(QColorSpace::SRgb);
+    if (!pixels->error.isEmpty())
+        pixels->fallbackTitle = job.title;
     pixels->image = paint(source, job.resolution, job.title);
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };
@@ -267,6 +283,13 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
         ++m_stale;
     } else {
         const qint64 bytes = pixels->image.sizeInBytes();
+        const auto completedKey = pixels->error.isEmpty() && !job.path.isEmpty()
+                ? key(job.identity, job.path, job.resolution, { })
+                : job.key;
+        if (const auto previous = m_cache.find(completedKey); previous != m_cache.end()) {
+            m_bytes -= previous->pixels->image.sizeInBytes();
+            m_cache.erase(previous);
+        }
         m_peakReaderBytes = qMax(m_peakReaderBytes, pixels->readerReturnedBytes);
         m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
         while (m_bytes + bytes > cacheLimit && !m_cache.isEmpty()) {
@@ -278,10 +301,10 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
             m_bytes -= oldest->pixels->image.sizeInBytes();
             m_cache.erase(oldest);
         }
-        m_cache.insert(job.key, { pixels, ++m_clock });
+        m_cache.insert(completedKey, { pixels, ++m_clock });
         m_bytes += bytes;
         const QPointer<CoverCache> guard(this);
-        emit ready(pixels);
+        Q_EMIT ready(pixels);
         if (!guard)
             return;
     }
@@ -289,20 +312,20 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 }
 QJsonObject CoverCache::statistics() const
 {
-    return { { "generation", qint64(generation()) },
-             { "suspended", m_suspended },
-             { "pending", m_pending.size() },
-             { "active", m_active },
-             { "peakPending", m_peakPending },
-             { "peakActive", m_peakActive },
-             { "peakReservedInFlightBytes", m_peakActive * workerReservation },
-             { "peakReaderReturnedBytesPerJob", m_peakReaderBytes },
-             { "decoderScaledResults", m_decoderScaledResults },
-             { "completedLruBytes", m_bytes },
-             { "reservedInFlightBytes", m_active * workerReservation },
-             { "decodeStarts", qint64(m_decodes) },
-             { "rejected", qint64(m_rejected) },
-             { "stale", qint64(m_stale) } };
+    return { { u"generation"_s, qint64(generation()) },
+             { u"suspended"_s, m_suspended },
+             { u"pending"_s, m_pending.size() },
+             { u"active"_s, m_active },
+             { u"peakPending"_s, m_peakPending },
+             { u"peakActive"_s, m_peakActive },
+             { u"peakReservedInFlightBytes"_s, m_peakActive * workerReservation },
+             { u"peakReaderReturnedBytesPerJob"_s, m_peakReaderBytes },
+             { u"decoderScaledResults"_s, m_decoderScaledResults },
+             { u"completedLruBytes"_s, m_bytes },
+             { u"reservedInFlightBytes"_s, m_active * workerReservation },
+             { u"decodeStarts"_s, qint64(m_decodes) },
+             { u"rejected"_s, qint64(m_rejected) },
+             { u"stale"_s, qint64(m_stale) } };
 }
 bool CoverCache::hasPendingCapacity() const
 {

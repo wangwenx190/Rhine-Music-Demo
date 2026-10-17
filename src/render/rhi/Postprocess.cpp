@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstring>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo::rhi {
 namespace {
 template <class T>
@@ -64,10 +66,10 @@ struct Postprocess::State
     qint64 uniformUploadBytes = 0;
     std::array<float, 256> kernelValues{ };
     std::vector<Pass> passes;
-    void add(const char *name, ColorTarget &target, QRhiTexture *input, QRhiTexture *auxiliary)
+    void add(const QString &name, ColorTarget &target, QRhiTexture *input, QRhiTexture *auxiliary)
     {
         Pass p;
-        p.name = QString::fromLatin1(name);
+        p.name = name;
         p.target = &target;
         p.uniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
                                        sizeof(PostUniform)));
@@ -78,7 +80,7 @@ struct Postprocess::State
                 { QRhiShaderResourceBinding::sampledTexture(0, fragment, input, linear.get()),
                   QRhiShaderResourceBinding::uniformBuffer(1, fragment, p.uniform.get()),
                   QRhiShaderResourceBinding::sampledTexture(
-                          2, fragment, p.name == "bokeh" ? dofDepth : aoDepth, nearest.get()),
+                          2, fragment, p.name == "bokeh"_L1 ? dofDepth : aoDepth, nearest.get()),
                   QRhiShaderResourceBinding::sampledTexture(3, fragment, normal, nearest.get()),
                   QRhiShaderResourceBinding::sampledTexture(4, fragment, source, nearest.get()),
                   QRhiShaderResourceBinding::sampledTexture(
@@ -90,9 +92,10 @@ struct Postprocess::State
                           8, fragment, search ? search.get() : source, nearest.get()) });
         require(p.bindings->create(), "Postprocess bindings failed");
         p.pipeline.reset(api->newGraphicsPipeline());
-        const auto path = QByteArray(":/rhi/") + name + ".frag.qsb";
-        p.pipeline->setShaderStages({ { QRhiShaderStage::Vertex, shader(":/rhi/output.vert.qsb") },
-                                      { QRhiShaderStage::Fragment, shader(path.constData()) } });
+        const auto path = ":/rhi/"_L1 + name + ".frag.qsb"_L1;
+        p.pipeline->setShaderStages(
+                { { QRhiShaderStage::Vertex, shader(u":/rhi/output.vert.qsb"_s) },
+                  { QRhiShaderStage::Fragment, shader(path) } });
         p.pipeline->setShaderResourceBindings(p.bindings.get());
         p.pipeline->setRenderPassDescriptor(target.pass.get());
         require(p.pipeline->create(), "Postprocess pipeline failed");
@@ -167,36 +170,35 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
     auto *current = color;
     int ping = 0;
     if (s.samples) {
-        const auto name = s.samples == 32 ? QByteArray("ssao")
-                                          : QByteArray("ssao") + QByteArray::number(s.samples);
-        p.add(name.constData(), p.rawAo, color, color);
-        p.add("ssao-blur", p.blur, p.rawAo.texture.get(), color);
-        p.add("ssao-composite", p.ping[ping], color, p.blur.texture.get());
+        const auto name = s.samples == 32 ? u"ssao"_s : "ssao"_L1 + QString::number(s.samples);
+        p.add(name, p.rawAo, color, color);
+        p.add(u"ssao-blur"_s, p.blur, p.rawAo.texture.get(), color);
+        p.add(u"ssao-composite"_s, p.ping[ping], color, p.blur.texture.get());
         current = p.output;
         ping ^= 1;
     }
     if (s.bokeh) {
-        p.add("bokeh", p.ping[ping], current, color);
+        p.add(u"bokeh"_s, p.ping[ping], current, color);
         current = p.output;
         ping ^= 1;
     }
     if (s.smaa) {
-        p.add("smaa-edges", p.edges, current, color);
-        p.add("smaa-weights", p.weights, p.edges.texture.get(), color);
-        p.add("smaa-blend", p.ping[ping], current, p.weights.texture.get());
+        p.add(u"smaa-edges"_s, p.edges, current, color);
+        p.add(u"smaa-weights"_s, p.weights, p.edges.texture.get(), color);
+        p.add(u"smaa-blend"_s, p.ping[ping], current, p.weights.texture.get());
     }
 }
 void Postprocess::render(QRhiCommandBuffer *cb)
 {
     auto &p = *m_state;
     const auto &s = p.settings;
-    auto *updates = p.api->nextResourceUpdateBatch();
+    ResourceUpdates updates(p.api->nextResourceUpdateBatch());
     const bool firstUpload = p.upload;
     p.uniformUploadBytes = 0;
     if (p.upload) {
         auto floats = [&](QRhiTexture *texture, const QString &name) {
             const auto bytes =
-                    preparedAssets().bytes.value(":/rhi/environment/" + name + ".rgba32f");
+                    preparedAssets().bytes.value(":/rhi/environment/"_L1 + name + ".rgba32f"_L1);
             require(bytes.size()
                             == texture->pixelSize().width() * texture->pixelSize().height() * 16,
                     "Invalid AO lookup size");
@@ -204,18 +206,19 @@ void Postprocess::render(QRhiCommandBuffer *cb)
                                    { { 0, 0, QRhiTextureSubresourceUploadDescription(bytes) } });
         };
         if (s.samples) {
-            const auto bytes = preparedAssets().bytes.value(
-                    ":/rhi/environment/ssao-kernel-" + QString::number(s.samples) + ".rgba32f");
+            const auto bytes =
+                    preparedAssets().bytes.value(":/rhi/environment/ssao-kernel-"_L1
+                                                 + QString::number(s.samples) + ".rgba32f"_L1);
             require(bytes.size() == s.samples * 16, "Invalid source AO kernel size");
             std::memcpy(p.kernelValues.data(), bytes.constData(), bytes.size());
-            floats(p.noise.get(), "ssao-noise-" + QString::number(s.samples));
+            floats(p.noise.get(), "ssao-noise-"_L1 + QString::number(s.samples));
         }
-        for (const auto &entry : { std::pair{ p.area.get(), "smaa-area" },
-                                   std::pair{ p.search.get(), "smaa-search" } }) {
+        for (const auto &entry : { std::pair{ p.area.get(), u"smaa-area"_s },
+                                   std::pair{ p.search.get(), u"smaa-search"_s } }) {
             if (!entry.first)
                 continue;
-            const auto image = preparedAssets().images.value(
-                    ":/rhi/postprocess/" + QString::fromLatin1(entry.second) + ".png");
+            const auto image = preparedAssets().images.value(":/rhi/postprocess/"_L1 + entry.second
+                                                             + ".png"_L1);
             require(image.size() == entry.first->pixelSize(), "Invalid SMAA lookup size");
             updates->uploadTexture(entry.first, image.convertToFormat(QImage::Format_RGBA8888));
         }
@@ -229,20 +232,20 @@ void Postprocess::render(QRhiCommandBuffer *cb)
                       { s.focus, s.aperture, .011f, float(s.size.width()) / s.size.height() },
                       { .22f, 0, 0, 0 } };
         if (firstUpload
-            && (pass.name == "ssao" || pass.name == "ssao16" || pass.name == "ssao64")) {
+            && (pass.name == "ssao"_L1 || pass.name == "ssao16"_L1 || pass.name == "ssao64"_L1)) {
             const int bytes = s.samples * 16;
             updates->updateDynamicBuffer(pass.uniform.get(), offsetof(PostUniform, kernel), bytes,
                                          p.kernelValues.data());
             p.uniformUploadBytes += bytes;
         }
 #ifdef YALAHOO_RHI_AUDIT
-        if (pass.name == "bokeh")
+        if (pass.name == "bokeh"_L1)
             p.submittedBokeh = u;
 #endif
         updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u);
         p.uniformUploadBytes += sizeof(u);
     }
-    cb->resourceUpdate(updates);
+    cb->resourceUpdate(updates.release());
     for (const auto &pass : p.passes) {
         const auto size = pass.target->texture->pixelSize();
         cb->beginPass(pass.target->target.get(), Qt::transparent, { 1, 0 });
@@ -299,13 +302,13 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
         for (const auto &pass : p.passes) {
             auto *expectedInput = currentColor;
             auto *expectedAuxiliary = p.source;
-            if (pass.name == "ssao-blur")
+            if (pass.name == "ssao-blur"_L1)
                 expectedInput = p.rawAo.texture.get();
-            if (pass.name == "ssao-composite")
+            if (pass.name == "ssao-composite"_L1)
                 expectedAuxiliary = p.blur.texture.get();
-            if (pass.name == "smaa-weights")
+            if (pass.name == "smaa-weights"_L1)
                 expectedInput = p.edges.texture.get();
-            if (pass.name == "smaa-blend")
+            if (pass.name == "smaa-blend"_L1)
                 expectedAuxiliary = p.weights.texture.get();
             auto matches = [&](int slot, QRhiTexture *texture, QRhiSampler *sampler) {
                 const auto expected = QRhiShaderResourceBinding::sampledTexture(
@@ -316,7 +319,8 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
             };
             const bool chainMatches = matches(0, expectedInput, p.linear.get())
                     && matches(6, expectedAuxiliary, p.linear.get())
-                    && matches(2, pass.name == "bokeh" ? p.dofDepth : p.aoDepth, p.nearest.get());
+                    && matches(2, pass.name == "bokeh"_L1 ? p.dofDepth : p.aoDepth,
+                               p.nearest.get());
             bool feedback = false;
             const auto *target = pass.target->texture.get();
             for (int binding : { 0, 2, 3, 4, 5, 6, 7, 8 }) {
@@ -329,35 +333,36 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
                             != pass.bindings->cendBindings();
                 }
             }
-            passes.append(QJsonObject{ { "name", pass.name },
-                                       { "feedback", feedback },
-                                       { "chainMatches", chainMatches },
-                                       { "format", int(target->format()) },
-                                       { "samples", target->sampleCount() },
-                                       { "width", target->pixelSize().width() },
-                                       { "height", target->pixelSize().height() },
-                                       { "pipelineSamples", pass.pipeline->sampleCount() } });
-            if (pass.name == "ssao-composite" || pass.name == "bokeh" || pass.name == "smaa-blend")
+            passes.append(QJsonObject{ { u"name"_s, pass.name },
+                                       { u"feedback"_s, feedback },
+                                       { u"chainMatches"_s, chainMatches },
+                                       { u"format"_s, int(target->format()) },
+                                       { u"samples"_s, target->sampleCount() },
+                                       { u"width"_s, target->pixelSize().width() },
+                                       { u"height"_s, target->pixelSize().height() },
+                                       { u"pipelineSamples"_s, pass.pipeline->sampleCount() } });
+            if (pass.name == "ssao-composite"_L1 || pass.name == "bokeh"_L1
+                || pass.name == "smaa-blend"_L1)
                 currentColor = pass.target->texture.get();
         }
-        return { { "colorLinearClamp",
+        return { { u"colorLinearClamp"_s,
                    p.linear->magFilter() == QRhiSampler::Linear
                            && p.linear->minFilter() == QRhiSampler::Linear
                            && p.linear->mipmapMode() == QRhiSampler::None
                            && p.linear->addressU() == QRhiSampler::ClampToEdge
                            && p.linear->addressV() == QRhiSampler::ClampToEdge },
-                 { "depthNearestClamp",
+                 { u"depthNearestClamp"_s,
                    p.nearest->magFilter() == QRhiSampler::Nearest
                            && p.nearest->minFilter() == QRhiSampler::Nearest
                            && p.nearest->mipmapMode() == QRhiSampler::None
                            && p.nearest->addressU() == QRhiSampler::ClampToEdge
                            && p.nearest->addressV() == QRhiSampler::ClampToEdge },
-                 { "sourceMatches", p.source == expectedSource },
-                 { "revision", qint64(m_revision) },
-                 { "sourceSamples", p.source->sampleCount() },
-                 { "sourceFormat", int(p.source->format()) },
-                 { "outputSamples", p.output->sampleCount() },
-                 { "passes", passes } };
+                 { u"sourceMatches"_s, p.source == expectedSource },
+                 { u"revision"_s, qint64(m_revision) },
+                 { u"sourceSamples"_s, p.source->sampleCount() },
+                 { u"sourceFormat"_s, int(p.source->format()) },
+                 { u"outputSamples"_s, p.output->sampleCount() },
+                 { u"passes"_s, passes } };
     }
 #else
     Q_UNUSED(expectedSource);
@@ -370,16 +375,16 @@ QJsonObject Postprocess::submittedBokeh() const
     if (m_state && m_state->settings.bokeh) {
         const auto &p = *m_state;
         const auto &u = p.submittedBokeh;
-        return { { "focus", u.dof[0] },
-                 { "aperture", u.dof[1] },
-                 { "maxblur", u.dof[2] },
-                 { "aspect", u.dof[3] },
-                 { "near", u.clip[0] },
-                 { "far", u.clip[1] },
-                 { "width", u.size[0] },
-                 { "height", u.size[1] },
-                 { "depthWidth", p.dofDepth->pixelSize().width() },
-                 { "depthHeight", p.dofDepth->pixelSize().height() } };
+        return { { u"focus"_s, u.dof[0] },
+                 { u"aperture"_s, u.dof[1] },
+                 { u"maxblur"_s, u.dof[2] },
+                 { u"aspect"_s, u.dof[3] },
+                 { u"near"_s, u.clip[0] },
+                 { u"far"_s, u.clip[1] },
+                 { u"width"_s, u.size[0] },
+                 { u"height"_s, u.size[1] },
+                 { u"depthWidth"_s, p.dofDepth->pixelSize().width() },
+                 { u"depthHeight"_s, p.dofDepth->pixelSize().height() } };
     }
 #endif
     return { };
@@ -398,15 +403,15 @@ void Postprocess::inventory(ResourceInventory &inventory) const
         return;
     const auto &p = *m_state;
     for (int i = 0; i < 2; ++i)
-        inventory.texture(QString("post-ping-%1").arg(i), p.ping[i].texture.get());
-    inventory.texture("post-ao-raw", p.rawAo.texture.get());
-    inventory.texture("post-ao-blur", p.blur.texture.get());
-    inventory.texture("smaa-edges", p.edges.texture.get());
-    inventory.texture("smaa-weights", p.weights.texture.get());
-    inventory.texture("ao-noise", p.noise.get());
-    inventory.texture("smaa-area", p.area.get());
-    inventory.texture("smaa-search", p.search.get());
+        inventory.texture(u"post-ping-%1"_s.arg(i), p.ping[i].texture.get());
+    inventory.texture(u"post-ao-raw"_s, p.rawAo.texture.get());
+    inventory.texture(u"post-ao-blur"_s, p.blur.texture.get());
+    inventory.texture(u"smaa-edges"_s, p.edges.texture.get());
+    inventory.texture(u"smaa-weights"_s, p.weights.texture.get());
+    inventory.texture(u"ao-noise"_s, p.noise.get());
+    inventory.texture(u"smaa-area"_s, p.area.get());
+    inventory.texture(u"smaa-search"_s, p.search.get());
     for (const auto &pass : p.passes)
-        inventory.buffer("post-uniform-" + pass.name, pass.uniform.get());
+        inventory.buffer("post-uniform-"_L1 + pass.name, pass.uniform.get());
 }
 }

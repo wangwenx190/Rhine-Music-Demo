@@ -11,43 +11,47 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 class TitleTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void initTestCase()
     {
         QVERIFY(yalahoo::initializeAssetFonts());
     }
     void graphemesAndParts()
     {
-        const QString text = QStringLiteral("A👨‍👩‍👧‍👦👍🏽é音乐（gyp）");
+        const QString text =
+                u"A\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466\U0001f44d\U0001f3fde\u0301\u97f3\u4e50\uff08gyp\uff09"_s;
         const auto boundaries = yalahoo::TextLayoutAdapter::boundaries(text);
         QCOMPARE(boundaries.size(), 12);
         QCOMPARE(text.mid(boundaries[1], boundaries[2] - boundaries[1]),
-                 QStringLiteral("👨‍👩‍👧‍👦"));
-        QCOMPARE(text.mid(boundaries[2], boundaries[3] - boundaries[2]), QStringLiteral("👍🏽"));
-        QCOMPARE(text.mid(boundaries[3], boundaries[4] - boundaries[3]), QStringLiteral("é"));
-        auto parts =
-                yalahoo::TextLayoutAdapter::titleParts(QStringLiteral("音乐收藏（Archive gyp）"));
-        QCOMPARE(parts.first, QStringLiteral("音乐收藏"));
-        QCOMPARE(parts.second, QStringLiteral("Archive gyp"));
-        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(QStringLiteral("Music (Live)")).second,
-                 QString());
-        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(QStringLiteral("音乐（现场版）")).second,
+                 u"\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466"_s);
+        QCOMPARE(text.mid(boundaries[2], boundaries[3] - boundaries[2]), u"\U0001f44d\U0001f3fd"_s);
+        QCOMPARE(text.mid(boundaries[3], boundaries[4] - boundaries[3]), u"e\u0301"_s);
+        auto parts = yalahoo::TextLayoutAdapter::titleParts(
+                u"\u97f3\u4e50\u6536\u85cf\uff08Archive gyp\uff09"_s);
+        QCOMPARE(parts.first, u"\u97f3\u4e50\u6536\u85cf"_s);
+        QCOMPARE(parts.second, u"Archive gyp"_s);
+        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(u"Music (Live)"_s).second, QString());
+        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(
+                         u"\u97f3\u4e50\uff08\u73b0\u573a\u7248\uff09"_s)
+                         .second,
                  QString());
     }
     void layoutAndCache()
     {
         yalahoo::TextLayoutAdapter adapter;
         const auto bold = yalahoo::assetFont(700), subtitle = yalahoo::assetFont(600);
-        auto a = adapter.measure(QStringLiteral("音乐收藏（Archive gyp）"), bold, subtitle, 28, 270,
-                                 180, false, 1);
+        auto a = adapter.measure(u"\u97f3\u4e50\u6536\u85cf\uff08Archive gyp\uff09"_s, bold,
+                                 subtitle, 28, 270, 180, false, 1);
         QVERIFY(a.height > 28 * 1.4);
         QVERIFY(a.glyphs.last().translation);
         const auto misses = adapter.misses();
-        auto b = adapter.measure(QStringLiteral("音乐收藏（Archive gyp）"), bold, subtitle, 28, 270,
-                                 180, false, 1);
+        auto b = adapter.measure(u"\u97f3\u4e50\u6536\u85cf\uff08Archive gyp\uff09"_s, bold,
+                                 subtitle, 28, 270, 180, false, 1);
         QCOMPARE(a.glyphs.size(), b.glyphs.size());
         QCOMPARE(adapter.misses(), misses);
         for (const auto &glyph : a.glyphs) {
@@ -56,7 +60,7 @@ private slots:
             QVERIFY(!glyph.renderRuns.isEmpty());
         }
         const auto longTitle =
-                QStringLiteral("收藏的音乐声音和往日的故事（The collected archive of music gyp）")
+                u"\u6536\u85cf\u7684\u97f3\u4e50\u58f0\u97f3\u548c\u5f80\u65e5\u7684\u6545\u4e8b\uff08The collected archive of music gyp\uff09"_s
                         .repeated(20);
         auto limited = adapter.measure(longTitle, bold, subtitle, 28, 150, 65, false, 2);
         QVERIFY(limited.overflow);
@@ -64,23 +68,24 @@ private slots:
         QCOMPARE(limited.height, 65.0);
         bool ellipsis = false;
         for (const auto &glyph : limited.glyphs)
-            ellipsis |= glyph.text == QStringLiteral("…");
+            ellipsis |= glyph.text == u"\u2026"_s;
         QVERIFY(ellipsis);
         for (int i = 0; i < 200; ++i)
             adapter.measure(QString::number(i), bold, subtitle, 28, 200 + i, 120, false, 1);
         QVERIFY(adapter.cacheEntries() <= 96);
         QVERIFY(adapter.cacheBytes() <= yalahoo::TextLayoutAdapter::CacheBytes);
-        auto song = adapter.measure(QStringLiteral("👨‍👩‍👧‍👦éAV gyp Music"),
-                                    bold, subtitle, 12, 48, 29, true, 1, true);
+        auto song = adapter.measure(
+                u"\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466e\u0301AV gyp Music"_s,
+                bold, subtitle, 12, 48, 29, true, 1, true);
         QVERIFY(song.naturalWidth > 48);
-        QVERIFY(song.fitted.endsWith(QStringLiteral("…")));
+        QVERIFY(song.fitted.endsWith(u"\u2026"_s));
         QVERIFY(!song.fitted.contains(QChar::ReplacementCharacter));
     }
     void wholeLineGlyphAssociation()
     {
         yalahoo::TextLayoutAdapter adapter;
         auto font = yalahoo::assetFont(700);
-        const QString text = QStringLiteral("AV office affinity é gyp");
+        const QString text = u"AV office affinity e\u0301 gyp"_s;
         const auto actual = adapter.measure(text, font, font, 28, 600, 150, false, 1);
         font.setPixelSize(int(actual.size));
         font.setHintingPreference(QFont::PreferNoHinting);
@@ -110,8 +115,8 @@ private slots:
             QCOMPARE(actualInk[i].first, expectedInk[i].first);
             QVERIFY(std::abs(actualInk[i].second - expectedInk[i].second) < 1e-6);
         }
-        const auto wrapped = adapter.measure(QStringLiteral("AV gyp (Live) [2026]"), font, font, 28,
-                                             120, 150, false, 1);
+        const auto wrapped =
+                adapter.measure(u"AV gyp (Live) [2026]"_s, font, font, 28, 120, 150, false, 1);
         for (int i = 0; i < wrapped.glyphs.size(); ++i)
             if (i + 1 == wrapped.glyphs.size() || wrapped.glyphs[i + 1].y != wrapped.glyphs[i].y)
                 QVERIFY(!wrapped.glyphs[i].text.endsWith(u' '));
@@ -126,13 +131,14 @@ private slots:
         const auto font = yalahoo::assetFont(700);
         for (const double dpr : { 1.0, 1.5, 2.0 }) {
             const auto plain =
-                    adapter.measure(QStringLiteral("收藏"), font, font, 28, 600, 150, false, dpr);
-            const auto mixed = adapter.measure(QStringLiteral("👨‍👩‍👧‍👦 收藏"),
-                                               font, font, 28, 600, 150, false, dpr);
+                    adapter.measure(u"\u6536\u85cf"_s, font, font, 28, 600, 150, false, dpr);
+            const auto mixed = adapter.measure(
+                    u"\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466 \u6536\u85cf"_s,
+                    font, font, 28, 600, 150, false, dpr);
             const auto &expected = plain.glyphs.first();
             const auto found =
                     std::find_if(mixed.glyphs.cbegin(), mixed.glyphs.cend(), [](const auto &glyph) {
-                        return glyph.text == QStringLiteral("收");
+                        return glyph.text == u"\u6536"_s;
                     });
             QVERIFY(found != mixed.glyphs.cend());
             QCOMPARE(found->renderRuns.first().indexes, expected.renderRuns.first().indexes);
@@ -148,8 +154,8 @@ private slots:
         yalahoo::TextLayoutAdapter adapter;
         const auto primary = yalahoo::assetFont(700);
         for (const double size : { 12.0, 28.0, 29.75, 44.0 }) {
-            QFont emoji(QStringLiteral("Apple Color Emoji"));
-            emoji.setStyleName(QStringLiteral("Regular"));
+            QFont emoji(u"Apple Color Emoji"_s);
+            emoji.setStyleName(u"Regular"_s);
             emoji.setWeight(QFont::Normal);
             emoji.setPixelSize(int(std::round(size)));
             emoji.setHintingPreference(QFont::PreferNoHinting);
@@ -158,8 +164,7 @@ private slots:
             QVERIFY(!reference.fontTable("sbix").isEmpty());
             for (const double dpr : { 1.0, 1.5, 2.0 }) {
                 const auto layout = adapter.measure(
-                        QStringLiteral(
-                                "👨‍👩‍👧‍👦 👍🏽 é 🇨🇳 🎵 收藏"),
+                        u"\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466 \U0001f44d\U0001f3fd e\u0301 \U0001f1e8\U0001f1f3 \U0001f3b5 \u6536\u85cf"_s,
                         primary, primary, size, 1000, 150, false, dpr);
                 int colors = 0;
                 for (const auto &glyph : layout.glyphs) {
@@ -195,8 +200,8 @@ private slots:
         const auto font = yalahoo::assetFont(700);
         for (const double dpr : { 1.0, 1.5, 2.0 }) {
             for (const auto &[size, baseline] : baselines) {
-                const auto layout = adapter.measure(QStringLiteral("收藏"), font, font, size, 600,
-                                                    150, false, dpr);
+                const auto layout =
+                        adapter.measure(u"\u6536\u85cf"_s, font, font, size, 600, 150, false, dpr);
                 QCOMPARE(layout.glyphs.size(), 2);
                 for (const auto &glyph : layout.glyphs) {
                     const auto &run = glyph.renderRuns.first();
@@ -205,8 +210,9 @@ private slots:
                 }
             }
         }
-        const auto translated = adapter.measure(QStringLiteral("音乐（Music archive gyp）"), font,
-                                                yalahoo::assetFont(600), 44, 500, 220, false, 2);
+        const auto translated =
+                adapter.measure(u"\u97f3\u4e50\uff08Music archive gyp\uff09"_s, font,
+                                yalahoo::assetFont(600), 44, 500, 220, false, 2);
         for (const auto &glyph : translated.glyphs) {
             if (!glyph.translation)
                 continue;
@@ -248,14 +254,14 @@ private slots:
         yalahoo::TitleReel reel;
         reel.setFont(yalahoo::assetFont(400));
         reel.setTransport(true);
-        reel.setText(QStringLiteral("歌曲标题"));
+        reel.setText(u"\u6b4c\u66f2\u6807\u9898"_s);
         reel.componentComplete();
         QSignalSpy widths(&reel, &yalahoo::TitleReel::naturalWidthChanged);
         // Model the transport's visibility change while its width binding is evaluated.
         connect(&reel, &yalahoo::TitleReel::naturalWidthChanged, &reel, [&] {
             reel.setActive(false);
         });
-        reel.setText(QStringLiteral("更长的歌曲标题"));
+        reel.setText(u"\u66f4\u957f\u7684\u6b4c\u66f2\u6807\u9898"_s);
         reel.reconcile();
         QCOMPARE(widths.count(), 1);
         const double width = reel.naturalWidth();
@@ -269,9 +275,9 @@ private slots:
     {
         yalahoo::TitleReel reel;
         reel.setFont(yalahoo::assetFont(400));
-        reel.setText(QStringLiteral("第一首歌曲"));
+        reel.setText(u"\u7b2c\u4e00\u9996\u6b4c\u66f2"_s);
         reel.componentComplete();
-        reel.setText(QStringLiteral("下一首歌曲"));
+        reel.setText(u"\u4e0b\u4e00\u9996\u6b4c\u66f2"_s);
         reel.reconcile();
         QVERIFY(reel.moving());
         QSignalSpy frames(&reel, &yalahoo::TitleReel::changed);
@@ -286,7 +292,7 @@ private slots:
         QVERIFY(!reel.moving());
         // A restored item must retain its motion when an old hide callback arrives.
         reel.setActive(true);
-        reel.setText(QStringLiteral("恢复的歌曲"));
+        reel.setText(u"\u6062\u590d\u7684\u6b4c\u66f2"_s);
         reel.reconcile();
         QVERIFY(reel.moving());
         reel.setActive(false);
@@ -305,34 +311,37 @@ private slots:
         reel.setClock(&clock);
         reel.setFont(yalahoo::assetFont(700));
         reel.setSubtitleFont(yalahoo::assetFont(600));
-        reel.setText(QStringLiteral("收藏的声音（Sound archive）"));
+        reel.setText(u"\u6536\u85cf\u7684\u58f0\u97f3\uff08Sound archive\uff09"_s);
         reel.componentComplete();
         QVERIFY(!reel.moving());
         auto *slot = reel.slotAt(0);
-        reel.setText(QStringLiteral("昨日的故事（Stories gyp）"));
+        reel.setText(u"\u6628\u65e5\u7684\u6545\u4e8b\uff08Stories gyp\uff09"_s);
         reel.reconcile();
         QCOMPARE(reel.slotAt(0), slot);
         QVERIFY(reel.moving());
-        const auto misses = reel.diagnostics()["layoutMisses"];
+        const auto misses = reel.diagnostics()[u"layoutMisses"_s];
         clock.setSpeed(.25);
         clock.advance(.05);
         QCOMPARE(slot->roll.elapsed, .0125);
         clock.setSpeed(3);
         clock.advance(.05);
         QCOMPARE(slot->roll.elapsed, .1625);
-        QCOMPARE(reel.diagnostics()["layoutMisses"], misses);
+        QCOMPARE(reel.diagnostics()[u"layoutMisses"_s], misses);
         for (int i = 0; i < 100; ++i) {
-            reel.setText(QStringLiteral("音乐 %1 👨‍👩‍👧‍👦 é").arg(i));
+            reel.setText(
+                    u"\u97f3\u4e50 %1 \U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466 e\u0301"_s
+                            .arg(i));
             reel.reconcile();
             clock.advance(1.0 / 120);
-            QVERIFY(reel.diagnostics()["faces"].toInt() <= reel.slotCount() * 8);
+            QVERIFY(reel.diagnostics()[u"faces"_s].toInt() <= reel.slotCount() * 8);
         }
         reel.setReducedMotion(true);
         QVERIFY(!reel.moving());
-        QVERIFY(reel.diagnostics()["slots"].toInt() - reel.diagnostics()["activeSlots"].toInt()
+        QVERIFY(reel.diagnostics()[u"slots"_s].toInt()
+                        - reel.diagnostics()[u"activeSlots"_s].toInt()
                 <= 64);
         reel.setReducedMotion(false);
-        reel.setText(QStringLiteral("更多的收藏"));
+        reel.setText(u"\u66f4\u591a\u7684\u6536\u85cf"_s);
         reel.reconcile();
         reel.setAvailableWidth(90);
         reel.reconcile();
@@ -341,10 +350,10 @@ private slots:
         const double height = reel.layoutHeight();
         clock.advance(.05);
         QCOMPARE(reel.layoutHeight(), height);
-        const auto beforeInvalidation = reel.diagnostics()["layoutMisses"].toULongLong();
+        const auto beforeInvalidation = reel.diagnostics()[u"layoutMisses"_s].toULongLong();
         QVERIFY(QMetaObject::invokeMethod(qGuiApp, "fontDatabaseChanged"));
         reel.reconcile();
-        QVERIFY(reel.diagnostics()["layoutMisses"].toULongLong() > beforeInvalidation);
+        QVERIFY(reel.diagnostics()[u"layoutMisses"_s].toULongLong() > beforeInvalidation);
     }
     void transportTiming()
     {

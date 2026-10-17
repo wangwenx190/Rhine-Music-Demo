@@ -45,7 +45,7 @@ public:
     double informationRight() const;
     Q_INVOKABLE void setViewport(double width, double height, bool coarse = false,
                                  bool cinematic = false);
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

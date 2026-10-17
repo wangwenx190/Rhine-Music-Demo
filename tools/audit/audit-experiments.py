@@ -14,7 +14,7 @@ CHECKS = [
      "All four modes and five bounded parameters update existing light state and uniforms, preserving row/lane position and velocity. No shader, PSO, material, instance, attachment or rendering precision change. Temporary baseline comparison retains authored parameters."),
     ("COMMON-04", "src/app/main.cpp", "if (!verificationRun && !demonstration)",
      "The anonymous mode has no playable tracks and skips automatic audio start. Ordinary speed changes use the existing FrameClock once, leaving opening real dt and QtMultimedia song playback independent. Existing public media controls remain the only route."),
-    ("COMMON-05", "tools/review/ExperimentAudit.cpp", 'check("uniform-only"',
+    ("COMMON-05", "tools/review/ExperimentAudit.cpp", 'check(u"uniform-only"_s',
      "Hidden Metal integration separately checks actual mode uploads, unchanged resource/postprocess generation, pointer-wheel isolation, keyboard speed/comparison, responsive scrolling, diagnostic batches and release. Target GPU/input/display facts are not inferred from source or cross-target qsb."),
     ("PERF-01", "src/render/rhi/DiagnosticSamples.h", "static constexpr int capacity = 256;",
      "Each render adds fixed scalar values to four fixed rings; nearest-rank sorting occurs per 500ms batch. GUI formatting and three decode counters are batch-only. Controls and sampling cost are independent of library size; no library traversal or private paths in displayed data."),

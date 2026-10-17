@@ -9,6 +9,8 @@
 #include <memory>
 #import <AppKit/AppKit.h>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 NSMenuItem *action(NSMenu *menu, NSString *selector, NSInteger tag = 0)
 {
@@ -30,7 +32,7 @@ void invoke(NSMenuItem *item)
 class MacApplicationMenuTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void commandsAndOwnership()
     {
         QQuickWindow window;
@@ -38,7 +40,8 @@ private slots:
         QQmlEngine engine;
         QQmlComponent component(&engine);
         component.setData(
-                "import QtQuick\nTextInput { text: '匿名 Music'; width: 300; height: 40 }", QUrl());
+                "import QtQuick\nTextInput { text: '\345\214\277\345\220\215 Music'; width: 300; height: 40 }"_ba,
+                QUrl());
         std::unique_ptr<QObject> object(component.create());
         QVERIFY2(object, qPrintable(component.errorString()));
         auto *input = qobject_cast<QQuickItem *>(object.get());
@@ -61,7 +64,7 @@ private slots:
         QVERIFY(bar != previous);
         auto *settings = action(bar, @"openSettings:");
         QVERIFY(settings);
-        QCOMPARE(QString::fromNSString(settings.keyEquivalent), QString(","));
+        QCOMPARE(QString::fromNSString(settings.keyEquivalent), u","_s);
         QVERIFY(![settings.target validateMenuItem:settings]);
         invoke(settings);
         QCOMPARE(opened, 0);
@@ -87,14 +90,14 @@ private slots:
         QVERIFY(selectAll);
         QVERIFY([selectAll.target validateMenuItem:selectAll]);
         invoke(selectAll);
-        QCOMPARE(object->property("selectedText").toString(), QString::fromUtf8("匿名 Music"));
+        QCOMPARE(object->property("selectedText").toString(), u"\u533f\u540d Music"_s);
         auto *cut = action(bar, @"edit:", 3);
         QVERIFY([cut.target validateMenuItem:cut]);
         // Read-only editors retain selection/copy but cannot mutate via system menus.
         object->setProperty("readOnly", true);
         QVERIFY(![cut.target validateMenuItem:cut]);
         invoke(cut);
-        QCOMPARE(object->property("text").toString(), QString::fromUtf8("匿名 Music"));
+        QCOMPARE(object->property("text").toString(), u"\u533f\u540d Music"_s);
         object->setProperty("readOnly", false);
         // Rebuilding the visual editor does not retain an old focus object.
         input->setParentItem(nullptr);

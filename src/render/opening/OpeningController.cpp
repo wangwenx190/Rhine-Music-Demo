@@ -21,7 +21,7 @@ OpeningController::OpeningController(MotionController *motion, SceneAdapter *sce
 }
 void OpeningController::replay()
 {
-    ++m_revision;
+    const auto revision = ++m_revision;
     m_time = m_reveal = 0;
     m_skipPending = m_motion->reducedMotion();
     m_phase = Phase::Preparing;
@@ -29,21 +29,31 @@ void OpeningController::replay()
     m_scene->setPointer(0, 0);
     // Warm the actual settled production pipeline before starting the fixed film clock.
     m_selection->setOpeningTime(27.12);
+    if (revision != m_revision)
+        return;
     m_scene->setOpeningTime(27.12);
-    emit changed();
-    emit started();
+    if (revision != m_revision)
+        return;
+    Q_EMIT changed();
+    if (revision == m_revision && preparing())
+        Q_EMIT started();
 }
 void OpeningController::scenePrepared()
 {
     if (!preparing())
         return;
+    const auto revision = m_revision;
     m_phase = Phase::Film;
     m_motion->clock()->startOpening();
+    if (revision != m_revision || !film())
+        return;
     sample(0);
+    if (revision != m_revision || !film())
+        return;
     if (m_skipPending)
         finishFilm(true);
     else
-        emit changed();
+        Q_EMIT changed();
 }
 void OpeningController::skip()
 {
@@ -54,50 +64,69 @@ void OpeningController::skip()
 }
 void OpeningController::sample(double dt)
 {
+    const auto revision = m_revision;
+    const auto phase = m_phase;
     const double shot = std::min(27.12, openingSceneTime(m_time));
     m_selection->setOpeningTime(shot);
-    m_scene->setOpeningTime(shot, dt);
+    if (revision == m_revision && phase == m_phase)
+        m_scene->setOpeningTime(shot, dt);
 }
 void OpeningController::advance(double dt)
 {
     if (film()) {
+        const auto revision = m_revision;
         m_time = m_motion->clock()->openingTime();
         sample(dt);
+        if (revision != m_revision || !film())
+            return;
         if (m_time == 11.6)
             finishFilm(false);
         else
-            emit changed();
+            Q_EMIT changed();
     } else if (m_phase == Phase::Reveal) {
         m_reveal = std::min(.72, m_reveal + dt);
         if (.72 - m_reveal < 1e-9)
             complete();
         else
-            emit changed();
+            Q_EMIT changed();
     }
 }
 void OpeningController::finishFilm(bool skipped)
 {
     if (!film())
         return;
+    const auto revision = m_revision;
     m_time = 11.6;
     if (skipped)
         sample(0);
-    m_motion->clock()->finishOpening();
-    m_selection->setOpeningTime(std::nullopt);
-    m_scene->setOpeningTime(std::nullopt);
+    if (revision != m_revision || !film())
+        return;
     m_phase = Phase::Reveal;
     m_reveal = 0;
-    emit handedOff();
+    m_motion->clock()->finishOpening();
+    if (revision != m_revision || m_phase != Phase::Reveal)
+        return;
+    m_selection->setOpeningTime(std::nullopt);
+    if (revision != m_revision || m_phase != Phase::Reveal)
+        return;
+    m_scene->setOpeningTime(std::nullopt);
+    if (revision != m_revision || m_phase != Phase::Reveal)
+        return;
+    Q_EMIT handedOff();
+    if (revision != m_revision || m_phase != Phase::Reveal)
+        return;
     if (m_motion->reducedMotion())
         complete();
     else
-        emit changed();
+        Q_EMIT changed();
 }
 void OpeningController::complete()
 {
+    const auto revision = m_revision;
     m_phase = Phase::Done;
     m_reveal = .72;
-    emit changed();
-    emit completed();
+    Q_EMIT changed();
+    if (revision == m_revision && m_phase == Phase::Done)
+        Q_EMIT completed();
 }
 }

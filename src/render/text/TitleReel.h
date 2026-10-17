@@ -77,7 +77,7 @@ public:
     void rollTo(const TitleGlyph &next, bool instant);
     void advance(double dt);
     bool moving() const;
-signals:
+Q_SIGNALS:
     void contentChanged();
     void frameChanged();
 
@@ -150,7 +150,7 @@ public:
     Q_INVOKABLE QVariantMap diagnostics() const;
     QList<QSize> resourceSizes() const;
     void advance(double dt);
-signals:
+Q_SIGNALS:
     void inputChanged();
     void clockChanged();
     void slotsChanged();

@@ -8,14 +8,14 @@ void FrameClock::requestVisualFrame()
     if (m_workPending)
         return;
     m_workPending = true;
-    emit workPendingChanged();
+    Q_EMIT workPendingChanged();
 }
 void FrameClock::setApplicationVisible(bool visible)
 {
     if (m_applicationVisible == visible)
         return;
     m_applicationVisible = visible;
-    emit applicationVisibleChanged();
+    Q_EMIT applicationVisibleChanged();
 }
 void FrameClock::setActive(bool active)
 {
@@ -23,7 +23,7 @@ void FrameClock::setActive(bool active)
         return;
     m_active = active;
     m_discardNext = true; // The first resumed QML interval may include the whole suspension.
-    emit activeChanged();
+    Q_EMIT activeChanged();
 }
 void FrameClock::setSpeed(double speed)
 {
@@ -33,7 +33,7 @@ void FrameClock::setSpeed(double speed)
     if (speed == m_speed)
         return;
     m_speed = speed;
-    emit speedChanged();
+    Q_EMIT speedChanged();
 }
 void FrameClock::advance(double frameSeconds)
 {
@@ -54,17 +54,17 @@ void FrameClock::advance(double frameSeconds)
             finishOpening();
     }
     ++m_frameCount;
-    emit frame(dt, motionDt);
-    emit advanced();
+    Q_EMIT frame(dt, motionDt);
+    Q_EMIT advanced();
     if (!m_workPending)
-        emit workPendingChanged();
+        Q_EMIT workPendingChanged();
 }
 void FrameClock::startOpening()
 {
     m_openingTime = 0;
     m_openingRunning = true;
-    emit openingChanged();
-    emit advanced();
+    Q_EMIT openingChanged();
+    Q_EMIT advanced();
 }
 void FrameClock::finishOpening()
 {
@@ -72,8 +72,8 @@ void FrameClock::finishOpening()
         return;
     m_openingTime = 11.6;
     m_openingRunning = false;
-    emit openingChanged();
-    emit openingFinished();
-    emit advanced();
+    Q_EMIT openingChanged();
+    Q_EMIT openingFinished();
+    Q_EMIT advanced();
 }
 }

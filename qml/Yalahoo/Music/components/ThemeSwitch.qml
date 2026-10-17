@@ -29,7 +29,7 @@ Rectangle {
         }
     }
     Repeater {
-        model: ["暖昼", "深夜"]
+        model: [qsTr("Warm day"), qsTr("Deep night")]
         delegate: T.Button {
             id: option
             focusPolicy: Qt.StrongFocus
@@ -45,7 +45,7 @@ Rectangle {
             opacity: checked ? 1 : 0.6
             text: modelData
             checked: root.tokens.night === (index === 1)
-            Accessible.name: text + "主题"
+            Accessible.name: qsTr("%1 theme").arg(text)
             background: Rectangle {
                 color: "transparent"
                 radius: 16

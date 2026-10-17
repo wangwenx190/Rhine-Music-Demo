@@ -7,7 +7,7 @@
 class ModuleProbe : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void quick3DLink()
     {
         QQuick3DGeometry geometry;

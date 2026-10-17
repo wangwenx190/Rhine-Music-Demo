@@ -4,11 +4,13 @@
 #include <cmath>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo::rhi {
 namespace {
-QVector3D linear(const char *hex)
+QVector3D linear(QLatin1StringView hex)
 {
-    QColor c(QString::fromLatin1(hex));
+    QColor c(hex);
     const auto decode = [](float x) {
         return x <= .04045f ? x / 12.92f : std::pow((x + .055f) / 1.055f, 2.4f);
     };
@@ -26,10 +28,12 @@ ShellMaterial shellMaterial(int surface, float warmth, float clarity, float envi
         || !std::isfinite(environment))
         throw std::invalid_argument("Invalid RHI shell parameters");
     const float w = std::clamp(warmth, 0.0f, 1.0f), c = std::clamp(clarity, 0.0f, 1.0f);
-    const char *day[] = { "#fffdf8", "#e7e1d8", "#ece6dc" };
+    const QLatin1StringView day[] = { "#fffdf8"_L1, "#e7e1d8"_L1, "#ece6dc"_L1 };
     ShellMaterial m;
-    m.tint = linear(surface == 2 ? "#c6d6e5" : "#f6fbff") * (1 - w) + linear(day[surface]) * w;
-    m.attenuation = linear(surface == 2 ? "#f3e9db" : "#dceafd") * (1 - w) + linear("#f3e9db") * w;
+    m.tint =
+            linear(surface == 2 ? "#c6d6e5"_L1 : "#f6fbff"_L1) * (1 - w) + linear(day[surface]) * w;
+    m.attenuation =
+            linear(surface == 2 ? "#f3e9db"_L1 : "#dceafd"_L1) * (1 - w) + linear("#f3e9db"_L1) * w;
     if (surface == 0)
         m.transport = { .96f - .02f * w, lidRoughness(w, c), .018f + .004f * w, 5 - 1.2f * w };
     else if (surface == 1)

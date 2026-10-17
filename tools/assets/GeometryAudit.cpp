@@ -12,6 +12,8 @@
 #include <set>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo::assets {
 namespace {
 void require(bool ok, const char *message)
@@ -66,11 +68,11 @@ QJsonObject summary(const Batch &batch)
             low[axis] = std::min(low[axis], v[axis]);
             high[axis] = std::max(high[axis], v[axis]);
         }
-    return { { "name", batch.name },
-             { "vertices", batch.vertices.size() },
-             { "triangles", batch.indices.size() / 3 },
-             { "min", QJsonArray{ low[0], low[1], low[2] } },
-             { "max", QJsonArray{ high[0], high[1], high[2] } } };
+    return { { u"name"_s, batch.name },
+             { u"vertices"_s, batch.vertices.size() },
+             { u"triangles"_s, batch.indices.size() / 3 },
+             { u"min"_s, QJsonArray{ low[0], low[1], low[2] } },
+             { u"max"_s, QJsonArray{ high[0], high[1], high[2] } } };
 }
 }
 QByteArray readFile(const QString &path)
@@ -100,58 +102,60 @@ QVector<Batch> readGlb(const QByteArray &bytes)
     const auto bin = r.take(binSize);
     require(r.offset == bytes.size(), "Unsupported GLB chunks");
     const auto root = document.object();
-    const auto nodes = root["nodes"].toArray();
+    const auto nodes = root[u"nodes"_s].toArray();
     for (const auto &value : nodes) {
         const auto node = value.toObject();
-        require(!node.contains("matrix") && !node.contains("translation")
-                        && !node.contains("rotation") && !node.contains("scale"),
+        require(!node.contains(u"matrix"_s) && !node.contains(u"translation"_s)
+                        && !node.contains(u"rotation"_s) && !node.contains(u"scale"_s),
                 "Unexpected source node transform; audit adapter before import");
     }
-    const auto accessors = root["accessors"].toArray(), views = root["bufferViews"].toArray();
+    const auto accessors = root[u"accessors"_s].toArray(), views = root[u"bufferViews"_s].toArray();
     auto accessor = [&](int index, int components, int componentType) {
         require(index >= 0 && index < accessors.size(), "Invalid accessor index");
         const auto a = accessors[index].toObject();
-        const int viewId = a["bufferView"].toInt(-1);
-        require(viewId >= 0 && viewId < views.size() && !a.contains("sparse")
-                        && !a["normalized"].toBool(),
+        const int viewId = a[u"bufferView"_s].toInt(-1);
+        require(viewId >= 0 && viewId < views.size() && !a.contains(u"sparse"_s)
+                        && !a[u"normalized"_s].toBool(),
                 "Unsupported accessor");
         const auto view = views[viewId].toObject();
-        require(a["componentType"].toInt() == componentType && view["buffer"].toInt() == 0,
+        require(a[u"componentType"_s].toInt() == componentType && view[u"buffer"_s].toInt() == 0,
                 "Unsupported accessor component");
-        require(a["type"].toString()
-                        == (components == 1           ? "SCALAR"
-                                    : components == 2 ? "VEC2"
-                                                      : "VEC3"),
+        require(a[u"type"_s].toString()
+                        == (components == 1           ? "SCALAR"_L1
+                                    : components == 2 ? "VEC2"_L1
+                                                      : "VEC3"_L1),
                 "Invalid accessor dimensions");
         const int size = componentType == 5123 ? 2 : 4;
-        const int stride = view["byteStride"].toInt(components * size), count = a["count"].toInt();
-        const int viewStart = view["byteOffset"].toInt(), localStart = a["byteOffset"].toInt();
+        const int stride = view[u"byteStride"_s].toInt(components * size),
+                  count = a[u"count"_s].toInt();
+        const int viewStart = view[u"byteOffset"_s].toInt(),
+                  localStart = a[u"byteOffset"_s].toInt();
         require(count > 0 && stride >= components * size && viewStart >= 0 && localStart >= 0,
                 "Invalid accessor range");
         const qint64 required = qint64(count - 1) * stride + components * size;
-        require(required <= qint64(view["byteLength"].toInt()) - localStart
+        require(required <= qint64(view[u"byteLength"_s].toInt()) - localStart
                         && qint64(viewStart) + localStart + required <= bin.size(),
                 "Accessor exceeds buffer");
-        return std::array<int, 3>{ viewStart + localStart, stride, count };
+        return std::array<qsizetype, 3>{ qsizetype(viewStart) + localStart, stride, count };
     };
     QVector<Batch> batches;
-    for (const auto &meshValue : root["meshes"].toArray()) {
+    for (const auto &meshValue : root[u"meshes"_s].toArray()) {
         const auto mesh = meshValue.toObject();
-        const auto primitives = mesh["primitives"].toArray();
+        const auto primitives = mesh[u"primitives"_s].toArray();
         require(primitives.size() == 1, "Expected one primitive per shell batch");
         const auto p = primitives[0].toObject();
-        require(p["mode"].toInt(4) == 4, "Expected triangles");
-        const auto attributes = p["attributes"].toObject();
-        const auto pos = accessor(attributes["POSITION"].toInt(-1), 3, 5126);
-        const auto norm = accessor(attributes["NORMAL"].toInt(-1), 3, 5126);
-        const auto uv = accessor(attributes["TEXCOORD_0"].toInt(-1), 2, 5126);
+        require(p[u"mode"_s].toInt(4) == 4, "Expected triangles");
+        const auto attributes = p[u"attributes"_s].toObject();
+        const auto pos = accessor(attributes[u"POSITION"_s].toInt(-1), 3, 5126);
+        const auto norm = accessor(attributes[u"NORMAL"_s].toInt(-1), 3, 5126);
+        const auto uv = accessor(attributes[u"TEXCOORD_0"_s].toInt(-1), 2, 5126);
         require(pos[2] == norm[2] && pos[2] == uv[2], "Attribute count mismatch");
         Batch b;
-        const auto materials = root["materials"].toArray();
-        const int material = p["material"].toInt(-1);
+        const auto materials = root[u"materials"_s].toArray();
+        const int material = p[u"material"_s].toInt(-1);
         require(material >= 0 && material < materials.size(), "Missing shell material identity");
-        b.name = materials[material].toObject()["name"].toString();
-        const QStringList names{ "Frosted_Polymer", "Ivory_Edges", "Optical_Diffuser" };
+        b.name = materials[material].toObject()[u"name"_s].toString();
+        const QStringList names{ u"Frosted_Polymer"_s, u"Ivory_Edges"_s, u"Optical_Diffuser"_s };
         require(batches.size() < names.size() && b.name == names[batches.size()],
                 "Unexpected shell order/material");
         for (int i = 0; i < pos[2]; ++i) {
@@ -166,9 +170,9 @@ QVector<Batch> readGlb(const QByteArray &bytes)
             v[7] = ur.f32();
             b.vertices.append(v);
         }
-        const int indexId = p["indices"].toInt(-1);
+        const int indexId = p[u"indices"_s].toInt(-1);
         require(indexId >= 0 && indexId < accessors.size(), "Missing indices");
-        const int type = accessors[indexId].toObject()["componentType"].toInt();
+        const int type = accessors[indexId].toObject()[u"componentType"_s].toInt();
         require(type == 5123 || type == 5125, "Unsupported indices");
         const auto idx = accessor(indexId, 1, type);
         require(idx[2] % 3 == 0, "Incomplete triangle");
@@ -212,8 +216,7 @@ Batch readQtMesh(const QByteArray &bytes)
                 "Unexpected vertex layout");
     }
     r.qtAlign();
-    for (const auto &name :
-         { QByteArray("attr_pos"), QByteArray("attr_norm"), QByteArray("attr_uv0") }) {
+    for (const auto &name : { "attr_pos"_ba, "attr_norm"_ba, "attr_uv0"_ba }) {
         const auto size = r.u32();
         require(r.take(size) == name + '\0', "Unexpected attribute name");
         r.qtAlign();
@@ -247,7 +250,7 @@ QJsonObject compareGeometry(const QVector<Batch> &original, const QVector<Batch>
         const auto &a = original[i], &b = imported[i];
         if (a.indices.size() != b.indices.size() || a.vertices.size() != b.vertices.size())
             throw std::runtime_error(
-                    QString("Geometry counts changed: batch %1 source v=%2 i=%3 imported v=%4 i=%5")
+                    u"Geometry counts changed: batch %1 source v=%2 i=%3 imported v=%4 i=%5"_s
                             .arg(i)
                             .arg(a.vertices.size())
                             .arg(a.indices.size())
@@ -297,19 +300,20 @@ QJsonObject compareGeometry(const QVector<Batch> &original, const QVector<Batch>
                 "Imported triangle topology or winding changed");
         auto bcopy = b;
         bcopy.name = a.name;
-        reports.append(QJsonObject{ { "source", summary(a) }, { "imported", summary(bcopy) } });
+        reports.append(
+                QJsonObject{ { u"source"_s, summary(a) }, { u"imported"_s, summary(bcopy) } });
         triangles += int(b.indices.size() / 3);
     }
     require(triangles == 1000, "Source triangle total changed");
-    return { { "passed", true },
-             { "batches", reports },
-             { "triangles", triangles },
-             { "maxAttributeError", maxError },
-             { "uvConvention", "Qt V = 1 - glTF V; positions/normals unchanged" },
-             { "nodeTransforms", "identity; no scale or axis conversion" },
-             { "paperPlaneZ", 0.027 },
-             { "rearFrontZ", -0.032 },
-             { "lidBackZ", 0.052 },
-             { "lidFrontZ", 0.070 } };
+    return { { u"passed"_s, true },
+             { u"batches"_s, reports },
+             { u"triangles"_s, triangles },
+             { u"maxAttributeError"_s, maxError },
+             { u"uvConvention"_s, u"Qt V = 1 - glTF V; positions/normals unchanged"_s },
+             { u"nodeTransforms"_s, u"identity; no scale or axis conversion"_s },
+             { u"paperPlaneZ"_s, 0.027 },
+             { u"rearFrontZ"_s, -0.032 },
+             { u"lidBackZ"_s, 0.052 },
+             { u"lidFrontZ"_s, 0.070 } };
 }
 }

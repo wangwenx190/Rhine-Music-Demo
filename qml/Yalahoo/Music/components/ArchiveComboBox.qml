@@ -9,16 +9,11 @@ T.ComboBox {
     required property DesignTokens tokens
     readonly property var hostWindow: control.Window.window
     property var disabledValue: undefined
-    readonly property real optionsWidth: {
-        let result = 0;
-        const rows = control.model;
-        for (let i = 0; rows && i < rows.length; ++i)
-            result = Math.max(result, metrics.advanceWidth(String(rows[i][control.textRole]
-                                                                  ?? rows[i])));
-        return result;
-    }
-    FontMetrics {
+    readonly property real optionsWidth: metrics.maximumWidth
+    OptionMetrics {
         id: metrics
+        model: control.model || []
+        textRole: control.textRole
         font.family: control.tokens.regular.family
         font.styleName: control.tokens.regular.styleName
         font.weight: control.tokens.regular.weight

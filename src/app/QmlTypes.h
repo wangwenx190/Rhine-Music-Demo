@@ -1,8 +1,10 @@
+#pragma once
+#include "OptionMetrics.h"
+#include "GenreRowsModel.h"
 #include "OpeningController.h"
 #include "StartupCoordinator.h"
 #include "OpeningInk.h"
 #include "TextAreaFormat.h"
-#pragma once
 #include "LibrarySession.h"
 #include "SettingsController.h"
 #include "PlaybackController.h"
@@ -284,4 +286,18 @@ struct StartupCoordinatorQml
     QML_FOREIGN(yalahoo::StartupCoordinator)
     QML_NAMED_ELEMENT(StartupCoordinator)
     QML_UNCREATABLE("Owned by application")
+};
+
+struct GenreRowsModelQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::GenreRowsModel)
+    QML_NAMED_ELEMENT(GenreRowsModel)
+};
+
+struct OptionMetricsQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::OptionMetrics)
+    QML_NAMED_ELEMENT(OptionMetrics)
 };

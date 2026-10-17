@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include <QVariantMap>
 namespace yalahoo {
 enum class RenderBackend {
@@ -10,11 +12,11 @@ struct RenderBackendContract
     static constexpr RenderBackend selected = RenderBackend::Rhi;
     static QVariantMap fields()
     {
-        return { { "selected", "rhi" },
-                 { "implementationReady", true },
-                 { "activeImplementation", "rhi" },
-                 { "contractRevision", 4 },
-                 { "contract", "docs/contracts/render-backend.json" } };
+        return { { u"selected"_s, u"rhi"_s },
+                 { u"implementationReady"_s, true },
+                 { u"activeImplementation"_s, u"rhi"_s },
+                 { u"contractRevision"_s, 4 },
+                 { u"contract"_s, u"docs/contracts/render-backend.json"_s } };
     }
 };
 }

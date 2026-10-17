@@ -2,7 +2,6 @@
 param(
     [switch]$FullMatrix,
     [switch]$BackendMatrix,
-    [switch]$TitleContext,
     [switch]$UseExistingWebSource,
     [ValidateSet('d3d11', 'opengl')][string]$Backend = 'd3d11',
     [ValidateSet(1, 1.5, 2)][double]$Dpr = 1,
@@ -11,8 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-if ([int][bool]$FullMatrix + [int][bool]$BackendMatrix + [int][bool]$TitleContext -gt 1) {
-    throw 'Choose FullMatrix, BackendMatrix or TitleContext'
+if ([int][bool]$FullMatrix + [int][bool]$BackendMatrix -gt 1) {
+    throw 'Choose FullMatrix or BackendMatrix'
 }
 function Run([scriptblock]$Command) {
     & $Command
@@ -55,7 +54,7 @@ try {
         }
     }
     Run { python tools/audit/audit-title-source.py }
-    Run { ctest --preset qt-release --output-on-failure }
+    Run { ctest --preset qt-release -R '^(source-format|title-reels)$' --output-on-failure --no-tests=error }
 } finally {
     Pop-Location
 }

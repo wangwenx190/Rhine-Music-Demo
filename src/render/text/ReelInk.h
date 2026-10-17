@@ -21,7 +21,7 @@ public:
 
 protected:
     QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *) override;
-signals:
+Q_SIGNALS:
     void slotChanged();
     void colorChanged();
 

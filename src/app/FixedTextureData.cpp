@@ -4,13 +4,16 @@
 #include <QSize>
 #include <QImage>
 #include <cstring>
+
+using namespace Qt::StringLiterals;
+
 void FixedTextureData::setAsset(const QString &asset)
 {
     if (asset == m_asset)
         return;
-    if (asset == "smaa-area" || asset == "smaa-search") {
-        QImage image(":/assets/postprocess/" + asset + ".png");
-        const QSize expected = asset == "smaa-area" ? QSize(160, 560) : QSize(66, 33);
+    if (asset == "smaa-area"_L1 || asset == "smaa-search"_L1) {
+        QImage image(":/assets/postprocess/"_L1 + asset + ".png"_L1);
+        const QSize expected = asset == "smaa-area"_L1 ? QSize(160, 560) : QSize(66, 33);
         if (image.size() != expected) {
             qWarning("Invalid SMAA lookup texture");
             return;
@@ -23,27 +26,27 @@ void FixedTextureData::setAsset(const QString &asset)
         setHasTransparency(false);
         setTextureData(
                 QByteArray(reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes()));
-        emit assetChanged();
+        Q_EMIT assetChanged();
         return;
     }
     QSize size;
-    if (asset == "room-pmrem")
+    if (asset == "room-pmrem"_L1)
         size = { 768, 1024 };
-    else if (asset == "dfg")
+    else if (asset == "dfg"_L1)
         size = { 16, 16 };
-    else if (asset == "ltc1" || asset == "ltc2")
+    else if (asset == "ltc1"_L1 || asset == "ltc2"_L1)
         size = { 64, 64 };
-    else if (asset.startsWith("ssao-kernel-")
-             && (asset.endsWith("-16") || asset.endsWith("-32") || asset.endsWith("-64")))
-        size = { asset.section('-', -1).toInt(), 1 };
-    else if (asset.startsWith("ssao-noise-")
-             && (asset.endsWith("-16") || asset.endsWith("-32") || asset.endsWith("-64")))
+    else if (asset.startsWith(u"ssao-kernel-"_s)
+             && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
+        size = { asset.section('-'_L1, -1).toInt(), 1 };
+    else if (asset.startsWith(u"ssao-noise-"_s)
+             && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
         size = { 4, 4 };
     else {
         qWarning("Unknown fixed material texture");
         return;
     }
-    QFile file(":/assets/environment/" + asset + ".rgba32f");
+    QFile file(":/assets/environment/"_L1 + asset + ".rgba32f"_L1);
     if (!file.open(QIODevice::ReadOnly)) {
         qWarning("Missing fixed material texture");
         return;
@@ -64,5 +67,5 @@ void FixedTextureData::setAsset(const QString &asset)
     setFormat(QQuick3DTextureData::RGBA32F);
     setHasTransparency(false);
     setTextureData(bytes);
-    emit assetChanged();
+    Q_EMIT assetChanged();
 }

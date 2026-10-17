@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "LibraryStore.h"
 #include "LegacyImporter.h"
 
@@ -10,13 +11,15 @@
 #include <QtConcurrentRun>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 constexpr qint64 maximumCacheBytes = 256 * 1024 * 1024;
 }
 LibraryStore::LibraryStore(QString dataRoot, QObject *parent)
     : QObject(parent),
-      m_path(QDir(dataRoot).filePath(QStringLiteral("library-index.json"))),
+      m_path(QDir(dataRoot).filePath(u"library-index.json"_s)),
       m_snapshot(std::make_shared<const LibrarySnapshot>()),
       m_dataRoot(std::move(dataRoot))
 {
@@ -68,25 +71,29 @@ QList<QUrl> LibraryStore::roots() const
 bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
 {
     if (!m_initialized || busy() || !m_writable) {
-        report(QStringLiteral("请等待音乐库准备完成后保存资料设置。"));
+        report(QCoreApplication::translate(
+                "Yalahoo",
+                "Wait until the music library is ready before saving metadata settings."));
         return false;
     }
     auto snapshot = *m_snapshot;
-    auto object = snapshot.fields.value("metadataConfiguration").toObject();
+    auto object = snapshot.fields.value(u"metadataConfiguration"_s).toObject();
     const auto patch = QJsonObject::fromVariantMap(configuration);
-    if ((patch.contains("musicBrainzContact") && !patch.value("musicBrainzContact").isString())
-        || (patch.contains("onlineEnabled") && !patch.value("onlineEnabled").isBool())) {
-        report(QStringLiteral("资料配置字段类型无效。"));
+    if ((patch.contains(u"musicBrainzContact"_s)
+         && !patch.value(u"musicBrainzContact"_s).isString())
+        || (patch.contains(u"onlineEnabled"_s) && !patch.value(u"onlineEnabled"_s).isBool())) {
+        report(QCoreApplication::translate("Yalahoo",
+                                           "Invalid metadata configuration field type."));
         return false;
     }
     for (auto it = patch.begin(); it != patch.end(); ++it)
         object.insert(it.key(), it.value());
-    if (object == snapshot.fields.value("metadataConfiguration").toObject())
+    if (object == snapshot.fields.value(u"metadataConfiguration"_s).toObject())
         return true;
-    snapshot.fields.insert("metadataConfiguration", object);
+    snapshot.fields.insert(u"metadataConfiguration"_s, object);
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     m_savePending = m_snapshot;
-    emit snapshotReady(m_snapshot);
+    Q_EMIT snapshotReady(m_snapshot);
     schedule();
     return true;
 }
@@ -97,9 +104,9 @@ Snapshot LibraryStore::snapshot() const
 void LibraryStore::report(const QString &error)
 {
     m_error = error;
-    emit statusChanged();
+    Q_EMIT statusChanged();
     if (!error.isEmpty())
-        emit failed(error);
+        Q_EMIT failed(error);
 }
 void LibraryStore::load()
 {
@@ -118,7 +125,7 @@ QStringList LibraryStore::rootPaths() const
 bool LibraryStore::setRootPaths(const QString &paths)
 {
     QList<QUrl> roots;
-    for (const auto &line : paths.split('\n'))
+    for (const auto &line : paths.split('\n'_L1))
         if (!line.trimmed().isEmpty())
             roots.append(QUrl::fromLocalFile(line.trimmed()));
     return setRoots(roots);
@@ -141,7 +148,8 @@ bool LibraryStore::importLegacy(const QUrl &directory)
     if (!directory.isLocalFile() || !QDir::isAbsolutePath(directory.toLocalFile())
         || directory.hasQuery() || directory.hasFragment()
         || directory.toLocalFile().contains(QChar::Null)) {
-        report(QStringLiteral("旧数据导入需要本地绝对目录。"));
+        report(QCoreApplication::translate("Yalahoo",
+                                           "Legacy import requires a local absolute directory."));
         return false;
     }
     cancel();
@@ -169,7 +177,7 @@ void LibraryStore::cancel()
     m_importPending.clear();
     if (m_active == Kind::Probe)
         m_probe.cancel();
-    emit statusChanged();
+    Q_EMIT statusChanged();
 }
 LibraryStore::JobResult LibraryStore::read(const QString &path)
 {
@@ -180,7 +188,9 @@ LibraryStore::JobResult LibraryStore::read(const QString &path)
         return result;
     }
     if (!file.open(QIODevice::ReadOnly) || file.size() > maximumCacheBytes) {
-        result.error = QStringLiteral("无法读取音乐库缓存或缓存超过 256MiB，保留原文件。");
+        result.error = QCoreApplication::translate(
+                "Yalahoo",
+                "Cannot read the library cache, or it exceeds 256 MiB. The original file was preserved.");
         return result;
     }
     QJsonParseError parse;
@@ -189,16 +199,20 @@ LibraryStore::JobResult LibraryStore::read(const QString &path)
                                                             : QJsonDocument();
     LibrarySnapshot snapshot;
     if (file.error() != QFileDevice::NoError || parse.error != QJsonParseError::NoError
-        || !document.isObject() || document.object().value("nativeSchemaVersion").toInt() != 1
+        || !document.isObject() || document.object().value(u"nativeSchemaVersion"_s).toInt() != 1
         || !readLibrary(document.object(), snapshot, &result.error)) {
-        result.error = QStringLiteral("音乐库缓存无效，保留原文件：") + result.error;
+        result.error =
+                QCoreApplication::translate(
+                        "Yalahoo", "Invalid library cache. The original file was preserved: ")
+                + result.error;
         return result;
     }
     QList<QUrl> roots, normalized;
     for (const auto &root : snapshot.roots)
         roots.append(root.path);
     if (!DirectoryScanner::normalizeRoots(roots, normalized, result.error) || roots != normalized) {
-        result.error = QStringLiteral("音乐库缓存根目录无效，保留原文件。");
+        result.error = QCoreApplication::translate(
+                "Yalahoo", "Invalid library cache roots. The original file was preserved.");
         return result;
     }
     result.snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
@@ -208,39 +222,48 @@ LibraryStore::JobResult LibraryStore::write(const QString &path, Snapshot snapsh
 {
     JobResult result;
     auto json = toJson(*snapshot);
-    json.insert("nativeSchemaVersion", 1);
+    json.insert(u"nativeSchemaVersion"_s, 1);
     const auto bytes = QJsonDocument(json).toJson();
     if (bytes.size() > maximumCacheBytes) {
-        result.error = QStringLiteral("音乐库缓存超过 256MiB，保留原文件。");
+        result.error = QCoreApplication::translate(
+                "Yalahoo", "The library cache exceeds 256 MiB. The original file was preserved.");
         return result;
     }
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
-        result.error = QStringLiteral("无法创建音乐库缓存目录。");
+        result.error = QCoreApplication::translate("Yalahoo",
+                                                   "Cannot create the library cache directory.");
         return result;
     }
     if (QFileInfo(path).isSymLink()) {
-        result.error = QStringLiteral("原生音乐库缓存不能通过符号链接覆盖其他文件。");
+        result.error = QCoreApplication::translate(
+                "Yalahoo",
+                "The native library cache cannot overwrite other files through symbolic links.");
         return result;
     }
     QSaveFile file(path);
     file.setDirectWriteFallback(false);
     if (!file.open(QIODevice::WriteOnly)) {
-        result.error = QStringLiteral("无法保存音乐库缓存：") + file.errorString();
+        result.error = QCoreApplication::translate("Yalahoo", "Cannot save the library cache: ")
+                + file.errorString();
         return result;
     }
     if (!file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
-        result.error = QStringLiteral("无法设置音乐库缓存权限：") + file.errorString();
+        result.error =
+                QCoreApplication::translate("Yalahoo", "Cannot set library cache permissions: ")
+                + file.errorString();
         file.cancelWriting();
         return result;
     }
     if (file.write(bytes) != bytes.size() || !file.commit())
-        result.error = QStringLiteral("无法原子保存音乐库缓存：") + file.errorString();
+        result.error =
+                QCoreApplication::translate("Yalahoo", "Cannot atomically save the library cache: ")
+                + file.errorString();
     return result;
 }
 void LibraryStore::schedule()
 {
     if (m_active != Kind::None) {
-        emit statusChanged();
+        Q_EMIT statusChanged();
         return;
     }
     m_activeGeneration = m_generation;
@@ -274,7 +297,7 @@ void LibraryStore::schedule()
                                       scan.cancelled };
                 }));
     }
-    emit statusChanged();
+    Q_EMIT statusChanged();
 }
 void LibraryStore::complete()
 {
@@ -286,13 +309,13 @@ void LibraryStore::complete()
         m_active = Kind::Probe;
         m_filesVisited = result.filesVisited;
         m_probe.start(result.snapshot, m_dataRoot, m_cancel, generation);
-        emit statusChanged();
+        Q_EMIT statusChanged();
         return;
     }
     m_cancel.reset();
     if (kind == Kind::Save) {
         if (result.error.isEmpty())
-            emit saved();
+            Q_EMIT saved();
         else
             report(result.error);
     } else if (kind == Kind::Load) {
@@ -310,7 +333,7 @@ void LibraryStore::complete()
                 m_roots.clear();
                 for (const auto &root : m_snapshot->roots)
                     m_roots.append(root.path);
-                emit snapshotReady(m_snapshot);
+                Q_EMIT snapshotReady(m_snapshot);
             }
         }
     } else {
@@ -335,9 +358,9 @@ void LibraryStore::accept(JobResult result, Kind kind, quint64 generation)
         }
         if (m_writable)
             m_savePending = m_snapshot;
-        emit snapshotReady(m_snapshot);
+        Q_EMIT snapshotReady(m_snapshot);
         if (kind == Kind::Scan)
-            emit scanFinished(generation, result.filesVisited);
+            Q_EMIT scanFinished(generation, result.filesVisited);
     }
 }
 }

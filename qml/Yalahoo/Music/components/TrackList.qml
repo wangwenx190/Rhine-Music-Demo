@@ -10,12 +10,6 @@ Item {
     required property DesignTokens tokens
     required property DetailModel detailModel
     property TrackFocusController trackFocus: null
-    property real revealOrigin: 0
-    property int revealIndex: -1
-    property real revealTargetRelative: 0
-    property real revealLow: 0
-    property real revealHigh: 0
-    property real revealGeometryOffset: 0
     property bool about: false
     property real viewportWidth: width
     readonly property real columnGap: viewportWidth <= 1100 ? 6 : 9
@@ -32,7 +26,7 @@ Item {
     // Resolve thin-scrollbar occupancy after layout, outside the width binding.
     property bool scrollable: false
     readonly property real contentWidth: Math.max(0, width - (scrollable ? 11 : 0))
-    function updateScrollbar() {
+    function updateScrollbar(): void {
         scrollable = currentView && currentView.contentHeight > currentView.height;
     }
     readonly property real tabsY: layoutHeader ? layoutHeader.y - currentView.contentY
@@ -40,10 +34,10 @@ Item {
     readonly property var producerGroups: detailModel.album.producerGroups || []
     readonly property int creditColumns: Math.max(1, Math.min(producerGroups.length, Math.floor((contentWidth
                                                                                                  + 26) / 236)))
-    function saveScroll() {
+    function saveScroll(): void {
         savedScroll = currentView ? currentView.contentY - currentView.originY : 0;
     }
-    function restoreScroll() {
+    function restoreScroll(): void {
         if (!currentView)
             return;
         currentView.forceLayout();
@@ -54,21 +48,21 @@ Item {
                                                                                         currentView.contentHeight
                                                                                         - currentView.height));
     }
-    function forceLayout() {
+    function forceLayout(): void {
         if (currentView)
             currentView.forceLayout();
     }
-    function positionViewAtBeginning() {
+    function positionViewAtBeginning(): void {
         preserveBeginning = true;
         restoreBeginning();
     }
-    function restoreBeginning() {
+    function restoreBeginning(): void {
         if (!preserveBeginning)
             return;
         if (currentView)
             currentView.positionViewAtBeginning();
     }
-    function positionViewAtIndex(index, mode) {
+    function positionViewAtIndex(index: int, mode: int): void {
         preserveBeginning = false;
         if (currentView)
             currentView.positionViewAtIndex(index, mode);
@@ -78,7 +72,7 @@ Item {
             root.settleLayout(child);
         item.ensurePolished();
     }
-    function reveal(revision, index) {
+    function reveal(revision: double, index: int): void {
         if (!trackFocus || revision !== trackFocus.revision || !currentView || about)
             return;
         preserveBeginning = false;
@@ -107,40 +101,26 @@ Item {
             trackFocus.cancel();
             return;
         }
-        const tabHeight = layoutHeader ? layoutHeader.tabsHeight : 0;
-        const offset = tabHeight + Math.max(0, (height - tabHeight - row.trackHeight) / 2);
-        revealOrigin = currentView.originY;
-        const target = Math.max(low, Math.min(high, row.y - revealOrigin + row.trackTop - offset))
-              + revealOrigin;
-        revealIndex = index;
-        revealLow = low;
-        revealHigh = high;
-        revealTargetRelative = target - revealOrigin;
-        revealGeometryOffset = 0;
-        const start = startRelative + revealOrigin;
-        currentView.contentY = start;
-        trackFocus.beginReveal(revision, start, target);
+        currentView.contentY = startRelative + currentView.originY;
+        trackFocus.beginListReveal(revision, startRelative, currentView.originY, low, high, row.y + row.trackTop,
+                                   row.trackHeight, height, layoutHeader ? layoutHeader.tabsHeight :
+                                                                           0);
     }
-    function applyRevealScroll() {
+    function applyRevealScroll(): void {
         if (!trackFocus || !currentView)
             return;
         currentView.forceLayout();
-        const row = currentView.itemAtIndex(revealIndex) as TrackRow;
+        const row = currentView.itemAtIndex(trackFocus.row) as TrackRow;
         if (row) {
-            const tabHeight = layoutHeader ? layoutHeader.tabsHeight : 0;
-            const offset = tabHeight + Math.max(0, (height - tabHeight - row.trackHeight) / 2);
             const last = currentView.itemAtIndex(detailModel.count - 1) as TrackRow;
-            const high = last ? last.y + last.height - height - currentView.originY : revealHigh;
-            const relative = row.y + row.trackTop - offset - currentView.originY;
-            // Keep the authored cubic distance to the target invariant when the
-            // native list refines estimates outside the realized row pool.
-            revealGeometryOffset = Math.max(revealLow, Math.min(high, relative))
-                    - revealTargetRelative;
+            trackFocus.refineListReveal(currentView.originY, row.y + row.trackTop, row.trackHeight,
+                                        height, layoutHeader ? layoutHeader.tabsHeight : 0, last
+                                        ? last.y + last.height - height - currentView.originY :
+                                          Number.NaN);
         }
-        currentView.contentY = trackFocus.scrollY + currentView.originY - revealOrigin
-                + revealGeometryOffset;
+        currentView.contentY = trackFocus.listScrollY(currentView.originY);
     }
-    function cancelReveal() {
+    function cancelReveal(): void {
         if (trackFocus)
             trackFocus.cancel();
     }
@@ -165,23 +145,23 @@ Item {
                               root.cancelReveal()
         gesturePolicy: TapHandler.DragThreshold
     }
+    function focusRevealedRow(revision: double, index: int): void {
+        if (!trackFocus || revision !== trackFocus.revision || !currentView || about)
+            return;
+        currentView.forceLayout();
+        applyRevealScroll();
+        currentView.forceLayout();
+        const row = currentView.itemAtIndex(index);
+        if (row)
+            row.forceActiveFocus(Qt.OtherFocusReason);
+    }
     Connections {
         target: root.trackFocus
         function onScrollChanged() {
             root.applyRevealScroll();
         }
         function onFocusRequested(index) {
-            const revision = root.trackFocus.revision;
-            Qt.callLater(() => {
-                if (!root.trackFocus || revision !== root.trackFocus.revision || !root.currentView)
-                    return;
-                root.currentView.forceLayout();
-                root.applyRevealScroll();
-                root.currentView.forceLayout();
-                const row = root.currentView.itemAtIndex(index);
-                if (row)
-                    row.forceActiveFocus(Qt.OtherFocusReason);
-            });
+            Qt.callLater(root.focusRevealedRow, root.trackFocus.revision, index);
         }
     }
     Loader {
@@ -274,7 +254,7 @@ Item {
             id: discLabel
             tokens: root.tokens
             visible: row.discHeading
-            text: "DISC " + row.disc.toString().padStart(2, "0")
+            text: qsTr("DISC %1").arg(row.disc.toString().padStart(2, "0"))
             cssPixelSize: 8
             color: root.tokens.muted
             y: 20
@@ -409,7 +389,7 @@ Item {
                     ArchiveText {
                         tokens: root.tokens
                         width: parent.width
-                        text: person.credit.roles.join(" · ")
+                        text: person.credit.roles.join(" \u00b7 ")
                         cssPixelSize: 12
                         cssLineHeight: cssPixelSize * 1.7
                         wrapMode: Text.WrapAnywhere
@@ -417,7 +397,7 @@ Item {
                     ArchiveText {
                         tokens: root.tokens
                         width: parent.width
-                        text: "来源：" + person.credit.sources.join(" · ")
+                        text: qsTr("Source: %1").arg(person.credit.sources.join(" \u00b7 "))
                         cssPixelSize: 10
                         cssLineHeight: cssPixelSize * 1.5
                         wrapMode: Text.WrapAnywhere
@@ -427,7 +407,8 @@ Item {
                         objectName: "detailCreditExpand"
                         tokens: root.tokens
                         visible: person.credit.tracks.length > 1
-                        text: (person.expanded ? "收起参与曲目 −" : "展开参与曲目 ＋")
+                        text: (person.expanded ? qsTr("Hide credited tracks \u2212") : qsTr(
+                                                     "Show credited tracks +"))
                         cssPixelSize: 11
                         onClicked: person.expanded = !person.expanded
                         Accessible.expanded: person.expanded
@@ -470,7 +451,8 @@ Item {
                         tokens: root.tokens
                         width: parent.width
                         visible: person.credit.unscoped.length > 0
-                        text: "未细分曲目的署名 · " + person.credit.unscoped.join(" · ")
+                        text: qsTr("Credits without track assignments \u00b7 %1").arg(
+                                  person.credit.unscoped.join(" \u00b7 "))
                         cssPixelSize: 11
                         cssLineHeight: cssPixelSize * 1.7
                         wrapMode: Text.WrapAnywhere

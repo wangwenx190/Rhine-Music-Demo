@@ -28,6 +28,7 @@ class PlaybackController final : public QObject
     Q_PROPERTY(bool dragging READ dragging NOTIFY positionChanged)
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged)
+    Q_PROPERTY(QVariantList deviceChoices READ deviceChoices NOTIFY devicesChanged)
     Q_PROPERTY(QString selectedDevice READ selectedDevice NOTIFY devicesChanged)
     Q_PROPERTY(bool outputAvailable READ outputAvailable NOTIFY devicesChanged)
     Q_PROPERTY(bool canNext READ canNext NOTIFY currentChanged)
@@ -84,9 +85,10 @@ public:
     }
     void setVolume(double value);
     QVariantList devices() const;
+    QVariantList deviceChoices() const;
     QString selectedDevice() const
     {
-        return QString::fromLatin1(m_preferred.toBase64());
+        return QString::fromUtf8(m_preferred.toBase64());
     }
     bool outputAvailable() const
     {
@@ -120,7 +122,7 @@ public:
     {
         return m_support;
     }
-signals:
+Q_SIGNALS:
     void rejected(const QString &message);
     void currentChanged();
     void stateChanged();

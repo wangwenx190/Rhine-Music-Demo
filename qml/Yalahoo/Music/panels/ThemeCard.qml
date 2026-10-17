@@ -14,7 +14,7 @@ T.Button {
     property bool narrow: false
     padding: narrow ? 9 : 12
     implicitHeight: contentItem.implicitHeight + topPadding + bottomPadding
-    Accessible.name: night ? "夜间主题" : "日间主题"
+    Accessible.name: night ? qsTr("Night theme") : qsTr("Day theme")
     Accessible.checkable: true
     Accessible.checked: selected
     background: Rectangle {
@@ -63,14 +63,15 @@ T.Button {
         }
         ArchiveText {
             tokens: root.tokens
-            text: root.night ? "夜间" : "日间"
+            text: root.night ? qsTr("Night") : qsTr("Day")
             cssPixelSize: 11
             font.weight: Font.Medium
         }
         ArchiveText {
             tokens: root.tokens
             width: parent.width
-            text: root.night ? "极简星空与透光白卡" : "暖白玻璃与日光"
+            text: root.night ? qsTr("Minimal stars and translucent white cards") : qsTr(
+                                   "Warm white glass and daylight")
             cssPixelSize: root.narrow ? 7 : 8
             color: root.tokens.muted
             wrapMode: Text.Wrap

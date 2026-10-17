@@ -80,7 +80,7 @@ Item {
     Text {
         x: 16
         y: 128 - baselineOffset
-        text: "音乐收藏  gyp  é  🎵"
+        text: "\u97f3\u4e50\u6536\u85cf  gyp  e\u0301  \ud83c\udfb5"
         font.family: MusicFonts.regular.family
         font.styleName: MusicFonts.regular.styleName
         font.weight: MusicFonts.regular.weight

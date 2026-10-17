@@ -3,21 +3,23 @@
 #include <QStandardPaths>
 #include <QtTest>
 
+using namespace Qt::StringLiterals;
+
 class IdentityTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void stableIdentity()
     {
         yalahoo::initializeIdentity();
-        QCOMPARE(QCoreApplication::organizationName(), QStringLiteral("yalahoo"));
-        QCOMPARE(QCoreApplication::applicationName(), QStringLiteral("yalahoo"));
-        QCOMPARE(QGuiApplication::applicationDisplayName(), QStringLiteral("yalahOO!!!"));
+        QCOMPARE(QCoreApplication::organizationName(), u"yalahoo"_s);
+        QCOMPARE(QCoreApplication::applicationName(), u"yalahoo"_s);
+        QCOMPARE(QGuiApplication::applicationDisplayName(), u"yalahOO!!!"_s);
         const QString before = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        QGuiApplication::setApplicationDisplayName(QStringLiteral("Future display name"));
+        QGuiApplication::setApplicationDisplayName(u"Future display name"_s);
         QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation), before);
-        QVERIFY(before.contains(QStringLiteral("yalahoo")));
-        QVERIFY(!before.contains(QLatin1Char('!')));
+        QVERIFY(before.contains(u"yalahoo"_s));
+        QVERIFY(!before.contains('!'_L1));
     }
 };
 QTEST_MAIN(IdentityTest)

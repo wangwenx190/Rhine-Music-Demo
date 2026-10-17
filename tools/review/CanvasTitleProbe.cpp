@@ -138,7 +138,7 @@ void CanvasTitleProbe::setController(yalahoo::TitleReel *controller)
     m_controller = controller;
     if (controller)
         connect(controller, &yalahoo::TitleReel::changed, this, &CanvasTitleProbe::requestPaint);
-    emit changed();
+    Q_EMIT changed();
 }
 QCanvasPainterItemRenderer *CanvasTitleProbe::createItemRenderer() const
 {

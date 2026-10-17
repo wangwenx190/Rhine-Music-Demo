@@ -2,6 +2,8 @@
 #include "DemoLibrary.h"
 #include <QTest>
 #include <QSignalSpy>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
 Snapshot snapshot(const QString &title)
@@ -23,7 +25,7 @@ struct Fixture
 class StartupTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void initialReadinessAndLateSnapshot()
     {
         Fixture f;
@@ -32,25 +34,25 @@ private slots:
         f.opening.replay();
         f.startup.scenePrepared();
         QVERIFY(f.opening.preparing());
-        f.startup.receive(snapshot("first"));
-        f.startup.receive(snapshot("latest"));
+        f.startup.receive(snapshot(u"first"_s));
+        f.startup.receive(snapshot(u"latest"_s));
         QTRY_COMPARE(applied.size(), 1);
-        QCOMPARE(f.library.snapshot()->albums[0].title, "latest");
+        QCOMPARE(f.library.snapshot()->albums[0].title, u"latest"_s);
         QCOMPARE(invalidated.size(), 1);
-        f.startup.receive(snapshot("after-polish"));
+        f.startup.receive(snapshot(u"after-polish"_s));
         f.startup.scenePrepared();
         QVERIFY(f.opening.preparing());
         QCOMPARE(invalidated.size(), 2);
-        QCOMPARE(f.library.snapshot()->albums[0].title, "after-polish");
+        QCOMPARE(f.library.snapshot()->albums[0].title, u"after-polish"_s);
         f.startup.scenePrepared();
         QVERIFY(f.opening.film());
         QCOMPARE(f.opening.time(), 0);
-        f.startup.receive(snapshot("during-film"));
+        f.startup.receive(snapshot(u"during-film"_s));
         QCoreApplication::sendPostedEvents();
         QCOMPARE(applied.size(), 2);
         f.opening.skip();
         QTRY_COMPARE(applied.size(), 3);
-        QCOMPARE(f.library.snapshot()->albums[0].title, "during-film");
+        QCOMPARE(f.library.snapshot()->albums[0].title, u"during-film"_s);
     }
     void hiddenCoalescingAndResumeInterval()
     {
@@ -64,14 +66,14 @@ private slots:
             f.startup.receive(snapshot(QString::number(i)));
         QCoreApplication::sendPostedEvents();
         QCOMPARE(applied.size(), 0);
-        QCOMPARE(f.startup.statistics()["pendingSnapshots"].toInt(), 1);
-        QCOMPARE(f.startup.statistics()["coalescedSnapshots"].toInt(), 99);
+        QCOMPARE(f.startup.statistics()[u"pendingSnapshots"_s].toInt(), 1);
+        QCOMPARE(f.startup.statistics()[u"coalescedSnapshots"_s].toInt(), 99);
         const auto frames = f.motion.clock()->frameCount();
         f.motion.clock()->advance(300);
         QCOMPARE(f.motion.clock()->frameCount(), frames);
         f.startup.setVisualActive(true);
         QTRY_COMPARE(applied.size(), 1);
-        QCOMPARE(f.library.snapshot()->albums[0].title, "99");
+        QCOMPARE(f.library.snapshot()->albums[0].title, u"99"_s);
         f.motion.clock()->setActive(true);
         QSignalSpy intervals(f.motion.clock(), &FrameClock::frame);
         f.motion.clock()->advance(300);
@@ -82,19 +84,19 @@ private slots:
     void replayAndQueuedDestruction()
     {
         Fixture f;
-        f.startup.receive(snapshot("initial"));
-        QTRY_VERIFY(f.startup.statistics()["initialReady"].toBool());
+        f.startup.receive(snapshot(u"initial"_s));
+        QTRY_VERIFY(f.startup.statistics()[u"initialReady"_s].toBool());
         f.opening.replay();
         f.startup.scenePrepared();
-        f.startup.receive(snapshot("pending"));
+        f.startup.receive(snapshot(u"pending"_s));
         f.opening.replay();
-        QTRY_COMPARE(f.library.snapshot()->albums[0].title, "pending");
+        QTRY_COMPARE(f.library.snapshot()->albums[0].title, u"pending"_s);
         auto temporary = std::make_unique<StartupCoordinator>(&f.library, &f.opening,
                                                               f.motion.clock(), false);
-        temporary->receive(snapshot("destroyed"));
+        temporary->receive(snapshot(u"destroyed"_s));
         temporary.reset();
         QCoreApplication::sendPostedEvents();
-        QCOMPARE(f.library.snapshot()->albums[0].title, "pending");
+        QCOMPARE(f.library.snapshot()->albums[0].title, u"pending"_s);
     }
     void openingCompletionInvalidationSurvivesSleep()
     {

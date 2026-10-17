@@ -7,6 +7,8 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <numbers>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
 SceneVector vector(const QJsonValue &v)
@@ -24,13 +26,14 @@ class SceneTest : public QObject
     Q_OBJECT
     QJsonObject oracle;
     double maxProjection = 0, maxPose = 0, maxMotion = 0, maxFov = 0, maxNavigation = 0;
-private slots:
+private Q_SLOTS:
     void initTestCase()
     {
-        QFile input(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/scene/camera-golden.json"));
+        QFile input(
+                (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/scene/camera-golden.json"_s));
         QVERIFY(input.open(QIODevice::ReadOnly));
         oracle = QJsonDocument::fromJson(input.readAll()).object();
-        QCOMPARE(oracle["cases"].toArray().size(), 48);
+        QCOMPARE(oracle[u"cases"_s].toArray().size(), 48);
     }
     void fogTracksRenderedCameraAndDetail()
     {
@@ -59,29 +62,29 @@ private slots:
     void frozenTargetsAndProjection()
     {
         SceneAdapter scene;
-        for (auto value : oracle["cases"].toArray()) {
-            const auto c = value.toObject(), p = c["pose"].toObject();
-            scene.layout()->setViewport(c["width"].toDouble(), c["height"].toDouble());
-            scene.setDetail(c["detail"].toDouble());
+        for (auto value : oracle[u"cases"_s].toArray()) {
+            const auto c = value.toObject(), p = c[u"pose"_s].toObject();
+            scene.layout()->setViewport(c[u"width"_s].toDouble(), c[u"height"_s].toDouble());
+            scene.setDetail(c[u"detail"_s].toDouble());
             scene.snapToTarget();
             const auto &f = scene.frame();
-            maxPose = std::max({ maxPose, difference(f.camera.position, vector(p["position"])),
-                                 difference(f.camera.aim, vector(p["aim"])),
-                                 std::abs(f.camera.span - p["span"].toDouble()) });
+            maxPose = std::max({ maxPose, difference(f.camera.position, vector(p[u"position"_s])),
+                                 difference(f.camera.aim, vector(p[u"aim"_s])),
+                                 std::abs(f.camera.span - p[u"span"_s].toDouble()) });
             QVERIFY(maxPose < 1e-6);
-            QCOMPARE(scene.layout()->kind(), c["metrics"].toObject()["kind"].toString());
+            QCOMPARE(scene.layout()->kind(), c[u"metrics"_s].toObject()[u"kind"_s].toString());
             QVERIFY(std::abs(scene.layout()->layoutScale()
-                             - c["metrics"].toObject()["scale"].toDouble())
+                             - c[u"metrics"_s].toObject()[u"scale"_s].toDouble())
                     < 1e-10);
-            QVERIFY(difference(f.casePosition, vector(c["casePosition"])) < 1e-10);
-            QVERIFY(std::abs(f.fieldOfView - c["fov"].toDouble()) < 1e-10);
+            QVERIFY(difference(f.casePosition, vector(c[u"casePosition"_s])) < 1e-10);
+            QVERIFY(std::abs(f.fieldOfView - c[u"fov"_s].toDouble()) < 1e-10);
             const auto forward = f.cameraRotation.rotatedVector({ 0, 0, -1 });
             QVERIFY((forward - (f.camera.aim - f.camera.position).normalized().qt()).length()
                     < 1e-5);
-            for (auto point : c["projections"].toArray()) {
+            for (auto point : c[u"projections"_s].toArray()) {
                 const auto q = point.toObject();
-                const auto actual = scene.projectWorldPoint(vector(q["world"]).qt());
-                const auto expected = q["pixel"].toArray();
+                const auto actual = scene.projectWorldPoint(vector(q[u"world"_s]).qt());
+                const auto expected = q[u"pixel"_s].toArray();
                 const double error = std::hypot(actual.x() - expected[0].toDouble(),
                                                 actual.y() - expected[1].toDouble());
                 maxProjection = std::max(maxProjection, error);
@@ -95,24 +98,24 @@ private slots:
     }
     void frozenCameraInterruptions()
     {
-        for (auto sequence : oracle["sequences"].toArray()) {
+        for (auto sequence : oracle[u"sequences"_s].toArray()) {
             SceneAdapter scene;
             scene.observe({ { -62.26, 35.98, 43.28 },
                             { -.5, 1.1, .4 },
                             2 * SceneVector{ -62.26 + .5, 35.98 - 1.1, 43.28 - .4 }.length()
                                     * std::tan(6.15 * std::numbers::pi / 360) },
                           0);
-            for (auto value : sequence.toObject()["samples"].toArray()) {
+            for (auto value : sequence.toObject()[u"samples"_s].toArray()) {
                 const auto c = value.toObject();
-                scene.layout()->setViewport(c["width"].toDouble(), c["height"].toDouble());
-                scene.setDetail(c["detail"].toDouble());
-                scene.setReducedMotion(c["reduced"].toBool());
-                scene.advance(c["dt"].toDouble());
-                maxMotion =
-                        std::max({ maxMotion,
-                                   difference(scene.frame().camera.position, vector(c["position"])),
-                                   difference(scene.frame().camera.aim, vector(c["aim"])) });
-                maxFov = std::max(maxFov, std::abs(scene.fieldOfView() - c["fov"].toDouble()));
+                scene.layout()->setViewport(c[u"width"_s].toDouble(), c[u"height"_s].toDouble());
+                scene.setDetail(c[u"detail"_s].toDouble());
+                scene.setReducedMotion(c[u"reduced"_s].toBool());
+                scene.advance(c[u"dt"_s].toDouble());
+                maxMotion = std::max(
+                        { maxMotion,
+                          difference(scene.frame().camera.position, vector(c[u"position"_s])),
+                          difference(scene.frame().camera.aim, vector(c[u"aim"_s])) });
+                maxFov = std::max(maxFov, std::abs(scene.fieldOfView() - c[u"fov"_s].toDouble()));
                 QVERIFY(maxMotion < 1e-6);
                 QVERIFY(maxFov < 1e-6);
             }
@@ -150,30 +153,31 @@ private slots:
         QCOMPARE(scene.layout()->width(), 1.0);
         QCOMPARE(scene.layout()->height(), 1.0);
         scene.layout()->setViewport(1920, 1080, false, true);
-        QCOMPARE(scene.layout()->kind(), QString("cinematic"));
+        QCOMPARE(scene.layout()->kind(), u"cinematic"_s);
         QCOMPARE(scene.layout()->referenceWidth(), 1920.0);
         QCOMPARE(scene.layout()->referenceHeight(), 1080.0);
     }
     void frozenNavigationTargets()
     {
-        QCOMPARE(oracle["navigation"].toArray().size(), 6);
-        for (const auto runValue : oracle["navigation"].toArray()) {
+        QCOMPARE(oracle[u"navigation"_s].toArray().size(), 6);
+        for (const auto runValue : oracle[u"navigation"_s].toArray()) {
             const auto run = runValue.toObject();
             SceneAdapter scene;
-            scene.layout()->setViewport(run["width"].toDouble(), run["height"].toDouble(),
-                                        run["coarse"].toBool());
-            for (const auto sampleValue : run["samples"].toArray()) {
+            scene.layout()->setViewport(run[u"width"_s].toDouble(), run[u"height"_s].toDouble(),
+                                        run[u"coarse"_s].toBool());
+            for (const auto sampleValue : run[u"samples"_s].toArray()) {
                 const auto sample = sampleValue.toObject();
-                scene.setDetail(sample["detail"].toDouble());
-                scene.setNavigation(sample["laneSpeed"].toDouble(), sample["rowSpeed"].toDouble(),
-                                    sample["realistic"].toBool());
-                scene.setReducedMotion(sample["reduced"].toBool());
-                scene.advance(sample["dt"].toDouble());
+                scene.setDetail(sample[u"detail"_s].toDouble());
+                scene.setNavigation(sample[u"laneSpeed"_s].toDouble(),
+                                    sample[u"rowSpeed"_s].toDouble(),
+                                    sample[u"realistic"_s].toBool());
+                scene.setReducedMotion(sample[u"reduced"_s].toBool());
+                scene.advance(sample[u"dt"_s].toDouble());
                 const auto pose = scene.target();
                 maxNavigation = std::max({ maxNavigation,
-                                           difference(pose.position, vector(sample["position"])),
-                                           difference(pose.aim, vector(sample["aim"])),
-                                           std::abs(pose.span - sample["span"].toDouble()) });
+                                           difference(pose.position, vector(sample[u"position"_s])),
+                                           difference(pose.aim, vector(sample[u"aim"_s])),
+                                           std::abs(pose.span - sample[u"span"_s].toDouble()) });
                 QVERIFY(maxNavigation <= 1e-6);
             }
         }
@@ -193,8 +197,8 @@ private slots:
         const auto point = scene.projectWorldPoint(
                 (scene.frame().casePosition + SceneVector{ .17, 1.85, .07 }).qt());
         const auto hit = scene.hitTest(point.x(), point.y());
-        QCOMPARE(hit["objectId"].toString(), QString("inspection-case"));
-        QCOMPARE(hit["frameRevision"].toULongLong(), scene.frameRevision());
+        QCOMPARE(hit[u"objectId"_s].toString(), u"inspection-case"_s);
+        QCOMPARE(hit[u"frameRevision"_s].toULongLong(), scene.frameRevision());
         QVERIFY(scene.hitTest(0, 0).isEmpty());
     }
     void selectionSnapshotLifetime()
@@ -202,9 +206,7 @@ private slots:
         MotionController motion;
         SceneAdapter scene;
         auto selection = std::make_unique<SelectionController>(&motion);
-        selection->setColumns({ { QStringLiteral("test"),
-                                  QStringLiteral("Test"),
-                                  { QStringLiteral("album") } } });
+        selection->setColumns({ { u"test"_s, u"Test"_s, { u"album"_s } } });
         scene.setSelection(selection.get());
         QVERIFY(scene.frame().hasArchivePool);
         QVERIFY(!scene.frame().instances.isEmpty());
@@ -226,17 +228,17 @@ private slots:
     }
     void cleanupTestCase()
     {
-        QSaveFile output(QStringLiteral(SCENE_REPORT));
+        QSaveFile output(QString::fromUtf8(SCENE_REPORT));
         QVERIFY(output.open(QIODevice::WriteOnly));
-        output.write(QJsonDocument(QJsonObject{ { "targetCases", 48 },
-                                                { "navigationTargets", 36 },
-                                                { "maxNavigationTargetError", maxNavigation },
-                                                { "cameraSamples", 694 },
-                                                { "projectionPoints", 528 },
-                                                { "maxProjectionPixels", maxProjection },
-                                                { "maxTargetError", maxPose },
-                                                { "maxCameraPositionAimError", maxMotion },
-                                                { "maxFovError", maxFov } })
+        output.write(QJsonDocument(QJsonObject{ { u"targetCases"_s, 48 },
+                                                { u"navigationTargets"_s, 36 },
+                                                { u"maxNavigationTargetError"_s, maxNavigation },
+                                                { u"cameraSamples"_s, 694 },
+                                                { u"projectionPoints"_s, 528 },
+                                                { u"maxProjectionPixels"_s, maxProjection },
+                                                { u"maxTargetError"_s, maxPose },
+                                                { u"maxCameraPositionAimError"_s, maxMotion },
+                                                { u"maxFovError"_s, maxFov } })
                              .toJson());
         QVERIFY(output.commit());
     }

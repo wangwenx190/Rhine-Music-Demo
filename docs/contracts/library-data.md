@@ -2,13 +2,15 @@
 
 冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts`、`data.ts:setMusicAlbums`及`scripts/music-library.mjs`。本文管理值模型、身份/排序/搜索、本地扫描/存储序列化与Provider协议；媒体与UI消费者按各自专项契约接入。
 
-`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留未知扩展与当前元数据，写回时覆盖已知字段。已由值模型持有的子数组不再重复存入扩展对象。`readLibrary` 使用临时值解析，重复/错配 ID 或非法集合返回错误，原快照不变。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
+`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留未知扩展与当前元数据，写回时覆盖已知字段。已由值模型持有的子数组不再重复存入扩展对象。`readLibrary` 使用临时值解析，重复/错配 ID、非法集合或已知字段类型、非整数或超int范围的可选整数、非数值/负数/非有限时长返回错误，原快照不变；缺失/null可选参数保持未知。本地file URL须有效、绝对且没有query/fragment/NUL，非法来源保持空URL，不猜测为可播放文件。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
 
 歌曲 `sourceUrl`、目录 `folder` 和 roots.path 使用本地 QUrl；绝对 Unicode 原生路径用 `QUrl::fromLocalFile`，不从当前目录猜相对音乐路径。歌曲 URL 只接受本地文件；封面额外允许 qrc。来源/候选链接保留文本。显式目录导入见下节。`MediaSupport` 为 Unknown/Supported/Unsupported，只有实际媒体状态才能更新；无声标签加载不证明可解码播放，不按扩展名猜测。
 
 排序使用 zh_CN QCollator、numericMode、CaseInsensitive；文本 NFKC、合并空白、trim、lowercase。相等时按规范化字符串、ID 稳定排序。流派模式保持快照顺序，列顺序为已使用的配置流派、再按首次出现补充未配置流派；列用流派 ID 分组，重名不合并。歌手模式用规范化 key 分组，显示原始歌手经空白整理的名称，空歌手为“未知歌手”。专辑模式每列 12 张，标签为 01–12 等；slotStride=max(32, 最大列长+12)。QCollator 平台后端可能与浏览器 ICU 排列细节不同；视觉 fixture 的既有列顺序仍以 `library-order.json` 固定。API 依据：[QCollator](https://doc.qt.io/qt-6/qcollator.html)。
 
 排序时每张专辑的标题/歌手规范化键预计算一次，比较器保留相同QCollator、规范化字符串及ID的顺序；列位置用key→index索引查找，避免不同歌手/流派很多时反复扫描已建立的列。索引仅用于查找，列顺序仍由原规则确定，不迭代QHash来决定展示顺序。算法与成本审计按 [performance.md](performance.md) 执行。
+
+LibrarySession在快照替换时缓存已使用流派列表。搜索筛选由GenreRowsModel在C++测量和分行，字体/字体库变化才重新测量，宽度变化只重新分行；行通过QAbstractListModel供QML ListView虚拟化，显示顺序与22px内距/7px间距保持原规则。模型内容与测量/分行均为O(流派数量)，不随视觉帧运行。全部选项和空库仍保留“全部”。
 
 SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→索引及搜索字符串/流派名缓存；同一快照改变query只归一化查询，复用全部条目。查询结果保留相同前后缀，中间重叠行以单批dataChanged复用，仅数量差触发一次区间删除或插入，不按键重置模型；新查询清除旧键盘选择行号；委托按下时保存专辑/曲目身份，释放时身份已变化则取消定位；快照更换/清空时事务重置并重建/清空索引。role与resultAt按稳定ID索引读取，曲目定位仍在所属专辑内，不假设跨专辑曲目ID全局唯一。内存为O(专辑+曲目+搜索文本)，查询为O(总搜索文本+结果)，不改变匹配和返回顺序。
 
@@ -18,11 +20,11 @@ SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→�
 
 LibrarySession 的 navigationAlbumId/navigationTrackId 与 playbackAlbumId/playbackTrackId 独立。`navigate`、`search`、`sort`、`requestMetadata` 不调用播放或修改播放 ID；播放ID只由受控C++入口同步：通用setPlaybackIds验证当前库，PlaybackController可为已验证并保留的旧队列同步孤立ID；Qt媒体状态与设备边界见[playback.md](playback.md)。库替换使过期导航失效，播放 ID 保留以便后续正在播放的媒体独立存活。
 
-IMetadataProvider 构造注入，固定 Introduction/Credits/Enrichment/cancel 异步接口。AlbumQuery 预留批量 ID、联系人、enabled/force/configuration；ProviderCapabilities 预留各类能力，产品只注册 OfflineMetadataProvider，networkEnabled=false。ProviderResult 带 requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error；状态为 Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。来源与日期为缓存原值，不伪造检查时间。
+IMetadataProvider 构造注入，固定 Introduction/Credits/Enrichment/cancel 异步接口。请求返回bool表示是否接纳；未接纳不建立订阅，调用者必须处理false。取消可阻止尚未开始的交付，不要求额外发出Cancelled；已在途结果仍可能到达，必须核对token。AlbumQuery 预留批量 ID、联系人、enabled/force/configuration；ProviderCapabilities 预留各类能力，产品只注册 OfflineMetadataProvider，networkEnabled=false。ProviderResult 带 requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error；状态为 Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。来源与日期为缓存原值，不伪造检查时间。
 
-OfflineMetadataProvider 对不可变本地缓存快照进行事件循环异步读取；已有介绍或制作信息及历史查询状态直接返回，即使 force 也不重查。没有缓存返回 Deferred、“联网资料功能暂未启用”，不写成 NotFound，不生成 retryAt。历史缓存中的 NotFound/error/retryAt 原样保留。使用绑定 QObject 上下文的 QTimer，取消只改变对应 token，销毁后回调不执行；语义见 [QTimer](https://doc.qt.io/qt-6/qtimer.html)。不创建网络对象、请求、子进程或写缓存。LibrarySession 用 queued connection 路由结果，检查 requestId、generation、实体和 kind，处理请求覆盖/取消/库替换/视觉重载/销毁，重复或过期结果在写入实体缓存前丢弃。ProviderCapabilities通过capabilitiesChanged发布，产品始终离线；显式请求的enabled取当前Provider网络能力，不将配置的未来自动查询开关当作实际联网授权。
+OfflineMetadataProvider 对不可变本地缓存快照按稳定ID索引异步读取；已有介绍或制作信息及历史查询状态直接返回，即使 force 也不重查。没有缓存返回 Deferred、“联网资料功能暂未启用”，不写成 NotFound，不生成 retryAt。历史缓存中的 NotFound/error/retryAt 原样保留。单个QObject所属QTimer按FIFO每次交付一项，最多八项等待；满时拒绝接纳，重复token不重复入队。取消立即释放该项与快照引用，空队列停止timer，不保留逐请求queued closure或取消记录；已接纳请求持有对应快照和索引，不受后续换库影响。销毁后不再交付；语义见[QTimer](https://doc.qt.io/qt-6/qtimer.html)。不创建网络对象、请求、子进程或写缓存。LibrarySession 用 queued connection 路由结果，检查 requestId、generation、实体和 kind，处理请求覆盖/取消/库替换/视觉重载/销毁，重复或过期结果在写入实体缓存前丢弃。ProviderCapabilities通过capabilitiesChanged发布，产品始终离线；显式请求的enabled取当前Provider网络能力，不将配置的未来自动查询开关当作实际联网授权。
 
-资料批次由LibrarySession按当前快照稳定ID串行调度，一次一个请求，全部独立请求合计最多八个。metadataProgress发布kind/active/total/completed/errors/最后真实状态；取消或换库增加同一generation并取消旧token，不产生第二套身份。新批次保留先前已接受的本机结果，快照替换清除会话结果。metadataRevision作为显式参数驱动UI按当前专辑/kind读取metadataFor，避免每次结果把整个缓存交给QML；制作人员只序列化producerData，不为读取制作信息构造专辑/曲目JSON；payload/source/checkedAt/retryAt/error归属于结果中的实体，导航与播放不受影响。未注入结果时读取快照原缓存，缺缓存为Deferred；不伪造成功或无结果。
+资料批次由LibrarySession按当前快照稳定ID串行调度，一次一个请求，全部独立请求合计最多八个。metadataProgress发布kind/active/total/completed/errors/最后真实状态；取消或换库增加同一generation并取消旧token，不产生第二套身份。新批次保留先前已接受的本机结果，快照替换清除会话结果。metadataRevision作为显式参数驱动UI按当前专辑/kind读取metadataFor，避免每次结果把整个缓存交给QML；制作人员只序列化producerData，不为读取制作信息构造专辑/曲目JSON；payload/source/checkedAt/retryAt/error归属于结果中的实体，导航与播放不受影响。未注入结果时读取快照原缓存，缺缓存为Deferred；不伪造成功或无结果。LibrarySession通过MetadataPresentation提供stateText/contentText/sourceText，保留原payload/source/status/时间/错误；QML不解析或序列化元数据。
 
 ## 本地扫描与原生缓存
 
@@ -54,6 +56,8 @@ OfflineMetadataProvider 对不可变本地缓存快照进行事件循环异步�
 
 ## 音乐库面板、搜索与歌曲定位
 
+自动创建的未分类流派名称与缺失歌手以空值保存在领域数据中，不把翻译后的占位文案当成元数据或状态标记。列表、浏览信息与详情通过genreDisplayName/artistDisplayName显示本地化提示；真实标签即使恰好与提示同名也保持原值，Provider查询仍接收原始数据。
+
 `panels/LibraryPanel.qml`通过LibraryStore公开接口编辑绝对路径、选择文件夹、保存扫描、重扫/取消并显示实际扫描/标签/保存/错误/离线状态；路径转换统一由C++ QUrl完成。曲库统计与已用流派只随快照发布，不按媒体或视觉帧重建。FolderDialog不触碰歌曲标签，匿名Review不提供真实数据根。
 
 `SearchPanel.qml`保留冻结music-app/music.css的标题、搜索框、流派按钮、49px contain封面/缺图音符、结果与无结果状态。结果ListView与按实际字体宽度换行的流派行均虚拟化；大量流派可在有界区域滚动，曲库大小不扩大可见委托池。面板标题和查询区域随列表滚动，重新打开恢复查询入口。`PanelController`复用SurfaceTransition的300/200ms、10/6px及中断语义，由唯一FrameClock的motionDt驱动；Popup关闭Qt样式自身的enter/exit动画，仅由SurfaceTransition管理可见生命周期和模态焦点；退出/重开只保留最后完成动作。
@@ -62,13 +66,13 @@ OfflineMetadataProvider 对不可变本地缓存快照进行事件循环异步�
 
 `TrackFocusController`验证稳定专辑/所属曲目身份，复用PresentationController的archiveRoute：必要时退字/归架，再以既有五次轨迹定位和重新打开，真正detailEnabled后才交付行号。当前打开专辑直接切歌单并滚动，不重新抽取。搜索结果和播放歌名使用同一个request接口，只读播放ID，任何定位均不调用媒体命令。最后目标覆盖未完成请求，回退/换库/重播/打开面板与用户滚轮/按下/触摸/按键/resize取消旧revealing revision；旧布局回调不能恢复高亮。
 
-TrackList按已布局的实际歌曲行（不含CD标题）/页签尺寸居中，以原生列表实际首尾范围钳制滚动；只对有界已实现项完成polish；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
+TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项完成polish；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
 
 ## 设置与偏好
 
 SettingsPanel沿冻结music-app的renderSettingsPanel/music.css：两列主题卡、排列、介绍/制作信息、阵列与列记忆、画质预设及折叠精细设置、减少动态/速度、全屏/开场重播/界面重载、三路声音和折叠MusicBrainz配置。面板沿用LibraryPanels的几何、模态输入、唯一SurfaceTransition与背景资源；来源布局与当前适配判定见source-fidelity-review.md。歌曲、BGM、音效及设备接口只由playback.md维护，画质字段及归一化只由occlusion.md维护。
 
-SettingsController按字段路由至既有LibrarySession、SelectionController、MotionController/FrameClock、SelectionLighting和RenderQuality。主题只监听目标nightChanged，动画渐变不保存偏好；速度不改变开场或歌曲速度。排列显式更新列模型，theme/speed不重建库/媒体/材质/封面。App的reloadRequested关闭并完成面板退出，销毁/重建MusicStage视觉树；原生控制器、正在播放对象、音源/意图、数据、用户画质和会话列记忆继续存活。重载先取消资料请求generation，QML异步结果不能回写旧视图。
+SettingsController::updateQuality在C++合并单字段与当前完整画质值，再交RenderQuality归一化；未知字段拒绝，不重置其他选择。SettingsController按字段路由至既有LibrarySession、SelectionController、MotionController/FrameClock、SelectionLighting和RenderQuality。主题只监听目标nightChanged，动画渐变不保存偏好；速度不改变开场或歌曲速度。排列显式更新列模型，theme/speed不重建库/媒体/材质/封面。App的reloadRequested关闭并完成面板退出，销毁/重建MusicStage视觉树；原生控制器、正在播放对象、音源/意图、数据、用户画质和会话列记忆继续存活。重载先取消资料请求generation，QML异步结果不能回写旧视图。
 
 原生preferences.json的schemaVersion为1；无版本对象在显式导入或读取时归入1，其他版本/坏JSON/非法已知字段保留原文件并阻止自动覆盖。theme、sortMode、arrayMode、rememberColumnPosition、reduced、motionSpeed、volume/bgm/bgmVolume/sound/soundVolume和renderQuality保存当前选择；renderQuality优先于quality预设值。已知字段校验类型、离散选项及音量/速度范围；画质数值交唯一RenderQuality归一化，不改变其未知扩展。未知根字段与对象扩展在更新/导入/保存中保留。会话各列位置仍只在ColumnMemory，不写偏好JSON。
 
@@ -78,7 +82,7 @@ PreferencesStore在事件循环合并变化，只有一个在途worker保存和�
 
 ## 检查入口
 
-`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/review/export-search-golden.mjs`导出，历史薄入口verify-r04.ps1/audit-r04.ps1；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。
+`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/review/export-search-golden.mjs`导出；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。
 
 `directory-scanner`用临时合成目录覆盖扫描/重扫/改名/删除/离线/读取拒绝、取消/切根/加载竞态、缓存原子读写/损坏保护、源hash及GUI事件循环/一次模型重置；不加载媒体或显示窗口。`node tools/review/verify-scan-fingerprint.mjs`额外用本机Node的真实stat核对原fingerprint与UTF-8哈希；原生构建/CTest不依赖Node。`python3 tools/audit/audit-library-scan.py`生成COMMON/PERF和三平台逐符号/hash矩阵至本地verification；目标环境待验归计划R21-P。
 

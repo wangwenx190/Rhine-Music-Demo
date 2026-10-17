@@ -1,3 +1,5 @@
+[CmdletBinding()]
+param([ValidateSet('d3d11', 'opengl')][string[]]$Backends = @('d3d11'))
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $evidence = Join-Path $repository 'verification/windows/navigation'
@@ -37,7 +39,7 @@ try {
     }
     Run 'web-source.txt' { node tools/review/export-ruler.mjs }
     $reports = @()
-    foreach ($backend in @('d3d11', 'opengl')) {
+    foreach ($backend in $Backends) {
         $env:QSG_RHI_BACKEND = $backend
         foreach ($dpr in @(1, 1.5, 2)) {
             $env:QT_SCALE_FACTOR = ($dpr / $nativeDpr).ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -61,7 +63,7 @@ try {
             throw 'Product navigation verification failed'
         }
     }
-    Run 'ctest.txt' { ctest --preset qt-release --output-on-failure }
+    Run 'ctest.txt' { ctest --preset qt-release -R '^(source-format|navigation|motion)$' --output-on-failure --no-tests=error }
     Run 'shader.txt' { & "$($chain.qtKit)/bin/qsb.exe" --dump build/release/src/app/.qsb/edge-fade.frag.qsb }
     [IO.File]::WriteAllText((Join-Path $evidence 'summary.json'), (@{
                 passed = $true

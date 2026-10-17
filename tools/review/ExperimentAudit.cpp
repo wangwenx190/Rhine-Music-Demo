@@ -17,6 +17,9 @@
 #include <QTest>
 #include <QTimer>
 #include <QWheelEvent>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 QQuickItem *visual(QQuickItem *item, const QString &name)
@@ -47,14 +50,14 @@ int reviewExperiments(const QString &output)
     InputRouter input(&selection);
     QQmlEngine engine;
     QSignalSpy warnings(&engine, &QQmlEngine::warnings);
-    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"));
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"_s));
     std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { "librarySession", QVariant::fromValue(&library) },
-              { "motionController", QVariant::fromValue(&motion) },
-              { "sceneAdapter", QVariant::fromValue(&scene) },
-              { "settingsController", QVariant::fromValue(&settings) },
-              { "inputRouter", QVariant::fromValue(&input) },
-              { "experimentsVisible", true } }));
+            { { u"librarySession"_s, QVariant::fromValue(&library) },
+              { u"motionController"_s, QVariant::fromValue(&motion) },
+              { u"sceneAdapter"_s, QVariant::fromValue(&scene) },
+              { u"settingsController"_s, QVariant::fromValue(&settings) },
+              { u"inputRouter"_s, QVariant::fromValue(&input) },
+              { u"experimentsVisible"_s, true } }));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
         qWarning() << component.errors();
@@ -68,7 +71,7 @@ int reviewExperiments(const QString &output)
     OffscreenSurface surface(window, control);
     root->setParentItem(window.contentItem());
     input.attach(&window);
-    auto *native = qobject_cast<rhi::SceneItem *>(visual(root, "nativeScene"));
+    auto *native = qobject_cast<rhi::SceneItem *>(visual(root, u"nativeScene"_s));
     if (!native)
         return 3;
     QJsonObject lastSample;
@@ -86,7 +89,7 @@ int reviewExperiments(const QString &output)
         bool rendered = false;
         qint64 expectedInput = -1;
         const auto ready = [&] {
-            return rendered && lastSample["inputRevision"].toInteger() == expectedInput;
+            return rendered && lastSample[u"inputRevision"_s].toInteger() == expectedInput;
         };
         QObject::connect(native, &rhi::SceneItem::frameSubmitted, &loop, [&] {
             if (ready())
@@ -118,8 +121,8 @@ int reviewExperiments(const QString &output)
     bool passed = true;
     const auto check = [&](const QString &name, bool okay) {
         auto result = context;
-        result["check"] = name;
-        result["passed"] = okay;
+        result[u"check"_s] = name;
+        result[u"passed"_s] = okay;
         checks.append(result);
         passed &= okay;
         if (!okay)
@@ -146,31 +149,31 @@ int reviewExperiments(const QString &output)
             root->setSize(size);
             for (bool night : { false, true }) {
                 scene.lighting()->setNight(night);
-                context = { { "width", size.width() },
-                            { "height", size.height() },
-                            { "dpr", dpr },
-                            { "night", night } };
-                check("render", render());
-                auto *panel = visual(root, "experimentPanels");
-                auto *lighting = visual(root, "lightingPanel");
-                auto *scroll = visual(root, "experimentScroll");
+                context = { { u"width"_s, size.width() },
+                            { u"height"_s, size.height() },
+                            { u"dpr"_s, dpr },
+                            { u"night"_s, night } };
+                check(u"render"_s, render());
+                auto *panel = visual(root, u"experimentPanels"_s);
+                auto *lighting = visual(root, u"lightingPanel"_s);
+                auto *scroll = visual(root, u"experimentScroll"_s);
                 auto *flickable =
                         scroll ? scroll->property("contentItem").value<QQuickItem *>() : nullptr;
-                check("bounded-panel",
+                check(u"bounded-panel"_s,
                       panel && panel->x() >= 0 && panel->y() >= 0
                               && panel->mapToScene({ panel->width(), panel->height() }).x()
                                       <= size.width()
                               && panel->mapToScene({ panel->width(), panel->height() }).y()
                                       <= size.height());
                 if (!night)
-                    check("responsive-initial-fold",
+                    check(u"responsive-initial-fold"_s,
                           lighting
                                   && lighting->property("expanded").toBool()
                                           == (size.width() > 760 && size.height() > 650));
                 if (lighting)
                     lighting->setProperty("expanded", true);
-                check("expanded", render());
-                check("scroll-content",
+                check(u"expanded"_s, render());
+                check(u"scroll-content"_s,
                       flickable && flickable->property("contentHeight").toDouble() > 0);
                 const auto cell = selection.cell();
                 const auto playback = library.playbackTrackId();
@@ -179,10 +182,10 @@ int reviewExperiments(const QString &output)
                             panel->mapToScene({ panel->width() / 2, panel->height() / 2 });
                     QWheelEvent wheel(point, window.mapToGlobal(point.toPoint()), { }, { 0, -120 },
                                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
-                    check("wheel-owned", !input.wheel(&wheel, &window));
+                    check(u"wheel-owned"_s, !input.wheel(&wheel, &window));
                     QCoreApplication::sendEvent(&window, &wheel);
                 }
-                check("wheel-no-navigation",
+                check(u"wheel-no-navigation"_s,
                       selection.cell() == cell && library.playbackTrackId() == playback);
                 if (flickable) {
                     const auto bottom = std::max(0.0,
@@ -190,17 +193,18 @@ int reviewExperiments(const QString &output)
                                                          - flickable->height());
                     flickable->setProperty("contentY", bottom);
                 }
-                check("bottom-render", render());
-                auto *toggle = visual(root, "diagnosticsToggle");
-                auto *label = toggle ? visual(toggle, "checkBoxCaption") : nullptr;
-                check("theme-control-text",
+                check(u"bottom-render"_s, render());
+                auto *toggle = visual(root, u"diagnosticsToggle"_s);
+                auto *label = toggle ? visual(toggle, u"checkBoxCaption"_s) : nullptr;
+                check(u"theme-control-text"_s,
                       label
                               && label->property("color").value<QColor>()
                                       == QColor(night ? "#e9eef2" : "#232722"));
                 if (size.width() == 320 && dpr == 1)
-                    check("own-image",
-                          surface.grab().save(output
-                                              + (night ? "/narrow-night.png" : "/narrow-day.png")));
+                    check(u"own-image"_s,
+                          surface.grab().save(
+                                  output
+                                  + (night ? "/narrow-night.png"_L1 : "/narrow-day.png"_L1)));
                 if (flickable)
                     flickable->setProperty("contentY", 0);
             }
@@ -211,103 +215,105 @@ int reviewExperiments(const QString &output)
     root->setSize({ 1280, 720 });
     if (OffscreenSurface::Enabled)
         surface.setDevicePixelRatio(1);
-    check("interaction-render", render());
-    auto *scroll = visual(root, "experimentScroll");
+    check(u"interaction-render"_s, render());
+    auto *scroll = visual(root, u"experimentScroll"_s);
     auto *flickable = scroll ? scroll->property("contentItem").value<QQuickItem *>() : nullptr;
-    auto *speed = visual(root, "motionSpeedControl");
+    auto *speed = visual(root, u"motionSpeedControl"_s);
     const auto cell = selection.cell();
     if (speed) {
         speed->forceActiveFocus();
         QTest::keyClick(&window, Qt::Key_Right);
     }
-    check("speed-keyboard-owned", speed && motion.clock()->speed() > 1 && selection.cell() == cell);
-    click(visual(root, "motionReset"));
-    check("speed-reset", motion.clock()->speed() == 1);
-    check("resource-baseline", render() && !lastSample.isEmpty());
-    const auto generation = lastSample["resourceGeneration"],
-               post = lastSample["postprocessRevision"];
+    check(u"speed-keyboard-owned"_s,
+          speed && motion.clock()->speed() > 1 && selection.cell() == cell);
+    click(visual(root, u"motionReset"_s));
+    check(u"speed-reset"_s, motion.clock()->speed() == 1);
+    check(u"resource-baseline"_s, render() && !lastSample.isEmpty());
+    const auto generation = lastSample[u"resourceGeneration"_s],
+               post = lastSample[u"postprocessRevision"_s];
     for (const auto &mode : { "baseline", "area", "guided", "hybrid" }) {
-        scene.lighting()->configure({ { "mode", mode },
-                                      { "strength", 1.65 },
-                                      { "width", 1.8 },
-                                      { "offset", -.5 },
-                                      { "fill", .6 },
-                                      { "transitionDuration", .8 } });
-        check("mode-render", render());
-        check("uniform-only",
-              lastSample["resourceGeneration"] == generation
-                      && lastSample["postprocessRevision"] == post);
-        check("actual-mode",
+        scene.lighting()->configure({ { u"mode"_s, QString::fromUtf8(mode) },
+                                      { u"strength"_s, 1.65 },
+                                      { u"width"_s, 1.8 },
+                                      { u"offset"_s, -.5 },
+                                      { u"fill"_s, .6 },
+                                      { u"transitionDuration"_s, .8 } });
+        check(u"mode-render"_s, render());
+        check(u"uniform-only"_s,
+              lastSample[u"resourceGeneration"_s] == generation
+                      && lastSample[u"postprocessRevision"_s] == post);
+        check(u"actual-mode"_s,
               native->input().rowSettings.x() == int(scene.lighting()->ribbon.settings.mode));
     }
     if (flickable)
         flickable->setProperty("contentY", 180);
-    check("comparison-ready", render());
-    auto *compare = visual(root, "lightingCompare");
+    check(u"comparison-ready"_s, render());
+    auto *compare = visual(root, u"lightingCompare"_s);
     if (compare) {
         compare->forceActiveFocus();
         QTest::keyPress(&window, Qt::Key_Space);
     }
-    check("hold-original",
+    check(u"hold-original"_s,
           scene.lighting()->comparing()
                   && scene.lighting()->ribbon.settings.mode == RowLightingMode::Baseline);
     if (compare)
         QTest::keyRelease(&window, Qt::Key_Space);
-    check("release-restores",
+    check(u"release-restores"_s,
           !scene.lighting()->comparing()
                   && scene.lighting()->ribbon.settings.mode == RowLightingMode::Hybrid);
     scene.lighting()->setComparing(true);
     root->setProperty("experimentsVisible", false);
-    check("close-render", render());
-    check("close-restores", !scene.lighting()->comparing() && !native->diagnosticsEnabled());
+    check(u"close-render"_s, render());
+    check(u"close-restores"_s, !scene.lighting()->comparing() && !native->diagnosticsEnabled());
     root->setProperty("experimentsVisible", true);
-    check("reopen", render());
+    check(u"reopen"_s, render());
     scene.lighting()->resetSettings();
-    auto *panel = visual(root, "experimentPanels");
+    auto *panel = visual(root, u"experimentPanels"_s);
     if (panel)
         panel->setProperty("diagnostics", true);
-    check("diagnostics-on", render() && native->diagnosticsEnabled());
+    check(u"diagnostics-on"_s, render() && native->diagnosticsEnabled());
     QElapsedTimer sampling;
     sampling.start();
     while (native->diagnosticValues().isEmpty() && sampling.elapsed() < 5000)
         if (!render())
             break;
     const auto values = native->diagnosticValues();
-    check("diagnostic-batch",
-          !values.isEmpty() && values["cpu"].toMap()["count"].toInt() > 0
-                  && values["elapsedMs"].toDouble() >= 500
-                  && values["cpu"].toMap()["count"].toInt() <= 256
-                  && values["qtFrameIntervals"].toMap().isEmpty() == OffscreenSurface::Enabled);
+    check(u"diagnostic-batch"_s,
+          !values.isEmpty() && values[u"cpu"_s].toMap()[u"count"_s].toInt() > 0
+                  && values[u"elapsedMs"_s].toDouble() >= 500
+                  && values[u"cpu"_s].toMap()[u"count"_s].toInt() <= 256
+                  && values[u"qtFrameIntervals"_s].toMap().isEmpty() == OffscreenSurface::Enabled);
     QSignalSpy published(native, &rhi::SceneItem::diagnosticValuesChanged);
     if (panel)
         panel->setProperty("diagnostics", false);
-    check("diagnostics-off", !native->diagnosticsEnabled() && native->diagnosticValues().isEmpty());
+    check(u"diagnostics-off"_s,
+          !native->diagnosticsEnabled() && native->diagnosticValues().isEmpty());
     const auto disabled = published.size();
     for (int i = 0; i < 4; ++i)
         render();
-    check("no-late-diagnostics", published.size() == disabled);
-    check("qml-warnings", warnings.isEmpty());
-    check("window-policy", verification::windowPolicySatisfied(window));
+    check(u"no-late-diagnostics"_s, published.size() == disabled);
+    check(u"qml-warnings"_s, warnings.isEmpty());
+    check(u"window-policy"_s, verification::windowPolicySatisfied(window));
     const auto windowPolicy = verification::windowPolicy(window);
     surface.hide();
     root->setParentItem(nullptr);
     object.reset();
     window.releaseResources();
-    check("renderers-released",
+    check(u"renderers-released"_s,
           QTest::qWaitFor(
                   [] {
                       return rhi::sceneSubmissionStats().renderers.load() == 0;
                   },
                   5000));
-    QSaveFile file(output + "/report.json");
+    QSaveFile file(output + "/report.json"_L1);
     if (!file.open(QIODevice::WriteOnly))
         return 4;
-    file.write(
-            QJsonDocument(QJsonObject{ { "passed", passed },
-                                       { "checks", checks },
-                                       { "diagnosticSample", QJsonObject::fromVariantMap(values) },
-                                       { "windowPolicy", windowPolicy },
-                                       { "offscreen", OffscreenSurface::Enabled } })
-                    .toJson());
+    file.write(QJsonDocument(
+                       QJsonObject{ { u"passed"_s, passed },
+                                    { u"checks"_s, checks },
+                                    { u"diagnosticSample"_s, QJsonObject::fromVariantMap(values) },
+                                    { u"windowPolicy"_s, windowPolicy },
+                                    { u"offscreen"_s, OffscreenSurface::Enabled } })
+                       .toJson());
     return file.commit() && passed ? 0 : 5;
 }

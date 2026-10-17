@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 // Review-only private Qt adaptation; never linked or called by the product renderer.
 #include <QJsonObject>
 #include <QOpenGLContext>
@@ -59,17 +61,17 @@ inline QJsonObject quick3DTarget(QQuickWindow &window)
     if (auto *attachment = QQuick3DSceneManager::getOrSetWindowAttachment(window)) {
         if (attachment->rci()) {
             const auto &context = attachment->rci()->rhiContext();
-            result.insert("samples", context->mainPassSampleCount());
+            result.insert(u"samples"_s, context->mainPassSampleCount());
             if (auto *target = context->renderTarget();
                 target && target->resourceType() == QRhiResource::TextureRenderTarget) {
                 const auto description =
                         static_cast<QRhiTextureRenderTarget *>(target)->description();
                 if (description.colorAttachmentCount() > 0) {
                     const auto *color = description.colorAttachmentAt(0);
-                    result.insert("renderbuffer", color->renderBuffer() != nullptr);
-                    result.insert("resolved", color->resolveTexture() != nullptr);
+                    result.insert(u"renderbuffer"_s, color->renderBuffer() != nullptr);
+                    result.insert(u"resolved"_s, color->resolveTexture() != nullptr);
                     if (color->renderBuffer() && color->resolveTexture())
-                        result.insert("formatPreserved",
+                        result.insert(u"formatPreserved"_s,
                                       color->renderBuffer()->backingFormat()
                                               == color->resolveTexture()->format());
                 }

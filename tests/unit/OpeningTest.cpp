@@ -7,14 +7,15 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <limits>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
 void near(double actual, double expected)
 {
     QVERIFY2(std::abs(actual - expected) <= 1e-6,
-             qPrintable(QString("actual %1 expected %2")
-                                .arg(actual, 0, 'g', 17)
-                                .arg(expected, 0, 'g', 17)));
+             qPrintable(
+                     u"actual %1 expected %2"_s.arg(actual, 0, 'g', 17).arg(expected, 0, 'g', 17)));
 }
 struct Fixture
 {
@@ -24,7 +25,7 @@ struct Fixture
     OpeningController opening{ &motion, &scene, &selection };
     Fixture()
     {
-        selection.setColumns({ { "column", "column", { "album-a", "album-b" } } });
+        selection.setColumns({ { u"column"_s, u"column"_s, { u"album-a"_s, u"album-b"_s } } });
         scene.setSelection(&selection);
         motion.clock()->setActive(true);
         motion.clock()->advance(0);
@@ -34,40 +35,42 @@ struct Fixture
 class OpeningTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void sourceFormulaAndCamera()
     {
-        QFile file(QString(FIXTURE_ROOT) + "/tests/fixtures/opening/source-golden.json");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT))
+                   + "/tests/fixtures/opening/source-golden.json"_L1);
         QVERIFY(file.open(QIODevice::ReadOnly));
         const auto source = QJsonDocument::fromJson(file.readAll()).object();
-        for (const auto &value : source["frames"].toArray()) {
+        for (const auto &value : source[u"frames"_s].toArray()) {
             const auto row = value.toObject();
-            const auto actual = openingFrame(row["time"].toDouble()).values();
+            const auto actual = openingFrame(row[u"time"_s].toDouble()).values();
             for (auto it = actual.cbegin(); it != actual.cend(); ++it) {
-                if (it.key() == "phase")
+                if (it.key() == "phase"_L1)
                     QCOMPARE(it.value().toString(), row[it.key()].toString());
                 else
                     near(it.value().toDouble(), row[it.key()].toDouble());
             }
-            near(openingSceneTime(row["time"].toDouble()), row["sceneTime"].toDouble());
+            near(openingSceneTime(row[u"time"_s].toDouble()), row[u"sceneTime"_s].toDouble());
         }
-        for (const auto &value : source["poses"].toArray()) {
+        for (const auto &value : source[u"poses"_s].toArray()) {
             const auto row = value.toObject();
-            const auto selected = row["selected"].toArray();
+            const auto selected = row[u"selected"_s].toArray();
             const auto pose = openingCamera(
-                    row["shot"].toDouble(), row["width"].toDouble(), row["height"].toDouble(),
+                    row[u"shot"_s].toDouble(), row[u"width"_s].toDouble(),
+                    row[u"height"_s].toDouble(),
                     { selected[0].toDouble(), selected[1].toDouble(), selected[2].toDouble() });
-            const auto p = row["position"].toArray(), a = row["aim"].toArray();
+            const auto p = row[u"position"_s].toArray(), a = row[u"aim"_s].toArray();
             near(pose.position.x, p[0].toDouble());
             near(pose.position.y, p[1].toDouble());
             near(pose.position.z, p[2].toDouble());
             near(pose.aim.x, a[0].toDouble());
             near(pose.aim.y, a[1].toDouble());
             near(pose.aim.z, a[2].toDouble());
-            near(pose.span, row["span"].toDouble());
+            near(pose.span, row[u"span"_s].toDouble());
             Fixture f;
-            f.scene.layout()->setViewport(row["width"].toDouble(), row["height"].toDouble());
-            f.selection.setOpeningTime(row["shot"].toDouble());
+            f.scene.layout()->setViewport(row[u"width"_s].toDouble(), row[u"height"_s].toDouble());
+            f.selection.setOpeningTime(row[u"shot"_s].toDouble());
             const auto position = f.selection.selectedPosition();
             near(position.x, selected[0].toDouble());
             near(position.y, selected[1].toDouble());
@@ -144,6 +147,47 @@ private slots:
         QVERIFY(!f.opening.active());
         QCOMPARE(handed.size(), 3);
         QCOMPARE(completed.size(), 2);
+    }
+    void reentrantReplayCannotBeCompletedByOldHandoff()
+    {
+        Fixture f;
+        f.motion.setReducedMotion(true);
+        QSignalSpy completed(&f.opening, &OpeningController::completed);
+        bool restarted = false;
+        connect(&f.opening, &OpeningController::handedOff, &f.opening, [&] {
+            if (!restarted) {
+                restarted = true;
+                f.opening.replay();
+            }
+        });
+        f.opening.replay();
+        const auto oldRevision = f.opening.revision();
+        f.opening.scenePrepared();
+        QVERIFY(restarted);
+        QVERIFY(f.opening.revision() > oldRevision);
+        QVERIFY(f.opening.preparing());
+        QCOMPARE(completed.size(), 0);
+        f.opening.scenePrepared();
+        QVERIFY(!f.opening.active());
+        QCOMPARE(completed.size(), 1);
+    }
+    void changedCallbackReplayRejectsObsoleteCompletion()
+    {
+        Fixture f;
+        f.motion.setReducedMotion(true);
+        QSignalSpy completed(&f.opening, &OpeningController::completed);
+        bool restarted = false;
+        connect(&f.opening, &OpeningController::changed, &f.opening, [&] {
+            if (!restarted && !f.opening.active()) {
+                restarted = true;
+                f.opening.replay();
+            }
+        });
+        f.opening.replay();
+        f.opening.scenePrepared();
+        QVERIFY(restarted);
+        QVERIFY(f.opening.preparing());
+        QCOMPARE(completed.size(), 0);
     }
     void brandArcLengthsAndReveal()
     {

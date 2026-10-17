@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <array>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 class QtMetadataSource final : public MetadataSource
@@ -58,7 +60,7 @@ QString text(const QMediaMetaData &metadata, QMediaMetaData::Key key)
 }
 QString genreKey(QString value)
 {
-    static const QRegularExpression separators(QStringLiteral("[\\s\\p{P}\\p{S}]"));
+    static const QRegularExpression separators(u"[\\s\\p{P}\\p{S}]"_s);
     return value.trimmed().normalized(QString::NormalizationForm_KC).toLower().remove(separators);
 }
 void resolveGenres(LibrarySnapshot &snapshot)
@@ -76,7 +78,7 @@ void resolveGenres(LibrarySnapshot &snapshot)
                 names.insert(key, genre.id);
         }
     }
-    const auto overrides = snapshot.fields.value("genreOverrides").toObject();
+    const auto overrides = snapshot.fields.value(u"genreOverrides"_s).toObject();
     QHash<QString, int> counts;
     for (auto &album : snapshot.albums) {
         const auto overrideId = overrides.value(album.id).toString();
@@ -92,8 +94,8 @@ void resolveGenres(LibrarySnapshot &snapshot)
             if (id.isEmpty()) {
                 const auto name = album.rawGenres.first();
                 const auto key = genreKey(name);
-                id = "source-"
-                        + QString::fromLatin1(
+                id = "source-"_L1
+                        + QString::fromUtf8(
                                 QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
                                         .toHex()
                                         .first(24));
@@ -134,20 +136,20 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
     const auto bitrate = metadata.value(QMediaMetaData::AudioBitRate).toInt();
     if (bitrate > 0)
         track.bitrate = bitrate;
-    auto common = track.fields.value("_common").toObject();
+    auto common = track.fields.value(u"_common"_s).toObject();
     const auto albumTitle = text(metadata, QMediaMetaData::AlbumTitle);
     const auto albumArtist = text(metadata, QMediaMetaData::AlbumArtist);
     if (!albumTitle.isEmpty())
-        common.insert("album", albumTitle);
+        common.insert(u"album"_s, albumTitle);
     if (!albumArtist.isEmpty())
-        common.insert("albumartist", albumArtist);
+        common.insert(u"albumartist"_s, albumArtist);
     const auto date = metadata.value(QMediaMetaData::Date).toDate();
     if (date.isValid())
-        common.insert("year", date.year());
+        common.insert(u"year"_s, date.year());
     const auto genres = metadata.value(QMediaMetaData::Genre).toStringList();
     if (!genres.isEmpty())
-        common.insert("genres", QJsonArray::fromStringList(genres));
-    track.fields.insert("_common", common);
+        common.insert(u"genres"_s, QJsonArray::fromStringList(genres));
+    track.fields.insert(u"_common"_s, common);
     // Loading a container does not prove that its audio can actually be decoded.
     // Playback in R24 owns promotion to Supported; metadata remains independently useful.
     track.mediaSupport = !timeout
@@ -155,16 +157,16 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
                         || (value.status == MediaObservation::Loaded && !value.hasAudio))
             ? MediaSupport::Unsupported
             : MediaSupport::Unknown;
-    track.fields.insert("_probeStatus",
-                        timeout ? "timeout"
-                                : value.status == MediaObservation::Loaded ? "loaded"
-                                                                           : "invalid");
+    track.fields.insert(u"_probeStatus"_s,
+                        timeout ? u"timeout"_s
+                                : value.status == MediaObservation::Loaded ? u"loaded"_s
+                                                                           : u"invalid"_s);
     if (!value.error.isEmpty())
-        track.fields.insert("_probeError", value.error);
+        track.fields.insert(u"_probeError"_s, value.error);
     else
-        track.fields.remove("_probeError");
+        track.fields.remove(u"_probeError"_s);
     if (!timeout)
-        track.fields.insert("_qtProbeVersion", QString::fromLatin1(qVersion()));
+        track.fields.insert(u"_qtProbeVersion"_s, QString::fromUtf8(qVersion()));
 }
 }
 class ProbeWorker final : public QObject
@@ -208,9 +210,9 @@ public:
         }
         m_running = false;
         m_next = { };
-        emit done(m_generation, { }, true);
+        Q_EMIT done(m_generation, { }, true);
     }
-signals:
+Q_SIGNALS:
     void done(quint64 generation, yalahoo::Snapshot snapshot, bool cancelled);
 
 private:
@@ -231,7 +233,7 @@ private:
     {
         // Candidates are sorted by the scanner; reject invalid images before fallback.
         album.coverUrl = QUrl();
-        for (const auto &candidate : album.fields.value("_coverCandidates").toArray()) {
+        for (const auto &candidate : album.fields.value(u"_coverCandidates"_s).toArray()) {
             if (stopped())
                 return;
             album.coverUrl = ArtworkStore::copy(candidate.toString(), m_root);
@@ -261,16 +263,17 @@ private:
                 }
                 const auto index = m_track++;
                 const auto &track = album.tracks[index];
-                bool coverKnown = track.fields.contains("_embeddedCover");
-                const auto embedded = track.fields.value("_embeddedCover").toObject();
-                if (!embedded.isEmpty() && !QFileInfo(embedded.value("path").toString()).isFile())
+                bool coverKnown = track.fields.contains(u"_embeddedCover"_s);
+                const auto embedded = track.fields.value(u"_embeddedCover"_s).toObject();
+                if (!embedded.isEmpty()
+                    && !QFileInfo(embedded.value(u"path"_s).toString()).isFile())
                     coverKnown = false;
                 const bool needsCover =
-                        (album.fields.value("_singleFile").toBool() || album.coverUrl.isEmpty())
+                        (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty())
                         && !coverKnown;
                 if (!needsCover
-                    && track.fields.value("_qtProbeVersion").toString()
-                            == QString::fromLatin1(qVersion()))
+                    && track.fields.value(u"_qtProbeVersion"_s).toString()
+                            == QString::fromUtf8(qVersion()))
                     continue;
                 if (!track.sourceUrl.isLocalFile())
                     continue;
@@ -313,11 +316,11 @@ private:
             }
             if (album.offline)
                 continue;
-            if (album.fields.value("_singleFile").toBool() || album.coverUrl.isEmpty()) {
+            if (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty()) {
                 for (const auto &track : album.tracks) {
-                    const auto cached = track.fields.value("_embeddedCover")
+                    const auto cached = track.fields.value(u"_embeddedCover"_s)
                                                 .toObject()
-                                                .value("path")
+                                                .value(u"path"_s)
                                                 .toString();
                     if (!cached.isEmpty()) {
                         const auto embedded = ArtworkStore::copy(cached, m_root);
@@ -335,17 +338,17 @@ private:
                     });
             if (!album.tracks.isEmpty()) {
                 const auto &first = album.tracks.first();
-                const auto common = first.fields.value("_common").toObject();
-                const bool single = album.fields.value("_singleFile").toBool();
-                const auto title = common.value("album").toString();
+                const auto common = first.fields.value(u"_common"_s).toObject();
+                const bool single = album.fields.value(u"_singleFile"_s).toBool();
+                const auto title = common.value(u"album"_s).toString();
                 if (single || !title.isEmpty())
                     album.title = single ? first.title : title;
-                const auto artist = common.value("albumartist").toString();
-                if (!artist.isEmpty() || first.artist != QStringLiteral("未知艺术家"))
+                const auto artist = common.value(u"albumartist"_s).toString();
+                if (!artist.isEmpty() || !first.artist.isEmpty())
                     album.artist = !single && !artist.isEmpty() ? artist : first.artist;
-                if (common.value("year").toInt() > 0)
-                    album.year = common.value("year").toInt();
-                const auto genres = common.value("genres").toArray();
+                if (common.value(u"year"_s).toInt() > 0)
+                    album.year = common.value(u"year"_s).toInt();
+                const auto genres = common.value(u"genres"_s).toArray();
                 if (!genres.isEmpty()) {
                     album.rawGenres.clear();
                     for (const auto &genre : genres)
@@ -355,7 +358,8 @@ private:
         }
         resolveGenres(m_next);
         m_running = false;
-        emit done(m_generation, std::make_shared<const LibrarySnapshot>(std::move(m_next)), false);
+        Q_EMIT done(m_generation, std::make_shared<const LibrarySnapshot>(std::move(m_next)),
+                    false);
     }
     void complete(Slot &slot, bool timeout)
     {
@@ -369,21 +373,21 @@ private:
         auto &album = m_next.albums[slot.album];
         auto &track = album.tracks[slot.track];
         apply(track, observation, timeout);
-        if (album.fields.value("_singleFile").toBool() || album.coverUrl.isEmpty()) {
+        if (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty()) {
             const auto image =
                     observation.metadata.value(QMediaMetaData::CoverArtImage).value<QImage>();
             if (image.isNull()) {
-                track.fields.insert("_embeddedCover", QJsonValue::Null);
+                track.fields.insert(u"_embeddedCover"_s, QJsonValue::Null);
             } else {
                 QString error;
                 const auto cover = ArtworkStore::save(image, m_root, &error);
                 if (!cover.isEmpty())
-                    track.fields.insert("_embeddedCover",
-                                        QJsonObject{ { "path", cover.toLocalFile() } });
+                    track.fields.insert(u"_embeddedCover"_s,
+                                        QJsonObject{ { u"path"_s, cover.toLocalFile() } });
                 if (!error.isEmpty())
-                    track.fields.insert("_artworkError", error);
+                    track.fields.insert(u"_artworkError"_s, error);
                 else
-                    track.fields.remove("_artworkError");
+                    track.fields.remove(u"_artworkError"_s);
             }
         }
         disconnect(slot.connection);

@@ -18,29 +18,6 @@ Rectangle {
     border.color: tokens.line
     radius: 5
     clip: true
-    function percentile(series: var, key: string): string {
-        return series && series.count ? Number(series[key]).toFixed(2) + " ms" : "不可用";
-    }
-    function summary(sample: var): string {
-        if (!diagnostics)
-            return "诊断已关闭";
-        if (!sample.submissions)
-            return "等待有效渲染样本…";
-        return ["RHI 提交间隔 p50 / p95 / p99", percentile(sample.submissionIntervals, "p50") + " / "
-                + percentile(sample.submissionIntervals, "p95") + " / " + percentile(
-                    sample.submissionIntervals, "p99"), "CPU 提交 p95 " + percentile(sample.cpu,
-                                                                                   "p95") + " · 同步 p95 "
-                + percentile(sample.sync, "p95"), "GPU 已完成帧 p95 " + percentile(sample.gpu, "p95"),
-                "Qt 呈现事件 p95 " + percentile(sample.qtFrameIntervals, "p95"),
-                "本批上传 图集 / 选中 / uniform", sample.atlasUploadBytes + " / "
-                + sample.selectedUploadBytes + " / " + sample.uniformUploadBytes + " bytes",
-                "解码启动累计 " + sample.decodeStarts + " · 活跃 " + sample.decodeActive + " · 等待 "
-                + sample.decodePending, "当前调度下提交吞吐 " + Number(sample.submissionRate).toFixed(1)
-                + " / 秒", "提交样本 " + sample.submissions + " / " + Number(sample.elapsedMs).toFixed(0)
-                + " ms", "VSYNC 请求间隔 " + sample.requestedSwapInterval + " · 实际 VSYNC / 屏幕显示时刻不可用",
-                "固定 256 样本窗口，超出保留最近样本。RHI 间隔反映当前调度，非完整产品吞吐基准。CPU 不含 GPU 完成；GPU 范围由 QRhi 后端提供。"].join(
-                    "\n");
-    }
     onVisibleChanged: {
         if (!visible)
             diagnostics = false;
@@ -60,7 +37,7 @@ Rectangle {
             ArchiveButton {
                 objectName: "experimentsClose"
                 tokens: root.tokens
-                text: "关闭调试面板 ×"
+                text: qsTr("Close tools \u00d7")
                 cssPixelSize: 11
                 onClicked: root.closeRequested()
             }
@@ -78,7 +55,7 @@ Rectangle {
             ArchiveCheckBox {
                 tokens: root.tokens
                 objectName: "diagnosticsToggle"
-                text: "采样运行诊断"
+                text: qsTr("Sample runtime diagnostics")
                 checked: root.diagnostics
                 onToggled: root.diagnostics = checked
             }
@@ -90,7 +67,7 @@ Rectangle {
                 cssPixelSize: 10
                 color: root.tokens.muted
                 wrapMode: Text.Wrap
-                text: root.summary(root.sceneSource.diagnosticValues)
+                text: root.sceneSource.diagnosticText
             }
         }
     }

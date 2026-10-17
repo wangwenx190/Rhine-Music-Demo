@@ -17,7 +17,7 @@ checks = [
      "Transport and coat now enter std140 unchanged; the entity lid override changes roughness only. "
      "The 816-byte layout, bindings, clip/Y correction, capture and pipeline formats are unchanged. "
      "Native shell algorithms/LOD/sorting are still R19C2/D, not inferred from parameter equality."),
-    ("COMMON-04", "src/app/MaterialReview.cpp", 'state["position"].toArray().size() != 3',
+    ("COMMON-04", "src/app/MaterialReview.cpp", 'state[u"position"_s].toArray().size() != 3',
      "Source cases validate world positions before any show/capture. No player, output device, "
      "worker cancellation or music path is modified; Qt/renderer ownership and teardown are retained."),
     ("COMMON-05", "tests/unit/RhiMaterialTest.cpp", "continuousSourceAndQmlParameters",
@@ -33,7 +33,7 @@ checks = [
     ("PERF-03", "src/render/rhi/RhiItem.cpp", "updates->updateDynamicBuffer(uniforms.get(), 0, cursor",
      "Input snapshots and unchanged resource payloads remain implicitly shared; uniformScratch "
      "uploads only cursor bytes. Removing arithmetic scales adds no pixel copy or texture upload."),
-    ("PERF-04", "src/render/rhi/RhiItem.cpp", "p->capture.metadata[\"submittedShellUniforms\"]",
+    ("PERF-04", "src/render/rhi/RhiItem.cpp", 'p->capture.metadata[u"submittedShellUniforms"_s]',
      "At most 3*(432+4) material tuples are serialized only for capture. No product attachment, "
      "MSAA/resolve edge, PSO/SRB compatibility key or resource lifetime changes with optics values."),
     ("PERF-05", "src/render/rhi/ShellMaterial.cpp", "ShellMaterial shellMaterial",

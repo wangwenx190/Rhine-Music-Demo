@@ -66,7 +66,7 @@ T.ApplicationWindow {
             geometryProbe: window.geometryProbe
         }
     }
-    function rebuildVisualTree() {
+    function rebuildVisualTree(): void {
         visualTree.active = true;
     }
     Connections {

@@ -51,7 +51,7 @@ void SurfaceTransition::run(bool show, bool reduced, std::function<void()> finis
     if (reduced || (!show && hidden)) {
         finish();
     } else {
-        emit changed();
+        Q_EMIT changed();
     }
 }
 void SurfaceTransition::advance(double seconds)
@@ -66,7 +66,7 @@ void SurfaceTransition::advance(double seconds)
     const double t = m_ease.valueForProgress(m_elapsed / m_duration);
     m_opacity = m_fromOpacity + ((m_show ? 1 : 0) - m_fromOpacity) * t;
     m_offset = m_fromOffset + (m_toOffset - m_fromOffset) * t;
-    emit changed();
+    Q_EMIT changed();
 }
 void SurfaceTransition::finish()
 {
@@ -79,7 +79,7 @@ void SurfaceTransition::finish()
     const auto revision = m_revision;
     auto callback = std::move(m_finished);
     m_finished = { };
-    emit changed();
+    Q_EMIT changed();
     if (callback && revision == m_revision)
         callback();
 }
@@ -94,6 +94,6 @@ void SurfaceTransition::reset(bool shown)
     m_opacity = shown ? 1 : 0;
     m_offset = 0;
     if (changedState)
-        emit changed();
+        Q_EMIT changed();
 }
 }

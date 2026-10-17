@@ -17,47 +17,28 @@ Item {
     FontMetrics {
         id: genreFont
         font.family: root.tokens.regular.family
+        font.styleName: root.tokens.regular.styleName
+        font.weight: root.tokens.regular.weight
         font.pixelSize: 10
     }
-    readonly property var genreRows: {
-        const rows = [];
-        let row = [];
-        let used = 0;
-        for (const genre of [
-                 {
-                     id: "",
-                     name: "全部"
-                 }
-             ].concat(librarySession.genres)) {
-            const size = Math.min(width, Math.ceil(genreFont.advanceWidth(genre.name)) + 22);
-            if (row.length && used + 7 + size > width) {
-                rows.push(row);
-                row = [];
-                used = 0;
-            }
-            row.push({
-                         id: genre.id,
-                         name: genre.name,
-                         size: size
-                     });
-            used += (used ? 7 : 0) + size;
-        }
-        if (row.length)
-            rows.push(row);
-        return rows;
+    GenreRowsModel {
+        id: genreRows
+        genres: root.librarySession.genres
+        font: genreFont.font
+        width: root.width
     }
-    function prepare() {
+    function prepare(): void {
         if (queryInput)
             queryInput.clear();
         results.currentIndex = -1;
     }
-    function focusSearch() {
+    function focusSearch(): void {
         results.forceLayout();
         results.positionViewAtBeginning();
         if (queryInput)
             queryInput.forceActiveFocus();
     }
-    function refresh() {
+    function refresh(): void {
         if (!visible)
             return;
         librarySession.search(queryInput ? queryInput.text : "", genreId);
@@ -82,14 +63,14 @@ Item {
             font.family: root.tokens.regular.family
             font.pixelSize: 12
             color: root.tokens.ink
-            placeholderText: "专辑、歌曲、歌手、流派…"
+            placeholderText: qsTr("Albums, tracks, artists, genres...")
             placeholderTextColor: root.tokens.muted
             selectByMouse: true
             background: Rectangle {
                 color: root.tokens.surface
                 border.color: root.tokens.line
             }
-            Accessible.name: "搜索专辑与歌曲"
+            Accessible.name: qsTr("Search albums and tracks")
             onTextChanged: root.refresh()
             Keys.onDownPressed: {
                 if (results.count) {
@@ -108,15 +89,15 @@ Item {
             clip: true
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
-            model: root.genreRows
+            model: genreRows
             spacing: 7
             delegate: Row {
                 id: genreRow
-                required property var modelData
+                required property var entries
                 spacing: 7
                 height: 27
                 Repeater {
-                    model: genreRow.modelData
+                    model: genreRow.entries
                     delegate: T.Button {
                         id: filter
                         focusPolicy: Qt.StrongFocus
@@ -126,6 +107,8 @@ Item {
                         width: modelData.size
                         height: 27
                         font.family: root.tokens.regular.family
+                        font.styleName: root.tokens.regular.styleName
+                        font.weight: root.tokens.regular.weight
                         font.pixelSize: 10
                         padding: 5
                         checked: root.genreId === modelData.id
@@ -136,6 +119,7 @@ Item {
                         contentItem: Text {
                             text: filter.text
                             font: filter.font
+                            renderType: Text.CurveRendering
                             color: filter.checked ? root.tokens.surface : root.tokens.ink
                             horizontalAlignment: Text.AlignHCenter
                             elide: Text.ElideRight
@@ -166,7 +150,7 @@ Item {
         model: root.librarySession.searchResults
         currentIndex: -1
         header: SearchHeader {}
-        function activate(index) {
+        function activate(index: int): void {
             const item = root.librarySession.searchResults.resultAt(index);
             if (item.albumId)
                 root.resultRequested(item.albumId, item.trackId);
@@ -232,7 +216,7 @@ Item {
                         visible: result.coverUrl.toString().length === 0 || artwork.status
                                  === Image.Error
 
-                        text: "♪"
+                        text: "\u266a"
                         cssPixelSize: 16
                     }
                 }
@@ -252,7 +236,7 @@ Item {
                     ArchiveText {
                         width: parent.width
                         tokens: root.tokens
-                        text: result.artist + " · " + result.subtitle
+                        text: result.artist + " \u00b7 " + result.subtitle
                         cssPixelSize: 10
                         color: root.tokens.muted
                         wrapMode: Text.WrapAnywhere
@@ -262,7 +246,7 @@ Item {
                     x: parent.width - 49
                     anchors.verticalCenter: parent.verticalCenter
                     tokens: root.tokens
-                    text: result.kind === "track" ? "歌曲" : "专辑"
+                    text: result.kind === "track" ? qsTr("Track") : qsTr("Albums")
                     cssPixelSize: 10
                     color: root.tokens.muted
                 }
@@ -270,7 +254,7 @@ Item {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     tokens: root.tokens
-                    text: "↗"
+                    text: "\u2197"
                     cssPixelSize: 17
                 }
             }
@@ -287,7 +271,9 @@ Item {
                 if (unchanged)
                     root.resultRequested(albumId, trackId);
             }
-            Accessible.name: (kind === "track" ? "定位歌曲 " : "定位专辑 ") + title + "，" + subtitle
+            Accessible.name: (kind === "track" ? qsTr("Locate track %1, %2") : qsTr(
+                                                     "Locate album %1, %2")).arg(title).arg(
+                                 subtitle)
         }
         T.ScrollBar.vertical: ArchiveScrollBar {
             tokens: root.tokens
@@ -299,7 +285,7 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             tokens: root.tokens
             visible: results.count === 0
-            text: "没有找到专辑或歌曲。"
+            text: qsTr("No albums or tracks found.")
             cssPixelSize: 12
             color: root.tokens.muted
         }
@@ -307,7 +293,7 @@ Item {
     Connections {
         target: root.librarySession
         function onSnapshotChanged() {
-            if (root.genreId && !root.librarySession.genres.some(g => g.id === root.genreId))
+            if (root.genreId && !root.librarySession.hasGenre(root.genreId))
                 root.genreId = "";
             root.refresh();
         }

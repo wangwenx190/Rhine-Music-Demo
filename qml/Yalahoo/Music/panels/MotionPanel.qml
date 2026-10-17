@@ -12,7 +12,7 @@ Column {
     spacing: 10
     ArchiveButton {
         tokens: root.tokens
-        text: "DEV · MOTION 整体切换速度 " + (root.expanded ? "−" : "+")
+        text: qsTr("DEV \u00b7 MOTION Overall speed %1").arg(root.expanded ? "\u2212" : "+")
         cssPixelSize: 11
         onClicked: root.expanded = !root.expanded
     }
@@ -25,11 +25,11 @@ Column {
             captionSize: 10
             objectName: "motionSpeed"
             tokens: root.tokens
-            label: "动画速度"
+            label: qsTr("Animation speed")
             minimum: .25
             maximum: 3
             step: .05
-            suffix: "×"
+            suffix: "\u00d7"
             value: root.settings.values.motionSpeed
             onMoved: value => root.settings.update("motionSpeed", value)
         }
@@ -39,12 +39,13 @@ Column {
             cssPixelSize: 10
             color: root.tokens.muted
             wrapMode: Text.Wrap
-            text: "专辑、镜头、文字与光带同步变速。光带实际时长 = 光效面板时长 ÷ 此倍率。歌曲播放和开场片头不变。"
+            text: qsTr(
+                      "Albums, camera, text, and light transitions change speed together. Actual light duration = panel duration / this multiplier. Track playback and the opening sequence are unchanged.")
         }
         ArchiveButton {
             objectName: "motionReset"
             tokens: root.tokens
-            text: "恢复 1×"
+            text: qsTr("Restore 1x")
             cssPixelSize: 11
             onClicked: root.settings.update("motionSpeed", 1)
         }

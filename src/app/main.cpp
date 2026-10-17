@@ -34,6 +34,7 @@
 
 #include "InputRouter.h"
 #include "RulerController.h"
+#include "Localization.h"
 #ifdef YALAHOO_REVIEW
 #  include "SceneReview.h"
 #  include "IntegrationReview.h"
@@ -69,6 +70,8 @@
 #include <memory>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 QMutex diagnosticsMutex;
 QStringList diagnostics;
@@ -83,7 +86,7 @@ void recordDiagnostic(QtMsgType, const QMessageLogContext &, const QString &mess
 int main(int argc, char **argv)
 {
     for (int i = 1; i < argc; ++i) {
-        if (QByteArray(argv[i]).startsWith("--verify-")) {
+        if (QByteArray(argv[i]).startsWith("--verify-"_ba)) {
             yalahoo::verification::prepareApplication();
         }
     }
@@ -91,12 +94,12 @@ int main(int argc, char **argv)
         return 22;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    const yalahoo::Localization localization;
     yalahoo::probeOptionalGraphicsBackend();
     QIcon applicationIcon;
     for (const int size : { 16, 24, 32, 48, 64, 128, 256, 512, 1024 }) {
-        applicationIcon.addFile(
-                QStringLiteral(":/assets/icons/yalahoo/png/yalahoo-%1.png").arg(size),
-                QSize(size, size));
+        applicationIcon.addFile(u":/assets/icons/yalahoo/png/yalahoo-%1.png"_s.arg(size),
+                                QSize(size, size));
     }
     app.setWindowIcon(applicationIcon);
     const auto coverShutdown = qScopeGuard([] {
@@ -107,112 +110,134 @@ int main(int argc, char **argv)
         return 6;
     }
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("yalahOO!!! native music archive"));
+    parser.setApplicationDescription(
+            QCoreApplication::translate("CommandLine", "yalahOO!!! native music archive"));
     parser.addHelpOption();
     parser.addOption(
-            { QStringLiteral("demo"),
-              QStringLiteral(
+            { u"demo"_s,
+              QCoreApplication::translate(
+                      "CommandLine",
                       "Use anonymous albums without reading saved data or starting audio") });
+    parser.addOption({ u"lighting-lab"_s,
+                       QCoreApplication::translate(
+                               "CommandLine",
+                               "Open lighting/motion controls with the anonymous demonstration") });
+    parser.addOption({ u"verify-deployment"_s,
+                       QCoreApplication::translate(
+                               "CommandLine",
+                               "Verify hidden product resources and media loading, then exit"),
+                       QCoreApplication::translate("CommandLine", "report") });
     parser.addOption(
-            { QStringLiteral("lighting-lab"),
-              QStringLiteral("Open lighting/motion controls with the anonymous demonstration") });
+            { u"verify-overview"_s,
+              QCoreApplication::translate("CommandLine", "Verify production overview and exit"),
+              QCoreApplication::translate("CommandLine", "directory") });
+    parser.addOption({ u"verify-detail"_s,
+                       QCoreApplication::translate("CommandLine",
+                                                   "Verify production detail motion and exit"),
+                       QCoreApplication::translate("CommandLine", "directory") });
     parser.addOption(
-            { QStringLiteral("verify-deployment"),
-              QStringLiteral("Verify hidden product resources and media loading, then exit"),
-              QStringLiteral("report") });
-    parser.addOption({ QStringLiteral("verify-overview"),
-                       QStringLiteral("Verify production overview and exit"),
-                       QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("verify-detail"),
-                       QStringLiteral("Verify production detail motion and exit"),
-                       QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("verify-navigation"),
-                       QStringLiteral("Verify production navigation and exit"),
-                       QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("verify-browse"),
-                       QStringLiteral("Verify production browse UI and exit"),
-                       QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("data-dir"), QStringLiteral("Override the native data root"),
-                       QStringLiteral("directory") });
+            { u"verify-navigation"_s,
+              QCoreApplication::translate("CommandLine", "Verify production navigation and exit"),
+              QCoreApplication::translate("CommandLine", "directory") });
     parser.addOption(
-            { QStringLiteral("music-root"),
-              QStringLiteral(
+            { u"verify-browse"_s,
+              QCoreApplication::translate("CommandLine", "Verify production browse UI and exit"),
+              QCoreApplication::translate("CommandLine", "directory") });
+    parser.addOption({ u"data-dir"_s,
+                       QCoreApplication::translate("CommandLine", "Override the native data root"),
+                       QCoreApplication::translate("CommandLine", "directory") });
+    parser.addOption(
+            { u"music-root"_s,
+              QCoreApplication::translate(
+                      "CommandLine",
                       "Scan a local absolute music directory (repeatable, replaces saved roots)"),
-              QStringLiteral("directory") });
+              QCoreApplication::translate("CommandLine", "directory") });
     parser.addOption(
-            { QStringLiteral("import-legacy"),
-              QStringLiteral("Read a legacy music-data-v3 directory into the native cache"),
-              QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("import-preferences"),
-                       QStringLiteral("Import an explicitly exported browser preferences JSON"),
-                       QStringLiteral("file") });
-    parser.addOption({ QStringLiteral("rescan-library"),
-                       QStringLiteral("Rescan saved local music directories") });
-    parser.addOption({ QStringLiteral("verify-runtime"),
-                       QStringLiteral("Write runtime evidence and exit"),
-                       QStringLiteral("report") });
-    parser.addOption({ QStringLiteral("verify-library"),
-                       QStringLiteral("Load anonymous mixed library for runtime verification only"),
-                       QStringLiteral("fixture") });
+            { u"import-legacy"_s,
+              QCoreApplication::translate(
+                      "CommandLine", "Read a legacy music-data-v3 directory into the native cache"),
+              QCoreApplication::translate("CommandLine", "directory") });
     parser.addOption(
-            { QStringLiteral("verify-filled"),
-              QStringLiteral("Exercise the production filled demonstration with verify-runtime") });
+            { u"import-preferences"_s,
+              QCoreApplication::translate("CommandLine",
+                                          "Import an explicitly exported browser preferences JSON"),
+              QCoreApplication::translate("CommandLine", "file") });
     parser.addOption(
-            { QStringLiteral("verify-motion"),
-              QStringLiteral(
+            { u"rescan-library"_s,
+              QCoreApplication::translate("CommandLine", "Rescan saved local music directories") });
+    parser.addOption(
+            { u"verify-runtime"_s,
+              QCoreApplication::translate("CommandLine", "Write runtime evidence and exit"),
+              QCoreApplication::translate("CommandLine", "report") });
+    parser.addOption(
+            { u"verify-library"_s,
+              QCoreApplication::translate(
+                      "CommandLine", "Load anonymous mixed library for runtime verification only"),
+              QCoreApplication::translate("CommandLine", "fixture") });
+    parser.addOption(
+            { u"verify-filled"_s,
+              QCoreApplication::translate(
+                      "CommandLine",
+                      "Exercise the production filled demonstration with verify-runtime") });
+    parser.addOption(
+            { u"verify-motion"_s,
+              QCoreApplication::translate(
+                      "CommandLine",
                       "Verify the production frame source, hide/restore and motion completion") });
     parser.addOption(
-            { QStringLiteral("verify-shading"),
-              QStringLiteral(
+            { u"verify-shading"_s,
+              QCoreApplication::translate(
+                      "CommandLine",
                       "Exercise production material/shadow/AO rendering with verify-runtime") });
 #ifdef YALAHOO_REVIEW
-    parser.addOption({ QStringLiteral("verify-integration"),
-                       QStringLiteral("Measure RHI production integration and exit"),
-                       QStringLiteral("directory") });
-    parser.addOption({ QStringLiteral("integration-seconds"),
-                       QStringLiteral("Production sampling duration (12-120 seconds)"),
-                       QStringLiteral("seconds"), QStringLiteral("12") });
-    parser.addOption({ QStringLiteral("verify-materials"),
-                       QStringLiteral("Verify source material state and native output"),
-                       QStringLiteral("fixture") });
-    parser.addOption({ QStringLiteral("material-report"),
-                       QStringLiteral("Material source/state report"), QStringLiteral("report") });
-    parser.addOption({ QStringLiteral("verify-scene"),
-                       QStringLiteral("Run deterministic geometry fixtures"),
-                       QStringLiteral("fixture") });
-    parser.addOption({ QStringLiteral("scene-report"), QStringLiteral("Geometry review report"),
-                       QStringLiteral("report") });
+    parser.addOption({ u"verify-integration"_s,
+                       QCoreApplication::translate("CommandLine",
+                                                   "Measure RHI production integration and exit"),
+                       QCoreApplication::translate("CommandLine", "directory") });
+    parser.addOption({ u"integration-seconds"_s,
+                       QCoreApplication::translate("CommandLine",
+                                                   "Production sampling duration (12-120 seconds)"),
+                       QCoreApplication::translate("CommandLine", "seconds"), u"12"_s });
+    parser.addOption({ u"verify-materials"_s,
+                       QCoreApplication::translate(
+                               "CommandLine", "Verify source material state and native output"),
+                       QCoreApplication::translate("CommandLine", "fixture") });
+    parser.addOption({ u"material-report"_s,
+                       QCoreApplication::translate("CommandLine", "Material source/state report"),
+                       QCoreApplication::translate("CommandLine", "report") });
+    parser.addOption(
+            { u"verify-scene"_s,
+              QCoreApplication::translate("CommandLine", "Run deterministic geometry fixtures"),
+              QCoreApplication::translate("CommandLine", "fixture") });
+    parser.addOption({ u"scene-report"_s,
+                       QCoreApplication::translate("CommandLine", "Geometry review report"),
+                       QCoreApplication::translate("CommandLine", "report") });
 #endif
     parser.process(app);
-    const bool demonstration =
-            parser.isSet(QStringLiteral("demo")) || parser.isSet(QStringLiteral("lighting-lab"));
+    const bool demonstration = parser.isSet(u"demo"_s) || parser.isSet(u"lighting-lab"_s);
     if (demonstration) {
         for (const auto &option : parser.optionNames()) {
-            if (option.startsWith(QStringLiteral("verify-"))
-                || QStringList{ "data-dir", "music-root", "import-legacy", "import-preferences",
-                                "rescan-library" }
+            if (option.startsWith(u"verify-"_s)
+                || QStringList{ u"data-dir"_s, u"music-root"_s, u"import-legacy"_s,
+                                u"import-preferences"_s, u"rescan-library"_s }
                            .contains(option)) {
                 qWarning("Demonstration cannot be combined with data or verification options");
                 return 7;
             }
         }
     }
-    const bool appVerification = parser.isSet(QStringLiteral("verify-deployment"))
-            || parser.isSet(QStringLiteral("verify-browse"))
-            || parser.isSet(QStringLiteral("verify-navigation"))
-            || parser.isSet(QStringLiteral("verify-detail"))
-            || parser.isSet(QStringLiteral("verify-overview"));
-    if (parser.isSet(QStringLiteral("verify-filled"))
-        && (!parser.isSet(QStringLiteral("verify-runtime"))
-            || parser.isSet(QStringLiteral("verify-library"))
-            || parser.isSet(QStringLiteral("verify-motion"))))
+    const bool appVerification = parser.isSet(u"verify-deployment"_s)
+            || parser.isSet(u"verify-browse"_s) || parser.isSet(u"verify-navigation"_s)
+            || parser.isSet(u"verify-detail"_s) || parser.isSet(u"verify-overview"_s);
+    if (parser.isSet(u"verify-filled"_s)
+        && (!parser.isSet(u"verify-runtime"_s) || parser.isSet(u"verify-library"_s)
+            || parser.isSet(u"verify-motion"_s)))
         return 7;
-    if (parser.isSet(QStringLiteral("verify-shading"))
-        && !parser.isSet(QStringLiteral("verify-runtime")))
+    if (parser.isSet(u"verify-shading"_s) && !parser.isSet(u"verify-runtime"_s))
         return 7;
-    if (parser.isSet(QStringLiteral("verify-runtime")) || appVerification
+    if (parser.isSet(u"verify-runtime"_s) || appVerification
 #ifdef YALAHOO_REVIEW
-        || parser.isSet(QStringLiteral("verify-materials"))
+        || parser.isSet(u"verify-materials"_s)
 #endif
     )
         qInstallMessageHandler(recordDiagnostic);
@@ -231,10 +256,10 @@ int main(int argc, char **argv)
         background.stop();
         sounds.stop();
     });
-    if (parser.isSet(QStringLiteral("verify-library"))) {
-        if (!parser.isSet(QStringLiteral("verify-runtime")))
+    if (parser.isSet(u"verify-library"_s)) {
+        if (!parser.isSet(u"verify-runtime"_s))
             return 7;
-        QFile input(parser.value(QStringLiteral("verify-library")));
+        QFile input(parser.value(u"verify-library"_s));
         if (!input.open(QIODevice::ReadOnly))
             return 7;
         QJsonParseError parseError;
@@ -243,20 +268,18 @@ int main(int argc, char **argv)
         QString error;
         if (parseError.error != QJsonParseError::NoError
             || !yalahoo::readLibrary(
-                    document.object().value("libraries").toObject().value("mixed").toObject(),
+                    document.object().value(u"libraries"_s).toObject().value(u"mixed"_s).toObject(),
                     snapshot, &error))
             return 7;
         library.setSnapshot(std::move(snapshot));
-        library.search(QStringLiteral("Typography"));
+        library.search(u"Typography"_s);
         if (!library.snapshot()->albums.isEmpty())
-            library.requestMetadata(library.snapshot()->albums.first().id,
-                                    QStringLiteral("introduction"));
+            library.requestMetadata(library.snapshot()->albums.first().id, u"introduction"_s);
     }
-    const bool verificationRun = parser.isSet(QStringLiteral("verify-runtime")) || appVerification
+    const bool verificationRun = parser.isSet(u"verify-runtime"_s) || appVerification
 #ifdef YALAHOO_REVIEW
-            || parser.isSet(QStringLiteral("verify-materials"))
-            || parser.isSet(QStringLiteral("verify-scene"))
-            || parser.isSet(QStringLiteral("verify-integration"))
+            || parser.isSet(u"verify-materials"_s) || parser.isSet(u"verify-scene"_s)
+            || parser.isSet(u"verify-integration"_s)
 #endif
             ;
     yalahoo::MotionController motion;
@@ -299,8 +322,8 @@ int main(int argc, char **argv)
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
     if (!verificationRun && !demonstration) {
-        const QString dataRoot = parser.isSet(QStringLiteral("data-dir"))
-                ? parser.value(QStringLiteral("data-dir"))
+        const QString dataRoot = parser.isSet(u"data-dir"_s)
+                ? parser.value(u"data-dir"_s)
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir::isAbsolutePath(dataRoot)) {
             qWarning("--data-dir requires an absolute path");
@@ -309,21 +332,21 @@ int main(int argc, char **argv)
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
         const auto applyAudio = [&] {
             const auto audio = preferences->audio();
-            playback.setVolume(audio.value("volume").toDouble(.65));
-            background.setVolume(audio.value("bgmVolume").toDouble(.18));
-            background.setEnabled(audio.value("bgm").toBool(true));
-            sounds.setVolume(audio.value("soundVolume").toDouble(.22));
-            sounds.setEnabled(audio.value("sound").toBool(true));
+            playback.setVolume(audio.value(u"volume"_s).toDouble(.65));
+            background.setVolume(audio.value(u"bgmVolume"_s).toDouble(.18));
+            background.setEnabled(audio.value(u"bgm"_s).toBool(true));
+            sounds.setVolume(audio.value(u"soundVolume"_s).toDouble(.22));
+            sounds.setEnabled(audio.value(u"sound"_s).toBool(true));
         };
         applyAudio();
         QObject::connect(preferences.get(), &yalahoo::PreferencesStore::imported, &background,
                          applyAudio);
         const auto saveAudio = [&] {
-            preferences->setAudio({ { "volume", playback.volume() },
-                                    { "bgm", background.enabled() },
-                                    { "bgmVolume", background.volume() },
-                                    { "sound", sounds.enabled() },
-                                    { "soundVolume", sounds.volume() } });
+            preferences->setAudio({ { u"volume"_s, playback.volume() },
+                                    { u"bgm"_s, background.enabled() },
+                                    { u"bgmVolume"_s, background.volume() },
+                                    { u"sound"_s, sounds.enabled() },
+                                    { u"soundVolume"_s, sounds.volume() } });
         };
         QObject::connect(&playback, &yalahoo::PlaybackController::volumeChanged, preferences.get(),
                          saveAudio);
@@ -336,28 +359,26 @@ int main(int argc, char **argv)
                          &yalahoo::StartupCoordinator::receive);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
                          [&](const QString &error) {
-                             if (!startup.statistics()["initialReady"].toBool())
+                             if (!startup.statistics()[u"initialReady"_s].toBool())
                                  startup.receive(libraryStore->snapshot());
                              qWarning().noquote() << error;
                          });
-        if (parser.isSet(QStringLiteral("import-preferences")))
+        if (parser.isSet(u"import-preferences"_s))
             if (!preferences->importJson(
-                        QUrl::fromLocalFile(parser.value(QStringLiteral("import-preferences")))))
+                        QUrl::fromLocalFile(parser.value(u"import-preferences"_s))))
                 return 7;
-        if (parser.isSet(QStringLiteral("import-legacy"))
-            && (parser.isSet(QStringLiteral("music-root"))
-                || parser.isSet(QStringLiteral("rescan-library")))) {
+        if (parser.isSet(u"import-legacy"_s)
+            && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
             qWarning("--import-legacy cannot be combined with scan options");
             return 7;
         }
         libraryStore->load();
-        if (parser.isSet(QStringLiteral("import-legacy"))) {
-            if (!libraryStore->importLegacy(
-                        QUrl::fromLocalFile(parser.value(QStringLiteral("import-legacy")))))
+        if (parser.isSet(u"import-legacy"_s)) {
+            if (!libraryStore->importLegacy(QUrl::fromLocalFile(parser.value(u"import-legacy"_s))))
                 return 7;
-        } else if (parser.isSet(QStringLiteral("music-root"))) {
+        } else if (parser.isSet(u"music-root"_s)) {
             QList<QUrl> roots;
-            for (const auto &path : parser.values(QStringLiteral("music-root"))) {
+            for (const auto &path : parser.values(u"music-root"_s)) {
                 if (!QDir::isAbsolutePath(path)) {
                     qWarning("--music-root requires absolute paths");
                     return 7;
@@ -366,7 +387,7 @@ int main(int argc, char **argv)
             }
             if (!libraryStore->setRoots(roots))
                 return 7;
-        } else if (parser.isSet(QStringLiteral("rescan-library"))) {
+        } else if (parser.isSet(u"rescan-library"_s)) {
             const auto once = std::make_shared<QMetaObject::Connection>();
             *once = QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady,
                                      libraryStore.get(),
@@ -377,7 +398,7 @@ int main(int argc, char **argv)
         }
     }
     yalahoo::SettingsController settings(preferences.get(), &library, &motion, &scene, &selection);
-    if (!verificationRun || parser.isSet(QStringLiteral("verify-filled")) || appVerification) {
+    if (!verificationRun || parser.isSet(u"verify-filled"_s) || appVerification) {
         // Verification fixtures stay isolated from the user's persistent library.
         if (verificationRun || demonstration) {
             library.setSnapshot(yalahoo::demonstrationLibrary());
@@ -460,24 +481,21 @@ int main(int argc, char **argv)
         QObject::connect(&selection, &yalahoo::SelectionController::selectionChanged, &sounds,
                          [&, soundCell] {
                              const auto cell = selection.cell();
-                             sounds.trigger(cell.lane != soundCell->lane ? QStringLiteral("column")
-                                                                         : QStringLiteral("tick"));
+                             sounds.trigger(cell.lane != soundCell->lane ? u"column"_s : u"tick"_s);
                              *soundCell = cell;
                          });
         QObject::connect(&panels, &yalahoo::PanelController::changed, &sounds, [&] {
-            sounds.trigger(panels.panel().isEmpty() ? QStringLiteral("page-close")
-                                                    : QStringLiteral("page-open"));
+            sounds.trigger(panels.panel().isEmpty() ? u"page-close"_s : u"page-open"_s);
         });
         QObject::connect(&presentation, &yalahoo::PresentationController::focusRequested, &sounds,
                          [&](bool detail) {
-                             sounds.trigger(detail ? QStringLiteral("open")
-                                                   : QStringLiteral("back"));
+                             sounds.trigger(detail ? u"open"_s : u"back"_s);
                          });
         background.start();
     }
     QStringList deploymentWarnings;
     QQmlApplicationEngine engine;
-    if (parser.isSet(QStringLiteral("verify-deployment"))) {
+    if (parser.isSet(u"verify-deployment"_s)) {
         QObject::connect(&engine, &QQmlEngine::warnings, &engine,
                          [&](const QList<QQmlError> &warnings) {
                              for (const auto &warning : warnings)
@@ -488,54 +506,53 @@ int main(int argc, char **argv)
     QVariantMap presentationProperties;
     if (usesApp) {
         if (!verificationRun) {
-            presentationProperties.insert("openingController", QVariant::fromValue(&opening));
-            presentationProperties.insert("startupCoordinator", QVariant::fromValue(&startup));
+            presentationProperties.insert(u"openingController"_s, QVariant::fromValue(&opening));
+            presentationProperties.insert(u"startupCoordinator"_s, QVariant::fromValue(&startup));
         }
-        presentationProperties.insert("presentationController", QVariant::fromValue(&presentation));
-        presentationProperties.insert("playbackController", QVariant::fromValue(&playback));
-        presentationProperties.insert("backgroundMusicController",
+        presentationProperties.insert(u"presentationController"_s,
+                                      QVariant::fromValue(&presentation));
+        presentationProperties.insert(u"playbackController"_s, QVariant::fromValue(&playback));
+        presentationProperties.insert(u"backgroundMusicController"_s,
                                       QVariant::fromValue(&background));
-        presentationProperties.insert("interfaceSoundController", QVariant::fromValue(&sounds));
-        presentationProperties.insert("trackFocusController", QVariant::fromValue(&trackFocus));
-        presentationProperties.insert("panelController", QVariant::fromValue(&panels));
-        presentationProperties.insert("libraryStore", QVariant::fromValue(libraryStore.get()));
-        presentationProperties.insert("detailModel", QVariant::fromValue(&detailModel));
-        presentationProperties.insert("overviewController", QVariant::fromValue(&overview));
+        presentationProperties.insert(u"interfaceSoundController"_s, QVariant::fromValue(&sounds));
+        presentationProperties.insert(u"trackFocusController"_s, QVariant::fromValue(&trackFocus));
+        presentationProperties.insert(u"panelController"_s, QVariant::fromValue(&panels));
+        presentationProperties.insert(u"libraryStore"_s, QVariant::fromValue(libraryStore.get()));
+        presentationProperties.insert(u"detailModel"_s, QVariant::fromValue(&detailModel));
+        presentationProperties.insert(u"overviewController"_s, QVariant::fromValue(&overview));
     }
     auto initialProperties = presentationProperties;
     const bool verificationFrameless = appVerification
 #ifdef YALAHOO_REVIEW
-            || parser.isSet(QStringLiteral("verify-integration"))
+            || parser.isSet(u"verify-integration"_s)
 #endif
             ;
     const QVariantMap commonProperties(
-            { { "inputRouter", QVariant::fromValue(&inputRouter) },
-              { "rulerController", QVariant::fromValue(&rulerController) },
-              { "verificationRun", verificationRun },
-              { "verificationFlags",
+            { { u"inputRouter"_s, QVariant::fromValue(&inputRouter) },
+              { u"rulerController"_s, QVariant::fromValue(&rulerController) },
+              { u"verificationRun"_s, verificationRun },
+              { u"verificationFlags"_s,
                 int(yalahoo::verification::windowFlags(verificationFrameless)) },
-              { "librarySession", QVariant::fromValue(&library) },
-              { "motionController", QVariant::fromValue(&motion) },
-              { "sceneAdapter", QVariant::fromValue(&scene) },
-              { "preferencesError", preferences ? preferences->error() : QString() },
-              { "geometryProbe",
-                parser.isSet(QStringLiteral("verify-runtime"))
-                        && !parser.isSet(QStringLiteral("verify-shading")) } });
+              { u"librarySession"_s, QVariant::fromValue(&library) },
+              { u"motionController"_s, QVariant::fromValue(&motion) },
+              { u"sceneAdapter"_s, QVariant::fromValue(&scene) },
+              { u"preferencesError"_s, preferences ? preferences->error() : QString() },
+              { u"geometryProbe"_s,
+                parser.isSet(u"verify-runtime"_s) && !parser.isSet(u"verify-shading"_s) } });
     for (auto it = commonProperties.cbegin(); it != commonProperties.cend(); ++it)
         initialProperties.insert(it.key(), it.value());
 #ifdef YALAHOO_REVIEW
-    if (parser.isSet(QStringLiteral("verify-materials"))) {
-        if (!parser.isSet(QStringLiteral("material-report")))
+    if (parser.isSet(u"verify-materials"_s)) {
+        if (!parser.isSet(u"material-report"_s))
             return 12;
-        return yalahoo::reviewMaterials(app, scene,
-                                        parser.value(QStringLiteral("verify-materials")),
-                                        parser.value(QStringLiteral("material-report")));
+        return yalahoo::reviewMaterials(app, scene, parser.value(u"verify-materials"_s),
+                                        parser.value(u"material-report"_s));
     }
 #endif
     if (usesApp)
-        initialProperties.insert("lightingLab", parser.isSet(QStringLiteral("lighting-lab")));
+        initialProperties.insert(u"lightingLab"_s, parser.isSet(u"lighting-lab"_s));
     if (!verificationRun || appVerification)
-        initialProperties.insert("settingsController", QVariant::fromValue(&settings));
+        initialProperties.insert(u"settingsController"_s, QVariant::fromValue(&settings));
     engine.setInitialProperties(initialProperties);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -558,7 +575,7 @@ int main(int argc, char **argv)
         applicationMenu = std::make_unique<yalahoo::ApplicationMenu>(
                 *window,
                 [&] {
-                    panels.open(QStringLiteral("settings"));
+                    panels.open(u"settings"_s);
                 },
                 [&] {
                     return !opening.active();
@@ -581,42 +598,40 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
-    if (parser.isSet(QStringLiteral("verify-deployment")))
-        return yalahoo::verifyDeployment(app, *window,
-                                         parser.value(QStringLiteral("verify-deployment")),
+    if (parser.isSet(u"verify-deployment"_s))
+        return yalahoo::verifyDeployment(app, *window, parser.value(u"verify-deployment"_s),
                                          deploymentWarnings);
-    if (parser.isSet(QStringLiteral("verify-overview")))
+    if (parser.isSet(u"verify-overview"_s))
         return yalahoo::reviewOverview(app, *window, scene, overview, presentation, library, motion,
-                                       parser.value(QStringLiteral("verify-overview")));
-    if (parser.isSet(QStringLiteral("verify-detail")))
+                                       parser.value(u"verify-overview"_s));
+    if (parser.isSet(u"verify-detail"_s))
         return yalahoo::reviewDetail(app, *window, scene, library, presentation, motion,
-                                     parser.value(QStringLiteral("verify-detail")));
-    if (parser.isSet(QStringLiteral("verify-navigation")))
+                                     parser.value(u"verify-detail"_s));
+    if (parser.isSet(u"verify-navigation"_s))
         return yalahoo::reviewNavigation(app, *window, scene, library, inputRouter, rulerController,
-                                         parser.value(QStringLiteral("verify-navigation")));
-    if (parser.isSet(QStringLiteral("verify-browse")))
+                                         parser.value(u"verify-navigation"_s));
+    if (parser.isSet(u"verify-browse"_s))
         return yalahoo::reviewBrowse(app, *window, scene, library,
-                                     parser.value(QStringLiteral("verify-browse")));
+                                     parser.value(u"verify-browse"_s));
 #ifdef YALAHOO_REVIEW
-    if (parser.isSet(QStringLiteral("verify-integration"))) {
+    if (parser.isSet(u"verify-integration"_s)) {
         bool ok = false;
-        const auto seconds = parser.value(QStringLiteral("integration-seconds")).toDouble(&ok);
+        const auto seconds = parser.value(u"integration-seconds"_s).toDouble(&ok);
         if (!ok)
             return 20;
-        return yalahoo::reviewIntegration(
-                app, *window, scene, parser.value(QStringLiteral("verify-integration")), seconds);
+        return yalahoo::reviewIntegration(app, *window, scene,
+                                          parser.value(u"verify-integration"_s), seconds);
     }
-    if (parser.isSet(QStringLiteral("verify-scene"))) {
-        if (!parser.isSet(QStringLiteral("scene-report")))
+    if (parser.isSet(u"verify-scene"_s)) {
+        if (!parser.isSet(u"scene-report"_s))
             return 9;
-        return yalahoo::reviewScene(app, *window, scene,
-                                    parser.value(QStringLiteral("verify-scene")),
-                                    parser.value(QStringLiteral("scene-report")));
+        return yalahoo::reviewScene(app, *window, scene, parser.value(u"verify-scene"_s),
+                                    parser.value(u"scene-report"_s));
     }
 #endif
 
-    if (parser.isSet(QStringLiteral("verify-motion"))) {
-        if (!parser.isSet(QStringLiteral("verify-runtime")))
+    if (parser.isSet(u"verify-motion"_s)) {
+        if (!parser.isSet(u"verify-runtime"_s))
             return 8;
         QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, &app, [&](double dt, double) {
             if (awaitingResume) {
@@ -637,7 +652,7 @@ int main(int argc, char **argv)
             pausedFrames = motion.clock()->frameCount();
         });
         QTimer::singleShot(700, window, [&] {
-            motionEvidence.insert("hiddenPaused",
+            motionEvidence.insert(u"hiddenPaused"_s,
                                   !motion.clock()->active()
                                           && pausedTime == motion.clock()->visualTime()
                                           && pausedFrames == motion.clock()->frameCount());
@@ -653,7 +668,7 @@ int main(int argc, char **argv)
             pausedFrames = motion.clock()->frameCount();
         });
         QTimer::singleShot(1500, window, [&] {
-            motionEvidence.insert("minimizedPaused",
+            motionEvidence.insert(u"minimizedPaused"_s,
                                   !motion.clock()->active()
                                           && pausedTime == motion.clock()->visualTime()
                                           && pausedFrames == motion.clock()->frameCount());
@@ -676,11 +691,11 @@ int main(int argc, char **argv)
             },
             Qt::DirectConnection);
 
-    if (parser.isSet(QStringLiteral("verify-runtime"))) {
+    if (parser.isSet(u"verify-runtime"_s)) {
         window->show();
-        const QString report = parser.value(QStringLiteral("verify-runtime"));
+        const QString report = parser.value(u"verify-runtime"_s);
         QTimer::singleShot(1000, window, [window] {
-            auto *button = window->findChild<QQuickItem *>(QStringLiteral("interactionProbe"));
+            auto *button = window->findChild<QQuickItem *>(u"interactionProbe"_s);
             if (!button)
                 return;
             const QPointF point =
@@ -698,36 +713,32 @@ int main(int argc, char **argv)
                 return;
             const QImage image = window->grabWindow();
             const QRawFont raw = QRawFont::fromFont(QGuiApplication::font());
-            const QString chinese = QStringLiteral("一张一张，慢慢听");
+            const QString chinese = u"\u4e00\u5f20\u4e00\u5f20\uff0c\u6162\u6162\u542c"_s;
             bool chineseSupported = true;
             for (const QChar character : chinese)
                 chineseSupported = chineseSupported && raw.supportsCharacter(character);
-            const bool shaderAvailable =
-                    QFile::exists(QStringLiteral(":/assets/shaders/probe.frag.qsb"));
-            const bool qmlAvailable =
-                    QFile::exists(QStringLiteral(":/qt/qml/Yalahoo/Music/App.qml"));
+            const bool shaderAvailable = QFile::exists(u":/assets/shaders/probe.frag.qsb"_s);
+            const bool qmlAvailable = QFile::exists(u":/qt/qml/Yalahoo/Music/App.qml"_s);
             const int interactions = window->property("interactionCount").toInt();
             const bool mediaAvailable = playback.isAvailable();
             bool backend = QSGRendererInterface::isApiRhiBased(
                     static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
 #if defined(Q_OS_WIN)
             backend = api
-                    == (qgetenv("QSG_RHI_BACKEND") == "opengl" ? QSGRendererInterface::OpenGL
-                                                               : QSGRendererInterface::Direct3D11);
+                    == (qgetenv("QSG_RHI_BACKEND") == "opengl"_ba
+                                ? QSGRendererInterface::OpenGL
+                                : QSGRendererInterface::Direct3D11);
 #endif
             QDir().mkpath(QFileInfo(report).absolutePath());
             const QString screenshot = QFileInfo(report).absolutePath()
-                    + (parser.isSet(QStringLiteral("verify-motion"))
-                               ? QStringLiteral("/runtime-motion.png")
-                               : QStringLiteral("/runtime.png"));
+                    + (parser.isSet(u"verify-motion"_s) ? u"/runtime-motion.png"_s
+                                                        : u"/runtime.png"_s);
             const bool saved = !image.isNull() && image.save(screenshot);
-            const auto *nativeScene =
-                    window->findChild<QQuickItem *>(QStringLiteral("nativeScene"));
+            const auto *nativeScene = window->findChild<QQuickItem *>(u"nativeScene"_s);
             const bool nativeSceneAvailable = nativeScene != nullptr;
             const bool qmlMediaAvailable =
-                    window->findChild<QObject *>(QStringLiteral("qmlMediaProbe")) != nullptr;
-            const auto *libraryProbe =
-                    window->findChild<QObject *>(QStringLiteral("libraryDataProbe"));
+                    window->findChild<QObject *>(u"qmlMediaProbe"_s) != nullptr;
+            const auto *libraryProbe = window->findChild<QObject *>(u"libraryDataProbe"_s);
             const QString libraryText =
                     libraryProbe ? libraryProbe->property("text").toString() : QString{ };
             int modelPixels = 0;
@@ -746,7 +757,7 @@ int main(int argc, char **argv)
                  ++y) {
                 for (int x = modelRegion.left(); x <= modelRegion.right(); ++x) {
                     const QColor color = image.pixelColor(x, y);
-                    if (parser.isSet(QStringLiteral("verify-shading"))
+                    if (parser.isSet(u"verify-shading"_s)
                                 ? (color.red() > color.blue() + 20
                                    && color.red() > color.green() + 8)
                                 : (color.green() > color.red() + 8 && color.green() < 165
@@ -759,12 +770,12 @@ int main(int argc, char **argv)
                 const QMutexLocker lock(&diagnosticsMutex);
                 recorded = diagnostics;
             }
-            motionEvidence.insert("finalWindowVisibility", int(window->visibility()));
-            motionEvidence.insert("clockActive", motion.clock()->active());
-            motionEvidence.insert("applicationVisible", motion.clock()->applicationVisible());
-            const bool motionPassed = !parser.isSet(QStringLiteral("verify-motion"))
-                    || (motionEvidence.value("hiddenPaused").toBool()
-                        && motionEvidence.value("minimizedPaused").toBool() && resumeDiscarded
+            motionEvidence.insert(u"finalWindowVisibility"_s, int(window->visibility()));
+            motionEvidence.insert(u"clockActive"_s, motion.clock()->active());
+            motionEvidence.insert(u"applicationVisible"_s, motion.clock()->applicationVisible());
+            const bool motionPassed = !parser.isSet(u"verify-motion"_s)
+                    || (motionEvidence.value(u"hiddenPaused"_s).toBool()
+                        && motionEvidence.value(u"minimizedPaused"_s).toBool() && resumeDiscarded
                         && resumeSamples == 2 && !motion.moving() && motion.rail() == -.62
                         && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
                         && !completionRevisions.isEmpty()
@@ -773,8 +784,8 @@ int main(int argc, char **argv)
                         && playback.source().isEmpty());
             const bool shaderDiagnostics =
                     std::any_of(recorded.cbegin(), recorded.cend(), [](const QString &s) {
-                        return s.contains("Failed to compile") || s.contains("QSpirvCompiler")
-                                || s.contains("TypeError");
+                        return s.contains(u"Failed to compile"_s) || s.contains(u"QSpirvCompiler"_s)
+                                || s.contains(u"TypeError"_s);
                     });
             const bool passed = yalahoo::verification::windowPolicySatisfied(*window)
                     && !shaderDiagnostics && motionPassed && frames > 0
@@ -782,66 +793,67 @@ int main(int argc, char **argv)
                     && backend && interactions == 1 && mediaAvailable && shaderAvailable
                     && qmlAvailable && chineseSupported && saved && nativeSceneAvailable
                     && qmlMediaAvailable && modelPixels > 100 && libraryProbe
-                    && (!parser.isSet(QStringLiteral("verify-filled"))
+                    && (!parser.isSet(u"verify-filled"_s)
                         || (scene.selection() == &selection && scene.frame().instances.size() == 432
                             && library.albums()->rowCount() == 27
                             && library.playbackTrackId().isEmpty() && playback.source().isEmpty()))
-                    && (!parser.isSet(QStringLiteral("verify-library"))
+                    && (!parser.isSet(u"verify-library"_s)
                         || (library.albums()->rowCount() == 21
                             && library.searchResults()->rowCount() == 28
                             && library.metadata().size() == 1 && library.playbackTrackId().isEmpty()
                             && playback.source().isEmpty()
-                            && libraryText == QStringLiteral("匿名库模型 · 21 张专辑")));
+                            && libraryText
+                                    == u"\u533f\u540d\u5e93\u6a21\u578b \u00b7 21 \u5f20\u4e13\u8f91"_s));
             const QJsonObject evidence{
-                { "passed", passed },
-                { "qtVersion", QString::fromLatin1(qVersion()) },
-                { "platformPlugin", QGuiApplication::platformName() },
-                { "graphicsApi", api.load() },
-                { "renderedFrames", frames.load() },
-                { "windowTitle", window->title() },
-                { "windowPolicy", yalahoo::verification::windowPolicy(*window) },
-                { "devicePixelRatio", window->devicePixelRatio() },
-                { "applicationName", app.applicationName() },
-                { "displayName", app.applicationDisplayName() },
-                { "dataDirectory",
+                { u"passed"_s, passed },
+                { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                { u"platformPlugin"_s, QGuiApplication::platformName() },
+                { u"graphicsApi"_s, api.load() },
+                { u"renderedFrames"_s, frames.load() },
+                { u"windowTitle"_s, window->title() },
+                { u"windowPolicy"_s, yalahoo::verification::windowPolicy(*window) },
+                { u"devicePixelRatio"_s, window->devicePixelRatio() },
+                { u"applicationName"_s, app.applicationName() },
+                { u"displayName"_s, app.applicationDisplayName() },
+                { u"dataDirectory"_s,
                   QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) },
-                { "controlRendering", "project-quick-templates" },
-                { "interactionCount", interactions },
-                { "chineseGlyphs", chineseSupported },
-                { "font", raw.familyName() },
-                { "qmlResource", qmlAvailable },
-                { "shaderResource", shaderAvailable },
-                { "nativeSceneObject", nativeSceneAvailable },
-                { "modelPixels", modelPixels },
-                { "shadingProbe", parser.isSet(QStringLiteral("verify-shading")) },
-                { "qmlMediaObject", qmlMediaAvailable },
-                { "diagnostics", QJsonArray::fromStringList(recorded) },
-                { "mediaAvailable", mediaAvailable },
-                { "audioOutputCount", QMediaDevices::audioOutputs().size() },
-                { "screenshotSaved", saved },
-                { "sourceOpened", false }
+                { u"controlRendering"_s, u"project-quick-templates"_s },
+                { u"interactionCount"_s, interactions },
+                { u"chineseGlyphs"_s, chineseSupported },
+                { u"font"_s, raw.familyName() },
+                { u"qmlResource"_s, qmlAvailable },
+                { u"shaderResource"_s, shaderAvailable },
+                { u"nativeSceneObject"_s, nativeSceneAvailable },
+                { u"modelPixels"_s, modelPixels },
+                { u"shadingProbe"_s, parser.isSet(u"verify-shading"_s) },
+                { u"qmlMediaObject"_s, qmlMediaAvailable },
+                { u"diagnostics"_s, QJsonArray::fromStringList(recorded) },
+                { u"mediaAvailable"_s, mediaAvailable },
+                { u"audioOutputCount"_s, QMediaDevices::audioOutputs().size() },
+                { u"screenshotSaved"_s, saved },
+                { u"sourceOpened"_s, false }
             };
             QJsonObject reportData = evidence;
-            reportData.insert("visualFrameCount", qint64(motion.clock()->frameCount()));
-            reportData.insert("visualTime", motion.clock()->visualTime());
-            if (parser.isSet(QStringLiteral("verify-motion"))) {
-                motionEvidence.insert("passed", motionPassed);
-                motionEvidence.insert("resumeDiscarded", resumeDiscarded);
-                motionEvidence.insert("resumeSamples", resumeSamples);
-                motionEvidence.insert("completionRevisions", completionRevisions);
-                motionEvidence.insert("finalRevision", qint64(motion.revision()));
-                motionEvidence.insert("openingTime", motion.clock()->openingTime());
-                motionEvidence.insert("mediaSourceEmpty", playback.source().isEmpty());
-                reportData.insert("motion", motionEvidence);
+            reportData.insert(u"visualFrameCount"_s, qint64(motion.clock()->frameCount()));
+            reportData.insert(u"visualTime"_s, motion.clock()->visualTime());
+            if (parser.isSet(u"verify-motion"_s)) {
+                motionEvidence.insert(u"passed"_s, motionPassed);
+                motionEvidence.insert(u"resumeDiscarded"_s, resumeDiscarded);
+                motionEvidence.insert(u"resumeSamples"_s, resumeSamples);
+                motionEvidence.insert(u"completionRevisions"_s, completionRevisions);
+                motionEvidence.insert(u"finalRevision"_s, qint64(motion.revision()));
+                motionEvidence.insert(u"openingTime"_s, motion.clock()->openingTime());
+                motionEvidence.insert(u"mediaSourceEmpty"_s, playback.source().isEmpty());
+                reportData.insert(u"motion"_s, motionEvidence);
             }
-            reportData.insert("libraryAlbums", library.albums()->rowCount());
-            reportData.insert("searchResults", library.searchResults()->rowCount());
-            reportData.insert("metadataResults", library.metadata().size());
-            reportData.insert("playbackTrackId", library.playbackTrackId());
-            reportData.insert("libraryQmlText", libraryText);
-            reportData.insert("filledProbe", parser.isSet(QStringLiteral("verify-filled")));
+            reportData.insert(u"libraryAlbums"_s, library.albums()->rowCount());
+            reportData.insert(u"searchResults"_s, library.searchResults()->rowCount());
+            reportData.insert(u"metadataResults"_s, library.metadata().size());
+            reportData.insert(u"playbackTrackId"_s, library.playbackTrackId());
+            reportData.insert(u"libraryQmlText"_s, libraryText);
+            reportData.insert(u"filledProbe"_s, parser.isSet(u"verify-filled"_s));
             if (scene.selection())
-                reportData.insert("poolInstances", scene.frame().instances.size());
+                reportData.insert(u"poolInstances"_s, scene.frame().instances.size());
             QSaveFile output(report);
             if (!output.open(QIODevice::WriteOnly)) {
                 app.exit(4);
@@ -851,7 +863,7 @@ int main(int argc, char **argv)
             const bool committed = output.commit();
             app.exit(passed && committed ? 0 : 5);
         };
-        if (parser.isSet(QStringLiteral("verify-motion"))) {
+        if (parser.isSet(u"verify-motion"_s)) {
             QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, window,
                              [&, writeRuntimeReport](double, double) {
                                  if (resumeSamples == 2 && motion.reducedMotion()

@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "LibraryModels.h"
 #include <QCollator>
 #include <QLocale>
@@ -5,7 +6,19 @@
 #include <algorithm>
 #include <numeric>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
+QString genreDisplayName(const Genre &genre)
+{
+    return genre.name.isEmpty() ? QCoreApplication::translate("Yalahoo", "Unclassified")
+                                : genre.name;
+}
+QString artistDisplayName(const QString &artist)
+{
+    return artist.isEmpty() ? QCoreApplication::translate("LibraryPresentation", "Unknown artist")
+                            : artist;
+}
 QString normalizedKey(const QString &value)
 {
     return value.normalized(QString::NormalizationForm_KC).simplified().toLower();
@@ -15,7 +28,7 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
     LibraryOrder result;
     result.indices.resize(snapshot.albums.size());
     std::iota(result.indices.begin(), result.indices.end(), 0);
-    QCollator collator(QLocale(QStringLiteral("zh_CN")));
+    QCollator collator(QLocale(u"zh_CN"_s));
     collator.setNumericMode(true);
     collator.setCaseSensitivity(Qt::CaseInsensitive);
     const auto compare = [&](const QString &a, const QString &b) {
@@ -46,11 +59,11 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
     if (mode == SortMode::Album) {
         for (int start = 0; start < result.indices.size(); start += 12) {
             const int end = std::min(start + 12, int(result.indices.size()));
-            LibraryColumn column{ QStringLiteral("album:%1").arg(start / 12),
-                                  QStringLiteral("%1–%2")
-                                          .arg(start + 1, 2, 10, QLatin1Char('0'))
-                                          .arg(end, 2, 10, QLatin1Char('0')),
-                                  { } };
+            LibraryColumn column{
+                u"album:%1"_s.arg(start / 12),
+                u"%1\u2013%2"_s.arg(start + 1, 2, 10, '0'_L1).arg(end, 2, 10, '0'_L1),
+                { }
+            };
             for (int i = start; i < end; ++i)
                 column.albumIds.append(snapshot.albums[result.indices[i]].id);
             result.columns.append(column);
@@ -62,7 +75,7 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         if (mode == SortMode::Genre) {
             for (const auto &genre : snapshot.genres) {
                 if (used.remove(genre.id))
-                    result.columns.append({ genre.id, genre.name, { } });
+                    result.columns.append({ genre.id, genreDisplayName(genre), { } });
             }
             for (const auto &album : snapshot.albums)
                 if (used.remove(album.genreId))
@@ -79,9 +92,11 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
             if (column == columnByKey.cend()) {
                 const QString label = album.artist.simplified();
                 columnByKey.insert(key, result.columns.size());
-                result.columns.append({ key,
-                                        label.isEmpty() ? QStringLiteral("未知歌手") : label,
-                                        { album.id } });
+                result.columns.append(
+                        { key,
+                          label.isEmpty() ? QCoreApplication::translate("Yalahoo", "Unknown artist")
+                                          : label,
+                          { album.id } });
             } else
                 result.columns[column.value()].albumIds.append(album.id);
         }
@@ -97,21 +112,21 @@ QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString
     const QString query = input.trimmed().toLower();
     QHash<QString, QString> names;
     for (const auto &genre : snapshot.genres)
-        names.insert(genre.id, genre.name);
+        names.insert(genre.id, genreDisplayName(genre));
     QList<SearchResult> results;
     for (const auto &album : snapshot.albums) {
         if (!genreId.isEmpty() && album.genreId != genreId)
             continue;
         QString genre = names.value(album.genreId);
         if (genre.isEmpty())
-            genre = QStringLiteral("未分类");
+            genre = QCoreApplication::translate("Yalahoo", "Unclassified");
         if (query.isEmpty()
-            || (album.title + ' ' + album.artist + ' ' + genre).toLower().contains(query))
+            || (album.title + ' '_L1 + album.artist + ' '_L1 + genre).toLower().contains(query))
             results.append({ album.id, { } });
         if (query.isEmpty())
             continue;
         for (const auto &track : album.tracks)
-            if ((track.title + ' ' + track.artist).toLower().contains(query))
+            if ((track.title + ' '_L1 + track.artist).toLower().contains(query))
                 results.append({ album.id, track.id });
     }
     return results;
@@ -126,27 +141,28 @@ int AlbumListModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> AlbumListModel::roleNames() const
 {
-    return { { AlbumId, "albumId" },
-             { Title, "title" },
-             { Artist, "artist" },
-             { Year, "year" },
-             { GenreId, "genreId" },
-             { CoverUrl, "coverUrl" },
-             { Folder, "folder" },
-             { Tracks, "tracks" },
-             { Producers, "producers" },
-             { Description, "description" },
-             { DescriptionSource, "descriptionSource" },
-             { Introduction, "introduction" },
-             { CreditsLookup, "creditsLookup" },
-             { Online, "online" },
-             { LocalNote, "localNote" },
-             { Offline, "offline" },
-             { AlbumData, "albumData" } };
+    return { { AlbumId, "albumId"_ba },
+             { Title, "title"_ba },
+             { Artist, "artist"_ba },
+             { Year, "year"_ba },
+             { GenreId, "genreId"_ba },
+             { CoverUrl, "coverUrl"_ba },
+             { Folder, "folder"_ba },
+             { Tracks, "tracks"_ba },
+             { Producers, "producers"_ba },
+             { Description, "description"_ba },
+             { DescriptionSource, "descriptionSource"_ba },
+             { Introduction, "introduction"_ba },
+             { CreditsLookup, "creditsLookup"_ba },
+             { Online, "online"_ba },
+             { LocalNote, "localNote"_ba },
+             { Offline, "offline"_ba },
+             { AlbumData, "albumData"_ba } };
 }
 QVariant AlbumListModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.column() != 0 || index.row() < 0 || index.row() >= rowCount())
+    if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
+        || index.row() >= rowCount())
         return { };
     const auto &album = m_snapshot->albums[m_order.indices[index.row()]];
     switch (role) {
@@ -155,7 +171,7 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
     case Title:
         return album.title;
     case Artist:
-        return album.artist;
+        return artistDisplayName(album.artist);
     case Year:
         return album.year ? QVariant(*album.year) : QVariant{ };
     case GenreId:
@@ -168,13 +184,13 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
         QVariantList tracks;
         for (const auto &track : album.tracks) {
             auto map = toJson(track).toVariantMap();
-            map.insert("sourceUrl", track.sourceUrl);
+            map.insert(u"sourceUrl"_s, track.sourceUrl);
             tracks.append(map);
         }
         return tracks;
     }
     case Producers:
-        return toJson(album).value("producers").toVariant();
+        return producerData(album.producers).toVariantList();
     case Description:
         return album.description;
     case DescriptionSource:
@@ -197,12 +213,14 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
 }
 void AlbumListModel::setSnapshot(Snapshot snapshot)
 {
+    const int previousCount = rowCount();
     beginResetModel();
     m_snapshot = snapshot ? std::move(snapshot) : std::make_shared<const LibrarySnapshot>();
     m_order = orderLibrary(*m_snapshot, m_mode);
     endResetModel();
-    emit countChanged();
-    emit columnsChanged();
+    if (previousCount != rowCount())
+        Q_EMIT countChanged();
+    Q_EMIT columnsChanged();
 }
 void AlbumListModel::setSortMode(SortMode mode)
 {
@@ -212,17 +230,17 @@ void AlbumListModel::setSortMode(SortMode mode)
     m_mode = mode;
     m_order = orderLibrary(*m_snapshot, mode);
     endResetModel();
-    emit columnsChanged();
+    Q_EMIT columnsChanged();
 }
 QVariantList AlbumListModel::columns() const
 {
     QVariantList result;
     int lane = 0;
     for (const auto &column : m_order.columns)
-        result.append(QVariantMap{ { "key", column.key },
-                                   { "label", column.label },
-                                   { "albumIds", column.albumIds },
-                                   { "lane", lane++ } });
+        result.append(QVariantMap{ { u"key"_s, column.key },
+                                   { u"label"_s, column.label },
+                                   { u"albumIds"_s, column.albumIds },
+                                   { u"lane"_s, lane++ } });
     return result;
 }
 SearchListModel::SearchListModel(QObject *parent)
@@ -235,13 +253,14 @@ int SearchListModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> SearchListModel::roleNames() const
 {
-    return { { Kind, "kind" },        { AlbumId, "albumId" }, { TrackId, "trackId" },
-             { Title, "title" },      { Artist, "artist" },   { CoverUrl, "coverUrl" },
-             { Subtitle, "subtitle" } };
+    return { { Kind, "kind"_ba },        { AlbumId, "albumId"_ba }, { TrackId, "trackId"_ba },
+             { Title, "title"_ba },      { Artist, "artist"_ba },   { CoverUrl, "coverUrl"_ba },
+             { Subtitle, "subtitle"_ba } };
 }
 QVariant SearchListModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.column() != 0 || index.row() < 0 || index.row() >= rowCount())
+    if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
+        || index.row() >= rowCount())
         return { };
     const auto &result = m_results[index.row()];
     const auto albumIndex = m_albumIndices.constFind(result.albumId);
@@ -254,7 +273,7 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     const auto *track = trackIndex < 0 ? nullptr : &album.tracks[trackIndex];
     switch (role) {
     case Kind:
-        return track ? QStringLiteral("track") : QStringLiteral("album");
+        return track ? u"track"_s : u"album"_s;
     case AlbumId:
         return result.albumId;
     case TrackId:
@@ -262,13 +281,14 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     case Title:
         return track ? track->title : album.title;
     case Artist:
-        return track ? track->artist : album.artist;
+        return artistDisplayName(track ? track->artist : album.artist);
     case CoverUrl:
         return album.coverUrl;
     case Subtitle:
         if (track)
             return album.title;
-        return m_genreNames.value(album.genreId, QStringLiteral("未分类"));
+        return m_genreNames.value(album.genreId,
+                                  QCoreApplication::translate("Yalahoo", "Unclassified"));
     default:
         return { };
     }
@@ -277,7 +297,7 @@ QVariantMap SearchListModel::resultAt(int row) const
 {
     if (row < 0 || row >= rowCount())
         return { };
-    return { { "albumId", m_results[row].albumId }, { "trackId", m_results[row].trackId } };
+    return { { u"albumId"_s, m_results[row].albumId }, { u"trackId"_s, m_results[row].trackId } };
 }
 void SearchListModel::update(Snapshot snapshot, const QString &query, const QString &genreId)
 {
@@ -293,8 +313,7 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
         m_entries.clear();
         m_genreNames.clear();
         for (const auto &genre : m_snapshot->genres)
-            if (!genre.name.isEmpty())
-                m_genreNames.insert(genre.id, genre.name);
+            m_genreNames.insert(genre.id, genreDisplayName(genre));
         m_albumIndices.reserve(m_snapshot->albums.size());
         m_trackIndices.reserve(m_snapshot->albums.size());
         for (qsizetype i = 0; i < m_snapshot->albums.size(); ++i) {
@@ -302,15 +321,16 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
             if (m_albumIndices.contains(album.id))
                 continue;
             m_albumIndices.insert(album.id, i);
-            const QString genre = m_genreNames.value(album.genreId, QStringLiteral("未分类"));
+            const QString genre = m_genreNames.value(
+                    album.genreId, QCoreApplication::translate("Yalahoo", "Unclassified"));
             m_entries.append({ { album.id, { } },
                                album.genreId,
-                               (album.title + ' ' + album.artist + ' ' + genre).toLower(),
+                               (album.title + ' '_L1 + album.artist + ' '_L1 + genre).toLower(),
                                true });
             for (const auto &track : album.tracks)
                 m_entries.append({ { album.id, track.id },
                                    album.genreId,
-                                   (track.title + ' ' + track.artist).toLower(),
+                                   (track.title + ' '_L1 + track.artist).toLower(),
                                    false });
             QHash<QString, qsizetype> tracks;
             tracks.reserve(album.tracks.size());
@@ -332,7 +352,7 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
         m_results = std::move(results);
         endResetModel();
         if (oldCount != rowCount())
-            emit countChanged();
+            Q_EMIT countChanged();
         return;
     }
     int prefix = 0;
@@ -349,7 +369,7 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
     for (int i = 0; i < reused; ++i)
         m_results[prefix + i] = results[prefix + i];
     if (reused)
-        emit dataChanged(index(prefix), index(prefix + reused - 1));
+        Q_EMIT dataChanged(index(prefix), index(prefix + reused - 1));
     if (removed > reused) {
         beginRemoveRows({ }, prefix + reused, prefix + removed - 1);
         m_results.remove(prefix + reused, removed - reused);
@@ -361,6 +381,6 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
         endInsertRows();
     }
     if (oldCount != rowCount())
-        emit countChanged();
+        Q_EMIT countChanged();
 }
 }

@@ -1,10 +1,13 @@
 #include "SelectionController.h"
 #include "OverviewController.h"
 #include "MotionFunctions.h"
+#include "MusicTypes.h"
 #include <QVector4D>
 #include <algorithm>
 #include <cmath>
 #include <limits>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 SelectionController::SelectionController(MotionController *motion, QObject *parent)
@@ -33,11 +36,11 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
     m_coverSources.clear();
     if (snapshot)
         for (const auto &album : snapshot->albums) {
-            const auto path = album.coverUrl.scheme() == QLatin1String("qrc")
-                    ? QStringLiteral(":") + album.coverUrl.path()
-                    : album.coverUrl.toLocalFile();
+            const auto path = album.coverUrl.scheme() == "qrc"_L1 ? u":"_s + album.coverUrl.path()
+                                                                  : album.coverUrl.toLocalFile();
             if (!m_coverSources.contains(album.id))
-                m_coverSources.insert(album.id, { path, album.title.left(256) });
+                m_coverSources.insert(album.id,
+                                      { path, graphemePrefix(album.title, 256), album.title });
         }
     m_returning.clear();
     m_drag.reset();
@@ -65,13 +68,20 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
                          m_cell.lane);
         m_motion->finish();
     }
-    emit libraryChanged();
+    Q_EMIT libraryChanged();
     publish();
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
 }
 QPair<QString, QString> SelectionController::coverSource(const QString &id) const
 {
-    return m_coverSources.value(id);
+    const auto source = m_coverSources.constFind(id);
+    return source == m_coverSources.cend() ? QPair<QString, QString>{ }
+                                           : qMakePair(source->path, source->placeholderTitle);
+}
+QString SelectionController::albumTitle(const QString &id) const
+{
+    const auto source = m_coverSources.constFind(id);
+    return source == m_coverSources.cend() ? QString{ } : source->title;
 }
 QString SelectionController::albumId() const
 {
@@ -139,7 +149,7 @@ void SelectionController::setRememberColumnPosition(bool enabled)
         m_memory.remember(
                 m_pool.columns()[ArchivePool::wrap(m_cell.lane, m_pool.columnCount())].key,
                 albumId());
-    emit memoryChanged();
+    Q_EMIT memoryChanged();
 }
 NavigationAvailability SelectionController::navigationAvailability() const
 {
@@ -176,9 +186,9 @@ void SelectionController::setRealistic(bool realistic)
     m_returning.clear();
     m_poolObjects.clear();
     m_pulses.clear();
-    emit arrayModeChanged();
+    Q_EMIT arrayModeChanged();
     publish();
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
 }
 ArchiveCell SelectionController::cell() const
 {
@@ -260,6 +270,8 @@ bool SelectionController::moveLane(int direction)
 {
     if ((direction != 1 && direction != -1) || !navigationAvailability().left)
         return false;
+    // Public selection accepts large periodic coordinates; narrow only after rebase.
+    rebase();
     const double lane = m_cell.lane + direction;
     return enterColumn(int(lane), false);
 }
@@ -350,7 +362,7 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
     if (m_pulses.size() > 6)
         m_pulses.removeFirst();
     publish();
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
     return true;
 }
 void SelectionController::setLift(double lift)
@@ -626,7 +638,7 @@ ArchiveCell SelectionController::rebase()
         pulse.cell.row -= shift.row;
     }
     m_motion->translate({ shift.row * .62, -shift.lane * 5.2, -shift.row, -shift.lane });
-    emit coordinatesRebased(shift.lane, shift.row);
+    Q_EMIT coordinatesRebased(shift.lane, shift.row);
     publish();
     return shift;
 }
@@ -808,7 +820,7 @@ void SelectionController::publish()
         return;
     m_instances = std::move(next);
     ++m_revision;
-    emit frameChanged();
+    Q_EMIT frameChanged();
 }
 QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, double y) const
 {
@@ -850,13 +862,13 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
             continue;
         nearest = enter;
         const auto local = localStart + delta * float(enter);
-        hit = { { "albumId", instance.albumId },
-                { "objectId", QVariant::fromValue(instance.objectId) },
-                { "lane", instance.cell.lane },
-                { "row", instance.cell.row },
-                { "localPoint", QVariant::fromValue(local) },
-                { "worldPoint", QVariant::fromValue(instance.transform.map(local)) },
-                { "frameRevision", QVariant::fromValue(frame.revision) } };
+        hit = { { u"albumId"_s, instance.albumId },
+                { u"objectId"_s, QVariant::fromValue(instance.objectId) },
+                { u"lane"_s, instance.cell.lane },
+                { u"row"_s, instance.cell.row },
+                { u"localPoint"_s, QVariant::fromValue(local) },
+                { u"worldPoint"_s, QVariant::fromValue(instance.transform.map(local)) },
+                { u"frameRevision"_s, QVariant::fromValue(frame.revision) } };
     }
     return hit;
 }

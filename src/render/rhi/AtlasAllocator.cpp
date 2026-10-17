@@ -47,9 +47,11 @@ AtlasLease AtlasAllocator::acquire(const QString &identity, quint64 coverGenerat
 }
 AtlasAllocator::Slot *AtlasAllocator::find(const AtlasLease &lease)
 {
+    if (lease.generation != m_generation || lease.page < 0 || lease.page >= pages()
+        || lease.slot < 0 || lease.slot >= m_slotsPerPage)
+        return nullptr;
     const int index = lease.page * m_slotsPerPage + lease.slot;
-    if (lease.generation != m_generation || lease.page < 0 || lease.slot < 0
-        || lease.slot >= m_slotsPerPage || index >= m_slots.size())
+    if (index >= m_slots.size())
         return nullptr;
     auto &slot = m_slots[index];
     return slot.lease == lease.lease && slot.identity == lease.identity && slot.references > 0
@@ -186,6 +188,7 @@ bool SelectedCoverPool::upgrade(const std::shared_ptr<SelectedCoverLease> &lease
         || (pixels->resolution != 256 && pixels->resolution != 1024)
         || pixels->generation != lease->coverGeneration
         || pixels->image.size() != QSize(pixels->resolution, pixels->resolution)
+        || (lease->pixels && lease->pixels->error.isEmpty() && !pixels->error.isEmpty())
         || (lease->pixels && pixels->resolution < lease->pixels->resolution))
         return false;
     lease->pixels = std::move(pixels);

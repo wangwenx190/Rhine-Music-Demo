@@ -18,6 +18,9 @@
 #include <QKeyEvent>
 #include <QSignalSpy>
 #include <stdexcept>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 void require(bool value, const char *message)
@@ -47,15 +50,15 @@ public:
         motion.clock()->advance(0);
         LibrarySnapshot snapshot;
         Genre genre;
-        genre.id = "opening-demo";
-        genre.name = "匿名序章收藏";
+        genre.id = "opening-demo"_L1;
+        genre.name = u"\u533f\u540d\u5e8f\u7ae0\u6536\u85cf"_s;
         snapshot.genres.append(genre);
         for (int i = 0; i < 3; ++i) {
             Album album;
-            album.id = QStringLiteral("opening-album-%1").arg(i);
-            album.title = QStringLiteral("匿名专辑 %1").arg(i + 1);
+            album.id = u"opening-album-%1"_s.arg(i);
+            album.title = u"\u533f\u540d\u4e13\u8f91 %1"_s.arg(i + 1);
             album.genreId = genre.id;
-            album.coverUrl = QUrl("qrc:/assets/demo-covers/square.png");
+            album.coverUrl = QUrl(u"qrc:/assets/demo-covers/square.png"_s);
             snapshot.albums.append(album);
         }
         library.setSnapshot(std::move(snapshot));
@@ -66,13 +69,13 @@ public:
                              for (const auto &error : errors)
                                  warnings.append(error.toString());
                          });
-        QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/pages/MusicStage.qml"));
+        QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/pages/MusicStage.qml"_s));
         root.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
-                { { "librarySession", QVariant::fromValue(&library) },
-                  { "motionController", QVariant::fromValue(&motion) },
-                  { "sceneAdapter", QVariant::fromValue(&scene) },
-                  { "openingController", QVariant::fromValue(&opening) },
-                  { "offscreenRendering", true } })));
+                { { u"librarySession"_s, QVariant::fromValue(&library) },
+                  { u"motionController"_s, QVariant::fromValue(&motion) },
+                  { u"sceneAdapter"_s, QVariant::fromValue(&scene) },
+                  { u"openingController"_s, QVariant::fromValue(&opening) },
+                  { u"offscreenRendering"_s, true } })));
         if (!root)
             qWarning() << component.errors();
         require(bool(root), "Cannot create production MusicStage");
@@ -80,11 +83,11 @@ public:
         motion.clock()->advance(0);
         root->setParentItem(window.contentItem());
         root->setSize(window.size());
-        native = qobject_cast<rhi::SceneItem *>(find(root.get(), "nativeScene"));
+        native = qobject_cast<rhi::SceneItem *>(find(root.get(), u"nativeScene"_s));
         require(native, "Missing production SceneItem");
         native->setTelemetryEnabled(true);
         QObject::connect(native, &rhi::SceneItem::frameSubmitted, &window, [&](QJsonObject sample) {
-            sample["openingTime"] = opening.time();
+            sample[u"openingTime"_s] = opening.time();
             samples.append(sample);
         });
         surface.show();
@@ -175,7 +178,7 @@ int reviewOpening(QGuiApplication &, const QString &output)
     bool passed = true;
     const auto check = [&](const QString &name, bool value) {
         passed &= value;
-        checks.append(QJsonObject{ { "name", name }, { "passed", value } });
+        checks.append(QJsonObject{ { u"name"_s, name }, { u"passed"_s, value } });
     };
     try {
         Driver d;
@@ -188,29 +191,29 @@ int reviewOpening(QGuiApplication &, const QString &output)
         d.frames(126, [&](int) {
             d.motion.clock()->advance(.05);
         });
-        check("opaque-paper-zero-3d-submission",
+        check(u"opaque-paper-zero-3d-submission"_s,
               d.opening.time() < 6.32 && rhi::sceneSubmissionStats().rendered.load() == warmDraws
                       && d.native->submission() == warmSubmission);
         d.frames(108, [&](int) {
             d.motion.clock()->advance(.05);
         });
-        check("one-film-handoff", handed.size() == 1 && !d.opening.film());
-        check("locked-during-chrome-reveal", d.opening.active());
+        check(u"one-film-handoff"_s, handed.size() == 1 && !d.opening.film());
+        check(u"locked-during-chrome-reveal"_s, d.opening.active());
         d.frames(15, [&](int) {
             d.motion.clock()->advance(.05);
         });
-        check("one-completion-after-720ms", !d.opening.active() && completed.size() == 1);
-        check("resting-camera", d.scene.settled());
-        check("focus-restored",
+        check(u"one-completion-after-720ms"_s, !d.opening.active() && completed.size() == 1);
+        check(u"resting-camera"_s, d.scene.settled());
+        check(u"focus-restored"_s,
               d.window.activeFocusItem() != nullptr
-                      && d.window.activeFocusItem() != find(d.root.get(), "openingSkip"));
-        check("scene-resumed", rhi::sceneSubmissionStats().rendered.load() > warmDraws);
+                      && d.window.activeFocusItem() != find(d.root.get(), u"openingSkip"_s));
+        check(u"scene-resumed"_s, rhi::sceneSubmissionStats().rendered.load() > warmDraws);
         d.ready();
         for (double time : { 6.4, 7.2, 9.0, 11.6 }) {
             d.seek(time);
             d.frames(2);
             const auto image = d.surface.grab();
-            require(!image.isNull() && image.save(output + QString("/scene-t%1.png").arg(time)),
+            require(!image.isNull() && image.save(output + u"/scene-t%1.png"_s.arg(time)),
                     "Cannot save live opening scene output");
         }
         for (int i = 0; i < 15; ++i)
@@ -218,7 +221,7 @@ int reviewOpening(QGuiApplication &, const QString &output)
         d.frames(2);
         const auto paintAtEnd = openingInkStats().paints.load();
         d.frames(3);
-        check("exited-canvas-zero-repaint", openingInkStats().paints.load() == paintAtEnd);
+        check(u"exited-canvas-zero-repaint"_s, openingInkStats().paints.load() == paintAtEnd);
         const auto playback = d.library.playbackTrackId();
         const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                   { 960, 900 },   { 930, 900 },   { 390, 844 },
@@ -236,40 +239,40 @@ int reviewOpening(QGuiApplication &, const QString &output)
                     for (double time : { .95, 1.64, 2.2, 4.3 }) {
                         d.seek(time);
                         d.frames(2);
-                        const QString name = QString("%1-%2x%3-dpr%4-t%5")
-                                                     .arg(night ? "night" : "day")
-                                                     .arg(size.width())
-                                                     .arg(size.height())
-                                                     .arg(dpr)
-                                                     .arg(time);
+                        const QString name =
+                                u"%1-%2x%3-dpr%4-t%5"_s.arg(night ? "night"_L1 : "day"_L1)
+                                        .arg(size.width())
+                                        .arg(size.height())
+                                        .arg(dpr)
+                                        .arg(time);
                         const auto image = d.surface.grab();
-                        require(!image.isNull() && image.save(output + '/' + name + ".png"),
+                        require(!image.isNull() && image.save(output + '/'_L1 + name + ".png"_L1),
                                 "Cannot save actual opening output");
                         if (time == 4.3 && size == QSize(1280, 720) && dpr == 1) {
                             const auto paints = openingInkStats().paints.load();
                             d.frames(3, [&](int) {
                                 d.motion.clock()->advance(.05);
                             });
-                            check("static-slogan-zero-canvas-work",
+                            check(u"static-slogan-zero-canvas-work"_s,
                                   openingInkStats().paints.load() == paints);
                         }
-                        const auto *skip = find(d.root.get(), "openingSkip");
-                        check("bounded-skip-backdrop-" + name,
+                        const auto *skip = find(d.root.get(), u"openingSkip"_s);
+                        check("bounded-skip-backdrop-"_L1 + name,
                               skip && skip->width() + 60 <= 220 && skip->height() + 60 <= 120);
-                        const auto *headerNav = find(d.root.get(), "headerNavigation");
-                        check("chrome-hidden-during-film-" + name,
+                        const auto *headerNav = find(d.root.get(), u"headerNavigation"_s);
+                        check("chrome-hidden-during-film-"_L1 + name,
                               headerNav && !headerNav->isVisible());
-                        const auto *mark = find(d.root.get(), "openingMark");
-                        check("brand-container-" + name,
+                        const auto *mark = find(d.root.get(), u"openingMark"_s);
+                        check("brand-container-"_L1 + name,
                               mark
                                       && std::abs(mark->width()
                                                   - std::clamp(size.width() * .17, 155.0, 235.0))
                                               < 1e-6);
-                        captures.append(
-                                QJsonObject{ { "name", name },
-                                             { "time", time },
-                                             { "size", QJsonArray{ size.width(), size.height() } },
-                                             { "dpr", d.window.effectiveDevicePixelRatio() } });
+                        captures.append(QJsonObject{
+                                { u"name"_s, name },
+                                { u"time"_s, time },
+                                { u"size"_s, QJsonArray{ size.width(), size.height() } },
+                                { u"dpr"_s, d.window.effectiveDevicePixelRatio() } });
                     }
                     d.opening.skip();
                     for (int i = 0; i < 15; ++i)
@@ -283,15 +286,15 @@ int reviewOpening(QGuiApplication &, const QString &output)
         d.ready();
         d.seek(.95);
         d.frames(2);
-        auto *ink = qobject_cast<OpeningInk *>(find(d.root.get(), "openingBrandInk"));
+        auto *ink = qobject_cast<OpeningInk *>(find(d.root.get(), u"openingBrandInk"_s));
         require(ink, "Missing production brand painter");
         const auto compare = [&](bool quick) {
             QQmlComponent component(&d.engine,
-                                    QUrl("qrc:/qt/qml/Yalahoo/Music/OpeningComparison.qml"));
+                                    QUrl(u"qrc:/qt/qml/Yalahoo/Music/OpeningComparison.qml"_s));
             std::unique_ptr<QQuickItem> shape;
             if (quick) {
                 shape.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
-                        { { "source", QVariant::fromValue(ink) } })));
+                        { { u"source"_s, QVariant::fromValue(ink) } })));
                 require(bool(shape), "Cannot create Quick Shape comparison");
                 shape->setParentItem(ink->parentItem());
                 shape->setPosition(ink->position());
@@ -307,15 +310,17 @@ int reviewOpening(QGuiApplication &, const QString &output)
                     shape->setProperty("paths", ink->comparisonPaths());
             });
             costs.append(QJsonObject{
-                    { "api", quick ? "QtQuick.Shape.CurveRenderer" : "C++ Canvas Painter" },
-                    { "frames", 32 },
-                    { "guiAndQuickWallMs", timer.nsecsElapsed() / 1e6 },
-                    { "canvasPaintMs", (openingInkStats().paintNs.load() - before) / 1e6 },
-                    { "canvasPaints", qint64(openingInkStats().paints.load() - paints) },
-                    { "gpuCompleteMs", QJsonValue::Null },
-                    { "scope", "Local serial diagnostic; no FPS or cross-API image score" } });
+                    { u"api"_s,
+                      quick ? u"QtQuick.Shape.CurveRenderer"_s : u"C++ Canvas Painter"_s },
+                    { u"frames"_s, 32 },
+                    { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / 1e6 },
+                    { u"canvasPaintMs"_s, (openingInkStats().paintNs.load() - before) / 1e6 },
+                    { u"canvasPaints"_s, qint64(openingInkStats().paints.load() - paints) },
+                    { u"gpuCompleteMs"_s, QJsonValue::Null },
+                    { u"scope"_s,
+                      u"Local serial diagnostic; no FPS or cross-API image score"_s } });
             const auto image = d.surface.grab();
-            require(image.save(output + (quick ? "/quick-shape.png" : "/canvas-painter.png")),
+            require(image.save(output + (quick ? "/quick-shape.png"_L1 : "/canvas-painter.png"_L1)),
                     "Cannot save drawing comparison");
             shape.reset();
             ink->setVisible(true);
@@ -326,12 +331,13 @@ int reviewOpening(QGuiApplication &, const QString &output)
         }
         QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &tab);
-        check("tab-focuses-skip", d.window.activeFocusItem() == find(d.root.get(), "openingSkip"));
+        check(u"tab-focuses-skip"_s,
+              d.window.activeFocusItem() == find(d.root.get(), u"openingSkip"_s));
         QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &enter);
-        check("enter-skips-film", !d.opening.film());
+        check(u"enter-skips-film"_s, !d.opening.film());
         d.motion.setReducedMotion(true);
-        check("reduced-motion-completes-reveal", !d.opening.active());
+        check(u"reduced-motion-completes-reveal"_s, !d.opening.active());
         for (int cycle = 0; cycle < 10; ++cycle) {
             d.motion.setReducedMotion(false);
             d.ready();
@@ -344,32 +350,32 @@ int reviewOpening(QGuiApplication &, const QString &output)
             d.window.releaseResources();
             d.surface.show();
             d.frames(2);
-            check("background-retains-time", d.opening.time() == paused);
+            check(u"background-retains-time"_s, d.opening.time() == paused);
             d.motion.clock()->setActive(true);
             d.motion.clock()->advance(10);
-            check("resume-discards-first-delta", d.opening.time() == paused);
+            check(u"resume-discards-first-delta"_s, d.opening.time() == paused);
             const auto sceneBefore = rhi::sceneSubmissionStats().rendered.load();
             d.motion.setReducedMotion(true);
             d.frames(2);
-            check("first-3d-frame-after-opaque-rebuild",
+            check(u"first-3d-frame-after-opaque-rebuild"_s,
                   rhi::sceneSubmissionStats().rendered.load() > sceneBefore);
-            check("renderer-release-after-replay", openingInkStats().renderers.load() == 0);
+            check(u"renderer-release-after-replay"_s, openingInkStats().renderers.load() == 0);
         }
-        check("playback-isolated", d.library.playbackTrackId() == playback);
-        check("window-policy", verification::windowPolicySatisfied(d.window));
-        check("no-qml-warnings", d.warnings.isEmpty());
-        QJsonObject report{ { "passed", passed },
-                            { "checks", checks },
-                            { "captures", captures },
-                            { "costs", costs },
-                            { "windowPolicy", verification::windowPolicy(d.window) },
-                            { "offscreen", d.surface.diagnostics() },
-                            { "samples", d.samples },
-                            { "qtVersion", qVersion() },
-                            { "backend", int(d.window.rendererInterface()->graphicsApi()) },
-                            { "normalVsync", QJsonValue::Null },
-                            { "physicalDisplay", QJsonValue::Null } };
-        QSaveFile file(output + "/report.json");
+        check(u"playback-isolated"_s, d.library.playbackTrackId() == playback);
+        check(u"window-policy"_s, verification::windowPolicySatisfied(d.window));
+        check(u"no-qml-warnings"_s, d.warnings.isEmpty());
+        QJsonObject report{ { u"passed"_s, passed },
+                            { u"checks"_s, checks },
+                            { u"captures"_s, captures },
+                            { u"costs"_s, costs },
+                            { u"windowPolicy"_s, verification::windowPolicy(d.window) },
+                            { u"offscreen"_s, d.surface.diagnostics() },
+                            { u"samples"_s, d.samples },
+                            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                            { u"backend"_s, int(d.window.rendererInterface()->graphicsApi()) },
+                            { u"normalVsync"_s, QJsonValue::Null },
+                            { u"physicalDisplay"_s, QJsonValue::Null } };
+        QSaveFile file(output + "/report.json"_L1);
         require(file.open(QIODevice::WriteOnly), "Cannot open opening report");
         file.write(QJsonDocument(report).toJson());
         require(file.commit(), "Cannot commit opening report");

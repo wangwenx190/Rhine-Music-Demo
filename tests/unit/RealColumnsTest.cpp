@@ -1,3 +1,4 @@
+#include <limits>
 #include "SelectionController.h"
 #include "PreferencesStore.h"
 #include <QFile>
@@ -8,6 +9,8 @@
 #include <QSignalSpy>
 #include <QSet>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
 QList<LibraryColumn> columns(const QList<int> &counts)
@@ -17,7 +20,7 @@ QList<LibraryColumn> columns(const QList<int> &counts)
         LibraryColumn column;
         column.key = QString::number(lane);
         for (int row = 0; row < counts[lane]; ++row)
-            column.albumIds.append(QStringLiteral("%1:%2").arg(lane).arg(row));
+            column.albumIds.append(u"%1:%2"_s.arg(lane).arg(row));
         result.append(column);
     }
     return result;
@@ -26,7 +29,25 @@ QList<LibraryColumn> columns(const QList<int> &counts)
 class RealColumnsTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void invalidSelectionCannotPoisonColumnState()
+    {
+        RealColumns columns;
+        columns.reset({ 3, 4 }, { 0, 12 }, std::numeric_limits<double>::quiet_NaN());
+        const auto before = columns.rowState(0);
+        QVERIFY(std::isfinite(before.value));
+        const double nan = std::numeric_limits<double>::quiet_NaN();
+        const double infinity = std::numeric_limits<double>::infinity();
+        for (const auto cell :
+             { ArchiveCell{ nan, 12 }, ArchiveCell{ infinity, 12 }, ArchiveCell{ 0, nan },
+               ArchiveCell{ 0, infinity }, ArchiveCell{ .5, 12 }, ArchiveCell{ -1, 12 },
+               ArchiveCell{ 2, 12 } })
+            columns.select(cell);
+        QCOMPARE(columns.rowState(0).value, before.value);
+        columns.update(.1, false);
+        QVERIFY(std::isfinite(columns.rowState(0).value));
+        QVERIFY(std::isfinite(columns.activityState(0).value));
+    }
     void duplicateIdentitiesAndInvalidReset()
     {
         auto input = columns({ 2, 3 });
@@ -61,12 +82,12 @@ private slots:
             selection->setColumns(columns({ 3, 49, 106, 7 }));
             selection->setLift(0);
         }
-        QVERIFY(first.select("1:40"));
+        QVERIFY(first.select(u"1:40"_s));
         first.advance(.3);
         second.advance(.3);
         QCOMPARE(first.field(15, 3), second.field(15, 3));
         QCOMPARE(first.browseRow(3), 15);
-        QVERIFY(first.select("2:105"));
+        QVERIFY(first.select(u"2:105"_s));
         first.advance(.3);
         second.advance(.3);
         QCOMPARE(first.field(16, 3), second.field(16, 3));
@@ -87,34 +108,33 @@ private slots:
     void frozenTrajectories()
     {
         const QString full = qEnvironmentVariable("YALAHOO_REAL_COLUMN_GOLDEN");
-        QFile input(full.isEmpty()
-                            ? QStringLiteral(FIXTURE_ROOT
-                                             "/tests/fixtures/real-columns/trajectories.json")
-                            : full);
+        QFile input(full.isEmpty() ? (QString::fromUtf8(FIXTURE_ROOT)
+                                      + u"/tests/fixtures/real-columns/trajectories.json"_s)
+                                   : full);
         QVERIFY(input.open(QIODevice::ReadOnly));
         const auto golden = QJsonDocument::fromJson(input.readAll()).object();
         QList<int> counts;
-        for (auto count : golden["counts"].toArray())
+        for (auto count : golden[u"counts"_s].toArray())
             counts.append(count.toInt());
         double error = 0;
-        for (auto value : golden["cases"].toArray()) {
+        for (auto value : golden[u"cases"_s].toArray()) {
             const auto run = value.toObject();
             RealColumns real;
             real.reset(counts, { 1, 12 });
-            const double dt = run["speed"].toDouble() / run["fps"].toDouble();
-            for (auto segmentValue : run["segments"].toArray()) {
+            const double dt = run[u"speed"_s].toDouble() / run[u"fps"_s].toDouble();
+            for (auto segmentValue : run[u"segments"_s].toArray()) {
                 const auto segment = segmentValue.toObject();
-                const auto action = segment["action"].toObject();
-                real.select({ action["lane"].toDouble(), action["row"].toDouble() },
-                            action["guided"].toBool(), action["detail"].toBool());
+                const auto action = segment[u"action"_s].toObject();
+                real.select({ action[u"lane"_s].toDouble(), action[u"row"_s].toDouble() },
+                            action[u"guided"_s].toBool(), action[u"detail"_s].toBool());
                 int step = 0;
-                for (auto sampleValue : segment["samples"].toArray()) {
+                for (auto sampleValue : segment[u"samples"_s].toArray()) {
                     const auto sample = sampleValue.toObject();
-                    while (step < sample["step"].toInt()) {
-                        real.update(dt, action["reduced"].toBool());
+                    while (step < sample[u"step"_s].toInt()) {
+                        real.update(dt, action[u"reduced"_s].toBool());
                         ++step;
                     }
-                    const auto states = sample["state"].toArray();
+                    const auto states = sample[u"state"_s].toArray();
                     for (int lane = 0; lane < counts.size(); ++lane) {
                         const auto row = real.rowState(lane), activity = real.activityState(lane);
                         const std::array<double, 6> actual{
@@ -138,23 +158,23 @@ private slots:
         SelectionController selection(&motion);
         selection.setRealistic(true);
         selection.setColumns(columns({ 0, 1, 2, 3, 49, 106 }));
-        QCOMPARE(selection.albumId(), QStringLiteral("1:0"));
+        QCOMPARE(selection.albumId(), u"1:0"_s);
         QVERIFY(!selection.canMoveNext());
         QVERIFY(!selection.canMovePrevious());
         const auto revision = selection.revision();
         QVERIFY(!selection.moveRow(1));
         QCOMPARE(selection.revision(), revision);
-        QVERIFY(selection.select("2:1"));
+        QVERIFY(selection.select(u"2:1"_s));
         QVERIFY(!selection.moveRow(1));
         QVERIFY(selection.moveRow(-1));
         QVERIFY(!selection.moveRow(-1));
         QVERIFY(!selection.navigateRow(11));
         QVERIFY(!selection.selectCell({ 2, 14 }));
-        QVERIFY(selection.select("5:105"));
+        QVERIFY(selection.select(u"5:105"_s));
         QVERIFY(!selection.canMoveNext());
         QVERIFY(selection.moveLane(-1));
         // Empty columns are retained in direct test inputs, never appear in production grouping.
-        QVERIFY(selection.select("4:24"));
+        QVERIFY(selection.select(u"4:24"_s));
         selection.advance(0);
         QSet<QString> ids;
         for (const auto &instance : selection.instances()) {
@@ -174,7 +194,7 @@ private slots:
         selection.setRealistic(true);
         selection.setColumns(columns({ 3, 106, 49 }));
         selection.setLift(0);
-        QVERIFY(selection.select("1:80"));
+        QVERIFY(selection.select(u"1:80"_s));
         selection.advance(2.4);
         QVERIFY(selection.moveLane(1));
         selection.advance(.2);
@@ -215,10 +235,10 @@ private slots:
     {
         QTemporaryDir root;
         QVERIFY(root.isValid());
-        const QString path = root.filePath("preferences.json");
+        const QString path = root.filePath(u"preferences.json"_s);
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
-        file.write("{\"futureField\":{\"keep\":true}}");
+        file.write("{\"futureField\":{\"keep\":true}}"_ba);
         file.close();
         {
             PreferencesStore preferences(root.path());
@@ -230,17 +250,17 @@ private slots:
         QVERIFY(file.open(QIODevice::ReadOnly));
         const auto saved = QJsonDocument::fromJson(file.readAll()).object();
         file.close();
-        QVERIFY(!saved["rememberColumnPosition"].toBool());
-        QCOMPARE(saved["arrayMode"].toString(), QStringLiteral("realistic"));
-        QVERIFY(saved["futureField"].toObject()["keep"].toBool());
-        QVERIFY(!saved.contains("columnMemory"));
+        QVERIFY(!saved[u"rememberColumnPosition"_s].toBool());
+        QCOMPARE(saved[u"arrayMode"_s].toString(), u"realistic"_s);
+        QVERIFY(saved[u"futureField"_s].toObject()[u"keep"_s].toBool());
+        QVERIFY(!saved.contains(u"columnMemory"_s));
         {
             PreferencesStore reloaded(root.path());
             QVERIFY(!reloaded.rememberColumnPosition());
             QVERIFY(reloaded.realistic());
         }
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
-        file.write("broken");
+        file.write("broken"_ba);
         file.close();
         {
             PreferencesStore corrupt(root.path());
@@ -250,7 +270,7 @@ private slots:
             QCOMPARE(errors.size(), 1);
         }
         QVERIFY(file.open(QIODevice::ReadOnly));
-        QCOMPARE(file.readAll(), QByteArray("broken"));
+        QCOMPARE(file.readAll(), "broken"_ba);
     }
 };
 QTEST_GUILESS_MAIN(RealColumnsTest)

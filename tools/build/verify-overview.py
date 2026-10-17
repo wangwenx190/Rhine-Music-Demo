@@ -34,6 +34,9 @@ if not executable.is_file():
     parser.error("Build the qt-release preset first")
 if args.visual:
     executable = root / "build/release/tools" / ("ui-audit.exe" if platform.system() == "Windows" else "ui-audit")
+chain = json.loads((root / "build/release/toolchain.json").read_text(encoding="utf-8"))
+if chain.get("configuration") != "Release":
+    parser.error("The native replay requires a Release build")
 args.output.mkdir(parents=True)
 environment = os.environ.copy()
 environment.update({
@@ -46,6 +49,10 @@ environment.update({
     "QSG_RENDER_LOOP": "threaded",
 })
 environment.pop("QSG_NO_VSYNC", None)
+kit = Path(chain["qtKit"])
+environment["QT_PLUGIN_PATH"] = str(kit / "plugins")
+if platform.system() == "Windows":
+    environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
 manifest = {
     "binarySha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
     "sourceRevision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),

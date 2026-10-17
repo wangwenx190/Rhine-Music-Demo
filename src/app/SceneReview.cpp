@@ -18,6 +18,9 @@
 #include <QTimer>
 #include <atomic>
 #include <memory>
+
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 const QString &fixture, const QString &report)
@@ -27,17 +30,17 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         return 9;
     const auto fixtureBytes = input.readAll();
     const auto oracle = QJsonDocument::fromJson(fixtureBytes).object();
-    auto cases = oracle["cases"].toArray();
+    auto cases = oracle[u"cases"_s].toArray();
     if (cases.size() != 48)
         return 9;
     // Render every 1/120-second state of the interrupted dolly on Windows too.
-    for (auto value : oracle["sequences"].toArray()) {
+    for (auto value : oracle[u"sequences"_s].toArray()) {
         const auto sequence = value.toObject();
-        if (sequence["fps"].toInt() != 120)
+        if (sequence[u"fps"_s].toInt() != 120)
             continue;
-        for (auto sample : sequence["samples"].toArray()) {
+        for (auto sample : sequence[u"samples"_s].toArray()) {
             auto c = sample.toObject();
-            c.insert("dynamic", true);
+            c.insert(u"dynamic"_s, true);
             cases.append(c);
         }
     }
@@ -47,8 +50,8 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
     window.show();
     scene.setReducedMotion(
             true); // exact state; acquisition waits for rendered frames, never wall time pose
-    auto *view = window.findChild<rhi::SceneItem *>(QStringLiteral("nativeScene"));
-    auto *layoutLabel = window.findChild<QObject *>(QStringLiteral("layoutProbe"));
+    auto *view = window.findChild<rhi::SceneItem *>(u"nativeScene"_s);
+    auto *layoutLabel = window.findChild<QObject *>(u"layoutProbe"_s);
     if (!view || !layoutLabel)
         return 9;
     const QString folder = QFileInfo(report).absolutePath();
@@ -77,12 +80,12 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                                     * std::tan(6.15 * std::acos(-1.0) / 360) },
                           0);
         }
-        window.resize(c["width"].toInt(), c["height"].toInt());
+        window.resize(c[u"width"_s].toInt(), c[u"height"_s].toInt());
         scene.layout()->setViewport(window.width(), window.height());
-        scene.setDetail(c["detail"].toDouble());
-        if (c["dynamic"].toBool()) {
-            scene.setReducedMotion(c["reduced"].toBool());
-            scene.advance(c["dt"].toDouble());
+        scene.setDetail(c[u"detail"_s].toDouble());
+        if (c[u"dynamic"_s].toBool()) {
+            scene.setReducedMotion(c[u"reduced"_s].toBool());
+            scene.advance(c[u"dt"_s].toDouble());
         } else
             scene.snapToTarget();
         startFrame = frames->load();
@@ -95,12 +98,12 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
             return;
         }
         const auto c = cases[index].toObject();
-        const bool dynamic = c["dynamic"].toBool();
+        const bool dynamic = c[u"dynamic"_s].toBool();
         const bool capture = !dynamic || index == 48 || index == 108 || index == 198 || index == 288
                 || index == 408;
         const QImage image = capture ? window.grabWindow() : QImage{ };
-        const bool bindings = window.width() == c["width"].toInt()
-                && window.height() == c["height"].toInt() && view->width() == window.width()
+        const bool bindings = window.width() == c[u"width"_s].toInt()
+                && window.height() == c[u"height"_s].toInt() && view->width() == window.width()
                 && view->height() == window.height()
                 && layoutLabel->property("text").toString().startsWith(scene.layout()->kind())
                 && (view->input().scene.camera.position.qt() - scene.cameraPosition()).length()
@@ -108,9 +111,9 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 && std::abs(view->input().scene.fieldOfView - scene.fieldOfView()) < 1e-4;
         bool points = true;
         QJsonArray projections;
-        for (auto value : c["projections"].toArray()) {
+        for (auto value : c[u"projections"_s].toArray()) {
             const auto p = value.toObject();
-            const auto a = p["world"].toArray(), expected = p["pixel"].toArray();
+            const auto a = p[u"world"_s].toArray(), expected = p[u"pixel"_s].toArray();
             const QVector3D world(float(a[0].toDouble()), float(a[1].toDouble()),
                                   float(a[2].toDouble()));
             QVector3D qt;
@@ -123,9 +126,9 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
             maxQt = std::max(maxQt, qtError);
             maxWeb = std::max(maxWeb, webError);
             points = points && invoked && qtError <= 2 && webError <= 2;
-            projections.append(QJsonObject{ { "qtPixel", QJsonArray{ qt.x(), qt.y() } },
-                                            { "qtCpuError", qtError },
-                                            { "webError", webError } });
+            projections.append(QJsonObject{ { u"qtPixel"_s, QJsonArray{ qt.x(), qt.y() } },
+                                            { u"qtCpuError"_s, qtError },
+                                            { u"webError"_s, webError } });
         }
         // Actual no-light mesh pixels and client dimensions/DPR, in addition to the submitted RHI snapshot mapping.
         int pixels = 0;
@@ -150,37 +153,36 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                     && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
                     ++pixels;
             }
-        const QString file = QString("case-%1-%2x%3-detail-%4.png")
-                                     .arg(index, 2, 10, QChar('0'))
+        const QString file = u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, 10, '0'_L1)
                                      .arg(window.width())
                                      .arg(window.height())
                                      .arg(scene.detail());
-        const bool saved = !capture || (!image.isNull() && image.save(folder + "/" + file));
+        const bool saved = !capture || (!image.isNull() && image.save(folder + "/"_L1 + file));
         const bool passed = bindings && points && saved && view->errorText().isEmpty()
                 && (!capture || pixels > 100);
         pass = pass && passed;
-        results.append(QJsonObject{ { "index", index },
-                                    { "width", window.width() },
-                                    { "height", window.height() },
-                                    { "detail", scene.detail() },
-                                    { "dynamic", dynamic },
-                                    { "time", c["time"] },
-                                    { "portrait", scene.layout()->portrait() },
-                                    { "kind", scene.layout()->kind() },
-                                    { "frameRevision", qint64(scene.frameRevision()) },
-                                    { "renderedFrames", frames->load() - startFrame },
-                                    { "imageWidth", image.width() },
-                                    { "imageHeight", image.height() },
-                                    { "dpr", window.devicePixelRatio() },
-                                    { "modelPixels", pixels },
-                                    { "renderTargetWidth", view->fixedColorBufferWidth() },
-                                    { "renderTargetHeight", view->fixedColorBufferHeight() },
-                                    { "pixelProtectionLimited", scene.quality()->limited() },
-                                    { "renderError", view->errorText() },
-                                    { "bindings", bindings },
-                                    { "passed", passed },
-                                    { "screenshot", capture ? file : QString{ } },
-                                    { "projections", projections } });
+        results.append(QJsonObject{ { u"index"_s, index },
+                                    { u"width"_s, window.width() },
+                                    { u"height"_s, window.height() },
+                                    { u"detail"_s, scene.detail() },
+                                    { u"dynamic"_s, dynamic },
+                                    { u"time"_s, c[u"time"_s] },
+                                    { u"portrait"_s, scene.layout()->portrait() },
+                                    { u"kind"_s, scene.layout()->kind() },
+                                    { u"frameRevision"_s, qint64(scene.frameRevision()) },
+                                    { u"renderedFrames"_s, frames->load() - startFrame },
+                                    { u"imageWidth"_s, image.width() },
+                                    { u"imageHeight"_s, image.height() },
+                                    { u"dpr"_s, window.devicePixelRatio() },
+                                    { u"modelPixels"_s, pixels },
+                                    { u"renderTargetWidth"_s, view->fixedColorBufferWidth() },
+                                    { u"renderTargetHeight"_s, view->fixedColorBufferHeight() },
+                                    { u"pixelProtectionLimited"_s, scene.quality()->limited() },
+                                    { u"renderError"_s, view->errorText() },
+                                    { u"bindings"_s, bindings },
+                                    { u"passed"_s, passed },
+                                    { u"screenshot"_s, capture ? file : QString{ } },
+                                    { u"projections"_s, projections } });
         if (index + 1 < cases.size()) {
             next();
             return;
@@ -194,20 +196,20 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         if (committed) {
             output.write(
                     QJsonDocument(
-                            QJsonObject{ { "passed", pass },
-                                         { "windowPolicy", verification::windowPolicy(window) },
-                                         { "qtVersion", qVersion() },
-                                         { "platform", QGuiApplication::platformName() },
-                                         { "graphicsApi", int(api) },
-                                         { "baseline", oracle["baseline"] },
-                                         { "fixtureSha256",
-                                           QString::fromLatin1(
+                            QJsonObject{ { u"passed"_s, pass },
+                                         { u"windowPolicy"_s, verification::windowPolicy(window) },
+                                         { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                                         { u"platform"_s, QGuiApplication::platformName() },
+                                         { u"graphicsApi"_s, int(api) },
+                                         { u"baseline"_s, oracle[u"baseline"_s] },
+                                         { u"fixtureSha256"_s,
+                                           QString::fromUtf8(
                                                    QCryptographicHash::hash(
                                                            fixtureBytes, QCryptographicHash::Sha256)
                                                            .toHex()) },
-                                         { "maxQtCpuPixels", maxQt },
-                                         { "maxWebPixels", maxWeb },
-                                         { "cases", results } })
+                                         { u"maxQtCpuPixels"_s, maxQt },
+                                         { u"maxWebPixels"_s, maxWeb },
+                                         { u"cases"_s, results } })
                             .toJson());
             committed = output.commit();
         }

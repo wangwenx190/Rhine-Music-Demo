@@ -21,7 +21,7 @@ void RealColumns::reset(const QList<int> &counts, ArchiveCell selected,
     if (selected.lane >= 0) {
         const double midpoint = 12 + (counts[int(selected.lane)] - 1) / 2.0;
         selected.row = std::clamp(std::isfinite(selected.row) ? selected.row : midpoint, 12.0,
-                                  double(11 + counts[int(selected.lane)]));
+                                  11. + counts[int(selected.lane)]);
     } else
         selected.row = 12;
     m_selected = selected;
@@ -30,9 +30,10 @@ void RealColumns::reset(const QList<int> &counts, ArchiveCell selected,
         const int count = std::max(0, counts[lane]);
         const double midpoint = 12 + std::max(0, count - 1) / 2.0;
         const double target = lane == selected.lane && count > 0
-                ? std::clamp(selected.row, 12.0, double(11 + count))
+                ? std::clamp(selected.row, 12.0, 11. + count)
                 : midpoint;
-        const double initial = displayedRow.value_or(target);
+        const double initial =
+                displayedRow && std::isfinite(*displayedRow) ? *displayedRow : target;
         m_columns.append({ count, midpoint, ColumnScalar(initial),
                            ColumnScalar(double(lane == selected.lane)), 0, 0 });
         distance = std::max(distance, std::abs(target - initial));
@@ -63,10 +64,13 @@ RealColumns::Column *RealColumns::sample(int lane) const
 }
 void RealColumns::select(ArchiveCell cell, bool guided, bool detail)
 {
+    if (!std::isfinite(cell.lane) || !std::isfinite(cell.row) || std::floor(cell.lane) != cell.lane
+        || cell.lane < 0 || cell.lane >= m_columns.size())
+        return;
     auto *current = sample(int(cell.lane));
     if (!current || current->count == 0)
         return;
-    cell.row = std::clamp(cell.row, 12.0, double(11 + current->count));
+    cell.row = std::clamp(cell.row, 12.0, 11. + current->count);
     if (cell == m_selected)
         return;
     const bool changed = cell.lane != m_selected.lane;

@@ -9,6 +9,8 @@ qt_add_library(
     SceneItem.h
     PreparedAssets.cpp
     PreparedAssets.h
+    ReadbackImage.cpp
+    ReadbackImage.h
     AtlasUpload.cpp
     AtlasUpload.h
     AtlasAllocator.h

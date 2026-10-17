@@ -15,6 +15,9 @@
 #include <QTimer>
 #include <optional>
 #include <stdexcept>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 namespace {
@@ -107,21 +110,21 @@ int main(int argc, char **argv)
         base.immutableCover = true;
         const auto empty = capture(base);
         auto detailed = base;
-        detailed.cover = CoverCache::paint(pixels("selected", Qt::red)->image, 1024, { });
+        detailed.cover = CoverCache::paint(pixels(u"selected"_s, Qt::red)->image, 1024, { });
         detailed.coverPainted = true;
         const auto high = capture(detailed);
-        require(high.metadata["selectedUploadBytes"].toInteger() == 1024 * 1024 * 4,
+        require(high.metadata[u"selectedUploadBytes"_s].toInteger() == 1024 * 1024 * 4,
                 "Selected cover upload payload differs from 1024 RGBA");
-        require(high.metadata["coverSnapshotCopies"].toInteger() == 0
-                        && high.metadata["resourceGeneration"]
-                                == empty.metadata["resourceGeneration"],
+        require(high.metadata[u"coverSnapshotCopies"_s].toInteger() == 0
+                        && high.metadata[u"resourceGeneration"_s]
+                                == empty.metadata[u"resourceGeneration"_s],
                 "Selected resolution copied immutable pixels or rebuilt targets");
-        const auto selectedNative = high.metadata["nativeSelectedTransfers"].toObject();
-        if (selectedNative["available"].toBool())
-            require(selectedNative["destinationBytes"].toInteger() == 1024 * 1024 * 4,
+        const auto selectedNative = high.metadata[u"nativeSelectedTransfers"_s].toObject();
+        if (selectedNative[u"available"_s].toBool())
+            require(selectedNative[u"destinationBytes"_s].toInteger() == 1024 * 1024 * 4,
                     "Native selected texture transfer differs from pixel payload");
         const auto highStable = capture(detailed);
-        require(highStable.metadata["selectedUploadBytes"].toInteger() == 0,
+        require(highStable.metadata[u"selectedUploadBytes"_s].toInteger() == 0,
                 "Stable selected cover uploaded again");
         QJsonArray shapes;
         for (const QSize size : { QSize(256, 256), QSize(128, 256), QSize(256, 128) }) {
@@ -131,19 +134,20 @@ int main(int argc, char **argv)
             raw.cover = CoverCache::paint(raw.cover, 256, { });
             raw.coverPainted = true;
             const auto painted = capture(raw);
-            require(painted.metadata["resourceGeneration"] == empty.metadata["resourceGeneration"],
+            require(painted.metadata[u"resourceGeneration"_s]
+                            == empty.metadata[u"resourceGeneration"_s],
                     "Cover resolution rebuilt unrelated render targets/pipelines");
-            require(painted.metadata["selectedCoverWidth"].toInt() == 256
-                            && painted.metadata["selectedCoverHeight"].toInt() == 256
-                            && painted.metadata["selectedUploadBytes"].toInteger() == 256 * 256 * 4,
+            require(painted.metadata[u"selectedCoverWidth"_s].toInt() == 256
+                            && painted.metadata[u"selectedCoverHeight"_s].toInt() == 256
+                            && painted.metadata[u"selectedUploadBytes"_s].toInteger()
+                                    == 256 * 256 * 4,
                     "Painted cover did not reach the actual GPU upload at the declared size");
             // Contain/inset is checked analytically by CoverCacheTest and source UV formulas.
             // Own output is retained for quality inspection, never scored against another image.
-            shapes.append(QJsonObject{ { "width", size.width() },
-                                       { "height", size.height() },
-                                       { "uploaded", painted.metadata } });
-            painted.color.save(output
-                               + QString("/shape-%1-%2.png").arg(size.width()).arg(size.height()));
+            shapes.append(QJsonObject{ { u"width"_s, size.width() },
+                                       { u"height"_s, size.height() },
+                                       { u"uploaded"_s, painted.metadata } });
+            painted.color.save(output + u"/shape-%1-%2.png"_s.arg(size.width()).arg(size.height()));
         }
         AtlasAllocator atlas(2048, 9);
         QList<AtlasLease> leases;
@@ -161,21 +165,22 @@ int main(int argc, char **argv)
         // Replay is bounded by one page; render still enforces its own per-frame budget.
         input.atlasUploads = atlas.uploads(0, true);
         const auto bounded = capture(input);
-        require(bounded.metadata["atlasUploadBytes"].toInteger() == AtlasUploadQueue::steadyBudget,
+        require(bounded.metadata[u"atlasUploadBytes"_s].toInteger()
+                        == AtlasUploadQueue::steadyBudget,
                 "Actual first frame exceeded/missed eight-tile budget");
-        require(bounded.metadata["atlasPending"].toInt() == 1, "Ninth tile did not defer");
+        require(bounded.metadata[u"atlasPending"_s].toInt() == 1, "Ninth tile did not defer");
         require(bounded.color == empty.color, "Unuploaded slot exposed old/uninitialized pixels");
         input.atlasUploads.clear();
         const auto drained = capture(input);
-        require(drained.metadata["atlasPending"].toInt() == 0, "Deferred upload did not drain");
+        require(drained.metadata[u"atlasPending"_s].toInt() == 0, "Deferred upload did not drain");
         require(drained.color != empty.color, "Uploaded slot remained hidden");
         const auto stable = capture(input);
-        require(stable.metadata["atlasUploadBytes"].toInteger() == 0
+        require(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0
                         && stable.atlas == drained.atlas,
                 "Stable frame copied/uploaded pixels");
         const auto previous = leases[8];
         atlas.release(previous);
-        const auto next = atlas.acquire("replacement");
+        const auto next = atlas.acquire(u"replacement"_s);
         input.coverTiles = { atlas.tile(next) };
         input.coverLeases = { next.lease };
         const auto hidden = capture(input);
@@ -184,18 +189,19 @@ int main(int argc, char **argv)
         input.atlasUploads = { { atlas.generation(), previous.lease, 999, previous.slot,
                                  pixels(previous.identity, Qt::green)->image } };
         const auto late = capture(input);
-        require(late.color == empty.color && late.metadata["atlasUploadBytes"].toInteger() == 0,
+        require(late.color == empty.color && late.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
                 "Late upload replaced a new lease");
-        require(atlas.publish(next, pixels("replacement", Qt::red)), "Replacement publish failed");
+        require(atlas.publish(next, pixels(u"replacement"_s, Qt::red)),
+                "Replacement publish failed");
         input.atlasUploads = atlas.uploads(0, false);
         const auto replaced = capture(input);
-        require(replaced.metadata["atlasUploadBytes"].toInteger() == AtlasUploadQueue::tileBytes,
+        require(replaced.metadata[u"atlasUploadBytes"_s].toInteger() == AtlasUploadQueue::tileBytes,
                 "Replacement did not upload exactly one tile");
         require(replaced.atlas.pixelColor(atlas.tile(next).center()) == QColor(Qt::red),
                 "GPU subregion differs from immutable worker payload");
-        const auto native = replaced.metadata["nativeAtlasTransfers"].toObject();
-        if (native["available"].toBool())
-            require(native["destinationBytes"].toInteger() == AtlasUploadQueue::tileBytes,
+        const auto native = replaced.metadata[u"nativeAtlasTransfers"_s].toObject();
+        if (native[u"available"_s].toBool())
+            require(native[u"destinationBytes"_s].toInteger() == AtlasUploadQueue::tileBytes,
                     "Native transfer bytes differ from submitted region");
         const auto retained = atlas.replay(0);
         // Real Qt scene graph destruction and restoration, with immutable page replay.
@@ -212,30 +218,31 @@ int main(int argc, char **argv)
         require(restored.color == replaced.color, "Reconstruction changed selected art");
         const auto oldGeneration = input.atlasGeneration;
         atlas.reset();
-        const auto rebuiltLease = atlas.acquire("rebuilt");
-        require(atlas.publish(rebuiltLease, pixels("rebuilt", Qt::yellow)),
+        const auto rebuiltLease = atlas.acquire(u"rebuilt"_s);
+        require(atlas.publish(rebuiltLease, pixels(u"rebuilt"_s, Qt::yellow)),
                 "Rebuild publish failed");
         input.atlasGeneration = atlas.generation();
         input.coverTiles = { atlas.tile(rebuiltLease) };
         input.coverLeases = { rebuiltLease.lease };
         input.atlasUploads = atlas.replay(0);
-        input.atlasUploads.append({ oldGeneration, 999, 1000, 0, pixels("old", Qt::green)->image });
+        input.atlasUploads.append(
+                { oldGeneration, 999, 1000, 0, pixels(u"old"_s, Qt::green)->image });
         const auto rebuilt = capture(input);
         require(rebuilt.atlas.pixelColor(128, 128) == QColor(Qt::yellow)
-                        && rebuilt.metadata["atlasRejected"].toInteger() > 0,
+                        && rebuilt.metadata[u"atlasRejected"_s].toInteger() > 0,
                 "Rebuilt atlas accepted a late generation");
-        QJsonObject report{ { "passed", true },
-                            { "selected", high.metadata },
-                            { "selectedStable", highStable.metadata },
-                            { "windowPolicy", verification::windowPolicy(window) },
-                            { "shapes", shapes },
-                            { "bounded", bounded.metadata },
-                            { "stable", stable.metadata },
-                            { "replacement", replaced.metadata },
-                            { "restored", restored.metadata },
-                            { "rebuilt", rebuilt.metadata },
-                            { "measuredVramBytes", QJsonValue() } };
-        QSaveFile file(output + "/runtime.json");
+        QJsonObject report{ { u"passed"_s, true },
+                            { u"selected"_s, high.metadata },
+                            { u"selectedStable"_s, highStable.metadata },
+                            { u"windowPolicy"_s, verification::windowPolicy(window) },
+                            { u"shapes"_s, shapes },
+                            { u"bounded"_s, bounded.metadata },
+                            { u"stable"_s, stable.metadata },
+                            { u"replacement"_s, replaced.metadata },
+                            { u"restored"_s, restored.metadata },
+                            { u"rebuilt"_s, rebuilt.metadata },
+                            { u"measuredVramBytes"_s, QJsonValue() } };
+        QSaveFile file(output + "/runtime.json"_L1);
         require(file.open(QIODevice::WriteOnly), "Cannot save cover GPU report");
         file.write(QJsonDocument(report).toJson());
         require(file.commit(), "Cannot commit cover GPU report");

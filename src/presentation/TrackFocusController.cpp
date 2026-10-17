@@ -1,7 +1,10 @@
+#include <QCoreApplication>
 #include "TrackFocusController.h"
 #include <algorithm>
 #include <QPointF>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 TrackFocusController::TrackFocusController(LibrarySession *library,
@@ -28,18 +31,20 @@ bool TrackFocusController::request(const QString &albumId, const QString &trackI
 {
     cancel();
     if (!m_library->contains(albumId, trackId)) {
-        emit rejected(QStringLiteral("这张专辑或歌曲已不在当前音乐库中，请重新扫描后重试。"));
+        Q_EMIT rejected(QCoreApplication::translate(
+                "Yalahoo",
+                "This album or track is no longer in the library. Rescan and try again."));
         return false;
     }
-    emit navigationRequested();
+    Q_EMIT navigationRequested();
     m_albumId = albumId;
     m_trackId = trackId;
     m_row = m_library->trackIndex(albumId, trackId);
-    emit changed();
+    Q_EMIT changed();
     const auto phase = m_presentation->phase();
     const bool reuse = !trackId.isEmpty() && m_library->navigationAlbumId() == albumId
             && !m_presentation->pendingSelection()
-            && (phase == "detail" || phase == "opening" || phase == "switching");
+            && (phase == "detail"_L1 || phase == "opening"_L1 || phase == "switching"_L1);
     if (!reuse)
         m_presentation->select(albumId, true, true, trackId);
     else
@@ -59,7 +64,7 @@ void TrackFocusController::cancel()
     m_row = -1;
     m_requested = m_scrolling = m_pulsing = false;
     m_highlight = 0;
-    emit changed();
+    Q_EMIT changed();
 }
 void TrackFocusController::ready()
 {
@@ -71,7 +76,7 @@ void TrackFocusController::ready()
         return;
     }
     m_requested = true;
-    emit revealRequested(m_revision, m_row);
+    Q_EMIT revealRequested(m_revision, m_row);
 }
 void TrackFocusController::beginReveal(quint64 revision, double start, double target)
 {
@@ -83,9 +88,46 @@ void TrackFocusController::beginReveal(quint64 revision, double start, double ta
     m_elapsed = 0;
     m_duration = std::min(.7, .32 + std::abs(target - start) * .00012);
     m_scrolling = true;
-    emit changed();
+    Q_EMIT changed();
+    if (revision != m_revision || !m_scrolling)
+        return;
     if (m_reduced || std::abs(target - start) < 1)
         advance(m_duration);
+}
+void TrackFocusController::beginListReveal(quint64 revision, double startRelative, double origin,
+                                           double low, double high, double rowTop, double rowHeight,
+                                           double viewportHeight, double headerHeight)
+{
+    if (revision != m_revision || !active() || !m_requested || !std::isfinite(startRelative)
+        || !std::isfinite(origin) || !std::isfinite(low) || !std::isfinite(high) || high < low
+        || !std::isfinite(rowTop) || !std::isfinite(rowHeight) || !std::isfinite(viewportHeight)
+        || !std::isfinite(headerHeight))
+        return;
+    m_listOrigin = origin;
+    m_listLow = low;
+    m_listHigh = high;
+    const double offset =
+            headerHeight + std::max(0., (viewportHeight - headerHeight - rowHeight) / 2);
+    m_listTarget = std::clamp(rowTop - origin - offset, low, high);
+    m_listOffset = 0;
+    beginReveal(revision, startRelative + origin, m_listTarget + origin);
+}
+void TrackFocusController::refineListReveal(double origin, double rowTop, double rowHeight,
+                                            double viewportHeight, double headerHeight, double high)
+{
+    if (!active() || !std::isfinite(origin) || !std::isfinite(rowTop) || !std::isfinite(rowHeight)
+        || !std::isfinite(viewportHeight) || !std::isfinite(headerHeight))
+        return;
+    if (!std::isfinite(high))
+        high = m_listHigh;
+    high = std::max(m_listLow, high);
+    const double offset =
+            headerHeight + std::max(0., (viewportHeight - headerHeight - rowHeight) / 2);
+    m_listOffset = std::clamp(rowTop - origin - offset, m_listLow, high) - m_listTarget;
+}
+double TrackFocusController::listScrollY(double origin) const
+{
+    return m_scrollY + origin - m_listOrigin + m_listOffset;
 }
 void TrackFocusController::startHighlight()
 {
@@ -93,8 +135,10 @@ void TrackFocusController::startHighlight()
     m_pulsing = true;
     m_elapsed = 0;
     m_highlight = m_reduced ? 1 : 0;
-    emit changed();
-    emit focusRequested(m_row);
+    const auto revision = m_revision;
+    Q_EMIT changed();
+    if (revision == m_revision && m_pulsing)
+        Q_EMIT focusRequested(m_row);
 }
 void TrackFocusController::setReducedMotion(bool reduced)
 {
@@ -111,8 +155,9 @@ void TrackFocusController::advance(double dt)
         const double t = std::min(1., m_elapsed / m_duration);
         const double eased = t < .5 ? 4 * t * t * t : 1 - std::pow(-2 * t + 2, 3) / 2;
         m_scrollY = m_start + (m_target - m_start) * eased;
-        emit scrollChanged();
-        if (t == 1)
+        const auto revision = m_revision;
+        Q_EMIT scrollChanged();
+        if (revision == m_revision && m_scrolling && t == 1)
             startHighlight();
     } else if (m_pulsing) {
         m_elapsed += dt;
@@ -122,13 +167,16 @@ void TrackFocusController::advance(double dt)
         }
         if (!m_reduced) {
             const double t = std::fmod(m_elapsed, 1.);
-            QEasingCurve ease(QEasingCurve::BezierSpline);
-            ease.addCubicBezierSegment({ .42, 0 }, { .58, 1 }, { 1, 1 });
+            static const QEasingCurve ease = [] {
+                QEasingCurve curve(QEasingCurve::BezierSpline);
+                curve.addCubicBezierSegment({ .42, 0 }, { .58, 1 }, { 1, 1 });
+                return curve;
+            }();
             m_highlight = t < .32 ? ease.valueForProgress(t / .32)
                     : t < .48     ? 1
                     : t < .88     ? 1 - ease.valueForProgress((t - .48) / .4)
                                   : 0;
-            emit changed();
+            Q_EMIT changed();
         }
     }
 }

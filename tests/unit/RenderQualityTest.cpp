@@ -6,18 +6,21 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 class RenderQualityTest : public QObject
 {
     Q_OBJECT
     QJsonObject load(const char *name)
     {
-        QFile f(QString(FIXTURE_ROOT "/tests/fixtures/occlusion/") + name);
+        QFile f((QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/occlusion/"_s)
+                + QString::fromUtf8(name));
         if (!f.open(QIODevice::ReadOnly))
             return { };
         return QJsonDocument::fromJson(f.readAll()).object();
     }
-private slots:
+private Q_SLOTS:
     void nativeDiagnosticDprProtection()
     {
         RenderQuality quality;
@@ -38,25 +41,26 @@ private slots:
         const auto oracle = load("quality.json");
         QVERIFY(!oracle.isEmpty());
         RenderQuality q;
-        for (auto value : oracle["normalized"].toArray()) {
+        for (auto value : oracle[u"normalized"_s].toArray()) {
             auto c = value.toObject();
-            q.configure(c["input"].toObject().toVariantMap());
-            const auto expected = c["expected"].toObject().toVariantMap();
+            q.configure(c[u"input"_s].toObject().toVariantMap());
+            const auto expected = c[u"expected"_s].toObject().toVariantMap();
             for (auto i = expected.begin(); i != expected.end(); ++i)
                 QCOMPARE(q.values()[i.key()], i.value());
-            QCOMPARE(q.preset(), c["preset"].toString());
+            QCOMPARE(q.preset(), c[u"preset"_s].toString());
         }
-        for (auto value : oracle["dimensions"].toArray()) {
-            const auto c = value.toObject(), e = c["expected"].toObject();
-            q.setPreset(c["preset"].toString());
-            q.resize(c["width"].toDouble(), c["height"].toDouble(), c["stageScale"].toDouble(),
-                     c["dpr"].toDouble(), c["maximum"].toInt());
-            QCOMPARE(q.targetSize(), QSize(e["width"].toInt(), e["height"].toInt()));
-            QCOMPARE(q.limited(), e["limited"].toBool());
+        for (auto value : oracle[u"dimensions"_s].toArray()) {
+            const auto c = value.toObject(), e = c[u"expected"_s].toObject();
+            q.setPreset(c[u"preset"_s].toString());
+            q.resize(c[u"width"_s].toDouble(), c[u"height"_s].toDouble(),
+                     c[u"stageScale"_s].toDouble(), c[u"dpr"_s].toDouble(),
+                     c[u"maximum"_s].toInt());
+            QCOMPARE(q.targetSize(), QSize(e[u"width"_s].toInt(), e[u"height"_s].toInt()));
+            QCOMPARE(q.limited(), e[u"limited"_s].toBool());
             QVERIFY(qint64(q.targetSize().width()) * q.targetSize().height() <= 8294400);
-            QVERIFY(q.targetSize().width() <= c["maximum"].toInt());
-            QVERIFY(q.targetSize().height() <= c["maximum"].toInt());
-            QCOMPARE(q.preset(), c["preset"].toString());
+            QVERIFY(q.targetSize().width() <= c[u"maximum"_s].toInt());
+            QVERIFY(q.targetSize().height() <= c[u"maximum"_s].toInt());
+            QCOMPARE(q.preset(), c[u"preset"_s].toString());
         }
     }
     void seededKernel()
@@ -69,9 +73,9 @@ private slots:
                 state = state * 1664525u + 1013904223u;
                 return double(state) / 4294967296.0;
             };
-            const auto samples = oracle["kernels"]
+            const auto samples = oracle[u"kernels"_s]
                                          .toObject()[QString::number(count)]
-                                         .toObject()["samples"]
+                                         .toObject()[u"samples"_s]
                                          .toArray();
             QCOMPARE(samples.size(), count);
             for (int i = 0; i < count; ++i) {
@@ -89,17 +93,17 @@ private slots:
     {
         RenderQuality q;
         QSignalSpy changes(&q, &RenderQuality::changed);
-        q.setPreset("original");
+        q.setPreset(u"original"_s);
         QCOMPARE(changes.size(), 0);
         const auto size = q.targetSize();
         q.resize(-1, 10, 1, 1, 4096);
         QCOMPARE(q.targetSize(), size);
-        q.setPreset("ultra");
+        q.setPreset(u"ultra"_s);
         q.resize(8000, 8000, 1, 3, 16384);
         QVERIFY(q.limited());
-        QCOMPARE(q.values()["scale"].toInt(), 150);
+        QCOMPARE(q.values()[u"scale"_s].toInt(), 150);
         auto values = q.values();
-        values["aoResolution"] = .5;
+        values[u"aoResolution"_s] = .5;
         q.configure(values);
         QCOMPARE(q.aoSize(), QSize(q.targetSize().width() / 2, q.targetSize().height() / 2));
     }
@@ -112,7 +116,7 @@ private slots:
         const auto position = scene.cameraPosition();
         const auto *lighting = scene.lighting();
         for (auto preset : { "performance", "high", "ultra", "original" }) {
-            scene.quality()->setPreset(preset);
+            scene.quality()->setPreset(QString::fromUtf8(preset));
             QCOMPARE(scene.frameRevision(), revision);
             QCOMPARE(scene.cameraPosition(), position);
             QCOMPARE(scene.detail(), 1.0);

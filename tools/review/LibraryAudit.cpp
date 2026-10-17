@@ -1,3 +1,4 @@
+#include "MetadataPresentation.h"
 #include "LibraryAudit.h"
 #include "PlaybackController.h"
 #include "BackgroundMusicController.h"
@@ -35,6 +36,8 @@
 #include <QTest>
 #include <atomic>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 // Test-only injection. No networking objects or production registration.
@@ -51,20 +54,23 @@ public:
     void setEnabled(bool value)
     {
         enabled = value;
-        emit capabilitiesChanged();
+        Q_EMIT capabilitiesChanged();
     }
-    void requestIntroduction(AlbumQuery query, RequestToken token) override
+    bool requestIntroduction(AlbumQuery query, RequestToken token) override
     {
         lastQueryEnabled = query.enabled;
         deliver(token, MetadataKind::Introduction);
+        return true;
     }
-    void requestCredits(AlbumQuery, RequestToken token) override
+    bool requestCredits(AlbumQuery, RequestToken token) override
     {
         deliver(token, MetadataKind::Credits);
+        return true;
     }
-    void requestEnrichment(AlbumQuery, RequestToken token) override
+    bool requestEnrichment(AlbumQuery, RequestToken token) override
     {
         deliver(token, MetadataKind::Enrichment);
+        return true;
     }
     void cancel(RequestToken) override
     {
@@ -77,11 +83,14 @@ public:
         result.albumId = token.albumId;
         result.kind = kind;
         result.status = status;
-        result.payload = { { "description", "Injected introduction · 本机测试资料" } };
-        result.source = { { "name", "Offline test provider" } };
-        result.error = status == ProviderStatus::Error ? "Injected error" : "";
+        result.payload = {
+            { u"description"_s,
+              u"Injected introduction \u00b7 \u672c\u673a\u6d4b\u8bd5\u8d44\u6599"_s }
+        };
+        result.source = { { u"name"_s, u"Offline test provider"_s } };
+        result.error = status == ProviderStatus::Error ? "Injected error"_L1 : ""_L1;
         QTimer::singleShot(0, this, [this, result] {
-            emit resultReady(result);
+            Q_EMIT resultReady(result);
         });
     }
 };
@@ -109,24 +118,25 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     QTemporaryDir audioDirectory;
     QUrl audioSource;
     if (playbackVerification) {
-        QFile audioFile(audioDirectory.path() + QStringLiteral("/匿名 歌曲 #.wav"));
+        QFile audioFile(audioDirectory.path() + u"/\u533f\u540d \u6b4c\u66f2 #.wav"_s);
         if (!audioFile.open(QIODevice::WriteOnly) || audioFile.write(test::wave(30000)) <= 0)
             return 2;
         audioSource = QUrl::fromLocalFile(audioFile.fileName());
     }
     LibrarySnapshot snapshot;
-    snapshot.genres = { { "g", "流派一", { }, { }, { } }, { "h", "流派二", { }, { }, { } } };
+    snapshot.genres = { { u"g"_s, u"\u6d41\u6d3e\u4e00"_s, { }, { }, { } },
+                        { u"h"_s, u"\u6d41\u6d3e\u4e8c"_s, { }, { }, { } } };
     for (int i = 0; i < 20; ++i) {
         Album album;
-        album.id = QString("album-%1").arg(i);
-        album.title = QString("收藏专辑 %1 · Anonymous Archive").arg(i);
-        album.artist = i < 10 ? "Artist A" : "Artist B";
-        album.genreId = i < 10 ? "g" : "h";
+        album.id = u"album-%1"_s.arg(i);
+        album.title = u"\u6536\u85cf\u4e13\u8f91 %1 \u00b7 Anonymous Archive"_s.arg(i);
+        album.artist = i < 10 ? "Artist A"_L1 : "Artist B"_L1;
+        album.genreId = i < 10 ? "g"_L1 : "h"_L1;
         for (int j = 0; j < 200; ++j) {
             Track track;
-            track.id = QString("track-%1").arg(j);
+            track.id = u"track-%1"_s.arg(j);
             track.albumId = album.id;
-            track.title = QString("Song %1 · 收藏曲目 🎵").arg(j);
+            track.title = u"Song %1 \u00b7 \u6536\u85cf\u66f2\u76ee \U0001f3b5"_s.arg(j);
             track.artist = album.artist;
             track.sourceUrl = audioSource;
             track.duration = 185;
@@ -136,11 +146,11 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         snapshot.albums.append(album);
     }
     library.setSnapshot(snapshot);
-    library.sort("artist");
+    library.sort(u"artist"_s);
     selection.setColumns(library.albums()->order().columns, library.snapshot());
     scene.setSelection(&selection);
     library.navigate(selection.albumId());
-    library.setPlaybackIds("album-0", "track-0");
+    library.setPlaybackIds(u"album-0"_s, u"track-0"_s);
     QObject::connect(&selection, &SelectionController::selectionChanged, &library, [&] {
         library.navigate(selection.albumId());
     });
@@ -177,23 +187,23 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     PreferencesStore preferences(audioDirectory.path());
     SettingsController settings(settingsVerification ? &preferences : nullptr, &library, &motion,
                                 &scene, &selection);
-    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"));
-    QVariantMap properties{ { "librarySession", QVariant::fromValue(&library) },
-                            { "motionController", QVariant::fromValue(&motion) },
-                            { "sceneAdapter", QVariant::fromValue(&scene) },
-                            { "presentationController", QVariant::fromValue(&presentation) },
-                            { "detailModel", QVariant::fromValue(&detail) },
-                            { "trackFocusController", QVariant::fromValue(&focus) },
-                            { "panelController", QVariant::fromValue(&panels) },
-                            { "inputRouter", QVariant::fromValue(&input) },
-                            { "rulerController", QVariant::fromValue(&ruler) },
-                            { "overviewController", QVariant::fromValue(&overview) } };
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/LibraryReview.qml"_s));
+    QVariantMap properties{ { u"librarySession"_s, QVariant::fromValue(&library) },
+                            { u"motionController"_s, QVariant::fromValue(&motion) },
+                            { u"sceneAdapter"_s, QVariant::fromValue(&scene) },
+                            { u"presentationController"_s, QVariant::fromValue(&presentation) },
+                            { u"detailModel"_s, QVariant::fromValue(&detail) },
+                            { u"trackFocusController"_s, QVariant::fromValue(&focus) },
+                            { u"panelController"_s, QVariant::fromValue(&panels) },
+                            { u"inputRouter"_s, QVariant::fromValue(&input) },
+                            { u"rulerController"_s, QVariant::fromValue(&ruler) },
+                            { u"overviewController"_s, QVariant::fromValue(&overview) } };
     if (settingsVerification)
-        properties.insert("settingsController", QVariant::fromValue(&settings));
+        properties.insert(u"settingsController"_s, QVariant::fromValue(&settings));
     if (song) {
-        properties.insert("playbackController", QVariant::fromValue(song.get()));
-        properties.insert("backgroundMusicController", QVariant::fromValue(&background));
-        properties.insert("interfaceSoundController", QVariant::fromValue(&sounds));
+        properties.insert(u"playbackController"_s, QVariant::fromValue(song.get()));
+        properties.insert(u"backgroundMusicController"_s, QVariant::fromValue(&background));
+        properties.insert(u"interfaceSoundController"_s, QVariant::fromValue(&sounds));
     }
     std::unique_ptr<QObject> object(component.createWithInitialProperties(properties));
     auto *root = qobject_cast<QQuickItem *>(object.get());
@@ -203,7 +213,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     }
     QJsonObject lastSettingsSample;
     QJsonArray settingsResourceSamples;
-    auto *settingsScene = qobject_cast<rhi::SceneItem *>(visual(root, "nativeScene"));
+    auto *settingsScene = qobject_cast<rhi::SceneItem *>(visual(root, u"nativeScene"_s));
     if (settingsVerification && settingsScene) {
         settingsScene->setTelemetryEnabled(true);
         QObject::connect(settingsScene, &rhi::SceneItem::frameSubmitted, root,
@@ -227,8 +237,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         : static_cast<QRhi *>(window.rendererInterface()->getResource(
                                   &window, QSGRendererInterface::RhiResource));
                 const QVariantMap info{
-                    { "backend", api ? QString::fromLatin1(api->backendName()) : QString() },
-                    { "gpu", api ? QString::fromUtf8(api->driverInfo().deviceName) : QString() }
+                    { u"backend"_s, api ? QString::fromUtf8(api->backendName()) : QString() },
+                    { u"gpu"_s, api ? QString::fromUtf8(api->driverInfo().deviceName) : QString() }
                 };
                 QMetaObject::invokeMethod(
                         &window,
@@ -282,7 +292,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         if (!settingsScene)
             return false;
         const auto expected = scene.quality()->targetSize();
-        const auto previous = lastSettingsSample["submission"].toInteger();
+        const auto previous = lastSettingsSample[u"submission"_s].toInteger();
         // One explicit Review action receipt, so a static scene submits this observation.
         scene.recordInput();
         const auto inputRevision = scene.frame().inputRevision;
@@ -294,10 +304,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         const auto connection = QObject::connect(
                 settingsScene, &rhi::SceneItem::frameSubmitted, &loop,
                 [&](const QJsonObject &sample) {
-                    if (sample["submission"].toInteger() > previous
-                        && sample["inputRevision"].toInteger() == qint64(inputRevision)
-                        && sample["targetWidth"].toInt() == expected.width()
-                        && sample["targetHeight"].toInt() == expected.height()) {
+                    if (sample[u"submission"_s].toInteger() > previous
+                        && sample[u"inputRevision"_s].toInteger() == qint64(inputRevision)
+                        && sample[u"targetWidth"_s].toInt() == expected.width()
+                        && sample[u"targetHeight"_s].toInt() == expected.height()) {
                         ready = true;
                         loop.quit();
                     }
@@ -321,8 +331,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     bool passed = true;
     const auto check = [&](const QString &name, bool okay) {
         auto entry = context;
-        entry.insert("check", name);
-        entry.insert("passed", okay);
+        entry.insert(u"check"_s, name);
+        entry.insert(u"passed"_s, okay);
         checks.append(entry);
         if (!okay)
             qWarning() << "Library audit failed:" << name;
@@ -332,7 +342,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         window.resize(1280, 720);
         root->setSize({ 1280, 720 });
         render();
-        auto *button = visual(window.contentItem(), "playButton");
+        auto *button = visual(window.contentItem(), u"playButton"_s);
         if (!button)
             return 4;
         QTest::mouseClick(
@@ -342,18 +352,18 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         loaded.start();
         while (!song->playing() && loaded.elapsed() < 10000)
             QTest::qWait(5);
-        check("reference-license-resource",
-              QFile::exists(":/assets/licenses/qt-playback-reference-NOTICE.md"));
-        check("actual-play-button", song->playing() && song->trackId() == "track-0");
+        check(u"reference-license-resource"_s,
+              QFile::exists(u":/assets/licenses/qt-playback-reference-NOTICE.md"_s));
+        check(u"actual-play-button"_s, song->playing() && song->trackId() == "track-0"_L1);
         root->forceActiveFocus(Qt::OtherFocusReason);
         QTest::keyClick(&window, Qt::Key_Space);
-        check("space-pauses", !song->requested());
+        check(u"space-pauses"_s, !song->requested());
         QTest::keyClick(&window, Qt::Key_Space);
         QElapsedTimer resumed;
         resumed.start();
         while (!song->playing() && resumed.elapsed() < 5000)
             QTest::qWait(5);
-        check("space-resumes", song->playing());
+        check(u"space-resumes"_s, song->playing());
         playback.clear();
     }
     const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
@@ -370,17 +380,17 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             window.resize(size);
             scene.layout()->setViewport(size.width(), size.height());
             for (bool night : { false, true }) {
-                context = { { "width", size.width() },
-                            { "height", size.height() },
-                            { "dpr", dpr },
-                            { "night", night } };
+                context = { { u"width"_s, size.width() },
+                            { u"height"_s, size.height() },
+                            { u"dpr"_s, dpr },
+                            { u"night"_s, night } };
                 scene.lighting()->setNight(night);
                 if (settingsVerification) {
-                    panels.open("settings");
-                    check("render-settings", render());
-                    auto *settingsPanel = visual(window.contentItem(), "settingsPanel");
-                    auto *pane = visual(window.contentItem(), "libraryPanelSurface");
-                    check("source-settings-panel",
+                    panels.open(u"settings"_s);
+                    check(u"render-settings"_s, render());
+                    auto *settingsPanel = visual(window.contentItem(), u"settingsPanel"_s);
+                    auto *pane = visual(window.contentItem(), u"libraryPanelSurface"_s);
+                    check(u"source-settings-panel"_s,
                           settingsPanel && pane
                                   && std::abs(pane->width()
                                               - std::min(
@@ -388,17 +398,17 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                       size.width()
                                                               - (size.width() <= 700 ? 24. : 56.)))
                                           <= 1);
-                    auto *query = visual(window.contentItem(), "introductionMetadataQuery");
-                    check("offline-query-disabled", query && !query->isEnabled());
+                    auto *query = visual(window.contentItem(), u"introductionMetadataQuery"_s);
+                    check(u"offline-query-disabled"_s, query && !query->isEnabled());
                     if (settingsPanel) {
                         settingsPanel->setProperty("qualityExpanded", true);
                         settingsPanel->setProperty("musicBrainzExpanded", true);
                     }
-                    check("expanded-settings-render", render());
+                    check(u"expanded-settings-render"_s, render());
                     auto *scroll = settingsPanel
                             ? settingsPanel->property("contentItem").value<QQuickItem *>()
                             : nullptr;
-                    check("settings-scrollable",
+                    check(u"settings-scrollable"_s,
                           scroll
                                   && scroll->property("contentHeight").toDouble()
                                           > scroll->height());
@@ -407,30 +417,29 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                             std::max(0.,
                                                      scroll->property("contentHeight").toDouble()
                                                              - scroll->height()));
-                    check("settings-bottom-render", render());
-                    auto *contact = visual(window.contentItem(), "settingsMetadataContact");
-                    check("configuration-reachable",
+                    check(u"settings-bottom-render"_s, render());
+                    auto *contact = visual(window.contentItem(), u"settingsMetadataContact"_s);
+                    check(u"configuration-reachable"_s,
                           settingsPanel && contact
                                   && settingsPanel->contains(settingsPanel->mapFromItem(
                                           contact,
                                           { contact->width() / 2, contact->height() / 2 })));
                     if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
-                        check("settings-bottom-own-image",
-                              surface.grab().save(output
-                                                  + QString("/settings-bottom-%1-%2.png")
-                                                            .arg(size.width())
-                                                            .arg(night)));
+                        check(u"settings-bottom-own-image"_s,
+                              surface.grab().save(
+                                      output
+                                      + u"/settings-bottom-%1-%2.png"_s.arg(size.width())
+                                                .arg(night)));
                     if (scroll)
                         scroll->setProperty("contentY", 0);
-                    check("settings-top-render", render());
+                    check(u"settings-top-render"_s, render());
                     if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
-                        check("settings-top-own-image",
-                              surface.grab().save(output
-                                                  + QString("/settings-top-%1-%2.png")
-                                                            .arg(size.width())
-                                                            .arg(night)));
+                        check(u"settings-top-own-image"_s,
+                              surface.grab().save(
+                                      output
+                                      + u"/settings-top-%1-%2.png"_s.arg(size.width()).arg(night)));
                     if (dpr == 1 && size == QSize(1280, 720) && !night) {
-                        check("settings-resource-sample",
+                        check(u"settings-resource-sample"_s,
                               renderSettingsTarget() && !lastSettingsSample.isEmpty());
                         const auto baselineResources = lastSettingsSample;
                         const auto atlasGeneration =
@@ -454,237 +463,241 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                             }
                             return control;
                         };
-                        auto *speed = focusSetting("settingsSpeedControl");
-                        check("speed-control-present", speed != nullptr);
+                        auto *speed = focusSetting(u"settingsSpeedControl"_s);
+                        check(u"speed-control-present"_s, speed != nullptr);
                         if (speed)
                             QTest::keyClick(&window, Qt::Key_Right);
-                        check("speed-qt-input", std::abs(motion.clock()->speed() - 1.05) < 1e-9);
-                        check("speed-control-range",
+                        check(u"speed-qt-input"_s, std::abs(motion.clock()->speed() - 1.05) < 1e-9);
+                        check(u"speed-control-range"_s,
                               speed && speed->property("from").toDouble() == .25
                                       && speed->property("to").toDouble() == 3.0);
-                        check("speed-resource-render", renderSettingsTarget());
-                        check("speed-keeps-resources",
-                              lastSettingsSample["resourceGeneration"]
-                                              == baselineResources["resourceGeneration"]
-                                      && lastSettingsSample["postprocessRevision"]
-                                              == baselineResources["postprocessRevision"]);
-                        settings.update("motionSpeed", 1.0);
+                        check(u"speed-resource-render"_s, renderSettingsTarget());
+                        check(u"speed-keeps-resources"_s,
+                              lastSettingsSample[u"resourceGeneration"_s]
+                                              == baselineResources[u"resourceGeneration"_s]
+                                      && lastSettingsSample[u"postprocessRevision"_s]
+                                              == baselineResources[u"postprocessRevision"_s]);
+                        settings.update(u"motionSpeed"_s, 1.0);
                         if (scroll)
                             scroll->setProperty("contentY", 0);
                         render();
-                        auto *theme = visual(window.contentItem(), "settingsNightTheme");
-                        check("theme-control-present", theme != nullptr);
+                        auto *theme = visual(window.contentItem(), u"settingsNightTheme"_s);
+                        check(u"theme-control-present"_s, theme != nullptr);
                         if (theme) {
                             theme->forceActiveFocus();
                             QTest::keyClick(&window, Qt::Key_Space);
                             renderSettingsTarget();
-                            check("theme-qt-input", scene.lighting()->night());
-                            settings.update("theme", "day");
+                            check(u"theme-qt-input"_s, scene.lighting()->night());
+                            settings.update(u"theme"_s, u"day"_s);
                             renderSettingsTarget();
                         }
-                        check("theme-keeps-resources",
-                              lastSettingsSample["resourceGeneration"]
-                                              == baselineResources["resourceGeneration"]
-                                      && lastSettingsSample["postprocessRevision"]
-                                              == baselineResources["postprocessRevision"]);
-                        auto *qualitySlider = focusSetting("settingsscaleControl");
-                        check("quality-control-present", qualitySlider != nullptr);
+                        check(u"theme-keeps-resources"_s,
+                              lastSettingsSample[u"resourceGeneration"_s]
+                                              == baselineResources[u"resourceGeneration"_s]
+                                      && lastSettingsSample[u"postprocessRevision"_s]
+                                              == baselineResources[u"postprocessRevision"_s]);
+                        auto *qualitySlider = focusSetting(u"settingsscaleControl"_s);
+                        check(u"quality-control-present"_s, qualitySlider != nullptr);
                         if (qualitySlider)
                             QTest::keyClick(&window, Qt::Key_Right);
-                        check("quality-qt-input",
-                              scene.quality()->values()["scale"].toInt() == 105);
-                        check("quality-resource-render", renderSettingsTarget());
-                        check("quality-target-rebuild",
-                              lastSettingsSample["resourceGeneration"].toInteger()
-                                              > baselineResources["resourceGeneration"].toInteger()
+                        check(u"quality-qt-input"_s,
+                              scene.quality()->values()[u"scale"_s].toInt() == 105);
+                        check(u"quality-resource-render"_s, renderSettingsTarget());
+                        check(u"quality-target-rebuild"_s,
+                              lastSettingsSample[u"resourceGeneration"_s].toInteger()
+                                              > baselineResources[u"resourceGeneration"_s]
+                                                        .toInteger()
                                       && settingsScene
                                       && settingsScene->input().atlasGeneration == atlasGeneration);
                         settingsResourceSamples.append(lastSettingsSample);
-                        check("quality-own-image",
-                              surface.grab().save(output + "/settings-quality.png"));
+                        check(u"quality-own-image"_s,
+                              surface.grab().save(output + "/settings-quality.png"_L1));
                         if (qualitySlider)
                             QTest::keyClick(&window, Qt::Key_Left);
-                        check("quality-resource-restore", renderSettingsTarget());
+                        check(u"quality-resource-restore"_s, renderSettingsTarget());
                         settingsResourceSamples.append(lastSettingsSample);
-                        check("quality-resource-return",
-                              lastSettingsSample["resources"].toObject()["estimatedCurrentBytes"]
-                                      == baselineResources["resources"]
-                                                 .toObject()["estimatedCurrentBytes"]);
+                        check(u"quality-resource-return"_s,
+                              lastSettingsSample[u"resources"_s]
+                                              .toObject()[u"estimatedCurrentBytes"_s]
+                                      == baselineResources[u"resources"_s]
+                                                 .toObject()[u"estimatedCurrentBytes"_s]);
                         if (scroll)
                             scroll->setProperty("contentY", 0);
                         render();
                         for (auto status : { ProviderStatus::Matched, ProviderStatus::Uncertain,
                                              ProviderStatus::Error }) {
                             injected.status = status;
-                            library.requestMetadata(library.navigationAlbumId(), "introduction");
+                            library.requestMetadata(library.navigationAlbumId(), u"introduction"_s);
                             QElapsedTimer timer;
                             timer.start();
                             while (library.metadataFor(library.navigationAlbumId(),
-                                                       "introduction")["status"]
+                                                       u"introduction"_s)[u"status"_s]
                                                    .toString()
                                            != statusName(status)
                                    && timer.elapsed() < 2000)
                                 QTest::qWait(5);
-                            check("injected-status-render", render());
-                            auto *state = visual(window.contentItem(), "introductionMetadataState");
-                            check("injected-status-ui",
+                            check(u"injected-status-render"_s, render());
+                            auto *state =
+                                    visual(window.contentItem(), u"introductionMetadataState"_s);
+                            check(u"injected-status-ui"_s,
                                   state
                                           && state->property("text").toString().contains(
-                                                  statusName(status)));
+                                                  metadataStatusText(statusName(status))));
                             auto *content =
-                                    visual(window.contentItem(), "introductionMetadataContent");
-                            check("injected-content-ui",
+                                    visual(window.contentItem(), u"introductionMetadataContent"_s);
+                            check(u"injected-content-ui"_s,
                                   content
                                           && content->property("text").toString().contains(
-                                                  "Injected introduction"));
+                                                  u"Injected introduction"_s));
                         }
                         injected.setEnabled(true);
-                        check("future-capability-render", render());
-                        check("future-capability-enables-query", query && query->isEnabled());
+                        check(u"future-capability-render"_s, render());
+                        check(u"future-capability-enables-query"_s, query && query->isEnabled());
                         if (query) {
                             query->forceActiveFocus();
                             QTest::keyClick(&window, Qt::Key_Space);
                         }
                         QElapsedTimer queryTimer;
                         queryTimer.start();
-                        while (library.metadataProgress()["active"].toBool()
+                        while (library.metadataProgress()[u"active"_s].toBool()
                                && queryTimer.elapsed() < 3000)
                             QTest::qWait(5);
-                        check("future-query-qt-input",
+                        check(u"future-query-qt-input"_s,
                               injected.lastQueryEnabled
-                                      && library.metadataProgress()["kind"].toString()
-                                              == "introduction"
-                                      && library.metadataProgress()["completed"].toInt()
+                                      && library.metadataProgress()[u"kind"_s].toString()
+                                              == "introduction"_L1
+                                      && library.metadataProgress()[u"completed"_s].toInt()
                                               == snapshot.albums.size());
                         injected.setEnabled(false);
-                        check("offline-capability-restored",
+                        check(u"offline-capability-restored"_s,
                               render() && query && !query->isEnabled());
-                        check("batch-start", library.requestMetadataBatch("credits"));
+                        check(u"batch-start"_s, library.requestMetadataBatch(u"credits"_s));
                         QElapsedTimer timer;
                         timer.start();
-                        while (library.metadataProgress()["active"].toBool()
+                        while (library.metadataProgress()[u"active"_s].toBool()
                                && timer.elapsed() < 3000)
                             QTest::qWait(5);
-                        check("batch-progress",
-                              !library.metadataProgress()["active"].toBool()
-                                      && library.metadataProgress()["completed"].toInt()
+                        check(u"batch-progress"_s,
+                              !library.metadataProgress()[u"active"_s].toBool()
+                                      && library.metadataProgress()[u"completed"_s].toInt()
                                               == snapshot.albums.size());
                     }
                     QPointer<QQuickItem> oldPanel = settingsPanel;
                     QTest::keyClick(&window, Qt::Key_Escape);
-                    check("escape-settings",
+                    check(u"escape-settings"_s,
                           render() && !panels.surface()->shown() && input.enabled() && !oldPanel);
-                    panels.open("settings");
-                    check("reverse-open-settings",
-                          render() && visual(window.contentItem(), "settingsPanel"));
+                    panels.open(u"settings"_s);
+                    check(u"reverse-open-settings"_s,
+                          render() && visual(window.contentItem(), u"settingsPanel"_s));
                     panels.close();
-                    check("settings-close", render() && !panels.surface()->shown());
+                    check(u"settings-close"_s, render() && !panels.surface()->shown());
                     continue;
                 }
-                panels.open("search");
-                check("render-search", render());
-                auto *pane = visual(window.contentItem(), "libraryPanelSurface");
-                auto *query = visual(window.contentItem(), "librarySearchInput");
-                auto *results = visual(window.contentItem(), "librarySearchResults");
+                panels.open(u"search"_s);
+                check(u"render-search"_s, render());
+                auto *pane = visual(window.contentItem(), u"libraryPanelSurface"_s);
+                auto *query = visual(window.contentItem(), u"librarySearchInput"_s);
+                auto *results = visual(window.contentItem(), u"librarySearchResults"_s);
                 if (!pane || !query || !results)
                     return 4;
-                check("source-panel-width",
+                check(u"source-panel-width"_s,
                       std::abs(pane->width()
                                - std::min(650., size.width() - (size.width() <= 700 ? 24. : 56.)))
                               <= 1);
-                auto *sceneItem =
-                        qobject_cast<rhi::SceneItem *>(visual(window.contentItem(), "nativeScene"));
-                check("scene-error-free", sceneItem && sceneItem->errorText().isEmpty());
-                check("panel-descriptor", sceneItem && sceneItem->input().panelLayerSize == size);
+                auto *sceneItem = qobject_cast<rhi::SceneItem *>(
+                        visual(window.contentItem(), u"nativeScene"_s));
+                check(u"scene-error-free"_s, sceneItem && sceneItem->errorText().isEmpty());
+                check(u"panel-descriptor"_s,
+                      sceneItem && sceneItem->input().panelLayerSize == size);
                 if (dpr == 1 && size == QSize(1280, 720) && !night) {
                     QPointer<QQuickItem> first =
-                            visual(window.contentItem(), "librarySearchResult-0");
-                    check("search-first-row",
+                            visual(window.contentItem(), u"librarySearchResult-0"_s);
+                    check(u"search-first-row"_s,
                           first && first->property("trackId").toString().isEmpty());
                     const QPoint press = first
                             ? first->mapToScene(QPointF(first->width() / 2, first->height() / 2))
                                       .toPoint()
                             : QPoint();
                     QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, press);
-                    check("search-row-pressed", first && first->property("pressed").toBool());
-                    query->setProperty("text", "Song");
+                    check(u"search-row-pressed"_s, first && first->property("pressed").toBool());
+                    query->setProperty("text", u"Song"_s);
                     render();
-                    check("search-row-reused",
-                          first && first == visual(window.contentItem(), "librarySearchResult-0")
-                                  && first->property("trackId").toString() == "track-0");
+                    check(u"search-row-reused"_s,
+                          first && first == visual(window.contentItem(), u"librarySearchResult-0"_s)
+                                  && first->property("trackId").toString() == "track-0"_L1);
                     QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, press);
-                    check("search-replaced-press-canceled",
+                    check(u"search-replaced-press-canceled"_s,
                           render() && panels.surface()->shown() && presentation.archiveEnabled());
-                    check("large-results", library.searchResults()->rowCount() == 4000);
+                    check(u"large-results"_s, library.searchResults()->rowCount() == 4000);
                     int live = 0;
                     for (auto *item : results->childItems())
                         live += item->childItems().size();
-                    check("large-result-virtualization", live < 100);
+                    check(u"large-result-virtualization"_s, live < 100);
                     query->forceActiveFocus();
                     QTest::keyClick(&window, Qt::Key_Down);
                     for (int i = 0; i < 6; ++i)
                         QTest::keyClick(&window, Qt::Key_Down);
-                    check("search-keyboard-row-selected",
+                    check(u"search-keyboard-row-selected"_s,
                           results->property("currentIndex").toInt() > 0);
                     query->forceActiveFocus();
-                    query->setProperty("text", "Song 199");
-                    check("new-query-discards-old-keyboard-target",
+                    query->setProperty("text", u"Song 199"_s);
+                    check(u"new-query-discards-old-keyboard-target"_s,
                           render() && results->property("currentIndex").toInt() <= 0);
-                    query->setProperty("text", "");
+                    query->setProperty("text", u""_s);
                     query->forceActiveFocus();
                 }
-                check("search-focus-and-modal", query->hasActiveFocus() && !input.enabled());
-                for (const auto character : QByteArray("Song 199"))
+                check(u"search-focus-and-modal"_s, query->hasActiveFocus() && !input.enabled());
+                for (const auto character : "Song 199"_ba)
                     QTest::keyClick(&window, character);
-                check("continuous-input", library.searchResults()->rowCount() == 20);
+                check(u"continuous-input"_s, library.searchResults()->rowCount() == 20);
                 if (song)
-                    check("search-space-keeps-intent", song->requested());
-                query->setProperty("text", "unmatched");
-                check("empty-results", library.searchResults()->rowCount() == 0);
-                query->setProperty("text", "");
-                check("empty-query-albums", library.searchResults()->rowCount() == 20);
+                    check(u"search-space-keeps-intent"_s, song->requested());
+                query->setProperty("text", u"unmatched"_s);
+                check(u"empty-results"_s, library.searchResults()->rowCount() == 0);
+                query->setProperty("text", u""_s);
+                check(u"empty-query-albums"_s, library.searchResults()->rowCount() == 20);
                 int delegates = 0;
                 for (auto *item : results->childItems())
                     delegates += item->childItems().size();
-                check("virtual-search-list", delegates < 100);
+                check(u"virtual-search-list"_s, delegates < 100);
                 render();
                 if ((size == QSize(1280, 720) || size == QSize(390, 844)) && dpr == 1)
-                    check("own-image",
+                    check(u"own-image"_s,
                           surface.grab().save(
-                                  output
-                                  + QString("/search-%1-%2.png").arg(size.width()).arg(night)));
-                QPointer<QQuickItem> backdrop = visual(window.contentItem(), "panelBackdropLoader");
+                                  output + u"/search-%1-%2.png"_s.arg(size.width()).arg(night)));
+                QPointer<QQuickItem> backdrop =
+                        visual(window.contentItem(), u"panelBackdropLoader"_s);
                 panels.close();
-                check("close-search", render() && !panels.surface()->shown() && input.enabled());
+                check(u"close-search"_s, render() && !panels.surface()->shown() && input.enabled());
                 if (dpr == 1 && size == QSize(1280, 720) && !night)
                     qInfo() << "Closed backdrop" << bool(backdrop)
                             << (backdrop ? backdrop->property("active") : QVariant())
                             << (backdrop ? backdrop->childItems().size() : -1)
                             << (sceneItem ? sceneItem->input().panelLayerSize : QSize());
-                check("closed-backdrop-released",
+                check(u"closed-backdrop-released"_s,
                       backdrop && !backdrop->property("active").toBool()
                               && backdrop->childItems().isEmpty() && sceneItem
                               && sceneItem->input().panelLayerSize.isEmpty());
-                panels.open("library");
-                check("render-library", render());
+                panels.open(u"library"_s);
+                check(u"render-library"_s, render());
                 if (size == QSize(1280, 720) && dpr == 1)
-                    check("own-library-image",
-                          surface.grab().save(output + QString("/library-%1.png").arg(night)));
+                    check(u"own-library-image"_s,
+                          surface.grab().save(output + u"/library-%1.png"_s.arg(night)));
                 panels.close();
                 render();
                 if (song) {
-                    panels.open("playback");
-                    check("playback-panel-render", render());
+                    panels.open(u"playback"_s);
+                    check(u"playback-panel-render"_s, render());
                     for (const auto &name : { "bgmEnabled", "bgmVolume", "interfaceSoundEnabled",
                                               "interfaceSoundVolume" })
-                        check(QString("audio-setting-%1").arg(name),
-                              visual(window.contentItem(), name) != nullptr);
-                    check("audio-independent-values",
+                        check(u"audio-setting-%1"_s.arg(name),
+                              visual(window.contentItem(), QString::fromUtf8(name)) != nullptr);
+                    check(u"audio-independent-values"_s,
                           background.volume() == .18 && sounds.volume() == .22
                                   && song->volume() == double(.01f) && !sounds.available());
-                    auto *outputs = visual(window.contentItem(), "songOutputDevices");
-                    check("output-device-control", outputs && outputs->isVisible());
-                    auto *settings = visual(window.contentItem(), "audioSettingsPanel");
+                    auto *outputs = visual(window.contentItem(), u"songOutputDevices"_s);
+                    check(u"output-device-control"_s, outputs && outputs->isVisible());
+                    auto *settings = visual(window.contentItem(), u"audioSettingsPanel"_s);
                     auto *scroll = settings
                             ? settings->property("contentItem").value<QQuickItem *>()
                             : nullptr;
@@ -694,39 +707,37 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                             std::max(0.,
                                                      scroll->property("contentHeight").toDouble()
                                                              - scroll->height()));
-                    check("audio-settings-scroll-render", scroll && render());
-                    check("audio-output-reachable",
+                    check(u"audio-settings-scroll-render"_s, scroll && render());
+                    check(u"audio-output-reachable"_s,
                           settings && outputs
                                   && settings->contains(settings->mapFromItem(
                                           outputs,
                                           QPointF(outputs->width() / 2, outputs->height() / 2))));
                     if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
-                        check("audio-output-own-image",
-                              surface.grab().save(output
-                                                  + QString("/audio-output-%1-%2.png")
-                                                            .arg(size.width())
-                                                            .arg(night)));
+                        check(u"audio-output-own-image"_s,
+                              surface.grab().save(
+                                      output
+                                      + u"/audio-output-%1-%2.png"_s.arg(size.width()).arg(night)));
                     if (scroll)
                         scroll->setProperty("contentY", previousY);
-                    check("audio-settings-top-render", render());
-                    auto *progress = visual(window.contentItem(), "songProgress");
-                    check("playback-progress-control",
+                    check(u"audio-settings-top-render"_s, render());
+                    auto *progress = visual(window.contentItem(), u"songProgress"_s);
+                    check(u"playback-progress-control"_s,
                           progress && progress->isVisible() && progress->isEnabled());
                     if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
-                        check("playback-own-image",
-                              surface.grab().save(output
-                                                  + QString("/playback-%1-%2.png")
-                                                            .arg(size.width())
-                                                            .arg(night)));
+                        check(u"playback-own-image"_s,
+                              surface.grab().save(
+                                      output
+                                      + u"/playback-%1-%2.png"_s.arg(size.width()).arg(night)));
                     if (dpr == 1 && size == QSize(1280, 720) && !night && progress) {
                         song->pause();
                         const auto before = song->position();
                         progress->forceActiveFocus();
                         QTest::keyClick(&window, Qt::Key_Right);
-                        check("progress-key-seeks",
+                        check(u"progress-key-seeks"_s,
                               song->position() > before && !song->requested());
                         QTest::keyClick(&window, Qt::Key_Space);
-                        check("slider-space-owned", !song->requested());
+                        check(u"slider-space-owned"_s, !song->requested());
                         const auto point = [&](double ratio) {
                             return progress
                                     ->mapToScene(
@@ -735,10 +746,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         };
                         QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, point(.4));
                         QTest::mouseMove(&window, point(.5));
-                        check("progress-pointer-preview",
+                        check(u"progress-pointer-preview"_s,
                               song->dragging() && song->position() > 5000 && !song->requested());
                         QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, point(.5));
-                        check("progress-pointer-commit",
+                        check(u"progress-pointer-commit"_s,
                               !song->dragging() && song->position() > 5000 && !song->requested());
                         song->seek(1000);
                         song->toggle();
@@ -750,36 +761,36 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         }
     }
     if (!settingsVerification) {
-        context = { { "scenario", "many-genres" }, { "dpr", dprs.last() } };
+        context = { { u"scenario"_s, u"many-genres"_s }, { u"dpr"_s, dprs.last() } };
         LibrarySnapshot large = snapshot;
         for (int i = 0; i < 1024; ++i) {
-            const auto id = QString("genre-%1").arg(i);
-            large.genres.append({ id, QString("分类 %1").arg(i), { }, { }, { } });
+            const auto id = u"genre-%1"_s.arg(i);
+            large.genres.append({ id, u"\u5206\u7c7b %1"_s.arg(i), { }, { }, { } });
             Album album;
-            album.id = QString("extra-album-%1").arg(i);
+            album.id = u"extra-album-%1"_s.arg(i);
             album.title = album.id;
             album.genreId = id;
             large.albums.append(album);
         }
         library.setSnapshot(large);
         selection.setColumns(library.albums()->order().columns, library.snapshot());
-        panels.open("search");
-        check("large-genres-render", render());
-        auto *genres = visual(window.contentItem(), "libraryGenreFilters");
+        panels.open(u"search"_s);
+        check(u"large-genres-render"_s, render());
+        auto *genres = visual(window.contentItem(), u"libraryGenreFilters"_s);
         int liveGenreRows = 0;
         if (genres)
             for (auto *child : genres->childItems())
                 liveGenreRows += child->childItems().size();
-        check("large-genres-virtualization",
+        check(u"large-genres-virtualization"_s,
               genres && liveGenreRows < 100 && library.genres().size() == 1026);
         panels.close();
         library.setSnapshot(snapshot);
         selection.setColumns(library.albums()->order().columns, library.snapshot());
         presentation.reset();
-        context = { { "scenario", "track-reveal" },
-                    { "width", 1280 },
-                    { "height", 720 },
-                    { "dpr", dprs.last() } };
+        context = { { u"scenario"_s, u"track-reveal"_s },
+                    { u"width"_s, 1280 },
+                    { u"height"_s, 720 },
+                    { u"dpr"_s, dprs.last() } };
         window.resize(1280, 720);
         root->setSize({ 1280, 720 });
         scene.layout()->setViewport(1280, 720);
@@ -787,25 +798,27 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         motion.setReducedMotion(false);
         QSignalSpy reveal(&focus, &TrackFocusController::revealRequested);
         QSignalSpy focused(&focus, &TrackFocusController::focusRequested);
-        check("request-last-track", focus.request("album-12", "track-199"));
+        check(u"request-last-track"_s, focus.request(u"album-12"_s, u"track-199"_s));
         for (int frame = 0; frame < 2400 && focused.isEmpty(); ++frame) {
             motion.clock()->advance(1. / 60);
             if (frame % 4 == 0)
                 render();
         }
         render();
-        check("detail-track-scroll-and-focus",
-              !focused.isEmpty() && reveal.size() == 1 && library.navigationAlbumId() == "album-12"
-                      && library.navigationTrackId() == "track-199");
+        check(u"detail-track-scroll-and-focus"_s,
+              !focused.isEmpty() && reveal.size() == 1
+                      && library.navigationAlbumId() == "album-12"_L1
+                      && library.navigationTrackId() == "track-199"_L1);
         qInfo() << "Focus actual"
                 << (window.activeFocusItem() ? window.activeFocusItem()->metaObject()->className()
                                              : "null")
                 << (window.activeFocusItem() ? window.activeFocusItem()->objectName() : QString())
                 << focus.active() << focus.revision() << focus.scrollY();
-        check("actual-track-focus",
+        check(u"actual-track-focus"_s,
               window.activeFocusItem()
-                      && window.activeFocusItem()->property("trackId").toString() == "track-199");
-        auto *trackList = visual(window.contentItem(), "detailTrackList");
+                      && window.activeFocusItem()->property("trackId").toString()
+                              == "track-199"_L1);
+        auto *trackList = visual(window.contentItem(), u"detailTrackList"_s);
         auto *trackView = trackList
                 ? qobject_cast<QQuickItem *>(trackList->property("currentView").value<QObject *>())
                 : nullptr;
@@ -817,16 +830,16 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 << (trackView ? trackView->property("contentY") : QVariant())
                 << (trackView ? trackView->property("contentHeight") : QVariant())
                 << (trackView ? trackView->property("originY") : QVariant());
-        check("last-row-clamped-to-content",
+        check(u"last-row-clamped-to-content"_s,
               trackView && std::abs(lastBottom - trackView->height()) <= 1);
         const auto layout = presentation.layoutRevision();
         if (trackList && trackList->parentItem())
             trackList->parentItem()->setProperty("activeTab", 1);
-        check("reuse-open-album", focus.request("album-12", "track-100"));
+        check(u"reuse-open-album"_s, focus.request(u"album-12"_s, u"track-100"_s));
         render();
         for (int frame = 0; frame < 240
              && (!window.activeFocusItem()
-                 || window.activeFocusItem()->property("trackId").toString() != "track-100");
+                 || window.activeFocusItem()->property("trackId").toString() != "track-100"_L1);
              ++frame) {
             motion.clock()->advance(1. / 60);
             if (frame % 4 == 0)
@@ -853,43 +866,44 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 << (middleRow ? middleRow->property("trackHeight") : QVariant())
                 << (trackView ? trackView->property("contentY") : QVariant())
                 << (trackView ? trackView->property("originY") : QVariant()) << focus.scrollY();
-        check("disc-heading-track-centered",
-              middleRow && middleRow->property("trackId").toString() == "track-100" && trackList
+        check(u"disc-heading-track-centered"_s,
+              middleRow && middleRow->property("trackId").toString() == "track-100"_L1 && trackList
                       && trackView
                       && std::abs(center
                                   - (trackView->height()
                                      + trackList->property("tabHeight").toDouble())
                                           / 2)
                               <= 1);
-        check("no-reextract",
+        check(u"no-reextract"_s,
               presentation.layoutRevision() == layout && presentation.detailEnabled());
-        auto *tracks = visual(window.contentItem(), "detailTrackList");
+        auto *tracks = visual(window.contentItem(), u"detailTrackList"_s);
         if (tracks)
             QMetaObject::invokeMethod(tracks, "cancelReveal");
-        check("user-cancel", !focus.active());
-        check("playback-unchanged", playback.isEmpty() && library.playbackTrackId() == "track-0");
+        check(u"user-cancel"_s, !focus.active());
+        check(u"playback-unchanged"_s,
+              playback.isEmpty() && library.playbackTrackId() == "track-0"_L1);
         if (song) {
-            check("playback-seekable", song->seekable());
+            check(u"playback-seekable"_s, song->seekable());
             song->pause();
             song->beginSeek();
             song->previewSeek(1000);
             song->commitSeek();
 
-            check("navigation-keeps-real-source",
-                  song->trackId() == "track-0" && song->source() == audioSource);
+            check(u"navigation-keeps-real-source"_s,
+                  song->trackId() == "track-0"_L1 && song->source() == audioSource);
             song->stop();
-            check("playback-stop", !song->requested() && song->source().isEmpty());
+            check(u"playback-stop"_s, !song->requested() && song->source().isEmpty());
         }
     }
     if (settingsVerification) {
-        context = { { "scenario", "production-visual-reload" } };
+        context = { { u"scenario"_s, u"production-visual-reload"_s } };
         auto appProperties = properties;
-        appProperties.insert("verificationRun", true);
-        appProperties.insert("verificationFlags", int(verification::windowFlags()));
-        QQmlComponent appComponent(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/App.qml"));
+        appProperties.insert(u"verificationRun"_s, true);
+        appProperties.insert(u"verificationFlags"_s, int(verification::windowFlags()));
+        QQmlComponent appComponent(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/App.qml"_s));
         std::unique_ptr<QObject> appRoot(appComponent.createWithInitialProperties(appProperties));
         auto *appWindow = qobject_cast<QQuickWindow *>(appRoot.get());
-        check("production-app-created", appWindow != nullptr);
+        check(u"production-app-created"_s, appWindow != nullptr);
         if (appWindow) {
             verification::prepareWindow(*appWindow);
             const auto source = song->source();
@@ -898,65 +912,65 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             auto *player = song.get();
             const auto values = settings.values();
             for (int i = 0; i < 10; ++i) {
-                QPointer<QQuickItem> oldScene = visual(appWindow->contentItem(), "nativeScene");
+                QPointer<QQuickItem> oldScene = visual(appWindow->contentItem(), u"nativeScene"_s);
                 settings.reload();
                 QElapsedTimer timer;
                 timer.start();
-                while ((!oldScene.isNull() || !visual(appWindow->contentItem(), "nativeScene"))
+                while ((!oldScene.isNull() || !visual(appWindow->contentItem(), u"nativeScene"_s))
                        && timer.elapsed() < 2000)
                     QTest::qWait(5);
-                check("reload-rebuilds-visual",
-                      oldScene.isNull() && visual(appWindow->contentItem(), "nativeScene"));
-                check("reload-preserves-media-quality",
+                check(u"reload-rebuilds-visual"_s,
+                      oldScene.isNull() && visual(appWindow->contentItem(), u"nativeScene"_s));
+                check(u"reload-preserves-media-quality"_s,
                       song.get() == player && song->source() == source && song->trackId() == track
                               && song->requested() == requested && settings.values() == values);
             }
-            check("hidden-app-policy",
+            check(u"hidden-app-policy"_s,
                   !appWindow->isVisible() && verification::windowPolicySatisfied(*appWindow));
         }
         appRoot.reset();
-        check("default-offline-capabilities",
-              !library.providerCapabilities()["networkEnabled"].toBool());
+        check(u"default-offline-capabilities"_s,
+              !library.providerCapabilities()[u"networkEnabled"_s].toBool());
         song->stop();
     }
-    check("qml-warnings", warnings.isEmpty());
+    check(u"qml-warnings"_s, warnings.isEmpty());
     const auto policy = verification::windowPolicy(window);
-    check("window-policy", policy.value("passed").toBool());
+    check(u"window-policy"_s, policy.value(u"passed"_s).toBool());
     QFile executable(QCoreApplication::applicationFilePath());
     QCryptographicHash executableHash(QCryptographicHash::Sha256);
     const bool hashed = executable.open(QIODevice::ReadOnly) && executableHash.addData(&executable);
     QJsonObject report{
-        { "passed", passed },
-        { "checks", checks },
-        { "windowPolicy", policy },
-        { "backend", window.property("libraryAuditDevice").toMap().value("backend").toString() },
-        { "gpu", window.property("libraryAuditDevice").toMap().value("gpu").toString() },
-        { "os", QSysInfo::prettyProductName() },
-        { "architecture", QSysInfo::currentCpuArchitecture() },
-        { "qt", qVersion() },
-        { "binarySha256",
-          hashed ? QString::fromLatin1(executableHash.result().toHex()) : QString() },
-        { "fixtureSha256",
-          QString::fromLatin1(
-                  QCryptographicHash::hash(
-                          QJsonDocument(toJson(snapshot)).toJson(QJsonDocument::Compact),
-                          QCryptographicHash::Sha256)
-                          .toHex()) },
-        { "offscreen", OffscreenSurface::Enabled },
-        { "settingsResourceSamples", settingsResourceSamples },
-        { "scope",
-          "source geometry, normal output, Qt focus/input, virtual delegates and track reveal; no image scoring or display latency claims" }
+        { u"passed"_s, passed },
+        { u"checks"_s, checks },
+        { u"windowPolicy"_s, policy },
+        { u"backend"_s,
+          window.property("libraryAuditDevice").toMap().value(u"backend"_s).toString() },
+        { u"gpu"_s, window.property("libraryAuditDevice").toMap().value(u"gpu"_s).toString() },
+        { u"os"_s, QSysInfo::prettyProductName() },
+        { u"architecture"_s, QSysInfo::currentCpuArchitecture() },
+        { u"qt"_s, QString::fromUtf8(qVersion()) },
+        { u"binarySha256"_s,
+          hashed ? QString::fromUtf8(executableHash.result().toHex()) : QString() },
+        { u"fixtureSha256"_s,
+          QString::fromUtf8(QCryptographicHash::hash(
+                                    QJsonDocument(toJson(snapshot)).toJson(QJsonDocument::Compact),
+                                    QCryptographicHash::Sha256)
+                                    .toHex()) },
+        { u"offscreen"_s, OffscreenSurface::Enabled },
+        { u"settingsResourceSamples"_s, settingsResourceSamples },
+        { u"scope"_s,
+          u"source geometry, normal output, Qt focus/input, virtual delegates and track reveal; no image scoring or display latency claims"_s }
     };
     if (song)
         report.insert(
-                "audio",
+                u"audio"_s,
                 QJsonObject{
-                        { "available", song->outputAvailable() },
-                        { "device", song->outputName() },
-                        { "deviceCount", song->devices().size() - 1 },
-                        { "scope",
-                          "actual public Qt playback and controls; no physical unplug or listening claim" } });
-    QSaveFile file(output + "/report.json");
+                        { u"available"_s, song->outputAvailable() },
+                        { u"device"_s, song->outputName() },
+                        { u"deviceCount"_s, song->devices().size() - 1 },
+                        { u"scope"_s,
+                          u"actual public Qt playback and controls; no physical unplug or listening claim"_s } });
+    QSaveFile file(output + "/report.json"_L1);
     if (!file.open(QIODevice::WriteOnly))
         return 5;
     file.write(QJsonDocument(report).toJson());

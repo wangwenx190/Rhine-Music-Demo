@@ -6,11 +6,13 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <limits>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 class ExperimentTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void authoredLightingAndTemporaryComparison()
     {
         QTemporaryDir directory;
@@ -30,12 +32,12 @@ private slots:
         lighting->update(input, { }, { }, 0, .1);
         const auto position = lighting->ribbon.row.value;
         const auto velocity = lighting->ribbon.row.velocity;
-        QVERIFY(lighting->configure({ { "mode", "hybrid" },
-                                      { "strength", 1.8 },
-                                      { "width", 2.0 },
-                                      { "offset", -2.0 },
-                                      { "fill", .4 },
-                                      { "transitionDuration", 2.0 } }));
+        QVERIFY(lighting->configure({ { u"mode"_s, u"hybrid"_s },
+                                      { u"strength"_s, 1.8 },
+                                      { u"width"_s, 2.0 },
+                                      { u"offset"_s, -2.0 },
+                                      { u"fill"_s, .4 },
+                                      { u"transitionDuration"_s, 2.0 } }));
         QCOMPARE(lighting->ribbon.row.value, position);
         QCOMPARE(lighting->ribbon.row.velocity, velocity);
         const auto authored = lighting->settings();
@@ -44,27 +46,27 @@ private slots:
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Baseline);
         QCOMPARE(lighting->settings(), authored);
         QCOMPARE(changes.size(), 1);
-        QCOMPARE(preferences.values()["lighting"].toMap(), authored);
+        QCOMPARE(preferences.values()[u"lighting"_s].toMap(), authored);
         lighting->setComparing(false);
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Hybrid);
-        for (const auto &invalid : { QVariant("1"), QVariant(true),
+        for (const auto &invalid : { QVariant(u"1"_s), QVariant(true),
                                      QVariant(std::numeric_limits<double>::quiet_NaN()) }) {
-            QVERIFY(!lighting->configure({ { "strength", invalid }, { "width", 1.0 } }));
+            QVERIFY(!lighting->configure({ { u"strength"_s, invalid }, { u"width"_s, 1.0 } }));
             QCOMPARE(lighting->settings(), authored);
         }
-        QVERIFY(!lighting->configure({ { "mode", "unknown" } }));
-        QVERIFY(!lighting->configure({ { "unknown", 1 } }));
-        QVERIFY(lighting->configure({ { "strength", 9.0 }, { "offset", -99.0 } }));
-        QCOMPARE(lighting->settings()["strength"].toDouble(), 2.0);
-        QCOMPARE(lighting->settings()["offset"].toDouble(), -6.0);
+        QVERIFY(!lighting->configure({ { u"mode"_s, u"unknown"_s } }));
+        QVERIFY(!lighting->configure({ { u"unknown"_s, 1 } }));
+        QVERIFY(lighting->configure({ { u"strength"_s, 9.0 }, { u"offset"_s, -99.0 } }));
+        QCOMPARE(lighting->settings()[u"strength"_s].toDouble(), 2.0);
+        QCOMPARE(lighting->settings()[u"offset"_s].toDouble(), -6.0);
         lighting->setComparing(true);
         lighting->resetSettings();
         QVERIFY(!lighting->comparing());
         QCOMPARE(lighting->settings(), defaults);
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Guided);
-        QVERIFY(preferences.update({ { "lighting", QVariantMap{ { "future", 7 } } } }));
-        lighting->configure({ { "mode", "area" } });
-        QCOMPARE(preferences.values()["lighting"].toMap()["future"].toInt(), 7);
+        QVERIFY(preferences.update({ { u"lighting"_s, QVariantMap{ { u"future"_s, 7 } } } }));
+        lighting->configure({ { u"mode"_s, u"area"_s } });
+        QCOMPARE(preferences.values()[u"lighting"_s].toMap()[u"future"_s].toInt(), 7);
     }
     void lightingPreferenceSurvivesRestart()
     {
@@ -77,7 +79,7 @@ private slots:
             SceneAdapter scene(motion.clock());
             SelectionController selection(&motion);
             SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-            scene.lighting()->configure({ { "mode", "area" }, { "width", 2.2 } });
+            scene.lighting()->configure({ { u"mode"_s, u"area"_s }, { u"width"_s, 2.2 } });
             scene.lighting()->setComparing(true);
         }
         PreferencesStore preferences(directory.path());
@@ -87,8 +89,8 @@ private slots:
         SceneAdapter scene(motion.clock());
         SelectionController selection(&motion);
         SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-        QCOMPARE(scene.lighting()->settings()["mode"].toString(), QString("area"));
-        QCOMPARE(scene.lighting()->settings()["width"].toDouble(), 2.2);
+        QCOMPARE(scene.lighting()->settings()[u"mode"_s].toString(), u"area"_s);
+        QCOMPARE(scene.lighting()->settings()[u"width"_s].toDouble(), 2.2);
         QVERIFY(!scene.lighting()->comparing());
         QCOMPARE(scene.lighting()->ribbon.settings.mode, RowLightingMode::Area);
     }
@@ -122,22 +124,22 @@ private slots:
         for (int i = 1; i <= 100; ++i)
             series.add(i);
         auto distribution = series.distribution();
-        QCOMPARE(distribution["p50"].toDouble(), 50.0);
-        QCOMPARE(distribution["p95"].toDouble(), 95.0);
-        QCOMPARE(distribution["p99"].toDouble(), 99.0);
+        QCOMPARE(distribution[u"p50"_s].toDouble(), 50.0);
+        QCOMPARE(distribution[u"p95"_s].toDouble(), 95.0);
+        QCOMPARE(distribution[u"p99"_s].toDouble(), 99.0);
         for (int i = 101; i <= 1000; ++i)
             series.add(i);
         distribution = series.distribution();
-        QCOMPARE(distribution["count"].toInt(), 256);
-        QCOMPARE(distribution["discarded"].toInt(), 744);
-        QCOMPARE(distribution["p99"].toDouble(), 998.0);
+        QCOMPARE(distribution[u"count"_s].toInt(), 256);
+        QCOMPARE(distribution[u"discarded"_s].toInt(), 744);
+        QCOMPARE(distribution[u"p99"_s].toDouble(), 998.0);
         rhi::DiagnosticSamples samples;
         QVERIFY(!samples.add({ 0, 3, 1, -1, 12, 4, 8 }));
         QVERIFY(!samples.add({ 20, 5, 2, -1, 12, 4, 8 }));
         auto batch = samples.add({ 600, 7, 4, -1, 12, 4, 8 });
         QVERIFY(batch.has_value());
         QCOMPARE(batch->submissions, 3);
-        QCOMPARE(batch->intervals.distribution()["p95"].toDouble(), 580.0);
+        QCOMPARE(batch->intervals.distribution()[u"p95"_s].toDouble(), 580.0);
         QVERIFY(batch->gpu.distribution().isEmpty());
         QCOMPARE(batch->atlasBytes, 36);
         QCOMPARE(batch->selectedBytes, 12);
@@ -153,8 +155,8 @@ private slots:
             QVERIFY(!ids.contains(album.id));
             ids.insert(album.id);
             QVERIFY(album.tracks.isEmpty());
-            QCOMPARE(album.coverUrl.scheme(), QString("qrc"));
-            QVERIFY(album.coverUrl.path().startsWith("/assets/demo-covers/"));
+            QCOMPARE(album.coverUrl.scheme(), u"qrc"_s);
+            QVERIFY(album.coverUrl.path().startsWith(u"/assets/demo-covers/"_s));
         }
     }
 };

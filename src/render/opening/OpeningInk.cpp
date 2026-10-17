@@ -10,6 +10,8 @@
 #include <QPainterPathStroker>
 #include <numbers>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 OpeningInkStats stats;
@@ -18,16 +20,16 @@ QString svgPath(const QPainterPath &p)
     QString result;
     auto point = [&](int i) {
         const auto e = p.elementAt(i);
-        return QString::number(e.x, 'g', 17) + " " + QString::number(e.y, 'g', 17) + " ";
+        return QString::number(e.x, 'g', 17) + " "_L1 + QString::number(e.y, 'g', 17) + " "_L1;
     };
     for (int i = 0; i < p.elementCount(); ++i) {
         const auto e = p.elementAt(i);
         if (e.isMoveTo())
-            result += "M" + point(i);
+            result += "M"_L1 + point(i);
         else if (e.isLineTo())
-            result += "L" + point(i);
+            result += "L"_L1 + point(i);
         else if (e.isCurveTo()) {
-            result += "C" + point(i) + point(i + 1) + point(i + 2);
+            result += "C"_L1 + point(i) + point(i + 1) + point(i + 2);
             i += 2;
         }
     }
@@ -210,14 +212,14 @@ OpeningInkStats &openingInkStats()
 }
 QVector<OpeningPath> loadOpeningPaths()
 {
-    QFile map(":/assets/branding/reveal-map.json"), svg(":/assets/branding/logo-light.svg");
+    QFile map(u":/assets/branding/reveal-map.json"_s), svg(u":/assets/branding/logo-light.svg"_s);
     if (!map.open(QIODevice::ReadOnly) || !svg.open(QIODevice::ReadOnly))
         qFatal("Missing opening brand assets");
     QHash<QString, QJsonObject> entries;
     for (const auto value :
-         QJsonDocument::fromJson(map.readAll()).object().value("paths").toArray()) {
+         QJsonDocument::fromJson(map.readAll()).object().value(u"paths"_s).toArray()) {
         const auto entry = value.toObject();
-        entries.insert(entry.value("id").toString(), entry);
+        entries.insert(entry.value(u"id"_s).toString(), entry);
     }
     QVector<OpeningPath> paths;
     QXmlStreamReader xml(svg.readAll());
@@ -239,13 +241,17 @@ QVector<OpeningPath> loadOpeningPaths()
             path.decoration = entry.isEmpty();
             path.width =
                     a.hasAttribute("stroke-width") ? a.value("stroke-width").toDouble() : width;
-            path.accent =
-                    (a.hasAttribute("stroke") ? a.value("stroke").toString() : stroke) == "#b56834";
+            path.accent = (a.hasAttribute("stroke") ? a.value("stroke").toString() : stroke)
+                    == "#b56834"_L1;
             if (!path.decoration) {
-                path.centerline = parseBrandCenterline(entry.value("d").toString());
+                try {
+                    path.centerline = parseBrandCenterline(entry.value(u"d"_s).toString());
+                } catch (const std::exception &error) {
+                    qFatal("Invalid embedded opening centerline: %s", error.what());
+                }
                 path.point = path.centerline.length() < .02;
-                path.start = entry.value("start").toDouble();
-                path.end = entry.value("end").toDouble();
+                path.start = entry.value(u"start"_s).toDouble();
+                path.end = entry.value(u"end"_s).toDouble();
             }
             paths.append(std::move(path));
         }
@@ -273,7 +279,7 @@ void OpeningInk::setTime(double value)
     if (!std::isfinite(value) || value == m_time)
         return;
     m_time = value;
-    emit timeChanged();
+    Q_EMIT timeChanged();
     invalidate();
 }
 void OpeningInk::setOrbit(bool value)
@@ -281,7 +287,7 @@ void OpeningInk::setOrbit(bool value)
     if (m_orbit == value)
         return;
     m_orbit = value;
-    emit orbitChanged();
+    Q_EMIT orbitChanged();
     invalidate();
 }
 void OpeningInk::setInk(QColor value)
@@ -289,7 +295,7 @@ void OpeningInk::setInk(QColor value)
     if (m_ink == value)
         return;
     m_ink = value;
-    emit colorsChanged();
+    Q_EMIT colorsChanged();
     invalidate();
 }
 void OpeningInk::setAccent(QColor value)
@@ -297,7 +303,7 @@ void OpeningInk::setAccent(QColor value)
     if (m_accent == value)
         return;
     m_accent = value;
-    emit colorsChanged();
+    Q_EMIT colorsChanged();
     invalidate();
 }
 QVariantList OpeningInk::comparisonPaths() const
@@ -308,14 +314,14 @@ QVariantList OpeningInk::comparisonPaths() const
         const double progress = path.decoration
                 ? double(state.contour == 1)
                 : std::clamp((state.contour - path.start) / (path.end - path.start), 0.0, 1.0);
-        result.append(QVariantMap{ { "d",
+        result.append(QVariantMap{ { u"d"_s,
                                      progress == 1 ? path.fullSvg
                                              : progress > 0
                                              ? svgPath(path.centerline.trimmed(0, progress))
                                              : QString() },
-                                   { "width", path.width },
-                                   { "color", path.accent ? m_accent : m_ink },
-                                   { "alpha", path.accent ? state.symbols : 1 } });
+                                   { u"width"_s, path.width },
+                                   { u"color"_s, path.accent ? m_accent : m_ink },
+                                   { u"alpha"_s, path.accent ? state.symbols : 1 } });
     }
     return result;
 }

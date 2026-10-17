@@ -7,6 +7,8 @@
 #include <QSignalSpy>
 #include <QTest>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 class InjectedProvider : public IMetadataProvider
 {
@@ -17,23 +19,25 @@ public:
     {
         return { };
     }
-    void requestIntroduction(AlbumQuery, RequestToken token) override
+    bool requestIntroduction(AlbumQuery, RequestToken token) override
     {
         ProviderResult result;
         result.requestId = token.requestId;
         result.generation = token.generation;
         result.albumId = token.albumId;
         result.status = status;
-        result.payload = { { "description", "injected" } };
-        emit resultReady(result); // Router guarantees queued delivery even for this test provider.
+        result.payload = { { u"description"_s, u"injected"_s } };
+        Q_EMIT resultReady(
+                result); // Router guarantees queued delivery even for this test provider.
+        return true;
     }
-    void requestCredits(AlbumQuery query, RequestToken token) override
+    bool requestCredits(AlbumQuery query, RequestToken token) override
     {
-        requestIntroduction(query, token);
+        return requestIntroduction(query, token);
     }
-    void requestEnrichment(AlbumQuery query, RequestToken token) override
+    bool requestEnrichment(AlbumQuery query, RequestToken token) override
     {
-        requestIntroduction(query, token);
+        return requestIntroduction(query, token);
     }
     void cancel(RequestToken) override
     {
@@ -42,23 +46,24 @@ public:
 class LibraryQmlTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void readsRolesAndInjectedResults()
     {
         qmlRegisterUncreatableType<LibrarySession>("Yalahoo.DataTest", 1, 0, "LibrarySession",
-                                                   "Injected");
+                                                   u"Injected"_s);
         qmlRegisterUncreatableType<AlbumListModel>("Yalahoo.DataTest", 1, 0, "AlbumListModel",
-                                                   "Owned");
+                                                   u"Owned"_s);
         qmlRegisterUncreatableType<SearchListModel>("Yalahoo.DataTest", 1, 0, "SearchListModel",
-                                                    "Owned");
-        QFile input(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/web-baseline/anonymous.json"));
+                                                    u"Owned"_s);
+        QFile input((QString::fromUtf8(FIXTURE_ROOT)
+                     + u"/tests/fixtures/web-baseline/anonymous.json"_s));
         QVERIFY(input.open(QIODevice::ReadOnly));
         LibrarySnapshot snapshot;
         QVERIFY(readLibrary(QJsonDocument::fromJson(input.readAll())
                                     .object()
-                                    .value("libraries")
+                                    .value(u"libraries"_s)
                                     .toObject()
-                                    .value("single")
+                                    .value(u"single"_s)
                                     .toObject(),
                             snapshot));
         const auto album = snapshot.albums.first();
@@ -86,50 +91,50 @@ private slots:
                     }
                 }
             }
-        )";
+        )"_ba;
         const auto run = [&](IMetadataProvider *provider, bool injected) {
             LibrarySession session(provider);
             session.setSnapshot(snapshot);
             QQmlEngine engine;
             QSignalSpy warnings(&engine, &QQmlEngine::warnings);
             QQmlComponent component(&engine);
-            component.setData(qml, QUrl(QStringLiteral("qrc:/library-data-test.qml")));
+            component.setData(qml, QUrl(u"qrc:/library-data-test.qml"_s));
             QVERIFY2(component.isReady(), qPrintable(component.errorString()));
             std::unique_ptr<QObject> root(component.createWithInitialProperties(
-                    { { "librarySession", QVariant::fromValue(&session) } }));
+                    { { u"librarySession"_s, QVariant::fromValue(&session) } }));
             QVERIFY2(root, qPrintable(component.errorString()));
             QTRY_COMPARE(root->property("albumCount").toInt(), 1);
             QVariant result;
             QVERIFY(QMetaObject::invokeMethod(root.get(), "roleAt", Q_RETURN_ARG(QVariant, result),
                                               Q_ARG(QVariant, 0)));
             const auto roles = result.toMap();
-            QCOMPARE(roles.value("albumId").toString(), album.id);
-            QCOMPARE(roles.value("title").toString(), album.title);
-            QCOMPARE(roles.value("trackId").toString(), album.tracks.first().id);
-            QCOMPARE(roles.value("support").toString(), QStringLiteral("Unknown"));
-            QCOMPARE(roles.value("description").toString(), album.description);
-            session.search("Typography");
+            QCOMPARE(roles.value(u"albumId"_s).toString(), album.id);
+            QCOMPARE(roles.value(u"title"_s).toString(), album.title);
+            QCOMPARE(roles.value(u"trackId"_s).toString(), album.tracks.first().id);
+            QCOMPARE(roles.value(u"support"_s).toString(), u"Unknown"_s);
+            QCOMPARE(roles.value(u"description"_s).toString(), album.description);
+            session.search(u"Typography"_s);
             QTRY_COMPARE(root->property("searchCount").toInt(), 1);
-            const auto key = album.id + "/introduction";
-            session.requestMetadata(album.id, "introduction");
+            const auto key = album.id + "/introduction"_L1;
+            session.requestMetadata(album.id, u"introduction"_s);
             QTRY_VERIFY(root->property("metadataValues").toMap().contains(key));
             QCOMPARE(root->property("metadataValues")
                              .toMap()
                              .value(key)
                              .toMap()
-                             .value("status")
+                             .value(u"status"_s)
                              .toString(),
-                     QStringLiteral("Matched"));
+                     u"Matched"_s);
             if (injected) {
                 auto *test = static_cast<InjectedProvider *>(provider);
                 for (auto status : { ProviderStatus::Uncertain, ProviderStatus::Error }) {
                     test->status = status;
-                    session.requestMetadata(album.id, "introduction");
+                    session.requestMetadata(album.id, u"introduction"_s);
                     QTRY_COMPARE(root->property("metadataValues")
                                          .toMap()
                                          .value(key)
                                          .toMap()
-                                         .value("status")
+                                         .value(u"status"_s)
                                          .toString(),
                                  statusName(status));
                 }

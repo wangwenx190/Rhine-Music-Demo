@@ -39,7 +39,7 @@ T.Popup {
     exit: null
     background: Item {}
     onOpened: Qt.callLater(focusContent)
-    function focusContent() {
+    function focusContent(): void {
         if (controller.panel === "search")
             search.focusSearch();
         else if (controller.panel === "library")
@@ -49,12 +49,12 @@ T.Popup {
         else if (playbackLoader.item)
             (playbackLoader.item as PlaybackPanel).focusControl();
     }
-    function dismiss() {
+    function dismiss(): void {
         pendingAlbum = "";
         pendingTrack = "";
         controller.close();
     }
-    function selectResult(albumId, trackId) {
+    function selectResult(albumId: string, trackId: string): void {
         pendingAlbum = albumId;
         pendingTrack = trackId;
         controller.close();
@@ -145,8 +145,8 @@ T.Popup {
                     heading: PanelHeading {
                         width: search.width
                         tokens: root.tokens
-                        title: "搜索专辑与歌曲"
-                        subtitle: "FIND MUSIC"
+                        title: qsTr("Search albums and tracks")
+                        subtitle: qsTr("FIND MUSIC")
                         narrow: root.narrow
                         onCloseRequested: root.dismiss()
                     }
@@ -166,8 +166,8 @@ T.Popup {
                         heading: PanelHeading {
                             width: playbackLoader.width
                             tokens: root.tokens
-                            title: "播放与声音"
-                            subtitle: "PLAYBACK"
+                            title: qsTr("Playback and sound")
+                            subtitle: qsTr("PLAYBACK")
                             bottomSpacing: 5
                             narrow: root.narrow
                             onCloseRequested: root.dismiss()
@@ -193,8 +193,8 @@ T.Popup {
                         heading: PanelHeading {
                             width: settingsLoader.width
                             tokens: root.tokens
-                            title: "播放与画质"
-                            subtitle: "SYSTEM SETTINGS"
+                            title: qsTr("Playback and quality")
+                            subtitle: qsTr("SYSTEM SETTINGS")
                             narrow: root.narrow
                             onCloseRequested: root.dismiss()
                         }
@@ -208,9 +208,9 @@ T.Popup {
                     heading: PanelHeading {
                         width: library.width
                         tokens: root.tokens
-                        title: "本地音乐库"
+                        title: qsTr("Local music library")
                         bottomSpacing: 8
-                        subtitle: "MUSIC LIBRARY"
+                        subtitle: qsTr("MUSIC LIBRARY")
                         narrow: root.narrow
                         onCloseRequested: root.dismiss()
                     }
@@ -220,12 +220,14 @@ T.Popup {
                 }
             }
             Accessible.role: Accessible.Dialog
-            Accessible.name: root.controller.panel === "settings" ? "播放与画质" : root.controller.panel
-                                                                    === "search" ? "搜索专辑与歌曲" :
+            Accessible.name: root.controller.panel === "settings" ? qsTr("Playback and quality") :
+                                                                    root.controller.panel
+                                                                    === "search" ? qsTr(
+                                                                                       "Search albums and tracks") :
                                                                                    root.controller.panel
                                                                                    === "playback"
-                                                                                   ? "播放与声音" :
-                                                                                     "本地音乐库"
+                                                                                   ? qsTr("Playback and sound") :
+                                                                                     qsTr("Local music library")
         }
     }
     Connections {

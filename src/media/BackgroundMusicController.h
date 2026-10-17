@@ -48,7 +48,7 @@ public:
     void setSongActivity(SongActivity activity);
     void start();
     void stop();
-signals:
+Q_SIGNALS:
     void settingsChanged();
     void stateChanged();
     void silenceReached();

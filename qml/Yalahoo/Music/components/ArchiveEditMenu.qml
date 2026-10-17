@@ -9,7 +9,7 @@ T.Popup {
     required property DesignTokens tokens
     required property var editor
     property int actionIndex: -1
-    function focusAction(direction: int) {
+    function focusAction(direction: int): void {
         for (let i = 0; i < actions.count; ++i) {
             actionIndex = (actionIndex + direction + actions.count) % actions.count;
             const button = actions.itemAt(actionIndex);
@@ -43,19 +43,19 @@ T.Popup {
             id: actions
             model: [
                 {
-                    label: "剪切",
+                    label: qsTr("Cut"),
                     action: "cut"
                 },
                 {
-                    label: "复制",
+                    label: qsTr("Copy"),
                     action: "copy"
                 },
                 {
-                    label: "粘贴",
+                    label: qsTr("Paste"),
                     action: "paste"
                 },
                 {
-                    label: "全选",
+                    label: qsTr("Select All"),
                     action: "selectAll"
                 }
             ]

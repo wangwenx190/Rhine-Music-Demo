@@ -15,10 +15,10 @@ FocusScope {
     property int activeTab: 0
     property int queuedLayoutRevision: -1
     property bool layoutPending: false
-    function setTab(tab) {
+    function setTab(tab: int): void {
         changeTab(tab, false);
     }
-    function changeTab(tab, reveal) {
+    function changeTab(tab: int, reveal: bool): void {
         if (activeTab === tab)
             return;
         if (!reveal && trackFocus)
@@ -27,15 +27,15 @@ FocusScope {
         presentation.revealTabContent();
         activeTab = tab;
     }
-    function focusDetailIfReady() {
+    function focusDetailIfReady(): void {
         if (presentation.detailEnabled)
             forceActiveFocus(Qt.OtherFocusReason);
     }
-    function revealAfterLayout(revision, index) {
+    function revealAfterLayout(revision: double, index: int): void {
         if (trackFocus && revision === trackFocus.revision)
             tracks.reveal(revision, index);
     }
-    function finishLayout() {
+    function finishLayout(): void {
         const revision = queuedLayoutRevision;
         layoutPending = false;
         tracks.forceLayout();
@@ -120,7 +120,7 @@ FocusScope {
                 return 144;
             return root.width <= 1100 ? 91 : 112;
         }
-        text: "← 返回收藏架     Esc"
+        text: qsTr("\u2190 Back to shelf     Esc")
         cssPixelSize: root.width <= 700 ? 9 : root.width >= 1700 ? 12 : 10
         onClicked: root.backRequested()
     }
@@ -131,14 +131,14 @@ FocusScope {
         spacing: root.width <= 700 || root.metrics.portrait ? 5 : 10
         ArchiveText {
             tokens: root.tokens
-            text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
+            text: qsTr("ALBUM %1").arg((root.album.code || 1).toString().padStart(3, "0"))
             cssPixelSize: root.width <= 700 ? 9 : 12
             font.letterSpacing: 2
         }
         ArchiveText {
             visible: !root.metrics.portrait && root.width > 700
             tokens: root.tokens
-            text: "拖动卡片，查看完整封面"
+            text: qsTr("Drag the card to view the full cover")
             cssPixelSize: root.width <= 1100 ? 8 : 9
             color: root.tokens.muted
         }
@@ -183,7 +183,7 @@ FocusScope {
                     objectName: "detailOrdinal"
                     y: (overline.contentHeight - height) / 2
                     tokens: root.tokens
-                    text: "ALBUM " + (root.album.code || 1).toString().padStart(3, "0")
+                    text: qsTr("ALBUM %1").arg((root.album.code || 1).toString().padStart(3, "0"))
                     cssPixelSize: root.width <= 700 ? 7 : 8
                     font.letterSpacing: 1.6
                 }
@@ -191,7 +191,7 @@ FocusScope {
                     id: navigationMeasure
                     tokens: root.tokens
                     visible: false
-                    text: "下一张 ↓"
+                    text: qsTr("Next album \u2193")
                     cssPixelSize: 9
                 }
                 Row {
@@ -202,7 +202,7 @@ FocusScope {
                     ArchiveButton {
                         objectName: "detailPrevious"
                         tokens: root.tokens
-                        text: "↑ 上一张"
+                        text: qsTr("\u2191 Previous album")
                         cssPixelSize: 9
                         height: navigationMeasure.implicitHeight
                         enabled: root.presentation.canMovePrevious
@@ -211,7 +211,7 @@ FocusScope {
                     ArchiveButton {
                         objectName: "detailNext"
                         tokens: root.tokens
-                        text: "下一张 ↓"
+                        text: qsTr("Next album \u2193")
                         cssPixelSize: 9
                         height: navigationMeasure.implicitHeight
                         enabled: root.presentation.canMoveNext
@@ -283,7 +283,7 @@ FocusScope {
                         id: badge
                         anchors.centerIn: parent
                         tokens: root.tokens
-                        text: "目录离线"
+                        text: qsTr("Directory offline")
                         cssPixelSize: 10
                         color: root.tokens.accent
                     }
@@ -350,7 +350,7 @@ FocusScope {
                 bottomPadding: 20
                 ArchiveText {
                     tokens: root.tokens
-                    text: "ABOUT THIS ALBUM"
+                    text: qsTr("ABOUT THIS ALBUM")
                     cssPixelSize: 8
                     color: root.tokens.muted
                 }
@@ -358,7 +358,7 @@ FocusScope {
                     tokens: root.tokens
                     width: parent.width
                     objectName: "detailDescription"
-                    text: root.album.description || "专辑介绍待补充"
+                    text: root.album.description || qsTr("Album introduction pending")
                     cssPixelSize: 12
                     cssLineHeight: cssPixelSize * 1.95
                     wrapMode: Text.Wrap
@@ -366,10 +366,7 @@ FocusScope {
                 ArchiveText {
                     tokens: root.tokens
                     width: parent.width
-                    text: root.album.descriptionSource ? [root.album.descriptionSource.name,
-                                                          root.album.descriptionSource.url,
-                                                          root.album.descriptionSource.license].filter(
-                                                             Boolean).join(" · ") : ""
+                    text: root.album.descriptionSourceText || ""
                     cssPixelSize: 9
                     wrapMode: Text.WrapAnywhere
                     color: root.tokens.muted
@@ -388,15 +385,17 @@ FocusScope {
                 ArchiveText {
                     tokens: root.tokens
                     width: parent.width
-                    text: "本地备注\n" + (root.album.localNote || "未提供")
+                    text: qsTr("Local note\n%1").arg(root.album.localNote || qsTr("Not provided"))
                     cssPixelSize: 11
                     wrapMode: Text.Wrap
                 }
                 ArchiveText {
                     tokens: root.tokens
                     width: parent.width
-                    text: "本地目录\n" + (root.album.folder || "") + "\n" + (root.album.rawGenres
-                                                                         || []).join(" · ")
+                    text: qsTr("Local directory\n%1\n%2").arg(root.album.folder || "").arg((
+                                                                                               root.album.rawGenres
+                                                                                               || []).join(
+                                                                                               " \u00b7 "))
                     cssPixelSize: 9
                     wrapMode: Text.WrapAnywhere
                     color: root.tokens.muted
@@ -407,14 +406,14 @@ FocusScope {
                     topPadding: 24
                     ArchiveText {
                         tokens: root.tokens
-                        text: "ALBUM CREDITS"
+                        text: qsTr("ALBUM CREDITS")
                         cssPixelSize: 9
                         font.letterSpacing: 1.4
                         color: root.tokens.muted
                     }
                     ArchiveText {
                         tokens: root.tokens
-                        text: "制作人员"
+                        text: qsTr("Contributors")
                         cssPixelSize: 16
                         font.letterSpacing: 0.4
                     }
@@ -423,7 +422,7 @@ FocusScope {
                     objectName: "detailCreditsStatus"
                     tokens: root.tokens
                     width: parent.width
-                    text: root.album.creditsStatus || "暂无制作资料。"
+                    text: root.album.creditsStatus || qsTr("No credits available.")
                     cssPixelSize: 11
                     cssLineHeight: cssPixelSize * 1.9
                     wrapMode: Text.Wrap
@@ -435,7 +434,7 @@ FocusScope {
                 visible: root.activeTab === 0 && root.detailModel.count === 0
                 width: parent.width
                 topPadding: 25
-                text: "这个专辑还没有可播放曲目"
+                text: qsTr("This album has no playable tracks")
                 cssPixelSize: 13
                 wrapMode: Text.Wrap
             }
@@ -472,7 +471,7 @@ FocusScope {
                     onWidthChanged: tabBar.syncIndicator(false)
                     objectName: "detailTracksTab"
                     tokens: root.tokens
-                    text: "歌单"
+                    text: qsTr("Track list")
                     height: tabBar.height - 7
                     contentItem: Row {
                         spacing: 6
@@ -486,7 +485,7 @@ FocusScope {
                         ArchiveText {
                             id: tabText
                             tokens: root.tokens
-                            text: "歌单"
+                            text: qsTr("Track list")
                             cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
                             color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
                         }
@@ -507,7 +506,7 @@ FocusScope {
                     onWidthChanged: tabBar.syncIndicator(false)
                     objectName: "detailAboutTab"
                     tokens: root.tokens
-                    text: "专辑介绍"
+                    text: qsTr("Album introductions")
                     height: trackTab.height
                     contentItem: Row {
                         spacing: 6
@@ -520,7 +519,7 @@ FocusScope {
                         }
                         ArchiveText {
                             tokens: root.tokens
-                            text: "专辑介绍"
+                            text: qsTr("Album introductions")
                             cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
                             color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
                         }
@@ -550,7 +549,7 @@ FocusScope {
                 width: root.presentation.tabWidth
                 color: root.tokens.ink
             }
-            function syncIndicator(animate) {
+            function syncIndicator(animate: bool): void {
                 if (!root.presentation || !trackTab || !aboutTab)
                     return;
                 const button = root.activeTab === 0 ? trackTab : aboutTab;

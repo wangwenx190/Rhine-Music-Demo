@@ -17,10 +17,6 @@ Rectangle {
     property bool playing: false
     property bool offscreenRendering: false
     property string lastAction: ""
-    function fullTitleNames(control) {
-        return control.ToolTip.text === root.song && control.Accessible.name === "定位歌曲："
-                + root.song;
-    }
     color: titleDesign.page
     DesignTokens {
         id: titleDesign

@@ -28,7 +28,7 @@ public:
     virtual void open(const QUrl &url) = 0;
     virtual void clear() = 0;
     virtual MediaObservation observation() const = 0;
-signals:
+Q_SIGNALS:
     void changed();
 };
 class MediaMetadataProbe final : public QObject
@@ -40,7 +40,7 @@ public:
     ~MediaMetadataProbe() override;
     void start(Snapshot snapshot, QString dataRoot, ScanCancellation cancel, quint64 generation);
     void cancel();
-signals:
+Q_SIGNALS:
     void finished(quint64 generation, yalahoo::Snapshot snapshot, bool cancelled);
 
 private:

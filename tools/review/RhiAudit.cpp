@@ -8,6 +8,9 @@
 #include <QSaveFile>
 #include <cstdio>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
@@ -58,7 +61,7 @@ Input fixture(QSize size, bool night, bool low, const QString &cover)
     in.rowFill = l->rowFill();
     in.lightColumn = l->lightColumn();
     in.printAmbient = l->printAmbient();
-    in.cover = QImage(":/assets/demo-covers/" + cover + ".png");
+    in.cover = QImage(":/assets/demo-covers/"_L1 + cover + ".png"_L1);
     in.shadows = false;
     return in;
 }
@@ -118,51 +121,52 @@ int main(int argc, char **argv)
         double worstDepth = 0, worstNormal = 0, worstProjection = 0;
         for (bool night : { false, true })
             for (bool low : { false, true })
-                for (QString cover : { "square", "portrait", "landscape" })
+                for (const auto &cover : { u"square"_s, u"portrait"_s, u"landscape"_s })
                     for (int channel : { 0, 1, 2 }) {
                         const QSize size(960, 720);
                         auto in = fixture(size, night, low, cover);
                         in.geometryDiagnostic = channel != 0;
                         const auto gpu = driver.capture(in, size);
-                        check(gpu.metadata["uniqueReadbackTextures"].toInt() == 4
-                                      && gpu.metadata["readbackFieldSlots"].toInt() == 12,
+                        check(gpu.metadata[u"uniqueReadbackTextures"_s].toInt() == 4
+                                      && gpu.metadata[u"readbackFieldSlots"_s].toInt() == 12,
                               "Opaque diagnostic readback duplicated an aliased texture");
                         check(gpu.color.constBits() == gpu.composite.constBits()
                                       && gpu.color.constBits() == gpu.postprocessed.constBits()
                                       && gpu.normal.constBits() == gpu.compositeNormal.constBits()
                                       && gpu.depth.constBits() == gpu.compositeDepth.constBits(),
                               "Aliased diagnostic fields copied their pixel storage");
-                        const auto inventory = gpu.metadata["resources"].toObject();
-                        check(inventory["estimatedCurrentBytes"].toDouble() > 0
-                                      && inventory["measuredVramBytes"].isNull(),
+                        const auto inventory = gpu.metadata[u"resources"_s].toObject();
+                        check(inventory[u"estimatedCurrentBytes"_s].toDouble() > 0
+                                      && inventory[u"measuredVramBytes"_s].isNull(),
                               "Missing descriptor inventory or fabricated driver memory");
                         int attachments = 0;
-                        for (const auto &entry : inventory["entries"].toArray()) {
+                        for (const auto &entry : inventory[u"entries"_s].toArray()) {
                             const auto resource = entry.toObject();
-                            const auto name = resource["name"].toString();
-                            if (name != "opaque-color-resolve" && name != "opaque-normal"
-                                && name != "opaque-linear-depth")
+                            const auto name = resource[u"name"_s].toString();
+                            if (name != "opaque-color-resolve"_L1 && name != "opaque-normal"_L1
+                                && name != "opaque-linear-depth"_L1)
                                 continue;
                             ++attachments;
-                            const auto format = name == "opaque-color-resolve"
+                            const auto format = name == "opaque-color-resolve"_L1
                                     ? QRhiTexture::RGBA16F
                                     : QRhiTexture::RGBA8;
-                            check(resource["format"].toInt() == int(format)
-                                          && resource["samples"].toInt() == 1
-                                          && resource["mipLevels"].toInt() == 1
-                                          && resource["width"].toInt() == size.width()
-                                          && resource["height"].toInt() == size.height(),
+                            check(resource[u"format"_s].toInt() == int(format)
+                                          && resource[u"samples"_s].toInt() == 1
+                                          && resource[u"mipLevels"_s].toInt() == 1
+                                          && resource[u"width"_s].toInt() == size.width()
+                                          && resource[u"height"_s].toInt() == size.height(),
                                   "Actual diagnostic attachment format or dimensions changed");
                         }
                         check(attachments == 3, "Missing opaque diagnostic attachments");
                         const auto actual = channel == 0 ? gpu.color
                                 : channel == 1           ? gpu.normal
                                                          : gpu.depth;
-                        const auto label =
-                                QString("%1-%2-%3-%4")
-                                        .arg(night ? "night" : "day", low ? "low" : "front", cover)
-                                        .arg(channel);
-                        check(actual.save(output + "/" + label + ".png"), "Cannot save own output");
+                        const auto label = u"%1-%2-%3-%4"_s
+                                                   .arg(night ? "night"_L1 : "day"_L1,
+                                                        low ? "low"_L1 : "front"_L1, cover)
+                                                   .arg(channel);
+                        check(actual.save(output + "/"_L1 + label + ".png"_L1),
+                              "Cannot save own output");
                         if (channel == 1) {
                             const auto point = projected(in, { .17f, 1.85f, .07f }, size);
                             const auto observed = gpu.normal.pixelColor(point);
@@ -189,15 +193,15 @@ int main(int argc, char **argv)
                         }
                         // Opaque color must contain actual content, not an empty background target.
                         check(depthAt(gpu.depth, 480, 360) < 1, "Missing opaque content");
-                        cases.append(QJsonObject{ { "scene", label },
-                                                  { "channel", channel },
-                                                  { "metadata", gpu.metadata } });
+                        cases.append(QJsonObject{ { u"scene"_s, label },
+                                                  { u"channel"_s, channel },
+                                                  { u"metadata"_s, gpu.metadata } });
                     }
         for (const QColor ink :
              { QColor(Qt::black), QColor(96, 160, 208), QColor(128, 128, 128), QColor(Qt::white) })
             for (double irradiance : { -1.0, 0.0, .25, 2.0 }) {
                 const QSize size(960, 720);
-                auto in = fixture(size, false, false, "square");
+                auto in = fixture(size, false, false, u"square"_s);
                 in.lightingEnabled = irradiance >= 0;
                 in.environmentIntensity = 0;
                 in.lightIntensities = { 0, float(std::max(0.0, irradiance) * std::acos(-1.0)), 0 };
@@ -220,21 +224,21 @@ int main(int argc, char **argv)
                                                 std::abs(observed.greenF() - linear(ink.greenF())),
                                                 std::abs(observed.blueF() - linear(ink.blueF())) });
                 check(error <= 1.0 / 255, "Paper source decode/diffuse clamp is incorrect");
-                inkProbes.append(QJsonObject{ { "ink", ink.name() },
-                                              { "irradiance", irradiance },
-                                              { "linearError", error } });
+                inkProbes.append(QJsonObject{ { u"ink"_s, ink.name() },
+                                              { u"irradiance"_s, irradiance },
+                                              { u"linearError"_s, error } });
             }
         for (auto size : { QSize(1920, 1080), QSize(1280, 720), QSize(995, 858), QSize(960, 900),
                            QSize(930, 900), QSize(390, 844), QSize(320, 720), QSize(2560, 1080),
                            QSize(3440, 1440), QSize(960, 720), QSize(320, 720), QSize(960, 720) })
-            sizes.append(driver.capture(fixture(size, false, true, "square"), size).metadata);
+            sizes.append(driver.capture(fixture(size, false, true, u"square"_s), size).metadata);
         driver.replay(30, [&](int index) {
             const QSize size(index % 2 ? 930 : 390, index % 2 ? 900 : 844);
-            driver.submitBurst(fixture(size, false, true, "portrait"), size);
+            driver.submitBurst(fixture(size, false, true, u"portrait"_s), size);
         });
         const QSize baseSize(960, 720);
-        auto finalResize = driver.capture(fixture(baseSize, false, false, "square"), baseSize);
-        auto changed = fixture(baseSize, false, false, "square");
+        auto finalResize = driver.capture(fixture(baseSize, false, false, u"square"_s), baseSize);
+        auto changed = fixture(baseSize, false, false, u"square"_s);
         changed.cover.fill(Qt::red);
         driver.submitWithoutCapture(changed, baseSize);
         driver.replay(3);
@@ -247,7 +251,7 @@ int main(int argc, char **argv)
               "Same-request cover revision was ignored");
         for (bool night : { false, true })
             for (int map : { 1024, 2048, 4096 }) {
-                auto in = fixture(baseSize, night, true, "square");
+                auto in = fixture(baseSize, night, true, u"square"_s);
                 in.shadowDiagnostic = true;
                 in.shadowSize = map;
                 in.scene.camera.position = { 6, 4, 6 };
@@ -279,14 +283,15 @@ int main(int argc, char **argv)
                         if (depthAt(off.depth, x, y) < 1)
                             check(off.color.pixelColor(x, y).redF() >= 254.0 / 255,
                                   "Disabled shadow receiver is not white");
-                const auto label = QString("shadow-%1-%2").arg(night ? "night" : "day").arg(map);
-                check(on.color.save(output + "/" + label + ".png"), "Cannot save shadow output");
-                shadows.append(QJsonObject{ { "scene", label },
-                                            { "shadowedReceiverPixels", shadowed },
-                                            { "minimumFactor", minimum },
-                                            { "metadata", on.metadata } });
+                const auto label = u"shadow-%1-%2"_s.arg(night ? "night"_L1 : "day"_L1).arg(map);
+                check(on.color.save(output + "/"_L1 + label + ".png"_L1),
+                      "Cannot save shadow output");
+                shadows.append(QJsonObject{ { u"scene"_s, label },
+                                            { u"shadowedReceiverPixels"_s, shadowed },
+                                            { u"minimumFactor"_s, minimum },
+                                            { u"metadata"_s, on.metadata } });
             }
-        const auto stableInput = fixture(baseSize, true, true, "landscape");
+        const auto stableInput = fixture(baseSize, true, true, u"landscape"_s);
         for (int cycle = 0; cycle < 10; ++cycle) {
             driver.rebuild();
             const auto restored = driver.capture(stableInput, baseSize);
@@ -294,25 +299,25 @@ int main(int argc, char **argv)
             check(depthAt(restored.depth, 480, 360) < 1, "Context rebuild lost opaque geometry");
             rebuilds.append(restored.metadata);
         }
-        const QJsonObject report{ { "round", "R19C2B1" },
-                                  { "configuration", "Release" },
-                                  { "passed", true },
-                                  { "validation", "source-math-and-own-output" },
-                                  { "qt", qVersion() },
-                                  { "offscreen", driver.surface->diagnostics() },
-                                  { "windowPolicy", verification::windowPolicy(*driver.window) },
-                                  { "cases", cases },
-                                  { "resize", sizes },
-                                  { "resizeBurst", 30 },
-                                  { "sameRequestCoverReplacement", true },
-                                  { "finalResize", finalResize.metadata },
-                                  { "shadows", shadows },
-                                  { "rebuilds", rebuilds },
-                                  { "inkProbes", inkProbes },
-                                  { "knownPlaneDepthError", worstDepth },
-                                  { "knownPlaneNormalError", worstNormal },
-                                  { "maxCornerProjectionPixels", worstProjection } };
-        QSaveFile file(output + "/runtime.json");
+        const QJsonObject report{ { u"round"_s, u"R19C2B1"_s },
+                                  { u"configuration"_s, u"Release"_s },
+                                  { u"passed"_s, true },
+                                  { u"validation"_s, u"source-math-and-own-output"_s },
+                                  { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                  { u"offscreen"_s, driver.surface->diagnostics() },
+                                  { u"windowPolicy"_s, verification::windowPolicy(*driver.window) },
+                                  { u"cases"_s, cases },
+                                  { u"resize"_s, sizes },
+                                  { u"resizeBurst"_s, 30 },
+                                  { u"sameRequestCoverReplacement"_s, true },
+                                  { u"finalResize"_s, finalResize.metadata },
+                                  { u"shadows"_s, shadows },
+                                  { u"rebuilds"_s, rebuilds },
+                                  { u"inkProbes"_s, inkProbes },
+                                  { u"knownPlaneDepthError"_s, worstDepth },
+                                  { u"knownPlaneNormalError"_s, worstNormal },
+                                  { u"maxCornerProjectionPixels"_s, worstProjection } };
+        QSaveFile file(output + "/runtime.json"_L1);
         check(file.open(QIODevice::WriteOnly), "Cannot open RHI report");
         file.write(QJsonDocument(report).toJson());
         check(file.commit(), "Cannot commit RHI report");

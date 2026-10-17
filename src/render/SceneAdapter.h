@@ -110,7 +110,7 @@ public:
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
     Q_INVOKABLE void recordInput();
     void recordNavigationCommit(quint64 revision);
-signals:
+Q_SIGNALS:
     void frameChanged();
     void detailChanged();
     void reducedMotionChanged();

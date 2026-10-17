@@ -57,7 +57,7 @@ Item {
     }
     ArchiveText {
         tokens: root.tokens
-        text: "ALBUM / SELECT"
+        text: qsTr("ALBUM / SELECT")
         cssPixelSize: root.labelSize
         font.letterSpacing: root.metrics.width <= 700 ? 1 : 1.5
         y: root.labelRowAscent - baselineOffset
@@ -140,9 +140,9 @@ Item {
         y: (root.counterHeight - height) / 2
         ArchiveButton {
             tokens: root.tokens
-            text: "↑"
+            text: "\u2191"
             cssPixelSize: root.metrics.width <= 700 ? 21 : 25
-            Accessible.name: "上一张专辑"
+            Accessible.name: qsTr("Previous album")
             enabled: Boolean(root.selection && root.selection.canMovePrevious)
             onClicked: root.inputRouter.row(-1)
         }
@@ -153,9 +153,9 @@ Item {
         }
         ArchiveButton {
             tokens: root.tokens
-            text: "↓"
+            text: "\u2193"
             cssPixelSize: root.metrics.width <= 700 ? 21 : 25
-            Accessible.name: "下一张专辑"
+            Accessible.name: qsTr("Next album")
             enabled: Boolean(root.selection && root.selection.canMoveNext)
             onClicked: root.inputRouter.row(1)
         }
@@ -172,9 +172,9 @@ Item {
         ArchiveButton {
             id: previousColumn
             tokens: root.tokens
-            text: "←"
+            text: "\u2190"
             cssPixelSize: root.metrics.width <= 700 ? 20 : 25
-            Accessible.name: "上一列"
+            Accessible.name: qsTr("Previous column")
             onClicked: root.inputRouter.lane(-1)
         }
         Column {
@@ -193,7 +193,7 @@ Item {
                 readonly property real size: root.metrics.width <= 700 ? 6 : 8
                 ArchiveText {
                     tokens: root.tokens
-                    text: "GENRE"
+                    text: qsTr("GENRE")
                     cssPixelSize: position.size
                     font.letterSpacing: 1.3
                     color: root.tokens.muted
@@ -242,9 +242,9 @@ Item {
         ArchiveButton {
             id: nextColumn
             tokens: root.tokens
-            text: "→"
+            text: "\u2192"
             cssPixelSize: root.metrics.width <= 700 ? 20 : 25
-            Accessible.name: "下一列"
+            Accessible.name: qsTr("Next column")
             onClicked: root.inputRouter.lane(1)
         }
     }

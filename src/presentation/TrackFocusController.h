@@ -21,6 +21,12 @@ public:
     Q_INVOKABLE bool locatePlayback();
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void beginReveal(quint64 revision, double start, double target);
+    Q_INVOKABLE void beginListReveal(quint64 revision, double startRelative, double origin,
+                                     double low, double high, double rowTop, double rowHeight,
+                                     double viewportHeight, double headerHeight);
+    Q_INVOKABLE void refineListReveal(double origin, double rowTop, double rowHeight,
+                                      double viewportHeight, double headerHeight, double high);
+    Q_INVOKABLE double listScrollY(double origin) const;
     void setReducedMotion(bool reduced);
     void advance(double dt);
     quint64 revision() const
@@ -51,7 +57,7 @@ public:
     {
         return !m_albumId.isEmpty();
     }
-signals:
+Q_SIGNALS:
     void navigationRequested();
     void changed();
     void scrollChanged();
@@ -70,5 +76,7 @@ private:
     bool m_reduced = false, m_requested = false, m_scrolling = false, m_pulsing = false;
     double m_scrollY = 0, m_start = 0, m_target = 0, m_duration = 0, m_elapsed = 0;
     double m_highlight = 0;
+    double m_listOrigin = 0, m_listLow = 0, m_listHigh = 0;
+    double m_listTarget = 0, m_listOffset = 0;
 };
 }

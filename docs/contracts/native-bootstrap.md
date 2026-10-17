@@ -48,6 +48,8 @@ macOS 使用 `sh tools/build/macos.sh`，Linux 使用 `sh tools/build/linux.sh`�
 
 Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于隔离的Review MSAA能力与真实附件探针；`YALAHOO_REVIEW_MSAA_API`配置期按实际头文件编译，缺失时明确失败，不降级Kit。普通产品不链接这些Review模块。
 
+开发Kit还须提供LinguistTools；同Kit的lupdate/lrelease由CMake翻译targets调用，生成QM嵌入产品资源，播放器不依赖这些开发工具。翻译源、加载与字符串编译闸门见[qt-best-practices.md](qt-best-practices.md#翻译和构建闸门)。
+
 基础CTest覆盖Kit数值排序/平台/架构/ABI/模块/过期覆盖、身份/模块插件和qsb变体；具体选择见test-gates.md，格式命令见code-style.md。
 
 `--verify-runtime 报告路径`为Review基础资源/窗口探针，可组合motion/library/shading参数；不设置歌曲来源或播放音频。它不替代相应生产组件/平台验收。工具输出位置与字段以实现及test-gates为准，不在本契约复制各轮次通过记录。

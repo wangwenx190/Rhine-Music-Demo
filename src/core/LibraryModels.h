@@ -28,6 +28,8 @@ struct SearchResult
     QString albumId, trackId;
     bool operator==(const SearchResult &) const = default;
 };
+QString genreDisplayName(const Genre &genre);
+QString artistDisplayName(const QString &artist);
 QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString &query,
                                   const QString &genreId = { });
 
@@ -77,7 +79,7 @@ public:
     {
         return m_order;
     }
-signals:
+Q_SIGNALS:
     void countChanged();
     void columnsChanged();
 
@@ -107,7 +109,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE QVariantMap resultAt(int row) const;
     void update(Snapshot snapshot, const QString &query, const QString &genreId);
-signals:
+Q_SIGNALS:
     void countChanged();
 
 private:

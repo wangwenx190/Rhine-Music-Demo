@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "SceneItem.h"
 
 namespace yalahoo::review {
@@ -12,12 +14,11 @@ inline Snapshot productionLibrary()
         result.genres.append(genre);
         for (int row = 0; row < 64; ++row) {
             Album album;
-            album.id = QString("%1:%2").arg(lane).arg(row);
+            album.id = u"%1:%2"_s.arg(lane).arg(row);
             album.genreId = QString::number(lane);
-            album.title = QString("Anonymous album %1").arg(row);
-            album.coverUrl =
-                    QUrl(QString("qrc:/assets/demo-covers/%1.png")
-                                 .arg(QStringList{ "square", "portrait", "landscape" }[row % 3]));
+            album.title = u"Anonymous album %1"_s.arg(row);
+            album.coverUrl = QUrl(u"qrc:/assets/demo-covers/%1.png"_s.arg(
+                    QStringList{ u"square"_s, u"portrait"_s, u"landscape"_s }[row % 3]));
             result.albums.append(album);
         }
     }

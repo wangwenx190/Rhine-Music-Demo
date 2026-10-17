@@ -1,10 +1,16 @@
 #include "LayoutMetrics.h"
 #include <algorithm>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 QString LayoutMetrics::kind() const
 {
-    return m_cinematic ? "cinematic" : portrait() ? "portrait" : compact() ? "compact" : "desktop";
+    return m_cinematic   ? u"cinematic"_s
+            : portrait() ? u"portrait"_s
+            : compact()  ? u"compact"_s
+                         : u"desktop"_s;
 }
 double LayoutMetrics::layoutScale() const
 {
@@ -40,6 +46,6 @@ void LayoutMetrics::setViewport(double width, double height, bool coarse, bool c
     m_height = height;
     m_coarse = coarse;
     m_cinematic = cinematic;
-    emit changed();
+    Q_EMIT changed();
 }
 }

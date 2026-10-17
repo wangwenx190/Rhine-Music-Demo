@@ -33,7 +33,7 @@ OpeningInk按reveal-map的分组与弧长绘制；揭示完成时在同节点补
 
 ## 导出、平台文件与验证
 
-Windows 默认无可见窗口：`./tools/assets/export-branding.ps1 -Preset qt-release`；全套证据：`./tools/build/verify-r03b.ps1`。只有验证原生 expose/paint 时显式加 `-WindowPreview`，窗口仍置底且不接受焦点，遵守 [测试窗口契约](test-window-policy.md)。POSIX：`sh tools/assets/export-branding.sh qt-release`。公共构建每次发现本机最新原生 Kit；工具使用 C++23 / QtGui / QtSvg，不使用其他图形库。原生可执行命令为 `build/<configuration>/tools/export-branding <repository> [--window-preview]`，校验模式加 `--verify-only --report <output.json>`。
+Windows 默认无可见窗口：`./tools/assets/export-branding.ps1 -Preset qt-release`；组件验证：`ctest --preset qt-release -R "^branding$"`。只有验证原生 expose/paint 时显式加 `-WindowPreview`，窗口仍置底且不接受焦点，遵守 [测试窗口契约](test-window-policy.md)。POSIX：`sh tools/assets/export-branding.sh qt-release`。公共构建每次发现本机最新原生 Kit；工具使用 C++23 / QtGui / QtSvg，不使用其他图形库。原生可执行命令为 `build/<configuration>/tools/export-branding <repository> [--window-preview]`，校验模式加 `--verify-only --report <output.json>`。
 
 - SVG 母版/生产稿/中心线/映射：`resources/branding/`；Linux 同源 SVG、九档透明 PNG：`resources/icons/yalahoo/`。
 - Windows ICO：16/24/32/48/64/128/256，32-bit PNG 块；目录中的 256 宽高编码为 0，planes=1，位深 32。

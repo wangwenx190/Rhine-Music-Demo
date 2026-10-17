@@ -32,7 +32,7 @@ CHECKS = [
      "Review selector uses the reserved std140 paperSize.w; existing std140 offsets (832 bytes after R19D2 fog) and "
      "per-frame/instance uploads remain. Math values and view changes do not rebuild targets; "
      "the driver checks real resourceGeneration across these states."),
-    ("PERF-04", "src/render/rhi/RhiItem.cpp", "opticalEvents.append(\"capture-mips\");",
+    ("PERF-04", "src/render/rhi/RhiItem.cpp", 'opticalEvents.append(u"capture-mips"_s);',
      "Trace follows actual opaque/endPass/mip update/copy/visibility/shading calls. Opaque draw "
      "kinds come from the submitted uniform bytes, not an expected pass-name template. "
      "Capture remains isolated from shells and resource feedback."),

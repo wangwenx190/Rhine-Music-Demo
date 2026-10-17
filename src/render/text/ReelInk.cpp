@@ -53,7 +53,7 @@ void ReelInk::setSlot(ReelSlot *slot)
         connect(slot, &ReelSlot::contentChanged, this, &ReelInk::update);
         connect(slot, &ReelSlot::frameChanged, this, &ReelInk::update);
     }
-    emit slotChanged();
+    Q_EMIT slotChanged();
     update();
 }
 QColor ReelInk::color() const
@@ -65,7 +65,7 @@ void ReelInk::setColor(const QColor &color)
     if (m_color == color)
         return;
     m_color = color;
-    emit colorChanged();
+    Q_EMIT colorChanged();
     update();
 }
 int ReelInk::liveNodes()

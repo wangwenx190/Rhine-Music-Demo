@@ -8,6 +8,8 @@
 #include <QQuickItem>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 void populate(SelectionController &selection)
@@ -17,7 +19,7 @@ void populate(SelectionController &selection)
         LibraryColumn column;
         column.key = QString::number(lane);
         for (int row = 0; row < (lane == 0 ? 37 : 3); ++row)
-            column.albumIds.append(QString("a%1-%2").arg(lane).arg(row));
+            column.albumIds.append(u"a%1-%2"_s.arg(lane).arg(row));
         columns.append(column);
     }
     selection.setColumns(columns);
@@ -27,7 +29,33 @@ void populate(SelectionController &selection)
 class NavigationTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void rulerKeepsFullAccessibleTitleSeparateFromCoverBudget()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        LibrarySnapshot library;
+        Album album;
+        album.id = u"one"_s;
+        album.title = QString(300, u'x') + u"\U0001f3b5"_s;
+        library.albums.append(album);
+        selection.setColumns({ LibraryColumn{ u"genre"_s, u"Genre"_s, { album.id } } },
+                             std::make_shared<const LibrarySnapshot>(library));
+        RulerController ruler(&motion, &selection);
+        QCOMPARE(selection.albumTitle(album.id), album.title);
+        QVERIFY(selection.coverSource(album.id).second.size() <= 256);
+        bool found = false;
+        for (const auto &value : ruler.slotStates()) {
+            const auto state = value.toMap();
+            if (state.value(u"active"_s).toBool()) {
+                QCOMPARE(state.value(u"title"_s).toString(), album.title);
+                found = true;
+            }
+        }
+        QVERIFY(found);
+        ruler.configure(37, 5, 5, true, true);
+        QVERIFY(!ruler.slotStates().isEmpty());
+    }
     void wheelRemainder()
     {
         InputRouter input(nullptr);
@@ -83,14 +111,14 @@ private slots:
                 selection.setLift(.9);
             QVERIFY(input.row(1));
         }
-        QCOMPARE(selection.albumId(), QString("a0-3"));
+        QCOMPARE(selection.albumId(), u"a0-3"_s);
         for (int i = 0; i < 13; ++i)
             QVERIFY(input.row(-1));
         for (int frame = 0; frame < 480; ++frame) {
             selection.advance(1.0 / 120);
             input.flush();
         }
-        QCOMPARE(selection.albumId(), QString("a0-17"));
+        QCOMPARE(selection.albumId(), u"a0-17"_s);
         QVERIFY(selection.instances().size() <= 436);
     }
     void pendingColumnAndRow()
@@ -103,7 +131,7 @@ private slots:
             selection.setLift(.9);
             QVERIFY(input.row(1));
         }
-        QCOMPARE(selection.albumId(), QString("a0-3"));
+        QCOMPARE(selection.albumId(), u"a0-3"_s);
         QVERIFY(input.lane(1));
         QVERIFY(input.row(1));
         QVERIFY(input.lane(-1));
@@ -113,7 +141,7 @@ private slots:
             selection.advance(1.0 / 120);
             input.flush();
         }
-        QCOMPARE(selection.albumId(), QString("a1-2"));
+        QCOMPARE(selection.albumId(), u"a1-2"_s);
         QVERIFY(selection.instances().size() <= 436);
     }
     void rulerOccurrenceAndRebase()
@@ -128,25 +156,25 @@ private slots:
         const auto states = ruler.slotStates();
         int previous = -1;
         for (int i = 0; i < 16; ++i)
-            if (states[i].toMap()["ordinal"].toDouble() == -1)
+            if (states[i].toMap()[u"ordinal"_s].toDouble() == -1)
                 previous = i;
         QVERIFY(previous >= 0);
         QVERIFY(ruler.click(previous));
-        QCOMPARE(selection.albumId(), QString("a0-36"));
-        QCOMPARE(ruler.state()["selected"].toDouble(), -1);
-        const double before = ruler.state()["selected"].toDouble();
+        QCOMPARE(selection.albumId(), u"a0-36"_s);
+        QCOMPARE(ruler.state()[u"selected"_s].toDouble(), -1);
+        const double before = ruler.state()[u"selected"_s].toDouble();
         selection.selectCell({ 0, 1000000 });
-        const auto target = ruler.state()["selected"].toDouble();
+        const auto target = ruler.state()[u"selected"_s].toDouble();
         selection.rebase();
-        QCOMPARE(ruler.state()["selected"].toDouble(), target);
+        QCOMPARE(ruler.state()[u"selected"_s].toDouble(), target);
         QVERIFY(target != before);
         QVERIFY(input.row(1));
-        QCOMPARE(ruler.state()["selected"].toDouble(), target + 1);
+        QCOMPARE(ruler.state()[u"selected"_s].toDouble(), target + 1);
         selection.setRealistic(true);
-        QCOMPARE(ruler.state()["selected"].toDouble(), selection.cell().row - 12);
+        QCOMPARE(ruler.state()[u"selected"_s].toDouble(), selection.cell().row - 12);
         ruler.setActive(false);
         for (int i = 0; i < 16; ++i)
-            QVERIFY(!ruler.slotStates()[i].toMap()["enabled"].toBool());
+            QVERIFY(!ruler.slotStates()[i].toMap()[u"enabled"_s].toBool());
     }
     void decimalDirectionOwnership()
     {
@@ -188,7 +216,7 @@ private slots:
         input.attach(&window);
         QQmlEngine engine;
         QQmlComponent component(&engine);
-        component.setData("import QtQuick\nTextInput { width: 100; height: 50; text: 'x' }",
+        component.setData("import QtQuick\nTextInput { width: 100; height: 50; text: 'x' }"_ba,
                           QUrl());
         std::unique_ptr<QObject> object(component.create());
         auto *text = qobject_cast<QQuickItem *>(object.get());
@@ -244,9 +272,9 @@ private slots:
         QCOMPARE(motion.faces(), partial);
         motion.setActive(true);
         motion.setReducedMotion(true);
-        QCOMPARE(motion.faces()[0].toMap()["upper"].toInt(), 1);
-        QCOMPARE(motion.faces()[1].toMap()["upper"].toInt(), 0);
-        QCOMPARE(motion.faces()[1].toMap()["fraction"].toDouble(), 0);
+        QCOMPARE(motion.faces()[0].toMap()[u"upper"_s].toInt(), 1);
+        QCOMPARE(motion.faces()[1].toMap()[u"upper"_s].toInt(), 0);
+        QCOMPARE(motion.faces()[1].toMap()[u"fraction"_s].toDouble(), 0);
     }
 };
 QTEST_MAIN(NavigationTest)

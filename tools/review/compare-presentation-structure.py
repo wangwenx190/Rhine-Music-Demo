@@ -1,13 +1,27 @@
 """Compare native detail boxes with independently executed frozen DOM/CSS, no pixels."""
 import json
+import math
 from pathlib import Path
 import sys
 
 native, frozen = [json.loads(Path(p).read_text()) for p in sys.argv[1:3]]
+IDENTITY_KEYS = ('width', 'height', 'night', 'dpr')
+if not native.get('passed') or not native.get('captures') or not frozen.get('captures'):
+    raise SystemExit('Passing nonempty native and frozen structure reports required')
+
+def identity(capture):
+    return tuple(capture[key] for key in IDENTITY_KEYS)
+
+references = {identity(capture): capture for capture in frozen['captures']}
+actual_keys = [identity(capture) for capture in native['captures']]
+declared_dprs = {capture['dpr'] for capture in native['captures']}
+expected_keys = {key for key in references if key[-1] in declared_dprs}
+if (len(references) != len(frozen['captures']) or len(set(actual_keys)) != len(actual_keys)
+        or set(actual_keys) != expected_keys):
+    raise SystemExit('Exactly one matching native/source record per declared state required')
 errors = []
 for capture in native['captures']:
-    source = next(c for c in frozen['captures']
-                  if all(c[k] == capture[k] for k in ['width', 'height', 'night', 'dpr']))
+    source = references[identity(capture)]
     for name, keys in {
         'article': ['x', 'y', 'width', 'height'], 'caption': ['x', 'y', 'height'],
         'back': ['x', 'y', 'fontSize'],
@@ -21,7 +35,7 @@ for capture in native['captures']:
     }.items():
         for key in keys:
             actual, expected = capture['fields'][name][key], source['fields'][name][key]
-            if abs(actual - expected) > 1:
+            if not math.isfinite(actual) or not math.isfinite(expected) or abs(actual - expected) > 1:
                 errors.append(dict(width=capture['width'], height=capture['height'],
                                    night=capture['night'], item=name, field=key,
                                    actual=actual, expected=expected))

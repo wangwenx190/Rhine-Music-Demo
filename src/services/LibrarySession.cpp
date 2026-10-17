@@ -1,9 +1,14 @@
+#include <QCoreApplication>
 #include "LibrarySession.h"
+#include "MetadataPresentation.h"
 #include "OfflineMetadataProvider.h"
 #include <utility>
+#include <algorithm>
 #include <QThread>
 #include <QSet>
 #include <QTimer>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
@@ -23,35 +28,42 @@ LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
                 Qt::QueuedConnection);
         connect(provider, &QObject::destroyed, this, [this] {
             invalidate();
-            emit metadataProgressChanged();
-            emit providerCapabilitiesChanged();
+            Q_EMIT metadataProgressChanged();
+            Q_EMIT providerCapabilitiesChanged();
         });
     }
+    rebuildSummary();
 }
 QVariantList LibrarySession::genres() const
 {
-    QVariantList result;
-    QSet<QString> used;
-    for (const auto &entry : m_snapshot->albums)
-        used.insert(entry.genreId);
-    for (const auto &genre : m_snapshot->genres)
-        if (used.contains(genre.id))
-            result.append(QVariantMap{ { "id", genre.id }, { "name", genre.name } });
-    return result;
+    return m_genres;
+}
+bool LibrarySession::hasGenre(const QString &id) const
+{
+    return std::any_of(m_genres.cbegin(), m_genres.cend(), [&id](const QVariant &value) {
+        return value.toMap().value(u"id"_s).toString() == id;
+    });
 }
 QVariantMap LibrarySession::summary() const
+{
+    return m_summary;
+}
+void LibrarySession::rebuildSummary()
 {
     int tracks = 0;
     QStringList offline;
     for (const auto &entry : m_snapshot->albums)
         tracks += int(entry.tracks.size());
     for (const auto &root : m_snapshot->roots)
-        if (root.status == "offline")
-            offline.append(root.path.toLocalFile() + QStringLiteral(" 暂时离线，原索引已保留。"));
-    return { { "albums", m_snapshot->albums.size() },
-             { "tracks", tracks },
-             { "genres", genres().size() },
-             { "offline", offline.join('\n') } };
+        if (root.status == "offline"_L1)
+            offline.append(
+                    root.path.toLocalFile()
+                    + QCoreApplication::translate(
+                            "Yalahoo", " Temporarily offline. The original index was retained."));
+    m_summary = { { u"albums"_s, m_snapshot->albums.size() },
+                  { u"tracks"_s, tracks },
+                  { u"genres"_s, genres().size() },
+                  { u"offline"_s, offline.join('\n'_L1) } };
 }
 int LibrarySession::trackIndex(const QString &albumId, const QString &trackId) const
 {
@@ -69,23 +81,34 @@ void LibrarySession::invalidate()
 {
     const auto pending = std::exchange(m_pending, { });
     if (m_batchActive)
-        m_batchStatus = "Cancelled";
+        m_batchStatus = "Cancelled"_L1;
     m_batchActive = false;
     m_batchRequest = 0;
     ++m_generation;
-    if (m_provider)
-        for (const auto &request : pending)
-            m_provider->cancel(request.token);
+    for (const auto &request : pending) {
+        if (!m_provider)
+            break;
+        m_provider->cancel(request.token);
+    }
 }
 void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
 {
     Q_ASSERT(QThread::currentThread() == thread());
     invalidate();
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
+    m_genres.clear();
+    QSet<QString> usedGenres;
+    for (const auto &entry : m_snapshot->albums)
+        usedGenres.insert(entry.genreId);
+    for (const auto &genre : m_snapshot->genres)
+        if (usedGenres.contains(genre.id))
+            m_genres.append(
+                    QVariantMap{ { u"id"_s, genre.id }, { u"name"_s, genreDisplayName(genre) } });
+    rebuildSummary();
     m_albumIndices.clear();
     m_genreNames.clear();
     for (const auto &genre : m_snapshot->genres)
-        m_genreNames.insert(genre.id, genre.name);
+        m_genreNames.insert(genre.id, genreDisplayName(genre));
     m_trackIndices.clear();
     m_albumIndices.reserve(m_snapshot->albums.size());
     for (qsizetype index = 0; index < m_snapshot->albums.size(); ++index) {
@@ -114,10 +137,10 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     // Playback IDs survive a library replacement: playing media may outlive its index.
     m_metadata.clear();
     ++m_metadataRevision;
-    emit metadataChanged();
-    emit browseInfoChanged();
-    emit snapshotChanged();
-    emit metadataProgressChanged();
+    Q_EMIT metadataChanged();
+    Q_EMIT browseInfoChanged();
+    Q_EMIT snapshotChanged();
+    Q_EMIT metadataProgressChanged();
 }
 void LibrarySession::search(const QString &query, const QString &genreId)
 {
@@ -127,13 +150,13 @@ void LibrarySession::search(const QString &query, const QString &genreId)
 }
 void LibrarySession::sort(const QString &mode)
 {
-    if (mode == QLatin1String("genre"))
+    if (mode == "genre"_L1)
         m_albums.setSortMode(SortMode::Genre);
-    else if (mode == QLatin1String("artist"))
+    else if (mode == "artist"_L1)
         m_albums.setSortMode(SortMode::Artist);
-    else if (mode == QLatin1String("album"))
+    else if (mode == "album"_L1)
         m_albums.setSortMode(SortMode::Album);
-    emit browseInfoChanged();
+    Q_EMIT browseInfoChanged();
 }
 void LibrarySession::rebuildBrowsePositions()
 {
@@ -163,8 +186,8 @@ bool LibrarySession::navigate(const QString &albumId, const QString &trackId)
         return true;
     m_navigationAlbumId = albumId;
     m_navigationTrackId = trackId;
-    emit navigationChanged();
-    emit browseInfoChanged();
+    Q_EMIT navigationChanged();
+    Q_EMIT browseInfoChanged();
     return true;
 }
 QVariantMap LibrarySession::browseInfo() const
@@ -174,18 +197,18 @@ QVariantMap LibrarySession::browseInfo() const
         return { };
     const QString genre = m_genreNames.value(selected->genreId);
     const auto position = m_browsePositions.value(selected->id);
-    return { { "title", selected->title },
-             { "artist", selected->artist },
-             { "genre", genre },
-             { "year", selected->year ? QString::number(*selected->year) : QString{ } },
-             { "tracks", selected->tracks.size() },
-             { "albumId", selected->id },
-             { "code", position.code },
-             { "number", position.number },
-             { "columnCount", position.total },
-             { "columnNumber", position.lane },
-             { "columnTotal", m_albums.order().columns.size() },
-             { "columnLabel", position.label } };
+    return { { u"title"_s, selected->title },
+             { u"artist"_s, artistDisplayName(selected->artist) },
+             { u"genre"_s, genre },
+             { u"year"_s, selected->year ? QString::number(*selected->year) : QString{ } },
+             { u"tracks"_s, selected->tracks.size() },
+             { u"albumId"_s, selected->id },
+             { u"code"_s, position.code },
+             { u"number"_s, position.number },
+             { u"columnCount"_s, position.total },
+             { u"columnNumber"_s, position.lane },
+             { u"columnTotal"_s, m_albums.order().columns.size() },
+             { u"columnLabel"_s, position.label } };
 }
 bool LibrarySession::setPlaybackIds(const QString &albumId, const QString &trackId)
 {
@@ -200,35 +223,38 @@ void LibrarySession::adoptPlaybackIds(const QString &albumId, const QString &tra
         return;
     m_playbackAlbumId = albumId;
     m_playbackTrackId = trackId;
-    emit playbackChanged();
+    Q_EMIT playbackChanged();
 }
 QVariantMap LibrarySession::providerCapabilities() const
 {
     const auto capabilities = m_provider
             ? m_provider->capabilities()
             : ProviderCapabilities{ false, false, false, false, false };
-    return { { "networkEnabled", capabilities.networkEnabled },
-             { "introductions", capabilities.introductions },
-             { "credits", capabilities.credits },
-             { "enrichment", capabilities.enrichment },
-             { "batch", capabilities.batch } };
+    return { { u"networkEnabled"_s, capabilities.networkEnabled },
+             { u"introductions"_s, capabilities.introductions },
+             { u"credits"_s, capabilities.credits },
+             { u"enrichment"_s, capabilities.enrichment },
+             { u"batch"_s, capabilities.batch } };
 }
 quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &name)
 {
+    const auto snapshot = m_snapshot;
+    const auto generation = m_generation;
+    const auto provider = m_provider;
     const auto *album = this->album(albumId);
     if (!album || !m_provider)
         return 0;
     const auto capabilities = m_provider->capabilities();
-    if ((name == "introduction" && !capabilities.introductions)
-        || (name == "credits" && !capabilities.credits)
-        || (name == "enrichment" && !capabilities.enrichment))
+    if ((name == "introduction"_L1 && !capabilities.introductions)
+        || (name == "credits"_L1 && !capabilities.credits)
+        || (name == "enrichment"_L1 && !capabilities.enrichment))
         return 0;
     MetadataKind kind;
-    if (name == QLatin1String("introduction"))
+    if (name == "introduction"_L1)
         kind = MetadataKind::Introduction;
-    else if (name == QLatin1String("credits"))
+    else if (name == "credits"_L1)
         kind = MetadataKind::Credits;
-    else if (name == QLatin1String("enrichment"))
+    else if (name == "enrichment"_L1)
         kind = MetadataKind::Enrichment;
     else
         return 0;
@@ -236,13 +262,15 @@ quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &n
     for (const auto &request : requests)
         if (request.token.albumId == albumId && request.kind == kind)
             cancelMetadata(request.token.requestId);
+    if (m_generation != generation || m_snapshot != snapshot || m_provider != provider || !provider)
+        return 0;
     if (m_pending.size() >= 8)
         return 0;
     const RequestToken token{ ++m_requestId, m_generation, albumId };
     m_pending.insert(token.requestId, { token, kind });
     AlbumQuery query;
-    query.configuration = m_snapshot->fields.value("metadataConfiguration").toObject();
-    query.contact = query.configuration.value("musicBrainzContact").toString();
+    query.configuration = m_snapshot->fields.value(u"metadataConfiguration"_s).toObject();
+    query.contact = query.configuration.value(u"musicBrainzContact"_s).toString();
     query.enabled = m_provider->capabilities().networkEnabled;
     query.albumId = albumId;
     query.title = album->title;
@@ -250,16 +278,21 @@ quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &n
     query.albumIds = { albumId };
     for (const auto &track : album->tracks)
         query.trackIds.append(track.id);
+    bool accepted = false;
     switch (kind) {
     case MetadataKind::Introduction:
-        m_provider->requestIntroduction(query, token);
+        accepted = provider->requestIntroduction(query, token);
         break;
     case MetadataKind::Credits:
-        m_provider->requestCredits(query, token);
+        accepted = provider->requestCredits(query, token);
         break;
     case MetadataKind::Enrichment:
-        m_provider->requestEnrichment(query, token);
+        accepted = provider->requestEnrichment(query, token);
         break;
+    }
+    if (!accepted || !m_pending.contains(token.requestId)) {
+        m_pending.remove(token.requestId);
+        return 0;
     }
     return token.requestId;
 }
@@ -273,8 +306,8 @@ void LibrarySession::cancelMetadata(quint64 requestId)
     if (m_batchRequest == requestId) {
         m_batchRequest = 0;
         m_batchActive = false;
-        m_batchStatus = "Cancelled";
-        emit metadataProgressChanged();
+        m_batchStatus = "Cancelled"_L1;
+        Q_EMIT metadataProgressChanged();
     }
     if (m_provider)
         m_provider->cancel(token);
@@ -287,53 +320,58 @@ void LibrarySession::receive(const ProviderResult &result)
         || result.kind != it->kind || !album(result.albumId))
         return;
     m_pending.erase(it);
-    m_metadata.insert(result.albumId + '/' + kindName(result.kind),
-                      QVariantMap{ { "requestId", QVariant::fromValue(result.requestId) },
-                                   { "generation", QVariant::fromValue(result.generation) },
-                                   { "albumId", result.albumId },
-                                   { "kind", kindName(result.kind) },
-                                   { "status", statusName(result.status) },
-                                   { "payload", result.payload.toVariantMap() },
-                                   { "source", result.source.toVariantMap() },
-                                   { "checkedAt", result.checkedAt },
-                                   { "retryAt", result.retryAt },
-                                   { "error", result.error } });
+    m_metadata.insert(result.albumId + '/'_L1 + kindName(result.kind),
+                      QVariantMap{ { u"requestId"_s, QVariant::fromValue(result.requestId) },
+                                   { u"generation"_s, QVariant::fromValue(result.generation) },
+                                   { u"albumId"_s, result.albumId },
+                                   { u"kind"_s, kindName(result.kind) },
+                                   { u"status"_s, statusName(result.status) },
+                                   { u"payload"_s, result.payload.toVariantMap() },
+                                   { u"source"_s, result.source.toVariantMap() },
+                                   { u"checkedAt"_s, result.checkedAt },
+                                   { u"retryAt"_s, result.retryAt },
+                                   { u"error"_s, result.error } });
     ++m_metadataRevision;
-    emit metadataChanged();
-    emit metadataDelivered(result);
+    Q_EMIT metadataChanged();
+    Q_EMIT metadataDelivered(result);
     if (m_batchActive && m_batchRequest == result.requestId) {
         m_batchRequest = 0;
         ++m_batchCompleted;
         if (result.status == ProviderStatus::Error)
             ++m_batchErrors;
         m_batchStatus = statusName(result.status);
-        emit metadataProgressChanged();
+        Q_EMIT metadataProgressChanged();
         QTimer::singleShot(0, this, &LibrarySession::advanceBatch);
     }
 }
 QVariantMap LibrarySession::metadataConfiguration() const
 {
-    return m_snapshot->fields.value("metadataConfiguration").toObject().toVariantMap();
+    return m_snapshot->fields.value(u"metadataConfiguration"_s).toObject().toVariantMap();
 }
 QVariantMap LibrarySession::metadataProgress() const
 {
-    return { { "active", m_batchActive },       { "kind", m_batchKind },
-             { "total", m_batchAlbums.size() }, { "completed", m_batchCompleted },
-             { "errors", m_batchErrors },       { "status", m_batchStatus } };
+    return { { u"active"_s, m_batchActive },
+             { u"kind"_s, m_batchKind },
+             { u"total"_s, m_batchAlbums.size() },
+             { u"completed"_s, m_batchCompleted },
+             { u"errors"_s, m_batchErrors },
+             { u"status"_s, m_batchStatus },
+             { u"statusText"_s, metadataStatusText(m_batchStatus) } };
 }
 void LibrarySession::cancelAllMetadata()
 {
     invalidate();
-    emit metadataProgressChanged();
+    Q_EMIT metadataProgressChanged();
 }
 bool LibrarySession::requestMetadataBatch(const QString &kind)
 {
-    if (!m_provider || (kind != "introduction" && kind != "credits" && kind != "enrichment"))
+    if (!m_provider
+        || (kind != "introduction"_L1 && kind != "credits"_L1 && kind != "enrichment"_L1))
         return false;
     const auto capabilities = m_provider->capabilities();
-    if ((kind == "introduction" && !capabilities.introductions)
-        || (kind == "credits" && !capabilities.credits)
-        || (kind == "enrichment" && !capabilities.enrichment))
+    if ((kind == "introduction"_L1 && !capabilities.introductions)
+        || (kind == "credits"_L1 && !capabilities.credits)
+        || (kind == "enrichment"_L1 && !capabilities.enrichment))
         return false;
     invalidate();
     m_batchAlbums.clear();
@@ -341,7 +379,7 @@ bool LibrarySession::requestMetadataBatch(const QString &kind)
         m_batchAlbums.append(entry.id);
     m_batchNext = m_batchCompleted = m_batchErrors = 0;
     m_batchKind = kind;
-    m_batchStatus = "Pending";
+    m_batchStatus = "Pending"_L1;
     m_batchActive = true;
     advanceBatch();
     return true;
@@ -352,51 +390,53 @@ void LibrarySession::advanceBatch()
         return;
     if (m_batchNext >= m_batchAlbums.size()) {
         m_batchActive = false;
-        emit metadataProgressChanged();
+        Q_EMIT metadataProgressChanged();
         return;
     }
     m_batchRequest = requestMetadata(m_batchAlbums[m_batchNext++], m_batchKind);
     if (!m_batchRequest) {
         m_batchActive = false;
-        m_batchStatus = "Error";
+        m_batchStatus = "Error"_L1;
     }
-    emit metadataProgressChanged();
+    Q_EMIT metadataProgressChanged();
 }
 QVariantMap LibrarySession::metadataFor(const QString &albumId, const QString &kind,
                                         quint64 revision) const
 {
     if (revision && revision != m_metadataRevision)
         return { };
-    const auto key = albumId + '/' + kind;
-    if (m_metadata.contains(key))
-        return m_metadata.value(key).toMap();
+    const auto key = albumId + '/'_L1 + kind;
     const auto *entry = album(albumId);
     if (!entry)
         return { };
+    if (m_metadata.contains(key))
+        return metadataPresentation(m_metadata.value(key).toMap(), entry->title);
     QJsonObject state, payload, source;
-    if (kind == "introduction") {
+    if (kind == "introduction"_L1) {
         state = entry->introduction;
-        payload = { { "description", entry->description }, { "introduction", state } };
+        payload = { { u"description"_s, entry->description }, { u"introduction"_s, state } };
         source = entry->descriptionSource;
-    } else if (kind == "credits") {
+    } else if (kind == "credits"_L1) {
         state = entry->creditsLookup;
-        payload = { { "producers", producerData(entry->producers) }, { "creditsLookup", state } };
-        source = { { "name", state.value("source") } };
-    } else if (kind == "enrichment") {
+        payload = { { u"producers"_s, producerData(entry->producers) },
+                    { u"creditsLookup"_s, state } };
+        source = { { u"name"_s, state.value(u"source"_s) } };
+    } else if (kind == "enrichment"_L1) {
         state = entry->online;
-        payload = { { "online", state } };
-        source = { { "name", "MusicBrainz" }, { "url", state.value("sourceUrl") } };
+        payload = { { u"online"_s, state } };
+        source = { { u"name"_s, u"MusicBrainz"_s }, { u"url"_s, state.value(u"sourceUrl"_s) } };
     } else {
         return { };
     }
-    return { { "albumId", albumId },
-             { "kind", kind },
-             { "status", state.value("status").toString("Deferred") },
-             { "payload", payload.toVariantMap() },
-             { "source", source.toVariantMap() },
-             { "checkedAt", state.value("checkedAt").toString() },
-             { "retryAt", state.value("retryAt").toString() },
-             { "error", state.value("error").toString() } };
+    return metadataPresentation({ { u"albumId"_s, albumId },
+                                  { u"kind"_s, kind },
+                                  { u"status"_s, state.value(u"status"_s).toString(u"Deferred"_s) },
+                                  { u"payload"_s, payload.toVariantMap() },
+                                  { u"source"_s, source.toVariantMap() },
+                                  { u"checkedAt"_s, state.value(u"checkedAt"_s).toString() },
+                                  { u"retryAt"_s, state.value(u"retryAt"_s).toString() },
+                                  { u"error"_s, state.value(u"error"_s).toString() } },
+                                entry->title);
 }
 const Album *LibrarySession::album(const QString &id) const
 {

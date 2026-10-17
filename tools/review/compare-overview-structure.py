@@ -1,6 +1,7 @@
 """Compare logical card/font boxes against frozen production CSS, without image scores."""
 import argparse
 import json
+import math
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -30,7 +31,7 @@ for capture in native["captures"]:
             for field in ("x", "y", "width", "height"):
                 delta = abs(card[part][field] - expected[part][field])
                 checks.append(dict(size=key, lane=card["lane"], expanded=card["expanded"],
-                                   part=part, field=field, delta=delta, passed=delta <= 1))
+                                   part=part, field=field, delta=delta, passed=math.isfinite(delta) and delta <= 1))
 result = dict(passed=len(native["captures"]) == 36 and all(c["passed"] for c in checks),
               scope="Frozen CSS/DOM logical boxes; no source image/GPU comparison",
               maximumLogicalPixelError=max(c["delta"] for c in checks), checks=checks)

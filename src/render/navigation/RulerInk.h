@@ -25,7 +25,7 @@ public:
     QColor accent() const;
     void setAccent(QColor color);
     QCanvasPainterItemRenderer *createItemRenderer() const override;
-signals:
+Q_SIGNALS:
     void controllerChanged();
     void colorsChanged();
 

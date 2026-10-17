@@ -1,4 +1,5 @@
 #include "RhiItem.h"
+#include "ReadbackImage.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"
 #include "ResourcePlan.h"
@@ -22,6 +23,9 @@
 #include <cstring>
 #include <algorithm>
 #include <cstdio>
+
+using namespace Qt::StringLiterals;
+
 #if defined(Q_OS_WIN)
 #  include <rhi/qrhi_platform.h>
 #endif
@@ -67,7 +71,7 @@ void copy(float *to, QVector4D v)
 struct Mesh
 {
     quint32 start = 0, count = 0;
-    QVector3D center;
+    QVector3D center{ };
 };
 struct Target
 {
@@ -102,6 +106,7 @@ struct Pending
     std::array<QRhiReadbackResult, 14> results;
     Capture capture;
     std::function<void(Capture)> deliver;
+    std::function<void(QString)> failed;
     int remaining = 0;
     std::array<int, 14> readbackOwner;
     int drainFrames = 0;
@@ -110,79 +115,11 @@ struct Pending
     bool captureShadowDepth = false;
     std::array<QSize, 14> logicalReadbackSizes;
 };
-QByteArray floatTextureBytes(const char *path, qsizetype expected)
+QByteArray floatTextureBytes(const QString &path, qsizetype expected)
 {
-    const auto bytes = preparedAssets().bytes.value(QString::fromLatin1(path));
+    const auto bytes = preparedAssets().bytes.value(path);
     require(bytes.size() == expected, "Invalid RHI float lookup bytes");
     return bytes;
-}
-QImage imageOf(const QRhiReadbackResult &r, bool yUp, bool uploaded = false,
-               QSize logicalSize = { })
-{
-    if (r.format == QRhiTexture::R16F) {
-        QImage image(logicalSize.isValid() ? logicalSize : r.pixelSize, QImage::Format_RGBA8888);
-        require(r.data.size() == r.pixelSize.width() * r.pixelSize.height() * 2,
-                "Invalid R16F readback");
-        for (int y = 0; y < image.height(); ++y)
-            for (int x = 0; x < image.width(); ++x) {
-                qfloat16 half;
-                const int sourceY = yUp ? image.height() - 1 - y : y;
-                std::memcpy(&half, r.data.constData() + (sourceY * r.pixelSize.width() + x) * 2, 2);
-                const float value = float(half);
-                require(std::isfinite(value), "Nonfinite scalar AO pixel");
-                const int gray = std::clamp(int(std::lround(value * 255)), 0, 255);
-                // Expand the invariant channels for the same diagnostic PNG contract.
-                image.setPixelColor(x, y, QColor(gray, gray, gray, 255));
-            }
-        return image;
-    }
-    if (r.format == QRhiTexture::R32F) {
-        QImage image(r.pixelSize, QImage::Format_RGBA8888);
-        require(r.data.size() == image.width() * image.height() * 4, "Invalid R32F readback");
-        for (int y = 0; y < image.height(); ++y)
-            for (int x = 0; x < image.width(); ++x) {
-                float value;
-                const int sourceY = yUp ? image.height() - 1 - y : y;
-                std::memcpy(&value, r.data.constData() + (sourceY * image.width() + x) * 4, 4);
-                require(std::isfinite(value), "Nonfinite shadow pixel");
-                const int gray = std::clamp(int(std::lround(value * 255)), 0, 255);
-                image.setPixelColor(x, y, QColor(gray, gray, gray));
-            }
-        return image;
-    }
-    if (r.data.size() == r.pixelSize.width() * r.pixelSize.height() * 4) {
-        // RGBA8 texture upload/readback retains decoded PNG row order on every backend.
-        auto image = QImage(reinterpret_cast<const uchar *>(r.data.constData()),
-                            r.pixelSize.width(), r.pixelSize.height(), QImage::Format_RGBA8888)
-                             .copy();
-        return yUp && !uploaded ? image.flipped(Qt::Vertical) : image;
-    }
-    const auto componentBytes = r.data.size() / (r.pixelSize.width() * r.pixelSize.height() * 4);
-    require(componentBytes == 2 || componentBytes == 4, "Invalid RGBA32F readback");
-    QImage image(r.pixelSize, QImage::Format_RGBA8888);
-    for (int y = 0; y < image.height(); ++y) {
-        const int sourceY = yUp ? image.height() - 1 - y : y;
-        auto *dest = image.scanLine(y);
-        for (int x = 0; x < image.width(); ++x)
-            for (int c = 0; c < 4; ++c) {
-                float value;
-                const auto *source = r.data.constData()
-                        + ((sourceY * image.width() + x) * 4 + c) * componentBytes;
-                if (componentBytes == 4)
-                    std::memcpy(&value, source, 4);
-                else {
-                    qfloat16 half;
-                    std::memcpy(&half, source, 2);
-                    value = float(half);
-                }
-                if (!std::isfinite(value))
-                    std::fprintf(stderr, "Nonfinite RHI pixel (%d,%d,%d), format %d\n", x, y, c,
-                                 int(r.format));
-                require(std::isfinite(value), "Nonfinite RHI pixel");
-                dest[x * 4 + c] = uchar(std::clamp(int(std::lround(value * 255)), 0, 255));
-            }
-    }
-    return image;
 }
 QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &entities)
 {
@@ -258,7 +195,7 @@ public:
                         guard,
                         [guard, message] {
                             if (guard)
-                                emit guard->renderFailed(message);
+                                Q_EMIT guard->renderFailed(message);
                         },
                         Qt::QueuedConnection);
         };
@@ -266,8 +203,13 @@ public:
         // Keep one owned cover snapshot per revision. The queue owns accepted tile pixels;
         // rejected/replayed uploads need no deep copy while the GUI is blocked in synchronize.
         input.cover = detachedCover;
-        if (input.atlasGeneration && atlasGeneration == input.atlasGeneration)
-            enqueueAtlas();
+        if (input.atlasGeneration && atlasGeneration == input.atlasGeneration) {
+            try {
+                enqueueAtlas();
+            } catch (const std::runtime_error &error) {
+                reportFailure(error.what());
+            }
+        }
         synchronizationMs = sync.isValid() ? sync.nsecsElapsed() / 1e6 : 0;
     }
     void initialize(QRhiCommandBuffer *cb) override
@@ -580,25 +522,25 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
                                                bool isShadow, bool isShell, bool instanced)
 {
     Owned<QRhiGraphicsPipeline> p(api->newGraphicsPipeline());
-    QByteArray fragment = isShadow ? ":/rhi/shadow.frag.qsb"
-            : target.prepass       ? ":/rhi/prepass.frag.qsb"
-                                   : ":/rhi/opaque.frag.qsb";
+    QString fragment = isShadow ? u":/rhi/shadow.frag.qsb"_s
+            : target.prepass    ? u":/rhi/prepass.frag.qsb"_s
+                                : u":/rhi/opaque.frag.qsb"_s;
     if (isShell) {
-        fragment = input.areaIntensity > 0 ? ":/rhi/shell" : ":/rhi/shell-basic";
+        fragment = input.areaIntensity > 0 ? u":/rhi/shell"_s : u":/rhi/shell-basic"_s;
         if (api->backend() != QRhi::OpenGLES2 || api->isFeatureSupported(QRhi::Compute))
-            fragment += "-early";
-        fragment += ".frag.qsb";
+            fragment += "-early"_L1;
+        fragment += ".frag.qsb"_L1;
 #ifdef YALAHOO_RHI_AUDIT
         if (input.opticalProbe > 0)
-            fragment = ":/rhi/optics-probe.frag.qsb";
+            fragment = u":/rhi/optics-probe.frag.qsb"_s;
 #endif
     }
     p->setShaderStages({ { QRhiShaderStage::Vertex,
-                           shader(isShadow ? (instanced ? ":/rhi/shadow-instanced.vert.qsb"
-                                                        : ":/rhi/shadow.vert.qsb")
-                                           : (instanced ? ":/rhi/geometry-instanced.vert.qsb"
-                                                        : ":/rhi/geometry.vert.qsb")) },
-                         { QRhiShaderStage::Fragment, shader(fragment.constData()) } });
+                           shader(isShadow ? (instanced ? u":/rhi/shadow-instanced.vert.qsb"_s
+                                                        : u":/rhi/shadow.vert.qsb"_s)
+                                           : (instanced ? u":/rhi/geometry-instanced.vert.qsb"_s
+                                                        : u":/rhi/geometry.vert.qsb"_s)) },
+                         { QRhiShaderStage::Fragment, shader(fragment) } });
     QRhiVertexInputLayout layout;
     layout.setBindings({ { 32 } });
     layout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float3, 0 },
@@ -687,12 +629,13 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         for (const auto &batch : preparedAssets().geometry)
             geometryBytes += batch.vertices.size() * 32 + batch.indices.size() * 4;
         const qint64 previousPlanBytes =
-                allocationPlan.value("estimatedBytesUpperBound").toInteger();
+                allocationPlan.value(u"estimatedBytesUpperBound"_s).toInteger();
         allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
                                       api->ubufAligned(sizeof(Uniform)), geometryBytes);
         allocationPlan.insert(
-                "replacementOldPlusNewUpperBoundBytes",
-                previousPlanBytes + allocationPlan.value("estimatedBytesUpperBound").toInteger());
+                u"replacementOldPlusNewUpperBoundBytes"_s,
+                previousPlanBytes
+                        + allocationPlan.value(u"estimatedBytesUpperBound"_s).toInteger());
         allocationKey = key;
         plannedOpeningLayer = input.openingLayerSize;
         plannedPanelLayer = input.panelLayerSize;
@@ -947,8 +890,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             visibilityProbeShader = false;
             coveragePipeline = pipeline(composite, geometryBindings.get(), false);
             coveragePipeline->setShaderStages(
-                    { { QRhiShaderStage::Vertex, shader(":/rhi/geometry.vert.qsb") },
-                      { QRhiShaderStage::Fragment, shader(":/rhi/coverage.frag.qsb") } });
+                    { { QRhiShaderStage::Vertex, shader(u":/rhi/geometry.vert.qsb"_s) },
+                      { QRhiShaderStage::Fragment, shader(u":/rhi/coverage.frag.qsb"_s) } });
             QRhiGraphicsPipeline::TargetBlend noColor;
             noColor.colorWrite = { };
             if (diagnosticTargets)
@@ -958,8 +901,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(coveragePipeline->create(), "Shell visibility pipeline failed");
             coverageInstances = pipeline(composite, geometryBindings.get(), false, false, true);
             coverageInstances->setShaderStages(
-                    { { QRhiShaderStage::Vertex, shader(":/rhi/geometry-instanced.vert.qsb") },
-                      { QRhiShaderStage::Fragment, shader(":/rhi/coverage.frag.qsb") } });
+                    { { QRhiShaderStage::Vertex, shader(u":/rhi/geometry-instanced.vert.qsb"_s) },
+                      { QRhiShaderStage::Fragment, shader(u":/rhi/coverage.frag.qsb"_s) } });
             if (diagnosticTargets)
                 coverageInstances->setTargetBlends({ noColor, noColor, noColor });
             else
@@ -981,8 +924,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(copyBindings->create(), "Opaque copy bindings failed");
             copyPipeline.reset(api->newGraphicsPipeline());
             copyPipeline->setShaderStages(
-                    { { QRhiShaderStage::Vertex, shader(":/rhi/output.vert.qsb") },
-                      { QRhiShaderStage::Fragment, shader(":/rhi/copy.frag.qsb") } });
+                    { { QRhiShaderStage::Vertex, shader(u":/rhi/output.vert.qsb"_s) },
+                      { QRhiShaderStage::Fragment, shader(u":/rhi/copy.frag.qsb"_s) } });
             copyPipeline->setShaderResourceBindings(copyBindings.get());
             copyPipeline->setRenderPassDescriptor(composite.pass.get());
             copyPipeline->setSampleCount(captureSamples);
@@ -1006,12 +949,13 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         visibilityProbeShader = input.opticalProbe == 10;
         for (int instanced = 0; instanced < 2; ++instanced) {
             auto *p = instanced ? coverageInstances.get() : coveragePipeline.get();
-            p->setShaderStages({ { QRhiShaderStage::Vertex,
-                                   shader(instanced ? ":/rhi/geometry-instanced.vert.qsb"
-                                                    : ":/rhi/geometry.vert.qsb") },
-                                 { QRhiShaderStage::Fragment,
-                                   shader(visibilityProbeShader ? ":/rhi/VisibilityProbe.frag.qsb"
-                                                                : ":/rhi/coverage.frag.qsb") } });
+            p->setShaderStages(
+                    { { QRhiShaderStage::Vertex,
+                        shader(instanced ? u":/rhi/geometry-instanced.vert.qsb"_s
+                                         : u":/rhi/geometry.vert.qsb"_s) },
+                      { QRhiShaderStage::Fragment,
+                        shader(visibilityProbeShader ? u":/rhi/VisibilityProbe.frag.qsb"_s
+                                                     : u":/rhi/coverage.frag.qsb"_s) } });
             QRhiGraphicsPipeline::TargetBlend color, disabled;
             disabled.colorWrite = { };
             if (!visibilityProbeShader)
@@ -1094,8 +1038,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     require(outputBindings->create(), "Output bindings failed");
     outputPipeline.reset(api->newGraphicsPipeline());
     outputPipeline->setShaderStages(
-            { { QRhiShaderStage::Vertex, shader(":/rhi/output.vert.qsb") },
-              { QRhiShaderStage::Fragment, shader(":/rhi/output.frag.qsb") } });
+            { { QRhiShaderStage::Vertex, shader(u":/rhi/output.vert.qsb"_s) },
+              { QRhiShaderStage::Fragment, shader(u":/rhi/output.frag.qsb"_s) } });
     outputPipeline->setShaderResourceBindings(outputBindings.get());
     outputPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
     outputPipeline->setSampleCount(renderTarget()->sampleCount());
@@ -1225,19 +1169,19 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                      return p->remaining == 0;
                                  }),
                   pending.end());
-    auto *updates = api->nextResourceUpdateBatch();
+    ResourceUpdates updates(api->nextResourceUpdateBatch());
     if (uploadGeometry) {
         updates->uploadStaticBuffer(vertices.get(), vertexBytes);
         updates->uploadStaticBuffer(indices.get(), indexBytes);
         const auto roomHalf =
-                floatTextureBytes(":/rhi/environment/room-pmrem.rgba16f", 768 * 1024 * 8);
+                floatTextureBytes(u":/rhi/environment/room-pmrem.rgba16f"_s, 768 * 1024 * 8);
         updates->uploadTexture(environment.get(),
                                QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
                                        0, 0, QRhiTextureSubresourceUploadDescription(roomHalf)) }));
         const std::array<QRhiTexture *, 3> lookup{ dfg.get(), ltc1.get(), ltc2.get() };
-        const std::array<const char *, 3> names{ ":/rhi/environment/dfg.rgba32f",
-                                                 ":/rhi/environment/ltc1.rgba32f",
-                                                 ":/rhi/environment/ltc2.rgba32f" };
+        const std::array<QString, 3> names{ u":/rhi/environment/dfg.rgba32f"_s,
+                                            u":/rhi/environment/ltc1.rgba32f"_s,
+                                            u":/rhi/environment/ltc2.rgba32f"_s };
         for (int i = 0; i < 3; ++i) {
             const auto bytes = floatTextureBytes(names[i],
                                                  lookup[i]->pixelSize().width()
@@ -1261,14 +1205,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             region.setDestinationTopLeft(destination);
             updates->uploadTexture(cover.get(), { { 0, 0, region } });
             frameUploadBytes += AtlasUploadQueue::tileBytes;
-            uploadRegions.append(QJsonObject{ { "slot", u.slot },
-                                              { "x", destination.x() },
-                                              { "y", destination.y() },
-                                              { "width", 256 },
-                                              { "height", 256 },
-                                              { "bytes", AtlasUploadQueue::tileBytes },
-                                              { "lease", qint64(u.lease) },
-                                              { "serial", qint64(u.serial) } });
+            uploadRegions.append(QJsonObject{ { u"slot"_s, u.slot },
+                                              { u"x"_s, destination.x() },
+                                              { u"y"_s, destination.y() },
+                                              { u"width"_s, 256 },
+                                              { u"height"_s, 256 },
+                                              { u"bytes"_s, AtlasUploadQueue::tileBytes },
+                                              { u"lease"_s, qint64(u.lease) },
+                                              { u"serial"_s, qint64(u.serial) } });
         }
     } else if (coverDirty) {
         // Filter premultiplied texels, then unpremultiply in the paper shader. Straight
@@ -1471,7 +1415,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     updates->updateDynamicBuffer(outputUniform.get(), 0, 16, out);
     const bool shadowRendered = shadowDirty;
     if (shadowDirty) {
-        cb->beginPass(shadow.rt.get(), Qt::white, { 1, 0 }, updates);
+        cb->beginPass(shadow.rt.get(), Qt::white, { 1, 0 }, updates.release());
         cb->setViewport({ 0, 0, float(shadowSize), float(shadowSize) });
         if (input.shadows) {
             if (batched)
@@ -1487,18 +1431,18 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cachedShadows = input.shadows;
         shadowDirty = false;
     } else {
-        cb->resourceUpdate(updates);
+        cb->resourceUpdate(updates.release());
     }
     const bool recordCapture = deliver && input.request != capturedRequest && pending.size() < 2;
     QJsonArray captureKinds, opticalEvents, fogUniforms;
     const auto recordFog = [&](const Uniform &submitted) {
         fogUniforms.append(QJsonObject{
-                { "kind", submitted.draw[0] },
-                { "shadow",
+                { u"kind"_s, submitted.draw[0] },
+                { u"shadow"_s,
                   QJsonArray{ submitted.draw[1], submitted.draw[2], submitted.draw[3],
                               submitted.optics[1], submitted.optics[2], submitted.optics[3] } },
-                { "range", QJsonArray{ submitted.fog[0], submitted.fog[1], submitted.fog[2] } },
-                { "color",
+                { u"range"_s, QJsonArray{ submitted.fog[0], submitted.fog[1], submitted.fog[2] } },
+                { u"color"_s,
                   QJsonArray{ submitted.background[0], submitted.background[1],
                               submitted.background[2] } } });
     };
@@ -1523,7 +1467,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->beginPass(target.rt.get(), Qt::black, { 1, 0 });
         cb->setViewport({ 0, 0, float(targetSize.width()), float(targetSize.height()) });
         if (recordCapture)
-            opticalEvents.append("opaque");
+            opticalEvents.append(u"opaque"_s);
         opaqueMeshDraw(backgroundPipeline.get(), backgroundTriangle, bgOffset);
         if (input.productFloor)
             opaqueMeshDraw(opaquePipeline.get(), productFloor, floorOffset);
@@ -1550,14 +1494,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     drawOpaque(opaque);
     cb->endPass();
     if (recordCapture)
-        opticalEvents.append("opaque-resolved");
+        opticalEvents.append(u"opaque-resolved"_s);
     if (input.shells) {
         // Resolve ends before generateMips; capture never contains transmission shells.
-        auto *mips = api->nextResourceUpdateBatch();
+        ResourceUpdates mips(api->nextResourceUpdateBatch());
         mips->generateMips(opaque.color.get());
-        cb->resourceUpdate(mips);
+        cb->resourceUpdate(mips.release());
         if (recordCapture)
-            opticalEvents.append("capture-mips");
+            opticalEvents.append(u"capture-mips"_s);
         // Load retained opaque depth and copy resolved color into the independent destination.
         // Both MRT layouts/sample counts are compatible; no sampled attachment aliases this target.
         cb->beginPass(composite.rt.get(), Qt::black, { 1, 0 });
@@ -1566,10 +1510,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->setShaderResources(copyBindings.get());
         cb->draw(3);
         if (recordCapture)
-            opticalEvents.append("composite-copy");
+            opticalEvents.append(u"composite-copy"_s);
         if (!input.geometryDiagnostic) {
             if (recordCapture)
-                opticalEvents.append("visibility");
+                opticalEvents.append(u"visibility"_s);
             if (batched) {
                 Mesh combined{ lid.start, lid.count + spine.count + tray.count };
                 drawInstances(cb, coverageInstances.get(), geometryBindings.get(), combined,
@@ -1581,7 +1525,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                  it->offset);
         }
         if (recordCapture && !input.geometryDiagnostic)
-            opticalEvents.append("shell-shading");
+            opticalEvents.append(u"shell-shading"_s);
         if (!input.geometryDiagnostic)
             for (const auto &draw : shells)
                 if (visible[draw.entity])
@@ -1638,31 +1582,34 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->opticalProbe = input.opticalProbe;
         p->captureShadowDepth = input.captureShadowDepth;
         p->deliver = deliver;
+        p->failed = failed;
         p->yUp = api->isYUpInFramebuffer();
         p->capture.metadata = {
-            { "backend", int(api->backend()) },
-            { "device", QString::fromUtf8(api->driverInfo().deviceName) },
-            { "qt", qVersion() },
-            { "generation", qint64(generation) },
-            { "resourceGeneration", qint64(generation) },
-            { "width", targetSize.width() },
-            { "height", targetSize.height() },
-            { "shadowSize", shadowSize },
-            { "frameRevision", qint64(input.scene.revision) },
-            { "guiThreadAccessInRender", false },
-            { "renderThreadDistinct", distinctThread },
-            { "passes",
-              input.shells ? QJsonArray{ "shadow", "opaque-color-normal-depth",
-                                         "capture-resolve-mips", "sorted-shell", "review-output" }
-                           : QJsonArray{ "shadow", "opaque-color-normal-depth", "review-output" } },
-            { "msaaSamples", captureSamples },
-            { "recursiveGlassCapture", false },
-            { "shellDepthWrite", true },
-            { "shellColorDepthWrite", false },
-            { "shellDepthVisibility",
-              "exact front-surface depth, Equal test before optical shading" },
-            { "shellBlend", false },
-            { "shellCull", "Back" }
+            { u"backend"_s, int(api->backend()) },
+            { u"device"_s, QString::fromUtf8(api->driverInfo().deviceName) },
+            { u"qt"_s, QString::fromUtf8(qVersion()) },
+            { u"generation"_s, qint64(generation) },
+            { u"resourceGeneration"_s, qint64(generation) },
+            { u"width"_s, targetSize.width() },
+            { u"height"_s, targetSize.height() },
+            { u"shadowSize"_s, shadowSize },
+            { u"frameRevision"_s, qint64(input.scene.revision) },
+            { u"guiThreadAccessInRender"_s, false },
+            { u"renderThreadDistinct"_s, distinctThread },
+            { u"passes"_s,
+              input.shells ? QJsonArray{ u"shadow"_s, u"opaque-color-normal-depth"_s,
+                                         u"capture-resolve-mips"_s, u"sorted-shell"_s,
+                                         u"review-output"_s }
+                           : QJsonArray{ u"shadow"_s, u"opaque-color-normal-depth"_s,
+                                         u"review-output"_s } },
+            { u"msaaSamples"_s, captureSamples },
+            { u"recursiveGlassCapture"_s, false },
+            { u"shellDepthWrite"_s, true },
+            { u"shellColorDepthWrite"_s, false },
+            { u"shellDepthVisibility"_s,
+              u"exact front-surface depth, Equal test before optical shading"_s },
+            { u"shellBlend"_s, false },
+            { u"shellCull"_s, u"Back"_s }
         };
 #ifdef YALAHOO_RHI_AUDIT
         QJsonArray resolveGraph;
@@ -1679,46 +1626,46 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 const auto *resolved = it->resolveTexture();
                 const auto size = texture ? texture->pixelSize() : buffer->pixelSize();
                 attachments.append(QJsonObject{
-                        { "storage", texture ? "texture" : "renderbuffer" },
-                        { "format", int(texture ? texture->format() : buffer->backingFormat()) },
-                        { "samples", texture ? texture->sampleCount() : buffer->sampleCount() },
-                        { "width", size.width() },
-                        { "height", size.height() },
-                        { "resolveFormat", resolved ? int(resolved->format()) : 0 },
-                        { "resolveSamples", resolved ? resolved->sampleCount() : 0 },
-                        { "resolveWidth", resolved ? resolved->pixelSize().width() : 0 },
-                        { "resolveHeight", resolved ? resolved->pixelSize().height() : 0 },
-                        { "separateResolve", resolved && resolved != texture } });
+                        { u"storage"_s, texture ? u"texture"_s : u"renderbuffer"_s },
+                        { u"format"_s, int(texture ? texture->format() : buffer->backingFormat()) },
+                        { u"samples"_s, texture ? texture->sampleCount() : buffer->sampleCount() },
+                        { u"width"_s, size.width() },
+                        { u"height"_s, size.height() },
+                        { u"resolveFormat"_s, resolved ? int(resolved->format()) : 0 },
+                        { u"resolveSamples"_s, resolved ? resolved->sampleCount() : 0 },
+                        { u"resolveWidth"_s, resolved ? resolved->pixelSize().width() : 0 },
+                        { u"resolveHeight"_s, resolved ? resolved->pixelSize().height() : 0 },
+                        { u"separateResolve"_s, resolved && resolved != texture } });
             }
-            resolveGraph.append(
-                    QJsonObject{ { "name", name },
-                                 { "samples", target->rt->sampleCount() },
-                                 { "pipelineSamples",
-                                   name == QString("opaque") ? opaquePipeline->sampleCount()
-                                                             : shellPipeline->sampleCount() },
-                                 { "depthSamples", target->z->sampleCount() },
-                                 { "attachments", attachments } });
+            resolveGraph.append(QJsonObject{ { u"name"_s, QString::fromUtf8(name) },
+                                             { u"samples"_s, target->rt->sampleCount() },
+                                             { u"pipelineSamples"_s,
+                                               QString::fromUtf8(name) == u"opaque"_s
+                                                       ? opaquePipeline->sampleCount()
+                                                       : shellPipeline->sampleCount() },
+                                             { u"depthSamples"_s, target->z->sampleCount() },
+                                             { u"attachments"_s, attachments } });
         }
-        p->capture.metadata["sampling"] =
-                QJsonObject{ { "coverLinearClampNoMip",
+        p->capture.metadata[u"sampling"_s] =
+                QJsonObject{ { u"coverLinearClampNoMip"_s,
                                linear->magFilter() == QRhiSampler::Linear
                                        && linear->minFilter() == QRhiSampler::Linear
                                        && linear->mipmapMode() == QRhiSampler::None
                                        && linear->addressU() == QRhiSampler::ClampToEdge
                                        && linear->addressV() == QRhiSampler::ClampToEdge },
-                             { "captureTrilinearClamp",
+                             { u"captureTrilinearClamp"_s,
                                mipLinear->magFilter() == QRhiSampler::Linear
                                        && mipLinear->minFilter() == QRhiSampler::Linear
                                        && mipLinear->mipmapMode() == QRhiSampler::Linear
                                        && mipLinear->addressU() == QRhiSampler::ClampToEdge
                                        && mipLinear->addressV() == QRhiSampler::ClampToEdge } };
-        p->capture.metadata["resolveGraph"] = resolveGraph;
-        p->capture.metadata["postprocessGraph"] = input.postprocess
+        p->capture.metadata[u"resolveGraph"_s] = resolveGraph;
+        p->capture.metadata[u"postprocessGraph"_s] = input.postprocess
                 ? post.graph(input.shells ? composite.color.get() : opaque.color.get())
                 : QJsonObject();
         const auto expectedOutput = QRhiShaderResourceBinding::sampledTexture(
                 0, QRhiShaderResourceBinding::FragmentStage, outputSource, linear.get());
-        p->capture.metadata["outputBindingMatches"] = outputSource
+        p->capture.metadata[u"outputBindingMatches"_s] = outputSource
                         == (input.postprocess
                                     ? post.output()
                                     : (input.shells ? composite.color.get() : opaque.color.get()))
@@ -1726,15 +1673,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                              expectedOutput)
                         != outputBindings->cendBindings();
 #endif
-        auto *reads = api->nextResourceUpdateBatch();
+        ResourceUpdates reads(api->nextResourceUpdateBatch());
         if (input.postprocess) {
-            p->capture.metadata["submittedBokeh"] = post.submittedBokeh();
-            auto passNames = p->capture.metadata["passes"].toArray();
+            p->capture.metadata[u"submittedBokeh"_s] = post.submittedBokeh();
+            auto passNames = p->capture.metadata[u"passes"_s].toArray();
             passNames.removeLast();
             for (const auto &name : post.passes())
                 passNames.append(name);
-            passNames.append("ACES-sRGB-output");
-            p->capture.metadata["passes"] = passNames;
+            passNames.append(u"ACES-sRGB-output"_s);
+            p->capture.metadata[u"passes"_s] = passNames;
         }
         if (input.shells) {
             const auto expectedBinding = QRhiShaderResourceBinding::sampledTexture(
@@ -1744,69 +1691,69 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             for (auto blend = shellPipeline->cbeginTargetBlends();
                  blend != shellPipeline->cendTargetBlends(); ++blend)
                 noBlend = noBlend && !blend->enable;
-            p->capture.metadata["opticalGraph"] = QJsonObject{
-                { "captureBindingMatches",
+            p->capture.metadata[u"opticalGraph"_s] = QJsonObject{
+                { u"captureBindingMatches"_s,
                   std::find(shellBindings->cbeginBindings(), shellBindings->cendBindings(),
                             expectedBinding)
                           != shellBindings->cendBindings() },
-                { "captureSeparateFromComposite", opaque.color.get() != composite.color.get() },
-                { "sharedOpaqueDepth",
+                { u"captureSeparateFromComposite"_s, opaque.color.get() != composite.color.get() },
+                { u"sharedOpaqueDepth"_s,
                   opaque.rt->description().depthStencilBuffer()
                           == composite.rt->description().depthStencilBuffer() },
-                { "depthContentsPreserved",
+                { u"depthContentsPreserved"_s,
                   composite.rt->flags().testFlag(
                           QRhiTextureRenderTarget::PreserveDepthStencilContents) },
-                { "captureMips", opaque.color->flags().testFlag(QRhiTexture::MipMapped) },
-                { "colorDepthTest", shellPipeline->hasDepthTest() },
-                { "colorDepthWrite", shellPipeline->hasDepthWrite() },
-                { "colorDepthEqual", shellPipeline->depthOp() == QRhiGraphicsPipeline::Equal },
-                { "colorCullBack", shellPipeline->cullMode() == QRhiGraphicsPipeline::Back },
-                { "colorBlendingDisabled", noBlend },
-                { "visibilityDepthWrite", coveragePipeline->hasDepthWrite() },
-                { "visibilityDepthLessEqual",
+                { u"captureMips"_s, opaque.color->flags().testFlag(QRhiTexture::MipMapped) },
+                { u"colorDepthTest"_s, shellPipeline->hasDepthTest() },
+                { u"colorDepthWrite"_s, shellPipeline->hasDepthWrite() },
+                { u"colorDepthEqual"_s, shellPipeline->depthOp() == QRhiGraphicsPipeline::Equal },
+                { u"colorCullBack"_s, shellPipeline->cullMode() == QRhiGraphicsPipeline::Back },
+                { u"colorBlendingDisabled"_s, noBlend },
+                { u"visibilityDepthWrite"_s, coveragePipeline->hasDepthWrite() },
+                { u"visibilityDepthLessEqual"_s,
                   coveragePipeline->depthOp() == QRhiGraphicsPipeline::LessOrEqual }
             };
         }
-        p->capture.metadata["atlasGeneration"] = qint64(atlasGeneration);
-        p->capture.metadata["atlasUploadBytes"] = frameUploadBytes;
-        p->capture.metadata["selectedUploadBytes"] = selectedUploadBytes;
-        p->capture.metadata["selectedCoverWidth"] = cover->pixelSize().width();
-        p->capture.metadata["selectedCoverHeight"] = cover->pixelSize().height();
-        p->capture.metadata["selectedTotalUploadBytes"] = selectedTotalUploadBytes;
-        p->capture.metadata["atlasTotalUploadBytes"] = totalUploadBytes;
-        p->capture.metadata["atlasRegions"] = uploadRegions;
+        p->capture.metadata[u"atlasGeneration"_s] = qint64(atlasGeneration);
+        p->capture.metadata[u"atlasUploadBytes"_s] = frameUploadBytes;
+        p->capture.metadata[u"selectedUploadBytes"_s] = selectedUploadBytes;
+        p->capture.metadata[u"selectedCoverWidth"_s] = cover->pixelSize().width();
+        p->capture.metadata[u"selectedCoverHeight"_s] = cover->pixelSize().height();
+        p->capture.metadata[u"selectedTotalUploadBytes"_s] = selectedTotalUploadBytes;
+        p->capture.metadata[u"atlasTotalUploadBytes"_s] = totalUploadBytes;
+        p->capture.metadata[u"atlasRegions"_s] = uploadRegions;
         if (atlasGeneration)
-            p->capture.metadata["nativeAtlasTransfers"] = nativeTransfers(api, cb, cover.get());
+            p->capture.metadata[u"nativeAtlasTransfers"_s] = nativeTransfers(api, cb, cover.get());
         else
-            p->capture.metadata["nativeSelectedTransfers"] =
+            p->capture.metadata[u"nativeSelectedTransfers"_s] =
                     nativeTransfers(api, cb, cover.get(), false);
-        p->capture.metadata["atlasPending"] = atlasQueue.pending();
-        p->capture.metadata["atlasRejected"] = qint64(atlasQueue.rejected());
-        p->capture.metadata["drawCount"] = entities.size();
-        p->capture.metadata["geometryInstanced"] = batched;
-        p->capture.metadata["visibleEntities"] = visibleCount;
-        p->capture.metadata["uniformBytes"] = int(sizeof(Uniform));
-        p->capture.metadata["postUniformUploadBytes"] =
+        p->capture.metadata[u"atlasPending"_s] = atlasQueue.pending();
+        p->capture.metadata[u"atlasRejected"_s] = qint64(atlasQueue.rejected());
+        p->capture.metadata[u"drawCount"_s] = entities.size();
+        p->capture.metadata[u"geometryInstanced"_s] = batched;
+        p->capture.metadata[u"visibleEntities"_s] = visibleCount;
+        p->capture.metadata[u"uniformBytes"_s] = int(sizeof(Uniform));
+        p->capture.metadata[u"postUniformUploadBytes"_s] =
                 input.postprocess ? post.uniformUploadBytes() : 0;
-        p->capture.metadata["uniformUploadBytes"] = qint64(cursor);
-        p->capture.metadata["uniformCapacityBytes"] = qint64(uniforms->size());
-        p->capture.metadata["coverSnapshotCopies"] = qint64(coverSnapshotCopies);
-        p->capture.metadata["coverSnapshotShares"] = qint64(coverSnapshotShares);
-        p->capture.metadata["coverResourceRevision"] = qint64(coverResourceRevision);
+        p->capture.metadata[u"uniformUploadBytes"_s] = qint64(cursor);
+        p->capture.metadata[u"uniformCapacityBytes"_s] = qint64(uniforms->size());
+        p->capture.metadata[u"coverSnapshotCopies"_s] = qint64(coverSnapshotCopies);
+        p->capture.metadata[u"coverSnapshotShares"_s] = qint64(coverSnapshotShares);
+        p->capture.metadata[u"coverResourceRevision"_s] = qint64(coverResourceRevision);
         QJsonArray effectiveRegions;
         for (int i = 0; i < effectiveCoverTiles.size(); ++i) {
             const auto tile = effectiveCoverTiles[i];
             effectiveRegions.append(
-                    QJsonObject{ { "x", tile.x() },
-                                 { "y", tile.y() },
-                                 { "width", tile.width() },
-                                 { "height", tile.height() },
-                                 { "lease",
+                    QJsonObject{ { u"x"_s, tile.x() },
+                                 { u"y"_s, tile.y() },
+                                 { u"width"_s, tile.width() },
+                                 { u"height"_s, tile.height() },
+                                 { u"lease"_s,
                                    effectiveCoverLeases.isEmpty()
                                            ? QJsonValue()
                                            : QJsonValue(qint64(effectiveCoverLeases[i])) } });
         }
-        p->capture.metadata["effectiveCoverRegions"] = effectiveRegions;
+        p->capture.metadata[u"effectiveCoverRegions"_s] = effectiveRegions;
         const std::array<QRhiTexture *, 14> textures{
             opaque.color.get(),
             opaque.normal.get(),
@@ -1829,9 +1776,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         QJsonArray sorted;
         QJsonArray opticalUniforms;
         for (const auto &draw : shells) {
-            sorted.append(QJsonObject{ { "id", qint64(draw.identity) },
-                                       { "surface", draw.surface },
-                                       { "depth", draw.depth } });
+            sorted.append(QJsonObject{ { u"id"_s, qint64(draw.identity) },
+                                       { u"surface"_s, draw.surface },
+                                       { u"depth"_s, draw.depth } });
             if (!visible[draw.entity])
                 continue;
             // Inspect the exact bytes sent to updateDynamicBuffer, only on capture.
@@ -1849,61 +1796,61 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                     ? input.scene.instances[draw.entity].clarity
                     : input.clarity;
             opticalUniforms.append(
-                    QJsonObject{ { "surface", draw.surface },
-                                 { "warmth", input.warmth },
-                                 { "clarity", clarity },
-                                 { "environment", input.environmentIntensity },
-                                 { "transport", array(submitted.material, 4) },
-                                 { "coat", array(submitted.coat, 4) },
-                                 { "tint", array(submitted.tint, 3) },
-                                 { "attenuation", array(submitted.attenuation, 3) } });
+                    QJsonObject{ { u"surface"_s, draw.surface },
+                                 { u"warmth"_s, input.warmth },
+                                 { u"clarity"_s, clarity },
+                                 { u"environment"_s, input.environmentIntensity },
+                                 { u"transport"_s, array(submitted.material, 4) },
+                                 { u"coat"_s, array(submitted.coat, 4) },
+                                 { u"tint"_s, array(submitted.tint, 3) },
+                                 { u"attenuation"_s, array(submitted.attenuation, 3) } });
         }
         // Inspect the same receiver bytes uploaded above, rather than restating Input defaults.
         Uniform receiver;
         std::memcpy(&receiver, bytes.constData() + floorOffset, sizeof(receiver));
-        p->capture.metadata["productFloor"] = QJsonObject{
-            { "enabled", input.productFloor },
-            { "color", QJsonArray{ receiver.tint[0], receiver.tint[1], receiver.tint[2] } },
-            { "roughness", receiver.material[1] },
-            { "environment", receiver.settings[3] },
-            { "kind", receiver.draw[0] },
-            { "opaqueIndices", input.productFloor ? int(productFloor.count) : 0 },
-            { "aoIndices",
+        p->capture.metadata[u"productFloor"_s] = QJsonObject{
+            { u"enabled"_s, input.productFloor },
+            { u"color"_s, QJsonArray{ receiver.tint[0], receiver.tint[1], receiver.tint[2] } },
+            { u"roughness"_s, receiver.material[1] },
+            { u"environment"_s, receiver.settings[3] },
+            { u"kind"_s, receiver.draw[0] },
+            { u"opaqueIndices"_s, input.productFloor ? int(productFloor.count) : 0 },
+            { u"aoIndices"_s,
               input.productFloor && input.postprocess && input.aoSamples ? int(productFloor.count)
                                                                          : 0 },
-            { "dofIndices",
+            { u"dofIndices"_s,
               input.productFloor && input.postprocess && input.bokeh ? int(productFloor.count)
                                                                      : 0 },
-            { "castsShadow", false }
+            { u"castsShadow"_s, false }
         };
         QJsonArray lightMatrix;
         for (float value : receiver.lightVP)
             lightMatrix.append(value);
-        p->capture.metadata["shadowState"] = QJsonObject{
-            { "rendered", shadowRendered },
-            { "separateCasterUniforms", shadowOffsets.size() },
-            { "casters", input.shadows ? entities.size() : 0 },
-            { "batched", batched },
-            { "enabled", receiver.draw[1] },
-            { "size", receiver.draw[2] },
-            { "radius", receiver.draw[3] },
-            { "strength", receiver.optics[1] },
-            { "normalBias", receiver.optics[2] },
-            { "bias", receiver.optics[3] },
-            { "lightVP", lightMatrix },
-            { "framebufferYUp", api->isYUpInFramebuffer() },
-            { "frontCull", shadowPipeline->cullMode() == QRhiGraphicsPipeline::Front },
-            { "lessEqual", shadowCompare->textureCompareOp() == QRhiSampler::LessOrEqual },
-            { "linearCompare",
+        p->capture.metadata[u"shadowState"_s] = QJsonObject{
+            { u"rendered"_s, shadowRendered },
+            { u"separateCasterUniforms"_s, shadowOffsets.size() },
+            { u"casters"_s, input.shadows ? entities.size() : 0 },
+            { u"batched"_s, batched },
+            { u"enabled"_s, receiver.draw[1] },
+            { u"size"_s, receiver.draw[2] },
+            { u"radius"_s, receiver.draw[3] },
+            { u"strength"_s, receiver.optics[1] },
+            { u"normalBias"_s, receiver.optics[2] },
+            { u"bias"_s, receiver.optics[3] },
+            { u"lightVP"_s, lightMatrix },
+            { u"framebufferYUp"_s, api->isYUpInFramebuffer() },
+            { u"frontCull"_s, shadowPipeline->cullMode() == QRhiGraphicsPipeline::Front },
+            { u"lessEqual"_s, shadowCompare->textureCompareOp() == QRhiSampler::LessOrEqual },
+            { u"linearCompare"_s,
               shadowCompare->minFilter() == QRhiSampler::Linear
                       && shadowCompare->magFilter() == QRhiSampler::Linear }
         };
-        p->capture.metadata["submittedFogUniforms"] = fogUniforms;
-        p->capture.metadata["outputOptions"] = QJsonArray{ out[0], out[1], out[2], out[3] };
-        p->capture.metadata["captureDrawKinds"] = captureKinds;
-        p->capture.metadata["opticalEvents"] = opticalEvents;
-        p->capture.metadata["sortedShells"] = sorted;
-        p->capture.metadata["submittedShellUniforms"] = opticalUniforms;
+        p->capture.metadata[u"submittedFogUniforms"_s] = fogUniforms;
+        p->capture.metadata[u"outputOptions"_s] = QJsonArray{ out[0], out[1], out[2], out[3] };
+        p->capture.metadata[u"captureDrawKinds"_s] = captureKinds;
+        p->capture.metadata[u"opticalEvents"_s] = opticalEvents;
+        p->capture.metadata[u"sortedShells"_s] = sorted;
+        p->capture.metadata[u"submittedShellUniforms"_s] = opticalUniforms;
         if (api->backend() == QRhi::OpenGLES2 && readbackPackAlignment == 0) {
             auto *context = QOpenGLContext::currentContext();
             require(context, "No current GL context for readback alignment");
@@ -1912,7 +1859,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                             || readbackPackAlignment == 4 || readbackPackAlignment == 8,
                     "Invalid GL pack alignment");
         }
-        p->capture.metadata["readbackPackAlignment"] = readbackPackAlignment;
+        p->capture.metadata[u"readbackPackAlignment"_s] = readbackPackAlignment;
         QJsonArray alignedCopies;
         p->readbackOwner.fill(-1);
         for (int i = 0; i < 14; ++i) {
@@ -1930,48 +1877,61 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             ++p->remaining;
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
-                    const auto image = imageOf(state->results[i], state->yUp, i == 8,
-                                               state->logicalReadbackSizes[i]);
-                    if (i == 3 && state->captureShadowDepth) {
-                        require(state->results[i].format == QRhiTexture::R32F,
-                                "Shadow math capture must retain R32F precision");
-                        state->capture.shadowDepth = state->results[i].data;
-                    }
-                    if (i == 4 && state->opticalProbe > 0) {
-                        const auto &readback = state->results[i];
-                        const int components = readback.format == QRhiTexture::RGBA16F ? 2 : 4;
-                        const int x = readback.pixelSize.width() / 2;
-                        const int y = readback.pixelSize.height() / 2;
-                        const int offset = (y * readback.pixelSize.width() + x) * 4 * components;
-                        QJsonArray values;
-                        for (int channel = 0; channel < 3; ++channel) {
-                            float value;
-                            if (components == 2) {
-                                qfloat16 half;
-                                std::memcpy(&half, readback.data.constData() + offset + channel * 2,
-                                            2);
-                                value = float(half);
-                            } else {
-                                std::memcpy(&value,
-                                            readback.data.constData() + offset + channel * 4, 4);
-                            }
-                            require(std::isfinite(value), "Nonfinite optical math probe");
-                            values.append(value);
+                    try {
+                        const auto image = readbackImage(state->results[i], state->yUp, i == 8,
+                                                         state->logicalReadbackSizes[i]);
+                        if (i == 3 && state->captureShadowDepth) {
+                            require(state->results[i].format == QRhiTexture::R32F,
+                                    "Shadow math capture must retain R32F precision");
+                            state->capture.shadowDepth = state->results[i].data;
                         }
-                        state->capture.metadata["opticalProbeSample"] = values;
+                        if (i == 4 && state->opticalProbe > 0) {
+                            const auto &readback = state->results[i];
+                            require(readback.format == QRhiTexture::RGBA16F
+                                            || readback.format == QRhiTexture::RGBA32F,
+                                    "Optical math capture must retain floating-point RGBA");
+                            const int components = readback.format == QRhiTexture::RGBA16F ? 2 : 4;
+                            const int x = readback.pixelSize.width() / 2;
+                            const int y = readback.pixelSize.height() / 2;
+                            const qsizetype offset = (qsizetype(y) * readback.pixelSize.width() + x)
+                                    * 4 * components;
+                            QJsonArray values;
+                            for (int channel = 0; channel < 3; ++channel) {
+                                float value;
+                                if (components == 2) {
+                                    qfloat16 half;
+                                    std::memcpy(&half,
+                                                readback.data.constData() + offset + channel * 2,
+                                                2);
+                                    value = float(half);
+                                } else {
+                                    std::memcpy(&value,
+                                                readback.data.constData() + offset + channel * 4,
+                                                4);
+                                }
+                                require(std::isfinite(value), "Nonfinite optical math probe");
+                                values.append(value);
+                            }
+                            state->capture.metadata[u"opticalProbeSample"_s] = values;
+                        }
+                        const std::array<QImage *, 14> outputs{
+                            &state->capture.color,          &state->capture.normal,
+                            &state->capture.depth,          &state->capture.shadow,
+                            &state->capture.composite,      &state->capture.compositeNormal,
+                            &state->capture.compositeDepth, &state->capture.postprocessed,
+                            &state->capture.atlas,          &state->capture.rawAo,
+                            &state->capture.blurredAo,      &state->capture.aoNormal,
+                            &state->capture.aoDepth,        &state->capture.dofDepth
+                        };
+                        for (int field = 0; field < 14; ++field)
+                            if (state->readbackOwner[field] == i)
+                                *outputs[field] = image;
+                    } catch (const std::runtime_error &error) {
+                        const auto message = QString::fromUtf8(error.what());
+                        state->capture.metadata[u"readbackError"_s] = message;
+                        if (state->failed)
+                            state->failed(message);
                     }
-                    const std::array<QImage *, 14> outputs{
-                        &state->capture.color,          &state->capture.normal,
-                        &state->capture.depth,          &state->capture.shadow,
-                        &state->capture.composite,      &state->capture.compositeNormal,
-                        &state->capture.compositeDepth, &state->capture.postprocessed,
-                        &state->capture.atlas,          &state->capture.rawAo,
-                        &state->capture.blurredAo,      &state->capture.aoNormal,
-                        &state->capture.aoDepth,        &state->capture.dofDepth
-                    };
-                    for (int field = 0; field < 14; ++field)
-                        if (state->readbackOwner[field] == i)
-                            *outputs[field] = image;
                     if (--state->remaining == 0)
                         state->deliver(std::move(state->capture));
                 }
@@ -1996,21 +1956,21 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 reads->copyTexture(texture.get(), readTexture, copy);
                 readTexture = texture.get();
                 p->logicalReadbackSizes[i] = logical;
-                alignedCopies.append(QJsonObject{ { "field", i },
-                                                  { "logicalWidth", logical.width() },
-                                                  { "storageWidth", padded.width() },
-                                                  { "height", logical.height() } });
+                alignedCopies.append(QJsonObject{ { u"field"_s, i },
+                                                  { u"logicalWidth"_s, logical.width() },
+                                                  { u"storageWidth"_s, padded.width() },
+                                                  { u"height"_s, logical.height() } });
             }
             reads->readBackTexture(QRhiReadbackDescription(readTexture), &p->results[i]);
         }
-        p->capture.metadata["alignedScalarCopies"] = alignedCopies;
-        p->capture.metadata["alignedReadbackRevision"] = qint64(alignedReadbackRevision);
-        p->capture.metadata["resources"] = resourceInventory();
-        p->capture.metadata["uniqueReadbackTextures"] = p->remaining;
-        p->capture.metadata["readbackFieldSlots"] =
+        p->capture.metadata[u"alignedScalarCopies"_s] = alignedCopies;
+        p->capture.metadata[u"alignedReadbackRevision"_s] = qint64(alignedReadbackRevision);
+        p->capture.metadata[u"resources"_s] = resourceInventory();
+        p->capture.metadata[u"uniqueReadbackTextures"_s] = p->remaining;
+        p->capture.metadata[u"readbackFieldSlots"_s] =
                 (input.captureAtlas ? 13 : 12) + int(input.captureFloorDepth);
         pending.push_back(p);
-        cb->resourceUpdate(reads);
+        cb->resourceUpdate(reads.release());
     }
     // Static scenes still need real frames to retire asynchronous backend readbacks.
     // Bound continuation by the backend limit; never resubmit the scene or poll the GUI.
@@ -2040,39 +2000,39 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{
-                { "cpuSubmitMs", cpu.nsecsElapsed() / 1e6 },
-                { "synchronizationMs", synchronizationMs },
-                { "frameRevision", qint64(input.scene.revision) },
-                { "submission", qint64(synchronizedSubmission) },
-                { "aoSamples", input.aoSamples },
-                { "bokeh", input.bokeh },
-                { "smaa", input.smaa },
-                { "logicalWidth", input.scene.width },
-                { "logicalHeight", input.scene.height },
-                { "targetWidth", targetSize.width() },
-                { "targetHeight", targetSize.height() },
-                { "inputRevision", qint64(input.scene.inputRevision) },
-                { "inputReceivedNs", input.scene.inputReceivedNs },
-                { "navigationRevision", qint64(input.scene.navigationRevision) },
-                { "navigationInputRevision", qint64(input.scene.navigationInputRevision) },
-                { "navigationCommittedNs", input.scene.navigationCommittedNs },
-                { "submittedNs",
+                { u"cpuSubmitMs"_s, cpu.nsecsElapsed() / 1e6 },
+                { u"synchronizationMs"_s, synchronizationMs },
+                { u"frameRevision"_s, qint64(input.scene.revision) },
+                { u"submission"_s, qint64(synchronizedSubmission) },
+                { u"aoSamples"_s, input.aoSamples },
+                { u"bokeh"_s, input.bokeh },
+                { u"smaa"_s, input.smaa },
+                { u"logicalWidth"_s, input.scene.width },
+                { u"logicalHeight"_s, input.scene.height },
+                { u"targetWidth"_s, targetSize.width() },
+                { u"targetHeight"_s, targetSize.height() },
+                { u"inputRevision"_s, qint64(input.scene.inputRevision) },
+                { u"inputReceivedNs"_s, input.scene.inputReceivedNs },
+                { u"navigationRevision"_s, qint64(input.scene.navigationRevision) },
+                { u"navigationInputRevision"_s, qint64(input.scene.navigationInputRevision) },
+                { u"navigationCommittedNs"_s, input.scene.navigationCommittedNs },
+                { u"submittedNs"_s,
                   qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                  std::chrono::steady_clock::now().time_since_epoch())
                                  .count()) },
-                { "coverSnapshotCopies", qint64(coverSnapshotCopies) },
-                { "coverSnapshotShares", qint64(coverSnapshotShares) },
-                { "postprocessRevision", qint64(post.revision()) },
-                { "gpuFrameMs", gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
-                { "atlasPending", atlasQueue.pending() },
-                { "atlasUploadBytes", frameUploadBytes },
-                { "selectedUploadBytes", selectedUploadBytes },
-                { "selectedCoverWidth", input.cover.width() },
-                { "selectedCoverHeight", input.cover.height() },
-                { "uniformUploadBytes", qint64(cursor) },
-                { "resourceGeneration", qint64(generation) },
-                { "visibleEntities", visibleCount },
-                { "resources", resourceInventory() } });
+                { u"coverSnapshotCopies"_s, qint64(coverSnapshotCopies) },
+                { u"coverSnapshotShares"_s, qint64(coverSnapshotShares) },
+                { u"postprocessRevision"_s, qint64(post.revision()) },
+                { u"gpuFrameMs"_s, gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
+                { u"atlasPending"_s, atlasQueue.pending() },
+                { u"atlasUploadBytes"_s, frameUploadBytes },
+                { u"selectedUploadBytes"_s, selectedUploadBytes },
+                { u"selectedCoverWidth"_s, input.cover.width() },
+                { u"selectedCoverHeight"_s, input.cover.height() },
+                { u"uniformUploadBytes"_s, qint64(cursor) },
+                { u"resourceGeneration"_s, qint64(generation) },
+                { u"visibleEntities"_s, visibleCount },
+                { u"resources"_s, resourceInventory() } });
     }
 }
 QJsonObject Renderer::resourceInventory()
@@ -2082,48 +2042,47 @@ QJsonObject Renderer::resourceInventory()
         return cachedInventory;
     ResourceInventory inventory;
     auto target = [&](const QString &name, const Target &t) {
-        inventory.texture(name + "-color-resolve", t.color.get());
-        inventory.texture(name + "-normal", t.normal.get());
-        inventory.texture(name + "-linear-depth", t.depth.get());
-        inventory.texture(name + "-hardware-depth", t.hardwareDepth.get());
-        inventory.renderBuffer(name + "-depth-stencil", t.z.get());
+        inventory.texture(name + "-color-resolve"_L1, t.color.get());
+        inventory.texture(name + "-normal"_L1, t.normal.get());
+        inventory.texture(name + "-linear-depth"_L1, t.depth.get());
+        inventory.texture(name + "-hardware-depth"_L1, t.hardwareDepth.get());
+        inventory.renderBuffer(name + "-depth-stencil"_L1, t.z.get());
         for (int i = 0; i < 3; ++i) {
-            inventory.texture(name + QString("-msaa-%1").arg(i), t.multisample[i].get());
-            inventory.renderBuffer(name + QString("-msaa-%1").arg(i),
-                                   t.multisampleBuffers[i].get());
+            inventory.texture(name + u"-msaa-%1"_s.arg(i), t.multisample[i].get());
+            inventory.renderBuffer(name + u"-msaa-%1"_s.arg(i), t.multisampleBuffers[i].get());
         }
     };
-    target("shadow", shadow);
-    target("opaque", opaque);
-    target("shell-composite", composite);
-    target("ao-geometry", aoGeometry);
-    target("dof-geometry", dofGeometry);
-    inventory.texture("cover-or-atlas", cover.get());
-    inventory.texture("environment", environment.get());
-    inventory.texture("dfg", dfg.get());
-    inventory.texture("ltc1", ltc1.get());
-    inventory.texture("ltc2", ltc2.get());
+    target(u"shadow"_s, shadow);
+    target(u"opaque"_s, opaque);
+    target(u"shell-composite"_s, composite);
+    target(u"ao-geometry"_s, aoGeometry);
+    target(u"dof-geometry"_s, dofGeometry);
+    inventory.texture(u"cover-or-atlas"_s, cover.get());
+    inventory.texture(u"environment"_s, environment.get());
+    inventory.texture(u"dfg"_s, dfg.get());
+    inventory.texture(u"ltc1"_s, ltc1.get());
+    inventory.texture(u"ltc2"_s, ltc2.get());
     for (int i = 0; i < int(alignedReadbacks.size()); ++i)
-        inventory.texture(QString("capture-aligned-scalar-%1").arg(i), alignedReadbacks[i].get());
-    inventory.buffer("geometry-vertices", vertices.get());
-    inventory.buffer("geometry-indices", indices.get());
-    inventory.buffer("bounded-draw-uniforms", uniforms.get());
-    inventory.buffer("bounded-instances", instanceBuffer.get());
-    inventory.buffer("output-uniform", outputUniform.get());
+        inventory.texture(u"capture-aligned-scalar-%1"_s.arg(i), alignedReadbacks[i].get());
+    inventory.buffer(u"geometry-vertices"_s, vertices.get());
+    inventory.buffer(u"geometry-indices"_s, indices.get());
+    inventory.buffer(u"bounded-draw-uniforms"_s, uniforms.get());
+    inventory.buffer(u"bounded-instances"_s, instanceBuffer.get());
+    inventory.buffer(u"output-uniform"_s, outputUniform.get());
     post.inventory(inventory);
-    inventory.texture("qt-item-color", colorTexture());
-    inventory.texture("qt-item-resolve", resolveTexture());
-    inventory.renderBuffer("qt-item-msaa", msaaColorBuffer());
-    inventory.renderBuffer("qt-item-depth-stencil", depthStencilBuffer());
+    inventory.texture(u"qt-item-color"_s, colorTexture());
+    inventory.texture(u"qt-item-resolve"_s, resolveTexture());
+    inventory.renderBuffer(u"qt-item-msaa"_s, msaaColorBuffer());
+    inventory.renderBuffer(u"qt-item-depth-stencil"_s, depthStencilBuffer());
     const qint64 current = inventory.bytes();
     cachedInventory = {
-        { "preallocationPlan", allocationPlan },
-        { "entries", inventory.entries() },
-        { "estimatedCurrentBytes", current },
-        { "resizeOldPlusNewUpperBoundBytes", current + previousResourceBytes },
-        { "measuredVramBytes", QJsonValue() },
-        { "scope",
-          "Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency. Qt UI attachment estimates and their full old+new plan are separate in preallocationPlan." }
+        { u"preallocationPlan"_s, allocationPlan },
+        { u"entries"_s, inventory.entries() },
+        { u"estimatedCurrentBytes"_s, current },
+        { u"resizeOldPlusNewUpperBoundBytes"_s, current + previousResourceBytes },
+        { u"measuredVramBytes"_s, QJsonValue() },
+        { u"scope"_s,
+          u"Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency. Qt UI attachment estimates and their full old+new plan are separate in preallocationPlan."_s }
     };
     previousResourceBytes = current;
     inventoryGeneration = generation;
@@ -2139,7 +2098,11 @@ SceneSubmissionStats &sceneSubmissionStats()
 }
 RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {
-    preparedAssets();
+    try {
+        preparedAssets();
+    } catch (const std::runtime_error &error) {
+        qFatal("Invalid embedded RHI assets: %s", error.what());
+    }
     setAlphaBlending(false);
 }
 QJsonArray adapterInventory()
@@ -2151,11 +2114,11 @@ QJsonArray adapterInventory()
     int index = 0;
     for (const auto &adapter : adapters) {
         const auto info = adapter->info();
-        result.append(QJsonObject{ { "index", index++ },
-                                   { "name", QString::fromUtf8(info.deviceName) },
-                                   { "deviceId", qint64(info.deviceId) },
-                                   { "vendorId", qint64(info.vendorId) },
-                                   { "deviceType", int(info.deviceType) } });
+        result.append(QJsonObject{ { u"index"_s, index++ },
+                                   { u"name"_s, QString::fromUtf8(info.deviceName) },
+                                   { u"deviceId"_s, qint64(info.deviceId) },
+                                   { u"vendorId"_s, qint64(info.vendorId) },
+                                   { u"deviceType"_s, int(info.deviceType) } });
     }
 #endif
     return result;
@@ -2172,13 +2135,13 @@ QJsonObject preparedAssetStatistics()
         meshPayload += mesh.vertices.size() * sizeof(std::array<float, 8>)
                 + mesh.indices.size() * sizeof(quint32);
     return {
-        { "bytePayloadBytes", bytePayload },
-        { "imagePayloadBytes", imagePayload },
-        { "meshPayloadBytes", meshPayload },
-        { "shaderObjects", fixed.shaders.size() },
-        { "allocatedHeapBytes", QJsonValue::Null },
-        { "scope",
-          "Immutable process cache payload; Qt container, shader internal storage and allocator overhead unknown. Separate from GPU descriptors and live cover/cache/lease/checkpoint counters." }
+        { u"bytePayloadBytes"_s, bytePayload },
+        { u"imagePayloadBytes"_s, imagePayload },
+        { u"meshPayloadBytes"_s, meshPayload },
+        { u"shaderObjects"_s, fixed.shaders.size() },
+        { u"allocatedHeapBytes"_s, QJsonValue::Null },
+        { u"scope"_s,
+          u"Immutable process cache payload; Qt container, shader internal storage and allocator overhead unknown. Separate from GPU descriptors and live cover/cache/lease/checkpoint counters."_s }
     };
 }
 void RhiItem::submit(Input input, QSize target)

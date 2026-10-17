@@ -25,7 +25,7 @@ public:
     QColor ink = Qt::black, muted = Qt::gray;
     bool offscreenRendering = false;
     QCanvasPainterItemRenderer *createItemRenderer() const override;
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

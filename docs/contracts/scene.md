@@ -28,4 +28,4 @@
 
 Review真实投影≤2逻辑px；QML浮点属性适配允许position1e-3/FOV1e-4，不能放宽最终投影。窗口记录实际QWindow DPR和目标像素；验证进程缩放环境变量不能替代真实DPR。`--verify-scene`/`--scene-report`仅Review，几何输出须renderError为空并排除错误提示区域，超大目标共用RenderQuality保护并检查恢复。
 
-历史verify-r06脚本的源码/投影入口可按当前门禁使用；公共构建与窗口行为由native-bootstrap/test-gates/test-window-policy维护。材质/光照/后处理各有独立组件契约。
+源码/投影检查使用已注册的`scene`与`runtime-scene-dpr-*`组件测试；公共构建与窗口行为由native-bootstrap/test-gates/test-window-policy维护。材质/光照/后处理各有独立组件契约。

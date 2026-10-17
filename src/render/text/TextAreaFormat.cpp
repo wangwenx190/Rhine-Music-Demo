@@ -23,7 +23,7 @@ void TextAreaFormat::setDocument(QQuickTextDocument *document)
                                });
         apply(0, 0, true);
     }
-    emit changed();
+    Q_EMIT changed();
 }
 qreal TextAreaFormat::lineHeight() const
 {
@@ -35,7 +35,7 @@ void TextAreaFormat::setLineHeight(qreal height)
         return;
     m_lineHeight = height;
     apply(0, 0, true);
-    emit changed();
+    Q_EMIT changed();
 }
 void TextAreaFormat::apply(int position, int added, bool all)
 {

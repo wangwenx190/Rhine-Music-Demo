@@ -42,7 +42,7 @@ public:
     void advance(double seconds);
     void finish();
     void reset(bool shown);
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

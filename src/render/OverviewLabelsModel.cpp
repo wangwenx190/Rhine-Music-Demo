@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 QEasingCurve curve(double x1, double y1, double x2, double y2)
@@ -27,24 +29,25 @@ int OverviewLabelsModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> OverviewLabelsModel::roleNames() const
 {
-    return { { Lane, "lane" },
-             { Name, "columnName" },
-             { Count, "albumCount" },
-             { X, "anchorX" },
-             { Y, "anchorY" },
-             { Extent, "extent" },
-             { Selected, "selectedColumn" },
-             { Interactive, "interactive" },
-             { Expanded, "expanded" },
-             { Fade, "fade" },
-             { Offset, "offset" },
-             { EntryWidth, "entryWidth" },
-             { EntryOpacity, "entryOpacity" },
-             { EntryOffset, "entryOffset" } };
+    return { { Lane, "lane"_ba },
+             { Name, "columnName"_ba },
+             { Count, "albumCount"_ba },
+             { X, "anchorX"_ba },
+             { Y, "anchorY"_ba },
+             { Extent, "extent"_ba },
+             { Selected, "selectedColumn"_ba },
+             { Interactive, "interactive"_ba },
+             { Expanded, "expanded"_ba },
+             { Fade, "fade"_ba },
+             { Offset, "offset"_ba },
+             { EntryWidth, "entryWidth"_ba },
+             { EntryOpacity, "entryOpacity"_ba },
+             { EntryOffset, "entryOffset"_ba } };
 }
 QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() < 0 || index.row() >= capacity)
+    if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
+        || index.row() >= capacity)
         return { };
     const auto &s = *m_slots[index.row()];
     const auto &c = s.column;
@@ -207,7 +210,7 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
                         + (target - s.opacityFrom)
                                 * opacityCurve.valueForProgress(s.opacityTime / .32);
         if (previouslyLive[row] || s.column.lane >= 0 || s.fade.running())
-            emit dataChanged(index(row), index(row));
+            Q_EMIT dataChanged(index(row), index(row));
     }
 }
 bool OverviewLabelsModel::expand(int lane)
@@ -243,7 +246,7 @@ void OverviewLabelsModel::clear()
         s->column = { };
         s->entry = s->entryOpacity = s->entryTarget = s->entryFrom = s->opacityFrom = 0;
     }
-    emit dataChanged(index(0), index(capacity - 1));
+    Q_EMIT dataChanged(index(0), index(capacity - 1));
 }
 int OverviewLabelsModel::liveCount() const
 {

@@ -3,9 +3,11 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 
+using namespace Qt::StringLiterals;
+
 void yalahoo::initializeIdentity()
 {
-    QCoreApplication::setOrganizationName(QStringLiteral("yalahoo"));
-    QCoreApplication::setApplicationName(QStringLiteral("yalahoo"));
-    QGuiApplication::setApplicationDisplayName(QStringLiteral("yalahOO!!!"));
+    QCoreApplication::setOrganizationName(u"yalahoo"_s);
+    QCoreApplication::setApplicationName(u"yalahoo"_s);
+    QGuiApplication::setApplicationDisplayName(u"yalahOO!!!"_s);
 }

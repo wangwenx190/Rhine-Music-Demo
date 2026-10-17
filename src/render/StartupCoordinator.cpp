@@ -3,6 +3,8 @@
 #include <QThread>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 StartupCoordinator::StartupCoordinator(LibrarySession *library, OpeningController *opening,
                                        FrameClock *clock, bool awaitInitialSnapshot,
@@ -37,7 +39,7 @@ void StartupCoordinator::setVisualActive(bool active)
         ++m_segments;
         schedule();
     }
-    emit visualActiveChanged();
+    Q_EMIT visualActiveChanged();
 }
 void StartupCoordinator::receive(Snapshot snapshot)
 {
@@ -59,7 +61,7 @@ void StartupCoordinator::schedule()
             [this] {
                 m_queued = false;
                 if (m_visualActive && !m_frozen && applyPending() && m_opening->preparing())
-                    emit preparationInvalidated();
+                    Q_EMIT preparationInvalidated();
             },
             Qt::QueuedConnection);
 }
@@ -79,7 +81,7 @@ void StartupCoordinator::scenePrepared()
         return;
     // A scan delivered after the last polish must get its own real cover/render acknowledgement.
     if (applyPending()) {
-        emit preparationInvalidated();
+        Q_EMIT preparationInvalidated();
         return;
     }
     m_frozen = true;
@@ -87,13 +89,13 @@ void StartupCoordinator::scenePrepared()
 }
 QJsonObject StartupCoordinator::statistics() const
 {
-    return { { "receivedSnapshots", qint64(m_received) },
-             { "appliedSnapshots", qint64(m_applied) },
-             { "coalescedSnapshots", qint64(m_coalesced) },
-             { "pendingSnapshots", int(bool(m_pending)) },
-             { "initialReady", m_initialReady },
-             { "visualActive", m_visualActive },
-             { "snapshotFrozen", m_frozen },
-             { "resumeSegments", qint64(m_segments) } };
+    return { { u"receivedSnapshots"_s, qint64(m_received) },
+             { u"appliedSnapshots"_s, qint64(m_applied) },
+             { u"coalescedSnapshots"_s, qint64(m_coalesced) },
+             { u"pendingSnapshots"_s, int(bool(m_pending)) },
+             { u"initialReady"_s, m_initialReady },
+             { u"visualActive"_s, m_visualActive },
+             { u"snapshotFrozen"_s, m_frozen },
+             { u"resumeSegments"_s, qint64(m_segments) } };
 }
 }

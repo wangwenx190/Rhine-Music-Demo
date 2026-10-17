@@ -21,7 +21,7 @@ public:
     bool night() const;
     void setNight(bool night);
     QCanvasPainterItemRenderer *createItemRenderer() const override;
-signals:
+Q_SIGNALS:
     void nightChanged();
 
 private:

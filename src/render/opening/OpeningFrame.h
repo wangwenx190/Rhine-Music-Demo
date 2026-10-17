@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "SceneFrame.h"
 #include <QVariantMap>
 
@@ -8,7 +10,7 @@ struct OpeningFrame
     double background = 1, mark = 0, contour = 0, symbols = 0;
     double orbit = 0, orbitDraw = 0, orbitTurn = 0, orbitScale = .9;
     double title = 0, titleY = 18, titleClip = 100, subtitle = 0;
-    QString phase = "logo";
+    QString phase = u"logo"_s;
     QVariantMap values() const;
 };
 OpeningFrame openingFrame(double time);

@@ -5,13 +5,15 @@
 #include <QJsonArray>
 #include <QQuickWindow>
 #include <QSaveFile>
+
+using namespace Qt::StringLiterals;
 #if defined(Q_OS_WIN)
 #  include <windows.h>
 #endif
 class VerificationWindowTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void foregroundOwnership()
     {
         using yalahoo::verification::foregroundOwnershipSafe;
@@ -39,11 +41,11 @@ private slots:
         bool passed = true;
         const auto record = [&](const QString &name, bool rendered = true) {
             const auto policy = yalahoo::verification::windowPolicy(window);
-            const bool valid = rendered && policy["passed"].toBool();
-            stages.append(QJsonObject{ { "stage", name },
-                                       { "passed", valid },
-                                       { "frameSwaps", swaps.size() },
-                                       { "windowPolicy", policy } });
+            const bool valid = rendered && policy[u"passed"_s].toBool();
+            stages.append(QJsonObject{ { u"stage"_s, name },
+                                       { u"passed"_s, valid },
+                                       { u"frameSwaps"_s, swaps.size() },
+                                       { u"windowPolicy"_s, policy } });
             passed = passed && valid;
         };
         const auto show = [&](const QString &name) {
@@ -55,7 +57,7 @@ private slots:
                         bool presented = swaps.size() > before && window.isExposed();
 #if defined(Q_OS_MACOS)
                         presented = presented
-                                && yalahoo::verification::nativeWindowPolicy(window)["onScreen"]
+                                && yalahoo::verification::nativeWindowPolicy(window)[u"onScreen"_s]
                                            .toBool();
 #endif
                         return presented;
@@ -63,19 +65,19 @@ private slots:
                     5000);
             record(name, visible);
         };
-        record("before-show");
-        show("first-show");
+        record(u"before-show"_s);
+        show(u"first-show"_s);
         if (passed) {
             for (int cycle = 0; cycle < 10; ++cycle) {
                 window.hide();
                 QTest::qWait(50);
-                record(QStringLiteral("hide-%1").arg(cycle), !window.isVisible());
+                record(u"hide-%1"_s.arg(cycle), !window.isVisible());
                 window.releaseResources();
                 window.destroy();
                 yalahoo::verification::prepareWindow(window, cycle % 2 == 0);
                 window.resize(640 + cycle * 2, 360 + cycle * 2);
-                record(QStringLiteral("recreate-%1").arg(cycle), !window.isVisible());
-                show(QStringLiteral("restore-%1").arg(cycle));
+                record(u"recreate-%1"_s.arg(cycle), !window.isVisible());
+                show(u"restore-%1"_s.arg(cycle));
                 if (!passed)
                     break;
             }
@@ -86,29 +88,31 @@ private slots:
                                 window.windowState() == Qt::WindowMinimized && !window.isExposed();
 #if defined(Q_OS_MACOS)
                         hidden = hidden
-                                && yalahoo::verification::nativeWindowPolicy(window)["miniaturized"]
+                                && yalahoo::verification::nativeWindowPolicy(
+                                           window)[u"miniaturized"_s]
                                            .toBool();
 #endif
                         return hidden;
                     },
                     5000);
-            record("minimize", minimized);
+            record(u"minimize"_s, minimized);
             window.showNormal();
-            show("show-normal");
+            show(u"show-normal"_s);
         }
         window.hide();
         QTest::qWait(50);
-        record("final-hide", !window.isVisible());
-        QSaveFile output(VISIBLE_WINDOW_REPORT);
+        record(u"final-hide"_s, !window.isVisible());
+        QSaveFile output(QString::fromUtf8(VISIBLE_WINDOW_REPORT));
         QVERIFY(output.open(QIODevice::WriteOnly));
-        const QJsonObject report{ { "passed", passed },
-                                  { "qtVersion", qVersion() },
-                                  { "graphicsApi", int(window.rendererInterface()->graphicsApi()) },
-                                  { "devicePixelRatio", window.devicePixelRatio() },
-                                  { "requestedSwapInterval",
-                                    window.requestedFormat().swapInterval() },
-                                  { "stages", stages },
-                                  { "desktopCaptured", false } };
+        const QJsonObject report{
+            { u"passed"_s, passed },
+            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+            { u"graphicsApi"_s, int(window.rendererInterface()->graphicsApi()) },
+            { u"devicePixelRatio"_s, window.devicePixelRatio() },
+            { u"requestedSwapInterval"_s, window.requestedFormat().swapInterval() },
+            { u"stages"_s, stages },
+            { u"desktopCaptured"_s, false }
+        };
         QVERIFY(output.write(QJsonDocument(report).toJson()) > 0);
         QVERIFY(output.commit());
         QVERIFY2(passed,
@@ -125,13 +129,13 @@ private slots:
         QVERIFY(window.flags().testFlag(Qt::FramelessWindowHint));
 #if defined(Q_OS_MACOS)
         const auto native = yalahoo::verification::nativeWindowPolicy(window);
-        QVERIFY(native["nativeWindowAvailable"].toBool());
-        QVERIFY(native["belowNormal"].toBool());
-        QVERIFY(native["activationProhibited"].toBool());
-        QVERIFY(native["ignoresMouseEvents"].toBool());
-        QVERIFY(!native["canBecomeKey"].toBool());
-        QVERIFY(!native["canBecomeMain"].toBool());
-        QVERIFY(native["foregroundOwnershipPassed"].toBool());
+        QVERIFY(native[u"nativeWindowAvailable"_s].toBool());
+        QVERIFY(native[u"belowNormal"_s].toBool());
+        QVERIFY(native[u"activationProhibited"_s].toBool());
+        QVERIFY(native[u"ignoresMouseEvents"_s].toBool());
+        QVERIFY(!native[u"canBecomeKey"_s].toBool());
+        QVERIFY(!native[u"canBecomeMain"_s].toBool());
+        QVERIFY(native[u"foregroundOwnershipPassed"_s].toBool());
 #endif
 #if defined(Q_OS_WIN)
         const auto handle = reinterpret_cast<HWND>(window.winId());

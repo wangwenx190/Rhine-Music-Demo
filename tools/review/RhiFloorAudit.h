@@ -6,7 +6,7 @@ struct FloorLookup
     int width, height;
     FloorLookup(const char *path, int w, int h) : width(w), height(h)
     {
-        QFile file(QString::fromLatin1(path));
+        QFile file(QString::fromUtf8(path));
         check(file.open(QIODevice::ReadOnly), "Missing floor source lookup");
         pixels = file.readAll();
         check(pixels.size() == w * h * 16, "Invalid floor source lookup");
@@ -159,14 +159,16 @@ QVector3D floorReference(const Input &input, QVector3D world, double shadow)
 QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size, bool math)
 {
     checkSubmittedShadow(input, capture);
-    const auto state = capture.metadata["productFloor"].toObject();
-    check(state["enabled"].toBool() && state["kind"].toInt() == 6
-                  && std::abs(state["roughness"].toDouble() - .95) < 1e-7
-                  && state["opaqueIndices"].toInt() == 6 && !state["castsShadow"].toBool(),
+    const auto state = capture.metadata[u"productFloor"_s].toObject();
+    check(state[u"enabled"_s].toBool() && state[u"kind"_s].toInt() == 6
+                  && std::abs(state[u"roughness"_s].toDouble() - .95) < 1e-7
+                  && state[u"opaqueIndices"_s].toInt() == 6 && !state[u"castsShadow"_s].toBool(),
           "Missing source floor draw/material or unexpected caster");
-    check(capture.metadata["captureDrawKinds"].toArray().contains(6), "Floor omitted from capture");
+    check(capture.metadata[u"captureDrawKinds"_s].toArray().contains(6),
+          "Floor omitted from capture");
     for (int c = 0; c < 3; ++c)
-        check(state["color"].toArray()[c].toDouble() == input.floorColor[c], "Stale floor theme");
+        check(state[u"color"_s].toArray()[c].toDouble() == input.floorColor[c],
+              "Stale floor theme");
     int points = 0, occluded = 0;
     double worst = 0, worstDepth = 0, worstProjection = 0;
     for (int y = 5; y < size.height(); y += 13)
@@ -219,7 +221,7 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
         check(occluded > 0, "Floor math did not exercise actual received shadows");
     check(points > 100 && worst <= 3.0 / 255, "Floor standard PBR/fog differs from source math");
     if (input.postprocess) {
-        check(state["aoIndices"].toInt() == 6 && state["dofIndices"].toInt() == 6,
+        check(state[u"aoIndices"_s].toInt() == 6 && state[u"dofIndices"_s].toInt() == 6,
               "Floor omitted from post geometry submission");
         for (const auto *image : { &capture.aoDepth, &capture.dofDepth }) {
             check(!image->isNull(), "Missing actual floor AO/DOF attachment");
@@ -237,23 +239,22 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
                   "Floor omitted from actual AO/DOF geometry");
         }
     }
-    return { { "points", points },
-             { "occluded", occluded },
-             { "maxError", worst },
-             { "maxDepthError", worstDepth },
-             { "maxProjectionPixels", worstProjection } };
+    return { { u"points"_s, points },
+             { u"occluded"_s, occluded },
+             { u"maxError"_s, worst },
+             { u"maxDepthError"_s, worstDepth },
+             { u"maxProjectionPixels"_s, worstProjection } };
 }
 QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString &output)
 {
     QJsonArray results;
     Input last;
     for (QSize size : { QSize(320, 240), QSize(960, 720) }) {
-        c["width"] = size.width();
-        c["height"] = size.height();
-        c["position"] = QJsonArray{ 6, 4, 9 };
-        for (const auto &theme :
-             { QStringLiteral("day"), QStringLiteral("night"), QStringLiteral("dusk") }) {
-            c["day"] = theme != "night";
+        c[u"width"_s] = size.width();
+        c[u"height"_s] = size.height();
+        c[u"position"_s] = QJsonArray{ 6, 4, 9 };
+        for (const auto &theme : { u"day"_s, u"night"_s, u"dusk"_s }) {
+            c[u"day"_s] = theme != "night"_L1;
             auto input = fixture(c);
             input.scene.camera.aim = { 0, -4.63, 0 };
             input.scene.view.setToIdentity();
@@ -285,23 +286,25 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
             input.scene.fogNear = 10;
             input.scene.fogFar = 35;
             for (int map : { 1024, 2048, 4096 }) {
-                if (theme == "dusk" && map != 1024)
+                if (theme == "dusk"_L1 && map != 1024)
                     continue;
                 input.shadowSize = map;
                 const auto capture = driver.capture(input, size);
                 auto row = validateFloor(input, capture, size, true);
-                row["map"] = map;
-                row["theme"] = theme;
-                row["metadata"] = capture.metadata;
+                row[u"map"_s] = map;
+                row[u"theme"_s] = theme;
+                row[u"metadata"_s] = capture.metadata;
                 results.append(row);
-                const auto generation = capture.metadata["resourceGeneration"];
+                const auto generation = capture.metadata[u"resourceGeneration"_s];
                 const auto same = driver.capture(input, size);
-                check(!same.metadata["shadowState"].toObject()["rendered"].toBool(),
+                check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool(),
                       "Floor invalidated caster cache");
                 input.floorColor *= .9f;
                 const auto changed = driver.capture(input, size);
-                check(changed.metadata["resourceGeneration"] == generation
-                              && !changed.metadata["shadowState"].toObject()["rendered"].toBool(),
+                check(changed.metadata[u"resourceGeneration"_s] == generation
+                              && !changed.metadata[u"shadowState"_s]
+                                          .toObject()[u"rendered"_s]
+                                          .toBool(),
                       "Floor color rebuilt targets or shadow map");
                 validateFloor(input, changed, size, true);
                 input.shadows = false;
@@ -318,8 +321,7 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
                 auto capture = driver.capture(input, size);
                 validateFloor(input, capture, size, false);
                 check(capture.postprocessed.save(output
-                                                 + QString("/floor-%1-%2-%3.png")
-                                                           .arg(size.width())
+                                                 + u"/floor-%1-%2-%3.png"_s.arg(size.width())
                                                            .arg(theme)
                                                            .arg(resolution)),
                       "Cannot save own floor output");
@@ -335,3 +337,6 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
     }
     return results;
 }
+#include <QString>
+using Qt::StringLiterals::operator""_s;
+using Qt::StringLiterals::operator""_L1;

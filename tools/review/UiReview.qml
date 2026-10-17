@@ -12,8 +12,8 @@ Rectangle {
     property bool night: false
     property bool probes: false
     property int probeMode: 0
-    property string titleText: "收藏的声音"
-    property string artistText: "本地音乐收藏"
+    property string titleText: "\u6536\u85cf\u7684\u58f0\u97f3"
+    property string artistText: "\u672c\u5730\u97f3\u4e50\u6536\u85cf"
     property string playingTitle: ""
     property int captureRevision: 0
     property bool offscreenRendering: false
@@ -32,7 +32,7 @@ Rectangle {
         album: ({
                     title: root.titleText,
                     artist: root.artistText,
-                    genre: "音乐",
+                    genre: "\u97f3\u4e50",
                     year: "2026",
                     tracks: 12
                 })

@@ -19,6 +19,9 @@
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 namespace {
@@ -97,10 +100,10 @@ QRhiReadbackResult capture(QRhi *api, Postprocess &post, Inputs &input)
     post.render(cb);
     require(post.uniformUploadBytes() == 80, "Bokeh uploaded unused uniform capacity");
     const auto uploaded = post.submittedBokeh();
-    require(uploaded["width"].toInt() == input.size.width()
-                    && uploaded["height"].toInt() == input.size.height()
-                    && uploaded["depthWidth"].toInt() == input.size.width()
-                    && uploaded["depthHeight"].toInt() == input.size.height(),
+    require(uploaded[u"width"_s].toInt() == input.size.width()
+                    && uploaded[u"height"_s].toInt() == input.size.height()
+                    && uploaded[u"depthWidth"_s].toInt() == input.size.width()
+                    && uploaded[u"depthHeight"_s].toInt() == input.size.height(),
             "Bokeh color/depth targets differ from actual uploaded dimensions");
     QRhiReadbackResult readback;
     auto *reads = api->nextResourceUpdateBatch();
@@ -163,16 +166,16 @@ QJsonObject verify(const Inputs &input, const PostSettings &settings,
     std::fprintf(stderr, "Bokeh %dx%d focus=%g aperture=%g max=%g\n", input.size.width(),
                  input.size.height(), settings.focus, settings.aperture, maximum);
     require(maximum <= 3.0 / 255, "Bokeh differs from independent source sampling");
-    return { { "maxError", maximum },
-             { "checkedPixels", checked },
-             { "sharp", sharp },
-             { "saturated", saturated },
-             { "foreground", foreground },
-             { "background", background },
-             { "width", input.size.width() },
-             { "height", input.size.height() },
-             { "focus", settings.focus },
-             { "aperture", settings.aperture } };
+    return { { u"maxError"_s, maximum },
+             { u"checkedPixels"_s, checked },
+             { u"sharp"_s, sharp },
+             { u"saturated"_s, saturated },
+             { u"foreground"_s, foreground },
+             { u"background"_s, background },
+             { u"width"_s, input.size.width() },
+             { u"height"_s, input.size.height() },
+             { u"focus"_s, settings.focus },
+             { u"aperture"_s, settings.aperture } };
 }
 }
 int main(int argc, char **argv)
@@ -187,9 +190,10 @@ int main(int argc, char **argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         require(QDir().mkpath(output), "Cannot create Bokeh report directory");
-        QFile source(QString(FIXTURE_ROOT) + "/tests/fixtures/postprocess/bokeh-kernel.json");
+        QFile source((QString::fromUtf8(FIXTURE_ROOT))
+                     + "/tests/fixtures/postprocess/bokeh-kernel.json"_L1);
         require(source.open(QIODevice::ReadOnly), "Missing locked Bokeh kernel");
-        const auto taps = QJsonDocument::fromJson(source.readAll()).object()["taps"].toArray();
+        const auto taps = QJsonDocument::fromJson(source.readAll()).object()[u"taps"_s].toArray();
         require(taps.size() == 41, "Wrong source tap count");
         preparedAssets();
         std::unique_ptr<QOffscreenSurface> fallback;
@@ -243,21 +247,20 @@ int main(int argc, char **argv)
                         stableRevision = post.revision();
                     require(stableRevision == post.revision(),
                             "Focus/aperture rebuilt Bokeh resources");
-                    require(post.passes() == QJsonArray{ "bokeh" }
+                    require(post.passes() == QJsonArray{ u"bokeh"_s }
                                     && post.output() != input.color.get(),
                             "Unexpected Bokeh graph or framebuffer feedback");
                     const auto readback = capture(api.get(), post, input);
                     QImage preview;
                     const auto result = verify(input, settings, readback, taps, preview);
                     results.append(result);
-                    totalSharp += result["sharp"].toInt();
-                    totalForeground += result["foreground"].toInt();
-                    totalBackground += result["background"].toInt();
-                    totalSaturated += result["saturated"].toInt();
+                    totalSharp += result[u"sharp"_s].toInt();
+                    totalForeground += result[u"foreground"_s].toInt();
+                    totalBackground += result[u"background"_s].toInt();
+                    totalSaturated += result[u"saturated"_s].toInt();
                     if (focus == 25 && aperture == .0008f)
                         require(preview.save(output
-                                             + QString("/bokeh-%1x%2.png")
-                                                       .arg(size.width())
+                                             + u"/bokeh-%1x%2.png"_s.arg(size.width())
                                                        .arg(size.height())),
                                 "Cannot save own Bokeh output");
                 }
@@ -277,7 +280,7 @@ int main(int argc, char **argv)
                     QImage preview;
                     auto row = verify(restored, settings, capture(api.get(), post, restored), taps,
                                       preview);
-                    row["resourceRebuild"] = cycle + 1;
+                    row[u"resourceRebuild"_s] = cycle + 1;
                     results.append(row);
                     // Release bindings while their source textures still exist.
                     post.reset();
@@ -305,20 +308,20 @@ int main(int argc, char **argv)
             visibleWindows += window->isVisible();
         require(visibleWindows == 0 && !QGuiApplication::focusWindow(),
                 "Offscreen Bokeh verification exposed or focused a window");
-        QSaveFile report(output + "/runtime.json");
+        QSaveFile report(output + "/runtime.json"_L1);
         require(report.open(QIODevice::WriteOnly), "Cannot open Bokeh report");
         report.write(
                 QJsonDocument(
                         QJsonObject{
-                                { "passed", true },
-                                { "round", "R19D4A" },
-                                { "backend", int(api->backend()) },
-                                { "qt", qVersion() },
-                                { "topLevelWindows", QGuiApplication::topLevelWindows().size() },
-                                { "visibleWindows", visibleWindows },
-                                { "measurement",
-                                  "production Postprocess in real QRhi offscreen frames; no presentation timing" },
-                                { "cases", results } })
+                                { u"passed"_s, true },
+                                { u"round"_s, u"R19D4A"_s },
+                                { u"backend"_s, int(api->backend()) },
+                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                { u"topLevelWindows"_s, QGuiApplication::topLevelWindows().size() },
+                                { u"visibleWindows"_s, visibleWindows },
+                                { u"measurement"_s,
+                                  u"production Postprocess in real QRhi offscreen frames; no presentation timing"_s },
+                                { u"cases"_s, results } })
                         .toJson());
         require(report.commit(), "Cannot save Bokeh report");
         return 0;

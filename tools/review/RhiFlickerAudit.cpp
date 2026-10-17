@@ -16,6 +16,9 @@
 #include <QSaveFile>
 #include <QDir>
 #include <cstdio>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
@@ -37,7 +40,7 @@ QJsonObject coverage(const Capture &capture)
             nonfinite += p[0] == 0 && p[1] == 255 && p[2] == 0;
         }
     }
-    return { { "missing", missing }, { "shaded", shaded }, { "nonfinite", nonfinite } };
+    return { { u"missing"_s, missing }, { u"shaded"_s, shaded }, { u"nonfinite"_s, nonfinite } };
 }
 
 }
@@ -51,7 +54,7 @@ int main(int argc, char **argv)
     const auto coverShutdown = qScopeGuard([] {
         yalahoo::CoverCache::finishDecoders();
     });
-    const bool opticsOnly = argc == 3 && QString::fromLocal8Bit(argv[2]) == "--optics-only";
+    const bool opticsOnly = argc == 3 && QString::fromLocal8Bit(argv[2]) == "--optics-only"_L1;
     if (argc != 2 && !opticsOnly)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
@@ -59,9 +62,9 @@ int main(int argc, char **argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         check(QDir().mkpath(output), "Cannot create diagnostic output");
-        QFile file(QString(FIXTURE_ROOT) + "/tests/fixtures/rhi-shell/visual.json");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
         check(file.open(QIODevice::ReadOnly), "Missing source input");
-        auto cases = QJsonDocument::fromJson(file.readAll()).object()["cases"].toArray();
+        auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         QJsonArray isolated;
         {
             RhiCaptureHarness driver;
@@ -82,18 +85,18 @@ int main(int argc, char **argv)
                     input.captureSamples = samples;
                     auto result = driver.capture(input, { 960, 720 });
                     auto sample = coverage(result);
-                    sample["entities"] = count;
-                    sample["samples"] = samples;
+                    sample[u"entities"_s] = count;
+                    sample[u"samples"_s] = samples;
                     isolated.append(sample);
                     std::fprintf(
                             stderr,
                             "Visibility entities=%d samples=%d missing=%d shaded=%d nonfinite=%d\n",
-                            count, samples, sample["missing"].toInt(), sample["shaded"].toInt(),
-                            sample["nonfinite"].toInt());
+                            count, samples, sample[u"missing"_s].toInt(),
+                            sample[u"shaded"_s].toInt(), sample[u"nonfinite"_s].toInt());
                     result.composite.save(output
-                                          + QString("/isolated-%1-%2.png").arg(count).arg(samples));
-                    check(sample["missing"].toInt() == 0 && sample["shaded"].toInt() > 100
-                                  && sample["nonfinite"].toInt() == 0,
+                                          + u"/isolated-%1-%2.png"_s.arg(count).arg(samples));
+                    check(sample[u"missing"_s].toInt() == 0 && sample[u"shaded"_s].toInt() > 100
+                                  && sample[u"nonfinite"_s].toInt() == 0,
                           "Visibility fragments lost at Equal shading or nonfinite optics");
                 }
             }
@@ -111,7 +114,7 @@ int main(int argc, char **argv)
             overview.bind(&adapter, &selection, &presentation);
             adapter.layout()->setViewport(size.width(), size.height());
             adapter.snapToTarget();
-            adapter.quality()->setPreset(size.width() == 1280 ? "high" : "original");
+            adapter.quality()->setPreset(size.width() == 1280 ? u"high"_s : u"original"_s);
             RhiCaptureHarness driver([](QQuickItem *parent) {
                 return new SceneItem(parent);
             });
@@ -130,8 +133,8 @@ int main(int argc, char **argv)
                 bool ready = false;
                 const auto checkReady = [&] {
                     const auto stats = item->coverStatistics();
-                    ready = stats["identities"].toInt() > 0
-                            && stats["identities"].toInt() == stats["ready"].toInt();
+                    ready = stats[u"identities"_s].toInt() > 0
+                            && stats[u"identities"_s].toInt() == stats[u"ready"_s].toInt();
                     if (ready)
                         wait.quit();
                 };
@@ -192,41 +195,43 @@ int main(int argc, char **argv)
                         checkSubmittedFog(input, result);
                         checkSubmittedShadow(input, result);
                         if (input.bokeh) {
-                            const auto uploaded = result.metadata["submittedBokeh"].toObject();
+                            const auto uploaded = result.metadata[u"submittedBokeh"_s].toObject();
                             const float focus =
                                     -(input.scene.view
                                       * QVector4D(adapter.casePosition() + QVector3D(0, 2, 0), 1))
                                              .z();
                             const float aperture = float(
                                     (.0003 + .0005 * adapter.detail())
-                                    * adapter.quality()->values()["depthOfField"].toDouble() / 100);
-                            const bool bokehMatches = uploaded["focus"].toDouble() == focus
-                                    && uploaded["aperture"].toDouble() == aperture
-                                    && uploaded["maxblur"].toDouble() == double(.011f)
-                                    && uploaded["near"].toDouble() == float(input.scene.nearPlane)
-                                    && uploaded["far"].toDouble() == float(input.scene.farPlane)
-                                    && uploaded["aspect"].toDouble()
+                                    * adapter.quality()->values()[u"depthOfField"_s].toDouble()
+                                    / 100);
+                            const bool bokehMatches = uploaded[u"focus"_s].toDouble() == focus
+                                    && uploaded[u"aperture"_s].toDouble() == aperture
+                                    && uploaded[u"maxblur"_s].toDouble() == double(.011f)
+                                    && uploaded[u"near"_s].toDouble()
+                                            == float(input.scene.nearPlane)
+                                    && uploaded[u"far"_s].toDouble() == float(input.scene.farPlane)
+                                    && uploaded[u"aspect"_s].toDouble()
                                             == float(target.width()) / target.height()
-                                    && uploaded["depthWidth"].toInt() == target.width()
-                                    && uploaded["depthHeight"].toInt() == target.height();
+                                    && uploaded[u"depthWidth"_s].toInt() == target.width()
+                                    && uploaded[u"depthHeight"_s].toInt() == target.height();
                             if (!bokehMatches)
                                 qWarning() << "Bokeh submission mismatch" << size << night << stage
                                            << frame << "focus" << focus << input.focus
-                                           << uploaded["focus"] << "aperture" << aperture
-                                           << input.aperture << uploaded["aperture"] << "uploaded"
-                                           << uploaded;
+                                           << uploaded[u"focus"_s] << "aperture" << aperture
+                                           << input.aperture << uploaded[u"aperture"_s]
+                                           << "uploaded" << uploaded;
                             check(bokehMatches,
                                   "Actual production Bokeh uniform/depth differs from frozen source");
                         }
-                        const auto floor = result.metadata["productFloor"].toObject();
-                        check(input.productFloor && floor["enabled"].toBool()
-                                      && floor["opaqueIndices"].toInt() == 6
+                        const auto floor = result.metadata[u"productFloor"_s].toObject();
+                        check(input.productFloor && floor[u"enabled"_s].toBool()
+                                      && floor[u"opaqueIndices"_s].toInt() == 6
                                       && (opticsOnly
-                                          || (floor["aoIndices"].toInt() == 6
-                                              && floor["dofIndices"].toInt() == 6)),
+                                          || (floor[u"aoIndices"_s].toInt() == 6
+                                              && floor[u"dofIndices"_s].toInt() == 6)),
                               "Production floor omitted from capture or post geometry");
                         for (int c = 0; c < 3; ++c)
-                            check(floor["color"].toArray()[c].toDouble()
+                            check(floor[u"color"_s].toArray()[c].toDouble()
                                           == adapter.lighting()->palette().floor.qt()[c],
                                   "Production floor uses stale theme color");
                         check(input.fogEnabled, "Production scene did not enable authored fog");
@@ -241,24 +246,24 @@ int main(int argc, char **argv)
                                               < 1e-10,
                               "Production fog is not anchored to the rendered camera");
                         check(item->errorText().isEmpty(), "Production renderer failed");
-                        check(result.metadata.contains("opticalProbeSample")
+                        check(result.metadata.contains(u"opticalProbeSample"_s)
                                       == (input.opticalProbe != 0),
                               "Capture used the wrong optical mode");
                         const auto actualGeneration =
-                                result.metadata["resourceGeneration"].toInteger();
+                                result.metadata[u"resourceGeneration"_s].toInteger();
                         if (generation >= 0)
                             check(generation == actualGeneration,
                                   "Frame/probe change rebuilt render targets");
                         generation = actualGeneration;
-                        check(result.metadata["visibleEntities"].toInt() >= 8,
+                        check(result.metadata[u"visibleEntities"_s].toInt() >= 8,
                               "Missing batched production overlap");
-                        check(result.metadata["atlasUploadBytes"].toInteger()
+                        check(result.metadata[u"atlasUploadBytes"_s].toInteger()
                                       <= AtlasUploadQueue::steadyBudget,
                               "Unbounded cover uploads");
                         auto sample = input.opticalProbe ? coverage(result) : QJsonObject{ };
                         if (input.opticalProbe) {
-                            if (sample["missing"].toInt() || sample["nonfinite"].toInt()
-                                || sample["shaded"].toInt() <= 100) {
+                            if (sample[u"missing"_s].toInt() || sample[u"nonfinite"_s].toInt()
+                                || sample[u"shaded"_s].toInt() <= 100) {
                                 std::fprintf(
                                         stderr,
                                         "Production failure %dx%d night=%d stage=%d frame=%d %s\n",
@@ -266,37 +271,38 @@ int main(int argc, char **argv)
                                         QJsonDocument(sample)
                                                 .toJson(QJsonDocument::Compact)
                                                 .constData());
-                                result.composite.save(output + "/failed-visibility.png");
-                                QSaveFile failed(output + "/failed-metadata.json");
+                                result.composite.save(output + "/failed-visibility.png"_L1);
+                                QSaveFile failed(output + "/failed-metadata.json"_L1);
                                 if (failed.open(QIODevice::WriteOnly)) {
                                     failed.write(QJsonDocument(result.metadata).toJson());
                                     failed.commit();
                                 }
                             }
-                            check(sample["missing"].toInt() == 0 && sample["nonfinite"].toInt() == 0
-                                          && sample["shaded"].toInt() > 100,
+                            check(sample[u"missing"_s].toInt() == 0
+                                          && sample[u"nonfinite"_s].toInt() == 0
+                                          && sample[u"shaded"_s].toInt() > 100,
                                   "Production overlap has Equal holes or nonfinite optics");
                         }
-                        sample["frame"] = frame;
-                        sample["diagnostic"] = input.opticalProbe != 0;
-                        sample["width"] = target.width();
-                        sample["height"] = target.height();
-                        sample["sceneRevision"] = qint64(item->input().scene.revision);
-                        sample["generation"] = result.metadata["resourceGeneration"];
-                        sample["visibleEntities"] = result.metadata["visibleEntities"];
-                        sample["shells"] = result.metadata["sortedShells"].toArray().size();
-                        sample["overview"] = overview.progress();
-                        sample["detail"] = adapter.detail();
-                        sample["fogNear"] = input.scene.fogNear;
-                        sample["fogFar"] = input.scene.fogFar;
-                        sample["fogColor"] = QJsonArray{ input.background.x(), input.background.y(),
-                                                         input.background.z() };
+                        sample[u"frame"_s] = frame;
+                        sample[u"diagnostic"_s] = input.opticalProbe != 0;
+                        sample[u"width"_s] = target.width();
+                        sample[u"height"_s] = target.height();
+                        sample[u"sceneRevision"_s] = qint64(item->input().scene.revision);
+                        sample[u"generation"_s] = result.metadata[u"resourceGeneration"_s];
+                        sample[u"visibleEntities"_s] = result.metadata[u"visibleEntities"_s];
+                        sample[u"shells"_s] = result.metadata[u"sortedShells"_s].toArray().size();
+                        sample[u"overview"_s] = overview.progress();
+                        sample[u"detail"_s] = adapter.detail();
+                        sample[u"fogNear"_s] = input.scene.fogNear;
+                        sample[u"fogFar"_s] = input.scene.fogFar;
+                        sample[u"fogColor"_s] =
+                                QJsonArray{ input.background.x(), input.background.y(),
+                                            input.background.z() };
                         frames.append(sample);
                         if (frame % 15 == 1 && input.opticalProbe == 0)
                             check((opticsOnly ? result.composite : driver.surface->grab())
                                           .save(output
-                                                + QString("/production-%1-%2-%3-%4.png")
-                                                          .arg(size.width())
+                                                + u"/production-%1-%2-%3-%4.png"_s.arg(size.width())
                                                           .arg(night)
                                                           .arg(stage)
                                                           .arg(frame)),
@@ -305,26 +311,26 @@ int main(int argc, char **argv)
                     std::fprintf(stderr, "Production %dx%d night=%d stage=%d passed 60 frames\n",
                                  size.width(), size.height(), night, stage);
                     sequences.append(QJsonObject{
-                            { "width", size.width() },
-                            { "height", size.height() },
-                            { "night", night },
-                            { "stage", stage },
-                            { "devicePixelRatio", driver.window->devicePixelRatio() },
-                            { "offscreen", driver.surface->diagnostics() },
-                            { "windowPolicy", verification::windowPolicy(*driver.window) },
-                            { "frames", frames } });
+                            { u"width"_s, size.width() },
+                            { u"height"_s, size.height() },
+                            { u"night"_s, night },
+                            { u"stage"_s, stage },
+                            { u"devicePixelRatio"_s, driver.window->devicePixelRatio() },
+                            { u"offscreen"_s, driver.surface->diagnostics() },
+                            { u"windowPolicy"_s, verification::windowPolicy(*driver.window) },
+                            { u"frames"_s, frames } });
                 }
             }
             item->captured = { };
         }
-        QSaveFile report(output + "/runtime.json");
+        QSaveFile report(output + "/runtime.json"_L1);
         check(report.open(QIODevice::WriteOnly), "Cannot write report");
-        report.write(QJsonDocument(QJsonObject{ { "round", "R19C2C" },
-                                                { "passed", true },
-                                                { "opticsOnly", opticsOnly },
-                                                { "qt", qVersion() },
-                                                { "isolated", isolated },
-                                                { "sequences", sequences } })
+        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19C2C"_s },
+                                                { u"passed"_s, true },
+                                                { u"opticsOnly"_s, opticsOnly },
+                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                                { u"isolated"_s, isolated },
+                                                { u"sequences"_s, sequences } })
                              .toJson());
         check(report.commit(), "Cannot commit report");
         return 0;

@@ -12,7 +12,7 @@ namespace yalahoo {
 // Values published once by the worker; consumers only share immutable, owned pixels.
 struct CoverPixels
 {
-    QString identity, path, error;
+    QString identity, path, error, fallbackTitle;
     quint64 generation = 0;
     int resolution = 256;
     QSize sourceSize;
@@ -48,7 +48,7 @@ public:
     static constexpr qint64 sourcePixelLimit = 4 * 1024 * 1024;
     static constexpr qint64 workerReservation = sourcePixelLimit * 32 + 12 * 1024 * 1024;
 
-signals:
+Q_SIGNALS:
     void ready(yalahoo::CoverSnapshot pixels);
 
 private:

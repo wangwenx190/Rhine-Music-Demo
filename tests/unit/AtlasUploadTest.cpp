@@ -4,7 +4,7 @@ using namespace yalahoo::rhi;
 class AtlasUploadTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void highResolutionRegionReadiness()
     {
         AtlasUploadQueue queue;

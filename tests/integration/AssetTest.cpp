@@ -18,12 +18,14 @@
 #include <QtTest>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo::assets;
 class AssetTest : public QObject
 {
     Q_OBJECT
     QJsonArray evidence;
-private slots:
+private Q_SLOTS:
     void initTestCase()
     {
         QVERIFY(yalahoo::initializeAssetFonts());
@@ -31,94 +33,97 @@ private slots:
     void embeddedHashes()
     {
         const auto manifest =
-                QJsonDocument::fromJson(readFile(":/assets/manifests/assets.json")).object();
-        QCOMPARE(manifest["baselineCommit"].toString(),
-                 QString("57f4f845c20cce646a15dbf4008c2a162aaaf4e2"));
-        const auto entries = manifest["entries"].toArray();
+                QJsonDocument::fromJson(readFile(u":/assets/manifests/assets.json"_s)).object();
+        QCOMPARE(manifest[u"baselineCommit"_s].toString(),
+                 u"57f4f845c20cce646a15dbf4008c2a162aaaf4e2"_s);
+        const auto entries = manifest[u"entries"_s].toArray();
         QCOMPARE(entries.size(), 47);
         for (const auto &value : entries) {
             const auto entry = value.toObject();
-            const auto bytes = readFile(entry["qrc"].toString());
-            QCOMPARE(bytes.size(), entry["bytes"].toInteger());
-            QCOMPARE(QString::fromLatin1(
+            const auto bytes = readFile(entry[u"qrc"_s].toString());
+            QCOMPARE(bytes.size(), entry[u"bytes"_s].toInteger());
+            QCOMPARE(QString::fromUtf8(
                              QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()),
-                     entry["sha256"].toString());
-            QVERIFY(!entry["path"].toString().contains("typing-preview"));
-            QVERIFY(!entry["path"].toString().contains("app-icon"));
+                     entry[u"sha256"_s].toString());
+            QVERIFY(!entry[u"path"_s].toString().contains(u"typing-preview"_s));
+            QVERIFY(!entry[u"path"_s].toString().contains(u"app-icon"_s));
         }
-        evidence.append(QJsonObject{
-                { "check", "qrc-hashes" }, { "entries", entries.size() }, { "passed", true } });
+        evidence.append(QJsonObject{ { u"check"_s, u"qrc-hashes"_s },
+                                     { u"entries"_s, entries.size() },
+                                     { u"passed"_s, true } });
     }
     void geometry()
     {
         QVector<Batch> imported;
         for (int i = 0; i < 3; ++i)
-            imported.append(readQtMesh(
-                    readFile(QString(":/assets/models/meshes/meshes_%1__mesh.mesh").arg(i))));
-        const auto report =
-                compareGeometry(readGlb(readFile(":/assets/models/music-case-v040.glb")), imported);
-        QVERIFY(report["passed"].toBool());
+            imported.append(
+                    readQtMesh(readFile(u":/assets/models/meshes/meshes_%1__mesh.mesh"_s.arg(i))));
+        const auto report = compareGeometry(
+                readGlb(readFile(u":/assets/models/music-case-v040.glb"_s)), imported);
+        QVERIFY(report[u"passed"_s].toBool());
         // Paper geometry is deliberately independent of the three source shells.
         const auto layout =
-                QJsonDocument::fromJson(readFile(":/assets/models/music-case-v040.json")).object();
-        const auto layers = layout["layers"].toObject();
-        const double paper = layout["cover"].toObject()["z"].toDouble();
-        QVERIFY(paper > layers["rearFront"].toDouble());
-        QVERIFY(paper < layers["lidBack"].toDouble());
-        QCOMPARE(layout["cover"].toObject()["width"].toDouble(), 3.06);
+                QJsonDocument::fromJson(readFile(u":/assets/models/music-case-v040.json"_s))
+                        .object();
+        const auto layers = layout[u"layers"_s].toObject();
+        const double paper = layout[u"cover"_s].toObject()[u"z"_s].toDouble();
+        QVERIFY(paper > layers[u"rearFront"_s].toDouble());
+        QVERIFY(paper < layers[u"lidBack"_s].toDouble());
+        QCOMPARE(layout[u"cover"_s].toObject()[u"width"_s].toDouble(), 3.06);
         QQmlEngine engine;
-        QQmlComponent component(&engine, QUrl("qrc:/assets/models/Music_case_v040.qml"));
+        QQmlComponent component(&engine, QUrl(u"qrc:/assets/models/Music_case_v040.qml"_s));
         QScopedPointer<QObject> object(component.create());
         QVERIFY2(object, qPrintable(component.errorString()));
         for (const auto &name : { "Frosted_Polymer", "Ivory_Edges", "Optical_Diffuser" })
-            QVERIFY(object->findChild<QObject *>(QString("Music_Case_V040__") + name));
-        evidence.append(QJsonObject{ { "check", "geometry" },
-                                     { "report", report },
-                                     { "paperGap", true },
-                                     { "qmlImport", true } });
+            QVERIFY(object->findChild<QObject *>(u"Music_Case_V040__"_s + QString::fromUtf8(name)));
+        evidence.append(QJsonObject{ { u"check"_s, u"geometry"_s },
+                                     { u"report"_s, report },
+                                     { u"paperGap"_s, true },
+                                     { u"qmlImport"_s, true } });
     }
     void malformedGeometryRejected()
     {
-        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readGlb(QByteArray("not a model")));
-        auto mesh = readFile(":/assets/models/meshes/meshes_0__mesh.mesh");
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, readGlb("not a model"_ba));
+        auto mesh = readFile(u":/assets/models/meshes/meshes_0__mesh.mesh"_s);
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, readQtMesh(mesh.left(130)));
         mesh[4] = 99;
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, readQtMesh(mesh));
-        auto source = readGlb(readFile(":/assets/models/music-case-v040.glb"));
+        auto source = readGlb(readFile(u":/assets/models/music-case-v040.glb"_s));
         QVector<Batch> corrupt;
         for (int i = 0; i < 3; ++i)
-            corrupt.append(readQtMesh(
-                    readFile(QString(":/assets/models/meshes/meshes_%1__mesh.mesh").arg(i))));
+            corrupt.append(
+                    readQtMesh(readFile(u":/assets/models/meshes/meshes_%1__mesh.mesh"_s.arg(i))));
         corrupt[0].vertices[0][0] += 0.01f;
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, compareGeometry(source, corrupt));
     }
     void fontFacesAndShaping()
     {
         const auto manifest =
-                QJsonDocument::fromJson(readFile(":/assets/manifests/fonts.json")).object();
-        const QString chinese = QStringLiteral("一张一张，慢慢听音乐收藏（专辑）");
-        const QString latin = QStringLiteral("AV To gyjp (Album) 0123456789");
+                QJsonDocument::fromJson(readFile(u":/assets/manifests/fonts.json"_s)).object();
+        const QString chinese =
+                u"\u4e00\u5f20\u4e00\u5f20\uff0c\u6162\u6162\u542c\u97f3\u4e50\u6536\u85cf\uff08\u4e13\u8f91\uff09"_s;
+        const QString latin = u"AV To gyjp (Album) 0123456789"_s;
         const std::array<int, 4> weights{ 250, 330, 450, 630 };
         int index = 0;
         QJsonArray faces;
         QSet<QByteArray> outlines;
         QImage preview(1100, 280, QImage::Format_ARGB32_Premultiplied);
-        preview.fill(QColor("#efede7"));
+        preview.fill(QColor("#efede7"_L1));
         QPainter painter(&preview);
-        painter.setPen(QColor("#232722"));
-        for (const auto &value : manifest["fonts"].toArray()) {
+        painter.setPen(QColor("#232722"_L1));
+        for (const auto &value : manifest[u"fonts"_s].toArray()) {
             const auto face = value.toObject();
-            const auto bytes = readFile(":/assets/" + face["path"].toString());
+            const auto bytes = readFile(":/assets/"_L1 + face[u"path"_s].toString());
             QRawFont raw(bytes, 24, QFont::PreferNoHinting);
             QVERIFY(raw.isValid());
-            QVERIFY(raw.familyName().startsWith("MiSans"));
+            QVERIFY(raw.familyName().startsWith(u"MiSans"_s));
             const auto os2 = raw.fontTable("OS/2");
             QVERIFY(os2.size() >= 6);
             QCOMPARE(qFromBigEndian<quint16>(os2.constData() + 4), weights[index]);
             for (const auto ch : chinese + latin)
                 QVERIFY2(raw.supportsCharacter(ch),
-                         qPrintable(QString("Missing MiSans glyph %1").arg(ch)));
-            QFont font = yalahoo::assetFont(face["cssWeight"].toInt());
+                         qPrintable(u"Missing MiSans glyph %1"_s.arg(ch)));
+            QFont font = yalahoo::assetFont(face[u"cssWeight"_s].toInt());
             font.setPixelSize(24);
             font.setHintingPreference(QFont::PreferNoHinting);
             const auto selected = QRawFont::fromFont(font);
@@ -126,7 +131,7 @@ private slots:
             // Verify the selected physical face and its original SFNT weight instead.
             QCOMPARE(selected.weight(), raw.weight());
             QCOMPARE(selected.fontTable("OS/2"), os2);
-            QVERIFY(selected.familyName().startsWith("MiSans"));
+            QVERIFY(selected.familyName().startsWith(u"MiSans"_s));
             const char *outlineTable = raw.fontTable("CFF ").isEmpty() ? "glyf" : "CFF ";
             QCOMPARE(selected.fontTable(outlineTable), raw.fontTable(outlineTable));
             auto measure = [&](const QString &text) {
@@ -140,27 +145,29 @@ private slots:
                 QVERIFY(line.naturalTextWidth() < 2000);
                 for (const auto &run : layout.glyphRuns())
                     QCOMPARE(run.rawFont().fontTable(outlineTable), raw.fontTable(outlineTable));
-                faces.append(QJsonObject{ { "face", face["weight"] },
-                                          { "weight", weights[index] },
-                                          { "nativeWeight", int(raw.weight()) },
-                                          { "text", text },
-                                          { "widthAt24px", line.naturalTextWidth() } });
+                faces.append(QJsonObject{ { u"face"_s, face[u"weight"_s] },
+                                          { u"weight"_s, weights[index] },
+                                          { u"nativeWeight"_s, int(raw.weight()) },
+                                          { u"text"_s, text },
+                                          { u"widthAt24px"_s, line.naturalTextWidth() } });
             };
             measure(chinese);
             measure(latin);
             painter.setFont(font);
             painter.drawText(20, index * 65 + 30,
-                             face["weight"].toString() + ": " + chinese + " · " + latin);
+                             face[u"weight"_s].toString() + ": "_L1 + chinese + u" \u00b7 "_s
+                                     + latin);
             const auto outlinesData = raw.fontTable(outlineTable);
             QVERIFY(!outlinesData.isEmpty());
             outlines.insert(QCryptographicHash::hash(outlinesData, QCryptographicHash::Sha256));
             ++index;
         }
         painter.end();
-        QVERIFY(preview.save("fonts.png"));
+        QVERIFY(preview.save(u"fonts.png"_s));
         QCOMPARE(outlines.size(), 4);
-        evidence.append(QJsonObject{
-                { "check", "fonts" }, { "faces", faces }, { "distinctOutlineCount", 4 } });
+        evidence.append(QJsonObject{ { u"check"_s, u"fonts"_s },
+                                     { u"faces"_s, faces },
+                                     { u"distinctOutlineCount"_s, 4 } });
     }
     void icons()
     {
@@ -168,13 +175,13 @@ private slots:
         preview.fill(Qt::transparent);
         QPainter painter(&preview);
         int row = 0;
-        for (const auto &theme : { QString("day"), QString("night") }) {
+        for (const auto &theme : { u"day"_s, u"night"_s }) {
             painter.fillRect(0, row * 96, preview.width(), 96,
-                             theme == "day" ? QColor("#efede7") : QColor("#162234"));
+                             theme == "day"_L1 ? QColor("#efede7"_L1) : QColor("#162234"_L1));
             int col = 0;
             for (const auto &name : { "play", "pause", "stop", "search", "settings", "folder",
                                       "overview", "overview-return" }) {
-                QSvgRenderer renderer(QString(":/assets/icons/%1-%2.svg").arg(name, theme));
+                QSvgRenderer renderer(u":/assets/icons/%1-%2.svg"_s.arg(name, theme));
                 QVERIFY(renderer.isValid());
                 QCOMPARE(renderer.viewBoxF(), QRectF(0, 0, 24, 24));
                 QImage tiny(24, 24, QImage::Format_ARGB32_Premultiplied);
@@ -193,33 +200,34 @@ private slots:
             ++row;
         }
         painter.end();
-        QVERIFY(preview.save("icons.png"));
-        evidence.append(QJsonObject{ { "check", "icons" },
-                                     { "themes", 2 },
-                                     { "functionalPaths", 8 },
-                                     { "viewBox", "0 0 24 24" },
-                                     { "passed", true } });
+        QVERIFY(preview.save(u"icons.png"_s));
+        evidence.append(QJsonObject{ { u"check"_s, u"icons"_s },
+                                     { u"themes"_s, 2 },
+                                     { u"functionalPaths"_s, 8 },
+                                     { u"viewBox"_s, u"0 0 24 24"_s },
+                                     { u"passed"_s, true } });
     }
     void silentInterfaceEvents()
     {
         const auto map =
-                QJsonDocument::fromJson(readFile(":/assets/audio/interface-events.json")).object();
-        QCOMPARE(map["events"].toArray().size(), 17);
-        QVERIFY(!map["typingPreviewUsed"].toBool());
-        for (const auto &event : map["events"].toArray()) {
-            QVERIFY(event.toObject()["source"].isNull());
-            QVERIFY(!event.toObject()["enabled"].toBool());
+                QJsonDocument::fromJson(readFile(u":/assets/audio/interface-events.json"_s))
+                        .object();
+        QCOMPARE(map[u"events"_s].toArray().size(), 17);
+        QVERIFY(!map[u"typingPreviewUsed"_s].toBool());
+        for (const auto &event : map[u"events"_s].toArray()) {
+            QVERIFY(event.toObject()[u"source"_s].isNull());
+            QVERIFY(!event.toObject()[u"enabled"_s].toBool());
         }
-        evidence.append(QJsonObject{ { "check", "interface-audio" },
-                                     { "silentEvents", 17 },
-                                     { "pcmOrPreviewPlayback", false } });
+        evidence.append(QJsonObject{ { u"check"_s, u"interface-audio"_s },
+                                     { u"silentEvents"_s, 17 },
+                                     { u"pcmOrPreviewPlayback"_s, false } });
     }
     void audioLoadsWithoutPlayback_data()
     {
         QTest::addColumn<QString>("file");
         for (const auto &name :
              { "atmosphere.ogg", "motif.ogg", "pulse.ogg", "observatory-preview.mp3" })
-            QTest::newRow(name) << QString(name);
+            QTest::newRow(name) << QString::fromUtf8(name);
     }
     void audioLoadsWithoutPlayback()
     {
@@ -231,7 +239,7 @@ private slots:
                 ++playing;
         });
         QVERIFY(player.audioOutput() == nullptr);
-        player.setSource(QUrl("qrc:/assets/audio/" + file));
+        player.setSource(QUrl("qrc:/assets/audio/"_L1 + file));
         QTRY_VERIFY_WITH_TIMEOUT(player.mediaStatus() == QMediaPlayer::LoadedMedia
                                          || player.mediaStatus() == QMediaPlayer::InvalidMedia,
                                  10000);
@@ -240,17 +248,18 @@ private slots:
         QVERIFY(player.duration() > 1000);
         QCOMPARE(player.playbackState(), QMediaPlayer::StoppedState);
         QCOMPARE(playing, 0);
-        evidence.append(QJsonObject{ { "check", "audio" },
-                                     { "file", file },
-                                     { "durationMs", player.duration() },
-                                     { "loaded", true },
-                                     { "playingEvents", playing },
-                                     { "audioOutput", false } });
+        evidence.append(QJsonObject{ { u"check"_s, u"audio"_s },
+                                     { u"file"_s, file },
+                                     { u"durationMs"_s, player.duration() },
+                                     { u"loaded"_s, true },
+                                     { u"playingEvents"_s, playing },
+                                     { u"audioOutput"_s, false } });
     }
     void cleanupTestCase()
     {
-        saveFile("assets-report.json",
-                 QJsonDocument(QJsonObject{ { "qtVersion", qVersion() }, { "checks", evidence } })
+        saveFile(u"assets-report.json"_s,
+                 QJsonDocument(QJsonObject{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                                            { u"checks"_s, evidence } })
                          .toJson());
     }
 };

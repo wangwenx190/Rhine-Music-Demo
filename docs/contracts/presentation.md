@@ -6,7 +6,7 @@
 
 两个 SurfaceTransition 使用同一 FrameClock 的 motionDt，保留 browse 720/140ms 与 detail 360/240ms，源码 Bezier、隐藏初始位移、退场位移和打断后的 `max(72ms, duration * sqrt(opacityDistance))`。改速不重置 progress，减少动态完成相同回调路径。一个 surface 只有一个可替换完成回调；revision 也覆盖 changed 信号重入。browse 的 veil/信息/导航/footer 分别改透明度，Header 保持自身绘制层级。详情退出期仍可见但禁用；InputRouter 与 SceneItem 的鼠标/触摸路径共同阻止底层选择。
 
-DetailModel 持有不可变库快照及索引取得的当前专辑指针。prepare 一次计算八项 facts，保留标题/英文译名、编号、曲目/分碟/时长、介绍、本地备注、制作人员、来源 URL/许可证和目录；不会把全歌单序列化为 QVariant 数组。相同快照、专辑和编号不重置模型。TrackList 使用可见/复用委托和 100px 预留，曲目与制作人员各有模型类型稳定的 ListView；切 tab 重建相应视图，不让旧角色缓存跨模型类型复用。制作人员在prepare时按NFKC人名/来源分组，以trackId索引解析当前曲名，角色/来源/参与曲目分别去重；可见行按源210px最小列宽/26px列距分配，展开阅读保留全部本地署名与URL。大量曲目署名在高度不超过详情视口70%的独立ListView中虚拟化，避免单个制作人展开后创建全量文本节点；这是原生有界委托适配。布局回调只排一个，新准备替换其 revision；完成后以 positionViewAtBeginning 显示 header。退出焦点请求在绑定更新后交付，恢复仍有效且可交互的原 Item，旧展示请求不能重新取得焦点。
+DetailModel 持有不可变库快照及索引取得的当前专辑指针。prepare 一次计算八项 facts及介绍来源显示文本，保留标题/英文译名、编号、曲目/分碟/时长、介绍、本地备注、制作人员、来源 URL/许可证和目录；不会把全歌单序列化为 QVariant 数组。相同快照、专辑和编号不重置模型。TrackList 使用可见/复用委托和 100px 预留，曲目与制作人员各有模型类型稳定的 ListView；切 tab 重建相应视图，不让旧角色缓存跨模型类型复用。制作人员在prepare时按NFKC人名/来源分组，以trackId索引解析当前曲名，角色/来源/参与曲目分别去重；可见行按源210px最小列宽/26px列距分配，展开阅读保留全部本地署名与URL。大量曲目署名在高度不超过详情视口70%的独立ListView中虚拟化，避免单个制作人展开后创建全量文本节点；这是原生有界委托适配。布局回调只排一个，新准备替换其 revision；完成后以 positionViewAtBeginning 显示 header。退出焦点请求在绑定更新后交付，恢复仍有效且可交互的原 Item，旧展示请求不能重新取得焦点。
 
 ## 排版、tab与离线资料
 

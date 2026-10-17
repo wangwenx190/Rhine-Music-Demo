@@ -31,7 +31,7 @@ public:
     int rowDirection() const;
     int columnDirection() const;
     int navigationDirection() const;
-signals:
+Q_SIGNALS:
     void enabledChanged();
     void directionChanged();
     void inputReceived();

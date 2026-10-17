@@ -52,7 +52,7 @@ public:
     bool moving() const;
     void advance(double dt);
     Q_INVOKABLE void finish();
-signals:
+Q_SIGNALS:
     void inputChanged();
     void changed();
 

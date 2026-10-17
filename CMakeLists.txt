@@ -4,6 +4,12 @@ project(yalahoo LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+add_compile_definitions(QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_KEYWORDS)
+add_custom_target(source-policy ALL
+    COMMAND "${CMAKE_COMMAND}" "-DSOURCE_ROOT=${PROJECT_SOURCE_DIR}"
+        -P "${PROJECT_SOURCE_DIR}/tools/audit/CheckSourcePolicy.cmake"
+    COMMENT "Check ASCII sources and explicit Qt string policy"
+    VERBATIM)
 set(CMAKE_TRY_COMPILE_CONFIGURATION "${CMAKE_BUILD_TYPE}")
 if(MSVC)
     add_compile_options(/Zc:__cplusplus /utf-8)
@@ -28,7 +34,9 @@ endif()
 yalahoo_check_tool(qmake "-query;QT_VERSION")
 yalahoo_check_tool(qsb "--version")
 yalahoo_check_tool(qmllint "--version")
-qt_standard_project_setup()
+yalahoo_check_tool(lupdate "-version")
+yalahoo_check_tool(lrelease "-version")
+qt_standard_project_setup(I18N_SOURCE_LANGUAGE en I18N_TRANSLATED_LANGUAGES zh_CN)
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 option(YALAHOO_REVIEW "Enable deterministic geometry review in the application" OFF)
@@ -49,6 +57,24 @@ add_subdirectory(src/render)
 add_subdirectory(tools/assets)
 add_subdirectory(tools/review)
 add_subdirectory(src/app)
+set(translation_source_targets
+    Yalahoo YalahooCore YalahooScene YalahooRhi YalahooNavigation YalahooText YalahooOpening ui-audit)
+foreach(target IN LISTS translation_source_targets)
+    set_property(TARGET "${target}" APPEND PROPERTY QT_EXCLUDE_SOURCES_FROM_TRANSLATION
+        "${PROJECT_SOURCE_DIR}/resources/*")
+endforeach()
+qt_add_translations(
+    TARGETS YalahooCore
+    SOURCE_TARGETS ${translation_source_targets}
+    TS_FILES "${PROJECT_SOURCE_DIR}/resources/i18n/yalahoo_zh_CN.ts"
+    PLURALS_TS_FILE "${PROJECT_SOURCE_DIR}/resources/i18n/yalahoo_en.ts"
+    QM_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/src/core"
+    RESOURCE_PREFIX /i18n
+    LUPDATE_OPTIONS -no-obsolete -locations none
+    LRELEASE_OPTIONS -fail-on-unfinished
+    MERGE_QT_TRANSLATIONS
+    QT_TRANSLATION_CATALOGS qtbase qtdeclarative qtmultimedia
+)
 enable_testing()
 include(cmake/SourceFormat.cmake)
 add_subdirectory(tests/unit)

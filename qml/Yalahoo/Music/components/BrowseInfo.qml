@@ -68,7 +68,7 @@ Flickable {
             ArchiveText {
                 id: eyebrowPrefix
                 tokens: root.tokens
-                text: "MUSIC ARCHIVE"
+                text: qsTr("MUSIC ARCHIVE")
                 cssPixelSize: eyebrow.size
                 cssLineHeight: cssPixelSize * 1.7
                 font.letterSpacing: 1.5
@@ -79,7 +79,7 @@ Flickable {
             }
             ArchiveText {
                 tokens: root.tokens
-                text: "／"
+                text: "\uff0f"
                 cssPixelSize: eyebrow.size
                 cssLineHeight: cssPixelSize * 1.7
                 font.letterSpacing: 1.5
@@ -90,7 +90,7 @@ Flickable {
             }
             ArchiveText {
                 tokens: root.tokens
-                text: root.album.genre || "未分类"
+                text: root.album.genre || qsTr("Unclassified")
                 cssPixelSize: eyebrow.size
                 cssLineHeight: cssPixelSize * 1.7
                 font.letterSpacing: 1.5
@@ -110,7 +110,7 @@ Flickable {
                 id: codeLabel
                 tokens: root.tokens
                 y: rule.ruleTop
-                text: root.clock ? "ALBUM " : "ALBUM " + root.ordinal
+                text: root.clock ? qsTr("ALBUM ") : qsTr("ALBUM %1").arg(root.ordinal)
                 cssPixelSize: root.metrics.width >= 1700 ? 12 : root.metrics.width <= 700 ? 8 : 10
                 font.letterSpacing: 1
             }
@@ -141,7 +141,7 @@ Flickable {
             tokens: root.tokens
             clock: root.clock
             width: parent.width
-            text: root.album.title || "让音乐进入这座档案馆。"
+            text: root.album.title || qsTr("Bring music into this archive.")
             pixelSize: root.titleSize
             narrow: root.metrics.width <= 700
             budget: Math.max(28, root.height - eyebrow.height - rule.height - artist.height
@@ -170,8 +170,9 @@ Flickable {
             id: meta
             tokens: root.tokens
             objectName: "albumMeta"
-            text: (root.album.year || "") + (root.album.year ? "  ·  " : "") + (root.album.tracks
-                                                                                || 0) + " TRACKS"
+            text: (root.album.year || "") + (root.album.year ? "  \u00b7  " : "") + qsTr("%n TRACKS",
+                                                                                         "", root.album.tracks
+                                                                                         || 0)
             color: root.tokens.muted
             cssPixelSize: root.metrics.width >= 1700 ? 12 : root.metrics.width <= 700 ? 9 : 10
             font.letterSpacing: 0.5
@@ -192,20 +193,20 @@ Flickable {
             bottomPadding: root.metrics.height <= 650 && root.metrics.width > 700 ? 9 :
                                                                                     root.metrics.width
                                                                                     <= 700 ? 8 : 15
-            text: "打开专辑"
+            text: qsTr("Open album")
             cssPixelSize: 16
             underline: true
             contentItem: Item {
                 ArchiveText {
                     tokens: root.tokens
                     objectName: "openAlbumCaption"
-                    text: "打开专辑"
+                    text: qsTr("Open album")
                     anchors.verticalCenter: parent.verticalCenter
                     cssPixelSize: 16
                 }
                 ArchiveText {
                     tokens: root.tokens
-                    text: "↗"
+                    text: "\u2197"
                     cssPixelSize: 24
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter

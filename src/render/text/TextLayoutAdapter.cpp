@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 struct Part
@@ -41,7 +43,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             // Frozen CSS font-synthesis:none keeps a regular color-font fallback regular.
             // The embedded primary faces still use their exact original SFNT weight/style.
             format.setFontWeight(QFont::Normal);
-            format.setFontStyleName(QStringLiteral("Regular"));
+            format.setFontStyleName(u"Regular"_s);
             formats.append({ graphemes[i], graphemes[i + 1] - graphemes[i], format });
         }
     }
@@ -123,8 +125,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             TitleGlyph glyph;
             if (!oneLine && start >= inkEnd)
                 continue;
-            glyph.key = QString("%1:%2:%3")
-                                .arg(translation ? "translation" : "main")
+            glyph.key = u"%1:%2:%3"_s.arg(translation ? "translation"_L1 : "main"_L1)
                                 .arg(index)
                                 .arg(column++);
             glyph.text = text.mid(start, std::min(next, inkEnd) - start);
@@ -159,20 +160,19 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
                 // Qt Quick Text retains the fallback face's own inline baseline.
                 glyph.baseline += line.ascent() - QFontMetricsF(font).ascent();
                 glyph.font.setWeight(QFont::Normal);
-                glyph.font.setStyleName(QStringLiteral("Regular"));
+                glyph.font.setStyleName(u"Regular"_s);
             }
             part.glyphs.append(glyph);
         }
         if (clamp && part.lines > visibleLines && index == visibleLines - 1) {
-            const auto ellipsis = shape(QStringLiteral("…"), font, size, width, ratio, spacing,
-                                        translation, true, false)
-                                          .glyphs.first();
+            const auto ellipsis =
+                    shape(u"\u2026"_s, font, size, width, ratio, spacing, translation, true, false)
+                            .glyphs.first();
             while (!part.glyphs.isEmpty() && part.glyphs.last().y == index * lineHeight
                    && part.glyphs.last().x + part.glyphs.last().width + ellipsis.width > width)
                 part.glyphs.removeLast();
             TitleGlyph dot = ellipsis;
-            dot.key = QString("%1:%2:%3")
-                              .arg(translation ? "translation" : "main")
+            dot.key = u"%1:%2:%3"_s.arg(translation ? "translation"_L1 : "main"_L1)
                               .arg(index)
                               .arg(column);
             dot.x = !part.glyphs.isEmpty() && part.glyphs.last().y == index * lineHeight
@@ -208,7 +208,7 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     QByteArray keyBytes;
     QDataStream stream(&keyBytes, QIODevice::WriteOnly);
     stream << text << main << subtitle << size << width << budget << narrow << dpr << transport;
-    const QString key = QString::fromLatin1(keyBytes.toBase64());
+    const QString key = QString::fromUtf8(keyBytes.toBase64());
     if (auto *cached = m_cache.object(key)) {
         m_keys.removeAll(key);
         m_keys.append(key);
@@ -218,10 +218,10 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     TitleLayout result;
     auto parts = transport ? qMakePair(text, QString()) : titleParts(text);
     if (!transport) {
-        static const QRegularExpression whitespace(QStringLiteral("[\\t\\n\\r\\f ]+"));
-        static const QRegularExpression ends(QStringLiteral("^ +| +$"));
-        parts.first.replace(whitespace, " ").remove(ends);
-        parts.second.replace(whitespace, " ").remove(ends);
+        static const QRegularExpression whitespace(u"[\\t\\n\\r\\f ]+"_s);
+        static const QRegularExpression ends(u"^ +| +$"_s);
+        parts.first.replace(whitespace, u" "_s).remove(ends);
+        parts.second.replace(whitespace, u" "_s).remove(ends);
     }
     const auto candidate = [&](double candidateSize, bool clamp, bool collect = false) {
         TitleLayout value;
@@ -244,14 +244,14 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
         result = candidate(size, false, true);
         result.fitted = text;
         if (result.naturalWidth > width) {
-            auto dots = shape(QStringLiteral("…"), main, size, width, 0, 0, false, true, false);
+            auto dots = shape(u"\u2026"_s, main, size, width, 0, 0, false, true, false);
             QString fitted;
             for (const auto &glyph : result.glyphs) {
                 if (glyph.x + glyph.width + dots.naturalWidth > width)
                     break;
                 fitted += glyph.text;
             }
-            result.fitted = dots.naturalWidth <= width ? fitted + QStringLiteral("…") : QString();
+            result.fitted = dots.naturalWidth <= width ? fitted + u"\u2026"_s : QString();
             result.glyphs =
                     shape(result.fitted, main, size, width, 0, 0, false, true, false).glyphs;
         }
@@ -290,6 +290,10 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
             bytes += sizeof(ResolvedGlyphRun) + run.fontHead.size()
                     + run.indexes.size() * (sizeof(quint32) + sizeof(QPointF));
     }
+    // Byte-cost eviction can remove entries independently of the entry-count LRU.
+    m_keys.removeIf([this, &key](const QString &cached) {
+        return cached == key || !m_cache.contains(cached);
+    });
     // Entry and byte LRU bounds complement each other; oversized inputs are never cached.
     if (m_keys.size() >= 96)
         m_cache.remove(m_keys.takeFirst());

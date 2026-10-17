@@ -58,7 +58,7 @@ public:
     {
         return m_revision;
     }
-signals:
+Q_SIGNALS:
     void changed();
     void started();
     void handedOff();

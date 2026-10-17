@@ -9,6 +9,9 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QSignalSpy>
+#include <memory>
+
+using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
@@ -25,9 +28,9 @@ struct Fixture
     {
         QList<LibraryColumn> columns;
         for (int lane = 0; lane < counts.size(); ++lane) {
-            LibraryColumn column{ QString::number(lane), QString("列 %1").arg(lane), { } };
+            LibraryColumn column{ QString::number(lane), u"\u5217 %1"_s.arg(lane), { } };
             for (int row = 0; row < counts[lane]; ++row)
-                column.albumIds.append(QString("a%1-%2").arg(lane).arg(row + 12));
+                column.albumIds.append(u"a%1-%2"_s.arg(lane).arg(row + 12));
             columns.append(column);
         }
         selection.setColumns(columns);
@@ -48,7 +51,8 @@ struct Fixture
 };
 QJsonObject golden()
 {
-    QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/overview/source-golden.json"));
+    QFile file(
+            (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/overview/source-golden.json"_s));
     if (!file.open(QIODevice::ReadOnly))
         qFatal("Missing frozen overview fixture");
     return QJsonDocument::fromJson(file.readAll()).object();
@@ -58,9 +62,9 @@ QVector<OverviewColumn> columns(const QJsonArray &array)
     QVector<OverviewColumn> result;
     for (const auto value : array) {
         const auto c = value.toObject();
-        result.append({ c["lane"].toInt(), c["name"].toString(), c["count"].toInt(),
-                        c["x"].toDouble(), c["y"].toDouble(), c["extent"].toDouble(),
-                        c["selected"].toBool() });
+        result.append({ c[u"lane"_s].toInt(), c[u"name"_s].toString(), c[u"count"_s].toInt(),
+                        c[u"x"_s].toDouble(), c[u"y"_s].toDouble(), c[u"extent"_s].toDouble(),
+                        c[u"selected"_s].toBool() });
     }
     return result;
 }
@@ -68,45 +72,82 @@ QVector<OverviewColumn> columns(const QJsonArray &array)
 class OverviewTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void dependencyTeardownClearsOverviewAndRejectsNewCommands()
+    {
+        for (int removed = 0; removed < 4; ++removed) {
+            auto motion = std::make_unique<MotionController>();
+            auto selection = std::make_unique<SelectionController>(motion.get());
+            auto scene = std::make_unique<SceneAdapter>(motion->clock());
+            auto presentation =
+                    std::make_unique<PresentationController>(motion->clock(), PresentationPorts{ });
+            OverviewController overview(motion.get());
+            selection->setColumns({ LibraryColumn{ u"one"_s, u"One"_s, { u"album"_s } } });
+            scene->setSelection(selection.get());
+            overview.bind(scene.get(), selection.get(), presentation.get());
+            overview.setActive(true);
+            overview.advance(1, true);
+            overview.synchronize(0, true);
+            QVERIFY(overview.active());
+            if (removed == 0)
+                scene.reset();
+            else if (removed == 1)
+                selection.reset();
+            else if (removed == 2)
+                presentation.reset();
+            else
+                motion.reset();
+            QVERIFY(!overview.active());
+            QCOMPARE(overview.labels()->liveCount(), 0);
+            if (motion)
+                motion->setReducedMotion(true);
+            overview.toggle();
+            overview.advance(.1, true);
+            overview.synchronize(.1, true);
+            overview.expand(0);
+            QVERIFY(!overview.enter(0));
+            QVERIFY(!overview.active());
+        }
+    }
     void frozenMotionEdgesAndCollisions()
     {
         double maximum = 0;
         const auto source = golden();
-        for (const auto value : source["cases"].toArray()) {
+        for (const auto value : source[u"cases"_s].toArray()) {
             Fixture f({ 3, 4, 7 });
-            for (const auto sample : value.toObject()["samples"].toArray()) {
+            for (const auto sample : value.toObject()[u"samples"_s].toArray()) {
                 const auto s = sample.toObject();
-                f.overview.setActive(s["active"].toBool());
-                f.overview.advance(s["dt"].toDouble(), s["reduced"].toBool());
-                maximum =
-                        std::max({ maximum, std::abs(f.overview.progress() - s["value"].toDouble()),
-                                   std::abs(f.overview.state().velocity - s["velocity"].toDouble()),
-                                   std::abs(f.overview.state().acceleration
-                                            - s["acceleration"].toDouble()) });
+                f.overview.setActive(s[u"active"_s].toBool());
+                f.overview.advance(s[u"dt"_s].toDouble(), s[u"reduced"_s].toBool());
+                maximum = std::max(
+                        { maximum, std::abs(f.overview.progress() - s[u"value"_s].toDouble()),
+                          std::abs(f.overview.state().velocity - s[u"velocity"_s].toDouble()),
+                          std::abs(f.overview.state().acceleration
+                                   - s[u"acceleration"_s].toDouble()) });
             }
         }
         QVERIFY2(maximum <= 1e-6, qPrintable(QString::number(maximum, 'g', 16)));
-        for (const auto value : source["extents"].toArray()) {
+        for (const auto value : source[u"extents"_s].toArray()) {
             const auto s = value.toObject();
-            QVERIFY(std::abs(OverviewController::columnExtent(s["lane"].toDouble(),
-                                                              s["center"].toDouble(),
-                                                              s["progress"].toDouble())
-                             - s["value"].toDouble())
+            QVERIFY(std::abs(OverviewController::columnExtent(s[u"lane"_s].toDouble(),
+                                                              s[u"center"_s].toDouble(),
+                                                              s[u"progress"_s].toDouble())
+                             - s[u"value"_s].toDouble())
                     <= 1e-6);
         }
-        for (const auto value : source["labels"].toArray()) {
+        for (const auto value : source[u"labels"_s].toArray()) {
             const auto s = value.toObject();
             QSet<int> retained;
-            for (const auto lane : s["retained"].toArray())
+            for (const auto lane : s[u"retained"_s].toArray())
                 retained.insert(lane.toInt());
             const auto visible = OverviewLabelsModel::visibleLabels(
-                    columns(s["columns"].toArray()), s["width"].toDouble(), s["height"].toDouble(),
-                    retained, s["expanded"].isNull() ? -1 : s["expanded"].toInt());
+                    columns(s[u"columns"_s].toArray()), s[u"width"_s].toDouble(),
+                    s[u"height"_s].toDouble(), retained,
+                    s[u"expanded"_s].isNull() ? -1 : s[u"expanded"_s].toInt());
             QJsonArray actual;
             for (const auto &c : visible)
                 actual.append(c.lane);
-            QCOMPARE(actual, s["visible"].toArray());
+            QCOMPARE(actual, s[u"visible"_s].toArray());
         }
         qInfo() << "Maximum frozen progress error" << maximum;
     }
@@ -117,14 +158,16 @@ private slots:
             const auto a = v.toArray();
             return SceneVector{ a[0].toDouble(), a[1].toDouble(), a[2].toDouble() };
         };
-        for (const auto value : golden()["cameraCases"].toArray()) {
-            const auto c = value.toObject(), b = c["base"].toObject(), e = c["expected"].toObject();
+        for (const auto value : golden()[u"cameraCases"_s].toArray()) {
+            const auto c = value.toObject(), b = c[u"base"_s].toObject(),
+                       e = c[u"expected"_s].toObject();
             const auto actual = OverviewController::framing(
-                    { vector(b["position"]), vector(b["aim"]), b["span"].toDouble() },
-                    c["width"].toDouble(), c["height"].toDouble(), c["progress"].toDouble());
-            maximum = std::max({ maximum, (actual.position - vector(e["position"])).length(),
-                                 (actual.aim - vector(e["aim"])).length(),
-                                 std::abs(actual.span - e["span"].toDouble()) });
+                    { vector(b[u"position"_s]), vector(b[u"aim"_s]), b[u"span"_s].toDouble() },
+                    c[u"width"_s].toDouble(), c[u"height"_s].toDouble(),
+                    c[u"progress"_s].toDouble());
+            maximum = std::max({ maximum, (actual.position - vector(e[u"position"_s])).length(),
+                                 (actual.aim - vector(e[u"aim"_s])).length(),
+                                 std::abs(actual.span - e[u"span"_s].toDouble()) });
         }
         QVERIFY2(maximum <= 1e-6, qPrintable(QString::number(maximum, 'g', 16)));
         qInfo() << "Maximum frozen camera error" << maximum;
@@ -149,22 +192,22 @@ private slots:
         QVERIFY(f.selection.selectCell({ 2, 48 }, true));
         f.motion.finish();
         double maximum = 0;
-        for (const auto value : golden()["projections"].toArray()) {
+        for (const auto value : golden()[u"projections"_s].toArray()) {
             const auto s = value.toObject();
-            f.selection.setRealistic(s["mode"] == "realistic");
+            f.selection.setRealistic(s[u"mode"_s] == u"realistic"_s);
             f.motion.finish();
             f.selection.advance(10);
-            f.scene.layout()->setViewport(s["width"].toDouble(), s["height"].toDouble());
-            const auto pose =
-                    OverviewController::framing({ { 0, 0, 140 }, { 0, 0, 0 }, 7.33 },
-                                                s["width"].toDouble(), s["height"].toDouble(), 1);
+            f.scene.layout()->setViewport(s[u"width"_s].toDouble(), s[u"height"_s].toDouble());
+            const auto pose = OverviewController::framing({ { 0, 0, 140 }, { 0, 0, 0 }, 7.33 },
+                                                          s[u"width"_s].toDouble(),
+                                                          s[u"height"_s].toDouble(), 1);
             // Projection fixture pins the wide camera independently of motion progress.
             f.scene.observe(pose, 0);
             f.overview.setActive(true);
             // Reach each exact source progress through the actual controller's rate-6.5 trajectory.
             f.overview.reset();
             f.overview.setActive(true);
-            const double target = s["progress"].toDouble();
+            const double target = s[u"progress"_s].toDouble();
             if (target == 1)
                 f.overview.advance(0, true);
             else if (target > 0) {
@@ -181,7 +224,7 @@ private slots:
             }
             f.scene.observe(pose, 0);
             const auto actual = f.overview.projectColumns();
-            const auto expected = columns(s["columns"].toArray());
+            const auto expected = columns(s[u"columns"_s].toArray());
             QCOMPARE(actual.size(), expected.size());
             for (int i = 0; i < actual.size(); ++i) {
                 QCOMPARE(actual[i].lane, expected[i].lane);
@@ -249,7 +292,7 @@ private slots:
     void retiringAnchorReversalAndSlotReuse()
     {
         OverviewLabelsModel labels;
-        OverviewColumn column{ 1, "第一列", 8, 800, 400, 1, true };
+        OverviewColumn column{ 1, u"\u7b2c\u4e00\u5217"_s, 8, 800, 400, 1, true };
         const auto rowFor = [&](int lane) {
             for (int row = 0; row < labels.rowCount(); ++row)
                 if (labels.data(labels.index(row), OverviewLabelsModel::Lane).toInt() == lane)

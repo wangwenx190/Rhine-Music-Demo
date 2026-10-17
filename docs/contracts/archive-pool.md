@@ -18,7 +18,7 @@
 
 ## 热路径与资源
 
-快照/排序边界建立 O(N) 的稳定 ID→格及 ID→本地封面描述索引；LibrarySession 在快照边界建立 O(N+T) 的专辑/曲目身份索引，使池导航同步无需线性查库，重复身份保留原先的首项语义。未接入库的 SelectionController 不接管其他运动调用。帧中只处理 432 格和四个有限接管对象。renderer 可接收最多 436 个对象，含窗口外有限归位/选中格；固定 buffer 容量不随实际实体数量切换。可见性每帧计算一次，depth key 先生成再排序；剔除只影响可见 draw，完整世界空间阴影 caster 不丢失。实体公共光场缓存按矩阵/灯光键失效，沿用现有渲染图。
+快照/排序边界建立 O(N) 的稳定 ID→格及 ID→本地封面描述索引（完整显示名与有界字素占位标题分开保留）；LibrarySession 在快照边界建立 O(N+T) 的专辑/曲目身份索引，使池导航同步无需线性查库，重复身份保留原先的首项语义。未接入库的 SelectionController 不接管其他运动调用。帧中只处理 432 格和四个有限接管对象。renderer 可接收最多 436 个对象，含窗口外有限归位/选中格；固定 buffer 容量不随实际实体数量切换。可见性每帧计算一次，depth key 先生成再排序；剔除只影响可见 draw，完整世界空间阴影 caster 不丢失。实体公共光场缓存按矩阵/灯光键失效，沿用现有渲染图。
 
 生产池使用一张 5632×6656 RGBA8 atlas，无 mip、线性 clamp：前 22×22 tile 区域容纳最多 436 个 256² 身份槽，底部四个 1024² 区域供 selected/returning。保持既有 256/1024 清晰度与 contain/留边数学；高分辨率快照仅在 revision 改变时拆成十六个 256² 区域，一张高图跨常态 2MiB 上传预算提交，全部区域准备好后才暴露高图 UV，准备中使用已就绪的低清晰度 tile。设备最大二维纹理尺寸须至少 6656；分配前按实际 QRhi 限制、格式和累计 ResourcePlan 核对，不支持时明确报错。该布局没有宣称适用于所有 GPU 的通用 VRAM 阈值。
 
@@ -46,4 +46,4 @@ SceneAdapter 销毁后的晚到封面回调直接丢弃；CoverCacheTest 的隐�
 
 `archive-pool`核对池顺序/方向/半周期、field与矩阵、接管/归位/重新接管、非零导数rebase、拾取、空库/90,000库/LCM溢出及播放隔离。数学输入在`tests/fixtures/archive-pool/golden.json`；源导出`node tools/review/export-archive-pool-golden.mjs`。
 
-Review `archive-pool-gpu`直接运行SceneItem，验证432池、低/高清准备、局部上传/稳态零上传、真实输入与四槽所有权、双主题/rebase、实体数量不重建目标、十次SG重建。只核对源矩阵/投影、自己输出的有效区域与实际资源，不比较浏览器图片。入口分组见test-gates.md；历史脚本verify-r12.ps1的图像评分不可恢复，目标剩余要求归计划R34/R19B-P。
+Review `archive-pool-gpu`直接运行SceneItem，验证432池、低/高清准备、局部上传/稳态零上传、真实输入与四槽所有权、双主题/rebase、实体数量不重建目标、十次SG重建。只核对源矩阵/投影、自己输出的有效区域与实际资源，不比较浏览器图片。入口分组见test-gates.md；目标剩余要求归计划R34/R19B-P。

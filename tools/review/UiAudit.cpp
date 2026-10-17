@@ -1,3 +1,5 @@
+#include "Localization.h"
+#include "ReadbackImage.h"
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "OpeningAudit.h"
@@ -34,12 +36,15 @@
 #include <QScreen>
 #include <QFontMetricsF>
 #include <functional>
+#include <stdexcept>
 #include <algorithm>
 #include <cstdio>
 #include <atomic>
 #include <QMutex>
 #include <QMutexLocker>
 #include <rhi/qrhi.h>
+
+using namespace Qt::StringLiterals;
 
 namespace {
 QJsonArray diagnostics;
@@ -69,19 +74,19 @@ QJsonObject bounds(QQuickItem *root, const QString &name)
     const auto point = item->mapToScene({ 0, 0 });
     const auto font = item->property("font").value<QFont>();
     const QFontMetricsF fontMetrics(font);
-    return { { "x", point.x() },
-             { "y", point.y() },
-             { "width", item->width() },
-             { "height", item->height() },
-             { "visible", item->isVisible() },
-             { "baseline", item->baselineOffset() },
-             { "ascent",
+    return { { u"x"_s, point.x() },
+             { u"y"_s, point.y() },
+             { u"width"_s, item->width() },
+             { u"height"_s, item->height() },
+             { u"visible"_s, item->isVisible() },
+             { u"baseline"_s, item->baselineOffset() },
+             { u"ascent"_s,
                item->property("cssAscent").isValid() ? item->property("cssAscent").toDouble()
                                                      : fontMetrics.ascent() },
-             { "descent",
+             { u"descent"_s,
                item->property("cssDescent").isValid() ? item->property("cssDescent").toDouble()
                                                       : fontMetrics.descent() },
-             { "implicitHeight", item->implicitHeight() } };
+             { u"implicitHeight"_s, item->implicitHeight() } };
 }
 }
 int main(int argc, char **argv)
@@ -93,6 +98,7 @@ int main(int argc, char **argv)
         return 2;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    const yalahoo::Localization localization(QLocale(QLocale::Chinese, QLocale::China));
     yalahoo::probeOptionalGraphicsBackend();
     const auto coverShutdown = qScopeGuard([] {
         yalahoo::CoverCache::finishDecoders();
@@ -100,54 +106,54 @@ int main(int argc, char **argv)
     const auto applicationNs = bootstrapTimer.nsecsElapsed();
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
-    if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--native-dpr") {
+    if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--native-dpr"_L1) {
         std::printf("%.9f\n", app.primaryScreen()->devicePixelRatio());
         return 0;
     }
     if (argc < 2 || !yalahoo::initializeAssetFonts())
         return 2;
     const auto fontsNs = bootstrapTimer.nsecsElapsed();
-    qputenv("QCPAINTER_DEBUG_COLLECT", "0");
+    qputenv("QCPAINTER_DEBUG_COLLECT", "0"_ba);
     qInstallMessageHandler(message);
-    if (app.arguments().contains("--controls"))
+    if (app.arguments().contains(u"--controls"_s))
         return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--experiments"))
+    if (app.arguments().contains(u"--experiments"_s))
         return argc == 3 ? reviewExperiments(QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--settings"))
+    if (app.arguments().contains(u"--settings"_s))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true, true) : 2;
-    if (app.arguments().contains("--playback"))
+    if (app.arguments().contains(u"--playback"_s))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
-    if (app.arguments().contains("--library"))
+    if (app.arguments().contains(u"--library"_s))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--gui"))
-        return argc == 3 || (argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow")
+    if (app.arguments().contains(u"--gui"_s))
+        return argc == 3 || (argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow"_L1)
                 ? reviewGui(QString::fromLocal8Bit(argv[2]), argc == 4)
                 : 2;
-    if (app.arguments().contains("--startup")) {
+    if (app.arguments().contains(u"--startup"_s)) {
         bool validSeconds = true;
         const double seconds =
                 argc >= 4 ? QString::fromLocal8Bit(argv[3]).toDouble(&validSeconds) : 0;
         return (argc == 3 || argc == 4 || argc == 5) && validSeconds
                 ? reviewStartup(
                           app, QString::fromLocal8Bit(argv[2]), seconds,
-                          { { "applicationSetupMs", applicationNs / 1e6 },
-                            { "fontAndArgumentSetupMs", (fontsNs - applicationNs) / 1e6 },
-                            { "scope",
-                              "Review main entry through QGuiApplication and embedded font/argument setup; excludes pre-main loader, anonymous fixture generation, model/cover/render preparation and native presentation." } },
-                          argc == 5 ? QString::fromLocal8Bit(argv[4]) : QStringLiteral("matrix"))
+                          { { u"applicationSetupMs"_s, applicationNs / 1e6 },
+                            { u"fontAndArgumentSetupMs"_s, (fontsNs - applicationNs) / 1e6 },
+                            { u"scope"_s,
+                              u"Review main entry through QGuiApplication and embedded font/argument setup; excludes pre-main loader, anonymous fixture generation, model/cover/render preparation and native presentation."_s } },
+                          argc == 5 ? QString::fromLocal8Bit(argv[4]) : u"matrix"_s)
                 : 2;
     }
-    if (app.arguments().contains("--opening"))
+    if (app.arguments().contains(u"--opening"_s))
         return argc == 3 ? reviewOpening(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--overview"))
+    if (app.arguments().contains(u"--overview"_s))
         return argc == 3 ? reviewOverviewVisual(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--presentation"))
+    if (app.arguments().contains(u"--presentation"_s))
         return argc == 3 ? reviewPresentation(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--ruler"))
+    if (app.arguments().contains(u"--ruler"_s))
         return argc == 3 ? reviewRuler(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains("--titles")) {
+    if (app.arguments().contains(u"--titles"_s)) {
         const auto arguments = app.arguments();
-        if ((arguments.size() != 3 && arguments.size() != 4) || arguments[1] != "--titles")
+        if ((arguments.size() != 3 && arguments.size() != 4) || arguments[1] != "--titles"_L1)
             return 2;
         return reviewTitle(app, arguments[2], arguments.size() == 4 ? arguments[3] : QString());
     }
@@ -155,9 +161,9 @@ int main(int argc, char **argv)
     QDir().mkpath(output);
     yalahoo::LayoutMetrics metrics;
     QQmlEngine engine;
-    QQmlComponent component(&engine, QUrl("qrc:/qt/qml/Yalahoo/Music/UiReview.qml"));
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/UiReview.qml"_s));
     std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { "metrics", QVariant::fromValue(&metrics) } }));
+            { { u"metrics"_s, QVariant::fromValue(&metrics) } }));
     auto *root = qobject_cast<QQuickItem *>(object.get());
     if (!root) {
         qWarning() << component.errors();
@@ -183,7 +189,7 @@ int main(int argc, char **argv)
     QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 }, { 995, 858 },   { 960, 900 },  { 930, 900 },
                         { 390, 844 },   { 320, 720 },  { 2560, 1080 }, { 3440, 1440 } };
     QJsonArray captures, probes, lifecycle;
-    if (app.arguments().contains("--representative"))
+    if (app.arguments().contains(u"--representative"_s))
         sizes = { { 1280, 720 }, { 930, 900 }, { 390, 844 } };
     quint64 swapped = 0;
     QObject::connect(
@@ -233,13 +239,14 @@ int main(int argc, char **argv)
                 const int captureRevision = requestedCaptureRevision;
                 const bool flip = rhi->isYUpInFramebuffer();
                 readback.completed = [&, flip, captureRevision] {
-                    const auto format = readback.format == QRhiTexture::BGRA8
-                            ? QImage::Format_ARGB32
-                            : QImage::Format_RGBA8888;
-                    QImage frame(reinterpret_cast<const uchar *>(readback.data.constData()),
-                                 readback.pixelSize.width(), readback.pixelSize.height(), format);
+                    QImage frame;
+                    try {
+                        frame = yalahoo::rhi::readbackImage(readback, flip);
+                    } catch (const std::runtime_error &error) {
+                        qWarning("UI readback: %s", error.what());
+                    }
                     const QMutexLocker lock(&captureMutex);
-                    capturedFrame = flip ? frame.flipped(Qt::Vertical) : frame.copy();
+                    capturedFrame = std::move(frame);
                     completedCaptureRevision = captureRevision;
                     captureInFlight = false;
                 };
@@ -268,42 +275,45 @@ int main(int argc, char **argv)
             root->setProperty("night", index % 2 == 1);
             QTimer::singleShot(150, &app, [&, index, size] {
                 const auto image = surface.grab();
-                const QString file = QString("browse-%1.png").arg(index, 2, 10, QChar('0'));
-                const auto info = bounds(root, "browseInfo");
-                const auto play = bounds(root, "playButton");
-                const auto stop = bounds(root, "stopButton");
-                const auto header = bounds(root, "archiveHeader");
-                const bool valid = !image.isNull() && image.save(output + '/' + file)
-                        && std::abs(info["x"].toDouble() - metrics.informationX()) < 0.01
-                        && play["x"].toDouble() + play["width"].toDouble() <= size.width()
-                        && stop["x"].toDouble() + stop["width"].toDouble() <= size.width()
+                const QString file = u"browse-%1.png"_s.arg(index, 2, 10, '0'_L1);
+                const auto info = bounds(root, u"browseInfo"_s);
+                const auto play = bounds(root, u"playButton"_s);
+                const auto stop = bounds(root, u"stopButton"_s);
+                const auto header = bounds(root, u"archiveHeader"_s);
+                const bool valid = !image.isNull() && image.save(output + '/'_L1 + file)
+                        && std::abs(info[u"x"_s].toDouble() - metrics.informationX()) < 0.01
+                        && play[u"x"_s].toDouble() + play[u"width"_s].toDouble() <= size.width()
+                        && stop[u"x"_s].toDouble() + stop[u"width"_s].toDouble() <= size.width()
                         && yalahoo::verification::windowPolicySatisfied(window);
                 passed &= valid;
-                captures.append(QJsonObject{ { "width", size.width() },
-                                             { "height", size.height() },
-                                             { "night", index % 2 == 1 },
-                                             { "dpr", window.devicePixelRatio() },
-                                             { "file", file },
-                                             { "passed", valid },
-                                             { "header", header },
-                                             { "browse", info },
-                                             { "footer", bounds(root, "archiveFooter") },
-                                             { "play", play },
-                                             { "stop", stop },
-                                             { "title", bounds(root, "albumTitle") },
-                                             { "artist", bounds(root, "albumArtist") },
-                                             { "meta", bounds(root, "albumMeta") },
-                                             { "open", bounds(root, "openAlbumButton") },
-                                             { "openCaption", bounds(root, "openAlbumCaption") },
-                                             { "settingsSvg", bounds(root, "settingsIcon") },
-                                             { "brand", bounds(root, "brandContainer") },
-                                             { "number", bounds(root, "staticOrdinal") },
-                                             { "total", bounds(root, "staticTotal") } });
-                root->setProperty("playingTitle",
-                                  QStringLiteral("播放中的长歌曲标题保持按钮位置").repeated(5));
+                captures.append(
+                        QJsonObject{ { u"width"_s, size.width() },
+                                     { u"height"_s, size.height() },
+                                     { u"night"_s, index % 2 == 1 },
+                                     { u"dpr"_s, window.devicePixelRatio() },
+                                     { u"file"_s, file },
+                                     { u"passed"_s, valid },
+                                     { u"header"_s, header },
+                                     { u"browse"_s, info },
+                                     { u"footer"_s, bounds(root, u"archiveFooter"_s) },
+                                     { u"play"_s, play },
+                                     { u"stop"_s, stop },
+                                     { u"title"_s, bounds(root, u"albumTitle"_s) },
+                                     { u"artist"_s, bounds(root, u"albumArtist"_s) },
+                                     { u"meta"_s, bounds(root, u"albumMeta"_s) },
+                                     { u"open"_s, bounds(root, u"openAlbumButton"_s) },
+                                     { u"openCaption"_s, bounds(root, u"openAlbumCaption"_s) },
+                                     { u"settingsSvg"_s, bounds(root, u"settingsIcon"_s) },
+                                     { u"brand"_s, bounds(root, u"brandContainer"_s) },
+                                     { u"number"_s, bounds(root, u"staticOrdinal"_s) },
+                                     { u"total"_s, bounds(root, u"staticTotal"_s) } });
+                root->setProperty(
+                        "playingTitle",
+                        u"\u64ad\u653e\u4e2d\u7684\u957f\u6b4c\u66f2\u6807\u9898\u4fdd\u6301\u6309\u94ae\u4f4d\u7f6e"_s
+                                .repeated(5));
                 QTimer::singleShot(150, &app, [&, play, stop, size] {
-                    const auto afterPlay = bounds(root, "playButton");
-                    const auto afterStop = bounds(root, "stopButton");
+                    const auto afterPlay = bounds(root, u"playButton"_s);
+                    const auto afterStop = bounds(root, u"stopButton"_s);
                     const bool fixed = play == afterPlay && stop == afterStop;
                     auto *transport = root->findChild<QObject *>("minimalTransport");
                     const double cap = size.width() / double(size.height()) < 1.05
@@ -314,11 +324,12 @@ int main(int argc, char **argv)
                     const bool sourceCap =
                             transport && transport->property("songCap").toDouble() == cap;
                     passed &= fixed && sourceCap;
-                    lifecycle.append(QJsonObject{ { "operation", "playing-title-fixed-buttons" },
-                                                  { "width", size.width() },
-                                                  { "height", size.height() },
-                                                  { "passed", fixed && sourceCap } });
-                    root->setProperty("playingTitle", "");
+                    lifecycle.append(
+                            QJsonObject{ { u"operation"_s, u"playing-title-fixed-buttons"_s },
+                                         { u"width"_s, size.width() },
+                                         { u"height"_s, size.height() },
+                                         { u"passed"_s, fixed && sourceCap } });
+                    root->setProperty("playingTitle", u""_s);
                     wait(0);
                 });
             });
@@ -353,8 +364,8 @@ int main(int argc, char **argv)
                     image = capturedFrame.copy(QRect(0, 0, qRound(360 * window.devicePixelRatio()),
                                                      qRound(160 * window.devicePixelRatio())));
                 }
-                const QString file = QString("probe-%1.png").arg(index);
-                passed &= !image.isNull() && image.save(output + '/' + file);
+                const QString file = u"probe-%1.png"_s.arg(index);
+                passed &= !image.isNull() && image.save(output + '/'_L1 + file);
                 const bool matchingRevision = completedCaptureRevision == requestedCaptureRevision;
                 passed &= matchingRevision;
                 if (image.isNull() || !matchingRevision) {
@@ -363,11 +374,11 @@ int main(int argc, char **argv)
                     app.exit(6);
                     return;
                 }
-                QJsonObject record{ { "mode", index % 3 },
-                                    { "night", index / 3 == 1 },
-                                    { "dpr", window.devicePixelRatio() },
-                                    { "file", file } };
-                record.insert("captureRevisionMatched", matchingRevision);
+                QJsonObject record{ { u"mode"_s, index % 3 },
+                                    { u"night"_s, index / 3 == 1 },
+                                    { u"dpr"_s, window.devicePixelRatio() },
+                                    { u"file"_s, file } };
+                record.insert(u"captureRevisionMatched"_s, matchingRevision);
                 int textPixels = 0;
                 const auto dpr = window.devicePixelRatio();
                 const auto background = image.pixelColor(image.width() - 1, image.height() - 1);
@@ -381,25 +392,25 @@ int main(int argc, char **argv)
                             ++textPixels;
                     }
                 }
-                record.insert("visibleTextPixels", textPixels);
+                record.insert(u"visibleTextPixels"_s, textPixels);
                 passed &= textPixels > 100;
-                record.insert("guiStateSetNs", guiStateNs);
-                record.insert("quickSyncCpuNs", qint64(syncNs - modeSyncStart));
-                record.insert("quickRenderCpuNs", qint64(renderNs - modeRenderStart));
-                record.insert("gpuNanoseconds", QJsonValue::Null);
-                const QString painterName = index % 3 == 0 ? "canvasCpp" : "canvasJs";
+                record.insert(u"guiStateSetNs"_s, guiStateNs);
+                record.insert(u"quickSyncCpuNs"_s, qint64(syncNs - modeSyncStart));
+                record.insert(u"quickRenderCpuNs"_s, qint64(renderNs - modeRenderStart));
+                record.insert(u"gpuNanoseconds"_s, QJsonValue::Null);
+                const QString painterName = index % 3 == 0 ? u"canvasCpp"_s : u"canvasJs"_s;
                 if (auto *item = root->findChild<QObject *>(painterName))
-                    record.insert("moduleDebug",
+                    record.insert(u"moduleDebug"_s,
                                   QJsonObject::fromVariantMap(item->property("debug").toMap()));
-                record.insert("attachmentBytesUpperBound",
+                record.insert(u"attachmentBytesUpperBound"_s,
                               qint64(360 * 160 * window.devicePixelRatio()
                                      * window.devicePixelRatio() * 12));
                 if (auto *js = root->findChild<QObject *>("canvasJs")) {
-                    record.insert("scriptMilliseconds",
+                    record.insert(u"scriptMilliseconds"_s,
                                   js->property("scriptMilliseconds").toDouble());
-                    record.insert("paintCount", js->property("paintCount").toInt());
+                    record.insert(u"paintCount"_s, js->property("paintCount").toInt());
                 }
-                record.insert("painterPaints", qint64(canvasProbeStats().paints.load()));
+                record.insert(u"painterPaints"_s, qint64(canvasProbeStats().paints.load()));
                 probes.append(record);
                 wait(0);
             });
@@ -428,7 +439,8 @@ int main(int argc, char **argv)
                     : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong()
                             == stationaryPaints;
             passed &= stable;
-            lifecycle.append(QJsonObject{ { "operation", "stationary" }, { "passed", stable } });
+            lifecycle.append(
+                    QJsonObject{ { u"operation"_s, u"stationary"_s }, { u"passed"_s, stable } });
             surface.hide();
             stationaryPaints = lifecycleMode == 0
                     ? canvasProbeStats().paints.load()
@@ -442,7 +454,8 @@ int main(int argc, char **argv)
                     : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong()
                             == stationaryPaints;
             passed &= stable;
-            lifecycle.append(QJsonObject{ { "operation", "hidden" }, { "passed", stable } });
+            lifecycle.append(
+                    QJsonObject{ { u"operation"_s, u"hidden"_s }, { u"passed"_s, stable } });
             window.releaseResources();
             surface.show();
             window.resize(420, 200);
@@ -466,16 +479,16 @@ int main(int argc, char **argv)
                 }
                 const auto expectedSize = QSize(qRound(420 * window.devicePixelRatio()),
                                                 qRound(200 * window.devicePixelRatio()));
-                const QString file = QString("restored-%1.png").arg(lifecycleMode);
-                const bool saved = restored.save(output + '/' + file);
+                const QString file = u"restored-%1.png"_s.arg(lifecycleMode);
+                const bool saved = restored.save(output + '/'_L1 + file);
                 const bool valid = completedCaptureRevision == requestedCaptureRevision
                         && restored.size() == expectedSize && saved
                         && yalahoo::verification::windowPolicySatisfied(window);
                 passed &= valid;
-                lifecycle.append(QJsonObject{ { "operation", "restore-resize-content" },
-                                              { "mode", lifecycleMode },
-                                              { "passed", valid },
-                                              { "file", file } });
+                lifecycle.append(QJsonObject{ { u"operation"_s, u"restore-resize-content"_s },
+                                              { u"mode"_s, lifecycleMode },
+                                              { u"passed"_s, valid },
+                                              { u"file"_s, file } });
             }
             root->setProperty("probes", phase % 2 != 0);
             wait(80);
@@ -489,9 +502,12 @@ int main(int argc, char **argv)
                 root->setSize({ 320, 480 });
                 root->setProperty(
                         "titleText",
-                        QStringLiteral("长标题中文与组合字 é、下伸 gyp 🎵 ").repeated(20));
-                root->setProperty("playingTitle",
-                                  QStringLiteral("当前播放歌曲保持固定按钮位置").repeated(5));
+                        u"\u957f\u6807\u9898\u4e2d\u6587\u4e0e\u7ec4\u5408\u5b57 e\u0301\u3001\u4e0b\u4f38 gyp \U0001f3b5 "_s
+                                .repeated(20));
+                root->setProperty(
+                        "playingTitle",
+                        u"\u5f53\u524d\u64ad\u653e\u6b4c\u66f2\u4fdd\u6301\u56fa\u5b9a\u6309\u94ae\u4f4d\u7f6e"_s
+                                .repeated(5));
             }
             wait(200);
             return;
@@ -500,8 +516,8 @@ int main(int argc, char **argv)
                 canvasProbeStats().renderers == 0 && !root->findChild<QObject *>("canvasJs");
         if (lifecycleMode == 0) {
             passed &= released;
-            lifecycle.append(QJsonObject{ { "operation", "cpp-ten-rebuilds-release" },
-                                          { "passed", released } });
+            lifecycle.append(QJsonObject{ { u"operation"_s, u"cpp-ten-rebuilds-release"_s },
+                                          { u"passed"_s, released } });
             wait(0);
             return;
         }
@@ -509,12 +525,12 @@ int main(int argc, char **argv)
         const bool scrollable =
                 shortInfo && shortInfo->property("contentHeight").toDouble() > shortInfo->height();
         passed &= scrollable;
-        lifecycle.append(
-                QJsonObject{ { "operation", "short-portrait-scroll" }, { "passed", scrollable } });
+        lifecycle.append(QJsonObject{ { u"operation"_s, u"short-portrait-scroll"_s },
+                                      { u"passed"_s, scrollable } });
         for (const auto &[name, action] :
              { std::pair{ "playButton", "play-pause" }, std::pair{ "stopButton", "stop" },
                std::pair{ "openAlbumButton", "open" } }) {
-            auto *button = findItem(root, name);
+            auto *button = findItem(root, QString::fromUtf8(name));
             const int before = root->property("actionCount").toInt();
             if (button) {
                 button->forceActiveFocus(Qt::TabFocusReason);
@@ -522,20 +538,23 @@ int main(int argc, char **argv)
             }
             const bool routed = button && button->hasActiveFocus()
                     && root->property("actionCount").toInt() == before + 1
-                    && root->property("lastAction").toString() == action;
+                    && root->property("lastAction").toString() == QString::fromUtf8(action);
             passed &= routed;
-            lifecycle.append(QJsonObject{ { "operation", name }, { "passed", routed } });
+            lifecycle.append(QJsonObject{ { u"operation"_s, QString::fromUtf8(name) },
+                                          { u"passed"_s, routed } });
         }
         for (const auto &name : { "dayButton", "nightButton" }) {
-            auto *button = findItem(root, name);
+            auto *button = findItem(root, QString::fromUtf8(name));
             if (button) {
                 button->forceActiveFocus(Qt::TabFocusReason);
                 QTest::keyClick(&window, Qt::Key_Space);
             }
-            const bool routed =
-                    button && root->property("night").toBool() == (QString(name) == "nightButton");
+            const bool routed = button
+                    && root->property("night").toBool()
+                            == (QString::fromUtf8(name) == "nightButton"_L1);
             passed &= routed;
-            lifecycle.append(QJsonObject{ { "operation", name }, { "passed", routed } });
+            lifecycle.append(QJsonObject{ { u"operation"_s, QString::fromUtf8(name) },
+                                          { u"passed"_s, routed } });
         }
         QJsonArray capturedDiagnostics;
         {
@@ -545,44 +564,45 @@ int main(int argc, char **argv)
         passed &= released && yalahoo::verification::windowPolicySatisfied(window) && swapped > 0
                 && capturedDiagnostics.isEmpty();
         lifecycle.append(
-                QJsonObject{ { "operation", "ten-rebuilds-release" },
-                             { "passed", released },
-                             { "liveRenderers", qint64(canvasProbeStats().renderers.load()) } });
+                QJsonObject{ { u"operation"_s, u"ten-rebuilds-release"_s },
+                             { u"passed"_s, released },
+                             { u"liveRenderers"_s, qint64(canvasProbeStats().renderers.load()) } });
         QJsonObject report{
-            { "passed", passed },
-            { "qtVersion", qVersion() },
-            { "offscreen", OffscreenSurface::Enabled },
-            { "offscreenResourcePlan", surface.diagnostics() },
-            { "graphicsApi", window.rendererInterface()->graphicsApi() },
-            { "windowPolicy", yalahoo::verification::windowPolicy(window) },
-            { "captureMethod",
+            { u"passed"_s, passed },
+            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+            { u"offscreen"_s, OffscreenSurface::Enabled },
+            { u"offscreenResourcePlan"_s, surface.diagnostics() },
+            { u"graphicsApi"_s, window.rendererInterface()->graphicsApi() },
+            { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) },
+            { u"captureMethod"_s,
               OffscreenSurface::Enabled
-                      ? "QQuickRenderControl Metal texture QRhi readback; native window stays hidden"
-                      : "UI grabWindow; Canvas actual submitted swapchain QRhi readback, no forced Canvas redraw" },
-            { "browse", captures },
-            { "probes", probes },
-            { "lifecycle", lifecycle },
-            { "diagnostics", capturedDiagnostics },
-            { "resourcePlan",
-              QJsonObject{ { "probeSize", QJsonArray{ 360, 160 } },
-                           { "sampleCount", 1 },
-                           { "colorFormat", "RGBA8" },
-                           { "mips", false },
-                           { "resizeSimultaneousAttachmentBytesUpperBound",
+                      ? u"QQuickRenderControl Metal texture QRhi readback; native window stays hidden"_s
+                      : u"UI grabWindow; Canvas actual submitted swapchain QRhi readback, no forced Canvas redraw"_s },
+            { u"browse"_s, captures },
+            { u"probes"_s, probes },
+            { u"lifecycle"_s, lifecycle },
+            { u"diagnostics"_s, capturedDiagnostics },
+            { u"resourcePlan"_s,
+              QJsonObject{ { u"probeSize"_s, QJsonArray{ 360, 160 } },
+                           { u"sampleCount"_s, 1 },
+                           { u"colorFormat"_s, u"RGBA8"_s },
+                           { u"mips"_s, false },
+                           { u"resizeSimultaneousAttachmentBytesUpperBound"_s,
                              qint64((360 * 160 + 420 * 200) * window.devicePixelRatio()
                                     * window.devicePixelRatio() * 12) },
-                           { "fontAtlasAndInternalBufferBytes", QJsonValue::Null },
-                           { "qtMainOutputAndSwapchainBytes", QJsonValue::Null } } },
-            { "metrics",
-              QJsonObject{ { "cppPaints", qint64(canvasProbeStats().paints.load()) },
-                           { "cppPaintCpuNs", qint64(canvasProbeStats().paintNanoseconds.load()) },
-                           { "cppSyncCpuNs", qint64(canvasProbeStats().syncNanoseconds.load()) },
-                           { "cppSyncCount", qint64(canvasProbeStats().synchronizations.load()) },
-                           { "gpuNanoseconds", QJsonValue::Null },
-                           { "imageBytes", qint64(canvasProbeStats().imageBytes.load()) },
-                           { "imageCount", qint64(canvasProbeStats().imageCount.load()) } } }
+                           { u"fontAtlasAndInternalBufferBytes"_s, QJsonValue::Null },
+                           { u"qtMainOutputAndSwapchainBytes"_s, QJsonValue::Null } } },
+            { u"metrics"_s,
+              QJsonObject{
+                      { u"cppPaints"_s, qint64(canvasProbeStats().paints.load()) },
+                      { u"cppPaintCpuNs"_s, qint64(canvasProbeStats().paintNanoseconds.load()) },
+                      { u"cppSyncCpuNs"_s, qint64(canvasProbeStats().syncNanoseconds.load()) },
+                      { u"cppSyncCount"_s, qint64(canvasProbeStats().synchronizations.load()) },
+                      { u"gpuNanoseconds"_s, QJsonValue::Null },
+                      { u"imageBytes"_s, qint64(canvasProbeStats().imageBytes.load()) },
+                      { u"imageCount"_s, qint64(canvasProbeStats().imageCount.load()) } } }
         };
-        QSaveFile file(output + "/report.json");
+        QSaveFile file(output + "/report.json"_L1);
         if (!file.open(QIODevice::WriteOnly)) {
             app.exit(5);
             return;

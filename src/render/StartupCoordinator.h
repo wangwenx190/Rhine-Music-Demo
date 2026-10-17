@@ -17,7 +17,7 @@ public:
     void setVisualActive(bool active);
     Q_INVOKABLE void scenePrepared();
     QJsonObject statistics() const;
-signals:
+Q_SIGNALS:
     void visualActiveChanged();
     void preparationInvalidated();
 

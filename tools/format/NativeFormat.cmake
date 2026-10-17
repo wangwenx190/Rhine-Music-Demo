@@ -34,6 +34,7 @@ foreach(directory IN ITEMS src qml tests tools resources/shaders)
         "${SOURCE_ROOT}/${directory}/*.glsl"
         "${SOURCE_ROOT}/${directory}/*.mjs"
         "${SOURCE_ROOT}/${directory}/*.js"
+        "${SOURCE_ROOT}/${directory}/*.ts"
     )
     list(APPEND cpp_files ${sources})
     file(GLOB_RECURSE sources LIST_DIRECTORIES FALSE "${SOURCE_ROOT}/${directory}/*.qml")
@@ -48,7 +49,7 @@ foreach(source IN LISTS cpp_files)
     else()
         set(arguments -i)
     endif()
-    if(source MATCHES "\\.m?js$")
+    if(source MATCHES "\\.(m?js|ts)$")
         set(language_file source.js)
     else()
         set(language_file source.cpp)

@@ -27,7 +27,8 @@ Item {
         width: root.stacked ? parent.width - output.implicitWidth - 8 : Math.max(0, parent.width
                                                                                  - slider.width
                                                                                  - 20)
-        text: root.label + (root.stacked ? "" : " · " + (root.value * root.displayFactor).toFixed(
+        text: root.label + (root.stacked ? "" : " \u00b7 " + (root.value
+                                                              * root.displayFactor).toFixed(
                                                root.decimals) + root.suffix)
         cssPixelSize: root.captionSize
         cssLineHeight: root.stacked ? 15 : Math.round(cssAscent) + Math.round(cssDescent)

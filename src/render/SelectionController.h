@@ -25,6 +25,7 @@ public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
     void setColumns(QList<LibraryColumn> columns, Snapshot snapshot = { });
     QPair<QString, QString> coverSource(const QString &id) const;
+    QString albumTitle(const QString &id) const;
     QString albumId() const;
     ArchiveCell cell() const;
     ArchiveCell coordinateOrigin() const;
@@ -101,7 +102,7 @@ public:
     SceneVector selectedPosition() const;
     QQuaternion selectedRotation() const;
     quint64 revision() const;
-signals:
+Q_SIGNALS:
     void selectionChanged();
     void frameChanged();
     void coordinatesRebased(double lane, double row);
@@ -135,7 +136,11 @@ private:
     RealColumns m_realColumns;
     ColumnMemory m_memory;
     bool m_realistic = false;
-    QHash<QString, QPair<QString, QString>> m_coverSources;
+    struct CoverSource
+    {
+        QString path, placeholderTitle, title;
+    };
+    QHash<QString, CoverSource> m_coverSources;
     ArchiveCell m_cell, m_origin;
     QVector<ArchiveInstance> m_instances;
     QHash<QPair<qint64, qint64>, quint64> m_poolObjects;

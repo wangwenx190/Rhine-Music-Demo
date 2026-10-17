@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
@@ -35,9 +38,9 @@ int main(int argc, char **argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         RhiCaptureHarness::require(QDir().mkpath(output), "Cannot create fog output");
-        QFile file(QString(FIXTURE_ROOT) + "/tests/fixtures/rhi-shell/visual.json");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
         RhiCaptureHarness::require(file.open(QIODevice::ReadOnly), "Missing fog input");
-        const auto cases = QJsonDocument::fromJson(file.readAll()).object()["cases"].toArray();
+        const auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         RhiCaptureHarness driver;
         QJsonArray results, rebuilds;
         Input last;
@@ -70,7 +73,7 @@ int main(int argc, char **argv)
                         input.opticalProbe = probe;
                         const auto capture = driver.capture(input, { 960, 720 });
                         checkSubmittedFog(input, capture);
-                        const auto actual = capture.metadata["opticalProbeSample"].toArray();
+                        const auto actual = capture.metadata[u"opticalProbeSample"_s].toArray();
                         auto expected =
                                 probe == 11 ? fogged : outputReference(fogged, input.exposure);
                         if (probe == 13)
@@ -86,17 +89,17 @@ int main(int argc, char **argv)
                         RhiCaptureHarness::require(error < .001,
                                                    "Fog/color order differs from source math");
                         maxError = std::max(maxError, error);
-                        const auto current = capture.metadata["resourceGeneration"].toInteger();
+                        const auto current = capture.metadata[u"resourceGeneration"_s].toInteger();
                         if (generation >= 0)
                             RhiCaptureHarness::require(current == generation,
                                                        "Fog rebuilt render targets");
                         generation = current;
-                        results.append(QJsonObject{ { "night", night },
-                                                    { "fraction", fraction },
-                                                    { "enabled", enabled },
-                                                    { "probe", probe },
-                                                    { "error", error },
-                                                    { "metadata", capture.metadata } });
+                        results.append(QJsonObject{ { u"night"_s, night },
+                                                    { u"fraction"_s, fraction },
+                                                    { u"enabled"_s, enabled },
+                                                    { u"probe"_s, probe },
+                                                    { u"error"_s, error },
+                                                    { u"metadata"_s, capture.metadata } });
                     }
                 }
             }
@@ -107,7 +110,7 @@ int main(int argc, char **argv)
             auto ordinary = driver.capture(input, { 960, 720 });
             checkSubmittedFog(input, ordinary);
             RhiCaptureHarness::require(
-                    driver.surface->grab().save(output + (night ? "/night.png" : "/day.png")),
+                    driver.surface->grab().save(output + (night ? "/night.png"_L1 : "/day.png"_L1)),
                     "Cannot save own fog output");
             last = input;
         }
@@ -121,16 +124,16 @@ int main(int argc, char **argv)
                                        "Fog lifecycle lost geometry");
             rebuilds.append(capture.metadata);
         }
-        QSaveFile report(output + "/runtime.json");
+        QSaveFile report(output + "/runtime.json"_L1);
         RhiCaptureHarness::require(report.open(QIODevice::WriteOnly), "Cannot open fog report");
-        report.write(QJsonDocument(QJsonObject{ { "round", "R19D2" },
-                                                { "passed", true },
-                                                { "qt", qVersion() },
-                                                { "rebuilds", rebuilds },
-                                                { "maxError", maxError },
-                                                { "cases", results },
-                                                { "offscreen", driver.surface->diagnostics() },
-                                                { "windowPolicy",
+        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19D2"_s },
+                                                { u"passed"_s, true },
+                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                                { u"rebuilds"_s, rebuilds },
+                                                { u"maxError"_s, maxError },
+                                                { u"cases"_s, results },
+                                                { u"offscreen"_s, driver.surface->diagnostics() },
+                                                { u"windowPolicy"_s,
                                                   verification::windowPolicy(*driver.window) } })
                              .toJson());
         RhiCaptureHarness::require(report.commit(), "Cannot write fog report");

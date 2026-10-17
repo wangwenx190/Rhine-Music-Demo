@@ -1,11 +1,14 @@
 #include "SelectionLighting.h"
 #include <QVector4D>
 #include <algorithm>
+
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
-SceneVector linear(const char *hex)
+SceneVector linear(QLatin1StringView hex)
 {
-    const QColor c(QString::fromLatin1(hex));
+    const QColor c(hex);
     auto decode = [](double s) {
         return s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
     };
@@ -21,7 +24,9 @@ void followVector(SceneVector &value, SceneVector &velocity, SceneVector target,
 }
 SceneVector LightingPalette::floorColor(QStringView theme)
 {
-    return linear(theme == u"night" ? "#0b1828" : theme == u"dusk" ? "#a6b8c0" : "#d8c9b9");
+    return linear(theme == u"night"          ? "#0b1828"_L1
+                          : theme == u"dusk" ? "#a6b8c0"_L1
+                                             : "#d8c9b9"_L1);
 }
 LightingPalette LightingPalette::theme(bool night)
 {
@@ -35,12 +40,12 @@ LightingPalette LightingPalette::theme(bool night)
     p.scatter = night ? .72 : 1;
     p.printAmbient = night ? .12 : .5;
     p.exposure = night ? 1.08 : 1.05;
-    p.keyColor = linear(night ? "#e5f0ff" : "#fff7ed");
-    p.skyColor = linear(night ? "#e2eeff" : "#fffaf5");
-    p.groundColor = linear(night ? "#56708c" : "#b4a18c");
-    p.spotColor = linear(night ? "#dbe9ff" : "#ffe3b2");
-    p.scatterColor = linear(night ? "#cee5ff" : "#ffdba3");
-    p.background = linear(night ? "#07111f" : "#eae5e1");
+    p.keyColor = linear(night ? "#e5f0ff"_L1 : "#fff7ed"_L1);
+    p.skyColor = linear(night ? "#e2eeff"_L1 : "#fffaf5"_L1);
+    p.groundColor = linear(night ? "#56708c"_L1 : "#b4a18c"_L1);
+    p.spotColor = linear(night ? "#dbe9ff"_L1 : "#ffe3b2"_L1);
+    p.scatterColor = linear(night ? "#cee5ff"_L1 : "#ffdba3"_L1);
+    p.background = linear(night ? "#07111f"_L1 : "#eae5e1"_L1);
     p.floor = floorColor(night ? u"night" : u"day");
     return p;
 }
@@ -69,8 +74,8 @@ void SelectionLighting::setNight(bool night)
         m_palette = m_to;
         m_elapsed = .65;
     }
-    emit nightChanged();
-    emit changed();
+    Q_EMIT nightChanged();
+    Q_EMIT changed();
 }
 void SelectionLighting::setReducedMotion(bool reduced)
 {
@@ -78,18 +83,18 @@ void SelectionLighting::setReducedMotion(bool reduced)
     if (reduced) {
         m_palette = m_to;
         m_elapsed = .65;
-        emit changed();
+        Q_EMIT changed();
     }
 }
 QVariantMap SelectionLighting::settings() const
 {
-    const QStringList modes{ "baseline", "area", "guided", "hybrid" };
-    return { { "mode", modes[int(m_settings.mode)] },
-             { "strength", m_settings.strength },
-             { "width", m_settings.width },
-             { "offset", m_settings.offset },
-             { "fill", m_settings.fill },
-             { "transitionDuration", m_settings.transitionDuration } };
+    const QStringList modes{ u"baseline"_s, u"area"_s, u"guided"_s, u"hybrid"_s };
+    return { { u"mode"_s, modes[int(m_settings.mode)] },
+             { u"strength"_s, m_settings.strength },
+             { u"width"_s, m_settings.width },
+             { u"offset"_s, m_settings.offset },
+             { u"fill"_s, m_settings.fill },
+             { u"transitionDuration"_s, m_settings.transitionDuration } };
 }
 void SelectionLighting::setSettings(RowLightingSettings s)
 {
@@ -109,28 +114,28 @@ void SelectionLighting::setSettings(RowLightingSettings s)
     if (m_comparing)
         ribbon.settings.mode = RowLightingMode::Baseline;
     if (settings() != before) {
-        emit settingsChanged();
-        emit changed();
+        Q_EMIT settingsChanged();
+        Q_EMIT changed();
     }
 }
 bool SelectionLighting::configure(const QVariantMap &patch)
 {
     auto next = m_settings;
-    const QStringList modes{ "baseline", "area", "guided", "hybrid" };
+    const QStringList modes{ u"baseline"_s, u"area"_s, u"guided"_s, u"hybrid"_s };
     for (auto it = patch.cbegin(); it != patch.cend(); ++it) {
-        if (it.key() == "mode") {
+        if (it.key() == "mode"_L1) {
             const auto index = modes.indexOf(it.value().toString());
             if (index < 0)
                 return false;
             next.mode = RowLightingMode(index);
             continue;
         }
-        double *target = it.key() == "strength"    ? &next.strength
-                : it.key() == "width"              ? &next.width
-                : it.key() == "offset"             ? &next.offset
-                : it.key() == "fill"               ? &next.fill
-                : it.key() == "transitionDuration" ? &next.transitionDuration
-                                                   : nullptr;
+        double *target = it.key() == "strength"_L1    ? &next.strength
+                : it.key() == "width"_L1              ? &next.width
+                : it.key() == "offset"_L1             ? &next.offset
+                : it.key() == "fill"_L1               ? &next.fill
+                : it.key() == "transitionDuration"_L1 ? &next.transitionDuration
+                                                      : nullptr;
         const auto &value = it.value();
         if (!target || value.metaType().id() == QMetaType::QString
             || value.metaType().id() == QMetaType::Bool || !value.canConvert<double>()
@@ -154,8 +159,8 @@ void SelectionLighting::setComparing(bool value)
     ribbon.settings = m_settings;
     if (value)
         ribbon.settings.mode = RowLightingMode::Baseline;
-    emit comparingChanged();
-    emit changed();
+    Q_EMIT comparingChanged();
+    Q_EMIT changed();
 }
 void SelectionLighting::advanceTheme(double dt)
 {
@@ -197,7 +202,7 @@ void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, Scene
     if (!i.visible) {
         m_initialized = false;
         ribbon.reset();
-        emit changed();
+        Q_EMIT changed();
         return;
     }
     if (!m_initialized || i.reduced || i.cinematic) {
@@ -211,7 +216,7 @@ void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, Scene
     m_offset = offset;
     m_initialized = true;
     ribbon.update(i, dt);
-    emit changed();
+    Q_EMIT changed();
 }
 double SelectionLighting::areaIntensity() const
 {

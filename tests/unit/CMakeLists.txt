@@ -1,4 +1,13 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(LocalizationTest LocalizationTest.cpp)
+target_link_libraries(LocalizationTest PRIVATE YalahooCore Qt6::Qml Qt6::Test)
+yalahoo_platform(LocalizationTest)
+add_test(NAME localization COMMAND LocalizationTest)
+set_tests_properties(localization PROPERTIES TIMEOUT 30)
+if(WIN32)
+    set_tests_properties(localization PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 qt_add_executable(TitleTest TitleTest.cpp "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(TitleTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(TitleTest PRIVATE YalahooText Qt6::Test)
@@ -63,7 +72,7 @@ if(WIN32)
     )
 endif()
 qt_add_executable(RhiMaterialTest RhiMaterialTest.cpp)
-target_link_libraries(RhiMaterialTest PRIVATE YalahooRhi Qt6::Test)
+target_link_libraries(RhiMaterialTest PRIVATE YalahooRhi Qt6::Test Qt6::GuiPrivate)
 target_compile_definitions(RhiMaterialTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 yalahoo_platform(RhiMaterialTest)
 add_test(NAME rhi-material-parameters COMMAND RhiMaterialTest)
@@ -136,7 +145,10 @@ if(YALAHOO_REVIEW)
     set_tests_properties(rhi-ao-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(APPLE)
+    if(WIN32)
+        set_tests_properties(rhi-ao-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    elseif(APPLE)
         set_tests_properties(rhi-ao-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
     endif()
@@ -167,7 +179,10 @@ if(YALAHOO_REVIEW)
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
         FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
-    if(APPLE)
+    if(WIN32)
+        set_tests_properties(rhi-flicker-gpu PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+    elseif(APPLE)
         set_tests_properties(rhi-flicker-gpu PROPERTIES ENVIRONMENT_MODIFICATION
             "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
     endif()

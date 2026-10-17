@@ -8,6 +8,8 @@ target_sources(
     OfflineMetadataProvider.cpp
     LibrarySession.h
     LibrarySession.cpp
+    MetadataPresentation.h
+    MetadataPresentation.cpp
     CoverCache.h
     CoverCache.cpp
     PreferencesStore.cpp

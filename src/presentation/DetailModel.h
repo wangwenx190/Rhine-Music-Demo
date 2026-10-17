@@ -34,7 +34,7 @@ public:
     void prepare(const LibrarySession &library);
     Q_INVOKABLE double normalLineHeight(const QString &text, const QFont &font);
     static QString time(double seconds);
-signals:
+Q_SIGNALS:
     void albumChanged();
 
 private:

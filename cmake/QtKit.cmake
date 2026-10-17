@@ -16,6 +16,7 @@ set(
     CanvasPainter
     Test
     QuickTest
+    LinguistTools
 )
 
 # Records: prefix|version|system|architecture|ABI|missing modules. Kept independent

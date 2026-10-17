@@ -85,14 +85,14 @@ void MotionController::observe(const ArchiveSprings &springs, const ArchiveValue
     m_springs = springs;
     m_archive.observe(springs, targets, rates);
     if (changed)
-        emit stateChanged();
+        Q_EMIT stateChanged();
 }
 bool MotionController::retarget(const ArchiveValues &targets)
 {
     if (!m_archive.retarget(m_springs, targets))
         return false;
     ++m_revision;
-    emit stateChanged();
+    Q_EMIT stateChanged();
     if (m_reduced)
         finish();
     return true;
@@ -106,7 +106,7 @@ void MotionController::translate(const ArchiveValues &offset)
     m_archive.translate(offset);
     for (size_t i = 0; i < m_springs.size(); ++i)
         m_springs[i].translate(offset[i]);
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void MotionController::cancelTravel()
 {
@@ -115,14 +115,14 @@ void MotionController::cancelTravel()
         return;
     m_archive.reset();
     ++m_revision;
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 void MotionController::setReducedMotion(bool reduced)
 {
     if (m_reduced == reduced)
         return;
     m_reduced = reduced;
-    emit reducedMotionChanged();
+    Q_EMIT reducedMotionChanged();
     if (reduced) {
         finish();
         m_clock.finishOpening();
@@ -135,9 +135,9 @@ void MotionController::step(double dt)
     m_archive.update(m_springs, dt, m_reduced);
     const bool finished = !moving();
     const auto revision = m_revision;
-    emit stateChanged();
+    Q_EMIT stateChanged();
     if (finished)
-        emit completed(revision);
+        Q_EMIT completed(revision);
 }
 void MotionController::finish()
 {
@@ -145,7 +145,7 @@ void MotionController::finish()
         return;
     m_archive.finish(m_springs);
     const auto revision = m_revision;
-    emit stateChanged();
-    emit completed(revision);
+    Q_EMIT stateChanged();
+    Q_EMIT completed(revision);
 }
 }

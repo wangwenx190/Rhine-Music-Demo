@@ -7,22 +7,23 @@
 #include <QJsonObject>
 #include <QSaveFile>
 #include <limits>
+
+using namespace Qt::StringLiterals;
 using namespace yalahoo;
 class LightingTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void floorThemeUsesLinearAuthoredColorsAndInterruptedTransition()
     {
         const auto decode = [](int value) {
             const double s = value / 255.;
             return s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
         };
-        for (const auto &theme :
-             { QStringLiteral("day"), QStringLiteral("night"), QStringLiteral("dusk") }) {
-            const QColor source(theme == "day"             ? "#d8c9b9"
-                                        : theme == "night" ? "#0b1828"
-                                                           : "#a6b8c0");
+        for (const auto &theme : { u"day"_s, u"night"_s, u"dusk"_s }) {
+            const QColor source(theme == "day"_L1             ? "#d8c9b9"
+                                        : theme == "night"_L1 ? "#0b1828"
+                                                              : "#a6b8c0");
             const auto actual = LightingPalette::floorColor(theme);
             QVERIFY(std::abs(actual.x - decode(source.red())) < 1e-7);
             QVERIFY(std::abs(actual.y - decode(source.green())) < 1e-7);
@@ -48,7 +49,7 @@ private slots:
     }
     void frozenGolden()
     {
-        QFile file(QStringLiteral(FIXTURE_ROOT "/tests/fixtures/lighting/golden.json"));
+        QFile file((QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/lighting/golden.json"_s));
         QVERIFY(file.open(QIODevice::ReadOnly));
         const auto data = QJsonDocument::fromJson(file.readAll()).object();
         double trajectoryError = 0, paletteError = 0, positionError = 0, fieldError = 0;
@@ -60,87 +61,88 @@ private slots:
         auto diff = [](SceneVector a, SceneVector b) {
             return std::max({ std::abs(a.x - b.x), std::abs(a.y - b.y), std::abs(a.z - b.z) });
         };
-        for (auto c : data["cases"].toArray()) {
+        for (auto c : data[u"cases"_s].toArray()) {
             SelectionLighting light;
-            for (auto value : c.toObject()["samples"].toArray()) {
-                const auto sample = value.toObject(), i = sample["input"].toObject(),
-                           p = sample["palette"].toObject();
-                light.setNight(i["night"].toBool());
-                light.setReducedMotion(i["reduced"].toBool());
+            for (auto value : c.toObject()[u"samples"_s].toArray()) {
+                const auto sample = value.toObject(), i = sample[u"input"_s].toObject(),
+                           p = sample[u"palette"_s].toObject();
+                light.setNight(i[u"night"_s].toBool());
+                light.setReducedMotion(i[u"reduced"_s].toBool());
                 auto settings = light.ribbon.settings;
-                settings.mode = RowLightingMode(i["mode"].toInt());
+                settings.mode = RowLightingMode(i[u"mode"_s].toInt());
                 light.setSettings(settings);
                 RowLightingInput input;
-                input.origin = vector(i["origin"]);
-                input.row = i["row"].toDouble();
-                input.lane = i["lane"].toDouble();
-                input.independentColumns = i["independent"].toBool();
-                input.visible = i["visible"].toBool();
-                input.reduced = i["reduced"].toBool();
-                input.cinematic = i["cinematic"].toBool();
-                if (i.contains("introTime"))
-                    input.introTime = i["introTime"].toDouble();
+                input.origin = vector(i[u"origin"_s]);
+                input.row = i[u"row"_s].toDouble();
+                input.lane = i[u"lane"_s].toDouble();
+                input.independentColumns = i[u"independent"_s].toBool();
+                input.visible = i[u"visible"_s].toBool();
+                input.reduced = i[u"reduced"_s].toBool();
+                input.cinematic = i[u"cinematic"_s].toBool();
+                if (i.contains(u"introTime"_s))
+                    input.introTime = i[u"introTime"_s].toDouble();
                 light.update(input, input.origin + SceneVector{ -2.085, 2.252, 0 },
-                             { -48, -17.6, 36 }, i["detail"].toDouble(), i["dt"].toDouble());
+                             { -48, -17.6, 36 }, i[u"detail"_s].toDouble(), i[u"dt"_s].toDouble());
                 auto scalar = [&](double actual, QJsonValue expected) {
                     trajectoryError =
                             std::max(trajectoryError, std::abs(actual - expected.toDouble()));
                 };
-                scalar(light.ribbon.row.value, sample["row"].toArray()[0]);
-                scalar(light.ribbon.row.velocity, sample["row"].toArray()[1]);
-                scalar(light.ribbon.lane.value, sample["lane"].toArray()[0]);
-                scalar(light.ribbon.lane.velocity, sample["lane"].toArray()[1]);
-                scalar(light.rowDetail(), sample["detail"]);
+                scalar(light.ribbon.row.value, sample[u"row"_s].toArray()[0]);
+                scalar(light.ribbon.row.velocity, sample[u"row"_s].toArray()[1]);
+                scalar(light.ribbon.lane.value, sample[u"lane"_s].toArray()[0]);
+                scalar(light.ribbon.lane.velocity, sample[u"lane"_s].toArray()[1]);
+                scalar(light.rowDetail(), sample[u"detail"_s]);
                 trajectoryError = std::max(trajectoryError,
-                                           diff(light.ribbon.column, vector(sample["column"])));
+                                           diff(light.ribbon.column, vector(sample[u"column"_s])));
                 trajectoryError = std::max(trajectoryError,
-                                           diff(light.anchorValue(), vector(sample["anchor"])));
-                trajectoryError = std::max(
-                        trajectoryError, diff(light.columnValue(), vector(sample["lightColumn"])));
+                                           diff(light.anchorValue(), vector(sample[u"anchor"_s])));
+                trajectoryError =
+                        std::max(trajectoryError,
+                                 diff(light.columnValue(), vector(sample[u"lightColumn"_s])));
                 if (input.visible) {
                     auto actual = light.spotPosition();
                     positionError = std::max(positionError,
                                              diff({ actual.x(), actual.y(), actual.z() },
-                                                  vector(sample["spotPosition"])));
+                                                  vector(sample[u"spotPosition"_s])));
                     actual = light.areaPosition();
                     positionError = std::max(positionError,
                                              diff({ actual.x(), actual.y(), actual.z() },
-                                                  vector(sample["areaPosition"])));
+                                                  vector(sample[u"areaPosition"_s])));
                 }
                 const auto &palette = light.palette();
-                for (auto pair :
-                     { std::pair{ palette.environment, p["environment"] },
-                       std::pair{ palette.key, p["key"] },
-                       std::pair{ palette.hemisphere, p["hemisphere"] },
-                       std::pair{ palette.spot, p["spot"] }, std::pair{ palette.area, p["area"] },
-                       std::pair{ palette.scatter, p["scatter"] },
-                       std::pair{ palette.printAmbient, p["printAmbient"] } })
+                for (auto pair : { std::pair{ palette.environment, p[u"environment"_s] },
+                                   std::pair{ palette.key, p[u"key"_s] },
+                                   std::pair{ palette.hemisphere, p[u"hemisphere"_s] },
+                                   std::pair{ palette.spot, p[u"spot"_s] },
+                                   std::pair{ palette.area, p[u"area"_s] },
+                                   std::pair{ palette.scatter, p[u"scatter"_s] },
+                                   std::pair{ palette.printAmbient, p[u"printAmbient"_s] } })
                     paletteError =
                             std::max(paletteError, std::abs(pair.first - pair.second.toDouble()));
                 paletteError = std::max({ paletteError,
-                                          diff(palette.scatterColor, vector(p["scatterColor"])),
-                                          diff(palette.spotColor, vector(p["spotColor"])) });
+                                          diff(palette.scatterColor, vector(p[u"scatterColor"_s])),
+                                          diff(palette.spotColor, vector(p[u"spotColor"_s])) });
                 ++samples;
             }
         }
-        for (auto value : data["fields"].toArray()) {
+        for (auto value : data[u"fields"_s].toArray()) {
             const auto field = value.toObject();
             RowLightController light;
-            light.settings.mode = RowLightingMode(field["mode"].toInt());
-            light.settings.fill = field["fill"].toDouble();
-            fieldError = std::max(
-                    fieldError,
-                    std::abs(light.sample({ field["dx"].toDouble(), 0, field["dz"].toDouble() })
-                             - field["value"].toDouble()));
+            light.settings.mode = RowLightingMode(field[u"mode"_s].toInt());
+            light.settings.fill = field[u"fill"_s].toDouble();
+            fieldError = std::max(fieldError,
+                                  std::abs(light.sample({ field[u"dx"_s].toDouble(), 0,
+                                                          field[u"dz"_s].toDouble() })
+                                           - field[u"value"_s].toDouble()));
         }
-        QSaveFile report(QStringLiteral(LIGHTING_REPORT));
+        QSaveFile report(QString::fromUtf8(LIGHTING_REPORT));
         QVERIFY(report.open(QIODevice::WriteOnly));
-        report.write(QJsonDocument(QJsonObject{ { "samples", samples },
-                                                { "fields", data["fields"].toArray().size() },
-                                                { "trajectoryError", trajectoryError },
-                                                { "paletteError", paletteError },
-                                                { "gpuUniformPositionError", positionError },
-                                                { "fieldError", fieldError } })
+        report.write(QJsonDocument(QJsonObject{ { u"samples"_s, samples },
+                                                { u"fields"_s, data[u"fields"_s].toArray().size() },
+                                                { u"trajectoryError"_s, trajectoryError },
+                                                { u"paletteError"_s, paletteError },
+                                                { u"gpuUniformPositionError"_s, positionError },
+                                                { u"fieldError"_s, fieldError } })
                              .toJson());
         QVERIFY(report.commit());
         QVERIFY2(trajectoryError <= 1e-6, qPrintable(QString::number(trajectoryError, 'g', 12)));

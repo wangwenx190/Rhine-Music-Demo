@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "RhiApi.h"
 #include <QJsonArray>
 #include <QJsonObject>
@@ -103,13 +105,13 @@ private:
     {
         require(bytes >= 0 && samples > 0, "Invalid resource plan");
         m_bytes += bytes;
-        m_entries.append(QJsonObject{ { "name", name },
-                                      { "width", size.width() },
-                                      { "height", size.height() },
-                                      { "format", format },
-                                      { "samples", samples },
-                                      { "mipLevels", levels },
-                                      { "estimatedBytes", bytes } });
+        m_entries.append(QJsonObject{ { u"name"_s, name },
+                                      { u"width"_s, size.width() },
+                                      { u"height"_s, size.height() },
+                                      { u"format"_s, format },
+                                      { u"samples"_s, samples },
+                                      { u"mipLevels"_s, levels },
+                                      { u"estimatedBytes"_s, bytes } });
     }
     QSet<const void *> m_seen;
     QJsonArray m_entries;

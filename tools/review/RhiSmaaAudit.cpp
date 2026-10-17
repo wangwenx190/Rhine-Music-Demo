@@ -17,6 +17,9 @@
 #include <QSysInfo>
 #include <cstring>
 #include <cstdio>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using smaa_reference::Image;
@@ -115,8 +118,8 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
                    const QString &output, int index)
 {
     const auto &assets = preparedAssets();
-    const auto area = assets.images.value(":/rhi/postprocess/smaa-area.png");
-    const auto search = assets.images.value(":/rhi/postprocess/smaa-search.png");
+    const auto area = assets.images.value(u":/rhi/postprocess/smaa-area.png"_s);
+    const auto search = assets.images.value(u":/rhi/postprocess/smaa-search.png"_s);
     require(area.size() == QSize(160, 560) && search.size() == QSize(66, 33),
             "SMAA numeric lookup dimensions changed");
     const auto expectedEdges = smaa_reference::edges(input);
@@ -187,18 +190,18 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
     require(weightError <= 3.0 / 255, "SMAA search/area weights differ from source formula");
     require(blendError <= 3.0 / 255, "SMAA gamma/alpha blending differs from source formula");
     if (index < 6)
-        require(preview.save(output + QString("/pattern-%1.png").arg(index)),
+        require(preview.save(output + u"/pattern-%1.png"_s.arg(index)),
                 "Cannot save own SMAA output");
-    return { { "index", index },
-             { "width", input.size.width() },
-             { "height", input.size.height() },
-             { "edgeError", edgeError },
-             { "weightError", weightError },
-             { "blendError", blendError },
-             { "softenedPixels", softened },
-             { "checkedPixels", input.size.width() * input.size.height() },
-             { "cpuSubmitNs", submitNs },
-             { "uniformUploadBytes", post.uniformUploadBytes() } };
+    return { { u"index"_s, index },
+             { u"width"_s, input.size.width() },
+             { u"height"_s, input.size.height() },
+             { u"edgeError"_s, edgeError },
+             { u"weightError"_s, weightError },
+             { u"blendError"_s, blendError },
+             { u"softenedPixels"_s, softened },
+             { u"checkedPixels"_s, input.size.width() * input.size.height() },
+             { u"cpuSubmitNs"_s, submitNs },
+             { u"uniformUploadBytes"_s, post.uniformUploadBytes() } };
 }
 }
 int main(int argc, char **argv)
@@ -266,11 +269,13 @@ int main(int argc, char **argv)
                     revision = post.revision();
                 require(post.revision() == revision,
                         "Input/focus rebuilt unrelated SMAA resources");
-                require(post.passes() == QJsonArray{ "smaa-edges", "smaa-weights", "smaa-blend" },
+                require(post.passes()
+                                == QJsonArray{ u"smaa-edges"_s, u"smaa-weights"_s,
+                                               u"smaa-blend"_s },
                         "SMAA graph changed");
                 auto row = verify(api.get(), post, texture.get(), analytic(size, pattern), output,
                                   index++);
-                totalSoftened += row["softenedPixels"].toInt();
+                totalSoftened += row[u"softenedPixels"_s].toInt();
                 rows.append(row);
             }
             ResourceInventory inventory;
@@ -289,7 +294,7 @@ int main(int argc, char **argv)
                     require(post.revision() > before, "SMAA reset did not rebuild resources");
                     auto row = verify(api.get(), post, texture.get(), analytic(size, cycle % 6),
                                       output, index++);
-                    row["resourceRebuild"] = cycle + 1;
+                    row[u"resourceRebuild"_s] = cycle + 1;
                     rows.append(row);
                 }
             }
@@ -306,24 +311,24 @@ int main(int argc, char **argv)
         for (const auto *window : QGuiApplication::topLevelWindows())
             require(!window->isVisible(), "SMAA exposed a native window");
         require(!QGuiApplication::focusWindow(), "SMAA focused a window");
-        QSaveFile report(output + "/runtime.json");
+        QSaveFile report(output + "/runtime.json"_L1);
         require(report.open(QIODevice::WriteOnly), "Cannot open SMAA report");
         report.write(
                 QJsonDocument(
                         QJsonObject{
-                                { "passed", true },
-                                { "round", "R19D4B1" },
-                                { "qt", qVersion() },
-                                { "backend", int(api->backend()) },
-                                { "device", QString::fromUtf8(api->driverInfo().deviceName) },
-                                { "system", QSysInfo::prettyProductName() },
-                                { "cpu", QSysInfo::currentCpuArchitecture() },
-                                { "framebufferYUp", api->isYUpInFramebuffer() },
-                                { "topLevelWindows", QGuiApplication::topLevelWindows().size() },
-                                { "visibleWindows", 0 },
-                                { "measurement",
-                                  "CPU command recording only; no GPU/present/VSYNC timing" },
-                                { "cases", rows } })
+                                { u"passed"_s, true },
+                                { u"round"_s, u"R19D4B1"_s },
+                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                { u"backend"_s, int(api->backend()) },
+                                { u"device"_s, QString::fromUtf8(api->driverInfo().deviceName) },
+                                { u"system"_s, QSysInfo::prettyProductName() },
+                                { u"cpu"_s, QSysInfo::currentCpuArchitecture() },
+                                { u"framebufferYUp"_s, api->isYUpInFramebuffer() },
+                                { u"topLevelWindows"_s, QGuiApplication::topLevelWindows().size() },
+                                { u"visibleWindows"_s, 0 },
+                                { u"measurement"_s,
+                                  u"CPU command recording only; no GPU/present/VSYNC timing"_s },
+                                { u"cases"_s, rows } })
                         .toJson());
         require(report.commit(), "Cannot save SMAA report");
         return 0;

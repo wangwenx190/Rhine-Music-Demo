@@ -21,7 +21,7 @@ Templates负责Qt事件、键盘、焦点、无障碍、文本编辑/输入法�
 | `music.css::.settings-row input[type=checkbox]` | 指示器16×16；浏览器上下3px外边距映射为22高的行内命中框 |
 | `.settings-row input[type=range]`与原生range框 | 常规150×16，16×16手柄；行内上下2px间距由SettingRange容器提供 |
 | `music-lighting-lab.css::.lighting-lab-sliders` | 标签上距5，字号10/行高15；滑杆满宽×20、外边距0，每组总高40，disabled透明度.3 |
-| `music.css::.settings-row select` | 高28、最小宽90、字号11、垂直内距5/水平10、边框1；长选项自然宽度按字体测量并计入箭头槽 |
+| `music.css::.settings-row select` | 高28、最小宽90、字号11、垂直内距5/水平10、边框1；长选项自然宽度由OptionMetrics在数据/字体变化时测量并计入箭头槽 |
 | `.music-panel textarea/input[type=search/text/url]` | 字号12、行高20.4、垂直内距12/水平13、边框1、圆角0；单行总高46.4，三行textarea最小87.2 |
 | `music-lighting-lab.css`模式与操作按钮 | 内距6/10、边框1、圆角2；模式字号11/行高16.5/总高30.5，操作字号10/行高15/总高29；按住对照背景accent×.08，选中模式背景accent×.11 |
 | `music.css`专辑介绍/制作信息progress | 专辑介绍3高，制作信息16高；进度直接映射到项目accent填充 |

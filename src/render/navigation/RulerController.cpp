@@ -4,6 +4,8 @@
 #include <cmath>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 bool approach(ScalarSpring &s, double target, double dt, bool instant)
@@ -263,7 +265,7 @@ void RulerController::setNarrow(bool narrow)
         s.offset.velocity *= ratio;
     }
     render(0, m_motion && m_motion->reducedMotion());
-    emit geometryChanged();
+    Q_EMIT geometryChanged();
 }
 bool RulerController::active() const
 {
@@ -274,7 +276,7 @@ void RulerController::setActive(bool active)
     if (m_active == active)
         return;
     m_active = active;
-    emit activeChanged();
+    Q_EMIT activeChanged();
     publish();
 }
 QString RulerController::title(double ordinal) const
@@ -283,7 +285,8 @@ QString RulerController::title(double ordinal) const
         || m_lane >= m_selection->pool().columnCount())
         return { };
     const auto &ids = m_selection->pool().columns()[m_lane].albumIds;
-    return m_selection->coverSource(ids[ArchivePool::wrap(ordinal, m_count)]).second;
+    const int row = ArchivePool::wrap(ordinal, m_count);
+    return row < ids.size() ? m_selection->albumTitle(ids[row]) : QString{ };
 }
 QVariantList RulerController::slotStates() const
 {
@@ -295,23 +298,23 @@ void RulerController::publish()
     result.reserve(16);
     for (int i = 0; i < 16; ++i) {
         const auto &mark = m_drawing.marks[i];
-        result.append(QVariantMap{ { "x", mark.x },
-                                   { "enabled", m_active && mark.visible },
-                                   { "active", mark.active },
-                                   { "title", title(m_slots[i].ordinal) },
-                                   { "ordinal", m_slots[i].ordinal },
-                                   { "height", mark.height },
-                                   { "alpha", mark.alpha },
-                                   { "hovering", mark.hovering } });
+        result.append(QVariantMap{ { u"x"_s, mark.x },
+                                   { u"enabled"_s, m_active && mark.visible },
+                                   { u"active"_s, mark.active },
+                                   { u"title"_s, title(m_slots[i].ordinal) },
+                                   { u"ordinal"_s, m_slots[i].ordinal },
+                                   { u"height"_s, mark.height },
+                                   { u"alpha"_s, mark.alpha },
+                                   { u"hovering"_s, mark.hovering } });
     }
     m_slotStates = std::move(result);
-    emit changed();
+    Q_EMIT changed();
 }
 bool RulerController::click(int slot)
 {
     if (!m_active || !m_selection || slot < 0 || slot >= 16 || !m_drawing.marks[slot].visible)
         return false;
-    emit inputReceived();
+    Q_EMIT inputReceived();
     const double ordinal = m_slots[slot].ordinal;
     if (m_router)
         return m_router->selectRow(m_selection->realistic()
@@ -338,9 +341,9 @@ void RulerController::hover(int slot, bool pointer, bool focused)
 }
 QVariantMap RulerController::state() const
 {
-    return { { "scroll", m_scroll.value }, { "scrollVelocity", m_scroll.velocity },
-             { "width", width() },         { "selected", m_selected },
-             { "moving", m_moving },       { "time", m_time },
-             { "slots", slotStates() } };
+    return { { u"scroll"_s, m_scroll.value }, { u"scrollVelocity"_s, m_scroll.velocity },
+             { u"width"_s, width() },         { u"selected"_s, m_selected },
+             { u"moving"_s, m_moving },       { u"time"_s, m_time },
+             { u"slots"_s, slotStates() } };
 }
 }

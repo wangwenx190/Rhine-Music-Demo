@@ -3,6 +3,8 @@
 #include <cmath>
 #include <QPointF>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 PresentationController::PresentationController(FrameClock *clock, PresentationPorts ports,
                                                QObject *parent)
@@ -39,14 +41,17 @@ void PresentationController::revealTabContent()
     m_tabOpacity = m_reduced ? 1 : m_tabFadeFrom;
     if (m_reduced)
         m_tabFadeElapsed = .15;
-    emit tabIndicatorChanged();
+    Q_EMIT tabIndicatorChanged();
 }
 void PresentationController::advanceTab(double dt)
 {
     if (!std::isfinite(dt) || dt <= 0)
         return;
-    QEasingCurve ease(QEasingCurve::BezierSpline);
-    ease.addCubicBezierSegment({ .22, 1 }, { .36, 1 }, { 1, 1 });
+    static const QEasingCurve ease = [] {
+        QEasingCurve curve(QEasingCurve::BezierSpline);
+        curve.addCubicBezierSegment({ .22, 1 }, { .36, 1 }, { 1, 1 });
+        return curve;
+    }();
     bool changed = false;
     if (m_tabElapsed < .18) {
         m_tabElapsed = std::min(.18, m_tabElapsed + dt);
@@ -64,7 +69,7 @@ void PresentationController::advanceTab(double dt)
         changed = true;
     }
     if (changed)
-        emit tabIndicatorChanged();
+        Q_EMIT tabIndicatorChanged();
 }
 void PresentationController::transact(const std::function<void()> &operation)
 {
@@ -73,17 +78,17 @@ void PresentationController::transact(const std::function<void()> &operation)
     operation();
     --m_depth;
     if (!m_depth && before != std::tuple(m_phase, m_wantsDetail, m_pending))
-        emit changed();
+        Q_EMIT changed();
 }
 void PresentationController::open()
 {
     transact([&] {
         m_wantsDetail = true;
-        if (m_phase == "archive") {
+        if (m_phase == "archive"_L1) {
             if (m_ports.archiveReady()) {
                 beginOpen();
             } else {
-                m_phase = "selecting";
+                m_phase = "selecting"_L1;
                 m_browse.hide(m_reduced);
             }
         }
@@ -94,7 +99,7 @@ void PresentationController::back()
     transact([&] {
         m_wantsDetail = false;
         m_pending.reset();
-        if (m_phase != "archive" && m_phase != "selecting")
+        if (m_phase != "archive"_L1 && m_phase != "selecting"_L1)
             beginExit();
     });
 }
@@ -107,19 +112,19 @@ void PresentationController::select(const QString &albumId, bool openAfter, bool
         m_pending = PresentationSelection{ albumId, trackId, archiveRoute };
         m_wantsDetail = openAfter;
         const bool switchInDetail = openAfter && !archiveRoute;
-        if (m_phase == "opening" && !m_cameraEntered)
+        if (m_phase == "opening"_L1 && !m_cameraEntered)
             return;
-        if (m_phase == "archive") {
+        if (m_phase == "archive"_L1) {
             const bool committed = commitSelection(false);
             if (openAfter || !committed) {
-                m_phase = "selecting";
+                m_phase = "selecting"_L1;
                 m_browse.hide(m_reduced);
             }
-        } else if (switchInDetail && (m_phase == "detail" || m_phase == "opening")) {
+        } else if (switchInDetail && (m_phase == "detail"_L1 || m_phase == "opening"_L1)) {
             beginDetailSwitch();
-        } else if (switchInDetail && (m_phase == "switch-hiding" || m_phase == "switching")) {
+        } else if (switchInDetail && (m_phase == "switch-hiding"_L1 || m_phase == "switching"_L1)) {
             return;
-        } else if (m_phase != "selecting") {
+        } else if (m_phase != "selecting"_L1) {
             beginExit();
         }
     });
@@ -150,7 +155,7 @@ void PresentationController::layoutReady(quint64 revision)
 void PresentationController::update()
 {
     transact([&] {
-        if (m_phase == "switching") {
+        if (m_phase == "switching"_L1) {
             if (m_pending) {
                 if (commitSelection(true))
                     prepareMenu();
@@ -160,42 +165,42 @@ void PresentationController::update()
                 showMenu();
             return;
         }
-        if (m_phase == "opening") {
+        if (m_phase == "opening"_L1) {
             if (m_browseHidden && m_cameraEntered && m_ports.presentationReady() && m_layoutReady)
                 showMenu();
             return;
         }
-        if (m_phase != "returning" && m_phase != "selecting")
+        if (m_phase != "returning"_L1 && m_phase != "selecting"_L1)
             return;
-        if (m_phase == "returning" && !m_wantsDetail && m_ports.archiveInteractive
+        if (m_phase == "returning"_L1 && !m_wantsDetail && m_ports.archiveInteractive
             && m_ports.archiveInteractive()) {
             if (m_pending && !commitSelection(false))
                 return;
-            m_phase = "archive";
+            m_phase = "archive"_L1;
             m_browse.show(m_reduced);
-            emit focusRequested(false);
+            Q_EMIT focusRequested(false);
             return;
         }
         if (!m_ports.archiveReady())
             return;
         if (m_pending) {
             commitSelection(false);
-            m_phase = "selecting";
+            m_phase = "selecting"_L1;
             return;
         }
         if (m_wantsDetail) {
             beginOpen();
         } else {
-            m_phase = "archive";
+            m_phase = "archive"_L1;
             m_browse.show(m_reduced);
-            emit focusRequested(false);
+            Q_EMIT focusRequested(false);
         }
     });
 }
 void PresentationController::beginOpen()
 {
     const auto revision = ++m_revision;
-    m_phase = "opening";
+    m_phase = "opening"_L1;
     m_browseHidden = m_cameraEntered = false;
     prepareMenu();
     m_browse.hide(m_reduced, [this, revision] {
@@ -204,7 +209,7 @@ void PresentationController::beginOpen()
                 return;
             m_browseHidden = true;
             if (m_pending) {
-                m_phase = "selecting";
+                m_phase = "selecting"_L1;
                 commitSelection(false);
                 return;
             }
@@ -215,10 +220,10 @@ void PresentationController::beginOpen()
 }
 void PresentationController::beginExit()
 {
-    if (m_phase == "hiding" || m_phase == "returning" || m_phase == "switch-hiding")
+    if (m_phase == "hiding"_L1 || m_phase == "returning"_L1 || m_phase == "switch-hiding"_L1)
         return;
     const auto revision = ++m_revision;
-    m_phase = "hiding";
+    m_phase = "hiding"_L1;
     m_detail.hide(m_reduced, [this, revision] {
         transact([&] {
             if (revision == m_revision)
@@ -229,7 +234,7 @@ void PresentationController::beginExit()
 void PresentationController::beginDetailSwitch()
 {
     const auto revision = ++m_revision;
-    m_phase = "switch-hiding";
+    m_phase = "switch-hiding"_L1;
     if (!m_browseHidden) {
         m_browse.hide(m_reduced, [this, revision] {
             if (revision == m_revision)
@@ -244,7 +249,7 @@ void PresentationController::beginDetailSwitch()
                 returnToArchive();
                 return;
             }
-            m_phase = "switching";
+            m_phase = "switching"_L1;
             if (m_pending) {
                 if (commitSelection(true))
                     prepareMenu();
@@ -266,7 +271,7 @@ bool PresentationController::commitSelection(bool detail)
 }
 void PresentationController::returnToArchive()
 {
-    m_phase = "returning";
+    m_phase = "returning"_L1;
     m_ports.returnCamera();
 }
 void PresentationController::prepareMenu()
@@ -274,16 +279,16 @@ void PresentationController::prepareMenu()
     m_detail.reset(false);
     m_tabOpacity = 1;
     m_tabFadeElapsed = .15;
-    emit tabIndicatorChanged();
+    Q_EMIT tabIndicatorChanged();
     m_layoutReady = false;
     ++m_layoutRevision;
-    emit prepared();
+    Q_EMIT prepared();
 }
 void PresentationController::showMenu()
 {
-    m_phase = "detail";
+    m_phase = "detail"_L1;
     m_detail.show(m_reduced);
-    emit focusRequested(true);
+    Q_EMIT focusRequested(true);
 }
 void PresentationController::reset()
 {
@@ -292,10 +297,10 @@ void PresentationController::reset()
         ++m_layoutRevision;
         m_pending.reset();
         m_wantsDetail = m_browseHidden = m_cameraEntered = m_layoutReady = false;
-        m_phase = "archive";
+        m_phase = "archive"_L1;
         m_detail.reset(false);
         m_browse.reset(true);
-        emit prepared();
+        Q_EMIT prepared();
     });
 }
 void PresentationController::setReducedMotion(bool reduced)

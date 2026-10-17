@@ -7,6 +7,8 @@ qt_add_library(
     MusicTypes.h
     LibraryModels.cpp
     LibraryModels.h
+    Localization.cpp
+    Localization.h
 )
 target_link_libraries(YalahooCore PUBLIC Qt6::Core PRIVATE Qt6::Gui)
 target_compile_features(YalahooCore PUBLIC cxx_std_23)

@@ -1,4 +1,7 @@
 #pragma once
+#include "ReadbackImage.h"
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include <QQuickRenderControl>
 #include <QQuickRenderTarget>
 #include <QQuickWindow>
@@ -126,28 +129,31 @@ public:
         commandBuffer()->resourceUpdate(batch);
         m_control.endFrame();
         rhi()->finish();
-        QImage image(reinterpret_cast<const uchar *>(result.data.constData()),
-                     result.pixelSize.width(), result.pixelSize.height(), QImage::Format_RGBA8888);
-        return rhi()->isYUpInFramebuffer() ? image.flipped(Qt::Vertical) : image.copy();
+        try {
+            return yalahoo::rhi::readbackImage(result, rhi()->isYUpInFramebuffer());
+        } catch (const std::runtime_error &error) {
+            qWarning("Offscreen readback failed: %s", error.what());
+            return { };
+        }
     }
     QJsonObject diagnostics() const
     {
-        return { { "enabled", Enabled },
-                 { "targetWidth", m_texture ? m_texture->pixelSize().width() : 0 },
-                 { "targetHeight", m_texture ? m_texture->pixelSize().height() : 0 },
-                 { "targetDpr", m_targetDpr },
-                 { "nativeWindowVisible", m_window.isVisible() },
-                 { "colorFormat", "RGBA8" },
-                 { "samples", 1 },
-                 { "mips", false },
-                 { "colorBytesPerPixel", 4 },
-                 { "depthStencilBytesPerPixelUpperBound", 8 },
-                 { "attachmentEstimateBytesPerPixel", 12 },
-                 { "attachmentPeakBytesUpperBound", double(m_peakBytes) },
-                 { "actualDriverAllocationBytes", QJsonValue::Null },
-                 { "includesQtLayersOrFontAtlas", false } };
+        return { { u"enabled"_s, Enabled },
+                 { u"targetWidth"_s, m_texture ? m_texture->pixelSize().width() : 0 },
+                 { u"targetHeight"_s, m_texture ? m_texture->pixelSize().height() : 0 },
+                 { u"targetDpr"_s, m_targetDpr },
+                 { u"nativeWindowVisible"_s, m_window.isVisible() },
+                 { u"colorFormat"_s, u"RGBA8"_s },
+                 { u"samples"_s, 1 },
+                 { u"mips"_s, false },
+                 { u"colorBytesPerPixel"_s, 4 },
+                 { u"depthStencilBytesPerPixelUpperBound"_s, 8 },
+                 { u"attachmentEstimateBytesPerPixel"_s, 12 },
+                 { u"attachmentPeakBytesUpperBound"_s, double(m_peakBytes) },
+                 { u"actualDriverAllocationBytes"_s, QJsonValue::Null },
+                 { u"includesQtLayersOrFontAtlas"_s, false } };
     }
-signals:
+Q_SIGNALS:
     void frameMeasured(QJsonObject costs);
     void frameRendered();
 
@@ -230,12 +236,12 @@ private:
         const qint64 rendered = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.endFrame();
         if (measurementEnabled)
-            emit frameMeasured({ { "polishMs", polished / 1e6 },
-                                 { "beginFrameMs", (begun - polished) / 1e6 },
-                                 { "syncMs", (synced - begun) / 1e6 },
-                                 { "quickRenderMs", (rendered - synced) / 1e6 },
-                                 { "endFrameMs", (timer.nsecsElapsed() - rendered) / 1e6 } });
-        emit frameRendered();
+            Q_EMIT frameMeasured({ { u"polishMs"_s, polished / 1e6 },
+                                   { u"beginFrameMs"_s, (begun - polished) / 1e6 },
+                                   { u"syncMs"_s, (synced - begun) / 1e6 },
+                                   { u"quickRenderMs"_s, (rendered - synced) / 1e6 },
+                                   { u"endFrameMs"_s, (timer.nsecsElapsed() - rendered) / 1e6 } });
+        Q_EMIT frameRendered();
     }
     QQuickWindow &m_window;
     QQuickRenderControl &m_control;

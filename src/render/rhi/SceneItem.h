@@ -21,6 +21,7 @@ class SceneItem : public RhiItem
     Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged)
     Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged)
     Q_PROPERTY(bool diagnosticsEnabled READ diagnosticsEnabled WRITE setDiagnosticsEnabled NOTIFY diagnosticsChanged)
+    Q_PROPERTY(QString diagnosticText READ diagnosticText NOTIFY diagnosticValuesChanged)
     Q_PROPERTY(QVariantMap diagnosticValues READ diagnosticValues NOTIFY diagnosticValuesChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
     Q_PROPERTY(yalahoo::TitleReel *titleReel READ titleReel WRITE setTitleReel NOTIFY textReelsChanged)
@@ -84,6 +85,7 @@ public:
     {
         return m_diagnosticValues;
     }
+    QString diagnosticText() const;
     QString errorText() const
     {
         return m_errorText;
@@ -94,7 +96,7 @@ public:
     void setTitleReel(TitleReel *reel);
     TitleReel *transportReel() const;
     void setTransportReel(TitleReel *reel);
-signals:
+Q_SIGNALS:
     void renderingActiveChanged();
     void openingChanged();
     void scenePrepared();
@@ -141,11 +143,13 @@ private:
         std::shared_ptr<SelectedCoverLease> pixels;
         CoverSnapshot tiledPixels;
         QVector<AtlasUpload> uploads;
+        bool highResolutionFailed = false;
     };
     AtlasAllocator m_atlas{ 8192, 436, 22 };
     QHash<QString, AtlasLease> m_poolLeases;
     QHash<QString, QPair<QString, QString>> m_poolSources;
-    QSet<QString> m_readyCovers;
+    // Ready identities map to whether the tile contains real artwork rather than a placeholder.
+    QHash<QString, bool> m_readyCovers;
     std::array<OwnedCover, 4> m_ownedCovers;
     quint64 m_ownedSerial = 0;
     quint64 m_activeObject = 0;

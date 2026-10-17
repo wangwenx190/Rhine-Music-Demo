@@ -4,6 +4,7 @@
 - 实施前读取计划公共规则、涉及的专项契约和对应经验，评估规模/耗时；专项职责由计划索引确定，同一要求不得多文档重复维护。
 - 经验只保留明确触发条件与核心解决方案；不记录实验/尝试过程、失败数值、验证成绩或流水账。未决问题归具体待办。
 - 正式展示名`yalahOO!!!`，技术标识`yalahoo`。根CMake/C++23，C++在`src/`、QML在`qml/Yalahoo/Music/`、资产`resources/`、测试`tests/`、工具`tools/`；`legacy-web/`冻结，只作来源与追溯。
+- 语言、Qt对象/线程/模型及QML/C++职责分别遵守[cpp23-best-practices.md](docs/contracts/cpp23-best-practices.md)、[qt-best-practices.md](docs/contracts/qt-best-practices.md)、[qml-best-practices.md](docs/contracts/qml-best-practices.md)；专项门槛仍由计划索引确定。
 - 源码风格与格式化/qmllint入口按[code-style.md](docs/contracts/code-style.md)；四空格、展开语句，提交前`check-format`及Release `source-format`必须通过。
 - Kit发现/C++23/模块闭包按[native-bootstrap.md](docs/contracts/native-bootstrap.md)，不得固定Qt minor/patch/安装目录或降级。
 - 外观按冻结生产源码理论效果及用户固定差异实现；禁止截图像素追分和复制锯齿/异常模糊。数学/状态、实际质量与功能分别证明。

@@ -22,6 +22,8 @@
 #include <QMutex>
 #include <QMutexLocker>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 QQuickItem *find(QQuickItem *item, const QString &name)
 {
@@ -38,7 +40,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                             LibrarySession &library, MotionController &motion,
                             const QString &output)
 {
-    auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), "nativeScene"));
+    auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), u"nativeScene"_s));
     auto *selection = scene.selection();
     if (!native || !selection)
         return 4;
@@ -51,7 +53,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     const int requestedCycles =
             qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 0;
     scene.lighting()->setNight(initialNight);
-    window.setProperty("reviewPlayingTitle", QStringLiteral("正在播放 · 固定位置"));
+    window.setProperty("reviewPlayingTitle",
+                       u"\u6b63\u5728\u64ad\u653e \u00b7 \u56fa\u5b9a\u4f4d\u7f6e"_s);
     const QString playback = library.playbackTrackId();
     QObject lifetime;
     QJsonArray checks, samples, states, pictures;
@@ -72,26 +75,28 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                               { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
     const auto check = [&](const QString &name, bool result) {
         passed &= result;
-        checks.append(QJsonObject{ { "name", name }, { "passed", result }, { "stage", stage } });
+        checks.append(
+                QJsonObject{ { u"name"_s, name }, { u"passed"_s, result }, { u"stage"_s, stage } });
     };
     const auto capture = [&](const QString &name) {
         const auto image = window.grabWindow();
-        check("capture-" + name, !image.isNull() && image.save(output + '/' + name + ".png"));
+        check("capture-"_L1 + name,
+              !image.isNull() && image.save(output + '/'_L1 + name + ".png"_L1));
         QJsonArray anchors;
         for (const auto &c : overview.projectColumns())
-            anchors.append(QJsonObject{ { "lane", c.lane },
-                                        { "name", c.name },
-                                        { "x", c.x },
-                                        { "y", c.y },
-                                        { "count", c.count },
-                                        { "extent", c.extent },
-                                        { "selected", c.selected } });
-        pictures.append(QJsonObject{ { "name", name },
-                                     { "width", window.width() },
-                                     { "height", window.height() },
-                                     { "night", scene.lighting()->night() },
-                                     { "realistic", selection->realistic() },
-                                     { "anchors", anchors } });
+            anchors.append(QJsonObject{ { u"lane"_s, c.lane },
+                                        { u"name"_s, c.name },
+                                        { u"x"_s, c.x },
+                                        { u"y"_s, c.y },
+                                        { u"count"_s, c.count },
+                                        { u"extent"_s, c.extent },
+                                        { u"selected"_s, c.selected } });
+        pictures.append(QJsonObject{ { u"name"_s, name },
+                                     { u"width"_s, window.width() },
+                                     { u"height"_s, window.height() },
+                                     { u"night"_s, scene.lighting()->night() },
+                                     { u"realistic"_s, selection->realistic() },
+                                     { u"anchors"_s, anchors } });
     };
     const auto key = [&](int code) {
         QKeyEvent event(QEvent::KeyPress, code, Qt::NoModifier);
@@ -108,15 +113,16 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     const auto button = [&](const QString &name) {
         auto *item = find(window.contentItem(), name);
         if (!item || !item->isVisible() || !item->isEnabled()) {
-            check("button-" + name, false);
+            check("button-"_L1 + name, false);
             return;
         }
         clickPoint(item->mapToScene({ item->width() / 2, item->height() / 2 }));
     };
     const auto ready = [&] {
+        const auto cache = native->coverStatistics()[u"cache"_s].toObject();
         return native->errorText().isEmpty() && native->submission() > 0 && scene.settled()
-                && selection->archiveReady() && native->coverStatistics()["pending"].toInt() == 0
-                && native->coverStatistics()["active"].toInt() == 0;
+                && selection->archiveReady() && cache[u"pending"_s].toInt() == 0
+                && cache[u"active"_s].toInt() == 0;
     };
     const auto firstLane = [&] {
         for (int row = 0; row < overview.labels()->rowCount(); ++row) {
@@ -130,61 +136,62 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         if (finished)
             return;
         finished = true;
-        check("sequence-completed", stage == 19);
-        check("requested-lifecycle-cycles", cycle == requestedCycles);
-        check("playback-isolated", playback == library.playbackTrackId());
-        check("qml-warnings", warnings.isEmpty());
-        check("window-policy", verification::windowPolicySatisfied(window));
-        check("renderer-errors", native->errorText().isEmpty());
+        check(u"sequence-completed"_s, stage == 19);
+        check(u"requested-lifecycle-cycles"_s, cycle == requestedCycles);
+        check(u"playback-isolated"_s, playback == library.playbackTrackId());
+        check(u"qml-warnings"_s, warnings.isEmpty());
+        check(u"window-policy"_s, verification::windowPolicySatisfied(window));
+        check(u"renderer-errors"_s, native->errorText().isEmpty());
         QSet<qint64> generations, postprocess;
         qint64 peakUpload = 0;
         for (const auto value : samples) {
             const auto sample = value.toObject();
-            if (sample["stage"].toInt() >= 1 && sample["stage"].toInt() <= 7) {
-                generations.insert(sample["resourceGeneration"].toInteger());
-                postprocess.insert(sample["postprocessRevision"].toInteger());
+            if (sample[u"stage"_s].toInt() >= 1 && sample[u"stage"_s].toInt() <= 7) {
+                generations.insert(sample[u"resourceGeneration"_s].toInteger());
+                postprocess.insert(sample[u"postprocessRevision"_s].toInteger());
             }
-            peakUpload = std::max(peakUpload, sample["atlasUploadBytes"].toInteger());
+            peakUpload = std::max(peakUpload, sample[u"atlasUploadBytes"_s].toInteger());
         }
-        check("overview-keeps-render-targets", generations.size() == 1 && postprocess.size() == 1);
-        check("upload-burst", peakUpload <= 2 * 1024 * 1024);
+        check(u"overview-keeps-render-targets"_s,
+              generations.size() == 1 && postprocess.size() == 1);
+        check(u"upload-burst"_s, peakUpload <= 2 * 1024 * 1024);
         QJsonObject report{
-            { "passed", passed },
-            { "configuration", "Release" },
-            { "qtVersion", qVersion() },
-            { "backend", qEnvironmentVariable("QSG_RHI_BACKEND") },
-            { "dpr", window.effectiveDevicePixelRatio() },
-            { "windowPolicy", verification::windowPolicy(window) },
-            { "checks", checks },
-            { "pictures", pictures },
-            { "qmlWarnings", QJsonArray::fromStringList(warnings) },
-            { "states", states },
-            { "samples", samples },
-            { "cycles", cycle },
-            { "requestedLifecycleCycles", requestedCycles },
-            { "peakLabelSlots", peakLabels },
-            { "overviewUiAttachments",
+            { u"passed"_s, passed },
+            { u"configuration"_s, u"Release"_s },
+            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+            { u"backend"_s, qEnvironmentVariable("QSG_RHI_BACKEND") },
+            { u"dpr"_s, window.effectiveDevicePixelRatio() },
+            { u"windowPolicy"_s, verification::windowPolicy(window) },
+            { u"checks"_s, checks },
+            { u"pictures"_s, pictures },
+            { u"qmlWarnings"_s, QJsonArray::fromStringList(warnings) },
+            { u"states"_s, states },
+            { u"samples"_s, samples },
+            { u"cycles"_s, cycle },
+            { u"requestedLifecycleCycles"_s, requestedCycles },
+            { u"peakLabelSlots"_s, peakLabels },
+            { u"overviewUiAttachments"_s,
               QJsonObject{
-                      { "scope",
-                        "Separate Qt Quick crop/horizontal layers; descriptor estimate, not driver allocation" },
-                      { "maximumSlots", 18 },
-                      { "texturesPerSlot", 2 },
-                      { "width", 308 },
-                      { "height", 129 },
-                      { "rgba8PayloadBytesUpperBound", 5721408 },
-                      { "withDepthStencilUpperBoundBytes", 17164224 },
-                      { "resizeOverlapUpperBoundBytes", 34328448 },
-                      { "actualDriverAllocationBytes", QJsonValue::Null } } },
-            { "peakAtlasUploadBytes", peakUpload },
-            { "durationMs", time.elapsed() },
-            { "clockActive", motion.clock()->active() },
-            { "applicationVisible", motion.clock()->applicationVisible() },
-            { "cameraSettled", scene.settled() },
-            { "archiveReady", selection->archiveReady() },
-            { "measurementScope",
-              "Qt frame/renderer telemetry and own-window PNG; no input-to-photon or measured VRAM" }
+                      { u"scope"_s,
+                        u"Separate Qt Quick crop/horizontal layers; descriptor estimate, not driver allocation"_s },
+                      { u"maximumSlots"_s, 18 },
+                      { u"texturesPerSlot"_s, 2 },
+                      { u"width"_s, 308 },
+                      { u"height"_s, 129 },
+                      { u"rgba8PayloadBytesUpperBound"_s, 5721408 },
+                      { u"withDepthStencilUpperBoundBytes"_s, 17164224 },
+                      { u"resizeOverlapUpperBoundBytes"_s, 34328448 },
+                      { u"actualDriverAllocationBytes"_s, QJsonValue::Null } } },
+            { u"peakAtlasUploadBytes"_s, peakUpload },
+            { u"durationMs"_s, time.elapsed() },
+            { u"clockActive"_s, motion.clock()->active() },
+            { u"applicationVisible"_s, motion.clock()->applicationVisible() },
+            { u"cameraSettled"_s, scene.settled() },
+            { u"archiveReady"_s, selection->archiveReady() },
+            { u"measurementScope"_s,
+              u"Qt frame/renderer telemetry and own-window PNG; no input-to-photon or measured VRAM"_s }
         };
-        QSaveFile file(output + "/report.json");
+        QSaveFile file(output + "/report.json"_L1);
         if (!file.open(QIODevice::WriteOnly)) {
             app.exit(5);
             return;
@@ -198,15 +205,15 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                              warnings.append(error.toString());
                      });
     QObject::connect(native, &rhi::SceneItem::frameSubmitted, &lifetime, [&](QJsonObject sample) {
-        sample["stage"] = stage;
+        sample[u"stage"_s] = stage;
         samples.append(sample);
     });
     // GUI is blocked during sync: measure the exact polished row consumed by this frame.
     const auto positions = QObject::connect(
             &window, &QQuickWindow::afterSynchronizing, &window,
             [&] {
-                auto *play = find(window.contentItem(), "playButton");
-                auto *stop = find(window.contentItem(), "stopButton");
+                auto *play = find(window.contentItem(), u"playButton"_s);
+                auto *stop = find(window.contentItem(), u"stopButton"_s);
                 if (play && stop) {
                     QMutexLocker lock(&positionsMutex);
                     synchronizedPlay = play->mapToScene({ 0, 0 });
@@ -226,14 +233,14 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         window.update();
                 });
                 ++frames;
-                states.append(QJsonObject{ { "stage", stage },
-                                           { "progress", overview.progress() },
-                                           { "album", selection->albumId() },
-                                           { "labels", overview.labels()->liveCount() },
-                                           { "frameRevision", qint64(scene.frameRevision()) } });
+                states.append(QJsonObject{ { u"stage"_s, stage },
+                                           { u"progress"_s, overview.progress() },
+                                           { u"album"_s, selection->albumId() },
+                                           { u"labels"_s, overview.labels()->liveCount() },
+                                           { u"frameRevision"_s, qint64(scene.frameRevision()) } });
                 peakLabels = std::max(peakLabels, overview.labels()->liveCount());
                 if (overview.labels()->liveCount() > 18)
-                    check("label-capacity", false);
+                    check(u"label-capacity"_s, false);
                 switch (stage) {
                 case 0:
                     if (!ready() || frames < 30)
@@ -244,8 +251,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         stopPosition = synchronizedStop;
                     }
                     selected = selection->albumId();
-                    button("overviewToggle");
-                    check("toggle-enter", overview.active());
+                    button(u"overviewToggle"_s);
+                    check(u"toggle-enter"_s, overview.active());
                     ++stage;
                     break;
                 case 1:
@@ -253,15 +260,15 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         return;
                     {
                         QMutexLocker lock(&positionsMutex);
-                        check("fixed-transport-buttons",
+                        check(u"fixed-transport-buttons"_s,
                               QLineF(playPosition, synchronizedPlay).length() <= .01
                                       && QLineF(stopPosition, synchronizedStop).length() <= .01);
                     }
                     visibleLane = firstLane();
-                    check("visible-label", visibleLane >= 0);
-                    check("no-one-step-entry", !overview.enter(visibleLane));
-                    button("overviewLabel-" + QString::number(visibleLane));
-                    check("first-click-only-expands",
+                    check(u"visible-label"_s, visibleLane >= 0);
+                    check(u"no-one-step-entry"_s, !overview.enter(visibleLane));
+                    button("overviewLabel-"_L1 + QString::number(visibleLane));
+                    check(u"first-click-only-expands"_s,
                           overview.active() && overview.labels()->canEnter(visibleLane)
                                   && selected == selection->albumId());
                     frames = 0;
@@ -270,9 +277,9 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                 case 2:
                     if (frames < 35)
                         return;
-                    capture("expanded");
-                    button("overviewEnter-" + QString::number(visibleLane));
-                    check("second-click-enters-near",
+                    capture(u"expanded"_s);
+                    button("overviewEnter-"_L1 + QString::number(visibleLane));
+                    check(u"second-click-enters-near"_s,
                           !overview.active() && !presentation.wantsDetail());
                     ++stage;
                     break;
@@ -280,16 +287,16 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (!ready() || overview.progress() > .001
                         || !presentation.browseSurface()->shown())
                         return;
-                    check("return-focus",
-                          find(window.contentItem(), "overviewToggle")->hasActiveFocus());
+                    check(u"return-focus"_s,
+                          find(window.contentItem(), u"overviewToggle"_s)->hasActiveFocus());
                     key(Qt::Key_V);
                     ++stage;
                     break;
                 case 4:
                     if (!ready() || overview.progress() < .999)
                         return;
-                    button("overviewNext");
-                    check("column-navigation-stays-overview",
+                    button(u"overviewNext"_s);
+                    check(u"column-navigation-stays-overview"_s,
                           overview.active() && !overview.labels()->canEnter(visibleLane));
                     ++stage;
                     break;
@@ -297,7 +304,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (!ready())
                         return;
                     key(Qt::Key_Escape);
-                    check("escape-return", !overview.active());
+                    check(u"escape-return"_s, !overview.active());
                     ++stage;
                     break;
                 case 6:
@@ -322,7 +329,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                             break;
                         }
                     }
-                    check("album-click-returns", clicked && !overview.active());
+                    check(u"album-click-returns"_s, clicked && !overview.active());
                     ++stage;
                     break;
                 }
@@ -350,7 +357,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     break;
                 case 11:
                     motion.setReducedMotion(true);
-                    check("reduced-finishes-progress", overview.progress() == 1);
+                    check(u"reduced-finishes-progress"_s, overview.progress() == 1);
                     selection->setRealistic(true);
                     frames = 0;
                     ++stage;
@@ -376,19 +383,19 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         const int lane =
                                 overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
                         auto *label = find(window.contentItem(),
-                                           "overviewLabel-" + QString::number(lane));
+                                           "overviewLabel-"_L1 + QString::number(lane));
                         if (!label) {
-                            check("label-object", false);
+                            check(u"label-object"_s, false);
                             continue;
                         }
                         const auto rect = label->mapRectToScene(label->boundingRect());
-                        check("label-inside-viewport",
+                        check(u"label-inside-viewport"_s,
                               rect.left() >= -18 && rect.right() + 76 <= window.width() - 14);
                         for (const auto &other : occupied)
-                            check("labels-do-not-overlap", !rect.intersects(other));
+                            check(u"labels-do-not-overlap"_s, !rect.intersects(other));
                         occupied.append(rect);
                     }
-                    capture("size-" + QString::number(sizeIndex));
+                    capture("size-"_L1 + QString::number(sizeIndex));
                     if (++sizeIndex < sizes.size())
                         stage = 12;
                     else {
@@ -412,7 +419,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     window.destroy();
                     ++stage;
                     QTimer::singleShot(40, &lifetime, [&] {
-                        check("hidden-clock-paused",
+                        check(u"hidden-clock-paused"_s,
                               !motion.clock()->active() && overview.progress() == pausedProgress);
                         window.create();
                         window.show();
@@ -426,7 +433,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (++cycle < requestedCycles)
                         stage = 14;
                     else {
-                        capture("restored");
+                        capture(u"restored"_s);
                         overview.setActive(false);
                         ++stage;
                     }
@@ -442,14 +449,14 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (!ready() || frames < 5)
                         return;
                     key(Qt::Key_V);
-                    check("v-return", !overview.active());
+                    check(u"v-return"_s, !overview.active());
                     ++stage;
                     break;
                 case 18:
                     if (!ready() || overview.labels()->liveCount() != 0)
                         return;
-                    check("labels-release", overview.labels()->liveCount() == 0);
-                    check("archive-no-detail",
+                    check(u"labels-release"_s, overview.labels()->liveCount() == 0);
+                    check(u"archive-no-detail"_s,
                           presentation.archiveEnabled() && !presentation.wantsDetail());
                     ++stage;
                     finish();

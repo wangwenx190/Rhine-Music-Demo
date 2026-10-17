@@ -12,24 +12,26 @@
 #include <QJsonArray>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 class AudioAmbienceTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
     void realBgmGateInterruptionsAndHiddenPlayback()
     {
         QTemporaryDir root;
-        QFile file(root.filePath("anonymous.wav"));
+        QFile file(root.filePath(u"anonymous.wav"_s));
         QVERIFY(file.open(QIODevice::WriteOnly));
         QVERIFY(file.write(test::wave(2500)) > 0);
         file.close();
         OfflineMetadataProvider provider;
         LibrarySession library(&provider);
         Album album;
-        album.id = "album";
+        album.id = "album"_L1;
         Track track;
-        track.id = "track";
+        track.id = "track"_L1;
         track.albumId = album.id;
         track.sourceUrl = QUrl::fromLocalFile(file.fileName());
         album.tracks.append(track);
@@ -48,7 +50,7 @@ private slots:
         QTRY_VERIFY(!background.m_fade.isActive());
         QVERIFY(background.error().isEmpty());
         QCOMPARE(background.m_player.loops(), QMediaPlayer::Infinite);
-        QCOMPARE(background.m_player.source(), QUrl("qrc:/assets/audio/atmosphere.ogg"));
+        QCOMPARE(background.m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
         QCOMPARE(background.m_output.volume(), .01f);
         const auto duration = background.m_player.duration();
         QVERIFY(duration > 1000);
@@ -80,7 +82,7 @@ private slots:
         song.toggle();
         QTRY_VERIFY(song.playing());
         const auto before = song.position();
-        library.search("other");
+        library.search(u"other"_s);
         library.navigate(album.id);
         QTRY_VERIFY(song.position() > before + 100);
         QCOMPARE(song.trackId(), track.id);
@@ -119,7 +121,7 @@ private slots:
         background.start();
         QTRY_VERIFY_WITH_TIMEOUT(background.playing(), 10000);
         QTemporaryDir root;
-        background.m_player.setSource(QUrl::fromLocalFile(root.filePath("missing.ogg")));
+        background.m_player.setSource(QUrl::fromLocalFile(root.filePath(u"missing.ogg"_s)));
         QTRY_VERIFY_WITH_TIMEOUT(!background.error().isEmpty(), 10000);
         QVERIFY(background.silent());
         QVERIFY(!background.m_fade.isActive());
@@ -130,23 +132,23 @@ private slots:
         background.setEnabled(true);
         QTRY_VERIFY_WITH_TIMEOUT(background.playing(), 10000);
         QVERIFY(background.error().isEmpty());
-        QCOMPARE(background.m_player.source(), QUrl("qrc:/assets/audio/atmosphere.ogg"));
+        QCOMPARE(background.m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
         background.stop();
     }
     void missingEventsAreSilentAndPoolIsBounded()
     {
         InterfaceSoundController sounds;
         BackgroundMusicController background;
-        QFile manifest(":/assets/audio/interface-events.json");
+        QFile manifest(u":/assets/audio/interface-events.json"_s);
         QVERIFY(manifest.open(QIODevice::ReadOnly));
         const auto events =
-                QJsonDocument::fromJson(manifest.readAll()).object()["events"].toArray();
+                QJsonDocument::fromJson(manifest.readAll()).object()[u"events"_s].toArray();
         QCOMPARE(events.size(), 17);
         QVERIFY(!sounds.available());
         for (const auto &event : events)
-            QVERIFY(!sounds.trigger(event.toObject()["event"].toString()));
+            QVERIFY(!sounds.trigger(event.toObject()[u"event"_s].toString()));
         for (int i = 0; i < 10000; ++i)
-            QVERIFY(!sounds.trigger("key"));
+            QVERIFY(!sounds.trigger(u"key"_s));
         for (const auto &effect : sounds.m_pool)
             QVERIFY(!effect);
         const auto original = sounds.volume();
@@ -156,16 +158,16 @@ private slots:
         QCOMPARE(sounds.volume(), 1.);
         QCOMPARE(background.volume(), .18);
         sounds.setEnabled(false);
-        QVERIFY(!sounds.trigger("confirm"));
+        QVERIFY(!sounds.trigger(u"confirm"_s));
         sounds.setEnabled(true);
         // Test-only short WAV exercises the same production QSoundEffect dispatch.
         QTemporaryDir root;
-        QFile file(root.filePath("short.wav"));
+        QFile file(root.filePath(u"short.wav"_s));
         QVERIFY(file.open(QIODevice::WriteOnly));
         QVERIFY(file.write(test::wave(1000)) > 0);
         file.close();
         const auto url = QUrl::fromLocalFile(file.fileName());
-        sounds.m_sources.insert("confirm", url);
+        sounds.m_sources.insert(u"confirm"_s, url);
         sounds.setVolume(.01);
         for (auto &effect : sounds.m_pool) {
             effect = std::make_unique<QSoundEffect>();
@@ -176,8 +178,8 @@ private slots:
         for (const auto &effect : sounds.m_pool)
             QTRY_COMPARE_WITH_TIMEOUT(effect->status(), QSoundEffect::Ready, 10000);
         for (int i = 0; i < 4; ++i)
-            QVERIFY(sounds.trigger("confirm"));
-        QVERIFY(!sounds.trigger("confirm"));
+            QVERIFY(sounds.trigger(u"confirm"_s));
+        QVERIFY(!sounds.trigger(u"confirm"_s));
         sounds.setEnabled(false);
         for (const auto &effect : sounds.m_pool)
             QVERIFY(!effect->isPlaying());
@@ -185,11 +187,11 @@ private slots:
     void audioPreferencesPersistIndependently()
     {
         QTemporaryDir root;
-        const QJsonObject audio{ { "volume", .5 },
-                                 { "bgm", false },
-                                 { "bgmVolume", .3 },
-                                 { "sound", true },
-                                 { "soundVolume", .4 } };
+        const QJsonObject audio{ { u"volume"_s, .5 },
+                                 { u"bgm"_s, false },
+                                 { u"bgmVolume"_s, .3 },
+                                 { u"sound"_s, true },
+                                 { u"soundVolume"_s, .4 } };
         {
             PreferencesStore prefs(root.path());
             prefs.setNavigation(false, true);
@@ -200,18 +202,18 @@ private slots:
         QCOMPARE(prefs.audio(), audio);
         QVERIFY(prefs.realistic());
         QVERIFY(!prefs.rememberColumnPosition());
-        QFile imported(root.filePath("import.json"));
+        QFile imported(root.filePath(u"import.json"_s));
         QVERIFY(imported.open(QIODevice::WriteOnly));
-        imported.write(R"({"bgm":true})");
+        imported.write(R"({"bgm":true})"_ba);
         imported.close();
         QSignalSpy importedSignal(&prefs, &PreferencesStore::imported);
         QSignalSpy savedSignal(&prefs, &PreferencesStore::saved);
         QVERIFY(prefs.importJson(QUrl::fromLocalFile(imported.fileName())));
         QTRY_COMPARE(importedSignal.size(), 1);
         QTRY_VERIFY(!savedSignal.isEmpty());
-        QCOMPARE(prefs.audio()["bgm"].toBool(), true);
-        QCOMPARE(prefs.audio()["volume"].toDouble(), .5);
-        QCOMPARE(prefs.audio()["soundVolume"].toDouble(), .4);
+        QCOMPARE(prefs.audio()[u"bgm"_s].toBool(), true);
+        QCOMPARE(prefs.audio()[u"volume"_s].toDouble(), .5);
+        QCOMPARE(prefs.audio()[u"soundVolume"_s].toDouble(), .4);
     }
 };
 }

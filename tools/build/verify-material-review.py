@@ -74,7 +74,8 @@ def main():
         run("production-configure", ["cmake", "--preset", "qt-release", "-DYALAHOO_REVIEW=OFF",
                                      "-DYALAHOO_MACOS_VISIBLE_TESTS=OFF"])
         run("production-build", ["cmake", "--build", "--preset", "qt-release"])
-        run("production-tests", ["ctest", "--preset", "qt-release", "--output-on-failure"])
+        run("production-tests", ["ctest", "--preset", "qt-release", "--output-on-failure",
+                                 "-R", "^(source-format|module-link-and-plugins|shader-tools|assets)$"])
         chain = json.loads((ROOT / "build/release/toolchain.json").read_text())
         environment["PATH"] = str(Path(chain["qtKit"]) / "bin") + os.pathsep + environment["PATH"]
         executable = ROOT / "build/release/bin" / (

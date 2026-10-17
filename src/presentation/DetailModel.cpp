@@ -1,36 +1,52 @@
+#include <QCoreApplication>
 #include "DetailModel.h"
 #include <QSet>
 #include <QTextLayout>
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int trackCount = 0)
 {
-    const QString status = lookup.value("status").toString("unqueried");
-    const QString kept = retained ? QStringLiteral(" 已有资料仍然保留，可离线阅读。") : QString();
+    const QString status = lookup.value(u"status"_s).toString(u"unqueried"_s);
+    const QString kept = retained
+            ? QCoreApplication::translate("Yalahoo",
+                                          " Existing metadata is retained for offline reading.")
+            : QString();
     QString result;
-    if (status == "error")
-        result = "查询失败：" + lookup.value("error").toString("资料来源暂时无法访问。");
-    else if (status == "uncertain")
-        result = "尚无法可靠确认对应专辑或曲目，未采用存疑资料。";
-    else if (status == "not-found")
-        result = "未找到可核实的资料。";
-    else if (status == "partial" || status == "matched")
-        result = credits ? QStringLiteral("已核对 %1 / %2 首曲目的参与人员。")
-                                   .arg(lookup.value("matchedTracks").toInt())
-                                   .arg(lookup.value("totalTracks").toInt(trackCount))
-                         : QStringLiteral("介绍已保存在本机。");
-    else if (status == "unqueried")
-        result = retained ? QStringLiteral("资料已保存在本机。") : QStringLiteral("尚未查询资料。");
+    if (status == "error"_L1)
+        result = QCoreApplication::translate("Yalahoo", "Query failed: ")
+                + lookup.value(u"error"_s)
+                          .toString(QCoreApplication::translate(
+                                  "Yalahoo", "The metadata source is temporarily unavailable."));
+    else if (status == "uncertain"_L1)
+        result = QCoreApplication::translate(
+                "Yalahoo",
+                "The album or track could not be identified reliably. Uncertain metadata was not applied.");
+    else if (status == "not-found"_L1)
+        result = QCoreApplication::translate("Yalahoo", "No verifiable metadata was found.");
+    else if (status == "partial"_L1 || status == "matched"_L1)
+        result = credits
+                ? QCoreApplication::translate("Yalahoo", "Track credits verified: %1 / %2.")
+                          .arg(lookup.value(u"matchedTracks"_s).toInt())
+                          .arg(lookup.value(u"totalTracks"_s).toInt(trackCount))
+                : QCoreApplication::translate("Yalahoo", "The introduction is saved locally.");
+    else if (status == "unqueried"_L1)
+        result = retained
+                ? QCoreApplication::translate("Yalahoo", "Metadata is saved locally.")
+                : QCoreApplication::translate("Yalahoo", "Metadata has not been queried.");
     else
-        result = "资料状态：" + status + "。";
-    if (status != "error" && !lookup.value("error").toString().isEmpty())
-        result += " " + lookup.value("error").toString();
-    if (!lookup.value("retryAt").toString().isEmpty())
-        result += " 重试时间：" + lookup.value("retryAt").toString() + "。";
-    return result + kept + " 在线查询暂未启用。";
+        result = QCoreApplication::translate("Yalahoo", "Metadata status: %1.").arg(status);
+    if (status != "error"_L1 && !lookup.value(u"error"_s).toString().isEmpty())
+        result += " "_L1 + lookup.value(u"error"_s).toString();
+    if (!lookup.value(u"retryAt"_s).toString().isEmpty())
+        result += QCoreApplication::translate("Yalahoo", " Retry at: %1.")
+                          .arg(lookup.value(u"retryAt"_s).toString());
+    return result + kept
+            + QCoreApplication::translate("Yalahoo", " Online queries are not enabled yet.");
 }
 }
 double DetailModel::normalLineHeight(const QString &text, const QFont &font)
@@ -53,7 +69,7 @@ double DetailModel::normalLineHeight(const QString &text, const QFont &font)
 QString DetailModel::time(double seconds)
 {
     const qint64 value = std::isfinite(seconds) ? qint64(std::clamp(seconds, 0.0, 1e12)) : 0;
-    return QStringLiteral("%1:%2").arg(value / 60).arg(value % 60, 2, 10, QLatin1Char('0'));
+    return u"%1:%2"_s.arg(value / 60).arg(value % 60, 2, 10, '0'_L1);
 }
 int DetailModel::rowCount(const QModelIndex &parent) const
 {
@@ -61,19 +77,19 @@ int DetailModel::rowCount(const QModelIndex &parent) const
 }
 QVariant DetailModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() < 0 || index.row() >= rowCount())
+    if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
+        || index.row() >= rowCount())
         return { };
     const auto &track = m_album->tracks[index.row()];
     switch (role) {
     case TrackId:
         return track.id;
     case Number:
-        return QStringLiteral("%1").arg(track.trackNumber.value_or(index.row() + 1), 2, 10,
-                                        QLatin1Char('0'));
+        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2, 10, '0'_L1);
     case Title:
         return track.title;
     case Artist:
-        return track.artist;
+        return artistDisplayName(track.artist);
     case Format:
         return track.format;
     case Duration:
@@ -81,7 +97,7 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
     case Disc:
         return track.discNumber.value_or(1);
     case DiscHeading:
-        return m_info.value("discs").toInt() > 1
+        return m_info.value(u"discs"_s).toInt() > 1
                 && (index.row() == 0
                     || m_album->tracks[index.row() - 1].discNumber.value_or(1)
                             != track.discNumber.value_or(1));
@@ -91,16 +107,17 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
 }
 QHash<int, QByteArray> DetailModel::roleNames() const
 {
-    return { { TrackId, "trackId" }, { Number, "number" },          { Title, "trackTitle" },
-             { Artist, "artist" },   { Format, "format" },          { Duration, "duration" },
-             { Disc, "disc" },       { DiscHeading, "discHeading" } };
+    return { { TrackId, "trackId"_ba },  { Number, "number"_ba },
+             { Title, "trackTitle"_ba }, { Artist, "artist"_ba },
+             { Format, "format"_ba },    { Duration, "duration"_ba },
+             { Disc, "disc"_ba },        { DiscHeading, "discHeading"_ba } };
 }
 void DetailModel::prepare(const LibrarySession &library)
 {
     const auto snapshot = library.snapshot();
     const auto *album = library.navigationAlbum();
     if (snapshot == m_snapshot && album == m_album
-        && m_info.value("code") == library.browseInfo().value("code"))
+        && m_info.value(u"code"_s) == library.browseInfo().value(u"code"_s))
         return;
     beginResetModel();
     m_snapshot = snapshot;
@@ -111,12 +128,12 @@ void DetailModel::prepare(const LibrarySession &library)
         QVariantList facts, producers;
         QHash<QString, QString> trackTitles;
         const auto fact = [&](const QString &label, const QString &value) {
-            facts.append(QVariantMap{ { "label", label }, { "value", value } });
+            facts.append(QVariantMap{ { u"label"_s, label }, { u"value"_s, value } });
         };
-        QString genre = QStringLiteral("未分类");
+        QString genre = QCoreApplication::translate("Yalahoo", "Unclassified");
         for (const auto &g : snapshot->genres) {
             if (g.id == a.genreId) {
-                genre = g.name;
+                genre = genreDisplayName(g);
                 break;
             }
         }
@@ -136,7 +153,7 @@ void DetailModel::prepare(const LibrarySession &library)
         for (const auto &track : a.tracks) {
             trackTitles.insert(track.id, track.title);
             const auto format =
-                    track.codec.isEmpty() ? track.format : track.format + " / " + track.codec;
+                    track.codec.isEmpty() ? track.format : track.format + " / "_L1 + track.codec;
             if (!format.isEmpty() && !formatSet.contains(format)) {
                 formats.append(format);
                 formatSet.insert(format);
@@ -151,36 +168,45 @@ void DetailModel::prepare(const LibrarySession &library)
         const auto display = [](std::optional<int> low, std::optional<int> high, double scale,
                                 const QString &unit) {
             if (!low)
-                return QStringLiteral("未提供");
+                return QCoreApplication::translate("Yalahoo", "Not provided");
             const auto number = [scale, &unit](int value) {
                 double scaled = value / scale;
-                if (unit == "kbps")
+                if (unit == "kbps"_L1)
                     scaled = std::round(scaled);
-                else if (unit == "kHz")
+                else if (unit == "kHz"_L1)
                     scaled = std::round(scaled * 10) / 10;
                 return QString::number(scaled, 'g', 8);
             };
-            return number(*low) + " " + unit
-                    + (*low == *high ? QString() : "–" + number(*high) + " " + unit);
+            return number(*low) + " "_L1 + unit
+                    + (*low == *high ? QString() : u"\u2013"_s + number(*high) + " "_L1 + unit);
         };
-        fact("RELEASE / 发行年份", a.year ? QString::number(*a.year) : "未提供");
-        fact("ARTIST / 歌手", a.artist);
-        fact("GENRE / 流派", genre);
-        fact("VOLUMES / 内含 CD", QStringLiteral("%1 CD · %2 首").arg(discs).arg(a.tracks.size()));
-        fact("FORMAT / 文件格式", formats.isEmpty() ? "未提供" : formats.join(" · "));
-        fact("RESOLUTION / 位深与采样率",
-             (lossy ? QStringLiteral("有损编码") : display(minBits, maxBits, 1, "bit")) + " / "
-                     + display(minRate, maxRate, 1000, "kHz"));
-        fact("BITRATE / 码率", display(minBitrate, maxBitrate, 1000, "kbps"));
-        fact("DURATION / 总时长", time(duration));
+        fact(QCoreApplication::translate("Yalahoo", "RELEASE / Year"),
+             a.year ? QString::number(*a.year)
+                    : QCoreApplication::translate("Yalahoo", "Not provided"));
+        fact(QCoreApplication::translate("Yalahoo", "ARTIST"), artistDisplayName(a.artist));
+        fact(QCoreApplication::translate("Yalahoo", "GENRE"), genre);
+        fact(QCoreApplication::translate("Yalahoo", "VOLUMES / CDs"),
+             QCoreApplication::translate("Yalahoo", "%1 CD \u00b7 Tracks: %2")
+                     .arg(discs)
+                     .arg(a.tracks.size()));
+        fact(QCoreApplication::translate("Yalahoo", "FORMAT / File format"),
+             formats.isEmpty() ? QCoreApplication::translate("Yalahoo", "Not provided")
+                               : formats.join(u" \u00b7 "_s));
+        fact(QCoreApplication::translate("Yalahoo", "RESOLUTION / Bit depth and sample rate"),
+             (lossy ? QCoreApplication::translate("Yalahoo", "Lossy encoding")
+                    : display(minBits, maxBits, 1, u"bit"_s))
+                     + " / "_L1 + display(minRate, maxRate, 1000, u"kHz"_s));
+        fact(QCoreApplication::translate("Yalahoo", "BITRATE"),
+             display(minBitrate, maxBitrate, 1000, u"kbps"_s));
+        fact(QCoreApplication::translate("Yalahoo", "DURATION / Total time"), time(duration));
         for (const auto &producer : a.producers) {
             producers.append(QVariantMap{
-                    { "name", producer.name },
-                    { "role", producer.role },
-                    { "source", producer.source },
-                    { "url", producer.url },
-                    { "trackTitle", trackTitles.value(producer.trackId, producer.trackTitle) },
-                    { "trackId", producer.trackId } });
+                    { u"name"_s, producer.name },
+                    { u"role"_s, producer.role },
+                    { u"source"_s, producer.source },
+                    { u"url"_s, producer.url },
+                    { u"trackTitle"_s, trackTitles.value(producer.trackId, producer.trackTitle) },
+                    { u"trackId"_s, producer.trackId } });
         }
         // Group once per immutable album. Stable track IDs resolve through the index above.
         struct CreditGroup
@@ -193,18 +219,18 @@ void DetailModel::prepare(const LibrarySession &library)
         QHash<QString, int> groupIndex;
         for (const auto &value : producers) {
             const auto producer = value.toMap();
-            const auto key = producer["name"]
+            const auto key = producer[u"name"_s]
                                      .toString()
                                      .trimmed()
                                      .normalized(QString::NormalizationForm_KC)
                                      .toLower()
-                    + QChar(0) + producer["source"].toString();
+                    + QChar(0) + producer[u"source"_s].toString();
             int index = groupIndex.value(key, -1);
             if (index < 0) {
                 index = grouped.size();
                 groupIndex.insert(key, index);
                 grouped.append(CreditGroup{
-                        producer["name"].toString(), { }, { }, { }, { }, { }, { }, { }, { } });
+                        producer[u"name"_s].toString(), { }, { }, { }, { }, { }, { }, { }, { } });
             }
             auto &group = grouped[index];
             const auto appendUnique = [](QStringList &values, QSet<QString> &keys,
@@ -214,56 +240,62 @@ void DetailModel::prepare(const LibrarySession &library)
                     values.append(text);
                 }
             };
-            appendUnique(group.roles, group.roleKeys, producer["role"].toString());
-            const auto source = producer["source"].toString();
-            const auto url = producer["url"].toString();
+            appendUnique(group.roles, group.roleKeys, producer[u"role"_s].toString());
+            const auto source = producer[u"source"_s].toString();
+            const auto url = producer[u"url"_s].toString();
             appendUnique(group.sources, group.sourceKeys,
-                         source + (url.isEmpty() ? QString() : " · " + url));
-            const auto trackTitle = producer["trackTitle"].toString();
+                         source + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
+            const auto trackTitle = producer[u"trackTitle"_s].toString();
             if (!trackTitle.isEmpty()) {
-                const auto trackKey = producer["trackId"].toString() + QChar(0) + trackTitle
-                        + QChar(0) + producer["role"].toString() + QChar(0) + url;
+                const auto trackKey = producer[u"trackId"_s].toString() + QChar(0) + trackTitle
+                        + QChar(0) + producer[u"role"_s].toString() + QChar(0) + url;
                 if (!group.trackKeys.contains(trackKey)) {
                     group.trackKeys.insert(trackKey);
-                    group.tracks.append(trackTitle + " · " + producer["role"].toString()
-                                        + "\n来源：" + source
-                                        + (url.isEmpty() ? QString() : " · " + url));
+                    group.tracks.append(trackTitle + u" \u00b7 "_s + producer[u"role"_s].toString()
+                                        + QCoreApplication::translate("Yalahoo", "\nSource: ")
+                                        + source
+                                        + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
                 }
             } else
-                appendUnique(group.unscoped, group.unscopedKeys, producer["role"].toString());
+                appendUnique(group.unscoped, group.unscopedKeys, producer[u"role"_s].toString());
         }
         QVariantList groups;
         for (const auto &group : grouped)
-            groups.append(QVariantMap{ { "name", group.name },
-                                       { "roles", group.roles },
-                                       { "sources", group.sources },
-                                       { "tracks", group.tracks },
-                                       { "unscoped", group.unscoped } });
+            groups.append(QVariantMap{ { u"name"_s, group.name },
+                                       { u"roles"_s, group.roles },
+                                       { u"sources"_s, group.sources },
+                                       { u"tracks"_s, group.tracks },
+                                       { u"unscoped"_s, group.unscoped } });
         const auto title = albumTitleParts(a.title);
-        m_info = { { "id", a.id },
-                   { "title", a.title },
-                   { "mainTitle", title.first },
-                   { "translation", title.second },
-                   { "artist", a.artist },
-                   { "offline", a.offline },
-                   { "description", a.description },
-                   { "localNote", a.localNote },
-                   { "descriptionSource", a.descriptionSource.toVariantMap() },
-                   { "introduction", a.introduction.toVariantMap() },
-                   { "creditsLookup", a.creditsLookup.toVariantMap() },
-                   { "producers", producers },
-                   { "producerGroups", groups },
-                   { "introductionStatus",
+        QStringList descriptionSource{ a.descriptionSource.value(u"name"_s).toString(),
+                                       a.descriptionSource.value(u"url"_s).toString(),
+                                       a.descriptionSource.value(u"license"_s).toString() };
+        descriptionSource.removeAll(QString());
+        m_info = { { u"id"_s, a.id },
+                   { u"title"_s, a.title },
+                   { u"mainTitle"_s, title.first },
+                   { u"translation"_s, title.second },
+                   { u"artist"_s, artistDisplayName(a.artist) },
+                   { u"offline"_s, a.offline },
+                   { u"description"_s, a.description },
+                   { u"localNote"_s, a.localNote },
+                   { u"descriptionSource"_s, a.descriptionSource.toVariantMap() },
+                   { u"descriptionSourceText"_s, descriptionSource.join(u" \u00b7 "_s) },
+                   { u"introduction"_s, a.introduction.toVariantMap() },
+                   { u"creditsLookup"_s, a.creditsLookup.toVariantMap() },
+                   { u"producers"_s, producers },
+                   { u"producerGroups"_s, groups },
+                   { u"introductionStatus"_s,
                      lookupStatus(a.introduction, !a.description.isEmpty(), false) },
-                   { "creditsStatus",
+                   { u"creditsStatus"_s,
                      lookupStatus(a.creditsLookup, !a.producers.isEmpty(), true, a.tracks.size()) },
-                   { "folder", a.folder.toDisplayString() },
-                   { "rawGenres", a.rawGenres },
-                   { "facts", facts },
-                   { "discs", discs },
-                   { "code", library.browseInfo().value("code") } };
+                   { u"folder"_s, a.folder.toDisplayString() },
+                   { u"rawGenres"_s, a.rawGenres },
+                   { u"facts"_s, facts },
+                   { u"discs"_s, discs },
+                   { u"code"_s, library.browseInfo().value(u"code"_s) } };
     }
     endResetModel();
-    emit albumChanged();
+    Q_EMIT albumChanged();
 }
 }

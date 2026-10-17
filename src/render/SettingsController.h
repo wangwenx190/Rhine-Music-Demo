@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "SceneAdapter.h"
 #include "PreferencesStore.h"
 #include "LibrarySession.h"
@@ -15,8 +17,9 @@ public:
                        SelectionController *selection, QObject *parent = nullptr);
     QVariantMap values() const;
     Q_INVOKABLE bool update(const QString &field, const QVariant &value);
+    Q_INVOKABLE bool updateQuality(const QString &field, const QVariant &value);
     Q_INVOKABLE void reload();
-signals:
+Q_SIGNALS:
     void changed();
     void reloadRequested();
 
@@ -28,7 +31,7 @@ private:
     MotionController *m_motion;
     SceneAdapter *m_scene;
     SelectionController *m_selection;
-    QString m_sortMode = "genre";
+    QString m_sortMode = u"genre"_s;
     bool m_applying = false;
 };
 }

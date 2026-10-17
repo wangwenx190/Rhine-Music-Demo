@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "DirectoryScanner.h"
 
 #include <QCollator>
@@ -12,6 +13,8 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
@@ -40,19 +43,20 @@ constexpr Qt::CaseSensitivity pathCase =
 #endif
 bool within(const QString &path, const QString &parent)
 {
-    const QString prefix = parent.endsWith('/') ? parent : parent + '/';
+    const QString prefix = parent.endsWith('/'_L1) ? parent : parent + '/'_L1;
     return path.compare(parent, pathCase) == 0 || path.startsWith(prefix, pathCase);
 }
 QString fileError(const QString &path, const std::error_code &error)
 {
-    return path + QStringLiteral(": ") + QString::fromStdString(error.message());
+    return path + u": "_s + QString::fromStdString(error.message());
 }
 bool stopped(const ScanCancellation &cancel)
 {
     return cancel && cancel->load(std::memory_order_relaxed);
 }
-const QSet<QString> audioExtensions{ "ape", "wv",  "wma", "flac", "wav",  "m4a", "mp4", "alac",
-                                     "dsf", "dff", "mp3", "aac",  "aiff", "aif", "ogg", "opus" };
+const QSet<QString> audioExtensions{ u"ape"_s,  u"wv"_s,   u"wma"_s, u"flac"_s, u"wav"_s, u"m4a"_s,
+                                     u"mp4"_s,  u"alac"_s, u"dsf"_s, u"dff"_s,  u"mp3"_s, u"aac"_s,
+                                     u"aiff"_s, u"aif"_s,  u"ogg"_s, u"opus"_s };
 
 struct Walker
 {
@@ -61,7 +65,7 @@ struct Walker
     const ScanCancellation &cancel;
     QHash<QString, const Album *> albums;
     QHash<QString, const Track *> tracks;
-    QCollator collator{ QLocale(QStringLiteral("zh_CN")) };
+    QCollator collator{ QLocale(u"zh_CN"_s) };
     quint64 filesVisited = 0;
 
     Walker(LibrarySnapshot &next, const Snapshot &previous, const ScanCancellation &cancel)
@@ -89,13 +93,13 @@ struct Walker
     bool appendAlbum(const QString &root, const QString &folder, const QStringList &files,
                      bool single, const QStringList &images, QString &error)
     {
-        const auto id = DirectoryScanner::stableId("album", single ? files.first() : folder);
+        const auto id = DirectoryScanner::stableId(u"album"_s, single ? files.first() : folder);
         const Album *old = albums.value(id);
         Album album = old ? *old : Album{ };
         album.id = id;
         album.folder = QUrl::fromLocalFile(folder);
         album.folderLabel = folder;
-        album.fields.insert("_singleFile", single);
+        album.fields.insert(u"_singleFile"_s, single);
         album.offline = false;
         QJsonArray candidates;
         for (const auto &image : images) {
@@ -105,7 +109,7 @@ struct Walker
                         == 0)
                 candidates.append(image);
         }
-        album.fields.insert("_coverCandidates", candidates);
+        album.fields.insert(u"_coverCandidates"_s, candidates);
         album.tracks.clear();
         album.tracks.reserve(files.size());
         for (const auto &file : files) {
@@ -115,26 +119,25 @@ struct Walker
             if (!error.isEmpty())
                 return false;
             const Track *oldTrack = tracks.value(file);
-            const bool unchanged = oldTrack && oldTrack->fields.value("_fingerprint") == stamp;
+            const bool unchanged = oldTrack && oldTrack->fields.value(u"_fingerprint"_s) == stamp;
             Track track = unchanged ? *oldTrack : Track{ };
             if (oldTrack && !unchanged) {
                 track.fields = oldTrack->fields;
-                for (const auto *key : { "_embeddedCover", "_common", "_qtProbeVersion",
-                                         "_probeStatus", "_probeError", "_artworkError" })
-                    track.fields.remove(QLatin1String(key));
+                for (const auto &key : { u"_embeddedCover"_s, u"_common"_s, u"_qtProbeVersion"_s,
+                                         u"_probeStatus"_s, u"_probeError"_s, u"_artworkError"_s })
+                    track.fields.remove(key);
             }
             const QFileInfo info(file);
-            track.id = DirectoryScanner::stableId("track", file);
+            track.id = DirectoryScanner::stableId(u"track"_s, file);
             track.albumId = id;
             track.sourceUrl = QUrl::fromLocalFile(file);
             track.relativePath = QDir(root).relativeFilePath(file);
             track.format = info.suffix().toUpper();
-            track.fields.insert("_fingerprint", stamp);
+            track.fields.insert(u"_fingerprint"_s, stamp);
             if (!unchanged) {
                 track.title = info.completeBaseName();
-                track.artist = QStringLiteral("未知艺术家");
-                static const QRegularExpression disc(
-                        QStringLiteral("^(\\d{1,2})[-_](\\d{1,3})(?:[\\s._-]|$)"));
+                track.artist.clear();
+                static const QRegularExpression disc(u"^(\\d{1,2})[-_](\\d{1,3})(?:[\\s._-]|$)"_s);
                 const auto match = disc.match(info.fileName());
                 if (match.hasMatch()) {
                     if (match.captured(1).toInt() > 0)
@@ -154,8 +157,8 @@ struct Walker
         });
         if (!old) {
             album.title = single ? album.tracks.first().title : QFileInfo(folder).fileName();
-            album.artist = QStringLiteral("未知艺术家");
-            album.genreId = QStringLiteral("unclassified");
+            album.artist.clear();
+            album.genreId = u"unclassified"_s;
         }
         next.albums.append(std::move(album));
         return true;
@@ -183,15 +186,15 @@ struct Walker
             const QString name = QFileInfo(path).fileName();
             if (fs::is_symlink(status))
                 continue;
-            if (fs::is_directory(status) && !name.startsWith('.'))
+            if (fs::is_directory(status) && !name.startsWith('.'_L1))
                 directories.append(path);
             if (fs::is_regular_file(status)) {
                 ++filesVisited;
                 if (audioExtensions.contains(QFileInfo(name).suffix().toLower()))
                     files.append(path);
                 const auto extension = QFileInfo(name).suffix().toLower();
-                if (extension == "png" || extension == "jpg" || extension == "jpeg"
-                    || extension == "webp")
+                if (extension == "png"_L1 || extension == "jpg"_L1 || extension == "jpeg"_L1
+                    || extension == "webp"_L1)
                     images.append(path);
             }
         }
@@ -206,7 +209,7 @@ struct Walker
                   [this](const QString &a, const QString &b) {
                       return less(a, b);
                   });
-        const QStringList preferred{ "cover", "folder", "front" };
+        const QStringList preferred{ u"cover"_s, u"folder"_s, u"front"_s };
         QHash<QString, int> imageRanks;
         for (const auto &image : images) {
             const auto rank = preferred.indexOf(QFileInfo(image).completeBaseName().toLower());
@@ -242,7 +245,7 @@ bool DirectoryScanner::normalizeRoots(const QList<QUrl> &input, QList<QUrl> &out
 {
     error.clear();
     if (input.size() > 64) {
-        error = QStringLiteral("音乐目录最多 64 个。");
+        error = QCoreApplication::translate("Yalahoo", "At most 64 music directories are allowed.");
         return false;
     }
     QStringList paths;
@@ -250,7 +253,8 @@ bool DirectoryScanner::normalizeRoots(const QList<QUrl> &input, QList<QUrl> &out
         const auto path = QDir::fromNativeSeparators(url.toLocalFile());
         if (!url.isLocalFile() || !url.query().isEmpty() || !url.fragment().isEmpty()
             || !QDir::isAbsolutePath(path) || path.contains(QChar::Null)) {
-            error = QStringLiteral("音乐目录必须为本地绝对路径。");
+            error = QCoreApplication::translate("Yalahoo",
+                                                "Music directories must be local absolute paths.");
             return false;
         }
         const auto clean = QDir::cleanPath(path);
@@ -273,8 +277,8 @@ QString DirectoryScanner::stableId(const QString &prefix, const QString &absolut
 {
     // Hash native separators exactly as Node path.resolve did on the target OS.
     const auto bytes = QDir::toNativeSeparators(absolutePath).toUtf8();
-    return prefix + '-'
-            + QString::fromLatin1(
+    return prefix + '-'_L1
+            + QString::fromUtf8(
                     QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex().first(24));
 }
 QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *error)
@@ -302,7 +306,7 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
             encoded = encoded.mid(1, encoded.size() - 2);
             if (error)
                 error->clear();
-            return QString::number(size) + ':' + QString::fromLatin1(encoded);
+            return QString::number(size) + ':'_L1 + QString::fromUtf8(encoded);
         }
     }
     if (error)
@@ -339,13 +343,15 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
         const auto status = fs::symlink_status(nativePath(root), ec);
         bool ok = !ec && fs::is_directory(status) && !fs::is_symlink(status);
         if (!ok)
-            entry.error = ec ? fileError(root, ec) : QStringLiteral("根目录不是普通文件夹。");
+            entry.error = ec ? fileError(root, ec)
+                             : QCoreApplication::translate("Yalahoo",
+                                                           "The root is not a regular directory.");
         walker.frontier = { root };
         while (ok && !walker.frontier.isEmpty() && !stopped(cancel)) {
             const QString folder = walker.frontier.takeLast();
             ok = walker.walk(root, folder, entry.error);
         }
-        entry.status = ok ? QStringLiteral("online") : QStringLiteral("offline");
+        entry.status = ok ? u"online"_s : u"offline"_s;
         if (!ok) {
             // A partially unreadable root is transactional: no apparent deletions.
             next.albums.resize(start);
@@ -363,11 +369,10 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
     if (result.cancelled)
         return result;
     if (std::none_of(next.genres.cbegin(), next.genres.cend(), [](const Genre &genre) {
-            return genre.id == QLatin1String("unclassified");
+            return genre.id == "unclassified"_L1;
         })) {
         Genre genre;
-        genre.id = QStringLiteral("unclassified");
-        genre.name = QStringLiteral("未分类");
+        genre.id = u"unclassified"_s;
         next.genres.append(std::move(genre));
     }
     QHash<QString, int> counts;
@@ -375,9 +380,9 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
         ++counts[album.genreId];
     for (auto &genre : next.genres)
         genre.albumCount = counts.value(genre.id);
-    next.scan.insert("running", false);
-    next.scan.remove("error");
-    next.scan.insert("finishedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    next.scan.insert(u"running"_s, false);
+    next.scan.remove(u"error"_s);
+    next.scan.insert(u"finishedAt"_s, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
     result.snapshot = std::make_shared<const LibrarySnapshot>(std::move(next));
     return result;
 }

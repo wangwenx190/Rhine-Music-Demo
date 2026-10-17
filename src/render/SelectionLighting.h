@@ -161,7 +161,7 @@ public:
     {
         return m_column;
     }
-signals:
+Q_SIGNALS:
     void changed();
     void nightChanged();
     void settingsChanged();

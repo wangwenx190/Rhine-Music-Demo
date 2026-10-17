@@ -13,10 +13,10 @@ Column {
     property bool expanded: !compact
     readonly property string mode: lighting.settings.mode
     spacing: 10
-    function stopCompare() {
+    function stopCompare(): void {
         lighting.comparing = false;
     }
-    function field(name: string, value: real) {
+    function field(name: string, value: real): void {
         const patch = {};
         patch[name] = value;
         lighting.configure(patch);
@@ -43,7 +43,7 @@ Column {
     }
     ArchiveButton {
         tokens: root.tokens
-        text: "DEV · LIGHTING 光效调试 " + (root.expanded ? "−" : "+")
+        text: qsTr("DEV \u00b7 LIGHTING %1").arg(root.expanded ? "\u2212" : "+")
         cssPixelSize: 11
         onClicked: root.expanded = !root.expanded
     }
@@ -59,19 +59,19 @@ Column {
                 model: [
                     {
                         value: "baseline",
-                        label: "0 原版"
+                        label: qsTr("0 Original")
                     },
                     {
                         value: "area",
-                        label: "A 条形灯"
+                        label: qsTr("A Strip light")
                     },
                     {
                         value: "guided",
-                        label: "B 排光场"
+                        label: qsTr("B Row field")
                     },
                     {
                         value: "hybrid",
-                        label: "C 混合"
+                        label: qsTr("C Combined")
                     }
                 ]
                 delegate: T.Button {
@@ -123,11 +123,13 @@ Column {
             cssPixelSize: 10
             color: root.tokens.muted
             wrapMode: Text.Wrap
-            text: root.mode === "baseline" ? "保留原有环境光与封面照明，作为亮度对照。" : root.mode === "area" ? "条形灯照亮玻璃顶边与端面；封面不直接响应这盏灯。" :
-                                                                                             root.mode
-                                                                                             === "guided"
-                                                                                             ? "整排高光保留；其他专辑亮度 100% 接近原版，降低可加强对比。" :
-                                                                                               "用排光场控制明暗，再以条形灯补充壳体高光。"
+            text: root.mode === "baseline" ? qsTr(
+                                                 "Retain the original ambient and cover lighting as a brightness reference.") :
+                                             root.mode === "area" ? qsTr(
+                                                                        "The strip light illuminates the top and ends of the case; covers do not respond directly to it.") :
+                                                                    root.mode === "guided" ? qsTr(
+                                                                                                 "Retain highlights across the row. Other albums at 100% approximate the original; lower values increase contrast.") :
+                                                                                             qsTr("Use the row field for brightness, then add case highlights with the strip light.")
         }
         Column {
             width: parent.width
@@ -136,39 +138,40 @@ Column {
                 model: [
                     {
                         key: "transitionDuration",
-                        label: "光带切换时长",
+                        label: qsTr("Light transition duration"),
                         min: .4,
                         max: 2.4,
                         step: .05,
-                        suffix: " 秒"
+                        suffix: qsTr(" seconds")
                     },
                     {
                         key: "strength",
-                        label: "光照强度",
+                        label: qsTr("Light intensity"),
                         min: 0,
                         max: 2,
                         step: .05,
-                        suffix: "×"
+                        suffix: "\u00d7"
                     },
                     {
                         key: "width",
-                        label: root.mode === "area" ? "灯面宽度" : "光带宽度",
+                        label: root.mode === "area" ? qsTr("Light surface width") : qsTr(
+                                                          "Light band width"),
                         min: .6,
                         max: 2.5,
                         step: .05,
-                        suffix: root.mode === "area" ? "×" : " 排"
+                        suffix: root.mode === "area" ? "\u00d7" : qsTr(" rows")
                     },
                     {
                         key: "offset",
-                        label: "光带位置",
+                        label: qsTr("Light band position"),
                         min: -6,
                         max: 6,
                         step: .1,
-                        suffix: " 排"
+                        suffix: qsTr(" rows")
                     },
                     {
                         key: "fill",
-                        label: "其他专辑亮度",
+                        label: qsTr("Other album brightness"),
                         min: 0,
                         max: 1,
                         step: .05,
@@ -201,7 +204,8 @@ Column {
             cssPixelSize: 10
             color: root.tokens.muted
             wrapMode: Text.Wrap
-            text: "时长为 1× 下的值，同时受整体动画速度调节。专辑详情沿用原选中光。"
+            text: qsTr(
+                      "Duration is measured at 1x and follows the overall animation speed. Album details retain the original selection light.")
         }
         Row {
             spacing: 12
@@ -212,7 +216,8 @@ Column {
                 cssPixelSize: 10
                 objectName: "lightingCompare"
                 enabled: root.mode !== "baseline"
-                text: pressed ? "原版 · 松开恢复" : "按住看原版"
+                text: pressed ? qsTr("Original \u00b7 Release to restore") : qsTr(
+                                    "Hold for original")
                 onPressedChanged: root.lighting.comparing = pressed
                 onActiveFocusChanged: {
                     if (!activeFocus)
@@ -223,7 +228,7 @@ Column {
             ArchiveButton {
                 objectName: "lightingReset"
                 tokens: root.tokens
-                text: "重置"
+                text: qsTr("Reset")
                 cssPixelSize: 11
                 onClicked: root.lighting.resetSettings()
             }

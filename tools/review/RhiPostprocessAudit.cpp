@@ -13,6 +13,9 @@
 #include <mutex>
 #include <cstdio>
 #include <cmath>
+
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
@@ -31,30 +34,31 @@ QJsonObject read(const QString &path)
 }
 void checkResolve(const Capture &capture, int samples, bool shells)
 {
-    const auto graph = capture.metadata["resolveGraph"].toArray();
+    const auto graph = capture.metadata[u"resolveGraph"_s].toArray();
     check(graph.size() == (shells ? 2 : 1), "Missing actual resolve targets");
     for (const auto &value : graph) {
         const auto target = value.toObject();
-        check(target["samples"].toInt() == samples && target["depthSamples"].toInt() == samples
-                      && target["pipelineSamples"].toInt() == samples,
+        check(target[u"samples"_s].toInt() == samples
+                      && target[u"depthSamples"_s].toInt() == samples
+                      && target[u"pipelineSamples"_s].toInt() == samples,
               "Geometry/depth sample count changed");
-        const auto attachments = target["attachments"].toArray();
+        const auto attachments = target[u"attachments"_s].toArray();
         check(attachments.size() == 3, "Review MRT attachment missing");
         for (int i = 0; i < attachments.size(); ++i) {
             const auto a = attachments[i].toObject();
             const int format = int(i == 0 ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8);
-            check(a["format"].toInt() == format && a["samples"].toInt() == samples
-                          && a["width"].toInt() == capture.color.width()
-                          && a["height"].toInt() == capture.color.height(),
+            check(a[u"format"_s].toInt() == format && a[u"samples"_s].toInt() == samples
+                          && a[u"width"_s].toInt() == capture.color.width()
+                          && a[u"height"_s].toInt() == capture.color.height(),
                   "MSAA attachment lost format, size or samples");
             if (samples > 1)
-                check(a["separateResolve"].toBool() && a["resolveSamples"].toInt() == 1
-                              && a["resolveFormat"].toInt() == format
-                              && a["resolveWidth"] == a["width"]
-                              && a["resolveHeight"] == a["height"],
+                check(a[u"separateResolve"_s].toBool() && a[u"resolveSamples"_s].toInt() == 1
+                              && a[u"resolveFormat"_s].toInt() == format
+                              && a[u"resolveWidth"_s] == a[u"width"_s]
+                              && a[u"resolveHeight"_s] == a[u"height"_s],
                       "MSAA resolve aliases, changes precision or has wrong dimensions");
             else
-                check(a["resolveSamples"].toInt() == 0, "Single sample has redundant resolve");
+                check(a[u"resolveSamples"_s].toInt() == 0, "Single sample has redundant resolve");
         }
     }
 }
@@ -62,10 +66,10 @@ QJsonObject distribution(QVector<double> values)
 {
     check(!values.isEmpty(), "Empty local CPU submission sample");
     std::sort(values.begin(), values.end());
-    return { { "count", values.size() },
-             { "p50Ms", values[(values.size() - 1) / 2] },
-             { "p95Ms", values[int((values.size() - 1) * .95)] },
-             { "maxMs", values.last() } };
+    return { { u"count"_s, values.size() },
+             { u"p50Ms"_s, values[(values.size() - 1) / 2] },
+             { u"p95Ms"_s, values[int((values.size() - 1) * .95)] },
+             { u"maxMs"_s, values.last() } };
 }
 }
 int main(int argc, char **argv)
@@ -75,11 +79,11 @@ int main(int argc, char **argv)
         return 2;
     QGuiApplication app(argc, argv);
     yalahoo::probeOptionalGraphicsBackend();
-    if (argc == 2 && QByteArray(argv[1]) == "--adapters") {
+    if (argc == 2 && QByteArray(argv[1]) == "--adapters"_ba) {
         std::printf("%s\n", QJsonDocument(adapterInventory()).toJson().constData());
         return 0;
     }
-    const bool profile = argc == 3 && QByteArray(argv[2]) == "--profile";
+    const bool profile = argc == 3 && QByteArray(argv[2]) == "--profile"_ba;
     if (argc != 2 && !profile)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
@@ -87,9 +91,9 @@ int main(int argc, char **argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         check(QDir().mkpath(output), "Cannot create diagnostic output");
-        const auto original =
-                read(QString(FIXTURE_ROOT) + "/tests/fixtures/render-backend/visual.json");
-        const auto sourceCases = original["cases"].toArray();
+        const auto original = read((QString::fromUtf8(FIXTURE_ROOT))
+                                   + "/tests/fixtures/render-backend/visual.json"_L1);
+        const auto sourceCases = original[u"cases"_s].toArray();
         RhiCaptureHarness driver;
         QJsonArray states, rebuilds;
         auto input = fixture(sourceCases[3].toObject());
@@ -113,23 +117,24 @@ int main(int argc, char **argv)
                     const auto stable = driver.capture(input, size);
                     checkResolve(stable, samples, true);
                     checkPostprocessGraph(input, stable);
-                    check(first.metadata["resourceGeneration"]
-                                          == stable.metadata["resourceGeneration"]
-                                  && first.metadata["postprocessGraph"]
-                                          == stable.metadata["postprocessGraph"]
+                    check(first.metadata[u"resourceGeneration"_s]
+                                          == stable.metadata[u"resourceGeneration"_s]
+                                  && first.metadata[u"postprocessGraph"_s]
+                                          == stable.metadata[u"postprocessGraph"_s]
                                   && first.postprocessed == stable.postprocessed,
                           "Stable resolve/postprocess changed or rebuilt");
-                    const int passCount = stable.metadata["postprocessGraph"]
-                                                  .toObject()["passes"]
+                    const int passCount = stable.metadata[u"postprocessGraph"_s]
+                                                  .toObject()[u"passes"_s]
                                                   .toArray()
                                                   .size();
-                    check(stable.metadata["postUniformUploadBytes"].toInteger() == passCount * 80,
+                    check(stable.metadata[u"postUniformUploadBytes"_s].toInteger()
+                                  == passCount * 80,
                           "Steady postprocess uploaded beyond dynamic prefixes");
                     if (size == QSize(640, 480) && samples == 4)
-                        check(stable.postprocessed.save(output
-                                                        + QString("/combined-%1.png").arg(mode)),
+                        check(stable.postprocessed.save(output + u"/combined-%1.png"_s.arg(mode)),
                               "Cannot save actual combined output");
-                    states.append(QJsonObject{ { "mode", mode }, { "metadata", stable.metadata } });
+                    states.append(
+                            QJsonObject{ { u"mode"_s, mode }, { u"metadata"_s, stable.metadata } });
                 }
             }
         }
@@ -138,7 +143,7 @@ int main(int argc, char **argv)
         const auto finalCapture = driver.capture(input, { 640, 480 });
         checkPostprocessGraph(input, finalCapture);
         const auto finalImage = driver.surface->grab();
-        check(!finalImage.isNull() && finalImage.save(output + "/final-output.png"),
+        check(!finalImage.isNull() && finalImage.save(output + "/final-output.png"_L1),
               "Final compositor output missing");
         const auto expectedOutput = outputReference(input.background, input.exposure);
         const auto actual = finalImage.pixelColor(0, 0);
@@ -163,19 +168,22 @@ int main(int argc, char **argv)
         input.aperture = .0008f;
         input.exposure = 1.1f;
         const auto numerical = driver.capture(input, { 640, 480 });
-        check(active.metadata["resourceGeneration"] == numerical.metadata["resourceGeneration"]
-                      && active.metadata["postprocessGraph"]
-                              == numerical.metadata["postprocessGraph"],
+        check(active.metadata[u"resourceGeneration"_s]
+                              == numerical.metadata[u"resourceGeneration"_s]
+                      && active.metadata[u"postprocessGraph"_s]
+                              == numerical.metadata[u"postprocessGraph"_s],
               "Numerical state rebuilt compatible targets");
         input.postprocess = false;
         input.aoSamples = 0;
         input.bokeh = input.smaa = false;
         const auto disabled = driver.capture(input, { 640, 480 });
         checkPostprocessGraph(input, disabled);
-        for (const auto &entry : disabled.metadata["resources"].toObject()["entries"].toArray()) {
-            const auto name = entry.toObject()["name"].toString();
-            check(!name.startsWith("post-") && !name.startsWith("smaa-")
-                          && !name.startsWith("ao-geometry") && !name.startsWith("dof-geometry"),
+        for (const auto &entry :
+             disabled.metadata[u"resources"_s].toObject()[u"entries"_s].toArray()) {
+            const auto name = entry.toObject()[u"name"_s].toString();
+            check(!name.startsWith(u"post-"_s) && !name.startsWith(u"smaa-"_s)
+                          && !name.startsWith(u"ao-geometry"_s)
+                          && !name.startsWith(u"dof-geometry"_s),
                   "Disabled channel retained resources");
         }
         input.postprocess = input.bokeh = input.smaa = true;
@@ -192,21 +200,21 @@ int main(int argc, char **argv)
         auto coverInput = fixture(sourceCases[25].toObject());
         const auto firstCover = driver.capture(coverInput, { 960, 720 }, true);
         const auto replayCover = driver.capture(coverInput, { 960, 720 }, true);
-        check(firstCover.metadata["coverSnapshotCopies"]
-                              == replayCover.metadata["coverSnapshotCopies"]
+        check(firstCover.metadata[u"coverSnapshotCopies"_s]
+                              == replayCover.metadata[u"coverSnapshotCopies"_s]
                       && firstCover.atlas == replayCover.atlas,
               "Unchanged cover copied or changed on synchronization");
         coverInput.cover.fill(Qt::blue);
         const auto changedCover = driver.capture(coverInput, { 960, 720 }, true);
-        check(changedCover.metadata["coverSnapshotCopies"].toInteger()
-                              == replayCover.metadata["coverSnapshotCopies"].toInteger() + 1
+        check(changedCover.metadata[u"coverSnapshotCopies"_s].toInteger()
+                              == replayCover.metadata[u"coverSnapshotCopies"_s].toInteger() + 1
                       && changedCover.atlas.pixelColor(0, 0) == QColor(Qt::blue),
               "New cover revision was not copied/uploaded");
         auto atlas = fixture(sourceCases[25].toObject());
         atlas.postprocess = true;
         atlas.aoSamples = 32;
         atlas.bokeh = true;
-        atlas.focus = float(sourceCases[25].toObject()["focus"].toDouble());
+        atlas.focus = float(sourceCases[25].toObject()[u"focus"_s].toDouble());
         atlas.atlasGeneration = 1;
         atlas.atlasSize = { 2048, 2048 };
         atlas.initializingAtlas = true;
@@ -240,26 +248,26 @@ int main(int argc, char **argv)
         }
         check(rejectedFallback, "Fallback without primary leases was accepted");
         const auto initial = driver.capture(atlas, { 960, 720 }, true);
-        for (const auto &entry : initial.metadata["effectiveCoverRegions"].toArray())
-            check(entry.toObject()["lease"].isNull(), "Absent atlas lease fabricated a value");
-        initial.composite.save(output + "/atlas-432-composite.png");
+        for (const auto &entry : initial.metadata[u"effectiveCoverRegions"_s].toArray())
+            check(entry.toObject()[u"lease"_s].isNull(), "Absent atlas lease fabricated a value");
+        initial.composite.save(output + "/atlas-432-composite.png"_L1);
         check(initial.atlas == page, "Initialized atlas GPU bytes differ");
-        auto native = initial.metadata["nativeAtlasTransfers"].toObject();
-        const bool nativeProof = native["available"].toBool();
+        auto native = initial.metadata[u"nativeAtlasTransfers"_s].toObject();
+        const bool nativeProof = native[u"available"_s].toBool();
 #if defined(Q_OS_WIN)
         check(nativeProof, "Windows D3D11 native transfer proof unavailable");
 #endif
-        check((nativeProof ? native["destinationBytes"].toInteger()
-                           : initial.metadata["atlasUploadBytes"].toInteger())
+        check((nativeProof ? native[u"destinationBytes"_s].toInteger()
+                           : initial.metadata[u"atlasUploadBytes"_s].toInteger())
                       == 16777216,
               "Initialization native transfer bytes unavailable/over budget");
         atlas.initializingAtlas = false;
         atlas.atlasUploads.clear();
         const auto stable = driver.capture(atlas, { 960, 720 }, true);
-        check(stable.metadata["atlasUploadBytes"].toInteger() == 0
+        check(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0
                       && (!nativeProof
-                          || stable.metadata["nativeAtlasTransfers"]
-                                          .toObject()["destinationBytes"]
+                          || stable.metadata[u"nativeAtlasTransfers"_s]
+                                          .toObject()[u"destinationBytes"_s]
                                           .toInteger()
                                   == 0)
                       && stable.atlas == initial.atlas
@@ -272,17 +280,17 @@ int main(int argc, char **argv)
             bounded.entityIds.resize(count);
             bounded.coverTiles.resize(count);
             const auto result = driver.capture(bounded, { 960, 720 }, true);
-            check(result.metadata["generation"] == stable.metadata["generation"],
+            check(result.metadata[u"generation"_s] == stable.metadata[u"generation"_s],
                   "Entity count/visibility recreated the render graph");
-            check(result.metadata["uniformUploadBytes"].toInteger()
-                          <= result.metadata["uniformCapacityBytes"].toInteger(),
+            check(result.metadata[u"uniformUploadBytes"_s].toInteger()
+                          <= result.metadata[u"uniformCapacityBytes"_s].toInteger(),
                   "Uniform prefix exceeds its fixed capacity");
             check(result.atlas == stable.atlas, "Entity count changed atlas pixels");
-            capacityCases.append(
-                    QJsonObject{ { "instances", count },
-                                 { "generation", result.metadata["generation"] },
-                                 { "uploadBytes", result.metadata["uniformUploadBytes"] },
-                                 { "capacityBytes", result.metadata["uniformCapacityBytes"] } });
+            capacityCases.append(QJsonObject{
+                    { u"instances"_s, count },
+                    { u"generation"_s, result.metadata[u"generation"_s] },
+                    { u"uploadBytes"_s, result.metadata[u"uniformUploadBytes"_s] },
+                    { u"capacityBytes"_s, result.metadata[u"uniformCapacityBytes"_s] } });
         }
         auto fullVisibility = atlas;
         fullVisibility.scene.view.setToIdentity();
@@ -290,26 +298,26 @@ int main(int argc, char **argv)
         fullVisibility.scene.projection.setToIdentity();
         fullVisibility.scene.projection.ortho(-30, 30, -30, 30, .1f, 300);
         const auto maximum = driver.capture(fullVisibility, { 960, 720 }, true);
-        check(maximum.metadata["visibleEntities"].toInt() == 432
-                      && maximum.metadata["uniformUploadBytes"].toInteger()
-                              <= maximum.metadata["uniformCapacityBytes"].toInteger()
-                      && maximum.metadata["generation"] == stable.metadata["generation"],
+        check(maximum.metadata[u"visibleEntities"_s].toInt() == 432
+                      && maximum.metadata[u"uniformUploadBytes"_s].toInteger()
+                              <= maximum.metadata[u"uniformCapacityBytes"_s].toInteger()
+                      && maximum.metadata[u"generation"_s] == stable.metadata[u"generation"_s],
               "Fully visible pool exceeded capacity or rebuilt the render graph");
         capacityCases.append(
-                QJsonObject{ { "instances", 432 },
-                             { "allVisible", true },
-                             { "generation", maximum.metadata["generation"] },
-                             { "uploadBytes", maximum.metadata["uniformUploadBytes"] },
-                             { "capacityBytes", maximum.metadata["uniformCapacityBytes"] } });
+                QJsonObject{ { u"instances"_s, 432 },
+                             { u"allVisible"_s, true },
+                             { u"generation"_s, maximum.metadata[u"generation"_s] },
+                             { u"uploadBytes"_s, maximum.metadata[u"uniformUploadBytes"_s] },
+                             { u"capacityBytes"_s, maximum.metadata[u"uniformCapacityBytes"_s] } });
         QImage replacement(256, 256, QImage::Format_RGBA8888);
         replacement.fill(QColor(230, 30, 90));
         atlas.atlasUploads = { { 1, 2, 2, 0, replacement } };
         const auto tile = driver.capture(atlas, { 960, 720 }, true);
-        native = tile.metadata["nativeAtlasTransfers"].toObject();
-        check((nativeProof ? native["destinationBytes"].toInteger()
-                           : tile.metadata["atlasUploadBytes"].toInteger())
+        native = tile.metadata[u"nativeAtlasTransfers"_s].toObject();
+        check((nativeProof ? native[u"destinationBytes"_s].toInteger()
+                           : tile.metadata[u"atlasUploadBytes"_s].toInteger())
                               == 262144
-                      && (!nativeProof || native["regions"].toArray().size() == 1),
+                      && (!nativeProof || native[u"regions"_s].toArray().size() == 1),
               "One tile caused a native whole-page transfer");
         QImage expected = page.copy();
         {
@@ -329,13 +337,13 @@ int main(int argc, char **argv)
         std::reverse(atlas.coverTiles.begin(), atlas.coverTiles.end());
         const auto reverse = driver.capture(atlas, { 960, 720 }, true);
         check(reverse.postprocessed == initial.postprocessed
-                      && reverse.metadata["sortedShells"] == initial.metadata["sortedShells"],
+                      && reverse.metadata[u"sortedShells"_s] == initial.metadata[u"sortedShells"_s],
               "432-instance order/atlas assignment changed");
         // Target rebuild must retain atlas resource and must not upload it again.
         const auto resized = driver.capture(atlas, { 1280, 720 }, true);
-        check(resized.atlas == page && resized.metadata["atlasUploadBytes"].toInteger() == 0
-                      && resized.metadata["nativeAtlasTransfers"]
-                                      .toObject()["destinationBytes"]
+        check(resized.atlas == page && resized.metadata[u"atlasUploadBytes"_s].toInteger() == 0
+                      && resized.metadata[u"nativeAtlasTransfers"_s]
+                                      .toObject()[u"destinationBytes"_s]
                                       .toInteger()
                               == 0,
               "Resize reuploaded/lost atlas");
@@ -346,31 +354,34 @@ int main(int argc, char **argv)
                     { 2, 4, 1, slot, page.copy((slot % 8) * 256, (slot / 8) * 256, 256, 256) });
         atlas.atlasUploads.append({ 1, 99, 100, 0, replacement });
         const auto rebuilt = driver.capture(atlas, { 960, 720 }, true);
-        check(rebuilt.atlas == page && rebuilt.metadata["atlasRejected"].toInteger() > 0,
+        check(rebuilt.atlas == page && rebuilt.metadata[u"atlasRejected"_s].toInteger() > 0,
               "Destroyed atlas accepted old generation");
         atlas.initializingAtlas = false;
         atlas.atlasUploads.clear();
         for (int slot = 0; slot < 9; ++slot)
             atlas.atlasUploads.append({ 2, 5, 2, slot, replacement });
         const auto budget = driver.capture(atlas, { 960, 720 }, true);
-        check((nativeProof ? budget.metadata["nativeAtlasTransfers"]
-                                     .toObject()["destinationBytes"]
+        check((nativeProof ? budget.metadata[u"nativeAtlasTransfers"_s]
+                                     .toObject()[u"destinationBytes"_s]
                                      .toInteger()
-                           : budget.metadata["atlasUploadBytes"].toInteger())
+                           : budget.metadata[u"atlasUploadBytes"_s].toInteger())
                               == 2097152
-                      && budget.metadata["atlasPending"].toInt() == 1,
+                      && budget.metadata[u"atlasPending"_s].toInt() == 1,
               "Steady queue did not defer the ninth tile");
         atlas.atlasUploads.clear();
         const auto drained = driver.capture(atlas, { 960, 720 }, true);
-        check(drained.metadata["atlasPending"].toInt() == 0, "Deferred atlas queue did not drain");
-        initial.postprocessed.save(output + "/atlas-432-initial.png");
-        tile.postprocessed.save(output + "/atlas-432-tile.png");
-        QJsonObject atlasReport{ { "instances", 432 },           { "initial", initial.metadata },
-                                 { "stable", stable.metadata },  { "tile", tile.metadata },
-                                 { "revert", revert.metadata },  { "reverse", reverse.metadata },
-                                 { "resize", resized.metadata }, { "rebuild", rebuilt.metadata },
-                                 { "gpuPageExact", true },       { "unchangedOutsideTile", true },
-                                 { "stablePixelsExact", true },  { "revertPixelsExact", true } };
+        check(drained.metadata[u"atlasPending"_s].toInt() == 0,
+              "Deferred atlas queue did not drain");
+        initial.postprocessed.save(output + "/atlas-432-initial.png"_L1);
+        tile.postprocessed.save(output + "/atlas-432-tile.png"_L1);
+        QJsonObject atlasReport{
+            { u"instances"_s, 432 },           { u"initial"_s, initial.metadata },
+            { u"stable"_s, stable.metadata },  { u"tile"_s, tile.metadata },
+            { u"revert"_s, revert.metadata },  { u"reverse"_s, reverse.metadata },
+            { u"resize"_s, resized.metadata }, { u"rebuild"_s, rebuilt.metadata },
+            { u"gpuPageExact"_s, true },       { u"unchangedOutsideTile"_s, true },
+            { u"stablePixelsExact"_s, true },  { u"revertPixelsExact"_s, true }
+        };
         QJsonArray costs;
         if (profile) {
             // Local CPU command submission only. RenderControl has no physical presentation/VSYNC.
@@ -382,7 +393,7 @@ int main(int argc, char **argv)
             auto samples = std::make_shared<Samples>();
             driver.item->profiled = [samples](QJsonObject sample) {
                 std::scoped_lock lock(samples->mutex);
-                samples->cpu.append(sample["cpuSubmitMs"].toDouble());
+                samples->cpu.append(sample[u"cpuSubmitMs"_s].toDouble());
             };
             driver.item->captured = { };
             atlas.profile = true;
@@ -408,37 +419,37 @@ int main(int argc, char **argv)
                     }
                     driver.replay(60, advance);
                     std::scoped_lock lock(samples->mutex);
-                    costs.append(QJsonObject{ { "run", run },
-                                              { "stage", stage },
-                                              { "cpuSubmission", distribution(samples->cpu) } });
+                    costs.append(QJsonObject{ { u"run"_s, run },
+                                              { u"stage"_s, stage },
+                                              { u"cpuSubmission"_s, distribution(samples->cpu) } });
                 }
             }
             driver.item->profiled = { };
         }
         QJsonObject report{
-            { "round", "R19D4B2" },
-            { "qt", qVersion() },
-            { "configuration", "Release" },
-            { "passed", true },
-            { "states", states },
-            { "rebuilds", rebuilds },
-            { "atlas", atlasReport },
-            { "capacityCases", capacityCases },
-            { "steadyBudget",
-              QJsonObject{ { "firstFrame", budget.metadata },
-                           { "drainedFrame", drained.metadata } } },
-            { "nativeTransferByteProof", nativeProof },
-            { "coverSnapshotReuse", true },
-            { "finalOutputError", finalError },
-            { "localCosts", costs },
-            { "costScope",
-              "CPU submission only; renderer-only anonymous pool. Three independent batches per stage; no GPU/display/VSYNC or full-product performance claim." },
-            { "gpuCompletedMs", QJsonValue() },
-            { "displayLatencyMs", QJsonValue() },
-            { "offscreen", driver.surface->diagnostics() },
-            { "windowPolicy", verification::windowPolicy(*driver.window) }
+            { u"round"_s, u"R19D4B2"_s },
+            { u"qt"_s, QString::fromUtf8(qVersion()) },
+            { u"configuration"_s, u"Release"_s },
+            { u"passed"_s, true },
+            { u"states"_s, states },
+            { u"rebuilds"_s, rebuilds },
+            { u"atlas"_s, atlasReport },
+            { u"capacityCases"_s, capacityCases },
+            { u"steadyBudget"_s,
+              QJsonObject{ { u"firstFrame"_s, budget.metadata },
+                           { u"drainedFrame"_s, drained.metadata } } },
+            { u"nativeTransferByteProof"_s, nativeProof },
+            { u"coverSnapshotReuse"_s, true },
+            { u"finalOutputError"_s, finalError },
+            { u"localCosts"_s, costs },
+            { u"costScope"_s,
+              u"CPU submission only; renderer-only anonymous pool. Three independent batches per stage; no GPU/display/VSYNC or full-product performance claim."_s },
+            { u"gpuCompletedMs"_s, QJsonValue() },
+            { u"displayLatencyMs"_s, QJsonValue() },
+            { u"offscreen"_s, driver.surface->diagnostics() },
+            { u"windowPolicy"_s, verification::windowPolicy(*driver.window) }
         };
-        QSaveFile file(output + "/runtime.json");
+        QSaveFile file(output + "/runtime.json"_L1);
         check(file.open(QIODevice::WriteOnly), "Cannot write report");
         file.write(QJsonDocument(report).toJson());
         check(file.commit(), "Cannot commit report");

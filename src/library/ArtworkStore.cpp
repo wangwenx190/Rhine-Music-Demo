@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "ArtworkStore.h"
 #include <QBuffer>
 #include <QCryptographicHash>
@@ -6,6 +7,8 @@
 #include <QFileInfo>
 #include <QImageReader>
 #include <QSaveFile>
+
+using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
@@ -17,11 +20,12 @@ bool validSize(QSize size)
 QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &root, QString *error)
 {
     const auto hash = QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
-    const auto directory = QDir(root).filePath("artwork");
-    const auto path = QDir(directory).filePath(QString::fromLatin1(hash + '.' + format));
+    const auto directory = QDir(root).filePath(u"artwork"_s);
+    const auto path = QDir(directory).filePath(QString::fromUtf8(hash + '.' + format));
     if (QFileInfo(directory).isSymLink() || QFileInfo(path).isSymLink()) {
         if (error)
-            *error = QStringLiteral("封面缓存目录/文件不能是符号链接。");
+            *error = QCoreApplication::translate(
+                    "Yalahoo", "Cover cache directories and files cannot be symbolic links.");
         return { };
     }
     QFile previous(path);
@@ -30,7 +34,8 @@ QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &r
         return QUrl::fromLocalFile(path);
     if (!QDir().mkpath(directory)) {
         if (error)
-            *error = QStringLiteral("无法创建封面缓存目录。");
+            *error = QCoreApplication::translate("Yalahoo",
+                                                 "Cannot create the cover cache directory.");
         return { };
     }
     QSaveFile file(path);
@@ -39,7 +44,8 @@ QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &r
         || !file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)
         || file.write(bytes) != bytes.size() || !file.commit()) {
         if (error)
-            *error = QStringLiteral("无法原子保存封面：") + file.errorString();
+            *error = QCoreApplication::translate("Yalahoo", "Cannot atomically save the cover: ")
+                    + file.errorString();
         return { };
     }
     return QUrl::fromLocalFile(path);
@@ -55,7 +61,8 @@ QUrl ArtworkStore::copy(const QString &source, const QString &dataRoot, QString 
     if (QFileInfo(source).isSymLink() || !file.open(QIODevice::ReadOnly) || file.size() <= 0
         || file.size() > maximumBytes) {
         if (error)
-            *error = QStringLiteral("封面无法读取或超过 30MiB。");
+            *error = QCoreApplication::translate("Yalahoo",
+                                                 "Cannot read the cover, or it exceeds 30 MiB.");
         return { };
     }
     auto bytes = file.read(maximumBytes + 1);
@@ -64,16 +71,19 @@ QUrl ArtworkStore::copy(const QString &source, const QString &dataRoot, QString 
     QImageReader reader(&buffer);
     const auto format = reader.format().toLower();
     if (bytes.size() > maximumBytes || file.error() != QFileDevice::NoError
-        || !validSize(reader.size()) || (format != "png" && format != "jpeg" && format != "webp")) {
+        || !validSize(reader.size())
+        || (format != "png"_ba && format != "jpeg"_ba && format != "webp"_ba)) {
         if (error)
-            *error = QStringLiteral("封面格式无效或展开尺寸超过 4194304 像素。");
+            *error = QCoreApplication::translate(
+                    "Yalahoo",
+                    "Invalid cover format, or the decoded image exceeds 4194304 pixels.");
         return { };
     }
     // Decode once here to reject corrupt images before selecting their priority.
     reader.setAutoTransform(true);
     if (reader.read().isNull()) {
         if (error)
-            *error = QStringLiteral("封面已损坏。");
+            *error = QCoreApplication::translate("Yalahoo", "The cover is damaged.");
         return { };
     }
     return persist(bytes, format, dataRoot, error);
@@ -84,7 +94,8 @@ QUrl ArtworkStore::save(const QImage &image, const QString &dataRoot, QString *e
         error->clear();
     if (!validSize(image.size())) {
         if (error)
-            *error = QStringLiteral("内嵌封面展开尺寸无效或过大。");
+            *error = QCoreApplication::translate("Yalahoo",
+                                                 "Invalid or oversized embedded cover dimensions.");
         return { };
     }
     QByteArray bytes;
@@ -92,9 +103,10 @@ QUrl ArtworkStore::save(const QImage &image, const QString &dataRoot, QString *e
     buffer.open(QIODevice::WriteOnly);
     if (!image.save(&buffer, "PNG") || bytes.size() > maximumBytes) {
         if (error)
-            *error = QStringLiteral("内嵌封面编码失败或超过 30MiB。");
+            *error = QCoreApplication::translate(
+                    "Yalahoo", "Cannot encode the embedded cover, or it exceeds 30 MiB.");
         return { };
     }
-    return persist(bytes, "png", dataRoot, error);
+    return persist(bytes, "png"_ba, dataRoot, error);
 }
 }

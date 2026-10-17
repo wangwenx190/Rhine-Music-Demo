@@ -5,6 +5,8 @@
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 constexpr NSInteger VerificationLevel = NSNormalWindowLevel - 1;
 pid_t foregroundPid = 0;
@@ -223,28 +225,28 @@ QJsonObject yalahoo::verification::nativeWindowPolicy(const QWindow &window)
             CFRelease(info);
         }
     }
-    return { { "passed", safe },
-             { "nativeWindowAvailable", native != nil },
-             { "visible", native && bool(native.visible) },
-             { "onScreen", onScreen },
-             { "miniaturized", native && bool(native.miniaturized) },
-             { "occlusionVisible",
+    return { { u"passed"_s, safe },
+             { u"nativeWindowAvailable"_s, native != nil },
+             { u"visible"_s, native && bool(native.visible) },
+             { u"onScreen"_s, onScreen },
+             { u"miniaturized"_s, native && bool(native.miniaturized) },
+             { u"occlusionVisible"_s,
                native && bool(native.occlusionState & NSWindowOcclusionStateVisible) },
-             { "level", native ? int(native.level) : int(VerificationLevel) },
-             { "belowNormal", !native || native.level < NSNormalWindowLevel },
-             { "canBecomeKey", native && native.canBecomeKeyWindow },
-             { "canBecomeMain", native && native.canBecomeMainWindow },
-             { "applicationActive", bool(NSApp.active) },
-             { "applicationHidden", bool(NSApp.hidden) },
-             { "activationProhibited", prohibited },
-             { "activationObserved", activationObserved },
-             { "focusObserved", focusObserved },
-             { "launchActivationDisabled", launchActivationDisabled },
-             { "ignoresMouseEvents", !native || bool(native.ignoresMouseEvents) },
-             { "foregroundUnchanged", foregroundUnchanged },
-             { "foregroundOwnershipPassed", foregroundOwnershipPassed },
-             { "externalForegroundChanges", externalForegroundChanges },
-             { "initialForegroundPid", int(foregroundPid) },
-             { "currentForegroundPid", int(currentForegroundPid) },
-             { "verificationPid", int(NSProcessInfo.processInfo.processIdentifier) } };
+             { u"level"_s, native ? int(native.level) : int(VerificationLevel) },
+             { u"belowNormal"_s, !native || native.level < NSNormalWindowLevel },
+             { u"canBecomeKey"_s, native && native.canBecomeKeyWindow },
+             { u"canBecomeMain"_s, native && native.canBecomeMainWindow },
+             { u"applicationActive"_s, bool(NSApp.active) },
+             { u"applicationHidden"_s, bool(NSApp.hidden) },
+             { u"activationProhibited"_s, prohibited },
+             { u"activationObserved"_s, activationObserved },
+             { u"focusObserved"_s, focusObserved },
+             { u"launchActivationDisabled"_s, launchActivationDisabled },
+             { u"ignoresMouseEvents"_s, !native || bool(native.ignoresMouseEvents) },
+             { u"foregroundUnchanged"_s, foregroundUnchanged },
+             { u"foregroundOwnershipPassed"_s, foregroundOwnershipPassed },
+             { u"externalForegroundChanges"_s, externalForegroundChanges },
+             { u"initialForegroundPid"_s, int(foregroundPid) },
+             { u"currentForegroundPid"_s, int(currentForegroundPid) },
+             { u"verificationPid"_s, int(NSProcessInfo.processInfo.processIdentifier) } };
 }

@@ -95,7 +95,7 @@ public:
     std::function<void(QJsonObject)> profiled;
     std::function<void(DiagnosticSample)> diagnosed;
     std::function<void(quint64, quint64, bool)> prepared;
-signals:
+Q_SIGNALS:
     void renderFailed(QString message);
 
 protected:

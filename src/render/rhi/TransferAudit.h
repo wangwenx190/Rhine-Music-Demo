@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include "RhiApi.h"
 #include <QJsonArray>
 #include <QJsonObject>
@@ -12,7 +14,7 @@ namespace yalahoo::rhi {
 inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture *texture,
                                    bool tileOnly = true)
 {
-    QJsonObject result{ { "available", false } };
+    QJsonObject result{ { u"available"_s, false } };
 #if defined(Q_OS_WIN) && defined(YALAHOO_RHI_AUDIT)
     if (api->backend() == QRhi::D3D11) {
         const auto *native = static_cast<QD3D11Texture *>(texture)->textureResource();
@@ -34,18 +36,18 @@ inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture
             const int bottom = u.hasDstBox ? int(box.bottom) : texture->pixelSize().height();
             const auto count = qint64(right - left) * (bottom - top) * 4;
             bytes += count;
-            regions.append(QJsonObject{ { "left", left },
-                                        { "top", top },
-                                        { "right", right },
-                                        { "bottom", bottom },
-                                        { "rowPitch", int(u.srcRowPitch) },
-                                        { "bytes", count } });
+            regions.append(QJsonObject{ { u"left"_s, left },
+                                        { u"top"_s, top },
+                                        { u"right"_s, right },
+                                        { u"bottom"_s, bottom },
+                                        { u"rowPitch"_s, int(u.srcRowPitch) },
+                                        { u"bytes"_s, count } });
         }
-        result = { { "available", true },
-                   { "backend", "D3D11 UpdateSubresource" },
-                   { "destinationBytes", bytes },
-                   { "regions", regions },
-                   { "physicalBusTrafficMeasured", false } };
+        result = { { u"available"_s, true },
+                   { u"backend"_s, u"D3D11 UpdateSubresource"_s },
+                   { u"destinationBytes"_s, bytes },
+                   { u"regions"_s, regions },
+                   { u"physicalBusTrafficMeasured"_s, false } };
     }
 #else
     Q_UNUSED(api);

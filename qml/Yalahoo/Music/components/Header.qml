@@ -52,7 +52,7 @@ Item {
         ArchiveText {
             tokens: root.tokens
             y: root.brandHeight + 5
-            text: "MUSIC ARCHIVE  ／  私人音乐终端"
+            text: qsTr("MUSIC ARCHIVE / PERSONAL MUSIC TERMINAL")
             cssPixelSize: root.narrow ? 7 : root.metrics.width >= 1700 ? 11 : 9
             cssLineHeight: cssPixelSize * 1.5
             font.letterSpacing: root.metrics.portrait ? 1 : 1.8
@@ -78,7 +78,7 @@ Item {
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2
-            text: "音乐库"
+            text: qsTr("Library")
             iconName: "folder"
             width: root.metrics.portrait ? 28 : implicitWidth
             showText: !root.metrics.portrait
@@ -94,7 +94,7 @@ Item {
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2
-            text: "搜索"
+            text: qsTr("Search")
             iconName: "search"
             width: root.metrics.portrait ? 28 : implicitWidth
             showText: !root.metrics.portrait
@@ -123,7 +123,7 @@ Item {
             tokens: root.tokens
             height: root.metrics.portrait ? 32 : 17
             y: (nav.height - height) / 2
-            text: "播放与画质设置"
+            text: qsTr("Playback and quality settings")
             iconName: "settings"
             width: root.metrics.portrait ? 28 : 17
             showText: false
@@ -182,7 +182,7 @@ Item {
                 x: parent.width - width * 2 - (root.metrics.portrait ? 1 : 6)
                 width: root.metrics.portrait ? 24 : 29
                 iconName: ""
-                text: root.playing ? "暂停" : "播放"
+                text: root.playing ? qsTr("Pause") : qsTr("Play")
                 showText: false
                 contentItem: Item {
                     Image {
@@ -222,7 +222,7 @@ Item {
                 x: parent.width - width
                 width: root.metrics.portrait ? 24 : 29
                 iconName: "stop"
-                text: "停止"
+                text: qsTr("Stop")
                 showText: false
                 onClicked: root.actionRequested("stop")
             }

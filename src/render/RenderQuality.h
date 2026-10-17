@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include <QObject>
 #include <QVariantMap>
 #include <QSize>
@@ -28,15 +30,15 @@ public:
                             int maxTextureSize, bool nativeDpr = false);
     int shadows() const
     {
-        return m_values["shadows"].toInt();
+        return m_values[u"shadows"_s].toInt();
     }
     int aoSamples() const
     {
-        return m_values["aoSamples"].toInt();
+        return m_values[u"aoSamples"_s].toInt();
     }
     double aoResolution() const
     {
-        return m_values["aoResolution"].toDouble();
+        return m_values[u"aoResolution"_s].toDouble();
     }
     QSize targetSize() const
     {
@@ -48,7 +50,7 @@ public:
         return m_limited;
     }
     static QVariantMap authoredPreset(const QString &name);
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

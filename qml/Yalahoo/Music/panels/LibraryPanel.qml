@@ -11,15 +11,15 @@ ArchiveScrollView {
     property LibraryStore store: null
     implicitHeight: 550
     contentWidth: availableWidth
-    function focusEditor() {
+    function focusEditor(): void {
         roots.forceActiveFocus();
     }
-    function loadRoots() {
+    function loadRoots(): void {
         roots.text = store ? store.rootPaths().join("\n") : "";
     }
     FolderDialog {
         id: folder
-        title: "选择本地音乐文件夹"
+        title: qsTr("Choose a local music folder")
         onAccepted: {
             roots.text += (roots.text.trim().length ? "\n" : "") + root.store.localPath(
                         selectedFolder);
@@ -35,7 +35,8 @@ ArchiveScrollView {
         ArchiveText {
             width: parent.width
             tokens: root.tokens
-            text: "根目录中的每首单曲各是一张卡片，优先使用自身内嵌封面。子文件夹按专辑展示，优先使用文件夹封面。"
+            text: qsTr(
+                      "Each track in a root directory gets its own card, preferring embedded artwork. Subfolders appear as albums, preferring folder artwork.")
             cssPixelSize: 12
             cssLineHeight: 22.2
             wrapMode: Text.Wrap
@@ -43,7 +44,7 @@ ArchiveScrollView {
         }
         ArchiveText {
             tokens: root.tokens
-            text: "音乐文件夹 · 多个目录各占一行"
+            text: qsTr("Music folders \u00b7 One directory per line")
             cssPixelSize: 11
         }
         ArchiveTextArea {
@@ -57,39 +58,39 @@ ArchiveScrollView {
             color: root.tokens.ink
             selectByMouse: true
             wrapMode: TextEdit.WrapAnywhere
-            placeholderText: "输入本地绝对路径，或选择文件夹"
+            placeholderText: qsTr("Enter a local absolute path, or choose a folder")
             placeholderTextColor: root.tokens.muted
             background: Rectangle {
                 color: root.tokens.surface
                 border.color: root.tokens.line
             }
-            Accessible.name: "音乐文件夹，多个目录各占一行"
+            Accessible.name: qsTr("Music folders, one directory per line")
         }
         Flow {
             width: parent.width
             spacing: 20
             ArchiveButton {
                 tokens: root.tokens
-                text: "选择文件夹 ↗"
+                text: qsTr("Choose folder \u2197")
                 enabled: root.store !== null
                 onClicked: folder.open()
             }
             ArchiveButton {
                 objectName: "librarySaveRoots"
                 tokens: root.tokens
-                text: "保存目录并扫描 ↗"
+                text: qsTr("Save folders and scan \u2197")
                 enabled: root.store !== null && !root.store.busy
                 onClicked: root.store.setRootPaths(roots.text)
             }
             ArchiveButton {
                 tokens: root.tokens
-                text: "重新扫描"
+                text: qsTr("Rescan")
                 enabled: root.store !== null && !root.store.busy
                 onClicked: root.store.rescan()
             }
             ArchiveButton {
                 tokens: root.tokens
-                text: "取消"
+                text: qsTr("Cancel")
                 visible: root.store !== null && root.store.busy
                 onClicked: root.store.cancel()
             }
@@ -102,16 +103,18 @@ ArchiveScrollView {
             cssLineHeight: 18
             wrapMode: Text.WrapAnywhere
             color: root.store && root.store.error ? root.tokens.accent : root.tokens.muted
-            text: !root.store ? "匿名预览不读取本地音乐目录。" : root.store.probing ? "正在读取歌曲标签与封面，已有曲库可以继续浏览…" :
-                                                                        root.store.scanning
-                                                                        ? "正在扫描，已有曲库可以继续浏览…" :
-                                                                          root.store.busy
-                                                                          ? "正在读取或保存本地音乐索引…" :
-                                                                            root.store.error
-                                                                            || root.librarySession.summary.offline
-                                                                            || (root.store.roots.length
-                                                                                ? "本地索引已就绪。" :
-                                                                                  "尚未配置音乐目录。")
+            text: !root.store ? qsTr("Anonymous previews do not read local music folders.") :
+                                root.store.probing ? qsTr(
+                                                         "Reading track tags and artwork. You can keep browsing the existing library...") :
+                                                     root.store.scanning ? qsTr(
+                                                                               "Scanning. You can keep browsing the existing library...") :
+                                                                           root.store.busy ? qsTr(
+                                                                                                 "Reading or saving the local music index...") :
+                                                                                             root.store.error
+                                                                                             || root.librarySession.summary.offline
+                                                                                             || (root.store.roots.length
+                                                                                                 ? qsTr("The local index is ready.") :
+                                                                                                   qsTr("No music folders configured."))
             Accessible.role: Accessible.StaticText
         }
         Rectangle {
@@ -125,15 +128,15 @@ ArchiveScrollView {
                 model: [
                     {
                         value: root.librarySession.summary.albums,
-                        label: "专辑"
+                        label: qsTr("Albums")
                     },
                     {
                         value: root.librarySession.summary.tracks,
-                        label: "曲目"
+                        label: qsTr("Tracks")
                     },
                     {
                         value: root.librarySession.summary.genres,
-                        label: "流派"
+                        label: qsTr("Genres")
                     }
                 ]
                 delegate: Row {
@@ -162,13 +165,14 @@ ArchiveScrollView {
         }
         ArchiveText {
             tokens: root.tokens
-            text: "封面显示"
+            text: qsTr("Cover display")
             cssPixelSize: 12
         }
         ArchiveText {
             width: parent.width
             tokens: root.tokens
-            text: "方形、竖版、横版封面均保持原始比例，完整放入卡片正面。没有封面时显示专辑名称占位，不使用其他专辑的图片。"
+            text: qsTr(
+                      "Square, portrait, and landscape covers keep their original proportions and fit fully on the card. Missing artwork uses an album title placeholder, never another album's image.")
             cssPixelSize: 11
             cssLineHeight: 20.9
             color: root.tokens.muted

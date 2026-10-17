@@ -8,6 +8,8 @@
 #include <QJsonDocument>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 QByteArray read(const QString &path)
@@ -24,15 +26,35 @@ bool put(const QString &path, const QByteArray &bytes)
 class SettingsTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void qualityFieldKeepsOtherRuntimeValues()
+    {
+        QTemporaryDir directory;
+        PreferencesStore preferences(directory.path());
+        OfflineMetadataProvider provider;
+        LibrarySession library(&provider);
+        MotionController motion;
+        SceneAdapter scene(motion.clock());
+        SelectionController selection(&motion);
+        SettingsController settings(&preferences, &library, &motion, &scene, &selection);
+        QVERIFY(settings.update(u"quality"_s, u"high"_s));
+        const auto before = scene.quality()->values();
+        QVERIFY(settings.updateQuality(u"scale"_s, 75));
+        auto expected = before;
+        expected.insert(u"scale"_s, 75.);
+        QCOMPARE(scene.quality()->values(), expected);
+        QVERIFY(!settings.updateQuality(u"unknown"_s, 1));
+        QCOMPARE(scene.quality()->values(), expected);
+    }
+
     void persistenceImportAndDamage()
     {
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
-        const auto path = directory.filePath("preferences.json");
-        const auto source = directory.filePath(QStringLiteral("显式 导出.json"));
+        const auto path = directory.filePath(u"preferences.json"_s);
+        const auto source = directory.filePath(u"\u663e\u5f0f \u5bfc\u51fa.json"_s);
         const QByteArray bytes = R"({"theme":"night","sortMode":"artist","motionSpeed":2.5,
-            "reduced":true,"renderQuality":{"scale":125,"futureQuality":7},"future":{"x":8}})";
+            "reduced":true,"renderQuality":{"scale":125,"futureQuality":7},"future":{"x":8}})"_ba;
         QVERIFY(put(source, bytes));
         {
             PreferencesStore preferences(directory.path());
@@ -41,36 +63,37 @@ private slots:
             QVERIFY(preferences.importJson(QUrl::fromLocalFile(source)));
             QTRY_COMPARE(imported.size(), 1);
             QTRY_COMPARE(saved.size(), 1);
-            QCOMPARE(preferences.values()["theme"].toString(), "night");
+            QCOMPARE(preferences.values()[u"theme"_s].toString(), u"night"_s);
             for (int i = 0; i < 100; ++i)
-                QVERIFY(preferences.update({ { "motionSpeed", .25 + i * .025 } }));
-            QVERIFY(preferences.update({ { "renderQuality", QVariantMap{ { "scale", 150 } } } }));
+                QVERIFY(preferences.update({ { u"motionSpeed"_s, .25 + i * .025 } }));
+            QVERIFY(preferences.update(
+                    { { u"renderQuality"_s, QVariantMap{ { u"scale"_s, 150 } } } }));
             QTRY_COMPARE(saved.size(), 2);
             auto json = QJsonDocument::fromJson(read(path)).object();
-            QCOMPARE(json["schemaVersion"].toInt(), 1);
-            QCOMPARE(json["future"].toObject()["x"].toInt(), 8);
-            QCOMPARE(json["renderQuality"].toObject()["futureQuality"].toInt(), 7);
+            QCOMPARE(json[u"schemaVersion"_s].toInt(), 1);
+            QCOMPARE(json[u"future"_s].toObject()[u"x"_s].toInt(), 8);
+            QCOMPARE(json[u"renderQuality"_s].toObject()[u"futureQuality"_s].toInt(), 7);
             QCOMPARE(read(source), bytes);
             const auto before = read(path);
-            QVERIFY(!preferences.update({ { "theme", "invalid" } }));
-            QVERIFY(!preferences.update({ { "motionSpeed", true } }));
-            QVERIFY(!preferences.update({ { "soundVolume", 2.0 } }));
+            QVERIFY(!preferences.update({ { u"theme"_s, u"invalid"_s } }));
+            QVERIFY(!preferences.update({ { u"motionSpeed"_s, true } }));
+            QVERIFY(!preferences.update({ { u"soundVolume"_s, 2.0 } }));
             QCOMPARE(read(path), before);
             QVERIFY(preferences.importJson(QUrl::fromLocalFile(source)));
-            QVERIFY(preferences.update({ { "theme", "day" } }));
+            QVERIFY(preferences.update({ { u"theme"_s, u"day"_s } }));
             QTRY_COMPARE(saved.size(), 3);
             QCOMPARE(imported.size(), 1);
-            QCOMPARE(preferences.values()["theme"].toString(), "day");
+            QCOMPARE(preferences.values()[u"theme"_s].toString(), u"day"_s);
         }
         PreferencesStore restored(directory.path());
-        QCOMPARE(restored.values()["theme"].toString(), "day");
-        for (const auto &invalid : { QByteArray("{"), QByteArray("[]"),
-                                     QByteArray("{\"schemaVersion\":2,\"theme\":\"night\"}"),
-                                     QByteArray("{\"reduced\":5}") }) {
+        QCOMPARE(restored.values()[u"theme"_s].toString(), u"day"_s);
+        for (const auto &invalid :
+             { "{"_ba, "[]"_ba, "{\"schemaVersion\":2,\"theme\":\"night\"}"_ba,
+               "{\"reduced\":5}"_ba }) {
             QVERIFY(put(path, invalid));
             PreferencesStore damaged(directory.path());
             QVERIFY(!damaged.error().isEmpty());
-            QVERIFY(!damaged.update({ { "theme", "day" } }));
+            QVERIFY(!damaged.update({ { u"theme"_s, u"day"_s } }));
             QCOMPARE(read(path), invalid);
         }
     }
@@ -87,11 +110,11 @@ private slots:
         SettingsController settings(&preferences, &library, &motion, &scene, &selection);
         QSignalSpy quality(scene.quality(), &RenderQuality::changed);
         QSignalSpy saved(&preferences, &PreferencesStore::saved);
-        QVERIFY(settings.update("theme", "night"));
-        QVERIFY(settings.update("motionSpeed", 2.0));
-        QVERIFY(settings.update("sortMode", "album"));
-        QVERIFY(settings.update("rememberColumnPosition", false));
-        QVERIFY(settings.update("arrayMode", "realistic"));
+        QVERIFY(settings.update(u"theme"_s, u"night"_s));
+        QVERIFY(settings.update(u"motionSpeed"_s, 2.0));
+        QVERIFY(settings.update(u"sortMode"_s, u"album"_s));
+        QVERIFY(settings.update(u"rememberColumnPosition"_s, false));
+        QVERIFY(settings.update(u"arrayMode"_s, u"realistic"_s));
         QCOMPARE(quality.size(), 0);
         QTRY_COMPARE(saved.size(), 1);
         motion.clock()->setActive(true);
@@ -99,12 +122,12 @@ private slots:
             motion.clock()->advance(1.0 / 60);
         QCoreApplication::processEvents();
         QCOMPARE(saved.size(), 1);
-        QVERIFY(settings.update("quality", "high"));
+        QVERIFY(settings.update(u"quality"_s, u"high"_s));
         QCOMPARE(quality.size(), 1);
         auto authored = scene.quality()->values();
-        authored["scale"] = 175;
-        QVERIFY(settings.update("renderQuality", authored));
-        QCOMPARE(settings.values()["quality"].toString(), "custom");
+        authored[u"scale"_s] = 175;
+        QVERIFY(settings.update(u"renderQuality"_s, authored));
+        QCOMPARE(settings.values()[u"quality"_s].toString(), u"custom"_s);
         QSignalSpy reload(&settings, &SettingsController::reloadRequested);
         const auto snapshot = library.snapshot();
         const auto values = settings.values();
@@ -113,13 +136,13 @@ private slots:
         QCOMPARE(settings.values(), values);
         QCOMPARE(library.snapshot(), snapshot);
         QVERIFY(!motion.clock()->active());
-        QVERIFY(!settings.update("theme", "invalid"));
-        QVERIFY(!settings.update("motionSpeed", "2"));
-        QVERIFY(!settings.update("motionSpeed", std::numeric_limits<double>::quiet_NaN()));
+        QVERIFY(!settings.update(u"theme"_s, u"invalid"_s));
+        QVERIFY(!settings.update(u"motionSpeed"_s, u"2"_s));
+        QVERIFY(!settings.update(u"motionSpeed"_s, std::numeric_limits<double>::quiet_NaN()));
         QTRY_COMPARE(saved.size(), 2);
         PreferencesStore restored(directory.path());
-        QCOMPARE(restored.values()["renderQuality"].toMap()["scale"].toInt(), 175);
-        QCOMPARE(restored.values()["arrayMode"].toString(), "realistic");
+        QCOMPARE(restored.values()[u"renderQuality"_s].toMap()[u"scale"_s].toInt(), 175);
+        QCOMPARE(restored.values()[u"arrayMode"_s].toString(), u"realistic"_s);
         QVERIFY(!restored.rememberColumnPosition());
     }
     void configurationKeepsUnknownFields()
@@ -129,20 +152,21 @@ private slots:
         store.load();
         QTRY_VERIFY(!store.busy());
         QVERIFY(store.setMetadataConfiguration(
-                { { "musicBrainzContact", "project@example.invalid" },
-                  { "onlineEnabled", true },
-                  { "future", 7 } }));
+                { { u"musicBrainzContact"_s, u"project@example.invalid"_s },
+                  { u"onlineEnabled"_s, true },
+                  { u"future"_s, 7 } }));
         QTRY_VERIFY(!store.busy());
-        QVERIFY(store.setMetadataConfiguration({ { "musicBrainzContact", "新 联系" } }));
+        QVERIFY(store.setMetadataConfiguration(
+                { { u"musicBrainzContact"_s, u"\u65b0 \u8054\u7cfb"_s } }));
         QTRY_VERIFY(!store.busy());
-        const auto configuration = store.snapshot()->fields["metadataConfiguration"].toObject();
-        QCOMPARE(configuration["future"].toInt(), 7);
-        QCOMPARE(configuration["musicBrainzContact"].toString(), QStringLiteral("新 联系"));
-        QVERIFY(configuration["onlineEnabled"].toBool());
+        const auto configuration = store.snapshot()->fields[u"metadataConfiguration"_s].toObject();
+        QCOMPARE(configuration[u"future"_s].toInt(), 7);
+        QCOMPARE(configuration[u"musicBrainzContact"_s].toString(), u"\u65b0 \u8054\u7cfb"_s);
+        QVERIFY(configuration[u"onlineEnabled"_s].toBool());
         LibraryStore restored(directory.path());
         restored.load();
         QTRY_VERIFY(!restored.busy());
-        QCOMPARE(restored.snapshot()->fields["metadataConfiguration"].toObject(), configuration);
+        QCOMPARE(restored.snapshot()->fields[u"metadataConfiguration"_s].toObject(), configuration);
     }
 };
 QTEST_GUILESS_MAIN(SettingsTest)

@@ -2,17 +2,20 @@
 #include <QQuickWindow>
 #include <QDebug>
 
+using namespace Qt::StringLiterals;
+
 #if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
 #  include "RhiApi.h"
 #  include <rhi/qrhi_platform.h>
 #  include <QVulkanInstance>
+#  include <QVersionNumber>
 #  include <memory>
 #endif
 
 void yalahoo::probeOptionalGraphicsBackend()
 {
 #if defined(Q_OS_LINUX)
-    if (qgetenv("QSG_RHI_BACKEND") != "vulkan")
+    if (qgetenv("QSG_RHI_BACKEND") != "vulkan"_ba)
         return;
     bool supported = false;
 #  if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
@@ -33,7 +36,7 @@ void yalahoo::probeOptionalGraphicsBackend()
 #  endif
     if (!supported) {
         qWarning("Vulkan initialization or required formats unavailable; using OpenGL");
-        qputenv("QSG_RHI_BACKEND", "opengl");
+        qputenv("QSG_RHI_BACKEND", "opengl"_ba);
         QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     }
 #endif

@@ -11,7 +11,7 @@ Item {
     onVisibleChanged: if (!visible)
                           playback.cancelSeek()
     Component.onDestruction: playback.cancelSeek()
-    function time(value) {
+    function time(value: real): string {
         const seconds = Math.max(0, Math.floor(value / 1000));
         return Math.floor(seconds / 60) + ":" + (seconds % 60).toString().padStart(2, "0");
     }
@@ -21,14 +21,14 @@ Item {
         spacing: 12
         ArchiveButton {
             tokens: root.tokens
-            text: "上一首"
+            text: qsTr("Previous track")
             cssPixelSize: 10
             enabled: root.playback.canPrevious
             onClicked: root.playback.previous()
         }
         ArchiveButton {
             tokens: root.tokens
-            text: "下一首"
+            text: qsTr("Next track")
             cssPixelSize: 10
             enabled: root.playback.canNext
             onClicked: root.playback.next()
@@ -61,7 +61,7 @@ Item {
             else
                 root.playback.seek(value);
         }
-        Accessible.name: "歌曲进度"
+        Accessible.name: qsTr("Track position")
     }
     ArchiveText {
         anchors.right: parent.right
@@ -69,7 +69,7 @@ Item {
         tokens: root.tokens
         text: root.time(root.playback.position) + " / " + (root.playback.duration > 0 ? root.time(
                                                                                             root.playback.duration) :
-                                                                                        "—")
+                                                                                        "\u2014")
         cssPixelSize: 9
         color: root.tokens.muted
     }

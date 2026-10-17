@@ -85,7 +85,7 @@ try {
 }
 const {createServer} =
     await import(pathToFileURL(path.join(web, 'node_modules/vite/dist/node/index.js')).href);
-const hook = await fs.readFile(path.join(here, 'review-hook.txt'), 'utf8');
+const hook = await fs.readFile(path.join(here, 'review-hook.ts'), 'utf8');
 
 // One input document usable by both the future Qt review entry and this Web runner.
 const titles = [
@@ -384,18 +384,19 @@ const browserProcess = spawn(
 let browser;
 let page;
 const errors = [], blocked = [], captures = [], states = [];
-if (argumentsMap['refresh-contracts']) {
-    const previous = JSON.parse(await fs.readFile(path.join(output, 'screenshots.json'), 'utf8'));
-    const previousStates = await loadSceneIndex(
-        repo,
-        JSON.parse(await fs.readFile(path.join(contracts, 'scene-parameters.json'), 'utf8')),
-    );
-    assert.equal(previous.fixtureHash, fixtureHash);
-    assert.equal(previous.baseline, BASELINE);
-    captures.push(...previous.captures);
-    states.push(...previousStates.states);
-}
 try {
+    if (argumentsMap['refresh-contracts']) {
+        const previous =
+            JSON.parse(await fs.readFile(path.join(output, 'screenshots.json'), 'utf8'));
+        const previousStates = await loadSceneIndex(
+            repo,
+            JSON.parse(await fs.readFile(path.join(contracts, 'scene-parameters.json'), 'utf8')),
+        );
+        assert.equal(previous.fixtureHash, fixtureHash);
+        assert.equal(previous.baseline, BASELINE);
+        captures.push(...previous.captures);
+        states.push(...previousStates.states);
+    }
     const devtools = await waitFor(
         async () =>
             (await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n'),

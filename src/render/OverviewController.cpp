@@ -23,10 +23,12 @@ OverviewController::OverviewController(MotionController *motion, QObject *parent
     QEasingCurve curve(QEasingCurve::BezierSpline);
     curve.addCubicBezierSegment({ .4, 0 }, { .2, 1 }, { 1, 1 });
     m_chrome.setEnterCurve(curve);
-    if (m_clock)
+    if (m_clock) {
         connect(m_clock, &FrameClock::frame, this, [this](double, double dt) {
             advance(dt, m_motion->reducedMotion());
         });
+        connect(motion, &QObject::destroyed, this, &OverviewController::reset);
+    }
 }
 void OverviewController::bind(SceneAdapter *scene, SelectionController *selection,
                               PresentationController *presentation)
@@ -36,6 +38,9 @@ void OverviewController::bind(SceneAdapter *scene, SelectionController *selectio
     m_selection = selection;
     m_presentation = presentation;
     selection->setOverview(this);
+    connect(scene, &QObject::destroyed, this, &OverviewController::reset);
+    connect(selection, &QObject::destroyed, this, &OverviewController::reset);
+    connect(presentation, &QObject::destroyed, this, &OverviewController::reset);
     connect(selection, &SelectionController::libraryChanged, this, &OverviewController::reset);
     connect(selection, &SelectionController::selectionChanged, this, &OverviewController::collapse);
     connect(selection, &SelectionController::arrayModeChanged, this, &OverviewController::collapse);
@@ -50,9 +55,12 @@ void OverviewController::bind(SceneAdapter *scene, SelectionController *selectio
         connect(m_motion, &MotionController::reducedMotionChanged, this, [this] {
             advance(0, m_motion->reducedMotion());
             if (m_motion->reducedMotion()) {
-                m_scene->setReducedMotion(true);
-                m_selection->advance(0);
-                m_scene->advance(0);
+                if (m_scene)
+                    m_scene->setReducedMotion(true);
+                if (m_selection)
+                    m_selection->advance(0);
+                if (m_scene)
+                    m_scene->advance(0);
             }
             synchronize(0, m_motion->reducedMotion());
         });
@@ -95,8 +103,8 @@ void OverviewController::setActive(bool active)
     if (active == m_active)
         return;
     if (active
-        && (!m_selection || m_selection->albumId().isEmpty() || !m_presentation
-            || !m_presentation->archiveEnabled()))
+        && (!m_motion || !m_scene || !m_selection || m_selection->albumId().isEmpty()
+            || !m_presentation || !m_presentation->archiveEnabled()))
         return;
     m_active = active;
     m_revealPending = !active;
@@ -113,7 +121,7 @@ void OverviewController::setActive(bool active)
     } else {
         m_chromeShown = false;
         m_chrome.hide(reduced);
-        emit focusRequested(false);
+        Q_EMIT focusRequested(false);
     }
     if (reduced) {
         advance(0, true);
@@ -142,7 +150,8 @@ void OverviewController::expand(int lane)
 }
 bool OverviewController::enter(int lane)
 {
-    if (!ready() || !m_labels.canEnter(lane) || !m_selection->enterColumn(lane, true))
+    if (!ready() || !m_selection || !m_labels.canEnter(lane)
+        || !m_selection->enterColumn(lane, true))
         return false;
     setActive(false);
     return true;
@@ -173,7 +182,7 @@ void OverviewController::synchronize(double dt, bool reduced)
     if (m_active && progress() > .12 && !m_chromeShown) {
         m_chromeShown = true;
         m_chrome.show(reduced);
-        emit focusRequested(true);
+        Q_EMIT focusRequested(true);
     }
     m_chrome.advance(dt);
     if (reduced)
@@ -190,7 +199,7 @@ void OverviewController::synchronize(double dt, bool reduced)
         && m_scene->settled()) {
         m_revealPending = false;
         m_presentation->browseSurface()->show(reduced);
-        emit focusRequested(false);
+        Q_EMIT focusRequested(false);
     }
     notify();
 }
@@ -214,7 +223,7 @@ void OverviewController::notify()
     if (state == m_notified)
         return;
     m_notified = state;
-    emit changed();
+    Q_EMIT changed();
 }
 double OverviewController::columnExtent(double lane, double centerLane, double progress)
 {

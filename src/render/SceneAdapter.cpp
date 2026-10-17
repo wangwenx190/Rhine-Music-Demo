@@ -7,6 +7,9 @@
 #include <numbers>
 #include <limits>
 #include <chrono>
+
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 SelectionController *SceneAdapter::selection() const
 {
@@ -28,7 +31,7 @@ void SceneAdapter::setSelection(SelectionController *selection)
             m_managedDetail = false;
             m_detail = 0;
             snapToTarget();
-            emit detailChanged();
+            Q_EMIT detailChanged();
         });
         connect(selection, &SelectionController::arrayModeChanged, this, [this] {
             m_lighting.ribbon.reset();
@@ -42,11 +45,11 @@ void SceneAdapter::setSelection(SelectionController *selection)
             m_explicitLightingInput = false;
             m_selectionRevision = 0;
             publish();
-            emit selectionControllerChanged();
+            Q_EMIT selectionControllerChanged();
         });
     }
     publish();
-    emit selectionControllerChanged();
+    Q_EMIT selectionControllerChanged();
 }
 void SceneAdapter::recordInput()
 {
@@ -54,7 +57,7 @@ void SceneAdapter::recordInput()
     m_frame.inputReceivedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                       std::chrono::steady_clock::now().time_since_epoch())
                                       .count();
-    emit frameChanged();
+    Q_EMIT frameChanged();
 }
 void SceneAdapter::recordNavigationCommit(quint64 revision)
 {
@@ -63,7 +66,7 @@ void SceneAdapter::recordNavigationCommit(quint64 revision)
     m_frame.navigationCommittedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                             std::chrono::steady_clock::now().time_since_epoch())
                                             .count();
-    emit frameChanged();
+    Q_EMIT frameChanged();
 }
 namespace {
 constexpr double radians = std::numbers::pi / 180;
@@ -165,7 +168,7 @@ void SceneAdapter::setDetail(double detail)
         snapToTarget();
     else
         publish();
-    emit detailChanged();
+    Q_EMIT detailChanged();
 }
 void SceneAdapter::setReducedMotion(bool reduced)
 {
@@ -182,7 +185,7 @@ void SceneAdapter::setReducedMotion(bool reduced)
             snapToTarget();
     }
     updateLighting(0);
-    emit reducedMotionChanged();
+    Q_EMIT reducedMotionChanged();
 }
 void SceneAdapter::setNavigation(double laneSpeed, double rowSpeed, bool realColumns)
 {
@@ -210,7 +213,7 @@ void SceneAdapter::advance(double dt)
         const double detail = m_selection->detailMotion().value();
         if (m_detail != detail) {
             m_detail = detail;
-            emit detailChanged();
+            Q_EMIT detailChanged();
         }
     }
     if (m_reduced) {
@@ -329,7 +332,7 @@ void SceneAdapter::publish()
         setLightingInput({ caseOrigin, cell.row, cell.lane, m_selection->realistic() },
                          m_selection->selectedRotation());
     }
-    emit frameChanged();
+    Q_EMIT frameChanged();
 }
 void SceneAdapter::setLightingInput(RowLightingInput input, QQuaternion rotation)
 {
@@ -401,9 +404,9 @@ QVariantMap SceneAdapter::hitTest(double x, double y) const
         }
     }
     const auto local = start + delta * float(enter);
-    return { { "objectId", QStringLiteral("inspection-case") },
-             { "localPoint", QVariant::fromValue(local) },
-             { "worldPoint", QVariant::fromValue(m_frame.caseTransform.map(local)) },
-             { "frameRevision", QVariant::fromValue(frameRevision()) } };
+    return { { u"objectId"_s, u"inspection-case"_s },
+             { u"localPoint"_s, QVariant::fromValue(local) },
+             { u"worldPoint"_s, QVariant::fromValue(m_frame.caseTransform.map(local)) },
+             { u"frameRevision"_s, QVariant::fromValue(frameRevision()) } };
 }
 }

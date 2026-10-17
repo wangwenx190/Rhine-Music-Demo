@@ -7,6 +7,8 @@
 #include <QTest>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 using namespace yalahoo;
 namespace {
 struct Fixture
@@ -23,24 +25,24 @@ struct Fixture
         LibrarySnapshot snapshot;
         for (int i = 0; i < 15; ++i) {
             Album album;
-            album.id = QString("album-%1").arg(i);
-            album.artist = i < 7 ? "Artist A" : "Artist B";
+            album.id = u"album-%1"_s.arg(i);
+            album.artist = i < 7 ? "Artist A"_L1 : "Artist B"_L1;
             album.title = QString::number(i);
             for (int j = 0; j < 60; ++j) {
                 Track track;
-                track.id = QString("track-%1").arg(j);
+                track.id = u"track-%1"_s.arg(j);
                 track.albumId = album.id;
-                track.title = QString("Song %1").arg(j);
+                track.title = u"Song %1"_s.arg(j);
                 album.tracks.append(track);
             }
             snapshot.albums.append(album);
         }
         library.setSnapshot(snapshot);
-        library.sort("artist");
+        library.sort(u"artist"_s);
         selection.setColumns(library.albums()->order().columns, library.snapshot());
         scene.setSelection(&selection);
         library.navigate(selection.albumId());
-        library.setPlaybackIds("album-0", "track-0");
+        library.setPlaybackIds(u"album-0"_s, u"track-0"_s);
         QObject::connect(&selection, &SelectionController::selectionChanged, &library, [&] {
             library.navigate(selection.albumId());
         });
@@ -66,7 +68,60 @@ struct Fixture
 class TrackFocusTest : public QObject
 {
     Q_OBJECT
-private slots:
+private Q_SLOTS:
+    void listOriginRefinementPreservesMotionDistance()
+    {
+        Fixture f;
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-10"_s));
+        QVERIFY(f.untilDetail());
+        const auto revision = f.focus.revision();
+        f.focus.beginListReveal(revision, 10, 100, 0, 500, 400, 40, 200, 20);
+        QCOMPARE(f.focus.listScrollY(100), 110.);
+        f.focus.advance(.1);
+        const double scroll = f.focus.listScrollY(100);
+        f.focus.refineListReveal(150, 450, 40, 200, 20, 500);
+        QCOMPARE(f.focus.listScrollY(150), scroll + 50);
+        f.focus.refineListReveal(150, 470, 40, 200, 20, 500);
+        QCOMPARE(f.focus.listScrollY(150), scroll + 70);
+        f.focus.advance(1);
+        QCOMPARE(f.focus.listScrollY(150), 380.);
+        f.focus.cancel();
+        const auto final = f.focus.listScrollY(150);
+        f.focus.beginListReveal(revision, 0, 0, 0, 500, 0, 0, 200, 0);
+        QCOMPARE(f.focus.listScrollY(150), final);
+    }
+    void synchronousScrollCancellationCannotRestoreHighlight()
+    {
+        Fixture f;
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-10"_s));
+        QVERIFY(f.untilDetail());
+        f.focus.beginReveal(f.focus.revision(), 0, 1000);
+        QSignalSpy focused(&f.focus, &TrackFocusController::focusRequested);
+        connect(&f.focus, &TrackFocusController::scrollChanged, &f.focus,
+                &TrackFocusController::cancel);
+        f.focus.advance(1);
+        QVERIFY(!f.focus.active());
+        QVERIFY(!f.focus.revealing());
+        QCOMPARE(focused.size(), 0);
+        f.focus.advance(1);
+        QCOMPARE(focused.size(), 0);
+    }
+    void synchronousHighlightCancellationCannotFocusOldRow()
+    {
+        Fixture f;
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-10"_s));
+        QVERIFY(f.untilDetail());
+        f.focus.beginReveal(f.focus.revision(), 0, 1000);
+        QSignalSpy focused(&f.focus, &TrackFocusController::focusRequested);
+        connect(&f.focus, &TrackFocusController::changed, &f.focus, [&] {
+            if (f.focus.highlight() == 0 && f.focus.revealing())
+                f.focus.cancel();
+        });
+        f.focus.advance(1);
+        QVERIFY(!f.focus.active());
+        QVERIFY(!f.focus.revealing());
+        QCOMPARE(focused.size(), 0);
+    }
     void lastTargetArchiveRouteAndPlaybackIsolation()
     {
         Fixture f;
@@ -74,19 +129,19 @@ private slots:
         QSignalSpy playback(&f.library, &LibrarySession::playbackChanged);
         f.presentation.open();
         QVERIFY(f.untilDetail());
-        QVERIFY(f.focus.request("album-8", "track-59"));
+        QVERIFY(f.focus.request(u"album-8"_s, u"track-59"_s));
         f.step(12);
-        QVERIFY(f.focus.request("album-3", "track-17"));
+        QVERIFY(f.focus.request(u"album-3"_s, u"track-17"_s));
         f.step(6);
-        QVERIFY(f.focus.request("album-12", "track-45"));
+        QVERIFY(f.focus.request(u"album-12"_s, u"track-45"_s));
         QVERIFY(f.untilDetail());
-        QCOMPARE(f.selection.albumId(), QString("album-12"));
-        QCOMPARE(f.library.navigationTrackId(), QString("track-45"));
+        QCOMPARE(f.selection.albumId(), u"album-12"_s);
+        QCOMPARE(f.library.navigationTrackId(), u"track-45"_s);
         QCOMPARE(revealed.size(), 1);
         QCOMPARE(revealed[0][1].toInt(), 45);
-        QCOMPARE(f.library.playbackAlbumId(), QString("album-0"));
+        QCOMPARE(f.library.playbackAlbumId(), u"album-0"_s);
         QCOMPARE(playback.size(), 0);
-        QVERIFY(!f.focus.request("missing", "track-0"));
+        QVERIFY(!f.focus.request(u"missing"_s, u"track-0"_s));
         QVERIFY(!f.focus.active());
     }
     void reuseScrollCancelAndReducedMotion()
@@ -98,9 +153,9 @@ private slots:
         const auto sceneRevision = f.selection.revision();
         QSignalSpy reveal(&f.focus, &TrackFocusController::revealRequested);
         QSignalSpy focused(&f.focus, &TrackFocusController::focusRequested);
-        QVERIFY(f.focus.request("album-0", "track-30"));
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-30"_s));
         QCOMPARE(reveal.size(), 1);
-        QCOMPARE(f.library.navigationTrackId(), QString("track-30"));
+        QCOMPARE(f.library.navigationTrackId(), u"track-30"_s);
         QCOMPARE(f.presentation.layoutRevision(), layout);
         QCOMPARE(f.selection.revision(), sceneRevision);
         const auto revision = f.focus.revision();
@@ -114,7 +169,7 @@ private slots:
         QCOMPARE(focused.size(), 0);
         f.focus.beginReveal(revision, 0, 2000);
         QCOMPARE(focused.size(), 0);
-        QVERIFY(f.focus.request("album-0", "track-59"));
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-59"_s));
         f.focus.setReducedMotion(true);
         f.focus.beginReveal(f.focus.revision(), 0, 4000);
         QCOMPARE(f.focus.scrollY(), 4000.);
@@ -122,7 +177,7 @@ private slots:
         QCOMPARE(f.focus.highlight(), 1.);
         f.focus.advance(1.1);
         QVERIFY(!f.focus.active());
-        QVERIFY(f.focus.request("album-0", "track-1"));
+        QVERIFY(f.focus.request(u"album-0"_s, u"track-1"_s));
         f.presentation.back();
         QVERIFY(!f.focus.active());
         f.library.setSnapshot({ });
@@ -135,15 +190,15 @@ private slots:
         QSignalSpy closed(&panels, &PanelController::closed);
         clock.setActive(true);
         clock.advance(0);
-        panels.open("search");
+        panels.open(u"search"_s);
         clock.advance(.05);
         QVERIFY(panels.surface()->opacity() > 0);
         panels.close();
         clock.advance(.01);
-        panels.open("library");
+        panels.open(u"library"_s);
         for (int i = 0; i < 20; ++i)
             clock.advance(.05);
-        QCOMPARE(panels.panel(), QString("library"));
+        QCOMPARE(panels.panel(), u"library"_s);
         QCOMPARE(closed.size(), 0);
         panels.close();
         panels.setReducedMotion(true);

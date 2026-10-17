@@ -7,22 +7,24 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 InterfaceSoundController::InterfaceSoundController(QObject *parent)
     : QObject(parent), m_devices(this)
 {
     // One small, trusted embedded manifest is read at construction, never on an event.
-    QFile manifest(QStringLiteral(":/assets/audio/interface-events.json"));
+    QFile manifest(u":/assets/audio/interface-events.json"_s);
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto events =
-                QJsonDocument::fromJson(manifest.readAll()).object().value("events").toArray();
+                QJsonDocument::fromJson(manifest.readAll()).object().value(u"events"_s).toArray();
         for (const auto &value : events) {
             const auto entry = value.toObject();
-            const QUrl source(entry.value("source").toString());
-            if (entry.value("enabled").toBool() && source.scheme() == QLatin1String("qrc")
-                && source.path().startsWith(QLatin1String("/assets/audio/")) && !source.hasQuery()
-                && !source.hasFragment() && QFile::exists(":" + source.path()))
-                m_sources.insert(entry.value("event").toString(), source);
+            const QUrl source(entry.value(u"source"_s).toString());
+            if (entry.value(u"enabled"_s).toBool() && source.scheme() == "qrc"_L1
+                && source.path().startsWith("/assets/audio/"_L1) && !source.hasQuery()
+                && !source.hasFragment() && QFile::exists(":"_L1 + source.path()))
+                m_sources.insert(entry.value(u"event"_s).toString(), source);
         }
     }
     if (available()) {
@@ -68,7 +70,7 @@ void InterfaceSoundController::setEnabled(bool enabled)
     m_enabled = enabled;
     if (!enabled)
         stop();
-    emit settingsChanged();
+    Q_EMIT settingsChanged();
 }
 void InterfaceSoundController::setVolume(double volume)
 {
@@ -81,7 +83,7 @@ void InterfaceSoundController::setVolume(double volume)
     for (auto &effect : m_pool)
         if (effect)
             effect->setVolume(float(volume));
-    emit settingsChanged();
+    Q_EMIT settingsChanged();
 }
 bool InterfaceSoundController::trigger(const QString &event)
 {
@@ -102,6 +104,6 @@ bool InterfaceSoundController::trigger(const QString &event)
 }
 void InterfaceSoundController::preview()
 {
-    trigger(QStringLiteral("confirm"));
+    trigger(u"confirm"_s);
 }
 }

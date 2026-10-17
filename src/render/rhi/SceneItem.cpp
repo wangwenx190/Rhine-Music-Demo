@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #include "SceneItem.h"
 #include <QQuickRenderTarget>
 #include <chrono>
@@ -15,7 +16,61 @@
 #include <limits>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo::rhi {
+QString SceneItem::diagnosticText() const
+{
+    if (!m_diagnosticsEnabled)
+        return QCoreApplication::translate("Yalahoo", "Diagnostics disabled");
+    const auto &sample = m_diagnosticValues;
+    if (!sample.value(u"submissions"_s).toULongLong())
+        return QCoreApplication::translate("Yalahoo", "Waiting for valid rendering samples...");
+    const auto percentile = [&sample](QLatin1StringView series, QLatin1StringView key) {
+        const auto values = sample.value(series).toMap();
+        return values.value(u"count"_s).toUInt()
+                ? QString::number(values.value(key).toDouble(), 'f', 2) + " ms"_L1
+                : QCoreApplication::translate("Yalahoo", "Unavailable");
+    };
+    return QStringList{
+        QCoreApplication::translate("Yalahoo", "RHI submission interval p50 / p95 / p99"),
+        percentile("submissionIntervals"_L1, "p50"_L1) + " / "_L1
+                + percentile("submissionIntervals"_L1, "p95"_L1) + " / "_L1
+                + percentile("submissionIntervals"_L1, "p99"_L1),
+        QCoreApplication::translate("Yalahoo", "CPU submission p95 ")
+                + percentile("cpu"_L1, "p95"_L1)
+                + QCoreApplication::translate("Yalahoo", " \u00b7 Sync p95 ")
+                + percentile("sync"_L1, "p95"_L1),
+        QCoreApplication::translate("Yalahoo", "Completed GPU frame p95 ")
+                + percentile("gpu"_L1, "p95"_L1),
+        QCoreApplication::translate("Yalahoo", "Qt presentation event p95 ")
+                + percentile("qtFrameIntervals"_L1, "p95"_L1),
+        QCoreApplication::translate("Yalahoo", "Batch uploads: atlas / selected / uniform"),
+        sample.value(u"atlasUploadBytes"_s).toString() + " / "_L1
+                + sample.value(u"selectedUploadBytes"_s).toString() + " / "_L1
+                + sample.value(u"uniformUploadBytes"_s).toString() + " bytes"_L1,
+        QCoreApplication::translate("Yalahoo", "Total decodes started ")
+                + sample.value(u"decodeStarts"_s).toString()
+                + QCoreApplication::translate("Yalahoo", " \u00b7 Active ")
+                + sample.value(u"decodeActive"_s).toString()
+                + QCoreApplication::translate("Yalahoo", " \u00b7 Waiting ")
+                + sample.value(u"decodePending"_s).toString(),
+        QCoreApplication::translate("Yalahoo", "Submission throughput at current scheduling ")
+                + QString::number(sample.value(u"submissionRate"_s).toDouble(), 'f', 1)
+                + QCoreApplication::translate("Yalahoo", " / second"),
+        QCoreApplication::translate("Yalahoo", "Submission samples ")
+                + sample.value(u"submissions"_s).toString() + " / "_L1
+                + QString::number(sample.value(u"elapsedMs"_s).toDouble(), 'f', 0) + " ms"_L1,
+        QCoreApplication::translate("Yalahoo", "Requested VSYNC interval ")
+                + sample.value(u"requestedSwapInterval"_s).toString()
+                + QCoreApplication::translate(
+                        "Yalahoo", " \u00b7 Actual VSYNC and screen presentation time unavailable"),
+        QCoreApplication::translate(
+                "Yalahoo",
+                "A fixed window retains the latest 256 samples. RHI intervals reflect current scheduling, not a complete product throughput benchmark. CPU excludes GPU completion; GPU scope is provided by the QRhi backend.")
+    }
+            .join('\n'_L1);
+}
 TitleReel *SceneItem::titleReel() const
 {
     return m_titleReel;
@@ -34,7 +89,7 @@ void SceneItem::setTitleReel(TitleReel *reel)
                 connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
     }
     refreshTextResources();
-    emit textReelsChanged();
+    Q_EMIT textReelsChanged();
 }
 TitleReel *SceneItem::transportReel() const
 {
@@ -54,7 +109,7 @@ void SceneItem::setTransportReel(TitleReel *reel)
                 connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
     }
     refreshTextResources();
-    emit textReelsChanged();
+    Q_EMIT textReelsChanged();
 }
 void SceneItem::refreshTextResources()
 {
@@ -77,22 +132,30 @@ SceneItem::SceneItem(QQuickItem *parent)
     setFlag(QQuickItem::ItemIsFocusScope, true);
     setFocus(true);
     m_cover.fill(Qt::transparent);
-    m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
+    m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
     connect(&m_covers, &CoverCache::ready, this, [this](CoverSnapshot pixels) {
         if (m_poolMode) {
             if (!m_adapter)
                 return;
+            if (m_poolSelection && !pixels->error.isEmpty()
+                && pixels->fallbackTitle != m_poolSelection->coverSource(pixels->identity).second) {
+                schedule();
+                return;
+            }
             const auto &instances = m_adapter->frame().instances;
             const auto activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
             if (pixels->resolution == 256) {
                 const auto lease = m_poolLeases.constFind(pixels->identity);
                 if (lease != m_poolLeases.cend() && m_atlas.publish(*lease, pixels))
-                    m_readyCovers.insert(pixels->identity);
+                    m_readyCovers.insert(pixels->identity, pixels->error.isEmpty());
             }
             for (auto &owned : m_ownedCovers)
                 if (owned.objectId == activeObject && owned.pixels
-                    && owned.pixels->identity == pixels->identity)
+                    && owned.pixels->identity == pixels->identity) {
+                    if (pixels->resolution == 1024)
+                        owned.highResolutionFailed = !pixels->error.isEmpty();
                     m_coverPool.upgrade(owned.pixels, pixels);
+                }
             ++m_coverRevision;
             schedule();
             return;
@@ -108,7 +171,7 @@ SceneItem::SceneItem(QQuickItem *parent)
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::configureDiagnostics);
     connect(this, &RhiItem::renderFailed, this, [this](const QString &message) {
         m_errorText = message;
-        emit errorTextChanged();
+        Q_EMIT errorTextChanged();
     });
     connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
         disconnect(m_windowStateConnection);
@@ -175,7 +238,7 @@ void SceneItem::setAdapter(SceneAdapter *adapter)
         connect(adapter, &SceneAdapter::selectionControllerChanged, this, &SceneItem::schedule);
     }
     schedule();
-    emit adapterChanged();
+    Q_EMIT adapterChanged();
 }
 void SceneItem::resetPool()
 {
@@ -198,10 +261,19 @@ void SceneItem::refreshPool()
     // Only the bounded visible pool is reconciled; content-addressed native paths
     // carry revisions, while missing artwork also depends on its fallback title.
     for (auto it = m_poolSources.begin(); it != m_poolSources.end();) {
-        auto next = m_poolSelection->coverSource(it.key());
-        if (!next.first.isEmpty())
-            next.second.clear();
+        const auto next = m_poolSelection->coverSource(it.key());
         if (it.value() == next) {
+            ++it;
+            continue;
+        }
+        const bool ownedPlaceholder = std::any_of(
+                m_ownedCovers.cbegin(), m_ownedCovers.cend(), [&it](const OwnedCover &owned) {
+                    return owned.pixels && owned.pixels->identity == it.key()
+                            && owned.pixels->pixels && !owned.pixels->pixels->error.isEmpty();
+                });
+        if (!next.first.isEmpty() && next.first == it->first && m_readyCovers.value(it.key(), false)
+            && !ownedPlaceholder) {
+            it.value() = next;
             ++it;
             continue;
         }
@@ -273,10 +345,7 @@ void SceneItem::preparePool(Input &in)
         const auto source = selection->coverSource(id);
         if (!m_poolLeases.contains(id)) {
             m_poolLeases.insert(id, m_atlas.acquire(id, m_covers.generation()));
-            auto key = source;
-            if (!key.first.isEmpty())
-                key.second.clear();
-            m_poolSources.insert(id, key);
+            m_poolSources.insert(id, source);
         }
         const auto lease = m_poolLeases.value(id);
         auto tile = m_atlas.tile(lease);
@@ -286,7 +355,7 @@ void SceneItem::preparePool(Input &in)
         if (!m_readyCovers.contains(id)) {
             if (auto pixels = m_covers.lookup(id, source.first, 256, source.second)) {
                 if (m_atlas.publish(lease, pixels))
-                    m_readyCovers.insert(id);
+                    m_readyCovers.insert(id, pixels->error.isEmpty());
             } else if (m_covers.hasPendingCapacity())
                 m_covers.request(id, source.first, 256, source.second);
         }
@@ -309,11 +378,12 @@ void SceneItem::preparePool(Input &in)
                 }
             }
             if (it != m_ownedCovers.end() && it->pixels) {
-                if (instance.objectId == m_activeObject
+                if (instance.objectId == m_activeObject && !it->highResolutionFailed
                     && (!it->pixels->pixels || it->pixels->pixels->resolution != 1024)) {
-                    if (auto pixels = m_covers.lookup(id, source.first, 1024, source.second))
+                    if (auto pixels = m_covers.lookup(id, source.first, 1024, source.second)) {
+                        it->highResolutionFailed = !pixels->error.isEmpty();
                         m_coverPool.upgrade(it->pixels, pixels);
-                    else if (m_covers.hasPendingCapacity())
+                    } else if (m_covers.hasPendingCapacity())
                         m_covers.request(id, source.first, 1024, source.second);
                 }
                 const auto pixels = it->pixels->pixels;
@@ -356,7 +426,7 @@ void SceneItem::setInspectionEnabled(bool enabled)
     m_inspectionEnabled = enabled;
     if (!enabled)
         mouseUngrabEvent();
-    emit inspectionEnabledChanged();
+    Q_EMIT inspectionEnabledChanged();
 }
 void SceneItem::setGeometryOnly(bool enabled)
 {
@@ -364,7 +434,7 @@ void SceneItem::setGeometryOnly(bool enabled)
         return;
     m_geometryOnly = enabled;
     schedule();
-    emit geometryOnlyChanged();
+    Q_EMIT geometryOnlyChanged();
 }
 void SceneItem::setDiagnosticsEnabled(bool enabled)
 {
@@ -372,7 +442,7 @@ void SceneItem::setDiagnosticsEnabled(bool enabled)
         return;
     m_diagnosticsEnabled = enabled;
     configureDiagnostics();
-    emit diagnosticsChanged();
+    Q_EMIT diagnosticsChanged();
 }
 void SceneItem::configureDiagnostics()
 {
@@ -381,7 +451,7 @@ void SceneItem::configureDiagnostics()
     diagnosed = { };
     disconnect(m_presentedConnection);
     m_diagnosticValues.clear();
-    emit diagnosticValuesChanged();
+    Q_EMIT diagnosticValuesChanged();
     // Explicit Review targets can submit while the native window stays hidden.
     if (!m_renderingActive || !m_diagnosticsEnabled || !isVisible() || !window()
         || QGuiApplication::applicationState() == Qt::ApplicationHidden
@@ -443,24 +513,25 @@ void SceneItem::configureDiagnostics()
                             return;
                         const auto cache = guard->m_covers.statistics();
                         guard->m_diagnosticValues = {
-                            { "cpu", batch.cpu.distribution() },
-                            { "sync", batch.sync.distribution() },
-                            { "gpu", batch.gpu.distribution() },
-                            { "submissionIntervals", batch.intervals.distribution() },
-                            { "qtFrameIntervals", presented.distribution() },
-                            { "submissions", batch.submissions },
-                            { "elapsedMs", batch.elapsedMs },
-                            { "submissionRate", batch.intervals.seen() * 1000.0 / batch.elapsedMs },
-                            { "atlasUploadBytes", batch.atlasBytes },
-                            { "selectedUploadBytes", batch.selectedBytes },
-                            { "uniformUploadBytes", batch.uniformBytes },
-                            { "decodeStarts", cache.value("decodeStarts").toVariant() },
-                            { "decodeActive", cache.value("active").toVariant() },
-                            { "decodePending", cache.value("pending").toVariant() },
-                            { "requestedSwapInterval",
+                            { u"cpu"_s, batch.cpu.distribution() },
+                            { u"sync"_s, batch.sync.distribution() },
+                            { u"gpu"_s, batch.gpu.distribution() },
+                            { u"submissionIntervals"_s, batch.intervals.distribution() },
+                            { u"qtFrameIntervals"_s, presented.distribution() },
+                            { u"submissions"_s, batch.submissions },
+                            { u"elapsedMs"_s, batch.elapsedMs },
+                            { u"submissionRate"_s,
+                              batch.intervals.seen() * 1000.0 / batch.elapsedMs },
+                            { u"atlasUploadBytes"_s, batch.atlasBytes },
+                            { u"selectedUploadBytes"_s, batch.selectedBytes },
+                            { u"uniformUploadBytes"_s, batch.uniformBytes },
+                            { u"decodeStarts"_s, cache.value(u"decodeStarts"_s).toVariant() },
+                            { u"decodeActive"_s, cache.value(u"active"_s).toVariant() },
+                            { u"decodePending"_s, cache.value(u"pending"_s).toVariant() },
+                            { u"requestedSwapInterval"_s,
                               guard->window()->requestedFormat().swapInterval() }
                         };
-                        emit guard->diagnosticValuesChanged();
+                        Q_EMIT guard->diagnosticValuesChanged();
                     },
                     Qt::QueuedConnection);
     };
@@ -473,7 +544,7 @@ void SceneItem::setTelemetryEnabled(bool enabled)
     m_telemetryEnabled = enabled;
     configureTelemetry();
     schedule();
-    emit telemetryEnabledChanged();
+    Q_EMIT telemetryEnabledChanged();
 }
 void SceneItem::configureTelemetry()
 {
@@ -515,8 +586,11 @@ void SceneItem::configureTelemetry()
                             if (guard && epoch == guard->m_telemetryEpoch
                                 && guard->m_renderingActive && guard->telemetryEnabled())
                                 for (auto &sample : batch) {
-                                    sample["coalescedSamples"] = qint64(dropped);
-                                    emit guard->frameSubmitted(std::move(sample));
+                                    if (!guard || epoch != guard->m_telemetryEpoch
+                                        || !guard->m_renderingActive || !guard->telemetryEnabled())
+                                        break;
+                                    sample[u"coalescedSamples"_s] = qint64(dropped);
+                                    Q_EMIT guard->frameSubmitted(std::move(sample));
                                 }
                         },
                         Qt::QueuedConnection);
@@ -545,10 +619,10 @@ QJsonObject SceneItem::coverStatistics() const
             continue;
         ++owned;
         owners.append(QJsonObject{
-                { "objectId", qint64(cover.objectId) },
-                { "albumId", cover.pixels->identity },
-                { "lease", qint64(cover.lease) },
-                { "resolution", cover.pixels->pixels ? cover.pixels->pixels->resolution : 0 } });
+                { u"objectId"_s, qint64(cover.objectId) },
+                { u"albumId"_s, cover.pixels->identity },
+                { u"lease"_s, qint64(cover.lease) },
+                { u"resolution"_s, cover.pixels->pixels ? cover.pixels->pixels->resolution : 0 } });
         if (cover.pixels->pixels) {
             ownedBytes += cover.pixels->pixels->image.sizeInBytes();
             detailed += cover.pixels->pixels->resolution == 1024;
@@ -558,17 +632,17 @@ QJsonObject SceneItem::coverStatistics() const
         for (const auto &upload : cover.uploads)
             tiledBytes += upload.pixels.sizeInBytes();
     }
-    return { { "owners", owners },
-             { "cache", m_covers.statistics() },
-             { "identities", m_poolLeases.size() },
-             { "ready", m_readyCovers.size() },
-             { "owned", owned },
-             { "detailed", detailed },
-             { "selectedDetailed", selectedDetailed },
-             { "atlasRetainedBytes", m_atlas.retainedBytes() },
-             { "ownedBytes", ownedBytes },
-             { "tiledBytes", tiledBytes },
-             { "atlasSize", QJsonArray{ 5632, 6656 } } };
+    return { { u"owners"_s, owners },
+             { u"cache"_s, m_covers.statistics() },
+             { u"identities"_s, m_poolLeases.size() },
+             { u"ready"_s, m_readyCovers.size() },
+             { u"owned"_s, owned },
+             { u"detailed"_s, detailed },
+             { u"selectedDetailed"_s, selectedDetailed },
+             { u"atlasRetainedBytes"_s, m_atlas.retainedBytes() },
+             { u"ownedBytes"_s, ownedBytes },
+             { u"tiledBytes"_s, tiledBytes },
+             { u"atlasSize"_s, QJsonArray{ 5632, 6656 } } };
 }
 void SceneItem::setRenderingActive(bool active)
 {
@@ -584,7 +658,7 @@ void SceneItem::setRenderingActive(bool active)
     } else {
         mouseUngrabEvent();
     }
-    emit renderingActiveChanged();
+    Q_EMIT renderingActiveChanged();
 }
 void SceneItem::setSceneOccluded(bool value)
 {
@@ -592,7 +666,7 @@ void SceneItem::setSceneOccluded(bool value)
         return;
     m_sceneOccluded = value;
     schedule();
-    emit openingChanged();
+    Q_EMIT openingChanged();
 }
 void SceneItem::restartPreparation()
 {
@@ -619,17 +693,18 @@ void SceneItem::setPreparing(bool value)
                             || submission != guard->submission() || !uploaded)
                             return;
                         const auto covers = guard->coverStatistics();
-                        if (covers.value("ready").toInt() != covers.value("identities").toInt()
-                            || (covers.value("owned").toInt() > 0
-                                && !covers.value("selectedDetailed").toBool()))
+                        if (covers.value(u"ready"_s).toInt()
+                                    != covers.value(u"identities"_s).toInt()
+                            || (covers.value(u"owned"_s).toInt() > 0
+                                && !covers.value(u"selectedDetailed"_s).toBool()))
                             return;
-                        emit guard->scenePrepared();
+                        Q_EMIT guard->scenePrepared();
                     },
                     Qt::QueuedConnection);
         };
     }
     schedule();
-    emit openingChanged();
+    Q_EMIT openingChanged();
 }
 void SceneItem::setPanelLayerSize(QSize value)
 {
@@ -637,7 +712,7 @@ void SceneItem::setPanelLayerSize(QSize value)
         return;
     m_panelLayerSize = value;
     schedule();
-    emit openingChanged();
+    Q_EMIT openingChanged();
 }
 void SceneItem::setOpeningLayerSize(QSize value)
 {
@@ -645,7 +720,7 @@ void SceneItem::setOpeningLayerSize(QSize value)
         return;
     m_openingLayerSize = value;
     schedule();
-    emit openingChanged();
+    Q_EMIT openingChanged();
 }
 void SceneItem::schedule()
 {
@@ -677,7 +752,7 @@ bool SceneItem::selectAt(QPointF point)
         forceActiveFocus(Qt::MouseFocusReason);
     m_adapter->recordInput();
     const bool selected = m_adapter->selection()->selectCell(
-            { hit.value("lane").toDouble(), hit.value("row").toDouble() }, true);
+            { hit.value(u"lane"_s).toDouble(), hit.value(u"row"_s).toDouble() }, true);
     if (selected) {
         m_adapter->selection()->overviewAlbumClicked();
         m_adapter->recordNavigationCommit(m_adapter->selection()->revision());
@@ -760,7 +835,7 @@ void SceneItem::setInputRouter(InputRouter *router)
     if (m_inputRouter == router)
         return;
     m_inputRouter = router;
-    emit inputRouterChanged();
+    Q_EMIT inputRouterChanged();
 }
 void SceneItem::wheelEvent(QWheelEvent *event)
 {
@@ -813,7 +888,7 @@ void SceneItem::touchEvent(QTouchEvent *event)
     event->accept();
 }
 void SceneItem::updatePolish()
-{
+try {
     if (!m_renderingActive || !m_adapter || !window() || !isVisible() || width() <= 0
         || height() <= 0)
         return;
@@ -841,13 +916,13 @@ void SceneItem::updatePolish()
             m_poolResetConnection = connect(m_poolSelection, &SelectionController::libraryChanged,
                                             this, &SceneItem::refreshPool);
         else {
-            m_selectedCover = m_coverPool.acquire(QStringLiteral("demo-square"));
+            m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
         }
     }
     if (!m_poolMode && m_selectedCover
         && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution != 1024)) {
-        const auto identity = QStringLiteral("demo-square");
-        const auto path = QStringLiteral(":/assets/demo-covers/square.png");
+        const auto identity = u"demo-square"_s;
+        const auto path = u":/assets/demo-covers/square.png"_s;
         if (auto pixels = m_covers.lookup(identity, path, 1024)) {
             if (m_coverPool.upgrade(m_selectedCover, pixels))
                 m_cover = pixels->image;
@@ -895,8 +970,8 @@ void SceneItem::updatePolish()
     in.postprocess = !m_geometryOnly;
     in.aoSamples = m_geometryOnly ? 0 : quality.aoSamples();
     in.aoResolution = float(quality.aoResolution());
-    in.bokeh = !m_geometryOnly && settings.value("depthOfField").toDouble() > 0;
-    in.smaa = !m_geometryOnly && settings.value("antialias") == "smaa";
+    in.bokeh = !m_geometryOnly && settings.value(u"depthOfField"_s).toDouble() > 0;
+    in.smaa = !m_geometryOnly && settings.value(u"antialias"_s) == u"smaa"_s;
 #ifdef YALAHOO_RHI_AUDIT
     if (property("_yalahooReviewOpticsOnly").toBool()) {
         in.postprocess = false;
@@ -907,7 +982,7 @@ void SceneItem::updatePolish()
 #endif
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
     in.aperture = float((.0003 + .0005 * adapter.detail())
-                        * settings.value("depthOfField").toDouble() / 100);
+                        * settings.value(u"depthOfField"_s).toDouble() / 100);
     in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
     in.background = l.backgroundLinear();
     in.keyColor = l.keyColor();
@@ -976,5 +1051,9 @@ void SceneItem::updatePolish()
     if (m_poolMode)
         preparePool(in);
     submit(std::move(in), target);
+} catch (const std::runtime_error &error) {
+    m_errorText = QString::fromUtf8(error.what());
+    setRenderingActive(false);
+    Q_EMIT errorTextChanged();
 }
 }

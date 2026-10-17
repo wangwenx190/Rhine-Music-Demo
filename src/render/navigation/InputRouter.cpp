@@ -85,7 +85,7 @@ void InputRouter::setEnabled(bool enabled)
     m_enabled = enabled;
     m_pending.reset();
     reset();
-    emit enabledChanged();
+    Q_EMIT enabledChanged();
 }
 void InputRouter::reset()
 {
@@ -111,7 +111,7 @@ bool InputRouter::commit(int direction, bool column)
 {
     if (!m_enabled || !m_selection || direction == 0)
         return false;
-    emit inputReceived();
+    Q_EMIT inputReceived();
     setNavigationDirection(direction, column);
     // Finite columns clamp the requested endpoint, including oversized wheel/ruler steps.
     const auto base = m_pending.value_or(m_selection->cell());
@@ -158,7 +158,7 @@ void InputRouter::flush()
     m_committing = false;
     if (moved) {
         m_pending.reset();
-        emit navigationCommitted(m_selection->revision());
+        Q_EMIT navigationCommitted(m_selection->revision());
     }
 }
 bool InputRouter::row(int direction)
@@ -210,10 +210,10 @@ bool InputRouter::key(QKeyEvent *event, QQuickWindow *window)
         return false;
     switch (event->key()) {
     case Qt::Key_V:
-        emit overviewToggleRequested();
+        Q_EMIT overviewToggleRequested();
         return true;
     case Qt::Key_Escape:
-        emit overviewReturnRequested();
+        Q_EMIT overviewReturnRequested();
         return false;
     case Qt::Key_Up:
         commit(-1, false);
@@ -271,7 +271,7 @@ void InputRouter::setNavigationDirection(int direction, bool column)
     m_rowDirection = row;
     m_columnDirection = lane;
     m_navigationDirection = direction;
-    emit directionChanged();
+    Q_EMIT directionChanged();
 }
 bool InputRouter::eventFilter(QObject *object, QEvent *event)
 {

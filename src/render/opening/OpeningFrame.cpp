@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <numbers>
 
+using namespace Qt::StringLiterals;
+
 namespace yalahoo {
 namespace {
 double unit(double t, double from, double to)
@@ -23,7 +25,7 @@ OpeningFrame openingFrame(double time)
     const double t = std::isfinite(time) ? std::max(0.0, time) : 0;
     const double in = settle(unit(t, 2.72, 3.58)), out = openingSmooth(unit(t, 5.7, 6.32));
     OpeningFrame f;
-    f.phase = t < 1.8 ? "logo" : t < 2.9 ? "orbit" : t < 6.4 ? "slogan" : "array";
+    f.phase = t < 1.8 ? "logo"_L1 : t < 2.9 ? "orbit"_L1 : t < 6.4 ? "slogan"_L1 : "array"_L1;
     f.background = 1 - openingSmooth(unit(t, 6.32, 6.82));
     f.mark = openingSmooth(unit(t, .2, .48)) * (1 - openingSmooth(unit(t, 1.8, 2.26)));
     f.contour = settle(unit(t, .24, 1.64));
@@ -40,19 +42,19 @@ OpeningFrame openingFrame(double time)
 }
 QVariantMap OpeningFrame::values() const
 {
-    return { { "background", background },
-             { "mark", mark },
-             { "contour", contour },
-             { "symbols", symbols },
-             { "orbit", orbit },
-             { "orbitDraw", orbitDraw },
-             { "orbitTurn", orbitTurn },
-             { "orbitScale", orbitScale },
-             { "title", title },
-             { "titleY", titleY },
-             { "titleClip", titleClip },
-             { "subtitle", subtitle },
-             { "phase", phase } };
+    return { { u"background"_s, background },
+             { u"mark"_s, mark },
+             { u"contour"_s, contour },
+             { u"symbols"_s, symbols },
+             { u"orbit"_s, orbit },
+             { u"orbitDraw"_s, orbitDraw },
+             { u"orbitTurn"_s, orbitTurn },
+             { u"orbitScale"_s, orbitScale },
+             { u"title"_s, title },
+             { u"titleY"_s, titleY },
+             { u"titleClip"_s, titleClip },
+             { u"subtitle"_s, subtitle },
+             { u"phase"_s, phase } };
 }
 double openingSceneTime(double time)
 {

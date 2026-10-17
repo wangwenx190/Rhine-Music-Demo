@@ -4,13 +4,22 @@
 #include <rhi/qshader.h>
 #include <QFile>
 #include <stdexcept>
+#include <memory>
 namespace yalahoo::rhi {
 inline void require(bool ok, const char *reason)
 {
     if (!ok)
         throw std::runtime_error(reason);
 }
-QShader shader(const char *path);
+struct ResourceUpdateDeleter
+{
+    void operator()(QRhiResourceUpdateBatch *batch) const noexcept
+    {
+        batch->release();
+    }
+};
+using ResourceUpdates = std::unique_ptr<QRhiResourceUpdateBatch, ResourceUpdateDeleter>;
+QShader shader(const QString &path);
 inline QMatrix4x4 lightView()
 {
     QMatrix4x4 m;

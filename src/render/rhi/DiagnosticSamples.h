@@ -1,4 +1,6 @@
 #pragma once
+#include <QString>
+using Qt::StringLiterals::operator""_s;
 #include <QVariantMap>
 #include <algorithm>
 #include <array>
@@ -26,11 +28,11 @@ public:
         const auto percentile = [&](double p) {
             return sorted[std::max(0, int(std::ceil(count * p)) - 1)];
         };
-        return { { "count", count },
-                 { "discarded", m_seen - count },
-                 { "p50", percentile(.5) },
-                 { "p95", percentile(.95) },
-                 { "p99", percentile(.99) } };
+        return { { u"count"_s, count },
+                 { u"discarded"_s, m_seen - count },
+                 { u"p50"_s, percentile(.5) },
+                 { u"p95"_s, percentile(.95) },
+                 { u"p99"_s, percentile(.99) } };
     }
     int seen() const
     {
