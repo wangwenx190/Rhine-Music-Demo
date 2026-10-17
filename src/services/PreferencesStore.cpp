@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "PreferencesStore.h"
+#include "Logging.h"
 #include <QtConcurrentRun>
 #include <QDir>
 #include <QFile>
@@ -36,6 +37,11 @@ PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
                 m_document = { };
         }
     }
+    if (!m_error.isEmpty())
+        qCWarning(logSettings) << "Preferences load failed" << "path=" << m_path
+                               << "error=" << m_error;
+    else
+        qCInfo(logSettings) << "Preferences loaded" << "path=" << m_path;
     m_document.insert(u"schemaVersion"_s, 1);
     connect(&m_save, &QFutureWatcher<QString>::finished, this, [this] {
         m_saving = false;
@@ -43,8 +49,10 @@ PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
         reportError(error);
         if (!error.isEmpty())
             m_dirty = false;
-        else
+        else {
+            qCInfo(logSettings) << "Preferences saved" << "path=" << m_path;
             Q_EMIT saved();
+        }
         schedule();
     });
 }
@@ -52,8 +60,12 @@ PreferencesStore::~PreferencesStore()
 {
     // Teardown only: finish the one in-flight save and commit the latest coalesced value.
     m_worker.waitForDone();
-    if (m_dirty && m_writable)
-        write(m_path, m_document);
+    if (m_dirty && m_writable) {
+        const auto error = write(m_path, m_document);
+        if (!error.isEmpty())
+            qCWarning(logSettings)
+                    << "Preferences shutdown save failed" << "path=" << m_path << "error=" << error;
+    }
 }
 bool PreferencesStore::rememberColumnPosition() const
 {
@@ -155,8 +167,11 @@ void PreferencesStore::reportError(const QString &error)
         m_error = error;
         Q_EMIT errorChanged();
     }
-    if (!error.isEmpty())
+    if (!error.isEmpty()) {
+        qCWarning(logSettings) << "Preferences operation failed" << "path=" << m_path
+                               << "error=" << error;
         Q_EMIT saveError(error);
+    }
 }
 bool PreferencesStore::update(const QVariantMap &patch)
 {

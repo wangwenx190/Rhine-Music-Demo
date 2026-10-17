@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "AssetCatalog.h"
 #include <QFile>
 #include <QFontDatabase>
@@ -96,7 +97,7 @@ bool yalahoo::initializeAssetFonts()
     // Select it once through Qt's emoji policy so whole-line shaping and QML Text agree.
     const QString emojiFamily = u"Apple Color Emoji"_s;
     if (!QFontDatabase::families().contains(emojiFamily)) {
-        qWarning("Required macOS source emoji font is unavailable");
+        qCWarning(yalahoo::logApp, "Required macOS source emoji font is unavailable");
         return rollback();
     }
     QFontDatabase::setApplicationEmojiFontFamilies({ emojiFamily });

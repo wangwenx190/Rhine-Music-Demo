@@ -10,7 +10,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", required=True, choices=("metal", "d3d11", "opengl", "vulkan"))
+parser.add_argument("--backend", required=True, choices=("metal", "d3d11", "d3d12", "opengl", "vulkan"))
 parser.add_argument("--mode", choices=("offscreen", "vsync", "uncapped"), default="offscreen")
 scenarios = ["day-wave", "day-ruler", "day-detail", "day-switch", "day-overview", "day-search",
              "night-wave", "night-ruler", "night-detail", "night-switch", "night-overview", "night-search"]

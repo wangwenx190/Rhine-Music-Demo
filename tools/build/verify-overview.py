@@ -10,7 +10,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", choices=("metal", "opengl", "d3d11"), required=True)
+parser.add_argument("--backend", choices=("metal", "opengl", "d3d11", "d3d12", "vulkan"), required=True)
 parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
 parser.add_argument("--runs", type=int, default=1)
 parser.add_argument("--foreground", action="store_true")

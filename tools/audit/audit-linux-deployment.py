@@ -27,7 +27,7 @@ CHECKS = [
     ('COMMON-03', 'src/render/rhi/BackendCapabilities.cpp', 'QRhi::create(QRhi::Vulkan',
      'Linux defaults to Vulkan. Default or explicit Vulkan is probed once after QGuiApplication and before any '
      'Quick window with QVulkanInstance/QRhi device and production RGBA16F/R16F/D32F render formats; '
-     'unsupported Kit/headers/device falls back with warning and actual backend environment updated. '
+     'Only an implicit default falls back with warning and actual backend environment updated; explicit requests fail on unavailable Kit/headers/device/formats. '
      'Probe device dies before instance, production Qt owns its own render device. Actual swapchain, '
      'format/MSAA/resolve, clip/Y and GPU efficiency remain target runtime checks, never inferred.'),
     ('COMMON-03', 'src/render/rhi/RhiItem.cpp', 'clipSpaceCorrMatrix',

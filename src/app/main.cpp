@@ -1,6 +1,7 @@
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "AppIdentity.h"
+#include "Logging.h"
 #include "AssetCatalog.h"
 #include "LibrarySession.h"
 #include "PlaybackController.h"
@@ -64,6 +65,7 @@
 #include <QSaveFile>
 #include <QSGRendererInterface>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QTimer>
 #include <atomic>
 #include <algorithm>
@@ -76,24 +78,41 @@ using namespace Qt::StringLiterals;
 namespace {
 QMutex diagnosticsMutex;
 QStringList diagnostics;
-void recordDiagnostic(QtMsgType, const QMessageLogContext &, const QString &message)
+QtMessageHandler diagnosticSink = nullptr;
+void recordDiagnostic(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
     const QMutexLocker lock(&diagnosticsMutex);
+    if (diagnostics.size() == 1024)
+        diagnostics.removeFirst();
     diagnostics.append(message);
-    std::fprintf(stderr, "%s\n", message.toUtf8().constData());
+    if (diagnosticSink)
+        diagnosticSink(type, context, message);
 }
 }
 
 int main(int argc, char **argv)
 {
+    bool collectDiagnostics = false;
     for (int i = 1; i < argc; ++i) {
         if (QByteArray(argv[i]).startsWith("--verify-"_ba)) {
+            collectDiagnostics = true;
             yalahoo::verification::prepareApplication();
         }
     }
+    yalahoo::initializeIdentity();
+    const yalahoo::LoggingSession logging;
+    // Install before QGuiApplication can start threads that emit Qt messages.
+    if (collectDiagnostics)
+        diagnosticSink = qInstallMessageHandler(recordDiagnostic);
+    const auto diagnosticRestore = qScopeGuard([] {
+        if (diagnosticSink)
+            qInstallMessageHandler(diagnosticSink);
+    });
+    qCInfo(yalahoo::logApp) << "Application starting" << "Qt=" << qVersion()
+                            << "platform=" << QSysInfo::prettyProductName()
+                            << "architecture=" << QSysInfo::currentCpuArchitecture();
     if (!yalahoo::selectGraphicsBackend())
         return 22;
-    yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
     auto globalFont = QGuiApplication::font();
     globalFont.setStyleStrategy(
@@ -102,7 +121,8 @@ int main(int argc, char **argv)
     QGuiApplication::setFont(globalFont);
     yalahoo::DisplayOutput displayOutput;
     const yalahoo::Localization localization;
-    yalahoo::probeOptionalGraphicsBackend();
+    if (!yalahoo::probeOptionalGraphicsBackend())
+        return 22;
     QIcon applicationIcon;
     for (const int size : { 16, 24, 32, 48, 64, 128, 256, 512, 1024 }) {
         applicationIcon.addFile(u":/assets/icons/yalahoo/png/yalahoo-%1.png"_s.arg(size),
@@ -113,7 +133,7 @@ int main(int argc, char **argv)
         yalahoo::CoverCache::finishDecoders();
     });
     if (!yalahoo::initializeAssetFonts()) {
-        std::fprintf(stderr, "Embedded MiSans font registration failed\n");
+        qCCritical(yalahoo::logApp) << "Embedded MiSans font registration failed";
         return 6;
     }
     QCommandLineParser parser;
@@ -228,7 +248,8 @@ int main(int argc, char **argv)
                 || QStringList{ u"data-dir"_s, u"music-root"_s, u"import-legacy"_s,
                                 u"import-preferences"_s, u"rescan-library"_s }
                            .contains(option)) {
-                qWarning("Demonstration cannot be combined with data or verification options");
+                qCWarning(yalahoo::logApp,
+                          "Demonstration cannot be combined with data or verification options");
                 return 7;
             }
         }
@@ -242,13 +263,6 @@ int main(int argc, char **argv)
         return 7;
     if (parser.isSet(u"verify-shading"_s) && !parser.isSet(u"verify-runtime"_s))
         return 7;
-    if (parser.isSet(u"verify-runtime"_s) || appVerification
-#ifdef YALAHOO_REVIEW
-        || parser.isSet(u"verify-materials"_s)
-#endif
-    )
-        qInstallMessageHandler(recordDiagnostic);
-
     // Outlive the engine and its render-thread callbacks during teardown.
     std::atomic<int> frames{ 0 };
     std::atomic<int> api{ QSGRendererInterface::Unknown };
@@ -333,7 +347,7 @@ int main(int argc, char **argv)
                 ? parser.value(u"data-dir"_s)
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir::isAbsolutePath(dataRoot)) {
-            qWarning("--data-dir requires an absolute path");
+            qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
             return 7;
         }
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
@@ -365,10 +379,9 @@ int main(int argc, char **argv)
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &startup,
                          &yalahoo::StartupCoordinator::receive);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
-                         [&](const QString &error) {
+                         [&](const QString &) {
                              if (!startup.statistics()[u"initialReady"_s].toBool())
                                  startup.receive(libraryStore->snapshot());
-                             qWarning().noquote() << error;
                          });
         if (parser.isSet(u"import-preferences"_s))
             if (!preferences->importJson(
@@ -376,7 +389,7 @@ int main(int argc, char **argv)
                 return 7;
         if (parser.isSet(u"import-legacy"_s)
             && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
-            qWarning("--import-legacy cannot be combined with scan options");
+            qCWarning(yalahoo::logApp, "--import-legacy cannot be combined with scan options");
             return 7;
         }
         libraryStore->load();
@@ -387,7 +400,7 @@ int main(int argc, char **argv)
             QList<QUrl> roots;
             for (const auto &path : parser.values(u"music-root"_s)) {
                 if (!QDir::isAbsolutePath(path)) {
-                    qWarning("--music-root requires absolute paths");
+                    qCWarning(yalahoo::logApp, "--music-root requires absolute paths");
                     return 7;
                 }
                 roots.append(QUrl::fromLocalFile(path));
@@ -566,6 +579,7 @@ int main(int argc, char **argv)
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
             [] {
+                qCCritical(yalahoo::logApp) << "QML application creation failed";
                 QCoreApplication::exit(2);
             },
             Qt::QueuedConnection);
@@ -734,14 +748,7 @@ int main(int argc, char **argv)
             const bool qmlAvailable = QFile::exists(u":/qt/qml/Yalahoo/Music/App.qml"_s);
             const int interactions = window->property("interactionCount").toInt();
             const bool mediaAvailable = playback.isAvailable();
-            bool backend = QSGRendererInterface::isApiRhiBased(
-                    static_cast<QSGRendererInterface::GraphicsApi>(api.load()));
-#if defined(Q_OS_WIN)
-            backend = api
-                    == (qgetenv("QSG_RHI_BACKEND") == "opengl"_ba
-                                ? QSGRendererInterface::OpenGL
-                                : QSGRendererInterface::Direct3D11);
-#endif
+            const bool backend = api.load() == int(QQuickWindow::graphicsApi());
             QDir().mkpath(QFileInfo(report).absolutePath());
             const QString screenshot = QFileInfo(report).absolutePath()
                     + (parser.isSet(u"verify-motion"_s) ? u"/runtime-motion.png"_s
@@ -888,5 +895,7 @@ int main(int argc, char **argv)
             QTimer::singleShot(2500, window, writeRuntimeReport);
         }
     }
-    return app.exec();
+    const int result = app.exec();
+    qCInfo(yalahoo::logApp) << "Application event loop stopped" << "exitCode=" << result;
+    return result;
 }

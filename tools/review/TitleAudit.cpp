@@ -1,5 +1,6 @@
 #include "OffscreenSurface.h"
 #include "TitleAudit.h"
+#include "BackendCapabilities.h"
 #include "TitleReel.h"
 #include "ReelInk.h"
 #include "CanvasTitleProbe.h"
@@ -658,42 +659,34 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                 }
                 file.write(
                         QJsonDocument(
-                                QJsonObject{ { u"passed"_s, passed },
-                                             { u"motionError"_s, motionError },
-                                             { u"dpr"_s, window.devicePixelRatio() },
-                                             { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                             { u"offscreen"_s, OffscreenSurface::Enabled },
-                                             { u"renderProtocol"_s,
-                                               OffscreenSurface::Enabled
-                                                       ? u"render-control-gui-thread"_s
-                                                       : u"native-window"_s },
-                                             { u"offscreenResourcePlan"_s, surface.diagnostics() },
-                                             { u"backend"_s,
-                                               window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::Direct3D11
-                                                       ? u"d3d11"_s
-                                                       : window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::OpenGL
-                                                       ? u"opengl"_s
-                                                       : window.rendererInterface()->graphicsApi()
-                                                               == QSGRendererInterface::Metal
-                                                       ? u"metal"_s
-                                                       : u"unsupported"_s },
-                                             { u"sourceDirectory"_s, sourceDirectory },
-                                             { u"captures"_s, captures },
-                                             { u"lifecycle"_s, lifecycle },
-                                             { u"animatedCosts"_s, animatedCosts },
-                                             { u"headerChecks"_s, headerChecks },
-                                             { u"costs"_s, costs },
-                                             { u"released"_s, released },
-                                             { u"canvasSyncCpuNs"_s,
-                                               double(canvasTitleStats().syncNs.load()) },
-                                             { u"canvasPaintCpuNs"_s,
-                                               double(canvasTitleStats().paintNs.load()) },
-                                             { u"canvasPaints"_s,
-                                               double(canvasTitleStats().paints.load()) },
-                                             { u"windowPolicy"_s,
-                                               yalahoo::verification::windowPolicy(window) } })
+                                QJsonObject{
+                                        { u"passed"_s, passed },
+                                        { u"motionError"_s, motionError },
+                                        { u"dpr"_s, window.devicePixelRatio() },
+                                        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                                        { u"offscreen"_s, OffscreenSurface::Enabled },
+                                        { u"renderProtocol"_s,
+                                          OffscreenSurface::Enabled ? u"render-control-gui-thread"_s
+                                                                    : u"native-window"_s },
+                                        { u"offscreenResourcePlan"_s, surface.diagnostics() },
+                                        { u"backend"_s,
+                                          QString::fromUtf8(yalahoo::graphicsBackendName(
+                                                  window.rendererInterface()->graphicsApi())) },
+                                        { u"sourceDirectory"_s, sourceDirectory },
+                                        { u"captures"_s, captures },
+                                        { u"lifecycle"_s, lifecycle },
+                                        { u"animatedCosts"_s, animatedCosts },
+                                        { u"headerChecks"_s, headerChecks },
+                                        { u"costs"_s, costs },
+                                        { u"released"_s, released },
+                                        { u"canvasSyncCpuNs"_s,
+                                          double(canvasTitleStats().syncNs.load()) },
+                                        { u"canvasPaintCpuNs"_s,
+                                          double(canvasTitleStats().paintNs.load()) },
+                                        { u"canvasPaints"_s,
+                                          double(canvasTitleStats().paints.load()) },
+                                        { u"windowPolicy"_s,
+                                          yalahoo::verification::windowPolicy(window) } })
                                 .toJson());
                 app.exit(file.commit() && passed ? 0 : 6);
             });

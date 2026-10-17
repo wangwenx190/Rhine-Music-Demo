@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "ReelTextNode.h"
 #include "TextLayoutAdapter.h"
 #include <QQuickWindow>
@@ -16,7 +17,8 @@ QSGTextNode *createReelTextNode(QQuickWindow *window, const TitleGlyph &glyph, Q
     for (const auto &data : glyph.renderRuns) {
         const auto font = QRawFont::fromFont(data.font);
         if (!font.isValid() || font.fontTable("head") != data.fontHead) {
-            qWarning("Render-thread font identity differs from measured glyph font");
+            qCWarning(yalahoo::logRender,
+                      "Render-thread font identity differs from measured glyph font");
             return node;
         }
         QGlyphRun run;

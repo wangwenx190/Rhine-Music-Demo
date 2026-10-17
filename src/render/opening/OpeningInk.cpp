@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "OpeningInk.h"
 #include "BrandPaths.h"
 #include <QCanvasPainterItemRenderer>
@@ -214,7 +215,7 @@ QVector<OpeningPath> loadOpeningPaths()
 {
     QFile map(u":/assets/branding/reveal-map.json"_s), svg(u":/assets/branding/logo-light.svg"_s);
     if (!map.open(QIODevice::ReadOnly) || !svg.open(QIODevice::ReadOnly))
-        qFatal("Missing opening brand assets");
+        qCFatal(yalahoo::logRender, "Missing opening brand assets");
     QHash<QString, QJsonObject> entries;
     for (const auto value :
          QJsonDocument::fromJson(map.readAll()).object().value(u"paths"_s).toArray()) {
@@ -247,7 +248,8 @@ QVector<OpeningPath> loadOpeningPaths()
                 try {
                     path.centerline = parseBrandCenterline(entry.value(u"d"_s).toString());
                 } catch (const std::exception &error) {
-                    qFatal("Invalid embedded opening centerline: %s", error.what());
+                    qCFatal(yalahoo::logRender, "Invalid embedded opening centerline: %s",
+                            error.what());
                 }
                 path.point = path.centerline.length() < .02;
                 path.start = entry.value(u"start"_s).toDouble();
@@ -257,7 +259,7 @@ QVector<OpeningPath> loadOpeningPaths()
         }
     }
     if (xml.hasError() || entries.size() != 17 || paths.size() != 19)
-        qFatal("Invalid opening brand mapping");
+        qCFatal(yalahoo::logRender, "Invalid opening brand mapping");
     return paths;
 }
 OpeningInk::OpeningInk(QQuickItem *parent) : QCanvasPainterItem(parent)

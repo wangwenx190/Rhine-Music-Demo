@@ -1,4 +1,5 @@
 #include "InterfaceSoundController.h"
+#include "Logging.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -32,6 +33,11 @@ InterfaceSoundController::InterfaceSoundController(QObject *parent)
             effect = std::make_unique<QSoundEffect>();
             effect->setLoopCount(1);
             effect->setVolume(float(m_volume));
+            connect(effect.get(), &QSoundEffect::statusChanged, this, [sound = effect.get()] {
+                if (sound->status() == QSoundEffect::Error)
+                    qCWarning(logMedia) << "Interface sound error" << "source=" << sound->source()
+                                        << "device=" << sound->audioDevice().description();
+            });
         }
     }
     connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {

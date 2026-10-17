@@ -1,9 +1,11 @@
 #include "RhiItem.h"
+#include "Logging.h"
 #include "ReadbackImage.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"
 #include "ResourcePlan.h"
 #include <QPointer>
+#include <QQuickWindow>
 #include <chrono>
 #include <limits>
 #include "RhiApi.h"
@@ -245,7 +247,11 @@ private:
     QJsonObject resourceInventory();
     void reportFailure(const char *message)
     {
-        std::fprintf(stderr, "RHI rendering failed: %s\n", message);
+        qCCritical(logRender) << "RHI rendering failed"
+                              << "backend=" << (api ? api->backendName() : "uninitialized")
+                              << "submission=" << synchronizedSubmission << "target="
+                              << (renderTarget() ? renderTarget()->pixelSize() : QSize())
+                              << "error=" << message;
         failedRenderer = true;
         if (failed)
             failed(QString::fromUtf8(message));
@@ -589,6 +595,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         pending.clear();
         reset();
         api = rhi();
+        qCInfo(logRender) << "RHI renderer initialized" << "backend=" << api->backendName()
+                          << "device=" << api->driverInfo().deviceName;
     }
     if (input.cover.isNull() && !input.atlasGeneration)
         return;
@@ -2109,7 +2117,7 @@ RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
     try {
         preparedAssets();
     } catch (const std::runtime_error &error) {
-        qFatal("Invalid embedded RHI assets: %s", error.what());
+        qCFatal(yalahoo::logRender, "Invalid embedded RHI assets: %s", error.what());
     }
     setAlphaBlending(false);
     setSmooth(true);
@@ -2134,8 +2142,17 @@ QJsonArray adapterInventory()
 {
     QJsonArray result;
 #if defined(Q_OS_WIN)
-    QRhiD3D11InitParams params;
-    const auto adapters = QRhi::enumerateAdapters(QRhi::D3D11, &params);
+    QRhi::AdapterList adapters;
+    if (QQuickWindow::graphicsApi() == QSGRendererInterface::Direct3D11) {
+        QRhiD3D11InitParams params;
+        adapters = QRhi::enumerateAdapters(QRhi::D3D11, &params);
+    }
+#  if QT_CONFIG(direct3d12)
+    else if (QQuickWindow::graphicsApi() == QSGRendererInterface::Direct3D12) {
+        QRhiD3D12InitParams params;
+        adapters = QRhi::enumerateAdapters(QRhi::D3D12, &params);
+    }
+#  endif
     int index = 0;
     for (const auto &adapter : adapters) {
         const auto info = adapter->info();
@@ -2145,6 +2162,7 @@ QJsonArray adapterInventory()
                                    { u"vendorId"_s, qint64(info.vendorId) },
                                    { u"deviceType"_s, int(info.deviceType) } });
     }
+    qDeleteAll(adapters);
 #endif
     return result;
 }

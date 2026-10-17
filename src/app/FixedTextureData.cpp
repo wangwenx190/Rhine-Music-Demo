@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "FixedTextureData.h"
 #include <QFile>
 #include <QtEndian>
@@ -15,7 +16,7 @@ void FixedTextureData::setAsset(const QString &asset)
         QImage image(":/assets/postprocess/"_L1 + asset + ".png"_L1);
         const QSize expected = asset == "smaa-area"_L1 ? QSize(160, 560) : QSize(66, 33);
         if (image.size() != expected) {
-            qWarning("Invalid SMAA lookup texture");
+            qCWarning(yalahoo::logRender, "Invalid SMAA lookup texture");
             return;
         }
         // SMAAPass sets flipY=false: decoded PNG row zero is lookup UV.y=0.
@@ -43,17 +44,17 @@ void FixedTextureData::setAsset(const QString &asset)
              && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
         size = { 4, 4 };
     else {
-        qWarning("Unknown fixed material texture");
+        qCWarning(yalahoo::logRender, "Unknown fixed material texture");
         return;
     }
     QFile file(":/assets/environment/"_L1 + asset + ".rgba32f"_L1);
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning("Missing fixed material texture");
+        qCWarning(yalahoo::logRender, "Missing fixed material texture");
         return;
     }
     auto bytes = file.readAll();
     if (bytes.size() != size.width() * size.height() * 16) {
-        qWarning("Invalid fixed material texture size");
+        qCWarning(yalahoo::logRender, "Invalid fixed material texture size");
         return;
     }
 #if Q_BYTE_ORDER == Q_BIG_ENDIAN

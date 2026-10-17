@@ -1,4 +1,5 @@
 #pragma once
+#include <QLoggingCategory>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
 // Review-only private Qt adaptation; never linked or called by the product renderer.
@@ -15,6 +16,7 @@ using Qt::StringLiterals::operator""_s;
 #endif
 
 namespace yalahoo::review {
+Q_STATIC_LOGGING_CATEGORY(logReviewGl, "yalahoo.render", QtInfoMsg)
 #if defined(Q_OS_MACOS)
 class ReviewRhiResourceAccess : public QRhiResource
 {
@@ -30,12 +32,12 @@ public:
 inline bool useReviewGlMultisampleBuffers(QRhi *api)
 {
     if (!api)
-        qFatal("Review capability check requires the initialized RHI");
+        qCFatal(logReviewGl, "Review capability check requires the initialized RHI");
 #if defined(Q_OS_MACOS)
     if (api && api->backend() == QRhi::OpenGLES2) {
         auto *context = QOpenGLContext::currentContext();
         if (!context)
-            qFatal("Review OpenGL capability check requires the current RHI context");
+            qCFatal(logReviewGl, "Review OpenGL capability check requires the current RHI context");
         if (!context->getProcAddress("glTexStorage2DMultisample")) {
             // Quick3D already has a same-format, same-sample renderbuffer+resolve
             // path. Qt's GL backend advertises texture MSAA even when its storage
@@ -44,7 +46,7 @@ inline bool useReviewGlMultisampleBuffers(QRhi *api)
             auto *backend =
                     static_cast<QRhiGles2 *>(ReviewRhiResourceAccess::implementation(*descriptor));
             if (backend->q != api || !api->isFeatureSupported(QRhi::MultisampleRenderBuffer))
-                qFatal("Review OpenGL cannot preserve multisample rendering");
+                qCFatal(logReviewGl, "Review OpenGL cannot preserve multisample rendering");
             backend->caps.multisampledTexture = false;
             return true;
         }

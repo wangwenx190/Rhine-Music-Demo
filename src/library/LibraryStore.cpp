@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "LibraryStore.h"
+#include "Logging.h"
 #include "LegacyImporter.h"
 
 #include <QDir>
@@ -42,8 +43,12 @@ LibraryStore::~LibraryStore()
         m_cancel->store(true, std::memory_order_relaxed);
     // Only teardown waits. A scan that never reached GUI acceptance is never saved.
     m_worker.waitForDone();
-    if (m_savePending && m_writable)
-        write(m_path, m_savePending);
+    if (m_savePending && m_writable) {
+        const auto result = write(m_path, m_savePending);
+        if (!result.error.isEmpty())
+            qCWarning(logLibrary) << "Library shutdown save failed" << "cache=" << m_path
+                                  << "error=" << result.error;
+    }
 }
 bool LibraryStore::busy() const
 {
@@ -105,8 +110,12 @@ void LibraryStore::report(const QString &error)
 {
     m_error = error;
     Q_EMIT statusChanged();
-    if (!error.isEmpty())
+    if (!error.isEmpty()) {
+        qCWarning(logLibrary) << "Library operation failed" << "kind=" << int(m_active)
+                              << "generation=" << m_generation << "cache=" << m_path
+                              << "error=" << error;
         Q_EMIT failed(error);
+    }
 }
 void LibraryStore::load()
 {
@@ -267,6 +276,12 @@ void LibraryStore::schedule()
         return;
     }
     m_activeGeneration = m_generation;
+    if (m_savePending || m_loadPending || !m_initialized || !m_importPending.isEmpty()
+        || m_scanPending)
+        qCInfo(logLibrary) << "Library job scheduled" << "generation=" << m_generation
+                           << "cache=" << m_path << "roots=" << m_roots
+                           << "save=" << bool(m_savePending) << "scan=" << m_scanPending
+                           << "import=" << m_importPending;
     if (m_savePending) {
         m_active = Kind::Save;
         m_job.setFuture(QtConcurrent::run(&m_worker, &LibraryStore::write, m_path,
@@ -304,6 +319,10 @@ void LibraryStore::complete()
     const auto kind = std::exchange(m_active, Kind::None);
     const auto generation = m_activeGeneration;
     const auto result = m_job.result();
+    qCInfo(logLibrary) << "Library job completed" << "kind=" << int(kind)
+                       << "generation=" << generation << "currentGeneration=" << m_generation
+                       << "filesVisited=" << result.filesVisited << "cancelled=" << result.cancelled
+                       << "error=" << result.error;
     if (kind == Kind::Scan && generation == m_generation && result.snapshot && !result.cancelled
         && result.error.isEmpty()) {
         m_active = Kind::Probe;

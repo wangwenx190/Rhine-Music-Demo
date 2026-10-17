@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "IntegrationReview.h"
 #include "SceneItem.h"
 #include "VerificationWindow.h"
@@ -293,7 +294,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             window = qobject_cast<QQuickWindow *>(rebuiltRoot.get());
             if (!window) {
                 passed = false;
-                qWarning() << component.errors();
+                qCWarning(yalahoo::logApp) << component.errors();
                 app.exit(21);
                 return;
             }

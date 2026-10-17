@@ -107,7 +107,8 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
-    yalahoo::probeOptionalGraphicsBackend();
+    if (!yalahoo::probeOptionalGraphicsBackend())
+        return 22;
     if (argc != 2)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)

@@ -1,5 +1,6 @@
 #pragma once
 #include <QString>
+#include "Logging.h"
 using Qt::StringLiterals::operator""_ba;
 #include "../render/rhi/BackendCapabilities.h"
 #include <QQuickWindow>
@@ -14,38 +15,59 @@ inline bool selectGraphicsBackend()
     // system enablement checks or disagree with the final color conversion.
     qunsetenv("QSG_RHI_HDR");
     const auto requested = qgetenv("QSG_RHI_BACKEND");
+    if (requested == "vulkan"_ba) {
+#if QT_CONFIG(vulkan)
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Vulkan);
+        return true;
+#else
+        qCCritical(logRender) << "Vulkan requested but this Qt Kit has no Vulkan support";
+        return false;
+#endif
+    }
     if (requested == "opengl"_ba) {
-#if defined(Q_OS_MACOS)
-        // Current AppKit requires NSOpenGLContext::setView on the main thread.
-        // The Qt basic loop keeps the visible OpenGL drawable on that thread.
+#if QT_CONFIG(opengl)
+#  if defined(Q_OS_MACOS)
+        // AppKit requires NSOpenGLContext::setView on the main thread.
         qputenv("QSG_RENDER_LOOP", "basic"_ba);
-        // Cocoa's legacy default cannot consume the Kit's GLSL 150 shaders.
-        // Select the core context before QGuiApplication creates any shared contexts.
         auto format = QSurfaceFormat::defaultFormat();
         format.setVersion(4, 1);
         format.setProfile(QSurfaceFormat::CoreProfile);
         QSurfaceFormat::setDefaultFormat(format);
-#endif
+#  endif
         QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
         return true;
+#else
+        qCCritical(logRender) << "OpenGL requested but this Qt Kit has no OpenGL support";
+        return false;
+#endif
     }
 #if defined(Q_OS_WIN)
-    if (!requested.isEmpty() && requested != "d3d11"_ba)
+    if (requested == "d3d12"_ba) {
+#  if QT_CONFIG(direct3d12)
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D12);
+        return true;
+#  else
+        qCCritical(logRender) << "D3D12 requested but this Qt Kit has no D3D12 support";
         return false;
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
+#  endif
+    }
+    if (requested.isEmpty() || requested == "d3d11"_ba) {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
+        return true;
+    }
 #elif defined(Q_OS_MACOS)
-    if (!requested.isEmpty() && requested != "metal"_ba)
-        return false;
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal);
+    if (requested.isEmpty() || requested == "metal"_ba) {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal);
+        return true;
+    }
 #elif defined(Q_OS_LINUX)
-    if (requested.isEmpty() || requested == "vulkan"_ba) {
+    if (requested.isEmpty()) {
+        // The post-application probe handles an unavailable default Vulkan device.
         QQuickWindow::setGraphicsApi(QSGRendererInterface::Vulkan);
         return true;
     }
-    if (!requested.isEmpty() && requested != "opengl"_ba)
-        return false;
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 #endif
-    return true;
+    qCCritical(logRender) << "Unsupported graphics backend for this platform:" << requested;
+    return false;
 }
 }

@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "MaterialReview.h"
 #include "OffscreenSurface.h"
 #include "ReviewGlCapabilities.h"
@@ -131,7 +132,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             { { u"adapter"_s, QVariant::fromValue(&scene) }, { u"materialReview"_s, true } }));
     auto *view = qobject_cast<QQuickItem *>(object.get());
     if (!view) {
-        qWarning() << component.errors();
+        qCWarning(yalahoo::logRender) << component.errors();
         return 12;
     }
     view->setParent(window->contentItem());
@@ -144,7 +145,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     std::unique_ptr<QObject> pool;
     if (backendReview) {
         atlas = std::make_unique<RenderProbeAtlas>();
-        qInfo() << "R10: creating instance probe";
+        qCInfo(yalahoo::logRender) << "R10: creating instance probe";
         QQmlComponent component(&engine, QUrl(u"qrc:/review/InstanceProbe.qml"_s));
         pool.reset(component.createWithInitialProperties(
                 { { u"adapter"_s, QVariant::fromValue(&scene) },
@@ -152,13 +153,13 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                   { u"atlas"_s,
                     QVariant::fromValue(static_cast<QQuick3DTextureData *>(atlas.get())) } }));
         if (!pool) {
-            qWarning() << component.errors();
+            qCWarning(yalahoo::logRender) << component.errors();
             return 12;
         }
         auto *node = qobject_cast<QQuick3DObject *>(pool.get());
         node->setParentItem(window->findChild<QQuick3DObject *>("inspectionCase")->parentItem());
         node->setProperty("visible", false);
-        qInfo() << "R10: instance probe ready";
+        qCInfo(yalahoo::logRender) << "R10: instance probe ready";
     }
     int index = -1, start = 0;
     QJsonArray results, restores;
@@ -169,7 +170,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     const auto applyState = [&] {
         const auto c = cases[index].toObject();
         if (backendReview)
-            qInfo() << "R10 GPU case" << index;
+            qCInfo(yalahoo::logRender) << "R10 GPU case" << index;
         view->setProperty("warmth", c[u"day"_s].toBool() ? 1.0 : 0.0);
         view->setProperty("clarity", c[u"clarity"_s].toDouble());
         if (pool) {
@@ -286,7 +287,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                 restore == 0 ? u"case-%1.png"_s.arg(index) : u"restore-%1.png"_s.arg(restore);
         const auto actual = surface->grab().convertToFormat(QImage::Format_RGB32);
         if (actual.isNull() || actual.size() != window->size() * window->devicePixelRatio()) {
-            qWarning() << "Material output/readback size mismatch" << actual.size();
+            qCWarning(yalahoo::logRender)
+                    << "Material output/readback size mismatch" << actual.size();
             app.exit(15);
             return;
         }

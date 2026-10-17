@@ -8,7 +8,7 @@
 
 | 平台 | 系统状态与输出 |
 | --- | --- |
-| Windows / D3D11 | 通过目标HMONITOR的DXGI_OUTPUT_DESC1确认当前为PQ/Rec.2020 HDR，QueryDisplayConfig读取对应活动路径的DISPLAYCONFIG_SDR_WHITE_LEVEL；未知/失败回退。窗口为RGBA16F scRGB，UI线性值乘`SDR白电平nits/80`，高光上限为`max(1,屏幕峰值/SDR白电平)`。 |
+| Windows / D3D11、D3D12、Vulkan | 通过目标HMONITOR的DXGI_OUTPUT_DESC1确认当前为PQ/Rec.2020 HDR，QueryDisplayConfig读取对应活动路径的DISPLAYCONFIG_SDR_WHITE_LEVEL；未知/失败回退。窗口为RGBA16F scRGB，UI线性值乘`SDR白电平nits/80`，高光上限为`max(1,屏幕峰值/SDR白电平)`。 |
 | macOS / Metal | NSScreen的potential EDR大于1时使用RGBA16F extended-linear sRGB EDR。macOS自动管理EDR，1.0代表当前SDR白；读取current EDR作为高光上限。current=1时保留EDR能力且限制到SDR范围，避免亮度变化导致反复重建。 |
 | Linux / Vulkan | Wayland `color-management-v1`的当前输出描述确认HDR传递函数与高于reference white的target luminance；不使用EDID推断系统开关。优先采用compositor可描述的PQ/Rec.2020 HDR10，否则采用extended-linear sRGB；仍须通过实际swapchain能力。X11、无协议、未知亮度或无可用编码时SDR。协议将输入reference white锚定到输出reference white；线性输入使用协议默认80，PQ输入使用默认203 nits，不再次乘输出reference white。 |
 

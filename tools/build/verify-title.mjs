@@ -25,13 +25,16 @@ for (let i = 0; i < args.length; ++i) {
         visible = true;
     } else {
         if (!['--backend', '--dpr', '--source', '--output'].includes(option) || !args[i + 1])
-            throw Error('Usage: verify-title.mjs [--backend metal|d3d11|opengl] [--dpr 1|1.5|2] ' +
-                        '[--source directory] [--output directory] [--visible]');
+            throw Error(
+                'Usage: verify-title.mjs [--backend metal|d3d11|d3d12|vulkan|opengl] [--dpr 1|1.5|2] '
+                +
+                '[--source directory] [--output directory] [--visible]');
         options[option.slice(2)] = args[++i];
     }
 }
 const dpr = Number(options.dpr);
-if (![1, 1.5, 2].includes(dpr) || !['metal', 'd3d11', 'opengl'].includes(options.backend))
+if (![1, 1.5, 2].includes(dpr)
+    || !['metal', 'd3d11', 'd3d12', 'vulkan', 'opengl'].includes(options.backend))
     throw Error('Unsupported backend or DPR');
 const source = path.resolve(options.source);
 const output = options.output ? path.resolve(options.output)

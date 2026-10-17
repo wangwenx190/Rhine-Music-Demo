@@ -10,7 +10,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--backend', required=True, choices=('metal', 'd3d11', 'opengl', 'vulkan'))
+parser.add_argument('--backend', required=True, choices=('metal', 'd3d11', 'd3d12', 'opengl', 'vulkan'))
 parser.add_argument('--narrow', action='store_true', help='Regress only viewports <=700 after a narrow-layout change')
 parser.add_argument('--visible', action='store_true', help='Use a native window on macOS')
 parser.add_argument('--foreground', action='store_true', help="Use this round's authorized foreground policy")

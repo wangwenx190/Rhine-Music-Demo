@@ -99,7 +99,8 @@ int main(int argc, char **argv)
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
     const yalahoo::Localization localization(QLocale(QLocale::Chinese, QLocale::China));
-    yalahoo::probeOptionalGraphicsBackend();
+    if (!yalahoo::probeOptionalGraphicsBackend())
+        return 22;
     const auto coverShutdown = qScopeGuard([] {
         yalahoo::CoverCache::finishDecoders();
     });

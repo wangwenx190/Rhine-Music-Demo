@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "BackgroundMusicController.h"
+#include "Logging.h"
 #include <algorithm>
 #include <cmath>
 
@@ -23,6 +24,8 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
             [this](auto error, const QString &reason) {
                 if (error == QMediaPlayer::NoError || error != m_player.error())
                     return;
+                qCWarning(logMedia) << "Background music error" << "source=" << m_player.source()
+                                    << "code=" << int(error) << "reason=" << reason;
                 m_error = reason.isEmpty()
                         ? QCoreApplication::translate("Yalahoo",
                                                       "Qt cannot play the background music.")

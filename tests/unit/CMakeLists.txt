@@ -80,7 +80,7 @@ if(WIN32)
 endif()
 qt_add_executable(VerificationWindowTest VerificationWindowTest.cpp)
 target_include_directories(VerificationWindowTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(VerificationWindowTest PRIVATE Qt6::Quick Qt6::Test)
+target_link_libraries(VerificationWindowTest PRIVATE YalahooCore Qt6::Quick Qt6::Test)
 target_compile_definitions(VerificationWindowTest PRIVATE
     VISIBLE_WINDOW_REPORT="${CMAKE_BINARY_DIR}/verification/native-window-visible.json")
 yalahoo_platform(VerificationWindowTest)
@@ -830,5 +830,29 @@ add_test(NAME startup COMMAND StartupTest)
 set_tests_properties(startup PROPERTIES TIMEOUT 60)
 if(WIN32)
     set_tests_properties(startup PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+
+qt_add_executable(LoggingTest LoggingTest.cpp)
+target_link_libraries(LoggingTest PRIVATE YalahooCore Qt6::Test)
+yalahoo_platform(LoggingTest)
+add_test(NAME logging COMMAND LoggingTest)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME logging-terminal COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/LoggingTerminalTest.py" "$<TARGET_FILE:LoggingTest>")
+set_tests_properties(logging logging-terminal PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+if(WIN32)
+    set_tests_properties(logging logging-terminal PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
+
+qt_add_executable(GraphicsBackendTest GraphicsBackendTest.cpp)
+target_include_directories(GraphicsBackendTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_link_libraries(GraphicsBackendTest PRIVATE YalahooRhi Qt6::Test)
+yalahoo_platform(GraphicsBackendTest)
+add_test(NAME graphics-backend COMMAND GraphicsBackendTest)
+set_tests_properties(graphics-backend PROPERTIES TIMEOUT 10)
+if(WIN32)
+    set_tests_properties(graphics-backend PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()

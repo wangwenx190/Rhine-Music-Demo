@@ -52,7 +52,7 @@ QT_QPA_PLATFORM=xcb QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 ```
 
-默认Vulkan；默认或显式Vulkan的初始化能力不足会提示回退，后续验证必须记录实际后端，回退不等于Vulkan通过。缺Vulkan开发头或Qt支持时同样明确回退。实际surface/swapchain及全部效果兼容性仍需目标验证，不能由初始化探测代替。
+默认Vulkan；未显式选择时初始化能力不足会提示回退OpenGL。显式Vulkan请求遇到Qt特性、开发头、运行时/设备或格式不足时非零退出并输出原因，后续验证必须记录实际后端，回退不等于Vulkan通过。实际surface/swapchain及全部效果兼容性仍需目标验证，不能由初始化探测代替。
 
 ## 目标操作清单
 

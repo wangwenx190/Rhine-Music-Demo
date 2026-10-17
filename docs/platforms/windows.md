@@ -62,3 +62,5 @@ pwsh -NoProfile -File ./tools/format/FormatTools.ps1 -Check
 ```
 
 审计输出在 `verification/{windows,macos,linux}-static/windows-deployment/`，覆盖 COMMON/WIN/PERF 的实际调用链、平台分支和源 hash。它证明源码接线与可追溯性，不证明目标 PE、windeployqt 或 GPU 已执行；实际 Windows 构建与干净包/设备/呈现欠验按 R30-P 执行。
+
+开发或普通启动可在当前PowerShell设置`$env:QSG_RHI_BACKEND='d3d12'`或`'vulkan'`后运行`./yalahoo.ps1`；`'opengl'`同样可选，移除该环境变量恢复默认。对应Qt编译特性及驱动必须可用；D3D12需要Windows 10 1703或更新版本和支持的设备，Vulkan需要匹配架构的loader/ICD及开发Kit头。选择、能力与失败语义见[后端契约](../contracts/render-backend.md)。

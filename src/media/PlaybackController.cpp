@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include "PlaybackController.h"
+#include "Logging.h"
 #include <QDir>
 #include <QSet>
 #include <QTimer>
@@ -47,6 +48,10 @@ void PlaybackController::setBackgroundMusic(BackgroundMusicController *backgroun
 }
 void PlaybackController::setIntent(Intent intent)
 {
+    if (m_intent != intent)
+        qCInfo(logMedia) << "Playback intent changed" << "intent=" << int(intent)
+                         << "albumId=" << albumId() << "trackId=" << trackId()
+                         << "positionMs=" << position();
     m_intent = intent;
     if (m_background) {
         using Activity = BackgroundMusicController::SongActivity;
@@ -181,6 +186,8 @@ bool PlaybackController::current(quint64 revision, const QUrl &source) const
 void PlaybackController::load(qint64 restore)
 {
     const auto revision = ++m_revision;
+    qCInfo(logMedia) << "Loading track" << "revision=" << revision << "albumId=" << albumId()
+                     << "trackId=" << trackId() << "source=" << m_source << "restoreMs=" << restore;
     setSupport(MediaSupport::Unknown);
     clearConnections();
     m_player.stop();
@@ -246,21 +253,25 @@ void PlaybackController::load(qint64 restore)
                                      }
                                      Q_EMIT stateChanged();
                                  }));
-    m_connections.append(connect(&m_player, &QMediaPlayer::errorOccurred, this,
-                                 [this, revision, source](auto error, const QString &reason) {
-                                     if (!current(revision, source) || error != m_player.error()
-                                         || m_unavailable || error == QMediaPlayer::NoError)
-                                         return;
-                                     m_error = reason.isEmpty()
-                                             ? QCoreApplication::translate("Yalahoo",
-                                                                           "Qt media error: %1")
-                                                       .arg(int(error))
-                                             : reason;
-                                     setIntent(Intent::Paused);
-                                     if (error == QMediaPlayer::FormatError)
-                                         setSupport(MediaSupport::Unsupported);
-                                     Q_EMIT stateChanged();
-                                 }));
+    m_connections.append(
+            connect(&m_player, &QMediaPlayer::errorOccurred, this,
+                    [this, revision, source](auto error, const QString &reason) {
+                        if (!current(revision, source) || error != m_player.error() || m_unavailable
+                            || error == QMediaPlayer::NoError)
+                            return;
+                        qCWarning(logMedia) << "Playback error" << "revision=" << revision
+                                            << "source=" << source << "code=" << int(error)
+                                            << "reason=" << reason
+                                            << "device=" << m_output.device().description();
+                        m_error = reason.isEmpty()
+                                ? QCoreApplication::translate("Yalahoo", "Qt media error: %1")
+                                          .arg(int(error))
+                                : reason;
+                        setIntent(Intent::Paused);
+                        if (error == QMediaPlayer::FormatError)
+                            setSupport(MediaSupport::Unsupported);
+                        Q_EMIT stateChanged();
+                    }));
     m_player.setPlaybackRate(1);
     m_player.setSource(source);
 }
@@ -305,6 +316,8 @@ void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revisio
 {
     if (revision != m_revision)
         return;
+    qCInfo(logMedia) << "Media status changed" << "revision=" << revision << "source=" << m_source
+                     << "status=" << int(value) << "error=" << m_player.errorString();
     if (value == QMediaPlayer::EndOfMedia && requested() && m_endedRevision != revision) {
         m_endedRevision = revision;
         // Never replace a source inside the backend's signal stack.
@@ -505,6 +518,9 @@ void PlaybackController::refreshDevices()
 void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
                                       const QAudioDevice &systemDefault)
 {
+    qCInfo(logMedia) << "Audio outputs refreshed" << "count=" << devices.size()
+                     << "default=" << systemDefault.description()
+                     << "preferredId=" << m_preferred.toBase64();
     m_outputs = devices;
     auto selected = systemDefault;
     if (!m_preferred.isEmpty()) {

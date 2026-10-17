@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "DisplayOutput.h"
 #include <QColorSpace>
 #include <QGuiApplication>
@@ -98,8 +99,9 @@ void DisplayOutput::attach(QQuickWindow &window)
                             if (m_requested) {
                                 recoverOutput();
                             } else {
-                                qWarning("Scene graph initialization failed: %s",
-                                         qPrintable(message));
+                                qCWarning(yalahoo::logRender,
+                                          "Scene graph initialization failed: %s",
+                                          qPrintable(message));
                                 QCoreApplication::exit(23);
                             }
                         },
@@ -125,7 +127,8 @@ void DisplayOutput::refresh()
     m_state = state;
     const auto api = QQuickWindow::graphicsApi();
     const bool available = api == QSGRendererInterface::Direct3D11
-            || api == QSGRendererInterface::Metal || api == QSGRendererInterface::Vulkan;
+            || api == QSGRendererInterface::Direct3D12 || api == QSGRendererInterface::Metal
+            || api == QSGRendererInterface::Vulkan;
     const bool request = available && state.enabled && !m_rejected;
     const bool hdr10 = state.hdr10 && !m_useLinearFallback;
     if (request != m_requested || (request && hdr10 != m_requestedHdr10))

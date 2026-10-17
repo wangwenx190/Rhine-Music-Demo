@@ -10,8 +10,12 @@
 
 ## 生产API选择
 
-`GraphicsBackend.h`在QGuiApplication前固定默认API：Windows为D3D11，macOS为Metal，Linux为Vulkan；显式OpenGL在三平台可用。macOS OpenGL的CoreProfile/basic适配沿平台契约。未支持的显式API请求失败，不伪称已选择。
+`GraphicsBackend.h`在QGuiApplication前选择API。平台默认值为Windows D3D11、macOS Metal、Linux Vulkan；默认值不限制可选后端。`QSG_RHI_BACKEND=opengl`和`vulkan`为三平台通用选项，Windows另支持`d3d11`/`d3d12`，macOS另支持`metal`。选择依赖当前Qt Kit的对应编译特性；未知名称、平台不适用或Kit未编译的显式请求以明确日志和非零退出失败，不静默替换API。macOS OpenGL的CoreProfile/basic适配沿平台契约。
 
-Linux默认或显式`QSG_RHI_BACKEND=vulkan`时，`probeOptionalGraphicsBackend`在QGuiApplication后、任何Quick窗口前一次初始化临时QVulkanInstance/QRhi并核对生产浮点/深度附件格式；缺Kit支持、开发头、设备或格式时明确提示并更新实际API为OpenGL。探测资源在GUI启动阶段释放，生产实例/设备仍由Qt的场景图拥有，不跨线程传递探测资源。初始化不证明surface/swapchain、呈现或完整画质；成功启用的Vulkan动态检查归R34，OpenGL归R35。部署及会话操作只在Linux平台文档维护。
+`probeOptionalGraphicsBackend`在QGuiApplication后、任何Quick窗口前对Vulkan及Windows显式D3D12一次初始化临时QRhi并核对生产RGBA16F/R16F/D32F附件能力。Vulkan使用临时QVulkanInstance，要求Qt Vulkan特性、SDK开发头及运行时/驱动；macOS可使用MoltenVK，但仅安装MoltenVK不能给未启用Vulkan的Qt构建添加该特性。显式请求初始化或格式失败时退出；仅Linux未显式指定时允许默认Vulkan失败后提示并更新实际API为OpenGL。
+
+探测资源在GUI启动阶段释放，生产实例/设备仍由Qt场景图拥有，不跨线程传递探测资源。生产渲染器记录实际QRhi后端和设备，验证报告按实际API与选择值核对。初始化不证明surface/swapchain、呈现或完整画质；D3D11/Metal及实际启用的D3D12/Vulkan动态检查归R34，OpenGL归R35。平台部署与运行操作仅在各平台文档维护。后端选择的无GPU检查为Release `graphics-backend`，不创建上下文或窗口。
+
+依据：[Qt QRhi后端与能力](https://doc.qt.io/qt-6/qrhi.html)、[Qt Quick显式D3D12选择](https://www.qt.io/blog/direct3d-12-support-in-qt-6.6)。
 
 HDR/SDR自动输出与默认绘制质量见[display-output.md](display-output.md)。

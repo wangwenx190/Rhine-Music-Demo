@@ -1,4 +1,5 @@
 #include "DetailReview.h"
+#include "BackendCapabilities.h"
 #include "SceneAdapter.h"
 #include "SceneItem.h"
 #include "LibrarySession.h"
@@ -167,11 +168,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
             { u"configuration"_s, u"Release"_s },
             { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
             { u"backend"_s,
-              window->rendererInterface()->graphicsApi() == QSGRendererInterface::Metal ? u"metal"_s
-                      : window->rendererInterface()->graphicsApi()
-                              == QSGRendererInterface::Direct3D11
-                      ? u"d3d11"_s
-                      : u"opengl"_s },
+              QString::fromUtf8(graphicsBackendName(window->rendererInterface()->graphicsApi())) },
             { u"renderLoop"_s, qEnvironmentVariable("QSG_RENDER_LOOP", u"Qt default"_s) },
             { u"separateRenderThreadObserved"_s, separateRenderThread->load() },
             { u"dpr"_s, window->effectiveDevicePixelRatio() },

@@ -78,7 +78,8 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
-    yalahoo::probeOptionalGraphicsBackend();
+    if (!yalahoo::probeOptionalGraphicsBackend())
+        return 22;
     if (argc == 2 && QByteArray(argv[1]) == "--adapters"_ba) {
         std::printf("%s\n", QJsonDocument(adapterInventory()).toJson().constData());
         return 0;

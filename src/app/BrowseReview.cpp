@@ -1,3 +1,4 @@
+#include "Logging.h"
 #include "BrowseReview.h"
 #include "LibrarySession.h"
 #include "SceneAdapter.h"
@@ -92,7 +93,7 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
     QTimer::singleShot(300, &reviewLifetime, [&] {
         auto *button = visualItem(window.contentItem(), u"nightButton"_s);
         if (!button) {
-            qWarning("Browse theme button is missing");
+            qCWarning(yalahoo::logApp, "Browse theme button is missing");
             app.exit(6);
             return;
         }

@@ -30,7 +30,7 @@
 
 ### 测试与窗口
 
-- 后端执行分工：R20–R34的Windows动态检查使用D3D11，macOS使用Metal；三平台OpenGL/GLES上下文、GPU/窗口、质量、输入、生命周期与性能统一归R35，包含Linux显式OpenGL。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
+- 后端执行分工：R20–R34的Windows默认动态检查使用D3D11，macOS默认使用Metal；显式D3D12和三平台实际启用的Vulkan同归R34；三平台OpenGL/GLES上下文、GPU/窗口、质量、输入、生命周期与性能统一归R35，包含Linux显式OpenGL。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
 - 验证优先复用已有有效结果；不影响行为的注释/文档/脚本等改动免测，逻辑改动只跑对应测试，不因共享代码变更或提交惯性执行全量回归。Release配置、测试分组、有效性判定与执行范围统一由[test-gates.md](docs/contracts/test-gates.md)定义；正式成本/性能采样执行[performance.md](docs/contracts/performance.md)。
 - 全部测试/采集/重建执行[test-window-policy.md](docs/contracts/test-window-policy.md)。默认隐藏；当轮可见授权与结束恢复只按该契约处理，不跨轮次继承。采集限自身渲染，不能为遮挡或节流提升前台。
 - 离屏、Qt提交、正常VSYNC、物理输入/屏幕和媒体听感是独立事实，按实际能力分别验收，未执行或无有效样本保留后置任务。
@@ -68,6 +68,7 @@
 | [navigation.md](docs/contracts/navigation.md) / [title-reels.md](docs/contracts/title-reels.md) | 滑尺/数字/输入；标题字轮/字体/文字缓存 |
 | [presentation.md](docs/contracts/presentation.md) / [detail-motion.md](docs/contracts/detail-motion.md) / [overview.md](docs/contracts/overview.md) | 详情展示；抽取/换片/拖动；总览取景/折叠/标签 |
 | [covers.md](docs/contracts/covers.md) / [archive-pool.md](docs/contracts/archive-pool.md) / [real-columns.md](docs/contracts/real-columns.md) | 封面解码/图集/租约；填充池/选择坐标；真实列/会话记忆 |
+| [logging.md](docs/contracts/logging.md) | 分类日志、Qt消息格式、UTF-8控制台/文件、终端颜色、轮转与保留期 |
 | [render-backend.md](docs/contracts/render-backend.md) | 后端选择和SceneAdapter固定业务边界 |
 | [display-output.md](docs/contracts/display-output.md) | HDR/SDR输出、平台动态检测/白电平与默认绘制质量 |
 | [rhi-opaque.md](docs/contracts/rhi-opaque.md) / [rhi-shell.md](docs/contracts/rhi-shell.md) | 不透明目标/阴影/地面；透射捕获/壳体/排序 |
@@ -182,9 +183,15 @@
 
 ### R34 · 非OpenGL后置补修与实机验证
 
-- 依赖R33阶段交接。按下方专项分工表执行D3D11、Metal、实际启用的Vulkan，以及各平台非OpenGL的构建/媒体/部署事项；每单元按目标/DPR/窗口或性能边界执行。
+- 依赖R33阶段交接。按下方专项分工表执行D3D11、Metal、Windows显式D3D12及三平台实际启用的Vulkan，以及各平台非OpenGL的构建/媒体/部署事项；每单元按目标/DPR/窗口或性能边界执行。
 - 入口与门槛引用“后置专项输入与退出条件”，公共检查引用test-gates.md、test-window-policy.md及performance.md。共享修正回归当前主力平台受影响组件，范围按test-gates.md选择；适用PowerShell工具必须在目标真实解析/运行。
 - 缺环境或采集不可靠的事项保留具体任务；全部本轮任务完成才删除本节。阶段收口不表示R35已完成。
+
+#### 后端选择与日志目标系统检查
+
+- 输入为GraphicsBackend/BackendCapabilities、LoggingSession及Release `graphics-backend`/`logging`/`logging-terminal`。Windows缺原生系统/Qt Kit/驱动与控制台；macOS当前Qt Kit未编译Vulkan，缺启用该特性的同版本原生Kit、SDK头及MoltenVK；Linux缺原生系统/Kit/驱动/终端。无GPU选择检查不证明运行支持。
+- Windows分别显式选择d3d11/d3d12/vulkan，macOS显式metal/vulkan，Linux显式vulkan；Qt特性缺失、设备/格式初始化失败时显式请求必须非零退出并输出原因。成功目标复用各专项原匿名输入、质量/资源/生命周期门槛，核对实际QRhi API；不能将默认API成绩外推为其他后端通过。OpenGL仍归R35。
+- 三平台运行上述日志定向测试，按logging.md检查实际日志目录、保留期、轮转及会话总量上界；Windows终端核对VT黄/红/默认色和UTF-8输入输出代码页，管道/文件无自动颜色序列，GUI父控制台连接保留已有重定向。日志异常须继续控制台并明确错误。缺目标环境不记通过。
 
 ### R35 · 三平台OpenGL集中验证与补修
 
@@ -241,7 +248,7 @@
 - R34非图形入口：按Linux平台文档真实执行`sh tools/build/linux.sh`和受影响fast检查、`sh tools/deploy/linux.sh`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`及包外新目录`python3 tools/deploy/verify-linux.py --output 绝对新目录`。核对最新Kit/C++23与官方qmllint/同Kit qsb、compiled QML导入清单、ELF架构/全部ldd依赖/相对RPATH/qt.conf、xcb/Wayland/Qt随附媒体/CanvasPainter闭包、许可/可执行位/LF。失败须保留旧包；真实当前退出码与当前report均通过，不以帮助或文件存在代替加载。包复制到无开发Qt的兼容CPU/系统ABI及中文/空格路径重验，实际加载Qt/媒体库不得借用外部Kit。隐藏offscreen QPA探针只加载QML/媒体，无GPU上下文/窗口呈现证明。
 - R34非图形修复对象：原生大小写/Unicode/空格/只读权限与XDG数据根、扫描/异步缓存/只读导入/离线Provider、三路公开媒体播放/暂停/停止/seek/上下曲/自然结束/格式及权限错误、默认/显式设备消失恢复、后台继续和关闭停止。入口及匿名输入沿R21-P/R22-P/R24-P/R25-P；Qt动态支持格式与元数据索引分开，实际设备/听感不能由无输出Loaded样本代替。不得安装包/改驱动/音频配置或写用户歌曲。
 - R35负责显式OpenGL在真实X11/xcb与Wayland会话的产品/组件/部署图形、输入、DPR/跨屏、原窗口hide/minimize/restore、十次SG/视觉重建与全部原质量/资源门槛。修复对象包括实际C++滑尺/二维序章的透明裁切/轮廓、glyph/Quick Text与emoji、三维阵列/玻璃/详情/总览/片头及物理触控板pixelDelta/输入法/焦点；生产无QtCanvas2D导入。依Linux平台文档和对应R19A–E/R16/R17–20/R29专项运行现有Release Review入口，显式`QSG_RHI_BACKEND=opengl`并记录真实API/会话/尺寸/DPR1/1.5/2；原几何≤2逻辑px、布局≤1逻辑px、double运动≤1e-6、颜色/附件/样本/上传/资源断言不放宽。不能用隐藏target DPR或完整root重建冒充物理跨屏/同对象窗口恢复。
-- 若Linux Kit/设备支持Vulkan，R34以`QSG_RHI_BACKEND=vulkan`在两个真实会话执行相同受影响组件及完整产品矩阵，核对实际API，不能将回退OpenGL算Vulkan通过。另以不可用`QT_VULKAN_LIB`运行普通启动/帮助检查显式警告与OpenGL回退；初始化成功仍须验证surface/swapchain/格式/MSAA/resolve/所有权。缺目标Vulkan能力保留具体缺口，不假造运行。
+- 若Linux Kit/设备支持Vulkan，R34以`QSG_RHI_BACKEND=vulkan`在两个真实会话执行相同受影响组件及完整产品矩阵，核对实际API，不能将回退OpenGL算Vulkan通过。另以不可用`QT_VULKAN_LIB`分别运行默认普通启动/帮助检查警告与OpenGL回退，以及显式Vulkan请求非零退出和明确错误；初始化成功仍须验证surface/swapchain/格式/MSAA/resolve/所有权。缺目标Vulkan能力保留具体缺口，不假造运行。
 - 正式产品性能沿R28-P及performance.md入口：两主题十二固定场景、原画质1080p、正常VSYNC和独立未限速各暖机后120秒/至少三次串行，原p95/p99/长帧/输入到Qt提交/准备时延/资源峰值门槛不变；分别记录GL/Vulkan、xcb/Wayland、实际DPR/刷新/窗口策略。driver显存/GPU完成/显示时刻未知仍为null。性能不能从Metal/D3D11或离屏成本推断；缺可靠样本继续保留。
 - 退出：Linux实际构建/依赖/非图形/媒体/部署以及两会话对应API的质量、输入、生命周期和性能原门槛有可靠目标证据；未执行项不记通过。共享修正按test-gates.md回归主力Metal对应组件、格式/官方qmllint及默认隐藏策略，其余目标不外推。
 

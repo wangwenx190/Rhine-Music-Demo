@@ -56,7 +56,7 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 ## 图形与验证差异
 
-默认Metal/threaded。显式OpenGL在QGuiApplication前选择4.1/CoreProfile，native drawable用basic主线程；缺多采样纹理入口时保持同格式/样本renderbuffer+resolve，动态执行集中于R35。两种线程模式的成本分开。
+默认Metal/threaded。可用`QSG_RHI_BACKEND=vulkan ./yalahoo.command --demo`显式请求Vulkan；需要启用Vulkan的Qt Kit、SDK开发头和MoltenVK运行时，未编译该特性的Qt须使用同版本且启用该特性的原生构建，不能只安装运行库。选择与失败语义见[后端契约](../contracts/render-backend.md)。显式OpenGL在QGuiApplication前选择4.1/CoreProfile，native drawable用basic主线程；缺多采样纹理入口时保持同格式/样本renderbuffer+resolve，动态执行集中于R35。两种线程模式的成本分开。
 
 普通验证遵守[test-window-policy.md](../contracts/test-window-policy.md)，macOS可见测试默认OFF，RenderControl真正隐藏。原生工具需有WindowServer/系统服务访问；受限进程中的无屏幕或不可用系统服务不算运行通过。前台授权不跨轮次；不能为遮挡/节流提升窗口。
 

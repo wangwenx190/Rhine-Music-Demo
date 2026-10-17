@@ -332,7 +332,8 @@ int main(int argc, char **argv)
     if (!selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
-    probeOptionalGraphicsBackend();
+    if (!probeOptionalGraphicsBackend())
+        return 22;
     DisplayOutputTest test;
     return QTest::qExec(&test, argc, argv);
 }
