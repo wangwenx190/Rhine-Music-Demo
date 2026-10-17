@@ -115,7 +115,6 @@ Item {
                         active: face.visible
                         sourceComponent: Text {
                             antialiasing: true
-                            font.hintingPreference: Font.PreferNoHinting
                             text: face.faceData ? face.faceData.text : ""
                             font: face.faceData ? face.faceData.font : root.titleFont
                             renderType: Text.CurveRendering

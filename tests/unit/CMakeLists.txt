@@ -838,6 +838,9 @@ target_link_libraries(LoggingTest PRIVATE YalahooCore Qt6::Test)
 yalahoo_platform(LoggingTest)
 add_test(NAME logging COMMAND LoggingTest)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME startup-verification COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/StartupVerificationTest.py")
+set_tests_properties(startup-verification PROPERTIES TIMEOUT 10)
 add_test(NAME logging-terminal COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/LoggingTerminalTest.py" "$<TARGET_FILE:LoggingTest>")
 set_tests_properties(logging logging-terminal PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)

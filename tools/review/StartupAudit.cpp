@@ -551,6 +551,12 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                                  u"night-switch"_s, u"night-overview"_s, u"night-search"_s };
     if (scenario != "matrix"_L1 && !allStages.contains(scenario))
         return 2;
+    const bool stress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_STRESS") == 1;
+    if ((stress && seconds != 0)
+        || (!stress && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1))
+        return 2;
+    const int switchCount = stress ? 30 : 3;
+    const int rebuildCount = stress ? 10 : 2;
     QDir().mkpath(output);
     QJsonObject report{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
                         { u"os"_s, QSysInfo::prettyProductName() },
@@ -560,6 +566,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         { u"measuredVramBytes"_s, QJsonValue::Null } };
     report[u"bootstrap"_s] = bootstrap;
     report[u"scenario"_s] = scenario;
+    report[u"stressRequested"_s] = stress;
+    report[u"samplingRequestedSeconds"_s] = seconds;
+    report[u"switches"_s] = 0;
+    report[u"rebuilds"_s] = 0;
     QJsonArray checks, resources, actions;
     bool passed = true;
     const auto check = [&](const char *name, bool value) {
@@ -810,14 +820,14 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             requested = false;
             report[u"nativeWindowTransitions"_s] = 4;
         }
-        d.setStage(u"switch-stress"_s);
+        d.setStage(u"switch-replay"_s);
         d.presentation.open();
         d.wait(
                 [&] {
                     return d.presentation.detailEnabled();
                 },
                 true);
-        for (int i = 0; i < 30; ++i) {
+        for (int i = 0; i < switchCount; ++i) {
             const auto &albums = d.library.snapshot()->albums;
             d.presentation.select(albums[i % 2 ? 1 : 2].id, true);
             d.wait(
@@ -830,8 +840,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             check("bounded-switch-pool",
                   d.native->coverStatistics()[u"owned"_s].toInt() <= 4
                           && d.native->input().scene.instances.size() <= ArchivePool::capacity + 4);
+            report[u"switches"_s] = i + 1;
         }
-        report[u"switches"_s] = 30;
         d.presentation.back();
         d.wait(
                 [&] {
@@ -853,9 +863,9 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
               d.samples.last().toObject()[u"atlasUploadBytes"_s].toInt() == 0
                       && d.samples.last().toObject()[u"selectedUploadBytes"_s].toInt() == 0);
         const QJsonValue stableBytes = d.lastResources[u"estimatedCurrentBytes"_s];
-        for (int cycle = 0; cycle < 10; ++cycle) {
+        for (int cycle = 0; cycle < rebuildCount; ++cycle) {
             d.setStage(u"rebuild-%1"_s.arg(cycle));
-            if (cycle == 5) {
+            if (cycle == rebuildCount / 2) {
                 d.playback.toggle();
                 d.wait([&] {
                     return d.playback.playing();
@@ -875,8 +885,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             check("rebuild-retained-cover-budget",
                   d.native->coverStatistics()[u"atlasRetainedBytes"_s].toInteger()
                           <= qint64(ArchivePool::capacity + 4) * 256 * 256 * 4);
+            report[u"rebuilds"_s] = cycle + 1;
         }
-        report[u"rebuilds"_s] = 10;
         d.playback.stop();
         d.motion.setReducedMotion(false);
         d.motion.clock()->setActive(true);
@@ -1112,8 +1122,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             }
         }
         report[u"qtPresentationIntervals"_s] = distribution(intervals);
-        bool nativeValid = !OffscreenSurface::Enabled && seconds == 120
-                && report[u"samplingSeconds"_s].toDouble() >= 120 && scenario != "matrix"_L1
+        bool nativeValid = !OffscreenSurface::Enabled && seconds > 0
+                && report[u"samplingSeconds"_s].toDouble() >= seconds && scenario != "matrix"_L1
                 && presentation.size() == 1;
         QJsonArray presentationTimes;
         {
@@ -1156,20 +1166,22 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 OffscreenSurface::Enabled ? QJsonValue(1000.0 / 60) : QJsonValue::Null;
         report[u"steadyWarmupSecondsPerStage"_s] = 1;
         report[u"qtPresentationByStage"_s] = presentationStages;
-        report[u"performanceGateEnforced"_s] = !OffscreenSurface::Enabled
-                && d.window.requestedFormat().swapInterval() > 0
+        const bool performanceGateEnforced = !OffscreenSurface::Enabled && seconds == 120
+                && scenario != "matrix"_L1 && d.window.requestedFormat().swapInterval() > 0
                 && d.window.effectiveDevicePixelRatio() == 1;
-        report[u"performanceGatePassed"_s] = OffscreenSurface::Enabled
-                ? QJsonValue::Null
-                : QJsonValue(nativeValid && numericPass);
+        report[u"performanceGateEnforced"_s] = performanceGateEnforced;
+        report[u"performanceGatePassed"_s] =
+                performanceGateEnforced ? QJsonValue(nativeValid && numericPass) : QJsonValue::Null;
         report[u"samplingComplete"_s] = (!d.overflow && !d.presented->overflow)
                 && (seconds == 0 || stages.size() >= (scenario == "matrix"_L1 ? 12 : 1));
         report[u"performanceAcceptance"_s] = OffscreenSurface::Enabled
                 ? u"unavailable-native-presentation"_s
-                : scenario == "matrix"_L1 ? u"matrix-local-diagnostic-only"_s
-                : !nativeValid            ? u"invalid-native-sample"_s
-                : numericPass             ? u"native-qt-presentation-targets-met"_s
-                                          : u"native-qt-presentation-targets-failed"_s;
+                : seconds == 0             ? u"functional-replay-only"_s
+                : scenario == "matrix"_L1  ? u"matrix-local-diagnostic-only"_s
+                : !nativeValid             ? u"invalid-native-sample"_s
+                : !performanceGateEnforced ? u"native-local-diagnostic-only"_s
+                : numericPass              ? u"native-qt-presentation-targets-met"_s
+                                           : u"native-qt-presentation-targets-failed"_s;
         report[u"samples"_s] = d.samples;
         report[u"quickTimings"_s] = d.timings;
         report[u"inventories"_s] = d.inventories;

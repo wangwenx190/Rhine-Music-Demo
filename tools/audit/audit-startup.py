@@ -6,13 +6,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
     ("COMMON-01", "src/render/CMakeLists.txt", "StartupCoordinator.cpp",
-     "Root C++23/latest native Kit builds StartupCoordinator in YalahooScene. Product QmlTypes injects it through App/MusicStage; Review uses the identical stage. Public media and core remain independent of render resources. StartupTest and startup-qml are connected to fast/hidden-render groups respectively."),
+     "Root C++23/latest native Kit builds StartupCoordinator in YalahooScene. Product QmlTypes injects it through App/MusicStage; Review uses the identical stage. Public media and core remain independent of render resources. StartupTest/startup-qml provide fast/hidden functional coverage; startup-stress is separately opt-in and excluded from ordinary full regression."),
     ("COMMON-02", "tools/review/StartupAudit.cpp", "Snapshot fixture",
      "The stress input is generated under QTemporaryDir: 576 invented album IDs, 96 distinct 2048-square JPEGs, one muted generated WAV, plus embedded qrc assets. No user library is read, no songs are written, and release removes only owned temporary inputs. Resource paths use QUrl/QFile/QString; startup passes immutable snapshot values."),
     ("COMMON-03", "src/render/rhi/SceneItem.cpp", "void SceneItem::updatePolish",
      "RenderingActive gates GUI publication without changing source matrices, formats, samples, effects or render scale. Existing QRhi/ResourcePlan target compatibility, format and sample probes apply to D3D11/Metal/OpenGL. Review RenderControl target DPR is explicit; its endFrame waiting is measured separately from sync/render and is not a display timestamp."),
     ("COMMON-04", "src/app/main.cpp", "StartupCoordinator startup",
-     "Coordinator owns only library display admission and visual clock suspension. PlaybackController remains outside the QML Loader, with no media commands on snapshot, hide, film, or reload. Real muted QtMultimedia source revision/current track/paused intent survive all ten tested visual rebuilds; actual routing/hearing and other targets remain R28-P."),
+     "Coordinator owns only library display admission and visual clock suspension. PlaybackController remains outside the QML Loader, with no media commands on snapshot, hide, film, or reload. Real muted QtMultimedia source revision/current track/paused intent survive paused and playing visual rebuilds; repeated ownership stress uses the separate startup-stress entry; actual routing/hearing and other targets remain R28-P."),
     ("COMMON-05", "tools/build/verify-startup.py", "sourceSha256",
      "Serialized runs preserve binary/source/input construction hashes, OS/Qt/backend/DPR/quality, requested swap mode, raw samples, descriptor inventories, logs and failure exit status. No pixel comparison or historical result rewriting. A missing target/presentation sample cannot become a pass."),
     ("PERF-01", "src/render/rhi/SceneItem.cpp", "void SceneItem::preparePool",

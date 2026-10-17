@@ -199,6 +199,11 @@ double rollingError(const QJsonArray &samples)
 }
 int reviewTitle(QGuiApplication &app, const QString &output, const QString &source)
 {
+    const int costRuns = qEnvironmentVariableIsSet("YALAHOO_VERIFY_COST_RUNS")
+            ? qEnvironmentVariableIntValue("YALAHOO_VERIFY_COST_RUNS")
+            : 1;
+    if (costRuns != 1 && costRuns != 3)
+        return 2;
     const QString sourceDirectory = source.isEmpty()
             ? (QString::fromUtf8(FIXTURE_ROOT) + u"/verification/windows/title-reels/web"_s)
             : QDir(source).absolutePath();
@@ -463,7 +468,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
         }
     });
     const int staticSteps = cases.size() * 3;
-    const int animationSteps = 9;
+    const int animationSteps = 3 * costRuns;
     const int headerSteps = productSizes.size() * 2;
     completed = [&](QImage image) {
         const int index = step - 1;

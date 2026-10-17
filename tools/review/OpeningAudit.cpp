@@ -325,10 +325,8 @@ int reviewOpening(QGuiApplication &, const QString &output)
             shape.reset();
             ink->setVisible(true);
         };
-        for (int sample = 0; sample < 3; ++sample) {
-            compare(false);
-            compare(true);
-        }
+        compare(false);
+        compare(true);
         QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &tab);
         check(u"tab-focuses-skip"_s,

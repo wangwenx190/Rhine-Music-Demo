@@ -18,5 +18,5 @@
 - `node tools/review/export-opening-golden.mjs`从映射后的冻结Git blobs执行序章函数和生产相机片段，导出最小数学测试向量；`--check`核对同源可复现性。
 - `startup`/`startup-qml`的集成/压力及成本入口见[performance.md](performance.md)。
 - `ctest --preset qt-release -R '^opening$'`核对逐参数/相机≤1e-6、20/30/60/120fps与0.25×/1×/3×、就绪/跳过/重播/后台/减少动态、品牌弧长与错峰终点。
-- `ui-audit --opening 输出目录`/`opening-qml`实例化生产MusicStage；九尺寸、双主题、有效DPR1/1.5/2、实际Logo/圆环/标语、一次完整片头/交接、零遮挡三维提交、键盘焦点/跳过及十次SG重建恢复。三次串行局部绘制比较分别报告，不作为正常VSYNC/物理屏幕或完整产品性能证明。图像只为自身正常输出质量检查，原始报告/图像均留本地。
+- `ui-audit --opening 输出目录`/`opening-qml`实例化生产MusicStage；按test-gates.md分别覆盖九尺寸布局、双主题及有效DPR边界、实际Logo/圆环/标语、一次完整片头/交接、零遮挡三维提交、键盘焦点/跳过及独立一次十次SG重建恢复，不随尺寸/主题/DPR重复。两条绘制路径各一次局部诊断，明确成本比较时才独立重复，不作为正常VSYNC/物理屏幕或完整产品性能证明。图像只为自身正常输出质量检查，原始报告/图像均留本地。
 - `python3 tools/audit/audit-opening.py`生成COMMON-01–05、PERF-01–07与三平台源码/来源矩阵；目标运行与静态结论分开。非OpenGL欠验归R20-P，OpenGL动态矩阵由R35执行。

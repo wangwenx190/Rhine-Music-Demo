@@ -216,11 +216,15 @@ if(WIN32)
 endif()
 
 add_test(NAME startup-qml COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup")
-set_tests_properties(startup-qml PROPERTIES TIMEOUT 900
+add_test(NAME startup-stress COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup-stress")
+set_tests_properties(startup-stress PROPERTIES LABELS resource-stress)
+set_tests_properties(startup-qml startup-stress PROPERTIES TIMEOUT 900
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+set_property(TEST startup-qml APPEND PROPERTY ENVIRONMENT "YALAHOO_VERIFY_STRESS=0")
+set_property(TEST startup-stress APPEND PROPERTY ENVIRONMENT "YALAHOO_VERIFY_STRESS=1")
 if(WIN32)
-    set_tests_properties(startup-qml PROPERTIES ENVIRONMENT_MODIFICATION
+    set_tests_properties(startup-qml startup-stress PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 

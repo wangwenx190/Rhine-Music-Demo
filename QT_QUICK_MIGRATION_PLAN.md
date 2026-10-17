@@ -197,7 +197,7 @@
 
 - 依赖R33实现交接和R34非OpenGL阶段审计；作为最后的专门轮次，按平台/设备/DPR/组件拆单元，集中执行三平台OpenGL兼容后端，包含Linux显式OpenGL的X11/xcb和Wayland会话。
 - 按下方分工表保留原任务ID、输入、修复对象、准确入口、原门槛和回归依赖。使用最新原生Kit的Release，显式`QSG_RHI_BACKEND=opengl`或对应工具`--backend opengl`，确认实际后端；macOS上下文/basic适配见平台文档，窗口选择见test-window-policy.md。
-- 源码可确定缺陷直接修复；共享修正回归受影响默认生产后端，范围按test-gates.md选择。缺真实系统/Kit/GPU/窗口的单元保留具体缺口，全部三平台适用动态矩阵完成后才删除本节。
+- 源码可确定缺陷直接修复；共享修正回归受影响默认生产后端，范围按test-gates.md选择。缺真实系统/Kit/GPU/窗口的单元保留具体缺口，全部三平台适用独立覆盖项及必要组合完成后才删除本节。
 
 ## 后置专项输入与退出条件
 
@@ -227,6 +227,17 @@
 
 各单元的配置/格式/官方qmllint/回归范围统一见test-gates.md，COMMON/PERF与平台审计执行本计划“严格静态审计”。目标检查优先使用可靠隐藏入口；具体测试和数值门槛见各项。原生同对象窗口恢复、SG失效、完整root重建、正常VSYNC/物理输入分别记录，未知GPU完成/显示/driver显存值保留null。没有有效样本或缺目标环境不算通过。
 
+积欠项按下表合并执行；组合选择、结果有效性及缺选择器的处理唯一按test-gates.md，性能触发与采样唯一按performance.md。每个任务保留自身断言和真实目标缺口，同一份有效证据按覆盖项分别销项。
+
+| 共用执行单元 | 对应待办 | 仅补的独立事实 |
+| --- | --- | --- |
+| 构建/部署及产品正常呈现 | R30-P/R31-P/R32-P、R28-P、R29-P、MAC-VISIBLE-3D、最终实机矩阵 | 包外加载/干净系统、物理输入/显示/媒体；部署未改相关运行依赖时复用已有呈现/压力，不重跑产品长矩阵 |
+| 音乐与声音面板 | R24-P/R25-P、UI-CONTROLS-P对应宿主 | playback-qml一次覆盖双方共有GUI断言；歌曲/BGM/音效各自路由、格式、听感和设备错误仍独立 |
+| 设置/实验/资料面板 | R26-P/R27-P/R23-P、UI-CONTROLS-P、R29-P | 各宿主功能各一次，复用同源控件和原生宿主窗口恢复/跨屏事实；不同路由/取消/关闭断言不能省略 |
+| 文字/页眉/滑尺 | R16B2W/R16B3/R16M3-S、R19E-P及R17-P | 来源数学、各绘制路径的字形语义/缓存各一次；相同DPR/页眉/窗口证据不按历史轮次重做，成本重复仅明确比较时开启 |
+| 生产RHI连续输出 | R19C2C-P、R19D1-P/R19D2-P/R19D3A-P/R19D3B-P/R19D4A-P/R19D4B2-P/R19D4C-P | 同目标最终源码运行一次完整rhi-flicker序列，逐项覆盖各pass实际上传/有限值/覆盖/资源；各独立pass公式、格式和所有权测试仍保留 |
+| 启动、场景和媒体生命周期 | R28-P与组件/部署相关积欠项 | startup-stress一次证明完整舞台换片/root压力；各独立renderer重建及原生同对象窗口恢复按真实所有者分别补验，不跨主题/DPR/计时批次重复 |
+
 组件自动回放的剩余平台为Windows/D3D11、Linux实际Vulkan及R35的三平台OpenGL。macOS/Metal待办限各项明确列出的物理输入/显示、跨屏、其他目标设备、实际音频路由及R28-P呈现间断复核；这些目标仍使用原输入、入口与门槛。
 
 #### HDR-OUTPUT-P · HDR目标系统与原生显示事件
@@ -248,8 +259,8 @@
 - R34非图形入口：按Linux平台文档真实执行`sh tools/build/linux.sh`和受影响fast检查、`sh tools/deploy/linux.sh`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`及包外新目录`python3 tools/deploy/verify-linux.py --output 绝对新目录`。核对最新Kit/C++23与官方qmllint/同Kit qsb、compiled QML导入清单、ELF架构/全部ldd依赖/相对RPATH/qt.conf、xcb/Wayland/Qt随附媒体/CanvasPainter闭包、许可/可执行位/LF。失败须保留旧包；真实当前退出码与当前report均通过，不以帮助或文件存在代替加载。包复制到无开发Qt的兼容CPU/系统ABI及中文/空格路径重验，实际加载Qt/媒体库不得借用外部Kit。隐藏offscreen QPA探针只加载QML/媒体，无GPU上下文/窗口呈现证明。
 - R34非图形修复对象：原生大小写/Unicode/空格/只读权限与XDG数据根、扫描/异步缓存/只读导入/离线Provider、三路公开媒体播放/暂停/停止/seek/上下曲/自然结束/格式及权限错误、默认/显式设备消失恢复、后台继续和关闭停止。入口及匿名输入沿R21-P/R22-P/R24-P/R25-P；Qt动态支持格式与元数据索引分开，实际设备/听感不能由无输出Loaded样本代替。不得安装包/改驱动/音频配置或写用户歌曲。
 - R35负责显式OpenGL在真实X11/xcb与Wayland会话的产品/组件/部署图形、输入、DPR/跨屏、原窗口hide/minimize/restore、十次SG/视觉重建与全部原质量/资源门槛。修复对象包括实际C++滑尺/二维序章的透明裁切/轮廓、glyph/Quick Text与emoji、三维阵列/玻璃/详情/总览/片头及物理触控板pixelDelta/输入法/焦点；生产无QtCanvas2D导入。依Linux平台文档和对应R19A–E/R16/R17–20/R29专项运行现有Release Review入口，显式`QSG_RHI_BACKEND=opengl`并记录真实API/会话/尺寸/DPR1/1.5/2；原几何≤2逻辑px、布局≤1逻辑px、double运动≤1e-6、颜色/附件/样本/上传/资源断言不放宽。不能用隐藏target DPR或完整root重建冒充物理跨屏/同对象窗口恢复。
-- 若Linux Kit/设备支持Vulkan，R34以`QSG_RHI_BACKEND=vulkan`在两个真实会话执行相同受影响组件及完整产品矩阵，核对实际API，不能将回退OpenGL算Vulkan通过。另以不可用`QT_VULKAN_LIB`分别运行默认普通启动/帮助检查警告与OpenGL回退，以及显式Vulkan请求非零退出和明确错误；初始化成功仍须验证surface/swapchain/格式/MSAA/resolve/所有权。缺目标Vulkan能力保留具体缺口，不假造运行。
-- 正式产品性能沿R28-P及performance.md入口：两主题十二固定场景、原画质1080p、正常VSYNC和独立未限速各暖机后120秒/至少三次串行，原p95/p99/长帧/输入到Qt提交/准备时延/资源峰值门槛不变；分别记录GL/Vulkan、xcb/Wayland、实际DPR/刷新/窗口策略。driver显存/GPU完成/显示时刻未知仍为null。性能不能从Metal/D3D11或离屏成本推断；缺可靠样本继续保留。
+- 若Linux Kit/设备支持Vulkan，R34以`QSG_RHI_BACKEND=vulkan`在两个真实会话执行相同受影响组件及按test-gates.md选择的产品覆盖，核对实际API，不能将回退OpenGL算Vulkan通过。另以不可用`QT_VULKAN_LIB`分别运行默认普通启动/帮助检查警告与OpenGL回退，以及显式Vulkan请求非零退出和明确错误；初始化成功仍须验证surface/swapchain/格式/MSAA/resolve/所有权。缺目标Vulkan能力保留具体缺口，不假造运行。
+- 正式产品性能沿R28-P及performance.md入口：正常VSYNC正式矩阵、未限速诊断与独立资源压力的选择、次数及指标统一按performance.md，保留输入到Qt提交、准备时延与资源峰值事实；分别记录GL/Vulkan、xcb/Wayland、实际DPR/刷新/窗口策略。driver显存/GPU完成/显示时刻未知仍为null。性能不能从Metal/D3D11或离屏成本推断；缺可靠样本继续保留。
 - 退出：Linux实际构建/依赖/非图形/媒体/部署以及两会话对应API的质量、输入、生命周期和性能原门槛有可靠目标证据；未执行项不记通过。共享修正按test-gates.md回归主力Metal对应组件、格式/官方qmllint及默认隐藏策略，其余目标不外推。
 
 #### R31-P · macOS生产包的物理设备与完整产品实机验证
@@ -257,7 +268,7 @@
 - 依赖R33阶段交接、R31部署/菜单实现及可靠macOS目标设备、显示会话、匿名音乐和实际音频路由。输入为`cmake/Deployment.cmake`实际QML清单、Info.plist/ICNS、`src/platform/macos/ApplicationMenu.mm`、普通启动器、`tools/deploy/macos.*`、`verify-macos.py`与既有生产fixture。缺口为另一台目标系统、物理屏幕/键鼠/触控板/跨屏事件、设备拔插/听感及正常原生呈现的可靠采集。
 - 静态入口`python3 tools/audit/audit-macos-deployment.py`绑定COMMON-01–05/MAC-01/PERF-01–07和三平台symbol/hash；构建/部署及用户操作清单唯一入口为`docs/platforms/macos.md`。在目标以`sh tools/deploy/macos.sh`生成`out/macos/`，从包外全新目录运行`python3 tools/deploy/verify-macos.py --output 绝对新目录`；复制整包到另一台目标与中文/空格路径后重复。真实进程退出、当前report、所有实际加载映像/架构/相对资源/签名须有效；不复制开发Kit，不以帮助或普通退出0认定功能通过。
 - 修复对象：Finder品牌/普通.command参数与cwd、AppKit菜单/系统目录对话框编辑焦点与输入法、片头输入锁、真实关闭/后台媒体、Retina跨屏后SceneItem/Canvas/文字的尺寸/缓存/透明裁切与生命周期。用隔离`--data-dir`和匿名`--music-root`检查浏览/详情/总览/片头/玻璃、三路公开媒体的播放/暂停/seek/换曲/错误、系统默认与显式设备/消失恢复、最小化继续及关闭停止；不改用户歌曲。物理Command快捷键、同窗口hide/minimize/restore、跨屏DPR1/1.5/2与十次视觉/SG重建的原门槛保留，隐藏Qt事件/target DPR/完整root重建分别不能替代对应物理事实。
-- Metal归R34；部署包显式OpenGL的同项图形/窗口/输入/资源回归归R35。正常VSYNC/未限速、冷启动/输入/准备/资源峰值按R28-P、MAC-VISIBLE-3D与“各平台最终实机矩阵”的固定场景、三次120秒及原数值门槛执行，不能用本机隐藏成本或资源估算替代。独立听感/物理设备按R24-P/R25-P，不重复维护阈值。
+- Metal归R34；部署包显式OpenGL的同项图形/窗口/输入/资源回归归R35。正常VSYNC/未限速、冷启动/输入/准备/资源峰值按R28-P、MAC-VISIBLE-3D与“各平台最终实机矩阵”的正式场景、独立资源压力及数值门槛执行；范围与复用统一按performance.md/test-gates.md，不能用本机隐藏成本或资源估算替代。独立听感/物理设备按R24-P/R25-P，不重复维护阈值。
 - 退出：目标部署/真实质量、物理菜单与输入/显示/媒体/生命周期及适用性能门槛有可靠证据；缺样本仍保留原任务。共享修正按test-gates.md回归当前Metal受影响组件、默认隐藏策略、格式与官方qmllint；Windows/Linux回归保持R30-P/R32-P及后置分工，不将主机qsb翻译外推目标运行。
 
 #### R30-P · Windows生产部署与干净环境实机验证
@@ -266,64 +277,64 @@
 - 输入为`cmake/Deployment.cmake`生成的实际应用QML清单、`cmake/yalahoo.rc.in`、R03B品牌manifest及ICO/PNG/SVG、qrc资产、匿名库/可支持媒体样本；源码审计入口`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`，输出COMMON-01–05/WIN-01/PERF-01–07的symbol/hash矩阵。核对完整CMake/C++23/最新Kit/RC/PE入口、生产Review OFF及Quick3D隔离、QtQuick/Templates/Dialogs/Multimedia/CanvasPainter/Qt随附媒体依赖/字体/shader、Unicode与可写数据根、三路公开媒体与设备/错误/退出调用链。源码可确定或目标运行发现的缺陷必须修复，不以本机qsb翻译或脚本解析宣称目标通过。
 - 准确入口及用户清单为`docs/platforms/windows.md`：先以`pwsh -NoProfile -File tools/deploy/windows.ps1`真实configure/build/windeployqt生成`out/windows/`，核对同Kit工具版本、dumpbin import/delay-import解析、架构匹配官方VC Redistributable、相对qt.conf、许可证及包清单。核对失败保留旧包、无私人库/缓存/PDB/研究工具/比较模块、不复制整个Kit；实际检查PE GUI资源与Explorer/窗口/任务栏大小图标。审计PowerShell成功/错误/空格Unicode参数/Process.ExitCode及包优先/开发回退启动器，不仅检查文件存在。
 - 在无Qt开发PATH/Node/外部FFmpeg的临时环境执行`out/windows/verify-windows.ps1`的help、browse/navigation/detail/overview、demo和normal，自动验证要求当前退出码与当前report均成功；再在未安装Qt/开发工具的干净Windows上重复，安装随包官方运行库，排除机器依赖掩盖。正常启动检查离线/空库/匿名demo/Unicode音乐目录、字体、设备列表、支持样本、播放/暂停/seek/切歌/输出设备变化、错误恢复及后台继续播放；滑尺和二维序章实际CanvasPainter透明合成/裁切/shader/重建必须有效，不能仅凭导入成功。原生物理输入、正常呈现/VSYNC、尺寸/DPR/跨屏及听感分别证明；窗口策略沿test-window-policy，不未经当轮授权提升前台。
-- 正式产品路径按performance.md及R28入口验证主要场景、冷启动/准备/输入时延和资源峰值，保留原画质/1080p/预热后每场景120秒/至少三次串行、p95/p99/长帧与资源原门槛，记录实际OS/GPU/Qt/D3D11/逻辑物理尺寸/DPR/刷新/VSYNC/窗口策略；Review工具单独构建，不混入产品、不转抄历史benchmark或macOS结果。Windows OpenGL同项动态运行归R35。适用格式/官方qmllint与受影响回归按test-gates选择；共享修正回归当前主力平台对应入口。退出须上述目标实际检查通过，缺环境或有效样本保留本任务，不以阶段交接销项。
+- 正式产品路径按performance.md及R28入口验证主要场景、冷启动/准备/输入时延和资源峰值，正式呈现、未限速诊断及独立资源压力统一按performance.md，不按部署阶段无条件重复矩阵，记录实际OS/GPU/Qt/D3D11/逻辑物理尺寸/DPR/刷新/VSYNC/窗口策略；Review工具单独构建，不混入产品、不转抄历史benchmark或macOS结果。Windows OpenGL同项动态运行归R35。适用格式/官方qmllint与受影响回归按test-gates选择；共享修正回归当前主力平台对应入口。退出须上述目标实际检查通过，缺环境或有效样本保留本任务，不以阶段交接销项。
 
 #### R29-P · 整场GUI目标与原生呈现回归
 
 - 依赖R33阶段交接与R29整场重放实现；冻结来源经历史映射，输入为`StartupAudit::fixture`的576匿名专辑及qrc横/竖/方封面、各组件源数学/结构输入。缺Windows/Linux目标系统/最新原生Kit/GPU/显示会话；macOS仍需物理输入/跨屏与其他目标设备。
-- 目标Release Review ON实际构建后，运行`python3 tools/build/verify-gui.py --backend d3d11|metal|vulkan|opengl --output verification/全新目录`和`python3 tools/audit/audit-gui.py --report 上述目录/matrix/report.json`；后端按R34/R35分工，仅执行实际启用的Vulkan。完整矩阵/采集语义由rhi-integration.md维护，保持九尺寸、双主题、两阵列与既有原画质/完整数量/动效/源效果。目标实际DPR另验，不能以隐藏target覆盖冒充物理屏幕。
+- 目标Release Review ON实际构建后，运行`python3 tools/build/verify-gui.py --backend d3d11|metal|vulkan|opengl --output verification/全新目录`和`python3 tools/audit/audit-gui.py --report 上述目录/matrix/report.json`；后端按R34/R35分工，仅执行实际启用的Vulkan。完整矩阵/采集语义由rhi-integration.md维护，按test-gates.md分别覆盖九尺寸布局、双主题合成和两阵列状态，保持原画质/完整数量/动效/源效果。目标实际DPR另验，不能以隐藏target覆盖冒充物理屏幕。
 - 原生自身窗口回放并检查头部/文字/滑尺/盒体/光带/背景/详情/总览/片头的正常清晰度、轮廓、裁切和合成；Qt动作、最终CSS结构/来源数学、实际输出质量分别验收。详情总览入口隐藏/返回恢复、竖屏返回按钮位于头部下方、退字连选/搜索隔离/片头交接、有限矩阵/容量/资源代次和最终释放通过。CSS锚点≤1逻辑px、投影≤2逻辑px、double运动≤1e-6、时序≤一个60Hz帧仍由各组件原入口保持，SDE-01/02按来源例外契约处理字号与空间不足时的导航换行；可容纳布局及其余门槛不变。
 - 物理键鼠/触控板、原生同对象hide/minimize/restore、真实跨屏DPR/焦点与正常VSYNC按各平台最终实机矩阵和R28-P执行；遵守当轮窗口策略，不因遮挡提高前台。GPU完成/屏幕扫描/driver显存未知保留null。共享修正按test-gates.md回归当前主力平台受影响组件；无渲染/调度/资源算法变化不重复无关正式性能矩阵。保留COMMON/PERF/三平台符号/hash、实际OS/Kit/GPU/后端和原始报告，仅本地归档。
 
 #### R28-P · 冷启动、原生生命周期与性能目标
 
 - 输入/修复对象：StartupCoordinator、FrameClock、MusicStage、SceneItem/RhiItem、CoverCache/AtlasUploadQueue及既有ResourcePlan，含StartupAudit的共享呈现采样与销毁期回调寿命；`StartupAudit::fixture`生成9×64匿名库/96张独立2048² JPEG和静音WAV，禁止私人输入。依赖R28实现与原R10D设备/Kit/fixture。剩余完整目标为Windows/D3D11、Linux实际Vulkan及R35三平台OpenGL；macOS/Metal保留其他目标设备的冷启动/部署、物理显示/输入、跨屏、实际设备资源观测与下述呈现间断复核。Windows/Linux系统、目标编译器/GPU/显示会话与物理设备缺失，静态审计不能代替这些事实。
-- 入口：目标最新原生Kit Release，`python3 tools/audit/audit-startup.py`，`ctest --preset qt-release -R '^(startup|motion|cover-cache|opening|playback|verification-window-policy)$'`；按默认或当轮显式授权窗口策略运行`python3 tools/build/verify-startup.py --backend metal|d3d11|vulkan --mode vsync --scenario day-wave --seconds 120 --runs 3 --output verification/新目录`及独立`--mode uncapped`三次串行样本。OpenGL同入口显式`--backend opengl`归R35。普通隐藏生命周期入口为`startup-qml`；三平台原生构建和Windows PowerShell适用门禁仍执行公共契约。
-- 保留原1920×1080原画质、双主题固定产品场景/预热120秒、p95≤20ms、不重复稳定>50ms，以及正常VSYNC p99≤两个60Hz目标周期、分场景超周期/连续长帧、input→状态→Qt提交及准备时延。入口matrix十二段混合回放用于共同诊断；各目标按performance.md逐一指定十二个day/night固定场景，完成暖机后的120秒有效采样，不能把单段短样本或隐藏CPU成本当作该门槛通过。DPR1/1.5/2、其他画质/大尺寸为独立资源/压力结果，不强套主要1080p目标。物理显示与input-to-photon无法获取继续null。
-- 原生hide/minimize/restore、同对象surface/SG失效、完整QML root/窗口十次重建、30次换片、隐藏扫描合并/晚到解码、恢复首间隔/最新revision、暂停及播放中当前源/意图连续均须真实执行；检查实际滑尺/文字/序章的输入、透明合成、缓存、资源回落。描述符峰值与driver/系统可获得峰值分别保留，十次释放不能凭generation重置判定。异常/样本不足/遮挡节流保留原始失败，源码可确定问题直接修复。
-- macOS/Metal呈现间断待定位：`night-wave`正常VSYNC的一次120秒运行出现3个>50ms间隔，最长约2.48秒；最长间隔内GUI时钟推进154帧，RHI没有封面上传或资源代际变化，结束时应用失去前台。该次缺少连续曝光原始记录，不能自动判为环境噪声或通过。输入仍为`StartupAudit::fixture`，定位对象为`StartupAudit::Driver`、Qt窗口曝光/呈现调度与`SceneItem::frameSubmitted`时间链；使用上述入口的`--scenario night-wave --seconds 120 --runs 3 --foreground`在可持续曝光的目标会话复核，保留`qtPresentationTimestampsNs`、`nativeWindowEvents`和GUI/同步/CPU/GPU时间。核实曝光变化或真正停提的原因，按performance.md处理固定复核与原门槛；不以其余运行抵消失败，也不无限重跑。共享修正只回归受影响调度/窗口场景。
+- 入口：目标最新原生Kit Release，`python3 tools/audit/audit-startup.py`，`ctest --preset qt-release -R '^(startup|motion|cover-cache|opening|playback|verification-window-policy)$'`；按默认或当轮显式授权窗口策略运行`python3 tools/build/verify-startup.py --backend metal|d3d11|vulkan --formal --mode vsync --scenario day-wave --output verification/新目录`；未限速仅按performance.md的诊断触发条件选择相关场景。OpenGL同入口显式`--backend opengl`归R35。普通隐藏功能入口为`startup-qml`；独立资源压力用`qt-release-stress -R '^startup-stress$'`或`verify-startup.py --stress`，原生同对象hide/minimize另加`--mode vsync --lifecycle`；三平台原生构建和Windows PowerShell适用门禁仍执行公共契约。
+- 正式场景、采样协议、数值门槛及局部诊断结论边界唯一按performance.md。首次目标建立完整正常VSYNC基线，后续只补受影响且无有效结果的场景；短matrix或隐藏CPU成本不代替正式验收。DPR、其他画质/大尺寸、资源压力分别验证，不与长采样组合穷举。物理显示与input-to-photon无法获取继续null。
+- 原生hide/minimize/restore、同对象surface/SG失效、独立完整QML root/窗口及换片压力、隐藏扫描合并/晚到解码、恢复首间隔/最新revision、暂停及播放中当前源/意图连续均须真实执行；具体次数与入口归performance.md，同一有效压力结果不随主题/DPR/计时模式重复；检查实际滑尺/文字/序章的输入、透明合成、缓存、资源回落。描述符峰值与driver/系统可获得峰值分别保留，释放压力不能凭generation重置判定。异常/样本不足/遮挡节流保留原始失败，源码可确定问题直接修复。
+- macOS/Metal呈现间断待定位：`night-wave`正常VSYNC的一次120秒运行出现3个>50ms间隔，最长约2.48秒；最长间隔内GUI时钟推进154帧，RHI没有封面上传或资源代际变化，结束时应用失去前台。该次缺少连续曝光原始记录，不能自动判为环境噪声或通过。输入仍为`StartupAudit::fixture`，定位对象为`StartupAudit::Driver`、Qt窗口曝光/呈现调度与`SceneItem::frameSubmitted`时间链；使用上述入口的`--formal --mode vsync --scenario night-wave --foreground`在可持续曝光的目标会话复核，保留`qtPresentationTimestampsNs`、`nativeWindowEvents`和GUI/同步/CPU/GPU时间。核实曝光变化或真正停提的原因，按performance.md处理固定复核与原门槛；不以其余运行抵消失败，也不无限重跑。共享修正只回归受影响调度/窗口场景。
 - Windows R10D的18.35/20.98ms及record-only事实仍未复现；按`tools/build/verify-r10d.ps1 -Backend d3d11`在原设备/Kit/匿名fixture运行（R35显式改用`-Backend opengl`），使用当前非像素入口保留原采样/噪声和原数值门槛，不能重跑已禁图像评分或写为已确认环境噪声。D3D11归R34、OpenGL关联回归归R35。
-- 退出：相应目标COMMON/PERF、正常启动产品功能/质量/媒体、有效VSYNC与未限速原始样本、输入/准备时延、真实资源压力和生命周期原门槛均有可追溯结论；共享修正回归当前Metal受影响startup/封面/开场/实验面板及默认隐藏策略。未解决失败明确保留，不由部署或本机局部成绩冲销。
+- 退出：相应目标COMMON/PERF、正常启动产品功能/质量/媒体、有效VSYNC原始样本及按需未限速诊断、输入/准备时延、真实资源压力和生命周期原门槛均有可追溯结论；共享修正回归当前Metal受影响startup/封面/开场/实验面板及默认隐藏策略。未解决失败明确保留，不由部署或本机局部成绩冲销。
 
 #### UI-CONTROLS-P · 自绘控件的目标系统与原生输入
 
 - 输入为controls.md定义的Archive控件、TextAreaFormat、全项目QML视觉树与ControlsReview/ControlsAudit；冻结music.css/style.css/music-lighting-lab.css按历史映射。匿名控件与既有面板fixture不读取私人库。缺Windows/Linux最新原生Kit及目标GPU/窗口，本机隐藏Metal只证明Qt对象输入/自身输出，不能证明物理输入/系统输入法/辅助技术或跨屏。
-- 目标Release构建、官方Yalahoo_qmllint/ui-audit_qmllint、check-format/source-format、kit-selection/bootstrap与`python3 tools/audit/audit-controls.py`；按可靠窗口策略执行`controls-qml`及settings-qml/experiments-qml/library-panels-qml/playback-qml，保留来源尺寸/行高、双主题九尺寸/显式DPR1/1.5/2与各宿主输入隔离/关闭释放原门槛。改变环境主题后绘制仍取项目token，模块/qrc/字体和QuickTemplates2在真实目标部署闭包可解析。
+- 目标Release构建、官方Yalahoo_qmllint/ui-audit_qmllint、check-format/source-format、kit-selection/bootstrap与`python3 tools/audit/audit-controls.py`；按可靠窗口策略执行`controls-qml`及settings-qml/experiments-qml/library-panels-qml/playback-qml，保留来源尺寸/行高、按test-gates.md分别覆盖布局尺寸、双主题及DPR边界与各宿主输入隔离/关闭释放原门槛。改变环境主题后绘制仍取项目token，模块/qrc/字体和QuickTemplates2在真实目标部署闭包可解析。
 - 物理键鼠/触控板、Tab/ShiftTab、方向键/Space/Enter/Escape、失焦/外部点击关闭、滚动条拖动与下拉虚拟滚动、系统中英文/emoji组合输入、选择/剪贴板菜单/撤销重做、readOnly/disabled、屏幕阅读器角色/名称、目录选择与跨屏DPR/原生hide/minimize/restore按目标系统验收。D3D11/Metal归R34，全部OpenGL及Linux窗口归R35；不以隐藏事件或显式target DPR替代原生事实。共享修正只回归受影响的本机控件/宿主与窗口策略，完整性能仍依R28和最终矩阵。
 
 #### R27-P · 光照/速度实验与匿名启动的目标平台/实机回归
 
 - 输入为LightingPanel/MotionPanel/ExperimentPanels、SelectionLighting已确认/临时对照状态、SettingsController/PreferencesStore、DiagnosticSamples/SceneItem/RhiItem、demonstrationLibrary及根/工具目录启动脚本；冻结music-lighting-lab、music-motion-lab、music-row-lighting和CSS经历史映射。匿名九列二十七专辑只含qrc封面/空曲目。缺Windows/Linux真实系统、最新原生Kit、目标GPU/原生窗口；本机隐藏Metal/Qt事件不能证明物理键鼠、跨屏、正常VSYNC或歌曲听感。
 - 目标Release真实构建、官方Yalahoo_qmllint/ui-audit_qmllint、check-format/source-format，执行`python3 tools/audit/audit-experiments.py`与`ctest --preset qt-release -R '^(experiments|settings|motion|lighting|verification-window-policy)$'`。保留四模式、五项原范围/guided固定预设、无效patch原子拒绝、未知嵌套字段、临时对照不保存、改速x/v/a/revision连续和片头未缩放dt。Windows另真实解析/运行新ps1及FormatTools，核对任意cwd/Unicode空格/参数与本次GUI ExitCode；macOS/Linux运行`python3 tools/audit/verify-experiment-launchers.py`，帮助与演示/数据组合拒绝不得触碰数据根。
-- 按可靠窗口策略运行`ui-audit --experiments 全新目录`/`experiments-qml`：双主题九尺寸、显式DPR1/1.5/2、窄屏折叠/滚动、真实Qt滚轮/方向键/空格、四模式实际参数上传与资源/postprocess generation不变、按住原版后释放/失焦/隐藏/销毁恢复、关闭/重开与renderer释放。诊断开启才采样；固定256样本/nearest-rank/至少500ms批次与一个待送通知，关闭/隐藏/换窗口拒绝旧epoch，无生产readback。CPU提交/同步、QRhi已完成GPU、未钳制提交间隔、原生Qt呈现事件、请求上传字节与解码计数范围按performance.md；缺GPU/原生呈现/实际VSYNC不可伪造为0或已通过。
+- 按可靠窗口策略运行`ui-audit --experiments 全新目录`/`experiments-qml`：按test-gates.md分别覆盖布局尺寸、双主题及DPR边界、窄屏折叠/滚动、真实Qt滚轮/方向键/空格、四模式实际参数上传与资源/postprocess generation不变、按住原版后释放/失焦/隐藏/销毁恢复、关闭/重开与renderer释放。诊断开启才采样；固定256样本/nearest-rank/至少500ms批次与一个待送通知，关闭/隐藏/换窗口拒绝旧epoch，无生产readback。CPU提交/同步、QRhi已完成GPU、未钳制提交间隔、原生Qt呈现事件、请求上传字节与解码计数范围按performance.md；缺GPU/原生呈现/实际VSYNC不可伪造为0或已通过。
 - 产品实机用物理键鼠/触控板核对面板滚动不导航、各倍率往返连续、片头/普通歌曲不随改速、默认复位与设置入口一致；原生同对象hide/minimize/restore、跨屏DPR和应用后台恢复保持当前参数/歌曲且不累积诊断。Windows/D3D11和macOS/Metal归R34，全部OpenGL归R35；目标修正仅回归受影响的本机参数/设置/光照/面板/窗口检查。正常VSYNC与完整性能归R28/最终矩阵，不能将隐藏调度吞吐当作正式呈现成绩。
 
 #### R26-P · 完整设置与资料路由的目标平台/实机回归
 
 - 输入为SettingsController/PreferencesStore（含C++单字段画质合并）、SettingsPanel/MetadataSection及MetadataPresentation、LibrarySession批次/能力/代次、LibraryStore::setMetadataConfiguration及实际App视觉重载；冻结music-app::renderSettingsPanel、music.css、quality-settings和motion-settings经历史映射。匿名库/公开Qt合成WAV、SampleProvider的Matched/Uncertain/Error及不同代订阅者只用于测试；产品仅OfflineMetadataProvider，零网络。接口/来源边界见library-data.md和source-fidelity-review.md。缺Windows/Linux系统、最新原生Kit与目标窗口/音频环境；本机隐藏Metal与Qt事件不代替物理输入、跨屏或正常VSYNC。
 - Release目标真实构建后执行`ctest --preset qt-release -R '^(settings|library-data|library-qml|media-metadata|audio-ambience|real-columns|render-quality|verification-window-policy|source-format)$'`、官方Yalahoo_qmllint/ui-audit_qmllint及`python3 tools/audit/audit-settings.py`。保留schemaVersion1/未知字段、对象JSON≤1MiB/只读源/坏文件保护、原子保存合并、变更字段路由、八个独立请求/一个批次请求、requestId/generation/album/kind拒绝和取消/换库/退出门槛；不以禁用实现代替目标编译。
-- 当前可靠窗口策略运行`ui-audit --settings 全新目录`/`settings-qml`，九尺寸/双主题/DPR1/1.5/2：两列主题、排序/阵列/列记忆、画质/折叠精细、减少动态/.25–3速度、三路声音/设备、MusicBrainz配置及整页滚动；查询按钮禁用且说明离线，缓存内容/来源/原状态正常，注入三种状态与能力变化不改UI。实际Qt输入、关闭/反向打开/模态隔离、面板与背景释放、真实App十次视觉树重建保留同一媒体对象/音源/意图/用户画质。macOS用隐藏Metal；Windows/D3D11归R34，全部OpenGL归R35，目标有可靠隐藏能力先重新分类；不将显式target DPR当物理屏幕。
+- 当前可靠窗口策略运行`ui-audit --settings 全新目录`/`settings-qml`，按test-gates.md分别覆盖布局尺寸、双主题及DPR边界：两列主题、排序/阵列/列记忆、画质/折叠精细、减少动态/.25–3速度、三路声音/设备、MusicBrainz配置及整页滚动；查询按钮禁用且说明离线，缓存内容/来源/原状态正常，注入三种状态与能力变化不改UI。实际Qt输入、关闭/反向打开/模态隔离、面板与背景释放、真实App十次视觉树重建保留同一媒体对象/音源/意图/用户画质。macOS用隐藏Metal；Windows/D3D11归R34，全部OpenGL归R35，目标有可靠隐藏能力先重新分类；不将显式target DPR当物理屏幕。
 - 原生产品还须以真实键鼠/触控板核对设置控件滚动不导航、重新打开反映当前状态、全屏/片头重播/界面重载，并在实际播放/暂停时确认媒体连续、三路音量与设备意图保留；原生同对象hide/restore和跨屏DPR归既有最终矩阵。正常VSYNC/正式性能按R28及最终矩阵；隐藏场景重载只证明视觉所有权，听感/物理输出及缺目标执行保留，不能写通过。共享修正仅回归本机受影响路径。
 
 #### R25-P · 三路声音与原生数据的目标平台/实机回归
 
 - 输入为BackgroundMusicController/InterfaceSoundController、PlaybackController静音门、PreferencesStore与MusicTypes读写边界、原生metadataConfiguration/genreOverrides、RenderQuality单参数接口及生产声音面板。资源为既有atmosphere.ogg、interface-events.json（17事件当前均无独立短资产）、AudioAmbienceTest匿名WAV/测试专用短WAV、LibraryAudit匿名库及既有来源画质oracle；来源/消费者与实现规范见playback.md/library-data.md/occlusion.md。缺Windows/Linux系统、最新原生Kit/音频后端；本机Qt媒体进度与Metal隐藏输出不证明物理路由/听感、原生最小化或其他平台通过。
 - R34目标Release实际构建及`ctest --preset qt-release -R '^(audio-ambience|playback|library-data|library-qml|directory-scanner|media-metadata|render-quality|real-columns|source-format|verification-window-policy)$'`、官方Yalahoo_qmllint/ui-audit_qmllint、`python3 tools/audit/audit-audio-ambience.py`。保留独立player/output、单个24ms必要淡变timer/四槽音效且满池丢弃、无视觉时钟音频进度、实际静音后放行歌曲、220ms下降/650ms恢复、暂停/格式错误不恢复、曲间不出现BGM、开关/反向/退出取消原门槛。当前画质算法/尺寸门槛、未知未来扩展和明确Provider槽不变。共享修正回归本机受影响项。
-- 当前可靠窗口策略执行`playback-qml`或`ui-audit --playback 全新目录`，九尺寸/双主题/实际或显式DPR1/1.5/2：三路音量/开关、静音资源试听禁用、全内容滚动、设备/Qt格式错误、进度/导航播放隔离与面板关闭资源回落。D3D11/Metal归R34；三平台OpenGL和Linux native图形/输入归R35，正常VSYNC/完整产品性能依R28和最终矩阵。
+- 当前可靠窗口策略执行`playback-qml`或`ui-audit --playback 全新目录`，按test-gates.md分别覆盖布局尺寸、双主题及DPR边界：三路音量/开关、静音资源试听禁用、全内容滚动、设备/Qt格式错误、进度/导航播放隔离与面板关闭资源回落。D3D11/Metal归R34；三平台OpenGL和Linux native图形/输入归R35，正常VSYNC/完整产品性能依R28和最终矩阵。
 - 三平台物理输出分别核对歌曲显式设备与BGM/音效系统默认路由、默认切换/无输出/重连及当前Playing/Paused/Stopped意图；真实最小化和同窗口恢复时歌曲继续，后台只保留必要音频事件与淡变。听感确认无意外重叠/突变，三路音量独立；当前缺资源事件须精确静音，不补合成器/PCM。程序进度/真实Qt描述符通知不冒充听感、拔插或物理最小化，缺音频设备与窗口条件不记通过。其余原R24-P/R22-P设备、格式、导入门槛仍各自执行，不重复定义。
 
 #### R24-P · 普通歌曲播放与设备的目标平台/实机回归
 
 - 输入为PlaybackController、MusicStage/Header/Detail/PlaybackControls/PlaybackPanel、LibrarySession受控播放ID同步、PlaybackTest/AudioFixture及`ui-audit --playback`匿名WAV/损坏输入。来源为冻结music-player/music-app和REFDB-04公开函数/事件序列，实际读取hash/作者/MIT见随包参考NOTICE。缺Windows/Linux目标系统、最新Kit与音频后端；本机真实Qt播放和Metal隐藏结果不代表物理拔插/默认路由切换、听感、物理输入/跨屏或其他格式全集通过。
 - 目标真实Release构建、format/check-format、官方Yalahoo_qmllint/ui-audit_qmllint、`ctest --preset qt-release -R '^(playback|library-data|library-qml|track-focus|navigation|presentation|source-format|verification-window-policy)$'`及`python3 tools/audit/audit-playback.py`，保留单个歌曲player/output、公开API、local URL、rate=1、source revision/断旧连接、暂停/停止意图、一次EndOfMedia、保留孤立队列和导航播放隔离。不得迁入私有设备补丁、模拟描述符或PCM/外部解码后备。
-- 当前可靠窗口策略运行`playback-qml`/`ui-audit --playback 全新目录`：九尺寸/双主题/实际或显式DPR1/1.5/2，真实播放按钮、歌名/图标、播放进度/单次seek、音量/系统默认与设备选择、格式错误/重试、搜索/库替换/定位不改音源及关闭面板/隐藏恢复。D3D11/Metal归R34，三平台OpenGL和Linux native图形/输入归R35；正常VSYNC与完整产品性能按R28/最终矩阵，不从离屏或局部媒体事件推断。
+- 当前可靠窗口策略运行`playback-qml`/`ui-audit --playback 全新目录`：按test-gates.md分别覆盖布局尺寸、双主题及DPR边界，真实播放按钮、歌名/图标、播放进度/单次seek、音量/系统默认与设备选择、格式错误/重试、搜索/库替换/定位不改音源及关闭面板/隐藏恢复。D3D11/Metal归R34，三平台OpenGL和Linux native图形/输入归R35；正常VSYNC与完整产品性能按R28/最终矩阵，不从离屏或局部媒体事件推断。
 - 真正设备分别执行：默认输出改选、明确选择仍在时不随默认、显式设备消失回默认并提示、全部输出消失时待播、同设备/新设备重连、加载中换曲/换设备、暂停/停止后重连、有效位置/音量保留、最小化歌曲继续及退出停止。PlaybackTest空列表/真实描述符通知仅为竞态分支证据，不能冲销实物门槛。Windows/Linux用本机Qt实际支持格式验证播放/暂停/seek/停止/自然队列结束；覆盖不可seek/未知duration、损坏/无音轨/不支持格式的Qt原因，不按扩展名假定能力。无声加载、Qt播放进度、实际出声/听感分别记录；缺格式/设备条件仍未通过，修正共享代码只回归受影响范围。
 
 #### R23-P · 音乐库面板、搜索与歌曲定位的目标平台回归
 
 - 输入为LibraryPanel/SearchPanel/GenreRowsModel/LibraryPanels、PanelController/TrackFocusController、LibraryModels、LibraryStore与生产MusicStage，冻结music-app/music-search/music-track-focus/music.css/ui-transitions及TrackFocusTest/LibraryAudit匿名库（跨歌手列、200曲目专辑/4000命中、1024专辑查询）。本机Metal隐藏执行范围见source-fidelity-review.md；缺Windows/Linux目标系统/最新Kit，物理输入/原生目录对话框、真实屏幕DPR及正常呈现不由离屏替代。
 - 目标Release真实构建、`check-format`、官方`Yalahoo_qmllint`/`ui-audit_qmllint`及`ctest --preset qt-release -R '^(track-focus|library-data|library-qml|directory-scanner|cover-cache|presentation|detail-motion|navigation|source-format|verification-window-policy)$'`，运行`python3 tools/audit/audit-library-panels.py`绑定COMMON/PERF/平台符号/hash。保留冻结216例、trim/lowercase语义、按快照一次预处理、查询增量通知、专辑内曲目身份和一次最后目标/无播放副作用。
-- 图形入口`ui-audit --library 全新目录`/CTest `library-panels-qml`按窗口契约与当前可靠能力分类：九尺寸/双主题/实际或显式DPR1/1.5/2，面板宽/边距/全内容滚动、4000结果/大量流派虚拟化、输入取消/无结果、模态焦点/Find/Escape/箭头与Enter、跨歌手列退详情→归架→五次定位→打开→目标居中高亮、同专辑不重抽盒、关闭背景附件释放/Descriptor回落。布局≤1逻辑px；滚动/高亮按源函数与1100ms减少动态，不能恢复图像评分。D3D11/Metal归R34，三平台OpenGL及Linux native窗口归R35。
+- 图形入口`ui-audit --library 全新目录`/CTest `library-panels-qml`按窗口契约与当前可靠能力分类：按test-gates.md分别覆盖布局尺寸、双主题及DPR边界，面板宽/边距/全内容滚动、4000结果/大量流派虚拟化、输入取消/无结果、模态焦点/Find/Escape/箭头与Enter、跨歌手列退详情→归架→五次定位→打开→目标居中高亮、同专辑不重抽盒、关闭背景附件释放/Descriptor回落。布局≤1逻辑px；滚动/高亮按源函数与1100ms减少动态，不能恢复图像评分。D3D11/Metal归R34，三平台OpenGL及Linux native窗口归R35。
 - 实机普通产品用临时匿名目录通过文件夹选择/多根保存/重扫/取消/离线错误检查Unicode/空格/#/Windows UNC，任何目录保存不写歌曲。真实键鼠/触控板、编辑焦点、面板滚动与场景输入隔离、窗口隐藏恢复/跨屏和当前播放歌名定位逐项验证；R24接线后核对播放/暂停/source/音量不因定位变化。共享修正仅回归受影响范围；正常VSYNC、120秒完整产品成本与实际显存按R28和最终实机矩阵，不用局部隐藏提交推断通过。
 
 #### R22-P · 无声元数据、封面与旧数据的目标平台回归
@@ -344,7 +355,7 @@
 
 - 输入为OpeningController/OpeningInk、生产MusicStage/SceneItem、`tests/fixtures/opening/source-golden.json`、原创SVG/reveal-map和内置匿名封面；冻结函数/相机片段由export-opening-golden.mjs导出。当前缺Windows/D3D11目标系统/Kit/GPU；三平台OpenGL执行分工见上表。无已确认目标产品失败，未运行不能写通过。
 - 静态入口`python3 tools/audit/audit-opening.py`及`node tools/review/export-opening-golden.mjs --check`；目标Release实际构建/qsb、`opening`数学/状态测试及适用的官方qmllint/格式检查。具体算法和资源职责见opening.md。
-- 目标运行`ui-audit --opening 新目录`或`opening-qml`精确CTest选择，按test-gates/test-window-policy选择隐藏或当轮授权native入口。保留九尺寸/双主题/实际DPR1/1.5/2、逐参数/相机≤1e-6、20–120fps、遮挡零三维submit、正确恢复首帧/一次交接、跳过/重播/减少动态/焦点、十次SG重建与Canvas资源回落门槛；实际质量独立检查描边/点/圆环/遮罩/透明合成。
+- 目标运行`ui-audit --opening 新目录`或`opening-qml`精确CTest选择，按test-gates/test-window-policy选择隐藏或当轮授权native入口。按test-gates.md分别覆盖布局尺寸、双主题及DPR边界，保留逐参数/相机≤1e-6、20–120fps、遮挡零三维submit、正确恢复首帧/一次交接、跳过/重播/减少动态/焦点、十次SG重建与Canvas资源回落门槛；实际质量独立检查描边/点/圆环/遮罩/透明合成。
 - macOS本轮隐藏结果不代替原生同窗口恢复、物理输入/跨屏DPR、正常VSYNC或完整产品性能，这些按“各平台最终实机矩阵”执行；共享修正回归受影响组件，范围按test-gates.md选择。
 
 #### R19A-P · 资产来源保护与缺图绘制的目标平台回归
@@ -387,12 +398,12 @@
 
 - 依赖R33阶段交接和可靠Windows/D3D11目标环境；执行前重新评估规模，覆盖真实DPR1/1.5/2中尚欠的字体、布局与生命周期事实，不为栅格相似度改动正确绘制路径。
 - 输入为冻结字体/生产字轮源码、`tests/fixtures/text/titles.json`。目标先运行`export-title.mjs --output 新源目录`，再以`verify-title.mjs --backend d3d11 --dpr 数值 --source 新源目录 --output 新目录`及`audit-title.mjs 新目录`验证。静态入口`python3 tools/audit/audit-title-source.py`绑定原轮次/hash；Windows须真实运行`FormatTools.ps1`及`-Check`并解析/执行两个PowerShell薄入口。
-- 针对R19F当前实际DPR槽层（起点cfce597）及既有字体/通知修正，检查20项双主题文字的内容、字体身份、连字/组合字/彩色字体、断行/省略/裁切、QML层请求尺寸与资源计划一致，以及18项页眉的结构、按钮位置、改速/减少动态及定位不改变播放；验证十次恢复和最终释放。三路径各三次独立120帧采样，分别报告GUI、同步/CPU提交、Canvas绘制、缓存与资源，隐藏候选无文字绘制、静止无重排，GPU不可测为null。
+- 针对R19F当前实际DPR槽层（起点cfce597）及既有字体/通知修正，检查20项双主题文字的内容、字体身份、连字/组合字/彩色字体、断行/省略/裁切、QML层请求尺寸与资源计划一致，以及18项页眉的结构、按钮位置、改速/减少动态及定位不改变播放；验证十次恢复和最终释放。三路径各一次120帧活动/缓存回放；明确成本对比才开启三次独立采样，分别报告GUI、同步/CPU提交、Canvas绘制、缓存与资源，隐藏候选无文字绘制、静止无重排，GPU不可测为null。
 - 退出：结构≤1逻辑px、源码运动≤1e-6、窗口/资源/生命周期、Release/source-format/官方qmllint/qsb与PERF-01–07检查通过；只回归实际改动影响的DPR/后端。
 
 #### R16B3 · OpenGL功能、质量与文字路径选型
 
-- 依赖R16B2W及R16M3阶段选型。在可靠Windows/Linux目标OpenGL环境运行相同匿名文字/页眉、DPR/主题、运动、生命周期及三次成本采样，验证实际可见呈现；macOS已有隐藏/授权原生OpenGL4.1/CoreProfile事实不外推到其他系统，也不无故重复未受影响矩阵。
+- 依赖R16B2W及R16M3阶段选型。在可靠Windows/Linux目标OpenGL环境运行相同匿名文字/页眉、DPR/主题、运动、生命周期及一次局部成本诊断（明确对比才重复），验证实际可见呈现；macOS已有隐藏/授权原生OpenGL4.1/CoreProfile事实不外推到其他系统，也不无故重复未受影响矩阵。
 - 修复实际后端的shader/pipeline、文字缺失、裁切、输入、缓存或资源错误；按源码核对布局/字形与运动，检查可见锯齿和异常模糊。保留正常画质，不为贴合另一后端的栅格改字号、基线或采样。
 - 依据源码语义、实际功能/质量、成本、缓存失效与生命周期选择生产路径，写明连字/组合字、彩色字体及维护差异。执行COMMON/PERF和平台分支审计；OpenGL上下文/着色器兼容边界见`docs/contracts/title-reels.md`。
 - 退出：上述非像素要求通过，更新简明结论，并回归R17–R33受影响路径。
@@ -400,7 +411,7 @@
 #### R16M3-S · 共享隐藏完成通知的目标平台回归
 
 - 依赖R33交接及可靠Windows/D3D11、Linux/OpenGL环境。
-- 输入为冻结字轮/字体、匿名titles fixture及TitleReel自然宽度通知、active=false有界queued finish/恢复取消、TransportTitle退出运动。运行目标Release的`title-reels`与适用Release回归，确认十次hide合并、恢复取消、真实宽度单次通知；使用上节当前非图像入口检查20项文字、18项页眉、九组活动/缓存、隐藏零文字工作、十次恢复/释放及零绑定环/shader错误。
+- 输入为冻结字轮/字体、匿名titles fixture及TitleReel自然宽度通知、active=false有界queued finish/恢复取消、TransportTitle退出运动。运行目标Release的`title-reels`与适用Release回归，确认十次hide合并、恢复取消、真实宽度单次通知；使用上节当前非图像入口检查20项文字、18项页眉、三路径活动/缓存（次数按title-reels.md）、隐藏零文字工作、十次恢复/释放及零绑定环/shader错误。
 - 此项为尚未执行的共享回归。结构≤1逻辑px、源码运动≤1e-6及窗口/资源门槛保留；修改共享通知链后回归当前平台受影响路径。真实可见hide/restore/minimize与正常VSYNC另行验证，离屏释放不代替呈现事实。
 
 #### R17-P · 详情展示的目标后端与可见输入/焦点
@@ -437,9 +448,9 @@
 
 - 输入为同源匿名fixture、冻结生产源码、当前Release源码/二进制及具体产品失败/暂缓记录。先核对系统/Kit/后端/设备/入口/窗口策略，未具可靠环境的项目继续保留，不能把“已安排”写成“已执行”。
 - 窗口：Windows/Linux验证首次show、hide/restore、minimize、flags/surface重建与退出；按当轮授权选择前台或默认策略。默认隐藏策略持续回归；未授权模式遮挡/节流样本不可用，不提升Z顺序。
-- 图形/输入：按后置专项分工分别对D3D11、Metal/Retina、OpenGL及实际启用的Vulkan覆盖九尺寸/双主题/DPR1/1.5/2、浏览/详情/总览/片头、文字/彩色字体/滑尺、玻璃/纸面/透明合成、键鼠/触摸板/快捷键与焦点。核对源码效果与真实产品质量；发现锯齿、异常模糊等问题时定位实际原因并修复，保留缓存/资源差异。
+- 图形/输入：按后置专项分工分别对D3D11、Metal/Retina、OpenGL及实际启用的Vulkan，按test-gates.md分别覆盖布局尺寸、双主题及DPR边界，以及浏览/详情/总览/片头、文字/彩色字体/滑尺、玻璃/纸面/透明合成、键鼠/触摸板/快捷键与焦点。核对源码效果与真实产品质量；发现锯齿、异常模糊等问题时定位实际原因并修复，保留缓存/资源差异。
 - 媒体/部署：用匿名或用户指定本地样本真实播放、暂停/seek/停止/换曲，检查独立歌曲/BGM/音效、后台、默认/切换/消失设备与格式错误。部署包脱离开发Kit、Node/外部FFmpeg运行，检查Unicode/空格路径、资源/插件/字体/图标/可写目录，不改用户音乐文件。
-- 性能/资源：同Kit/设备/fixture的正常VSYNC与未限速吞吐各至少三次串行，记录呈现事件、输入到Qt提交、冷启动/准备、资源峰值和重建/换片回落；保留120秒/1920×1080及p95/p99/长帧目标，解释历史Windows波动的适用范围和噪声。不可测显示/GPU完成写null或估算，不以离屏/CPU或其他设备成绩替代。
+- 性能/资源：同Kit/设备/fixture的正常VSYNC正式验收、按需未限速诊断及独立资源压力按performance.md执行，记录呈现事件、输入到Qt提交、冷启动/准备、资源峰值和重建/换片回落；有效结果按test-gates.md复用，解释历史Windows波动的适用范围和噪声。不可测显示/GPU完成写null或估算，不以离屏/CPU或其他设备成绩替代。
 - 退出：上述源码、功能、实际质量、窗口、媒体、部署、性能与资源项目在可靠目标环境通过，受影响主线回归及文档完成后删除专项。缺环境、真实产品失败或未完成非像素检查保留具体任务；R33阶段完成不豁免本专项。
 
 #### R19D4A-P · Bokeh 目标平台与生产集成回归
@@ -481,7 +492,7 @@
 
 - 依赖R33交接、R19D3A源码及可靠Windows/D3D11、Linux/OpenGL最新原生Kit/编译器/窗口环境。输入为冻结基线（按历史映射）、锁定Three0.183.2 shadow源码、music-case-v040.glb、匿名rhi-shell/visual与9×64生产fixture；起点2f50812。
 - 静态入口`python3 tools/audit/audit-rhi-shadow.py`输出COMMON-01–05/PERF-01–07和平台symbol/hash。核对source backface caster、D32F comparison/R32F canonical诊断、receiver顶点normalBias→插值→片元depthBias、五点Vogel/IGN、同Kit qsb五目标、Y/clip转换、缓存失效、最多两读回及所有权。
-- 目标Release Review ON后按当轮窗口契约运行`ctest --preset qt-release-visible -R '^(rhi-shadow-gpu|rhi-opaque-gpu|rhi-shell-gpu|rhi-flicker-gpu)$' --output-on-failure`；若已有可靠隐藏能力先重新分类、真实隐藏执行。期望三map、1/7/8/9 caster边界、源几何投影与PCF、开关/运动/接收相机/灯色/重复捕获、十次真实SG重建，以及1200帧双主题/小大场景通过。投影≤2物理阴影纹素，恒深面depth<2e-6，PCF≤2/255，原.32强度/.035 normalBias/-.0003 bias/radius4和D32F/R32F/单采样不变；实际paper/shell上传参数匹配源、未失效非批量caster专用uniform数为0。
+- 目标Release Review ON后按当轮窗口契约运行`ctest --preset qt-release-visible -R '^(rhi-shadow-gpu|rhi-opaque-gpu|rhi-shell-gpu|rhi-flicker-gpu)$' --output-on-failure`；若已有可靠隐藏能力先重新分类、真实隐藏执行。期望三map、1/7/8/9 caster边界、源几何投影与PCF、开关/运动/接收相机/灯色/重复捕获、十次真实SG重建，以及共用rhi-flicker生产序列通过。投影≤2物理阴影纹素，恒深面depth<2e-6，PCF≤2/255，原.32强度/.035 normalBias/-.0003 bias/radius4和D32F/R32F/单采样不变；实际paper/shell上传参数匹配源、未失效非批量caster专用uniform数为0。
 - 产品地面与真实接收的目标回归另见R19D3B-P，景深/AA/缩放/BLUR-01来源和本机结论见source-fidelity-review.md，目标补验不得用其他组件代替。目标修正须回归本机阴影、透明覆盖/雾/封面及适用的官方qmllint/check-format，范围按test-gates.md选择；原生窗口同对象hide/restore、正常VSYNC和正式产品性能按既有专项，不用离屏SG重建冒充。
 
 #### R19D3B-P · 产品地面与接收的目标平台回归
@@ -517,6 +528,6 @@
 
 - 依赖R33及R19E交付；冻结输入经历史映射，`export-browse-ui.mjs`生成CSS结构、`export-ruler.mjs`生成144组数学/数字轨迹，均无源PNG。Windows/D3D11及Linux/OpenGL缺真实系统/最新原生Kit/GPU；物理键鼠/触控板、跨屏DPR及后续完整产品窗口/VSYNC仍需对应实机证明。
 - 静态入口`python3 tools/audit/audit-browse-navigation.py`绑定R14/R15/R16页眉接线及Apple后续修正的符号/hash，展开COMMON-01–05/PERF-01–07与三平台分支；目标实际编译/qsb、PowerShell解析/FormatTools仍须运行。修复对象为Header最终竖屏song-cap、SVG实际窗口DPR、Ruler/Ordinal的唯一时钟/可见性、InputRouter背压及Canvas附件/恢复，不恢复四倍图标采样或任何图像评分。
-- 目标Release Review ON后执行上述两个导出器；按窗口契约运行`ui-audit 输出目录`及`ui-audit --ruler 输出目录`，三DPR1/1.5/2、九尺寸/双主题；用`compare-browse-structure.py 原生report.json 冻结report.json 输出.json`核对锚点≤1逻辑px。滑尺20/30/60/120fps及1/120秒trace/数字轨迹误差≤1e-6；三API正常轮廓/裁切/淡隐、十次真实SG重建/33恢复捕获、静止/隐藏零paint、renderer归零与默认窗口策略必须通过。macOS用隐藏入口；目标有可靠隐藏能力时优先重新分类，正常呈现仍单独记录。
+- 目标Release Review ON后执行上述两个导出器；按窗口契约运行`ui-audit 输出目录`及`ui-audit --ruler 输出目录`，按test-gates.md分别覆盖布局尺寸、双主题及DPR边界；用`compare-browse-structure.py 原生report.json 冻结report.json 输出.json`核对锚点≤1逻辑px。滑尺20/30/60/120fps及1/120秒trace/数字轨迹误差≤1e-6；三API正常轮廓/裁切/淡隐、十次真实SG重建/33恢复捕获、静止/隐藏零paint、renderer归零与默认窗口策略必须通过。macOS用隐藏入口；目标有可靠隐藏能力时优先重新分类，正常呈现仍单独记录。
 - 原生产品入口`yalahoo --verify-browse 输出目录`、`--verify-navigation 输出目录`（Windows包装verify-r14/r15.ps1读取本次Process.ExitCode及report）检查播放歌名/按钮位置、主题/动作、真实Qt输入receipt→navigation commit→对应帧提交、滚轮正反/有限端点/切列/滑尺/触摸/编辑焦点、浏览播放隔离和hide/restore。三平台实物输入及同对象窗口/跨屏/VSYNC按既有窗口专项执行；遮挡或节流无样本不能算通过，不未经授权提升前台。
 - 适用回归通过；共享修正回归当前主力平台navigation/title-reels/ui-drawing/ruler-drawing，范围按test-gates.md选择。保持四份封面所有权/一个待提交目的地、固定槽/字轮面、ResourcePlan及异步读回上界；正式产品性能依performance.md与后置专项分工，不以局部CPU成本或离屏提交替代屏幕延迟。

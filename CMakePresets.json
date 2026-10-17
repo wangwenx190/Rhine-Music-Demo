@@ -48,13 +48,14 @@
       },
       "filter": {
         "exclude": {
-          "label": "native-visible|render-integration"
+          "label": "native-visible|render-integration|resource-stress"
         }
       },
       "environment": {
         "YALAHOO_VERIFY_VISIBLE": "0",
         "YALAHOO_VERIFY_FOREGROUND": "0",
-        "YALAHOO_VERIFY_LIFECYCLE": "0"
+        "YALAHOO_VERIFY_LIFECYCLE": "0",
+        "YALAHOO_VERIFY_STRESS": "0"
       }
     },
     {
@@ -68,22 +69,23 @@
       },
       "filter": {
         "exclude": {
-          "label": "native-visible|render-integration"
+          "label": "native-visible|render-integration|resource-stress"
         }
       },
       "environment": {
         "YALAHOO_VERIFY_VISIBLE": "0",
         "YALAHOO_VERIFY_FOREGROUND": "0",
-        "YALAHOO_VERIFY_LIFECYCLE": "0"
+        "YALAHOO_VERIFY_LIFECYCLE": "0",
+        "YALAHOO_VERIFY_STRESS": "0"
       }
     },
     {
       "name": "qt-release-full",
-      "displayName": "Release automatic regression (no visible windows)",
+      "displayName": "Release functional regression (no visible windows or independent stress)",
       "inherits": "qt-release",
       "filter": {
         "exclude": {
-          "label": "native-visible"
+          "label": "native-visible|resource-stress"
         }
       }
     },
@@ -96,8 +98,24 @@
           "label": "hidden-render"
         },
         "exclude": {
+          "label": "native-visible|resource-stress"
+        }
+      }
+    },
+    {
+      "name": "qt-release-stress",
+      "displayName": "Release explicit hidden resource lifecycle stress",
+      "inherits": "qt-release",
+      "filter": {
+        "include": {
+          "label": "resource-stress"
+        },
+        "exclude": {
           "label": "native-visible"
         }
+      },
+      "environment": {
+        "YALAHOO_VERIFY_STRESS": "1"
       }
     },
     {
@@ -113,7 +131,14 @@
       "filter": {
         "include": {
           "label": "native-visible"
+        },
+        "exclude": {
+          "label": "resource-stress"
         }
+      },
+      "environment": {
+        "YALAHOO_VERIFY_STRESS": "0",
+        "YALAHOO_VERIFY_LIFECYCLE": "0"
       }
     }
   ]

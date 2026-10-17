@@ -11,6 +11,7 @@ const options = {
              : platform === 'macos' ? 'metal'
                                     : 'opengl',
     dpr: 2,
+    'cost-runs': 1,
     source: path.join(root, 'verification', platform, 'title-reels/web')
 };
 let visible = false;
@@ -24,15 +25,19 @@ for (let i = 0; i < args.length; ++i) {
     if (option === '--visible') {
         visible = true;
     } else {
-        if (!['--backend', '--dpr', '--source', '--output'].includes(option) || !args[i + 1])
+        if (!['--backend', '--dpr', '--source', '--output', '--cost-runs'].includes(option)
+            || !args[i + 1])
             throw Error(
                 'Usage: verify-title.mjs [--backend metal|d3d11|d3d12|vulkan|opengl] [--dpr 1|1.5|2] '
                 +
-                '[--source directory] [--output directory] [--visible]');
+                '[--source directory] [--output directory] [--visible] [--cost-runs 1|3]');
         options[option.slice(2)] = args[++i];
     }
 }
 const dpr = Number(options.dpr);
+const costRuns = Number(options['cost-runs']);
+if (![1, 3].includes(costRuns))
+    throw Error('Cost diagnostics run once; explicit comparisons may request three runs');
 if (![1, 1.5, 2].includes(dpr)
     || !['metal', 'd3d11', 'd3d12', 'vulkan', 'opengl'].includes(options.backend))
     throw Error('Unsupported backend or DPR');
@@ -66,6 +71,7 @@ const environment = {
 };
 delete environment.QSG_NO_VSYNC;
 environment.YALAHOO_VERIFY_VISIBLE = visible ? '1' : '0';
+environment.YALAHOO_VERIFY_COST_RUNS = String(costRuns);
 environment.YALAHOO_VERIFY_FOREGROUND =
     visible ? (process.env.YALAHOO_VERIFY_FOREGROUND || '0') : '0';
 const executable =
@@ -109,7 +115,7 @@ const production = report.captures.filter((capture) => capture.mode === 0);
 if (report.backend !== options.backend || Math.abs(report.dpr - dpr) > 0.001 || !report.released
     || !report.windowPolicy.passed || report.motionError > 0.000001 || production.length !== 20
     || report.headerChecks.length !== 18 || report.lifecycle.length !== 10
-    || report.animatedCosts.length !== 9)
+    || report.animatedCosts.length !== 3 * costRuns)
     throw Error('Backend, DPR, motion, window, capture or lifecycle gates failed');
 if (production.some((capture) =>
                         !capture.valid || !capture.geometry.passed || !capture.structurePassed)
@@ -118,8 +124,9 @@ if (production.some((capture) =>
     throw Error('Structure, header or lifecycle gates failed');
 for (const mode of [0, 1, 2]) {
     const samples = report.animatedCosts.filter((sample) => sample.mode === mode);
-    if (samples.length !== 3 || new Set(samples.map((sample) => sample.run)).size !== 3)
-        throw Error('Three independent cost runs required for each path');
+    if (samples.length !== costRuns
+        || new Set(samples.map((sample) => sample.run)).size !== costRuns)
+        throw Error('Requested independent cost runs required for each path');
     for (const sample of samples) {
         if (!sample.passed || sample.frames !== 120 || sample.samples.length !== 120
             || sample.gpuTime !== null || sample.guiStateNs == null
@@ -132,6 +139,7 @@ if (!report.passed)
     throw Error('Native checks failed');
 const summary = {
     passed: true,
+    costRuns,
     protocol: 'source-structure-font-metrics-motion-v1',
     visualQuality: 'requires-own-output-inspection',
     platform: process.platform,

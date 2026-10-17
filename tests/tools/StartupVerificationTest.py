@@ -1,0 +1,139 @@
+"""Check sampling scope and reject incomplete or falsely promoted verification evidence."""
+import contextlib
+import importlib.util
+import io
+import json
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
+import unittest
+from unittest.mock import patch
+
+MODULE_PATH = Path(__file__).resolve().parents[2] / "tools/build/verify-startup.py"
+SPEC = importlib.util.spec_from_file_location("startup_verification", MODULE_PATH)
+VERIFY = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(VERIFY)
+
+
+class StartupVerificationTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name).resolve()
+        self.platform_patch = patch.object(VERIFY.platform, "system", return_value="Darwin")
+        self.platform_patch.start()
+        self.addCleanup(self.platform_patch.stop)
+
+    def arguments(self, *options):
+        return VERIFY.parse_arguments(["--backend", "metal", "--output", str(self.root / "result"), *options])
+
+    def report(self, args):
+        return dict(functionalPassed=True, samplingComplete=True, backend=6, dpr=args.dpr,
+                    scenario=args.scenario, stressRequested=args.stress,
+                    samplingRequestedSeconds=args.seconds, samplingSeconds=args.seconds,
+                    switches=30 if args.stress else 3, rebuilds=10 if args.stress else 2,
+                    stages={args.scenario: {"cpuSubmit": {"count": 100}}},
+                    swapIntervalRequested=0 if args.mode == "uncapped" else 1,
+                    qsgNoVsyncRequested=args.mode == "uncapped", nativeSamplingValid=True,
+                    performanceGateEnforced=args.formal, performanceGatePassed=True)
+
+    def test_scopes_have_distinct_defaults_and_acceptance(self):
+        for options, expected in [((), (30, 1)), (("--stress",), (0, 1)),
+                                  (("--formal", "--mode", "vsync", "--scenario", "day-wave"), (120, 3))]:
+            with self.subTest(options=options):
+                args = self.arguments(*options)
+                self.assertEqual((args.seconds, args.runs), expected)
+                self.assertTrue(VERIFY.validate_report(self.report(args), args, 0))
+
+    def test_invalid_scope_combinations_stop_before_execution(self):
+        combinations = [("--stress", "--seconds", "30"), ("--stress", "--runs", "3"),
+                        ("--formal",), ("--formal", "--stress"), ("--lifecycle",),
+                        ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--runs", "1"),
+                        ("--formal", "--mode", "uncapped", "--scenario", "day-wave"),
+                        ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--seconds", "30"),
+                        ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--dpr", "2")]
+        for options in combinations:
+            with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as caught:
+                    self.arguments(*options)
+                self.assertEqual(caught.exception.code, 2)
+
+    def test_incomplete_or_wrong_run_cannot_pass(self):
+        args = self.arguments()
+        for field, value in [("functionalPassed", False), ("samplingComplete", False),
+                             ("samplingSeconds", 12), ("stages", {}), ("backend", 4),
+                             ("stressRequested", True), ("switches", 2), ("rebuilds", 1),
+                             ("scenario", "day-wave"), ("samplingRequestedSeconds", 120)]:
+            with self.subTest(field=field):
+                report = self.report(args)
+                report[field] = value
+                self.assertFalse(VERIFY.validate_report(report, args, 0))
+        self.assertFalse(VERIFY.validate_report(self.report(args), args, "timeout"))
+        self.assertFalse(VERIFY.validate_report({}, args, 0))
+
+    def test_native_diagnostic_requires_exposure_evidence_without_formal_claim(self):
+        args = self.arguments("--mode", "vsync", "--scenario", "night-wave")
+        report = self.report(args)
+        report["performanceGatePassed"] = None
+        self.assertTrue(VERIFY.validate_report(report, args, 0))
+        report["nativeSamplingValid"] = False
+        self.assertFalse(VERIFY.validate_report(report, args, 0))
+        args = self.arguments("--formal", "--mode", "vsync", "--scenario", "night-wave")
+        report = self.report(args)
+        report["performanceGatePassed"] = False
+        self.assertFalse(VERIFY.validate_report(report, args, 0))
+        report["performanceGatePassed"] = True
+        report["performanceGateEnforced"] = False
+        self.assertFalse(VERIFY.validate_report(report, args, 0))
+
+    def test_native_stress_requires_requested_transitions_and_full_pressure(self):
+        args = self.arguments("--stress", "--mode", "vsync", "--lifecycle")
+        report = self.report(args)
+        self.assertFalse(VERIFY.validate_report(report, args, 0))
+        report["nativeWindowTransitions"] = 4
+        self.assertTrue(VERIFY.validate_report(report, args, 0))
+        report["switches"] = 3
+        self.assertFalse(VERIFY.validate_report(report, args, 0))
+
+    def test_formal_batch_preserves_first_failure_and_never_retries_to_green(self):
+        script = self.root / "tools/build/verify-startup.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("# fixture\n", encoding="utf-8")
+        cache = self.root / "build/release/CMakeCache.txt"
+        cache.parent.mkdir(parents=True)
+        cache.write_text(f"YALAHOO_SELECTED_QT:PATH={self.root}\nCMAKE_BUILD_TYPE:STRING=Release\n", encoding="utf-8")
+        executable = cache.parent / "tools/ui-audit"
+        executable.parent.mkdir()
+        executable.write_text("fixture", encoding="utf-8")
+        options = ["--backend", "metal", "--formal", "--mode", "vsync", "--scenario", "night-wave",
+                   "--output", str(self.root / "result")]
+        args = VERIFY.parse_arguments(options)
+        calls = []
+
+        def sample(command, **kwargs):
+            calls.append(command)
+            self.assertNotIn("QSG_NO_VSYNC", kwargs["env"])
+            self.assertEqual(kwargs["env"]["YALAHOO_VERIFY_STRESS"], "0")
+            report = self.report(args)
+            report["performanceGatePassed"] = len(calls) != 1
+            output = Path(command[2])
+            output.mkdir()
+            (output / "report.json").write_text(json.dumps(report), encoding="utf-8")
+            return SimpleNamespace(returncode=0)
+
+        with patch.object(VERIFY, "ROOT", self.root), patch.object(VERIFY, "__file__", str(script)), \
+                patch.object(VERIFY.platform, "platform", return_value="test-platform"), \
+                patch.object(VERIFY.subprocess, "run", side_effect=sample), \
+                patch.dict(VERIFY.os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(VERIFY.main(options), 1)
+        manifest = json.loads((self.root / "result/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(calls), 3)
+        self.assertEqual([run["passed"] for run in manifest["runs"]], [False, True, True])
+        self.assertTrue(manifest["completed"])
+        self.assertFalse(manifest["formalAcceptancePassed"])
+        self.assertFalse(manifest["passed"])
+
+
+if __name__ == "__main__":
+    unittest.main()
