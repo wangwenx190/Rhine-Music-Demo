@@ -28,6 +28,7 @@ T.ComboBox {
     hoverEnabled: true
     opacity: enabled ? 1 : .38
     background: Rectangle {
+        antialiasing: true
         color: control.tokens.surface
         border.color: control.activeFocus || control.hovered ? control.tokens.accent :
                                                                control.tokens.line
@@ -41,6 +42,7 @@ T.ComboBox {
         elide: Text.ElideRight
     }
     indicator: Shape {
+        antialiasing: true
         x: control.width - width - 10
         y: (control.height - height) / 2
         width: 9
@@ -77,6 +79,7 @@ T.ComboBox {
         opacity: enabled ? 1 : .38
         highlighted: control.highlightedIndex === index
         background: Rectangle {
+            antialiasing: true
             color: option.highlighted || option.hovered ? control.tokens.veil :
                                                           control.tokens.surface
 
@@ -106,6 +109,7 @@ T.ComboBox {
         enter: null
         exit: null
         background: Rectangle {
+            antialiasing: true
             color: control.tokens.surface
             border.color: control.tokens.line
         }

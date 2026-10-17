@@ -17,6 +17,7 @@ T.CheckBox {
     opacity: enabled ? 1 : .38
     Accessible.name: text
     background: Rectangle {
+        antialiasing: true
         color: "transparent"
         border.width: control.visualFocus ? 1 : 0
         border.color: control.tokens.accent
@@ -31,6 +32,7 @@ T.CheckBox {
         border.color: control.hovered || control.activeFocus || control.checked
                       ? control.tokens.accent : control.tokens.line
         Shape {
+            antialiasing: true
             anchors.fill: parent
             visible: control.checkState === Qt.Checked
             preferredRendererType: Shape.CurveRenderer
@@ -53,6 +55,7 @@ T.CheckBox {
             }
         }
         Rectangle {
+            antialiasing: true
             anchors.centerIn: parent
             width: 8
             height: 2

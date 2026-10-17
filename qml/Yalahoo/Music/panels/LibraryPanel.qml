@@ -61,6 +61,7 @@ ArchiveScrollView {
             placeholderText: qsTr("Enter a local absolute path, or choose a folder")
             placeholderTextColor: root.tokens.muted
             background: Rectangle {
+                antialiasing: true
                 color: root.tokens.surface
                 border.color: root.tokens.line
             }
@@ -118,6 +119,7 @@ ArchiveScrollView {
             Accessible.role: Accessible.StaticText
         }
         Rectangle {
+            antialiasing: true
             width: parent.width
             height: 1
             color: root.tokens.line
@@ -159,6 +161,7 @@ ArchiveScrollView {
             }
         }
         Rectangle {
+            antialiasing: true
             width: parent.width
             height: 1
             color: root.tokens.line

@@ -44,6 +44,7 @@ Item {
                 Accessible.checked: Boolean(slotState.active)
                 contentItem: Item {}
                 background: Rectangle {
+                    antialiasing: true
                     color: "transparent"
                     border.width: button.visualFocus ? 1 : 0
                     border.color: root.tokens.accent

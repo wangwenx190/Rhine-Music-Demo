@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.VectorImage
 import Yalahoo.Music
 import "../components"
 
@@ -625,14 +626,13 @@ ArchiveScrollView {
             tokens: root.tokens
             last: true
 
-            Image {
+            VectorImage {
+                preferredRendererType: VectorImage.CurveRenderer
+                fillMode: VectorImage.PreserveAspectFit
                 objectName: "settingsBrandIcon"
                 width: 48
                 height: 48
                 source: "qrc:/assets/icons/yalahoo/yalahoo.svg"
-                sourceSize.width: width * Screen.devicePixelRatio
-                sourceSize.height: height * Screen.devicePixelRatio
-                fillMode: Image.PreserveAspectFit
                 smooth: true
                 Accessible.ignored: true
             }

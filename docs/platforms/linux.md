@@ -4,7 +4,7 @@
 
 ## 环境与构建
 
-准备本机C++23编译器、CMake、Ninja、clang-format和最新完整Qt Desktop Kit。部署工具另需Python 3.9以上、binutils的readelf/ldd以及patchelf；播放器运行不依赖这些工具。Qt必须包含匹配的私有开发头、CanvasPainter、Multimedia及xcb/Wayland插件；可选Vulkan编译路径还需Vulkan开发头。标准安装根自动发现，自定义完整前缀通过YALAHOO_QT_ROOTS提供。最新Kit缺模块必须补齐，不降级。
+准备本机C++23编译器、CMake、Ninja、clang-format和最新完整Qt Desktop Kit。部署工具另需Python 3.9以上、binutils的readelf/ldd以及patchelf；播放器运行不依赖这些工具。Qt必须包含匹配的私有开发头、CanvasPainter、Multimedia及xcb/Wayland插件；默认Vulkan编译路径还需Vulkan开发头；Wayland颜色管理构建还需pkg-config、wayland-client开发文件和wayland-scanner。标准安装根自动发现，自定义完整前缀通过YALAHOO_QT_ROOTS提供。最新Kit缺模块必须补齐，不降级。
 
 ```sh
 sh tools/build/linux.sh
@@ -52,7 +52,7 @@ QT_QPA_PLATFORM=xcb QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 ```
 
-默认OpenGL；显式Vulkan的初始化能力不足会提示回退，后续验证必须记录实际后端，回退不等于Vulkan通过。缺Vulkan开发头或Qt支持时同样明确回退。实际surface/swapchain及全部效果兼容性仍需目标验证，不能由初始化探测代替。
+默认Vulkan；默认或显式Vulkan的初始化能力不足会提示回退，后续验证必须记录实际后端，回退不等于Vulkan通过。缺Vulkan开发头或Qt支持时同样明确回退。实际surface/swapchain及全部效果兼容性仍需目标验证，不能由初始化探测代替。
 
 ## 目标操作清单
 

@@ -166,6 +166,7 @@ SceneItem::SceneItem(QQuickItem *parent)
         }
     });
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
+    connect(this, &RhiItem::hdrHeadroomChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::heightChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::visibleChanged, this, &SceneItem::configureDiagnostics);
@@ -964,6 +965,10 @@ try {
     in.shells = !m_geometryOnly;
     in.showPaper = !m_geometryOnly;
     in.captureSamples = 4;
+    in.hdrHeadroom = hdrHeadroom();
+    in.hdrActive = hdrActive();
+    if (in.hdrActive)
+        in.displayLayerSize = window()->size() * window()->effectiveDevicePixelRatio();
     in.profile = m_telemetryEnabled;
     in.shadows = !m_geometryOnly && quality.shadows() > 0;
     in.shadowSize = qMax(1, quality.shadows());
@@ -1026,9 +1031,10 @@ try {
             && in.productFloor == old.productFloor && in.floorColor == old.floorColor
             && in.shadows == old.shadows && in.shadowSize == old.shadowSize
             && in.captureSamples == old.captureSamples && in.aoSamples == old.aoSamples
-            && in.aoResolution == old.aoResolution && in.postprocess == old.postprocess
-            && in.bokeh == old.bokeh && in.smaa == old.smaa && in.focus == old.focus
-            && in.aperture == old.aperture && in.clarity == old.clarity
+            && in.hdrHeadroom == old.hdrHeadroom && in.hdrActive == old.hdrActive
+            && in.displayLayerSize == old.displayLayerSize && in.aoResolution == old.aoResolution
+            && in.postprocess == old.postprocess && in.bokeh == old.bokeh && in.smaa == old.smaa
+            && in.focus == old.focus && in.aperture == old.aperture && in.clarity == old.clarity
             && in.background == old.background && in.keyColor == old.keyColor
             && in.skyColor == old.skyColor && in.groundColor == old.groundColor
             && in.lightIntensities == old.lightIntensities && in.spotPosition == old.spotPosition

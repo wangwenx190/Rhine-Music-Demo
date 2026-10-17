@@ -22,6 +22,7 @@
 #include "SceneAdapter.h"
 #include "VerificationWindow.h"
 #include "GraphicsBackend.h"
+#include "DisplayOutput.h"
 #include "DeploymentProbe.h"
 #ifdef Q_OS_MACOS
 #  include "ApplicationMenu.h"
@@ -94,6 +95,12 @@ int main(int argc, char **argv)
         return 22;
     yalahoo::initializeIdentity();
     QGuiApplication app(argc, argv);
+    auto globalFont = QGuiApplication::font();
+    globalFont.setStyleStrategy(
+            QFont::StyleStrategy(QFont::PreferAntialias | QFont::PreferQuality));
+    globalFont.setHintingPreference(QFont::PreferNoHinting);
+    QGuiApplication::setFont(globalFont);
+    yalahoo::DisplayOutput displayOutput;
     const yalahoo::Localization localization;
     yalahoo::probeOptionalGraphicsBackend();
     QIcon applicationIcon;
@@ -551,6 +558,8 @@ int main(int argc, char **argv)
 #endif
     if (usesApp)
         initialProperties.insert(u"lightingLab"_s, parser.isSet(u"lighting-lab"_s));
+    if (usesApp)
+        initialProperties.insert(u"displayOutput"_s, QVariant::fromValue(&displayOutput));
     if (!verificationRun || appVerification)
         initialProperties.insert(u"settingsController"_s, QVariant::fromValue(&settings));
     engine.setInitialProperties(initialProperties);
@@ -567,6 +576,10 @@ int main(int argc, char **argv)
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
         return 3;
+    if (!verificationRun) {
+        displayOutput.attach(*window);
+        window->show();
+    }
     if (verificationRun)
         yalahoo::verification::prepareWindow(*window, verificationFrameless);
 #ifdef Q_OS_MACOS

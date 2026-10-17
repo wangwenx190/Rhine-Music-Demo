@@ -17,6 +17,7 @@ Item {
         spacing: 11
     }
     Rectangle {
+        antialiasing: true
         anchors.bottom: parent.bottom
         width: parent.width
         height: 1

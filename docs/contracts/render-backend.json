@@ -116,7 +116,7 @@
     "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
     "rebuild": "ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'",
     "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: non-OpenGL R34, OpenGL R35.",
-    "linux": "Target latest-Kit build and actual OpenGL execution remain R34.",
+    "linux": "Target latest-Kit Vulkan build/runtime remains R34; explicit OpenGL runtime remains R35.",
     "coverage": "docs/contracts/source-fidelity-review.md#r19d4b2-msaaresolve与旧门禁覆盖"
   },
   "productIntegration": {

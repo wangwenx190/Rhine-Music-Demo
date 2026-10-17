@@ -29,6 +29,7 @@ T.Slider {
             color: control.tokens.line
             radius: 1
             Rectangle {
+                antialiasing: true
                 x: control.horizontal && control.mirrored ? parent.width - width : 0
                 y: control.horizontal ? 0 : parent.height - height
                 width: control.horizontal ? parent.width * control.position : parent.width
@@ -38,6 +39,7 @@ T.Slider {
             }
         }
         Rectangle {
+            antialiasing: true
             anchors.fill: parent
             color: "transparent"
             border.width: control.visualFocus ? 1 : 0

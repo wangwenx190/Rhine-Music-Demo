@@ -62,6 +62,7 @@ Item {
                      root.opening ? root.opening.chrome(root.opening.revealTime, 0.11) : 1)
         onClicked: root.overviewController.toggle()
         Rectangle {
+            antialiasing: true
             y: parent.height - 1
             width: parent.width
             height: 1

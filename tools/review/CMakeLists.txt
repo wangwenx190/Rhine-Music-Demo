@@ -3,7 +3,7 @@ qt_add_executable(ui-audit UiAudit.cpp StartupAudit.cpp StartupAudit.h ControlsA
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/support")
 target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooOpening YalahooRhi
-    Qt6::CanvasPainter Qt6::QuickTemplates2 Qt6::Svg Qt6::Test Qt6::GuiPrivate)
+    Qt6::CanvasPainter Qt6::QuickTemplates2 Qt6::QuickVectorImage Qt6::Svg Qt6::Test Qt6::GuiPrivate)
 set_target_properties(ui-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
     WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
 yalahoo_platform(ui-audit)
@@ -31,6 +31,7 @@ target_compile_definitions(ui-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
 qt_add_shaders(ui-audit navigation_shaders PREFIX /assets/shaders
     BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/opening-paper.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/display-output.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/opening-blur.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"

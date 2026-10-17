@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.VectorImage
 import Yalahoo.Music
 
 Item {
@@ -38,16 +39,15 @@ Item {
         objectName: "brandContainer"
         width: root.brandHeight * 816 / 104
         height: root.brandHeight + 5 + (root.narrow ? 7 : root.metrics.width >= 1700 ? 11 : 9) * 1.5
-        Image {
+        VectorImage {
+            preferredRendererType: VectorImage.CurveRenderer
+            fillMode: VectorImage.PreserveAspectFit
             objectName: "brandLogo"
             // Keep the capital-height slot and full SVG descent; no crop of the accents.
             y: root.brandHeight + 3 - root.brandHeight * 188 / 104
             width: parent.width
             height: root.brandHeight * 208 / 104
             source: "qrc:/assets/branding/logo-" + (root.tokens.night ? "dark" : "light") + ".svg"
-            readonly property real outputDpr: Window.window ? Window.window.devicePixelRatio :
-                                                              Screen.devicePixelRatio
-            sourceSize: Qt.size(width * outputDpr, height * outputDpr)
         }
         ArchiveText {
             tokens: root.tokens
@@ -151,6 +151,7 @@ Item {
             y: (nav.height - (height - (root.metrics.portrait ? 0 : 5))) / 2 - (
                    root.metrics.portrait ? 0 : 5)
             Rectangle {
+                antialiasing: true
                 width: 1
                 height: parent.height
                 color: root.tokens.line
@@ -185,7 +186,9 @@ Item {
                 text: root.playing ? qsTr("Pause") : qsTr("Play")
                 showText: false
                 contentItem: Item {
-                    Image {
+                    VectorImage {
+                        preferredRendererType: VectorImage.CurveRenderer
+                        fillMode: VectorImage.PreserveAspectFit
                         anchors.centerIn: parent
                         width: root.metrics.width <= 700 ? 15 : 17
                         height: width
@@ -193,12 +196,10 @@ Item {
                         scale: .7 + .3 * opacity
                         source: "qrc:/assets/icons/play-" + (root.tokens.night ? "night" : "day")
                                 + ".svg"
-                        readonly property real outputDpr: Window.window
-                                                          ? Window.window.devicePixelRatio :
-                                                            Screen.devicePixelRatio
-                        sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                     }
-                    Image {
+                    VectorImage {
+                        preferredRendererType: VectorImage.CurveRenderer
+                        fillMode: VectorImage.PreserveAspectFit
                         anchors.centerIn: parent
                         width: root.metrics.width <= 700 ? 15 : 17
                         height: width
@@ -206,10 +207,6 @@ Item {
                         scale: .7 + .3 * opacity
                         source: "qrc:/assets/icons/pause-" + (root.tokens.night ? "night" : "day")
                                 + ".svg"
-                        readonly property real outputDpr: Window.window
-                                                          ? Window.window.devicePixelRatio :
-                                                            Screen.devicePixelRatio
-                        sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                     }
                 }
                 onClicked: root.actionRequested("play-pause")

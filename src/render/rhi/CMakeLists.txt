@@ -3,6 +3,9 @@ qt_add_library(
     STATIC
     BackendCapabilities.cpp
     BackendCapabilities.h
+    DisplayOutput.cpp
+    DisplayOutput.h
+    DisplayState.h
     RhiItem.cpp
     RhiItem.h
     SceneItem.cpp
@@ -36,6 +39,34 @@ if(YALAHOO_REVIEW)
     target_compile_definitions(YalahooRhi PRIVATE YALAHOO_RHI_AUDIT)
 endif()
 yalahoo_platform(YalahooRhi)
+if(WIN32)
+    target_sources(YalahooRhi PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/windows/DisplayMonitor.cpp")
+    target_link_libraries(YalahooRhi PRIVATE dxgi user32)
+elseif(APPLE)
+    target_sources(YalahooRhi PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/macos/DisplayMonitor.mm")
+    target_link_libraries(YalahooRhi PRIVATE "-framework AppKit")
+elseif(UNIX)
+    target_sources(YalahooRhi PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/linux/DisplayMonitor.cpp")
+    if(QT_FEATURE_wayland)
+        enable_language(C)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+        find_program(YALAHOO_WAYLAND_SCANNER wayland-scanner REQUIRED)
+        find_file(YALAHOO_COLOR_PROTOCOL color-management-v1.xml
+            PATHS "${YALAHOO_SELECTED_QT}/share/qt6/wayland/protocols/color-management"
+                  "${YALAHOO_SELECTED_QT}/share/wayland/protocols/color-management"
+            NO_DEFAULT_PATH REQUIRED)
+        set(color_protocol_header "${CMAKE_CURRENT_BINARY_DIR}/color-management-v1-client.h")
+        set(color_protocol_source "${CMAKE_CURRENT_BINARY_DIR}/color-management-v1-protocol.c")
+        add_custom_command(OUTPUT "${color_protocol_header}" "${color_protocol_source}"
+            COMMAND "${YALAHOO_WAYLAND_SCANNER}" client-header "${YALAHOO_COLOR_PROTOCOL}" "${color_protocol_header}"
+            COMMAND "${YALAHOO_WAYLAND_SCANNER}" private-code "${YALAHOO_COLOR_PROTOCOL}" "${color_protocol_source}"
+            DEPENDS "${YALAHOO_COLOR_PROTOCOL}" VERBATIM)
+        target_sources(YalahooRhi PRIVATE "${color_protocol_header}" "${color_protocol_source}")
+        target_include_directories(YalahooRhi PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+        target_link_libraries(YalahooRhi PRIVATE PkgConfig::WAYLAND_CLIENT)
+    endif()
+endif()
 # Position invariance for the shared visibility/Equal color geometry requires MSL 2.1.
 qt_add_shaders(YalahooRhi rhi_geometry PREFIX /rhi
     BASE "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"

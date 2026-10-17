@@ -18,6 +18,7 @@ T.Button {
     Accessible.checkable: true
     Accessible.checked: selected
     background: Rectangle {
+        antialiasing: true
         color: "transparent"
         border.color: root.selected || root.activeFocus ? root.tokens.ink : root.tokens.line
         border.width: root.selected || root.activeFocus ? 2 : 1
@@ -39,6 +40,7 @@ T.Button {
                 }
             }
             Rectangle {
+                antialiasing: true
                 visible: root.night
                 x: parent.width * .64
                 y: parent.height * .29
@@ -48,6 +50,7 @@ T.Button {
                 color: "#eee9df"
             }
             Rectangle {
+                antialiasing: true
                 visible: root.night
                 x: parent.width * .34
                 y: parent.height * .62

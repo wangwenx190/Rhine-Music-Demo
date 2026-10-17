@@ -6,7 +6,7 @@
 - QML URI：`Yalahoo.Music`；入口：`loadFromModule("Yalahoo.Music", "App")`；资源：`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。
 - 非 QML shader：`resources/shaders/probe.frag` → 同 Kit `qsb` → `:/assets/shaders/probe.frag.qsb`。Qt 标准默认变体包含 SPIR-V、GLSL、HLSL、MSL。
 - organization/applicationName 均为 `yalahoo`，display/title 为 `yalahOO!!!`。身份设置在 QGuiApplication、引擎与 QStandardPaths 之前；更改展示名不改数据目录。探针不创建或读取用户音乐库。
-- 默认API与Linux可选Vulkan的探测/回退由[render-backend.md](render-backend.md)维护；全平台采用逻辑像素和Qt公开API。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
+- 默认API与Linux默认Vulkan的探测/回退由[render-backend.md](render-backend.md)维护；全平台采用逻辑像素和Qt公开API。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
 
 ## 最新 Kit 与编译器
 

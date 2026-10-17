@@ -30,7 +30,7 @@
 
 ### 测试与窗口
 
-- 后端执行分工：R20–R34的Windows动态检查使用D3D11，macOS使用Metal；三平台OpenGL/GLES上下文、GPU/窗口、质量、输入、生命周期与性能统一归R35，包含Linux默认OpenGL。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
+- 后端执行分工：R20–R34的Windows动态检查使用D3D11，macOS使用Metal；三平台OpenGL/GLES上下文、GPU/窗口、质量、输入、生命周期与性能统一归R35，包含Linux显式OpenGL。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
 - 验证优先复用已有有效结果；不影响行为的注释/文档/脚本等改动免测，逻辑改动只跑对应测试，不因共享代码变更或提交惯性执行全量回归。Release配置、测试分组、有效性判定与执行范围统一由[test-gates.md](docs/contracts/test-gates.md)定义；正式成本/性能采样执行[performance.md](docs/contracts/performance.md)。
 - 全部测试/采集/重建执行[test-window-policy.md](docs/contracts/test-window-policy.md)。默认隐藏；当轮可见授权与结束恢复只按该契约处理，不跨轮次继承。采集限自身渲染，不能为遮挡或节流提升前台。
 - 离屏、Qt提交、正常VSYNC、物理输入/屏幕和媒体听感是独立事实，按实际能力分别验收，未执行或无有效样本保留后置任务。
@@ -69,6 +69,7 @@
 | [presentation.md](docs/contracts/presentation.md) / [detail-motion.md](docs/contracts/detail-motion.md) / [overview.md](docs/contracts/overview.md) | 详情展示；抽取/换片/拖动；总览取景/折叠/标签 |
 | [covers.md](docs/contracts/covers.md) / [archive-pool.md](docs/contracts/archive-pool.md) / [real-columns.md](docs/contracts/real-columns.md) | 封面解码/图集/租约；填充池/选择坐标；真实列/会话记忆 |
 | [render-backend.md](docs/contracts/render-backend.md) | 后端选择和SceneAdapter固定业务边界 |
+| [display-output.md](docs/contracts/display-output.md) | HDR/SDR输出、平台动态检测/白电平与默认绘制质量 |
 | [rhi-opaque.md](docs/contracts/rhi-opaque.md) / [rhi-shell.md](docs/contracts/rhi-shell.md) | 不透明目标/阴影/地面；透射捕获/壳体/排序 |
 | [occlusion.md](docs/contracts/occlusion.md) / [postprocess.md](docs/contracts/postprocess.md) | SSAO/画质；雾/Bokeh/SMAA/最终输出算法与组件验证 |
 | [rhi-postprocess.md](docs/contracts/rhi-postprocess.md) / [rhi-integration.md](docs/contracts/rhi-integration.md) | RHI图集/后处理资源图；生产快照/同步/生命周期/测量接线 |
@@ -116,7 +117,7 @@
 | COMMON-05 | 每项证据可追溯；功能、构建/资源、平台、部署缺陷与未实现路径修复；缺实机单独交接，不能以静态通过冲销失败 |
 | WIN-01 | MSVC/入口/PE与ICO、windeployqt/QML/CanvasPainter/媒体/运行库、启动器自身路径/参数/退出；不伪称生成/运行PE |
 | MAC-01 | bundle/Info.plist/Resources/Frameworks/PlugIns/qml/macdeployqt、Metal/Retina/Command/菜单/关闭/数据根、.command引用 |
-| LNX-01 | xcb/Wayland/GL及可选Vulkan探测回退、库/插件/媒体依赖、LF/可执行位/参数/XDG/权限错误；不静默改系统配置 |
+| LNX-01 | xcb/Wayland、默认Vulkan探测回退及显式GL、库/插件/媒体依赖、LF/可执行位/参数/XDG/权限错误；不静默改系统配置 |
 | PERF-01–07 | 按performance契约展开复杂度/背压/快照上传/资源图/缓存/QML输入/生命周期，覆盖本轮与受影响路径 |
 
 ## 跨轮次经验
@@ -187,7 +188,7 @@
 
 ### R35 · 三平台OpenGL集中验证与补修
 
-- 依赖R33实现交接和R34非OpenGL阶段审计；作为最后的专门轮次，按平台/设备/DPR/组件拆单元，集中执行三平台OpenGL兼容后端，包含Linux默认OpenGL的X11/xcb和Wayland会话。
+- 依赖R33实现交接和R34非OpenGL阶段审计；作为最后的专门轮次，按平台/设备/DPR/组件拆单元，集中执行三平台OpenGL兼容后端，包含Linux显式OpenGL的X11/xcb和Wayland会话。
 - 按下方分工表保留原任务ID、输入、修复对象、准确入口、原门槛和回归依赖。使用最新原生Kit的Release，显式`QSG_RHI_BACKEND=opengl`或对应工具`--backend opengl`，确认实际后端；macOS上下文/basic适配见平台文档，窗口选择见test-window-policy.md。
 - 源码可确定缺陷直接修复；共享修正回归受影响默认生产后端，范围按test-gates.md选择。缺真实系统/Kit/GPU/窗口的单元保留具体缺口，全部三平台适用动态矩阵完成后才删除本节。
 
@@ -197,9 +198,10 @@
 
 | 专项 | R34执行范围 | R35执行范围 |
 | --- | --- | --- |
+| HDR-OUTPUT-P | Windows/D3D11、macOS/Metal、Linux/Vulkan的HDR/SDR原生输出与系统通知 | 三平台显式OpenGL的共享变更SDR回归 |
 | BP-P | Windows/MSVC与Linux原生Kit的严格字符串编译、翻译/模型/资源与部署回归；Windows PowerShell工具真实目标运行 | 三平台OpenGL的共享读回/资源提交与受影响QML回归 |
 | R31-P | macOS独立包在其他目标设备上的Finder/菜单/媒体/物理输入/跨屏及Metal正常呈现与性能 | macOS部署包的OpenGL图形/窗口/输入/性能回归 |
-| R32-P | Linux原生最新Kit/C++23构建、ELF/独立目录部署与干净系统、非图形模型/媒体/设备及实际启用Vulkan的图形/窗口/性能 | Linux默认OpenGL及部署包的X11/xcb、Wayland图形/窗口/输入/生命周期与性能 |
+| R32-P | Linux原生最新Kit/C++23构建、ELF/独立目录部署与干净系统、非图形模型/媒体/设备及实际启用Vulkan的图形/窗口/性能 | Linux显式OpenGL及部署包的X11/xcb、Wayland图形/窗口/输入/生命周期与性能 |
 | R30-P | Windows原生MSVC/最新Kit构建、windeployqt/PE/运行库与干净环境部署、D3D11产品GUI/媒体/性能 | Windows部署包的OpenGL图形/窗口/输入/性能回归 |
 | UI-CONTROLS-P | Windows/D3D11与macOS/Metal原生控件/物理输入、输入法/无障碍/跨屏；三平台目标构建与模块闭包 | 三平台OpenGL控件与宿主窗口/输入回归 |
 | R21-P | Windows/Linux原生文件系统、缓存与非图形扫描回归 | — |
@@ -220,6 +222,13 @@
 
 组件自动回放的剩余平台为Windows/D3D11、Linux实际Vulkan及R35的三平台OpenGL。macOS/Metal待办限各项明确列出的物理输入/显示、跨屏、其他目标设备、实际音频路由及R28-P呈现间断复核；这些目标仍使用原输入、入口与门槛。
 
+#### HDR-OUTPUT-P · HDR目标系统与原生显示事件
+
+- 输入为DisplayOutput/三平台DisplayMonitor、DisplaySurface、display-output.md与5×1颜色输入；需要Windows/D3D11、Linux/Vulkan及支持HDR的真实系统/最新Kit/GPU/窗口环境。本机跨目标qsb仅证明静态翻译，不能替代目标编译/运行。
+- 入口：Release构建Yalahoo/DisplayOutputTest，官方Yalahoo_qmllint/ui-audit_qmllint；`ctest --preset qt-release-render -R '^display-transfer-gpu$'`；获得当轮可见授权后`ctest --preset qt-release-visible -R '^display-output-visible$'`。只运行本专项的小窗口和颜色输入，不隐式启动整场矩阵/性能/阵列。
+- 目标门槛：Windows实测HDR开关、跨HDR/SDR屏、SDR content brightness slider更新及正确nits/80，WCG SDR不误判；Linux在Wayland颜色管理协议与PQ/linear实际swapchain下核对reference white/target luminance通知、X11/无协议SDR及Vulkan初始化失败回退；macOS真实亮度/电源导致current EDR变化及跨屏恢复。查询失败不使用旧HDR状态，参数更新不重建，模式变化保留QML/音频状态，所有者/epoch/关闭释放及可见授权结束恢复默认策略有效。当前系统设置的实际通知、物理显示亮度和跨屏事件须实机操作，不用受控Monitor状态替代。
+- 全平台显式OpenGL继续实现且保持SDR；其HDR相关共享变更回归归R35，原OpenGL门槛不减少。HDR专项不隐式触发全量/大型阵列或性能A/B；性能按既有PERF专项独立验收。
+
 #### BP-P · 语言与框架实践的目标补验
 
 - 输入为根CMake永久编译闸门、`resources/i18n/`、Localization、GenreRowsModel/OptionMetrics、LibrarySession/OfflineMetadataProvider、TrackFocusController与RHI ReadbackImage/资源提交闭包。当前缺Windows/MSVC和Linux原生Kit/系统/GPU/媒体环境；主机编译、qsb、PowerShell解析或合成报告检查均不替代目标事实。
@@ -231,7 +240,7 @@
 - 依赖R33阶段交接和R32交付：`cmake/Deployment.cmake`、`GraphicsBackend.h`/`BackendCapabilities`、`DeploymentProbe`、`tools/build/linux.sh`、`tools/deploy/linux*`/`verify-linux.py`、根普通启动器和`docs/platforms/linux.md`。输入为实际生产QML清单、qrc品牌/字体/CanvasPainter/shader/音频及既有匿名9×64库、支持媒体样本和StartupAudit fixture。当前缺Linux系统/原生编译器/最新完整Kit、ELF执行、GPU、X11/Wayland会话与物理音频设备；主机macOS的Release/模块/源码/工具检查不替代目标事实。Linux打包/动态加载成功路径和Vulkan编译分支尚待目标执行。
 - R34非图形入口：按Linux平台文档真实执行`sh tools/build/linux.sh`和受影响fast检查、`sh tools/deploy/linux.sh`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`及包外新目录`python3 tools/deploy/verify-linux.py --output 绝对新目录`。核对最新Kit/C++23与官方qmllint/同Kit qsb、compiled QML导入清单、ELF架构/全部ldd依赖/相对RPATH/qt.conf、xcb/Wayland/Qt随附媒体/CanvasPainter闭包、许可/可执行位/LF。失败须保留旧包；真实当前退出码与当前report均通过，不以帮助或文件存在代替加载。包复制到无开发Qt的兼容CPU/系统ABI及中文/空格路径重验，实际加载Qt/媒体库不得借用外部Kit。隐藏offscreen QPA探针只加载QML/媒体，无GPU上下文/窗口呈现证明。
 - R34非图形修复对象：原生大小写/Unicode/空格/只读权限与XDG数据根、扫描/异步缓存/只读导入/离线Provider、三路公开媒体播放/暂停/停止/seek/上下曲/自然结束/格式及权限错误、默认/显式设备消失恢复、后台继续和关闭停止。入口及匿名输入沿R21-P/R22-P/R24-P/R25-P；Qt动态支持格式与元数据索引分开，实际设备/听感不能由无输出Loaded样本代替。不得安装包/改驱动/音频配置或写用户歌曲。
-- R35负责默认OpenGL在真实X11/xcb与Wayland会话的产品/组件/部署图形、输入、DPR/跨屏、原窗口hide/minimize/restore、十次SG/视觉重建与全部原质量/资源门槛。修复对象包括实际C++滑尺/二维序章的透明裁切/轮廓、glyph/Quick Text与emoji、三维阵列/玻璃/详情/总览/片头及物理触控板pixelDelta/输入法/焦点；生产无QtCanvas2D导入。依Linux平台文档和对应R19A–E/R16/R17–20/R29专项运行现有Release Review入口，显式`QSG_RHI_BACKEND=opengl`并记录真实API/会话/尺寸/DPR1/1.5/2；原几何≤2逻辑px、布局≤1逻辑px、double运动≤1e-6、颜色/附件/样本/上传/资源断言不放宽。不能用隐藏target DPR或完整root重建冒充物理跨屏/同对象窗口恢复。
+- R35负责显式OpenGL在真实X11/xcb与Wayland会话的产品/组件/部署图形、输入、DPR/跨屏、原窗口hide/minimize/restore、十次SG/视觉重建与全部原质量/资源门槛。修复对象包括实际C++滑尺/二维序章的透明裁切/轮廓、glyph/Quick Text与emoji、三维阵列/玻璃/详情/总览/片头及物理触控板pixelDelta/输入法/焦点；生产无QtCanvas2D导入。依Linux平台文档和对应R19A–E/R16/R17–20/R29专项运行现有Release Review入口，显式`QSG_RHI_BACKEND=opengl`并记录真实API/会话/尺寸/DPR1/1.5/2；原几何≤2逻辑px、布局≤1逻辑px、double运动≤1e-6、颜色/附件/样本/上传/资源断言不放宽。不能用隐藏target DPR或完整root重建冒充物理跨屏/同对象窗口恢复。
 - 若Linux Kit/设备支持Vulkan，R34以`QSG_RHI_BACKEND=vulkan`在两个真实会话执行相同受影响组件及完整产品矩阵，核对实际API，不能将回退OpenGL算Vulkan通过。另以不可用`QT_VULKAN_LIB`运行普通启动/帮助检查显式警告与OpenGL回退；初始化成功仍须验证surface/swapchain/格式/MSAA/resolve/所有权。缺目标Vulkan能力保留具体缺口，不假造运行。
 - 正式产品性能沿R28-P及performance.md入口：两主题十二固定场景、原画质1080p、正常VSYNC和独立未限速各暖机后120秒/至少三次串行，原p95/p99/长帧/输入到Qt提交/准备时延/资源峰值门槛不变；分别记录GL/Vulkan、xcb/Wayland、实际DPR/刷新/窗口策略。driver显存/GPU完成/显示时刻未知仍为null。性能不能从Metal/D3D11或离屏成本推断；缺可靠样本继续保留。
 - 退出：Linux实际构建/依赖/非图形/媒体/部署以及两会话对应API的质量、输入、生命周期和性能原门槛有可靠目标证据；未执行项不记通过。共享修正按test-gates.md回归主力Metal对应组件、格式/官方qmllint及默认隐藏策略，其余目标不外推。

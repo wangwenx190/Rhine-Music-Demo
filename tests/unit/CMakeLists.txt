@@ -1,4 +1,34 @@
 qt_add_executable(IdentityTest IdentityTest.cpp)
+qt_add_executable(DisplayOutputTest DisplayOutputTest.cpp)
+target_include_directories(DisplayOutputTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_link_libraries(DisplayOutputTest PRIVATE YalahooRhi Qt6::Test Qt6::GuiPrivate Qt6::QuickVectorImage)
+target_compile_definitions(DisplayOutputTest PRIVATE DISPLAY_OUTPUT_REPORT="${CMAKE_BINARY_DIR}/verification/display-output.json")
+set_source_files_properties("${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/components/DisplaySurface.qml"
+    PROPERTIES QT_RESOURCE_ALIAS "components/DisplaySurface.qml")
+qt_add_qml_module(DisplayOutputTest URI Yalahoo.DisplayTest
+    DEPENDENCIES QtQuick
+    QML_FILES DisplayOutputProbe.qml
+        "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/components/DisplaySurface.qml"
+    SOURCES DisplayOutputTypes.h)
+qt_add_resources(DisplayOutputTest display_brand PREFIX /display
+    BASE "${PROJECT_SOURCE_DIR}/resources/branding"
+    FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg")
+qt_add_shaders(DisplayOutputTest display_transfer PREFIX /assets/shaders
+    BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
+    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/display-output.frag")
+qt_add_shaders(DisplayOutputTest display_vertex PREFIX /display
+    BASE "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"
+    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
+        "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag")
+yalahoo_platform(DisplayOutputTest)
+add_test(NAME display-transfer-gpu COMMAND DisplayOutputTest transferShader)
+add_test(NAME display-output-visible COMMAND DisplayOutputTest nativeOutput)
+set_tests_properties(display-transfer-gpu display-output-visible PROPERTIES TIMEOUT 30)
+set_tests_properties(display-output-visible PROPERTIES ENVIRONMENT "YALAHOO_VERIFY_VISIBLE=1")
+if(WIN32)
+    set_tests_properties(display-transfer-gpu display-output-visible PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 qt_add_executable(LocalizationTest LocalizationTest.cpp)
 target_link_libraries(LocalizationTest PRIVATE YalahooCore Qt6::Qml Qt6::Test)
 yalahoo_platform(LocalizationTest)

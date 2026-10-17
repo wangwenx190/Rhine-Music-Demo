@@ -272,6 +272,7 @@ Item {
                                                                                       ? root.tokens.veil :
                                                                                         "transparent"
             Rectangle {
+                antialiasing: true
                 width: 3
                 height: parent.height
                 color: root.tokens.accent
@@ -339,6 +340,7 @@ Item {
                 color: root.tokens.muted
             }
             Rectangle {
+                antialiasing: true
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: -1
                 width: parent.width
@@ -459,6 +461,7 @@ Item {
                         color: root.tokens.muted
                     }
                     Rectangle {
+                        antialiasing: true
                         width: parent.width
                         height: 1
                         color: root.tokens.line

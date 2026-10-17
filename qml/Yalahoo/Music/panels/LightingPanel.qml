@@ -94,6 +94,7 @@ Column {
                     }
                     Accessible.name: text
                     background: Rectangle {
+                        antialiasing: true
                         radius: 2
                         color: modeButton.checked ? Qt.rgba(root.tokens.accent.r,
                                                             root.tokens.accent.g,

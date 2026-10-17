@@ -62,6 +62,9 @@ struct Input
     float warmth = 1, clarity = 0, exposure = 1.05f, scatterStrength = 1, areaIntensity = 0;
     QVector3D scatterColor, areaPosition, areaTarget;
     bool shells = false, showPaper = true, rawOutput = false;
+    float hdrHeadroom = 1;
+    bool hdrActive = false;
+    QSize displayLayerSize;
     bool lightingEnabled = true;
     bool productFloor = false; // SceneItem enables the source ground, independent Review opts in.
     QVector3D floorColor; // Linear working color, owned by the theme controller.
@@ -83,8 +86,20 @@ struct Capture
 class RhiItem : public QQuickRhiItem
 {
     Q_OBJECT
+    Q_PROPERTY(float hdrHeadroom READ hdrHeadroom WRITE setHdrHeadroom NOTIFY hdrHeadroomChanged)
+    Q_PROPERTY(bool hdrActive READ hdrActive WRITE setHdrActive NOTIFY hdrHeadroomChanged)
 public:
     explicit RhiItem(QQuickItem *parent = nullptr);
+    float hdrHeadroom() const
+    {
+        return m_hdrHeadroom;
+    }
+    void setHdrHeadroom(float value);
+    bool hdrActive() const
+    {
+        return m_hdrActive;
+    }
+    void setHdrActive(bool value);
     void submit(Input input, QSize target);
     const Input &input() const
     {
@@ -96,12 +111,15 @@ public:
     std::function<void(DiagnosticSample)> diagnosed;
     std::function<void(quint64, quint64, bool)> prepared;
 Q_SIGNALS:
+    void hdrHeadroomChanged();
     void renderFailed(QString message);
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;
 
 private:
+    float m_hdrHeadroom = 1;
+    bool m_hdrActive = false;
     Input m_input;
     quint64 m_submission = 0;
 

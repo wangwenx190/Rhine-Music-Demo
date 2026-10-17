@@ -39,6 +39,7 @@ Item {
     }
     Text {
         id: glyphs
+        antialiasing: true
         // Qt Quick rounds font sizes to pixels. A local vector transform keeps
         // the CSS fractional size without inflating font caches or adding a layer.
         width: root.width / root.fontScale

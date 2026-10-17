@@ -41,9 +41,15 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedBuffer(u"geometry"_s, geometryBytes);
     plan.plannedBuffer(u"draw-uniforms"_s, qint64(stride) * (436 * 3 + 6));
     plan.plannedBuffer(u"instances"_s, 436 * 112);
-    plan.plannedBuffer(u"output-uniform"_s, 16);
-    plan.plannedTexture(u"qt-item-output"_s, size, QRhiTexture::RGBA8);
+    plan.plannedBuffer(u"output-uniform"_s, 32);
+    plan.plannedTexture(u"qt-item-output"_s, size,
+                        in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8);
     plan.plannedTexture(u"qt-item-depth-upper-bound"_s, size, QRhiTexture::D32FS8);
+    if (in.hdrActive) {
+        plan.plannedTexture(u"display-composition"_s, in.displayLayerSize, QRhiTexture::RGBA16F);
+        plan.plannedTexture(u"display-composition-depth-upper-bound"_s, in.displayLayerSize,
+                            QRhiTexture::D32FS8);
+    }
     if (in.navigationDpr > 0) {
         const auto scaled = [&](int width, int height) {
             return QSize(int(std::ceil(width * in.navigationDpr)),
@@ -61,11 +67,11 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
                                 QRhiTexture::RGBA8);
     }
     if (!in.panelLayerSize.isEmpty()) {
-        // CSS sigma=8 logical-pixel blur uses two logical-pixel RGBA8 filter surfaces.
+        // CSS sigma=8 logical-pixel blur uses two logical-pixel filter surfaces.
         // Their owners are the visible Popup Loader; closing destroys both captures.
         for (int i = 0; i < 2; ++i) {
             plan.plannedTexture(u"panel-blur-%1-color"_s.arg(i), in.panelLayerSize,
-                                QRhiTexture::RGBA8);
+                                in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8, 1, true);
             plan.plannedTexture(u"panel-blur-%1-depth-upper-bound"_s.arg(i), in.panelLayerSize,
                                 QRhiTexture::D32FS8);
         }
@@ -74,7 +80,7 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
         // Skip backdrop has two bounded logical-pixel textures, including 3 sigma padding.
         for (int i = 0; i < 2; ++i) {
             plan.plannedTexture(u"opening-skip-blur-%1-color-upper-bound"_s.arg(i), { 220, 120 },
-                                QRhiTexture::RGBA8);
+                                in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8, 1, true);
             plan.plannedTexture(u"opening-skip-blur-%1-depth-upper-bound"_s.arg(i), { 220, 120 },
                                 QRhiTexture::D32FS8);
         }

@@ -85,6 +85,8 @@ bool yalahoo::initializeAssetFonts()
             if (!found)
                 return rollback();
         }
+        font.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias | QFont::PreferQuality));
+        font.setHintingPreference(QFont::PreferNoHinting);
         preparedFaces.insert(face[u"cssWeight"_s].toInt(), font);
     }
     if (preparedFaces.keys() != QList<int>{ 300, 400, 600, 700 })

@@ -6,6 +6,7 @@ set(
     Gui
     Qml
     Quick
+    QuickVectorImage
     QuickTemplates2
     QuickDialogs2
     Quick3D

@@ -29,6 +29,7 @@ T.TextArea {
     renderType: Text.CurveRendering
     opacity: enabled ? 1 : .38
     background: Rectangle {
+        antialiasing: true
         color: control.tokens.surface
         border.color: control.activeFocus ? control.tokens.accent : control.tokens.line
         radius: 0
@@ -38,6 +39,7 @@ T.TextArea {
         lineHeight: control.cssLineHeight
     }
     Text {
+        antialiasing: true
         x: control.leftPadding
         y: control.topPadding
         width: Math.max(0, control.width - control.leftPadding - control.rightPadding)

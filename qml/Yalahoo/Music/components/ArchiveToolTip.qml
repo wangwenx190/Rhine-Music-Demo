@@ -25,6 +25,7 @@ T.ToolTip {
     enter: null
     exit: null
     background: Rectangle {
+        antialiasing: true
         color: tip.tokens.surface
         border.color: tip.tokens.line
         radius: 2

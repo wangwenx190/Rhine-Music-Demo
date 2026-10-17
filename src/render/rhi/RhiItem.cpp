@@ -268,7 +268,8 @@ private:
         bool operator==(const AllocationKey &) const = default;
     };
     AllocationKey allocationKey;
-    QSize plannedOpeningLayer, plannedPanelLayer;
+    QSize plannedOpeningLayer, plannedPanelLayer, plannedDisplayLayer;
+    bool plannedHdr = false;
     void reset();
     void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
@@ -607,7 +608,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                              input.navigationDpr,
                              input.textResourceRevision };
     if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize
-        || plannedPanelLayer != input.panelLayerSize || !vertices) {
+        || plannedPanelLayer != input.panelLayerSize || plannedHdr != input.hdrActive
+        || plannedDisplayLayer != input.displayLayerSize || !vertices) {
         for (const auto format :
              { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
             require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
@@ -639,6 +641,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         allocationKey = key;
         plannedOpeningLayer = input.openingLayerSize;
         plannedPanelLayer = input.panelLayerSize;
+        plannedDisplayLayer = input.displayLayerSize;
+        plannedHdr = input.hdrActive;
         cachedInventory = { };
     }
     if (!vertices) {
@@ -704,7 +708,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         instanceBuffer.reset(
                 api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 436 * 112));
         require(instanceBuffer->create(), "RHI instance buffer failed");
-        outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16));
+        outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32));
         require(outputUniform->create(), "Output uniform buffer failed");
         linear.reset(api->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
                                      QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
@@ -1403,16 +1407,20 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                      instances.constData());
     }
     updates->updateDynamicBuffer(uniforms.get(), 0, cursor, bytes.constData());
-    const float out[4] = {
+    const float out[8] = {
         api->isYUpInFramebuffer() ? 0.0f : 1.0f,
         input.geometryDiagnostic || input.shadowDiagnostic || input.rawOutput ? 1.0f : 0.0f,
         (input.postprocess || input.shells) && input.lightingEnabled && !input.rawOutput
                         && !input.geometryDiagnostic && !input.shadowDiagnostic
                 ? 1.0f
                 : 0.0f,
-        input.exposure
+        input.exposure,
+        input.hdrHeadroom,
+        0,
+        0,
+        0
     };
-    updates->updateDynamicBuffer(outputUniform.get(), 0, 16, out);
+    updates->updateDynamicBuffer(outputUniform.get(), 0, sizeof(out), out);
     const bool shadowRendered = shadowDirty;
     if (shadowDirty) {
         cb->beginPass(shadow.rt.get(), Qt::white, { 1, 0 }, updates.release());
@@ -2104,6 +2112,23 @@ RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
         qFatal("Invalid embedded RHI assets: %s", error.what());
     }
     setAlphaBlending(false);
+    setSmooth(true);
+}
+void RhiItem::setHdrHeadroom(float value)
+{
+    value = std::isfinite(value) ? std::max(1.0f, value) : 1;
+    if (value == m_hdrHeadroom)
+        return;
+    m_hdrHeadroom = value;
+    Q_EMIT hdrHeadroomChanged();
+}
+void RhiItem::setHdrActive(bool value)
+{
+    if (value == m_hdrActive)
+        return;
+    m_hdrActive = value;
+    setColorBufferFormat(value ? TextureFormat::RGBA16F : TextureFormat::RGBA8);
+    Q_EMIT hdrHeadroomChanged();
 }
 QJsonArray adapterInventory()
 {

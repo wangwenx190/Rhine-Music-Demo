@@ -25,7 +25,7 @@ CHECKS = [
      'QSaveFile and surface permission failures; read-only import never writes music. Fonts, icons, '
      'GLB, audio and qsb are qrc resources, independent of cwd. No source/compatibility field is added.'),
     ('COMMON-03', 'src/render/rhi/BackendCapabilities.cpp', 'QRhi::create(QRhi::Vulkan',
-     'Linux defaults to OpenGL. Explicit Vulkan is probed once after QGuiApplication and before any '
+     'Linux defaults to Vulkan. Default or explicit Vulkan is probed once after QGuiApplication and before any '
      'Quick window with QVulkanInstance/QRhi device and production RGBA16F/R16F/D32F render formats; '
      'unsupported Kit/headers/device falls back with warning and actual backend environment updated. '
      'Probe device dies before instance, production Qt owns its own render device. Actual swapchain, '

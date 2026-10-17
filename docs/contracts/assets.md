@@ -29,7 +29,7 @@ macOS/Linux 可运行 `sh tools/assets/prepare-assets.sh qt-release` 重新导�
 | Demibold | 600 | 450 |
 | Bold | 700 | 630 |
 
-Qt 的数值权重匹配不能直接代替 Web 的 `@font-face` 映射。`src/app/AssetCatalog` 按字体实际 family/styleName 显式选择原字形；C++ 使用 `assetFont(cssWeight)`，QML 使用 `MusicFonts.light/regular/demibold/bold`，随后设置 pixelSize。不要仅设置 `font.bold` 或用系统字体代替。默认应用字体为原 Regular，品牌探针标题使用原 Bold。实际 styleName 和映射见 `resources/manifests/fonts.json`。
+Qt 的数值权重匹配不能直接代替 Web 的 `@font-face` 映射。`src/app/AssetCatalog` 按字体实际 family/styleName 显式选择原字形；C++ 使用 `assetFont(cssWeight)`，QML 使用 `MusicFonts.light/regular/demibold/bold`，随后设置 pixelSize。不要仅设置 `font.bold` 或用系统字体代替。默认应用字体为原 Regular，品牌探针标题使用原 Bold。渲染质量与hinting默认值见[display-output.md](display-output.md)。实际 styleName 和映射见 `resources/manifests/fonts.json`。
 
 启动时核对实际选中字体的 CFF/glyf 表；若 DirectWrite/CoreText/Fontconfig 暴露的字体别名不同，则从本次注册返回的 family/style 中找到同一字形表。无法选中原字形时明确失败并回滚注册，不静默使用系统替代字体。
 

@@ -161,6 +161,7 @@ FocusScope {
         }
         background: Item {
             OpeningBackdrop {
+                hdrActive: root.tokens.hdrActive
                 anchors.fill: parent
                 sceneSource: root.sceneSource
                 sceneX: skip.x
@@ -171,12 +172,14 @@ FocusScope {
                 paperAlpha: root.drawing.background
             }
             Rectangle {
+                antialiasing: true
                 anchors.fill: parent
                 color: root.tokens.veil
                 border.width: 1
                 border.color: root.tokens.line
             }
             Rectangle {
+                antialiasing: true
                 x: -6
                 y: -6
                 width: parent.width + 12

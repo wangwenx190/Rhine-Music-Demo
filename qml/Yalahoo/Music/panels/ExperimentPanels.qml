@@ -5,6 +5,7 @@ import "../components"
 
 Rectangle {
     id: root
+    antialiasing: true
     objectName: "experimentPanels"
     required property DesignTokens tokens
     required property SettingsController settings

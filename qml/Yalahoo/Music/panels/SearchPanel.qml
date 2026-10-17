@@ -67,6 +67,7 @@ Item {
             placeholderTextColor: root.tokens.muted
             selectByMouse: true
             background: Rectangle {
+                antialiasing: true
                 color: root.tokens.surface
                 border.color: root.tokens.line
             }
@@ -113,10 +114,12 @@ Item {
                         padding: 5
                         checked: root.genreId === modelData.id
                         background: Rectangle {
+                            antialiasing: true
                             color: filter.checked ? root.tokens.ink : "transparent"
                             border.color: root.tokens.line
                         }
                         contentItem: Text {
+                            antialiasing: true
                             text: filter.text
                             font: filter.font
                             renderType: Text.CurveRendering
@@ -188,6 +191,7 @@ Item {
                                                                 === result.index)
                        ? root.tokens.veil : "transparent"
                 Rectangle {
+                    antialiasing: true
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: 1
@@ -196,6 +200,7 @@ Item {
             }
             contentItem: Item {
                 Rectangle {
+                    antialiasing: true
                     width: 49
                     height: 49
                     anchors.verticalCenter: parent.verticalCenter
@@ -203,6 +208,8 @@ Item {
                     border.color: root.tokens.line
                     Image {
                         id: artwork
+                        smooth: true
+                        mipmap: true
                         anchors.fill: parent
                         anchors.margins: 1
                         source: result.coverUrl

@@ -31,6 +31,8 @@ Item {
     property OverviewController overviewController: null
     property Item presentationReturnFocus: null
     property bool geometryProbe: false
+    property real hdrHeadroom: 1
+    property bool hdrActive: false
     property string preferencesError: ""
     property string navigationError: ""
     readonly property ExperimentPanels experimentPanel: experiments.item as ExperimentPanels
@@ -52,6 +54,7 @@ Item {
     }
     DesignTokens {
         id: design
+        hdrActive: stage.hdrActive
         offscreenRendering: stage.offscreenRendering
         night: stage.sceneAdapter.lighting.night
         reducedMotion: stage.motionController.reducedMotion
@@ -123,6 +126,8 @@ Item {
         anchors.fill: parent
         SceneItem {
             id: nativeScene
+            hdrHeadroom: stage.hdrHeadroom
+            hdrActive: stage.hdrActive
             objectName: "nativeScene"
             diagnosticsEnabled: stage.experimentPanel !== null && stage.experimentPanel.diagnostics
                                 && stage.experimentsVisible && (!stage.openingController ||

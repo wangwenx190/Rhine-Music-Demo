@@ -15,6 +15,7 @@ T.ScrollBar {
     visible: policy === T.ScrollBar.AlwaysOn || (policy === T.ScrollBar.AsNeeded && size < 1)
     background: Item {}
     contentItem: Rectangle {
+        antialiasing: true
         implicitWidth: 4
         implicitHeight: 4
         radius: 2

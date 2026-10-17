@@ -12,6 +12,7 @@ unset(YALAHOO_RHI_API CACHE)
 check_cxx_source_compiles(
     [=[
     #include <QQuickRhiItem>
+    #include <QQuickWindow>
     #include <rhi/qrhi.h>
     #include <rhi/qshader.h>
     class Probe : public QQuickRhiItemRenderer
@@ -104,6 +105,12 @@ check_cxx_source_compiles(
     int main()
     {
         Probe p;
+        QQuickWindow window;
+        auto *swap = window.swapChain();
+        if (swap) {
+            (void)swap->isFormatSupported(QRhiSwapChain::HDRExtendedSrgbLinear);
+            (void)swap->isFormatSupported(QRhiSwapChain::HDR10);
+        }
         return 0;
     }
 ]=]

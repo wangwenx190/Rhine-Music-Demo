@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.VectorImage
 import QtQuick.Templates as T
 import Yalahoo.Music
 import QtQuick.Shapes
@@ -40,6 +41,7 @@ T.Button {
                                                                                 "transparent"
         border.width: control.framed ? 1 : 2
         Rectangle {
+            antialiasing: true
             anchors.bottom: parent.bottom
             width: parent.width
             height: control.underline ? 1 : 0
@@ -67,15 +69,12 @@ T.Button {
                                                                                   control.tokens.night
                                                                                   ? "-night.svg" :
                                                                                     "-day.svg") : ""
-                Image {
+                VectorImage {
+                    preferredRendererType: VectorImage.CurveRenderer
+                    fillMode: VectorImage.PreserveAspectFit
                     anchors.fill: parent
                     visible: control.iconName !== "settings"
                     source: control.iconName !== "settings" ? iconSlot.asset : ""
-                    readonly property real outputDpr: Window.window
-                                                      ? Window.window.devicePixelRatio :
-                                                        Screen.devicePixelRatio
-                    // Rasterize the source SVG at the actual output extent.
-                    sourceSize: Qt.size(width * outputDpr, height * outputDpr)
                 }
                 Item {
                     visible: control.iconName === "settings"
@@ -86,6 +85,7 @@ T.Button {
                         yScale: control.iconSize / 24
                     }
                     Shape {
+                        antialiasing: true
                         width: 24
                         height: 24
                         preferredRendererType: Shape.CurveRenderer
@@ -100,6 +100,7 @@ T.Button {
                         }
                     }
                     Shape {
+                        antialiasing: true
                         z: 1
                         width: 24
                         height: 24

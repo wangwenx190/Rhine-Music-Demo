@@ -15,7 +15,7 @@ using namespace Qt::StringLiterals;
 void yalahoo::probeOptionalGraphicsBackend()
 {
 #if defined(Q_OS_LINUX)
-    if (qgetenv("QSG_RHI_BACKEND") != "vulkan"_ba)
+    if (QQuickWindow::graphicsApi() != QSGRendererInterface::Vulkan)
         return;
     bool supported = false;
 #  if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)

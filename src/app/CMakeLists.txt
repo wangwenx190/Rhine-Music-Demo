@@ -205,6 +205,7 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders"
     FILES
     "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/display-output.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/opening-paper.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/opening-blur.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
@@ -226,6 +227,7 @@ target_link_libraries(
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick
+    Qt6::QuickVectorImage
     Qt6::QuickTemplates2
     Qt6::QuickDialogs2
     Qt6::Multimedia

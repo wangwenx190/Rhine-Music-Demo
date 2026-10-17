@@ -18,6 +18,8 @@ Item {
     }
     Image {
         id: backdrop
+        smooth: true
+        mipmap: true
         anchors.fill: parent
         source: root.backgroundUrl
         fillMode: Image.Tile

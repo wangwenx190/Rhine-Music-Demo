@@ -3,6 +3,7 @@ import QtQuick
 
 Item {
     id: root
+    property bool hdrActive: false
     required property Item sceneSource
     required property Item contentSource
     required property real sceneX
@@ -13,6 +14,8 @@ Item {
     clip: true
     ShaderEffectSource {
         id: scene
+        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
+        mipmap: true
         sourceItem: root.sceneSource
         sourceRect: Qt.rect(root.sceneX - 54, root.sceneY - 54, root.targetWidth, root.targetHeight)
         width: root.targetWidth
@@ -23,6 +26,8 @@ Item {
     }
     ShaderEffectSource {
         id: content
+        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
+        mipmap: true
         sourceItem: root.contentSource
         sourceRect: Qt.rect(-54, root.contentY - 54, root.targetWidth, root.targetHeight)
         width: root.targetWidth
@@ -44,6 +49,8 @@ Item {
     }
     ShaderEffectSource {
         id: horizontalTexture
+        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
+        mipmap: true
         sourceItem: horizontal
         textureSize: Qt.size(root.targetWidth, root.targetHeight)
         width: root.targetWidth

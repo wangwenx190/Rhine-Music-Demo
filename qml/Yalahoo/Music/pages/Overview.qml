@@ -117,6 +117,7 @@ Item {
                     anchors.fill: parent
                     active: anchor.visible && anchor.extent > 0
                     sourceComponent: OverviewBackdrop {
+                        hdrActive: root.tokens.hdrActive
                         objectName: "overviewBackdrop-" + anchor.lane
                         sceneSource: root.sceneSource
                         sceneX: anchor.x
@@ -125,16 +126,19 @@ Item {
                     }
                 }
                 Rectangle {
+                    antialiasing: true
                     anchors.fill: parent
                     color: Qt.rgba(root.tokens.surface.r, root.tokens.surface.g,
                                    root.tokens.surface.b, .87)
                 }
                 Rectangle {
+                    antialiasing: true
                     width: parent.width
                     height: 1
                     color: anchor.selectedColumn ? root.tokens.accent : root.tokens.line
                 }
                 Rectangle {
+                    antialiasing: true
                     x: root.labelWidth / 2
                     y: parent.height
                     width: 1
@@ -161,6 +165,7 @@ Item {
                         visible: label.visible && label.hovered
                     }
                     background: Rectangle {
+                        antialiasing: true
                         color: "transparent"
                         border.width: label.visualFocus ? 1 : 0
                         border.color: root.tokens.accent
@@ -218,6 +223,7 @@ Item {
                             border.width: enter.visualFocus ? 1 : 0
                             border.color: root.tokens.accent
                             Rectangle {
+                                antialiasing: true
                                 width: 1
                                 height: parent.height
                                 color: root.tokens.line
@@ -259,6 +265,7 @@ Item {
         height: 37
         onClicked: root.controller.setActive(false)
         Rectangle {
+            antialiasing: true
             y: parent.height - 1
             width: parent.width
             height: 1
@@ -279,6 +286,7 @@ Item {
             height: 32
             onClicked: root.inputRouter.lane(-1)
             Rectangle {
+                antialiasing: true
                 anchors.fill: parent
                 color: "transparent"
                 border.color: root.tokens.line
@@ -300,6 +308,7 @@ Item {
             height: 32
             onClicked: root.inputRouter.lane(1)
             Rectangle {
+                antialiasing: true
                 anchors.fill: parent
                 color: "transparent"
                 border.color: root.tokens.line

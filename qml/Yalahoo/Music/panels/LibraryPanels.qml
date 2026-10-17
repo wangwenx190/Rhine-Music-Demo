@@ -70,6 +70,9 @@ T.Popup {
             sourceComponent: Item {
                 ShaderEffectSource {
                     id: backdropTexture
+                    format: root.tokens.hdrActive ? ShaderEffectSource.RGBA16F :
+                                                    ShaderEffectSource.RGBA8
+                    mipmap: true
                     sourceItem: root.sceneSource
                     anchors.fill: parent
                     textureSize: Qt.size(width, height)
@@ -86,6 +89,9 @@ T.Popup {
                 }
                 ShaderEffectSource {
                     id: intermediate
+                    format: root.tokens.hdrActive ? ShaderEffectSource.RGBA16F :
+                                                    ShaderEffectSource.RGBA8
+                    mipmap: true
                     sourceItem: horizontal
                     anchors.fill: parent
                     textureSize: Qt.size(width, height)
@@ -102,6 +108,7 @@ T.Popup {
             }
         }
         Rectangle {
+            antialiasing: true
             anchors.fill: parent
             color: Qt.rgba(4 / 255, 12 / 255, 19 / 255, .25)
         }
@@ -117,6 +124,7 @@ T.Popup {
         }
         Rectangle {
             id: pane
+            antialiasing: true
             objectName: "libraryPanelSurface"
             x: (parent.width - width) / 2
             y: (parent.height - height) / 2 + root.controller.surface.offset

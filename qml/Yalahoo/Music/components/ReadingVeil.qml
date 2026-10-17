@@ -18,6 +18,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
         visible: root.metrics.portrait
         gradient: Gradient {
@@ -36,6 +37,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
         visible: !root.metrics.portrait
         gradient: Gradient {
@@ -55,6 +57,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
         opacity: 1 - root.tokens.nightMix
         visible: opacity > 0
@@ -78,6 +81,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
         opacity: root.tokens.nightMix
         visible: opacity > 0
@@ -101,6 +105,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
         visible: opacity > 0
         opacity: root.tokens.nightMix * root.sideVeilOpacity
@@ -125,6 +130,7 @@ Item {
         }
     }
     Rectangle {
+        antialiasing: true
         x: root.metrics.informationX
         y: root.calloutTop
         width: root.metrics.width - x - root.metrics.informationRight

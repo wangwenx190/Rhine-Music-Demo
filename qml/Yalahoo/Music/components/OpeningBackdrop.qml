@@ -3,6 +3,7 @@ import QtQuick
 
 Item {
     id: root
+    property bool hdrActive: false
     required property Item sceneSource
     required property real sceneX
     required property real sceneY
@@ -15,6 +16,8 @@ Item {
     clip: true
     ShaderEffectSource {
         id: crop
+        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
+        mipmap: true
         sourceItem: root.sceneSource
         sourceRect: Qt.rect(root.sceneX - 30, root.sceneY - 30, root.targetWidth, root.targetHeight)
         width: root.targetWidth
@@ -40,6 +43,8 @@ Item {
     }
     ShaderEffectSource {
         id: horizontalTexture
+        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
+        mipmap: true
         sourceItem: horizontal
         textureSize: Qt.size(root.targetWidth, root.targetHeight)
         width: root.targetWidth

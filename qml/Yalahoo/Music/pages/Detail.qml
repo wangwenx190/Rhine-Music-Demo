@@ -86,6 +86,7 @@ FocusScope {
     }
     Rectangle {
         id: portraitBackdrop
+        antialiasing: true
         visible: root.metrics.portrait
         y: root.height * 0.46
         width: root.width
@@ -272,6 +273,7 @@ FocusScope {
                 }
                 Rectangle {
                     id: offline
+                    antialiasing: true
                     objectName: "detailOfflineBadge"
                     visible: root.album.offline || false
                     width: badge.implicitWidth + 14
@@ -290,6 +292,7 @@ FocusScope {
                 }
             }
             Rectangle {
+                antialiasing: true
                 width: parent.width
                 height: 1
                 color: root.tokens.ink
@@ -332,6 +335,7 @@ FocusScope {
                 }
             }
             Rectangle {
+                antialiasing: true
                 width: parent.width
                 height: 1
                 color: root.tokens.line
@@ -450,6 +454,7 @@ FocusScope {
                 anchors.fill: parent
                 active: root.visible && tabBar.y < tracks.height
                 sourceComponent: DetailTabsBackdrop {
+                    hdrActive: root.tokens.hdrActive
                     sceneSource: root.metrics.portrait ? portraitBackdrop : root.sceneSource
                     contentSource: tracks.currentView
                     sceneX: tracks.x
@@ -458,6 +463,7 @@ FocusScope {
                 }
             }
             Rectangle {
+                antialiasing: true
                 anchors.fill: parent
                 color: root.tokens.veil
             }
@@ -536,12 +542,14 @@ FocusScope {
                 }
             }
             Rectangle {
+                antialiasing: true
                 anchors.bottom: parent.bottom
                 width: parent.width
                 height: 1
                 color: root.tokens.line
             }
             Rectangle {
+                antialiasing: true
                 objectName: "detailTabIndicator"
                 y: parent.height - 1
                 height: 2

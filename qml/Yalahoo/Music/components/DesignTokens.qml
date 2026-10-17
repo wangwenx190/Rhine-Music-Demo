@@ -5,6 +5,7 @@ import Yalahoo.Music
 QtObject {
     id: root
     property bool night: false
+    property bool hdrActive: false
     property bool reducedMotion: false
     property bool offscreenRendering: false
     property real motionSpeed: 1

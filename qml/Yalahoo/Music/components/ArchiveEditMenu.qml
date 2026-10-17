@@ -33,6 +33,7 @@ T.Popup {
     enter: null
     exit: null
     background: Rectangle {
+        antialiasing: true
         color: menu.tokens.surface
         border.color: menu.tokens.line
     }

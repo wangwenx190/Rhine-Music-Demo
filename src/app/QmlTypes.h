@@ -19,6 +19,7 @@
 #include "SceneAdapter.h"
 #include "OverviewController.h"
 #include "SceneItem.h"
+#include "DisplayOutput.h"
 #include "RulerController.h"
 #include "RulerInk.h"
 #include "InputRouter.h"
@@ -28,6 +29,14 @@
 #include "TransportMotion.h"
 #include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>
+
+struct DisplayOutputQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::DisplayOutput)
+    QML_NAMED_ELEMENT(DisplayOutput)
+    QML_UNCREATABLE("Display output is owned by the application")
+};
 
 struct LayoutMetricsQml
 {

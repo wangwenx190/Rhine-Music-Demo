@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Templates as T
 import Yalahoo.Music
 import "pages"
+import "components"
 
 T.ApplicationWindow {
     id: window
@@ -28,19 +29,29 @@ T.ApplicationWindow {
     property bool lightingLab: false
     property bool geometryProbe: false
     property bool verificationRun: false
+    property DisplayOutput displayOutput: null
     property int verificationFlags: Qt.Window
     width: 1280
     height: 720
     minimumWidth: 320
     minimumHeight: 240
-    visible: !verificationRun
+    visible: false
     flags: verificationRun ? verificationFlags : Qt.Window
     title: "yalahOO!!!"
-    color: sceneAdapter.lighting.night ? "#08121f" : "#e8e5e1"
+    color: displayOutput && (!displayOutput.ready || displayOutput.hdrActive) ? "black" :
+                                                                                sceneAdapter.lighting.night
+                                                                                ? "#08121f" :
+                                                                                  "#e8e5e1"
+    contentItem: DisplaySurface {
+        output: window.displayOutput
+        backgroundColor: window.sceneAdapter.lighting.night ? "#08121f" : "#e8e5e1"
+    }
     Loader {
         id: visualTree
         anchors.fill: parent
         sourceComponent: MusicStage {
+            hdrHeadroom: window.displayOutput ? window.displayOutput.headroom : 1
+            hdrActive: window.displayOutput ? window.displayOutput.hdrActive : false
             anchors.fill: parent
             librarySession: window.librarySession
             motionController: window.motionController

@@ -29,6 +29,8 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 - `rhi-smaa-gpu`直接生产三pass真正离屏；34状态含64×64/129×73/73×129、七种解析模式、动态后flat清零与十次重建。edges≤1/255、weights/blend≤3/255，全部RGBA通道有限，HDR/变化alpha保持。`audit-rhi-smaa.py`核对完整源helper/lookup/历史调用。
 - Quick3D Review保留仅DOF/仅SMAA/DOF→SMAA三个固定Effect实例；组合在同Effect内用具名RGBA16F中间目标，最终pass必须输出最终目标；不动态重定向Pass.output/BufferInput。
 
+HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR颜色和独立后处理公式门槛不变。
+
 ## AA与执行边界
 
 原始antialias=off只关闭后期SMAA，几何MSAA仍开启；高/极高追加SMAA。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。

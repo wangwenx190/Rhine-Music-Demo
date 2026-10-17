@@ -45,6 +45,7 @@ Flickable {
         padding: 0
         background: Item {}
         contentItem: Rectangle {
+            antialiasing: true
             color: root.tokens.muted
             radius: 2
             opacity: root.contentHeight > root.height ? 0.5 : 0
@@ -129,6 +130,7 @@ Flickable {
                 y: codeLabel.y + codeLabel.baselineOffset - baselineOffset
             }
             Rectangle {
+                antialiasing: true
                 y: parent.height - rule.ruleMargin - 1
                 width: parent.width
                 height: 1

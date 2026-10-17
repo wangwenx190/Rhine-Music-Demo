@@ -16,7 +16,7 @@
 
 - 合成次序：SceneItem → 横/竖阅读渐变 → 暖昼/夜间竖向渐变 → 夜间侧向渐变 → 竖屏信息局部渐变 → 页眉/浏览文字/计数/页脚。稳定透明层visible=false；普通渐变直接进入Qt Quick主场景，不创建整屏ShaderEffectSource。
 - 主题只改颜色/透明度，不重建三维资源。Flickable矩形裁切，文字/SVG内容不变时复用节点。
-- 功能图标保留源SVG几何。settings的横线/圆点以同几何Quick Shape分层；其他图标由源SVG按所属窗口实际DPR栅格化，无额外倍采样/mips，仅内容/主题/DPR变化失效。17px单图RGBA8约1156bytes×DPR²为描述符估算，Qt图集/对齐另计。
+- 功能图标保留源SVG几何。settings的横线/圆点以同几何Quick Shape分层；其他图标与品牌SVG使用VectorImage曲线渲染，质量默认值见[display-output.md](display-output.md)。
 - 静态文字用同源字体、CurveRendering和局部矢量比例表达分数字号；不能由截图反推布局常量。静态盒模型判定见source-fidelity-review.md的R19E；完整字体/标题采样仍按R19F复审。
 
 组件入口：`yalahoo --verify-browse 输出目录`；源码导出`node tools/review/export-browse-ui.mjs`。`ui-audit 输出目录`检查九尺寸/双主题、长歌名下按钮固定、最终song-cap及自身Qt键盘动作；用`python3 tools/review/compare-browse-structure.py 原生report.json 冻结report.json 输出.json`检查同尺寸/主题/DPR的CSS锚点≤1逻辑px，不读取图像。字体身份/内容与实际质量单列。

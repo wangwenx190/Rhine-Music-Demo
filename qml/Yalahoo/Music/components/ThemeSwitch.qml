@@ -12,6 +12,7 @@ Rectangle {
     color: "transparent"
     border.color: tokens.line
     Rectangle {
+        antialiasing: true
         // CSS absolute offsets are measured inside the 1px border.
         x: root.tokens.night ? root.width / 2 + 2 : 4
         y: 4
@@ -47,6 +48,7 @@ Rectangle {
             checked: root.tokens.night === (index === 1)
             Accessible.name: qsTr("%1 theme").arg(text)
             background: Rectangle {
+                antialiasing: true
                 color: "transparent"
                 radius: 16
                 border.color: option.activeFocus ? root.tokens.accent : "transparent"
@@ -62,6 +64,7 @@ Rectangle {
                         width: 7
                         height: 7
                         Rectangle {
+                            antialiasing: true
                             x: -1
                             y: -1
                             width: 9
@@ -71,6 +74,7 @@ Rectangle {
                             border.color: Qt.rgba(0.5, 0.5, 0.5, 0.35)
                         }
                         Rectangle {
+                            antialiasing: true
                             anchors.fill: parent
                             radius: 3.5
                             color: option.index === 0 ? "#e9c492" : "#415577"
