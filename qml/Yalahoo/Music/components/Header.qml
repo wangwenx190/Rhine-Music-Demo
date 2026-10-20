@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.VectorImage
 import Yalahoo.Music
 
 Item {
@@ -39,9 +38,7 @@ Item {
         objectName: "brandContainer"
         width: root.brandHeight * 816 / 104
         height: root.brandHeight + 5 + (root.narrow ? 7 : root.metrics.width >= 1700 ? 11 : 9) * 1.5
-        VectorImage {
-            preferredRendererType: VectorImage.CurveRenderer
-            fillMode: VectorImage.PreserveAspectFit
+        ArchiveVectorImage {
             objectName: "brandLogo"
             // Keep the capital-height slot and full SVG descent; no crop of the accents.
             y: root.brandHeight + 3 - root.brandHeight * 188 / 104
@@ -186,9 +183,7 @@ Item {
                 text: root.playing ? qsTr("Pause") : qsTr("Play")
                 showText: false
                 contentItem: Item {
-                    VectorImage {
-                        preferredRendererType: VectorImage.CurveRenderer
-                        fillMode: VectorImage.PreserveAspectFit
+                    ArchiveVectorImage {
                         anchors.centerIn: parent
                         width: root.metrics.width <= 700 ? 15 : 17
                         height: width
@@ -197,9 +192,7 @@ Item {
                         source: "qrc:/assets/icons/play-" + (root.tokens.night ? "night" : "day")
                                 + ".svg"
                     }
-                    VectorImage {
-                        preferredRendererType: VectorImage.CurveRenderer
-                        fillMode: VectorImage.PreserveAspectFit
+                    ArchiveVectorImage {
                         anchors.centerIn: parent
                         width: root.metrics.width <= 700 ? 15 : 17
                         height: width

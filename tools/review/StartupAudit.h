@@ -8,3 +8,5 @@ int reviewStartup(QGuiApplication &app, const QString &output, double seconds,
                   bool observeOnly = false);
 
 int reviewGui(const QString &output, bool narrowOnly = false, bool representative = false);
+
+int reviewWindowLifecycle(const QString &output);

@@ -5,6 +5,7 @@
 #include "StartupCoordinator.h"
 #include "OpeningInk.h"
 #include "TextAreaFormat.h"
+#include "SceneGraphLifecycle.h"
 #include "LibrarySession.h"
 #include "SettingsController.h"
 #include "PlaybackController.h"
@@ -309,4 +310,11 @@ struct OptionMetricsQml
     Q_GADGET
     QML_FOREIGN(yalahoo::OptionMetrics)
     QML_NAMED_ELEMENT(OptionMetrics)
+};
+
+struct SceneGraphLifecycleQml
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SceneGraphLifecycle)
+    QML_NAMED_ELEMENT(SceneGraphLifecycle)
 };

@@ -41,27 +41,29 @@ T.ComboBox {
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
-    indicator: Shape {
-        antialiasing: true
+    indicator: SceneGraphVisual {
         x: control.width - width - 10
         y: (control.height - height) / 2
         width: 9
         height: 5
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            strokeColor: control.tokens.ink
-            strokeWidth: 1
-            capStyle: ShapePath.RoundCap
-            fillColor: "transparent"
-            startX: 0
-            startY: 0
-            PathLine {
-                x: 4.5
-                y: 4.5
-            }
-            PathLine {
-                x: 9
-                y: 0
+        sourceComponent: Shape {
+            antialiasing: true
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: control.tokens.ink
+                strokeWidth: 1
+                capStyle: ShapePath.RoundCap
+                fillColor: "transparent"
+                startX: 0
+                startY: 0
+                PathLine {
+                    x: 4.5
+                    y: 4.5
+                }
+                PathLine {
+                    x: 9
+                    y: 0
+                }
             }
         }
     }

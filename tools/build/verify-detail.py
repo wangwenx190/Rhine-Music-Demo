@@ -15,9 +15,13 @@ parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
 parser.add_argument("--runs", type=int, default=1)
 parser.add_argument("--foreground", action="store_true")
 parser.add_argument("--lifecycle", action="store_true", help="Include lifecycle stress and repeated window rebuilds")
+parser.add_argument("--window-lifecycle", action="store_true",
+                    help="Check one same-window hide and minimize restore without stress")
 parser.add_argument("--night", action="store_true")
 parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
+if args.lifecycle and args.window_lifecycle:
+    parser.error("window-lifecycle and lifecycle stress are separate checks")
 if not 1 <= args.runs <= 10:
     parser.error("runs must be between 1 and 10")
 if args.output.exists():
@@ -42,6 +46,7 @@ environment.update({
     "YALAHOO_VERIFY_FOREGROUND": "1" if args.foreground else "0",
     "YALAHOO_VERIFY_NIGHT": "1" if args.night else "0",
     "YALAHOO_VERIFY_LIFECYCLE": "1" if args.lifecycle else "0",
+    "YALAHOO_VERIFY_WINDOW_LIFECYCLE": "1" if args.window_lifecycle else "0",
     "QSG_RENDER_LOOP": "threaded",
 })
 environment.pop("QSG_NO_VSYNC", None)
@@ -54,7 +59,9 @@ manifest = {
     "sourceRevision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
     "workingTreeDiffSha256": hashlib.sha256(subprocess.check_output(["git", "diff"], cwd=root)).hexdigest(),
     "system": platform.platform(), "backend": args.backend, "dpr": args.dpr,
-    "lifecycleStress": args.lifecycle, "foreground": args.foreground, "night": args.night, "requestedRuns": args.runs, "runs": [],
+    "lifecycleStress": args.lifecycle, "windowLifecycle": args.window_lifecycle,
+    "foreground": args.foreground, "night": args.night,
+    "requestedRuns": args.runs, "runs": [],
 }
 manifest["completed"] = False
 manifest["passed"] = False
@@ -73,6 +80,8 @@ for index in range(1, args.runs + 1):
     valid = (result.returncode == 0 and report.get("passed") and not bad_log
              and report.get("backend") == args.backend and report.get("dpr") == args.dpr
              and report.get("lifecycleStressRequested") == args.lifecycle
+             and report.get("windowLifecycleRequested") == args.window_lifecycle
+             and len(report.get("windowTransitions", [])) == (4 if args.window_lifecycle else 0)
              and report.get("fullWindowRebuilds") == (10 if args.lifecycle else 0))
     passed = bool(valid) and passed
     manifest["runs"].append({"run": index, "exitCode": result.returncode,

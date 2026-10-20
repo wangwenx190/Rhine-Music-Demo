@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.VectorImage
 import Yalahoo.Music
 import "../components"
 
@@ -626,9 +625,7 @@ ArchiveScrollView {
             tokens: root.tokens
             last: true
 
-            VectorImage {
-                preferredRendererType: VectorImage.CurveRenderer
-                fillMode: VectorImage.PreserveAspectFit
+            ArchiveVectorImage {
                 objectName: "settingsBrandIcon"
                 width: 48
                 height: 48

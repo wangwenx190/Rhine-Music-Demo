@@ -31,26 +31,28 @@ T.CheckBox {
         color: control.checkState !== Qt.Unchecked ? control.tokens.accent : "transparent"
         border.color: control.hovered || control.activeFocus || control.checked
                       ? control.tokens.accent : control.tokens.line
-        Shape {
-            antialiasing: true
+        SceneGraphVisual {
             anchors.fill: parent
             visible: control.checkState === Qt.Checked
-            preferredRendererType: Shape.CurveRenderer
-            ShapePath {
-                strokeColor: control.tokens.surface
-                strokeWidth: 1.8
-                capStyle: ShapePath.RoundCap
-                joinStyle: ShapePath.RoundJoin
-                fillColor: "transparent"
-                startX: 3.5
-                startY: 8
-                PathLine {
-                    x: 6.5
-                    y: 11
-                }
-                PathLine {
-                    x: 12.5
-                    y: 5
+            sourceComponent: Shape {
+                antialiasing: true
+                preferredRendererType: Shape.CurveRenderer
+                ShapePath {
+                    strokeColor: control.tokens.surface
+                    strokeWidth: 1.8
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    fillColor: "transparent"
+                    startX: 3.5
+                    startY: 8
+                    PathLine {
+                        x: 6.5
+                        y: 11
+                    }
+                    PathLine {
+                        x: 12.5
+                        y: 5
+                    }
                 }
             }
         }

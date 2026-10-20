@@ -61,6 +61,13 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
     time.start();
     int stage = 0, switches = 0, stress = 0, rebuilds = 0, contexts = 0, fullRebuilds = 0;
     const bool lifecycleStress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1;
+    const bool windowLifecycle =
+            qEnvironmentVariableIntValue("YALAHOO_VERIFY_WINDOW_LIFECYCLE") == 1;
+    if (lifecycleStress && windowLifecycle)
+        return 2;
+    int windowTransition = 0;
+    quint64 submissionBeforeHide = 0;
+    QJsonArray windowTransitions;
     quint64 windowEpoch = 0;
     const bool quitOnClose = app.quitOnLastWindowClosed();
     app.setQuitOnLastWindowClosed(false);
@@ -140,6 +147,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
         } else {
             check(u"smoke-keeps-original-window"_s, fullRebuilds == 0 && rebuilds == 0);
         }
+        check(u"requested-window-transitions"_s, windowTransition == (windowLifecycle ? 2 : 0));
         check(u"render-error-empty"_s, native->errorText().isEmpty());
         check(u"qml-warnings-empty"_s, warnings.isEmpty());
         check(u"playback-independent"_s, library.playbackTrackId() == playback);
@@ -182,6 +190,8 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
             { u"contexts"_s, contexts },
             { u"fullWindowRebuilds"_s, fullRebuilds },
             { u"lifecycleStressRequested"_s, lifecycleStress },
+            { u"windowLifecycleRequested"_s, windowLifecycle },
+            { u"windowTransitions"_s, windowTransitions },
             { u"nativeInputSubmission"_s, qint64(native->submission()) },
             { u"nativeInputFrameRevision"_s, qint64(native->input().scene.revision) },
             { u"nativeItemVisible"_s, native->isVisible() },
@@ -435,6 +445,44 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                     case 12:
                         if (!ready())
                             return;
+                        if (windowLifecycle && windowTransition < 2) {
+                            stage = 18;
+                            submissionBeforeHide = native->submission();
+                            if (windowTransition == 0)
+                                window->hide();
+                            else
+                                window->showMinimized();
+                            QTimer::singleShot(250, &reviewLifetime, [&] {
+                                const bool hidden = !window->isExposed()
+                                        && !native->renderingActive() && !motion.clock()->active();
+                                const auto frames = motion.clock()->frameCount();
+                                const auto submission = native->submission();
+                                check(u"native-window-stops-visuals"_s, hidden);
+                                if (windowTransition == 1) {
+                                    check(u"native-window-minimized"_s,
+                                          window->windowState() == Qt::WindowMinimized);
+#ifdef Q_OS_MACOS
+                                    check(u"native-window-miniaturized"_s,
+                                          verification::nativeWindowPolicy(
+                                                  *window)[u"miniaturized"_s]
+                                                  .toBool());
+#endif
+                                }
+                                QTimer::singleShot(150, &reviewLifetime, [&, frames, submission] {
+                                    check(u"native-hidden-no-visual-work"_s,
+                                          motion.clock()->frameCount() == frames
+                                                  && native->submission() == submission);
+                                    windowTransitions.append(
+                                            QJsonObject{ { u"minimized"_s, windowTransition == 1 },
+                                                         { u"hiddenWindowPolicy"_s,
+                                                           verification::windowPolicy(*window) } });
+                                    stage = 19;
+                                    window->showNormal();
+                                    window->update();
+                                });
+                            });
+                            break;
+                        }
                         if (!lifecycleStress) {
                             expected = selection->adjacentAlbum({ }, 1);
                             button(u"detailNext"_s);
@@ -517,6 +565,22 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                             button(u"detailNext"_s);
                             ++stage;
                         }
+                        break;
+                    case 19:
+                        if (!ready() || !window->isExposed()
+                            || native->submission() <= submissionBeforeHide)
+                            return;
+                        check(u"native-restored-original-window"_s,
+                              window == &initialWindow
+                                      && find(window->contentItem(), u"nativeScene"_s) == native);
+                        check(u"native-restored-window-policy"_s,
+                              verification::windowPolicySatisfied(*window));
+                        capture(u"window-restored-%1"_s.arg(windowTransition));
+                        windowTransitions.append(QJsonObject{
+                                { u"restoredWindowPolicy"_s, verification::windowPolicy(*window) },
+                                { u"submission"_s, qint64(native->submission()) } });
+                        ++windowTransition;
+                        stage = 12;
                         break;
                     case 16:
                         if (!ready())

@@ -134,6 +134,8 @@ int main(int argc, char **argv)
                 ? reviewGui(QString::fromLocal8Bit(argv[2]), narrow, representative)
                 : 2;
     }
+    if (app.arguments().contains(u"--window-lifecycle"_s))
+        return argc == 3 ? reviewWindowLifecycle(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--startup"_s)) {
         bool validSeconds = true;
         const double seconds =

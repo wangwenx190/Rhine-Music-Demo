@@ -29,6 +29,14 @@
 - `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/四画质/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。当前入口仍捆绑上述工作，仅具体未决问题确需运行时按test-gates.md解开最小分支，不默认执行矩阵/压力或为此单设工具改造任务；短单盒输入不能冒充完整产品。
 - `rhi-postprocess-audit --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。Windows定向包装`verify-r10d.ps1 -Seconds 所需时长`只消费已构建产物，默认一次；显式`-Runs`才调整样本数，不附带其他组件/构建检查。
 
+## 原生同窗口恢复
+
+二维SVG与手写Shape装饰由`SceneGraphVisual`/`ArchiveVectorImage`持有。`SceneGraphLifecycle`将窗口SG失效/初始化排队交GUI，并以窗口epoch拒绝旧通知；只释放和重建绘制装饰，保留按钮、焦点、模型、媒体及原尺寸/CurveRenderer。隐藏无逐帧工作，装饰数量有界，不遍历业务视觉树或重建整个App。
+
+`ui-audit --window-lifecycle 全新目录`只运行生产MusicStage的暂停/播放×隐藏/最小化四次转换；使用qrc封面和一首临时匿名WAV，不生成大封面、不换片、不重建QML根或采样性能。macOS设置`YALAHOO_VERIFY_VISIBLE=1`选择原生窗口；当前轮次授权前台时设置`YALAHOO_VERIFY_FOREGROUND=1`。后端通过`QSG_RHI_BACKEND`选择，Kit插件路径沿native-bootstrap.md。
+
+核对首次曝光、隐藏停止视觉工作而歌曲继续或保持暂停、同一窗口/root/SceneItem恢复当前快照和自身输出、停止清空歌曲及最终资源释放。报告保留每次转换的实际SG失效、隐藏时保留的renderer和窗口策略。Qt的persistency设置为提示：basic循环可保留context/SG，surface销毁不冒充新renderer；删除场景后先在有效context交付清理帧，再隐藏并检查所有拥有的渲染资源归零。实际物理输入、听感、跨屏与默认置底无激活显示仍由计划的独立门槛维护。
+
 ## 目标尺度与生产阵列检查
 
 `ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。

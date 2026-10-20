@@ -202,9 +202,9 @@
 | 目标/归属 | 准确入口与独立退出事实 |
 | --- | --- |
 | Windows · R30-P/BP-P | 操作按[windows.md](docs/platforms/windows.md)；`pwsh -NoProfile -File tools/deploy/windows.ps1`，`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`及包内`verify-windows.ps1`。真实MSVC/最新Kit/C++23、PE/图标、同Kit windeployqt/官方VC运行库、插件/媒体/字体/shader/许可与相对路径完整；包复制到无开发Qt的干净系统及中文/空格路径，从包外加载，不借开发PATH。 |
-| macOS · R31-P | 操作按[macos.md](docs/platforms/macos.md)；`sh tools/deploy/macos.sh`、`python3 tools/audit/audit-macos-deployment.py`及`python3 tools/deploy/verify-macos.py --output 绝对新目录`。整包在另一台兼容目标设备与中文/空格路径从包外加载；实际映像/架构/相对资源/签名有效，Finder品牌、普通启动器、AppKit菜单/Command、系统目录选择与输入法正常。 |
+| macOS · R31-P | 输入为`out/macos/`完整生产包，操作按[macos.md](docs/platforms/macos.md)。整包在另一台兼容目标设备的中文/空格路径从包外运行`python3 verify-macos.py --output 绝对新目录`，核对实际映像/架构/相对资源/签名；实机核对Finder品牌、物理AppKit菜单/Command、系统目录选择与输入法。 |
 | Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、ELF/ldd/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
-| 后端与日志 | 使用Release `graphics-backend`、`logging`、`logging-terminal`及普通部署包。显式D3D11/12、Metal、Vulkan、OpenGL核对真实API；Qt特性或设备/格式不支持时明确报错并非零退出。Linux默认Vulkan不可用时警告并回退OpenGL，显式请求不回退。目标成功路径需真实输出，不能只看初始化。日志目录/上界/轮转按logging.md；Windows真实控制台VT颜色/UTF-8及重定向正常。 |
+| 后端与日志 | 使用Release `graphics-backend`、`logging`、`logging-terminal`及普通部署包。Windows显式D3D11/12、Windows/Linux的OpenGL与已启用Vulkan、macOS Vulkan核对真实API；Qt特性或设备/格式不支持时明确报错并非零退出。Linux默认Vulkan不可用时警告并回退OpenGL，显式请求不回退。目标成功路径需真实输出，不能只看初始化。日志目录/上界/轮转按logging.md；Windows真实控制台VT颜色/UTF-8及重定向正常。 |
 
 部署验证失败保留旧包；加载探针仅证明实际报告中的加载事实。产品功能、设备与窗口检查直接共用下方正常产品会话，不在部署后再跑整套组件/性能矩阵。macOS当前Kit未启用Vulkan，缺对应原生Kit/SDK/MoltenVK；未具能力时保留该具体缺口。
 
@@ -222,8 +222,8 @@
 
 ### 产品功能、文字与物理输入/显示
 
-- 目标边界：Windows/Linux保留对应后端实际输出及产品接线；macOS保留MAC-VISIBLE-3D的生产bundle可见入口；三平台保留下方物理输入/显示与真实系统窗口操作。
-- 归属：UI-CONTROLS-P、R16B2W/R16B3/R16M3-S、R17-P/R18-P/R19-P/R19E-P/R20-P/R23-P/R26-P/R27-P/R29-P、MAC-VISIBLE-3D及R28-P正常启动/窗口事实。依赖目标构建和现有生产接线；输入为各组件既有匿名fixture、冻结数学/CSS结构与qrc封面。生产文字glyph+彩色Quick Text、滑尺C++ CanvasPainter、序章沿当前路径验收，不安排默认候选路径比较或成本测试。
+- 目标边界：Windows/Linux保留对应后端实际输出及产品接线；macOS仅保留MAC-VISIBLE-3D的默认置底无激活显示；三平台保留下方物理输入/显示，Windows/Linux另保留原生窗口生命周期。
+- 归属：UI-CONTROLS-P、R16B2W/R16B3/R16M3-S、R17-P/R18-P/R19-P/R19E-P/R20-P/R23-P/R26-P/R27-P/R29-P、MAC-VISIBLE-3D。依赖目标构建和现有生产接线；输入为各组件既有匿名fixture、冻结数学/CSS结构与qrc封面。生产文字glyph+彩色Quick Text、滑尺C++ CanvasPainter、序章沿当前路径验收，不安排默认候选路径比较或成本测试。
 - 先将已有产品/组件报告按实际断言对照，只补缺口。源码数学、信号/状态可复用同平台非图形结果；布局/主题/DPR按test-gates.md选独立边界。目标真实输出与实际输入仍须对应目标证据，不能以源码审计假称画质通过。
 
 | 共同检查及归属 | 修复对象、输入与入口 | 独立退出条件 |
@@ -232,9 +232,9 @@
 | 文字/页眉/滑尺 · R16B2W/R16B3/R16M3-S/R19E-P | TitleReel/TransportTitle/Header、Ruler/Ordinal/InputRouter；`tests/fixtures/text/titles.json`及144组滑尺源轨迹。`export-title.mjs`→`verify-title.mjs --backend 目标 --dpr 实际值 --source 源目录 --output 新目录`、`title-reels`、`ui-audit --ruler`/普通ui-audit及export-ruler/export-browse-ui/compare-browse-structure；源码入口audit-title-source/audit-browse-navigation.py。 | 字体身份、连字/组合字/emoji、字形/断行/省略/裁切、页眉结构与播放隔离、自然宽度通知/隐藏完成与恢复取消、刻线/clip/淡隐/背压符合title-reels/navigation/browse-ui；所有权/缓存/隐藏工作量先静态确定，未决运行行为才最小观察。 |
 | 详情/总览 · R17-P/R18-P/R19-P | Presentation/DetailMotion/ReturningCasePool/PointerDragController、Overview与SceneItem；presentation/detail-golden/overview/source-golden匿名输入。`ui-audit --presentation`、`verify-detail.py --backend 目标 --runs 1 --output 新目录`、`verify-overview.py --visual --backend 目标 --runs 1 --output 新目录`按缺项选择；audit-presentation/detail/overview/detail-overview-source及对应结构导出/比较入口。 | ready/revision/四种archiveRoute、连选最后意图/反向/拖动取消、sticky tabs/行高/委托虚拟化、总览两步点击/跨列收拢与反转/碰撞准入（标签240ms退场与420ms入口收拢的衔接、计数block宽度）、焦点恢复/定位不改播放，遵守presentation/detail-motion/overview；产品回放与组件报告共用。 |
 | 序章与产品联动 · R20-P/R29-P | OpeningController/OpeningInk、MusicStage/SceneItem；opening/source-golden.json与qrc封面/匿名库。`opening`、`ui-audit --opening`及audit-opening/export-opening-golden；仅组件证据未覆盖的跨组件联动才选`verify-gui.py --backend 目标 --output 新目录`/audit-gui.py。 | 输入锁/跳过/重播/减少动态/一次交接、遮挡零三维submit和恢复正确，产品浏览→详情→总览→搜索/片头的真实接线、透明合成与资源容量符合opening/rhi-integration；不为汇总已有组件结果另跑完整GUI矩阵。 |
-| macOS生产bundle置底可见入口 · MAC-VISIBLE-3D / R18-P / R29-P | VerificationWindowMac::NativeWindowGuard/prepareNativeApplication、App.qml与DetailReview；`python3 tools/build/verify-detail.py --backend opengl --runs 1 --output 新目录`的匿名库。默认Prohibited下`verification/r35-detail-native/run-1/report.json`显示Qt visible但原生应用hidden、窗口不在屏幕且无曝光/帧；`verification/r35-detail-accessory/run-1/report.json`中的Accessory窗口策略出现进程激活，不能采用该策略。依赖允许可靠观察自身窗口且不干扰工作区的macOS会话；修复对象仅为验证启动/显示策略与实际原生窗口事实，不能以离屏结果替代。 | 实际API为OpenGL，bundle自身真实show/帧、详情操作与原门槛均满足；置底、拒key/鼠标、前台PID与完整激活/焦点历史同时合规，同对象hide/minimize/restore独立核对。保持默认隐藏策略和普通产品行为；无可靠条件或发生激活时不得宣告通过、提高层级或放宽窗口门槛。 |
+| macOS默认置底无激活显示 · MAC-VISIBLE-3D | VerificationWindowMac::NativeWindowGuard/prepareNativeApplication、App.qml；`python3 tools/build/verify-detail.py --backend opengl --runs 1 --output 新目录`的匿名库。已知失败输入为`verification/r35-detail-native/run-1/report.json`（原生应用hidden、窗口不在屏幕且无曝光/帧）与`verification/r35-detail-accessory/run-1/report.json`（进程激活）。依赖可靠观察自身窗口且不干扰工作区的macOS会话，修复对象仅为默认验证启动/显示策略。 | 默认策略下实际OpenGL窗口show/提交、置底、拒key/鼠标、前台PID与完整激活/焦点历史同时合规，恢复后仍遵守该策略。保持普通产品行为；无可靠条件或发生激活时不得宣告通过、提高层级或放宽门槛。 |
 
-物理检查与部署、媒体共用同一目标产品会话：键鼠/触控板pixelDelta/快捷键、系统中英文与emoji组合输入、剪贴板/撤销、目录选择、辅助技术角色/名称、焦点/模态隔离；首次show、同对象hide/minimize/restore、实际surface变化与退出；真实跨屏DPR后的SceneItem/Canvas/文字尺寸/清晰度和缓存恢复。不同系统/会话的事实分别保留，隐藏target DPR及注入Qt事件不能冒充物理设备。
+物理检查与部署、媒体共用同一目标产品会话：键鼠/触控板pixelDelta/快捷键、系统中英文与emoji组合输入、剪贴板/撤销、目录选择、辅助技术角色/名称、焦点/模态隔离；Windows/Linux另核对首次show、同对象hide/minimize/restore、实际surface变化与退出；真实跨屏DPR后的SceneItem/Canvas/文字尺寸/清晰度和缓存恢复。不同系统/会话的事实分别保留，隐藏target DPR及注入Qt事件不能冒充物理设备。
 
 退出：按组件权威契约核对布局≤1逻辑px、投影≤2逻辑px、double轨迹≤1e-6及原时序/语义容差；自身输出无漏画/错误裁切/合成、锯齿或异常模糊，QML/shader无错误。源码可确定的复杂度/资源上界/取消与释放直接以静态结论收口；只有具体未决运行行为才补必要转换，不附带默认十次SG/root重建、三十次换片或成本采样。
 

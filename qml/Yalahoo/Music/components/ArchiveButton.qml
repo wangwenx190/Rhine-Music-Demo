@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.VectorImage
 import QtQuick.Templates as T
 import Yalahoo.Music
 import QtQuick.Shapes
@@ -81,9 +80,7 @@ T.Button {
                                                                                   control.tokens.night
                                                                                   ? "-night.svg" :
                                                                                     "-day.svg") : ""
-                VectorImage {
-                    preferredRendererType: VectorImage.CurveRenderer
-                    fillMode: VectorImage.PreserveAspectFit
+                ArchiveVectorImage {
                     anchors.fill: parent
                     visible: control.iconName !== "settings"
                     source: control.iconName !== "settings" ? iconSlot.asset : ""
@@ -96,51 +93,55 @@ T.Button {
                         xScale: control.iconSize / 24
                         yScale: control.iconSize / 24
                     }
-                    Shape {
-                        antialiasing: true
+                    SceneGraphVisual {
                         width: 24
                         height: 24
-                        preferredRendererType: Shape.CurveRenderer
-                        ShapePath {
-                            strokeColor: control.tokens.ink
-                            strokeWidth: 1.5
-                            capStyle: ShapePath.RoundCap
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: "M4 7h16M4 17h16"
+                        sourceComponent: Shape {
+                            antialiasing: true
+                            preferredRendererType: Shape.CurveRenderer
+                            ShapePath {
+                                strokeColor: control.tokens.ink
+                                strokeWidth: 1.5
+                                capStyle: ShapePath.RoundCap
+                                fillColor: "transparent"
+                                PathSvg {
+                                    path: "M4 7h16M4 17h16"
+                                }
                             }
                         }
                     }
-                    Shape {
-                        antialiasing: true
+                    SceneGraphVisual {
                         z: 1
                         width: 24
                         height: 24
-                        preferredRendererType: Shape.CurveRenderer
-                        ShapePath {
-                            strokeColor: control.tokens.ink
-                            strokeWidth: 1.5
-                            fillColor: control.tokens.surface
-                            PathAngleArc {
-                                centerX: 9
-                                centerY: 7
-                                radiusX: 2.5
-                                radiusY: 2.5
-                                startAngle: 0
-                                sweepAngle: 360
+                        sourceComponent: Shape {
+                            antialiasing: true
+                            preferredRendererType: Shape.CurveRenderer
+                            ShapePath {
+                                strokeColor: control.tokens.ink
+                                strokeWidth: 1.5
+                                fillColor: control.tokens.surface
+                                PathAngleArc {
+                                    centerX: 9
+                                    centerY: 7
+                                    radiusX: 2.5
+                                    radiusY: 2.5
+                                    startAngle: 0
+                                    sweepAngle: 360
+                                }
                             }
-                        }
-                        ShapePath {
-                            strokeColor: control.tokens.ink
-                            strokeWidth: 1.5
-                            fillColor: control.tokens.surface
-                            PathAngleArc {
-                                centerX: 15
-                                centerY: 17
-                                radiusX: 2.5
-                                radiusY: 2.5
-                                startAngle: 0
-                                sweepAngle: 360
+                            ShapePath {
+                                strokeColor: control.tokens.ink
+                                strokeWidth: 1.5
+                                fillColor: control.tokens.surface
+                                PathAngleArc {
+                                    centerX: 15
+                                    centerY: 17
+                                    radiusX: 2.5
+                                    radiusY: 2.5
+                                    startAngle: 0
+                                    sweepAngle: 360
+                                }
                             }
                         }
                     }

@@ -112,7 +112,7 @@ QJsonObject counters()
              { u"textGeometryUpdates"_s, qint64(ReelInk::geometryUpdates()) },
              { u"textGeometryReuses"_s, qint64(ReelInk::geometryReuses()) } };
 }
-Snapshot fixture(const QString &directory, bool largeCovers = true)
+Snapshot fixture(const QString &directory, bool largeCovers = true, bool tracks = true)
 {
     LibrarySnapshot library;
     QStringList paths;
@@ -139,7 +139,7 @@ Snapshot fixture(const QString &directory, bool largeCovers = true)
             const int index = lane * 64 + row;
             album.coverUrl = index < paths.size() ? QUrl::fromLocalFile(paths[index])
                                                   : QUrl(u"qrc:/assets/demo-covers/square.png"_s);
-            for (int trackIndex = 0; trackIndex < (largeCovers ? 3 : 0); ++trackIndex) {
+            for (int trackIndex = 0; trackIndex < (tracks ? 3 : 0); ++trackIndex) {
                 Track track;
                 track.id = album.id + u"-track-%1"_s.arg(trackIndex);
                 track.title = u"\u533f\u540d\u66f2\u76ee %1"_s.arg(trackIndex);
@@ -207,11 +207,12 @@ protected:
 class Driver
 {
 public:
-    Driver(Snapshot input)
+    Driver(Snapshot input, bool windowLifecycle = false)
         : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
     {
-        verification::prepareWindow(window,
-                                    qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") != 1);
+        verification::prepareWindow(
+                window,
+                !windowLifecycle && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") != 1);
         window.setPersistentGraphics(false);
         window.setPersistentSceneGraph(false);
         QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &engine,
@@ -219,7 +220,7 @@ public:
                              window.record(u"application-state"_s);
                          });
         window.resize(1280, 720);
-        surface.measurementEnabled = true;
+        surface.measurementEnabled = !windowLifecycle;
         QObject::connect(&surface, &OffscreenSurface::frameMeasured, &window,
                          [&](QJsonObject costs) {
                              if (timings.size() >= 40000)
@@ -362,6 +363,18 @@ public:
         QObject::connect(&deadline, &QTimer::timeout, &invalidation, &QEventLoop::quit);
         root.reset();
         native = nullptr;
+        if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic"_ba
+            && window.isExposed()) {
+            // Basic keeps deferred QSG deletion until a frame with a current context.
+            QSignalSpy cleanup(&window, &QQuickWindow::frameSwapped);
+            surface.requestFrame();
+            if (!QTest::qWaitFor(
+                        [&] {
+                            return !cleanup.isEmpty();
+                        },
+                        5000))
+                failure = u"No native cleanup frame"_s;
+        }
         surface.hide();
         window.releaseResources();
         if (!OffscreenSurface::Enabled && rhi::sceneSubmissionStats().renderers.load() > 0) {
@@ -542,6 +555,130 @@ public:
     std::unique_ptr<QQuickItem> root;
     rhi::SceneItem *native = nullptr;
 };
+void verifyNativeWindowLifecycle(Driver &d, const std::function<void(const char *, bool)> &check,
+                                 QJsonArray &transitions)
+{
+    const auto trackId = d.playback.trackId();
+    const auto source = d.playback.source();
+    const auto revision = d.playback.sourceRevision();
+    const auto preservesMedia = [&](bool playing) {
+        return d.playback.trackId() == trackId && d.playback.source() == source
+                && d.playback.sourceRevision() == revision && d.playback.requested() == playing
+                && (playing ? d.playback.playing() : !d.playback.playing());
+    };
+    require(!OffscreenSurface::Enabled, "Native lifecycle requires a visible window");
+    check("first-native-show",
+          d.window.isVisible() && d.window.isExposed()
+                  && verification::windowPolicySatisfied(d.window));
+    auto *const retainedRoot = d.root.get();
+    auto *const retainedScene = d.native;
+    for (const bool playing : { false, true }) {
+        if (playing) {
+            d.playback.toggle();
+            d.wait([&] {
+                return d.playback.playing();
+            });
+        }
+        for (const bool minimize : { false, true }) {
+            QSignalSpy invalidations(&d.window, &QQuickWindow::sceneGraphInvalidated);
+            d.setStage(u"native-%1-%2"_s.arg(playing ? "playing"_L1 : "paused"_L1,
+                                             minimize ? "minimize"_L1 : "hide"_L1));
+            if (minimize)
+                d.window.showMinimized();
+            else
+                d.surface.hide();
+            const bool hidden = QTest::qWaitFor(
+                    [&] {
+                        bool stopped = !d.window.isExposed()
+                                && !d.root->property("visualActive").toBool()
+                                && !d.motion.clock()->active();
+                        if (minimize) {
+                            stopped &= d.window.windowState() == Qt::WindowMinimized;
+#if defined(Q_OS_MACOS)
+                            stopped &= verification::nativeWindowPolicy(d.window)[u"miniaturized"_s]
+                                               .toBool();
+#endif
+                        } else {
+                            stopped &= !d.window.isVisible();
+                        }
+                        return stopped;
+                    },
+                    5000);
+            check("native-window-stops-visuals", hidden);
+            require(hidden, "Native window did not become hidden/minimized");
+            d.window.releaseResources();
+            const bool basic = qgetenv("QSG_RENDER_LOOP") == "basic"_ba;
+            if (basic)
+                d.window.destroy();
+            else
+                check("same-root-sg-invalidation",
+                      QTest::qWaitFor(
+                              [&] {
+                                  return rhi::sceneSubmissionStats().renderers.load() == 0;
+                              },
+                              5000));
+            // Qt's persistency flags are hints; basic may retain its scene graph/context.
+            // Full owner release is checked after deleting the root and its cleanup frame.
+            const auto hiddenRenderers = rhi::sceneSubmissionStats().renderers.load();
+            d.quiet(150);
+            const auto stoppedFrames = d.motion.clock()->frameCount();
+            const auto stoppedRenders = rhi::sceneSubmissionStats().rendered.load();
+            const auto position = d.playback.position();
+            if (playing)
+                check("native-hidden-song-advances",
+                      QTest::qWaitFor(
+                              [&] {
+                                  return d.playback.position() > position;
+                              },
+                              2000));
+            else
+                d.quiet(200);
+            check("native-hidden-no-visual-work",
+                  d.motion.clock()->frameCount() == stoppedFrames
+                          && rhi::sceneSubmissionStats().rendered.load() == stoppedRenders);
+            check("native-hidden-preserves-media", preservesMedia(playing));
+            if (!playing)
+                check("native-hidden-paused-position", d.playback.position() == position);
+            d.window.showNormal();
+            d.surface.show();
+            require(QTest::qWaitFor(
+                            [&] {
+                                return d.window.isExposed()
+                                        && d.root->property("visualActive").toBool();
+                            },
+                            5000),
+                    "Native window did not restore");
+            d.settle();
+            check("native-restore-retains-root-and-scene",
+                  d.root.get() == retainedRoot && d.native == retainedScene);
+            const auto restoredInput = d.scene.frame().inputRevision;
+            const auto submitted =
+                    d.samples.isEmpty() ? QJsonObject{ } : d.samples.last().toObject();
+            check("native-restore-current-render",
+                  d.native->input().scene.inputRevision == restoredInput
+                          && submitted[u"inputRevision"_s].toInteger() == qint64(restoredInput)
+                          && !d.surface.grab().isNull());
+            check("native-restore-preserves-media", preservesMedia(playing));
+            check("native-restore-window-policy", verification::windowPolicySatisfied(d.window));
+            transitions.append(
+                    QJsonObject{ { u"playing"_s, playing },
+                                 { u"minimized"_s, minimize },
+                                 { u"surfaceRecreated"_s, basic },
+                                 { u"sceneGraphInvalidations"_s, invalidations.size() },
+                                 { u"retainedSceneRenderersWhileHidden"_s, hiddenRenderers },
+                                 { u"inputRevision"_s, qint64(restoredInput) },
+                                 { u"submittedInputRevision"_s, submitted[u"inputRevision"_s] },
+                                 { u"submittedFrameRevision"_s, submitted[u"frameRevision"_s] },
+                                 { u"windowPolicy"_s, verification::windowPolicy(d.window) } });
+#if defined(Q_OS_MACOS)
+            check("native-restore-onscreen",
+                  verification::nativeWindowPolicy(d.window)[u"onScreen"_s].toBool());
+#endif
+        }
+    }
+    d.playback.pause();
+}
+
 }
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                   const QJsonObject &bootstrap, const QString &scenario, bool observeOnly)
@@ -597,7 +734,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             require(audio.write(bytes) == bytes.size(), "Cannot write anonymous audio");
             audio.close();
         }
-        const auto input = fixture(anonymous.path(), !observeOnly);
+        const auto input = fixture(anonymous.path(), !observeOnly, !observeOnly);
         QCryptographicHash inputHash(QCryptographicHash::Sha256);
         for (int i = 0; i < (observeOnly ? 1 : 96); ++i) {
             QFile file(observeOnly ? u":/assets/demo-covers/square.png"_s
@@ -676,7 +813,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         report[u"initialCovers"_s] = d.native->coverStatistics();
         const auto releaseCheck = [&] {
             const auto value = counters();
-            return value[u"sceneRenderers"_s].toInt() == 0
+            return d.failure.isEmpty() && value[u"sceneRenderers"_s].toInt() == 0
                     && value[u"rulerRenderers"_s].toInt() == 0
                     && value[u"openingRenderers"_s].toInt() == 0
                     && value[u"textNodes"_s].toInt() == 0;
@@ -781,93 +918,11 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             };
             check("hidden-preserves-current-media-and-intent", preservesMedia());
             if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1) {
-                require(!OffscreenSurface::Enabled, "Native lifecycle requires a visible window");
-                auto *const retainedRoot = d.root.get();
-                auto *const retainedScene = d.native;
-                for (const bool playing : { false, true }) {
-                    if (playing) {
-                        d.playback.toggle();
-                        d.wait([&] {
-                            return d.playback.playing();
-                        });
-                        requested = true;
-                    }
-                    for (const bool minimize : { false, true }) {
-                        d.setStage(u"native-%1-%2"_s.arg(playing ? "playing"_L1 : "paused"_L1,
-                                                         minimize ? "minimize"_L1 : "hide"_L1));
-                        if (minimize)
-                            d.window.showMinimized();
-                        else
-                            d.surface.hide();
-                        const bool hidden = QTest::qWaitFor(
-                                [&] {
-                                    bool stopped = !d.window.isExposed()
-                                            && !d.root->property("visualActive").toBool()
-                                            && !d.motion.clock()->active();
-                                    if (minimize) {
-                                        stopped &= d.window.windowState() == Qt::WindowMinimized;
-#if defined(Q_OS_MACOS)
-                                        stopped &= verification::nativeWindowPolicy(
-                                                           d.window)[u"miniaturized"_s]
-                                                           .toBool();
-#endif
-                                    } else {
-                                        stopped &= !d.window.isVisible();
-                                    }
-                                    return stopped;
-                                },
-                                5000);
-                        check("native-window-stops-visuals", hidden);
-                        require(hidden, "Native window did not become hidden/minimized");
-                        d.window.releaseResources();
-                        check("same-root-sg-invalidation",
-                              QTest::qWaitFor(
-                                      [&] {
-                                          return rhi::sceneSubmissionStats().renderers.load() == 0;
-                                      },
-                                      5000));
-                        d.quiet(150);
-                        const auto stoppedFrames = d.motion.clock()->frameCount();
-                        const auto stoppedRenders = rhi::sceneSubmissionStats().rendered.load();
-                        const auto position = d.playback.position();
-                        if (playing)
-                            check("native-hidden-song-advances",
-                                  QTest::qWaitFor(
-                                          [&] {
-                                              return d.playback.position() > position;
-                                          },
-                                          2000));
-                        else
-                            d.quiet(200);
-                        check("native-hidden-no-visual-work",
-                              d.motion.clock()->frameCount() == stoppedFrames
-                                      && rhi::sceneSubmissionStats().rendered.load()
-                                              == stoppedRenders);
-                        check("native-hidden-preserves-media", preservesMedia());
-                        if (!playing)
-                            check("native-hidden-paused-position",
-                                  d.playback.position() == position);
-                        d.window.showNormal();
-                        d.surface.show();
-                        require(QTest::qWaitFor(
-                                        [&] {
-                                            return d.window.isExposed()
-                                                    && d.root->property("visualActive").toBool();
-                                        },
-                                        5000),
-                                "Native window did not restore");
-                        d.settle();
-                        check("native-restore-retains-root-and-scene",
-                              d.root.get() == retainedRoot && d.native == retainedScene);
-                        check("native-restore-current-render",
-                              d.native->input().scene.revision == d.scene.frame().revision
-                                      && !d.surface.grab().isNull());
-                        check("native-restore-preserves-media", preservesMedia());
-                    }
-                }
-                d.playback.pause();
+                QJsonArray transitions;
+                verifyNativeWindowLifecycle(d, check, transitions);
+                report[u"nativeWindowTransitions"_s] = transitions.size();
+                report[u"nativeWindowTransitionStates"_s] = transitions;
                 requested = false;
-                report[u"nativeWindowTransitions"_s] = 4;
             }
             d.setStage(u"switch-replay"_s);
             d.presentation.open();
@@ -1277,6 +1332,93 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     return passed ? 0 : 1;
 }
 
+int reviewWindowLifecycle(const QString &output)
+{
+    if (OffscreenSurface::Enabled || QFileInfo::exists(output) || !QDir().mkpath(output))
+        return 2;
+    QJsonObject report{
+        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+        { u"measurementScope"_s,
+          u"Same native MusicStage window: paused/playing hide and minimize, scene restoration and public media continuity; no performance sampling or physical input/hearing claim."_s }
+    };
+    QJsonArray checks;
+    bool passed = true;
+    const auto check = [&](const char *name, bool value) {
+        checks.append(
+                QJsonObject{ { u"name"_s, QString::fromUtf8(name) }, { u"passed"_s, value } });
+        passed &= value;
+        if (!value)
+            qWarning("Native lifecycle check failed: %s", name);
+    };
+    try {
+        QTemporaryDir anonymous;
+        require(anonymous.isValid(), "Cannot create native lifecycle fixture");
+        QFile audio(anonymous.path() + "/anonymous.wav"_L1);
+        require(audio.open(QIODevice::WriteOnly), "Cannot create anonymous song");
+        const auto bytes = test::wave(60000);
+        require(audio.write(bytes) == bytes.size(), "Cannot write anonymous song");
+        audio.close();
+        auto input = *fixture(anonymous.path(), false, false);
+        Track track;
+        track.id = u"native-lifecycle-track"_s;
+        track.title = u"Anonymous lifecycle sample"_s;
+        track.sourceUrl = QUrl::fromLocalFile(audio.fileName());
+        input.albums[0].tracks.append(track);
+        Driver d(std::make_shared<const LibrarySnapshot>(std::move(input)), true);
+        const auto evidence = qScopeGuard([&] {
+            report[u"windowPolicy"_s] = verification::windowPolicy(d.window);
+            report[u"nativeWindowEvents"_s] = d.window.events;
+            report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
+            report[u"lastStage"_s] = d.stage;
+            report[u"backend"_s] = int(d.window.rendererInterface()->graphicsApi());
+            report[u"dpr"_s] = d.window.effectiveDevicePixelRatio();
+        });
+        d.opening.replay();
+        d.wait([&] {
+            return d.opening.film();
+        });
+        d.opening.skip();
+        d.motion.setReducedMotion(false);
+        d.settle();
+        d.playback.setVolume(0);
+        check("anonymous-public-media-command",
+              d.playback.playTrack(d.library.snapshot()->albums[0].id, track.id));
+        d.wait([&] {
+            return d.playback.playing();
+        });
+        d.playback.pause();
+        d.wait([&] {
+            return !d.playback.playing();
+        });
+        QJsonArray transitions;
+        verifyNativeWindowLifecycle(d, check, transitions);
+        report[u"nativeWindowTransitions"_s] = transitions;
+        check("restored-own-output", d.surface.grab().save(output + "/restored.png"_L1));
+        check("window-policy", verification::windowPolicySatisfied(d.window));
+        check("no-qml-or-renderer-errors",
+              d.warnings.isEmpty() && d.failure.isEmpty() && d.native->errorText().isEmpty());
+        d.playback.stop();
+        check("stop-releases-song", d.playback.source().isEmpty() && !d.playback.requested());
+        d.destroyRoot();
+        report[u"releasedCounters"_s] = counters();
+        check("released-owned-renderers",
+              d.failure.isEmpty() && rhi::sceneSubmissionStats().renderers.load() == 0
+                      && rulerInkStats().renderers.load() == 0
+                      && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
+    } catch (const std::exception &error) {
+        passed = false;
+        report[u"error"_s] = QString::fromUtf8(error.what());
+        qWarning("Native lifecycle failed: %s", error.what());
+    }
+    report[u"passed"_s] = passed;
+    report[u"checks"_s] = checks;
+    QSaveFile file(output + "/report.json"_L1);
+    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
+        || !file.commit())
+        return 2;
+    return passed ? 0 : 1;
+}
+
 int reviewGui(const QString &output, bool narrowOnly, bool representative)
 {
     // The same driver and production stage serve cold-start and integrated GUI checks.
@@ -1307,7 +1449,7 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
     try {
         QTemporaryDir anonymous;
         require(anonymous.isValid(), "Cannot create GUI fixture");
-        auto input = *fixture(anonymous.path());
+        auto input = *fixture(anonymous.path(), false);
         const QStringList covers{ u"portrait.png"_s, u"landscape.png"_s, u"square.png"_s };
         for (int i = 0; i < input.albums.size(); ++i)
             input.albums[i].coverUrl =
@@ -1561,8 +1703,9 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
         check("bounded-samples", (!d.overflow && !d.presented->overflow));
         check("window-policy", verification::windowPolicySatisfied(d.window));
         d.destroyRoot();
+        report[u"releasedCounters"_s] = counters();
         check("released-owned-renderers",
-              rhi::sceneSubmissionStats().renderers.load() == 0
+              d.failure.isEmpty() && rhi::sceneSubmissionStats().renderers.load() == 0
                       && rulerInkStats().renderers.load() == 0
                       && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
     } catch (const std::exception &error) {

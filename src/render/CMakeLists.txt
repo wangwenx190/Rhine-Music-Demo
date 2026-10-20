@@ -57,3 +57,9 @@ yalahoo_platform(YalahooOpening)
 qt_add_resources(YalahooOpening opening_brand PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
     FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
     "${PROJECT_SOURCE_DIR}/resources/branding/reveal-map.json")
+
+qt_add_library(YalahooVisuals STATIC SceneGraphLifecycle.cpp SceneGraphLifecycle.h)
+target_include_directories(YalahooVisuals PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(YalahooVisuals PUBLIC Qt6::Quick)
+target_compile_features(YalahooVisuals PUBLIC cxx_std_23)
+yalahoo_platform(YalahooVisuals)

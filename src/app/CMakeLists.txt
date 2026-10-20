@@ -223,6 +223,7 @@ target_link_libraries(
     YalahooRhi
     YalahooNavigation
     YalahooText
+    YalahooVisuals
     YalahooOpening
     Qt6::Gui
     Qt6::Qml

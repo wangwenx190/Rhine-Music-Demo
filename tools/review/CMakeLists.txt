@@ -2,7 +2,7 @@ qt_add_executable(ui-audit UiAudit.cpp StartupAudit.cpp StartupAudit.h ControlsA
     TitleAudit.cpp TitleAudit.h CanvasTitleProbe.cpp CanvasTitleProbe.h
     "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/support")
-target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooOpening YalahooRhi
+target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooOpening YalahooRhi YalahooVisuals
     Qt6::CanvasPainter Qt6::QuickTemplates2 Qt6::QuickVectorImage Qt6::Svg Qt6::Test Qt6::GuiPrivate)
 set_target_properties(ui-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
     WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
