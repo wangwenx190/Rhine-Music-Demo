@@ -48,11 +48,11 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 | 配置/构建/静态 | 上述构建与部署成功；`python3 tools/audit/audit-macos-deployment.py`展开COMMON/MAC/PERF与编译QML闭包。格式/官方qmllint按code-style执行 |
 | 脱离Kit | 从包外目录运行验证器，当前进程退出0且新report.json passed；Qt/QML/媒体映像不来自安装Kit；Finder图标/名称正确 |
 | 浏览/详情/总览 | 双主题、真实列/填充、搜索与播放定位互不干扰；检查源景深/磨砂、玻璃排序、透明轮廓、裁切与清晰度。隐藏组件入口用`qt-release-render`选择ui/ruler/opening/settings及相应RHI测试 |
-| 片头/Canvas/文字 | Logo圆环、滑尺数字与标题/emoji正常合成；重播/跳过交接有效；DPR/resize及十次重建后无漏画或增长。数学/状态和自身正常输出分别验收 |
+| 片头/Canvas/文字 | Logo圆环、滑尺数字与标题/emoji正常合成；重播/跳过交接有效；实际DPR/resize后无漏画；资源所有权先静态审计，重复重建按test-gates.md按需选择。数学/状态和自身正常输出分别验收 |
 | 原生菜单/输入 | 物理键盘逐项使用上述Command快捷键；编辑焦点/输入法/只读/片头锁正确，设置视觉重载后仍可用；⌘W/⌘Q退出不残留音频进程 |
 | Retina/屏幕 | 在实际DPR1/1.5/2设备与跨屏切换中记录真实值，逻辑尺寸和清晰度正确；显式离屏target DPR不替代物理屏幕 |
 | 播放与设备 | 本地播放、暂停/继续、seek、上下曲、停止、错误、默认/显式设备切换与断开恢复；检查三路独立音量、实际听感、后台继续与退出停止 |
-| 生命周期/性能 | hide/minimize/restore、同窗口surface和完整视觉重建分别核对；正常VSYNC与独立吞吐、输入/准备时延、资源峰值按performance.md和R28-P取有效样本；不能从隐藏提交成本推断显示延迟 |
+| 生命周期/性能 | 实际hide/minimize/restore和同窗口surface恢复有效；性能按performance.md先静态审计，仅具体未决问题最小实测。已知Metal呈现间断按计划R28-P处理 |
 
 ## 图形与验证差异
 

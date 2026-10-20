@@ -11,11 +11,13 @@
 
 ## 不透明检查
 
+本节及下方阴影/地面入口的固定状态和重建次数描述工具覆盖能力；执行只补test-gates.md选出的实际缺口，资源/寿命先静态审计，不默认重复压力。
+
 36个双主题×前/低视角×三封面×三通道状态保留独立数学检查：已知前平面线性RGB24深度误差<2e-6，view normal按8位编码精度（1/255），源几何四角投影≤2物理px（本入口实际DPR1）。四角只对数学投影与自身合成几何位置，不读取参考图。16个均匀墨色/入射探针直接按sRGBDecode与源Lambert diffuse clamp推导；半球同色并取`intensity=irradiance*PI`隔离已知入射，关闭环境/spot/key/fill并令print exposure=1，覆盖关闭灯光及0/.25/2入射，不据结果拟合参数。
 
 实际附件inventory来自QRhi对象：不透明RGBA16F、法线/线性RGB24深度RGBA8、1×/无mips及真实尺寸；driver分配仍为null。显式采集按实际纹理指针去重，12个语义字段对应4张真实纹理时只读回和转换4次，别名字段共享QImage存储；captured回调仍最多2批，只有显式采集有这项工作，不改产品pass/格式/采样。十次重建由真实sceneGraphInvalidated确认，不靠renderer局部generation递增证明。
 
-保留12个有序尺寸（九种必测尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
+保留12个有序尺寸（九种布局尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
 
 `rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`和`audit-rhi-opaque.py`为现行入口。未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
 

@@ -1,6 +1,6 @@
 # 雾、Bokeh、SMAA与最终输出
 
-本文维护后处理源算法与组件公式检查；SSAO/画质归[occlusion.md](occlusion.md)，附件/上传图归[rhi-postprocess.md](rhi-postprocess.md)。冻结scene.ts及锁定Three的来源/lookup hash在`resources/manifests/postprocess.json`。
+本文维护后处理源算法与组件公式检查；SSAO/画质归[occlusion.md](occlusion.md)，附件/上传图归[rhi-postprocess.md](rhi-postprocess.md)。冻结scene.ts及锁定Three的来源/lookup hash在`resources/manifests/postprocess.json`。下列状态、帧数与重建次数描述现有工具覆盖能力，实际缺口和必要入口调整按[test-gates.md](test-gates.md)选择，不自动形成逐pass全跑或重复压力任务。
 
 ## 顺序与颜色
 

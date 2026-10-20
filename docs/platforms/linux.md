@@ -65,7 +65,7 @@ QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 | 浏览/详情/总览 | 九尺寸、双主题与DPR1/1.5/2分别记录真实值；鼠标、键盘、触控板pixelDelta、首尾/反向/切列、抽取/连选/归位、详情拖动、总览折叠定位和焦点均正常；输入法和系统目录对话框另验。 |
 | Canvas/文字/片头 | 生产C++滑尺、二维序章、glyph/Quick Text标题及彩色emoji的轮廓/透明合成/裁切/淡隐正常；片头输入锁/跳过/重播/三维交接、改速/减少动态沿唯一帧源。不能只用模块导入成功代替绘制质量。 |
 | 声音 | 默认/显式设备、播放/暂停/停止/seek/上下曲/自然结束、未知格式/权限错误恢复；BGM/音效独立。最小化歌曲继续；设备切换/消失/恢复及实际听感分别确认，关闭停止三路。 |
-| 生命周期/资源 | 同一窗口hide/minimize/restore、跨屏DPR、resize/画质/主题及十次SG/视觉重建分别核对，恢复首帧与缓存/封面上传有效，资源回落；不以完整root重建冒充原窗口恢复。 |
-| 呈现/性能 | xcb/Wayland各自检查完整效果与所有附件/格式/MSAA/resolve，正常VSYNC、独立吞吐、输入到状态/Qt提交、冷启动与封面准备；无法观测显示/GPU完成/driver显存保留null。正式采样执行performance.md，不从Metal/D3D11推断效率。 |
+| 生命周期/资源 | 同一窗口hide/minimize/restore、跨屏DPR及resize/画质/主题变化后输出有效；资源/寿命先静态审计，重复SG/视觉重建仅按test-gates.md补具体未决行为。 |
+| 呈现/性能 | xcb/Wayland各自核对实际上下文/swapchain、附件/格式/MSAA/resolve与正常呈现，共用无会话依赖结果。性能先按performance.md静态审计，具体未决问题才最小实测，不默认追加吞吐/计时；未知显示/GPU完成/driver显存保留null。 |
 
-目标组件检查先构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`。OpenGL动态图形/窗口入口统一在R35以`QSG_RHI_BACKEND=opengl`运行，包含现有`qt-release-render`的Bokeh/SMAA真正离屏项及`qt-release-visible`的实际native组件。Vulkan成功启用后的同项归R34，传`QSG_RHI_BACKEND=vulkan`并核对报告实际后端。整场入口为`python3 tools/build/verify-gui.py --backend opengl或vulkan --output verification/全新目录`；正式呈现入口为`verify-startup.py --backend opengl或vulkan --formal --mode vsync --scenario day-wave --output verification/全新目录`；局部成本用`--mode uncapped --scenario day-wave`，独立资源压力用`--stress --mode vsync`，原生hide/minimize另加`--lifecycle`，其他固定场景见performance.md。这些入口的可见权限、场景、原门槛及受影响回归归对应契约和R32-P，不以短回放代替正式矩阵。
+需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL动态图形/窗口入口归R35，实际启用Vulkan的同项归R34，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tools/build/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。

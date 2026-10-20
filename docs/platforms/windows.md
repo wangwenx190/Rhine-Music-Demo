@@ -52,7 +52,7 @@ pwsh -NoProfile -File ./out/windows/verify-windows.ps1 -Scenario normal `
 
 在无 Qt、Node、外部 FFmpeg/开发工具的 Windows 干净机器上重复以上入口，排除开发机已安装运行库及硬编码 Kit 搜索路径掩盖缺失依赖。检查无缺模块/插件/shader/字体错误，MiSans 中文与长标题正确，滑尺和序章轮廓、透明合成/裁切及恢复正常；在 Explorer、窗口/任务栏检查大小图标。正常产品检查空库、演示、Unicode 音乐目录、扫描/错误提示、设备列表、支持的匿名格式、播放/暂停/seek/切歌、设备切换及后台继续播放。格式能力由实际 QtMultimedia 后端决定，缺样本/无设备不得记为通过。
 
-代表尺寸/DPR、浏览/详情/总览/序章、hide/restore/resize、冷启动和资源峰值沿用迁移计划各组件门槛。正式正常 VSYNC 与未限速场景分别按[性能契约](../contracts/performance.md)和 `verify-startup.py` 的目标入口采集，Review 测量工具单独构建保留，不能混入成品。记录真实 OS/GPU/Kit/D3D11、逻辑/物理尺寸/DPR/质量/刷新率/窗口策略，未知 GPU 完成、屏幕显示及 driver 显存保持 null；不能用 macOS 或离屏成绩填写 Windows 产品结果。
+代表尺寸/DPR、浏览/详情/总览/序章及hide/restore/resize沿迁移计划的共用产品会话检查，复用已有有效组件结果。性能按[performance.md](../contracts/performance.md)严格静态审计，只有具体未决问题才选择最小目标实测；不默认采正常VSYNC、未限速或资源峰值。Review工具与产品包分开，实际报告记录目标环境与范围，未知GPU完成/显示/driver显存保持null。
 
 ## 源码审计
 
