@@ -416,18 +416,18 @@ REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检�
 
 StartupCoordinator把异步扫描/模型快照与既有OpeningController的真实渲染就绪事件相接；Preparing重确认最新快照，Film到handedOff之间固定展示状态。它是原生快照/线程交接适配，开场数学、片长、材质、画质和普通媒体语义沿原契约。减少动态静止时由同一FrameClock消费失效，帧内/片尾回调产生的新失效保留；普通波浪和活动过渡继续使用原时间数学。隐藏解码/提交门槛、剩余tile续帧与退出前decoder join属于原生所有权收口。
 
-REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回选和重建保留歌曲的场景意图；作者LBEILC、MIT，实际读取文件hash/符号与采用边界由audit-startup.py记录到本地矩阵。未复制实现/素材、其资源释放策略或截图比较。具体启动状态、资源边界、统计与入口分别由opening.md、covers.md、rhi-integration.md和performance.md维护；目标欠验集中在迁移计划R28-P。
+REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回选和重建保留歌曲的场景意图；作者LBEILC、MIT，实际读取文件hash/符号与采用边界由audit-startup.py记录到本地矩阵。未复制实现/素材、其资源释放策略或截图比较。具体启动状态、资源边界、统计与入口分别由opening.md、covers.md、rhi-integration.md和performance.md维护；目标欠验集中在迁移计划R36。
 
 本机Release已实际执行启动/帧源/封面/开场/实验状态和隐藏Metal生产图集、片头、诊断与完整舞台生命周期回归；三次串行120秒隐藏成本回放保留独立原始样本。初始化、准备时延、GUI/同步/Quick提交/endFrame等待、RHI提交及资源描述符分别记账；不将其解释为原生VSYNC、物理输入/显示或driver显存验收。
 
-当前非OpenGL阶段的提交链判定如下；这些源码结论与历史呈现异常的原因分开，未决事实只由计划R28-P维护。
+当前非OpenGL阶段的提交链判定如下。
 
 | 当前源码边界 | 静态判定 |
 | --- | --- |
 | StartupCoordinator::schedule/applyPending → LibrarySession | 单个queued通知与一个最新不可变快照；没有pending时不进入库替换。Film冻结、隐藏与恢复门槛不引入周期等待或逐帧扫描。 |
 | MusicStage.FrameAnimation → FrameClock::advance → SceneAdapter::publish → SceneItem::schedule/updatePolish | 原生唯一帧源、GUI失效合并与最新revision提交；正常波浪的实体工作集至多436，不读取封面文件或等待解码。不能从这条源码链推断Qt原生曝光和驱动调度的实际时序。 |
 | RhiItem::submit → Renderer::synchronize/renderFrame → SceneItem::configureTelemetry | render仅使用同步快照，上传有界；无捕获稳态不做GPU读回/finish。遥测邮箱至多128个样本，queued通知合并且epoch拒绝旧结果，GUI接收时刻与render提交时刻是不同事实。 |
-| StartupAudit::Driver::wait / AuditWindow::record | 原生等待由真实frameSwapped排队评估，FrameAnimation继续由Qt驱动；旧失败缺失的曝光/GUI时序不能用末尾windowPolicy或GUI接收时的clockFrame补证。该范围内未确定能解释原始间断的产品源码缺陷。 |
+| StartupAudit::Driver::wait / AuditWindow::record | 原生等待由真实frameSwapped排队评估，FrameAnimation继续由Qt驱动；曝光、GUI帧、同步、RHI提交和Qt呈现分别记录，GUI接收时的clockFrame不能代替独立帧时间戳。 |
 | StartupAudit原生observe分支 → verify-startup | 只缩小诊断驱动与匿名输入，复用同一生产MusicStage/RHI；独立时间流和失败证据保留不改变源运动、画质、渲染图或正常播放器行为。 |
 
 ## R29 · 整场GUI来源与状态闭包
@@ -457,7 +457,7 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 | main → ApplicationMenu → PanelController / 当前Qt编辑器 / 系统原生对话框 | 系统菜单使用公开AppKit，Command设置尊重片头锁；编辑能力沿焦点/只读/选区与撤销状态判定，原生对话框沿系统responder。QPointer与RAII保证菜单不持有重建后的视觉对象；关闭/退出沿既有Qt媒体停止链。 |
 | MusicStage.visualActive → FrameClock/SceneItem/封面；独立媒体会话 | 后台视觉停止、媒体意图与来源独立；部署不改变渲染图、源材质/运动/Canvas透明合成或缓存。现有R28正式隐藏成本及未受影响组件结果仍有效。 |
 
-本机已实际执行Release资源/模块/shader/公开媒体/隐藏窗口与AppKit菜单检查，以及Metal绘制、滑尺、完整片头和设置自身输出；实际轮廓/裁切/合成与状态、资源断言分开。部署包的隐藏加载不证明GPU呈现、物理菜单输入、跨屏、设备听感或正常VSYNC。其余目标与完整产品物理/性能验收保留R31-P/R28-P及公共后置分工，技术入口只在macOS平台文档和组件契约维护。
+本机已实际执行Release资源/模块/shader/公开媒体/隐藏窗口与AppKit菜单检查，以及Metal绘制、滑尺、完整片头和设置自身输出；实际轮廓/裁切/合成与状态、资源断言分开。部署包的隐藏加载不证明GPU呈现、物理菜单输入、跨屏、设备听感或正常VSYNC。其余目标与产品物理验收保留R31-P及迁移计划R36，技术入口只在macOS平台文档和组件契约维护。
 
 ## Linux部署与后端边界
 

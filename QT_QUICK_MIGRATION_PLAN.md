@@ -185,14 +185,13 @@
 
 - 依赖现有生产实现、有效组件结果及下方任务；只处理尚缺的目标事实。图形运行剩余目标为Windows的D3D11、显式D3D12/OpenGL及实际启用的Vulkan，Linux的OpenGL和实际启用的Vulkan（真实X11/xcb与Wayland），以及缺少启用特性Kit/SDK/MoltenVK的macOS Vulkan；macOS生产bundle的严格置底无激活可见入口沿下方MAC-VISIBLE-3D处理。非图形构建、文件系统、媒体、部署与三平台物理设备同属本轮。
 - 能力准入：Windows/Linux须有各自原生系统、最新完整Kit及所需GPU/桌面会话；macOS跨设备部署须有另一台兼容设备，Vulkan须有启用该特性的原生Kit、SDK/MoltenVK。物理输入、跨屏DPR/HDR/EDR、设备拔插与听感须有对应实物和可靠操作条件，不能用注入事件或离屏DPR替代。
-- OpenGL使用`QSG_RHI_BACKEND=opengl`或工具`--backend opengl`并核对真实API；Windows/Linux须有原生系统、最新完整Kit和实际GPU。Linux同系统/Kit/GPU/后端的无会话依赖结果共用，xcb/Wayland分别补上下文/swapchain、窗口/输入/焦点/DPR与呈现差异；各组件准确入口、匿名输入和原门槛沿下方六组，不复制矩阵。macOS尚缺的物理输入、跨屏和设备事实沿相应物理任务保留。
-- 原ID与完整闭包沿下方六组保留：BP-P/R30-P/R31-P/R32-P的构建部署与日志；R21-P/R22-P/R24-P/R25-P的目标文件系统/媒体与声音；UI-CONTROLS-P及文字/详情/总览/序章/整场产品的目标输入、显示与窗口事实；R19A/B/C/D各`-P`的目标GPU差异；HDR-OUTPUT-P；R28-P已知呈现间断。各组的源码、匿名输入、准确入口、依赖及原退出门槛是本轮清单，不另复制一套矩阵。
-- R28-P需要可持续曝光且不遮盖工作区的原生窗口观测条件；无可靠呈现样本时保留失败与未知原因，不能以隐藏Metal检查或其他正常运行收口。已有效的Metal自动组件结果不重跑。
+- OpenGL使用`QSG_RHI_BACKEND=opengl`或工具`--backend opengl`并核对真实API；Windows/Linux须有原生系统、最新完整Kit和实际GPU。Linux同系统/Kit/GPU/后端的无会话依赖结果共用，xcb/Wayland分别补上下文/swapchain、窗口/输入/焦点/DPR与呈现差异；各组件准确入口、匿名输入和原门槛沿下方五组，不复制矩阵。macOS尚缺的物理输入、跨屏和设备事实沿相应物理任务保留。
+- 原ID与完整闭包沿下方五组保留：BP-P/R30-P/R31-P/R32-P的构建部署与日志；R21-P/R22-P/R24-P/R25-P的目标文件系统/媒体与声音；UI-CONTROLS-P及文字/详情/总览/序章/整场产品的目标输入、显示与窗口事实；R19A/B/C/D各`-P`的目标GPU差异；HDR-OUTPUT-P。各组的源码、匿名输入、准确入口、依赖及原退出门槛是本轮清单，不另复制一套矩阵。
 - 只在当前必要检查确被无关回放/压力阻塞时，在对应任务内解开最小分支；不设独立工具改造轮次。共享修正仅回归受影响生产后端和产品状态；全部独立缺口获得相应目标事实后删除本轮。
 
 ## 后置专项输入与退出条件
 
-以下六组是R36的剩余任务；表中原ID用于追溯断言，不各自启动一套验证。一次只实施其中一个可收尾单元。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
+以下五组是R36的剩余任务；表中原ID用于追溯断言，不各自启动一套验证。一次只实施其中一个可收尾单元。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
 
 ### 目标构建、部署与后端/日志
 
@@ -263,10 +262,3 @@
 - 依赖真实目标系统、显示设备及输出能力；输入为DisplayOutputState/Monitor、WindowsDisplayQuery/LinuxColorManagement/MacDisplayQuery和DisplayOutputTest的5×1颜色。契约为[display-output.md](docs/contracts/display-output.md)。主机静态/qsb不能证明其他系统编译或显示事实。
 - Release的DisplayOutputTest、`display-transfer-gpu`及需要当轮可见授权的`display-output-visible`只补缺项。Windows核对HDR开关/跨HDR-SDR屏/SDR brightness slider和nits/80，WCG SDR不误判；Linux核对真实Wayland颜色协议/PQ或linear swapchain及reference white/target luminance通知、无协议/X11的SDR和Vulkan失败回退；macOS核对亮度/电源引起的current EDR及跨屏恢复。
 - 退出：查询失败清旧状态、参数变化不重建/模式切换保留QML与音频、epoch/释放正确，真实通知与输出符合契约。R36按上述剩余目标执行；OpenGL保持SDR，Windows/Linux需真实输出事实，macOS仅在共享变更影响时回归。不附带大型阵列、性能A/B或整场矩阵。
-
-### 已知呈现间断 · R28-P · R36
-
-- 原始失败输入为`verification/r33-product-performance/vsync-night-wave/run-2/report.json`及同目录日志、上级manifest：macOS/Metal的`night-wave`出现约2.48秒Qt呈现间断，邻近提交的封面上传为零、资源代次不变。原报告缺连续曝光事件与独立GUI/同步时间戳；`clockFrame`在遥测送达GUI时读取，前后计数变化不能证明间断期间的精确GUI时序。原因未明，不能归为噪声或被其他正常运行抵消。
-- 依赖当前StartupCoordinator/FrameClock/MusicStage/StartupAudit::Driver、窗口曝光调度及SceneItem::frameSubmitted时间链，静态判定见source-fidelity-review.md。尚缺的是该具体异常发生时的可关联时间链，旧采集无法补回；需要可靠重现条件，普通短观察未复现不能结案。正常启动和窗口/资源所有权并入前述产品单元，不另跑启动/压力矩阵。
-- 定向入口：`python3 tools/build/verify-startup.py --backend metal --mode vsync --scenario night-wave --observe-only --seconds 必要秒数 --output 新目录`。该分支只准备576张匿名qrc封面专辑，无歌曲/大图生成、换片、root重建或固定暖机；保存独立GUI帧、Qt同步、RHI提交、原生呈现及曝光事件，采样期间失去曝光即无效。原始异常处无上传，先用同实体/附件规模的qrc输入观察提交调度；只有证据指向解码/输入压力时才恢复原96张2048²封面与音频fixture。窗口遵守当轮授权；置底被遮挡导致无效时不得提高层级。
-- 退出：以源码与现有证据确定停提或曝光变化原因；存在产品缺陷则修复并最小验证，结论不超出证据。无需为无法测量的GPU完成/显示延迟或历史分位另建任务；仍未解释的真实失败继续保留此项。

@@ -52,7 +52,7 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 | 原生菜单/输入 | 物理键盘逐项使用上述Command快捷键；编辑焦点/输入法/只读/片头锁正确，设置视觉重载后仍可用；⌘W/⌘Q退出不残留音频进程 |
 | Retina/屏幕 | 在实际DPR1/1.5/2设备与跨屏切换中记录真实值，逻辑尺寸和清晰度正确；显式离屏target DPR不替代物理屏幕 |
 | 播放与设备 | 本地播放、暂停/继续、seek、上下曲、停止、错误、默认/显式设备切换与断开恢复；检查三路独立音量、实际听感、后台继续与退出停止 |
-| 生命周期/性能 | 实际hide/minimize/restore和同窗口surface恢复有效；性能按performance.md先静态审计，仅具体未决问题最小实测。已知Metal呈现间断按计划R28-P处理 |
+| 生命周期/性能 | 实际hide/minimize/restore和同窗口surface恢复有效；性能按performance.md先静态审计，仅具体未决问题最小实测 |
 
 ## 图形与验证差异
 
