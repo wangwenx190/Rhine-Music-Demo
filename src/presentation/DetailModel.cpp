@@ -112,16 +112,19 @@ QHash<int, QByteArray> DetailModel::roleNames() const
              { Format, "format"_ba },    { Duration, "duration"_ba },
              { Disc, "disc"_ba },        { DiscHeading, "discHeading"_ba } };
 }
-void DetailModel::prepare(const LibrarySession &library)
+void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
 {
     const auto snapshot = library.snapshot();
     const auto *album = library.navigationAlbum();
-    if (snapshot == m_snapshot && album == m_album
+    if (!metadataOnly && snapshot == m_snapshot && album && album->id == m_resolved.id
         && m_info.value(u"code"_s) == library.browseInfo().value(u"code"_s))
         return;
-    beginResetModel();
+    if (!metadataOnly)
+        beginResetModel();
     m_snapshot = snapshot;
-    m_album = album;
+    m_resolved = album ? library.resolvedAlbum(album->id) : Album();
+    m_album = album ? &m_resolved : nullptr;
+    album = m_album;
     m_info.clear();
     if (album) {
         const auto &a = *album;
@@ -137,6 +140,12 @@ void DetailModel::prepare(const LibrarySession &library)
                 break;
             }
         }
+        QStringList onlineGenres;
+        for (const auto &value : a.fields.value(u"_onlineGenres"_s).toArray())
+            onlineGenres.append(value.toString());
+        if (!onlineGenres.isEmpty())
+            fact(QCoreApplication::translate("Yalahoo", "MusicBrainz genres"),
+                 onlineGenres.join(u", "_s));
         QStringList formats;
         QSet<QString> formatSet;
         int discs = a.discCount.value_or(1);
@@ -295,7 +304,8 @@ void DetailModel::prepare(const LibrarySession &library)
                    { u"discs"_s, discs },
                    { u"code"_s, library.browseInfo().value(u"code"_s) } };
     }
-    endResetModel();
+    if (!metadataOnly)
+        endResetModel();
     Q_EMIT albumChanged();
 }
 }

@@ -222,6 +222,27 @@ void AlbumListModel::setSnapshot(Snapshot snapshot)
         Q_EMIT countChanged();
     Q_EMIT columnsChanged();
 }
+void AlbumListModel::updateMetadataSnapshot(Snapshot snapshot)
+{
+    if (!snapshot || snapshot->albums.size() != m_snapshot->albums.size())
+        return;
+    const auto previous = m_snapshot;
+    m_snapshot = std::move(snapshot);
+    const auto updated = m_snapshot;
+    const auto indices = m_order.indices;
+    for (int row = 0; row < indices.size(); ++row) {
+        const auto position = indices[row];
+        const auto &before = previous->albums[position];
+        const auto &after = updated->albums[position];
+        if (before.introduction != after.introduction || before.creditsLookup != after.creditsLookup
+            || before.online != after.online)
+            Q_EMIT dataChanged(index(row), index(row),
+                               { Producers, Description, DescriptionSource, Introduction,
+                                 CreditsLookup, Online, AlbumData });
+        if (m_snapshot != updated)
+            return;
+    }
+}
 void AlbumListModel::setSortMode(SortMode mode)
 {
     if (m_mode == mode)

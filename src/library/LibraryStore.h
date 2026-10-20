@@ -2,6 +2,8 @@
 
 #include "DirectoryScanner.h"
 #include "MediaMetadataProbe.h"
+#include "IMetadataProvider.h"
+#include <QHash>
 #include <QFutureWatcher>
 #include <QObject>
 #include <QThreadPool>
@@ -20,6 +22,8 @@ public:
     explicit LibraryStore(QString dataRoot, QObject *parent = nullptr);
     ~LibraryStore() override;
     void load();
+    void stageMetadata(const ProviderResult &result);
+    void commitMetadata();
     Q_INVOKABLE bool setMetadataConfiguration(const QVariantMap &configuration);
     Q_INVOKABLE bool setRootPaths(const QString &paths);
     Q_INVOKABLE QStringList rootPaths() const;
@@ -40,6 +44,8 @@ public:
 Q_SIGNALS:
     void statusChanged();
     void snapshotReady(yalahoo::Snapshot snapshot);
+    void metadataCommitted(yalahoo::Snapshot snapshot);
+    void metadataConfigurationChanged(yalahoo::Snapshot snapshot);
     void saved();
     void failed(const QString &error);
     void scanFinished(quint64 generation, quint64 filesVisited);
@@ -51,7 +57,8 @@ private:
         Scan,
         Probe,
         Import,
-        Save
+        Save,
+        Metadata
     };
     struct JobResult
     {
@@ -69,6 +76,9 @@ private:
     QString m_path, m_error;
     QList<QUrl> m_roots;
     Snapshot m_snapshot, m_savePending;
+    QHash<QString, ProviderResult> m_metadataPending;
+    bool m_metadataCommit = false;
+    qsizetype m_metadataBytes = 0;
     QString m_dataRoot, m_importPending;
     quint64 m_filesVisited = 0;
     MediaMetadataProbe m_probe;

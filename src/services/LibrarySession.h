@@ -19,7 +19,8 @@ class LibrarySession final : public QObject
     Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged)
     Q_PROPERTY(quint64 metadataRevision READ metadataRevision NOTIFY metadataChanged)
     Q_PROPERTY(QVariantMap metadataProgress READ metadataProgress NOTIFY metadataProgressChanged)
-    Q_PROPERTY(QVariantMap metadataConfiguration READ metadataConfiguration NOTIFY snapshotChanged)
+    Q_PROPERTY(bool metadataBusy READ metadataBusy NOTIFY metadataProgressChanged)
+    Q_PROPERTY(QVariantMap metadataConfiguration READ metadataConfiguration NOTIFY metadataConfigurationChanged)
     Q_PROPERTY(QVariantMap browseInfo READ browseInfo NOTIFY browseInfoChanged)
     Q_PROPERTY(QVariantMap providerCapabilities READ providerCapabilities NOTIFY providerCapabilitiesChanged)
 public:
@@ -52,10 +53,18 @@ public:
     Q_INVOKABLE bool navigate(const QString &albumId, const QString &trackId = { });
     // Explicit playback-state synchronization; navigation/search/provider never call this.
     bool setPlaybackIds(const QString &albumId, const QString &trackId);
-    Q_INVOKABLE quint64 requestMetadata(const QString &albumId, const QString &kind);
+    Album resolvedAlbum(const QString &albumId) const;
+    void adoptMetadataSnapshot(Snapshot snapshot);
+    void adoptMetadataConfiguration(Snapshot snapshot);
+    bool metadataBusy() const
+    {
+        return !m_pending.isEmpty();
+    }
+    Q_INVOKABLE quint64 requestMetadata(const QString &albumId, const QString &kind,
+                                        bool force = false, const QString &releaseId = { });
     Q_INVOKABLE void cancelMetadata(quint64 requestId);
     Q_INVOKABLE void cancelAllMetadata();
-    Q_INVOKABLE bool requestMetadataBatch(const QString &kind);
+    Q_INVOKABLE bool requestMetadataBatch(const QString &kind, bool missingOnly = false);
     Q_INVOKABLE QVariantMap metadataFor(const QString &albumId, const QString &kind,
                                         quint64 revision = 0) const;
     QVariantMap metadataConfiguration() const;
@@ -80,10 +89,7 @@ public:
     {
         return m_metadataRevision;
     }
-    QVariantMap metadata() const
-    {
-        return m_metadata;
-    }
+    QVariantMap metadata() const;
     QVariantMap providerCapabilities() const;
     QVariantMap browseInfo() const;
 Q_SIGNALS:
@@ -95,6 +101,8 @@ Q_SIGNALS:
     void metadataProgressChanged();
     void providerCapabilitiesChanged();
     void metadataDelivered(const yalahoo::ProviderResult &result);
+    void albumMetadataChanged(const QString &albumId);
+    void metadataConfigurationChanged();
 
 private:
     friend class PlaybackController;
@@ -129,7 +137,7 @@ private:
     QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,
             m_playbackTrackId;
     QVariantList m_genres;
-    QVariantMap m_metadata;
+    QHash<QString, ProviderResult> m_metadata;
     QVariantMap m_summary;
     QStringList m_batchAlbums;
     QString m_batchKind, m_batchStatus;

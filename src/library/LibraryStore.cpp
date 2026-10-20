@@ -2,6 +2,8 @@
 #include "LibraryStore.h"
 #include "Logging.h"
 #include "LegacyImporter.h"
+#include "metadata/MetadataMerge.h"
+#include <QTimer>
 
 #include <QDir>
 #include <QFile>
@@ -43,12 +45,49 @@ LibraryStore::~LibraryStore()
         m_cancel->store(true, std::memory_order_relaxed);
     // Only teardown waits. A scan that never reached GUI acceptance is never saved.
     m_worker.waitForDone();
+    if (m_active == Kind::Metadata) {
+        const auto result = m_job.result();
+        if (result.snapshot)
+            m_snapshot = result.snapshot;
+        m_savePending = m_snapshot;
+    }
+    if (!m_metadataPending.isEmpty() && m_writable) {
+        auto snapshot = *m_snapshot;
+        for (auto &album : snapshot.albums)
+            for (const auto kind :
+                 { MetadataKind::Introduction, MetadataKind::Credits, MetadataKind::Enrichment }) {
+                const auto it = m_metadataPending.constFind(album.id + '/'_L1 + kindName(kind));
+                if (it != m_metadataPending.cend() && it->inputKey == metadataKey(album, kind))
+                    mergeMetadata(album, *it);
+            }
+        m_savePending = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
+    }
     if (m_savePending && m_writable) {
         const auto result = write(m_path, m_savePending);
         if (!result.error.isEmpty())
             qCWarning(logLibrary) << "Library shutdown save failed" << "cache=" << m_path
                                   << "error=" << result.error;
     }
+}
+void LibraryStore::stageMetadata(const ProviderResult &result)
+{
+    if (!m_initialized || !m_writable || result.fromCache || result.inputKey.isEmpty()
+        || result.checkedAt.isEmpty() || result.status == ProviderStatus::Deferred
+        || result.status == ProviderStatus::Cancelled)
+        return;
+    const auto key = result.albumId + '/'_L1 + kindName(result.kind);
+    m_metadataBytes -= m_metadataPending.value(key).payloadBytes;
+    m_metadataPending.insert(key, result);
+    m_metadataBytes += result.payloadBytes;
+    if (m_metadataBytes >= 8 * 1024 * 1024)
+        commitMetadata();
+}
+void LibraryStore::commitMetadata()
+{
+    if (m_metadataPending.isEmpty())
+        return;
+    m_metadataCommit = true;
+    schedule();
 }
 bool LibraryStore::busy() const
 {
@@ -91,6 +130,36 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
                                            "Invalid metadata configuration field type."));
         return false;
     }
+    if ((patch.contains(u"proxyEnabled"_s) && !patch.value(u"proxyEnabled"_s).isBool())
+        || (patch.contains(u"proxyMode"_s)
+            && (!patch.value(u"proxyMode"_s).isString()
+                || !QStringList{ u"system"_s, u"manual"_s }.contains(
+                        patch.value(u"proxyMode"_s).toString())))
+        || (patch.contains(u"networkEnabled"_s) && !patch.value(u"networkEnabled"_s).isBool())
+        || (patch.contains(u"proxyUrl"_s) && !patch.value(u"proxyUrl"_s).isString())) {
+        report(QCoreApplication::translate("Yalahoo",
+                                           "Invalid metadata configuration field type."));
+        return false;
+    }
+    if (patch.contains(u"musicBrainzContact"_s)) {
+        const auto contact = patch.value(u"musicBrainzContact"_s).toString();
+        if (contact.size() > 500 || contact.contains(QChar::CarriageReturn)
+            || contact.contains(QChar::LineFeed)) {
+            report(QCoreApplication::translate(
+                    "Yalahoo", "The metadata contact must be one line of at most 500 characters."));
+            return false;
+        }
+    }
+    if (patch.contains(u"proxyUrl"_s) && !patch.value(u"proxyUrl"_s).toString().isEmpty()) {
+        const QUrl proxy(patch.value(u"proxyUrl"_s).toString());
+        if (!proxy.isValid() || proxy.scheme() != "http"_L1 || proxy.host().isEmpty()
+            || !proxy.userInfo().isEmpty() || proxy.hasQuery() || proxy.hasFragment()
+            || proxy.port(8080) < 1 || proxy.port(8080) > 65535
+            || (!proxy.path().isEmpty() && proxy.path() != "/"_L1)) {
+            report(QCoreApplication::translate("Yalahoo", "Enter a valid HTTP proxy URL."));
+            return false;
+        }
+    }
     for (auto it = patch.begin(); it != patch.end(); ++it)
         object.insert(it.key(), it.value());
     if (object == snapshot.fields.value(u"metadataConfiguration"_s).toObject())
@@ -98,7 +167,9 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
     snapshot.fields.insert(u"metadataConfiguration"_s, object);
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     m_savePending = m_snapshot;
-    Q_EMIT snapshotReady(m_snapshot);
+    Q_EMIT metadataConfigurationChanged(m_snapshot);
+    if (!m_metadataPending.isEmpty())
+        m_metadataCommit = true;
     schedule();
     return true;
 }
@@ -282,7 +353,26 @@ void LibraryStore::schedule()
                            << "cache=" << m_path << "roots=" << m_roots
                            << "save=" << bool(m_savePending) << "scan=" << m_scanPending
                            << "import=" << m_importPending;
-    if (m_savePending) {
+    if (m_metadataCommit && m_initialized && !m_loadPending) {
+        m_metadataCommit = false;
+        m_active = Kind::Metadata;
+        auto pending = std::exchange(m_metadataPending, { });
+        m_metadataBytes = 0;
+        m_job.setFuture(
+                QtConcurrent::run(&m_worker, [snapshot = m_snapshot, pending = std::move(pending)] {
+                    auto updated = *snapshot;
+                    for (auto &album : updated.albums)
+                        for (const auto kind : { MetadataKind::Introduction, MetadataKind::Credits,
+                                                 MetadataKind::Enrichment }) {
+                            const auto it = pending.constFind(album.id + '/'_L1 + kindName(kind));
+                            if (it != pending.cend() && it->inputKey == metadataKey(album, kind))
+                                mergeMetadata(album, *it);
+                        }
+                    return JobResult{
+                        std::make_shared<const LibrarySnapshot>(std::move(updated)), { }, 0, false
+                    };
+                }));
+    } else if (m_savePending) {
         m_active = Kind::Save;
         m_job.setFuture(QtConcurrent::run(&m_worker, &LibraryStore::write, m_path,
                                           std::exchange(m_savePending, { })));
@@ -332,7 +422,11 @@ void LibraryStore::complete()
         return;
     }
     m_cancel.reset();
-    if (kind == Kind::Save) {
+    if (kind == Kind::Metadata && result.snapshot) {
+        m_snapshot = result.snapshot;
+        m_savePending = m_snapshot;
+        Q_EMIT metadataCommitted(m_snapshot);
+    } else if (kind == Kind::Save) {
         if (result.error.isEmpty())
             Q_EMIT saved();
         else

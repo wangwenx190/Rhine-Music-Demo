@@ -866,3 +866,13 @@ if(WIN32)
     set_tests_properties(graphics-backend PROPERTIES ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
+
+qt_add_executable(OnlineMetadataTest OnlineMetadataTest.cpp)
+target_link_libraries(OnlineMetadataTest PRIVATE YalahooCore Qt6::Test Qt6::Network)
+yalahoo_platform(OnlineMetadataTest)
+add_test(NAME online-metadata COMMAND OnlineMetadataTest)
+set_tests_properties(online-metadata PROPERTIES TIMEOUT 60)
+if(WIN32)
+    set_tests_properties(online-metadata PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()

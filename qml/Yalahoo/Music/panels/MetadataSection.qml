@@ -64,26 +64,68 @@ Column {
         tokens: root.tokens
         text: root.kind === "introduction" ? qsTr("Query / update album introduction \u2197") :
                                              root.kind === "credits" ? qsTr(
-                                                                           "Query missing credits \u2197") :
-                                                                       qsTr("Enrich missing online metadata \u2197")
-        enabled: root.queryEnabled && !root.progress.active
-        onClicked: root.librarySession.requestMetadataBatch(root.kind)
+                                                                           "Query / update credits \u2197") :
+                                                                       qsTr("Query / update MusicBrainz metadata \u2197")
+        enabled: root.queryEnabled && !root.progress.active && !root.librarySession.metadataBusy
+                 && root.librarySession.navigationAlbumId !== ""
+        onClicked: root.librarySession.requestMetadata(root.librarySession.navigationAlbumId,
+                                                       root.kind, true)
         ArchiveToolTip {
             parent: queryButton
             tokens: root.tokens
-            visible: queryButton.hovered && !queryButton.enabled
-            text: qsTr("Online metadata is not enabled yet")
+            visible: queryButton.hovered && !root.queryEnabled
+            text: qsTr("Enable online metadata in advanced settings")
         }
-        Accessible.description: enabled ? "" : qsTr("Online metadata is not enabled yet")
+        Accessible.description: root.queryEnabled ? "" : qsTr(
+                                                        "Enable online metadata in advanced settings")
     }
     ArchiveText {
         tokens: root.tokens
-        text: qsTr("Online metadata is not enabled yet. Existing caches remain available offline.")
+        text: qsTr("Online queries are disabled. Existing metadata remains available offline.")
         width: parent.width
         wrapMode: Text.Wrap
         visible: !root.queryEnabled
         cssPixelSize: 11
         color: root.tokens.muted
+    }
+    ArchiveButton {
+        objectName: root.kind + "MetadataBatch"
+        tokens: root.tokens
+        text: qsTr("Query missing or expired metadata for the library")
+        enabled: root.queryEnabled && !root.progress.active && !root.librarySession.metadataBusy
+        onClicked: root.librarySession.requestMetadataBatch(root.kind)
+    }
+    Column {
+        width: parent.width
+        spacing: 12
+        visible: (root.result.releaseCandidates || []).length > 0
+        ArchiveText {
+            tokens: root.tokens
+            width: parent.width
+            wrapMode: Text.Wrap
+            cssPixelSize: 11
+            text: qsTr(
+                      "Several releases may match. Confirm the edition for this album before querying credits or genres.")
+        }
+        ArchiveComboBox {
+            id: releaseChoice
+            objectName: root.kind + "MetadataRelease"
+            tokens: root.tokens
+            width: parent.width
+            model: root.result.releaseCandidates || []
+            textRole: "display"
+            valueRole: "id"
+            Accessible.name: qsTr("MusicBrainz release edition")
+        }
+        ArchiveButton {
+            tokens: root.tokens
+            text: qsTr("Query the selected release")
+            enabled: root.queryEnabled && !root.progress.active &&
+                     !root.librarySession.metadataBusy && releaseChoice.currentIndex >= 0
+            onClicked: root.librarySession.requestMetadata(root.librarySession.navigationAlbumId,
+                                                           root.kind, true,
+                                                           releaseChoice.currentValue)
+        }
     }
     ArchiveProgressBar {
         tokens: root.tokens
@@ -106,7 +148,7 @@ Column {
     ArchiveButton {
         tokens: root.tokens
         text: qsTr("Cancel query")
-        visible: root.progress.kind === root.kind && root.progress.active
+        visible: root.progress.active || root.librarySession.metadataBusy
         onClicked: root.librarySession.cancelAllMetadata()
     }
 }

@@ -1,4 +1,4 @@
-# 数据模型、排序、搜索与离线资料契约
+# 数据模型、排序、搜索与资料查询契约
 
 冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts`、`data.ts:setMusicAlbums`及`scripts/music-library.mjs`。本文管理值模型、身份/排序/搜索、本地扫描/存储序列化与Provider协议；媒体与UI消费者按各自专项契约接入。
 
@@ -20,11 +20,24 @@ SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→�
 
 LibrarySession 的 navigationAlbumId/navigationTrackId 与 playbackAlbumId/playbackTrackId 独立。`navigate`、`search`、`sort`、`requestMetadata` 不调用播放或修改播放 ID；播放ID只由受控C++入口同步：通用setPlaybackIds验证当前库，PlaybackController可为已验证并保留的旧队列同步孤立ID；Qt媒体状态与设备边界见[playback.md](playback.md)。库替换使过期导航失效，播放 ID 保留以便后续正在播放的媒体独立存活。
 
-IMetadataProvider 构造注入，固定 Introduction/Credits/Enrichment/cancel 异步接口。请求返回bool表示是否接纳；未接纳不建立订阅，调用者必须处理false。取消可阻止尚未开始的交付，不要求额外发出Cancelled；已在途结果仍可能到达，必须核对token。AlbumQuery 预留批量 ID、联系人、enabled/force/configuration；ProviderCapabilities 预留各类能力，产品只注册 OfflineMetadataProvider，networkEnabled=false。ProviderResult 带 requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error；状态为 Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。来源与日期为缓存原值，不伪造检查时间。
+## 联网资料与离线缓存
 
-OfflineMetadataProvider 对不可变本地缓存快照按稳定ID索引异步读取；已有介绍或制作信息及历史查询状态直接返回，即使 force 也不重查。没有缓存返回 Deferred、“联网资料功能暂未启用”，不写成 NotFound，不生成 retryAt。历史缓存中的 NotFound/error/retryAt 原样保留。单个QObject所属QTimer按FIFO每次交付一项，最多八项等待；满时拒绝接纳，重复token不重复入队。取消立即释放该项与快照引用，空队列停止timer，不保留逐请求queued closure或取消记录；已接纳请求持有对应快照和索引，不受后续换库影响。销毁后不再交付；语义见[QTimer](https://doc.qt.io/qt-6/qtimer.html)。不创建网络对象、请求、子进程或写缓存。LibrarySession 用 queued connection 路由结果，检查 requestId、generation、实体和 kind，处理请求覆盖/取消/库替换/视觉重载/销毁，重复或过期结果在写入实体缓存前丢弃。ProviderCapabilities通过capabilitiesChanged发布，产品始终离线；显式请求的enabled取当前Provider网络能力，不将配置的未来自动查询开关当作实际联网授权。
+IMetadataProvider构造注入，提供Introduction/Credits/Enrichment/cancel异步接口。AlbumQuery携带专辑值、本地曲目用于匹配、enabled/force/configuration；本地路径与曲目文件不发送。请求bool表示是否接纳，拒绝时不建立订阅。ProviderResult携带requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error及输入摘要；状态为Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。LibrarySession在结果进入缓存前检查请求、代次、实体和kind；取消、换库、扫描、视觉重载及销毁淘汰过期结果。导航与播放始终独立。
 
-资料批次由LibrarySession按当前快照稳定ID串行调度，一次一个请求，全部独立请求合计最多八个。metadataProgress发布kind/active/total/completed/errors/最后真实状态；取消或换库增加同一generation并取消旧token，不产生第二套身份。新批次保留先前已接受的本机结果，快照替换清除会话结果。metadataRevision作为显式参数驱动UI按当前专辑/kind读取metadataFor，避免每次结果把整个缓存交给QML；制作人员只序列化producerData，不为读取制作信息构造专辑/曲目JSON；payload/source/checkedAt/retryAt/error归属于结果中的实体，导航与播放不受影响。未注入结果时读取快照原缓存，缺缓存为Deferred；不伪造成功或无结果。LibrarySession通过MetadataPresentation提供stateText/contentText/sourceText，保留原payload/source/status/时间/错误；QML不解析或序列化元数据。
+普通产品注入OnlineMetadataProvider，演示和验证入口使用OfflineMetadataProvider。`metadataConfiguration.networkEnabled`默认false；用户在“高级 · 联网资料”显式开启后才能发送查询。`onlineEnabled`独立控制扫描后对尚无MusicBrainz查询状态的专辑自动补充结构化资料，初次加载缓存不自动查询。手动当前专辑按钮刷新该类资料；全库按钮串行补缺或刷新过期项，不强制重查有效缓存。原MusicBrainz联系字段可选，空值使用项目公开网址标识User-Agent；`proxyEnabled`默认true，关闭时明确直连；`proxyMode`默认system，区分系统默认代理与manual手动代理，手填地址在`proxyUrl`独立保存。手动代理必须为不含认证信息的有效HTTP地址；空或无效手填地址不能静默回退系统代理。配置修改仅更新配置并取消在途请求，保留已接受资料、曲目模型、导航与播放，不作为换库。所有配置通过LibraryStore保存，验证字段类型、联系方式长度/换行及代理结构，保留未知扩展。忙碌/损坏库拒绝配置写入。
+
+OnlineMetadataProvider的专用QThread拥有调度器、QNetworkAccessManager、响应缓冲和JSON解析。GUI只交接隐式共享的值；包括等待、在途、取消确认和完成邮箱在内最多八个已投递请求，同一时刻一个HTTP请求。取消立即停止worker中对应timer/reply，GUI在worker确认释放前仍计入容量，避免反复取消造成无限queued closure。析构仅在退出路径等待线程；QObject/timer/reply在所属线程清理。
+
+HTTP仅允许`musicbrainz.org`、`zh.wikipedia.org`、`en.wikipedia.org`与`www.wikidata.org`的HTTPS；不跟随重定向、不发送/保存cookies或复用认证，不忽略TLS错误。MusicBrainz及Wikimedia各自请求起点至少间隔1100ms；使用对象所属单次timer唤醒，不轮询。单响应解压后最多2MiB，有12秒传输与15秒总时限。429/503/Retry-After及Wikimedia maxlag触发服务冷却，保留retryAt；没有自动重试，force也不能绕过冷却。源错误、响应格式变化、缺资料和匹配歧义分别报告，不能以断网写成NotFound。依据：[MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API)、[Wikimedia API etiquette](https://www.mediawiki.org/wiki/API:Etiquette)、[Qt Network](https://doc.qt.io/qt-6/qnetworkaccessmanager.html)。
+
+- **MusicBrainz**：已知release ID先验证格式再查询并复核专辑/歌手/可用年份及完整曲目；缺ID时搜索至多十个发行版本，仅完整搜索范围内唯一符合标题、歌手、曲目总数和可用年份的高分候选自动进入详情；截断搜索或多版本返回Uncertain并缓存至多十个候选的日期/地区/厂牌/标识，由当前专辑的版本选择控件明确确认后再查询，不能静默取首项。逐曲按标题、已知disc/track及实际可用时长（差≤3秒）唯一匹配，不能把不同发行版本或live/remix混用。制作信息读取release/recording及所关联work的艺术家关系，保留作词、作曲、编曲、演奏、制作、混音/母带等具体职责、属性、来源和稳定trackId；署名别名按关系方向读取，空别名回退人员姓名；有资料仍返回Partial，不将“有若干署名”等同完整。每次最多2000条远端曲目、4096条署名和128个流派。Enrichment保存发行标识及在线流派，保持本地名称、标签、文件与人工genreId。资料模型与关系依据：[MusicBrainz relationships](https://musicbrainz.org/doc/Relationships)。
+- **Wikipedia/Wikidata**：按中文→英文查询明确标题及至多五个搜索候选；检索片段不作为介绍。使用Action API的TextExtracts公开纯文本导言（每页最多1200字符），同时获取pageprops和revision；该接口可批量绑定导言与实体，第三方客户端不依赖HTML解析或浏览器。Wikidata每批至多50个实体，核对标题别名、P175歌手与P577日期；无本地年份时须有结构化歌手证据。缺结构化证据时，仅允许标题匹配且正文同时证实歌手与发行年份；已知结构化矛盾、缺失歌手实体、消歧页或多个符合实体不能被正文“救回”。没有足够证据返回Uncertain。保存正文、来源页链接、revision ID、查询时间、明确的CC BY-SA 4.0与许可链接。依据：[Wikidata data access](https://www.wikidata.org/wiki/Wikidata:Data_access)、[TextExtracts](https://www.mediawiki.org/wiki/Extension:TextExtracts)、[Wikimedia复用要求](https://foundation.wikimedia.org/wiki/Terms_of_Use)。
+
+缓存输入摘要覆盖查询种类、专辑名/歌手/年份及本地曲目身份、名称、时长、disc/track；输入变化使相应缓存失效。成功/部分资料有效30天，NotFound/Uncertain有效一天，错误按retryAt（默认60秒）保留，连接配置变更可重新尝试普通连接错误，但不能绕过服务限流冷却；未知字段和有效历史来源保留，不伪造checkedAt。关闭联网仍可读取过期缓存。失败刷新只更新查询状态，保留已有正文/制作人员；成功制作查询在creditsLookup保存已核对的发行标识并清除旧候选；制作与流派查询状态各自保存，后续查询采用较新的已核对标识，避免不同查询种类互相覆盖；只替换MusicBrainz来源，保留本地及其他来源。OfflineMetadataProvider以对象所属FIFO timer异步读取快照，最多八项，不创建网络对象或写缓存；无缓存返回Deferred，已有历史状态原样交付。
+
+LibrarySession以稳定ID串行推进批次，metadataProgress显示真实状态与完成/错误数；取消保留已经接受的结果。metadataRevision驱动当前实体读取，QML不解析JSON。当前专辑的元数据通过DetailModel刷新，保持曲目模型、滚动与播放；模型metadata提交使用定向dataChanged，不触发排序、导航或整个场景重建。来源、许可和查询错误可离线查看。
+
+LibraryStore按实体/kind合并已接受结果；批次结束、取消或累计载荷达到8MiB时，在其唯一worker中按索引合并进最新快照。合并前再次验证输入摘要；仅修改资料字段，不写音乐文件、不覆盖人工分类。元数据快照与保存共用既有有界串行调度和QSaveFile/256MiB缓存门槛；GUI不逐结果复制/序列化全库。单次合并最坏O(专辑数+被修改专辑曲目/资料数)，暂存最多当前库每专辑三类结果，HTTP等待/在途/完成容量独立有界。元数据提交不作为换库，不中断批次。保存失败保留原文件并暴露错误，退出处理已接纳结果；内存结果与磁盘保存成功是独立事实。
 
 ## 本地扫描与原生缓存
 
@@ -50,7 +63,7 @@ OfflineMetadataProvider 对不可变本地缓存快照按稳定ID索引异步读
 
 目录图片候选按cover、folder、front、其他图片排序；根直属单曲只取同名图片。无效优先图片继续尝试下一候选；目录图片优先于嵌入图，直属单曲的嵌入图优先于同名图。ArtworkStore在worker中读取PNG/JPEG/WebP，压缩文件≤30MiB、尺寸有效，再由Qt完整验证解码；图片分配准入唯一见[covers.md](covers.md)。内容SHA256决定新dataDir的`artwork/`文件名，QSaveFile按owner权限原子保存，拒绝缓存目录/文件符号链接，不改原图/歌曲。相同内容复用，内容变化产生新URL供现有租约定向失效。Qt公开CoverArtImage返回的QImage已由Qt解码，原生侧在编码前按同一有效分配上限核对现有载荷（至少32bpp），保存PNG并检查30MiB输出上限；原始嵌入压缩字节和Qt后端内部解码峰值公开API不可观测，不冒充已在分配前检查它们。缓存/图集/归位所有权按封面契约。
 
-`--import-legacy /绝对/music-data-v3 --data-dir /独立/原生数据`显式读取旧`library-index.json`（version:1，曲目_metadataVersion:3或4）、可选config.json/genre-rules.json，不扫描用户目录或触碰浏览器数据库。新旧目录含符号链接解析后互不嵌套。索引上限256MiB，配置/规则各1MiB；本机URL、rawGenres和封面路径提供原生值；查询配置存metadataConfiguration，人工流派引用存genreOverrides，产品始终离线。以本机绝对直属路径重建稳定ID并重映射已知制作人员/人工流派引用，不猜测跨平台路径。只复制被引用且位于允许音乐根或旧artwork内的封面，不复制PCM、整棵缓存或歌曲；坏图只记录_coverImportError并回退缺图，索引/路径/schema错误不发布快照、不改旧文件或现有缓存。导入通过LibraryStore唯一worker和一次换代提交，不逐条重建模型；下一次显式重扫再按fingerprint补齐Qt标签。
+`--import-legacy /绝对/music-data-v3 --data-dir /独立/原生数据`显式读取旧`library-index.json`（version:1，曲目_metadataVersion:3或4）、可选config.json/genre-rules.json，不扫描用户目录或触碰浏览器数据库。新旧目录含符号链接解析后互不嵌套。索引上限256MiB，配置/规则各1MiB；本机URL、rawGenres和封面路径提供原生值；查询配置存metadataConfiguration，人工流派引用存genreOverrides；联网授权仅由上述networkEnabled控制。以本机绝对直属路径重建稳定ID并重映射已知制作人员/人工流派引用，不猜测跨平台路径。只复制被引用且位于允许音乐根或旧artwork内的封面，不复制PCM、整棵缓存或歌曲；坏图只记录_coverImportError并回退缺图，索引/路径/schema错误不发布快照、不改旧文件或现有缓存。导入通过LibraryStore唯一worker和一次换代提交，不逐条重建模型；下一次显式重扫再按fingerprint补齐Qt标签。
 
 `--import-preferences /绝对/浏览器导出.json`或`PreferencesStore::importJson`只读用户明确提供的对象JSON（≤1MiB），在worker解析后合并未知字段并原子保存。导航字段类型校验，单个在途导入；期间有新的导航偏好写入时按revision拒绝旧导入。全偏好schema及设置控件见下节。导入/扫描命令互斥，普通数据根要求绝对路径；它们不与Review读取私人数据的隔离规则混用。
 
@@ -78,7 +91,7 @@ SettingsController::updateQuality在C++合并单字段与当前完整画质值�
 
 PreferencesStore在事件循环合并变化，只有一个在途worker保存和一个最新意图；JSON序列化与QSaveFile提交在worker，禁止direct-write fallback，文件仅owner读写。显式导入最多1MiB、单个在途，按revision拒绝期间发生设置变化后的旧结果；原文件不写。损坏/未知schema使用内存默认值并暴露错误，写失败保留旧文件、无自动重试循环；析构只完成已接受的最后保存。
 
-介绍/制作信息/MusicBrainz区域显示当前专辑缓存、来源、原查询状态/时间与批量进度。产品查询按钮禁用且提示“联网资料功能暂未启用”；测试Provider的Matched/Uncertain/Error可经相同UI显示。MusicBrainz联系字段通过LibraryStore::setMetadataConfiguration合并原生metadataConfiguration，保留未知字段与未来onlineEnabled配置；忙碌/损坏库不接受写入，不触发自动查询。产品只注册OfflineMetadataProvider，不构造网络对象或发起请求。
+介绍/制作信息/MusicBrainz区域的来源、当前查询、全库补缺、取消、网络开关及配置行为遵守上节“联网资料与离线缓存”，不在UI另建状态或请求机制。
 
 ## 检查入口
 
@@ -91,3 +104,5 @@ PreferencesStore在事件循环合并变化，只有一个在途worker保存和�
 `track-focus`使用实际Selection/SceneAdapter/Presentation状态机验证跨歌手列的最后目标、当前专辑复用、取消/过期回调、减少动态和播放隔离；`library-data`同时核对冻结216例的缓存搜索及1024专辑连续查询无reset。`library-panels-qml`（`ui-audit --library 输出目录`）使用实际MusicStage、九尺寸/双主题/DPR1/1.5/2、4000命中虚拟列表、真实Qt按键、模态/关闭、详情滚动聚焦、背景附件释放与默认隐藏策略；自身输出用于质量检查，不做图像评分或正常呈现性能推断。`python3 tools/audit/audit-library-panels.py`绑定COMMON/PERF/三平台符号与冻结hash，目标/物理输入欠验归计划R23-P。
 
 `settings`检查完整偏好持久化/导入/坏文件/未知schema、字段路由、原子合并保存、配置未知字段与重载状态保留；`library-data`覆盖单请求及批次取消/不同代订阅者晚到结果。`settings-qml`（`ui-audit --settings 输出目录`）在实际MusicStage上覆盖九尺寸、双主题、DPR1/1.5/2、折叠/滚动/Qt输入/反向打开、离线按钮及测试Provider状态/能力，另在真实App上十次重建视觉树并核对播放源/意图/用户画质。macOS默认Metal真正隐藏，其他目标入口按test-gates.md/window契约执行；截图只检查自身正常输出，无图像评分或屏幕/VSYNC推断。`python3 tools/audit/audit-settings.py`绑定COMMON/PERF与三平台源码，目标欠验归R26-P。
+
+`online-metadata`使用合成音乐资料与注入的QNetworkAccessManager响应，验证真实worker/HTTP调度、保守匹配、职责/曲目映射、来源/许可、缓存、取消确认容量、限流冷却、超大/坏响应、离线复用及原子持久化和详情增量更新，不访问真实网络。`metadata-network-probe`仅用于显式公开专辑联网验证，不注册为常规CTest、不读用户曲库：`build/release/tools/metadata-network-probe --kind introduction --title 'OK Computer' --artist Radiohead --year 1997 [--proxy http://127.0.0.1:7897]`；`--kind credits|enrichment`可配`--release`指定公开MusicBrainz发行ID，`--tracks`读取显式公开测试曲目数组（title/duration/disc/number），不接受歌曲文件作为输入。成功/部分资料退出0，查询未匹配/错误退出2，总超时退出4。目标系统的Qt Network/TLS/代理实际运行仍须对应环境证明。

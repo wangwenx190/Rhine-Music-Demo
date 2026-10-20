@@ -17,6 +17,8 @@
 #include "OpeningController.h"
 #include "StartupCoordinator.h"
 #include "OfflineMetadataProvider.h"
+#include "OnlineMetadataProvider.h"
+#include <QNetworkProxyFactory>
 #include "PreferencesStore.h"
 #include "SettingsController.h"
 #include "DemoLibrary.h"
@@ -270,8 +272,19 @@ int main(int argc, char **argv)
     // Outlive the engine and its render-thread callbacks during teardown.
     std::atomic<int> frames{ 0 };
     std::atomic<int> api{ QSGRendererInterface::Unknown };
-    yalahoo::OfflineMetadataProvider provider;
-    yalahoo::LibrarySession library(&provider);
+    const bool verificationRun = parser.isSet(u"verify-runtime"_s) || appVerification
+#ifdef YALAHOO_REVIEW
+            || parser.isSet(u"verify-materials"_s) || parser.isSet(u"verify-scene"_s)
+            || parser.isSet(u"verify-integration"_s)
+#endif
+            ;
+    QNetworkProxyFactory::setUseSystemConfiguration(true);
+    std::unique_ptr<yalahoo::IMetadataProvider> provider;
+    if (verificationRun || demonstration)
+        provider = std::make_unique<yalahoo::OfflineMetadataProvider>();
+    else
+        provider = std::make_unique<yalahoo::OnlineMetadataProvider>();
+    yalahoo::LibrarySession library(provider.get());
     yalahoo::BackgroundMusicController background;
     yalahoo::InterfaceSoundController sounds;
     yalahoo::PlaybackController playback(&library);
@@ -301,12 +314,6 @@ int main(int argc, char **argv)
         if (!library.snapshot()->albums.isEmpty())
             library.requestMetadata(library.snapshot()->albums.first().id, u"introduction"_s);
     }
-    const bool verificationRun = parser.isSet(u"verify-runtime"_s) || appVerification
-#ifdef YALAHOO_REVIEW
-            || parser.isSet(u"verify-materials"_s) || parser.isSet(u"verify-scene"_s)
-            || parser.isSet(u"verify-integration"_s)
-#endif
-            ;
     yalahoo::MotionController motion;
     yalahoo::OverviewController overview(&motion);
     yalahoo::SelectionController selection(&motion);
@@ -380,6 +387,54 @@ int main(int argc, char **argv)
         QObject::connect(&sounds, &yalahoo::InterfaceSoundController::settingsChanged,
                          preferences.get(), saveAudio);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, provider.get(),
+                         [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
+                                 yalahoo::Snapshot snapshot) {
+                             online->configure(
+                                     snapshot->fields.value(u"metadataConfiguration"_s).toObject());
+                         });
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
+                         provider.get(),
+                         [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
+                                 yalahoo::Snapshot snapshot) {
+                             online->configure(
+                                     snapshot->fields.value(u"metadataConfiguration"_s).toObject());
+                         });
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
+                         &library, &yalahoo::LibrarySession::adoptMetadataConfiguration);
+        QObject::connect(&library, &yalahoo::LibrarySession::metadataDelivered, libraryStore.get(),
+                         &yalahoo::LibraryStore::stageMetadata);
+        QObject::connect(&library, &yalahoo::LibrarySession::metadataProgressChanged,
+                         libraryStore.get(), [&] {
+                             if (!library.metadataProgress().value(u"active"_s).toBool())
+                                 libraryStore->commitMetadata();
+                         });
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataCommitted, &library,
+                         &yalahoo::LibrarySession::adoptMetadataSnapshot);
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::statusChanged, &library, [&] {
+            if (libraryStore->scanning())
+                library.cancelAllMetadata();
+        });
+        auto automaticPending = std::make_shared<bool>(false);
+        const auto automatic = [&, automaticPending] {
+            if (!*automaticPending || libraryStore->scanning())
+                return;
+            const auto snapshot = library.snapshot();
+            const auto stored = libraryStore->snapshot();
+            if (snapshot->scan != stored->scan || snapshot->albums.size() != stored->albums.size())
+                return;
+            *automaticPending = false;
+            const auto config = snapshot->fields.value(u"metadataConfiguration"_s).toObject();
+            if (config.value(u"networkEnabled"_s).toBool()
+                && config.value(u"onlineEnabled"_s).toBool())
+                library.requestMetadataBatch(u"enrichment"_s, true);
+        };
+        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::scanFinished, &library,
+                         [&, automaticPending, automatic](quint64, quint64) {
+                             *automaticPending = true;
+                             QTimer::singleShot(0, &library, automatic);
+                         });
+        QObject::connect(&library, &yalahoo::LibrarySession::snapshotChanged, &library, automatic);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &startup,
                          &yalahoo::StartupCoordinator::receive);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
@@ -444,6 +499,11 @@ int main(int argc, char **argv)
         scene.setSelection(&selection);
     }
     yalahoo::DetailModel detailModel;
+    QObject::connect(&library, &yalahoo::LibrarySession::albumMetadataChanged, &detailModel,
+                     [&](const QString &albumId) {
+                         if (detailModel.album().value(u"id"_s).toString() == albumId)
+                             detailModel.prepare(library, true);
+                     });
     yalahoo::PresentationController presentation(motion.clock(),
                                                  yalahoo::detailPorts(scene, selection, library));
     QObject::connect(&presentation, &yalahoo::PresentationController::prepared, &detailModel, [&] {

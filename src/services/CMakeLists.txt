@@ -4,6 +4,16 @@ target_sources(
     DemoLibrary.h
     DemoLibrary.cpp
     IMetadataProvider.h
+    OnlineMetadataProvider.h
+    OnlineMetadataProvider.cpp
+    metadata/MetadataHttp.h
+    metadata/MetadataHttp.cpp
+    metadata/MetadataMerge.h
+    metadata/MetadataMerge.cpp
+    metadata/MusicBrainzSource.h
+    metadata/MusicBrainzSource.cpp
+    metadata/WikipediaSource.h
+    metadata/WikipediaSource.cpp
     OfflineMetadataProvider.h
     OfflineMetadataProvider.cpp
     LibrarySession.h
@@ -15,5 +25,5 @@ target_sources(
     PreferencesStore.cpp
     PreferencesStore.h
 )
-target_link_libraries(YalahooCore PUBLIC Qt6::Gui Qt6::Concurrent)
+target_link_libraries(YalahooCore PUBLIC Qt6::Gui Qt6::Concurrent Qt6::Network)
 target_include_directories(YalahooCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

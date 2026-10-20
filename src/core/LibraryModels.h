@@ -65,6 +65,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     void setSnapshot(Snapshot snapshot);
+    void updateMetadataSnapshot(Snapshot snapshot);
     void setSortMode(SortMode mode);
     QVariantList columns() const;
     int slotStride() const
@@ -109,6 +110,10 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE QVariantMap resultAt(int row) const;
     void update(Snapshot snapshot, const QString &query, const QString &genreId);
+    void updateMetadataSnapshot(Snapshot snapshot)
+    {
+        m_snapshot = std::move(snapshot);
+    }
 Q_SIGNALS:
     void countChanged();
 

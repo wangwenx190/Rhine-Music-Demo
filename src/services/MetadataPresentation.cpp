@@ -22,7 +22,7 @@ QString contentText(const QVariantMap &result)
     if (kind == u"introduction"_s) {
         const auto description = payload.value(u"description"_s).toString();
         return description.isEmpty()
-                ? QCoreApplication::translate("Yalahoo", "No local introduction cache")
+                ? QCoreApplication::translate("Yalahoo", "No introduction available")
                 : description;
     }
     QStringList lines;
@@ -38,7 +38,7 @@ QString contentText(const QVariantMap &result)
                 line += u" \u00b7 "_s + jsonText(source);
             lines.append(line);
         }
-        return lines.isEmpty() ? QCoreApplication::translate("Yalahoo", "No local credits cache")
+        return lines.isEmpty() ? QCoreApplication::translate("Yalahoo", "No credits available")
                                : lines.join('\n'_L1);
     }
     const auto online = payload.value(u"online"_s).toMap();
@@ -47,9 +47,11 @@ QString contentText(const QVariantMap &result)
         title = online.value(u"albumTitle"_s).toString();
     lines = { title, online.value(u"releaseId"_s).toString(),
               online.value(u"releaseGroupId"_s).toString() };
+    for (const auto &value : payload.value(u"genres"_s).toList())
+        lines.append(value.toString());
     lines.removeAll(QString());
     return lines.isEmpty()
-            ? QCoreApplication::translate("Yalahoo", "No local MusicBrainz identifier cache")
+            ? QCoreApplication::translate("Yalahoo", "No MusicBrainz metadata available")
             : lines.join('\n'_L1);
 }
 }
@@ -93,6 +95,22 @@ QVariantMap metadataPresentation(QVariantMap result, const QString &albumTitle)
     for (auto it = source.cbegin(); it != source.cend(); ++it)
         sources.append(it.value().canConvert<QString>() ? it.value().toString()
                                                         : jsonText(it.value()));
+    QVariantList candidates;
+    const auto payload = result.value(u"payload"_s).toMap();
+    const auto field =
+            result.value(u"kind"_s).toString() == "credits"_L1 ? u"creditsLookup"_s : u"online"_s;
+    for (const auto &value : payload.value(field).toMap().value(u"candidates"_s).toList()) {
+        auto candidate = value.toMap();
+        QStringList parts{ candidate.value(u"title"_s).toString(),
+                           candidate.value(u"date"_s).toString(),
+                           candidate.value(u"country"_s).toString(),
+                           candidate.value(u"label"_s).toString(),
+                           candidate.value(u"id"_s).toString() };
+        parts.removeAll(QString());
+        candidate.insert(u"display"_s, parts.join(u" / "_s));
+        candidates.append(candidate);
+    }
+    result.insert(u"releaseCandidates"_s, candidates);
     result.insert(u"stateText"_s, state);
     result.insert(u"contentText"_s, contentText(result));
     result.insert(

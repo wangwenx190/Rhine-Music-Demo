@@ -31,7 +31,7 @@ public:
     {
         return m_info;
     }
-    void prepare(const LibrarySession &library);
+    void prepare(const LibrarySession &library, bool metadataOnly = false);
     Q_INVOKABLE double normalLineHeight(const QString &text, const QFont &font);
     static QString time(double seconds);
 Q_SIGNALS:
@@ -41,6 +41,7 @@ private:
     QCache<QString, double> m_lineHeights{ 256 * 1024 };
     Snapshot m_snapshot;
     const Album *m_album = nullptr;
+    Album m_resolved;
     QVariantMap m_info;
 };
 }

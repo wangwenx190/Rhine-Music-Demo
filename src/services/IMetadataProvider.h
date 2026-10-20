@@ -31,7 +31,8 @@ inline size_t qHash(const RequestToken &token, size_t seed = 0)
 }
 struct AlbumQuery
 {
-    QString albumId, title, artist, contact;
+    QString albumId, contact, releaseId;
+    Album album;
     QStringList albumIds, trackIds;
     bool enabled = false, force = false;
     QJsonObject configuration;
@@ -49,6 +50,9 @@ struct ProviderResult
     ProviderStatus status = ProviderStatus::Deferred;
     QJsonObject payload, source;
     QString checkedAt, retryAt, error;
+    QString inputKey;
+    bool fromCache = false;
+    qsizetype payloadBytes = 0;
 };
 class IMetadataProvider : public QObject
 {

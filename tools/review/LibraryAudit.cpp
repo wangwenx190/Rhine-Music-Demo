@@ -47,6 +47,7 @@ public:
     ProviderStatus status = ProviderStatus::Matched;
     bool enabled = false;
     bool lastQueryEnabled = false;
+    int introductionRequests = 0;
     ProviderCapabilities capabilities() const override
     {
         return { enabled, true, true, true, false };
@@ -59,6 +60,7 @@ public:
     bool requestIntroduction(AlbumQuery query, RequestToken token) override
     {
         lastQueryEnabled = query.enabled;
+        ++introductionRequests;
         deliver(token, MetadataKind::Introduction);
         return true;
     }
@@ -406,6 +408,15 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         settingsPanel->setProperty("musicBrainzExpanded", true);
                     }
                     check(u"expanded-settings-render"_s, render());
+                    auto *proxySwitch = visual(window.contentItem(), u"settingsProxyEnabled"_s);
+                    auto *proxyMode = visual(window.contentItem(), u"settingsProxyMode"_s);
+                    auto *proxyAddress = visual(window.contentItem(), u"settingsMetadataProxy"_s);
+                    check(u"proxy-default-enabled"_s,
+                          proxySwitch && proxySwitch->property("checked").toBool());
+                    check(u"proxy-default-system"_s,
+                          proxyMode && proxyMode->property("selected").toString() == "system"_L1);
+                    check(u"manual-proxy-hidden-by-default"_s,
+                          proxyAddress && !proxyAddress->isVisible());
                     auto *scroll = settingsPanel
                             ? settingsPanel->property("contentItem").value<QQuickItem *>()
                             : nullptr;
@@ -554,19 +565,37 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         injected.setEnabled(true);
                         check(u"future-capability-render"_s, render());
                         check(u"future-capability-enables-query"_s, query && query->isEnabled());
+                        const int previousRequests = injected.introductionRequests;
+                        injected.status = ProviderStatus::Matched;
                         if (query) {
                             query->forceActiveFocus();
                             QTest::keyClick(&window, Qt::Key_Space);
                         }
                         QElapsedTimer queryTimer;
                         queryTimer.start();
+                        while (library.metadataBusy() && queryTimer.elapsed() < 3000)
+                            QTest::qWait(5);
+                        check(u"current-query-qt-input"_s,
+                              injected.lastQueryEnabled
+                                      && injected.introductionRequests == previousRequests + 1
+                                      && library.metadataFor(library.navigationAlbumId(),
+                                                             u"introduction"_s)[u"status"_s]
+                                                      .toString()
+                                              == "Matched"_L1);
+                        auto *batchQuery =
+                                visual(window.contentItem(), u"introductionMetadataBatch"_s);
+                        check(u"batch-query-enabled"_s,
+                              render() && batchQuery && batchQuery->isEnabled());
+                        if (batchQuery) {
+                            batchQuery->forceActiveFocus();
+                            QTest::keyClick(&window, Qt::Key_Space);
+                        }
+                        queryTimer.restart();
                         while (library.metadataProgress()[u"active"_s].toBool()
                                && queryTimer.elapsed() < 3000)
                             QTest::qWait(5);
-                        check(u"future-query-qt-input"_s,
-                              injected.lastQueryEnabled
-                                      && library.metadataProgress()[u"kind"_s].toString()
-                                              == "introduction"_L1
+                        check(u"batch-query-qt-input"_s,
+                              library.metadataProgress()[u"kind"_s].toString() == "introduction"_L1
                                       && library.metadataProgress()[u"completed"_s].toInt()
                                               == snapshot.albums.size());
                         injected.setEnabled(false);

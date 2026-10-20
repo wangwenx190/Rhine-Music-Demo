@@ -612,18 +612,6 @@
             <translation>取消查询</translation>
         </message>
         <message>
-            <source>Enrich missing online metadata ↗</source>
-            <translation>补充缺失的在线资料 ↗</translation>
-        </message>
-        <message>
-            <source>Online metadata is not enabled yet</source>
-            <translation>联网资料功能暂未启用</translation>
-        </message>
-        <message>
-            <source>Online metadata is not enabled yet. Existing caches remain available offline.</source>
-            <translation>联网资料功能暂未启用；已有缓存可离线查看。</translation>
-        </message>
-        <message>
             <source>%1 query progress</source>
             <translation>%1查询进度</translation>
         </message>
@@ -636,16 +624,44 @@
             <translation>查询 / 更新专辑介绍 ↗</translation>
         </message>
         <message>
-            <source>Query missing credits ↗</source>
-            <translation>查询缺失的制作信息 ↗</translation>
-        </message>
-        <message>
             <source>Select an album to view local metadata.</source>
             <translation>选择专辑后查看本机资料。</translation>
         </message>
         <message>
             <source>Source: </source>
             <translation>来源：</translation>
+        </message>
+        <message>
+            <source>Several releases may match. Confirm the edition for this album before querying credits or genres.</source>
+            <translation>存在多个可能匹配的发行版本，请先确认当前专辑版本，再查询制作信息或流派。</translation>
+        </message>
+        <message>
+            <source>MusicBrainz release edition</source>
+            <translation>MusicBrainz 发行版本</translation>
+        </message>
+        <message>
+            <source>Query the selected release</source>
+            <translation>查询所选发行版本</translation>
+        </message>
+        <message>
+            <source>Query / update credits ↗</source>
+            <translation>查询／更新当前专辑制作信息 ↗</translation>
+        </message>
+        <message>
+            <source>Query / update MusicBrainz metadata ↗</source>
+            <translation>查询／更新当前专辑 MusicBrainz 资料 ↗</translation>
+        </message>
+        <message>
+            <source>Enable online metadata in advanced settings</source>
+            <translation>请在高级设置中启用联网资料查询</translation>
+        </message>
+        <message>
+            <source>Online queries are disabled. Existing metadata remains available offline.</source>
+            <translation>联网查询已关闭，已有资料仍可离线查看。</translation>
+        </message>
+        <message>
+            <source>Query missing or expired metadata for the library</source>
+            <translation>为曲库查询缺失或过期的资料</translation>
         </message>
     </context>
     <context>
@@ -1017,10 +1033,6 @@
             <translation>高级设置 · 专辑阵列</translation>
         </message>
         <message>
-            <source>Advanced · MusicBrainz</source>
-            <translation>高级设置 · MusicBrainz</translation>
-        </message>
-        <message>
             <source>Album columns</source>
             <translation>专辑列显示</translation>
         </message>
@@ -1039,10 +1051,6 @@
         <message>
             <source>Artist sorting puts each artist in one column. Album title sorting puts 12 albums in each column.</source>
             <translation>按歌手时，同一歌手的专辑放在同一列；按专辑名时，每 12 张一列。</translation>
-        </message>
-        <message>
-            <source>Automatically enrich new albums after scanning (network access is not enabled yet)</source>
-            <translation>扫描后自动补充新专辑资料（联网暂未启用）</translation>
         </message>
         <message>
             <source>BGM and interface effects use the system default output. All three volumes are independent. Events without a dedicated short sound remain silent.</source>
@@ -1067,10 +1075,6 @@
         <message>
             <source>By genre</source>
             <translation>按流派</translation>
-        </message>
-        <message>
-            <source>Contact email or public project URL</source>
-            <translation>联系邮箱或公开项目网址</translation>
         </message>
         <message>
             <source>Credits</source>
@@ -1147,10 +1151,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
             <translation>重播开场 ↗</translation>
         </message>
         <message>
-            <source>Retain local tags, contributors, and existing metadata sources.</source>
-            <translation>保留本地标签、参与人员与已有资料来源。</translation>
-        </message>
-        <message>
             <source>Save metadata settings ↗</source>
             <translation>保存资料库设置 ↗</translation>
         </message>
@@ -1171,10 +1171,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
             <translation>音效音量</translation>
         </message>
         <message>
-            <source>The local cache retains album titles, artists, genres, contributors, and sources. Manual classification takes priority.</source>
-            <translation>本机缓存保留专辑名称、艺术家、流派、制作人员及来源，人工分类优先。</translation>
-        </message>
-        <message>
             <source>Theme</source>
             <translation>外观主题</translation>
         </message>
@@ -1189,6 +1185,58 @@ MIT licensed code. Asset and font licenses are included with the application.</s
         <message>
             <source>Track volume</source>
             <translation>歌曲音量</translation>
+        </message>
+        <message>
+            <source>Use a proxy for metadata queries</source>
+            <translation>资料查询使用代理</translation>
+        </message>
+        <message>
+            <source>Proxy source</source>
+            <translation>代理来源</translation>
+        </message>
+        <message>
+            <source>System default proxy</source>
+            <translation>系统默认代理</translation>
+        </message>
+        <message>
+            <source>Manual proxy</source>
+            <translation>手动填写代理</translation>
+        </message>
+        <message>
+            <source>Manual HTTP proxy URL</source>
+            <translation>手动 HTTP 代理地址</translation>
+        </message>
+        <message>
+            <source>Automatically query MusicBrainz for new albums after scanning</source>
+            <translation>扫描后自动为新专辑查询 MusicBrainz 资料</translation>
+        </message>
+        <message>
+            <source>Advanced · Online metadata</source>
+            <translation>高级 · 联网资料</translation>
+        </message>
+        <message>
+            <source>MusicBrainz provides release identifiers and genres. Local titles and manual classification are preserved.</source>
+            <translation>MusicBrainz 提供发行版本标识和流派，保留本地名称与人工分类。</translation>
+        </message>
+        <message>
+            <source>Enable online metadata</source>
+            <translation>启用联网资料查询</translation>
+        </message>
+        <message>
+            <source>Queries send album titles, artist names, and public identifiers to MusicBrainz, Wikipedia, or Wikidata. Music files and local paths stay on this device. Automatic queries are controlled separately.</source>
+            <translation>查询会向 MusicBrainz、维基百科或 Wikidata 发送专辑名、歌手名和公开标识。音乐文件及本地路径保留在本机。自动查询由独立开关控制。</translation>
+        </message>
+        <message>
+            <source>Metadata HTTP proxy</source>
+            <translation>资料查询 HTTP 代理</translation>
+        </message>
+        <message>
+            <source>Optional contact email or public project URL</source>
+            <translation>可选联系邮箱或公开项目网址</translation>
+        </message>
+        <message>
+            <source>Query MusicBrainz credits while retaining local tags and other sources.</source>
+            <translation>向 MusicBrainz 查询制作信息，保留本地标签和其他来源的资料。</translation>
         </message>
     </context>
     <context>
@@ -1568,18 +1616,6 @@ Source: </source>
             <translation>暂无专辑封面</translation>
         </message>
         <message>
-            <source>No local MusicBrainz identifier cache</source>
-            <translation>暂无本机 MusicBrainz 标识缓存</translation>
-        </message>
-        <message>
-            <source>No local credits cache</source>
-            <translation>暂无本机制作信息缓存</translation>
-        </message>
-        <message>
-            <source>No local introduction cache</source>
-            <translation>暂无本机介绍缓存</translation>
-        </message>
-        <message>
             <source>No verifiable metadata was found.</source>
             <translation>未找到可核实的资料。</translation>
         </message>
@@ -1832,6 +1868,108 @@ Query status: %2</source>
         <message>
             <source>Invalid track duration</source>
             <translation>曲目时长无效。</translation>
+        </message>
+        <message>
+            <source>Enter a valid HTTP proxy URL.</source>
+            <translation>请输入有效的 HTTP 代理地址。</translation>
+        </message>
+        <message>
+            <source>The metadata contact must be one line of at most 500 characters.</source>
+            <translation>资料查询联系方式须为单行，且不超过 500 个字符。</translation>
+        </message>
+        <message>
+            <source>MusicBrainz genres</source>
+            <translation>MusicBrainz 流派</translation>
+        </message>
+        <message>
+            <source>No introduction available</source>
+            <translation>暂无专辑介绍</translation>
+        </message>
+        <message>
+            <source>No credits available</source>
+            <translation>暂无制作信息</translation>
+        </message>
+        <message>
+            <source>No MusicBrainz metadata available</source>
+            <translation>暂无 MusicBrainz 资料</translation>
+        </message>
+    </context>
+    <context>
+        <name>yalahoo::MetadataHttp</name>
+        <message>
+            <source>Metadata request timed out.</source>
+            <translation>资料查询超时。</translation>
+        </message>
+        <message>
+            <source>Unsupported metadata address.</source>
+            <translation>不支持此资料查询地址。</translation>
+        </message>
+        <message>
+            <source>The metadata service is cooling down. Try again later.</source>
+            <translation>资料服务处于冷却期，请稍后重试。</translation>
+        </message>
+        <message>
+            <source>Invalid HTTP proxy address.</source>
+            <translation>HTTP 代理地址无效。</translation>
+        </message>
+        <message>
+            <source>Metadata response exceeds 2 MiB.</source>
+            <translation>资料响应超过 2 MiB 上限。</translation>
+        </message>
+        <message>
+            <source>%1 returned HTTP %2.</source>
+            <translation>%1 返回 HTTP %2。</translation>
+        </message>
+        <message>
+            <source>Cannot connect to %1: %2</source>
+            <translation>无法连接 %1：%2</translation>
+        </message>
+        <message>
+            <source>The metadata service returned invalid JSON.</source>
+            <translation>资料服务返回了无效的 JSON。</translation>
+        </message>
+        <message>
+            <source>The metadata service reported an API error.</source>
+            <translation>资料服务报告了 API 错误。</translation>
+        </message>
+    </context>
+    <context>
+        <name>yalahoo::MetadataWorker</name>
+        <message>
+            <source>Enable online metadata in settings to query this source.</source>
+            <translation>请在设置中启用联网资料查询后再查询此来源。</translation>
+        </message>
+        <message>
+            <source>An album title and artist are required for a reliable match.</source>
+            <translation>需要专辑名称和歌手信息才能可靠匹配。</translation>
+        </message>
+        <message>
+            <source>Album titles and artist names must be at most 512 characters for online queries.</source>
+            <translation>联网查询的专辑名称和歌手名称均不能超过 512 个字符。</translation>
+        </message>
+        <message>
+            <source>Invalid MusicBrainz release identifier.</source>
+            <translation>MusicBrainz 发行版本标识无效。</translation>
+        </message>
+        <message>
+            <source>MusicBrainz returned an unexpected search response.</source>
+            <translation>MusicBrainz 搜索响应格式不符合预期。</translation>
+        </message>
+        <message>
+            <source>MusicBrainz returned an unexpected release response.</source>
+            <translation>MusicBrainz 发行版本响应格式不符合预期。</translation>
+        </message>
+        <message>
+            <source>MusicBrainz returned an unexpected release group response.</source>
+            <translation>MusicBrainz 专辑作品响应格式不符合预期。</translation>
+        </message>
+        <message>
+            <source>Wikipedia returned an unexpected page response.</source>
+            <translation>维基百科页面响应格式不符合预期。</translation>
+        </message>
+        <message>
+            <source>Wikidata returned an unexpected entity response.</source>
+            <translation>Wikidata 实体响应格式不符合预期。</translation>
         </message>
     </context>
 </TS>

@@ -12,7 +12,7 @@
 - PERF-01–07、预算与测量语义按[performance.md](docs/contracts/performance.md)，设计缺陷不能用benchmark通过豁免。
 - 常规仅Release；只有明确需要堆栈才用Debug。检查范围与复用按[test-gates.md](docs/contracts/test-gates.md)，不能将暂缓写为通过。
 - 所有验证窗口/采集遵守[test-window-policy.md](docs/contracts/test-window-policy.md)。用户指定轮次可见验证即授权该轮前台，无需再确认；结束清开关并恢复默认隐藏策略，授权不跨轮次。
-- 普通音乐只用QtMultimedia公开API；歌曲/BGM/UI音效独立，不做无缝/PCM/自建音频引擎。联网暂缓但保留异步Provider、来源/缓存/状态与配置扩展。
+- 普通音乐只用QtMultimedia公开API；歌曲/BGM/UI音效独立，不做无缝/PCM/自建音频引擎。联网资料的Provider、来源/缓存/状态与配置遵守library-data契约。
 - 三平台完整实现，按本轮实际能力执行可靠检查；源码可确定缺陷当轮修复，独立缺环境的目标事项按计划后置分工完整移交。
 - 保留作者/许可/来源，不自动发布、上传私人数据、改发行标签或写用户歌曲。
 - Git只收源码、产品资产、必要测试输入与简明契约。[verification-artifacts.md](docs/contracts/verification-artifacts.md)定义输出边界；按明确路径暂存并检查数量/体积，不批量提交验证产物。

@@ -122,7 +122,8 @@ ArchiveScrollView {
                 librarySession: root.librarySession
                 kind: "credits"
                 title: qsTr("Credits")
-                explanation: qsTr("Retain local tags, contributors, and existing metadata sources.")
+                explanation: qsTr(
+                                 "Query MusicBrainz credits while retaining local tags and other sources.")
             }
         }
         SettingsSection {
@@ -338,7 +339,7 @@ ArchiveScrollView {
                 objectName: "settingsMusicBrainzExpand"
                 tokens: root.tokens
                 text: (root.musicBrainzExpanded ? "\u25be " : "\u25b8 ") + qsTr(
-                          "Advanced \u00b7 MusicBrainz")
+                          "Advanced \u00b7 Online metadata")
                 onClicked: root.musicBrainzExpanded = !root.musicBrainzExpanded
             }
             Column {
@@ -351,7 +352,69 @@ ArchiveScrollView {
                     kind: "enrichment"
                     title: "MusicBrainz"
                     explanation: qsTr(
-                                     "The local cache retains album titles, artists, genres, contributors, and sources. Manual classification takes priority.")
+                                     "MusicBrainz provides release identifiers and genres. Local titles and manual classification are preserved.")
+                }
+                ArchiveCheckBox {
+                    tokens: root.tokens
+                    objectName: "settingsNetworkEnabled"
+                    text: qsTr("Enable online metadata")
+                    checked: root.librarySession.metadataConfiguration.networkEnabled || false
+                    enabled: root.store !== null && !root.store.busy
+                    onToggled: root.store.setMetadataConfiguration({
+                                                                       networkEnabled: checked
+                                                                   })
+                }
+                ArchiveText {
+                    tokens: root.tokens
+                    width: parent.width
+                    cssPixelSize: 11
+                    color: root.tokens.muted
+                    wrapMode: Text.Wrap
+                    text: qsTr(
+                              "Queries send album titles, artist names, and public identifiers to MusicBrainz, Wikipedia, or Wikidata. Music files and local paths stay on this device. Automatic queries are controlled separately.")
+                }
+                ArchiveCheckBox {
+                    id: proxyEnabled
+                    tokens: root.tokens
+                    objectName: "settingsProxyEnabled"
+                    text: qsTr("Use a proxy for metadata queries")
+                    checked: root.librarySession.metadataConfiguration.proxyEnabled ?? true
+                    enabled: root.store !== null && !root.store.busy
+                    onToggled: root.store.setMetadataConfiguration({
+                                                                       proxyEnabled: checked
+                                                                   })
+                }
+                SettingChoice {
+                    tokens: root.tokens
+                    objectName: "settingsProxyMode"
+                    label: qsTr("Proxy source")
+                    choices: [
+                        {
+                            label: qsTr("System default proxy"),
+                            value: "system"
+                        },
+                        {
+                            label: qsTr("Manual proxy"),
+                            value: "manual"
+                        }
+                    ]
+                    selected: root.librarySession.metadataConfiguration.proxyMode || "system"
+                    enabled: proxyEnabled.checked && root.store !== null && !root.store.busy
+                    onChosen: value => root.store.setMetadataConfiguration({
+                                                                               proxyMode: value
+                                                                           })
+                }
+                ArchiveTextField {
+                    id: proxy
+                    tokens: root.tokens
+                    objectName: "settingsMetadataProxy"
+                    width: parent.width
+                    text: root.librarySession.metadataConfiguration.proxyUrl || ""
+                    visible: (root.librarySession.metadataConfiguration.proxyMode || "system")
+                             === "manual"
+                    enabled: proxyEnabled.checked
+                    placeholderText: qsTr("Manual HTTP proxy URL")
+                    Accessible.name: qsTr("Metadata HTTP proxy")
                 }
                 ArchiveTextField {
                     id: contact
@@ -359,14 +422,13 @@ ArchiveScrollView {
                     objectName: "settingsMetadataContact"
                     width: parent.width
                     text: root.librarySession.metadataConfiguration.musicBrainzContact || ""
-                    placeholderText: qsTr("Contact email or public project URL")
+                    placeholderText: qsTr("Optional contact email or public project URL")
                     Accessible.name: qsTr("MusicBrainz contact email or project URL")
                 }
                 ArchiveCheckBox {
                     id: onlineEnabled
                     tokens: root.tokens
-                    text: qsTr(
-                              "Automatically enrich new albums after scanning (network access is not enabled yet)")
+                    text: qsTr("Automatically query MusicBrainz for new albums after scanning")
                     checked: root.librarySession.metadataConfiguration.onlineEnabled || false
                     enabled: root.librarySession.providerCapabilities.networkEnabled && root.store
                              !== null && !root.store.busy
@@ -380,7 +442,8 @@ ArchiveScrollView {
                     enabled: root.store !== null && !root.store.busy
                     onClicked: root.store.setMetadataConfiguration({
                                                                        musicBrainzContact:
-                                                                       contact.text
+                                                                       contact.text,
+                                                                       proxyUrl: proxy.text
                                                                    })
                 }
                 ArchiveText {

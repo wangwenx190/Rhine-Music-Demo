@@ -186,3 +186,10 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
 endif()
+
+qt_add_executable(metadata-network-probe MetadataNetworkProbe.cpp)
+target_link_libraries(metadata-network-probe PRIVATE YalahooCore Qt6::Network)
+set_target_properties(metadata-network-probe PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
+    WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+yalahoo_platform(metadata-network-probe)

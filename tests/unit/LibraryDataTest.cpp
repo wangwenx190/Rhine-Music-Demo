@@ -290,7 +290,7 @@ private Q_SLOTS:
                 { { u"kind"_s, u"introduction"_s }, { u"status"_s, u"Deferred"_s } },
                 u"\u4e13\u8f91"_s);
         QCOMPARE(empty.value(u"contentText"_s).toString(),
-                 u"\u6682\u65e0\u672c\u673a\u4ecb\u7ecd\u7f13\u5b58"_s);
+                 u"\u6682\u65e0\u4e13\u8f91\u4ecb\u7ecd"_s);
         QVERIFY(!empty.value(u"stateText"_s).toString().contains(u"\u68c0\u67e5\u65f6\u95f4"_s));
     }
     void metadataConfigurationUsesNativeQueryBoundary()

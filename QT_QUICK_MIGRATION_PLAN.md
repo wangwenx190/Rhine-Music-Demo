@@ -41,7 +41,7 @@
 - 最终运行不依赖Node、浏览器、WebEngine、本地HTTP、Swift桥接、外部FFmpeg或新增第三方库；Qt随附依赖由部署工具处理，不自行链接内部FFmpeg。Web开发工具只可用已有锁定依赖，不新增图像比较库或下载浏览器。
 - 普通播放器只用QtMultimedia公开API：播放/暂停/停止/上下曲/队列/进度/音量/设备/错误。歌曲、BGM、UI音效独立；删除旧无缝三档及浏览器/CoreAudio后端选择。不实现无缝、交叉混音、手动PCM/重采样/音频回调/环形缓冲/自建引擎，不引入QAudioSink/QAudioDecoder/QAudioBufferOutput或AVAudioEngine/CoreAudio路线。
 - 保留双主题、减少动态、0.25×–3×速度、响应式、真实列/填充、列记忆、详情拖动、景深与光效调节；浏览/搜索/总览定位不改变播放。旧`?original=1`、PWA、浏览器菜单限制、在线播放代理及拆解研究界面不进入产品。
-- 本阶段零网络请求；保留异步Provider、来源/缓存/状态/查询配置、未知JSON字段和计划明确的未来能力扩展；已确认不再被生产使用的字段/设置直接删除，不保留兼容，不能伪造查询结果。
+- 联网资料通过library-data契约的显式开关与异步Provider接入MusicBrainz及Wikipedia/Wikidata；保留来源/缓存/状态/查询配置、未知JSON字段；已确认不再被生产使用的字段/设置直接删除，不保留兼容，不能伪造查询结果。
 - 展示名统一`yalahOO!!!`，技术名`yalahoo`；CMake项目`yalahoo`，目标`Yalahoo`/`YalahooCore`，输出`yalahoo`，QML模块`Yalahoo.Music`。创建引擎/读取QStandardPaths前设organizationName/applicationName=`yalahoo`、applicationDisplayName=`yalahOO!!!`，改展示名不迁移数据根。
 - macOS bundle ID=`yalahoo.music`；Linux desktop/图标名=`yalahoo`。旧档案/署名保留原名。原创图标/Logo以真正SVG路径为主，不嵌PNG、不套用旧标识；主素材`resources/branding/`、衍生`resources/icons/yalahoo/`，设计/中心线/分组/安全区/16–32px光学稿及来源按[branding.md](docs/contracts/branding.md)。品牌替换保留原容器锚点、留白、层级和动效时间窗。
 
@@ -59,7 +59,7 @@
 | [web-baseline.md](docs/contracts/web-baseline.md) | 冻结来源解析、匿名输入和基线重建 |
 | [assets.md](docs/contracts/assets.md) / [branding.md](docs/contracts/branding.md) | 导入资产/字体/图标/音频来源；原创品牌资产 |
 | [playback.md](docs/contracts/playback.md) | 普通歌曲Qt播放、保留队列、进度与输出设备/恢复 |
-| [library-data.md](docs/contracts/library-data.md) | 稳定身份、本地扫描/存储、排序/搜索与离线Provider接口 |
+| [library-data.md](docs/contracts/library-data.md) | 稳定身份、本地扫描/存储、排序/搜索与资料Provider接口 |
 | [motion.md](docs/contracts/motion.md) / [scene.md](docs/contracts/scene.md) | 唯一帧源/运动数学；布局/相机/坐标/拾取 |
 | [opening.md](docs/contracts/opening.md) | 二维序章/三维开场、事件就绪、遮挡提交与交互交接 |
 | [materials.md](docs/contracts/materials.md) / [lighting.md](docs/contracts/lighting.md) | 源材质/纸面语义；世界光场/主题/源单位 |
@@ -207,6 +207,12 @@
 
 部署验证失败保留旧包；加载探针仅证明实际报告中的加载事实。产品功能、设备与窗口检查直接共用下方正常产品会话，不在部署后再跑整套组件/性能矩阵。macOS当前Kit未启用Vulkan，缺对应原生Kit/SDK/MoltenVK；未具能力时保留该具体缺口。
 
+### 联网资料目标运行 · ONLINE-METADATA-P
+
+- 缺口：Windows/Linux原生Qt Network/TLS、系统代理发现、直连与手动HTTP代理的实际运行；macOS其他系统代理/PAC配置仍需对应系统设置环境。共用匹配、取消、缓存、持久化与代理选择算法由`online-metadata`验证，不能外推目标系统的连接事实。
+- 源码与输入：`OnlineMetadataProvider`、`metadata/MetadataHttp`、`LibraryStore`、SettingsPanel/MetadataSection及`tools/review/MetadataNetworkProbe.cpp`；仅用公开专辑名与公开MusicBrainz发行ID/曲目数组，不读用户库。依赖最新目标Kit的Network模块和随包TLS后端、对应系统代理环境。
+- 入口与门槛：按library-data.md运行`online-metadata`及`metadata-network-probe`的介绍/制作/流派三类公开查询；测试页核对代理开关默认开启、来源默认system、关闭时直连、manual仅使用已保存地址。实际成功需有Matched介绍及修订号/许可、Partial制作署名与Matched/Partial发行/流派；系统或网络不可达保留原因，不能写成NotFound或成功。部署后复用目标包验证Qt Network/TLS闭包；GUI/默认隐藏策略按test-window-policy.md，相关设置检查按test-gates.md选择。
+
 ### 文件系统、媒体与数据
 
 - 归属：R21-P、R22-P、R24-P、R25-P。依赖上述目标构建；Windows/Linux尚缺原生文件系统/媒体插件实际执行，三平台尚缺明确列出的物理设备与听感事实。输入仅用DirectoryScannerTest/MediaMetadataTest/PlaybackTest/AudioAmbienceTest生成的匿名目录、标签/图像、WAV/损坏输入及既有BGM；不写用户歌曲。
@@ -227,7 +233,7 @@
 
 | 共同检查及归属 | 修复对象、输入与入口 | 独立退出条件 |
 | --- | --- | --- |
-| 面板/控件 · UI-CONTROLS-P、R23-P/R26-P/R27-P | Library/Search/Settings/ExperimentPanels、TrackFocusController、PreferencesStore/OfflineMetadataProvider；LibraryAudit/Settings/Experiment匿名输入。选择`controls-qml`、`library-panels-qml`、`settings-qml`、`experiments-qml`中实际缺项，或对应`ui-audit --library/--settings/--experiments`入口；审计分别为audit-controls/library-panels/settings/experiments.py。 | 模态/滚动/焦点、搜索取消与最终定位、资料来源/离线状态、设置保存/未知字段与当前媒体连续、四实验模式/改速/临时对照恢复符合controls/library-data/lighting/motion契约；相同控件断言在各宿主复用，宿主特有路由独立保留。 |
+| 面板/控件 · UI-CONTROLS-P、R23-P/R26-P/R27-P | Library/Search/Settings/ExperimentPanels、TrackFocusController、PreferencesStore/OnlineMetadataProvider；LibraryAudit/Settings/Experiment匿名输入。选择`controls-qml`、`library-panels-qml`、`settings-qml`、`experiments-qml`中实际缺项，或对应`ui-audit --library/--settings/--experiments`入口；审计分别为audit-controls/library-panels/settings/experiments.py。 | 模态/滚动/焦点、搜索取消与最终定位、资料来源/离线状态、设置保存/未知字段与当前媒体连续、四实验模式/改速/临时对照恢复符合controls/library-data/lighting/motion契约；相同控件断言在各宿主复用，宿主特有路由独立保留。 |
 | 文字/页眉/滑尺 · R16B2W/R16B3/R16M3-S/R19E-P | TitleReel/TransportTitle/Header、Ruler/Ordinal/InputRouter；`tests/fixtures/text/titles.json`及144组滑尺源轨迹。`export-title.mjs`→`verify-title.mjs --backend 目标 --dpr 实际值 --source 源目录 --output 新目录`、`title-reels`、`ui-audit --ruler`/普通ui-audit及export-ruler/export-browse-ui/compare-browse-structure；源码入口audit-title-source/audit-browse-navigation.py。 | 字体身份、连字/组合字/emoji、字形/断行/省略/裁切、页眉结构与播放隔离、自然宽度通知/隐藏完成与恢复取消、刻线/clip/淡隐/背压符合title-reels/navigation/browse-ui；所有权/缓存/隐藏工作量先静态确定，未决运行行为才最小观察。 |
 | 详情/总览 · R17-P/R18-P/R19-P | Presentation/DetailMotion/ReturningCasePool/PointerDragController、Overview与SceneItem；presentation/detail-golden/overview/source-golden匿名输入。`ui-audit --presentation`、`verify-detail.py --backend 目标 --runs 1 --output 新目录`、`verify-overview.py --visual --backend 目标 --runs 1 --output 新目录`按缺项选择；audit-presentation/detail/overview/detail-overview-source及对应结构导出/比较入口。 | ready/revision/四种archiveRoute、连选最后意图/反向/拖动取消、sticky tabs/行高/委托虚拟化、总览两步点击/跨列收拢与反转/碰撞准入（标签240ms退场与420ms入口收拢的衔接、计数block宽度）、焦点恢复/定位不改播放，遵守presentation/detail-motion/overview；产品回放与组件报告共用。 |
 | 序章与产品联动 · R20-P/R29-P | OpeningController/OpeningInk、MusicStage/SceneItem；opening/source-golden.json与qrc封面/匿名库。`opening`、`ui-audit --opening`及audit-opening/export-opening-golden；仅组件证据未覆盖的跨组件联动才选`verify-gui.py --backend 目标 --output 新目录`/audit-gui.py。 | 输入锁/跳过/重播/减少动态/一次交接、遮挡零三维submit和恢复正确，产品浏览→详情→总览→搜索/片头的真实接线、透明合成与资源容量符合opening/rhi-integration；不为汇总已有组件结果另跑完整GUI矩阵。 |

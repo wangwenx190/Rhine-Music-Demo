@@ -3,6 +3,7 @@ include_guard(GLOBAL)
 set(
     YALAHOO_QT_COMPONENTS
     Core
+    Network
     Gui
     Qml
     Quick
