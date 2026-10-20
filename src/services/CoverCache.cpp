@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 
 using namespace Qt::StringLiterals;
 
@@ -106,7 +107,8 @@ CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, i
 bool CoverCache::request(QString identity, QString path, int resolution, QString title)
 {
     if (identity.isEmpty() || identity.size() > 1024 || path.size() > 32768 || title.size() > 256
-        || (resolution <= 0 || (resolution & (resolution - 1)) != 0)) {
+        || (resolution <= 0 || (resolution & (resolution - 1)) != 0)
+        || qint64(resolution) > std::numeric_limits<qint64>::max() / resolution / 36) {
         ++m_rejected;
         return false;
     }
@@ -202,16 +204,17 @@ void CoverCache::pump()
         m_pendingKeys.remove(job.key);
         m_running.insert(job.key, job);
         ++m_active;
-        m_reservedBytes += reservationFor(job.resolution);
-        m_peakReservedBytes = std::max(m_peakReservedBytes, m_reservedBytes);
+        m_workingSetBytes += workingSetEstimateFor(job.resolution);
+        m_peakWorkingSetBytes = std::max(m_peakWorkingSetBytes, m_workingSetBytes);
         ++m_decodes;
         m_peakActive = qMax(m_peakActive, m_active);
     }
 }
-qint64 CoverCache::reservationFor(int resolution)
+qint64 CoverCache::workingSetEstimateFor(int resolution)
 {
-    // Source decoder expansion plus square paint, float working levels and encoded mips.
-    return sourcePixelLimit * 32 + qint64(resolution) * resolution * 36;
+    // Requested paint/mip working storage only. Source decoder and color-conversion
+    // allocations are independent and are not a process-memory reservation.
+    return qint64(resolution) * resolution * 36;
 }
 QImage CoverCache::paint(const QImage &source, int resolution, const QString &title)
 {
@@ -341,9 +344,8 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
         pixels->sourceSize = reader.size();
         pixels->decoderScaling = reader.supportsOption(QImageIOHandler::ScaledSize);
         const auto size = pixels->sourceSize;
-        // Source size is checked even for scaling plugins: their internal scratch is not observable.
-        if (!size.isValid() || qint64(size.width()) * size.height() > sourcePixelLimit) {
-            pixels->error = u"Missing/unknown cover dimensions or source exceeds 4M pixels"_s;
+        if (!size.isValid()) {
+            pixels->error = u"Missing/unknown cover dimensions"_s;
         } else if (job.generation == state->generation.load() && job.wanted->load()) {
             if (qMax(size.width(), size.height()) > job.resolution)
                 reader.setScaledSize(
@@ -390,7 +392,7 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
 void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 {
     --m_active;
-    m_reservedBytes -= reservationFor(job.resolution);
+    m_workingSetBytes -= workingSetEstimateFor(job.resolution);
     if (m_running.value(job.key).wanted == job.wanted)
         m_running.remove(job.key);
     if (job.generation != generation() || !job.wanted->load() || !pixels) {
@@ -434,11 +436,15 @@ QJsonObject CoverCache::statistics() const
              { u"active"_s, m_active },
              { u"peakPending"_s, m_peakPending },
              { u"peakActive"_s, m_peakActive },
-             { u"peakReservedInFlightBytes"_s, m_peakReservedBytes },
+             { u"peakInFlightWorkingSetEstimateBytes"_s, m_peakWorkingSetBytes },
+             { u"imageAllocationLimitBytes"_s,
+               QImageReader::allocationLimit() > 0
+                       ? QJsonValue(qint64(QImageReader::allocationLimit()) * 1024 * 1024)
+                       : QJsonValue(QJsonValue::Null) },
              { u"peakReaderReturnedBytesPerJob"_s, m_peakReaderBytes },
              { u"decoderScaledResults"_s, m_decoderScaledResults },
              { u"completedLruBytes"_s, m_bytes },
-             { u"reservedInFlightBytes"_s, m_reservedBytes },
+             { u"inFlightWorkingSetEstimateBytes"_s, m_workingSetBytes },
              { u"decodeStarts"_s, qint64(m_decodes) },
              { u"rejected"_s, qint64(m_rejected) },
              { u"stale"_s, qint64(m_stale) } };

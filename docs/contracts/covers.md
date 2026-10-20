@@ -10,7 +10,9 @@ R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量
 
 CoverCache 仅在 GUI 线程调用。请求键为稳定identity、完整本地/qrc path、resolution和标题；已解码的有效图片按无标题别名复用，缺图及解码失败占位保留完整标题依赖，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须`invalidate(identity)`并重新获取对应租约；完整场景更换才reset generation。原生扫描封面使用内容寻址URL携带revision，SceneItem在libraryChanged时只比较有界可见池的来源和占位标题（有效图片单独改名保留租约），释放变化身份的图集/选中租约，保留其余槽位和serial；不能仅用相同路径复用旧revision。完成占位携带fallbackTitle，过期标题不得发布到新来源；有效缩略图不被高清解码失败的占位覆盖。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
 
-QImageReader 在 worker 中读取尺寸、缩放能力和错误，设置 autoTransform，仅在原图超过请求缓存层最长边时设置 scaledSize，小图直接绘制到目标画布，避免先放大再缩小。插件不支持解码缩放时允许 Qt 有界的完整解码再缩放；带有效 ICC 配置的图像先在 worker 转换到 sRGB，与 shader 的颜色空间一致。未知尺寸或原图超过 4,194,304 像素时显式返回 error 与缺图画面，不尝试无界展开。该限制是本实现的输入资源保护，并非声称 Qt 不能读取更大的图像。PNG/JPEG 插件内部缓冲、字体及 Qt 分配器开销不冒充可测的 QImage 像素。
+QImageReader 在 worker 中读取尺寸、缩放能力和错误，设置 autoTransform，仅在原图超过请求缓存层最长边时设置 scaledSize，小图直接绘制到目标画布，避免先放大再缩小。插件不支持解码缩放时由 Qt 完整解码后缩放；带有效 ICC 配置的图像先在 worker 转换到 sRGB，与 shader 的颜色空间一致。未知尺寸或解码失败返回 error 与缺图画面。
+
+图片解码准入使用 Qt 的有效 `QImageReader::allocationLimit()`，不由产品覆盖；进程启动前的 `QT_IMAGEIO_MAXALLOC` 以 MiB 控制该值，0 明确关闭检查。Qt 首次查询时缓存环境值，运行中不改环境变量或在 worker 改全局上限。PNG/JPEG/WebP 的输出图像通过 `QImageIOHandler::allocateImage` 按格式且至少32bpp核算；JPEG 还按实际缩放输出分配，并将上限传给解码库。此为单次图像分配边界，不是全部 worker、编解码内部缓冲、颜色转换、画布/mip、字体或进程总内存上限。依据为[Qt分配接口](https://doc.qt.io/qt-6/qimageiohandler.html#allocateImage)、[Qt环境值解析](https://github.com/qt/qtbase/blob/dev/src/gui/image/qimagereader.cpp)、[JPEG](https://github.com/qt/qtbase/blob/dev/src/plugins/imageformats/jpeg/qjpeghandler.cpp)、[PNG](https://github.com/qt/qtbase/blob/dev/src/gui/image/qpnghandler.cpp)与[WebP](https://github.com/qt/qtimageformats/blob/dev/src/plugins/imageformats/webp/qwebphandler.cpp)源码。
 
 worker 用统一方形逻辑画布绘制一次 contain+1/64 留边，生成拥有内存的 RGBA8888 premultiplied 图像。缺图保留中性唱片圆环和标题提示，不替代成别张专辑。ready 发布 `shared_ptr<const CoverPixels>`，消费者不得通过外部存储修改像素；标题/来源字符串同样有界。paint接受正的二次幂缓存层。生产 trusted immutable 标志仅用于该所有权链；外部 Review 输入仍在同步/入队隔离一次。
 
@@ -28,9 +30,9 @@ SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三�
 
 worker以线性光、预乘alpha对每张封面独立做面积归约，生成完整mip链；不对合并图集整体生成mip。各层随对应dirty分块增量上传，字节全部计入原上传预算，静止不重算/重传。opaque.frag根据UV导数的椭圆足迹选择mip和自适应长轴采样；最多32个重叠积分点，极端斜角相应扩大mip足迹，控制工作量并避免欠采样。每级以实际textureSize换算整数原点与范围并钳制半像素边界，不跨封面串色；透射捕获保留独立mip链。alpha测试门槛仍为.025，颜色还原的分母以同门槛为下界，使透明helper片元也保持有限，不改变存活片元的颜色。
 
-清晰封面缓存层由实际纸面四角投影边长×窗口DPR×留边系数向上取整至二次幂决定，不设固定清晰图尺寸上限。普通阵列使用256²缩略图，独立selected/returning按自身快照尺寸占用清晰区；归位仍固定接管快照，晚到结果仅升级当前selected。sourcePixelLimit是源解码资源保护，QImageReader分配能力与实际GPU尺寸不足时显式报告错误，不更改屏幕空间目标。
+清晰封面缓存层由实际纸面四角投影边长×窗口DPR×留边系数向上取整至二次幂决定，不设固定清晰图尺寸上限。普通阵列使用256²缩略图，独立selected/returning按自身快照尺寸占用清晰区；归位仍固定接管快照，晚到结果仅升级当前selected。普通阵列缩略图是来源设计的资源取舍，不是安全边界；是否需升级须结合最终可见区域、源壳体透射采样与景深判断，不能仅凭投影边长宣称可见画质缺陷或等价。QImageReader分配能力与实际GPU尺寸不足时显式报告错误，不更改屏幕空间目标。
 
-封面尺寸/generation改变只替换cover texture和兼容bindings，保持其他附件/阴影/postprocess；coverResourceRevision使资源清单失效。CPU缓存将每级mip按真实字节计费，在途预留为源展开上界加请求画布面积×36bytes，涵盖浮点工作层/paint/编码mip/不可变分块。
+封面尺寸/generation改变只替换cover texture和兼容bindings，保持其他附件/阴影/postprocess；coverResourceRevision使资源清单失效。CPU缓存将每级mip按真实字节计费。在途工作集估算只按请求画布面积×36bytes计入paint、浮点工作层、编码mip与分块；不包含源解码、颜色转换或编解码内部存储，不称总内存预留。统计独立给出有效单图分配上限（关闭时为null）与实际返回QImage的最大载荷。
 
 ## 容量与资源清单
 
@@ -44,7 +46,7 @@ worker以线性光、预乘alpha对每张封面独立做面积归约，生成完
 
 ## 检查入口
 
-`CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立完整mip上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
+`CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图、PNG/JPEG/WebP单图分配准入及JPEG解码缩放、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。定向准入检查可用 `CoverCacheTest imageAllocationPolicy`，改变环境上限须启动独立进程。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立完整mip上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 
 目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码自动安全检查使用`tools/audit/audit-best-practices.py`，架构与生命周期仍需逐路径审查。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R36。
 

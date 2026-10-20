@@ -48,7 +48,7 @@ OfflineMetadataProvider 对不可变本地缓存快照按稳定ID索引异步读
 
 `_probeStatus`为loaded/invalid/timeout，原Qt错误保留在`_probeError`。Loaded不等于解码/设备播放已验证，因此mediaSupport保持Unknown；明确InvalidMedia/无音轨为Unsupported，超时为Unknown，不删除歌曲。Supported提升属于R24真实播放路径。`_qtProbeVersion`加扫描fingerprint复用完成的探测，文件或Qt版本变化重新探测；目录图移除后若尚无嵌入图判定，或嵌入缓存已丢失，也重新探测；超时下次显式扫描可重试。
 
-目录图片候选按cover、folder、front、其他图片排序；根直属单曲只取同名图片。无效优先图片继续尝试下一候选；目录图片优先于嵌入图，直属单曲的嵌入图优先于同名图。ArtworkStore在worker中读取PNG/JPEG/WebP，压缩文件≤30MiB、尺寸已知且≤4,194,304像素才完整验证解码；内容SHA256决定新dataDir的`artwork/`文件名，QSaveFile按owner权限原子保存，拒绝缓存目录/文件符号链接，不改原图/歌曲。相同内容复用，内容变化产生新URL供现有租约定向失效。Qt公开CoverArtImage返回的QImage已由Qt解码，原生侧再检查像素上限、保存PNG及30MiB输出上限；原始嵌入压缩字节和Qt后端内部解码峰值公开API不可观测，不冒充已在分配前检查它们。缓存/图集/归位所有权按[covers.md](covers.md)。
+目录图片候选按cover、folder、front、其他图片排序；根直属单曲只取同名图片。无效优先图片继续尝试下一候选；目录图片优先于嵌入图，直属单曲的嵌入图优先于同名图。ArtworkStore在worker中读取PNG/JPEG/WebP，压缩文件≤30MiB、尺寸有效，再由Qt完整验证解码；图片分配准入唯一见[covers.md](covers.md)。内容SHA256决定新dataDir的`artwork/`文件名，QSaveFile按owner权限原子保存，拒绝缓存目录/文件符号链接，不改原图/歌曲。相同内容复用，内容变化产生新URL供现有租约定向失效。Qt公开CoverArtImage返回的QImage已由Qt解码，原生侧在编码前按同一有效分配上限核对现有载荷（至少32bpp），保存PNG并检查30MiB输出上限；原始嵌入压缩字节和Qt后端内部解码峰值公开API不可观测，不冒充已在分配前检查它们。缓存/图集/归位所有权按封面契约。
 
 `--import-legacy /绝对/music-data-v3 --data-dir /独立/原生数据`显式读取旧`library-index.json`（version:1，曲目_metadataVersion:3或4）、可选config.json/genre-rules.json，不扫描用户目录或触碰浏览器数据库。新旧目录含符号链接解析后互不嵌套。索引上限256MiB，配置/规则各1MiB；本机URL、rawGenres和封面路径提供原生值；查询配置存metadataConfiguration，人工流派引用存genreOverrides，产品始终离线。以本机绝对直属路径重建稳定ID并重映射已知制作人员/人工流派引用，不猜测跨平台路径。只复制被引用且位于允许音乐根或旧artwork内的封面，不复制PCM、整棵缓存或歌曲；坏图只记录_coverImportError并回退缺图，索引/路径/schema错误不发布快照、不改旧文件或现有缓存。导入通过LibraryStore唯一worker和一次换代提交，不逐条重建模型；下一次显式重扫再按fingerprint补齐Qt标签。
 

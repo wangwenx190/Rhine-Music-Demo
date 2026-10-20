@@ -12,6 +12,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QImage>
+#include <QImageReader>
+#include <QImageIOHandler>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
@@ -159,6 +161,7 @@ private Q_SLOTS:
     void timeout();
     void cancellationAndReuse();
     void artworkGuards();
+    void embeddedAllocationAccounting();
     void artworkSymlink();
     void legacy_data();
     void legacy();
@@ -365,9 +368,10 @@ void MediaMetadataTest::artworkGuards()
     const auto path = temp.filePath(u"large.png"_s);
     QVERIFY(large.save(path));
     QString error;
-    QVERIFY(ArtworkStore::copy(path, native, &error).isEmpty());
-    QVERIFY(!error.isEmpty());
-    QVERIFY(ArtworkStore::save(large, native, &error).isEmpty());
+    const auto limit = QImageReader::allocationLimit();
+    const bool allowed = limit == 0 || large.sizeInBytes() <= qint64(limit) * 1024 * 1024;
+    QCOMPARE(!ArtworkStore::copy(path, native, &error).isEmpty(), allowed);
+    QCOMPARE(!ArtworkStore::save(large, native, &error).isEmpty(), allowed);
     QVERIFY(put(temp.filePath(u"broken.png"_s), "not an image"_ba));
     QVERIFY(ArtworkStore::copy(temp.filePath(u"broken.png"_s), native, &error).isEmpty());
     QFile oversized(temp.filePath(u"oversized.png"_s));
@@ -388,6 +392,19 @@ void MediaMetadataTest::artworkGuards()
     QVERIFY(put(temp.filePath(u"read-only-parent"_s), "file"_ba));
     QVERIFY(ArtworkStore::save(small, temp.filePath(u"read-only-parent/native"_s), &error)
                     .isEmpty());
+}
+void MediaMetadataTest::embeddedAllocationAccounting()
+{
+    QTemporaryDir directory;
+    for (const auto format : { QImage::Format_Grayscale8, QImage::Format_RGBA64 }) {
+        QImage image(1025, 1024, format);
+        image.fill(Qt::red);
+        QImage allocation;
+        const bool allowed = QImageIOHandler::allocateImage(image.size(), format, &allocation);
+        QString error;
+        QCOMPARE(!ArtworkStore::save(image, directory.path(), &error).isEmpty(), allowed);
+        QCOMPARE(error.isEmpty(), allowed);
+    }
 }
 void MediaMetadataTest::artworkSymlink()
 {

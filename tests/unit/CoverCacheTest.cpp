@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QElapsedTimer>
 #include <QColorSpace>
+#include <QImageReader>
 #include <QEventLoop>
 #include <QJsonDocument>
 #include <QSaveFile>
@@ -278,7 +279,7 @@ private Q_SLOTS:
         QVERIFY(stats[u"peakActive"_s].toInt() <= 3);
         QVERIFY(stats[u"peakPending"_s].toInt() <= 96);
         QVERIFY(stats[u"completedLruBytes"_s].toInteger() <= CoverCache::cacheLimit);
-        QCOMPARE(stats[u"reservedInFlightBytes"_s].toInteger(), 0);
+        QCOMPARE(stats[u"inFlightWorkingSetEstimateBytes"_s].toInteger(), 0);
         const auto cached = cache.lookup(u"95"_s, directory.filePath(u"95.jpg"_s), 256);
         QVERIFY(cached);
         QVERIFY(cache.request(u"95"_s, directory.filePath(u"95.jpg"_s), 256));
@@ -331,20 +332,59 @@ private Q_SLOTS:
         QVERIFY(cache.request(u"after-close"_s, path, 256));
         QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, 10000);
     }
-    void missingAndExpansionGuard()
+    void imageAllocationPolicy_data()
     {
+        QTest::addColumn<QByteArray>("format");
+        QTest::newRow("png") << "png"_ba;
+        QTest::newRow("jpeg-scaled") << "jpeg"_ba;
+        QTest::newRow("webp") << "webp"_ba;
+    }
+    void imageAllocationPolicy()
+    {
+        QFETCH(QByteArray, format);
         QTemporaryDir directory;
-        QImage image(4096, 2048, QImage::Format_RGB32);
+        QImage image(2049, 2048, QImage::Format_RGB32);
         image.fill(Qt::red);
-        const auto path = directory.filePath(u"oversized.png"_s);
-        QVERIFY(image.save(path));
+        const auto path = directory.filePath(u"cover."_s + QString::fromLatin1(format));
+        QVERIFY(image.save(path, format.constData()));
         CoverCache cache;
         QSignalSpy spy(&cache, &CoverCache::ready);
-        QVERIFY(cache.request(u"oversized"_s, path, 256));
+        QVERIFY(cache.request(u"cover"_s, path, 256));
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, 10000);
+        const auto pixels = qvariant_cast<CoverSnapshot>(spy.first().first());
+        const auto limit = QImageReader::allocationLimit();
+        bool configured = false;
+        const auto requestedLimit =
+                qEnvironmentVariableIntValue("QT_IMAGEIO_MAXALLOC", &configured);
+        if (configured && requestedLimit >= 0)
+            QCOMPARE(limit, requestedLimit);
+        const auto reportedLimit = cache.statistics().value(u"imageAllocationLimitBytes"_s);
+        if (limit == 0)
+            QVERIFY(reportedLimit.isNull());
+        else
+            QCOMPARE(reportedLimit.toInteger(), qint64(limit) * 1024 * 1024);
+        // JPEG scales during decode; PNG/WebP allocate the source image first.
+        const bool allowed = format == "jpeg"_ba || limit == 0
+                || image.sizeInBytes() <= qint64(limit) * 1024 * 1024;
+        QCOMPARE(pixels->error.isEmpty(), allowed);
+        QCOMPARE(pixels->sourceSize, image.size());
+        QCOMPARE(pixels->image.size(), QSize(256, 256));
+        if (allowed) {
+            QVERIFY(pixels->image.pixelColor(128, 128).red() > 250);
+            QVERIFY(pixels->readerReturnedBytes > 0);
+        } else {
+            QCOMPARE(pixels->readerReturnedBytes, 0);
+        }
+    }
+    void missingCovers()
+    {
+        QTemporaryDir directory;
+        CoverCache cache;
+        QSignalSpy spy(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"missing"_s, directory.filePath(u"missing.png"_s), 256,
                               u"Missing album"_s));
         QVERIFY(cache.request(u"absent"_s, u""_s, 256, u"No cover album"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 3, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, 10000);
         for (const auto &call : spy) {
             const auto p = qvariant_cast<CoverSnapshot>(call.first());
             QVERIFY(!p->error.isEmpty());

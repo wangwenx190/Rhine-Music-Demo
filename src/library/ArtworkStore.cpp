@@ -12,10 +12,15 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-bool validSize(QSize size)
+bool withinImageAllocationLimit(const QImage &image)
 {
-    return size.width() > 0 && size.height() > 0
-            && qint64(size.width()) * size.height() <= ArtworkStore::maximumPixels;
+    // Embedded artwork is already decoded by Qt Multimedia. Apply the same
+    // minimum 32-bit allocation accounting as QImageIOHandler before encoding it.
+    const auto limit = QImageReader::allocationLimit();
+    if (limit == 0)
+        return true;
+    const qint64 bytes = qint64(limit) * 1024 * 1024;
+    return image.sizeInBytes() <= bytes && qint64(image.width()) * image.height() <= bytes / 4;
 }
 QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &root, QString *error)
 {
@@ -71,19 +76,18 @@ QUrl ArtworkStore::copy(const QString &source, const QString &dataRoot, QString 
     QImageReader reader(&buffer);
     const auto format = reader.format().toLower();
     if (bytes.size() > maximumBytes || file.error() != QFileDevice::NoError
-        || !validSize(reader.size())
+        || !reader.size().isValid()
         || (format != "png"_ba && format != "jpeg"_ba && format != "webp"_ba)) {
         if (error)
-            *error = QCoreApplication::translate(
-                    "Yalahoo",
-                    "Invalid cover format, or the decoded image exceeds 4194304 pixels.");
+            *error = QCoreApplication::translate("Yalahoo", "Invalid cover format or dimensions.");
         return { };
     }
     // Decode once here to reject corrupt images before selecting their priority.
     reader.setAutoTransform(true);
     if (reader.read().isNull()) {
         if (error)
-            *error = QCoreApplication::translate("Yalahoo", "The cover is damaged.");
+            *error = QCoreApplication::translate("Yalahoo", "Cannot decode the cover: ")
+                    + reader.errorString();
         return { };
     }
     return persist(bytes, format, dataRoot, error);
@@ -92,10 +96,11 @@ QUrl ArtworkStore::save(const QImage &image, const QString &dataRoot, QString *e
 {
     if (error)
         error->clear();
-    if (!validSize(image.size())) {
+    if (image.isNull() || !withinImageAllocationLimit(image)) {
         if (error)
-            *error = QCoreApplication::translate("Yalahoo",
-                                                 "Invalid or oversized embedded cover dimensions.");
+            *error = QCoreApplication::translate(
+                    "Yalahoo",
+                    "Invalid embedded cover, or it exceeds Qt's image allocation limit.");
         return { };
     }
     QByteArray bytes;

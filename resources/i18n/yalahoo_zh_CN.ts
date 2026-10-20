@@ -1460,8 +1460,8 @@ Source: </source>
             <translation>隐藏 yalahOO!!!</translation>
         </message>
         <message>
-            <source>Invalid cover format, or the decoded image exceeds 4194304 pixels.</source>
-            <translation>封面格式无效或展开尺寸超过 4194304 像素。</translation>
+            <source>Invalid cover format or dimensions.</source>
+            <translation>封面格式或尺寸无效。</translation>
         </message>
         <message>
             <source>Invalid legacy album root.</source>
@@ -1496,8 +1496,8 @@ Source: </source>
             <translation>资料配置字段类型无效。</translation>
         </message>
         <message>
-            <source>Invalid or oversized embedded cover dimensions.</source>
-            <translation>内嵌封面展开尺寸无效或过大。</translation>
+            <source>Invalid embedded cover, or it exceeds Qt's image allocation limit.</source>
+            <translation>内嵌封面无效或超过 Qt 的图像分配上限。</translation>
         </message>
         <message>
             <source>Invalid preference JSON. The original file was preserved.</source>
@@ -1696,8 +1696,8 @@ Source: </source>
             <translation>尚无法可靠确认对应专辑或曲目，未采用存疑资料。</translation>
         </message>
         <message>
-            <source>The cover is damaged.</source>
-            <translation>封面已损坏。</translation>
+            <source>Cannot decode the cover: </source>
+            <translation>无法解码封面：</translation>
         </message>
         <message>
             <source>The introduction is saved locally.</source>
