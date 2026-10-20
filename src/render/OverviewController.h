@@ -12,13 +12,14 @@ class PresentationController;
 class OverviewController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool active READ active NOTIFY changed)
-    Q_PROPERTY(bool ready READ ready NOTIFY changed)
-    Q_PROPERTY(double progress READ progress NOTIFY changed)
-    Q_PROPERTY(yalahoo::OverviewLabelsModel *labels READ labels CONSTANT)
-    Q_PROPERTY(yalahoo::SurfaceTransition *chrome READ chrome CONSTANT)
-    Q_PROPERTY(double navigationOpacity READ navigationOpacity NOTIFY changed)
-    Q_PROPERTY(double navigationOffset READ navigationOffset NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(OverviewController)
+    Q_PROPERTY(bool active READ active NOTIFY changed FINAL)
+    Q_PROPERTY(bool ready READ ready NOTIFY changed FINAL)
+    Q_PROPERTY(double progress READ progress NOTIFY changed FINAL)
+    Q_PROPERTY(yalahoo::OverviewLabelsModel *labels READ labels CONSTANT FINAL)
+    Q_PROPERTY(yalahoo::SurfaceTransition *chrome READ chrome CONSTANT FINAL)
+    Q_PROPERTY(double navigationOpacity READ navigationOpacity NOTIFY changed FINAL)
+    Q_PROPERTY(double navigationOffset READ navigationOffset NOTIFY changed FINAL)
 public:
     explicit OverviewController(MotionController *motion, QObject *parent = nullptr);
     void bind(SceneAdapter *scene, SelectionController *selection,

@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "Logging.h"
 #include "DisplayOutput.h"
 #include <QColorSpace>

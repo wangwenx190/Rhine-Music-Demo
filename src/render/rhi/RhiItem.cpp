@@ -38,7 +38,7 @@ SceneSubmissionStats submissionStats;
 template <class T>
 using Owned = std::unique_ptr<T>;
 // Exactly matches frame.glsl; avoid compiler-dependent QVector3D/std140 packing.
-struct alignas(16) Uniform
+struct alignas(16) Uniform final
 {
     float mvp[16], model[16], view[16], lightMvp[16], lightVP[16];
     float background[4], rowSettings[4], rowColumn[4], lightColumn[4], spotPosition[4],
@@ -70,13 +70,15 @@ void copy(float *to, QVector4D v)
     to[2] = v.z();
     to[3] = v.w();
 }
-struct Mesh
+struct Mesh final
 {
     quint32 start = 0, count = 0;
     QVector3D center{ };
 };
-struct Target
+struct Target final
 {
+    Q_DISABLE_COPY_MOVE(Target)
+    Target() = default;
     bool mrt = false;
     bool prepass = false;
     QSize size;
@@ -103,8 +105,10 @@ struct Target
     }
     // Dependencies are destroyed in reverse declaration order: target before attachments.
 };
-struct Pending
+struct Pending final
 {
+    Q_DISABLE_COPY_MOVE(Pending)
+    Pending() = default;
     std::array<QRhiReadbackResult, 14> results;
     Capture capture;
     std::function<void(Capture)> deliver;
@@ -150,6 +154,7 @@ QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &ent
 }
 class Renderer final : public QQuickRhiItemRenderer
 {
+    Q_DISABLE_COPY_MOVE(Renderer)
 public:
     Renderer()
     {
@@ -263,7 +268,7 @@ private:
     quint64 inventoryGeneration = 0, inventoryPostRevision = 0, inventoryCoverRevision = 0;
     quint64 coverResourceRevision = 0;
     QJsonObject cachedInventory, allocationPlan;
-    struct AllocationKey
+    struct AllocationKey final
     {
         QSize size, cover;
         int shadow = 0, samples = 0, aoSamples = 0;
@@ -1363,7 +1368,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         for (int i = 0; i < entities.size(); ++i)
             opaqueOffsets.append(append(entities[i], input.geometryDiagnostic ? 1 : 0, i));
     const auto floorOffset = append({ }, input.productFloor ? 6 : 2);
-    struct ShellDraw
+    struct ShellDraw final
     {
         Mesh mesh;
         quint32 offset;

@@ -1,3 +1,5 @@
+#include "FrameClock.h"
+#include "MotionController.h"
 #include "SelectionController.h"
 #include "OverviewController.h"
 #include "MotionFunctions.h"

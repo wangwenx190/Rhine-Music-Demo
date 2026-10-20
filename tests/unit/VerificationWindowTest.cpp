@@ -10,9 +10,13 @@ using namespace Qt::StringLiterals;
 #if defined(Q_OS_WIN)
 #  include <windows.h>
 #endif
-class VerificationWindowTest : public QObject
+class VerificationWindowTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(VerificationWindowTest)
+public:
+    VerificationWindowTest() = default;
+
 private Q_SLOTS:
     void foregroundOwnership()
     {

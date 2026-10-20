@@ -6,7 +6,7 @@ namespace yalahoo {
 double archiveTravelDuration(double lanes, double rows);
 
 // Rest-to-rest endpoint, preserving the displayed x/v/a on interruption.
-class QuinticTrack
+class QuinticTrack final
 {
 public:
     const Kinematics &state() const
@@ -51,7 +51,7 @@ private:
 };
 
 // Scalar portion of music-real-columns.ts. Column identity/layout remains R13.
-class ColumnScalar
+class ColumnScalar final
 {
 public:
     explicit ColumnScalar(double value = 0) : m_target(value)

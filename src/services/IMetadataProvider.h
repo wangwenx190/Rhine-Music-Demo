@@ -19,7 +19,7 @@ enum class ProviderStatus {
 };
 QString kindName(MetadataKind kind);
 QString statusName(ProviderStatus status);
-struct RequestToken
+struct RequestToken final
 {
     quint64 requestId = 0, generation = 0;
     QString albumId;
@@ -29,7 +29,7 @@ inline size_t qHash(const RequestToken &token, size_t seed = 0)
 {
     return qHashMulti(seed, token.requestId, token.generation, token.albumId);
 }
-struct AlbumQuery
+struct AlbumQuery final
 {
     QString albumId, contact, releaseId;
     Album album;
@@ -37,12 +37,12 @@ struct AlbumQuery
     bool enabled = false, force = false;
     QJsonObject configuration;
 };
-struct ProviderCapabilities
+struct ProviderCapabilities final
 {
     bool networkEnabled = false;
     bool introductions = true, credits = true, enrichment = true, batch = false;
 };
-struct ProviderResult
+struct ProviderResult final
 {
     quint64 requestId = 0, generation = 0;
     QString albumId;
@@ -57,7 +57,9 @@ struct ProviderResult
 class IMetadataProvider : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(IMetadataProvider)
 public:
+    IMetadataProvider() = default;
     using QObject::QObject;
     virtual ProviderCapabilities capabilities() const = 0;
     [[nodiscard]] virtual bool requestIntroduction(AlbumQuery query, RequestToken token) = 0;

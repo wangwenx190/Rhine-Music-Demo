@@ -1,3 +1,6 @@
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "SceneItem.h"
@@ -137,7 +140,7 @@ int main(int argc, char **argv)
                 submissionSamples.removeFirst();
             submissionSamples.append(sample);
         });
-        struct Wait
+        struct Wait final
         {
             quint64 request = 0;
             QPointer<QEventLoop> loop;

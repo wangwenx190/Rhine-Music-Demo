@@ -15,9 +15,10 @@ using Qt::StringLiterals::operator""_s;
 
 // Review-only rendering. Cocoa can stop swapchain frames for fully occluded
 // bottom windows. RenderControl submits the same QML scene into a real Metal target.
-class OffscreenSurface : public QObject
+class OffscreenSurface final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OffscreenSurface)
 public:
     bool measurementEnabled = false;
     static inline bool Enabled =

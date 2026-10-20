@@ -362,8 +362,9 @@ void paintReveal(QPainter &p, const QJsonObject &mapping, double progress, const
     }
     p.restore();
 }
-class PreviewWindow : public QWindow
+class PreviewWindow final : public QWindow
 {
+    Q_DISABLE_COPY_MOVE(PreviewWindow)
     QBackingStore backing{ this };
     QImage board;
     QImage rendered;

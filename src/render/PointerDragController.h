@@ -4,7 +4,7 @@
 namespace yalahoo {
 // Pointer samples replace one target. Rotation follows on the sole FrameClock;
 // releasing retains the authored target, returning uses motion::returnStep.
-class PointerDragController
+class PointerDragController final
 {
 public:
     bool press(QPointF point, int pointerId = 0);

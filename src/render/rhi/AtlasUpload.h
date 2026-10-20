@@ -7,7 +7,7 @@
 #include <utility>
 
 namespace yalahoo::rhi {
-struct AtlasUpload
+struct AtlasUpload final
 {
     AtlasUpload(quint64 generation = 0, quint64 lease = 0, quint64 serial = 0, int slot = 0,
                 QImage pixels = { }, bool immutableOwned = false, QList<QImage> mipmaps = { })
@@ -27,9 +27,11 @@ struct AtlasUpload
     QList<QImage> mipmaps;
 };
 // Render-thread queue. Generation changes invalidate both pending work and slot revisions.
-class AtlasUploadQueue
+class AtlasUploadQueue final
 {
+    Q_DISABLE_COPY_MOVE(AtlasUploadQueue)
 public:
+    AtlasUploadQueue() = default;
     void reset(QSize size, quint64 generation);
     void enqueue(const QVector<AtlasUpload> &uploads);
     QVector<AtlasUpload> take(bool initializing);

@@ -1,3 +1,11 @@
+#include "SelectionLighting.h"
+#include "RenderQuality.h"
+#include "FrameClock.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include "LibrarySession.h"
+#include "PreferencesStore.h"
+#include "SceneAdapter.h"
 #include "SettingsController.h"
 #include <cmath>
 

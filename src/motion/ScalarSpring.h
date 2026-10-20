@@ -9,7 +9,7 @@ struct Kinematics
 };
 
 // Exact solution of the critically damped spring in frozen motion.ts.
-struct ScalarSpring : Kinematics
+struct ScalarSpring final : Kinematics
 {
     void observe(double target, double rate);
     void update(double target, double rate, double dt);

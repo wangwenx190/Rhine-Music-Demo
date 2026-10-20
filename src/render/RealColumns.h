@@ -4,9 +4,11 @@
 
 namespace yalahoo {
 // Frozen MusicRealColumns semantics, sampled lazily at the shared motion time.
-class RealColumns
+class RealColumns final
 {
+    Q_DISABLE_COPY_MOVE(RealColumns)
 public:
+    RealColumns() = default;
     void reset(const QList<int> &counts, ArchiveCell selected,
                std::optional<double> displayedRow = std::nullopt);
     void select(ArchiveCell cell, bool guided = false, bool detail = false);
@@ -18,7 +20,7 @@ public:
     bool settled(int lane) const;
 
 private:
-    struct Column
+    struct Column final
     {
         int count = 0;
         double midpoint = 12;

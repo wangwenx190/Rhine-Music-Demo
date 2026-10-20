@@ -1,3 +1,5 @@
+#include "FrameClock.h"
+#include "LibrarySession.h"
 #include "Localization.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
@@ -9,7 +11,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-struct Fixture
+struct Fixture final
 {
     bool archiveReady = true, presentationReady = false, interactive = false;
     QStringList events;
@@ -58,9 +60,14 @@ struct Fixture
     }
 };
 }
-class PresentationTest : public QObject
+class PresentationTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(PresentationTest)
+public:
+    PresentationTest() = default;
+
+private:
     yalahoo::Localization localization{ QLocale(QLocale::Chinese, QLocale::China) };
 private Q_SLOTS:
     void openingReadinessAndSingleNotification()

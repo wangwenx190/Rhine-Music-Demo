@@ -1,17 +1,15 @@
 #pragma once
+#include <memory>
 #include "IMetadataProvider.h"
-#include <QHash>
-#include <QSet>
-#include <QThread>
 #include <functional>
 class QNetworkAccessManager;
 
 namespace yalahoo {
-class MetadataWorker;
 // The GUI facade has at most eight accepted requests. Network/JSON work lives on its thread.
 class OnlineMetadataProvider final : public IMetadataProvider
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OnlineMetadataProvider)
 public:
     explicit OnlineMetadataProvider(QObject *parent = nullptr,
                                     std::function<QNetworkAccessManager *()> networkFactory = { });
@@ -25,10 +23,7 @@ public:
 
 private:
     bool request(AlbumQuery query, RequestToken token, MetadataKind kind);
-    QThread m_thread;
-    MetadataWorker *m_worker;
-    QHash<RequestToken, MetadataKind> m_pending;
-    QSet<RequestToken> m_outstanding;
-    bool m_enabled = false;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

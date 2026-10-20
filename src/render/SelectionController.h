@@ -13,14 +13,15 @@
 
 namespace yalahoo {
 class OverviewController;
-class SelectionController : public QObject
+class SelectionController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString albumId READ albumId NOTIFY selectionChanged)
-    Q_PROPERTY(bool realistic READ realistic WRITE setRealistic NOTIFY arrayModeChanged)
-    Q_PROPERTY(bool rememberColumnPosition READ rememberColumnPosition WRITE setRememberColumnPosition NOTIFY memoryChanged)
-    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY selectionChanged)
-    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY selectionChanged)
+    Q_DISABLE_COPY_MOVE(SelectionController)
+    Q_PROPERTY(QString albumId READ albumId NOTIFY selectionChanged FINAL)
+    Q_PROPERTY(bool realistic READ realistic WRITE setRealistic NOTIFY arrayModeChanged FINAL)
+    Q_PROPERTY(bool rememberColumnPosition READ rememberColumnPosition WRITE setRememberColumnPosition NOTIFY memoryChanged FINAL)
+    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY selectionChanged FINAL)
+    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY selectionChanged FINAL)
 public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
     void setColumns(QList<LibraryColumn> columns, Snapshot snapshot = { });
@@ -111,7 +112,7 @@ Q_SIGNALS:
     void memoryChanged();
 
 private:
-    struct Pulse
+    struct Pulse final
     {
         ArchiveCell cell;
         double time = 0;
@@ -123,7 +124,7 @@ private:
     std::array<double, 2> displayOffset() const;
     QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0,
                          bool folded = true) const;
-    struct ExtentCache
+    struct ExtentCache final
     {
         double lane = std::numeric_limits<double>::infinity();
         double extent = 1;
@@ -136,7 +137,7 @@ private:
     RealColumns m_realColumns;
     ColumnMemory m_memory;
     bool m_realistic = false;
-    struct CoverSource
+    struct CoverSource final
     {
         QString path, placeholderTitle, title;
     };

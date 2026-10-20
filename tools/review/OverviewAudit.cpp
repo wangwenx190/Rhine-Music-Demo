@@ -1,3 +1,6 @@
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QQuickWindow>
 #include "OverviewAudit.h"
 #include "OverviewController.h"
 #include "DetailPorts.h"

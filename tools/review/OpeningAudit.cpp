@@ -1,3 +1,7 @@
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QQuickWindow>
 #include "OpeningAudit.h"
 #include "OffscreenSurface.h"
 #include "OpeningController.h"
@@ -37,8 +41,9 @@ QQuickItem *find(QQuickItem *root, const QString &name)
             return item;
     return nullptr;
 }
-class Driver
+class Driver final
 {
+    Q_DISABLE_COPY_MOVE(Driver)
 public:
     Driver() : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
     {

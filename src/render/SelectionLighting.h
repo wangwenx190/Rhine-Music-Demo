@@ -6,7 +6,7 @@
 #include <QVector4D>
 #include <QVariantMap>
 namespace yalahoo {
-struct LightingPalette
+struct LightingPalette final
 {
     double warmth = 1, environment = .25, key = .45, hemisphere = .32, fill = .045;
     double spot = 180 * 64, area = 34, scatter = 1, printAmbient = .5, exposure = 1.05;
@@ -18,33 +18,34 @@ struct LightingPalette
 class SelectionLighting : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantMap settings READ settings NOTIFY settingsChanged)
-    Q_PROPERTY(bool comparing READ comparing WRITE setComparing NOTIFY comparingChanged)
-    Q_PROPERTY(double warmth READ warmth NOTIFY changed)
-    Q_PROPERTY(double environmentIntensity READ environmentIntensity NOTIFY changed)
-    Q_PROPERTY(double exposure READ exposure NOTIFY changed)
-    Q_PROPERTY(double printAmbient READ printAmbient NOTIFY changed)
-    Q_PROPERTY(double scatterStrength READ scatterStrength NOTIFY changed)
-    Q_PROPERTY(double spotIntensity READ spotIntensity NOTIFY changed)
-    Q_PROPERTY(double areaIntensity READ areaIntensity NOTIFY changed)
-    Q_PROPERTY(double rowDetail READ rowDetail NOTIFY changed)
-    Q_PROPERTY(double rowFill READ rowFill NOTIFY changed)
-    Q_PROPERTY(QVector4D rowSettings READ rowSettings NOTIFY changed)
-    Q_PROPERTY(QVector3D rowColumn READ rowColumn NOTIFY changed)
-    Q_PROPERTY(QVector3D lightColumn READ lightColumn NOTIFY changed)
-    Q_PROPERTY(QVector3D spotPosition READ spotPosition NOTIFY changed)
-    Q_PROPERTY(QVector3D spotTarget READ spotTarget NOTIFY changed)
-    Q_PROPERTY(QVector3D areaPosition READ areaPosition NOTIFY changed)
-    Q_PROPERTY(QVector3D areaTarget READ areaTarget NOTIFY changed)
-    Q_PROPERTY(QVector3D scatterColor READ scatterColor NOTIFY changed)
-    Q_PROPERTY(QVector3D spotColor READ spotColor NOTIFY changed)
-    Q_PROPERTY(QVector3D keyColor READ keyColor NOTIFY changed)
-    Q_PROPERTY(QVector3D skyColor READ skyColor NOTIFY changed)
-    Q_PROPERTY(QVector3D groundColor READ groundColor NOTIFY changed)
-    Q_PROPERTY(QVector3D lightIntensities READ lightIntensities NOTIFY changed)
-    Q_PROPERTY(QVector3D backgroundLinear READ backgroundLinear NOTIFY changed)
-    Q_PROPERTY(QColor backgroundColor READ backgroundColor NOTIFY changed)
-    Q_PROPERTY(bool night READ night WRITE setNight NOTIFY nightChanged)
+    Q_DISABLE_COPY_MOVE(SelectionLighting)
+    Q_PROPERTY(QVariantMap settings READ settings NOTIFY settingsChanged FINAL)
+    Q_PROPERTY(bool comparing READ comparing WRITE setComparing NOTIFY comparingChanged FINAL)
+    Q_PROPERTY(double warmth READ warmth NOTIFY changed FINAL)
+    Q_PROPERTY(double environmentIntensity READ environmentIntensity NOTIFY changed FINAL)
+    Q_PROPERTY(double exposure READ exposure NOTIFY changed FINAL)
+    Q_PROPERTY(double printAmbient READ printAmbient NOTIFY changed FINAL)
+    Q_PROPERTY(double scatterStrength READ scatterStrength NOTIFY changed FINAL)
+    Q_PROPERTY(double spotIntensity READ spotIntensity NOTIFY changed FINAL)
+    Q_PROPERTY(double areaIntensity READ areaIntensity NOTIFY changed FINAL)
+    Q_PROPERTY(double rowDetail READ rowDetail NOTIFY changed FINAL)
+    Q_PROPERTY(double rowFill READ rowFill NOTIFY changed FINAL)
+    Q_PROPERTY(QVector4D rowSettings READ rowSettings NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D rowColumn READ rowColumn NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D lightColumn READ lightColumn NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D spotPosition READ spotPosition NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D spotTarget READ spotTarget NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D areaPosition READ areaPosition NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D areaTarget READ areaTarget NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D scatterColor READ scatterColor NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D spotColor READ spotColor NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D keyColor READ keyColor NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D skyColor READ skyColor NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D groundColor READ groundColor NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D lightIntensities READ lightIntensities NOTIFY changed FINAL)
+    Q_PROPERTY(QVector3D backgroundLinear READ backgroundLinear NOTIFY changed FINAL)
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor NOTIFY changed FINAL)
+    Q_PROPERTY(bool night READ night WRITE setNight NOTIFY nightChanged FINAL)
 public:
     explicit SelectionLighting(QObject *parent = nullptr);
     RowLightController ribbon;

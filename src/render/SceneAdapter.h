@@ -12,21 +12,22 @@ namespace yalahoo {
 class SceneAdapter : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(yalahoo::SelectionLighting* lighting READ lighting CONSTANT)
-    Q_PROPERTY(yalahoo::RenderQuality* quality READ quality CONSTANT)
-    Q_PROPERTY(QVariantMap renderBackendContract READ renderBackendContract CONSTANT)
-    Q_PROPERTY(yalahoo::LayoutMetrics* layout READ layout CONSTANT)
-    Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY frameChanged)
-    Q_PROPERTY(QVector3D cameraAim READ cameraAim NOTIFY frameChanged)
-    Q_PROPERTY(QQuaternion cameraRotation READ cameraRotation NOTIFY frameChanged)
-    Q_PROPERTY(QVector3D casePosition READ casePosition NOTIFY frameChanged)
-    Q_PROPERTY(double fieldOfView READ fieldOfView NOTIFY frameChanged)
-    Q_PROPERTY(double clipNear READ clipNear CONSTANT)
-    Q_PROPERTY(double clipFar READ clipFar CONSTANT)
-    Q_PROPERTY(quint64 frameRevision READ frameRevision NOTIFY frameChanged)
-    Q_PROPERTY(double detail READ detail WRITE setDetail NOTIFY detailChanged)
-    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
-    Q_PROPERTY(yalahoo::SelectionController* selection READ selection NOTIFY selectionControllerChanged)
+    Q_DISABLE_COPY_MOVE(SceneAdapter)
+    Q_PROPERTY(yalahoo::SelectionLighting* lighting READ lighting CONSTANT FINAL)
+    Q_PROPERTY(yalahoo::RenderQuality* quality READ quality CONSTANT FINAL)
+    Q_PROPERTY(QVariantMap renderBackendContract READ renderBackendContract CONSTANT FINAL)
+    Q_PROPERTY(yalahoo::LayoutMetrics* layout READ layout CONSTANT FINAL)
+    Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY frameChanged FINAL)
+    Q_PROPERTY(QVector3D cameraAim READ cameraAim NOTIFY frameChanged FINAL)
+    Q_PROPERTY(QQuaternion cameraRotation READ cameraRotation NOTIFY frameChanged FINAL)
+    Q_PROPERTY(QVector3D casePosition READ casePosition NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double fieldOfView READ fieldOfView NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double clipNear READ clipNear CONSTANT FINAL)
+    Q_PROPERTY(double clipFar READ clipFar CONSTANT FINAL)
+    Q_PROPERTY(quint64 frameRevision READ frameRevision NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double detail READ detail WRITE setDetail NOTIFY detailChanged FINAL)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged FINAL)
+    Q_PROPERTY(yalahoo::SelectionController* selection READ selection NOTIFY selectionControllerChanged FINAL)
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
     void setSelection(SelectionController *selection);

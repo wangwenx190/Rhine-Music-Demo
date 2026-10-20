@@ -1,3 +1,5 @@
+#include "SelectionController.h"
+#include "PresentationController.h"
 #include "DetailPorts.h"
 #include "SceneAdapter.h"
 #include "LibrarySession.h"

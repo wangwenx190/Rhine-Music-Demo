@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "MotionController.h"
 
 namespace yalahoo {

@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "TitleReel.h"
 #include <QSet>
 #include <QFontMetricsF>

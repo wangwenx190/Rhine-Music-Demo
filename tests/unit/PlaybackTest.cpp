@@ -1,3 +1,4 @@
+#include "LibrarySession.h"
 #include "PlaybackController.h"
 #include "AudioFixture.h"
 #include "OfflineMetadataProvider.h"
@@ -13,7 +14,7 @@ using namespace Qt::StringLiterals;
 namespace yalahoo {
 namespace {
 
-struct Fixture
+struct Fixture final
 {
     QTemporaryDir directory;
     OfflineMetadataProvider provider;
@@ -44,9 +45,13 @@ struct Fixture
     }
 };
 }
-class PlaybackTest : public QObject
+class PlaybackTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(PlaybackTest)
+public:
+    PlaybackTest() = default;
+
 private Q_SLOTS:
     void publicPlaybackPauseSeekStopAndNavigation()
     {

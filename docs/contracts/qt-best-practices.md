@@ -8,7 +8,7 @@
 - **QT-02 观察指针不承诺线程安全。** 可提前销毁QObject的观察者使用QPointer或等价销毁协议；固定依赖可用引用/裸指针。QPointer不会使跨线程解引用安全，检查后也不能假定任意回调后仍非空。[QPointer](https://doc.qt.io/qt-6/qpointer.html)
 - **QT-03 连接具有合适context。** 优先成员指针connect；捕获lambda绑定context，单独核对其他捕获的有效期。断开连接不保证已排队完成消失；DirectConnection要明确实际执行线程，不能凭接收对象归属线程推断。[QObject连接](https://doc.qt.io/qt-6/qobject.html)
 - **QT-04 信号可能同步重入。** 在发信号前建立一致状态；发出后重新检查可被槽改变的对象、请求和容器。不得保留快照元素裸指针跨越可能换库的通知；同步连接也不能让异常逃出槽调用。[QObject](https://doc.qt.io/qt-6/qobject.html)、[异常安全](https://doc.qt.io/qt-6/exceptionsafety.html)
-- **QT-05 属性通知完整且克制。** NOTIFY覆盖所有派生属性依赖，普通标量仅在值改变时发出。CONSTANT确实不变；可写属性的setter校验输入并维护不变量。模型reset和属性变化分别通知，不用无条件全量刷新弥补依赖缺失。[属性系统](https://doc.qt.io/qt-6/properties.html)
+- **QT-05 属性通知完整且克制。** NOTIFY覆盖所有派生属性依赖，普通标量仅在值改变时发出。属性无重写需求时加`FINAL`；同一对象生命期内值或对象身份不变的只读属性加`CONSTANT`，指针指向对象的内部状态仍可通知变化。CONSTANT确实不变；可写属性的setter校验输入并维护不变量。模型reset和属性变化分别通知，不用无条件全量刷新弥补依赖缺失。[属性系统](https://doc.qt.io/qt-6/properties.html)
 - **QT-06 公开接口稳定。** C++暴露窄typed属性、命令和模型；生产逻辑不按objectName反向遍历QML。QML可创建注册类型须允许注册包装派生；测试观察实际树不成为生产依赖。[从C++与QML交互](https://doc.qt.io/qt-6/qtqml-cppintegration-interactqmlfromcpp.html)
 
 ## 线程、事件和异步退出

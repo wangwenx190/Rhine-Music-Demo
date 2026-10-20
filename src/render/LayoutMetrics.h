@@ -7,16 +7,17 @@ namespace yalahoo {
 class LayoutMetrics : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(double width READ width NOTIFY changed)
-    Q_PROPERTY(double height READ height NOTIFY changed)
-    Q_PROPERTY(bool portrait READ portrait NOTIFY changed)
-    Q_PROPERTY(bool compact READ compact NOTIFY changed)
-    Q_PROPERTY(QString kind READ kind NOTIFY changed)
-    Q_PROPERTY(double layoutScale READ layoutScale NOTIFY changed)
-    Q_PROPERTY(double referenceWidth READ referenceWidth NOTIFY changed)
-    Q_PROPERTY(double referenceHeight READ referenceHeight NOTIFY changed)
-    Q_PROPERTY(double informationX READ informationX NOTIFY changed)
-    Q_PROPERTY(double informationRight READ informationRight NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(LayoutMetrics)
+    Q_PROPERTY(double width READ width NOTIFY changed FINAL)
+    Q_PROPERTY(double height READ height NOTIFY changed FINAL)
+    Q_PROPERTY(bool portrait READ portrait NOTIFY changed FINAL)
+    Q_PROPERTY(bool compact READ compact NOTIFY changed FINAL)
+    Q_PROPERTY(QString kind READ kind NOTIFY changed FINAL)
+    Q_PROPERTY(double layoutScale READ layoutScale NOTIFY changed FINAL)
+    Q_PROPERTY(double referenceWidth READ referenceWidth NOTIFY changed FINAL)
+    Q_PROPERTY(double referenceHeight READ referenceHeight NOTIFY changed FINAL)
+    Q_PROPERTY(double informationX READ informationX NOTIFY changed FINAL)
+    Q_PROPERTY(double informationRight READ informationRight NOTIFY changed FINAL)
 public:
     explicit LayoutMetrics(QObject *parent = nullptr) : QObject(parent)
     {

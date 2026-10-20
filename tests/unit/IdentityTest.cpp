@@ -5,9 +5,13 @@
 
 using namespace Qt::StringLiterals;
 
-class IdentityTest : public QObject
+class IdentityTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(IdentityTest)
+public:
+    IdentityTest() = default;
+
 private Q_SLOTS:
     void stableIdentity()
     {

@@ -9,11 +9,12 @@ namespace yalahoo {
 class RenderQuality : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantMap values READ values NOTIFY changed)
-    Q_PROPERTY(int shadows READ shadows NOTIFY changed)
-    Q_PROPERTY(int aoSamples READ aoSamples CONSTANT)
-    Q_PROPERTY(QSize targetSize READ targetSize NOTIFY changed)
-    Q_PROPERTY(QSize aoSize READ targetSize NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(RenderQuality)
+    Q_PROPERTY(QVariantMap values READ values NOTIFY changed FINAL)
+    Q_PROPERTY(int shadows READ shadows NOTIFY changed FINAL)
+    Q_PROPERTY(int aoSamples READ aoSamples CONSTANT FINAL)
+    Q_PROPERTY(QSize targetSize READ targetSize NOTIFY changed FINAL)
+    Q_PROPERTY(QSize aoSize READ targetSize NOTIFY changed FINAL)
 public:
     explicit RenderQuality(QObject *parent = nullptr);
     QVariantMap values() const

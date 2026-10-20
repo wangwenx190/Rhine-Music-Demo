@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import plistlib
 import re
+import shutil
 import subprocess
 
 MACHO = {bytes.fromhex(value) for value in
@@ -101,6 +102,16 @@ def normalize_bundle(bundle):
     info['LSMinimumSystemVersion'] = minimum
     plist_path.write_bytes(plistlib.dumps(info))
     return dict(removedExternalRpaths=removed, minimumMacOS=minimum)
+
+
+def strip_bundle(bundle):
+    # Preserve exported/dynamic symbols; modify only the staged copies before signing.
+    for symbols in sorted(bundle.rglob('*.dSYM'), reverse=True):
+        if symbols.is_dir() and not symbols.is_symlink():
+            shutil.rmtree(symbols)
+    for binary in sorted(bundle.rglob('*')):
+        if macho(binary):
+            run('/usr/bin/strip', '-S', '-x', binary)
 
 
 def inspect_bundle(bundle):

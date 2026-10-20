@@ -89,8 +89,9 @@ int externalForegroundChanges = 0;
 @end
 
 namespace {
-class NativeWindowGuard : public QObject
+class NativeWindowGuard final : public QObject
 {
+    Q_DISABLE_COPY_MOVE(NativeWindowGuard)
 public:
     explicit NativeWindowGuard(QWindow &window) : QObject(&window), m_window(window)
     {

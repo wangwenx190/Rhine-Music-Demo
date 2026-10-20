@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "PanelController.h"
 
 using namespace Qt::StringLiterals;

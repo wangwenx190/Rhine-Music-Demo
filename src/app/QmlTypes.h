@@ -31,7 +31,7 @@
 #include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>
 
-struct DisplayOutputQml
+struct DisplayOutputQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::DisplayOutput)
@@ -39,21 +39,21 @@ struct DisplayOutputQml
     QML_UNCREATABLE("Display output is owned by the application")
 };
 
-struct LayoutMetricsQml
+struct LayoutMetricsQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::LayoutMetrics)
     QML_NAMED_ELEMENT(LayoutMetrics)
     QML_UNCREATABLE("Owned by SceneAdapter")
 };
-struct SceneAdapterQml
+struct SceneAdapterQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SceneAdapter)
     QML_NAMED_ELEMENT(SceneAdapter)
     QML_UNCREATABLE("Injected by the native application")
 };
-struct SelectionControllerQml
+struct SelectionControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SelectionController)
@@ -61,14 +61,14 @@ struct SelectionControllerQml
     QML_UNCREATABLE("Injected by the native application")
 };
 
-struct FrameClockQml
+struct FrameClockQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::FrameClock)
     QML_NAMED_ELEMENT(FrameClock)
     QML_UNCREATABLE("Owned by MotionController")
 };
-struct MotionControllerQml
+struct MotionControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::MotionController)
@@ -76,21 +76,21 @@ struct MotionControllerQml
     QML_UNCREATABLE("Injected by the native application")
 };
 
-struct LibrarySessionQml
+struct LibrarySessionQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::LibrarySession)
     QML_NAMED_ELEMENT(LibrarySession)
     QML_UNCREATABLE("Injected by the native application")
 };
-struct AlbumListModelQml
+struct AlbumListModelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::AlbumListModel)
     QML_NAMED_ELEMENT(AlbumListModel)
     QML_UNCREATABLE("Owned by LibrarySession")
 };
-struct SearchListModelQml
+struct SearchListModelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SearchListModel)
@@ -98,14 +98,14 @@ struct SearchListModelQml
     QML_UNCREATABLE("Owned by LibrarySession")
 };
 
-struct SelectionLightingQml
+struct SelectionLightingQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SelectionLighting)
     QML_NAMED_ELEMENT(SelectionLighting)
     QML_UNCREATABLE("Owned by SceneAdapter")
 };
-struct RenderQualityQml
+struct RenderQualityQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::RenderQuality)
@@ -113,86 +113,86 @@ struct RenderQualityQml
     QML_UNCREATABLE("Owned by SceneAdapter")
 };
 
-struct SceneItemQml
+struct SceneItemQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::rhi::SceneItem)
     QML_NAMED_ELEMENT(SceneItem)
 };
 
-struct RulerControllerQml
+struct RulerControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::RulerController)
     QML_NAMED_ELEMENT(RulerController)
     QML_UNCREATABLE("Owned by application")
 };
-struct InputRouterQml
+struct InputRouterQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::InputRouter)
     QML_NAMED_ELEMENT(InputRouter)
     QML_UNCREATABLE("Owned by application")
 };
-struct RulerInkQml
+struct RulerInkQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::RulerInk)
     QML_NAMED_ELEMENT(RulerInk)
 };
-struct OrdinalMotionQml
+struct OrdinalMotionQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OrdinalMotion)
     QML_NAMED_ELEMENT(OrdinalMotion)
 };
-struct CanvasPainterBase
+struct CanvasPainterBase final
 {
     Q_GADGET
     QML_FOREIGN(QCanvasPainterItem)
     QML_ANONYMOUS
 };
-struct TitleReelQml
+struct TitleReelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::TitleReel)
     QML_NAMED_ELEMENT(TitleReelMotion)
 };
-struct ReelSlotQml
+struct ReelSlotQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::ReelSlot)
     QML_NAMED_ELEMENT(ReelSlot)
     QML_UNCREATABLE("Owned by TitleReelMotion")
 };
-struct ReelInkQml
+struct ReelInkQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::ReelInk)
     QML_NAMED_ELEMENT(ReelInk)
 };
-struct TransportMotionQml
+struct TransportMotionQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::TransportMotion)
     QML_NAMED_ELEMENT(TransportMotion)
 };
 
-struct PresentationControllerQml
+struct PresentationControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::PresentationController)
     QML_NAMED_ELEMENT(PresentationController)
     QML_UNCREATABLE("Owned by application")
 };
-struct SurfaceTransitionQml
+struct SurfaceTransitionQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SurfaceTransition)
     QML_NAMED_ELEMENT(SurfaceTransition)
     QML_UNCREATABLE("Owned by PresentationController")
 };
-struct DetailModelQml
+struct DetailModelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::DetailModel)
@@ -200,14 +200,14 @@ struct DetailModelQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct OverviewControllerQml
+struct OverviewControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OverviewController)
     QML_NAMED_ELEMENT(OverviewController)
     QML_UNCREATABLE("Owned by application")
 };
-struct OverviewLabelsModelQml
+struct OverviewLabelsModelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OverviewLabelsModel)
@@ -215,35 +215,35 @@ struct OverviewLabelsModelQml
     QML_UNCREATABLE("Owned by OverviewController")
 };
 
-struct OpeningControllerQml
+struct OpeningControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OpeningController)
     QML_NAMED_ELEMENT(OpeningController)
     QML_UNCREATABLE("Owned by application")
 };
-struct OpeningInkQml
+struct OpeningInkQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OpeningInk)
     QML_NAMED_ELEMENT(OpeningInk)
 };
 
-struct LibraryStoreQml
+struct LibraryStoreQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::LibraryStore)
     QML_NAMED_ELEMENT(LibraryStore)
     QML_UNCREATABLE("Owned by application")
 };
-struct TrackFocusControllerQml
+struct TrackFocusControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::TrackFocusController)
     QML_NAMED_ELEMENT(TrackFocusController)
     QML_UNCREATABLE("Owned by application")
 };
-struct PanelControllerQml
+struct PanelControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::PanelController)
@@ -251,7 +251,7 @@ struct PanelControllerQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct PlaybackControllerQml
+struct PlaybackControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::PlaybackController)
@@ -259,7 +259,7 @@ struct PlaybackControllerQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct BackgroundMusicControllerQml
+struct BackgroundMusicControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::BackgroundMusicController)
@@ -267,7 +267,7 @@ struct BackgroundMusicControllerQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct InterfaceSoundControllerQml
+struct InterfaceSoundControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::InterfaceSoundController)
@@ -275,7 +275,7 @@ struct InterfaceSoundControllerQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct SettingsControllerQml
+struct SettingsControllerQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SettingsController)
@@ -283,14 +283,14 @@ struct SettingsControllerQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct TextAreaFormatQml
+struct TextAreaFormatQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::TextAreaFormat)
     QML_NAMED_ELEMENT(TextAreaFormat)
 };
 
-struct StartupCoordinatorQml
+struct StartupCoordinatorQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::StartupCoordinator)
@@ -298,21 +298,21 @@ struct StartupCoordinatorQml
     QML_UNCREATABLE("Owned by application")
 };
 
-struct GenreRowsModelQml
+struct GenreRowsModelQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::GenreRowsModel)
     QML_NAMED_ELEMENT(GenreRowsModel)
 };
 
-struct OptionMetricsQml
+struct OptionMetricsQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::OptionMetrics)
     QML_NAMED_ELEMENT(OptionMetrics)
 };
 
-struct SceneGraphLifecycleQml
+struct SceneGraphLifecycleQml final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::SceneGraphLifecycle)

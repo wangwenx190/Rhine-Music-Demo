@@ -181,8 +181,10 @@ NSMenuItem *addItem(NSMenu *menu, NSString *title, NSString *key, SEL action, id
 @end
 
 namespace yalahoo {
-struct ApplicationMenu::State
+struct ApplicationMenu::State final
 {
+    Q_DISABLE_COPY_MOVE(State)
+    State() = default;
     NSMenu *previous = nil;
     NSMenu *bar = nil;
     YalahooMenuTarget *target = nil;

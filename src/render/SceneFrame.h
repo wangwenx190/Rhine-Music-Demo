@@ -6,7 +6,7 @@
 #include <cmath>
 #include "ArchivePool.h"
 namespace yalahoo {
-struct SceneVector
+struct SceneVector final
 {
     double x = 0, y = 0, z = 0;
     bool operator==(const SceneVector &) const = default;
@@ -43,13 +43,13 @@ inline SceneVector cross(SceneVector a, SceneVector b)
 {
     return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
-struct CameraPose
+struct CameraPose final
 {
     SceneVector position, aim;
     double span = 7.33;
 };
 // Immutable value snapshot: future renderers copy this at synchronization.
-struct SceneFrame
+struct SceneFrame final
 {
     quint64 revision = 0;
     quint64 inputRevision = 0;

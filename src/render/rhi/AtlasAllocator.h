@@ -5,7 +5,7 @@
 #include <memory>
 
 namespace yalahoo::rhi {
-struct AtlasLease
+struct AtlasLease final
 {
     quint64 generation = 0, lease = 0;
     quint64 coverGeneration = 1;
@@ -13,8 +13,9 @@ struct AtlasLease
     QString identity;
 };
 // GUI-owned fixed pages; references pin slots until explicitly released.
-class AtlasAllocator
+class AtlasAllocator final
 {
+    Q_DISABLE_COPY_MOVE(AtlasAllocator)
 public:
     explicit AtlasAllocator(int maximumTextureSize, int capacity = 432, int pageTiles = 8);
     AtlasLease acquire(const QString &identity, quint64 coverGeneration = 1);
@@ -32,7 +33,7 @@ public:
     int pending() const;
 
 private:
-    struct Slot
+    struct Slot final
     {
         QString identity;
         quint64 lease = 0, serial = 0;
@@ -51,16 +52,20 @@ private:
 
 // Four independently owned snapshots: one selected and up to three returning copies.
 // Forking pins the previous pixels while a new selected lease upgrades resolution.
-struct SelectedCoverLease
+struct SelectedCoverLease final
 {
+    Q_DISABLE_COPY_MOVE(SelectedCoverLease)
+    SelectedCoverLease() = default;
     QString identity;
     quint64 generation = 0, lease = 0;
     quint64 coverGeneration = 1;
     CoverSnapshot pixels;
 };
-class SelectedCoverPool
+class SelectedCoverPool final
 {
+    Q_DISABLE_COPY_MOVE(SelectedCoverPool)
 public:
+    SelectedCoverPool() = default;
     std::shared_ptr<SelectedCoverLease> acquire(QString identity, CoverSnapshot pixels = { },
                                                 quint64 coverGeneration = 1);
     std::shared_ptr<SelectedCoverLease> fork(const std::shared_ptr<SelectedCoverLease> &source);

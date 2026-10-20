@@ -1,3 +1,7 @@
+#include "SelectionLighting.h"
+#include "RenderQuality.h"
+#include "SceneAdapter.h"
+#include "SelectionController.h"
 #include <QCoreApplication>
 #include "SceneItem.h"
 #include <QLineF>
@@ -476,8 +480,10 @@ void SceneItem::configureDiagnostics()
         schedule();
         return;
     }
-    struct Mailbox
+    struct Mailbox final
     {
+        Q_DISABLE_COPY_MOVE(Mailbox)
+        Mailbox() = default;
         QMutex mutex;
         DiagnosticSamples samples;
         DiagnosticSeries presented;
@@ -567,7 +573,7 @@ void SceneItem::configureTelemetry()
     const auto epoch = ++m_telemetryEpoch;
     profiled = { };
     if (m_telemetryEnabled && m_renderingActive) {
-        struct Mailbox
+        struct Mailbox final
         {
             QMutex mutex;
             QVector<QJsonObject> samples;

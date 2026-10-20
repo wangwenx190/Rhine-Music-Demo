@@ -5,14 +5,15 @@ namespace yalahoo {
 class FrameClock : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool workPending READ workPending NOTIFY workPendingChanged)
-    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
-    Q_PROPERTY(bool applicationVisible READ applicationVisible WRITE setApplicationVisible NOTIFY applicationVisibleChanged)
-    Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
-    Q_PROPERTY(double visualTime READ visualTime NOTIFY advanced)
-    Q_PROPERTY(double openingTime READ openingTime NOTIFY advanced)
-    Q_PROPERTY(bool openingRunning READ openingRunning NOTIFY openingChanged)
-    Q_PROPERTY(quint64 frameCount READ frameCount NOTIFY advanced)
+    Q_DISABLE_COPY_MOVE(FrameClock)
+    Q_PROPERTY(bool workPending READ workPending NOTIFY workPendingChanged FINAL)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged FINAL)
+    Q_PROPERTY(bool applicationVisible READ applicationVisible WRITE setApplicationVisible NOTIFY applicationVisibleChanged FINAL)
+    Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged FINAL)
+    Q_PROPERTY(double visualTime READ visualTime NOTIFY advanced FINAL)
+    Q_PROPERTY(double openingTime READ openingTime NOTIFY advanced FINAL)
+    Q_PROPERTY(bool openingRunning READ openingRunning NOTIFY openingChanged FINAL)
+    Q_PROPERTY(quint64 frameCount READ frameCount NOTIFY advanced FINAL)
 public:
     explicit FrameClock(QObject *parent = nullptr) : QObject(parent)
     {

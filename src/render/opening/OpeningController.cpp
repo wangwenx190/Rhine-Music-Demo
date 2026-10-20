@@ -1,3 +1,7 @@
+#include "FrameClock.h"
+#include "SelectionController.h"
+#include "MotionController.h"
+#include "SceneAdapter.h"
 #include "OpeningController.h"
 
 namespace yalahoo {

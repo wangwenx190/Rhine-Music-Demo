@@ -4,7 +4,7 @@
 namespace yalahoo {
 // Frozen DecryptionController's material state only. The reference film overlay
 // is independent; music consumes its REVEAL curve and refrosting value.
-class CaseClarity
+class CaseClarity final
 {
 public:
     void enter(bool alreadyClear = false);

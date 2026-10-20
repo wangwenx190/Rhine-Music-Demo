@@ -1,3 +1,6 @@
+#include "FrameClock.h"
+#include "LibrarySession.h"
+#include <QQuickWindow>
 #include "PresentationAudit.h"
 #include "OffscreenSurface.h"
 #include "PresentationController.h"

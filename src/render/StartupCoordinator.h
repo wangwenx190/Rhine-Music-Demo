@@ -1,14 +1,19 @@
 #pragma once
-#include "LibrarySession.h"
+#include <QObject>
+#include "MusicTypes.h"
 #include <QJsonObject>
-#include "opening/OpeningController.h"
 
 namespace yalahoo {
+class LibrarySession;
+class OpeningController;
+class FrameClock;
+
 // GUI owner of the single pending library snapshot. Rendering readiness remains event driven.
 class StartupCoordinator final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool visualActive READ visualActive WRITE setVisualActive NOTIFY visualActiveChanged)
+    Q_DISABLE_COPY_MOVE(StartupCoordinator)
+    Q_PROPERTY(bool visualActive READ visualActive WRITE setVisualActive NOTIFY visualActiveChanged FINAL)
 public:
     StartupCoordinator(LibrarySession *library, OpeningController *opening, FrameClock *clock,
                        bool awaitInitialSnapshot, QObject *parent = nullptr);

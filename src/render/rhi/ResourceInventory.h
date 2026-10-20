@@ -8,9 +8,11 @@ using Qt::StringLiterals::operator""_s;
 
 namespace yalahoo::rhi {
 // Descriptor payload estimate, not measured VRAM. Includes full mip chains and MSAA storage.
-class ResourceInventory
+class ResourceInventory final
 {
+    Q_DISABLE_COPY_MOVE(ResourceInventory)
 public:
+    ResourceInventory() = default;
     void plannedTexture(const QString &name, QSize size, QRhiTexture::Format format,
                         int samples = 1, bool mips = false)
     {

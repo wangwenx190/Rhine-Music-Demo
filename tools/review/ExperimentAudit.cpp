@@ -1,3 +1,8 @@
+#include "RowLightController.h"
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QQuickWindow>
 #include "ExperimentAudit.h"
 #include "OffscreenSurface.h"
 #include "DemoLibrary.h"

@@ -1,4 +1,5 @@
 #pragma once
+#include <QtClassHelperMacros>
 #include <functional>
 #include <memory>
 
@@ -8,12 +9,11 @@ namespace yalahoo {
 // The system menu is independent of the replaceable QML visual tree.
 class ApplicationMenu final
 {
+    Q_DISABLE_COPY_MOVE(ApplicationMenu)
 public:
     ApplicationMenu(QQuickWindow &window, std::function<void()> settings,
                     std::function<bool()> settingsEnabled);
     ~ApplicationMenu();
-    ApplicationMenu(const ApplicationMenu &) = delete;
-    ApplicationMenu &operator=(const ApplicationMenu &) = delete;
 
 private:
     struct State;

@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "Postprocess.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"
@@ -26,7 +27,7 @@ using namespace yalahoo;
 using namespace yalahoo::rhi;
 namespace {
 using Pixel = std::array<double, 4>;
-struct Inputs
+struct Inputs final
 {
     QSize size;
     QVector<Pixel> colors;

@@ -58,7 +58,7 @@ const QSet<QString> audioExtensions{ u"ape"_s,  u"wv"_s,   u"wma"_s, u"flac"_s, 
                                      u"mp4"_s,  u"alac"_s, u"dsf"_s, u"dff"_s,  u"mp3"_s, u"aac"_s,
                                      u"aiff"_s, u"aif"_s,  u"ogg"_s, u"opus"_s };
 
-struct Walker
+struct Walker final
 {
     LibrarySnapshot &next;
     const Snapshot &previous;

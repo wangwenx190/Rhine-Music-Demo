@@ -86,8 +86,10 @@ void consoleWrite(QtMsgType type, const QByteArray &bytes, bool color)
 }
 }
 
-struct LoggingSession::State
+struct LoggingSession::State final
 {
+    Q_DISABLE_COPY_MOVE(State)
+    State() = default;
     static State *active;
     Options options;
     QString stem;

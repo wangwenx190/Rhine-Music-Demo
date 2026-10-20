@@ -1,4 +1,5 @@
 #include "MediaMetadataProbe.h"
+#include <QThread>
 #include "ArtworkStore.h"
 #include <QDate>
 #include <QCryptographicHash>
@@ -19,6 +20,7 @@ namespace yalahoo {
 namespace {
 class QtMetadataSource final : public MetadataSource
 {
+    Q_DISABLE_COPY_MOVE(QtMetadataSource)
 public:
     explicit QtMetadataSource(QObject *parent) : MetadataSource(parent), m_player(this)
     {
@@ -172,6 +174,7 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
 class ProbeWorker final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ProbeWorker)
 public:
     explicit ProbeWorker(MediaMetadataProbe::Factory factory) : m_factory(std::move(factory))
     {
@@ -216,7 +219,7 @@ Q_SIGNALS:
     void done(quint64 generation, yalahoo::Snapshot snapshot, bool cancelled);
 
 private:
-    struct Slot
+    struct Slot final
     {
         MetadataSource *source = nullptr;
         QTimer *timer = nullptr;
@@ -406,34 +409,42 @@ private:
     qsizetype m_album = 0, m_track = 0;
     bool m_running = false;
 };
-MediaMetadataProbe::MediaMetadataProbe(QObject *parent, Factory factory) : QObject(parent)
+struct MediaMetadataProbe::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    QThread m_thread;
+    QObject *m_worker = nullptr;
+};
+MediaMetadataProbe::MediaMetadataProbe(QObject *parent, Factory factory)
+    : QObject(parent), d(std::make_unique<Private>())
 {
     qRegisterMetaType<Snapshot>();
     auto *worker = new ProbeWorker(std::move(factory));
-    m_worker = worker;
-    worker->moveToThread(&m_thread);
-    connect(&m_thread, &QThread::finished, worker, &QObject::deleteLater);
+    d->m_worker = worker;
+    worker->moveToThread(&d->m_thread);
+    connect(&d->m_thread, &QThread::finished, worker, &QObject::deleteLater);
     connect(worker, &ProbeWorker::done, this, &MediaMetadataProbe::finished, Qt::QueuedConnection);
-    m_thread.setObjectName("media-metadata");
-    m_thread.start();
+    d->m_thread.setObjectName("media-metadata");
+    d->m_thread.start();
 }
 MediaMetadataProbe::~MediaMetadataProbe()
 {
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = static_cast<ProbeWorker *>(m_worker)] {
+            d->m_worker,
+            [worker = static_cast<ProbeWorker *>(d->m_worker)] {
                 worker->abort();
             },
             Qt::BlockingQueuedConnection);
-    m_thread.quit();
-    m_thread.wait();
+    d->m_thread.quit();
+    d->m_thread.wait();
 }
 void MediaMetadataProbe::start(Snapshot snapshot, QString root, ScanCancellation cancel,
                                quint64 generation)
 {
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = static_cast<ProbeWorker *>(m_worker), snapshot = std::move(snapshot),
+            d->m_worker,
+            [worker = static_cast<ProbeWorker *>(d->m_worker), snapshot = std::move(snapshot),
              root = std::move(root), cancel = std::move(cancel), generation] {
                 worker->begin(snapshot, root, cancel, generation);
             },
@@ -442,8 +453,8 @@ void MediaMetadataProbe::start(Snapshot snapshot, QString root, ScanCancellation
 void MediaMetadataProbe::cancel()
 {
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = static_cast<ProbeWorker *>(m_worker)] {
+            d->m_worker,
+            [worker = static_cast<ProbeWorker *>(d->m_worker)] {
                 worker->abort();
             },
             Qt::QueuedConnection);

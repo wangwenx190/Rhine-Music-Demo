@@ -3,9 +3,11 @@
 #include <QQuick3DTextureData>
 #include <QVariantList>
 // R10 research only. No production pool, decoder, cache or RHI implementation.
-class RenderProbeInstances : public QQuick3DInstancing
+class RenderProbeInstances final : public QQuick3DInstancing
 {
+    Q_DISABLE_COPY_MOVE(RenderProbeInstances)
 public:
+    RenderProbeInstances() = default;
     using QQuick3DInstancing::QQuick3DInstancing;
     void setPositions(const QVariantList &positions);
 
@@ -20,8 +22,9 @@ private:
     QByteArray m_buffer;
     int m_count = 0;
 };
-class RenderProbeAtlas : public QQuick3DTextureData
+class RenderProbeAtlas final : public QQuick3DTextureData
 {
+    Q_DISABLE_COPY_MOVE(RenderProbeAtlas)
 public:
     explicit RenderProbeAtlas(QQuick3DObject *parent = nullptr);
     void setPhase(int phase);

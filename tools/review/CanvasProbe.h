@@ -3,7 +3,7 @@
 #include <QtQml/qqmlregistration.h>
 #include <atomic>
 
-struct CanvasProbeStats
+struct CanvasProbeStats final
 {
     std::atomic<quint64> paints{ 0 }, synchronizations{ 0 }, renderers{ 0 };
     std::atomic<qint64> paintNanoseconds{ 0 }, syncNanoseconds{ 0 }, imageBytes{ 0 },
@@ -14,8 +14,9 @@ CanvasProbeStats &canvasProbeStats();
 class CanvasProbe : public QCanvasPainterItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CanvasProbe)
     QML_ELEMENT
-    Q_PROPERTY(bool night READ night WRITE setNight NOTIFY nightChanged)
+    Q_PROPERTY(bool night READ night WRITE setNight NOTIFY nightChanged FINAL)
 public:
     explicit CanvasProbe(QQuickItem *parent = nullptr);
     bool night() const;

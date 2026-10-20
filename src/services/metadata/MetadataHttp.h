@@ -5,12 +5,14 @@
 #include <QDateTime>
 #include <QHash>
 #include <QJsonObject>
-#include <QNetworkAccessManager>
 #include <QPointer>
 #include <QTimer>
 
+class QNetworkAccessManager;
+class QNetworkReply;
+
 namespace yalahoo {
-struct MetadataResponse
+struct MetadataResponse final
 {
     QJsonObject data;
     QString error, retryAt;
@@ -19,6 +21,7 @@ struct MetadataResponse
 class MetadataHttp final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MetadataHttp)
 public:
     explicit MetadataHttp(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr);
     ~MetadataHttp() override;

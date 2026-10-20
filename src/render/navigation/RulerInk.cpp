@@ -9,6 +9,7 @@ namespace {
 RulerInkStats stats;
 class Renderer final : public QCanvasPainterItemRenderer
 {
+    Q_DISABLE_COPY_MOVE(Renderer)
 public:
     Renderer()
     {

@@ -5,7 +5,7 @@
 #include <QImage>
 
 namespace yalahoo::rhi {
-struct PreparedAssets
+struct PreparedAssets final
 {
     QVector<assets::Batch> geometry;
     QHash<QString, QByteArray> bytes;

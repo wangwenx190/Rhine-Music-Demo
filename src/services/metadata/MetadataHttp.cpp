@@ -1,3 +1,4 @@
+#include <QNetworkAccessManager>
 #include "MetadataHttp.h"
 #include <algorithm>
 #include <QDateTime>

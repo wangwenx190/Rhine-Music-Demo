@@ -1,3 +1,4 @@
+#include <QWheelEvent>
 #include "NavigationReview.h"
 #include "InputRouter.h"
 #include "RulerController.h"

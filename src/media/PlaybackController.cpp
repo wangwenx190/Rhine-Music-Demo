@@ -1,3 +1,4 @@
+#include "LibrarySession.h"
 #include <QCoreApplication>
 #include "PlaybackController.h"
 #include "Logging.h"

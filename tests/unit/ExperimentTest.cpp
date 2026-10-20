@@ -1,3 +1,10 @@
+#include "RowLightController.h"
+#include "SelectionLighting.h"
+#include "SceneAdapter.h"
+#include "LibrarySession.h"
+#include "PreferencesStore.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "DiagnosticSamples.h"
 #include "DemoLibrary.h"
 #include "SettingsController.h"
@@ -9,9 +16,13 @@
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
-class ExperimentTest : public QObject
+class ExperimentTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ExperimentTest)
+public:
+    ExperimentTest() = default;
+
 private Q_SLOTS:
     void authoredLightingAndTemporaryComparison()
     {

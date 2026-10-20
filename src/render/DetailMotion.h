@@ -4,7 +4,7 @@
 namespace yalahoo {
 // Frozen music-camera.ts placement and presentation gate. The caller supplies
 // actual camera/rail/lift readiness after advancing the same shared frame.
-class DetailMotion
+class DetailMotion final
 {
 public:
     enum class Phase {

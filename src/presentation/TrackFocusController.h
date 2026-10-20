@@ -1,19 +1,23 @@
 #pragma once
-#include "LibrarySession.h"
-#include "PresentationController.h"
+#include <QObject>
+#include <QString>
 
 namespace yalahoo {
+class LibrarySession;
+class PresentationController;
+class FrameClock;
 // One replaceable reveal; all navigation stays in PresentationController.
 class TrackFocusController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(quint64 revision READ revision NOTIFY changed)
-    Q_PROPERTY(int row READ row NOTIFY changed)
-    Q_PROPERTY(QString trackId READ trackId NOTIFY changed)
-    Q_PROPERTY(double scrollY READ scrollY NOTIFY scrollChanged)
-    Q_PROPERTY(double highlight READ highlight NOTIFY changed)
-    Q_PROPERTY(bool revealing READ revealing NOTIFY changed)
-    Q_PROPERTY(bool active READ active NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(TrackFocusController)
+    Q_PROPERTY(quint64 revision READ revision NOTIFY changed FINAL)
+    Q_PROPERTY(int row READ row NOTIFY changed FINAL)
+    Q_PROPERTY(QString trackId READ trackId NOTIFY changed FINAL)
+    Q_PROPERTY(double scrollY READ scrollY NOTIFY scrollChanged FINAL)
+    Q_PROPERTY(double highlight READ highlight NOTIFY changed FINAL)
+    Q_PROPERTY(bool revealing READ revealing NOTIFY changed FINAL)
+    Q_PROPERTY(bool active READ active NOTIFY changed FINAL)
 public:
     TrackFocusController(LibrarySession *library, PresentationController *presentation,
                          FrameClock *clock, QObject *parent = nullptr);

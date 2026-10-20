@@ -1,20 +1,20 @@
 #pragma once
+#include <memory>
 #include <QObject>
 #include <QUrl>
 #include <QJsonObject>
-#include <QFutureWatcher>
-#include <QThreadPool>
 #include <QVariantMap>
 
 namespace yalahoo {
-class PreferencesStore : public QObject
+class PreferencesStore final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(PreferencesStore)
 public:
     explicit PreferencesStore(QString dataRoot, QObject *parent = nullptr);
     ~PreferencesStore() override;
-    Q_PROPERTY(QVariantMap values READ values NOTIFY changed)
-    Q_PROPERTY(QString error READ error NOTIFY errorChanged)
+    Q_PROPERTY(QVariantMap values READ values NOTIFY changed FINAL)
+    Q_PROPERTY(QString error READ error NOTIFY errorChanged FINAL)
     QVariantMap values() const;
     Q_INVOKABLE bool update(const QVariantMap &patch);
     bool rememberColumnPosition() const;
@@ -36,12 +36,7 @@ private:
     static QString write(const QString &path, const QJsonObject &document);
     void schedule();
     void reportError(const QString &error);
-    QString m_path, m_error;
-    QJsonObject m_document;
-    QThreadPool m_worker;
-    QFutureWatcher<QString> m_save;
-    QFutureWatcher<QPair<QJsonObject, QString>> m_import;
-    quint64 m_revision = 0;
-    bool m_writable = true, m_dirty = false, m_saving = false, m_scheduled = false;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

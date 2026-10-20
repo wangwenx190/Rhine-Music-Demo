@@ -4,7 +4,7 @@
 #include <optional>
 
 namespace yalahoo {
-struct ReturningCase
+struct ReturningCase final
 {
     ArchiveCell cell;
     QString albumId;
@@ -16,8 +16,9 @@ struct ReturningCase
 };
 // Selected + three returning owners share the four detailed cover leases.
 // No eviction: admission waits, or atomically reclaims the same physical cell.
-class ReturningCasePool
+class ReturningCasePool final
 {
+    Q_DISABLE_COPY_MOVE(ReturningCasePool)
 public:
     static constexpr qsizetype capacity = 3;
     ReturningCasePool()

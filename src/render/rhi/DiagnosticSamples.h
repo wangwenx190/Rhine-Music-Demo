@@ -9,7 +9,7 @@ using Qt::StringLiterals::operator""_s;
 
 namespace yalahoo::rhi {
 // Fixed-size nearest-rank distributions. No allocations or JSON on the render hot path.
-class DiagnosticSeries
+class DiagnosticSeries final
 {
 public:
     void add(double value)
@@ -44,19 +44,19 @@ private:
     std::array<double, capacity> m_values{ };
     int m_seen = 0;
 };
-struct DiagnosticSample
+struct DiagnosticSample final
 {
     double submittedMs = 0, cpuMs = 0, syncMs = 0, gpuMs = -1;
     qint64 atlasBytes = 0, selectedBytes = 0, uniformBytes = 0;
 };
-struct DiagnosticBatch
+struct DiagnosticBatch final
 {
     DiagnosticSeries intervals, cpu, sync, gpu;
     int submissions = 0;
     double elapsedMs = 0;
     qint64 atlasBytes = 0, selectedBytes = 0, uniformBytes = 0;
 };
-class DiagnosticSamples
+class DiagnosticSamples final
 {
 public:
     std::optional<DiagnosticBatch> add(const DiagnosticSample &sample)

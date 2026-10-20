@@ -1,3 +1,4 @@
+#include "RowLightController.h"
 #include "Logging.h"
 #include "MaterialReview.h"
 #include "OffscreenSurface.h"

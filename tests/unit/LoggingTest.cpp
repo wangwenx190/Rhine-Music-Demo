@@ -55,9 +55,14 @@ int emitLogs(const QString &directory, const QString &mode)
 }
 }
 
-class LoggingTest : public QObject
+class LoggingTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LoggingTest)
+public:
+    LoggingTest() = default;
+
+private:
 private:
     QByteArray run(const QString &directory, const QString &mode)
     {

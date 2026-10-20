@@ -1,3 +1,8 @@
+#include "FrameClock.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QWheelEvent>
+#include <QQuickWindow>
 #include "InputRouter.h"
 #include "RulerController.h"
 #include "OrdinalMotion.h"
@@ -26,9 +31,13 @@ void populate(SelectionController &selection)
     selection.setLift(0);
 }
 }
-class NavigationTest : public QObject
+class NavigationTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(NavigationTest)
+public:
+    NavigationTest() = default;
+
 private Q_SLOTS:
     void rulerKeepsFullAccessibleTitleSeparateFromCoverBudget()
     {

@@ -1,3 +1,11 @@
+#include "SceneAdapter.h"
+#include "FrameClock.h"
+#include "LibrarySession.h"
+#include "OpeningController.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QQuickWindow>
+#include "PresentationController.h"
 #include "StartupAudit.h"
 #include "OffscreenSurface.h"
 #include "StartupCoordinator.h"
@@ -153,6 +161,7 @@ Snapshot fixture(const QString &directory, bool largeCovers = true, bool tracks 
 }
 class AuditWindow final : public QQuickWindow
 {
+    Q_DISABLE_COPY_MOVE(AuditWindow)
 public:
     using QQuickWindow::QQuickWindow;
     QJsonArray events;
@@ -204,8 +213,9 @@ protected:
         return result;
     }
 };
-class Driver
+class Driver final
 {
+    Q_DISABLE_COPY_MOVE(Driver)
 public:
     Driver(Snapshot input, bool windowLifecycle = false)
         : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
@@ -523,7 +533,7 @@ public:
     QJsonArray samples, timings, inventories;
     QJsonObject lastResources, lastPlan;
     qint64 peakBytes = 0;
-    struct PresentationSamples
+    struct PresentationSamples final
     {
         QMutex mutex;
         QVector<qint64> times;
@@ -768,8 +778,12 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     },
                     Qt::DirectConnection);
         }
-        struct SaveEvidence
+        struct SaveEvidence final
         {
+            Q_DISABLE_COPY_MOVE(SaveEvidence)
+            explicit SaveEvidence(std::function<void()> callback) : save(std::move(callback))
+            {
+            }
             std::function<void()> save;
             ~SaveEvidence()
             {

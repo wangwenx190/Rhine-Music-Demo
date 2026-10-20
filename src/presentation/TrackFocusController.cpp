@@ -1,3 +1,6 @@
+#include "FrameClock.h"
+#include "PresentationController.h"
+#include "LibrarySession.h"
 #include <QCoreApplication>
 #include "TrackFocusController.h"
 #include <algorithm>

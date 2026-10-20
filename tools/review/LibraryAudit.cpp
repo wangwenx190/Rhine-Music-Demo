@@ -1,3 +1,9 @@
+#include "LibrarySession.h"
+#include "MotionController.h"
+#include "SelectionController.h"
+#include <QQuickWindow>
+#include "PresentationController.h"
+#include "PreferencesStore.h"
 #include "MetadataPresentation.h"
 #include "LibraryAudit.h"
 #include "PlaybackController.h"
@@ -43,7 +49,9 @@ namespace {
 // Test-only injection. No networking objects or production registration.
 class SampleProvider final : public IMetadataProvider
 {
+    Q_DISABLE_COPY_MOVE(SampleProvider)
 public:
+    SampleProvider() = default;
     ProviderStatus status = ProviderStatus::Matched;
     bool enabled = false;
     bool lastQueryEnabled = false;
@@ -252,7 +260,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             Qt::DirectConnection);
     input.attach(&window);
     QSignalSpy rendered(&surface, &OffscreenSurface::frameRendered);
-    struct NativeFrames
+    struct NativeFrames final
     {
         std::atomic<quint64> synchronized{ 0 };
         std::atomic<quint64> presented{ 0 };

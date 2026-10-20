@@ -1,3 +1,6 @@
+#include "FrameClock.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "RulerController.h"
 #include "InputRouter.h"
 #include <algorithm>

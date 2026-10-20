@@ -17,7 +17,9 @@ namespace yalahoo {
 // retains sole ownership of the window's color-management surface and dispatch.
 class WaylandDisplayMonitor final : public DisplayMonitor
 {
+    Q_DISABLE_COPY_MOVE(WaylandDisplayMonitor)
 public:
+    WaylandDisplayMonitor() = default;
     ~WaylandDisplayMonitor() override
     {
         resetOutput();
@@ -231,7 +233,9 @@ std::unique_ptr<DisplayMonitor> makeDisplayMonitor()
 namespace yalahoo {
 class SdrDisplayMonitor final : public DisplayMonitor
 {
+    Q_DISABLE_COPY_MOVE(SdrDisplayMonitor)
 public:
+    SdrDisplayMonitor() = default;
     DisplayState query(QWindow &) override
     {
         return { };

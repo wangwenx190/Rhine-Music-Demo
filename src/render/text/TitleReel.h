@@ -8,13 +8,13 @@
 #include <array>
 
 namespace yalahoo {
-struct ReelTrack
+struct ReelTrack final
 {
     double start = 0, initialVelocity = 0, target = 0, elapsed = .460;
     double duration = .460;
     bool sampled = false;
     std::array<double, 49> points{ };
-    struct Sample
+    struct Sample final
     {
         double value = 0, velocity = 0;
     };
@@ -28,24 +28,26 @@ struct ReelTrack
 class ReelSlot : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(double positionX READ positionX NOTIFY frameChanged)
-    Q_PROPERTY(double positionY READ positionY NOTIFY frameChanged)
-    Q_PROPERTY(double viewportHeight READ viewportHeight NOTIFY frameChanged)
-    Q_PROPERTY(double padding READ padding NOTIFY contentChanged)
-    Q_PROPERTY(double capacityWidth MEMBER capacityWidth NOTIFY contentChanged)
-    Q_PROPERTY(double capacityHeight MEMBER capacityHeight NOTIFY contentChanged)
-    Q_PROPERTY(bool shown READ shown NOTIFY frameChanged)
-    Q_PROPERTY(bool translation READ translation NOTIFY contentChanged)
-    Q_PROPERTY(double pixelSize READ pixelSize NOTIFY contentChanged)
-    Q_PROPERTY(double rollPosition READ rollPosition NOTIFY frameChanged)
-    Q_PROPERTY(QVariantList faceValues READ faceValues NOTIFY contentChanged)
-    Q_PROPERTY(double opacity READ opacity NOTIFY frameChanged)
-    Q_PROPERTY(double blurOpacity READ blurOpacity NOTIFY frameChanged)
-    Q_PROPERTY(bool nativeInk READ nativeInk NOTIFY contentChanged)
-    Q_PROPERTY(int faceCapacity READ faceCapacity NOTIFY contentChanged)
+    Q_DISABLE_COPY_MOVE(ReelSlot)
+    Q_PROPERTY(double positionX READ positionX NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double positionY READ positionY NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double viewportHeight READ viewportHeight NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double padding READ padding NOTIFY contentChanged FINAL)
+    Q_PROPERTY(double capacityWidth MEMBER capacityWidth NOTIFY contentChanged FINAL)
+    Q_PROPERTY(double capacityHeight MEMBER capacityHeight NOTIFY contentChanged FINAL)
+    Q_PROPERTY(bool shown READ shown NOTIFY frameChanged FINAL)
+    Q_PROPERTY(bool translation READ translation NOTIFY contentChanged FINAL)
+    Q_PROPERTY(double pixelSize READ pixelSize NOTIFY contentChanged FINAL)
+    Q_PROPERTY(double rollPosition READ rollPosition NOTIFY frameChanged FINAL)
+    Q_PROPERTY(QVariantList faceValues READ faceValues NOTIFY contentChanged FINAL)
+    Q_PROPERTY(double opacity READ opacity NOTIFY frameChanged FINAL)
+    Q_PROPERTY(double blurOpacity READ blurOpacity NOTIFY frameChanged FINAL)
+    Q_PROPERTY(bool nativeInk READ nativeInk NOTIFY contentChanged FINAL)
+    Q_PROPERTY(int faceCapacity READ faceCapacity NOTIFY contentChanged FINAL)
 public:
+    ReelSlot() = default;
     using QObject::QObject;
-    struct Face
+    struct Face final
     {
         TitleGlyph glyph;
         double offset = 0;
@@ -88,25 +90,26 @@ private:
 class TitleReel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(TitleReel)
     Q_INTERFACES(QQmlParserStatus)
-    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY clockChanged)
-    Q_PROPERTY(QString text READ text WRITE setText NOTIFY inputChanged)
-    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY inputChanged)
-    Q_PROPERTY(QFont subtitleFont READ subtitleFont WRITE setSubtitleFont NOTIFY inputChanged)
-    Q_PROPERTY(double pixelSize READ pixelSize WRITE setPixelSize NOTIFY inputChanged)
-    Q_PROPERTY(double availableWidth READ availableWidth WRITE setAvailableWidth NOTIFY inputChanged)
-    Q_PROPERTY(double budget READ budget WRITE setBudget NOTIFY inputChanged)
-    Q_PROPERTY(double dpr READ dpr WRITE setDpr NOTIFY inputChanged)
-    Q_PROPERTY(bool narrow READ narrow WRITE setNarrow NOTIFY inputChanged)
-    Q_PROPERTY(bool transport READ transport WRITE setTransport NOTIFY inputChanged)
-    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY inputChanged)
-    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY inputChanged)
-    Q_PROPERTY(int slotCount READ slotCount NOTIFY slotsChanged)
-    Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY changed)
-    Q_PROPERTY(double naturalWidth READ naturalWidth NOTIFY naturalWidthChanged)
-    Q_PROPERTY(double fittedSize READ fittedSize NOTIFY changed)
-    Q_PROPERTY(QString fittedText READ fittedText NOTIFY changed)
-    Q_PROPERTY(bool moving READ moving NOTIFY changed)
+    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY clockChanged FINAL)
+    Q_PROPERTY(QString text READ text WRITE setText NOTIFY inputChanged FINAL)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY inputChanged FINAL)
+    Q_PROPERTY(QFont subtitleFont READ subtitleFont WRITE setSubtitleFont NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double pixelSize READ pixelSize WRITE setPixelSize NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double availableWidth READ availableWidth WRITE setAvailableWidth NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double budget READ budget WRITE setBudget NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double dpr READ dpr WRITE setDpr NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool narrow READ narrow WRITE setNarrow NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool transport READ transport WRITE setTransport NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY inputChanged FINAL)
+    Q_PROPERTY(int slotCount READ slotCount NOTIFY slotsChanged FINAL)
+    Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY changed FINAL)
+    Q_PROPERTY(double naturalWidth READ naturalWidth NOTIFY naturalWidthChanged FINAL)
+    Q_PROPERTY(double fittedSize READ fittedSize NOTIFY changed FINAL)
+    Q_PROPERTY(QString fittedText READ fittedText NOTIFY changed FINAL)
+    Q_PROPERTY(bool moving READ moving NOTIFY changed FINAL)
 public:
     explicit TitleReel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = { }) const override;

@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "TransportMotion.h"
 #include <algorithm>
 #include <cmath>

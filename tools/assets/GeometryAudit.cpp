@@ -21,7 +21,7 @@ void require(bool ok, const char *message)
     if (!ok)
         throw std::runtime_error(message);
 }
-struct Reader
+struct Reader final
 {
     const QByteArray &bytes;
     qsizetype offset = 0;

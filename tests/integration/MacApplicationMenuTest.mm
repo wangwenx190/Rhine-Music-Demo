@@ -29,9 +29,13 @@ void invoke(NSMenuItem *item)
     [NSApp sendAction:item.action to:item.target from:item];
 }
 }
-class MacApplicationMenuTest : public QObject
+class MacApplicationMenuTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MacApplicationMenuTest)
+public:
+    MacApplicationMenuTest() = default;
+
 private Q_SLOTS:
     void commandsAndOwnership()
     {

@@ -8,6 +8,7 @@ namespace yalahoo {
 class OfflineMetadataProvider final : public IMetadataProvider
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OfflineMetadataProvider)
 public:
     explicit OfflineMetadataProvider(QObject *parent = nullptr);
     ProviderCapabilities capabilities() const override
@@ -21,7 +22,7 @@ public:
     void cancel(RequestToken token) override;
 
 private:
-    struct Pending
+    struct Pending final
     {
         AlbumQuery query;
         RequestToken token;

@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "Postprocess.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"

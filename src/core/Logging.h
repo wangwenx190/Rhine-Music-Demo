@@ -12,10 +12,11 @@ Q_DECLARE_LOGGING_CATEGORY(logMedia)
 Q_DECLARE_LOGGING_CATEGORY(logSettings)
 
 // Construct after application identity, before QGuiApplication; outlive all Qt objects.
-class LoggingSession
+class LoggingSession final
 {
+    Q_DISABLE_COPY_MOVE(LoggingSession)
 public:
-    struct Options
+    struct Options final
     {
         QString directory;
         qint64 segmentBytes = 8 * 1024 * 1024;
@@ -25,8 +26,6 @@ public:
     LoggingSession();
     explicit LoggingSession(Options options);
     ~LoggingSession();
-    LoggingSession(const LoggingSession &) = delete;
-    LoggingSession &operator=(const LoggingSession &) = delete;
     QString filePath() const;
 
 private:

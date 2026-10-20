@@ -1,7 +1,7 @@
 #pragma once
-#include "PresentationController.h"
 
 namespace yalahoo {
+struct PresentationPorts;
 class SceneAdapter;
 class SelectionController;
 class LibrarySession;

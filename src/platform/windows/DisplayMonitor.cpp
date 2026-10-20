@@ -13,6 +13,7 @@
 namespace yalahoo {
 class WindowsDisplayMonitor final : public DisplayMonitor, public QAbstractNativeEventFilter
 {
+    Q_DISABLE_COPY_MOVE(WindowsDisplayMonitor)
 public:
     WindowsDisplayMonitor()
     {

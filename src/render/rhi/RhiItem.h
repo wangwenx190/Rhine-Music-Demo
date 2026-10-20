@@ -13,13 +13,13 @@ namespace yalahoo::rhi {
 QJsonArray adapterInventory();
 QJsonObject preparedAssetStatistics();
 // Values only. No QObject or QRhi ownership crosses the synchronization boundary.
-struct SceneSubmissionStats
+struct SceneSubmissionStats final
 {
     std::atomic<quint64> rendered{ 0 }, occluded{ 0 };
     std::atomic<int> renderers{ 0 };
 };
 SceneSubmissionStats &sceneSubmissionStats();
-struct Input
+struct Input final
 {
     bool sceneOccluded = false;
     quint64 preparationToken = 0;
@@ -73,7 +73,7 @@ struct Input
     bool shadows = true, geometryDiagnostic = false, shadowDiagnostic = false;
     quint64 request = 0;
 };
-struct Capture
+struct Capture final
 {
     quint64 request = 0;
     QImage color, normal, depth, shadow;
@@ -87,8 +87,9 @@ struct Capture
 class RhiItem : public QQuickRhiItem
 {
     Q_OBJECT
-    Q_PROPERTY(float hdrHeadroom READ hdrHeadroom WRITE setHdrHeadroom NOTIFY hdrHeadroomChanged)
-    Q_PROPERTY(bool hdrActive READ hdrActive WRITE setHdrActive NOTIFY hdrHeadroomChanged)
+    Q_DISABLE_COPY_MOVE(RhiItem)
+    Q_PROPERTY(float hdrHeadroom READ hdrHeadroom WRITE setHdrHeadroom NOTIFY hdrHeadroomChanged FINAL)
+    Q_PROPERTY(bool hdrActive READ hdrActive WRITE setHdrActive NOTIFY hdrHeadroomChanged FINAL)
 public:
     explicit RhiItem(QQuickItem *parent = nullptr);
     float hdrHeadroom() const

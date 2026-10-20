@@ -6,7 +6,7 @@
 #include <memory>
 
 namespace yalahoo {
-struct OverviewColumn
+struct OverviewColumn final
 {
     int lane = -1;
     QString name;
@@ -17,6 +17,7 @@ struct OverviewColumn
 class OverviewLabelsModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OverviewLabelsModel)
 public:
     static constexpr int capacity = 18; // Nine current and at most nine retiring anchors.
     enum Role {
@@ -53,7 +54,7 @@ public:
     bool running() const;
 
 private:
-    struct Slot
+    struct Slot final
     {
         OverviewColumn column;
         SurfaceTransition fade{ 460, 240, false, false };

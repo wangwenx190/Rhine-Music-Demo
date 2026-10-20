@@ -1,23 +1,21 @@
 #pragma once
+#include <memory>
 
-#include "DirectoryScanner.h"
-#include "MediaMetadataProbe.h"
-#include "IMetadataProvider.h"
-#include <QHash>
-#include <QFutureWatcher>
+#include "MusicTypes.h"
 #include <QObject>
-#include <QThreadPool>
 
 namespace yalahoo {
+struct ProviderResult;
 // One running job, one latest scan intent and one coalesced accepted save.
 class LibraryStore final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool busy READ busy NOTIFY statusChanged)
-    Q_PROPERTY(bool scanning READ scanning NOTIFY statusChanged)
-    Q_PROPERTY(bool probing READ probing NOTIFY statusChanged)
-    Q_PROPERTY(QString error READ error NOTIFY statusChanged)
-    Q_PROPERTY(QList<QUrl> roots READ roots NOTIFY statusChanged)
+    Q_DISABLE_COPY_MOVE(LibraryStore)
+    Q_PROPERTY(bool busy READ busy NOTIFY statusChanged FINAL)
+    Q_PROPERTY(bool scanning READ scanning NOTIFY statusChanged FINAL)
+    Q_PROPERTY(bool probing READ probing NOTIFY statusChanged FINAL)
+    Q_PROPERTY(QString error READ error NOTIFY statusChanged FINAL)
+    Q_PROPERTY(QList<QUrl> roots READ roots NOTIFY statusChanged FINAL)
 public:
     explicit LibraryStore(QString dataRoot, QObject *parent = nullptr);
     ~LibraryStore() override;
@@ -60,7 +58,7 @@ private:
         Save,
         Metadata
     };
-    struct JobResult
+    struct JobResult final
     {
         Snapshot snapshot;
         QString error;
@@ -73,20 +71,7 @@ private:
     void complete();
     void accept(JobResult result, Kind kind, quint64 generation);
     void report(const QString &error);
-    QString m_path, m_error;
-    QList<QUrl> m_roots;
-    Snapshot m_snapshot, m_savePending;
-    QHash<QString, ProviderResult> m_metadataPending;
-    bool m_metadataCommit = false;
-    qsizetype m_metadataBytes = 0;
-    QString m_dataRoot, m_importPending;
-    quint64 m_filesVisited = 0;
-    MediaMetadataProbe m_probe;
-    QThreadPool m_worker;
-    QFutureWatcher<JobResult> m_job;
-    ScanCancellation m_cancel;
-    Kind m_active = Kind::None;
-    quint64 m_generation = 0, m_activeGeneration = 0;
-    bool m_loadPending = false, m_scanPending = false, m_writable = true, m_initialized = false;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

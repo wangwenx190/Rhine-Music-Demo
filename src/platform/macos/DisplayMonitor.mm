@@ -9,6 +9,7 @@
 namespace yalahoo {
 class MacDisplayMonitor final : public DisplayMonitor
 {
+    Q_DISABLE_COPY_MOVE(MacDisplayMonitor)
 public:
     MacDisplayMonitor()
     {

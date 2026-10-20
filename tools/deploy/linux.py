@@ -72,13 +72,15 @@ def complete_runtime(root, kit):
     for path in elf_files(root):
         relative = os.path.relpath(root / 'lib', path.parent)
         run('patchelf', '--set-rpath', '$ORIGIN/' + relative, path)
+        # Keep the dynamic symbol table required by Qt plugins and runtime loading.
+        run('strip', '--strip-unneeded', path)
 
 
 def main():
     argparse.ArgumentParser(description=__doc__).parse_args()
     if platform.system() != 'Linux':
         raise SystemExit('Linux deployment requires native Linux and its latest complete Qt Kit.')
-    for tool in ('cmake', 'ninja', 'patchelf', 'readelf', 'ldd'):
+    for tool in ('cmake', 'ninja', 'patchelf', 'readelf', 'ldd', 'strip'):
         if not shutil.which(tool):
             raise RuntimeError(f'Install the development tool first: {tool}')
     build = ROOT / 'build/linux-release'

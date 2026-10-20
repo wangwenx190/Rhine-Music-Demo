@@ -1,19 +1,23 @@
 #pragma once
+#include <QObject>
 #include "OpeningFrame.h"
-#include "SceneAdapter.h"
-#include "MotionController.h"
 
 namespace yalahoo {
-class OpeningController : public QObject
+class SceneAdapter;
+class MotionController;
+class SelectionController;
+
+class OpeningController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool active READ active NOTIFY changed)
-    Q_PROPERTY(bool preparing READ preparing NOTIFY changed)
-    Q_PROPERTY(bool sceneOccluded READ sceneOccluded NOTIFY changed)
-    Q_PROPERTY(bool film READ film NOTIFY changed)
-    Q_PROPERTY(double time READ time NOTIFY changed)
-    Q_PROPERTY(double revealTime READ revealTime NOTIFY changed)
-    Q_PROPERTY(QVariantMap drawing READ drawing NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(OpeningController)
+    Q_PROPERTY(bool active READ active NOTIFY changed FINAL)
+    Q_PROPERTY(bool preparing READ preparing NOTIFY changed FINAL)
+    Q_PROPERTY(bool sceneOccluded READ sceneOccluded NOTIFY changed FINAL)
+    Q_PROPERTY(bool film READ film NOTIFY changed FINAL)
+    Q_PROPERTY(double time READ time NOTIFY changed FINAL)
+    Q_PROPERTY(double revealTime READ revealTime NOTIFY changed FINAL)
+    Q_PROPERTY(QVariantMap drawing READ drawing NOTIFY changed FINAL)
 public:
     OpeningController(MotionController *motion, SceneAdapter *scene, SelectionController *selection,
                       QObject *parent = nullptr);

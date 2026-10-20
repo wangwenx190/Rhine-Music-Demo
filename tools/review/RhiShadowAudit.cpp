@@ -30,7 +30,7 @@ QJsonObject validateProjection(const Input &input, const Capture &capture)
     QMatrix4x4 view, projection;
     view.lookAt({ -6, 14, -5 }, { 0, 0, 0 }, { 0, 1, 0 });
     projection.ortho(-16, 16, -15, 15, .1f, 45);
-    struct Triangle
+    struct Triangle final
     {
         QVector3D a, b, c;
         double area;

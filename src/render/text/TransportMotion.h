@@ -5,7 +5,7 @@
 #include <QQmlParserStatus>
 
 namespace yalahoo {
-struct TransportTrack
+struct TransportTrack final
 {
     double start = 0, target = 0, elapsed = 1, duration = 1;
     double reversingStart = 0, shortening = 1;
@@ -17,18 +17,19 @@ struct TransportTrack
 class TransportMotion : public QObject, public QQmlParserStatus
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(TransportMotion)
     Q_INTERFACES(QQmlParserStatus)
-    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY inputChanged)
-    Q_PROPERTY(double targetWidth READ targetWidth WRITE setTargetWidth NOTIFY inputChanged)
-    Q_PROPERTY(bool shown READ shown WRITE setShown NOTIFY inputChanged)
-    Q_PROPERTY(bool playing READ playing WRITE setPlaying NOTIFY inputChanged)
-    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY inputChanged)
-    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY inputChanged)
-    Q_PROPERTY(double width READ width NOTIFY changed)
-    Q_PROPERTY(double opacity READ opacity NOTIFY changed)
-    Q_PROPERTY(double offset READ offset NOTIFY changed)
-    Q_PROPERTY(double pauseOpacity READ pauseOpacity NOTIFY changed)
-    Q_PROPERTY(bool moving READ moving NOTIFY changed)
+    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double targetWidth READ targetWidth WRITE setTargetWidth NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool shown READ shown WRITE setShown NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool playing READ playing WRITE setPlaying NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY inputChanged FINAL)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY inputChanged FINAL)
+    Q_PROPERTY(double width READ width NOTIFY changed FINAL)
+    Q_PROPERTY(double opacity READ opacity NOTIFY changed FINAL)
+    Q_PROPERTY(double offset READ offset NOTIFY changed FINAL)
+    Q_PROPERTY(double pauseOpacity READ pauseOpacity NOTIFY changed FINAL)
+    Q_PROPERTY(bool moving READ moving NOTIFY changed FINAL)
 public:
     explicit TransportMotion(QObject *parent = nullptr);
     void classBegin() override;

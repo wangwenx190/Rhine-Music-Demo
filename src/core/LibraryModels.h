@@ -10,12 +10,12 @@ enum class SortMode {
     Artist,
     Album
 };
-struct LibraryColumn
+struct LibraryColumn final
 {
     QString key, label;
     QStringList albumIds;
 };
-struct LibraryOrder
+struct LibraryOrder final
 {
     QList<int> indices;
     QList<LibraryColumn> columns;
@@ -23,7 +23,7 @@ struct LibraryOrder
 };
 QString normalizedKey(const QString &value);
 LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode);
-struct SearchResult
+struct SearchResult final
 {
     QString albumId, trackId;
     bool operator==(const SearchResult &) const = default;
@@ -36,9 +36,10 @@ QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString
 class AlbumListModel : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
-    Q_PROPERTY(QVariantList columns READ columns NOTIFY columnsChanged)
-    Q_PROPERTY(int slotStride READ slotStride NOTIFY columnsChanged)
+    Q_DISABLE_COPY_MOVE(AlbumListModel)
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged FINAL)
+    Q_PROPERTY(QVariantList columns READ columns NOTIFY columnsChanged FINAL)
+    Q_PROPERTY(int slotStride READ slotStride NOTIFY columnsChanged FINAL)
 public:
     enum Role {
         AlbumId = Qt::UserRole + 1,
@@ -92,7 +93,8 @@ private:
 class SearchListModel : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+    Q_DISABLE_COPY_MOVE(SearchListModel)
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged FINAL)
 public:
     enum Role {
         Kind = Qt::UserRole + 1,
@@ -118,7 +120,7 @@ Q_SIGNALS:
     void countChanged();
 
 private:
-    struct SearchEntry
+    struct SearchEntry final
     {
         SearchResult result;
         QString genreId, text;

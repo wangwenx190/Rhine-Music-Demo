@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "DisplayOutput.h"
 #include "GraphicsBackend.h"
 #include "VerificationWindow.h"
@@ -26,7 +27,9 @@ using namespace yalahoo;
 namespace {
 class ControlledMonitor final : public DisplayMonitor
 {
+    Q_DISABLE_COPY_MOVE(ControlledMonitor)
 public:
+    ControlledMonitor() = default;
     DisplayState state;
     DisplayState query(QWindow &) override
     {
@@ -47,9 +50,13 @@ QShader loadShader(const QString &path)
     return QShader::fromSerialized(file.readAll());
 }
 }
-class DisplayOutputTest : public QObject
+class DisplayOutputTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(DisplayOutputTest)
+public:
+    DisplayOutputTest() = default;
+
 private Q_SLOTS:
     void transferShader()
     {

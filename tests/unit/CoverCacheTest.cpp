@@ -1,3 +1,6 @@
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include <limits>
 #include "CoverCache.h"
 #include "AtlasAllocator.h"
@@ -17,9 +20,11 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 
-class HiddenSceneItem : public SceneItem
+class HiddenSceneItem final : public SceneItem
 {
+    Q_DISABLE_COPY_MOVE(HiddenSceneItem)
 public:
+    HiddenSceneItem() = default;
     using SceneItem::SceneItem;
     void publishNow()
     {
@@ -27,10 +32,12 @@ public:
     }
 };
 
-class CoverCacheTest : public QObject
+class CoverCacheTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CoverCacheTest)
 public:
+    CoverCacheTest() = default;
     ~CoverCacheTest() override
     {
         CoverCache::finishDecoders();
@@ -345,7 +352,7 @@ private Q_SLOTS:
         QTemporaryDir directory;
         QImage image(2049, 2048, QImage::Format_RGB32);
         image.fill(Qt::red);
-        const auto path = directory.filePath(u"cover."_s + QString::fromLatin1(format));
+        const auto path = directory.filePath(u"cover."_s + QString::fromUtf8(format));
         QVERIFY(image.save(path, format.constData()));
         CoverCache cache;
         QSignalSpy spy(&cache, &CoverCache::ready);

@@ -7,7 +7,7 @@
 
 namespace yalahoo::rhi {
 class ResourceInventory;
-struct PostSettings
+struct PostSettings final
 {
     QSize size;
     int samples = 0;
@@ -16,8 +16,9 @@ struct PostSettings
     float radius = .18f;
     bool bokeh = false, smaa = false;
 };
-class Postprocess
+class Postprocess final
 {
+    Q_DISABLE_COPY_MOVE(Postprocess)
 public:
     Postprocess();
     ~Postprocess();

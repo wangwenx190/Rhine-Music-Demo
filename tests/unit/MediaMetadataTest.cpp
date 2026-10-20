@@ -85,13 +85,14 @@ Snapshot scanned(const QString &root)
 {
     return DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, { }, { }).snapshot;
 }
-struct FakeStats
+struct FakeStats final
 {
     std::atomic_int created = 0, active = 0, peak = 0, opens = 0, clears = 0;
     std::atomic_bool offGui = true;
 };
 class FakeSource final : public MetadataSource
 {
+    Q_DISABLE_COPY_MOVE(FakeSource)
 public:
     FakeSource(QObject *parent, std::shared_ptr<FakeStats> stats, MediaObservation value, int delay)
         : MetadataSource(parent), m_stats(std::move(stats)), m_value(value), m_delay(delay)
@@ -151,9 +152,13 @@ Snapshot resultOf(const QSignalSpy &spy, int index = 0)
     return qvariant_cast<Snapshot>(spy.at(index).at(1));
 }
 }
-class MediaMetadataTest : public QObject
+class MediaMetadataTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MediaMetadataTest)
+public:
+    MediaMetadataTest() = default;
+
 private Q_SLOTS:
     void publicMetadataAndPriority();
     void realSilentAndInvalid();

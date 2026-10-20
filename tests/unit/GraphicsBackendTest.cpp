@@ -1,11 +1,16 @@
+#include <QQuickWindow>
 #include "GraphicsBackend.h"
 #include <QtTest>
 
 using namespace Qt::StringLiterals;
 
-class GraphicsBackendTest : public QObject
+class GraphicsBackendTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(GraphicsBackendTest)
+public:
+    GraphicsBackendTest() = default;
+
 private Q_SLOTS:
     void selection()
     {

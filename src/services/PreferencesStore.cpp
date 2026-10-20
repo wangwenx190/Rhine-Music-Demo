@@ -1,5 +1,7 @@
 #include <QCoreApplication>
 #include "PreferencesStore.h"
+#include <QThreadPool>
+#include <QFutureWatcher>
 #include "Logging.h"
 #include <QtConcurrentRun>
 #include <QDir>
@@ -13,11 +15,24 @@
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
-    : QObject(parent), m_path(QDir(dataRoot).filePath(u"preferences.json"_s))
+struct PreferencesStore::Private final
 {
-    m_worker.setMaxThreadCount(1);
-    QFile file(m_path);
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    QString m_path, m_error;
+    QJsonObject m_document;
+    QThreadPool m_worker;
+    QFutureWatcher<QString> m_save;
+    QFutureWatcher<QPair<QJsonObject, QString>> m_import;
+    quint64 m_revision = 0;
+    bool m_writable = true, m_dirty = false, m_saving = false, m_scheduled = false;
+};
+PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>())
+{
+    d->m_path = QDir(dataRoot).filePath(u"preferences.json"_s);
+    d->m_worker.setMaxThreadCount(1);
+    QFile file(d->m_path);
     if (file.exists()) {
         QJsonParseError parse;
         const bool opened = file.open(QIODevice::ReadOnly);
@@ -25,32 +40,32 @@ PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
                 ? QJsonDocument::fromJson(file.readAll(), &parse)
                 : QJsonDocument();
         if (!opened || document.isNull() || !document.isObject()) {
-            m_writable = false;
-            m_error = QCoreApplication::translate(
+            d->m_writable = false;
+            d->m_error = QCoreApplication::translate(
                     "Yalahoo",
                     "Cannot read preferences, or the file is damaged. The original file was preserved.");
         } else {
-            m_document = document.object();
-            m_error = validate(m_document);
-            m_writable = m_error.isEmpty();
-            if (!m_writable)
-                m_document = { };
+            d->m_document = document.object();
+            d->m_error = validate(d->m_document);
+            d->m_writable = d->m_error.isEmpty();
+            if (!d->m_writable)
+                d->m_document = { };
         }
     }
-    if (!m_error.isEmpty())
-        qCWarning(logSettings) << "Preferences load failed" << "path=" << m_path
-                               << "error=" << m_error;
+    if (!d->m_error.isEmpty())
+        qCWarning(logSettings) << "Preferences load failed" << "path=" << d->m_path
+                               << "error=" << d->m_error;
     else
-        qCInfo(logSettings) << "Preferences loaded" << "path=" << m_path;
-    m_document.insert(u"schemaVersion"_s, 1);
-    connect(&m_save, &QFutureWatcher<QString>::finished, this, [this] {
-        m_saving = false;
-        const auto error = m_save.result();
+        qCInfo(logSettings) << "Preferences loaded" << "path=" << d->m_path;
+    d->m_document.insert(u"schemaVersion"_s, 1);
+    connect(&d->m_save, &QFutureWatcher<QString>::finished, this, [this] {
+        d->m_saving = false;
+        const auto error = d->m_save.result();
         reportError(error);
         if (!error.isEmpty())
-            m_dirty = false;
+            d->m_dirty = false;
         else {
-            qCInfo(logSettings) << "Preferences saved" << "path=" << m_path;
+            qCInfo(logSettings) << "Preferences saved" << "path=" << d->m_path;
             Q_EMIT saved();
         }
         schedule();
@@ -59,28 +74,28 @@ PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
 PreferencesStore::~PreferencesStore()
 {
     // Teardown only: finish the one in-flight save and commit the latest coalesced value.
-    m_worker.waitForDone();
-    if (m_dirty && m_writable) {
-        const auto error = write(m_path, m_document);
+    d->m_worker.waitForDone();
+    if (d->m_dirty && d->m_writable) {
+        const auto error = write(d->m_path, d->m_document);
         if (!error.isEmpty())
-            qCWarning(logSettings)
-                    << "Preferences shutdown save failed" << "path=" << m_path << "error=" << error;
+            qCWarning(logSettings) << "Preferences shutdown save failed" << "path=" << d->m_path
+                                   << "error=" << error;
     }
 }
 bool PreferencesStore::rememberColumnPosition() const
 {
-    return m_document.value(u"rememberColumnPosition"_s).toBool(true);
+    return d->m_document.value(u"rememberColumnPosition"_s).toBool(true);
 }
 bool PreferencesStore::realistic() const
 {
-    return m_document.value(u"arrayMode"_s).toString() == "realistic"_L1;
+    return d->m_document.value(u"arrayMode"_s).toString() == "realistic"_L1;
 }
 QJsonObject PreferencesStore::audio() const
 {
     QJsonObject result;
     for (const auto &key : { u"volume"_s, u"bgm"_s, u"bgmVolume"_s, u"sound"_s, u"soundVolume"_s })
-        if (m_document.contains(key))
-            result.insert(key, m_document.value(key));
+        if (d->m_document.contains(key))
+            result.insert(key, d->m_document.value(key));
     return result;
 }
 QVariantMap PreferencesStore::values() const
@@ -96,7 +111,7 @@ QVariantMap PreferencesStore::values() const
                         { u"bgmVolume"_s, .18 },
                         { u"sound"_s, true },
                         { u"soundVolume"_s, .22 } };
-    for (auto it = m_document.begin(); it != m_document.end(); ++it)
+    for (auto it = d->m_document.begin(); it != d->m_document.end(); ++it)
         values.insert(it.key(), it.value());
     return values.toVariantMap();
 }
@@ -157,20 +172,20 @@ QString PreferencesStore::validate(const QJsonObject &document)
 }
 void PreferencesStore::reportError(const QString &error)
 {
-    if (m_error != error) {
-        m_error = error;
+    if (d->m_error != error) {
+        d->m_error = error;
         Q_EMIT errorChanged();
     }
     if (!error.isEmpty()) {
-        qCWarning(logSettings) << "Preferences operation failed" << "path=" << m_path
+        qCWarning(logSettings) << "Preferences operation failed" << "path=" << d->m_path
                                << "error=" << error;
         Q_EMIT saveError(error);
     }
 }
 bool PreferencesStore::update(const QVariantMap &patch)
 {
-    if (!m_writable) {
-        Q_EMIT saveError(m_error);
+    if (!d->m_writable) {
+        Q_EMIT saveError(d->m_error);
         return false;
     }
     const auto input = QJsonObject::fromVariantMap(patch);
@@ -182,23 +197,23 @@ bool PreferencesStore::update(const QVariantMap &patch)
     bool modified = false;
     for (auto it = input.begin(); it != input.end(); ++it) {
         QJsonValue value = it.value();
-        if (value.isObject() && m_document.value(it.key()).isObject()) {
-            auto object = m_document.value(it.key()).toObject();
+        if (value.isObject() && d->m_document.value(it.key()).isObject()) {
+            auto object = d->m_document.value(it.key()).toObject();
             const auto additions = value.toObject();
             for (auto field = additions.begin(); field != additions.end(); ++field)
                 if (object.value(field.key()) != field.value())
                     object.insert(field.key(), field.value());
             value = object;
         }
-        if (m_document.value(it.key()) != value) {
-            m_document.insert(it.key(), value);
+        if (d->m_document.value(it.key()) != value) {
+            d->m_document.insert(it.key(), value);
             modified = true;
         }
     }
     if (!modified)
         return true;
-    ++m_revision;
-    m_dirty = true;
+    ++d->m_revision;
+    d->m_dirty = true;
     reportError({ });
     Q_EMIT changed();
     schedule();
@@ -214,7 +229,7 @@ void PreferencesStore::setAudio(const QJsonObject &audio)
 }
 QString PreferencesStore::error() const
 {
-    return m_error;
+    return d->m_error;
 }
 void PreferencesStore::setNavigation(bool remember, bool realistic)
 {
@@ -223,20 +238,20 @@ void PreferencesStore::setNavigation(bool remember, bool realistic)
 }
 bool PreferencesStore::importJson(const QUrl &url)
 {
-    if (!m_writable || m_import.isRunning() || !url.isLocalFile()
+    if (!d->m_writable || d->m_import.isRunning() || !url.isLocalFile()
         || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery() || url.hasFragment()) {
         Q_EMIT saveError(QCoreApplication::translate(
                 "Yalahoo",
                 "Preference import requires writable native data and a local absolute JSON path."));
         return false;
     }
-    const auto revision = ++m_revision;
-    disconnect(&m_import, nullptr, this, nullptr);
-    connect(&m_import, &QFutureWatcher<QPair<QJsonObject, QString>>::finished, this,
+    const auto revision = ++d->m_revision;
+    disconnect(&d->m_import, nullptr, this, nullptr);
+    connect(&d->m_import, &QFutureWatcher<QPair<QJsonObject, QString>>::finished, this,
             [this, revision] {
-                if (revision != m_revision)
+                if (revision != d->m_revision)
                     return;
-                const auto result = m_import.result();
+                const auto result = d->m_import.result();
                 if (!result.second.isEmpty()) {
                     reportError(result.second);
                     return;
@@ -244,7 +259,7 @@ bool PreferencesStore::importJson(const QUrl &url)
                 if (update(result.first.toVariantMap()))
                     Q_EMIT imported();
             });
-    m_import.setFuture(QtConcurrent::run(&m_worker, [path = url.toLocalFile()] {
+    d->m_import.setFuture(QtConcurrent::run(&d->m_worker, [path = url.toLocalFile()] {
         using Result = QPair<QJsonObject, QString>;
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly) || file.size() > 1024 * 1024)
@@ -292,17 +307,17 @@ QString PreferencesStore::write(const QString &path, const QJsonObject &document
 }
 void PreferencesStore::schedule()
 {
-    if (!m_dirty || m_saving || m_scheduled || !m_writable)
+    if (!d->m_dirty || d->m_saving || d->m_scheduled || !d->m_writable)
         return;
-    m_scheduled = true;
+    d->m_scheduled = true;
     QTimer::singleShot(0, this, [this] {
-        m_scheduled = false;
-        if (!m_dirty || m_saving || !m_writable)
+        d->m_scheduled = false;
+        if (!d->m_dirty || d->m_saving || !d->m_writable)
             return;
-        m_dirty = false;
-        m_saving = true;
-        m_save.setFuture(
-                QtConcurrent::run(&m_worker, &PreferencesStore::write, m_path, m_document));
+        d->m_dirty = false;
+        d->m_saving = true;
+        d->m_save.setFuture(QtConcurrent::run(&d->m_worker, &PreferencesStore::write, d->m_path,
+                                              d->m_document));
     });
 }
 }

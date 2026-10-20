@@ -2,7 +2,7 @@
 #include "DisplayOutput.h"
 #include <QtQml/qqmlregistration.h>
 
-struct DisplayOutputTestType
+struct DisplayOutputTestType final
 {
     Q_GADGET
     QML_FOREIGN(yalahoo::DisplayOutput)

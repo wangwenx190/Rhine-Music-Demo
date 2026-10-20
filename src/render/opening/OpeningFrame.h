@@ -5,7 +5,7 @@ using Qt::StringLiterals::operator""_s;
 #include <QVariantMap>
 
 namespace yalahoo {
-struct OpeningFrame
+struct OpeningFrame final
 {
     double background = 1, mark = 0, contour = 0, symbols = 0;
     double orbit = 0, orbitDraw = 0, orbitTurn = 0, orbitScale = .9;

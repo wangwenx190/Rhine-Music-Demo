@@ -6,14 +6,15 @@
 #include <QQuickWindow>
 namespace {
 CanvasTitleStats stats;
-struct Slot
+struct Slot final
 {
     QList<yalahoo::ReelSlot::Face> faces;
     double x = 0, y = 0, height = 0, roll = 0, size = 0;
     bool translation = false;
 };
-class Renderer : public QCanvasPainterItemRenderer
+class Renderer final : public QCanvasPainterItemRenderer
 {
+    Q_DISABLE_COPY_MOVE(Renderer)
 public:
     Renderer()
     {

@@ -1,24 +1,20 @@
 #pragma once
-#include <QHash>
 #include <QImage>
 #include <QList>
 #include <QPoint>
 #include <QJsonObject>
 #include <QObject>
-#include <QTimer>
-#include <QSet>
-#include <atomic>
 #include <memory>
 
 namespace yalahoo {
 // Values published once by the worker; consumers only share immutable, owned pixels.
-struct CoverMipTile
+struct CoverMipTile final
 {
     QPoint origin;
     QImage image;
     QList<QImage> mipmaps;
 };
-struct CoverPixels
+struct CoverPixels final
 {
     QString identity, path, error, fallbackTitle;
     quint64 generation = 0;
@@ -33,9 +29,10 @@ struct CoverPixels
 };
 using CoverSnapshot = std::shared_ptr<const CoverPixels>;
 
-class CoverCache : public QObject
+class CoverCache final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CoverCache)
 public:
     explicit CoverCache(QObject *parent = nullptr);
     ~CoverCache() override;
@@ -62,36 +59,16 @@ Q_SIGNALS:
     void ready(yalahoo::CoverSnapshot pixels);
 
 private:
-    struct Job
-    {
-        QString key, identity, path, title;
-        int resolution = 256;
-        quint64 generation = 0;
-        std::shared_ptr<std::atomic_bool> wanted;
-    };
+    struct Job;
     struct State;
-    struct Entry
-    {
-        CoverSnapshot pixels;
-        quint64 used = 0;
-    };
+    struct Entry;
     static CoverSnapshot decode(const Job &job, const std::shared_ptr<State> &state);
     static QString key(const QString &identity, const QString &path, int resolution,
                        const QString &title);
     void pump();
     void complete(const Job &job, CoverSnapshot pixels);
-    std::shared_ptr<State> m_state;
-    QTimer m_retry;
-    QList<Job> m_pending;
-    QSet<QString> m_pendingKeys;
-    QHash<QString, Job> m_running;
-    QHash<QString, Entry> m_cache;
-    qint64 m_bytes = 0, m_workingSetBytes = 0, m_peakWorkingSetBytes = 0;
-    bool m_suspended = false;
-    int m_active = 0, m_peakActive = 0, m_peakPending = 0;
-    quint64 m_clock = 0, m_decodes = 0, m_rejected = 0, m_stale = 0;
-    qint64 m_peakReaderBytes = 0;
-    int m_decoderScaledResults = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }
 Q_DECLARE_METATYPE(yalahoo::CoverSnapshot)

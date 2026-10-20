@@ -200,9 +200,9 @@
 
 | 目标/归属 | 准确入口与独立退出事实 |
 | --- | --- |
-| Windows · R30-P/BP-P | 操作按[windows.md](docs/platforms/windows.md)；`pwsh -NoProfile -File tools/deploy/windows.ps1`，`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`及包内`verify-windows.ps1`。真实MSVC/最新Kit/C++23、PE/图标、同Kit windeployqt/官方VC运行库、插件/媒体/字体/shader/许可与相对路径完整；包复制到无开发Qt的干净系统及中文/空格路径，从包外加载，不借开发PATH。 |
+| Windows · R30-P/BP-P | 操作按[windows.md](docs/platforms/windows.md)；`pwsh -NoProfile -File tools/deploy/windows.ps1`，`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`及包内`verify-windows.ps1`。真实MSVC/最新Kit/C++23、Release IPO及`/Gy /Gw /OPT:REF /OPT:ICF`编译/链接、PE/图标、同Kit windeployqt/官方VC运行库、插件/媒体/字体/shader/许可与相对路径完整；包复制到无开发Qt的干净系统及中文/空格路径，从包外加载，不借开发PATH。 |
 | macOS · R31-P | 输入为`out/macos/`完整生产包，操作按[macos.md](docs/platforms/macos.md)。整包在另一台兼容目标设备的中文/空格路径从包外运行`python3 verify-macos.py --output 绝对新目录`，核对实际映像/架构/相对资源/签名；实机核对Finder品牌、物理AppKit菜单/Command、系统目录选择与输入法。 |
-| Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、ELF/ldd/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
+| Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tests/tools/UnixDeploymentTest.py`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、Release IPO及GCC ICF或Clang linker ICF、ELF/ldd/全部暂存ELF strip后保留动态导出/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
 | 后端与日志 | 使用Release `graphics-backend`、`logging`、`logging-terminal`及普通部署包。Windows显式D3D11/12、Windows/Linux的OpenGL与已启用Vulkan、macOS Vulkan核对真实API；Qt特性或设备/格式不支持时明确报错并非零退出。Linux默认Vulkan不可用时警告并回退OpenGL，显式请求不回退。目标成功路径需真实输出，不能只看初始化。日志目录/上界/轮转按logging.md；Windows真实控制台VT颜色/UTF-8及重定向正常。 |
 
 部署验证失败保留旧包；加载探针仅证明实际报告中的加载事实。产品功能、设备与窗口检查直接共用下方正常产品会话，不在部署后再跑整套组件/性能矩阵。macOS当前Kit未启用Vulkan，缺对应原生Kit/SDK/MoltenVK；未具能力时保留该具体缺口。

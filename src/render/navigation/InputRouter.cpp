@@ -1,3 +1,6 @@
+#include <QQuickWindow>
+#include <QWheelEvent>
+#include "SelectionController.h"
 #include "InputRouter.h"
 #include <QKeyEvent>
 #include <QQuickItem>

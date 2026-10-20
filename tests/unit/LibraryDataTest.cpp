@@ -21,7 +21,9 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 class TestProvider final : public IMetadataProvider
 {
+    Q_DISABLE_COPY_MOVE(TestProvider)
 public:
+    TestProvider() = default;
     using IMetadataProvider::IMetadataProvider;
     QList<RequestToken> requests, cancelled;
     QList<MetadataKind> kinds;
@@ -69,9 +71,14 @@ public:
         Q_EMIT resultReady(result);
     }
 };
-class LibraryDataTest : public QObject
+class LibraryDataTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LibraryDataTest)
+public:
+    LibraryDataTest() = default;
+
+private:
     yalahoo::Localization localization{ QLocale(QLocale::Chinese, QLocale::China) };
     QJsonObject fixtures, golden;
     LibrarySnapshot library(const QString &name = u"mixed"_s) const

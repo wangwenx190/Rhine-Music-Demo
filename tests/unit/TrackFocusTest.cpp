@@ -1,3 +1,8 @@
+#include "FrameClock.h"
+#include "LibrarySession.h"
+#include "PresentationController.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "DetailPorts.h"
 #include "TrackFocusController.h"
 #include "PanelController.h"
@@ -11,7 +16,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-struct Fixture
+struct Fixture final
 {
     MotionController motion;
     SelectionController selection{ &motion };
@@ -65,9 +70,13 @@ struct Fixture
     }
 };
 }
-class TrackFocusTest : public QObject
+class TrackFocusTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(TrackFocusTest)
+public:
+    TrackFocusTest() = default;
+
 private Q_SLOTS:
     void listOriginRefinementPreservesMotionDistance()
     {

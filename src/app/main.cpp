@@ -1,3 +1,5 @@
+#include "FrameClock.h"
+#include "SelectionController.h"
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "AppIdentity.h"

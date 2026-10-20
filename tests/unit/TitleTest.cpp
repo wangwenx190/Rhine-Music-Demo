@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "TextLayoutAdapter.h"
 #include "TitleReel.h"
 #include "TransportMotion.h"
@@ -13,9 +14,13 @@
 
 using namespace Qt::StringLiterals;
 
-class TitleTest : public QObject
+class TitleTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(TitleTest)
+public:
+    TitleTest() = default;
+
 private Q_SLOTS:
     void initTestCase()
     {

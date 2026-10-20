@@ -3,7 +3,7 @@
 #include <QVector4D>
 
 namespace yalahoo::rhi {
-struct ShellMaterial
+struct ShellMaterial final
 {
     QVector3D tint, attenuation;
     QVector4D transport;

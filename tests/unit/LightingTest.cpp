@@ -1,3 +1,5 @@
+#include "RowLightController.h"
+#include "FrameClock.h"
 #include "SelectionLighting.h"
 #include "SceneAdapter.h"
 #include <QtTest>
@@ -10,9 +12,13 @@
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
-class LightingTest : public QObject
+class LightingTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LightingTest)
+public:
+    LightingTest() = default;
+
 private Q_SLOTS:
     void floorThemeUsesLinearAuthoredColorsAndInterruptedTransition()
     {

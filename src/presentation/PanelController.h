@@ -4,8 +4,9 @@ namespace yalahoo {
 class PanelController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString panel READ panel NOTIFY changed)
-    Q_PROPERTY(yalahoo::SurfaceTransition *surface READ surface CONSTANT)
+    Q_DISABLE_COPY_MOVE(PanelController)
+    Q_PROPERTY(QString panel READ panel NOTIFY changed FINAL)
+    Q_PROPERTY(yalahoo::SurfaceTransition *surface READ surface CONSTANT FINAL)
 public:
     explicit PanelController(FrameClock *clock, QObject *parent = nullptr);
     QString panel() const

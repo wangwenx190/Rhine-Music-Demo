@@ -14,7 +14,7 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-struct Part
+struct Part final
 {
     QList<TitleGlyph> glyphs;
     double height = 0, naturalWidth = 0;

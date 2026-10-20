@@ -7,7 +7,7 @@ enum class RenderBackend {
     Rhi
 };
 // The product has one renderer; Review-only Quick3D is a source comparison oracle.
-struct RenderBackendContract
+struct RenderBackendContract final
 {
     static constexpr RenderBackend selected = RenderBackend::Rhi;
     static QVariantMap fields()

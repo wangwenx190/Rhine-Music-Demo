@@ -1,3 +1,6 @@
+#include "PresentationController.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "DetailPorts.h"
 #include "DetailModel.h"
 #include "SceneAdapter.h"
@@ -14,7 +17,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-struct Fixture
+struct Fixture final
 {
     MotionController motion;
     SelectionController selection{ &motion };
@@ -89,9 +92,13 @@ QString phaseName(DetailMotion::Phase phase)
     return { };
 }
 }
-class DetailMotionTest : public QObject
+class DetailMotionTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(DetailMotionTest)
+public:
+    DetailMotionTest() = default;
+
 private Q_SLOTS:
     void frozenPlacementAndRotation()
     {

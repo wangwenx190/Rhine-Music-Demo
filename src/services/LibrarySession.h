@@ -8,21 +8,22 @@ namespace yalahoo {
 class LibrarySession final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(yalahoo::AlbumListModel *albums READ albums CONSTANT)
-    Q_PROPERTY(yalahoo::SearchListModel *searchResults READ searchResults CONSTANT)
-    Q_PROPERTY(QString navigationAlbumId READ navigationAlbumId NOTIFY navigationChanged)
-    Q_PROPERTY(QString navigationTrackId READ navigationTrackId NOTIFY navigationChanged)
-    Q_PROPERTY(QString playbackAlbumId READ playbackAlbumId NOTIFY playbackChanged)
-    Q_PROPERTY(QString playbackTrackId READ playbackTrackId NOTIFY playbackChanged)
-    Q_PROPERTY(QVariantList genres READ genres NOTIFY snapshotChanged)
-    Q_PROPERTY(QVariantMap summary READ summary NOTIFY snapshotChanged)
-    Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged)
-    Q_PROPERTY(quint64 metadataRevision READ metadataRevision NOTIFY metadataChanged)
-    Q_PROPERTY(QVariantMap metadataProgress READ metadataProgress NOTIFY metadataProgressChanged)
-    Q_PROPERTY(bool metadataBusy READ metadataBusy NOTIFY metadataProgressChanged)
-    Q_PROPERTY(QVariantMap metadataConfiguration READ metadataConfiguration NOTIFY metadataConfigurationChanged)
-    Q_PROPERTY(QVariantMap browseInfo READ browseInfo NOTIFY browseInfoChanged)
-    Q_PROPERTY(QVariantMap providerCapabilities READ providerCapabilities NOTIFY providerCapabilitiesChanged)
+    Q_DISABLE_COPY_MOVE(LibrarySession)
+    Q_PROPERTY(yalahoo::AlbumListModel *albums READ albums CONSTANT FINAL)
+    Q_PROPERTY(yalahoo::SearchListModel *searchResults READ searchResults CONSTANT FINAL)
+    Q_PROPERTY(QString navigationAlbumId READ navigationAlbumId NOTIFY navigationChanged FINAL)
+    Q_PROPERTY(QString navigationTrackId READ navigationTrackId NOTIFY navigationChanged FINAL)
+    Q_PROPERTY(QString playbackAlbumId READ playbackAlbumId NOTIFY playbackChanged FINAL)
+    Q_PROPERTY(QString playbackTrackId READ playbackTrackId NOTIFY playbackChanged FINAL)
+    Q_PROPERTY(QVariantList genres READ genres NOTIFY snapshotChanged FINAL)
+    Q_PROPERTY(QVariantMap summary READ summary NOTIFY snapshotChanged FINAL)
+    Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged FINAL)
+    Q_PROPERTY(quint64 metadataRevision READ metadataRevision NOTIFY metadataChanged FINAL)
+    Q_PROPERTY(QVariantMap metadataProgress READ metadataProgress NOTIFY metadataProgressChanged FINAL)
+    Q_PROPERTY(bool metadataBusy READ metadataBusy NOTIFY metadataProgressChanged FINAL)
+    Q_PROPERTY(QVariantMap metadataConfiguration READ metadataConfiguration NOTIFY metadataConfigurationChanged FINAL)
+    Q_PROPERTY(QVariantMap browseInfo READ browseInfo NOTIFY browseInfoChanged FINAL)
+    Q_PROPERTY(QVariantMap providerCapabilities READ providerCapabilities NOTIFY providerCapabilitiesChanged FINAL)
 public:
     explicit LibrarySession(IMetadataProvider *provider, QObject *parent = nullptr);
     ~LibrarySession() override;
@@ -107,7 +108,7 @@ Q_SIGNALS:
 private:
     friend class PlaybackController;
     void adoptPlaybackIds(const QString &albumId, const QString &trackId);
-    struct Pending
+    struct Pending final
     {
         RequestToken token;
         MetadataKind kind;
@@ -125,7 +126,7 @@ private:
     Snapshot m_snapshot;
     QHash<QString, qsizetype> m_albumIndices;
     QHash<QString, QString> m_genreNames;
-    struct BrowsePosition
+    struct BrowsePosition final
     {
         int code = 0, number = 0, total = 0, lane = 0;
         QString label;

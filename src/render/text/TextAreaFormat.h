@@ -8,8 +8,13 @@ namespace yalahoo {
 class TextAreaFormat : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QQuickTextDocument *document READ document WRITE setDocument NOTIFY changed)
-    Q_PROPERTY(qreal lineHeight READ lineHeight WRITE setLineHeight NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(TextAreaFormat)
+public:
+    TextAreaFormat() = default;
+
+private:
+    Q_PROPERTY(QQuickTextDocument *document READ document WRITE setDocument NOTIFY changed FINAL)
+    Q_PROPERTY(qreal lineHeight READ lineHeight WRITE setLineHeight NOTIFY changed FINAL)
 public:
     using QObject::QObject;
     QQuickTextDocument *document() const;

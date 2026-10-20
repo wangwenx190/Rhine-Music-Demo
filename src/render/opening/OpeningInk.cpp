@@ -38,6 +38,7 @@ QString svgPath(const QPainterPath &p)
 }
 class Renderer final : public QCanvasPainterItemRenderer
 {
+    Q_DISABLE_COPY_MOVE(Renderer)
 public:
     Renderer()
     {

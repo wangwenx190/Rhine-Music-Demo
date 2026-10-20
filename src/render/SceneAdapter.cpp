@@ -1,3 +1,6 @@
+#include "RowLightController.h"
+#include "FrameClock.h"
+#include "SelectionController.h"
 #include "SceneAdapter.h"
 #include "OverviewController.h"
 #include "opening/OpeningFrame.h"

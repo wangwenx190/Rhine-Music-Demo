@@ -9,12 +9,12 @@ enum class RowLightingMode {
     Guided,
     Hybrid
 };
-struct RowLightingSettings
+struct RowLightingSettings final
 {
     RowLightingMode mode = RowLightingMode::Guided;
     double strength = 1.3, width = 1.35, offset = .3, fill = 1, transitionDuration = 1.1;
 };
-struct RowLightingInput
+struct RowLightingInput final
 {
     SceneVector origin;
     double row = 0, lane = 0;
@@ -22,7 +22,7 @@ struct RowLightingInput
     std::optional<double> introTime{ };
 };
 // Absolute logical coordinates; the rendered shelf transform is added only once.
-class RowLightController
+class RowLightController final
 {
 public:
     RowLightingSettings settings;

@@ -91,7 +91,7 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(QVector<OverviewColum
     // The inclusive physical interval has ten candidates at a half-lane boundary.
     // Cull its zero-extent endpoints after priority sorting; never truncate a selected ID.
     columns.resize(std::min(columns.size(), qsizetype(10)));
-    struct Candidate
+    struct Candidate final
     {
         OverviewColumn column;
         bool expanded;

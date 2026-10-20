@@ -7,7 +7,7 @@ namespace yalahoo {
 // rail, column, shoulder, lane in frozen ARCHIVE_TRACK_KEYS order.
 using ArchiveValues = std::array<double, 4>;
 using ArchiveSprings = std::array<ScalarSpring, 4>;
-class ArchiveMotion
+class ArchiveMotion final
 {
 public:
     bool active() const
@@ -41,12 +41,13 @@ private:
 class MotionController : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(yalahoo::FrameClock* clock READ clock CONSTANT)
-    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
-    Q_PROPERTY(bool moving READ moving NOTIFY stateChanged)
-    Q_PROPERTY(double rail READ rail NOTIFY stateChanged)
-    Q_PROPERTY(double column READ column NOTIFY stateChanged)
-    Q_PROPERTY(quint64 revision READ revision NOTIFY stateChanged)
+    Q_DISABLE_COPY_MOVE(MotionController)
+    Q_PROPERTY(yalahoo::FrameClock* clock READ clock CONSTANT FINAL)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged FINAL)
+    Q_PROPERTY(bool moving READ moving NOTIFY stateChanged FINAL)
+    Q_PROPERTY(double rail READ rail NOTIFY stateChanged FINAL)
+    Q_PROPERTY(double column READ column NOTIFY stateChanged FINAL)
+    Q_PROPERTY(quint64 revision READ revision NOTIFY stateChanged FINAL)
 public:
     explicit MotionController(QObject *parent = nullptr);
     FrameClock *clock()

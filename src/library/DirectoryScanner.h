@@ -6,7 +6,7 @@
 
 namespace yalahoo {
 using ScanCancellation = std::shared_ptr<std::atomic_bool>;
-struct ScanResult
+struct ScanResult final
 {
     Snapshot snapshot;
     QString error;
@@ -15,7 +15,7 @@ struct ScanResult
 };
 
 // All filesystem work runs on the store's single worker, never on GUI/render.
-class DirectoryScanner
+class DirectoryScanner final
 {
 public:
     static bool normalizeRoots(const QList<QUrl> &input, QList<QUrl> &output, QString &error);

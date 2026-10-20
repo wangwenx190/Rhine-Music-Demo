@@ -1,3 +1,6 @@
+#include "FrameClock.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "SceneAdapter.h"
 #include <QFile>
 #include <QJsonArray>
@@ -21,9 +24,14 @@ double difference(SceneVector a, SceneVector b)
     return (a - b).length();
 }
 }
-class SceneTest : public QObject
+class SceneTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(SceneTest)
+public:
+    SceneTest() = default;
+
+private:
     QJsonObject oracle;
     double maxProjection = 0, maxPose = 0, maxMotion = 0, maxFov = 0, maxNavigation = 0;
 private Q_SLOTS:

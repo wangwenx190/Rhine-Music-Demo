@@ -1,3 +1,4 @@
+#include "SelectionLighting.h"
 #include "RhiFogAudit.h"
 #include "OutputReference.h"
 #include "RhiReviewInput.h"

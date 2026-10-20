@@ -11,10 +11,11 @@ class AudioAmbienceTest;
 class BackgroundMusicController : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY settingsChanged)
-    Q_PROPERTY(bool playing READ playing NOTIFY stateChanged)
-    Q_PROPERTY(QString error READ error NOTIFY stateChanged)
+    Q_DISABLE_COPY_MOVE(BackgroundMusicController)
+    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY settingsChanged FINAL)
+    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY settingsChanged FINAL)
+    Q_PROPERTY(bool playing READ playing NOTIFY stateChanged FINAL)
+    Q_PROPERTY(QString error READ error NOTIFY stateChanged FINAL)
 public:
     enum class SongActivity {
         Stopped,

@@ -1,3 +1,9 @@
+#include "RenderQuality.h"
+#include "SceneAdapter.h"
+#include "LibrarySession.h"
+#include "PreferencesStore.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "SettingsController.h"
 #include "OfflineMetadataProvider.h"
 #include "LibraryStore.h"
@@ -23,9 +29,13 @@ bool put(const QString &path, const QByteArray &bytes)
     return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
 }
 }
-class SettingsTest : public QObject
+class SettingsTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(SettingsTest)
+public:
+    SettingsTest() = default;
+
 private Q_SLOTS:
     void qualityFieldKeepsOtherRuntimeValues()
     {

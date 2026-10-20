@@ -1,3 +1,6 @@
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "RhiCaptureHarness.h"

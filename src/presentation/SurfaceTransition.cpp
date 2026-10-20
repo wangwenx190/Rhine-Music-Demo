@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "SurfaceTransition.h"
 #include <QPointF>
 #include <algorithm>

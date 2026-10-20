@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "OrdinalMotion.h"
 #include "ArchivePool.h"
 #include <algorithm>

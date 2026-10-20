@@ -1,4 +1,7 @@
 #include "OnlineMetadataProvider.h"
+#include <QThread>
+#include <QSet>
+#include <QHash>
 #include "metadata/MetadataHttp.h"
 #include "metadata/MetadataMerge.h"
 #include "metadata/MusicBrainzSource.h"
@@ -81,6 +84,7 @@ QString stateName(ProviderStatus status)
 class MetadataWorker final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MetadataWorker)
 public:
     explicit MetadataWorker(QNetworkAccessManager *network) : m_http(this, network), m_next(this)
     {
@@ -142,7 +146,7 @@ private:
         Entities,
         Performers
     };
-    struct Job
+    struct Job final
     {
         AlbumQuery query;
         RequestToken token;
@@ -538,44 +542,54 @@ private:
     QList<Job> m_waiting;
     std::optional<Job> m_active;
 };
+struct OnlineMetadataProvider::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    QThread m_thread;
+    MetadataWorker *m_worker;
+    QHash<RequestToken, MetadataKind> m_pending;
+    QSet<RequestToken> m_outstanding;
+    bool m_enabled = false;
+};
 OnlineMetadataProvider::OnlineMetadataProvider(
         QObject *parent, std::function<QNetworkAccessManager *()> networkFactory)
-    : IMetadataProvider(parent),
-      m_worker(new MetadataWorker(networkFactory ? networkFactory() : nullptr))
+    : IMetadataProvider(parent), d(std::make_unique<Private>())
 {
+    d->m_worker = new MetadataWorker(networkFactory ? networkFactory() : nullptr);
     qRegisterMetaType<ProviderResult>();
-    m_worker->moveToThread(&m_thread);
-    connect(&m_thread, &QThread::finished, m_worker, &QObject::deleteLater);
-    connect(m_worker, &MetadataWorker::ready, this, [this](const ProviderResult &result) {
+    d->m_worker->moveToThread(&d->m_thread);
+    connect(&d->m_thread, &QThread::finished, d->m_worker, &QObject::deleteLater);
+    connect(d->m_worker, &MetadataWorker::ready, this, [this](const ProviderResult &result) {
         const RequestToken token{ result.requestId, result.generation, result.albumId };
-        m_outstanding.remove(token);
-        const auto it = m_pending.find(token);
-        if (it == m_pending.end() || *it != result.kind)
+        d->m_outstanding.remove(token);
+        const auto it = d->m_pending.find(token);
+        if (it == d->m_pending.end() || *it != result.kind)
             return;
-        m_pending.erase(it);
+        d->m_pending.erase(it);
         Q_EMIT resultReady(result);
     });
-    m_thread.setObjectName(u"metadata-network"_s);
-    m_thread.start();
+    d->m_thread.setObjectName(u"metadata-network"_s);
+    d->m_thread.start();
 }
 OnlineMetadataProvider::~OnlineMetadataProvider()
 {
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = m_worker] {
+            d->m_worker,
+            [worker = d->m_worker] {
                 worker->stop();
                 QThread::currentThread()->quit();
             },
             Qt::QueuedConnection);
-    m_thread.wait();
+    d->m_thread.wait();
 }
 void OnlineMetadataProvider::configure(const QJsonObject &configuration)
 {
     const bool enabled = configuration.value(u"networkEnabled"_s).toBool();
-    if (enabled == m_enabled)
+    if (enabled == d->m_enabled)
         return;
-    m_enabled = enabled;
-    const auto pending = m_pending;
+    d->m_enabled = enabled;
+    const auto pending = d->m_pending;
     for (auto it = pending.begin(); it != pending.end(); ++it) {
         const auto token = it.key();
         cancel(token);
@@ -591,20 +605,20 @@ void OnlineMetadataProvider::configure(const QJsonObject &configuration)
 }
 ProviderCapabilities OnlineMetadataProvider::capabilities() const
 {
-    return { m_enabled, true, true, true, true };
+    return { d->m_enabled, true, true, true, true };
 }
 bool OnlineMetadataProvider::request(AlbumQuery query, RequestToken token, MetadataKind kind)
 {
-    if (m_pending.contains(token))
-        return m_pending.value(token) == kind;
-    if (m_outstanding.size() >= 8 || m_outstanding.contains(token))
+    if (d->m_pending.contains(token))
+        return d->m_pending.value(token) == kind;
+    if (d->m_outstanding.size() >= 8 || d->m_outstanding.contains(token))
         return false;
-    m_outstanding.insert(token);
-    query.enabled = m_enabled && query.enabled;
-    m_pending.insert(token, kind);
+    d->m_outstanding.insert(token);
+    query.enabled = d->m_enabled && query.enabled;
+    d->m_pending.insert(token, kind);
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = m_worker, query = std::move(query), token = std::move(token),
+            d->m_worker,
+            [worker = d->m_worker, query = std::move(query), token = std::move(token),
              kind]() mutable {
                 worker->enqueue(std::move(query), std::move(token), kind);
             },
@@ -625,11 +639,11 @@ bool OnlineMetadataProvider::requestEnrichment(AlbumQuery query, RequestToken to
 }
 void OnlineMetadataProvider::cancel(RequestToken token)
 {
-    if (!m_pending.remove(token))
+    if (!d->m_pending.remove(token))
         return;
     QMetaObject::invokeMethod(
-            m_worker,
-            [worker = m_worker, token = std::move(token)] {
+            d->m_worker,
+            [worker = d->m_worker, token = std::move(token)] {
                 worker->cancel(token);
             },
             Qt::QueuedConnection);

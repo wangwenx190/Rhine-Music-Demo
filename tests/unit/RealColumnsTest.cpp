@@ -1,3 +1,4 @@
+#include "MotionController.h"
 #include <limits>
 #include "SelectionController.h"
 #include "PreferencesStore.h"
@@ -26,9 +27,13 @@ QList<LibraryColumn> columns(const QList<int> &counts)
     return result;
 }
 }
-class RealColumnsTest : public QObject
+class RealColumnsTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(RealColumnsTest)
+public:
+    RealColumnsTest() = default;
+
 private Q_SLOTS:
     void invalidSelectionCannotPoisonColumnState()
     {

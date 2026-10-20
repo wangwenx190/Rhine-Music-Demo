@@ -12,6 +12,10 @@ using namespace Qt::StringLiterals;
 class LocalizationTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LocalizationTest)
+public:
+    LocalizationTest() = default;
+
 private Q_SLOTS:
     void englishSourceFallback()
     {

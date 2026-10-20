@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
-from macos_bundle import digest, inspect_bundle, inventory, normalize_bundle, run
+from macos_bundle import digest, inspect_bundle, inventory, normalize_bundle, run, strip_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,7 +56,7 @@ def main():
                 shutil.copyfile(ROOT / 'qml' / path, destination)
             # The selected macdeployqt resolves frameworks/plugins and bundled media dependencies.
             subprocess.run([str(deploy), str(bundle), '-qmldir=' + scan,
-                            '-qmlimport=' + str(kit / 'qml'), '-verbose=2', '-no-codesign'],
+                            '-qmlimport=' + str(kit / 'qml'), '-verbose=2', '-no-codesign', '-no-strip'],
                            env=environment, check=True)
         # macdeployqt recursively copies QtQuick's optional LocalStorage module,
         # then every SQL driver. The product uses JSON stores, no external SQL
@@ -80,6 +80,7 @@ def main():
             raise RuntimeError('Selected Qt installation license directory is missing')
         shutil.copytree(qt_licenses, licenses / 'Qt')
         normalization = normalize_bundle(bundle)
+        strip_bundle(bundle)
         subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(bundle)], check=True)
         closure = inspect_bundle(bundle)
         closure.update(normalization)

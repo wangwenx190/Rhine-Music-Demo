@@ -1,3 +1,6 @@
+#include "SceneAdapter.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "OpeningController.h"
 #include "OpeningInk.h"
 #include "BrandPaths.h"
@@ -17,7 +20,7 @@ void near(double actual, double expected)
              qPrintable(
                      u"actual %1 expected %2"_s.arg(actual, 0, 'g', 17).arg(expected, 0, 'g', 17)));
 }
-struct Fixture
+struct Fixture final
 {
     MotionController motion;
     SelectionController selection{ &motion };
@@ -32,9 +35,13 @@ struct Fixture
     }
 };
 }
-class OpeningTest : public QObject
+class OpeningTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OpeningTest)
+public:
+    OpeningTest() = default;
+
 private Q_SLOTS:
     void sourceFormulaAndCamera()
     {

@@ -47,9 +47,13 @@ const Album *atFolder(Snapshot snapshot, const QString &folder)
     return nullptr;
 }
 }
-class DirectoryScannerTest : public QObject
+class DirectoryScannerTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(DirectoryScannerTest)
+public:
+    DirectoryScannerTest() = default;
+
 private Q_SLOTS:
     void rootValidation();
     void panelRootPaths();

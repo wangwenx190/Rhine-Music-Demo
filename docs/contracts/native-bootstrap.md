@@ -18,6 +18,16 @@ configure 每次重新发现 Kit；旧 `YALAHOO_SELECTED_QT`、任意已缓存�
 
 C++23 required、无扩展，并实际编译 `std::to_underlying` 和 `std::optional::transform`。MSVC 的 CMake C++23 映射可能为 `/std:c++latest`；能力探针失败时配置直接停止。Windows 脚本通过 vswhere 找实际 VS C++ 安装，导入 VsDevCmd 环境到当前进程；CMake/Ninja 从现有 PATH 或标准 CMake 安装位置发现，不修改全局环境。
 
+## Release代码优化
+
+`cmake/Optimization.cmake`在创建目标前统一设置优化，覆盖生产、生成QML、工具与测试。Release默认开启`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`，由`YALAHOO_RELEASE_IPO`控制；配置用CMake `CheckIPOSupported`实际编译/链接探测C++，macOS另对Objective-C++的实际LTO flags编译/链接探测，失败明确报错。其他配置不自动启用IPO或下列Release折叠/清理选项。
+
+- Windows/MSVC：`/Gy /Gw`分离COMDAT，链接`/OPT:REF /OPT:ICF`清除未引用项并合并相同代码/只读数据。
+- macOS/AppleClang：链接`-deduplicate -dead_strip`，配置先验证所选linker接受这些选项；C++与Objective-C++均使用同一Release IPO策略。
+- Linux：`-ffunction-sections -fdata-sections`及`--gc-sections`；GCC显式`-fipa-icf`并与IPO共同处理跨翻译单元，Clang用`--icf=safe`，当前linker不支持时探测LLVM lld，缺能力报错，IPO探测使用相同linker。
+
+构建期死代码清理与部署期strip各有职责；UNIX部署的包内路径和strip操作由对应[macOS](../platforms/macos.md)、[Linux](../platforms/linux.md)平台文档维护。
+
 ## 构建、测试与运行
 
 Windows 在 PowerShell 7.2 或更新版本中执行：

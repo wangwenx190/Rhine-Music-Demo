@@ -1,3 +1,4 @@
+#include "LibrarySession.h"
 #include "BackgroundMusicController.h"
 #include "InterfaceSoundController.h"
 #include "PlaybackController.h"
@@ -15,9 +16,13 @@
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-class AudioAmbienceTest : public QObject
+class AudioAmbienceTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(AudioAmbienceTest)
+public:
+    AudioAmbienceTest() = default;
+
 private Q_SLOTS:
     void realBgmGateInterruptionsAndHiddenPlayback()
     {

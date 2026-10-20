@@ -1,3 +1,4 @@
+#include "ArchivePool.h"
 #include "ColumnMemory.h"
 
 namespace yalahoo {

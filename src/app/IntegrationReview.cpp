@@ -1,3 +1,4 @@
+#include "SceneAdapter.h"
 #include "Logging.h"
 #include "IntegrationReview.h"
 #include "SceneItem.h"
@@ -107,7 +108,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     QObject reviewLifetime;
     QElapsedTimer elapsed;
     elapsed.start();
-    struct Events
+    struct Events final
     {
         std::mutex mutex;
         QVector<qint64> swapped;

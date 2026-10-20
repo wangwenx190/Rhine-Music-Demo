@@ -4,9 +4,13 @@
 #include <QQuick3DGeometry>
 #include <QtTest>
 
-class ModuleProbe : public QObject
+class ModuleProbe final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ModuleProbe)
+public:
+    ModuleProbe() = default;
+
 private Q_SLOTS:
     void quick3DLink()
     {

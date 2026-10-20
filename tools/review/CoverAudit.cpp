@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         window.setPersistentGraphics(false);
         auto *item = new RhiItem(window.contentItem());
         item->setSize({ 960, 720 });
-        struct Wait
+        struct Wait final
         {
             quint64 request = 0;
             std::optional<Capture> capture;

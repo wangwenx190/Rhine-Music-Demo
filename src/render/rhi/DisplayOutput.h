@@ -9,11 +9,12 @@ namespace yalahoo {
 class DisplayOutput : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool hdrActive READ hdrActive NOTIFY changed)
-    Q_PROPERTY(bool ready READ ready NOTIFY changed)
-    Q_PROPERTY(float whiteScale READ whiteScale NOTIFY changed)
-    Q_PROPERTY(float headroom READ headroom NOTIFY changed)
-    Q_PROPERTY(bool hdr10 READ hdr10 NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(DisplayOutput)
+    Q_PROPERTY(bool hdrActive READ hdrActive NOTIFY changed FINAL)
+    Q_PROPERTY(bool ready READ ready NOTIFY changed FINAL)
+    Q_PROPERTY(float whiteScale READ whiteScale NOTIFY changed FINAL)
+    Q_PROPERTY(float headroom READ headroom NOTIFY changed FINAL)
+    Q_PROPERTY(bool hdr10 READ hdr10 NOTIFY changed FINAL)
 public:
     explicit DisplayOutput(QObject *parent = nullptr);
     explicit DisplayOutput(std::unique_ptr<DisplayMonitor> monitor, QObject *parent = nullptr);

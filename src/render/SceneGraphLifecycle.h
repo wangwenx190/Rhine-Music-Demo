@@ -7,9 +7,11 @@ namespace yalahoo {
 class SceneGraphLifecycle : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QQuickWindow *window READ window WRITE setWindow NOTIFY windowChanged)
-    Q_PROPERTY(bool available READ available NOTIFY availableChanged)
+    Q_DISABLE_COPY_MOVE(SceneGraphLifecycle)
+    Q_PROPERTY(QQuickWindow *window READ window WRITE setWindow NOTIFY windowChanged FINAL)
+    Q_PROPERTY(bool available READ available NOTIFY availableChanged FINAL)
 public:
+    SceneGraphLifecycle() = default;
     using QObject::QObject;
     QQuickWindow *window() const;
     void setWindow(QQuickWindow *window);

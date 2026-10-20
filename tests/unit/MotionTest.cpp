@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "MotionController.h"
 #include "MotionFunctions.h"
 #include <QCryptographicHash>
@@ -36,9 +37,14 @@ ArchiveValues values(const QJsonObject &object)
     return result;
 }
 }
-class MotionTest : public QObject
+class MotionTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MotionTest)
+public:
+    MotionTest() = default;
+
+private:
     std::array<double, 3> maxError{ };
     int r01Samples = 0, extendedSamples = 0;
     void near(double actual, double expected, size_t derivative = 0)

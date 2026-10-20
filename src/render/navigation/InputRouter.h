@@ -1,17 +1,22 @@
 #pragma once
-#include "SelectionController.h"
+#include "ArchivePool.h"
+#include <QPointer>
 #include <QElapsedTimer>
-#include <QQuickWindow>
-#include <QWheelEvent>
+
+class QQuickWindow;
+class QWheelEvent;
+class QKeyEvent;
 
 namespace yalahoo {
+class SelectionController;
 class InputRouter final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
-    Q_PROPERTY(int rowDirection READ rowDirection NOTIFY directionChanged)
-    Q_PROPERTY(int columnDirection READ columnDirection NOTIFY directionChanged)
-    Q_PROPERTY(int navigationDirection READ navigationDirection NOTIFY directionChanged)
+    Q_DISABLE_COPY_MOVE(InputRouter)
+    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged FINAL)
+    Q_PROPERTY(int rowDirection READ rowDirection NOTIFY directionChanged FINAL)
+    Q_PROPERTY(int columnDirection READ columnDirection NOTIFY directionChanged FINAL)
+    Q_PROPERTY(int navigationDirection READ navigationDirection NOTIFY directionChanged FINAL)
 public:
     explicit InputRouter(SelectionController *selection, QObject *parent = nullptr);
     void attach(QQuickWindow *window);

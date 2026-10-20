@@ -1,3 +1,5 @@
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "OverviewController.h"
 #include "SceneAdapter.h"
 #include "DetailPorts.h"
@@ -15,7 +17,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-struct Fixture
+struct Fixture final
 {
     MotionController motion;
     OverviewController overview{ &motion };
@@ -69,9 +71,13 @@ QVector<OverviewColumn> columns(const QJsonArray &array)
     return result;
 }
 }
-class OverviewTest : public QObject
+class OverviewTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OverviewTest)
+public:
+    OverviewTest() = default;
+
 private Q_SLOTS:
     void dependencyTeardownClearsOverviewAndRejectsNewCommands()
     {

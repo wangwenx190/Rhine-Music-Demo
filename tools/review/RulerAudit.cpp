@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "RulerAudit.h"
 #include "RulerController.h"
 #include "RulerInk.h"

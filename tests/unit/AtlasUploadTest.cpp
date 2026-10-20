@@ -1,9 +1,13 @@
 #include "AtlasUpload.h"
 #include <QtTest>
 using namespace yalahoo::rhi;
-class AtlasUploadTest : public QObject
+class AtlasUploadTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(AtlasUploadTest)
+public:
+    AtlasUploadTest() = default;
+
 private Q_SLOTS:
     void highResolutionRegionReadiness()
     {

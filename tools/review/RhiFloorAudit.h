@@ -1,6 +1,6 @@
 // Included by RhiShadowAudit after its independent source PCF reference.
 // All values below derive from Three 0.183.2 MeshStandardMaterial, not rendered references.
-struct FloorLookup
+struct FloorLookup final
 {
     QByteArray pixels;
     int width, height;

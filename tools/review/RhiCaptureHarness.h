@@ -1,4 +1,5 @@
 #pragma once
+#include <QtClassHelperMacros>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
 #include "OffscreenSurface.h"
@@ -16,8 +17,9 @@ using Qt::StringLiterals::operator""_s;
 
 namespace yalahoo::review {
 // Review-only serial driver. A normal event loop waits for actual frame/readback events.
-class RhiCaptureHarness
+class RhiCaptureHarness final
 {
+    Q_DISABLE_COPY_MOVE(RhiCaptureHarness)
 public:
     RhiCaptureHarness(const std::function<rhi::RhiItem *(QQuickItem *)> &create = { })
         : m_create(create), m_quitOnClose(QGuiApplication::quitOnLastWindowClosed())
@@ -186,7 +188,7 @@ private:
         oldSurface.reset();
         item = nullptr;
     }
-    struct State
+    struct State final
     {
         quint64 request = 0;
         QPointer<QEventLoop> loop;

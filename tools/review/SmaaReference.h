@@ -11,7 +11,7 @@
 
 namespace smaa_reference {
 using Pixel = std::array<double, 4>;
-struct Image
+struct Image final
 {
     QSize size;
     std::vector<Pixel> pixels;

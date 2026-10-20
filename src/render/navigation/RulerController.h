@@ -6,13 +6,13 @@
 
 namespace yalahoo {
 class InputRouter;
-struct RulerMark
+struct RulerMark final
 {
     double x = 0, height = 0, alpha = 0;
     bool visible = false, active = false, hovering = false;
     bool operator==(const RulerMark &) const = default;
 };
-struct RulerDrawing
+struct RulerDrawing final
 {
     std::array<RulerMark, 16> marks;
     double width = 0, tick = 3, gap = 8, height = 30;
@@ -22,10 +22,11 @@ struct RulerDrawing
 class RulerController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantList slotStates READ slotStates NOTIFY changed)
-    Q_PROPERTY(double width READ width NOTIFY changed)
-    Q_PROPERTY(bool narrow READ narrow WRITE setNarrow NOTIFY geometryChanged)
-    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
+    Q_DISABLE_COPY_MOVE(RulerController)
+    Q_PROPERTY(QVariantList slotStates READ slotStates NOTIFY changed FINAL)
+    Q_PROPERTY(double width READ width NOTIFY changed FINAL)
+    Q_PROPERTY(bool narrow READ narrow WRITE setNarrow NOTIFY geometryChanged FINAL)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged FINAL)
 public:
     RulerController(MotionController *motion, SelectionController *selection,
                     QObject *parent = nullptr);
@@ -49,7 +50,7 @@ Q_SIGNALS:
     void inputReceived();
 
 private:
-    struct Slot
+    struct Slot final
     {
         double ordinal = 0, x = 0;
         ScalarSpring offset, presence, height, opacity;

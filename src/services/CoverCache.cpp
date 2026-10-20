@@ -1,5 +1,9 @@
+#include <atomic>
 #include <QCoreApplication>
 #include "CoverCache.h"
+#include <QSet>
+#include <QTimer>
+#include <QHash>
 #include "MusicTypes.h"
 #include <QImageReader>
 #include <QColorSpace>
@@ -38,8 +42,22 @@ qint64 CoverPixels::byteSize() const
     }
     return bytes;
 }
-struct CoverCache::State
+struct CoverCache::Job final
 {
+    QString key, identity, path, title;
+    int resolution = 256;
+    quint64 generation = 0;
+    std::shared_ptr<std::atomic_bool> wanted;
+};
+struct CoverCache::Entry final
+{
+    CoverSnapshot pixels;
+    quint64 used = 0;
+};
+struct CoverCache::State final
+{
+    Q_DISABLE_COPY_MOVE(State)
+    State() = default;
     QMutex mutex;
     CoverCache *receiver = nullptr;
     std::atomic<quint64> generation{ 1 };
@@ -56,19 +74,37 @@ QThreadPool &decodePool()
     return pool;
 }
 }
-CoverCache::CoverCache(QObject *parent) : QObject(parent), m_state(std::make_shared<State>())
+struct CoverCache::Private final
 {
-    m_state->receiver = this;
-    m_retry.setSingleShot(true);
-    m_retry.setInterval(10);
-    connect(&m_retry, &QTimer::timeout, this, &CoverCache::pump);
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    std::shared_ptr<State> m_state;
+    QTimer m_retry;
+    QList<Job> m_pending;
+    QSet<QString> m_pendingKeys;
+    QHash<QString, Job> m_running;
+    QHash<QString, Entry> m_cache;
+    qint64 m_bytes = 0, m_workingSetBytes = 0, m_peakWorkingSetBytes = 0;
+    bool m_suspended = false;
+    int m_active = 0, m_peakActive = 0, m_peakPending = 0;
+    quint64 m_clock = 0, m_decodes = 0, m_rejected = 0, m_stale = 0;
+    qint64 m_peakReaderBytes = 0;
+    int m_decoderScaledResults = 0;
+};
+CoverCache::CoverCache(QObject *parent) : QObject(parent), d(std::make_unique<Private>())
+{
+    d->m_state = std::make_shared<State>();
+    d->m_state->receiver = this;
+    d->m_retry.setSingleShot(true);
+    d->m_retry.setInterval(10);
+    connect(&d->m_retry, &QTimer::timeout, this, &CoverCache::pump);
 }
 CoverCache::~CoverCache()
 {
     // The lock only covers posting callbacks, never decoding. No worker wait on GUI shutdown.
-    const QMutexLocker lock(&m_state->mutex);
-    m_state->receiver = nullptr;
-    ++m_state->generation;
+    const QMutexLocker lock(&d->m_state->mutex);
+    d->m_state->receiver = nullptr;
+    ++d->m_state->generation;
 }
 void CoverCache::finishDecoders()
 {
@@ -86,22 +122,22 @@ QString CoverCache::key(const QString &identity, const QString &path, int resolu
 }
 quint64 CoverCache::generation() const
 {
-    return m_state->generation.load();
+    return d->m_state->generation.load();
 }
 CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, int resolution,
                                  const QString &title)
 {
     if (!path.isEmpty()) {
-        auto artwork = m_cache.find(key(identity, path, resolution, { }));
-        if (artwork != m_cache.end() && artwork->pixels->error.isEmpty()) {
-            artwork->used = ++m_clock;
+        auto artwork = d->m_cache.find(key(identity, path, resolution, { }));
+        if (artwork != d->m_cache.end() && artwork->pixels->error.isEmpty()) {
+            artwork->used = ++d->m_clock;
             return artwork->pixels;
         }
     }
-    auto it = m_cache.find(key(identity, path, resolution, title));
-    if (it == m_cache.end())
+    auto it = d->m_cache.find(key(identity, path, resolution, title));
+    if (it == d->m_cache.end())
         return { };
-    it->used = ++m_clock;
+    it->used = ++d->m_clock;
     return it->pixels;
 }
 bool CoverCache::request(QString identity, QString path, int resolution, QString title)
@@ -109,47 +145,47 @@ bool CoverCache::request(QString identity, QString path, int resolution, QString
     if (identity.isEmpty() || identity.size() > 1024 || path.size() > 32768 || title.size() > 256
         || (resolution <= 0 || (resolution & (resolution - 1)) != 0)
         || qint64(resolution) > std::numeric_limits<qint64>::max() / resolution / 36) {
-        ++m_rejected;
+        ++d->m_rejected;
         return false;
     }
     const auto cacheKey = key(identity, path, resolution, title);
     if (lookup(identity, path, resolution, title))
         return true;
-    const auto running = m_running.constFind(cacheKey);
-    if (running != m_running.cend() && running->generation == generation()
+    const auto running = d->m_running.constFind(cacheKey);
+    if (running != d->m_running.cend() && running->generation == generation()
         && running->wanted->load())
         return true;
-    if (m_pendingKeys.contains(cacheKey))
+    if (d->m_pendingKeys.contains(cacheKey))
         return true;
-    if (m_pending.size() >= pendingLimit) {
-        ++m_rejected;
+    if (d->m_pending.size() >= pendingLimit) {
+        ++d->m_rejected;
         return false;
     }
-    m_pending.append({ cacheKey, std::move(identity), std::move(path), std::move(title), resolution,
-                       generation(), std::make_shared<std::atomic_bool>(true) });
-    m_pendingKeys.insert(cacheKey);
-    m_peakPending = qMax(m_peakPending, int(m_pending.size()));
+    d->m_pending.append({ cacheKey, std::move(identity), std::move(path), std::move(title),
+                          resolution, generation(), std::make_shared<std::atomic_bool>(true) });
+    d->m_pendingKeys.insert(cacheKey);
+    d->m_peakPending = qMax(d->m_peakPending, int(d->m_pending.size()));
     pump();
     return true;
 }
 void CoverCache::reset()
 {
-    ++m_state->generation;
-    m_pending.clear();
-    m_pendingKeys.clear();
-    m_cache.clear();
-    m_bytes = 0;
+    ++d->m_state->generation;
+    d->m_pending.clear();
+    d->m_pendingKeys.clear();
+    d->m_cache.clear();
+    d->m_bytes = 0;
     // Running jobs retain their reservations until their completion is consumed.
-    m_retry.stop();
+    d->m_retry.stop();
 }
 void CoverCache::cancel(const QString &identity)
 {
-    m_pending.removeIf([this, &identity](const Job &job) {
+    d->m_pending.removeIf([this, &identity](const Job &job) {
         if (job.identity == identity)
-            m_pendingKeys.remove(job.key);
+            d->m_pendingKeys.remove(job.key);
         return job.identity == identity;
     });
-    for (const auto &job : m_running) {
+    for (const auto &job : d->m_running) {
         if (job.identity == identity)
             job.wanted->store(false);
     }
@@ -157,10 +193,10 @@ void CoverCache::cancel(const QString &identity)
 void CoverCache::invalidate(const QString &identity)
 {
     cancel(identity);
-    for (auto it = m_cache.begin(); it != m_cache.end();) {
+    for (auto it = d->m_cache.begin(); it != d->m_cache.end();) {
         if (it->pixels->identity == identity) {
-            m_bytes -= it->pixels->byteSize();
-            it = m_cache.erase(it);
+            d->m_bytes -= it->pixels->byteSize();
+            it = d->m_cache.erase(it);
         } else {
             ++it;
         }
@@ -168,21 +204,21 @@ void CoverCache::invalidate(const QString &identity)
 }
 void CoverCache::setSuspended(bool suspended)
 {
-    if (m_suspended == suspended)
+    if (d->m_suspended == suspended)
         return;
-    m_suspended = suspended;
+    d->m_suspended = suspended;
     if (suspended)
-        m_retry.stop();
+        d->m_retry.stop();
     else
         pump();
 }
 void CoverCache::pump()
 {
-    if (m_suspended)
+    if (d->m_suspended)
         return;
-    while (m_active < concurrency && !m_pending.isEmpty()) {
-        const auto job = m_pending.first();
-        const auto state = m_state;
+    while (d->m_active < concurrency && !d->m_pending.isEmpty()) {
+        const auto job = d->m_pending.first();
+        const auto state = d->m_state;
         const bool started = decodePool().tryStart([job, state] {
             const auto pixels = decode(job, state);
             const QMutexLocker lock(&state->mutex);
@@ -197,17 +233,17 @@ void CoverCache::pump()
             }
         });
         if (!started) {
-            m_retry.start();
+            d->m_retry.start();
             return;
         }
-        m_pending.removeFirst();
-        m_pendingKeys.remove(job.key);
-        m_running.insert(job.key, job);
-        ++m_active;
-        m_workingSetBytes += workingSetEstimateFor(job.resolution);
-        m_peakWorkingSetBytes = std::max(m_peakWorkingSetBytes, m_workingSetBytes);
-        ++m_decodes;
-        m_peakActive = qMax(m_peakActive, m_active);
+        d->m_pending.removeFirst();
+        d->m_pendingKeys.remove(job.key);
+        d->m_running.insert(job.key, job);
+        ++d->m_active;
+        d->m_workingSetBytes += workingSetEstimateFor(job.resolution);
+        d->m_peakWorkingSetBytes = std::max(d->m_peakWorkingSetBytes, d->m_workingSetBytes);
+        ++d->m_decodes;
+        d->m_peakActive = qMax(d->m_peakActive, d->m_active);
     }
 }
 qint64 CoverCache::workingSetEstimateFor(int resolution)
@@ -391,35 +427,35 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
 }
 void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 {
-    --m_active;
-    m_workingSetBytes -= workingSetEstimateFor(job.resolution);
-    if (m_running.value(job.key).wanted == job.wanted)
-        m_running.remove(job.key);
+    --d->m_active;
+    d->m_workingSetBytes -= workingSetEstimateFor(job.resolution);
+    if (d->m_running.value(job.key).wanted == job.wanted)
+        d->m_running.remove(job.key);
     if (job.generation != generation() || !job.wanted->load() || !pixels) {
-        ++m_stale;
+        ++d->m_stale;
     } else {
         const qint64 bytes = pixels->byteSize();
         const auto completedKey = pixels->error.isEmpty() && !job.path.isEmpty()
                 ? key(job.identity, job.path, job.resolution, { })
                 : job.key;
-        if (const auto previous = m_cache.find(completedKey); previous != m_cache.end()) {
-            m_bytes -= previous->pixels->byteSize();
-            m_cache.erase(previous);
+        if (const auto previous = d->m_cache.find(completedKey); previous != d->m_cache.end()) {
+            d->m_bytes -= previous->pixels->byteSize();
+            d->m_cache.erase(previous);
         }
-        m_peakReaderBytes = qMax(m_peakReaderBytes, pixels->readerReturnedBytes);
-        m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
+        d->m_peakReaderBytes = qMax(d->m_peakReaderBytes, pixels->readerReturnedBytes);
+        d->m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
         if (bytes <= cacheLimit) {
-            while (m_bytes + bytes > cacheLimit && !m_cache.isEmpty()) {
-                auto oldest = m_cache.begin();
-                for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
+            while (d->m_bytes + bytes > cacheLimit && !d->m_cache.isEmpty()) {
+                auto oldest = d->m_cache.begin();
+                for (auto it = d->m_cache.begin(); it != d->m_cache.end(); ++it) {
                     if (it->used < oldest->used)
                         oldest = it;
                 }
-                m_bytes -= oldest->pixels->byteSize();
-                m_cache.erase(oldest);
+                d->m_bytes -= oldest->pixels->byteSize();
+                d->m_cache.erase(oldest);
             }
-            m_cache.insert(completedKey, { pixels, ++m_clock });
-            m_bytes += bytes;
+            d->m_cache.insert(completedKey, { pixels, ++d->m_clock });
+            d->m_bytes += bytes;
         }
         const QPointer<CoverCache> guard(this);
         Q_EMIT ready(pixels);
@@ -431,26 +467,26 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 QJsonObject CoverCache::statistics() const
 {
     return { { u"generation"_s, qint64(generation()) },
-             { u"suspended"_s, m_suspended },
-             { u"pending"_s, m_pending.size() },
-             { u"active"_s, m_active },
-             { u"peakPending"_s, m_peakPending },
-             { u"peakActive"_s, m_peakActive },
-             { u"peakInFlightWorkingSetEstimateBytes"_s, m_peakWorkingSetBytes },
+             { u"suspended"_s, d->m_suspended },
+             { u"pending"_s, d->m_pending.size() },
+             { u"active"_s, d->m_active },
+             { u"peakPending"_s, d->m_peakPending },
+             { u"peakActive"_s, d->m_peakActive },
+             { u"peakInFlightWorkingSetEstimateBytes"_s, d->m_peakWorkingSetBytes },
              { u"imageAllocationLimitBytes"_s,
                QImageReader::allocationLimit() > 0
                        ? QJsonValue(qint64(QImageReader::allocationLimit()) * 1024 * 1024)
                        : QJsonValue(QJsonValue::Null) },
-             { u"peakReaderReturnedBytesPerJob"_s, m_peakReaderBytes },
-             { u"decoderScaledResults"_s, m_decoderScaledResults },
-             { u"completedLruBytes"_s, m_bytes },
-             { u"inFlightWorkingSetEstimateBytes"_s, m_workingSetBytes },
-             { u"decodeStarts"_s, qint64(m_decodes) },
-             { u"rejected"_s, qint64(m_rejected) },
-             { u"stale"_s, qint64(m_stale) } };
+             { u"peakReaderReturnedBytesPerJob"_s, d->m_peakReaderBytes },
+             { u"decoderScaledResults"_s, d->m_decoderScaledResults },
+             { u"completedLruBytes"_s, d->m_bytes },
+             { u"inFlightWorkingSetEstimateBytes"_s, d->m_workingSetBytes },
+             { u"decodeStarts"_s, qint64(d->m_decodes) },
+             { u"rejected"_s, qint64(d->m_rejected) },
+             { u"stale"_s, qint64(d->m_stale) } };
 }
 bool CoverCache::hasPendingCapacity() const
 {
-    return m_pending.size() < pendingLimit;
+    return d->m_pending.size() < pendingLimit;
 }
 }

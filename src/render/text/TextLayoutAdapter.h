@@ -4,7 +4,7 @@
 #include <QCache>
 
 namespace yalahoo {
-struct ResolvedGlyphRun
+struct ResolvedGlyphRun final
 {
     QFont font;
     QByteArray fontHead;
@@ -13,7 +13,7 @@ struct ResolvedGlyphRun
     QGlyphRun::GlyphRunFlags flags;
     bool operator==(const ResolvedGlyphRun &) const = default;
 };
-struct TitleGlyph
+struct TitleGlyph final
 {
     QString key, text;
     bool translation = false;
@@ -23,7 +23,7 @@ struct TitleGlyph
     double baseline = 0;
     bool colorGlyph = false;
 };
-struct TitleLayout
+struct TitleLayout final
 {
     QList<TitleGlyph> glyphs;
     QString fitted;
@@ -36,8 +36,9 @@ inline bool sameGlyphInk(const TitleGlyph &a, const TitleGlyph &b)
     return a.text == b.text && a.font == b.font && a.height == b.height && a.scale == b.scale
             && a.colorGlyph == b.colorGlyph && a.renderRuns == b.renderRuns;
 }
-class TextLayoutAdapter
+class TextLayoutAdapter final
 {
+    Q_DISABLE_COPY_MOVE(TextLayoutAdapter)
 public:
     static constexpr int CacheBytes = 8 * 1024 * 1024;
     TextLayoutAdapter();

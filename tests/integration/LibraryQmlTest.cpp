@@ -10,9 +10,11 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
-class InjectedProvider : public IMetadataProvider
+class InjectedProvider final : public IMetadataProvider
 {
+    Q_DISABLE_COPY_MOVE(InjectedProvider)
 public:
+    InjectedProvider() = default;
     using IMetadataProvider::IMetadataProvider;
     ProviderStatus status = ProviderStatus::Matched;
     ProviderCapabilities capabilities() const override
@@ -43,9 +45,13 @@ public:
     {
     }
 };
-class LibraryQmlTest : public QObject
+class LibraryQmlTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LibraryQmlTest)
+public:
+    LibraryQmlTest() = default;
+
 private Q_SLOTS:
     void readsRolesAndInjectedResults()
     {

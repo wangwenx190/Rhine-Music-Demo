@@ -11,9 +11,14 @@
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
-class RenderQualityTest : public QObject
+class RenderQualityTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(RenderQualityTest)
+public:
+    RenderQualityTest() = default;
+
+private:
     QJsonObject load(const char *name)
     {
         QFile f((QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/occlusion/"_s)

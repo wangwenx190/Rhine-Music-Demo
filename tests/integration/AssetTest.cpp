@@ -21,9 +21,14 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo::assets;
-class AssetTest : public QObject
+class AssetTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(AssetTest)
+public:
+    AssetTest() = default;
+
+private:
     QJsonArray evidence;
 private Q_SLOTS:
     void initTestCase()

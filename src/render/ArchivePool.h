@@ -4,12 +4,12 @@
 #include <array>
 
 namespace yalahoo {
-struct ArchiveCell
+struct ArchiveCell final
 {
     double lane = 2, row = 12;
     bool operator==(const ArchiveCell &) const = default;
 };
-struct ArchiveInstance
+struct ArchiveInstance final
 {
     ArchiveCell cell;
     QString albumId;
@@ -19,9 +19,11 @@ struct ArchiveInstance
     double clarity = 0;
     bool operator==(const ArchiveInstance &) const = default;
 };
-class ArchivePool
+class ArchivePool final
 {
+    Q_DISABLE_COPY_MOVE(ArchivePool)
 public:
+    ArchivePool() = default;
     static constexpr int lanes = 9, rows = 48, capacity = lanes * rows;
     static constexpr double columnSpacing = 5.2, rowSpacing = .62;
     static int wrap(double value, int count);

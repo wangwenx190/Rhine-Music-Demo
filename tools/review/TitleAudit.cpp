@@ -1,3 +1,4 @@
+#include "FrameClock.h"
 #include "OffscreenSurface.h"
 #include "TitleAudit.h"
 #include "BackendCapabilities.h"

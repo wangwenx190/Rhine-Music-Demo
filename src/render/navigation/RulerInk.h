@@ -4,7 +4,7 @@
 #include <atomic>
 
 namespace yalahoo {
-struct RulerInkStats
+struct RulerInkStats final
 {
     std::atomic<quint64> paints{ 0 }, syncs{ 0 }, paintNs{ 0 }, syncNs{ 0 };
     std::atomic<int> renderers{ 0 };
@@ -13,9 +13,10 @@ RulerInkStats &rulerInkStats();
 class RulerInk : public QCanvasPainterItem
 {
     Q_OBJECT
-    Q_PROPERTY(yalahoo::RulerController *controller READ controller WRITE setController NOTIFY controllerChanged)
-    Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY colorsChanged)
-    Q_PROPERTY(QColor accent READ accent WRITE setAccent NOTIFY colorsChanged)
+    Q_DISABLE_COPY_MOVE(RulerInk)
+    Q_PROPERTY(yalahoo::RulerController *controller READ controller WRITE setController NOTIFY controllerChanged FINAL)
+    Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY colorsChanged FINAL)
+    Q_PROPERTY(QColor accent READ accent WRITE setAccent NOTIFY colorsChanged FINAL)
 public:
     explicit RulerInk(QQuickItem *parent = nullptr);
     RulerController *controller() const;

@@ -1,19 +1,22 @@
 #pragma once
-#include "FrameClock.h"
+#include <QObject>
 #include <QEasingCurve>
 #include <QObject>
 #include <functional>
 #include <optional>
 
 namespace yalahoo {
+class FrameClock;
+
 // Frozen ui-transitions.ts: one replaceable animation, driven by the shared clock.
 class SurfaceTransition final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(double opacity READ opacity NOTIFY changed)
-    Q_PROPERTY(double offset READ offset NOTIFY changed)
-    Q_PROPERTY(bool shown READ shown NOTIFY changed)
-    Q_PROPERTY(bool running READ running NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(SurfaceTransition)
+    Q_PROPERTY(double opacity READ opacity NOTIFY changed FINAL)
+    Q_PROPERTY(double offset READ offset NOTIFY changed FINAL)
+    Q_PROPERTY(bool shown READ shown NOTIFY changed FINAL)
+    Q_PROPERTY(bool running READ running NOTIFY changed FINAL)
 public:
     SurfaceTransition(double enterMs, double exitMs, bool right, bool browse,
                       QObject *parent = nullptr);

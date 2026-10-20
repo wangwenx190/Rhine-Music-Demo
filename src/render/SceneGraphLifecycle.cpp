@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "SceneGraphLifecycle.h"
 
 namespace yalahoo {

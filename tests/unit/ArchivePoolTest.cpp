@@ -1,3 +1,4 @@
+#include "MotionController.h"
 #include "SelectionController.h"
 #include "SceneAdapter.h"
 #include "LibrarySession.h"
@@ -30,9 +31,14 @@ ArchiveCell cell(QJsonObject value)
     return { value[u"lane"_s].toDouble(), value[u"row"_s].toDouble() };
 }
 }
-class ArchivePoolTest : public QObject
+class ArchivePoolTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ArchivePoolTest)
+public:
+    ArchivePoolTest() = default;
+
+private:
     QJsonObject golden;
 private Q_SLOTS:
     void wrappingNeverProducesTheCountAtNegativeBoundary()

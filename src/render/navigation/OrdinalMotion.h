@@ -7,7 +7,7 @@
 
 namespace yalahoo {
 // Frozen rolling-number's 49-point critically damped track, sampled by the shared clock.
-struct OrdinalTrack
+struct OrdinalTrack final
 {
     std::array<double, 49> points{ };
     double value = 0, velocity = 0, target = 0, elapsed = .460;
@@ -17,14 +17,15 @@ struct OrdinalTrack
 class OrdinalMotion : public QObject, public QQmlParserStatus
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OrdinalMotion)
     Q_INTERFACES(QQmlParserStatus)
-    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY clockChanged)
-    Q_PROPERTY(int value READ value WRITE setValue NOTIFY valueChanged)
-    Q_PROPERTY(int digits READ digits WRITE setDigits NOTIFY digitsChanged)
-    Q_PROPERTY(int direction READ direction WRITE setDirection NOTIFY directionChanged)
-    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
-    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
-    Q_PROPERTY(QVariantList faces READ faces NOTIFY changed)
+    Q_PROPERTY(yalahoo::FrameClock *clock READ clock WRITE setClock NOTIFY clockChanged FINAL)
+    Q_PROPERTY(int value READ value WRITE setValue NOTIFY valueChanged FINAL)
+    Q_PROPERTY(int digits READ digits WRITE setDigits NOTIFY digitsChanged FINAL)
+    Q_PROPERTY(int direction READ direction WRITE setDirection NOTIFY directionChanged FINAL)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged FINAL)
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged FINAL)
+    Q_PROPERTY(QVariantList faces READ faces NOTIFY changed FINAL)
 public:
     explicit OrdinalMotion(QObject *parent = nullptr);
     void classBegin() override;

@@ -1,3 +1,4 @@
+#include "MotionController.h"
 #include "OverviewReview.h"
 #include "OverviewController.h"
 #include "SceneAdapter.h"

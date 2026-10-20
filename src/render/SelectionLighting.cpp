@@ -1,3 +1,4 @@
+#include "RowLightController.h"
 #include "SelectionLighting.h"
 #include <QVector4D>
 #include <algorithm>

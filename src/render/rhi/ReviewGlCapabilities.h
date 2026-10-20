@@ -18,7 +18,7 @@ using Qt::StringLiterals::operator""_s;
 namespace yalahoo::review {
 Q_STATIC_LOGGING_CATEGORY(logReviewGl, "yalahoo.render", QtInfoMsg)
 #if defined(Q_OS_MACOS)
-class ReviewRhiResourceAccess : public QRhiResource
+class ReviewRhiResourceAccess final : public QRhiResource
 {
 public:
     static QRhiImplementation *implementation(const QRhiResource &resource)

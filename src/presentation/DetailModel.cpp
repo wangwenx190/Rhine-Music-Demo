@@ -1,3 +1,4 @@
+#include "LibrarySession.h"
 #include <QCoreApplication>
 #include "DetailModel.h"
 #include <QSet>
@@ -218,7 +219,7 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                     { u"trackId"_s, producer.trackId } });
         }
         // Group once per immutable album. Stable track IDs resolve through the index above.
-        struct CreditGroup
+        struct CreditGroup final
         {
             QString name;
             QStringList roles, sources, tracks, unscoped;

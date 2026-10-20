@@ -8,7 +8,7 @@
 using Qt::StringLiterals::operator""_L1;
 
 namespace yalahoo {
-struct OpeningPath
+struct OpeningPath final
 {
     QPainterPath centerline;
     QCanvasPath full;
@@ -16,7 +16,7 @@ struct OpeningPath
     double start = 0, end = 1, width = 16;
     bool accent = false, decoration = false, point = false;
 };
-struct OpeningInkStats
+struct OpeningInkStats final
 {
     std::atomic<quint64> paints{ 0 }, syncs{ 0 }, paintNs{ 0 }, syncNs{ 0 };
     std::atomic<int> renderers{ 0 };
@@ -26,10 +26,11 @@ QVector<OpeningPath> loadOpeningPaths();
 class OpeningInk : public QCanvasPainterItem
 {
     Q_OBJECT
-    Q_PROPERTY(double time READ time WRITE setTime NOTIFY timeChanged)
-    Q_PROPERTY(bool orbit READ orbit WRITE setOrbit NOTIFY orbitChanged)
-    Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY colorsChanged)
-    Q_PROPERTY(QColor accent READ accent WRITE setAccent NOTIFY colorsChanged)
+    Q_DISABLE_COPY_MOVE(OpeningInk)
+    Q_PROPERTY(double time READ time WRITE setTime NOTIFY timeChanged FINAL)
+    Q_PROPERTY(bool orbit READ orbit WRITE setOrbit NOTIFY orbitChanged FINAL)
+    Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY colorsChanged FINAL)
+    Q_PROPERTY(QColor accent READ accent WRITE setAccent NOTIFY colorsChanged FINAL)
 public:
     explicit OpeningInk(QQuickItem *parent = nullptr);
     double time() const

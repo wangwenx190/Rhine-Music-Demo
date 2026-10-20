@@ -11,15 +11,16 @@ namespace {
 std::atomic<int> nodes{ 0 };
 std::atomic<quint64> rebuilds{ 0 };
 std::atomic<quint64> reused{ 0 };
-struct FaceNode
+struct FaceNode final
 {
     QSGTransformNode *transform = nullptr;
     QSGClipNode *clip = nullptr;
     QSGTextNode *text = nullptr;
     TitleGlyph glyph;
 };
-class InkNode : public QSGNode
+class InkNode final : public QSGNode
 {
+    Q_DISABLE_COPY_MOVE(InkNode)
 public:
     InkNode()
     {

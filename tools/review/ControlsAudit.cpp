@@ -1,3 +1,4 @@
+#include <QQuickWindow>
 #include "ControlsAudit.h"
 #include "OffscreenSurface.h"
 #include "VerificationWindow.h"

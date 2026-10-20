@@ -4,7 +4,7 @@
 
 namespace yalahoo {
 // Worker-only, content-addressed artwork. Never writes the source image/song.
-class ArtworkStore
+class ArtworkStore final
 {
 public:
     static constexpr qint64 maximumBytes = 30 * 1024 * 1024;

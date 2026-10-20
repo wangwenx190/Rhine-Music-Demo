@@ -11,7 +11,7 @@ inline void require(bool ok, const char *reason)
     if (!ok)
         throw std::runtime_error(reason);
 }
-struct ResourceUpdateDeleter
+struct ResourceUpdateDeleter final
 {
     void operator()(QRhiResourceUpdateBatch *batch) const noexcept
     {

@@ -11,9 +11,10 @@ class AudioAmbienceTest;
 class InterfaceSoundController : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY settingsChanged)
-    Q_PROPERTY(bool available READ available CONSTANT)
+    Q_DISABLE_COPY_MOVE(InterfaceSoundController)
+    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY settingsChanged FINAL)
+    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY settingsChanged FINAL)
+    Q_PROPERTY(bool available READ available CONSTANT FINAL)
 public:
     explicit InterfaceSoundController(QObject *parent = nullptr);
     ~InterfaceSoundController() override;

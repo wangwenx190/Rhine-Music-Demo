@@ -81,7 +81,7 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
     result.status = ProviderStatus::Uncertain;
     if (!basicMatch(album, release))
         return result;
-    struct Recording
+    struct Recording final
     {
         QJsonObject object;
         QString title;

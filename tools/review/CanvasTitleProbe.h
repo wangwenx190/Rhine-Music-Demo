@@ -3,7 +3,7 @@
 #include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>
 #include <atomic>
-struct CanvasTitleStats
+struct CanvasTitleStats final
 {
     std::atomic<int> renderers{ 0 };
     std::atomic<quint64> paints{ 0 }, syncs{ 0 };
@@ -13,11 +13,12 @@ CanvasTitleStats &canvasTitleStats();
 class CanvasTitleProbe : public QCanvasPainterItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CanvasTitleProbe)
     QML_ELEMENT
-    Q_PROPERTY(yalahoo::TitleReel *controller READ controller WRITE setController NOTIFY changed)
-    Q_PROPERTY(QColor ink MEMBER ink NOTIFY changed)
-    Q_PROPERTY(QColor muted MEMBER muted NOTIFY changed)
-    Q_PROPERTY(bool offscreenRendering MEMBER offscreenRendering NOTIFY changed)
+    Q_PROPERTY(yalahoo::TitleReel *controller READ controller WRITE setController NOTIFY changed FINAL)
+    Q_PROPERTY(QColor ink MEMBER ink NOTIFY changed FINAL)
+    Q_PROPERTY(QColor muted MEMBER muted NOTIFY changed FINAL)
+    Q_PROPERTY(bool offscreenRendering MEMBER offscreenRendering NOTIFY changed FINAL)
 public:
     explicit CanvasTitleProbe(QQuickItem *parent = nullptr);
     yalahoo::TitleReel *controller() const;

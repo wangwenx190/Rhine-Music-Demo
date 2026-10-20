@@ -8,10 +8,11 @@ namespace yalahoo {
 class OptionMetrics : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantList model READ model WRITE setModel NOTIFY modelChanged)
-    Q_PROPERTY(QString textRole READ textRole WRITE setTextRole NOTIFY textRoleChanged)
-    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
-    Q_PROPERTY(double maximumWidth READ maximumWidth NOTIFY maximumWidthChanged)
+    Q_DISABLE_COPY_MOVE(OptionMetrics)
+    Q_PROPERTY(QVariantList model READ model WRITE setModel NOTIFY modelChanged FINAL)
+    Q_PROPERTY(QString textRole READ textRole WRITE setTextRole NOTIFY textRoleChanged FINAL)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged FINAL)
+    Q_PROPERTY(double maximumWidth READ maximumWidth NOTIFY maximumWidthChanged FINAL)
 public:
     explicit OptionMetrics(QObject *parent = nullptr);
     QVariantList model() const;

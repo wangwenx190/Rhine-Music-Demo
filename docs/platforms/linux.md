@@ -4,7 +4,7 @@
 
 ## 环境与构建
 
-准备本机C++23编译器、CMake、Ninja、clang-format和最新完整Qt Desktop Kit。部署工具另需Python 3.9以上、binutils的readelf/ldd以及patchelf；播放器运行不依赖这些工具。Qt必须包含匹配的私有开发头、CanvasPainter、Multimedia及xcb/Wayland插件；默认Vulkan编译路径还需Vulkan开发头；Wayland颜色管理构建还需pkg-config、wayland-client开发文件和wayland-scanner。标准安装根自动发现，自定义完整前缀通过YALAHOO_QT_ROOTS提供。最新Kit缺模块必须补齐，不降级。
+准备本机C++23编译器、CMake、Ninja、clang-format和最新完整Qt Desktop Kit。部署工具另需Python 3.9以上、binutils的readelf/strip、ldd以及patchelf；播放器运行不依赖这些工具。Qt必须包含匹配的私有开发头、CanvasPainter、Multimedia及xcb/Wayland插件；默认Vulkan编译路径还需Vulkan开发头；Wayland颜色管理构建还需pkg-config、wayland-client开发文件和wayland-scanner。标准安装根自动发现，自定义完整前缀通过YALAHOO_QT_ROOTS提供。最新Kit缺模块必须补齐，不降级。
 
 ```sh
 sh tools/build/linux.sh
@@ -26,11 +26,13 @@ python3 tools/deploy/verify-linux.py --output /tmp/yalahoo-linux-check
 
 部署使用独立`build/linux-release`、生产Release/Review OFF及同Kit Qt CMake部署API，产物在`out/linux/`。Qt从实际编译的QML导入闭包部署Templates、Dialogs、Multimedia等模块，工具补齐运行期动态加载的会话集成，并递归核对ELF依赖。产品不使用QtCanvas2D，C++ CanvasPainter的共享库和内嵌shader随包保留；研究QML与测试工具不进产品包。官方依据为[Qt Linux部署](https://doc.qt.io/qt-6/linux-deployment.html)和[QML部署API](https://doc.qt.io/qt-6/qt-generate-deploy-qml-app-script.html)。
 
-目录包含`bin/yalahoo`、相对`bin/qt.conf`、`lib/`、`plugins/`、`qml/`、`licenses/`、品牌desktop/SVG及`yalahoo.sh`。ELF RPATH均相对自身`$ORIGIN`，启动脚本仅为子进程设置包内库路径并清除外来Qt/QML/预加载覆盖；保留显示会话、XDG、音频路由及显式后端选择。无需复制开发Kit、使用sudo或改动系统配置。desktop文件供用户安装到选定前缀时使用，当前目录包直接执行`./yalahoo.sh`，不自动注册桌面项。
+目录包含`bin/yalahoo`、相对`bin/qt.conf`、`lib/`、`plugins/`、`qml/`、`licenses/`、品牌desktop/SVG及`yalahoo.sh`。补齐全部运行依赖后，对暂存包中的每个ELF用`patchelf --set-rpath`更新相对自身`$ORIGIN`的RPATH，再用`strip --strip-unneeded`去除非运行必需符号，保留动态符号表；这些操作在清单hash和隐藏加载检查之前完成，不修改构建产物或开发Kit。启动脚本仅为子进程设置包内库路径并清除外来Qt/QML/预加载覆盖；保留显示会话、XDG、音频路由及显式后端选择。无需复制开发Kit、使用sudo或改动系统配置。desktop文件供用户安装到选定前缀时使用，当前目录包直接执行`./yalahoo.sh`，不自动注册桌面项。
 
 静态依赖、文件hash/权限/符号链接和包外隐藏产品加载全部成功后才替换旧包；失败保留原包。`package.json`记录内容/权限清单，`system-dependencies.json`记录构建系统与实际外部库。验证器从包外新工作目录和隔离XDG目录启动当前进程，核对退出码、实际加载ELF、Qt搜索路径、QML、qrc和无输出媒体加载；使用offscreen QPA，窗口始终隐藏，不创建GPU上下文、不播放声音。报告不能证明图形、设备听感或正常呈现。
 
 保留整目录复制至相同CPU架构、兼容系统ABI且未安装开发Qt的另一台Linux；另复制到包含中文和空格的目录，在包外执行其`verify-linux.py --output 全新绝对目录`并从`yalahoo.sh --demo`启动。验证器需Python/readelf/ldd，普通播放器无需这些工具。包不可仅复制二进制；跨发行版兼容性须实际证明。
+
+原生strip/重定位最小检查：`python3 tests/tools/UnixDeploymentTest.py`；动态导出、去除开发路径和包外执行须在对应原生平台通过。
 
 ## 系统依赖与会话
 

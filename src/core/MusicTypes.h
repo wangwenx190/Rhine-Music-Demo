@@ -15,7 +15,7 @@ enum class MediaSupport {
     Supported,
     Unsupported
 };
-struct Track
+struct Track final
 {
     QString id, albumId, title, artist, format, codec, relativePath;
     std::optional<int> trackNumber, discNumber, bitsPerSample, sampleRate, bitrate;
@@ -25,12 +25,12 @@ struct Track
     QUrl sourceUrl;
     QJsonObject fields;
 };
-struct Producer
+struct Producer final
 {
     QString name, role, source, trackId, trackTitle, url;
     QJsonObject fields;
 };
-struct Album
+struct Album final
 {
     QString id, title, artist, genreId, description, localNote, folderLabel;
     std::optional<int> year, discCount;
@@ -42,20 +42,20 @@ struct Album
     bool offline = false;
     QJsonObject fields;
 };
-struct Genre
+struct Genre final
 {
     QString id, name;
     QStringList aliases;
     std::optional<int> albumCount;
     QJsonObject fields;
 };
-struct LibraryRoot
+struct LibraryRoot final
 {
     QUrl path;
     QString status, error;
     QJsonObject fields;
 };
-struct LibrarySnapshot
+struct LibrarySnapshot final
 {
     QList<Album> albums;
     QList<Genre> genres;

@@ -385,7 +385,7 @@ int main(int argc, char **argv)
         QJsonArray costs;
         if (profile) {
             // Local CPU command submission only. RenderControl has no physical presentation/VSYNC.
-            struct Samples
+            struct Samples final
             {
                 std::mutex mutex;
                 QVector<double> cpu;

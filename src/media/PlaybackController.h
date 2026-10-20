@@ -1,5 +1,5 @@
 #pragma once
-#include "LibrarySession.h"
+#include "MusicTypes.h"
 #include "BackgroundMusicController.h"
 #include <QPointer>
 #include <QAudioDevice>
@@ -8,31 +8,33 @@
 #include <QMediaPlayer>
 
 namespace yalahoo {
+class LibrarySession;
 class PlaybackTest;
 // GUI-thread, ordinary local-file playback. No visual clock or PCM ownership.
 class PlaybackController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString title READ title NOTIFY currentChanged)
-    Q_PROPERTY(QString albumId READ albumId NOTIFY currentChanged)
-    Q_PROPERTY(QString trackId READ trackId NOTIFY currentChanged)
-    Q_PROPERTY(QString state READ state NOTIFY stateChanged)
-    Q_PROPERTY(bool playing READ playing NOTIFY stateChanged)
-    Q_PROPERTY(bool loading READ loading NOTIFY stateChanged)
-    Q_PROPERTY(bool requested READ requested NOTIFY stateChanged)
-    Q_PROPERTY(QString error READ error NOTIFY stateChanged)
-    Q_PROPERTY(QString notice READ notice NOTIFY devicesChanged)
-    Q_PROPERTY(qint64 position READ position NOTIFY positionChanged)
-    Q_PROPERTY(qint64 duration READ duration NOTIFY durationChanged)
-    Q_PROPERTY(bool seekable READ seekable NOTIFY seekableChanged)
-    Q_PROPERTY(bool dragging READ dragging NOTIFY positionChanged)
-    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
-    Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged)
-    Q_PROPERTY(QVariantList deviceChoices READ deviceChoices NOTIFY devicesChanged)
-    Q_PROPERTY(QString selectedDevice READ selectedDevice NOTIFY devicesChanged)
-    Q_PROPERTY(bool outputAvailable READ outputAvailable NOTIFY devicesChanged)
-    Q_PROPERTY(bool canNext READ canNext NOTIFY currentChanged)
-    Q_PROPERTY(bool canPrevious READ canPrevious NOTIFY currentChanged)
+    Q_DISABLE_COPY_MOVE(PlaybackController)
+    Q_PROPERTY(QString title READ title NOTIFY currentChanged FINAL)
+    Q_PROPERTY(QString albumId READ albumId NOTIFY currentChanged FINAL)
+    Q_PROPERTY(QString trackId READ trackId NOTIFY currentChanged FINAL)
+    Q_PROPERTY(QString state READ state NOTIFY stateChanged FINAL)
+    Q_PROPERTY(bool playing READ playing NOTIFY stateChanged FINAL)
+    Q_PROPERTY(bool loading READ loading NOTIFY stateChanged FINAL)
+    Q_PROPERTY(bool requested READ requested NOTIFY stateChanged FINAL)
+    Q_PROPERTY(QString error READ error NOTIFY stateChanged FINAL)
+    Q_PROPERTY(QString notice READ notice NOTIFY devicesChanged FINAL)
+    Q_PROPERTY(qint64 position READ position NOTIFY positionChanged FINAL)
+    Q_PROPERTY(qint64 duration READ duration NOTIFY durationChanged FINAL)
+    Q_PROPERTY(bool seekable READ seekable NOTIFY seekableChanged FINAL)
+    Q_PROPERTY(bool dragging READ dragging NOTIFY positionChanged FINAL)
+    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged FINAL)
+    Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged FINAL)
+    Q_PROPERTY(QVariantList deviceChoices READ deviceChoices NOTIFY devicesChanged FINAL)
+    Q_PROPERTY(QString selectedDevice READ selectedDevice NOTIFY devicesChanged FINAL)
+    Q_PROPERTY(bool outputAvailable READ outputAvailable NOTIFY devicesChanged FINAL)
+    Q_PROPERTY(bool canNext READ canNext NOTIFY currentChanged FINAL)
+    Q_PROPERTY(bool canPrevious READ canPrevious NOTIFY currentChanged FINAL)
 public:
     explicit PlaybackController(LibrarySession *library, QObject *parent = nullptr);
     ~PlaybackController() override;

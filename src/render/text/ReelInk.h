@@ -7,8 +7,9 @@ namespace yalahoo {
 class ReelInk : public QQuickItem
 {
     Q_OBJECT
-    Q_PROPERTY(yalahoo::ReelSlot *slot READ slot WRITE setSlot NOTIFY slotChanged)
-    Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
+    Q_DISABLE_COPY_MOVE(ReelInk)
+    Q_PROPERTY(yalahoo::ReelSlot *slot READ slot WRITE setSlot NOTIFY slotChanged FINAL)
+    Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged FINAL)
 public:
     explicit ReelInk(QQuickItem *parent = nullptr);
     ReelSlot *slot() const;

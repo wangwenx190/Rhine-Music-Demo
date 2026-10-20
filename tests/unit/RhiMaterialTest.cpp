@@ -17,9 +17,13 @@
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo::rhi;
-class RhiMaterialTest : public QObject
+class RhiMaterialTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(RhiMaterialTest)
+public:
+    RhiMaterialTest() = default;
+
 private Q_SLOTS:
     void readbackValidationAndHdrSaturation()
     {

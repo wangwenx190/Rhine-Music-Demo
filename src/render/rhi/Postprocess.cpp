@@ -13,8 +13,10 @@ namespace yalahoo::rhi {
 namespace {
 template <class T>
 using Owned = std::unique_ptr<T>;
-struct ColorTarget
+struct ColorTarget final
 {
+    Q_DISABLE_COPY_MOVE(ColorTarget)
+    ColorTarget() = default;
     Owned<QRhiTexture> texture;
     Owned<QRhiRenderPassDescriptor> pass;
     Owned<QRhiTextureRenderTarget> target;
@@ -29,19 +31,23 @@ struct ColorTarget
         require(target->create(), "Postprocess target creation failed");
     }
 };
-struct Pass
+struct Pass final
 {
+    Q_DISABLE_COPY(Pass)
+    Pass() = default;
+    Pass(Pass &&) = default;
+    Pass &operator=(Pass &&) = default;
     QString name;
     ColorTarget *target = nullptr;
     Owned<QRhiBuffer> uniform;
     Owned<QRhiShaderResourceBindings> bindings;
     Owned<QRhiGraphicsPipeline> pipeline;
 };
-struct alignas(16) PostPrefix
+struct alignas(16) PostPrefix final
 {
     float size[4], clip[4], ao[4], dof[4], options[4];
 };
-struct alignas(16) PostUniform
+struct alignas(16) PostUniform final
 {
     PostPrefix prefix;
     float kernel[64][4];
@@ -49,8 +55,10 @@ struct alignas(16) PostUniform
 static_assert(sizeof(PostPrefix) == 80);
 static_assert(sizeof(PostUniform) == 1104 && offsetof(PostUniform, kernel) == 80);
 }
-struct Postprocess::State
+struct Postprocess::State final
 {
+    Q_DISABLE_COPY_MOVE(State)
+    State() = default;
     QRhi *api = nullptr;
     PostSettings settings;
 #ifdef YALAHOO_RHI_AUDIT

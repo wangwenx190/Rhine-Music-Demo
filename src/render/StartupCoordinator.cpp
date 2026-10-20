@@ -1,3 +1,6 @@
+#include "FrameClock.h"
+#include "opening/OpeningController.h"
+#include "LibrarySession.h"
 #include "StartupCoordinator.h"
 #include <QJsonObject>
 #include <QThread>

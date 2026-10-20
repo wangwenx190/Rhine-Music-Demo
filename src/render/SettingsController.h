@@ -1,16 +1,21 @@
 #pragma once
+#include <QObject>
+#include <QVariantMap>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
-#include "SceneAdapter.h"
-#include "PreferencesStore.h"
-#include "LibrarySession.h"
 
 namespace yalahoo {
+class SceneAdapter;
+class PreferencesStore;
+class LibrarySession;
+class MotionController;
+class SelectionController;
 // Field-specific routing; visual reload never owns media or persistent controllers.
 class SettingsController final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantMap values READ values NOTIFY changed)
+    Q_DISABLE_COPY_MOVE(SettingsController)
+    Q_PROPERTY(QVariantMap values READ values NOTIFY changed FINAL)
 public:
     SettingsController(PreferencesStore *preferences, LibrarySession *library,
                        MotionController *motion, SceneAdapter *scene,

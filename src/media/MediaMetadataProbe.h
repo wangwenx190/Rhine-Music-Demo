@@ -1,12 +1,12 @@
 #pragma once
+#include <memory>
 #include "DirectoryScanner.h"
 #include <QMediaMetaData>
 #include <QObject>
-#include <QThread>
 #include <functional>
 
 namespace yalahoo {
-struct MediaObservation
+struct MediaObservation final
 {
     enum Status {
         Loading,
@@ -23,7 +23,9 @@ struct MediaObservation
 class MetadataSource : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MetadataSource)
 public:
+    MetadataSource() = default;
     using QObject::QObject;
     virtual void open(const QUrl &url) = 0;
     virtual void clear() = 0;
@@ -34,6 +36,7 @@ Q_SIGNALS:
 class MediaMetadataProbe final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MediaMetadataProbe)
 public:
     using Factory = std::function<MetadataSource *(QObject *)>;
     explicit MediaMetadataProbe(QObject *parent = nullptr, Factory factory = { });
@@ -44,7 +47,7 @@ Q_SIGNALS:
     void finished(quint64 generation, yalahoo::Snapshot snapshot, bool cancelled);
 
 private:
-    QThread m_thread;
-    QObject *m_worker = nullptr;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

@@ -1,3 +1,9 @@
+#include "SceneAdapter.h"
+#include "FrameClock.h"
+#include "LibrarySession.h"
+#include "opening/OpeningController.h"
+#include "MotionController.h"
+#include "SelectionController.h"
 #include "StartupCoordinator.h"
 #include "DemoLibrary.h"
 #include <QTest>
@@ -12,7 +18,7 @@ Snapshot snapshot(const QString &title)
     value.albums[0].title = title;
     return std::make_shared<const LibrarySnapshot>(std::move(value));
 }
-struct Fixture
+struct Fixture final
 {
     LibrarySession library{ nullptr };
     MotionController motion;
@@ -22,9 +28,13 @@ struct Fixture
     StartupCoordinator startup{ &library, &opening, motion.clock(), true };
 };
 }
-class StartupTest : public QObject
+class StartupTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(StartupTest)
+public:
+    StartupTest() = default;
+
 private Q_SLOTS:
     void initialReadinessAndLateSnapshot()
     {

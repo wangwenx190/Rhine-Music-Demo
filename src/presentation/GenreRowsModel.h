@@ -8,9 +8,10 @@ namespace yalahoo {
 class GenreRowsModel : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantList genres READ genres WRITE setGenres NOTIFY genresChanged)
-    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
-    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
+    Q_DISABLE_COPY_MOVE(GenreRowsModel)
+    Q_PROPERTY(QVariantList genres READ genres WRITE setGenres NOTIFY genresChanged FINAL)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged FINAL)
+    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged FINAL)
 public:
     explicit GenreRowsModel(QObject *parent = nullptr);
     QVariantList genres() const;
@@ -30,7 +31,7 @@ Q_SIGNALS:
 private:
     void measure();
     void rewrap();
-    struct Label
+    struct Label final
     {
         QString id, name;
         double width = 0;

@@ -2,7 +2,7 @@
 #include "DirectoryScanner.h"
 
 namespace yalahoo {
-class LegacyImporter
+class LegacyImporter final
 {
 public:
     // Explicit source directory only; reads index/config/rules and referenced artwork.

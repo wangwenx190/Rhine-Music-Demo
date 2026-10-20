@@ -1,15 +1,19 @@
 #pragma once
-#include "LibrarySession.h"
+#include <QObject>
+#include "MusicTypes.h"
 #include <QAbstractListModel>
 #include <QCache>
 #include <QFont>
 
 namespace yalahoo {
+class LibrarySession;
+
 class DetailModel : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantMap album READ album NOTIFY albumChanged)
-    Q_PROPERTY(int count READ rowCount NOTIFY albumChanged)
+    Q_DISABLE_COPY_MOVE(DetailModel)
+    Q_PROPERTY(QVariantMap album READ album NOTIFY albumChanged FINAL)
+    Q_PROPERTY(int count READ rowCount NOTIFY albumChanged FINAL)
 public:
     enum Role {
         TrackId = Qt::UserRole + 1,

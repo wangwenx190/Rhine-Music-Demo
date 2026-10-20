@@ -109,13 +109,13 @@ QJsonObject sampleEntities()
                                         QJsonObject{ { u"value"_s, u"Test Artist"_s } } } } } } }
     };
 }
-struct Response
+struct Response final
 {
     QByteArray body;
     int status = 200, delay = 0;
     QByteArray retry;
 };
-struct Server
+struct Server final
 {
     QMutex mutex;
     QList<QNetworkRequest> requests;
@@ -129,6 +129,7 @@ struct Server
 };
 class Reply final : public QNetworkReply
 {
+    Q_DISABLE_COPY_MOVE(Reply)
 public:
     Reply(const QNetworkRequest &request, Response response, QObject *parent)
         : QNetworkReply(parent), m_body(std::move(response.body))
@@ -179,6 +180,7 @@ private:
 };
 class Network final : public QNetworkAccessManager
 {
+    Q_DISABLE_COPY_MOVE(Network)
 public:
     explicit Network(std::shared_ptr<Server> server) : m_server(std::move(server))
     {
@@ -212,6 +214,10 @@ AlbumQuery queryFor(const Album &album)
 class OnlineMetadataTest final : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(OnlineMetadataTest)
+public:
+    OnlineMetadataTest() = default;
+
 private Q_SLOTS:
     void creditsMatchTracksAndPreserveRoles()
     {

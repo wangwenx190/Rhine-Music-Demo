@@ -19,7 +19,7 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 部署入口使用独立`build/macos-release/`，强制Release、Review OFF；不改开发构建的Review开关。它校验选中Kit的qtpaths，调用同Kit macdeployqt，只扫描编入应用的生产QML。`out/macos/yalahoo.app`包含Frameworks、PlugIns、Resources/qml、原始ICNS及qrc资源，署名/资源/字体/音频/安装Qt许可在Resources/licenses中。Qt随附媒体依赖由macdeployqt处理，应用不调用外部FFmpeg。递归QtQuick部署带入的SQL驱动仅保留自含SQLite；产品使用JSON存储，没有外部数据库服务。
 
-打包逐个核对实际Mach-O架构、加载依赖与rpath、QML/插件/CanvasPainter闭包、包内符号链接和本地签名；Info.plist与package.json的最低macOS版本取实际全部二进制切片要求的最大值，不从Qt版本猜测兼容系统。去除重定位后越出bundle的Kit搜索路径，实际依赖仍须全部解析。构建、部署、签名、闭包或隐藏产品探针失败均保留既有包。该包仅作本地ad-hoc签名，不自动上传、公证或发布。
+打包逐个核对实际Mach-O架构、加载依赖与rpath、QML/插件/CanvasPainter闭包、包内符号链接和本地签名；Info.plist与package.json的最低macOS版本取实际全部二进制切片要求的最大值，不从Qt版本猜测兼容系统。macdeployqt重写包内加载依赖后，去除重定位后越出bundle的Kit搜索路径，实际依赖仍须全部解析。对暂存bundle中的每个Mach-O执行`strip -S -x`，保留动态导出/运行符号，然后统一重新ad-hoc签名；文件清单和加载检查消费最终签名产物，不修改构建bundle或开发Kit。构建、部署、签名、闭包或隐藏产品探针失败均保留既有包。该包仅作本地ad-hoc签名，不自动上传、公证或发布。
 
 验证器校验package.json中的文件hash/可执行位/符号链接，再以系统PATH、清除Qt/QML/DYLD覆盖的子环境，从包外新目录运行`--verify-deployment`。产品保持隐藏，实例化真实App QML、核对嵌入字体/图标/shader/音频加载及QML warnings，并经真实Qt后端无声加载BGM；实际dyld映像只能来自bundle或系统。输出写入指定全新目录，省略时使用系统临时目录；不能放在部署包内。此入口不发play、不证明GPU画面或实际听感。Python仅用于开发验证，普通应用运行不需要它。
 
@@ -33,6 +33,8 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 - 文件/窗口：⌘W关闭最后窗口并退出；⌘M最小化，窗口菜单提供缩放。隐藏⌘H、隐藏其他⌥⌘H与全部显示由系统处理。
 - 编辑菜单：⌘Z、⇧⌘Z、⌘X/C/V/A调用当前Qt编辑器的撤销、重做、剪切、复制、粘贴、全选；能力随焦点、只读、选区与剪贴板状态变化。菜单不持有可重建的QML编辑对象。
 - 隐藏/最小化停止视觉帧与新封面工作，歌曲/BGM由独立Qt媒体会话继续；关闭/退出依次停止歌曲、BGM、音效。普通产品保持正常窗口行为；默认原生数据根由QStandardPaths/AppLocalDataLocation和稳定技术身份决定。
+
+原生strip/重定位最小检查：`python3 tests/tools/UnixDeploymentTest.py`；动态导出、去除开发路径和包外执行须在对应原生平台通过。
 
 ## 用户实机清单
 

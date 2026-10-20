@@ -6,7 +6,7 @@
 class QWindow;
 
 namespace yalahoo {
-struct DisplayState
+struct DisplayState final
 {
     bool enabled = false;
     bool hdr10 = false;
@@ -19,7 +19,9 @@ struct DisplayState
 // Platform callbacks and query() run on the GUI thread. Missing information is SDR.
 class DisplayMonitor : public QObject
 {
+    Q_DISABLE_COPY_MOVE(DisplayMonitor)
 public:
+    DisplayMonitor() = default;
     using QObject::QObject;
     virtual DisplayState query(QWindow &window) = 0;
     std::function<void()> changed;

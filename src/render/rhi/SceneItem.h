@@ -10,22 +10,23 @@ namespace yalahoo::rhi {
 class SceneItem : public RhiItem
 {
     Q_OBJECT
-    Q_PROPERTY(bool renderingActive READ renderingActive WRITE setRenderingActive NOTIFY renderingActiveChanged)
-    Q_PROPERTY(bool sceneOccluded READ sceneOccluded WRITE setSceneOccluded NOTIFY openingChanged)
-    Q_PROPERTY(bool preparing READ preparing WRITE setPreparing NOTIFY openingChanged)
-    Q_PROPERTY(QSize panelLayerSize READ panelLayerSize WRITE setPanelLayerSize NOTIFY openingChanged)
-    Q_PROPERTY(QSize openingLayerSize READ openingLayerSize WRITE setOpeningLayerSize NOTIFY openingChanged)
-    Q_PROPERTY(yalahoo::InputRouter *inputRouter READ inputRouter WRITE setInputRouter NOTIFY inputRouterChanged)
-    Q_PROPERTY(yalahoo::SceneAdapter* adapter READ adapter WRITE setAdapter NOTIFY adapterChanged)
-    Q_PROPERTY(bool inspectionEnabled READ inspectionEnabled WRITE setInspectionEnabled NOTIFY inspectionEnabledChanged)
-    Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged)
-    Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged)
-    Q_PROPERTY(bool diagnosticsEnabled READ diagnosticsEnabled WRITE setDiagnosticsEnabled NOTIFY diagnosticsChanged)
-    Q_PROPERTY(QString diagnosticText READ diagnosticText NOTIFY diagnosticValuesChanged)
-    Q_PROPERTY(QVariantMap diagnosticValues READ diagnosticValues NOTIFY diagnosticValuesChanged)
-    Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged)
-    Q_PROPERTY(yalahoo::TitleReel *titleReel READ titleReel WRITE setTitleReel NOTIFY textReelsChanged)
-    Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged)
+    Q_DISABLE_COPY_MOVE(SceneItem)
+    Q_PROPERTY(bool renderingActive READ renderingActive WRITE setRenderingActive NOTIFY renderingActiveChanged FINAL)
+    Q_PROPERTY(bool sceneOccluded READ sceneOccluded WRITE setSceneOccluded NOTIFY openingChanged FINAL)
+    Q_PROPERTY(bool preparing READ preparing WRITE setPreparing NOTIFY openingChanged FINAL)
+    Q_PROPERTY(QSize panelLayerSize READ panelLayerSize WRITE setPanelLayerSize NOTIFY openingChanged FINAL)
+    Q_PROPERTY(QSize openingLayerSize READ openingLayerSize WRITE setOpeningLayerSize NOTIFY openingChanged FINAL)
+    Q_PROPERTY(yalahoo::InputRouter *inputRouter READ inputRouter WRITE setInputRouter NOTIFY inputRouterChanged FINAL)
+    Q_PROPERTY(yalahoo::SceneAdapter* adapter READ adapter WRITE setAdapter NOTIFY adapterChanged FINAL)
+    Q_PROPERTY(bool inspectionEnabled READ inspectionEnabled WRITE setInspectionEnabled NOTIFY inspectionEnabledChanged FINAL)
+    Q_PROPERTY(bool geometryOnly READ geometryOnly WRITE setGeometryOnly NOTIFY geometryOnlyChanged FINAL)
+    Q_PROPERTY(bool telemetryEnabled READ telemetryEnabled WRITE setTelemetryEnabled NOTIFY telemetryEnabledChanged FINAL)
+    Q_PROPERTY(bool diagnosticsEnabled READ diagnosticsEnabled WRITE setDiagnosticsEnabled NOTIFY diagnosticsChanged FINAL)
+    Q_PROPERTY(QString diagnosticText READ diagnosticText NOTIFY diagnosticValuesChanged FINAL)
+    Q_PROPERTY(QVariantMap diagnosticValues READ diagnosticValues NOTIFY diagnosticValuesChanged FINAL)
+    Q_PROPERTY(QString errorText READ errorText NOTIFY errorTextChanged FINAL)
+    Q_PROPERTY(yalahoo::TitleReel *titleReel READ titleReel WRITE setTitleReel NOTIFY textReelsChanged FINAL)
+    Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged FINAL)
 public:
     explicit SceneItem(QQuickItem *parent = nullptr);
     bool renderingActive() const
@@ -137,7 +138,7 @@ private:
     QMetaObject::Connection m_titleDestroyedConnection, m_transportDestroyedConnection;
     QList<QSize> m_textSizes;
     quint64 m_textRevision = 0;
-    struct OwnedCover
+    struct OwnedCover final
     {
         quint64 objectId = 0, lease = 0;
         std::shared_ptr<SelectedCoverLease> pixels;
