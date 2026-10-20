@@ -262,6 +262,7 @@ private Q_SLOTS:
                 5000));
         const bool actualHdr = output.hdrActive();
         const auto presented = [&](qsizetype before) {
+            window->update();
             return QTest::qWaitFor(
                     [&] {
                         return output.ready() && swaps.size() > before && window->isExposed();

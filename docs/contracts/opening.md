@@ -19,4 +19,5 @@
 - `startup`/`startup-qml`的集成/压力及成本入口见[performance.md](performance.md)。
 - `ctest --preset qt-release -R '^opening$'`核对逐参数/相机≤1e-6、20/30/60/120fps与0.25×/1×/3×、就绪/跳过/重播/后台/减少动态、品牌弧长与错峰终点。
 - `ui-audit --opening 输出目录`/`opening-qml`实例化生产MusicStage；按test-gates.md分别覆盖九尺寸布局、双主题及有效DPR边界、实际Logo/圆环/标语、一次完整片头/交接、零遮挡三维提交、键盘焦点/跳过。性能/资源先按performance.md静态审查，仍有实际运行未决项才最小观测恢复或局部成本；不默认十次SG压力，备用路径仅具体问题确需时选择，不作为正常VSYNC/物理屏幕或完整产品性能证明。图像只为自身正常输出质量检查，原始报告/图像均留本地。
-- `python3 tools/audit/audit-opening.py`生成COMMON-01–05、PERF-01–07与三平台源码/来源矩阵；目标运行与静态结论分开。非OpenGL欠验归R20-P，OpenGL动态矩阵由R35执行。
+- 该入口的`--representative`保留日间DPR1九尺寸，其余主题/DPR仅选择1280×720和390×844；报告列出实际组合。`YALAHOO_VERIFY_LIFECYCLE=1`显式追加十次SG恢复，`YALAHOO_VERIFY_COMPARE_DRAWING=1`才执行Canvas/Quick Shape输出与局部成本比较；默认功能检查不包含这两项。
+- `python3 tools/audit/audit-opening.py`生成COMMON-01–05、PERF-01–07与三平台源码/来源矩阵；目标运行与静态结论分开。非OpenGL欠验归R20-P，OpenGL动态矩阵由R36执行。

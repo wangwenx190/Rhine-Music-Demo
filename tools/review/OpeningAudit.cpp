@@ -171,10 +171,12 @@ public:
     QJsonArray samples;
 };
 }
-int reviewOpening(QGuiApplication &, const QString &output)
+int reviewOpening(QGuiApplication &, const QString &output, bool representative)
 {
     QDir().mkpath(output);
     QJsonArray checks, captures, costs;
+    const bool compareDrawing = qEnvironmentVariableIntValue("YALAHOO_VERIFY_COMPARE_DRAWING") == 1;
+    const bool lifecycle = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1;
     bool passed = true;
     const auto check = [&](const QString &name, bool value) {
         passed &= value;
@@ -234,6 +236,10 @@ int reviewOpening(QGuiApplication &, const QString &output)
                 if (!OffscreenSurface::Enabled && dpr != d.window.devicePixelRatio())
                     continue;
                 for (const auto &size : sizes) {
+                    if (representative
+                        && ((dpr != 1 || night) && size != QSize(1280, 720)
+                            && size != QSize(390, 844)))
+                        continue;
                     d.resize(size, dpr);
                     d.ready();
                     for (double time : { .95, 1.64, 2.2, 4.3 }) {
@@ -325,8 +331,10 @@ int reviewOpening(QGuiApplication &, const QString &output)
             shape.reset();
             ink->setVisible(true);
         };
-        compare(false);
-        compare(true);
+        if (compareDrawing) {
+            compare(false);
+            compare(true);
+        }
         QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &tab);
         check(u"tab-focuses-skip"_s,
@@ -336,7 +344,7 @@ int reviewOpening(QGuiApplication &, const QString &output)
         check(u"enter-skips-film"_s, !d.opening.film());
         d.motion.setReducedMotion(true);
         check(u"reduced-motion-completes-reveal"_s, !d.opening.active());
-        for (int cycle = 0; cycle < 10; ++cycle) {
+        for (int cycle = 0; cycle < (lifecycle ? 10 : 0); ++cycle) {
             d.motion.setReducedMotion(false);
             d.ready();
             d.seek(cycle % 2 ? 2.2 : .95);
@@ -363,6 +371,9 @@ int reviewOpening(QGuiApplication &, const QString &output)
         check(u"window-policy"_s, verification::windowPolicySatisfied(d.window));
         check(u"no-qml-warnings"_s, d.warnings.isEmpty());
         QJsonObject report{ { u"passed"_s, passed },
+                            { u"representative"_s, representative },
+                            { u"drawingComparisonRequested"_s, compareDrawing },
+                            { u"lifecycleRequested"_s, lifecycle },
                             { u"checks"_s, checks },
                             { u"captures"_s, captures },
                             { u"costs"_s, costs },

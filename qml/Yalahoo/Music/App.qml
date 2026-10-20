@@ -42,39 +42,44 @@ T.ApplicationWindow {
                                                                                 sceneAdapter.lighting.night
                                                                                 ? "#08121f" :
                                                                                   "#e8e5e1"
-    contentItem: DisplaySurface {
+    T.Overlay.overlay.parent: displaySurface
+    T.Overlay.overlay.objectName: "displayOverlay"
+    DisplaySurface {
+        id: displaySurface
+        objectName: "displaySurface"
+        anchors.fill: parent
         output: window.displayOutput
         backgroundColor: window.sceneAdapter.lighting.night ? "#08121f" : "#e8e5e1"
-    }
-    Loader {
-        id: visualTree
-        anchors.fill: parent
-        sourceComponent: MusicStage {
-            hdrHeadroom: window.displayOutput ? window.displayOutput.headroom : 1
-            hdrActive: window.displayOutput ? window.displayOutput.hdrActive : false
+        Loader {
+            id: visualTree
             anchors.fill: parent
-            librarySession: window.librarySession
-            motionController: window.motionController
-            sceneAdapter: window.sceneAdapter
-            startupCoordinator: window.startupCoordinator
-            openingController: window.openingController
-            inputRouter: window.inputRouter
-            rulerController: window.rulerController
-            presentationController: window.presentationController
-            playbackController: window.playbackController
-            backgroundMusicController: window.backgroundMusicController
-            interfaceSoundController: window.interfaceSoundController
-            trackFocusController: window.trackFocusController
-            settingsController: window.settingsController
-            panelController: window.panelController
-            libraryStore: window.libraryStore
-            detailModel: window.detailModel
-            overviewController: window.overviewController
-            reviewPlayingTitle: window.reviewPlayingTitle
-            preferencesError: window.preferencesError
-            experimentsVisible: window.lightingLab
-            onExperimentsVisibilityRequested: shown => window.lightingLab = shown
-            geometryProbe: window.geometryProbe
+            sourceComponent: MusicStage {
+                hdrHeadroom: window.displayOutput ? window.displayOutput.headroom : 1
+                hdrActive: window.displayOutput ? window.displayOutput.hdrActive : false
+                anchors.fill: parent
+                librarySession: window.librarySession
+                motionController: window.motionController
+                sceneAdapter: window.sceneAdapter
+                startupCoordinator: window.startupCoordinator
+                openingController: window.openingController
+                inputRouter: window.inputRouter
+                rulerController: window.rulerController
+                presentationController: window.presentationController
+                playbackController: window.playbackController
+                backgroundMusicController: window.backgroundMusicController
+                interfaceSoundController: window.interfaceSoundController
+                trackFocusController: window.trackFocusController
+                settingsController: window.settingsController
+                panelController: window.panelController
+                libraryStore: window.libraryStore
+                detailModel: window.detailModel
+                overviewController: window.overviewController
+                reviewPlayingTitle: window.reviewPlayingTitle
+                preferencesError: window.preferencesError
+                experimentsVisible: window.lightingLab
+                onExperimentsVisibilityRequested: shown => window.lightingLab = shown
+                geometryProbe: window.geometryProbe
+            }
         }
     }
     function rebuildVisualTree(): void {

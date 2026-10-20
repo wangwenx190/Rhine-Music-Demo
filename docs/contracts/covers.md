@@ -53,6 +53,6 @@ RHI 场景附件、MSAA/resolve/mips、共享 depth、shadow、AO/DOF/SMAA、loo
 
 `CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图/过大展开、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立4MiB上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 
-目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码自动安全检查使用`tools/audit/audit-best-practices.py`，架构与生命周期仍需逐路径审查。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R35/R36。
+目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码自动安全检查使用`tools/audit/audit-best-practices.py`，架构与生命周期仍需逐路径审查。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R36。
 
 `archive-pool-gpu`额外沿生产SceneItem→AtlasUploadQueue→QRhi提交验证快照中的同专辑换曲零解码/上传，以及单封面revision恰好一个256²阵列tile加16个高清tile的实际上传；兼容render/cover资源generation不变，收敛后零上传。选中/归位旧像素隔离另由上述租约单元检查证明，不用源图评分替代资源事实。

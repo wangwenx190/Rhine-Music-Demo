@@ -30,7 +30,7 @@ CHECKS = [
     ("PERF-06", "src/render/rhi/SceneItem.cpp", "in.aperture = float((.0003 + .0005 * adapter.detail())",
      "Existing polish publishes current scene and quality values. No new QML clock, bindings, library scan, input path or production readback."),
     ("PERF-07", "tools/review/RhiBokehAudit.cpp", "cycle < 10",
-     "Ten real Postprocess reset/recreate cycles, alternate clip range and valid output, plus disable releases all owned targets. This is postprocess resource lifecycle, not native window or scene-graph restoration; those remain their original gates/R35/R36."),
+     "Ten real Postprocess reset/recreate cycles, alternate clip range and valid output, plus disable releases all owned targets. This is postprocess resource lifecycle, not native window or scene-graph restoration; those remain their original gates/R36."),
 ]
 
 mapping = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]

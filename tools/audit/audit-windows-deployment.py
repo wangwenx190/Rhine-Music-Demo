@@ -17,7 +17,7 @@ CHECKS = [
     ("COMMON-02", "cmake/Deployment.cmake", "set(deployment_qml",
      "file(GENERATE) serializes the actual application QML list and selected target/Kit. The deployer copies each listed relative path from root qml to an owned scan root, preserving directory imports; no source mutation. Product C++ types stay statically registered. windeployqt scans that root and the real PE, then qt.conf resolves QML/plugins relative to the deployed executable. Fonts, shaders, lookup/geometry/audio and branding use qrc, not the working directory."),
     ("COMMON-03", "src/app/GraphicsBackend.h", "QSGRendererInterface::Direct3D11",
-     "Windows ordinary startup explicitly selects D3D11; explicit OpenGL remains supported and is deferred to R35. Deployed shaders are the same qt_add_shaders multi-target qsb linked into Rhi/Opening/Navigation/Text/App. Deployment does not change clip/Y/depth, formats, MSAA/resolve, capture ordering, effects or sampling. CanvasPainter remains linked in the product and is required in the output closure."),
+     "Windows ordinary startup explicitly selects D3D11; explicit OpenGL remains supported and is deferred to R36. Deployed shaders are the same qt_add_shaders multi-target qsb linked into Rhi/Opening/Navigation/Text/App. Deployment does not change clip/Y/depth, formats, MSAA/resolve, capture ordering, effects or sampling. CanvasPainter remains linked in the product and is required in the output closure."),
     ("COMMON-04", "src/app/main.cpp", "yalahoo::PlaybackController playback",
      "App owns PlaybackController/BackgroundMusicController/InterfaceSoundController outside the QML visual lifetime. Public QtMultimedia source/seek/volume/device/error/EndOfMedia logic and queued metadata generation rejection remain unchanged. Shutdown stops all three lanes before QGuiApplication teardown. windeployqt collects Qt multimedia plugins and bundled media dependencies; every deployed PE import/delay import must resolve, while actual device/routing/decoding remains R30-P/R24-P/R25-P."),
     ("COMMON-05", "tools/deploy/verify-windows.ps1", "functionalReportRequired",
@@ -119,7 +119,7 @@ def main():
                                sourcePath=path, lineOrSymbol=symbol,
                                line=source[:source.index(symbol)].count("\n") + 1,
                                evidence=evidence, result="source-reviewed", sourceSha256=hashes[path],
-                               limitations="Windows PE/build/deploy/device/presentation: R30-P (R36); OpenGL: R35. "
+                               limitations="Windows PE/build/deploy/device/presentation: R30-P (R36); OpenGL: R36. "
                                + ("This platform is outside the Windows packaging branch; shared resource/startup impact only."
                                   if platform != "windows" else "No native Windows execution on this host inferred.")))
         output = ROOT / "verification" / f"{platform}-static" / "windows-deployment"

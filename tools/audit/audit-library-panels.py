@@ -48,7 +48,7 @@ for forbidden in ["QMediaPlayer", "QAudioOutput", "setSource(", "->play(", "->pa
 platforms = {
     "windows": ("WIN-01", "Public Qt URL/dialog/device-independent focus path; native D3D11 build, QML input, Unicode root picker and real output/playback integration remain R23-P/R36."),
     "macos": ("MAC-01", "Actual Release Metal hidden RenderControl checks are separate local reports. Native picker/physical input, screen DPR/focus and normal VSYNC remain R23-P/R36."),
-    "linux": ("LNX-01", "Qt local paths remain case-sensitive and platform-native. Target build/dialog/physical input remains R23-P/R36; OpenGL graphics and lifecycle remain R35."),
+    "linux": ("LNX-01", "Qt local paths remain case-sensitive and platform-native. Target build/dialog/physical input remains R23-P/R36; OpenGL graphics and lifecycle remain R36."),
 }
 dependencies = sorted({path for _, path, _, _ in CHECKS} | {
     "CMakeLists.txt", "cmake/TestPolicy.cmake", "src/app/QmlTypes.h", "src/app/CMakeLists.txt",

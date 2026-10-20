@@ -19,7 +19,7 @@
 当前光场数值复建入口为 `node tools/review/export-lighting-golden.mjs`，直接执行冻结MusicSelectionLighting/ThemeTransition/music-row-lighting并生成20/30/60/120fps轨迹、主题反向/减少动态/隐藏/rebase和392组光场采样。`ctest --preset qt-release -R '^lighting$' --output-on-failure` 检查其数值，不需要原图。sampleRowLighting的核本身不依赖mode/fill，测试仍显式传入两者；灯光shader的模式合成另由R19C2复查，不能用核测试代替。
 
 
-`runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。`python3 tools/audit/audit-material-parameters.py`与`audit-material-review.py`分别检查实际参数链与Review生命周期，目标欠验归计划R35/R36。
+`runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。`python3 tools/audit/audit-material-parameters.py`与`audit-material-review.py`分别检查实际参数链与Review生命周期，目标欠验归计划R36。
 
 ## 实验控制
 

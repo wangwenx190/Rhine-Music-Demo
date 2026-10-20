@@ -68,12 +68,12 @@ for path in ('Qt/src/RhiScene.cpp', 'LICENSE', 'NOTICE'):
 reference_info['symbol'] = 'ItemRenderer::render, opaque early return before renderer->render'
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []
-    entries = CHECKS + [(dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[platform], 'cmake/Platform.cmake', marker, 'Same native shared implementation and platform branch; target compiler/deployment/runtime remain separate. OpenGL dynamic runs are assigned to R35, Windows D3D11 to R36; this audit creates no contexts.')]
+    entries = CHECKS + [(dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[platform], 'cmake/Platform.cmake', marker, 'Same native shared implementation and platform branch; target compiler/deployment/runtime remain separate. Remaining target/backend runtime gates are assigned to R36; this audit creates no contexts.')]
     for identity, path, symbol, evidence in entries:
         data = (ROOT / path).read_bytes()
         if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
             raise SystemExit(f'Opening source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=evidence, platform=platform, sourcePath=path, lineOrSymbol=symbol, evidence=evidence, sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing non-OpenGL target evidence R20-P/R36, OpenGL R35.'))
+        rows.append(dict(checkId=identity, requirement=evidence, platform=platform, sourcePath=path, lineOrSymbol=symbol, evidence=evidence, sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing target/backend evidence remains R20-P/R36.'))
     output = ROOT / 'verification' / f'{platform}-static' / 'opening'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(checks=rows, frozen=golden['sources'], reference=reference_info), indent=2) + '\n')

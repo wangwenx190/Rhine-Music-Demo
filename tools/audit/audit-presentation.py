@@ -130,11 +130,11 @@ platform_checks = {
     "macos": ("MAC-01", "src/app/VerificationWindow.h", "prepareWindow",
               "Audit uses shared Prohibited/native low-level window guards and RenderControl "
               "without native show. Logical layout is independent of DPR. Hidden Metal rendering "
-              "can establish geometry/resources; focus, visible restore and VSYNC remain R35/R36."),
+              "can establish geometry/resources; focus, visible restore and VSYNC remain R36."),
     "linux": ("LNX-01", "cmake/Platform.cmake", "UNIX",
               "New presentation code uses Qt values and qrc only. Existing ELF/RPATH/plugin "
               "branches remain, and no D3D backend is hardcoded. Target X11/Wayland focus, "
-              "OpenGL text/input and native lifecycle need a Linux Kit/window manager in R35."),
+              "OpenGL text/input and native lifecycle need a Linux Kit/window manager in R36."),
 }
 for platform, platform_check in platform_checks.items():
     rows = []
@@ -147,7 +147,7 @@ for platform, platform_check in platform_checks.items():
                      "platform": platform, "sourcePath": source_path, "lineOrSymbol": symbol,
                      "sourceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
                      "evidence": evidence, "result": "static-audit-passed",
-                     "limitations": "Native visible input/focus/VSYNC and other-platform runtime remain R35/R36"})
+                     "limitations": "Native visible input/focus/VSYNC and other-platform runtime remain R36"})
     out = root / f"verification/{platform}-static/presentation"
     out.mkdir(parents=True, exist_ok=True)
     (out / "audit-matrix.json").write_text(json.dumps(dict(frozen=frozen, history=history, checks=rows), ensure_ascii=False, indent=2) + "\n")

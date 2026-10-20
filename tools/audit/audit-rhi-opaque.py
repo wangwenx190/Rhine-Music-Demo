@@ -55,7 +55,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Actual native build/backend/window branches remain separate. This host "
                         "runs macOS Metal RenderControl; Windows/D3D11 and Linux/OpenGL runtime "
-                        "remain R35/R36 when their compiler/device/window-manager environment is absent.")]
+                        "remain R36 when their compiler/device/window-manager environment is absent.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

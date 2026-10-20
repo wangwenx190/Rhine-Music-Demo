@@ -115,8 +115,8 @@
     "manifest": "resources/manifests/rhi-postprocess.json",
     "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
     "rebuild": "ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'",
-    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: non-OpenGL R36, OpenGL R35.",
-    "linux": "Target latest-Kit Vulkan build/runtime remains R36; explicit OpenGL runtime remains R35.",
+    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: remaining target and physical-device checks in R36.",
+    "linux": "Target latest-Kit Vulkan and OpenGL build/runtime gaps remain in R36.",
     "coverage": "docs/contracts/source-fidelity-review.md#r19d4b2-msaaresolve与旧门禁覆盖"
   },
   "productIntegration": {

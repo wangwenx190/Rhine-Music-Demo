@@ -49,7 +49,7 @@ CHECKS = [
 PLATFORMS = {
     "windows": ("WIN-01", "Wide paths/UNC and QSaveFile replacement rely on Qt; MSVC same-Kit build and actual Windows media backend, Unicode/ACL/timeout/cover parsing remain R22-P in R36."),
     "macos": ("MAC-01", "Apple Silicon Release exercises Qt Multimedia and event-loop thread, real RIFF/ID3 CoverArtImage loading, generation replacement and hidden Metal shared regressions; no audio output or foreground window is needed for metadata."),
-    "linux": ("LNX-01", "UTF-8/case-sensitive paths use Qt and existing native filesystem hash. Target compiler/plugins/audio format errors and permissions remain R22-P in R36. No OpenGL context is needed by metadata/import tests; graphical regressions remain R35."),
+    "linux": ("LNX-01", "UTF-8/case-sensitive paths use Qt and existing native filesystem hash. Target compiler/plugins/audio format errors and permissions remain R22-P in R36. No OpenGL context is needed by metadata/import tests; graphical regressions remain R36."),
 }
 reference = ROOT.parent / "Rhine-Music-Database/Qt/tests/UiChecks.cpp"
 reference_info = dict(available=reference.exists(), sourcePath="Qt/tests/UiChecks.cpp",
@@ -68,7 +68,7 @@ for platform, (check_id, explanation) in PLATFORMS.items():
         rows.append(dict(checkId=identity, requirement=evidence, platform=platform,
                          sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
                          result="source-reviewed", sourceSha256=hashlib.sha256(data).hexdigest(),
-                         limitations="Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R35 gates."))
+                         limitations="Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R36 gates."))
     paths = ["src/media/CMakeLists.txt", "src/media/MediaMetadataProbe.h", "src/library/CMakeLists.txt",
              "src/library/DirectoryScanner.cpp", "src/library/LibraryStore.h", "src/library/LegacyImporter.h",
              "src/services/PreferencesStore.h", "src/app/main.cpp", "src/core/LibraryModels.cpp", "src/core/MusicTypes.cpp",

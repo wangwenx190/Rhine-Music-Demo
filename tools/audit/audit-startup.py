@@ -30,7 +30,7 @@ CHECKS = [
     ("PERF-06", "src/motion/MotionController.cpp", "void MotionController::observe",
      "SelectionController observes all four displayed springs through the shared clock. Mathematical observation always updates the archive handoff; stateChanged is emitted only when an exact value/velocity/acceleration differs. An unchanged reduced-motion frame therefore drains visual demand instead of scheduling itself again. StartupTest covers settled demand and a real subsequent row navigation; native idle/window behavior remains independently measured."),
     ("PERF-07", "src/render/rhi/SceneItem.cpp", "const auto epoch = ++m_telemetryEpoch;",
-     "Suspend resets telemetry/diagnostic segments; old queued callbacks are epoch-rejected. Resume schedules latest polish/update and the shared clock discards its first interval. QObject/QML tree dies before OffscreenSurface invalidation and QRhi renderer-owned resources; resource counters must return to zero. Native surface/SG, real playing intent, driver peaks and normal VSYNC are separate R28-P/R35 facts."),
+     "Suspend resets telemetry/diagnostic segments; old queued callbacks are epoch-rejected. Resume schedules latest polish/update and the shared clock discards its first interval. QObject/QML tree dies before OffscreenSurface invalidation and QRhi renderer-owned resources; resource counters must return to zero. Native surface/SG, real playing intent, driver peaks and normal VSYNC are separate R28-P/R36 facts."),
 ]
 DEPENDENCIES = {path for _, path, _, _ in CHECKS} | {
     "src/render/StartupCoordinator.h", "src/motion/FrameClock.h", "src/render/rhi/SceneItem.h",
@@ -56,7 +56,7 @@ for platform, target in [("windows", "D3D11"), ("macos", "Metal"), ("linux", "Op
         checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
                            sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
                            sourceSha256=source_hashes[path], result="source-reviewed",
-                           limitations=f"Target {target} runtime independent. Native/physical/VSYNC gaps: R28-P in R36; all OpenGL dynamic checks: R35."))
+                           limitations=f"Target {target} runtime independent. Remaining native/physical/VSYNC and target OpenGL gaps retain the R28-P/R36 gates."))
     output = ROOT / "verification" / f"{platform}-static" / "startup"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, sourceSha256=source_hashes,

@@ -37,7 +37,7 @@
 | R16B2V | `07514a5` | R19F以QTextLine实际混合ascent确认主字体基线修正；恢复标题尺寸保留，撤回的采样不恢复。 |
 | R16B2V-P | 任务见 `07514a5`；未找到独立完成提交 | Windows 未收口像素任务已被后续契约替代；共享字体/基线代码由 R19F 追踪，不恢复原图门禁。 |
 | R16B2W | 任务见 `509afe8`；未找到独立完成提交 | 没有独立生产选型；已有共享 DPR/生命周期和工具改动归 R19F，D3D11 目标实机仍归 R36。 |
-| R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R35。 |
+| R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R36。 |
 | R16M1 | `c7e9b61`；前置 `6740abc` | R19F保留RenderControl真实target DPR、Review隐藏状态消费和字体head身份；不外推屏幕呈现。 |
 | R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
 | R16M2P | `9470126` | R19F用DOM rangeTop与Canvas字体框独立核对主基线至1/64逻辑px，使用macOS floor。 |
@@ -309,7 +309,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；联网执行保持暂缓；设置与资料异步路由见library-data.md。 |
 | 原生文字/资源适配 | 公共ArchiveText分数字号/整行shaping保留；曲目CSS normal以实际resolved ascent/descent分别取整，缓存有界，不加按截图调出的偏移。局部backdrop附件随可见Loader销毁，尺寸/DPR不改变3D目标键。 |
 
-macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R36/R17-P，Linux/OpenGL归R35的R17-P，不外推为全平台通过。
+macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R36/R17-P，Linux/OpenGL归R36的R17-P，不外推为全平台通过。
 
 ## R19H 全历史闭包与保留适配
 
@@ -365,7 +365,7 @@ R10D的`IntegrationReview`只覆盖单盒生产bootstrap；完整阵列/搜索/�
 | scene.ts的musicIntro / music-camera / viewport-layout | OpeningCamera与SelectionController消费同一shot，覆盖响应式相机、重定位波浪、entryZ/lift及row-light intro；末段保留精确浏览姿态后交给既有弹簧。 |
 | REFDB-02 ItemRenderer::render | 采用完全遮挡期在生产提交入口早退的思路；本项目按自身准备/遮挡状态、计数和token接线，未复制参考代码、时间阈值、素材或调度器。 |
 
-原生实际路径与缺环境目标分别由opening.md及迁移计划R20-P管理；OpenGL动态验证归R35。无新增冻结源缺陷例外。
+原生实际路径与缺环境目标分别由opening.md及迁移计划R20-P管理；OpenGL动态验证归R36。无新增冻结源缺陷例外。
 
 ## R21 · 本地扫描与缓存来源
 
@@ -379,7 +379,7 @@ R10D的`IntegrationReview`只覆盖单盒生产bootstrap；完整阵列/搜索/�
 
 REFDB-03只参考`Qt/tests/UiChecks.cpp::cachedSelection`附近三个断言的意图：重复命中资源稳定、同封面换曲不重传、仅更新实际采样绑定。实际读取文件SHA256为`b7a3878617aab8125dd43b0978d9c3bc0b29ad2501c445b5b21092a3538e56af`；仓库LICENSE为MIT、Copyright (c) 2026 LBEILC，未把NOTICE视为全部代码授权。没有复制其实现、测试代码、资产、24MiB预算或逐draw纹理架构；本项目的CoverCache/AtlasAllocator/SelectedCoverPool及生产SceneItem自行补齐同封面、内容revision、阵列/选中/归位覆盖。单身份失效由不可变内容URL和有界池对比触发，无关图集/目标保持原所有权；原来的整池重置属于原生遗漏，未判为冻结源缺陷。
 
-本机macOS/Apple Silicon已实际通过Release无声媒体/封面/导入与缓存检查、默认隐藏Metal生产图集/光学回归；收尾只重跑受影响项，其余有效结果复用。入口由library-data.md/covers.md维护；Windows/Linux实际媒体后端和导入文件系统欠验集中于R22-P，OpenGL共享图形回归仍归R35。无新增冻结源缺陷例外。
+本机macOS/Apple Silicon已实际通过Release无声媒体/封面/导入与缓存检查、默认隐藏Metal生产图集/光学回归；收尾只重跑受影响项，其余有效结果复用。入口由library-data.md/covers.md维护；Windows/Linux实际媒体后端和导入文件系统欠验集中于R22-P，OpenGL共享图形回归仍归R36。无新增冻结源缺陷例外。
 
 ## R23 · 音乐库面板与歌曲定位来源
 
@@ -467,4 +467,4 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 | GraphicsBackend → QGuiApplication → BackendCapabilities → Qt生产场景图 | Linux默认Vulkan；默认或显式Vulkan的一次初始化/附件格式探测有明确回退，探测资源不进入生产render线程。源渲染图/效果/相机/运动/控制器不变，Vulkan初始化不代表窗口/swapchain或完整产品验收。 |
 | 根sh/演示/实验启动器 → 包优先/Release开发回退 | 保留参数、Unicode/空格和退出码，包内查找路径不借外部Qt/媒体库；显示会话、XDG及音频路由保持调用者选择。播放器不引入Python/ELF工具等开发运行依赖。 |
 
-COMMON/LNX/PERF源码审计覆盖非Windows路径、大小写/权限/数据根、媒体状态/关闭、触控板、字体和Canvas缓存/线程/资源图；实际产品导入闭包与qsb跨目标变体由同Kit检查。主机macOS的Release、官方产品qmllint、默认隐藏策略与Metal独立后处理、生产包加载回归只证明受影响共享入口。Linux原生编译/打包/ELF与真实媒体成功路径、Vulkan编译/设备及xcb/Wayland图形/窗口/输入/性能尚需目标环境，完整保留于R32-P并按R35/R36分工；无新增冻结源效果例外。
+COMMON/LNX/PERF源码审计覆盖非Windows路径、大小写/权限/数据根、媒体状态/关闭、触控板、字体和Canvas缓存/线程/资源图；实际产品导入闭包与qsb跨目标变体由同Kit检查。主机macOS的Release、官方产品qmllint、默认隐藏策略与Metal独立后处理、生产包加载回归只证明受影响共享入口。Linux原生编译/打包/ELF与真实媒体成功路径、Vulkan编译/设备及xcb/Wayland图形/窗口/输入/性能尚需目标环境，完整保留于R32-P并按R36分工；无新增冻结源效果例外。

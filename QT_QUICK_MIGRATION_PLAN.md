@@ -21,16 +21,16 @@
 
 ## 执行顺序、规模与动态验证
 
-- 当前主线：`R35 → R36`。一次只执行一个执行单元；R35处理具备条件的OpenGL单元，R36集中处理非OpenGL目标环境与物理设备缺口。历史来源与静态判定见source-fidelity-review.md。跨目标的验证结果不作为无源码依赖的阻塞条件。
+- 当前主线：`R36`。一次只执行一个具备可靠环境、可收尾的执行单元；目标系统、剩余后端与物理设备缺口集中处理。历史来源与静态判定见source-fidelity-review.md。跨目标的验证结果不作为无源码依赖的阻塞条件。
 - 开始前按代理实际能力估算代码增删、实施、构建、验证、文档和提交总耗时并简报。代码理想≤1000行、通常≤2000行，上限目标两三千行/一小时；预计约4000行或七八十分钟仍不能收尾时，必须先拆计划，明确接口/输入/门槛。执行中超出预估及时缩小边界，保留未完成任务，不追认超时为达标。
 - 行数按新增与删除之和计，不能净增抵消或拆提交规避；生成脚本、文档、素材不计代码行数，但其执行时间计入。正常思考、工具等待、构建和调试均计时；仅断网/用户中止间隔扣除，恢复不重置累计时间。必要收尾允许小幅浮动。
 - 每轮依据实际系统/CPU、最新Kit、后端/设备、匿名输入和窗口策略判断能力，按test-gates.md选择必要构建/功能/渲染/媒体/部署检查。性能先按performance.md严格静态分析，只对仍无法确定的具体问题最小实测，不因环境可用追加采样或压力。需要图形实测时macOS/Apple Silicon优先真正离屏；源码确定缺陷、可靠检查失败及确需的入口缺失必须修复。
-- 只有独立缺环境或采集不可靠的子任务可严格审计后移交后置专项（非OpenGL归R36，OpenGL归R35），保留原任务ID、目标/能力缺口、源码与输入、已知失败、修复对象、准确入口/预期结果、原门槛、依赖和受影响回归。移交不代表取得实际运行事实；性能移交仅保留静态未决问题，不复制历史采样矩阵或重复次数。已交后置专项默认集中处理；用户指定提前补验仅处理指定已实现边界。
-- 已交付目标的受影响构建/部署回归按test-gates.md执行；R32-P保留Linux目标环境的待验闭包。R36负责非OpenGL的后置实机事项，R35集中执行OpenGL动态验证；两轮按实际环境及规模拆执行单元，缺环境时保留任务。
+- 只有独立缺环境或采集不可靠的子任务可严格审计后移交后置专项（统一归R36），保留原任务ID、目标/能力缺口、源码与输入、已知失败、修复对象、准确入口/预期结果、原门槛、依赖和受影响回归。移交不代表取得实际运行事实；性能移交仅保留静态未决问题，不复制历史采样矩阵或重复次数。已交后置专项默认集中处理；用户指定提前补验仅处理指定已实现边界。
+- 已交付目标的受影响构建/部署回归按test-gates.md执行；R32-P保留Linux目标环境的待验闭包。R36按目标系统、后端与设备能力拆执行单元，缺环境时保留具体任务。
 
 ### 测试与窗口
 
-- 后端执行分工：Windows默认动态检查使用D3D11，macOS默认使用Metal；这些后端、显式D3D12和三平台实际启用的Vulkan欠验归R36；三平台OpenGL/GLES上下文、GPU/窗口、质量、输入、生命周期与性能统一归R35，包含Linux显式OpenGL。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
+- 后端选择：Windows默认D3D11，macOS默认Metal；显式D3D12、实际启用的Vulkan及OpenGL/GLES按真实目标能力执行。剩余GPU/窗口、质量、输入、生命周期与具体呈现问题统一归R36。各轮照常完成源码/算法/构建/模块和适用的跨目标qsb静态检查，保留OpenGL实现及原门槛；用户明确点名的单项复现按其指定执行。
 - 验证优先复用已有有效结果；不影响行为的注释/文档/脚本等改动免测，逻辑改动只做必要检查，不因共享代码变更或提交惯性执行全量回归。Release分组与范围归[test-gates.md](docs/contracts/test-gates.md)；性能的架构→算法→实际实现严格静态审计及最低程度、最小范围实测，唯一执行[performance.md](docs/contracts/performance.md)。
 - 全部测试/采集/重建执行[test-window-policy.md](docs/contracts/test-window-policy.md)。默认隐藏；当轮可见授权与结束恢复只按该契约处理，不跨轮次继承。采集限自身渲染，不能为遮挡或节流提升前台。
 - 离屏、Qt提交、正常VSYNC、物理输入/屏幕和媒体听感是独立事实，按实际能力分别验收，未执行或无有效样本保留后置任务。
@@ -96,7 +96,7 @@
 - 数据根/JSON/排序/搜索/Provider协议以library-data契约为准。专辑/曲目ID固定为`album-/track-`加原生绝对目录/直属单曲/文件路径UTF-8的SHA256前24位；跨系统不猜映射。旧数据仅显式只读导入，不移动原目录或导入PCM缓存，不写源歌曲标签。
 - SceneAdapter/QML接口稳定，生产唯一RHI SceneItem；Quick3D仅Review，私有API留在RHI/字体适配边界。通道/格式/ABI与资源图分别由rhi-opaque/shell/postprocess/integration维护，接口/调用链与契约同步维护，不再重选框架。
 - 源材质/几何/光场、局部LOD、原contain/透明留白、帧源/打断/减少动态与状态机均按专项契约；不得建立第二套常量/时间/播放/身份机制。跨API换算必须有源公式/单位依据。
-- 生产滑尺用C++ Canvas Painter，标题当前glyph+彩色Quick Text；序章实现见opening.md，R35/R36按后端分工补实际输出；仅生产路径存在具体缺陷或瓶颈时再考虑选型。列表/输入/焦点/Accessible由Quick承担；固定有界池/封面队列/上传预算、ResourcePlan及异常失败路径按对应契约，不以局部benchmark豁免设计缺陷。
+- 生产滑尺用C++ Canvas Painter，标题当前glyph+彩色Quick Text；序章实现见opening.md，剩余目标实际输出归R36；仅生产路径存在具体缺陷或瓶颈时再考虑选型。列表/输入/焦点/Accessible由Quick承担；固定有界池/封面队列/上传预算、ResourcePlan及异常失败路径按对应契约，不以局部benchmark豁免设计缺陷。
 
 ## 验收要点
 
@@ -181,23 +181,18 @@
 
 ## 待执行轮次
 
-### R35 · 三平台OpenGL补修与目标验收
+### R36 · 目标环境、剩余后端与实物验收
 
-- 依赖R33交付及source-fidelity-review.md中的非OpenGL阶段静态判定，按平台选择一个执行单元。显式`QSG_RHI_BACKEND=opengl`或工具`--backend opengl`并核对真实API；macOS上下文/basic适配按平台文档。
-- 复用下方同一份任务清单，只补尚缺的OpenGL绘制、兼容性与窗口事实。Linux包含真实X11/xcb和Wayland；同系统/Kit/GPU/后端的无会话依赖结果共用，两会话只追加各自上下文/swapchain、窗口/输入/焦点/DPR与呈现差异。
-- 非图形数据、媒体、部署清单和已完成静态结论不因切换图形后端重验。共享修正仅回归受影响生产后端；全部目标独立缺口完成后删除本轮。
-
-### R36 · 非OpenGL目标环境与实物验收
-
-- 依赖R33交付、既有有效自动组件结果及下方共用任务；只处理尚缺的目标事实。Windows默认D3D11、macOS默认Metal；显式D3D12及实际启用的Vulkan只补各自真实差异。非图形构建、文件系统、媒体、部署同属本轮。
+- 依赖现有生产实现、有效组件结果及下方任务；只处理尚缺的目标事实。图形运行剩余目标为Windows的D3D11、显式D3D12/OpenGL及实际启用的Vulkan，Linux的OpenGL和实际启用的Vulkan（真实X11/xcb与Wayland），以及缺少启用特性Kit/SDK/MoltenVK的macOS Vulkan；macOS生产bundle的严格置底无激活可见入口沿下方MAC-VISIBLE-3D处理。非图形构建、文件系统、媒体、部署与三平台物理设备同属本轮。
 - 能力准入：Windows/Linux须有各自原生系统、最新完整Kit及所需GPU/桌面会话；macOS跨设备部署须有另一台兼容设备，Vulkan须有启用该特性的原生Kit、SDK/MoltenVK。物理输入、跨屏DPR/HDR/EDR、设备拔插与听感须有对应实物和可靠操作条件，不能用注入事件或离屏DPR替代。
+- OpenGL使用`QSG_RHI_BACKEND=opengl`或工具`--backend opengl`并核对真实API；Windows/Linux须有原生系统、最新完整Kit和实际GPU。Linux同系统/Kit/GPU/后端的无会话依赖结果共用，xcb/Wayland分别补上下文/swapchain、窗口/输入/焦点/DPR与呈现差异；各组件准确入口、匿名输入和原门槛沿下方六组，不复制矩阵。macOS尚缺的物理输入、跨屏和设备事实沿相应物理任务保留。
 - 原ID与完整闭包沿下方六组保留：BP-P/R30-P/R31-P/R32-P的构建部署与日志；R21-P/R22-P/R24-P/R25-P的目标文件系统/媒体与声音；UI-CONTROLS-P及文字/详情/总览/序章/整场产品的目标输入、显示与窗口事实；R19A/B/C/D各`-P`的目标GPU差异；HDR-OUTPUT-P；R28-P已知呈现间断。各组的源码、匿名输入、准确入口、依赖及原退出门槛是本轮清单，不另复制一套矩阵。
 - R28-P需要可持续曝光且不遮盖工作区的原生窗口观测条件；无可靠呈现样本时保留失败与未知原因，不能以隐藏Metal检查或其他正常运行收口。已有效的Metal自动组件结果不重跑。
 - 只在当前必要检查确被无关回放/压力阻塞时，在对应任务内解开最小分支；不设独立工具改造轮次。共享修正仅回归受影响生产后端和产品状态；全部独立缺口获得相应目标事实后删除本轮。
 
 ## 后置专项输入与退出条件
 
-以下六组是R35/R36共用任务；表中原ID用于追溯断言，不各自启动一套验证。一次只实施其中一个可收尾单元。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
+以下六组是R36的剩余任务；表中原ID用于追溯断言，不各自启动一套验证。一次只实施其中一个可收尾单元。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
 
 ### 目标构建、部署与后端/日志
 
@@ -227,6 +222,7 @@
 
 ### 产品功能、文字与物理输入/显示
 
+- 目标边界：Windows/Linux保留对应后端实际输出及产品接线；macOS保留MAC-VISIBLE-3D的生产bundle可见入口；三平台保留下方物理输入/显示与真实系统窗口操作。
 - 归属：UI-CONTROLS-P、R16B2W/R16B3/R16M3-S、R17-P/R18-P/R19-P/R19E-P/R20-P/R23-P/R26-P/R27-P/R29-P、MAC-VISIBLE-3D及R28-P正常启动/窗口事实。依赖目标构建和现有生产接线；输入为各组件既有匿名fixture、冻结数学/CSS结构与qrc封面。生产文字glyph+彩色Quick Text、滑尺C++ CanvasPainter、序章沿当前路径验收，不安排默认候选路径比较或成本测试。
 - 先将已有产品/组件报告按实际断言对照，只补缺口。源码数学、信号/状态可复用同平台非图形结果；布局/主题/DPR按test-gates.md选独立边界。目标真实输出与实际输入仍须对应目标证据，不能以源码审计假称画质通过。
 
@@ -236,6 +232,7 @@
 | 文字/页眉/滑尺 · R16B2W/R16B3/R16M3-S/R19E-P | TitleReel/TransportTitle/Header、Ruler/Ordinal/InputRouter；`tests/fixtures/text/titles.json`及144组滑尺源轨迹。`export-title.mjs`→`verify-title.mjs --backend 目标 --dpr 实际值 --source 源目录 --output 新目录`、`title-reels`、`ui-audit --ruler`/普通ui-audit及export-ruler/export-browse-ui/compare-browse-structure；源码入口audit-title-source/audit-browse-navigation.py。 | 字体身份、连字/组合字/emoji、字形/断行/省略/裁切、页眉结构与播放隔离、自然宽度通知/隐藏完成与恢复取消、刻线/clip/淡隐/背压符合title-reels/navigation/browse-ui；所有权/缓存/隐藏工作量先静态确定，未决运行行为才最小观察。 |
 | 详情/总览 · R17-P/R18-P/R19-P | Presentation/DetailMotion/ReturningCasePool/PointerDragController、Overview与SceneItem；presentation/detail-golden/overview/source-golden匿名输入。`ui-audit --presentation`、`verify-detail.py --backend 目标 --runs 1 --output 新目录`、`verify-overview.py --visual --backend 目标 --runs 1 --output 新目录`按缺项选择；audit-presentation/detail/overview/detail-overview-source及对应结构导出/比较入口。 | ready/revision/四种archiveRoute、连选最后意图/反向/拖动取消、sticky tabs/行高/委托虚拟化、总览两步点击/跨列收拢与反转/碰撞准入（标签240ms退场与420ms入口收拢的衔接、计数block宽度）、焦点恢复/定位不改播放，遵守presentation/detail-motion/overview；产品回放与组件报告共用。 |
 | 序章与产品联动 · R20-P/R29-P | OpeningController/OpeningInk、MusicStage/SceneItem；opening/source-golden.json与qrc封面/匿名库。`opening`、`ui-audit --opening`及audit-opening/export-opening-golden；仅组件证据未覆盖的跨组件联动才选`verify-gui.py --backend 目标 --output 新目录`/audit-gui.py。 | 输入锁/跳过/重播/减少动态/一次交接、遮挡零三维submit和恢复正确，产品浏览→详情→总览→搜索/片头的真实接线、透明合成与资源容量符合opening/rhi-integration；不为汇总已有组件结果另跑完整GUI矩阵。 |
+| macOS生产bundle置底可见入口 · MAC-VISIBLE-3D / R18-P / R29-P | VerificationWindowMac::NativeWindowGuard/prepareNativeApplication、App.qml与DetailReview；`python3 tools/build/verify-detail.py --backend opengl --runs 1 --output 新目录`的匿名库。默认Prohibited下`verification/r35-detail-native/run-1/report.json`显示Qt visible但原生应用hidden、窗口不在屏幕且无曝光/帧；`verification/r35-detail-accessory/run-1/report.json`中的Accessory窗口策略出现进程激活，不能采用该策略。依赖允许可靠观察自身窗口且不干扰工作区的macOS会话；修复对象仅为验证启动/显示策略与实际原生窗口事实，不能以离屏结果替代。 | 实际API为OpenGL，bundle自身真实show/帧、详情操作与原门槛均满足；置底、拒key/鼠标、前台PID与完整激活/焦点历史同时合规，同对象hide/minimize/restore独立核对。保持默认隐藏策略和普通产品行为；无可靠条件或发生激活时不得宣告通过、提高层级或放宽窗口门槛。 |
 
 物理检查与部署、媒体共用同一目标产品会话：键鼠/触控板pixelDelta/快捷键、系统中英文与emoji组合输入、剪贴板/撤销、目录选择、辅助技术角色/名称、焦点/模态隔离；首次show、同对象hide/minimize/restore、实际surface变化与退出；真实跨屏DPR后的SceneItem/Canvas/文字尺寸/清晰度和缓存恢复。不同系统/会话的事实分别保留，隐藏target DPR及注入Qt事件不能冒充物理设备。
 
@@ -243,6 +240,7 @@
 
 ### 图形算法与生产接线
 
+- 目标边界：下表图形运行只保留Windows/Linux及具备原生Vulkan能力的macOS目标差异；物理屏幕事实由产品/显示任务维护，不重复GPU算法检查。
 - 归属：R19A/B/C/D各`-P`。依赖目标构建/真实GPU；输入为冻结生产源码、`resources/manifests/`、各组件现有源数学fixture及匿名RhiProductionFixture，不默认生成完整大封面库。审计与适配判定索引为[source-fidelity-review.md](docs/contracts/source-fidelity-review.md)，算法/格式/容差仅由下表权威契约维护。
 - 先审生产入口到实际上传/着色器/附件/合成/释放，复用已有效的源公式与资源结论；只为目标格式、驱动、实际光学/合成等尚缺事实选对应入口。以下为定位表，不是每目标逐项必跑清单；工具的固定状态数、1200帧序列和十次重建均非默认任务数。共有生产状态可同时证明各pass接线，无需另跑同一连续序列。
 
@@ -264,7 +262,7 @@
 
 - 依赖真实目标系统、显示设备及输出能力；输入为DisplayOutputState/Monitor、WindowsDisplayQuery/LinuxColorManagement/MacDisplayQuery和DisplayOutputTest的5×1颜色。契约为[display-output.md](docs/contracts/display-output.md)。主机静态/qsb不能证明其他系统编译或显示事实。
 - Release的DisplayOutputTest、`display-transfer-gpu`及需要当轮可见授权的`display-output-visible`只补缺项。Windows核对HDR开关/跨HDR-SDR屏/SDR brightness slider和nits/80，WCG SDR不误判；Linux核对真实Wayland颜色协议/PQ或linear swapchain及reference white/target luminance通知、无协议/X11的SDR和Vulkan失败回退；macOS核对亮度/电源引起的current EDR及跨屏恢复。
-- 退出：查询失败清旧状态、参数变化不重建/模式切换保留QML与音频、epoch/释放正确，真实通知与输出符合契约。R36负责适用D3D/Metal/Vulkan；三平台OpenGL保持SDR并仅在共享变更影响时归R35回归。不附带大型阵列、性能A/B或整场矩阵。
+- 退出：查询失败清旧状态、参数变化不重建/模式切换保留QML与音频、epoch/释放正确，真实通知与输出符合契约。R36按上述剩余目标执行；OpenGL保持SDR，Windows/Linux需真实输出事实，macOS仅在共享变更影响时回归。不附带大型阵列、性能A/B或整场矩阵。
 
 ### 已知呈现间断 · R28-P · R36
 

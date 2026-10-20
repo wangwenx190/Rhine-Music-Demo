@@ -6,6 +6,8 @@
 
 默认macOS可见测试OFF；授权窗口例外与离屏选择由迁移计划的动态能力规则决定。OffscreenSurface在隐藏QQuickWindow上用RenderControl渲染真实RGBA8+depth/stencil，显式target DPR，合并有界render请求，只读自身texture；offscreenRendering只由Review tokens启用。
 
+用户同时要求置底或不抢焦点时，该轮仅授权显示，`YALAHOO_VERIFY_FOREGROUND`保持0；可见入口必须同时满足原生窗口策略，不能将显示授权解释为前台授权。
+
 macOS 必须落实原生窗口策略，不能只检查 Qt flags。Qt Cocoa 的 `windowLevel` 没有处理置底标志，应用启动委托还可能主动激活进程。所有 CTest 在创建 QGuiApplication 前设置 `QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM=1`；独立图形验证工具及产品 `--verify-*` 入口调用 `prepareApplication()`。QML 验证 root 保持隐藏，取得对象后、首次 show 前调用 `prepareWindow()`。
 
 `VerificationWindowMac.mm` 仅在验证进程使用 AppKit/CoreGraphics 公开 API；默认模式使用 Prohibited 策略禁止应用激活，并关闭 Qt 启动激活，以 `NSNormalWindowLevel-1` 置于普通工作窗口以下，保留拒绝 key 焦点的 Qt 标志，并禁止原生鼠标事件进入测试窗口。测试输入只通过自身 Qt 对象发送。守卫观察 NSView 的 window 和 NSWindow 的 level，Qt 重设层级/替换窗口时同步重新应用；surface 销毁前移除观察，恢复/重建继续生效。报告原生层级、key/main 状态、应用是否激活与前台应用是否变化；同时观察自身AppKit与NSWorkspace激活事件，初始/当前前台PID均须有效且不属于验证进程，自身任何激活/焦点历史仍使默认策略失败。其他应用之间的切换单独记录externalForegroundChanges/foregroundUnchanged，不冒充验证进程抢前台；默认模式的实际 key/main 或应用激活（含短暂通知）使窗口策略失败；授权前台模式核对 Regular/正常层级，并记录实际激活与曝光。该边界不包含音频桥接，不修改普通产品窗口。

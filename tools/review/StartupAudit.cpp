@@ -1277,7 +1277,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     return passed ? 0 : 1;
 }
 
-int reviewGui(const QString &output, bool narrowOnly)
+int reviewGui(const QString &output, bool narrowOnly, bool representative)
 {
     // The same driver and production stage serve cold-start and integrated GUI checks.
     // Captures are explicit checkpoints; their readback cost is excluded from local timings.
@@ -1383,6 +1383,9 @@ int reviewGui(const QString &output, bool narrowOnly)
                                   { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
         for (qsizetype index = 0; index < sizes.size(); ++index) {
             const auto size = sizes[index];
+            if (representative && size != QSize(1280, 720) && size != QSize(930, 900)
+                && size != QSize(390, 844))
+                continue;
             if (narrowOnly && size.width() > 700)
                 continue;
             const double dpr = OffscreenSurface::Enabled ? (index % 3 == 0           ? 1.0

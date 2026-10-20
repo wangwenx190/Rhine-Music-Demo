@@ -126,10 +126,14 @@ int main(int argc, char **argv)
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
     if (app.arguments().contains(u"--library"_s))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains(u"--gui"_s))
-        return argc == 3 || (argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow"_L1)
-                ? reviewGui(QString::fromLocal8Bit(argv[2]), argc == 4)
+    if (app.arguments().contains(u"--gui"_s)) {
+        const bool narrow = argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow"_L1;
+        const bool representative =
+                argc == 4 && QString::fromLocal8Bit(argv[3]) == "--representative"_L1;
+        return argc == 3 || narrow || representative
+                ? reviewGui(QString::fromLocal8Bit(argv[2]), narrow, representative)
                 : 2;
+    }
     if (app.arguments().contains(u"--startup"_s)) {
         bool validSeconds = true;
         const double seconds =
@@ -145,8 +149,13 @@ int main(int argc, char **argv)
                           argc >= 5 ? QString::fromLocal8Bit(argv[4]) : u"matrix"_s, observeOnly)
                 : 2;
     }
-    if (app.arguments().contains(u"--opening"_s))
-        return argc == 3 ? reviewOpening(app, QString::fromLocal8Bit(argv[2])) : 2;
+    if (app.arguments().contains(u"--opening"_s)) {
+        const bool representative =
+                argc == 4 && QString::fromLocal8Bit(argv[3]) == "--representative"_L1;
+        return argc == 3 || representative
+                ? reviewOpening(app, QString::fromLocal8Bit(argv[2]), representative)
+                : 2;
+    }
     if (app.arguments().contains(u"--overview"_s))
         return argc == 3 ? reviewOverviewVisual(app, QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--presentation"_s))

@@ -36,10 +36,22 @@ T.Button {
                                                            control.tokens.accent.b, .08) :
                                                    "transparent"
         radius: control.framed ? 2 : 0
-        border.color: control.activeFocus || control.pressed ? control.tokens.accent :
-                                                               control.framed ? control.tokens.line :
-                                                                                "transparent"
-        border.width: control.framed ? 1 : 2
+        border.color: control.pressed ? control.tokens.accent : control.framed ? control.tokens.line :
+                                                                                 "transparent"
+        border.width: control.framed ? 1 : 0
+        Rectangle {
+            objectName: "buttonFocusOutline"
+            x: -6
+            y: -6
+            width: control.width + 12
+            height: control.height + 12
+            visible: control.visualFocus
+            color: "transparent"
+            radius: 0
+            border.width: 2
+            border.color: control.tokens.accent
+            antialiasing: true
+        }
         Rectangle {
             antialiasing: true
             anchors.bottom: parent.bottom

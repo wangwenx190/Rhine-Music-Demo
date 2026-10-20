@@ -31,7 +31,7 @@
 
 ## 目标尺度与生产阵列检查
 
-`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R35/R36分工。
+`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
 
 九尺寸布局、主题和DPR边界按test-gates.md分开选择；必要入口调整按test-gates.md，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、半AO/full DOF/CoC等真实耦合边界仍须独立覆盖。
 
@@ -47,4 +47,4 @@
 
 报告保留实际viewport/DPR、有限矩阵、实体/清晰封面容量、renderer代次、资源描述符与旧新重叠估算、独立GUI/同步/提交成本和最终释放；显式读回发生在帧完成后的检查点，不计入帧成本。manifest保存源码/资产/二进制/图像hash和失败退出状态，不覆盖已有目录。此入口没有原生呈现、物理输入或显存实测，不产生performance.md之外的性能任务。
 
-`--narrow`只重放≤700逻辑px的尺寸，另核对长列名界限与单专辑恢复单行，用于小屏布局改动后的定向回归；原完整矩阵中的未受影响状态按test-gates.md复用。`python3 tools/audit/audit-gui.py --report 完整目录/matrix/report.json --report 后续定向目录/matrix/report.json`按输入顺序覆盖同状态/阶段记录，要求合并后完整矩阵齐全且各报告自身通过，然后复核各组件唯一来源审计，并输出本地COMMON/PERF/三平台调用链矩阵。正常输出由实际查看检查清晰度、轮廓、裁切和合成，不生成图像评分；源码数学和结构仍使用各组件既有导出/比较入口。
+`--representative`选择1280×720、930×900和390×844，保留双主题/两阵列及全部联动，输出60个检查点，用于组件布局结果仍有效时补后端产品接线。`--narrow`只重放≤700逻辑px的尺寸，另核对长列名界限与单专辑恢复单行，用于小屏布局改动后的定向回归；两种选择互斥，原完整矩阵中的未受影响状态按test-gates.md复用。`python3 tools/audit/audit-gui.py --report 完整目录/matrix/report.json --report 后续定向目录/matrix/report.json`按输入顺序覆盖同状态/阶段记录，要求合并后完整矩阵齐全且各报告自身通过，然后复核各组件唯一来源审计，并输出本地COMMON/PERF/三平台调用链矩阵。正常输出由实际查看检查清晰度、轮廓、裁切和合成，不生成图像评分；源码数学和结构仍使用各组件既有导出/比较入口。

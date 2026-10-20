@@ -105,6 +105,29 @@ int reviewControls(const QString &output)
         check(u"own-image"_s,
               surface.grab().save(output + (night ? "/night.png"_L1 : "/day.png"_L1)));
     }
+    auto *button = item("controlButton");
+    button->setProperty("framed", false);
+    button->setProperty("cssPixelSize", 12);
+    button->setProperty("text",
+                        QCoreApplication::translate("Overview", "Return to close view     V"));
+    button->forceActiveFocus(Qt::TabFocusReason);
+    check(u"shortcut-button-render"_s, render());
+    bool textBounded = true;
+    const auto inspectText = [&](auto &&self, QQuickItem *node) -> void {
+        if (node->property("contentWidth").toDouble() > 0)
+            textBounded &= node->width() + 1 >= node->property("contentWidth").toDouble()
+                    && node->mapRectToItem(button, node->boundingRect()).right()
+                            <= button->width() + 1;
+        for (auto *child : node->childItems())
+            self(self, child);
+    };
+    inspectText(inspectText, button);
+    check(u"shortcut-text-bounded"_s, textBounded);
+    auto *outline = visual(button, u"buttonFocusOutline"_s);
+    check(u"source-keyboard-outline"_s,
+          outline && outline->isVisible() && outline->position() == QPointF(-6, -6)
+                  && outline->size() == button->size() + QSizeF(12, 12));
+    check(u"shortcut-button-image"_s, surface.grab().save(output + "/shortcut.png"_L1));
     checkBox->forceActiveFocus();
     QTest::keyClick(&window, Qt::Key_Space);
     check(u"checkbox-keyboard"_s, checkBox->property("checked").toBool());

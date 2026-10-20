@@ -53,7 +53,7 @@ for path in ["src/music-player.ts", "src/music-app.ts"]:
 dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in sorted(paths)]
 for platform, platform_id in [("macos", "MAC-01"), ("windows", "WIN-01"), ("linux", "LNX-01")]:
     checks = []
-    for check_id, path, symbol, evidence in CHECKS + [(platform_id, "src/media/BackgroundMusicController.cpp", "void BackgroundMusicController::refreshOutput", "Public Qt default-device routing; actual native Qt plugin, devices and audio recovery require this target. Windows/Linux execution, physical route changes/listening and native minimize remain R25-P; GUI backend split remains R35/R36.")]:
+    for check_id, path, symbol, evidence in CHECKS + [(platform_id, "src/media/BackgroundMusicController.cpp", "void BackgroundMusicController::refreshOutput", "Public Qt default-device routing; actual native Qt plugin, devices and audio recovery require this target. Windows/Linux execution, physical route changes/listening and native minimize remain R25-P; GUI backend split remains R36.")]:
         data = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(data.decode().split()):
             raise SystemExit(f"Ambience source drift: {path}::{symbol}")

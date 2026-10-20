@@ -59,7 +59,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Native Kit/API branches remain separate; five qsb target languages only "
                         "prove static translation. Current actual GPU is macOS Metal; unavailable "
-                        "D3D11 runtime stays R36; Linux GL runtime stays R35. No version or install path is pinned.")]
+                        "D3D11 runtime stays R36; Linux GL runtime stays R36. No version or install path is pinned.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

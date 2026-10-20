@@ -140,6 +140,9 @@ int main(int argc, char **argv)
     parser.setApplicationDescription(
             QCoreApplication::translate("CommandLine", "yalahOO!!! native music archive"));
     parser.addHelpOption();
+    parser.addOption({ u"verify-app"_s,
+                       QCoreApplication::translate(
+                               "CommandLine", "Verify hidden product QML creation, then exit") });
     parser.addOption(
             { u"demo"_s,
               QCoreApplication::translate(
@@ -254,9 +257,10 @@ int main(int argc, char **argv)
             }
         }
     }
-    const bool appVerification = parser.isSet(u"verify-deployment"_s)
-            || parser.isSet(u"verify-browse"_s) || parser.isSet(u"verify-navigation"_s)
-            || parser.isSet(u"verify-detail"_s) || parser.isSet(u"verify-overview"_s);
+    const bool appVerification = parser.isSet(u"verify-app"_s)
+            || parser.isSet(u"verify-deployment"_s) || parser.isSet(u"verify-browse"_s)
+            || parser.isSet(u"verify-navigation"_s) || parser.isSet(u"verify-detail"_s)
+            || parser.isSet(u"verify-overview"_s);
     if (parser.isSet(u"verify-filled"_s)
         && (!parser.isSet(u"verify-runtime"_s) || parser.isSet(u"verify-library"_s)
             || parser.isSet(u"verify-motion"_s)))
@@ -515,7 +519,7 @@ int main(int argc, char **argv)
     }
     QStringList deploymentWarnings;
     QQmlApplicationEngine engine;
-    if (parser.isSet(u"verify-deployment"_s)) {
+    if (appVerification) {
         QObject::connect(&engine, &QQmlEngine::warnings, &engine,
                          [&](const QList<QQmlError> &warnings) {
                              for (const auto &warning : warnings)
@@ -525,7 +529,7 @@ int main(int argc, char **argv)
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
-        if (!verificationRun) {
+        if (!verificationRun || parser.isSet(u"verify-app"_s)) {
             presentationProperties.insert(u"openingController"_s, QVariant::fromValue(&opening));
             presentationProperties.insert(u"startupCoordinator"_s, QVariant::fromValue(&startup));
         }
@@ -625,6 +629,32 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return 7;
+    if (parser.isSet(u"verify-app"_s)) {
+        QTimer::singleShot(0, &engine, [&] {
+            const auto find = [](auto &&self, QQuickItem *item,
+                                 const QString &name) -> QQuickItem * {
+                if (item->objectName() == name)
+                    return item;
+                for (auto *child : item->childItems())
+                    if (auto *found = self(self, child, name))
+                        return found;
+                return nullptr;
+            };
+            auto *surface = find(find, window->contentItem(), u"displaySurface"_s);
+            auto *overlay = find(find, window->contentItem(), u"displayOverlay"_s);
+            auto *sceneItem = find(find, window->contentItem(), u"nativeScene"_s);
+            const bool passed = deploymentWarnings.isEmpty() && surface && overlay && sceneItem
+                    && overlay->parentItem() == surface && surface->isAncestorOf(sceneItem)
+                    && surface->size() == window->size() && !window->isVisible()
+                    && yalahoo::verification::windowPolicySatisfied(*window)
+                    && playback.source().isEmpty() && !playback.requested();
+            if (!passed)
+                qCCritical(yalahoo::logApp) << "Hidden product QML creation or composition failed"
+                                            << deploymentWarnings;
+            app.exit(passed ? 0 : 25);
+        });
+        return app.exec();
+    }
     if (parser.isSet(u"verify-deployment"_s))
         return yalahoo::verifyDeployment(app, *window, parser.value(u"verify-deployment"_s),
                                          deploymentWarnings);

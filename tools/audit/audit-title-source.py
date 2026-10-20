@@ -33,7 +33,7 @@ history = [record(rev, path, reason) for rev, path, reason in [
     ('509afe8', 'tools/review/CanvasTitleProbe.cpp', 'R16B2: retain effective visibility in synchronize/paint, window disconnect and actual cost counters; candidate still reshapes faces and is not semantically equivalent.'),
     ('07514a5', 'src/render/text/TextLayoutAdapter.cpp', 'R16B2V: actual QTextLine ascent includes fallback; subtract it to retain primary CSS baseline. Color inline face retains separate metrics, not an image offset.'),
     ('07514a5', 'tools/review/TitleAudit.cpp', 'R16B2V: restore title dimensions before lifecycle rendering; preserve real invalidation/one pending readback. B2V-P had no separate implementation; no pixel repair task survives.'),
-    ('6740abc', 'QT_QUICK_MIGRATION_PLAN.md', 'Handoff only: no separate B2W/B3 production implementation; shared GL/DPR/candidate branches are reviewed here; target runtime remains R35/R36.'),
+    ('6740abc', 'QT_QUICK_MIGRATION_PLAN.md', 'Handoff only: no separate B2W/B3 production implementation; shared GL/DPR/candidate branches are reviewed here; target runtime remains R36.'),
     ('c7e9b61', 'tools/review/OffscreenSurface.h', 'R16M1: preserve true RenderControl target with explicit DPR, hidden production-state consumers and font-head identity.'),
     ('b9a5ea7', 'src/app/AssetCatalog.cpp', 'R16M2: retain public Apple Color Emoji family policy; source PostScript face differs from UI fallback. Initialize before controller, rollback missing faces, no font file path in render.'),
     ('9470126', 'src/render/text/TextLayoutAdapter.cpp', 'R16M2P: retain macOS integral half-leading only with same-host DOM rangeTop/Canvas font-box metric proof; no screenshot or case-dependent baseline. Other platforms unchanged.'),
@@ -79,7 +79,7 @@ for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'),
         rows.append(dict(checkId=identity, requirement=reason, platform=platform, sourcePath=path,
                          lineOrSymbol=symbol, evidence=reason,
                          sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed',
-                         limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R35/R36.'))
+                         limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R36.'))
     directory = ROOT / 'verification' / f'{platform}-static' / 'title-reels' / 'r19f'
     directory.mkdir(parents=True, exist_ok=True)
     (directory / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, current=current, checks=rows), indent=2) + '\n')

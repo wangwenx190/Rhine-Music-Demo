@@ -29,7 +29,7 @@ CHECKS = [
     ("PERF-06", "src/render/rhi/SceneItem.cpp", "in.floorColor == old.floorColor",
      "Existing changed/polish and unchanged-input gate cover floor color, same FrameClock/theme transition; no QML delegate, independent timer or hidden tick introduced."),
     ("PERF-07", "tools/review/RhiFloorAudit.h", "cycle < 10",
-     "Ten actual SG invalidations restore floor, capture and AO/full DOF geometry. Existing renderer owns/releases all shared resources, no per-floor lifetime or unbounded cache. Native window/VSYNC and unavailable target hardware remain R35/R36."),
+     "Ten actual SG invalidations restore floor, capture and AO/full DOF geometry. Existing renderer owns/releases all shared resources, no per-floor lifetime or unbounded cache. Native window/VSYNC and unavailable target hardware remain R36."),
 ]
 # Verify the copied, source-derived LTC/GGX helper portion stays equivalent to the shared shell.
 def tokens(text):
@@ -72,5 +72,5 @@ for host, platform_id, symbol in [("windows", "WIN-01", "WIN32"),
         "Follow test-window-policy; select a native backend only when available. Expected source plane projection "
         "<=2 physical pixels, PBR/fog <=3/255, normal <=1/255, actual received shadow and AO/full DOF coverage, "
         "three map sizes, no unrelated target/caster rebuilds, bounded uploads and real resource recovery. "
-        "Normal windows, VSYNC, target deployment and formal product performance remain separate R35/R36/R28 tasks.\n")
+        "Normal windows, VSYNC, target deployment and formal product performance remain separate R36/R28 tasks.\n")
 print("Product floor COMMON/PERF/platform audit and helper equivalence passed")

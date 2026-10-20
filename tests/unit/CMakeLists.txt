@@ -485,6 +485,13 @@ target_link_libraries(
 )
 yalahoo_platform(ModuleProbe)
 add_test(NAME module-link-and-plugins COMMAND ModuleProbe)
+add_test(NAME production-app-root COMMAND Yalahoo --verify-app)
+set_tests_properties(production-app-root PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+if(WIN32)
+    set_tests_properties(production-app-root PROPERTIES ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+endif()
 add_test(
     NAME
     shader-tools

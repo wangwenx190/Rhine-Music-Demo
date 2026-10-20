@@ -29,7 +29,7 @@ CHECKS = [
     ("PERF-06", "qml/Yalahoo/Music/panels/ExperimentPanels.qml", "property bool navigationInputOwner: true",
      "One bounded ScrollView owns pointer/wheel/keyboard input through existing InputRouter ancestry checks. No new frame source/timer or per-frame QML serialization. Closing destroys the loader; hidden/modal/opening state pauses diagnostics and restores temporary comparison."),
     ("PERF-07", "src/render/rhi/SceneItem.cpp", "const auto epoch = ++m_diagnosticsEpoch;",
-     "Visibility/window changes reset sample baselines and disconnect native presentation events; stale deliveries cannot mutate current UI. Native frames and RenderControl submissions remain separate. Non-OpenGL target gaps retain R27-P in R36 and all GL gaps retain R35."),
+     "Visibility/window changes reset sample baselines and disconnect native presentation events; stale deliveries cannot mutate current UI. Native frames and RenderControl submissions remain separate. Remaining target and physical-device gaps retain R27-P in R36."),
 ]
 DEPENDENCIES = {
     "src/app/main.cpp", "src/app/QmlTypes.h", "src/render/SelectionLighting.h",

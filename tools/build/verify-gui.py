@@ -12,10 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--backend', required=True, choices=('metal', 'd3d11', 'd3d12', 'opengl', 'vulkan'))
 parser.add_argument('--narrow', action='store_true', help='Regress only viewports <=700 after a narrow-layout change')
+parser.add_argument('--representative', action='store_true', help='Check product integration at desktop, portrait boundary and narrow sizes')
 parser.add_argument('--visible', action='store_true', help='Use a native window on macOS')
 parser.add_argument('--foreground', action='store_true', help="Use this round's authorized foreground policy")
 parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
+if args.narrow and args.representative:
+    parser.error('--narrow and --representative are mutually exclusive')
 if args.foreground and not args.visible:
     parser.error('--foreground requires --visible')
 if args.output.exists():
@@ -45,7 +48,8 @@ manifest = dict(system=platform.platform(), backend=args.backend,
                 sourceSha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                               for p in sorted(files) if p.is_file()},
                 fixture='576 invented albums, qrc portrait/landscape/square covers, no user data or media commands',
-                narrowOnly=args.narrow, nativeWindowRequested=args.visible, foreground=args.foreground,
+                narrowOnly=args.narrow, representative=args.representative,
+                nativeWindowRequested=args.visible, foreground=args.foreground,
                 scope='Production-stage matrix; GUI events/geometry/resources and own output checkpoints. Source structure, numeric motion and visual inspection remain separate.',
                 completed=False, passed=False)
 manifest_path = args.output / 'manifest.json'
@@ -57,6 +61,8 @@ with (args.output / 'run.log').open('w', encoding='utf-8') as log:
         command = [str(executable), '--gui', str((args.output / 'matrix').resolve())]
         if args.narrow:
             command.append('narrow')
+        elif args.representative:
+            command.append('--representative')
         result = subprocess.run(command,
                                 cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
                                 timeout=1800, check=False)
@@ -70,6 +76,8 @@ sizes = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
          (390, 844), (320, 720), (2560, 1080), (3440, 1440))
 if args.narrow:
     sizes = tuple(size for size in sizes if size[0] <= 700)
+elif args.representative:
+    sizes = ((1280, 720), (930, 900), (390, 844))
 expected = {(w, h, night, real, phase) for w, h in sizes for night in (False, True)
             for real in (False, True) for phase in
             (('browse', 'overview', 'detail', 'search') if real else

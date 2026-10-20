@@ -901,6 +901,11 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         appProperties.insert(u"verificationRun"_s, true);
         appProperties.insert(u"verificationFlags"_s, int(verification::windowFlags()));
         QQmlComponent appComponent(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/App.qml"_s));
+        const bool appLoaded = QTest::qWaitFor([&] {
+            return appComponent.status() != QQmlComponent::Loading;
+        });
+        if (!appLoaded || appComponent.isError())
+            qWarning() << appComponent.errors();
         std::unique_ptr<QObject> appRoot(appComponent.createWithInitialProperties(appProperties));
         auto *appWindow = qobject_cast<QQuickWindow *>(appRoot.get());
         check(u"production-app-created"_s, appWindow != nullptr);
@@ -911,7 +916,9 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             const auto requested = song->requested();
             auto *player = song.get();
             const auto values = settings.values();
-            for (int i = 0; i < 10; ++i) {
+            const int reloadCount =
+                    qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
+            for (int i = 0; i < reloadCount; ++i) {
                 QPointer<QQuickItem> oldScene = visual(appWindow->contentItem(), u"nativeScene"_s);
                 settings.reload();
                 QElapsedTimer timer;

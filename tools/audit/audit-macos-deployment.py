@@ -23,7 +23,7 @@ CHECKS = [
      'fonts/shaders/audio/branding do not depend on cwd. PlugIns and Resources/qml resolve within Contents. '
      'Unicode/space paths use pathlib/subprocess argument arrays; no shell interpolation or user data copy.'),
     ('COMMON-03', 'src/app/GraphicsBackend.h', 'QSGRendererInterface::Metal',
-     'Ordinary macOS selects Metal; explicit OpenGL/CoreProfile/basic remains available for R35. '
+     'Ordinary macOS selects Metal; explicit OpenGL/CoreProfile/basic remains available for R36. '
      'Deployment changes no clip/Y/depth, source lighting/material, capture ordering, alpha, sampling or effect. '
      'Same-Kit qsb outputs are embedded. Actual Metal/Retina attachment checks use existing hidden probes; '
      'static cross-target translation does not establish other GPU execution.'),
@@ -151,11 +151,11 @@ def main():
                                line=source[:source.index(symbol)].count('\n') + 1,
                                sourceSha256=hashes[path], evidence=requirement, result='source-reviewed',
                                limitations=('Native macOS execution reported separately; '
-                                            'physical/device/presentation: R31-P/R36; OpenGL: R35.'
+                                            'physical/device/presentation: R31-P/R36; OpenGL: R36.'
                                             if platform == 'macos' else
                                             'macOS bundle/menu branch is N/A on this platform; '
                                             'shared metadata/probe/launcher source impact reviewed. '
-                                            'Target execution remains R30-P/R32-P and R35/R36.')))
+                                            'Target execution remains R30-P/R32-P and R36.')))
         output = ROOT / 'verification' / f'{platform}-static' / 'macos-deployment'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'source-matrix.json').write_text(json.dumps(dict(checks=checks, sourceSha256=hashes,

@@ -110,6 +110,10 @@
     <context>
         <name>CommandLine</name>
         <message>
+            <source>Verify hidden product QML creation, then exit</source>
+            <translation>在隐藏状态下验证产品 QML 创建，然后退出</translation>
+        </message>
+        <message>
             <source>yalahOO!!! native music archive</source>
             <translation>yalahOO!!! 原生音乐收藏馆</translation>
         </message>

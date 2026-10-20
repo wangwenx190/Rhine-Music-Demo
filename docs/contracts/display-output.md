@@ -16,6 +16,8 @@
 
 HDR内容先在RGBA16F的DisplaySurface中保留源sRGB编码UI合成，再通过一次sRGB解码、白电平调整和平台编码输出；HDR10另执行D65 Rec.709→Rec.2020与ST2084。三维保留源ACES的SDR基底，仅对曝光后超过1的线性高光追加有界指数肩部，范围不超过当前headroom；32-byte最终输出uniform包含原16-byte参数与HDR参数。三维item输出和背景模糊捕获在HDR时使用RGBA16F，避免中间RGBA8裁切。SDR保持源ACES/sRGB输出。
 
+ApplicationWindow的只读contentItem保持Qt所有权；DisplaySurface作为其填满视口的子项，持有生产Loader。Templates公开的`Overlay.overlay.parent`同样绑定到DisplaySurface，使Item型菜单/下拉列表与舞台共用一次最终颜色转换，并保留Qt弹出层的焦点、尺寸和输入行为。生产根创建门槛见[test-gates.md](test-gates.md)。
+
 模式变化只重建原生surface/SG及依赖的GPU资源，QML对象、业务状态和音频对象不替换；白电平/headroom变化只更新值。重建保留窗口visibility，Qt释放旧render资源后再销毁surface。DisplayOutput须比QML引擎/窗口活得更久，旧epoch回调丢弃。`ResourcePlan`计入HDR item输出、整窗浮点合成层及深度保守上界，已接线的面板/跳过按钮模糊捕获计完整mip；窗口swapchain/compositor/driver成本仍为未知。
 
 ## 通知与查询

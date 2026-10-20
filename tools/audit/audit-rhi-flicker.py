@@ -50,7 +50,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Native backend/compiler/window integration remains intact. Runtime is "
-                        "macOS Metal/OpenGL hidden; D3D11 target execution remains R36; Linux OpenGL remains R35.")]
+                        "macOS Metal/OpenGL hidden; D3D11 target execution remains R36; Linux OpenGL remains R36.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

@@ -46,4 +46,4 @@ SceneAdapter 销毁后的晚到封面回调直接丢弃；CoverCacheTest 的隐�
 
 `archive-pool`核对池顺序/方向/半周期、field与矩阵、接管/归位/重新接管、非零导数rebase、拾取、空库/90,000库/LCM溢出及播放隔离。数学输入在`tests/fixtures/archive-pool/golden.json`；源导出`node tools/review/export-archive-pool-golden.mjs`。
 
-Review `archive-pool-gpu`直接运行SceneItem，验证432池、低/高清准备、局部上传/稳态零上传、真实输入与四槽所有权、双主题/rebase、实体数量不重建目标、十次SG重建。只核对源矩阵/投影、自己输出的有效区域与实际资源，不比较浏览器图片。入口分组见test-gates.md；目标剩余要求归计划R35/R36/R19B-P。
+Review `archive-pool-gpu`直接运行SceneItem，验证432池、低/高清准备、局部上传/稳态零上传、真实输入与四槽所有权、双主题/rebase、实体数量不重建目标、十次SG重建。只核对源矩阵/投影、自己输出的有效区域与实际资源，不比较浏览器图片。入口分组见test-gates.md；目标剩余要求归计划R36/R19B-P。

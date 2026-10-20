@@ -65,7 +65,7 @@ checks = [
     ('PERF-06', 'tools/review/StartupAudit.cpp', 'navigation-groups-fit',
      'Actual navigation group bounds must fit the viewport without intersection (SDE-02). Real Qt open/back/overview navigation is interleaved with three replacement selections, search modal isolation and full opening handoff. Component numeric trajectories, virtual list bounds, font shaping and CSS anchors retain independent checks; checkpoint advancement is not a continuous timing benchmark.'),
     ('PERF-07', 'tools/review/StartupAudit.cpp', 'released-owned-renderers',
-     'All 36 states share the existing driver; final root/control invalidation requires zero scene/Canvas/text renderers. Default native window policy is checked. R28 owns repeated root/lifetime pressure; native same-window, physical input/VSYNC and missing targets stay in R29-P/R35/R36.'),
+     'All 36 states share the existing driver; final root/control invalidation requires zero scene/Canvas/text renderers. Default native window policy is checked. R28 owns repeated root/lifetime pressure; native same-window, physical input/VSYNC and missing targets stay in R29-P/R36.'),
 ]
 mapping = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text(encoding='utf-8'))['revisions']
 baseline = mapping['57f4f845c20cce646a15dbf4008c2a162aaaf4e2']

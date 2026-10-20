@@ -24,7 +24,7 @@ CHECKS = [
     ("COMMON-05", "tools/review/RhiShadowAudit.cpp", "validateProjection",
      "Independent source geometry projection and scalar PCF plus actual uploaded bytes, cache "
      "and lifecycle assertions. Preserve failed projection protocol and native-policy samples; "
-     "no old-image fitting. Product floor gap stays explicit R19D3B, missing hardware stays R35/R36."),
+     "no old-image fitting. Product floor gap stays explicit R19D3B, missing hardware stays R36."),
     ("SOURCE-01", "legacy-web/src/scene.ts", "this.light.shadow.intensity = 0.32",
      "Music uses baseline key (-6,14,-5), orthographic bounds -16/16/-15/15/.1/45, "
      "normalBias .035, bias -.0003, radius 4 and final music strength .32. Only diffuser casts; "
@@ -70,7 +70,7 @@ CHECKS = [
     ("PERF-07", "tools/review/RhiShadowAudit.cpp", "cycle < 10",
      "Ten real SG invalidations restore shadow depth/format and scalar PCF. Resource ownership "
      "stays renderer-side, reset releases SRB/pipeline/RT before attachments. Native windows, "
-     "VSYNC and unavailable target hardware remain R35/R36."),
+     "VSYNC and unavailable target hardware remain R36."),
 ]
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),

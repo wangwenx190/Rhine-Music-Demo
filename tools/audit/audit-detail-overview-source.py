@@ -83,7 +83,7 @@ for platform, marker in [("windows", "WIN32"), ("macos", "YalahooVerification"),
         rows.append(dict(checkId=identity, requirement=reason, platform=platform,
                          sourcePath=path, lineOrSymbol=symbol, evidence=reason,
                          sourceSha256=hashlib.sha256(data).hexdigest(), result="static-audit-passed",
-                         limitations="Runtime/quality checked separately. Missing target systems, native visibility/input/VSYNC remain R35/R36; R17 presentation review remains R19G2."))
+                         limitations="Runtime/quality checked separately. Missing target systems, native visibility/input/VSYNC remain R36; R17 presentation review remains R19G2."))
     output = ROOT / "verification" / f"{platform}-static" / "detail-overview" / "r19g1"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(

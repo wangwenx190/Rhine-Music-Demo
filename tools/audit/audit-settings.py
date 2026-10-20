@@ -58,7 +58,7 @@ dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).
 for platform, platform_id in [("macos", "MAC-01"), ("windows", "WIN-01"), ("linux", "LNX-01")]:
     checks = []
     platform_check = (platform_id, "src/app/main.cpp", "yalahoo::SettingsController settings",
-                      "Shared Qt/QML settings use platform-neutral paths/media/controls and existing backend selection. Target build/plugins, native keyboard/scroll/DPR and media survival need the target Kit/window/audio session. Missing targets retain R26-P, D3D11/Metal in R36 and all GL in R35.")
+                      "Shared Qt/QML settings use platform-neutral paths/media/controls and existing backend selection. Target build/plugins, native keyboard/scroll/DPR and media survival need the target Kit/window/audio session. Missing targets retain R26-P under the R36 target/backend gates.")
     for check_id, path, symbol, evidence in CHECKS + [platform_check]:
         data = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(data.decode().split()):
