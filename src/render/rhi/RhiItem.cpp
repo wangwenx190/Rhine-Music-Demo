@@ -267,8 +267,8 @@ private:
     {
         QSize size, cover;
         int shadow = 0, samples = 0, aoSamples = 0;
-        float aoResolution = 0;
-        bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false;
+        bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false,
+             filterCovers = false;
         double navigationDpr = 0;
         quint64 textResourceRevision = 0;
         bool operator==(const AllocationKey &) const = default;
@@ -607,12 +607,12 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                              input.shadowSize,
                              input.captureSamples,
                              input.aoSamples,
-                             input.aoResolution,
                              input.shells,
                              bool(deliver),
                              input.postprocess,
                              input.bokeh,
                              input.smaa,
+                             input.filterCovers,
                              input.navigationDpr,
                              input.textResourceRevision };
     if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize
@@ -628,11 +628,10 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(api->isTextureFormatSupported(QRhiTexture::R16F, QRhiTexture::RenderTarget),
                     "Selected GPU lacks the half-float scalar AO attachment");
         const int maximum = api->resourceLimit(QRhi::TextureSizeMax);
-        require(qint64(requestedSize.width()) * requestedSize.height() <= 8294400
-                        && qMax(requestedSize.width(), requestedSize.height()) <= maximum
+        require(qMax(requestedSize.width(), requestedSize.height()) <= maximum
                         && qMax(requestedCover.width(), requestedCover.height()) <= maximum
                         && qMax(1, input.shadowSize) <= maximum,
-                "Requested resource plan exceeds GPU dimensions or target pixel protection");
+                "Native resource dimensions exceed GPU capabilities");
         require(api->supportedSampleCounts().contains(input.captureSamples),
                 "Requested resource plan uses unsupported MSAA");
         qint64 geometryBytes = 15 * 32 + 21 * 4;
@@ -742,8 +741,9 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         }
     }
     const auto coverSize = input.atlasGeneration ? input.atlasSize : input.cover.size();
-    const bool replaceCover =
-            !cover || cover->pixelSize() != coverSize || atlasGeneration != input.atlasGeneration;
+    const bool replaceCover = !cover || cover->pixelSize() != coverSize
+            || atlasGeneration != input.atlasGeneration
+            || cover->flags().testFlag(QRhiTexture::MipMapped) != input.filterCovers;
     const bool replaceTargets = targetSize != renderTarget()->pixelSize()
             || shadowSize != std::max(1, input.shadowSize) || captureSamples != input.captureSamples
             || targetsHaveShells != input.shells || diagnosticTargets != bool(deliver)
@@ -753,8 +753,10 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "Cover exceeds GPU dimensions");
         auto previous = std::move(cover);
-        cover.reset(api->newTexture(QRhiTexture::RGBA8, coverSize, 1,
-                                    QRhiTexture::UsedAsTransferSource));
+        cover.reset(api->newTexture(
+                QRhiTexture::RGBA8, coverSize, 1,
+                QRhiTexture::UsedAsTransferSource
+                        | (input.filterCovers ? QRhiTexture::MipMapped : QRhiTexture::Flags())));
         require(cover->create(), "Cover texture replacement failed");
         for (auto *bindings : { geometryBindings.get(), shellBindings.get() }) {
             if (!bindings)
@@ -765,7 +767,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                     1,
                     QRhiShaderResourceBinding::VertexStage
                             | QRhiShaderResourceBinding::FragmentStage,
-                    cover.get(), linear.get());
+                    cover.get(), input.filterCovers ? mipLinear.get() : linear.get());
             bindings->setBindings(values.cbegin(), values.cend());
             require(bindings->create(), "Cover binding replacement failed");
         }
@@ -808,8 +810,6 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 "Requested capture MSAA is unsupported");
         ++generation;
         shadowDirty = true;
-        require(qint64(targetSize.width()) * targetSize.height() <= 8294400,
-                "RHI target exceeds RenderQuality pixel limit");
         require(std::max(targetSize.width(), targetSize.height())
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "RHI target exceeds GPU dimensions");
@@ -828,7 +828,9 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         if (replaceCover) {
             ++coverResourceRevision;
             cover.reset(api->newTexture(QRhiTexture::RGBA8, coverSize, 1,
-                                        QRhiTexture::UsedAsTransferSource));
+                                        QRhiTexture::UsedAsTransferSource
+                                                | (input.filterCovers ? QRhiTexture::MipMapped
+                                                                      : QRhiTexture::Flags())));
             require(cover->create(), "Cover texture failed");
             coverDirty = true;
             atlasGeneration = input.atlasGeneration;
@@ -843,7 +845,9 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         geometryBindings->setBindings(
                 { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
                           0, stages, uniforms.get(), sizeof(Uniform)),
-                  QRhiShaderResourceBinding::sampledTexture(1, stages, cover.get(), linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(1, stages, cover.get(),
+                                                            input.filterCovers ? mipLinear.get()
+                                                                               : linear.get()),
                   QRhiShaderResourceBinding::sampledTexture(
                           2, QRhiShaderResourceBinding::FragmentStage, environment.get(),
                           linear.get()),
@@ -980,8 +984,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         }
     }
 #endif
-    const QSize aoSize(std::max(1, int(targetSize.width() * input.aoResolution)),
-                       std::max(1, int(targetSize.height() * input.aoResolution)));
+    const QSize aoSize = targetSize;
     const bool wantAo = input.postprocess && input.aoSamples > 0;
     const bool wantDof = input.postprocess && input.bokeh && (!wantAo || aoSize != targetSize);
     if (postTargets != input.postprocess || aoTargets != wantAo || dofTargets != wantDof
@@ -1018,7 +1021,6 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         settings.size = targetSize;
         settings.samples = input.aoSamples;
         settings.radius = input.aoRadius;
-        settings.resolution = input.aoResolution;
         settings.nearPlane = float(input.scene.nearPlane);
         settings.farPlane = float(input.scene.farPlane);
         settings.focus = input.focus;
@@ -1069,7 +1071,7 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.background, input.background);
     copy(u.fog,
          QVector4D(float(input.scene.fogNear), float(input.scene.fogFar), input.fogEnabled ? 1 : 0,
-                   0));
+                   input.filterCovers ? 1 : 0));
     copy(u.rowSettings, input.rowSettings);
     copy(u.rowColumn, input.rowColumn);
     copy(u.lightColumn, input.lightColumn);
@@ -1216,7 +1218,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             region.setSourceSize({ 256, 256 });
             region.setDestinationTopLeft(destination);
             updates->uploadTexture(cover.get(), { { 0, 0, region } });
-            frameUploadBytes += AtlasUploadQueue::tileBytes;
+            if (input.filterCovers) {
+                for (int level = 1; level <= u.mipmaps.size(); ++level) {
+                    QRhiTextureSubresourceUploadDescription mip(u.mipmaps[level - 1]);
+                    mip.setDestinationTopLeft(
+                            { destination.x() >> level, destination.y() >> level });
+                    updates->uploadTexture(cover.get(), { { 0, level, mip } });
+                }
+            }
+            frameUploadBytes += AtlasUploadQueue::payloadBytes(u);
             uploadRegions.append(QJsonObject{ { u"slot"_s, u.slot },
                                               { u"x"_s, destination.x() },
                                               { u"y"_s, destination.y() },
@@ -1232,8 +1242,19 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         const auto image = input.cover.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
         updates->uploadTexture(cover.get(),
                                { { 0, 0, QRhiTextureSubresourceUploadDescription(image) } });
-        coverDirty = false;
         selectedUploadBytes = image.sizeInBytes();
+        if (input.filterCovers) {
+            require(input.coverMipmaps.size() == api->mipLevelsForSize(image.size()) - 1,
+                    "Cover filtering requires a complete independently generated mip chain");
+            for (int level = 1; level <= input.coverMipmaps.size(); ++level) {
+                const auto &mip = input.coverMipmaps[level - 1];
+                updates->uploadTexture(
+                        cover.get(),
+                        { { 0, level, QRhiTextureSubresourceUploadDescription(mip) } });
+                selectedUploadBytes += mip.sizeInBytes();
+            }
+        }
+        coverDirty = false;
         selectedTotalUploadBytes += selectedUploadBytes;
     }
     totalUploadBytes += frameUploadBytes;
@@ -1663,12 +1684,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                              { u"attachments"_s, attachments } });
         }
         p->capture.metadata[u"sampling"_s] =
-                QJsonObject{ { u"coverLinearClampNoMip"_s,
-                               linear->magFilter() == QRhiSampler::Linear
-                                       && linear->minFilter() == QRhiSampler::Linear
-                                       && linear->mipmapMode() == QRhiSampler::None
-                                       && linear->addressU() == QRhiSampler::ClampToEdge
-                                       && linear->addressV() == QRhiSampler::ClampToEdge },
+                QJsonObject{ { u"coverTileLocalMipmaps"_s,
+                               input.filterCovers && cover->flags().testFlag(QRhiTexture::MipMapped)
+                                       && mipLinear->mipmapMode() == QRhiSampler::Linear },
                              { u"captureTrilinearClamp"_s,
                                mipLinear->magFilter() == QRhiSampler::Linear
                                        && mipLinear->minFilter() == QRhiSampler::Linear
@@ -1943,7 +1961,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                             if (state->readbackOwner[field] == i)
                                 *outputs[field] = image;
                     } catch (const std::runtime_error &error) {
-                        const auto message = QString::fromUtf8(error.what());
+                        const auto message = u"Readback field %1: %2"_s.arg(i).arg(
+                                QString::fromUtf8(error.what()));
+                        qWarning("%s", qPrintable(message));
                         state->capture.metadata[u"readbackError"_s] = message;
                         if (state->failed)
                             state->failed(message);
@@ -2204,8 +2224,6 @@ void RhiItem::submit(Input input, QSize target)
     require(input.aoSamples == 0 || input.aoSamples == 16 || input.aoSamples == 32
                     || input.aoSamples == 64,
             "Invalid RHI AO kernel size");
-    require(input.aoResolution == .5f || input.aoResolution == .75f || input.aoResolution == 1,
-            "Invalid RHI AO resolution");
     if (input.atlasGeneration) {
         require(m_input.atlasGeneration != input.atlasGeneration
                         || m_input.atlasSize == input.atlasSize,
@@ -2218,8 +2236,8 @@ void RhiItem::submit(Input input, QSize target)
                         && input.atlasSize.height() % 256 == 0,
                 "Atlas size must use whole tiles");
         for (const auto &tile : input.coverTiles)
-            require(QRect(QPoint(), input.atlasSize).contains(tile)
-                            && (tile.size() == QSize(256, 256) || tile.size() == QSize(1024, 1024))
+            require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.width() == tile.height()
+                            && tile.width() >= 256 && (tile.width() & (tile.width() - 1)) == 0
                             && tile.x() % 256 == 0 && tile.y() % 256 == 0,
                     "Atlas tile outside page");
     }

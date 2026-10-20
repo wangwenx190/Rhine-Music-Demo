@@ -10,10 +10,33 @@
 #include <QPointer>
 #include <QThreadPool>
 #include <stdexcept>
+#include <algorithm>
+#include <array>
+#include <cmath>
 
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+qint64 CoverPixels::byteSize() const
+{
+    qint64 bytes = 0;
+    QSet<qint64> seen;
+    const auto count = [&](const QImage &pixels) {
+        if (!pixels.isNull() && !seen.contains(pixels.cacheKey())) {
+            seen.insert(pixels.cacheKey());
+            bytes += pixels.sizeInBytes();
+        }
+    };
+    count(image);
+    for (const auto &mip : mipmaps)
+        count(mip);
+    for (const auto &tile : tiles) {
+        count(tile.image);
+        for (const auto &mip : tile.mipmaps)
+            count(mip);
+    }
+    return bytes;
+}
 struct CoverCache::State
 {
     QMutex mutex;
@@ -83,7 +106,7 @@ CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, i
 bool CoverCache::request(QString identity, QString path, int resolution, QString title)
 {
     if (identity.isEmpty() || identity.size() > 1024 || path.size() > 32768 || title.size() > 256
-        || (resolution != 256 && resolution != 1024)) {
+        || (resolution <= 0 || (resolution & (resolution - 1)) != 0)) {
         ++m_rejected;
         return false;
     }
@@ -134,7 +157,7 @@ void CoverCache::invalidate(const QString &identity)
     cancel(identity);
     for (auto it = m_cache.begin(); it != m_cache.end();) {
         if (it->pixels->identity == identity) {
-            m_bytes -= it->pixels->image.sizeInBytes();
+            m_bytes -= it->pixels->byteSize();
             it = m_cache.erase(it);
         } else {
             ++it;
@@ -179,13 +202,20 @@ void CoverCache::pump()
         m_pendingKeys.remove(job.key);
         m_running.insert(job.key, job);
         ++m_active;
+        m_reservedBytes += reservationFor(job.resolution);
+        m_peakReservedBytes = std::max(m_peakReservedBytes, m_reservedBytes);
         ++m_decodes;
         m_peakActive = qMax(m_peakActive, m_active);
     }
 }
+qint64 CoverCache::reservationFor(int resolution)
+{
+    // Source decoder expansion plus square paint, float working levels and encoded mips.
+    return sourcePixelLimit * 32 + qint64(resolution) * resolution * 36;
+}
 QImage CoverCache::paint(const QImage &source, int resolution, const QString &title)
 {
-    if (resolution != 256 && resolution != 1024)
+    if (resolution <= 0 || (resolution & (resolution - 1)) != 0)
         throw std::invalid_argument("Invalid cover paint resolution");
     QImage image(resolution, resolution, QImage::Format_RGBA8888_Premultiplied);
     image.fill(Qt::transparent);
@@ -227,6 +257,70 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
         label(u"LOCAL COLLECTION / NO COVER"_s, logical * .025, logical * .87);
     }
     return image;
+}
+QList<QImage> CoverCache::makeMipmaps(const QImage &image)
+{
+    // Decode sRGB before area reduction; alpha remains premultiplied in linear light.
+    // Independent chains never incorporate pixels belonging to another atlas slot.
+    const auto source = image.convertToFormat(QImage::Format_RGBA8888);
+    const auto decode = [](double v) {
+        return v <= .04045 ? v / 12.92 : std::pow((v + .055) / 1.055, 2.4);
+    };
+    const auto encode = [](double v) {
+        return v <= .0031308 ? v * 12.92 : 1.055 * std::pow(v, 1.0 / 2.4) - .055;
+    };
+    std::array<float, 256> decoded;
+    for (int i = 0; i < 256; ++i)
+        decoded[i] = float(decode(i / 255.0));
+    QImage linear(source.size(), QImage::Format_RGBA32FPx4_Premultiplied);
+    for (int y = 0; y < source.height(); ++y) {
+        const auto *input = source.constScanLine(y);
+        auto *row = reinterpret_cast<float *>(linear.scanLine(y));
+        for (int x = 0; x < source.width(); ++x) {
+            const float alpha = input[4 * x + 3] / 255.0f;
+            for (int c = 0; c < 3; ++c)
+                row[4 * x + c] = decoded[input[4 * x + c]] * alpha;
+            row[4 * x + 3] = alpha;
+        }
+    }
+    QList<QImage> levels;
+    while (linear.width() > 1 || linear.height() > 1) {
+        const QSize size(qMax(1, linear.width() / 2), qMax(1, linear.height() / 2));
+        QImage next(size, linear.format());
+        QImage encoded(size, QImage::Format_RGBA8888_Premultiplied);
+        encoded.setColorSpace(QColorSpace::SRgb);
+        const double sx = double(linear.width()) / size.width();
+        const double sy = double(linear.height()) / size.height();
+        for (int y = 0; y < size.height(); ++y) {
+            auto *output = reinterpret_cast<float *>(next.scanLine(y));
+            auto *bytes = encoded.scanLine(y);
+            for (int x = 0; x < size.width(); ++x) {
+                std::array<double, 4> sum{ };
+                const double x0 = x * sx, x1 = (x + 1) * sx;
+                const double y0 = y * sy, y1 = (y + 1) * sy;
+                for (int iy = int(y0); iy < int(std::ceil(y1)); ++iy) {
+                    const auto *row = reinterpret_cast<const float *>(linear.constScanLine(iy));
+                    for (int ix = int(x0); ix < int(std::ceil(x1)); ++ix) {
+                        const double weight = (std::min(x1, ix + 1.0) - std::max(x0, double(ix)))
+                                * (std::min(y1, iy + 1.0) - std::max(y0, double(iy)));
+                        for (int c = 0; c < 4; ++c)
+                            sum[c] += row[4 * ix + c] * weight;
+                    }
+                }
+                for (int c = 0; c < 4; ++c)
+                    output[4 * x + c] = float(sum[c] / (sx * sy));
+                const double alpha = output[4 * x + 3];
+                for (int c = 0; c < 3; ++c)
+                    bytes[4 * x + c] = uchar(std::clamp(
+                            qRound(alpha > 0 ? encode(output[4 * x + c] / alpha) * alpha * 255 : 0),
+                            0, 255));
+                bytes[4 * x + 3] = uchar(std::clamp(qRound(alpha * 255), 0, 255));
+            }
+        }
+        levels.append(std::move(encoded));
+        linear = std::move(next);
+    }
+    return levels;
 }
 CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &state)
 {
@@ -270,6 +364,25 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     if (!pixels->error.isEmpty())
         pixels->fallbackTitle = job.title;
     pixels->image = paint(source, job.resolution, job.title);
+    pixels->image.setColorSpace(QColorSpace::SRgb);
+    pixels->mipmaps = makeMipmaps(pixels->image);
+    if (job.resolution > 256) {
+        for (int y = 0; y < job.resolution; y += 256)
+            for (int x = 0; x < job.resolution; x += 256) {
+                CoverMipTile tile;
+                tile.origin = { x, y };
+                tile.image = pixels->image.copy(x, y, 256, 256);
+                for (int level = 1; level <= pixels->mipmaps.size(); ++level) {
+                    const auto &mip = pixels->mipmaps[level - 1];
+                    if (level <= 8)
+                        tile.mipmaps.append(
+                                mip.copy(x >> level, y >> level, 256 >> level, 256 >> level));
+                    else if (x == 0 && y == 0)
+                        tile.mipmaps.append(mip);
+                }
+                pixels->tiles.append(std::move(tile));
+            }
+    }
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };
     return pixels;
@@ -277,32 +390,35 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
 void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 {
     --m_active;
+    m_reservedBytes -= reservationFor(job.resolution);
     if (m_running.value(job.key).wanted == job.wanted)
         m_running.remove(job.key);
     if (job.generation != generation() || !job.wanted->load() || !pixels) {
         ++m_stale;
     } else {
-        const qint64 bytes = pixels->image.sizeInBytes();
+        const qint64 bytes = pixels->byteSize();
         const auto completedKey = pixels->error.isEmpty() && !job.path.isEmpty()
                 ? key(job.identity, job.path, job.resolution, { })
                 : job.key;
         if (const auto previous = m_cache.find(completedKey); previous != m_cache.end()) {
-            m_bytes -= previous->pixels->image.sizeInBytes();
+            m_bytes -= previous->pixels->byteSize();
             m_cache.erase(previous);
         }
         m_peakReaderBytes = qMax(m_peakReaderBytes, pixels->readerReturnedBytes);
         m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
-        while (m_bytes + bytes > cacheLimit && !m_cache.isEmpty()) {
-            auto oldest = m_cache.begin();
-            for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
-                if (it->used < oldest->used)
-                    oldest = it;
+        if (bytes <= cacheLimit) {
+            while (m_bytes + bytes > cacheLimit && !m_cache.isEmpty()) {
+                auto oldest = m_cache.begin();
+                for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
+                    if (it->used < oldest->used)
+                        oldest = it;
+                }
+                m_bytes -= oldest->pixels->byteSize();
+                m_cache.erase(oldest);
             }
-            m_bytes -= oldest->pixels->image.sizeInBytes();
-            m_cache.erase(oldest);
+            m_cache.insert(completedKey, { pixels, ++m_clock });
+            m_bytes += bytes;
         }
-        m_cache.insert(completedKey, { pixels, ++m_clock });
-        m_bytes += bytes;
         const QPointer<CoverCache> guard(this);
         Q_EMIT ready(pixels);
         if (!guard)
@@ -318,11 +434,11 @@ QJsonObject CoverCache::statistics() const
              { u"active"_s, m_active },
              { u"peakPending"_s, m_peakPending },
              { u"peakActive"_s, m_peakActive },
-             { u"peakReservedInFlightBytes"_s, m_peakActive * workerReservation },
+             { u"peakReservedInFlightBytes"_s, m_peakReservedBytes },
              { u"peakReaderReturnedBytesPerJob"_s, m_peakReaderBytes },
              { u"decoderScaledResults"_s, m_decoderScaledResults },
              { u"completedLruBytes"_s, m_bytes },
-             { u"reservedInFlightBytes"_s, m_active * workerReservation },
+             { u"reservedInFlightBytes"_s, m_reservedBytes },
              { u"decodeStarts"_s, qint64(m_decodes) },
              { u"rejected"_s, qint64(m_rejected) },
              { u"stale"_s, qint64(m_stale) } };

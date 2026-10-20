@@ -14,7 +14,7 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 
 ## 资源与测量边界
 
-运动只发布变换和必要光场，不重建材质、图集或不变附件。四个清晰封面 CPU 租约最多 16MiB，四份 256px 分块暂存另最多 16MiB；它们不等于整个封面系统内存。既有解码并发、在途预留、完成 LRU、generation 取消和上传队列独立记账。固定 GPU 图集 5632×6656 RGBA8 的载荷是 149,946,368 bytes，清晰区已包含其中，不再当成四张额外 GPU 纹理相加。
+运动只发布变换和必要光场，不重建材质、图集或不变附件。四个清晰封面CPU租约、分块与mip按实际投影需求尺寸记账；GPU清晰区包含于生产图集，布局与所有权分别由archive-pool.md/covers.md维护。它们不等于完整封面系统内存。
 
 产品回放分别记录请求交付到场景及 CPU 封面 ready、实际 Qt submission、atlasUploadBytes、resourceGeneration/postprocessRevision、CPU 租约/分块暂存、ResourceInventory 附件与保守重建重叠。motion 状态不能触发目标重建，普通上传批次上界 2MiB。GPU time 是 QRhi 已完成帧的可用观测，可能对应先前帧；不可用为 null。descriptor 字节是估算，不包含驱动 padding/PSO/SRB 和窗口/compositor，不冒充实测显存。局部回放不替代 R28 的 120 秒正常 VSYNC/产品预算，也不提供 input-to-photon。
 ## 检查入口

@@ -1,5 +1,6 @@
 #include "AtlasAllocator.h"
 #include <stdexcept>
+#include <limits>
 
 namespace yalahoo::rhi {
 namespace {
@@ -8,9 +9,11 @@ std::atomic<quint64> nextGeneration{ 0 };
 AtlasAllocator::AtlasAllocator(int maximumTextureSize, int capacity, int pageTiles)
 {
     if (maximumTextureSize < 256 || capacity < 1 || capacity > 436 || pageTiles < 1
-        || pageTiles > 22)
+        || pageTiles > std::numeric_limits<int>::max() / 256)
         throw std::invalid_argument("GPU cannot hold a cover tile or invalid atlas capacity");
-    const int side = qMin(pageTiles * 256, maximumTextureSize) / 256;
+    const int side = qMin(pageTiles, maximumTextureSize / 256);
+    if (qint64(side) * side > std::numeric_limits<int>::max())
+        throw std::invalid_argument("Atlas page slot count exceeds the supported integer range");
     m_size = { side * 256, side * 256 };
     m_slotsPerPage = side * side;
     m_slots.resize(capacity);
@@ -87,16 +90,21 @@ QVector<AtlasUpload> AtlasAllocator::uploads(int page, bool initializing)
     QVector<AtlasUpload> batch;
     if (page < 0 || page >= pages())
         return batch;
-    const int limit =
-            int((initializing ? AtlasUploadQueue::initialBudget : AtlasUploadQueue::steadyBudget)
-                / AtlasUploadQueue::tileBytes);
-    for (int i = page * m_slotsPerPage;
-         i < qMin((page + 1) * m_slotsPerPage, int(m_slots.size())) && batch.size() < limit; ++i) {
+    const qint64 limit =
+            initializing ? AtlasUploadQueue::initialBudget : AtlasUploadQueue::steadyBudget;
+    qint64 bytes = 0;
+    for (int i = page * m_slotsPerPage; i < qMin((page + 1) * m_slotsPerPage, int(m_slots.size()));
+         ++i) {
         auto &slot = m_slots[i];
         if (slot.dirty && slot.references && slot.pixels) {
-            // Owned worker pixels are immutable: render synchronization does not detach again.
-            batch.append({ m_generation, slot.lease, slot.serial, i % m_slotsPerPage,
-                           slot.pixels->image, true });
+            AtlasUpload upload{ m_generation,        slot.lease,         slot.serial,
+                                i % m_slotsPerPage,  slot.pixels->image, true,
+                                slot.pixels->mipmaps };
+            const auto cost = AtlasUploadQueue::payloadBytes(upload);
+            if (bytes + cost > limit)
+                break;
+            bytes += cost;
+            batch.append(std::move(upload));
             slot.dirty = false;
         }
     }
@@ -112,7 +120,7 @@ QVector<AtlasUpload> AtlasAllocator::replay(int page) const
         const auto &slot = m_slots[i];
         if (slot.references && slot.pixels)
             batch.append({ m_generation, slot.lease, slot.serial, i % m_slotsPerPage,
-                           slot.pixels->image, true });
+                           slot.pixels->image, true, slot.pixels->mipmaps });
     }
     return batch;
 }
@@ -140,12 +148,20 @@ void AtlasAllocator::reset()
     for (auto &slot : m_slots)
         slot = { };
 }
+void AtlasAllocator::advanceGeneration()
+{
+    m_generation = ++nextGeneration;
+    for (auto &slot : m_slots)
+        if (slot.references && slot.pixels)
+            slot.dirty = true;
+}
 qint64 AtlasAllocator::retainedBytes() const
 {
     qint64 bytes = 0;
     for (const auto &slot : m_slots) {
-        if (slot.pixels)
-            bytes += slot.pixels->image.sizeInBytes();
+        if (slot.pixels) {
+            bytes += slot.pixels->byteSize();
+        }
     }
     return bytes;
 }
@@ -185,7 +201,7 @@ bool SelectedCoverPool::upgrade(const std::shared_ptr<SelectedCoverLease> &lease
 {
     if (!lease || lease->generation != m_generation || !pixels
         || pixels->identity != lease->identity
-        || (pixels->resolution != 256 && pixels->resolution != 1024)
+        || (pixels->resolution <= 0 || (pixels->resolution & (pixels->resolution - 1)) != 0)
         || pixels->generation != lease->coverGeneration
         || pixels->image.size() != QSize(pixels->resolution, pixels->resolution)
         || (lease->pixels && lease->pixels->error.isEmpty() && !pixels->error.isEmpty())

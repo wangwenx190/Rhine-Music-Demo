@@ -66,10 +66,10 @@ for kind, name in [("edges", "SMAAEdgesShader"), ("weights", "SMAAWeightsShader"
                         "vUv=frameUv(INPUT_UV);"]:
             if adapter not in tokens:
                 raise SystemExit(f"SMAA framebuffer adapter drift: {path}")
-        if kind == "edges" and "#defineSMAA_THRESHOLD0.1" not in tokens:
+        if kind == "edges" and "#defineSMAA_THRESHOLD0.05" not in tokens:
             raise SystemExit("SMAA threshold drift")
         if kind == "weights":
-            for value in ["#defineSMAA_MAX_SEARCH_STEPS8", "#defineSMAA_AREATEX_MAX_DISTANCE16",
+            for value in ["#defineSMAA_MAX_SEARCH_STEPS32", "#defineSMAA_AREATEX_MAX_DISTANCE16",
                           "#defineSMAA_AREATEX_PIXEL_SIZE(1.0/vec2(160.0,560.0))",
                           "#defineSMAA_AREATEX_SUBTEX_SIZE(1.0/7.0)"]:
                 if value not in tokens:
@@ -97,12 +97,12 @@ for revision, prefix in [("522a3f3", "resources/shaders"),
 
 checks = [
     ("COMMON-01-CALL", "legacy-web/src/scene.ts", "this.smaa.enabled = quality.antialias === \"smaa\"", "Frozen production caller appends SMAA after Bokeh and before OutputPass; high/ultra select SMAA, antialias off only bypasses post-AA, not native geometry MSAA."),
-    ("COMMON-01", shader_path, "'SMAA_THRESHOLD': '0.1'", "Locked source helper tokens, .1 threshold, eight searches, gamma2.2 and all three passes checked; clear instead of discard retains zeroed edge semantics."),
+    ("COMMON-01", shader_path, "'SMAA_THRESHOLD': '0.1'", "Locked source helper tokens with native quality .05 threshold, 32 searches, gamma2.2 and all three passes checked; clear instead of discard retains zeroed edge semantics."),
     ("COMMON-02", pass_path, "flipY = false", "Exact embedded PNG bytes, numeric RGBA8, no color transform/mips; lookup UV independent from framebuffer Y conversion."),
     ("COMMON-03", "resources/shaders/rhi/smaa-weights.frag", "textureLod(areaTex, texcoord, 0.0)", "Frame reads adapt Y; area linear and search nearest remain decoded row order. HDR pipeline precedes one final output transform."),
     ("COMMON-04", "tools/review/SmaaReference.h", "Independent double-precision", "Independent pixel-coordinate source equations cover local contrast, search ends/crossings, area lookup and gamma/alpha blend; half quantization matches authored attachments."),
     ("COMMON-05", "tools/review/RhiSmaaAudit.cpp", "edgeError <= 1.0 / 255", "Actual three production pass outputs tested against analytic formulas; no browser GPU, images or ROI score oracle. Scene/MSAA coverage remains B2/C."),
-    ("PERF-01", "tools/review/SmaaReference.h", "i < 8", "Three fixed screen passes, maximum eight steps per search; O(target pixels), no dependence on library cardinality."),
+    ("PERF-01", "tools/review/SmaaReference.h", "i < 32", "Three fixed screen passes, maximum 32 steps per search; O(target pixels), no dependence on library cardinality."),
     ("PERF-02", "src/render/rhi/Postprocess.cpp", "preparedAssets().images.value", "Immutable preloaded process cache; render owns all targets/SRB/uniforms. No runtime disk decode, worker wait or production readback."),
     ("PERF-03", "src/render/rhi/Postprocess.cpp", "updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u)", "Exactly three 80-byte prefixes per render; lookup only on graph creation, no unused kernel upload or pixel recopy each frame."),
     ("PERF-04", "src/render/rhi/Postprocess.cpp", 'p.add(u"smaa-blend"_s, p.ping[ping], current, p.weights.texture.get())', "Three distinct single-sample RGBA16F targets, RGBA8 lookup without mips; independent feedback/bytes/disabled-resource assertions."),

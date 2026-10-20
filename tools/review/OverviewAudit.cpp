@@ -192,8 +192,10 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                         if (!texture)
                             return 4;
                         const auto target = texture->property("textureSize").toSize();
-                        structurePassed =
-                                target == QSize(int(labelWidth + 148), 129) && structurePassed;
+                        structurePassed = target
+                                        == QSize(int(labelWidth + 148), 129)
+                                                * window.effectiveDevicePixelRatio()
+                                && structurePassed;
                         textures.append(QJsonObject{ { u"width"_s, target.width() },
                                                      { u"height"_s, target.height() } });
                     }

@@ -58,9 +58,9 @@
 | `music-case-v040.glb` → `GeometryAudit::compareGeometry` → qrc/生产 GLB | 三壳体 1000 三角形；保留属性/绕序、禁 LOD/全局缩放/优化。Qt mesh V 翻转为 glTF V 的补坐标适配，非截图调参。生产 RHI 从原 GLB 提取几何，导入 QML 材质不是有效产品材质。 |
 | WOFF2 → SFNT → `initializeAssetFonts`/`assetFont` | DirectWrite 只解容器；原 WOFF2 和 OTF、OS/2/CFF 与 CSS 300/400/600/700 映射明确。CoreText 命名字重允许不同，按物理字形表选择；没有替换字体或按截图修改轮廓。 |
 | `music-app.ts::svg`/`music.css` → 功能 SVG | 八个生产路径、24 viewBox、1.5 描边及 round 端点，昼夜颜色从实际 CSS 提取；属于源码设计。原创品牌小稿的光学改绘是用户允许的品牌差异，不能外推给原模型或封面。 |
-| `CoverCache::decode/paint` ← `cover-atlas.ts::paintCover/containCover` | worker 的 autoTransform 和有效 ICC→sRGB 是图像解释适配；256/1024 仅缩大图、contain、1/64 留边、透明 RGBA premultiplied 与逻辑 1024 缺图画布有源码依据。原首行 500、脚注默认 400；旧 C++ 脚注继承 Medium，现重设 Normal。没有锐化、按截图扩大封面或预放大小图。 |
+| `CoverCache::decode/paint` ← `cover-atlas.ts::paintCover/containCover` | worker 的 autoTransform 和有效 ICC→sRGB 是图像解释适配；contain、1/64 留边、透明 RGBA premultiplied 与缺图画布设计有源码依据；缓存层和过滤按用户要求由covers.md维护。原首行 500、脚注默认 400；旧 C++ 脚注继承 Medium，现重设 Normal。没有锐化、按截图扩大封面或预放大小图。 |
 | `AtlasAllocator::publish/uploads` → `AtlasUploadQueue::expect/enqueue/take` | generation/identity/lease/serial 先验证再共享/复制；上传预算来自冻结 `flushUploads`。小设备分页及生产合并图集是存储适配；ready 在相同命令提交后有效。 |
-| `SceneItem::updatePolish`/`SelectedCoverPool` → `RhiItem` | selected/returning 独立 lease、不可变像素与低清到高清升级；生产无需整页重绘。atlas/cover 无 mip、线性 clamp；opaque shader 在颜色转换前除 alpha，避免把 premultiplied 当 straight。 |
+| `SceneItem::updatePolish`/`SelectedCoverPool` → `RhiItem` | selected/returning 独立 lease、不可变像素与低清到高清升级；生产无需整页重绘。封面按用户要求采用独立线性光mip与足迹过滤，保留图集区域隔离；opaque shader 在颜色转换前除 alpha，避免把 premultiplied 当 straight。 |
 | `MusicTypes`/`LibraryModels` ← `music-types/order/search.ts`/`data.ts` | 本地 QUrl/媒体 Unknown、未知字段保留属于原生离线接口；QCollator 后端与 Web ICU 可不同，匿名视觉列顺序固定。规范化键与 ID tie-break、列索引、搜索索引不改变字段/顺序；搜索不改变播放。 |
 | `OfflineMetadataProvider::request`/`LibrarySession` 的 queued 结果过滤 | 对请求捕获 const 快照，QObject 上下文事件投递，token/generation/kind 过滤；无网络对象/请求、无缓存写入。缓存旧状态原样返回，无缓存 Deferred。数据/Provider 不因外观复查改变。 |
 
@@ -83,7 +83,7 @@
 | R05：`motion.ts::damp`、`MusicArchiveMotion`、`MusicRealColumnScalar` → `ScalarSpring`、`ArchiveMotion`、`ColumnScalar` | 保持解析临界阻尼、五次 x/v/a、1.4–2.4 秒时长、observe/retarget/translate/finish 顺序；C++ 保存精确加速度。同目标 archive 保护是计划明确的固定差异，不由截图决定。R18 `cancelTravel` 只在详情内部从原显示导数交给 rate=9，不重启 browse 轨迹。 |
 | R05：`scene.ts` 帧循环 / `music-boot-timing.ts` → `FrameClock`、`App.qml::FrameAnimation` | 生产只有一个帧源，dt 钳制后只乘一次速度；开场时间独立，恢复丢弃首次间隔，减少动态执行完成。没有因截图调参引入的额外时钟或媒体依赖。 |
 | R06：`viewport-layout.ts::viewportLayout/archiveFraming`、`scene.ts` 音乐相机目标块、`MusicCameraMotion` → `LayoutMetrics`、`SceneAdapter::target/advance` | 1.05 严格分界、1100/coarse 短屏、音乐 `.25` detailX、560/1080 detailY、preview `.36`、59°/25°→8°/20°、140→72、7.33→5.9 及固定检查槽均是有效生产值。轨道在 navigation 与 detail 插值各衰减一次，是原调用链语义。QMatrix4x4 float 是 Qt 交付适配；canonical GL z 仅用于投影/拾取，GPU 使用 QRhi clip 修正。无额外取景补偿。 |
-| R06：`music-model.ts` / `scene.ts::model.rotation` → `SelectionController::transform` / GLB | 模型高度 3.35、底边 .175、厚度 .14 与导入资产一致；音乐 inspection lift=3.47，4.05 只为通用 primitive 压力测试。XYZ 旋转用 double 展开再转 float，独立低 lift/同时 pitch+yaw 输入证明必要顺序，不回退为误差更大的 quaternion 乘法。geometryOnly 目标保护保持原请求精度并显式报告 limited，不是截图缩放。 |
+| R06：`music-model.ts` / `scene.ts::model.rotation` → `SelectionController::transform` / GLB | 模型高度 3.35、底边 .175、厚度 .14 与导入资产一致；音乐 inspection lift=3.47，4.05 只为通用 primitive 压力测试。XYZ 旋转用 double 展开再转 float，独立低 lift/同时 pitch+yaw 输入证明必要顺序，不回退为误差更大的 quaternion 乘法。geometryOnly使用实际物理输出尺寸，设备不支持时显式失败。 |
 | R12：`archive-loop.ts` / `scene.ts::field` → `ArchivePool`、`SelectionController::field/rebase/publish` | 9×48 顺序、半周期 floor、5.2/.62 间距、最多六个 3.2 秒脉冲、.24 clamp、2.5 秒 idle 与波浪原点均来自源码。按 selected 相对原点求位移、静止八 ulp 算术残差界和跨 rebase 的有限物理格 ID 是精度/身份适配；不改导数/几何/透明参数。八 ulp 仅覆盖平移、乘法和相消的有界舍入，不是可见像素偏移。 |
 | R13：`MusicRealColumns`、`scene.ts::musicColumnRowOffset/musicRealColumnField`、`music-app.ts` 列记忆 → `RealColumns`、`ColumnMemory`、`SelectionController` | 保留真实行 12…11+count、独立中点/列活动度、五次归中及折返导数、目标实际显示深度、记忆开关无播放副作用。按时间惰性取样是解析算法调度适配，避免每帧遍历全部列；减少动态 epoch 同步未观察列。R19 overview插值消费者已由R19G1沿同一progress/相机/投影复查，普通浏览结果不替代总览门禁。 |
 
@@ -215,8 +215,8 @@
 
 | 历史对象 / 来源 | 判定 |
 | --- | --- |
-| 冻结scene.ts / RenderQuality → SceneItem → Postprocess | 保留源启用条件及Bokeh→SMAA→Output次序；生产组合实际RT/PSO/SRB闭包由R19D4B2确认。 |
-| SMAAShader edges / weights / blend；SMAAPass lookup | 保留源Medium、lookup行序/过滤、gamma及alpha语义；源float(ivec2)取首分量后广播，数学期望按真实GLSL展开。 |
+| 冻结scene.ts / RenderQuality → SceneItem → Postprocess | 保持Bokeh→SMAA→Output次序；当前生产启用条件由occlusion.md/postprocess.md维护；生产组合实际RT/PSO/SRB闭包由R19D4B2确认。 |
+| SMAAShader edges / weights / blend；SMAAPass lookup | 保留源helper、lookup行序/过滤、gamma及alpha语义；生产质量参数按用户要求由postprocess.md维护；源float(ivec2)取首分量后广播，数学期望按真实GLSL展开。 |
 | Postprocess资源 / 上传 / Review | 三个生产pass直接离屏执行源数学检查；Review中间目标访问不改变普通构建ABI，不新增产品读回或队列。源适配/历史入口为audit-rhi-smaa.py。 |
 
 ## R19D4B2 MSAA/resolve与旧门禁覆盖
@@ -225,7 +225,7 @@
 
 | 历史对象 / 引入来源 | 源码判定及现行覆盖 |
 | --- | --- |
-| R09B `522a3f3`：GeometryScene MSAA/SSAA诊断、Bokeh/SMAA组合 | 冻结scene构造WebGLRenderer antialias=true，quality.antialias只控制SMAA。保留生产四样本及高/极高SMAA；旧SSAA为Review诊断，不能作为产品预设或与源图评分。三个固定Quick3D Effect的原生调度适配保留；生产组合以RHI显式资源图验证。 |
+| R09B `522a3f3`：GeometryScene MSAA/SSAA诊断、Bokeh/SMAA组合 | 冻结scene构造WebGLRenderer antialias=true，quality.antialias只控制SMAA。生产固定四样本及SMAA；旧SSAA为Review诊断，不能作为产品预设或与源图评分。三个固定Quick3D Effect的原生调度适配保留；生产组合以RHI显式资源图验证。 |
 | R10 `d06e5f3`：后端能力选择 | Quick3D公开接口无法控制源shadow/跨实体透明表面全局排序/独立捕获resolve，RHI具明确控制边界，因此保留唯一RHI生产路径。旧残差是否非空、平均损失是否缩小和Quick3D/浏览器谁更接近不是选型或通过条件。 |
 | R10C `1f2352a` / R10D `75775b3` / `b7f73d4`：附件与生产接线 | 保留RGBA16F颜色、RGBA8法线/RGB24距离、相同采样的depth、独立resolve与共享保留depth。实际RT/PSO/SRB逐项检查，不以设置值或名称证明。源算法不变；图集/数值更新不重建兼容目标。 |
 | `e98c798`：macOS GL MSAA renderbuffer fallback | 仅当实际context缺多样本texture storage时使用同格式、同样本renderbuffer，resolve仍单样本。属于必要API适配，不降到RGBA8或少样本；真实GL检查读取backingFormat/样本/目标和解析部分覆盖，Metal仍使用texture。 |
@@ -239,11 +239,11 @@
 | 历史对象 / 生产来源 | 源码判定 |
 | --- | --- |
 | 冻结music-app → fit/scene.resize → resizeQuality；music.css最终override | `#stage.music-app`宽高100%、`transform:none`，实际host bounding/client比例为1。archive-main的参考舞台缩放属于另一入口，不能套入当前音乐产品。 |
-| R09 `3fc6a39` RenderQuality；R09B `522a3f3` GeometryScene | RenderQuality的源DPR cap、scale归一化、floor与像素保护保留；View3D直接使用显示逻辑尺寸和stageScale=1。它仍是Review，不改变生产RHI选型。 |
-| R10D `75775b3` SceneItem；`e98c798`诊断保护 | product以实际item尺寸再乘`min(width/1920,height/1080)`造成非预期降采样，小窗口最终放大。修正为源宿主比例1；geometryOnly的真实DPR及像素保护保留。960×640/DPR1原先请求480×320，源音乐入口应为960×640；此为调用链推导，非截图追分。原用户所见窗口未能追溯，复现明确使用新的匿名生产阵列入口。 |
+| R09 `3fc6a39` RenderQuality；R09B `522a3f3` GeometryScene | RenderQuality按用户要求直接使用当前逻辑尺寸×实际DPR；View3D填满当前内容。它仍是Review，不改变生产RHI选型。 |
+| R10D `75775b3` SceneItem；`e98c798`诊断保护 | product以实际item尺寸再乘`min(width/1920,height/1080)`造成非预期降采样，小窗口最终放大。修正为源宿主比例1；geometryOnly使用真实DPR及设备能力检查。960×640/DPR1原先请求480×320，源音乐入口应为960×640；此为调用链推导，非截图追分。原用户所见窗口未能追溯，复现明确使用新的匿名生产阵列入口。 |
 | R10C `1f2352a`、R10D补丁`b7f73d4`、`e98c798` | 显式物理附件、MSAA/resolve、独立全尺寸DOF、传输捕获mip和有界资源所有权是必要原生适配，保留；没有引入整体倍采样、锐化或新模糊。窗口DPR变化重新提交，换窗口断开旧信号。 |
 | 封面解码 → pool/atlas → opaque/shell | 保留256缩略图、1024选中独立租约、contain/留白与无跨格mip；linear/clamp采样及透射独立trilinear捕获各有用途。封面高清不由小窗口降级；源磨砂/粗糙度与传输LOD保留。 |
-| R19D1 `4ab1e73`；D2 `2f50812`；D3A `f45024d`/`e9360b7`；D3B `f4e1610` | D1的三核/标量精度/常量前缀、D2线性雾/最终颜色次序、D3投射偏置/过滤和产品地面均继续使用既有生产资源图；尺寸修正只改变源公式应有的物理目标。逐项数学与实际附件规范引用对应组件，完整历史hash由audit-rhi-scale输出。 |
+| R19D1 `4ab1e73`；D2 `2f50812`；D3A `f45024d`/`e9360b7`；D3B `f4e1610` | D1的三核/标量精度/常量前缀、D2线性雾/最终颜色次序、D3投射偏置/过滤和产品地面均继续使用既有生产资源图；物理目标和采样质量按用户要求由occlusion.md维护。逐项数学与实际附件规范引用对应组件，完整历史hash由audit-rhi-scale输出。 |
 | D4A `704a99d`；D4B1 `5e333ec`；D4B2 `4e86136` | 保留view空间focus、完整RGB24 depth、nearest深度/linear颜色、41点UV CoC/.011与aspect；核本身不随窗口像素加倍。保留SMAA源核/lookup、4×几何与单样本resolve/后处理，不以关效果改善清晰度。 |
 | 质量/资源/绘制路径选择 | RHI继续承担源全局透明排序/阴影与显式捕获，Quick3D只Review。新独立入口检查实际DPR/物理附件/最终合成和源数学，连续入口保留数量/动效/重叠与恢复；运行结果留本地，物理屏幕、正常VSYNC、完整产品性能及缺设备平台按原专项。 |
 
@@ -254,7 +254,7 @@
 
 | 实际历史对象与调用链 | 来源与判定 |
 | --- | --- |
-| R14 `1a082f2` Header/品牌容器、ArchiveButton、ThemeSwitch | 源`music.css`及最后加载的`music-theme-switch.css`定义容器锚点、竖屏网格、17px SVG/圆端点、主题pill；新品牌图形由用户差异替换，容器位置保留。设置图标的两条线/两个圆用Curve Shape保留原矢量几何/层级，原生可访问焦点框是必要交互适配。SVG与play/pause按所属窗口实际DPR栅格化，动画scale独立应用。 |
+| R14 `1a082f2` Header/品牌容器、ArchiveButton、ThemeSwitch | 源`music.css`及最后加载的`music-theme-switch.css`定义容器锚点、竖屏网格、17px SVG/圆端点、主题pill；新品牌图形由用户差异替换，容器位置保留。设置图标的两条线/两个圆用Curve Shape保留原矢量几何/层级，原生可访问焦点框是必要交互适配。SVG与play/pause采用CurveRenderer矢量路径，动画scale独立应用。 |
 | R14 BrowseInfo/ArchiveText/NavigationFrame/Footer、R15数字接入 | 源最终callout CSS覆盖早期57%定位，采用68.633333%与竖屏clamp；navigation高度驱动callout-bottom。保留CSS normal ascent/descent分别取整、16px父inline strut、1.7行高、眉题span边距/空格advance、按钮继承16px及显式源码padding；这些是文字度量和盒模型适配，分数字号使用局部矢量scale而非增加缓存字号/离屏层。`ArchiveText`通用文字语义及标题专用基线进一步由R19F复查，不能由本节静态锚点关闭。 |
 | R14 DesignTokens/ReadingVeil、R19 `1c9b8c6`界面连接 | 650ms颜色/.4,0,.2,1、380ms pill/.22,1,.36,1及源渐变停点有明确CSS依据。直接Quick渐变节点按原层级位于三维与页眉之间，无额外全屏采样；稳定透明层停绘。R19的overview opacity/offset/enabled只是状态委托，实际总览时序由R19G1复查。 |
 | R16 `2abb4f6` Header/TransportTitle接入 | song slot增长推动前置控件而右侧play/stop不动，退出保宽由既有TransportMotion管理。该提交将竖屏cap误替换为横屏宽度断点，现恢复最后生产CSS的`clamp(0,width-320,280)`优先级；横屏760/610/340规则及间距保留。标题shaping、退字与采样归R19F。 |
@@ -395,7 +395,7 @@ Release本机Metal隐藏入口分别验证模型/状态/实际MusicStage输出�
 
 ## R26 · 设置与离线资料来源
 
-冻结music-app::renderSettingsPanel、music.css最终theme-cards/settings-row/quality覆盖、quality-settings及music-motion-settings分别映射至SettingsPanel/ThemeCard/SettingChoice/SettingRange、既有RenderQuality和唯一FrameClock。主题卡保持两列，精细画质和MusicBrainz可折叠，设置面板沿用既有源几何/遮罩/背景；原生Qt控件负责编辑/焦点/Accessible。来源中的联网执行与页面reload按用户固定差异改为禁用查询和只重建视觉树，普通媒体对象/用户画质保留；已排除的产品能力不进入设置。
+冻结music-app::renderSettingsPanel、music.css最终theme-cards/settings-row/quality覆盖、quality-settings及music-motion-settings分别映射至SettingsPanel/ThemeCard/SettingChoice/SettingRange、既有RenderQuality和唯一FrameClock。主题卡保持两列，景深强度可调、MusicBrainz可折叠，设置面板沿用既有源几何/遮罩/背景；原生Qt控件负责编辑/焦点/Accessible。来源中的联网执行与页面reload按用户固定差异改为禁用查询和只重建视觉树，普通媒体对象/艺术参数保留；已排除的产品能力不进入设置。
 
 REFDB-05只参考Host::acceptCookies与cover完成回调中代次/订阅者检查的局部思路；既有LibrarySession的requestId/generation已足够，补齐不同代订阅者晚到、批量串行与能力通知，未采用其Host、网络、账号或队列架构。实际读取文件hash/作者/MIT随包参考NOTICE保留；设置和资料技术规范仅由library-data.md维护。产品只注册OfflineMetadataProvider，测试注入不产生网络请求。
 

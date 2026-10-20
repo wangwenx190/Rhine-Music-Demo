@@ -11,6 +11,10 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
                                 qint64 geometryBytes)
 {
     ResourceInventory plan;
+    const auto scaled = [&](int width, int height) {
+        const double dpr = in.navigationDpr > 0 ? in.navigationDpr : 1;
+        return QSize(qRound(width * dpr), qRound(height * dpr));
+    };
     const QSize shadow(qMax(1, in.shadowSize), qMax(1, in.shadowSize));
     plan.plannedTexture(u"shadow-depth"_s, shadow, QRhiTexture::D32F);
     plan.plannedTexture(u"shadow-readback-color"_s, shadow, QRhiTexture::R32F);
@@ -33,7 +37,7 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedTexture(u"shared-main-depth-upper-bound"_s, size, QRhiTexture::D32FS8,
                         in.captureSamples);
     plan.plannedTexture(u"cover-or-atlas"_s, in.atlasGeneration ? in.atlasSize : in.cover.size(),
-                        QRhiTexture::RGBA8);
+                        QRhiTexture::RGBA8, 1, in.filterCovers);
     plan.plannedTexture(u"environment"_s, { 768, 1024 }, QRhiTexture::RGBA16F);
     plan.plannedTexture(u"dfg"_s, { 16, 16 }, QRhiTexture::RGBA32F);
     plan.plannedTexture(u"ltc1"_s, { 64, 64 }, QRhiTexture::RGBA32F);
@@ -51,10 +55,6 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
                             QRhiTexture::D32FS8);
     }
     if (in.navigationDpr > 0) {
-        const auto scaled = [&](int width, int height) {
-            return QSize(int(std::ceil(width * in.navigationDpr)),
-                         int(std::ceil(height * in.navigationDpr)));
-        };
         // Qt owns these UI attachments. They join the cumulative descriptor plan, not RHI allocation.
         plan.plannedTexture(u"navigation-ruler-color"_s, scaled(130, 30), QRhiTexture::RGBA8);
         plan.plannedTexture(u"navigation-ruler-depth-upper-bound"_s, scaled(130, 30),
@@ -67,7 +67,7 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
                                 QRhiTexture::RGBA8);
     }
     if (!in.panelLayerSize.isEmpty()) {
-        // CSS sigma=8 logical-pixel blur uses two logical-pixel filter surfaces.
+        // CSS sigma=8 blur uses two surfaces at the actual output DPR.
         // Their owners are the visible Popup Loader; closing destroys both captures.
         for (int i = 0; i < 2; ++i) {
             plan.plannedTexture(u"panel-blur-%1-color"_s.arg(i), in.panelLayerSize,
@@ -77,12 +77,13 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
         }
     }
     if (!in.openingLayerSize.isEmpty()) {
-        // Skip backdrop has two bounded logical-pixel textures, including 3 sigma padding.
+        // Skip backdrop includes 3 sigma padding at the actual output DPR.
         for (int i = 0; i < 2; ++i) {
-            plan.plannedTexture(u"opening-skip-blur-%1-color-upper-bound"_s.arg(i), { 220, 120 },
+            plan.plannedTexture(u"opening-skip-blur-%1-color-upper-bound"_s.arg(i),
+                                scaled(220, 120),
                                 in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8, 1, true);
-            plan.plannedTexture(u"opening-skip-blur-%1-depth-upper-bound"_s.arg(i), { 220, 120 },
-                                QRhiTexture::D32FS8);
+            plan.plannedTexture(u"opening-skip-blur-%1-depth-upper-bound"_s.arg(i),
+                                scaled(220, 120), QRhiTexture::D32FS8);
         }
         plan.plannedTexture(u"opening-canvas-color-upper-bound"_s, in.openingLayerSize,
                             QRhiTexture::RGBA8);
@@ -96,8 +97,7 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
         plan.plannedTexture(u"title-reel-depth-%1-upper-bound"_s.arg(i), in.textLayerSizes[i],
                             QRhiTexture::D32FS8);
     if (in.postprocess) {
-        const QSize ao(qMax(1, int(size.width() * in.aoResolution)),
-                       qMax(1, int(size.height() * in.aoResolution)));
+        const QSize ao = size;
         auto geometry = [&](const QString &name, QSize size) {
             plan.plannedTexture(name + "-normal"_L1, size, QRhiTexture::RGBA8);
             plan.plannedTexture(name + "-depth"_L1, size, QRhiTexture::RGBA8);

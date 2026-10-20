@@ -3,6 +3,7 @@ import QtQuick
 
 Item {
     id: root
+    readonly property real outputDpr: Window.window ? Window.window.devicePixelRatio : 1
     property bool hdrActive: false
     required property Item sceneSource
     required property real sceneX
@@ -21,7 +22,8 @@ Item {
         sourceRect: Qt.rect(root.sceneX - 36, root.sceneY - 36, root.targetWidth, root.targetHeight)
         width: root.targetWidth
         height: root.targetHeight
-        textureSize: Qt.size(root.targetWidth, root.targetHeight)
+        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
+                                 root.targetHeight * root.outputDpr))
         visible: false
         hideSource: false
         smooth: true
@@ -42,7 +44,8 @@ Item {
         mipmap: true
         objectName: "overviewHorizontalTexture"
         sourceItem: horizontal
-        textureSize: Qt.size(root.targetWidth, root.targetHeight)
+        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
+                                 root.targetHeight * root.outputDpr))
         width: root.targetWidth
         height: root.targetHeight
         visible: false

@@ -120,8 +120,13 @@ int main(int argc, char **argv)
         return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--experiments"_s))
         return argc == 3 ? reviewExperiments(QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains(u"--settings"_s))
-        return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true, true) : 2;
+    if (app.arguments().contains(u"--settings"_s)) {
+        const bool representative =
+                argc == 4 && QString::fromLocal8Bit(argv[3]) == "--representative"_L1;
+        return argc == 3 || representative
+                ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true, true, representative)
+                : 2;
+    }
     if (app.arguments().contains(u"--playback"_s))
         return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
     if (app.arguments().contains(u"--library"_s))

@@ -11,7 +11,7 @@ struct PostSettings
 {
     QSize size;
     int samples = 0;
-    float resolution = 1, nearPlane = 5, farPlane = 300, focus = 25, aperture = .0003f;
+    float nearPlane = 5, farPlane = 300, focus = 25, aperture = .0003f;
     float projectionX = 1, projectionY = 1;
     float radius = .18f;
     bool bokeh = false, smaa = false;

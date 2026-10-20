@@ -6,6 +6,8 @@ import "../components"
 
 T.Popup {
     id: root
+    readonly property real outputDpr: sceneSource.Window.window
+                                      ? sceneSource.Window.window.devicePixelRatio : 1
     required property DesignTokens tokens
     required property LibrarySession librarySession
     required property PanelController controller
@@ -75,7 +77,8 @@ T.Popup {
                     mipmap: true
                     sourceItem: root.sceneSource
                     anchors.fill: parent
-                    textureSize: Qt.size(width, height)
+                    textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
+                                                                                        * root.outputDpr))
                     visible: false
                     smooth: true
                 }
@@ -94,7 +97,8 @@ T.Popup {
                     mipmap: true
                     sourceItem: horizontal
                     anchors.fill: parent
-                    textureSize: Qt.size(width, height)
+                    textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
+                                                                                        * root.outputDpr))
                     visible: false
                     hideSource: true
                     smooth: true

@@ -76,7 +76,7 @@ CHECKS = [
      'No per-frame image copy, snapshot serialization or uniform upload is added.'),
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'navigation-ruler-depth-upper-bound',
      'Metal/Retina target keys retain physical width/height, format, samples, resolves/mips and '
-     '8294400-pixel guard. ResourcePlan includes shared attachments once, Canvas RGBA8 color4 + '
+     'native physical output and explicit device capability checks. ResourcePlan includes shared attachments once, Canvas RGBA8 color4 + '
      'depth/stencil8 bytes and resize overlap; driver/compositor/font residency remains independent. '
      'Menus/deployment add no pass/texture/PSO. Existing optics/postprocess probes own actual descriptors.'),
     ('PERF-05', 'src/render/navigation/RulerInk.cpp', 'synchronize',

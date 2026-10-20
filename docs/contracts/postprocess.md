@@ -4,7 +4,7 @@
 
 ## 顺序与颜色
 
-线性不透明捕获→线性壳体→SSAO→Bokeh→按设置SMAA→一次ACES exposure/精确sRGB。纸面toneMapped=false的入射/限亮语义保留，最终OutputPass仍转换整幅composer（含纸面/背景）。生产GlassMaterial.compositorOutput不提前tone-map；隔离直接材质Review的ACES路径不进入生产。
+线性不透明捕获→线性壳体→SSAO→Bokeh→SMAA→一次ACES exposure/精确sRGB。纸面toneMapped=false的入射/限亮语义保留，最终OutputPass仍转换整幅composer（含纸面/背景）。生产GlassMaterial.compositorOutput不提前tone-map；隔离直接材质Review的ACES路径不进入生产。
 
 raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断须追加identity ShaderPass，防止单RenderPass自动renderToScreen；以真正调用路径判断颜色域。文字/阅读层在三维之后。
 
@@ -24,7 +24,7 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 
 ## SMAA
 
-- 锁定Medium：颜色阈值.1、最多八步、160×560 area线性/66×33 search nearest，gamma2.2及alpha混合。lookup原内嵌PNG→RGBA8，flipY=false解码行序，不转sRGB、不建mip；framebuffer Y变换不能作用于lookup。
+- 生产颜色阈值.05、最多32步，保留锁定源helper和lookup：160×560 area线性/66×33 search nearest，gamma2.2及alpha混合。lookup原内嵌PNG→RGBA8，flipY=false解码行序，不转sRGB、不建mip；framebuffer Y变换不能作用于lookup。
 - 源crossing宏`float(ivec2)`取首分量后广播：(1,0)两轴各+1，(0,1)不增轴并保留调用前y减1，独立公式必须遵守该语义。
 - `rhi-smaa-gpu`直接生产三pass真正离屏；34状态含64×64/129×73/73×129、七种解析模式、动态后flat清零与十次重建。edges≤1/255、weights/blend≤3/255，全部RGBA通道有限，HDR/变化alpha保持。`audit-rhi-smaa.py`核对完整源helper/lookup/历史调用。
 - Quick3D Review保留仅DOF/仅SMAA/DOF→SMAA三个固定Effect实例；组合在同Effect内用具名RGBA16F中间目标，最终pass必须输出最终目标；不动态重定向Pass.output/BufferInput。
@@ -33,6 +33,6 @@ HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR
 
 ## AA与执行边界
 
-原始antialias=off只关闭后期SMAA，几何MSAA仍开启；高/极高追加SMAA。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
+生产始终启用几何MSAA和SMAA；屏幕空间尺寸执行occlusion.md。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
 
 Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。

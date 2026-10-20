@@ -85,8 +85,8 @@ checks = [
     ("PERF-04", "qml/Yalahoo/Music/components/OverviewBackdrop.qml", "targetWidth: labelWidth + 76 + 72",
      "Blur reads only the existing scene output into a fixed padded RGBA8 crop and horizontal layer, "
      "then composites vertical directly; each axis uses 37 paired linear fetches, sigma 12/radius 36. "
-     "Both textures are fixed logical-pixel sizes <=308x129 throughout entry animation and all DPRs; Review checks their actual textureSize. "
-     "At eighteen retiring/live slots, two RGBA8 images use <=5721408 bytes payload; conservatively "
+     "Both textures follow the logical capture dimensions multiplied by the effective window DPR; Review checks their actual textureSize. "
+     "At DPR1 and eighteen retiring/live slots, two RGBA8 images use <=5721408 bytes payload; other DPRs follow actual dimensions. Conservatively "
      "including 8-byte depth/stencil per layer gives 17164224 bytes, old/new resize overlap twice that. "
      "Qt internal padding/driver/font atlas are unknown, not measured zero. Three-dimensional target "
      "compatibility, postprocess and PSOs do not depend on overview progress."),

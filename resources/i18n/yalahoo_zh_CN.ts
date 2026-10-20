@@ -708,10 +708,6 @@
             <source>Graphics configuration unavailable: </source>
             <translation>图形配置不可用：</translation>
         </message>
-        <message>
-            <source>Output reached the size protection limit. Quality preferences are preserved.</source>
-            <translation>输出达到尺寸保护上限，画质设置保持原值。</translation>
-        </message>
     </context>
     <context>
         <name>NavigationFrame</name>
@@ -1017,18 +1013,6 @@
     <context>
         <name>SettingsPanel</name>
         <message>
-            <source>16 samples</source>
-            <translation>16 采样</translation>
-        </message>
-        <message>
-            <source>32 samples</source>
-            <translation>32 采样</translation>
-        </message>
-        <message>
-            <source>64 samples</source>
-            <translation>64 采样</translation>
-        </message>
-        <message>
             <source>Advanced · Album array</source>
             <translation>高级设置 · 专辑阵列</translation>
         </message>
@@ -1045,28 +1029,8 @@
             <translation>专辑介绍</translation>
         </message>
         <message>
-            <source>Ambient occlusion resolution</source>
-            <translation>环境遮蔽分辨率</translation>
-        </message>
-        <message>
-            <source>Ambient occlusion samples</source>
-            <translation>环境遮蔽采样</translation>
-        </message>
-        <message>
             <source>Animation speed</source>
             <translation>动画速度</translation>
-        </message>
-        <message>
-            <source>Anisotropic filtering</source>
-            <translation>各向异性过滤</translation>
-        </message>
-        <message>
-            <source>Antialiasing</source>
-            <translation>抗锯齿</translation>
-        </message>
-        <message>
-            <source>Applies immediately and saves automatically. Device size and the 8.29 megapixel target limit protect output size while preserving your selected quality preferences.</source>
-            <translation>即时生效并自动保存。受设备尺寸及 829 万像素目标上限保护，用户画质偏好保持所选值。</translation>
         </message>
         <message>
             <source>Array depth of field</source>
@@ -1113,10 +1077,6 @@
             <translation>制作信息</translation>
         </message>
         <message>
-            <source>Custom</source>
-            <translation>自定义</translation>
-        </message>
-        <message>
             <source>Development and assets · yalahOO!!!
 Music adaptation and maintenance: RonaldDeng
 Original interface: LBEILC / RhineLabUI
@@ -1129,14 +1089,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
         <message>
             <source>Fill the view</source>
             <translation>填充画面</translation>
-        </message>
-        <message>
-            <source>Fine settings · Clarity / Materials / Shadows</source>
-            <translation>精细设置 · 清晰度 / 材质 / 阴影</translation>
-        </message>
-        <message>
-            <source>High</source>
-            <translation>高</translation>
         </message>
         <message>
             <source>Interface sounds</source>
@@ -1163,28 +1115,12 @@ MIT licensed code. Asset and font licenses are included with the application.</s
             <translation>MusicBrainz 联系邮箱或项目网址</translation>
         </message>
         <message>
-            <source>Original</source>
-            <translation>原始</translation>
-        </message>
-        <message>
-            <source>Performance</source>
-            <translation>性能</translation>
-        </message>
-        <message>
-            <source>Pixel density limit</source>
-            <translation>像素密度上限</translation>
-        </message>
-        <message>
             <source>Preview interface sound ↗</source>
             <translation>试听界面音效 ↗</translation>
         </message>
         <message>
             <source>Public encyclopedia introductions and their sources are saved locally.</source>
             <translation>公开百科介绍与资料来源保存在本机。</translation>
-        </message>
-        <message>
-            <source>Quality preset</source>
-            <translation>画质预设</translation>
         </message>
         <message>
             <source>RENDER QUALITY</source>
@@ -1207,10 +1143,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
             <translation>保留每列浏览位置</translation>
         </message>
         <message>
-            <source>Render scale</source>
-            <translation>渲染比例</translation>
-        </message>
-        <message>
             <source>Replay opening ↗</source>
             <translation>重播开场 ↗</translation>
         </message>
@@ -1223,12 +1155,12 @@ MIT licensed code. Asset and font licenses are included with the application.</s
             <translation>保存资料库设置 ↗</translation>
         </message>
         <message>
-            <source>Shadow resolution</source>
-            <translation>阴影精度</translation>
-        </message>
-        <message>
             <source>Sort order</source>
             <translation>排列方式</translation>
+        </message>
+        <message>
+            <source>Renders at the display's native pixel density. Antialiasing and full-resolution effects remain enabled.</source>
+            <translation>按显示器原生像素密度渲染，始终启用抗锯齿与全分辨率特效。</translation>
         </message>
         <message>
             <source>Sound</source>
@@ -1257,18 +1189,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
         <message>
             <source>Track volume</source>
             <translation>歌曲音量</translation>
-        </message>
-        <message>
-            <source>Transmission resolution</source>
-            <translation>透射分辨率</translation>
-        </message>
-        <message>
-            <source>Ultra</source>
-            <translation>极高</translation>
-        </message>
-        <message>
-            <source>Off</source>
-            <translation>关闭</translation>
         </message>
     </context>
     <context>
@@ -1540,10 +1460,6 @@ Source: </source>
             <translation>隐藏 yalahOO!!!</translation>
         </message>
         <message>
-            <source>Invalid antialiasing option.</source>
-            <translation>抗锯齿选项无效。</translation>
-        </message>
-        <message>
             <source>Invalid cover format, or the decoded image exceeds 4194304 pixels.</source>
             <translation>封面格式无效或展开尺寸超过 4194304 像素。</translation>
         </message>
@@ -1572,6 +1488,10 @@ Source: </source>
             <translation>光照数值类型无效：</translation>
         </message>
         <message>
+            <source>Invalid depth of field strength.</source>
+            <translation>景深强度无效。</translation>
+        </message>
+        <message>
             <source>Invalid metadata configuration field type.</source>
             <translation>资料配置字段类型无效。</translation>
         </message>
@@ -1594,10 +1514,6 @@ Source: </source>
         <message>
             <source>Invalid preference switch type: </source>
             <translation>偏好开关类型无效：</translation>
-        </message>
-        <message>
-            <source>Invalid quality value type: </source>
-            <translation>画质数值类型无效：</translation>
         </message>
         <message>
             <source>Legacy albums require native absolute folder and track paths. Paths cannot be inferred across systems.</source>

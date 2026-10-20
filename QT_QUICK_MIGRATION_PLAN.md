@@ -40,7 +40,7 @@
 - 原生三平台Windows/macOS/Linux，C++23、最新本机原生Qt、Qt Quick/QML、Qt Quick 3D（Review）、QtMultimedia与根CMake；移动端不在范围。QML管界面，C++管模型、状态机、运动、扫描和控制器。
 - 最终运行不依赖Node、浏览器、WebEngine、本地HTTP、Swift桥接、外部FFmpeg或新增第三方库；Qt随附依赖由部署工具处理，不自行链接内部FFmpeg。Web开发工具只可用已有锁定依赖，不新增图像比较库或下载浏览器。
 - 普通播放器只用QtMultimedia公开API：播放/暂停/停止/上下曲/队列/进度/音量/设备/错误。歌曲、BGM、UI音效独立；删除旧无缝三档及浏览器/CoreAudio后端选择。不实现无缝、交叉混音、手动PCM/重采样/音频回调/环形缓冲/自建引擎，不引入QAudioSink/QAudioDecoder/QAudioBufferOutput或AVAudioEngine/CoreAudio路线。
-- 保留双主题、减少动态、0.25×–3×速度、响应式、真实列/填充、列记忆、详情拖动、画质与光效调节；浏览/搜索/总览定位不改变播放。旧`?original=1`、PWA、浏览器菜单限制、在线播放代理及拆解研究界面不进入产品。
+- 保留双主题、减少动态、0.25×–3×速度、响应式、真实列/填充、列记忆、详情拖动、景深与光效调节；浏览/搜索/总览定位不改变播放。旧`?original=1`、PWA、浏览器菜单限制、在线播放代理及拆解研究界面不进入产品。
 - 本阶段零网络请求；保留异步Provider、来源/缓存/状态/查询配置、未知JSON字段和计划明确的未来能力扩展；已确认不再被生产使用的字段/设置直接删除，不保留兼容，不能伪造查询结果。
 - 展示名统一`yalahOO!!!`，技术名`yalahoo`；CMake项目`yalahoo`，目标`Yalahoo`/`YalahooCore`，输出`yalahoo`，QML模块`Yalahoo.Music`。创建引擎/读取QStandardPaths前设organizationName/applicationName=`yalahoo`、applicationDisplayName=`yalahOO!!!`，改展示名不迁移数据根。
 - macOS bundle ID=`yalahoo.music`；Linux desktop/图标名=`yalahoo`。旧档案/署名保留原名。原创图标/Logo以真正SVG路径为主，不嵌PNG、不套用旧标识；主素材`resources/branding/`、衍生`resources/icons/yalahoo/`，设计/中心线/分组/安全区/16–32px光学稿及来源按[branding.md](docs/contracts/branding.md)。品牌替换保留原容器锚点、留白、层级和动效时间窗。
@@ -146,7 +146,7 @@
 - 隐藏验证期间其他应用切换导致foregroundUnchanged=false → 同时记录初始/当前/自身PID并监测AppKit/NSWorkspace自身激活与窗口焦点历史，只将验证进程占据前台/激活/焦点判为干扰，外部切换单独计数，未知PID继续失败。
 - macOS最小化恢复的原生动画晚于固定验收定时器 → 以真实恢复帧及场景终态完成验证，定时器只作有界失败看门狗，分别核对每次恢复首帧丢弃与暂停状态。
 - macOS验证窗口仅Qt flags仍可能激活 → QGuiApplication前设置启动策略；默认Prohibited、原生低层级/拒key/忽略输入并观察重建，授权前台则预先Regular，统一走VerificationWindow。
-- 原生item已使用显示逻辑viewport却再次套参考舞台比例 → 从冻结生产宿主最终CSS核对外层变换，已无变换时传stageScale=1；按实际target DPR/附件与最终合成验证，不提高全局画质。
+- 原生item已使用显示逻辑viewport却再次套参考舞台比例 → 从冻结生产宿主最终CSS核对外层变换，已无变换时直接使用实际逻辑尺寸与有效DPR；按实际target DPR/附件与最终合成验证，不提高全局画质。
 - RenderControl的高DPR图像占错误区域或隐藏控件不消费状态 → 显式设置target DPR，Title/Header/Transport/Canvas接offscreenRendering，仍消费生产FrameClock。
 - RenderControl同线程读回在endFrame内完成且后续会销毁窗口 → 完成结果强制queued交GUI，待当前RHI帧返回后再重建，旧窗口结果以epoch拒绝。
 - Metal静态场景异步读回无后续帧 → 显式采集按MaxAsyncReadbackFrames+1有界续帧、最多两批在途，不重复submit或轮询；无采集回调时不增加生产工作。
@@ -157,7 +157,7 @@
 - 封面数量与呈现状态跨polish帧混读 → ready核对同revision实体objectId/albumId集合、租约集合及选中资源；不放宽数量上界。
 - 基本渲染循环复用同对象surface而探针要求新renderer → 明确销毁完整验证窗口/根，重绑策略与输入/遥测并以epoch拒绝旧回调；同对象恢复另验，不把局部generation当全局身份。
 - 新renderer的resourceGeneration从1重置 → 用真实sceneGraphInvalidated事件及恢复输出/上传证明重建，不把局部代次当全局身份。
-- 几何探针绕过像素保护或把错误提示算作模型 → 共用RenderQuality保护、记录limited/实际尺寸，要求renderError为空并排除提示区域。
+- 几何探针把错误提示算作模型 → 要求renderError为空，按原生物理目标核对实际尺寸并排除提示区域。
 - Offscreen附件估算漏D32FS8或resize重叠 → RGBA8颜色4bytes加depth/stencil8bytes保守上界并计旧/新同时存活；估算与driver实分配分开。
 - QML视觉树重建时延迟闭包引用已销毁上下文 → 延后动作绑定所属对象方法并核对revision；页签指示条沿实际按钮几何变化同步，不排捕获旧页签的闭包。
 - Qt Quick Popup在统一退出状态结束后仍保留模态焦点/捕获 → 关闭样式默认enter/exit，仅由既有SurfaceTransition控制可见生命周期。

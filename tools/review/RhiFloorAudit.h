@@ -316,14 +316,11 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
             input.bokeh = true;
             input.captureSamples = 4;
             input.shadowSize = 1024;
-            for (float resolution : { 1.f, .5f }) {
-                input.aoResolution = resolution;
+            {
                 auto capture = driver.capture(input, size);
                 validateFloor(input, capture, size, false);
-                check(capture.postprocessed.save(output
-                                                 + u"/floor-%1-%2-%3.png"_s.arg(size.width())
-                                                           .arg(theme)
-                                                           .arg(resolution)),
+                check(capture.postprocessed.save(
+                              output + u"/floor-%1-%2.png"_s.arg(size.width()).arg(theme)),
                       "Cannot save own floor output");
             }
             last = input;

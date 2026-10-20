@@ -82,7 +82,7 @@ CHECKS = [
      'existing upload budgets. Platform selection adds no per-frame copy, serialization or upload.'),
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'navigation-ruler-depth-upper-bound',
      'GL/Vulkan use the same complete pass graph/physical size/sample/resolve/mip keys and '
-     '8294400-pixel guard. RGBA16F eight bytes, RGBA8 four, R16F two, D32F four; MSAA and resolves '
+     'native physical output and explicit device capability checks. RGBA16F eight bytes, RGBA8 four, R16F two, D32F four; MSAA and resolves '
      'are separate, shared textures count once. Canvas RGBA8 color4 + depth/stencil8 upper bound '
      'includes resize old+new overlap. Driver/compositor/font/buffer padding stays unknown, not zero; '
      'no GPU peak or D3D efficiency is claimed for either X11 or Wayland.'),

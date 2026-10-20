@@ -1,65 +1,42 @@
 #pragma once
-#include <QString>
-using Qt::StringLiterals::operator""_s;
 #include <QObject>
-#include <QVariantMap>
 #include <QSize>
+#include <QString>
+#include <QVariantMap>
+
 namespace yalahoo {
-// Authored choices remain separate from effective, device-bounded targets.
+// Physical output dimensions are independent of artistic effect controls.
 class RenderQuality : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QVariantMap values READ values NOTIFY changed)
-    Q_PROPERTY(QString preset READ preset WRITE setPreset NOTIFY changed)
     Q_PROPERTY(int shadows READ shadows NOTIFY changed)
-    Q_PROPERTY(int aoSamples READ aoSamples NOTIFY changed)
-    Q_PROPERTY(double aoResolution READ aoResolution NOTIFY changed)
+    Q_PROPERTY(int aoSamples READ aoSamples CONSTANT)
     Q_PROPERTY(QSize targetSize READ targetSize NOTIFY changed)
-    Q_PROPERTY(QSize aoSize READ aoSize NOTIFY changed)
-    Q_PROPERTY(bool limited READ limited NOTIFY changed)
+    Q_PROPERTY(QSize aoSize READ targetSize NOTIFY changed)
 public:
     explicit RenderQuality(QObject *parent = nullptr);
     QVariantMap values() const
     {
-        return m_values;
+        using namespace Qt::StringLiterals;
+        return { { u"depthOfField"_s, m_depthOfField } };
     }
-    QString preset() const;
-    void setPreset(const QString &name);
     Q_INVOKABLE void configure(const QVariantMap &values);
-    Q_INVOKABLE void resize(double width, double height, double stageScale, double dpr,
-                            int maxTextureSize, bool nativeDpr = false);
-    int shadows() const
-    {
-        return m_values[u"shadows"_s].toInt();
-    }
+    Q_INVOKABLE void resize(double width, double height, double dpr);
+    int shadows() const;
     int aoSamples() const
     {
-        return m_values[u"aoSamples"_s].toInt();
-    }
-    double aoResolution() const
-    {
-        return m_values[u"aoResolution"_s].toDouble();
+        return 64;
     }
     QSize targetSize() const
     {
         return m_size;
     }
-    QSize aoSize() const;
-    bool limited() const
-    {
-        return m_limited;
-    }
-    static QVariantMap authoredPreset(const QString &name);
 Q_SIGNALS:
     void changed();
 
 private:
-    void measure();
-    QVariantMap m_values;
     QSize m_size{ 960, 640 };
-    double m_width = 960, m_height = 640, m_stageScale = 1, m_dpr = 1;
-    int m_maxTexture = 4096;
-    bool m_limited = false;
-    bool m_nativeDpr = false;
+    double m_depthOfField = 100;
 };
 }

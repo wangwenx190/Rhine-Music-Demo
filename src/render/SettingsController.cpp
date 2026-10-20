@@ -48,7 +48,6 @@ QVariantMap SettingsController::values() const
              { u"rememberColumnPosition"_s, m_selection->rememberColumnPosition() },
              { u"reduced"_s, m_motion->reducedMotion() },
              { u"motionSpeed"_s, m_motion->clock()->speed() },
-             { u"quality"_s, m_scene->quality()->preset() },
              { u"renderQuality"_s, m_scene->quality()->values() } };
 }
 void SettingsController::persist(const QString &field, const QVariant &value)
@@ -83,8 +82,7 @@ void SettingsController::apply()
     m_selection->setRealistic(values.value(u"arrayMode"_s).toString() == "realistic"_L1);
     if (values.contains(u"renderQuality"_s))
         m_scene->quality()->configure(values.value(u"renderQuality"_s).toMap());
-    else
-        m_scene->quality()->setPreset(values.value(u"quality"_s, u"original"_s).toString());
+
     m_applying = false;
     Q_EMIT changed();
 }
@@ -107,10 +105,6 @@ bool SettingsController::update(const QString &field, const QVariant &value)
         m_selection->setRealistic(value == u"realistic"_s);
     else if (field == "rememberColumnPosition"_L1 && value.metaType().id() == QMetaType::Bool)
         m_selection->setRememberColumnPosition(value.toBool());
-    else if (field == "quality"_L1
-             && (value == u"performance"_s || value == u"original"_s || value == u"high"_s
-                 || value == u"ultra"_s))
-        m_scene->quality()->setPreset(value.toString());
     else if (field == "renderQuality"_L1 && value.canConvert<QVariantMap>())
         m_scene->quality()->configure(value.toMap());
     else

@@ -154,54 +154,47 @@ int main(int argc, char **argv)
         QJsonArray results;
         for (int count : { 16, 32, 64 }) {
             input.aoSamples = count;
-            for (float resolution : { 1.0f, .75f, .5f }) {
-                input.aoResolution = resolution;
-                for (QSize size : { QSize(128, 17), QSize(129, 17), QSize(213, 159) }) {
-                    std::fprintf(stderr, "AO samples=%d target=%dx%d\n", count, size.width(),
-                                 size.height());
-                    const auto capture = driver.capture(input, size);
-                    const QSize aoSize(std::max(1, int(size.width() * resolution)),
-                                       std::max(1, int(size.height() * resolution)));
-                    int scalarTargets = 0;
-                    for (const auto &entry :
-                         capture.metadata[u"resources"_s].toObject()[u"entries"_s].toArray()) {
-                        const auto resource = entry.toObject();
-                        if (resource[u"name"_s] == u"post-ao-raw"_s
-                            || resource[u"name"_s] == u"post-ao-blur"_s) {
-                            RhiCaptureHarness::require(
-                                    resource[u"format"_s].toInt() == int(QRhiTexture::R16F)
-                                            && resource[u"width"_s].toInt() == aoSize.width()
-                                            && resource[u"height"_s].toInt() == aoSize.height(),
-                                    "Product scalar AO attachment changed");
-                            ++scalarTargets;
-                        }
+            for (QSize size : { QSize(128, 17), QSize(129, 17), QSize(213, 159) }) {
+                std::fprintf(stderr, "AO samples=%d target=%dx%d\n", count, size.width(),
+                             size.height());
+                const auto capture = driver.capture(input, size);
+                const QSize aoSize = size;
+                int scalarTargets = 0;
+                for (const auto &entry :
+                     capture.metadata[u"resources"_s].toObject()[u"entries"_s].toArray()) {
+                    const auto resource = entry.toObject();
+                    if (resource[u"name"_s] == u"post-ao-raw"_s
+                        || resource[u"name"_s] == u"post-ao-blur"_s) {
+                        RhiCaptureHarness::require(
+                                resource[u"format"_s].toInt() == int(QRhiTexture::R16F)
+                                        && resource[u"width"_s].toInt() == aoSize.width()
+                                        && resource[u"height"_s].toInt() == aoSize.height(),
+                                "Product scalar AO attachment changed");
+                        ++scalarTargets;
                     }
-                    RhiCaptureHarness::require(scalarTargets == 2, "Missing scalar AO attachments");
-                    for (const auto *image : { &capture.rawAo, &capture.blurredAo }) {
-                        RhiCaptureHarness::require(image->size() == aoSize,
-                                                   "Scalar AO readback size changed");
-                        for (int y = 0; y < image->height(); ++y)
-                            for (int x = 0; x < image->width(); ++x)
-                                RhiCaptureHarness::require(
-                                        image->pixelColor(x, y) == QColor(Qt::white),
-                                        "Background source AO must be exactly one");
-                    }
-                    const auto replay = driver.capture(input, size);
-                    RhiCaptureHarness::require(
-                            replay.metadata[u"alignedReadbackRevision"_s]
-                                    == capture.metadata[u"alignedReadbackRevision"_s],
-                            "Identical scalar capture rebuilt alignment resources");
-                    RhiCaptureHarness::require(
-                            replay.metadata[u"postUniformUploadBytes"_s].toInteger() == 240,
-                            "Steady AO passes reupload constant kernels");
-                    for (const auto &entry :
-                         replay.metadata[u"resources"_s].toObject()[u"entries"_s].toArray())
-                        RhiCaptureHarness::require(entry.toObject()[u"name"_s] != u"ao-kernel"_s,
-                                                   "Unused GPU kernel texture remains");
-                    auto result = capture.metadata;
-                    result[u"aoResolution"_s] = resolution;
-                    results.append(result);
                 }
+                RhiCaptureHarness::require(scalarTargets == 2, "Missing scalar AO attachments");
+                for (const auto *image : { &capture.rawAo, &capture.blurredAo }) {
+                    RhiCaptureHarness::require(image->size() == aoSize,
+                                               "Scalar AO readback size changed");
+                    for (int y = 0; y < image->height(); ++y)
+                        for (int x = 0; x < image->width(); ++x)
+                            RhiCaptureHarness::require(image->pixelColor(x, y) == QColor(Qt::white),
+                                                       "Background source AO must be exactly one");
+                }
+                const auto replay = driver.capture(input, size);
+                RhiCaptureHarness::require(
+                        replay.metadata[u"alignedReadbackRevision"_s]
+                                == capture.metadata[u"alignedReadbackRevision"_s],
+                        "Identical scalar capture rebuilt alignment resources");
+                RhiCaptureHarness::require(replay.metadata[u"postUniformUploadBytes"_s].toInteger()
+                                                   == 240,
+                                           "Steady AO passes reupload constant kernels");
+                for (const auto &entry :
+                     replay.metadata[u"resources"_s].toObject()[u"entries"_s].toArray())
+                    RhiCaptureHarness::require(entry.toObject()[u"name"_s] != u"ao-kernel"_s,
+                                               "Unused GPU kernel texture remains");
+                results.append(capture.metadata);
             }
         }
         QFile contactFile((QString::fromUtf8(FIXTURE_ROOT))
@@ -225,7 +218,6 @@ int main(int argc, char **argv)
             RhiCaptureHarness::require(math[u"contacts"_s].toInt() > 0,
                                        "Source contact probes missed AO");
         }
-        input.aoResolution = 1;
         for (int cycle = 0; cycle < 10; ++cycle) {
             driver.rebuild();
             const auto restored = driver.capture(input, { 213, 159 });

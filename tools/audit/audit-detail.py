@@ -73,11 +73,11 @@ checks = [
      "Returning cases retain album/object identity and their existing SelectedCoverLease pixels. "
      "Reversal reclaims that same physical owner; normal motion submits transforms, never clones "
      "materials or recrops the same cover. SceneFrame uses Qt implicit sharing and renderer rejects "
-     "known upload revisions. Four 1024 RGBA8 source leases are <=16MiB; tiled upload staging is "
-     "another <=16MiB, not the same allocation or a measured GPU residency figure."),
+     "known upload revisions. Four immutable source leases include all demand-sized mip levels; tiled staging is "
+     "shared immutable worker output, separately counted without claiming measured GPU residency."),
     ("PERF-04", "src/render/rhi/RhiItem.cpp", "struct AllocationKey",
      "Transforms, camera, yaw and light values are absent from the target compatibility key. Existing "
-     "fixed atlas size is 5632x6656 RGBA8 (149946368 bytes); its owned region is included once, not "
+     "atlas dimensions follow current projected cover demand and include the complete mip chain; its owned region is included once, not "
      "four extra GPU textures. ResourceInventory separately lists attachments, MSAA/resolve/mips, "
      "buffers, lookup and Qt item output. Replay checks fixed target/postprocess generations during "
      "motion and <=2MiB upload batches; context recreation legitimately creates new resources. "

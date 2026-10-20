@@ -114,10 +114,9 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
                           QRhiTexture *aoDepth, QRhiTexture *dofDepth)
 {
     if (m_state && m_state->api == api && m_state->settings.size == s.size
-        && m_state->settings.samples == s.samples && m_state->settings.resolution == s.resolution
-        && m_state->settings.bokeh == s.bokeh && m_state->settings.smaa == s.smaa
-        && m_state->source == color && m_state->normal == normal && m_state->aoDepth == aoDepth
-        && m_state->dofDepth == dofDepth) {
+        && m_state->settings.samples == s.samples && m_state->settings.bokeh == s.bokeh
+        && m_state->settings.smaa == s.smaa && m_state->source == color && m_state->normal == normal
+        && m_state->aoDepth == aoDepth && m_state->dofDepth == dofDepth) {
         m_state->settings = s;
         return;
     }
@@ -134,8 +133,7 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
     const int colorPasses = int(s.samples > 0) + int(s.bokeh) + int(s.smaa);
     for (int i = 0; i < std::min(2, colorPasses); ++i)
         p.ping[i].create(api, s.size, QRhiTexture::RGBA16F);
-    const QSize aoSize(std::max(1, int(s.size.width() * s.resolution)),
-                       std::max(1, int(s.size.height() * s.resolution)));
+    const QSize aoSize = s.size;
     if (s.samples) {
         // Both shaders output (r,r,r,1), and every consumer reads .r only. Keep precisely
         // the same half-float component and filtering; the other stored channels carry no data.

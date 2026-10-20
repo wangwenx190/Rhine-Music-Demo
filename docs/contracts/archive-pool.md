@@ -20,23 +20,13 @@
 
 快照/排序边界建立 O(N) 的稳定 ID→格及 ID→本地封面描述索引（完整显示名与有界字素占位标题分开保留）；LibrarySession 在快照边界建立 O(N+T) 的专辑/曲目身份索引，使池导航同步无需线性查库，重复身份保留原先的首项语义。未接入库的 SelectionController 不接管其他运动调用。帧中只处理 432 格和四个有限接管对象。renderer 可接收最多 436 个对象，含窗口外有限归位/选中格；固定 buffer 容量不随实际实体数量切换。可见性每帧计算一次，depth key 先生成再排序；剔除只影响可见 draw，完整世界空间阴影 caster 不丢失。实体公共光场缓存按矩阵/灯光键失效，沿用现有渲染图。
 
-生产池使用一张 5632×6656 RGBA8 atlas，无 mip、线性 clamp：前 22×22 tile 区域容纳最多 436 个 256² 身份槽，底部四个 1024² 区域供 selected/returning。保持既有 256/1024 清晰度与 contain/留边数学；高分辨率快照仅在 revision 改变时拆成十六个 256² 区域，一张高图跨常态 2MiB 上传预算提交，全部区域准备好后才暴露高图 UV，准备中使用已就绪的低清晰度 tile。设备最大二维纹理尺寸须至少 6656；分配前按实际 QRhi 限制、格式和累计 ResourcePlan 核对，不支持时明确报错。该布局没有宣称适用于所有 GPU 的通用 VRAM 阈值。
+生产池使用单张RGBA8图集：缩略图为24列256²槽，固定有界身份436；清晰区按当前投影需求缓存层的最大边长S保留2×2个区域，x起点为0/S，y起点为6144向上对齐S及其下一行。图集宽max(6144,2S)、高alignUp(6144,S)+2S，所有缩略图slot按实际行跨度映射。独立mip的布局、采样与计费归covers.md。只有整个清晰区域的每个分块和mip均已提交才暴露其UV，准备中使用已就绪缩略图。尺寸变化重放现存像素，身份/lease不变；硬件尺寸、格式及分配不足时显式报错。
 
 每个池身份保留有引用计数的不可变 tile。完成 LRU 淘汰后不会重复解码仍被 atlas 租约持有的图。待解码仍限 96，全局 worker/未消费结果仍限 3；满队列拒绝后由 ready→polish 重试。GUI replay 最多 436 个 thumbnail tile 加 64 个高图分块，隐式共享像素；render queue 按槽/代次/lease/serial 合并，重复结果在复制前拒绝，常态每帧最多上传八个 tile。replay 同时保证 GUI 提交被后续 polish 合并、hide/restore 和 scene graph 重建时不会丢失当前像素。旧 generation 不可发布。
 
-待解码键使用有界 hash 索引，重复请求不扫描描述符队列；生产先接纳 selected 的低/高清请求，并在无待解码容量时停止提交新请求，避免每次完成通知都重复撞满队列。容量释放后 coalesced polish 继续接纳。归位对象固定接管时的快照，晚到高清结果只升级当前 selected；重新接管时才能继续升级。render 对高图十六区域统一核对当前/已上传 lease，未就绪时使用独立低清晰度区域；新租约生效后旧租约不再被 ready 判定接受。
+待解码键使用有界 hash 索引，重复请求不扫描描述符队列；生产先接纳 selected 的低/高清请求，并在无待解码容量时停止提交新请求，避免每次完成通知都重复撞满队列。容量释放后 coalesced polish 继续接纳。归位对象固定接管时的快照，晚到高清结果只升级当前 selected；重新接管时才能继续升级。render 对高图全部区域统一核对当前/已上传 lease，未就绪时使用独立低清晰度区域；新租约生效后旧租约不再被 ready 判定接受。
 
-| 资源 | 载荷上界 |
-| --- | --- |
-| GUI atlas retained | 436×256²×4 = 109MiB |
-| selected/returning immutable 高图 | 四个 1024² RGBA8 = 16MiB，可能与完成 LRU 共享 |
-| 高图 tile 隔离载荷 | 四组十六 tile = 16MiB，仅在内容 revision 改变时复制一次 |
-| GUI replay / render 队列 | 最多 500 个区域，125MiB 引用载荷；共享上述像素，不另合成整页 CPU atlas |
-| GPU atlas | 5632×6656×4 = 143MiB，无 mip，含未占用的固定槽/安全余量 |
-| instance buffer | 436×112 = 48832 bytes，只上传实际实体前缀 |
-| draw uniform buffer | 实际 uniform stride×(436×3+6)，上传有效 cursor 范围 |
-
-既有 420MiB worker reservation、16MiB 完成 LRU 与生产retained/高图/tile 的保守独立所有者小计为 577MiB。共享载荷不代表实测 RSS；库索引、codec opaque scratch、驱动和 Qt 内部对象另计。快照换代时旧 render Input 和新 GUI retained 最多各保留一套，不能假设 reset 立即释放 render 所引用的旧像素。GPU atlas 旧/新同时存活的 descriptor 上界为 286MiB；全渲染图附件、MSAA/resolve/mips、环境/lookup、Qt 输出和 resize 旧/新目标由既有 ResourcePlan/ResourceInventory 按实际尺寸展开，`measuredVramBytes` 仍不可用，不将估算写成显存实测。
+CPU保留载荷按缩略图、清晰快照及其分块/mip的实际字节分别记录，隐式共享不重复解释成实测占用。GPU完整mip链和旧/新图集同时存活均计入既有ResourcePlan/ResourceInventory；动态清晰区不采用固定显存结论。instance buffer仍为436×112bytes，uniform按实际stride与有效cursor计费，descriptor估算不冒充driver驻留显存。
 
 库/排序替换使工作代次、atlas、接管租约失效，保留当前稳定 ID 的新规范格；QObject/QPointer 保证销毁后不访问旧 selection。render 独占 GPU 所有权。Review 采集 request 跨 coalesced polish 保留，避免 cover/camera 通知吞掉请求；生产无同步 readback、磁盘访问或手动转事件循环。
 

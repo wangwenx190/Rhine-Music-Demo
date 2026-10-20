@@ -1,5 +1,7 @@
 #include <QCoreApplication>
 #include "SceneItem.h"
+#include <QLineF>
+#include <QImageReader>
 #include <QQuickRenderTarget>
 #include <chrono>
 #include <QGuiApplication>
@@ -152,7 +154,7 @@ SceneItem::SceneItem(QQuickItem *parent)
             for (auto &owned : m_ownedCovers)
                 if (owned.objectId == activeObject && owned.pixels
                     && owned.pixels->identity == pixels->identity) {
-                    if (pixels->resolution == 1024)
+                    if (pixels->resolution >= m_detailResolution)
                         owned.highResolutionFailed = !pixels->error.isEmpty();
                     m_coverPool.upgrade(owned.pixels, pixels);
                 }
@@ -251,6 +253,8 @@ void SceneItem::resetPool()
     m_readyCovers.clear();
     m_atlas.reset();
     m_ownedCovers = { };
+    m_ownedSide = 256;
+    m_detailResolution = 256;
     m_activeObject = 0;
     ++m_coverRevision;
     schedule();
@@ -379,29 +383,36 @@ void SceneItem::preparePool(Input &in)
                 }
             }
             if (it != m_ownedCovers.end() && it->pixels) {
-                if (instance.objectId == m_activeObject && !it->highResolutionFailed
-                    && (!it->pixels->pixels || it->pixels->pixels->resolution != 1024)) {
-                    if (auto pixels = m_covers.lookup(id, source.first, 1024, source.second)) {
+                if (instance.objectId == m_activeObject
+                    && (!it->highResolutionFailed
+                        || (it->pixels->pixels && !it->pixels->pixels->error.isEmpty()))
+                    && (!it->pixels->pixels
+                        || it->pixels->pixels->resolution < m_detailResolution)) {
+                    if (auto pixels = m_covers.lookup(id, source.first, m_detailResolution,
+                                                      source.second)) {
                         it->highResolutionFailed = !pixels->error.isEmpty();
                         m_coverPool.upgrade(it->pixels, pixels);
                     } else if (m_covers.hasPendingCapacity())
-                        m_covers.request(id, source.first, 1024, source.second);
+                        m_covers.request(id, source.first, m_detailResolution, source.second);
                 }
                 const auto pixels = it->pixels->pixels;
-                if (pixels && pixels->resolution == 1024) {
+                if (pixels && pixels->resolution > 256) {
                     const int block = int(it - m_ownedCovers.begin());
-                    tile = { block * 1024, 5632, 1024, 1024 };
+                    const int top = ((6144 + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
+                    tile = { (block % 2) * m_ownedSide, top + (block / 2) * m_ownedSide,
+                             pixels->resolution, pixels->resolution };
                     coverLease = it->lease;
-                    if (it->tiledPixels != pixels) {
+                    if (it->tiledPixels != pixels || it->tiledRegion != tile) {
                         it->uploads.clear();
-                        for (int y = 0; y < 1024; y += 256)
-                            for (int x = 0; x < 1024; x += 256) {
-                                const int slot = ((tile.y() + y) / 256) * 22 + (tile.x() + x) / 256;
-                                it->uploads.append({ m_atlas.generation(), it->lease,
-                                                     ++m_ownedSerial, slot,
-                                                     pixels->image.copy(x, y, 256, 256), true });
-                            }
+                        for (const auto &part : pixels->tiles) {
+                            const int slot = ((tile.y() + part.origin.y()) / 256)
+                                            * (m_atlasSize.width() / 256)
+                                    + (tile.x() + part.origin.x()) / 256;
+                            it->uploads.append({ m_atlas.generation(), it->lease, ++m_ownedSerial,
+                                                 slot, part.image, true, part.mipmaps });
+                        }
                         it->tiledPixels = pixels;
+                        it->tiledRegion = tile;
                     }
                     in.atlasUploads += it->uploads;
                 }
@@ -412,12 +423,15 @@ void SceneItem::preparePool(Input &in)
         in.coverTiles[index] = tile;
         in.coverLeases[index] = coverLease;
     }
-    in.atlasSize = { 5632, 6656 };
+    in.atlasSize = m_atlasSize;
     in.atlasGeneration = m_atlas.generation();
     in.poolFrame = true;
     // Immutable replay handles render-context recreation and superseded GUI submissions;
     // the render queue rejects known revisions before conversion or upload.
-    in.atlasUploads += m_atlas.replay(0);
+    auto thumbnails = m_atlas.replay(0);
+    for (auto &upload : thumbnails)
+        upload.slot = (upload.slot / 24) * (m_atlasSize.width() / 256) + upload.slot % 24;
+    in.atlasUploads += thumbnails;
     in.immutableCover = true;
 }
 void SceneItem::setInspectionEnabled(bool enabled)
@@ -625,13 +639,13 @@ QJsonObject SceneItem::coverStatistics() const
                 { u"lease"_s, qint64(cover.lease) },
                 { u"resolution"_s, cover.pixels->pixels ? cover.pixels->pixels->resolution : 0 } });
         if (cover.pixels->pixels) {
-            ownedBytes += cover.pixels->pixels->image.sizeInBytes();
-            detailed += cover.pixels->pixels->resolution == 1024;
+            ownedBytes += cover.pixels->pixels->byteSize();
+            detailed += cover.pixels->pixels->resolution >= m_detailResolution;
             if (cover.objectId == m_activeObject)
-                selectedDetailed = cover.pixels->pixels->resolution == 1024;
+                selectedDetailed = cover.pixels->pixels->resolution >= m_detailResolution;
         }
         for (const auto &upload : cover.uploads)
-            tiledBytes += upload.pixels.sizeInBytes();
+            tiledBytes += AtlasUploadQueue::payloadBytes(upload);
     }
     return { { u"owners"_s, owners },
              { u"cache"_s, m_covers.statistics() },
@@ -643,7 +657,7 @@ QJsonObject SceneItem::coverStatistics() const
              { u"atlasRetainedBytes"_s, m_atlas.retainedBytes() },
              { u"ownedBytes"_s, ownedBytes },
              { u"tiledBytes"_s, tiledBytes },
-             { u"atlasSize"_s, QJsonArray{ 5632, 6656 } } };
+             { u"atlasSize"_s, QJsonArray{ m_atlasSize.width(), m_atlasSize.height() } } };
 }
 void SceneItem::setRenderingActive(bool active)
 {
@@ -920,23 +934,71 @@ try {
             m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
         }
     }
+    // Cover demand follows the projected paper at native DPR, including its source inset.
+    // A power-of-two cache tier avoids decoding again for every animation pixel.
+    double demand = 256;
+    const auto &frame = adapter.frame();
+    const auto vp = frame.projection * frame.view;
+    const auto inspect = [&](const QMatrix4x4 &model) {
+        std::array<QPointF, 4> points;
+        int index = 0;
+        for (float y : { .32f, 3.38f })
+            for (float x : { -1.36f, 1.70f }) {
+                const auto clip = vp * model * QVector4D(x, y, .027f, 1);
+                if (clip.w() <= 0)
+                    return;
+                points[index++] = QPointF(clip.x() / clip.w() * width() * .5,
+                                          clip.y() / clip.w() * height() * .5);
+            }
+        for (const auto edge : { std::pair{ 0, 1 }, { 0, 2 }, { 1, 3 }, { 2, 3 } })
+            demand = std::max(demand,
+                              QLineF(points[edge.first], points[edge.second]).length()
+                                      * window()->effectiveDevicePixelRatio() * 64 / 62);
+    };
+    if (frame.instances.isEmpty())
+        inspect(frame.caseTransform);
+    else
+        for (const auto &instance : frame.instances)
+            if (instance.owned)
+                inspect(instance.transform);
+    m_detailResolution = 256;
+    while (m_detailResolution < demand && m_detailResolution < (1 << 29))
+        m_detailResolution *= 2;
+    const auto allocationLimit = QImageReader::allocationLimit();
+    if (allocationLimit > 0
+        && qint64(m_detailResolution) * m_detailResolution * 4
+                > qint64(allocationLimit) * 1024 * 1024)
+        throw std::runtime_error("Projected cover exceeds the image allocation capability");
+    m_ownedSide = std::max(m_ownedSide, m_detailResolution);
+    for (const auto &owned : m_ownedCovers)
+        if (owned.pixels && owned.pixels->pixels)
+            m_ownedSide = std::max(m_ownedSide, owned.pixels->pixels->resolution);
+    const int top = ((6144 + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
+    const QSize nextAtlasSize(std::max(6144, 2 * m_ownedSide), top + 2 * m_ownedSide);
+    if (nextAtlasSize != m_atlasSize) {
+        m_atlasSize = nextAtlasSize;
+        m_atlas.advanceGeneration();
+        for (auto &lease : m_poolLeases)
+            lease.generation = m_atlas.generation();
+        for (auto &owned : m_ownedCovers)
+            owned.tiledPixels.reset();
+        ++m_coverRevision;
+    }
     if (!m_poolMode && m_selectedCover
-        && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution != 1024)) {
+        && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution < m_detailResolution)) {
         const auto identity = u"demo-square"_s;
         const auto path = u":/assets/demo-covers/square.png"_s;
-        if (auto pixels = m_covers.lookup(identity, path, 1024)) {
+        if (auto pixels = m_covers.lookup(identity, path, m_detailResolution)) {
             if (m_coverPool.upgrade(m_selectedCover, pixels))
                 m_cover = pixels->image;
         } else {
             m_covers.request(identity, path, 256);
-            m_covers.request(identity, path, 1024);
+            m_covers.request(identity, path, m_detailResolution);
         }
     }
     auto &quality = *adapter.quality();
-    // The item already fills the displayed viewport (music.css: transform: none).
-    // Applying the reference-stage scale again undersamples compact windows.
-    quality.resize(width(), height(), 1, window()->effectiveDevicePixelRatio(),
-                   std::numeric_limits<int>::max(), m_geometryOnly);
+    const double dpr = window()->effectiveDevicePixelRatio();
+    quality.resize(width(), height(), dpr);
     const auto &l = *adapter.lighting();
     const auto settings = quality.values();
     Input in;
@@ -951,12 +1013,15 @@ try {
 #endif
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
-    in.panelLayerSize = m_panelLayerSize;
+    in.panelLayerSize = m_panelLayerSize * dpr;
     in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
     in.textLayerSizes = m_textSizes;
     in.textResourceRevision = m_textRevision;
     in.cover = m_cover;
+    if (m_selectedCover && m_selectedCover->pixels)
+        in.coverMipmaps = m_selectedCover->pixels->mipmaps;
     in.coverPainted = true;
+    in.filterCovers = m_poolMode || !in.coverMipmaps.isEmpty();
     in.immutableCover = true;
     in.geometryDiagnostic = m_geometryOnly;
     in.fogEnabled = !m_geometryOnly;
@@ -971,12 +1036,11 @@ try {
         in.displayLayerSize = window()->size() * window()->effectiveDevicePixelRatio();
     in.profile = m_telemetryEnabled;
     in.shadows = !m_geometryOnly && quality.shadows() > 0;
-    in.shadowSize = qMax(1, quality.shadows());
+    in.shadowSize = m_geometryOnly ? 1 : qMax(1, quality.shadows());
     in.postprocess = !m_geometryOnly;
     in.aoSamples = m_geometryOnly ? 0 : quality.aoSamples();
-    in.aoResolution = float(quality.aoResolution());
     in.bokeh = !m_geometryOnly && settings.value(u"depthOfField"_s).toDouble() > 0;
-    in.smaa = !m_geometryOnly && settings.value(u"antialias"_s) == u"smaa"_s;
+    in.smaa = !m_geometryOnly;
 #ifdef YALAHOO_RHI_AUDIT
     if (property("_yalahooReviewOpticsOnly").toBool()) {
         in.postprocess = false;
@@ -1024,7 +1088,7 @@ try {
             && in.textResourceRevision == old.textResourceRevision
             && m_coverRevision == m_publishedCoverRevision
             && in.scene.inputRevision == old.scene.inputRevision
-            && in.cover.cacheKey() == old.cover.cacheKey()
+            && in.cover.cacheKey() == old.cover.cacheKey() && in.filterCovers == old.filterCovers
             && target == QSize(fixedColorBufferWidth(), fixedColorBufferHeight())
             && in.geometryDiagnostic == old.geometryDiagnostic && in.shells == old.shells
             && in.fogEnabled == old.fogEnabled && in.profile == old.profile
@@ -1032,9 +1096,9 @@ try {
             && in.shadows == old.shadows && in.shadowSize == old.shadowSize
             && in.captureSamples == old.captureSamples && in.aoSamples == old.aoSamples
             && in.hdrHeadroom == old.hdrHeadroom && in.hdrActive == old.hdrActive
-            && in.displayLayerSize == old.displayLayerSize && in.aoResolution == old.aoResolution
-            && in.postprocess == old.postprocess && in.bokeh == old.bokeh && in.smaa == old.smaa
-            && in.focus == old.focus && in.aperture == old.aperture && in.clarity == old.clarity
+            && in.displayLayerSize == old.displayLayerSize && in.postprocess == old.postprocess
+            && in.bokeh == old.bokeh && in.smaa == old.smaa && in.focus == old.focus
+            && in.aperture == old.aperture && in.clarity == old.clarity
             && in.background == old.background && in.keyColor == old.keyColor
             && in.skyColor == old.skyColor && in.groundColor == old.groundColor
             && in.lightIntensities == old.lightIntensities && in.spotPosition == old.spotPosition

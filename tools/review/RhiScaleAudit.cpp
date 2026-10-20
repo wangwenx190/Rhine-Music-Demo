@@ -47,16 +47,9 @@ QJsonObject sourceState(const Input &input)
              { u"focus"_s, input.focus },
              { u"aperture"_s, input.aperture } };
 }
-QSize sourceTarget(QSize logical, double dpr, const QVariantMap &values, int maximum)
+QSize sourceTarget(QSize logical, double dpr)
 {
-    // Frozen renderDimensions with the production music.css host transform of one.
-    const double requested =
-            std::min(dpr, values[u"pixelRatio"_s].toDouble()) * values[u"scale"_s].toDouble() / 100;
-    const double ratio = std::min(
-            { requested, std::sqrt(8294400.0 / (double(logical.width()) * logical.height())),
-              double(maximum) / std::max(logical.width(), logical.height()) });
-    return { std::max(1, int(std::floor(logical.width() * ratio))),
-             std::max(1, int(std::floor(logical.height() * ratio))) };
+    return logical * dpr;
 }
 QList<QSize> sourceSizes()
 {
@@ -102,8 +95,55 @@ void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
     }
     check(ready, "Anonymous production covers did not become ready");
 }
-QJsonObject captureState(QSize logical, double requestedDpr, int scale, double aoResolution,
-                         bool high, const QString &output, int index)
+void checkCoverFiltering()
+{
+    RhiCaptureHarness driver;
+    SceneAdapter adapter;
+    adapter.layout()->setViewport(193, 129);
+    adapter.snapToTarget();
+    Input input;
+    input.scene = adapter.frame();
+    input.entities = { input.scene.caseTransform };
+    input.entityIds = { 1 };
+    input.shadows = false;
+    input.lightingEnabled = false;
+    input.rawOutput = true;
+    input.filterCovers = true;
+    input.coverPainted = true;
+    input.captureSamples = 4;
+    input.atlasSize = { 512, 256 };
+    input.atlasGeneration = 1;
+    input.coverTiles = { QRect(0, 0, 256, 256) };
+    input.coverLeases = { 1 };
+    for (int slot = 0; slot < 2; ++slot) {
+        QImage image(256, 256, QImage::Format_RGBA8888_Premultiplied);
+        image.fill(slot ? Qt::blue : Qt::red);
+        if (!slot)
+            for (int y = 0; y < image.height(); ++y)
+                for (int x = 0; x < image.width(); ++x)
+                    if (x < 32 || x >= 224 || y < 32 || y >= 224)
+                        image.setPixelColor(x, y, Qt::transparent);
+        input.atlasUploads.append({ 1, 1, 1, slot, image, true, CoverCache::makeMipmaps(image) });
+    }
+    const auto result = driver.capture(input, { 193, 129 });
+    check(result.metadata[u"sampling"_s].toObject()[u"coverTileLocalMipmaps"_s].toBool(),
+          "Production cover filtering is not bound to the mipmapped texture");
+    int redPixels = 0;
+    for (int y = 0; y < result.color.height(); ++y)
+        for (int x = 0; x < result.color.width(); ++x) {
+            const auto color = result.color.pixelColor(x, y);
+            if (color.redF() > .5f) {
+                check(color.blueF() < .005f, "Cover mip filtering sampled a neighboring tile");
+                ++redPixels;
+            }
+        }
+    check(redPixels > 16, "Cover filtering probe did not draw the paper");
+    input.atlasUploads.clear();
+    const auto stable = driver.capture(input, { 193, 129 });
+    check(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
+          "Stable cover filtering regenerated or reuploaded mip levels");
+}
+QJsonObject captureState(QSize logical, double requestedDpr, const QString &output, int index)
 {
     MotionController motion;
     SelectionController selection(&motion);
@@ -114,11 +154,6 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
     adapter.layout()->setViewport(logical.width(), logical.height());
     adapter.snapToTarget();
     auto *quality = adapter.quality();
-    quality->setPreset(high ? u"high"_s : u"original"_s);
-    auto values = quality->values();
-    values[u"scale"_s] = scale;
-    values[u"aoResolution"_s] = aoResolution;
-    quality->configure(values);
     RhiCaptureHarness driver([](QQuickItem *parent) {
         return new SceneItem(parent);
     });
@@ -134,8 +169,7 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
     const double dpr = driver.window->effectiveDevicePixelRatio();
     check(!OffscreenSurface::Enabled || dpr == requestedDpr,
           "Actual target DPR differs from request");
-    const int maximum = driver.surface->rhi()->resourceLimit(QRhi::TextureSizeMax);
-    const auto expected = sourceTarget(logical, dpr, values, maximum);
+    const auto expected = sourceTarget(logical, dpr);
     const QSize displayPixels = logical * dpr;
     QJsonArray themes;
     qint64 generation = -1;
@@ -148,12 +182,12 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
         check(quality->targetSize() == expected
                       && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
                               == expected,
-              "SceneItem applied extra stage scale or omitted the source pixel limit");
+              "SceneItem output differs from current native physical dimensions");
         const auto input = item->input();
         const auto capture = driver.capture(input, expected);
         checkPostprocessGraph(input, capture);
-        check(item->errorText().isEmpty() && input.bokeh && input.aoSamples == 32
-                      && input.smaa == high && input.captureSamples == 4,
+        check(item->errorText().isEmpty() && input.bokeh && input.aoSamples == 64 && input.smaa
+                      && input.captureSamples == 4,
               "Scale audit changed authored effects or failed rendering");
         const auto bokeh = capture.metadata[u"submittedBokeh"_s].toObject();
         check(bokeh[u"width"_s].toInt() == expected.width()
@@ -167,7 +201,7 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
                               == float(expected.width()) / expected.height(),
               "Bokeh uses logical pixels or stale full-resolution depth");
         const auto sampling = capture.metadata[u"sampling"_s].toObject();
-        check(sampling[u"coverLinearClampNoMip"_s].toBool()
+        check(sampling[u"coverTileLocalMipmaps"_s].toBool()
                       && sampling[u"captureTrilinearClamp"_s].toBool(),
               "Cover or transmission filtering differs from source");
         const auto optical = capture.metadata[u"opticalGraph"_s].toObject();
@@ -187,7 +221,8 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
                 found.insert(name);
             }
             if (name == "cover-or-atlas"_L1)
-                check(entry[u"mipLevels"_s].toInt() == 1, "Atlas created cross-tile mip levels");
+                check(entry[u"mipLevels"_s].toInt() > 1,
+                      "Atlas is missing independent cover mip levels");
         }
         check(found.contains(u"opaque-color-resolve"_s) && found.contains(u"qt-item-color"_s),
               "Actual target inventory is missing");
@@ -204,18 +239,16 @@ QJsonObject captureState(QSize logical, double requestedDpr, int scale, double a
                                    { u"metadata"_s, capture.metadata },
                                    { u"covers"_s, item->coverStatistics() } });
     }
-    std::fprintf(stderr, "Scale %dx%d DPR %.2f scale %d -> %dx%d passed\n", logical.width(),
-                 logical.height(), dpr, scale, expected.width(), expected.height());
+    std::fprintf(stderr, "Native %dx%d DPR %.2f -> %dx%d passed\n", logical.width(),
+                 logical.height(), dpr, expected.width(), expected.height());
     return { { u"logical"_s, pair(logical) },
              { u"requestedDpr"_s, requestedDpr },
              { u"actualDpr"_s, dpr },
-             { u"renderScale"_s, scale },
              { u"sourceStageScale"_s, 1 },
              { u"physicalTarget"_s, pair(expected) },
              { u"displayPixels"_s, pair(displayPixels) },
              { u"finalScaleX"_s, double(displayPixels.width()) / expected.width() },
              { u"finalScaleY"_s, double(displayPixels.height()) / expected.height() },
-             { u"limited"_s, quality->limited() },
              { u"offscreen"_s, driver.surface->diagnostics() },
              { u"windowPolicy"_s, verification::windowPolicy(*driver.window) },
              { u"themes"_s, themes } };
@@ -243,14 +276,13 @@ QJsonArray dprTransitions()
     item->setAdapter(&adapter);
     driver.replay(2);
     waitForCovers(driver, item);
-    const quint64 atlasGeneration = item->input().atlasGeneration;
+    quint64 atlasGeneration = item->input().atlasGeneration;
+    QSize atlasSize = item->input().atlasSize;
     const auto originalState = sourceState(item->input());
     for (double dpr : { 1., 2., 1.5, 1. }) {
         driver.surface->setDevicePixelRatio(dpr);
         driver.replay(2);
-        const auto expected =
-                sourceTarget({ 640, 480 }, dpr, adapter.quality()->values(),
-                             driver.surface->rhi()->resourceLimit(QRhi::TextureSizeMax));
+        const auto expected = sourceTarget({ 640, 480 }, dpr);
         std::fprintf(
                 stderr,
                 "DPR transition requested=%.2f effective=%.2f quality=%dx%d fixed=%dx%d expected=%dx%d\n",
@@ -258,6 +290,9 @@ QJsonArray dprTransitions()
                 adapter.quality()->targetSize().width(), adapter.quality()->targetSize().height(),
                 item->fixedColorBufferWidth(), item->fixedColorBufferHeight(), expected.width(),
                 expected.height());
+        if (!item->errorText().isEmpty())
+            std::fprintf(stderr, "Production scene error: %s\n",
+                         item->errorText().toUtf8().constData());
         check(driver.window->effectiveDevicePixelRatio() == dpr
                       && adapter.quality()->targetSize() == expected
                       && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
@@ -268,10 +303,14 @@ QJsonArray dprTransitions()
         checkPostprocessGraph(input, result);
         check(sourceState(input) == originalState,
               "Same-window DPR transition changed source geometry, camera or optics");
-        check(input.atlasGeneration == atlasGeneration
-                      && result.metadata[u"atlasUploadBytes"_s].toInteger() == 0
+        check((input.atlasSize == atlasSize ? input.atlasGeneration == atlasGeneration
+                                            : input.atlasGeneration != atlasGeneration)
+                      && result.metadata[u"atlasUploadBytes"_s].toInteger()
+                              <= AtlasUploadQueue::steadyBudget
                       && driver.surface->grab().size() == QSize(640, 480) * dpr,
-              "DPR change retransmitted the atlas or used stale final compositor dimensions");
+              "DPR change used a stale atlas generation or final compositor dimensions");
+        atlasGeneration = input.atlasGeneration;
+        atlasSize = input.atlasSize;
         states.append(QJsonObject{ { u"dpr"_s, dpr },
                                    { u"actualDpr"_s, driver.window->effectiveDevicePixelRatio() },
                                    { u"target"_s, pair(expected) },
@@ -291,19 +330,25 @@ int main(int argc, char **argv)
     const auto coverShutdown = qScopeGuard([] {
         yalahoo::CoverCache::finishDecoders();
     });
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         check(QDir().mkpath(output), "Cannot create scale output directory");
+        checkCoverFiltering();
         const auto transitions = dprTransitions();
         QJsonArray states;
         const QList<double> dprs =
                 OffscreenSurface::Enabled ? QList<double>{ 1, 1.5, 2 } : QList<double>{ 0 };
-        for (auto size : sourceSizes()) {
+        check(argc == 2 || QByteArray(argv[2]) == "--representative",
+              "Unsupported native-size audit option");
+        const bool representative = argc == 3;
+        const auto sizes =
+                representative ? QList<QSize>{ { 321, 241 }, { 640, 480 } } : sourceSizes();
+        for (auto size : sizes) {
             QJsonArray sourceThemes;
             for (double dpr : dprs) {
-                const auto state = captureState(size, dpr, 100, 1, false, output, states.size());
+                const auto state = captureState(size, dpr, output, states.size());
                 const auto themes = state[u"themes"_s].toArray();
                 if (!sourceThemes.isEmpty())
                     for (int i = 0; i < themes.size(); ++i)
@@ -314,9 +359,6 @@ int main(int argc, char **argv)
                 states.append(state);
             }
         }
-        for (int scale : { 50, 125, 200 })
-            states.append(
-                    captureState({ 960, 900 }, 2, scale, .5, scale == 125, output, states.size()));
         QSaveFile file(output + "/runtime.json"_L1);
         check(file.open(QIODevice::WriteOnly), "Cannot open scale report");
         file.write(

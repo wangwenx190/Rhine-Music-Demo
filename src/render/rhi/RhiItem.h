@@ -32,7 +32,8 @@ struct Input
     QVector<QMatrix4x4> entities;
     QVector<quint64> entityIds;
     QImage cover;
-    bool coverPainted = false, immutableCover = false;
+    QList<QImage> coverMipmaps;
+    bool coverPainted = false, immutableCover = false, filterCovers = false;
     QSize atlasSize;
     quint64 atlasGeneration = 0;
     QVector<AtlasUpload> atlasUploads;
@@ -49,7 +50,7 @@ struct Input
             false; // Explicit Review capture; shares existing R32F readback bytes.
     bool postprocess = false, bokeh = false, smaa = false;
     int aoSamples = 0;
-    float aoResolution = 1, focus = 25, aperture = .0003f;
+    float focus = 25, aperture = .0003f;
     float aoRadius = .18f;
     QVector4D rowSettings;
     QVector3D rowColumn, lightColumn, spotPosition, spotTarget, spotColor;

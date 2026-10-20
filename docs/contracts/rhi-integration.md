@@ -6,7 +6,7 @@
 
 - `App.qml → MusicStage.qml → SceneItem → SceneAdapter::frame/SelectionLighting/RenderQuality → RhiItem::submit → synchronize/renderFrame`。SceneAdapter独占相机/实体/投影/拾取/focalDepth；QML不维护后端专属状态。生产实体由填充/真实列和有限选中/归位池提供，封面消费者见archive-pool.md。
 - 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册ResearchApp及隔离材质入口。几何验证使用生产提交矩阵。
-- SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；尺寸/scale/保护规则归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，源画质缩放或像素保护导致的比例须显式记录。
+- SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；原生尺寸与失败语义归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，各屏幕空间附件与最终输出保持相同物理尺寸。
 - 相机/布局/实体实际变化才更新几何revision，输入revision独立。polish合并同帧相机/灯光/画质/封面；相同submission不重复复制。封面owned immutable像素共享，外部Review输入隔离一次，cacheKey变化才交接。
 - SceneItem在实际可绘制的polish中按已确定的pool/单盒模式请求对应封面。
 - PreparedAssets在首个RhiItem的GUI构造/show前一次预载固定qrc GLB/qsb/PMREM half/lookup，进程内有界不可变；render/同步不读盘或解码。
@@ -26,7 +26,7 @@
 - 遥测与诊断在隐藏/恢复时重起分段，GUI邮箱回调按各自epoch拒绝旧结果；callbackRevision参与changed-only提交，静止恢复同样刷新render持有的回调。
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
-- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/四画质/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。当前入口仍捆绑上述工作，仅具体未决问题确需运行时按test-gates.md解开最小分支，不默认执行矩阵/压力或为此单设工具改造任务；短单盒输入不能冒充完整产品。
+- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/景深变化/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。当前入口仍捆绑上述工作，仅具体未决问题确需运行时按test-gates.md解开最小分支，不默认执行矩阵/压力或为此单设工具改造任务；短单盒输入不能冒充完整产品。
 - `rhi-postprocess-audit --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。Windows定向包装`verify-r10d.ps1 -Seconds 所需时长`只消费已构建产物，默认一次；显式`-Runs`才调整样本数，不附带其他组件/构建检查。
 
 ## 原生同窗口恢复
@@ -39,11 +39,11 @@
 
 ## 目标尺度与生产阵列检查
 
-`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
+`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原生质量与双主题、64核全分辨率AO及SMAA。CTest使用`rhi-scale-audit 新目录 --representative`选择321×241与640×480，核对封面过滤及同窗口DPR转换，供尺寸规则改动后的定向检查。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
 
 九尺寸布局、主题和DPR边界按test-gates.md分开选择；必要入口调整按test-gates.md，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、半AO/full DOF/CoC等真实耦合边界仍须独立覆盖。
 
-独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单、limited和最终缩放。核对实际线性/clamp封面无mip、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；256缩略图与1024独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集generation与稳态零上传保持。普通产品不增加读回或诊断遍历。
+独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单与相等的最终物理尺寸。核对实际独立封面mip/足迹过滤、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；缩略图与满足当前投影需求的独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集扩容时更新generation并重传已有不可变像素，尺寸不变时保留generation；就绪后维持零上传。普通产品不增加读回或诊断遍历。
 
 `python3 tools/audit/audit-rhi-scale.py`输出冻结生产调用/最终CSS、D1–D4历史及COMMON/PERF/三平台符号hash矩阵。尺度检查与`rhi-flicker-gpu`所选生产状态的有效报告共用；只补未覆盖的实际附件/合成断言，重复SG重建由具体未决寿命问题决定。连续入口在读取当次输入前执行生产item的ensurePolished并核对SceneFrame revision，避免native queued frameSwapped对应旧帧。自身输出另检查实际轮廓/清晰度/合成，不运行图像分数。CPU提交/driver显存/物理屏幕及完整产品性能的边界见performance与迁移计划。
 

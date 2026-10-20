@@ -111,7 +111,6 @@ int main(int argc, char **argv)
                 input.captureSamples = samples;
                 for (int mode = 0; mode < 8; ++mode) {
                     input.aoSamples = mode & 1 ? 32 : 0;
-                    input.aoResolution = .5f;
                     input.bokeh = mode & 2;
                     input.smaa = mode & 4;
                     const auto first = driver.capture(input, size);

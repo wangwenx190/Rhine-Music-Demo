@@ -1,6 +1,8 @@
 #pragma once
 #include <QHash>
 #include <QImage>
+#include <QList>
+#include <QPoint>
 #include <QJsonObject>
 #include <QObject>
 #include <QTimer>
@@ -10,6 +12,12 @@
 
 namespace yalahoo {
 // Values published once by the worker; consumers only share immutable, owned pixels.
+struct CoverMipTile
+{
+    QPoint origin;
+    QImage image;
+    QList<QImage> mipmaps;
+};
 struct CoverPixels
 {
     QString identity, path, error, fallbackTitle;
@@ -19,6 +27,9 @@ struct CoverPixels
     bool decoderScaling = false;
     qint64 readerReturnedBytes = 0;
     QImage image;
+    QList<QImage> mipmaps;
+    QList<CoverMipTile> tiles;
+    qint64 byteSize() const;
 };
 using CoverSnapshot = std::shared_ptr<const CoverPixels>;
 
@@ -40,13 +51,14 @@ public:
     quint64 generation() const;
     QJsonObject statistics() const;
     bool hasPendingCapacity() const;
+    static QList<QImage> makeMipmaps(const QImage &image);
     static QImage paint(const QImage &source, int resolution, const QString &title);
     static constexpr int concurrency = 3;
     static constexpr int pendingLimit = 96;
     static constexpr qint64 cacheLimit = 16 * 1024 * 1024;
     // Conservative source expansion incl. high precision decoders, plus conversion/paint scratch.
     static constexpr qint64 sourcePixelLimit = 4 * 1024 * 1024;
-    static constexpr qint64 workerReservation = sourcePixelLimit * 32 + 12 * 1024 * 1024;
+    static qint64 reservationFor(int resolution);
 
 Q_SIGNALS:
     void ready(yalahoo::CoverSnapshot pixels);
@@ -76,7 +88,7 @@ private:
     QSet<QString> m_pendingKeys;
     QHash<QString, Job> m_running;
     QHash<QString, Entry> m_cache;
-    qint64 m_bytes = 0;
+    qint64 m_bytes = 0, m_reservedBytes = 0, m_peakReservedBytes = 0;
     bool m_suspended = false;
     int m_active = 0, m_peakActive = 0, m_peakPending = 0;
     quint64 m_clock = 0, m_decodes = 0, m_rejected = 0, m_stale = 0;

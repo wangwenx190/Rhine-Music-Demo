@@ -27,6 +27,7 @@ public:
     int pages() const;
     quint64 generation() const;
     void reset();
+    void advanceGeneration();
     qint64 retainedBytes() const;
     int pending() const;
 
@@ -66,7 +67,6 @@ public:
     bool upgrade(const std::shared_ptr<SelectedCoverLease> &lease, CoverSnapshot pixels);
     void reset();
     static constexpr int capacity = 4;
-    static constexpr qint64 maximumBytes = capacity * 1024 * 1024 * 4;
 
 private:
     QVector<std::weak_ptr<SelectedCoverLease>> m_leases;

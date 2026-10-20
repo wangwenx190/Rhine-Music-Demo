@@ -45,10 +45,8 @@ inline void checkPostprocessGraph(const rhi::Input &input, const rhi::Capture &c
                         && pass[u"format"_s].toInt()
                                 == int(scalar ? QRhiTexture::R16F : QRhiTexture::RGBA16F),
                 "Postprocess ordering, format, sampling or feedback is invalid");
-        const double scale = scalar ? input.aoResolution : 1;
-        require(pass[u"width"_s].toInt() == std::max(1, int(capture.color.width() * scale))
-                        && pass[u"height"_s].toInt()
-                                == std::max(1, int(capture.color.height() * scale)),
+        require(pass[u"width"_s].toInt() == capture.color.width()
+                        && pass[u"height"_s].toInt() == capture.color.height(),
                 "Postprocess target dimensions are stale");
     }
 }

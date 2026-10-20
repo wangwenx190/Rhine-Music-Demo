@@ -105,7 +105,7 @@ QQuickItem *visual(QQuickItem *item, const QString &name)
 }
 }
 int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerification,
-                  bool settingsVerification)
+                  bool settingsVerification, bool representative)
 {
     QDir().mkpath(output);
     MotionController motion;
@@ -366,11 +366,13 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         check(u"space-resumes"_s, song->playing());
         playback.clear();
     }
-    const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
-                              { 960, 900 },   { 930, 900 },   { 390, 844 },
-                              { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
+    const QList<QSize> sizes = representative
+            ? QList<QSize>{ { 1280, 720 }, { 390, 844 } }
+            : QList<QSize>{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
+                            { 960, 900 },   { 930, 900 },   { 390, 844 },
+                            { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
     const QList<double> dprs = OffscreenSurface::Enabled
-            ? QList<double>{ 1, 1.5, 2 }
+            ? (representative ? QList<double>{ 1, 2 } : QList<double>{ 1, 1.5, 2 })
             : QList<double>{ window.devicePixelRatio() };
     for (double dpr : dprs) {
         if (OffscreenSurface::Enabled)
@@ -401,7 +403,6 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     auto *query = visual(window.contentItem(), u"introductionMetadataQuery"_s);
                     check(u"offline-query-disabled"_s, query && !query->isEnabled());
                     if (settingsPanel) {
-                        settingsPanel->setProperty("qualityExpanded", true);
                         settingsPanel->setProperty("musicBrainzExpanded", true);
                     }
                     check(u"expanded-settings-render"_s, render());
@@ -496,17 +497,17 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                               == baselineResources[u"resourceGeneration"_s]
                                       && lastSettingsSample[u"postprocessRevision"_s]
                                               == baselineResources[u"postprocessRevision"_s]);
-                        auto *qualitySlider = focusSetting(u"settingsscaleControl"_s);
+                        auto *qualitySlider = focusSetting(u"settingsdepthOfFieldControl"_s);
                         check(u"quality-control-present"_s, qualitySlider != nullptr);
                         if (qualitySlider)
                             QTest::keyClick(&window, Qt::Key_Right);
                         check(u"quality-qt-input"_s,
-                              scene.quality()->values()[u"scale"_s].toInt() == 105);
+                              scene.quality()->values()[u"depthOfField"_s].toInt() == 105);
                         check(u"quality-resource-render"_s, renderSettingsTarget());
-                        check(u"quality-target-rebuild"_s,
+                        check(u"effect-keeps-native-target"_s,
                               lastSettingsSample[u"resourceGeneration"_s].toInteger()
-                                              > baselineResources[u"resourceGeneration"_s]
-                                                        .toInteger()
+                                              == baselineResources[u"resourceGeneration"_s]
+                                                         .toInteger()
                                       && settingsScene
                                       && settingsScene->input().atlasGeneration == atlasGeneration);
                         settingsResourceSamples.append(lastSettingsSample);
@@ -948,6 +949,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     const bool hashed = executable.open(QIODevice::ReadOnly) && executableHash.addData(&executable);
     QJsonObject report{
         { u"passed"_s, passed },
+        { u"representative"_s, representative },
         { u"checks"_s, checks },
         { u"windowPolicy"_s, policy },
         { u"backend"_s,

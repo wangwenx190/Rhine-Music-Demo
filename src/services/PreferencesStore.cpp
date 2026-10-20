@@ -111,7 +111,6 @@ QString PreferencesStore::validate(const QJsonObject &document)
             return QCoreApplication::translate("Yalahoo", "Invalid preference switch type: ") + key;
     const QList<QPair<QString, QStringList>> choices{
         { u"theme"_s, { u"day"_s, u"night"_s } },
-        { u"quality"_s, { u"performance"_s, u"original"_s, u"high"_s, u"ultra"_s, u"custom"_s } },
         { u"sortMode"_s, { u"genre"_s, u"artist"_s, u"album"_s } },
         { u"arrayMode"_s, { u"filled"_s, u"realistic"_s } }
     };
@@ -149,15 +148,10 @@ QString PreferencesStore::validate(const QJsonObject &document)
         if (!document.value(u"renderQuality"_s).isObject())
             return QCoreApplication::translate("Yalahoo", "Quality preferences must be an object.");
         const auto quality = document.value(u"renderQuality"_s).toObject();
-        for (auto key : { u"scale"_s, u"depthOfField"_s, u"pixelRatio"_s, u"shadows"_s,
-                          u"aoSamples"_s, u"aoResolution"_s, u"transmission"_s, u"anisotropy"_s })
-            if (quality.contains(key)
-                && (!quality.value(key).isDouble()
-                    || !std::isfinite(quality.value(key).toDouble())))
-                return QCoreApplication::translate("Yalahoo", "Invalid quality value type: ") + key;
-        if (quality.contains(u"antialias"_s) && quality.value(u"antialias"_s) != u"off"_s
-            && quality.value(u"antialias"_s) != u"smaa"_s)
-            return QCoreApplication::translate("Yalahoo", "Invalid antialiasing option.");
+        const auto amount = quality.value(u"depthOfField"_s);
+        if (!amount.isUndefined()
+            && (!amount.isDouble() || !std::isfinite(amount.toDouble()) || amount.toDouble() < 0))
+            return QCoreApplication::translate("Yalahoo", "Invalid depth of field strength.");
     }
     return { };
 }

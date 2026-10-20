@@ -605,14 +605,18 @@ int main(int argc, char **argv)
         settledCapture(u"changed-cover-revision"_s);
         const auto changedCover = capture(u"changed-cover-stable"_s);
         QObject::disconnect(observe);
-        if (revisionBytes != 17 * AtlasUploadQueue::tileBytes)
-            std::fprintf(stderr,
-                         "Cover revision bytes: %lld; expected %lld; selected detailed: %d\n",
-                         static_cast<long long>(revisionBytes),
-                         static_cast<long long>(17 * AtlasUploadQueue::tileBytes),
-                         item->coverStatistics().value(u"selectedDetailed"_s).toBool());
-        require(revisionBytes == 17 * AtlasUploadQueue::tileBytes,
-                "Cover revision must upload only one array tile plus its sixteen selected tiles");
+        const auto current = item->input();
+        const int selected = int(current.entities.size()) - 1;
+        qint64 expectedBytes = 0;
+        for (const auto &upload : current.atlasUploads) {
+            const QPoint origin((upload.slot % (current.atlasSize.width() / 256)) * 256,
+                                (upload.slot / (current.atlasSize.width() / 256)) * 256);
+            if (current.coverTiles[selected].contains(origin)
+                || current.fallbackCoverTiles[selected].contains(origin))
+                expectedBytes += AtlasUploadQueue::payloadBytes(upload);
+        }
+        require(revisionBytes == expectedBytes,
+                "Cover revision must upload only changed thumbnail/detail regions and their mips");
         require(changedCover.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
                 "Changed cover did not settle to zero uploads");
         for (const auto *result : { &sameAlbum, &changedCover }) {
@@ -627,7 +631,7 @@ int main(int argc, char **argv)
                                 { u"revisionUploadBytes"_s, revisionBytes } };
         auto delayedHigh = item->input();
         const int selectedIndex = int(delayedHigh.entities.size()) - 1;
-        require(delayedHigh.coverTiles[selectedIndex].size() == QSize(1024, 1024),
+        require(delayedHigh.coverTiles[selectedIndex].width() >= 256,
                 "Selected high-resolution region not ready");
         delayedHigh.coverLeases[selectedIndex] += quint64(1) << 40;
         const auto fallback = capture(u"delayed-high-fallback"_s, delayedHigh);

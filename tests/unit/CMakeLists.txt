@@ -217,7 +217,7 @@ if(YALAHOO_REVIEW)
             "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
     endif()
     add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit
-        "${CMAKE_BINARY_DIR}/verification/rhi-scale")
+        "${CMAKE_BINARY_DIR}/verification/rhi-scale" --representative)
     set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT 600
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
         FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")

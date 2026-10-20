@@ -11,7 +11,7 @@ CHECKS = [
     ("COMMON-02", "src/library/LibraryStore.cpp", "bool LibraryStore::setRootPaths",
      "Editor paths become local URLs in C++; the existing lexical absolute-path/64-root validation, worker scanner, immutable snapshot handoff and atomic data-root persistence remain authoritative. FolderDialog URLs round-trip through toLocalFile; no JavaScript URL decoding or source music writes."),
     ("COMMON-03", "resources/shaders/panel-blur.frag", "void main()",
-     "Two separable RGBA8 logical-pixel captures implement authored CSS sigma=8 Gaussian over the existing visible content. ShaderEffectSource smooth sampling and explicit logical texture dimensions preserve the logical filter grid; source scene rendering quality is unchanged. Analytic rectangle shadow adds no capture. Same Kit qsb emits platform targets; actual GPU execution is separate."),
+     "Two separable RGBA8 native-density captures implement authored CSS sigma=8 Gaussian over the existing visible content. ShaderEffectSource smooth sampling and native texture dimensions retain logical Gaussian radii; source scene rendering quality is unchanged. Analytic rectangle shadow adds no capture. Same Kit qsb emits platform targets; actual GPU execution is separate."),
     ("COMMON-04", "src/presentation/TrackFocusController.cpp", "bool TrackFocusController::locatePlayback()",
      "Playback IDs are read only. Requests validate album-scoped track identity, collapse overview and route through PresentationController select(...,true,true). Same open album bypasses re-extraction. No media object, source change, play or pause call exists in the focus path."),
     ("COMMON-05", "tools/review/LibraryAudit.cpp", "int reviewLibrary",

@@ -219,13 +219,6 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                           c[u"instancePool"_s].toBool()
                                   ? QVariantList{ }
                                   : c.value(u"neighbors"_s).toArray().toVariantList());
-        if (occlusionReview || postprocessReview)
-            scene.quality()->setPreset(c[u"quality"_s].toString());
-        if (c.contains(u"shadowSize"_s)) {
-            auto settings = scene.quality()->values();
-            settings.insert(u"shadows"_s, c[u"shadowSize"_s].toInt());
-            scene.quality()->configure(settings);
-        }
         if (lightingReview) {
             scene.lighting()->setReducedMotion(true);
             scene.lighting()->setNight(!c[u"day"_s].toBool());
@@ -246,7 +239,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                       0);
         if (occlusionReview || postprocessReview)
             scene.quality()->resize(c.value(u"width"_s).toInt(960), c.value(u"height"_s).toInt(720),
-                                    1, window->devicePixelRatio(), 4096);
+                                    window->devicePixelRatio());
         if (lightingReview) {
             const auto offset = scene.cameraRotation().rotatedVector({ -48, -17.6f, 36 });
             RowLightingInput i;
@@ -413,8 +406,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             { u"quality"_s, c[u"quality"_s] },
             { u"targetWidth"_s, view->property("effectiveTextureSize").toSize().width() },
             { u"targetHeight"_s, view->property("effectiveTextureSize").toSize().height() },
-            { u"aoWidth"_s, scene.quality()->aoSize().width() },
-            { u"aoHeight"_s, scene.quality()->aoSize().height() },
+            { u"aoWidth"_s, scene.quality()->targetSize().width() },
+            { u"aoHeight"_s, scene.quality()->targetSize().height() },
             { u"paperProbe"_s, paperProbe },
             { u"paperProbeError"_s, paperProbeError },
             { u"paperLight"_s, c[u"paperLight"_s] },

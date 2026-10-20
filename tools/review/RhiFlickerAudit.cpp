@@ -115,7 +115,6 @@ int main(int argc, char **argv)
             overview.bind(&adapter, &selection, &presentation);
             adapter.layout()->setViewport(size.width(), size.height());
             adapter.snapToTarget();
-            adapter.quality()->setPreset(size.width() == 1280 ? u"high"_s : u"original"_s);
             RhiCaptureHarness driver([](QQuickItem *parent) {
                 return new SceneItem(parent);
             });

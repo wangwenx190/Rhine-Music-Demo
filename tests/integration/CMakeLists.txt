@@ -13,6 +13,7 @@ target_include_directories(
 target_link_libraries(
     AssetTest
     PRIVATE
+    YalahooCore
     Qt6::Gui
     Qt6::Test
     Qt6::Quick3D
@@ -188,7 +189,7 @@ if(WIN32)
         "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
 endif()
 
-add_test(NAME settings-qml COMMAND ui-audit --settings "${CMAKE_BINARY_DIR}/verification/settings-qml")
+add_test(NAME settings-qml COMMAND ui-audit --settings "${CMAKE_BINARY_DIR}/verification/settings-qml" --representative)
 set_tests_properties(settings-qml PROPERTIES TIMEOUT 240
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")

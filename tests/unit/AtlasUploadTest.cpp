@@ -28,6 +28,31 @@ private Q_SLOTS:
         queue.expect(22 * 22, 4);
         QVERIFY(!queue.ready(region, 3));
     }
+    void mipPayloadParticipatesInBudget()
+    {
+        AtlasUploadQueue queue;
+        queue.reset({ 2048, 2048 }, 1);
+        QImage image(256, 256, QImage::Format_RGBA8888_Premultiplied);
+        image.fill(Qt::white);
+        QList<QImage> mips;
+        for (int side = 128; side >= 1; side /= 2) {
+            QImage mip(side, side, image.format());
+            mip.fill(Qt::white);
+            mips.append(mip);
+        }
+        for (int slot = 0; slot < 12; ++slot)
+            queue.enqueue({ { 1, 1, 1, slot, image, true, mips } });
+        const auto batch = queue.take(false);
+        qint64 bytes = 0;
+        for (const auto &upload : batch)
+            bytes += AtlasUploadQueue::payloadBytes(upload);
+        QVERIFY(bytes <= AtlasUploadQueue::steadyBudget);
+        QVERIFY(bytes + AtlasUploadQueue::payloadBytes(batch.first())
+                > AtlasUploadQueue::steadyBudget);
+        QVERIFY(queue.pending() > 0);
+        queue.enqueue({ { 1, 1, 1, 0, image, true, mips } });
+        QCOMPARE(queue.pending(), 12 - batch.size());
+    }
     void ownedSnapshot()
     {
         AtlasUploadQueue queue;

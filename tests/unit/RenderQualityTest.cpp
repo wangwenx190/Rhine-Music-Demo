@@ -6,6 +6,8 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <cmath>
+#include <limits>
+#include <stdexcept>
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
@@ -21,47 +23,21 @@ class RenderQualityTest : public QObject
         return QJsonDocument::fromJson(f.readAll()).object();
     }
 private Q_SLOTS:
-    void nativeDiagnosticDprProtection()
+    void nativeOutputDimensions()
     {
         RenderQuality quality;
-        const auto preferences = quality.values();
-        quality.resize(944, 900, 1, 1.5, 16384, true);
-        QCOMPARE(quality.targetSize(), QSize(1416, 1350));
-        QVERIFY(!quality.limited());
-        quality.resize(3440, 1440, 1, 1.5, 16384, true);
-        QVERIFY(quality.limited());
-        QVERIFY(qint64(quality.targetSize().width()) * quality.targetSize().height() <= 8294400);
-        QCOMPARE(quality.values(), preferences);
-        quality.resize(944, 900, 1, 1.5, 16384, true);
-        QCOMPARE(quality.targetSize(), QSize(1416, 1350));
-        QVERIFY(!quality.limited());
-    }
-    void frozenQuality()
-    {
-        const auto oracle = load("quality.json");
-        QVERIFY(!oracle.isEmpty());
-        RenderQuality q;
-        for (auto value : oracle[u"normalized"_s].toArray()) {
-            auto c = value.toObject();
-            q.configure(c[u"input"_s].toObject().toVariantMap());
-            const auto expected = c[u"expected"_s].toObject().toVariantMap();
-            for (auto i = expected.begin(); i != expected.end(); ++i)
-                QCOMPARE(q.values()[i.key()], i.value());
-            QCOMPARE(q.preset(), c[u"preset"_s].toString());
+        for (const QSize logical : { QSize(320, 720), QSize(995, 858), QSize(1920, 1080),
+                                     QSize(3440, 1440), QSize(7680, 4320) }) {
+            for (double dpr : { 1.0, 1.25, 1.5, 2.0, 3.0 }) {
+                quality.resize(logical.width(), logical.height(), dpr);
+                QCOMPARE(quality.targetSize(), logical * dpr);
+            }
         }
-        for (auto value : oracle[u"dimensions"_s].toArray()) {
-            const auto c = value.toObject(), e = c[u"expected"_s].toObject();
-            q.setPreset(c[u"preset"_s].toString());
-            q.resize(c[u"width"_s].toDouble(), c[u"height"_s].toDouble(),
-                     c[u"stageScale"_s].toDouble(), c[u"dpr"_s].toDouble(),
-                     c[u"maximum"_s].toInt());
-            QCOMPARE(q.targetSize(), QSize(e[u"width"_s].toInt(), e[u"height"_s].toInt()));
-            QCOMPARE(q.limited(), e[u"limited"_s].toBool());
-            QVERIFY(qint64(q.targetSize().width()) * q.targetSize().height() <= 8294400);
-            QVERIFY(q.targetSize().width() <= c[u"maximum"_s].toInt());
-            QVERIFY(q.targetSize().height() <= c[u"maximum"_s].toInt());
-            QCOMPARE(q.preset(), c[u"preset"_s].toString());
-        }
+        quality.resize(640, 480, 2);
+        QCOMPARE(quality.targetSize(), QSize(1280, 960));
+        quality.resize(640, 480, 1.5);
+        QCOMPARE(quality.targetSize(), QSize(960, 720));
+        QCOMPARE(quality.aoSamples(), 64);
     }
     void seededKernel()
     {
@@ -89,39 +65,31 @@ private Q_SLOTS:
             }
         }
     }
-    void invalidAndIdempotent()
-    {
-        RenderQuality q;
-        QSignalSpy changes(&q, &RenderQuality::changed);
-        q.setPreset(u"original"_s);
-        QCOMPARE(changes.size(), 0);
-        const auto size = q.targetSize();
-        q.resize(-1, 10, 1, 1, 4096);
-        QCOMPARE(q.targetSize(), size);
-        q.setPreset(u"ultra"_s);
-        q.resize(8000, 8000, 1, 3, 16384);
-        QVERIFY(q.limited());
-        QCOMPARE(q.values()[u"scale"_s].toInt(), 150);
-        auto values = q.values();
-        values[u"aoResolution"_s] = .5;
-        q.configure(values);
-        QCOMPARE(q.aoSize(), QSize(q.targetSize().width() / 2, q.targetSize().height() / 2));
-    }
-    void preservesSceneState()
+    void effectChangesKeepOutputAndScene()
     {
         SceneAdapter scene;
         scene.setReducedMotion(true);
         scene.setDetail(1);
+        scene.quality()->resize(1920, 1080, 2);
         const auto revision = scene.frameRevision();
         const auto position = scene.cameraPosition();
-        const auto *lighting = scene.lighting();
-        for (auto preset : { "performance", "high", "ultra", "original" }) {
-            scene.quality()->setPreset(QString::fromUtf8(preset));
+        QSignalSpy changes(scene.quality(), &RenderQuality::changed);
+        scene.quality()->configure({ { u"depthOfField"_s, 100 } });
+        QCOMPARE(changes.size(), 0);
+        for (double amount : { 0.0, 75.0, 150.0, 300.0 }) {
+            scene.quality()->configure({ { u"depthOfField"_s, amount } });
+            QCOMPARE(scene.quality()->targetSize(), QSize(3840, 2160));
             QCOMPARE(scene.frameRevision(), revision);
             QCOMPARE(scene.cameraPosition(), position);
-            QCOMPARE(scene.detail(), 1.0);
-            QCOMPARE(scene.lighting(), lighting);
         }
+        const auto values = scene.quality()->values();
+        scene.quality()->configure({ { u"depthOfField"_s, u"100"_s } });
+        scene.quality()->configure(
+                { { u"depthOfField"_s, std::numeric_limits<double>::infinity() } });
+        QCOMPARE(scene.quality()->values(), values);
+        scene.quality()->resize(-1, 10, 2);
+        QCOMPARE(scene.quality()->targetSize(), QSize(3840, 2160));
+        QVERIFY_EXCEPTION_THROWN(scene.quality()->resize(1e100, 10, 2), std::runtime_error);
     }
     void focalPlaneFollowsCamera()
     {

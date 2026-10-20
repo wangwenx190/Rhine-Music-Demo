@@ -142,16 +142,20 @@ private:
         quint64 objectId = 0, lease = 0;
         std::shared_ptr<SelectedCoverLease> pixels;
         CoverSnapshot tiledPixels;
+        QRect tiledRegion;
         QVector<AtlasUpload> uploads;
         bool highResolutionFailed = false;
     };
-    AtlasAllocator m_atlas{ 8192, 436, 22 };
+    AtlasAllocator m_atlas{ 8192, 436, 24 };
     QHash<QString, AtlasLease> m_poolLeases;
     QHash<QString, QPair<QString, QString>> m_poolSources;
     // Ready identities map to whether the tile contains real artwork rather than a placeholder.
     QHash<QString, bool> m_readyCovers;
     std::array<OwnedCover, 4> m_ownedCovers;
     quint64 m_ownedSerial = 0;
+    int m_detailResolution = 256;
+    int m_ownedSide = 256;
+    QSize m_atlasSize{ 6144, 6656 };
     quint64 m_activeObject = 0;
     QPointer<SelectionController> m_poolSelection;
     QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;

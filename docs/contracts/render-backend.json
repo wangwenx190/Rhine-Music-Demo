@@ -1,5 +1,5 @@
 {
-  "revision": 5,
+  "revision": 6,
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
   "selectedBackend": "rhi",
   "implementationReady": true,
@@ -29,7 +29,7 @@
     "scene": "SceneAdapter::frame() -> immutable SceneFrame copied during synchronize",
     "projectionAndPicking": "SceneAdapter::projectWorldPoint / hitTest / focalDepth remain authoritative",
     "lighting": "SelectionLighting palette, RowLightController world origin/row/lane, source-unit shader math",
-    "quality": "RenderQuality authored settings and effective bounded target size remain separate",
+    "quality": "Artistic depth-of-field settings and native screen targets follow occlusion.md",
     "resources": "shared authored geometry, cover leases and texture generations; no renderer types in core/media",
     "qml": "no backend branch in navigation, QML controls, motion or media"
   },
@@ -73,7 +73,6 @@
       "filter": "Three PCFSoftShadowMap",
       "casters": "Optical_Diffuser only"
     },
-    "targetMaxPixels": 8294400,
     "tileSize": 256,
     "steadyUploadBudgetBytes": 2097152,
     "initialUploadBudgetBytes": 16777216
@@ -87,7 +86,7 @@
     "AO/DOF-geometry",
     "SSAO",
     "Bokeh-41",
-    "SMAA-by-quality",
+    "SMAA",
     "ACES-sRGB-output"
   ],
   "evidence": [

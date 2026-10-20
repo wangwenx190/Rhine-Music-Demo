@@ -27,16 +27,21 @@ inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture
                 || command.args.updateSubRes.dst != native)
                 continue;
             const auto &u = command.args.updateSubRes;
-            require((u.hasDstBox || !tileOnly) && u.dstSubRes == 0,
+            const int level = int(u.dstSubRes);
+            require((u.hasDstBox || !tileOnly)
+                            && level < api->mipLevelsForSize(texture->pixelSize()),
                     "Atlas native upload lost destination region");
             const auto &box = u.dstBox;
             const int left = u.hasDstBox ? int(box.left) : 0;
             const int top = u.hasDstBox ? int(box.top) : 0;
-            const int right = u.hasDstBox ? int(box.right) : texture->pixelSize().width();
-            const int bottom = u.hasDstBox ? int(box.bottom) : texture->pixelSize().height();
+            const int right =
+                    u.hasDstBox ? int(box.right) : qMax(1, texture->pixelSize().width() >> level);
+            const int bottom =
+                    u.hasDstBox ? int(box.bottom) : qMax(1, texture->pixelSize().height() >> level);
             const auto count = qint64(right - left) * (bottom - top) * 4;
             bytes += count;
-            regions.append(QJsonObject{ { u"left"_s, left },
+            regions.append(QJsonObject{ { u"level"_s, level },
+                                        { u"left"_s, left },
                                         { u"top"_s, top },
                                         { u"right"_s, right },
                                         { u"bottom"_s, bottom },

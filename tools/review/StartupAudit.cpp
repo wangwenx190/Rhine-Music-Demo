@@ -1062,7 +1062,6 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 d.scene.lighting()->setNight(scenario == "night-wave"_L1);
             }
             d.resize({ 1920, 1080 }, d.window.devicePixelRatio());
-            d.scene.quality()->setPreset(u"original"_s);
             d.settle();
             const auto stages = scenario == "matrix"_L1 ? allStages : QStringList{ scenario };
             QElapsedTimer sampling;

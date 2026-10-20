@@ -64,8 +64,8 @@ inline Image edges(const Image &input)
                                               delta(center, input.sample(u, v - 1)),
                                               delta(center, input.sample(u - 2, v)),
                                               delta(center, input.sample(u, v + 2)) });
-            result.at(x, y) = { double(left >= .1 && left >= .5 * maximum),
-                                double(top >= .1 && top >= .5 * maximum), 0, 0 };
+            result.at(x, y) = { double(left >= .05 && left >= .5 * maximum),
+                                double(top >= .05 && top >= .5 * maximum), 0, 0 };
         }
     }
     return result;
@@ -85,9 +85,9 @@ inline double searchEnd(const Image &input, const QImage &search, double x, doub
     // Source WebGL port signs are intentional, including the Y loop end comparisons.
     const double direction = positive ? 1 : -1;
     const double start = vertical ? y : x;
-    const double end = start + direction * (vertical ? -16 : 16);
+    const double end = start + direction * (vertical ? -64 : 64);
     Pixel edge{ };
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 32; ++i) {
         edge = input.sample(x, y);
         (vertical ? y : x) += direction * 2;
         const double coordinate = vertical ? y : x;

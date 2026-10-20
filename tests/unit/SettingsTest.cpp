@@ -37,11 +37,10 @@ private Q_SLOTS:
         SceneAdapter scene(motion.clock());
         SelectionController selection(&motion);
         SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-        QVERIFY(settings.update(u"quality"_s, u"high"_s));
         const auto before = scene.quality()->values();
-        QVERIFY(settings.updateQuality(u"scale"_s, 75));
+        QVERIFY(settings.updateQuality(u"depthOfField"_s, 75));
         auto expected = before;
-        expected.insert(u"scale"_s, 75.);
+        expected.insert(u"depthOfField"_s, 75.);
         QCOMPARE(scene.quality()->values(), expected);
         QVERIFY(!settings.updateQuality(u"unknown"_s, 1));
         QCOMPARE(scene.quality()->values(), expected);
@@ -54,7 +53,7 @@ private Q_SLOTS:
         const auto path = directory.filePath(u"preferences.json"_s);
         const auto source = directory.filePath(u"\u663e\u5f0f \u5bfc\u51fa.json"_s);
         const QByteArray bytes = R"({"theme":"night","sortMode":"artist","motionSpeed":2.5,
-            "reduced":true,"renderQuality":{"scale":125,"futureQuality":7},"future":{"x":8}})"_ba;
+            "reduced":true,"renderQuality":{"depthOfField":125,"futureQuality":7},"future":{"x":8}})"_ba;
         QVERIFY(put(source, bytes));
         {
             PreferencesStore preferences(directory.path());
@@ -67,7 +66,7 @@ private Q_SLOTS:
             for (int i = 0; i < 100; ++i)
                 QVERIFY(preferences.update({ { u"motionSpeed"_s, .25 + i * .025 } }));
             QVERIFY(preferences.update(
-                    { { u"renderQuality"_s, QVariantMap{ { u"scale"_s, 150 } } } }));
+                    { { u"renderQuality"_s, QVariantMap{ { u"depthOfField"_s, 150 } } } }));
             QTRY_COMPARE(saved.size(), 2);
             auto json = QJsonDocument::fromJson(read(path)).object();
             QCOMPARE(json[u"schemaVersion"_s].toInt(), 1);
@@ -122,12 +121,9 @@ private Q_SLOTS:
             motion.clock()->advance(1.0 / 60);
         QCoreApplication::processEvents();
         QCOMPARE(saved.size(), 1);
-        QVERIFY(settings.update(u"quality"_s, u"high"_s));
-        QCOMPARE(quality.size(), 1);
         auto authored = scene.quality()->values();
-        authored[u"scale"_s] = 175;
+        authored[u"depthOfField"_s] = 175;
         QVERIFY(settings.update(u"renderQuality"_s, authored));
-        QCOMPARE(settings.values()[u"quality"_s].toString(), u"custom"_s);
         QSignalSpy reload(&settings, &SettingsController::reloadRequested);
         const auto snapshot = library.snapshot();
         const auto values = settings.values();
@@ -141,7 +137,7 @@ private Q_SLOTS:
         QVERIFY(!settings.update(u"motionSpeed"_s, std::numeric_limits<double>::quiet_NaN()));
         QTRY_COMPARE(saved.size(), 2);
         PreferencesStore restored(directory.path());
-        QCOMPARE(restored.values()[u"renderQuality"_s].toMap()[u"scale"_s].toInt(), 175);
+        QCOMPARE(restored.values()[u"renderQuality"_s].toMap()[u"depthOfField"_s].toInt(), 175);
         QCOMPARE(restored.values()[u"arrayMode"_s].toString(), u"realistic"_s);
         QVERIFY(!restored.rememberColumnPosition());
     }

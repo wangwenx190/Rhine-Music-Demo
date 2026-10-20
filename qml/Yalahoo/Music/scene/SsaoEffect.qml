@@ -54,14 +54,14 @@ Effect {
         id: ao
         name: "ssaoRaw"
         format: Buffer.RGBA16F
-        sizeMultiplier: effect.quality.aoResolution
+        sizeMultiplier: 1
         textureFilterOperation: Buffer.Linear
     }
     Buffer {
         id: blur
         name: "ssaoBlur"
         format: Buffer.RGBA16F
-        sizeMultiplier: effect.quality.aoResolution
+        sizeMultiplier: 1
         textureFilterOperation: Buffer.Linear
     }
     passes: [

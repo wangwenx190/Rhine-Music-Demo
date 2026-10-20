@@ -47,6 +47,45 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void mipmapsPreserveLinearLightAndAlpha()
+    {
+        QImage checker(2, 2, QImage::Format_RGBA8888_Premultiplied);
+        checker.fill(Qt::black);
+        checker.setPixelColor(0, 0, Qt::white);
+        checker.setPixelColor(1, 1, Qt::white);
+        auto levels = CoverCache::makeMipmaps(checker);
+        QCOMPARE(levels.size(), 1);
+        QCOMPARE(levels.first().size(), QSize(1, 1));
+        const auto average = levels.first().pixelColor(0, 0);
+        QVERIFY(std::abs(average.red() - 188) <= 1);
+        QCOMPARE(average.alpha(), 255);
+        checker.fill(Qt::transparent);
+        checker.setPixelColor(0, 0, Qt::white);
+        levels = CoverCache::makeMipmaps(checker);
+        const auto edge = levels.first().pixelColor(0, 0);
+        QVERIFY(edge.red() >= 253);
+        QVERIFY(std::abs(edge.alpha() - 64) <= 1);
+    }
+    void atlasExpansionRetainsPixelsAndLeaseIdentity()
+    {
+        AtlasAllocator atlas(8192, 436, 24);
+        auto lease = atlas.acquire(u"one"_s);
+        const auto cover = pixels(u"one"_s);
+        QVERIFY(atlas.publish(lease, cover));
+        const auto before = atlas.replay(0);
+        const auto generation = atlas.generation();
+        atlas.advanceGeneration();
+        QVERIFY(atlas.generation() != generation);
+        lease.generation = atlas.generation();
+        const auto after = atlas.replay(0);
+        QCOMPARE(after.size(), before.size());
+        QCOMPARE(after.first().lease, before.first().lease);
+        QCOMPARE(after.first().pixels.cacheKey(), before.first().pixels.cacheKey());
+        QCOMPARE(after.first().generation, atlas.generation());
+        QVERIFY(atlas.publish(lease, cover));
+        atlas.release(lease);
+        QCOMPARE(atlas.retainedBytes(), 0);
+    }
     void malformedAtlasLeaseCannotOverflowSlotIndex()
     {
         AtlasAllocator atlas(2048, 1);

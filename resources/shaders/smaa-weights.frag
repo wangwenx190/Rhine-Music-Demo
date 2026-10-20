@@ -1,5 +1,5 @@
 // Derived from locked Three.js (MIT); resources/licenses/three-LICENSE.
-#define SMAA_MAX_SEARCH_STEPS 8
+#define SMAA_MAX_SEARCH_STEPS 32
 #define SMAA_AREATEX_MAX_DISTANCE 16
 #define SMAA_AREATEX_PIXEL_SIZE (1.0 / vec2(160.0, 560.0))
 #define SMAA_AREATEX_SUBTEX_SIZE (1.0 / 7.0)

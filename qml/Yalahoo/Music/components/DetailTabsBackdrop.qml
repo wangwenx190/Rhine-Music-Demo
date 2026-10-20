@@ -3,6 +3,7 @@ import QtQuick
 
 Item {
     id: root
+    readonly property real outputDpr: Window.window ? Window.window.devicePixelRatio : 1
     property bool hdrActive: false
     required property Item sceneSource
     required property Item contentSource
@@ -20,7 +21,9 @@ Item {
         sourceRect: Qt.rect(root.sceneX - 54, root.sceneY - 54, root.targetWidth, root.targetHeight)
         width: root.targetWidth
         height: root.targetHeight
-        textureSize: Qt.size(width, height)
+        textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
+                                                                            * root.outputDpr))
+
         visible: false
         smooth: true
     }
@@ -32,7 +35,9 @@ Item {
         sourceRect: Qt.rect(-54, root.contentY - 54, root.targetWidth, root.targetHeight)
         width: root.targetWidth
         height: root.targetHeight
-        textureSize: Qt.size(width, height)
+        textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
+                                                                            * root.outputDpr))
+
         visible: false
         smooth: true
     }
@@ -52,7 +57,8 @@ Item {
         format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
         mipmap: true
         sourceItem: horizontal
-        textureSize: Qt.size(root.targetWidth, root.targetHeight)
+        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
+                                 root.targetHeight * root.outputDpr))
         width: root.targetWidth
         height: root.targetHeight
         visible: false

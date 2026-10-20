@@ -5,7 +5,7 @@
 ## 图集与几何数据
 
 - AtlasUpload按页面generation/槽lease/serial验证，重复/过期在复制前淘汰，按槽合并最新值。owned immutable像素按来源cacheKey共享；外部输入隔离一次，转换已有独立存储时不追加无效copy。
-- 固定256² RGBA8 tile，无跨格mip/各向异性；稳态8tile/2MiB，初始化64tile/16MiB，其余跨帧。resize保留图集，实际页面重建换generation。
+- 256² RGBA8分块与独立cover mip按真实字节计费；稳态2MiB、初始化16MiB，其余跨帧。每级坐标钳制在本封面内，缩小与倾斜使用足迹过滤；生成与上传见covers.md。resize保留图集，实际页面重建换generation。
 - Frame std140为832bytes：前752保留，coverUv752、paperSize768、originLight0/1为784/800、fog816。C++ static_assert/offset与qsb reflection核对；顶点属性location保持连续前缀，保留未使用输入占位，避免stage linkage错位。
 - 几何instance112bytes：model四列、tile UV、两组origin light；固定436实体容量（432池+4接管），draw uniform容量`uniformStride*(436*3+6)`。CPU暂存复用，只写/上传有效aligned前缀，不清零/上传未使用容量。
 - 深度键每实体预计算一次，稳定ID排序；112-byte实例直接填值，不生成被丢弃的完整材质块。caster保留必要窗口外实体，阴影未失效跳过专用uniform和重画。
@@ -15,7 +15,7 @@
 
 - 生产颜色/中间颜色RGBA16F，view normal/RGB24 depth为RGBA8；shadow D32F比较+R32F canonical诊断。环境PMREM的源float值必须可被half精确表示才转换上传RGBA16F，不能拟合/量化丢精度。
 - 不透明捕获resolve/mips后供独立壳体颜色使用；合成复用非重叠通道硬件depth/stencil，preserve/load，禁止采样正写入的附件。
-- AO raw/blur为R16F，normal/depth随AO尺寸，full DOF深度独立且仅全分辨率兼容时共用。kernel仅创建时写入std140的offset80，固定1104-byte块；每个pass动态80-byte前缀，不保留闲置kernel纹理。
+- AO raw/blur为R16F，normal/depth与颜色同尺寸，full DOF深度在全尺寸兼容时共用。kernel仅创建时写入std140的offset80，固定1104-byte块；每个pass动态80-byte前缀，不保留闲置kernel纹理。
 - 颜色ping/pong仅在生命周期不重叠时复用，pass各有uniform/SRB/目标。Bokeh-only一个全尺寸RGBA16F ping/一个uniform，常态80bytes；SMAA-only三个单采样全尺寸RGBA16F目标、两张无mip RGBA8 lookup、三个uniform，常态240bytes，载荷估算`24×width×height+370424`bytes。
 - 相机/focus/aperture/主题数值/输入内容变化只更新uniform，不重建兼容目标；尺寸/核/启用状态/实际输入附件身份变化才重建对应图。关闭通道不保留其附件；Review中间目标只读访问在普通构建返回nullptr，不改变跨编译单元类声明。
 - qsb由同一最新Kit生成SPIR-V/GLSL330/ES300/HLSL50/MSL12；位置invariant的两个geometry顶点独用MSL2.1。各语言翻译是静态证据，目标运行依计划R36。

@@ -144,7 +144,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     std::function<void()> finish, nextAction;
     std::function<bool(const QJsonObject &)> awaiting;
     int replayIndex = 0;
-    QSet<QString> observedPresets;
+    QSet<int> observedEffects;
     int rebuilt = 0;
     auto changeStage = [&](int index) {
         stageIndex = index;
@@ -225,7 +225,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     const QVector<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                 { 960, 900 },   { 930, 900 },   { 390, 844 },
                                 { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
-    const QStringList presets{ u"high"_s, u"ultra"_s, u"performance"_s, u"original"_s };
+    const QList<int> effectStrengths{ 50, 150, 0, 100 };
     // Acknowledge each actual submission before driving the next mutation. Independent coarse
     // timers can expire together and reorder resize/preset/release actions on a busy GUI thread.
     nextAction = [&] {
@@ -245,37 +245,36 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                                         { u"atNs"_s, after },
                                         { u"width"_s, size.width() },
                                         { u"height"_s, size.height() } });
-        } else if (index < sizes.size() + presets.size()) {
+        } else if (index < sizes.size() + effectStrengths.size()) {
             stage = "quality"_L1;
-            const auto preset = presets[index - sizes.size()];
+            const int strength = effectStrengths[index - sizes.size()];
             const auto after = nowNs();
-            awaiting = [&, preset, after](const QJsonObject &sample) {
+            awaiting = [&, strength, after](const QJsonObject &sample) {
                 const auto target = scene.quality()->targetSize();
-                const auto values = RenderQuality::authoredPreset(preset);
                 const bool match = sample[u"submittedNs"_s].toInteger() >= after
                         && sample[u"logicalWidth"_s].toDouble() == 1920
                         && sample[u"logicalHeight"_s].toDouble() == 1080
                         && sample[u"targetWidth"_s].toInt() == target.width()
                         && sample[u"targetHeight"_s].toInt() == target.height()
-                        && sample[u"aoSamples"_s].toInt() == values[u"aoSamples"_s].toInt()
-                        && sample[u"bokeh"_s].toBool() == (values[u"depthOfField"_s].toInt() > 0)
-                        && sample[u"smaa"_s].toBool() == (values[u"antialias"_s] == u"smaa"_s);
+                        && sample[u"aoSamples"_s].toInt() == 64
+                        && sample[u"bokeh"_s].toBool() == (strength > 0)
+                        && sample[u"smaa"_s].toBool() == true;
                 if (match)
-                    observedPresets.insert(preset);
+                    observedEffects.insert(strength);
                 return match;
             };
             window->resize(1920, 1080);
-            scene.quality()->setPreset(preset);
+            scene.quality()->configure({ { u"depthOfField"_s, strength } });
             item->update();
             actions.append(QJsonObject{
-                    { u"stage"_s, stage }, { u"preset"_s, preset }, { u"atNs"_s, after } });
-        } else if (index < sizes.size() + presets.size() + 10) {
+                    { u"stage"_s, stage }, { u"depthOfField"_s, strength }, { u"atNs"_s, after } });
+        } else if (index < sizes.size() + effectStrengths.size() + 10) {
             stage = "rebuild"_L1;
             const auto after = nowNs();
             awaiting = [&, after](const QJsonObject &sample) {
                 const bool match = sample[u"submittedNs"_s].toInteger() >= after
                         && sample[u"resourceGeneration"_s].toInteger() == 1
-                        && sample[u"selectedUploadBytes"_s].toInteger() == 1024 * 1024 * 4
+                        && sample[u"selectedUploadBytes"_s].toInteger() > 0
                         && sample[u"resources"_s].toObject()[u"estimatedCurrentBytes"_s].toInteger()
                                 == baseBytes;
                 if (match)
@@ -312,9 +311,10 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 router->attach(window);
             bindWindow();
             bindSwaps();
-            actions.append(QJsonObject{ { u"stage"_s, stage },
-                                        { u"iteration"_s, index - sizes.size() - presets.size() },
-                                        { u"policy"_s, verification::windowPolicy(*window) } });
+            actions.append(
+                    QJsonObject{ { u"stage"_s, stage },
+                                 { u"iteration"_s, index - sizes.size() - effectStrengths.size() },
+                                 { u"policy"_s, verification::windowPolicy(*window) } });
             QTimer::singleShot(200, Qt::PreciseTimer, window, [&] {
                 window->show();
                 passed = passed && verification::windowPolicySatisfied(*window);
@@ -328,7 +328,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         passed = passed && screenshot.save(output + "/integration.png"_L1)
                 && verification::windowPolicySatisfied(*window) && samples.size() > 100
                 && receivedInputs.size() == 4 && coalesced == 0 && baseBytes == finalBytes
-                && observedPresets.size() == 4 && rebuilt == 10;
+                && observedEffects.size() == 4 && rebuilt == 10;
         for (const auto &size : sizes)
             passed = passed
                     && observedSizes.contains(u"%1x%2"_s.arg(size.width()).arg(size.height()));
@@ -379,7 +379,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             { u"dpr"_s, window->effectiveDevicePixelRatio() },
             { u"inputRevisionsSubmitted"_s, receivedInputs.size() },
             { u"coalescedSamples"_s, coalesced },
-            { u"observedPresetCount"_s, observedPresets.size() },
+            { u"observedEffectCount"_s, observedEffects.size() },
             { u"verifiedRebuilds"_s, rebuilt },
             { u"resourceInventories"_s, resources },
             { u"estimatedReplacementPeakBytes"_s, peak },

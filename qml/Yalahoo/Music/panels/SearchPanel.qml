@@ -213,7 +213,10 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 1
                         source: result.coverUrl
-                        sourceSize: Qt.size(98, 98)
+                        sourceSize: Qt.size(Math.round(width * (Window.window ? Window.window.devicePixelRatio :
+                                                                                1)), Math.round(
+                                                height * (Window.window
+                                                          ? Window.window.devicePixelRatio : 1)))
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                     }

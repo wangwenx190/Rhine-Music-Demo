@@ -33,7 +33,7 @@ View3D {
                                         && occlusionChannel === 0
                                         && adapter.quality.values.depthOfField > 0
     readonly property bool smaaActive: postprocessEnabled && !reviewDisableSmaa && occlusionChannel
-                                       === 0 && adapter.quality.values.antialias === "smaa"
+                                       === 0 && true
     readonly property real currentDpr: Screen.devicePixelRatio
     onCurrentDprChanged: updateQuality()
     readonly property vector3d entityOrigin: materialReview ? reviewCasePosition :
@@ -310,8 +310,8 @@ View3D {
     }
     function updateQuality(): void {
         // View3D dimensions already use displayed logical pixels, with no CSS stage transform.
-        adapter.quality.resize(Math.max(1, width), Math.max(1, height), 1, reviewDpr > 0
-                               ? reviewDpr : currentDpr, 4096);
+        adapter.quality.resize(Math.max(1, width), Math.max(1, height), reviewDpr > 0 ? reviewDpr :
+                                                                                        currentDpr);
     }
     onWidthChanged: updateQuality()
     onHeightChanged: updateQuality()

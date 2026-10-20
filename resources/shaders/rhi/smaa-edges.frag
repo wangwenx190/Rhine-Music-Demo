@@ -37,7 +37,7 @@ layout(binding = 8) uniform sampler2D searchMap;
 #define weightMap auxiliaryMap
 #define FRAGCOLOR color
 // Derived from locked Three.js (MIT); resources/licenses/three-LICENSE.
-#define SMAA_THRESHOLD 0.1
+#define SMAA_THRESHOLD 0.05
 #define resolution (1.0 / INPUT_SIZE)
 vec2 frameUv(vec2 uv)
 {

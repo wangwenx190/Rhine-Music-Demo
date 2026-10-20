@@ -46,7 +46,8 @@ public:
         timeout.start(30000);
         loop.exec();
         state->loop = nullptr;
-        require(state->error.isEmpty(), "RHI render failed");
+        if (!state->error.isEmpty())
+            throw std::runtime_error((u"RHI render failed: "_s + state->error).toStdString());
         require(state->capture.has_value(), "RHI capture timed out");
         if (!verification::windowPolicySatisfied(*window)) {
             qWarning("Review policy failure: %s",

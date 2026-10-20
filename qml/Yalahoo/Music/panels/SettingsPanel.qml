@@ -15,7 +15,6 @@ ArchiveScrollView {
     property Component heading: null
     property bool navigationInputOwner: true
     property bool narrow: false
-    property bool qualityExpanded: false
     property bool musicBrainzExpanded: false
     signal replayRequested
     signal experimentsRequested
@@ -167,239 +166,6 @@ ArchiveScrollView {
                 text: qsTr("RENDER QUALITY")
                 cssPixelSize: 12
             }
-            SettingChoice {
-                objectName: "settingsQuality"
-                tokens: root.tokens
-                label: qsTr("Quality preset")
-                choices: [
-                    {
-                        label: qsTr("Performance"),
-                        value: "performance"
-                    },
-                    {
-                        label: qsTr("Original"),
-                        value: "original"
-                    },
-                    {
-                        label: qsTr("High"),
-                        value: "high"
-                    },
-                    {
-                        label: qsTr("Ultra"),
-                        value: "ultra"
-                    }
-                ].concat(root.settings.values.quality === "custom" ? [
-                                                                         {
-                                                                             label: qsTr("Custom"),
-                                                                             value: "custom"
-                                                                         }
-                                                                     ] : [])
-                selected: root.settings.values.quality
-                onChosen: value => root.settings.update("quality", value)
-            }
-            ArchiveButton {
-                objectName: "settingsQualityExpand"
-                tokens: root.tokens
-                text: (root.qualityExpanded ? "\u25be " : "\u25b8 ") + qsTr(
-                          "Fine settings \u00b7 Clarity / Materials / Shadows")
-                onClicked: root.qualityExpanded = !root.qualityExpanded
-            }
-            Column {
-                width: parent.width
-                spacing: 16
-                visible: root.qualityExpanded
-                SettingRange {
-                    objectName: "settingsscale"
-                    tokens: root.tokens
-                    label: qsTr("Render scale")
-                    minimum: 50
-                    maximum: 200
-                    suffix: "%"
-                    decimals: 0
-                    step: 5
-                    value: root.settings.values.renderQuality.scale
-                    onMoved: value => root.settings.updateQuality("scale", value)
-                }
-                SettingChoice {
-                    objectName: "settingspixelRatio"
-                    tokens: root.tokens
-                    label: qsTr("Pixel density limit")
-                    choices: [
-                        {
-                            label: "1\u00d7",
-                            value: 1
-                        },
-                        {
-                            label: "1.5\u00d7",
-                            value: 1.5
-                        },
-                        {
-                            label: "2\u00d7",
-                            value: 2
-                        },
-                        {
-                            label: "3\u00d7",
-                            value: 3
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.pixelRatio
-                    onChosen: value => root.settings.updateQuality("pixelRatio", value)
-                }
-                SettingChoice {
-                    objectName: "settingsantialias"
-                    tokens: root.tokens
-                    label: qsTr("Antialiasing")
-                    choices: [
-                        {
-                            label: qsTr("Original"),
-                            value: "off"
-                        },
-                        {
-                            label: "SMAA",
-                            value: "smaa"
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.antialias
-                    onChosen: value => root.settings.updateQuality("antialias", value)
-                }
-                SettingChoice {
-                    objectName: "settingsanisotropy"
-                    tokens: root.tokens
-                    label: qsTr("Anisotropic filtering")
-                    choices: [
-                        {
-                            label: "1\u00d7",
-                            value: 1
-                        },
-                        {
-                            label: "2\u00d7",
-                            value: 2
-                        },
-                        {
-                            label: "4\u00d7",
-                            value: 4
-                        },
-                        {
-                            label: "8\u00d7",
-                            value: 8
-                        },
-                        {
-                            label: "16\u00d7",
-                            value: 16
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.anisotropy
-                    onChosen: value => root.settings.updateQuality("anisotropy", value)
-                }
-                SettingChoice {
-                    objectName: "settingstransmission"
-                    tokens: root.tokens
-                    label: qsTr("Transmission resolution")
-                    choices: [
-                        {
-                            label: "25%",
-                            value: 0.25
-                        },
-                        {
-                            label: "50%",
-                            value: 0.5
-                        },
-                        {
-                            label: "75%",
-                            value: 0.75
-                        },
-                        {
-                            label: "100%",
-                            value: 1
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.transmission
-                    onChosen: value => root.settings.updateQuality("transmission", value)
-                }
-                SettingChoice {
-                    objectName: "settingsshadows"
-                    tokens: root.tokens
-                    label: qsTr("Shadow resolution")
-                    choices: [
-                        {
-                            label: qsTr("Off"),
-                            value: 0
-                        },
-                        {
-                            label: "1024",
-                            value: 1024
-                        },
-                        {
-                            label: "2048",
-                            value: 2048
-                        },
-                        {
-                            label: "4096",
-                            value: 4096
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.shadows
-                    onChosen: value => root.settings.updateQuality("shadows", value)
-                }
-                SettingChoice {
-                    objectName: "settingsaoSamples"
-                    tokens: root.tokens
-                    label: qsTr("Ambient occlusion samples")
-                    choices: [
-                        {
-                            label: qsTr("Off"),
-                            value: 0
-                        },
-                        {
-                            label: qsTr("16 samples"),
-                            value: 16
-                        },
-                        {
-                            label: qsTr("32 samples"),
-                            value: 32
-                        },
-                        {
-                            label: qsTr("64 samples"),
-                            value: 64
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.aoSamples
-                    onChosen: value => root.settings.updateQuality("aoSamples", value)
-                }
-                SettingChoice {
-                    objectName: "settingsaoResolution"
-                    tokens: root.tokens
-                    label: qsTr("Ambient occlusion resolution")
-                    choices: [
-                        {
-                            label: "50%",
-                            value: 0.5
-                        },
-                        {
-                            label: "75%",
-                            value: 0.75
-                        },
-                        {
-                            label: "100%",
-                            value: 1
-                        }
-                    ]
-                    selected: root.settings.values.renderQuality.aoResolution
-                    onChosen: value => root.settings.updateQuality("aoResolution", value)
-                }
-                SettingRange {
-                    objectName: "settingsdepthOfField"
-                    tokens: root.tokens
-                    label: qsTr("Array depth of field")
-                    minimum: 0
-                    maximum: 150
-                    suffix: "%"
-                    decimals: 0
-                    step: 5
-                    value: root.settings.values.renderQuality.depthOfField
-                    onMoved: value => root.settings.updateQuality("depthOfField", value)
-                }
-            }
             ArchiveText {
                 tokens: root.tokens
                 width: parent.width
@@ -407,7 +173,23 @@ ArchiveScrollView {
                 color: root.tokens.muted
                 wrapMode: Text.Wrap
                 text: qsTr(
-                          "Applies immediately and saves automatically. Device size and the 8.29 megapixel target limit protect output size while preserving your selected quality preferences.")
+                          "Renders at the display's native pixel density. Antialiasing and full-resolution effects remain enabled.")
+            }
+            Column {
+                width: parent.width
+                spacing: 16
+                SettingRange {
+                    objectName: "settingsdepthOfField"
+                    tokens: root.tokens
+                    label: qsTr("Array depth of field")
+                    minimum: 0
+                    maximum: 300
+                    suffix: "%"
+                    decimals: 0
+                    step: 5
+                    value: root.settings.values.renderQuality.depthOfField
+                    onMoved: value => root.settings.updateQuality("depthOfField", value)
+                }
             }
         }
         SettingsSection {

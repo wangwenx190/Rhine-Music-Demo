@@ -70,11 +70,11 @@ TrackList只采集原生列表实际几何并执行视图操作；TrackFocusCont
 
 ## 设置与偏好
 
-SettingsPanel沿冻结music-app的renderSettingsPanel/music.css：两列主题卡、排列、介绍/制作信息、阵列与列记忆、画质预设及折叠精细设置、减少动态/速度、全屏/开场重播/界面重载、三路声音和折叠MusicBrainz配置。面板沿用LibraryPanels的几何、模态输入、唯一SurfaceTransition与背景资源；来源布局与当前适配判定见source-fidelity-review.md。歌曲、BGM、音效及设备接口只由playback.md维护，画质字段及归一化只由occlusion.md维护。
+SettingsPanel沿冻结music-app的renderSettingsPanel/music.css：两列主题卡、排列、介绍/制作信息、阵列与列记忆、景深设置、减少动态/速度、全屏/开场重播/界面重载、三路声音和折叠MusicBrainz配置。面板沿用LibraryPanels的几何、模态输入、唯一SurfaceTransition与背景资源；来源布局与当前适配判定见source-fidelity-review.md。歌曲、BGM、音效及设备接口只由playback.md维护，画质字段及归一化只由occlusion.md维护。
 
 SettingsController::updateQuality在C++合并单字段与当前完整画质值，再交RenderQuality归一化；未知字段拒绝，不重置其他选择。SettingsController按字段路由至既有LibrarySession、SelectionController、MotionController/FrameClock、SelectionLighting和RenderQuality。主题只监听目标nightChanged，动画渐变不保存偏好；速度不改变开场或歌曲速度。排列显式更新列模型，theme/speed不重建库/媒体/材质/封面。App的reloadRequested关闭并完成面板退出，销毁/重建MusicStage视觉树；原生控制器、正在播放对象、音源/意图、数据、用户画质和会话列记忆继续存活。重载先取消资料请求generation，QML异步结果不能回写旧视图。
 
-原生preferences.json的schemaVersion为1；无版本对象在显式导入或读取时归入1，其他版本/坏JSON/非法已知字段保留原文件并阻止自动覆盖。theme、sortMode、arrayMode、rememberColumnPosition、reduced、motionSpeed、volume/bgm/bgmVolume/sound/soundVolume和renderQuality保存当前选择；renderQuality优先于quality预设值。已知字段校验类型、离散选项及音量/速度范围；画质数值交唯一RenderQuality归一化，不改变其未知扩展。未知根字段与对象扩展在更新/导入/保存中保留。会话各列位置仍只在ColumnMemory，不写偏好JSON。
+原生preferences.json的schemaVersion为1；无版本对象在显式导入或读取时归入1，其他版本/坏JSON/非法已知字段保留原文件并阻止自动覆盖。theme、sortMode、arrayMode、rememberColumnPosition、reduced、motionSpeed、volume/bgm/bgmVolume/sound/soundVolume和renderQuality保存当前选择；renderQuality仅保存艺术效果参数，原生尺寸与固定生产采样由occlusion.md维护。已知字段校验类型、离散选项及音量/速度范围；画质数值交唯一RenderQuality归一化，不改变其未知扩展。未知根字段与对象扩展在更新/导入/保存中保留。会话各列位置仍只在ColumnMemory，不写偏好JSON。
 
 PreferencesStore在事件循环合并变化，只有一个在途worker保存和一个最新意图；JSON序列化与QSaveFile提交在worker，禁止direct-write fallback，文件仅owner读写。显式导入最多1MiB、单个在途，按revision拒绝期间发生设置变化后的旧结果；原文件不写。损坏/未知schema使用内存默认值并暴露错误，写失败保留旧文件、无自动重试循环；析构只完成已接受的最后保存。
 

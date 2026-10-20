@@ -377,14 +377,12 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 24
         visible: stage.navigationError.length > 0 || stage.preferencesError.length > 0
-                 || nativeScene.errorText.length > 0 || stage.sceneAdapter.quality.limited
+                 || nativeScene.errorText.length > 0
         text: stage.navigationError.length > 0 ? stage.navigationError :
                                                  stage.preferencesError.length > 0
-                                                 ? stage.preferencesError :
-                                                   nativeScene.errorText.length > 0 ? qsTr(
-                                                                                          "Graphics configuration unavailable: ")
-                                                                                      + nativeScene.errorText :
-                                                                                      qsTr("Output reached the size protection limit. Quality preferences are preserved.")
+                                                 ? stage.preferencesError : qsTr(
+                                                       "Graphics configuration unavailable: ")
+                                                   + nativeScene.errorText
         color: design.accent
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)

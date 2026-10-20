@@ -58,7 +58,7 @@ T.ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 20
         visible: window.preferencesError.length > 0 || nativeScene.errorText.length > 0
-                 || window.sceneAdapter.quality.limited
+
         text: window.preferencesError.length > 0 ? window.preferencesError :
                                                    nativeScene.errorText.length > 0 ? qsTr(
                                                                                           "Graphics configuration unavailable: %1").arg(
