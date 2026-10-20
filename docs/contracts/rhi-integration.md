@@ -27,7 +27,7 @@
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
 - `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/四画质/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。当前入口仍捆绑上述工作，仅具体未决问题确需运行时按test-gates.md解开最小分支，不默认执行矩阵/压力或为此单设工具改造任务；短单盒输入不能冒充完整产品。
-- `rhi-postprocess-audit --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。
+- `rhi-postprocess-audit --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。Windows定向包装`verify-r10d.ps1 -Seconds 所需时长`只消费已构建产物，默认一次；显式`-Runs`才调整样本数，不附带其他组件/构建检查。
 
 ## 目标尺度与生产阵列检查
 

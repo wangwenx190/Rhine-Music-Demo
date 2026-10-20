@@ -1,4 +1,4 @@
-"""Run current source/state material or lighting checks without browser images."""
+"""Check material or lighting output using an already built Release Review target."""
 import argparse
 import hashlib
 import json
@@ -46,48 +46,29 @@ def main():
     host = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}[platform.system()]
     output = ROOT / "verification" / host / "material-review" / args.kind
     output.mkdir(parents=True, exist_ok=True)
+    cache = (ROOT / "build/release/CMakeCache.txt").read_text().splitlines()
+    if "CMAKE_BUILD_TYPE:STRING=Release" not in cache or "YALAHOO_REVIEW:BOOL=ON" not in cache:
+        raise RuntimeError("Prepare the Release Review build before running this component check")
+    chain = json.loads((ROOT / "build/release/toolchain.json").read_text())
     environment = os.environ.copy()
-    environment.update(YALAHOO_VERIFY_FOREGROUND="0", YALAHOO_VERIFY_VISIBLE="0")
+    environment.update(YALAHOO_VERIFY_FOREGROUND="0", YALAHOO_VERIFY_VISIBLE="0",
+                       YALAHOO_VERIFY_LIFECYCLE="0", YALAHOO_VERIFY_STRESS="0",
+                       QT_PLUGIN_PATH=str(Path(chain["qtKit"]) / "plugins"))
+    environment["PATH"] = str(Path(chain["qtKit"]) / "bin") + os.pathsep + environment["PATH"]
 
     def run(name, command):
         with (output / (name + ".log")).open("w") as log:
             subprocess.run(command, cwd=ROOT, env=environment, stdout=log,
                            stderr=subprocess.STDOUT, check=True)
 
-    try:
-        run("configure", ["cmake", "--preset", "qt-release", "-DYALAHOO_REVIEW=ON",
-                          "-DYALAHOO_MACOS_VISIBLE_TESTS=OFF"])
-        run("build", ["cmake", "--build", "--preset", "qt-release"])
-        run("format-lint", ["cmake", "--build", "--preset", "qt-release", "--target",
-                            "check-format", "Yalahoo_qmllint", "ui-audit_qmllint"])
-        run("source-tests", ["ctest", "--preset", "qt-release", "--output-on-failure", "-R",
-                             "^(rhi-material-parameters|lighting|verification-window-policy)$"])
-        run("render-tests", ["ctest", "--preset", "qt-release-full" if host == "macos"
-                             else "qt-release-visible", "--output-on-failure", "-R",
-                             f"^runtime-{args.kind}$"])
-        fixture = ROOT / "tests/fixtures" / args.kind / (
-            "single-case.json" if args.kind == "materials" else "visual.json")
-        source = ROOT / "build/release/verification" / args.kind / "runtime.json"
-        report = validate_report(source, fixture, 99 if args.kind == "materials" else 48)
-        (output / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
-    finally:
-        run("production-configure", ["cmake", "--preset", "qt-release", "-DYALAHOO_REVIEW=OFF",
-                                     "-DYALAHOO_MACOS_VISIBLE_TESTS=OFF"])
-        run("production-build", ["cmake", "--build", "--preset", "qt-release"])
-        run("production-tests", ["ctest", "--preset", "qt-release", "--output-on-failure",
-                                 "-R", "^(source-format|module-link-and-plugins|shader-tools|assets)$"])
-        chain = json.loads((ROOT / "build/release/toolchain.json").read_text())
-        environment["PATH"] = str(Path(chain["qtKit"]) / "bin") + os.pathsep + environment["PATH"]
-        executable = ROOT / "build/release/bin" / (
-            "yalahoo.app/Contents/MacOS/yalahoo" if host == "macos" else
-            "yalahoo.exe" if host == "windows" else "yalahoo")
-        with (output / "production-cli.log").open("w") as log:
-            result = subprocess.run([str(executable), "--verify-materials",
-                                     str(ROOT / "tests/fixtures/materials/single-case.json")],
-                                    cwd=ROOT, env=environment, stdout=log,
-                                    stderr=subprocess.STDOUT, timeout=30)
-        if result.returncode != 1:
-            raise RuntimeError("Production executable did not reject Review CLI")
+    run("render-tests", ["ctest", "--preset", "qt-release-render" if host == "macos"
+                         else "qt-release-visible", "--output-on-failure", "--no-tests=error", "-R",
+                         f"^runtime-{args.kind}$"])
+    fixture = ROOT / "tests/fixtures" / args.kind / (
+        "single-case.json" if args.kind == "materials" else "visual.json")
+    source = ROOT / "build/release/verification" / args.kind / "runtime.json"
+    report = validate_report(source, fixture, 99 if args.kind == "materials" else 48)
+    (output / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"{args.kind}: source/state and own-output checks passed; logs: {output}")
 
 

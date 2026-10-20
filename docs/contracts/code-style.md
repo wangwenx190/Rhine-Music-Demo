@@ -13,12 +13,11 @@
 
 ## 格式化与提交门槛
 
-源码改动后按需格式化；提交前确认相关格式结果有效。功能测试及结果复用范围按[test-gates.md](test-gates.md)选择，不能将以下格式入口扩展为默认全套测试。配置Release后的入口为：
+源码改动后按需格式化；提交前确认相关格式结果有效。功能测试及结果复用范围按[test-gates.md](test-gates.md)选择，不能将以下格式入口扩展为默认全套测试。以下是已配置Release中的独立入口，按实际变更与已有有效结果选择；无需为格式检查完整编译应用：
 
 ```sh
 cmake --build --preset qt-release --target format
 cmake --build --preset qt-release --target check-format
-cmake --build --preset qt-release
 ctest --preset qt-release -R '^source-format$' --output-on-failure
 git diff --check
 ```

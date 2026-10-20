@@ -2,7 +2,7 @@
 
 本契约由用户明确要求，适用于本轮、所有后续 session，以及原生单元/集成/GPU/视觉/性能测试、品牌验证、冻结 Web harness 和证据重建工具。普通用户主动启动的播放器窗口保持正常行为。
 
-用户明确要求某轮次进行可见窗口验证，即授权该轮次验证窗口抢前台、前置和获得焦点，无需重复确认。该例外只覆盖指定轮次与验证用途；显式设置 `YALAHOO_VERIFY_FOREGROUND=1`，macOS 可见 CTest 同时以 `YALAHOO_MACOS_VISIBLE_TESTS=ON` 配置。`VerificationWindow` 在该进程创建 QGuiApplication 之前即使用 macOS Regular，随后使用普通窗口 flags 与正常窗口层级，报告 `mode=user-authorized-foreground`、`nonInterferenceEnforced=false`，按实际策略验收，不冒充置底无激活通过。自身图像采集、Release、匿名输入及串行采样要求仍适用；不得截取用户桌面。轮次结束必须清除进程开关，恢复可见测试 OFF，并真实回归默认隐藏窗口策略。后续轮次/session 不继承此前授权。
+用户明确要求某轮次进行可见窗口验证，即授权该轮次验证窗口抢前台、前置和获得焦点，无需重复确认。该例外只覆盖指定轮次与验证用途；显式设置 `YALAHOO_VERIFY_FOREGROUND=1`，macOS 可见 CTest 同时以 `YALAHOO_MACOS_VISIBLE_TESTS=ON` 配置。`VerificationWindow` 在该进程创建 QGuiApplication 之前即使用 macOS Regular，随后使用普通窗口 flags 与正常窗口层级，报告 `mode=user-authorized-foreground`、`nonInterferenceEnforced=false`，按实际策略验收，不冒充置底无激活通过。自身图像采集、Release、匿名输入及串行采样要求仍适用；不得截取用户桌面。轮次结束必须清除进程开关，恢复可见测试 OFF；默认隐藏策略复用有效结果，仅策略实现或实际恢复行为变化时运行`verification-window-policy`定向检查，不附带组件矩阵。后续轮次/session 不继承此前授权。
 
 默认macOS可见测试OFF；授权窗口例外与离屏选择由迁移计划的动态能力规则决定。OffscreenSurface在隐藏QQuickWindow上用RenderControl渲染真实RGBA8+depth/stencil，显式target DPR，合并有界render请求，只读自身texture；offscreenRendering只由Review tokens启用。
 

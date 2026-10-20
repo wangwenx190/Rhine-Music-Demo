@@ -12,6 +12,8 @@
 
 ## 选择与资源
 
+仅在test-gates.md规定的具体问题或明确选型范围内使用下列比较方法；共用API契约不要求各生产组件逐一横评。
+
 - 同组件同内容/字体/路径/主题/尺寸/DPR/时刻/AA比较源码语义、结构、实际质量、成本及所有权；许可类别/技术预览标签不作为排除理由，不抄官方benchmark或用QPainter成绩替代实际GPU路径。
 - 检查描边/端点/连接、曲线、渐变/遮罩/裁切、透明预乘/颜色域、基线/shaping/emoji；不支持的效果组合Quick合成或保留更合适路径，不能擅自近似。
 - Qt管理的RGBA8单采样离屏附件再透明合成进Quick；无mip/resolve/业务封面上传。颜色4bytes+depth/stencil8bytes保守上界按实际物理尺寸计，resize旧/新重叠、字体图集/内部buffer/driver另列。生产使用纳入ResourcePlan；比较探针不计为产品资源。
@@ -20,4 +22,4 @@
 
 ## 检查入口
 
-`ui-audit 输出目录 [--representative]`使用360×160固定内容，覆盖两API和Quick的路径/文字、透明合成、静态零重绘、420×200恢复、十次Loader卸载/renderer释放。保留实际DPR、revision、资源/计数与QML/shader错误检查；自身纹理用于内容及实际质量检查，结构/数值、功能和资源分别断言。实际序章接入与退出条件见[opening.md](opening.md)，不能用此探针替代产品验证。
+以下描述工具的完整覆盖能力，是否运行及必要范围调整按test-gates.md；不因存在探针而追加比较或十次重建。`ui-audit 输出目录 [--representative]`使用360×160固定内容，覆盖两API和Quick的路径/文字、透明合成、静态零重绘、420×200恢复、十次Loader卸载/renderer释放。保留实际DPR、revision、资源/计数与QML/shader错误检查；自身纹理用于内容及实际质量检查，结构/数值、功能和资源分别断言。实际序章接入与退出条件见[opening.md](opening.md)，不能用此探针替代产品验证。

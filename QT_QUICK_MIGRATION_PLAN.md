@@ -86,7 +86,7 @@
 - Canvas Painter共用API、生命周期和选型执行[canvas-painter.md](docs/contracts/canvas-painter.md)；按实际等价性、质量、成本和维护性选择，缺能力明确定位，不因许可类别/技术预览标签放弃合适实现。
 - 根CMake/presets；C++在`src/{app,core,motion,render,media,library,services,platform}`，QML在`qml/Yalahoo/Music/{components,pages,panels,scene}`，资产`resources/`，测试`tests/`，工具`tools/{build,assets,review,deploy,audit,launchers}`。普通启动器在根，演示/研究启动器在`tools/launchers/`；不提前创建未来轮次的空实现。
 - `src/`子目录维护源清单；共用代码优先Qt，平台目录只放真实差异。QML用模块相对别名和`loadFromModule("Yalahoo.Music","App")`，非QML资源qrc `/assets/`，shader用qt_add_shaders/qsb；不依赖工作目录。构建`build/{release,debug}`、部署`out/{windows,macos,linux}`；本机配置/路径不提交。
-- 提交前依次执行`format`、`check-format`及适用Release检查，`source-format`必须通过；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
+- 源码按需执行`format`；提交前`check-format`、Release `source-format`及适用检查须有仍有效的通过结果，按test-gates.md复用，不把命令串当作每轮必跑流程；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
 
 ### 架构与产品接线
 
@@ -107,7 +107,7 @@
 
 ### 严格静态审计
 
-工具置`tools/audit/`，输出只留本地。每平台矩阵含checkId/requirement/platform/sourcePath/lineOrSymbol/evidence/result/limitations和内容hash；自动检查后必须推演架构边界、算法最坏复杂度/工作量及真实调用链/分支/错误路径，字符串命中、helper或文件清单不足以证明实现。性能结论按performance.md区分静态已确定、缺陷与具体未决项；静态可确定者不再实测，不能因缺硬件耗时数字生成泛化补验。源码可确定缺陷须修复，静态与真实运行事实分开。
+工具置`tools/audit/`，输出只留本地。复用仍有效的源码结论，只审查本轮实际缺口及受影响调用链，不以缺新报告触发完整重审。需要更新的平台矩阵含checkId/requirement/platform/sourcePath/lineOrSymbol/evidence/result/limitations和内容hash；自动检查后必须推演架构边界、算法最坏复杂度/工作量及真实调用链/分支/错误路径，字符串命中、helper或文件清单不足以证明实现。性能结论按performance.md区分静态已确定、缺陷与具体未决项；静态可确定者不再实测，不能因缺硬件耗时数字生成泛化补验。源码可确定缺陷须修复，静态与真实运行事实分开。
 
 | ID | 审计职责 |
 | --- | --- |
