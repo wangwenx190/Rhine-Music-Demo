@@ -112,12 +112,14 @@ QJsonObject counters()
              { u"textGeometryUpdates"_s, qint64(ReelInk::geometryUpdates()) },
              { u"textGeometryReuses"_s, qint64(ReelInk::geometryReuses()) } };
 }
-Snapshot fixture(const QString &directory)
+Snapshot fixture(const QString &directory, bool largeCovers = true)
 {
     LibrarySnapshot library;
     QStringList paths;
-    QImage image(2048, 2048, QImage::Format_RGB32);
-    for (int i = 0; i < 96; ++i) {
+    QImage image;
+    if (largeCovers)
+        image = QImage(2048, 2048, QImage::Format_RGB32);
+    for (int i = 0; i < (largeCovers ? 96 : 0); ++i) {
         image.fill(QColor::fromHsv(i * 359 / 96, 140, 210));
         const auto path = directory + u"/anonymous-%1.jpg"_s.arg(i);
         require(image.save(path, "JPEG", 82), "Cannot create anonymous large cover");
@@ -135,9 +137,9 @@ Snapshot fixture(const QString &directory)
             album.artist = "Anonymous"_L1;
             album.genreId = genre.id;
             const int index = lane * 64 + row;
-            album.coverUrl = index < 96 ? QUrl::fromLocalFile(paths[index])
-                                        : QUrl(u"qrc:/assets/demo-covers/square.png"_s);
-            for (int trackIndex = 0; trackIndex < 3; ++trackIndex) {
+            album.coverUrl = index < paths.size() ? QUrl::fromLocalFile(paths[index])
+                                                  : QUrl(u"qrc:/assets/demo-covers/square.png"_s);
+            for (int trackIndex = 0; trackIndex < (largeCovers ? 3 : 0); ++trackIndex) {
                 Track track;
                 track.id = album.id + u"-track-%1"_s.arg(trackIndex);
                 track.title = u"\u533f\u540d\u66f2\u76ee %1"_s.arg(trackIndex);
@@ -512,6 +514,7 @@ public:
     {
         QMutex mutex;
         QVector<qint64> times;
+        QVector<qint64> synchronized;
         std::atomic_bool overflow{ false };
     };
     std::shared_ptr<PresentationSamples> presented = std::make_shared<PresentationSamples>();
@@ -541,7 +544,7 @@ public:
 };
 }
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
-                  const QJsonObject &bootstrap, const QString &scenario)
+                  const QJsonObject &bootstrap, const QString &scenario, bool observeOnly)
 {
     if (!std::isfinite(seconds) || seconds < 0 || seconds > 120 || (seconds > 0 && seconds < 12))
         return 2;
@@ -553,7 +556,10 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         return 2;
     const bool stress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_STRESS") == 1;
     if ((stress && seconds != 0)
-        || (!stress && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1))
+        || (!stress && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1)
+        || (observeOnly
+            && (stress || OffscreenSurface::Enabled || seconds == 0
+                || (scenario != "day-wave"_L1 && scenario != "night-wave"_L1))))
         return 2;
     const int switchCount = stress ? 30 : 3;
     const int rebuildCount = stress ? 10 : 2;
@@ -567,6 +573,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     report[u"bootstrap"_s] = bootstrap;
     report[u"scenario"_s] = scenario;
     report[u"stressRequested"_s] = stress;
+    report[u"observationOnly"_s] = observeOnly;
     report[u"samplingRequestedSeconds"_s] = seconds;
     report[u"switches"_s] = 0;
     report[u"rebuilds"_s] = 0;
@@ -582,15 +589,19 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     try {
         QTemporaryDir anonymous;
         require(anonymous.isValid(), "Cannot create anonymous fixture directory");
-        QFile audio(anonymous.path() + "/anonymous.wav"_L1);
-        require(audio.open(QIODevice::WriteOnly), "Cannot create anonymous audio");
-        const auto bytes = test::wave(600000);
-        require(audio.write(bytes) == bytes.size(), "Cannot write anonymous audio");
-        audio.close();
-        const auto input = fixture(anonymous.path());
+        QByteArray bytes;
+        if (!observeOnly) {
+            QFile audio(anonymous.path() + "/anonymous.wav"_L1);
+            require(audio.open(QIODevice::WriteOnly), "Cannot create anonymous audio");
+            bytes = test::wave(600000);
+            require(audio.write(bytes) == bytes.size(), "Cannot write anonymous audio");
+            audio.close();
+        }
+        const auto input = fixture(anonymous.path(), !observeOnly);
         QCryptographicHash inputHash(QCryptographicHash::Sha256);
-        for (int i = 0; i < 96; ++i) {
-            QFile file(anonymous.path() + u"/anonymous-%1.jpg"_s.arg(i));
+        for (int i = 0; i < (observeOnly ? 1 : 96); ++i) {
+            QFile file(observeOnly ? u":/assets/demo-covers/square.png"_s
+                                   : anonymous.path() + u"/anonymous-%1.jpg"_s.arg(i));
             require(file.open(QIODevice::ReadOnly), "Cannot hash anonymous input");
             require(inputHash.addData(&file), "Cannot hash cover bytes");
         }
@@ -598,7 +609,28 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         report[u"fixtureSha256"_s] = QString::fromUtf8(inputHash.result().toHex());
         QElapsedTimer preparation;
         preparation.start();
+        QJsonArray guiFrames;
         Driver d(input);
+        if (observeOnly) {
+            QObject::connect(d.motion.clock(), &FrameClock::advanced, &d.window, [&] {
+                if (guiFrames.size() == 40000)
+                    d.overflow = true;
+                else
+                    guiFrames.append(QJsonObject{
+                            { u"atNs"_s, nowNs() },
+                            { u"clockFrame"_s, qint64(d.motion.clock()->frameCount()) } });
+            });
+            QObject::connect(
+                    &d.window, &QQuickWindow::afterSynchronizing, &d.window,
+                    [samples = d.presented] {
+                        const QMutexLocker lock(&samples->mutex);
+                        if (samples->synchronized.size() == 40000)
+                            samples->overflow = true;
+                        else
+                            samples->synchronized.append(nowNs());
+                    },
+                    Qt::DirectConnection);
+        }
         struct SaveEvidence
         {
             std::function<void()> save;
@@ -612,6 +644,20 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             report[u"inventories"_s] = d.inventories;
             report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
             report[u"lastStage"_s] = d.stage;
+            report[u"guiFrames"_s] = guiFrames;
+            report[u"nativeWindowEvents"_s] = d.window.events;
+            report[u"nativeWindowEventOverflow"_s] = d.window.eventOverflow;
+            if (!report.contains(u"windowPolicy"_s))
+                report[u"windowPolicy"_s] = verification::windowPolicy(d.window);
+            const QMutexLocker lock(&d.presented->mutex);
+            QJsonArray synchronized, presented;
+            for (const auto timestamp : d.presented->synchronized)
+                synchronized.append(timestamp);
+            for (const auto timestamp : d.presented->times)
+                presented.append(timestamp);
+            report[u"synchronizationTimestampsNs"_s] = synchronized;
+            if (!report.contains(u"qtPresentationTimestampsNs"_s))
+                report[u"qtPresentationTimestampsNs"_s] = presented;
         } };
         d.opening.replay();
         d.wait([&] {
@@ -648,307 +694,318 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             };
         };
         resources.append(resourceSnapshot());
-        if (!OffscreenSurface::Enabled)
+        if (!observeOnly) {
+            if (!OffscreenSurface::Enabled)
+                d.wait(
+                        [&] {
+                            return !d.motion.clock()->active() && !d.motion.clock()->workPending();
+                        },
+                        false, 5000);
+            const auto idle = counters();
+            const auto idleSubmission = d.native->submission();
+            const auto idleFrames = d.motion.clock()->frameCount();
+            d.quiet(120);
+            check("idle-zero-scene-submission", d.native->submission() == idleSubmission);
+            check("idle-zero-visual-step", d.motion.clock()->frameCount() == idleFrames);
+            check("idle-zero-canvas-repaint",
+                  counters()[u"rulerPaints"_s] == idle[u"rulerPaints"_s]
+                          && counters()[u"openingPaints"_s] == idle[u"openingPaints"_s]);
+            // Change state from a queued callback after a completed render. Its dirty revision must survive.
+            bool late = false;
+            QMetaObject::invokeMethod(
+                    d.native,
+                    [&] {
+                        d.scene.lighting()->setNight(true);
+                        d.selection.moveRow(1);
+                        late = true;
+                    },
+                    Qt::QueuedConnection);
+            d.wait([&] {
+                return late && d.native->input().scene.revision == d.scene.frame().revision
+                        && d.native->submission() > idleSubmission;
+            });
+            check("late-invalidation-submits-current-revision", late);
+            d.settle();
+            // Real public media path, muted anonymous WAV. Preserve source/intent across visual lifetimes.
+            d.playback.setVolume(0);
+            const auto albumId = d.library.snapshot()->albums[0].id;
+            const auto trackId = d.library.snapshot()->albums[0].tracks[0].id;
+            check("anonymous-public-media-command", d.playback.playTrack(albumId, trackId));
+            d.playback.pause();
+            const auto sourceRevision = d.playback.sourceRevision();
+            const auto source = d.playback.source();
+            bool requested = d.playback.requested();
+            d.setStage(u"hidden-snapshots"_s);
+            d.motion.clock()->setApplicationVisible(false);
+            d.motion.clock()->setActive(false);
+            const auto hiddenSubmission = d.native->submission();
+            const auto hiddenRenders = rhi::sceneSubmissionStats().rendered.load();
+            const QJsonValue hiddenStarts =
+                    d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
+            const auto hiddenApplied = d.startup.statistics()[u"appliedSnapshots"_s].toInt();
+            auto replacement = *input;
+            for (int i = 0; i < 10; ++i) {
+                replacement.albums[0].title = u"latest-%1"_s.arg(i);
+                d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
+            }
+            d.selection.moveRow(2);
+            d.scene.lighting()->setNight(false);
+            d.native->ensurePolished();
+            d.quiet(150);
+            check("hidden-no-snapshot-notifications",
+                  d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied);
+            check("hidden-no-submit-or-render",
+                  d.native->submission() == hiddenSubmission
+                          && rhi::sceneSubmissionStats().rendered.load() == hiddenRenders);
+            check("hidden-no-new-decode",
+                  d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s]
+                          == hiddenStarts);
+            d.motion.clock()->setApplicationVisible(true);
+            d.motion.clock()->setActive(true);
+            QSignalSpy resumed(d.motion.clock(), &FrameClock::frame);
+            d.motion.clock()->advance(100);
+            check("resume-discards-first-interval",
+                  resumed.size() == 1 && resumed[0][0].toDouble() == 0);
+            d.frames(2);
+            d.settle();
+            check("resume-one-latest-snapshot",
+                  d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied + 1
+                          && d.library.snapshot()->albums[0].title == "latest-9"_L1);
+            check("resume-presents-latest-state",
+                  d.native->input().scene.revision == d.scene.frame().revision);
+            const auto preservesMedia = [&] {
+                return d.playback.trackId() == trackId && d.playback.source() == source
+                        && d.playback.sourceRevision() == sourceRevision
+                        && d.playback.requested() == requested
+                        && (requested ? d.playback.playing() : !d.playback.playing());
+            };
+            check("hidden-preserves-current-media-and-intent", preservesMedia());
+            if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1) {
+                require(!OffscreenSurface::Enabled, "Native lifecycle requires a visible window");
+                auto *const retainedRoot = d.root.get();
+                auto *const retainedScene = d.native;
+                for (const bool playing : { false, true }) {
+                    if (playing) {
+                        d.playback.toggle();
+                        d.wait([&] {
+                            return d.playback.playing();
+                        });
+                        requested = true;
+                    }
+                    for (const bool minimize : { false, true }) {
+                        d.setStage(u"native-%1-%2"_s.arg(playing ? "playing"_L1 : "paused"_L1,
+                                                         minimize ? "minimize"_L1 : "hide"_L1));
+                        if (minimize)
+                            d.window.showMinimized();
+                        else
+                            d.surface.hide();
+                        const bool hidden = QTest::qWaitFor(
+                                [&] {
+                                    bool stopped = !d.window.isExposed()
+                                            && !d.root->property("visualActive").toBool()
+                                            && !d.motion.clock()->active();
+                                    if (minimize) {
+                                        stopped &= d.window.windowState() == Qt::WindowMinimized;
+#if defined(Q_OS_MACOS)
+                                        stopped &= verification::nativeWindowPolicy(
+                                                           d.window)[u"miniaturized"_s]
+                                                           .toBool();
+#endif
+                                    } else {
+                                        stopped &= !d.window.isVisible();
+                                    }
+                                    return stopped;
+                                },
+                                5000);
+                        check("native-window-stops-visuals", hidden);
+                        require(hidden, "Native window did not become hidden/minimized");
+                        d.window.releaseResources();
+                        check("same-root-sg-invalidation",
+                              QTest::qWaitFor(
+                                      [&] {
+                                          return rhi::sceneSubmissionStats().renderers.load() == 0;
+                                      },
+                                      5000));
+                        d.quiet(150);
+                        const auto stoppedFrames = d.motion.clock()->frameCount();
+                        const auto stoppedRenders = rhi::sceneSubmissionStats().rendered.load();
+                        const auto position = d.playback.position();
+                        if (playing)
+                            check("native-hidden-song-advances",
+                                  QTest::qWaitFor(
+                                          [&] {
+                                              return d.playback.position() > position;
+                                          },
+                                          2000));
+                        else
+                            d.quiet(200);
+                        check("native-hidden-no-visual-work",
+                              d.motion.clock()->frameCount() == stoppedFrames
+                                      && rhi::sceneSubmissionStats().rendered.load()
+                                              == stoppedRenders);
+                        check("native-hidden-preserves-media", preservesMedia());
+                        if (!playing)
+                            check("native-hidden-paused-position",
+                                  d.playback.position() == position);
+                        d.window.showNormal();
+                        d.surface.show();
+                        require(QTest::qWaitFor(
+                                        [&] {
+                                            return d.window.isExposed()
+                                                    && d.root->property("visualActive").toBool();
+                                        },
+                                        5000),
+                                "Native window did not restore");
+                        d.settle();
+                        check("native-restore-retains-root-and-scene",
+                              d.root.get() == retainedRoot && d.native == retainedScene);
+                        check("native-restore-current-render",
+                              d.native->input().scene.revision == d.scene.frame().revision
+                                      && !d.surface.grab().isNull());
+                        check("native-restore-preserves-media", preservesMedia());
+                    }
+                }
+                d.playback.pause();
+                requested = false;
+                report[u"nativeWindowTransitions"_s] = 4;
+            }
+            d.setStage(u"switch-replay"_s);
+            d.presentation.open();
             d.wait(
                     [&] {
-                        return !d.motion.clock()->active() && !d.motion.clock()->workPending();
+                        return d.presentation.detailEnabled();
                     },
-                    false, 5000);
-        const auto idle = counters();
-        const auto idleSubmission = d.native->submission();
-        const auto idleFrames = d.motion.clock()->frameCount();
-        d.quiet(120);
-        check("idle-zero-scene-submission", d.native->submission() == idleSubmission);
-        check("idle-zero-visual-step", d.motion.clock()->frameCount() == idleFrames);
-        check("idle-zero-canvas-repaint",
-              counters()[u"rulerPaints"_s] == idle[u"rulerPaints"_s]
-                      && counters()[u"openingPaints"_s] == idle[u"openingPaints"_s]);
-        // Change state from a queued callback after a completed render. Its dirty revision must survive.
-        bool late = false;
-        QMetaObject::invokeMethod(
-                d.native,
-                [&] {
-                    d.scene.lighting()->setNight(true);
-                    d.selection.moveRow(1);
-                    late = true;
-                },
-                Qt::QueuedConnection);
-        d.wait([&] {
-            return late && d.native->input().scene.revision == d.scene.frame().revision
-                    && d.native->submission() > idleSubmission;
-        });
-        check("late-invalidation-submits-current-revision", late);
-        d.settle();
-        // Real public media path, muted anonymous WAV. Preserve source/intent across visual lifetimes.
-        d.playback.setVolume(0);
-        const auto albumId = d.library.snapshot()->albums[0].id;
-        const auto trackId = d.library.snapshot()->albums[0].tracks[0].id;
-        check("anonymous-public-media-command", d.playback.playTrack(albumId, trackId));
-        d.playback.pause();
-        const auto sourceRevision = d.playback.sourceRevision();
-        const auto source = d.playback.source();
-        bool requested = d.playback.requested();
-        d.setStage(u"hidden-snapshots"_s);
-        d.motion.clock()->setApplicationVisible(false);
-        d.motion.clock()->setActive(false);
-        const auto hiddenSubmission = d.native->submission();
-        const auto hiddenRenders = rhi::sceneSubmissionStats().rendered.load();
-        const QJsonValue hiddenStarts =
-                d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
-        const auto hiddenApplied = d.startup.statistics()[u"appliedSnapshots"_s].toInt();
-        auto replacement = *input;
-        for (int i = 0; i < 10; ++i) {
-            replacement.albums[0].title = u"latest-%1"_s.arg(i);
-            d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
-        }
-        d.selection.moveRow(2);
-        d.scene.lighting()->setNight(false);
-        d.native->ensurePolished();
-        d.quiet(150);
-        check("hidden-no-snapshot-notifications",
-              d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied);
-        check("hidden-no-submit-or-render",
-              d.native->submission() == hiddenSubmission
-                      && rhi::sceneSubmissionStats().rendered.load() == hiddenRenders);
-        check("hidden-no-new-decode",
-              d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s]
-                      == hiddenStarts);
-        d.motion.clock()->setApplicationVisible(true);
-        d.motion.clock()->setActive(true);
-        QSignalSpy resumed(d.motion.clock(), &FrameClock::frame);
-        d.motion.clock()->advance(100);
-        check("resume-discards-first-interval",
-              resumed.size() == 1 && resumed[0][0].toDouble() == 0);
-        d.frames(2);
-        d.settle();
-        check("resume-one-latest-snapshot",
-              d.startup.statistics()[u"appliedSnapshots"_s].toInt() == hiddenApplied + 1
-                      && d.library.snapshot()->albums[0].title == "latest-9"_L1);
-        check("resume-presents-latest-state",
-              d.native->input().scene.revision == d.scene.frame().revision);
-        const auto preservesMedia = [&] {
-            return d.playback.trackId() == trackId && d.playback.source() == source
-                    && d.playback.sourceRevision() == sourceRevision
-                    && d.playback.requested() == requested
-                    && (requested ? d.playback.playing() : !d.playback.playing());
-        };
-        check("hidden-preserves-current-media-and-intent", preservesMedia());
-        if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1) {
-            require(!OffscreenSurface::Enabled, "Native lifecycle requires a visible window");
-            auto *const retainedRoot = d.root.get();
-            auto *const retainedScene = d.native;
-            for (const bool playing : { false, true }) {
-                if (playing) {
+                    true);
+            for (int i = 0; i < switchCount; ++i) {
+                const auto &albums = d.library.snapshot()->albums;
+                d.presentation.select(albums[i % 2 ? 1 : 2].id, true);
+                d.wait(
+                        [&] {
+                            return d.presentation.detailEnabled()
+                                    && !d.presentation.pendingSelection();
+                        },
+                        true);
+                d.settle();
+                resources.append(resourceSnapshot());
+                check("bounded-switch-pool",
+                      d.native->coverStatistics()[u"owned"_s].toInt() <= 4
+                              && d.native->input().scene.instances.size()
+                                      <= ArchivePool::capacity + 4);
+                report[u"switches"_s] = i + 1;
+            }
+            d.presentation.back();
+            d.wait(
+                    [&] {
+                        return d.presentation.archiveEnabled();
+                    },
+                    true);
+            d.settle();
+            const QJsonValue before =
+                    d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
+            d.setStage(u"cache-hit"_s);
+            for (int i = 0; i < 6; ++i) {
+                d.selection.select(d.library.snapshot()->albums[i % 2 ? 1 : 2].id);
+                d.settle();
+            }
+            check("cache-hits-no-redecode",
+                  d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s] == before);
+            d.frames(2);
+            check("settled-zero-upload",
+                  d.samples.last().toObject()[u"atlasUploadBytes"_s].toInt() == 0
+                          && d.samples.last().toObject()[u"selectedUploadBytes"_s].toInt() == 0);
+            const QJsonValue stableBytes = d.lastResources[u"estimatedCurrentBytes"_s];
+            for (int cycle = 0; cycle < rebuildCount; ++cycle) {
+                d.setStage(u"rebuild-%1"_s.arg(cycle));
+                if (cycle == rebuildCount / 2) {
                     d.playback.toggle();
                     d.wait([&] {
                         return d.playback.playing();
                     });
                     requested = true;
                 }
-                for (const bool minimize : { false, true }) {
-                    d.setStage(u"native-%1-%2"_s.arg(playing ? "playing"_L1 : "paused"_L1,
-                                                     minimize ? "minimize"_L1 : "hide"_L1));
-                    if (minimize)
-                        d.window.showMinimized();
-                    else
-                        d.surface.hide();
-                    const bool hidden = QTest::qWaitFor(
-                            [&] {
-                                bool stopped = !d.window.isExposed()
-                                        && !d.root->property("visualActive").toBool()
-                                        && !d.motion.clock()->active();
-                                if (minimize) {
-                                    stopped &= d.window.windowState() == Qt::WindowMinimized;
-#if defined(Q_OS_MACOS)
-                                    stopped &= verification::nativeWindowPolicy(
-                                                       d.window)[u"miniaturized"_s]
-                                                       .toBool();
-#endif
-                                } else {
-                                    stopped &= !d.window.isVisible();
-                                }
-                                return stopped;
-                            },
-                            5000);
-                    check("native-window-stops-visuals", hidden);
-                    require(hidden, "Native window did not become hidden/minimized");
-                    d.window.releaseResources();
-                    check("same-root-sg-invalidation",
-                          QTest::qWaitFor(
-                                  [&] {
-                                      return rhi::sceneSubmissionStats().renderers.load() == 0;
-                                  },
-                                  5000));
-                    d.quiet(150);
-                    const auto stoppedFrames = d.motion.clock()->frameCount();
-                    const auto stoppedRenders = rhi::sceneSubmissionStats().rendered.load();
-                    const auto position = d.playback.position();
-                    if (playing)
-                        check("native-hidden-song-advances",
-                              QTest::qWaitFor(
-                                      [&] {
-                                          return d.playback.position() > position;
-                                      },
-                                      2000));
-                    else
-                        d.quiet(200);
-                    check("native-hidden-no-visual-work",
-                          d.motion.clock()->frameCount() == stoppedFrames
-                                  && rhi::sceneSubmissionStats().rendered.load() == stoppedRenders);
-                    check("native-hidden-preserves-media", preservesMedia());
-                    if (!playing)
-                        check("native-hidden-paused-position", d.playback.position() == position);
-                    d.window.showNormal();
-                    d.surface.show();
-                    require(QTest::qWaitFor(
-                                    [&] {
-                                        return d.window.isExposed()
-                                                && d.root->property("visualActive").toBool();
-                                    },
-                                    5000),
-                            "Native window did not restore");
-                    d.settle();
-                    check("native-restore-retains-root-and-scene",
-                          d.root.get() == retainedRoot && d.native == retainedScene);
-                    check("native-restore-current-render",
-                          d.native->input().scene.revision == d.scene.frame().revision
-                                  && !d.surface.grab().isNull());
-                    check("native-restore-preserves-media", preservesMedia());
-                }
+                d.destroyRoot();
+                check("rebuild-releases-renderers", releaseCheck());
+                d.createRoot();
+                d.motion.clock()->setActive(true);
+                d.surface.show();
+                d.settle();
+                resources.append(resourceSnapshot());
+                check("rebuild-preserves-media-and-intent", preservesMedia());
+                check("rebuild-resources-return-to-baseline",
+                      d.lastResources[u"estimatedCurrentBytes"_s] == stableBytes);
+                check("rebuild-retained-cover-budget",
+                      d.native->coverStatistics()[u"atlasRetainedBytes"_s].toInteger()
+                              <= qint64(ArchivePool::capacity + 4) * 256 * 256 * 4);
+                report[u"rebuilds"_s] = cycle + 1;
             }
-            d.playback.pause();
-            requested = false;
-            report[u"nativeWindowTransitions"_s] = 4;
-        }
-        d.setStage(u"switch-replay"_s);
-        d.presentation.open();
-        d.wait(
-                [&] {
-                    return d.presentation.detailEnabled();
-                },
-                true);
-        for (int i = 0; i < switchCount; ++i) {
-            const auto &albums = d.library.snapshot()->albums;
-            d.presentation.select(albums[i % 2 ? 1 : 2].id, true);
-            d.wait(
-                    [&] {
-                        return d.presentation.detailEnabled() && !d.presentation.pendingSelection();
-                    },
-                    true);
-            d.settle();
-            resources.append(resourceSnapshot());
-            check("bounded-switch-pool",
-                  d.native->coverStatistics()[u"owned"_s].toInt() <= 4
-                          && d.native->input().scene.instances.size() <= ArchivePool::capacity + 4);
-            report[u"switches"_s] = i + 1;
-        }
-        d.presentation.back();
-        d.wait(
-                [&] {
-                    return d.presentation.archiveEnabled();
-                },
-                true);
-        d.settle();
-        const QJsonValue before =
-                d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s];
-        d.setStage(u"cache-hit"_s);
-        for (int i = 0; i < 6; ++i) {
-            d.selection.select(d.library.snapshot()->albums[i % 2 ? 1 : 2].id);
-            d.settle();
-        }
-        check("cache-hits-no-redecode",
-              d.native->coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s] == before);
-        d.frames(2);
-        check("settled-zero-upload",
-              d.samples.last().toObject()[u"atlasUploadBytes"_s].toInt() == 0
-                      && d.samples.last().toObject()[u"selectedUploadBytes"_s].toInt() == 0);
-        const QJsonValue stableBytes = d.lastResources[u"estimatedCurrentBytes"_s];
-        for (int cycle = 0; cycle < rebuildCount; ++cycle) {
-            d.setStage(u"rebuild-%1"_s.arg(cycle));
-            if (cycle == rebuildCount / 2) {
-                d.playback.toggle();
-                d.wait([&] {
-                    return d.playback.playing();
-                });
-                requested = true;
-            }
-            d.destroyRoot();
-            check("rebuild-releases-renderers", releaseCheck());
-            d.createRoot();
+            d.playback.stop();
+            d.motion.setReducedMotion(false);
             d.motion.clock()->setActive(true);
-            d.surface.show();
-            d.settle();
-            resources.append(resourceSnapshot());
-            check("rebuild-preserves-media-and-intent", preservesMedia());
-            check("rebuild-resources-return-to-baseline",
-                  d.lastResources[u"estimatedCurrentBytes"_s] == stableBytes);
-            check("rebuild-retained-cover-budget",
-                  d.native->coverStatistics()[u"atlasRetainedBytes"_s].toInteger()
-                          <= qint64(ArchivePool::capacity + 4) * 256 * 256 * 4);
-            report[u"rebuilds"_s] = cycle + 1;
-        }
-        d.playback.stop();
-        d.motion.setReducedMotion(false);
-        d.motion.clock()->setActive(true);
-        // Exercise real ruler/controller/Quick text, panels, source search, opening and target invalidation.
-        const auto drawBefore = counters();
-        d.setStage(u"ruler-reverse"_s);
-        for (int i = 0; i < 24; ++i) {
-            QKeyEvent key(QEvent::KeyPress, i < 12 ? Qt::Key_Down : Qt::Key_Up, Qt::NoModifier);
-            QCoreApplication::sendEvent(&d.window, &key);
-            d.frames(2, true);
-        }
-        d.setStage(u"overview"_s);
-        d.overview.setActive(true);
-        d.frames(45, true);
-        d.overview.setActive(false);
-        d.setStage(u"search-panels"_s);
-        d.panels.open(u"search"_s);
-        d.library.search(u"\u533f\u540d"_s);
-        d.library.search(u"\u533f\u540d\u4e13\u8f91 2"_s);
-        d.library.search(u""_s);
-        d.frames(25, true);
-        d.panels.close();
-        d.frames(25, true);
-        d.selection.setRealistic(true);
-        d.frames(10, true);
-        d.selection.setRealistic(false);
-        d.setStage(u"opening-replay"_s);
-        d.opening.replay();
-        d.wait([&] {
-            return d.opening.film();
-        });
-        d.frames(40, true);
-        d.motion.clock()->setApplicationVisible(false);
-        d.motion.clock()->setActive(false);
-        d.destroyRoot();
-        check("opaque-rebuild-releases-renderers", releaseCheck());
-        d.createRoot();
-        d.surface.show();
-        const auto opaqueBefore = rhi::sceneSubmissionStats().rendered.load();
-        d.motion.clock()->setApplicationVisible(true);
-        d.frames(2);
-        check("opaque-rebuild-submits-only-clear",
-              d.native->input().sceneOccluded
-                      && rhi::sceneSubmissionStats().rendered.load() == opaqueBefore);
-        report[u"opaqueRootRebuilds"_s] = 1;
-        d.motion.clock()->setActive(true);
-        d.motion.clock()->advance(30);
-        d.opening.skip();
-        d.frames(50, true);
-        for (double dpr : { 1.0, 1.5, 2.0 }) {
-            d.setStage(u"theme-dpr-resize"_s);
-            d.scene.lighting()->setNight(!d.scene.lighting()->night());
-            d.resize({ 960, 900 }, dpr);
+            // Exercise real ruler/controller/Quick text, panels, source search, opening and target invalidation.
+            const auto drawBefore = counters();
+            d.setStage(u"ruler-reverse"_s);
+            for (int i = 0; i < 24; ++i) {
+                QKeyEvent key(QEvent::KeyPress, i < 12 ? Qt::Key_Down : Qt::Key_Up, Qt::NoModifier);
+                QCoreApplication::sendEvent(&d.window, &key);
+                d.frames(2, true);
+            }
+            d.setStage(u"overview"_s);
+            d.overview.setActive(true);
             d.frames(45, true);
+            d.overview.setActive(false);
+            d.setStage(u"search-panels"_s);
+            d.panels.open(u"search"_s);
+            d.library.search(u"\u533f\u540d"_s);
+            d.library.search(u"\u533f\u540d\u4e13\u8f91 2"_s);
+            d.library.search(u""_s);
+            d.frames(25, true);
+            d.panels.close();
+            d.frames(25, true);
+            d.selection.setRealistic(true);
+            d.frames(10, true);
+            d.selection.setRealistic(false);
+            d.setStage(u"opening-replay"_s);
+            d.opening.replay();
+            d.wait([&] {
+                return d.opening.film();
+            });
+            d.frames(40, true);
+            d.motion.clock()->setApplicationVisible(false);
+            d.motion.clock()->setActive(false);
+            d.destroyRoot();
+            check("opaque-rebuild-releases-renderers", releaseCheck());
+            d.createRoot();
+            d.surface.show();
+            const auto opaqueBefore = rhi::sceneSubmissionStats().rendered.load();
+            d.motion.clock()->setApplicationVisible(true);
+            d.frames(2);
+            check("opaque-rebuild-submits-only-clear",
+                  d.native->input().sceneOccluded
+                          && rhi::sceneSubmissionStats().rendered.load() == opaqueBefore);
+            report[u"opaqueRootRebuilds"_s] = 1;
+            d.motion.clock()->setActive(true);
+            d.motion.clock()->advance(30);
+            d.opening.skip();
+            d.frames(50, true);
+            for (double dpr : { 1.0, 1.5, 2.0 }) {
+                d.setStage(u"theme-dpr-resize"_s);
+                d.scene.lighting()->setNight(!d.scene.lighting()->night());
+                d.resize({ 960, 900 }, dpr);
+                d.frames(45, true);
+            }
+            d.resize({ 1280, 720 }, d.window.devicePixelRatio());
+            check("actual-ruler-and-opening-drawing",
+                  counters()[u"rulerPaints"_s].toInteger()
+                                  > drawBefore[u"rulerPaints"_s].toInteger()
+                          && counters()[u"openingPaints"_s].toInteger()
+                                  > drawBefore[u"openingPaints"_s].toInteger());
+            resources.append(resourceSnapshot());
         }
-        d.resize({ 1280, 720 }, d.window.devicePixelRatio());
-        check("actual-ruler-and-opening-drawing",
-              counters()[u"rulerPaints"_s].toInteger() > drawBefore[u"rulerPaints"_s].toInteger()
-                      && counters()[u"openingPaints"_s].toInteger()
-                              > drawBefore[u"openingPaints"_s].toInteger());
-        resources.append(resourceSnapshot());
         if (seconds > 0) {
+            if (observeOnly) {
+                d.motion.setReducedMotion(false);
+                d.scene.lighting()->setNight(scenario == "night-wave"_L1);
+            }
             d.resize({ 1920, 1080 }, d.window.devicePixelRatio());
             d.scene.quality()->setPreset(u"original"_s);
             d.settle();
@@ -1001,7 +1058,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 }
                 return false;
             };
-            if (scenario != "matrix"_L1) {
+            if (scenario != "matrix"_L1 && !observeOnly) {
                 d.wait(
                         [&] {
                             return replay(1);
@@ -1013,11 +1070,21 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             sampling.restart();
             report[u"samplingStartedNs"_s] = nowNs();
             d.window.record(u"sampling-start"_s);
-            d.wait(
-                    [&] {
-                        return replay(seconds);
-                    },
-                    true, int(seconds * 1000 + 30000), true);
+            if (observeOnly) {
+                replay(seconds);
+                QEventLoop observation;
+                QTimer::singleShot(int(seconds * 1000), Qt::PreciseTimer, &observation,
+                                   &QEventLoop::quit);
+                observation.exec();
+                require(d.native->errorText().isEmpty() && d.failure.isEmpty(),
+                        "Presentation observation failed");
+            } else {
+                d.wait(
+                        [&] {
+                            return replay(seconds);
+                        },
+                        true, int(seconds * 1000 + 30000), true);
+            }
             report[u"samplingEndedNs"_s] = nowNs();
             report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / 1e9;
             report[u"sampleStartIndex"_s] = startSample;
@@ -1112,7 +1179,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 for (qsizetype j = actions.size() - 1; j >= 0; --j) {
                     const auto action = actions[j].toObject();
                     // Separate each transition/warmup second from steady target gates.
-                    if (previous >= action[u"atNs"_s].toInteger() + 1000000000) {
+                    if (previous
+                        >= action[u"atNs"_s].toInteger() + (observeOnly ? 0 : 1000000000)) {
                         presentation[action[u"stage"_s].toString()].append(dt);
                         break;
                     }
@@ -1164,10 +1232,11 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         report[u"targetRefreshHz"_s] = 60;
         report[u"offscreenReplayPeriodMsRequested"_s] =
                 OffscreenSurface::Enabled ? QJsonValue(1000.0 / 60) : QJsonValue::Null;
-        report[u"steadyWarmupSecondsPerStage"_s] = 1;
+        report[u"steadyWarmupSecondsPerStage"_s] = observeOnly ? 0 : 1;
         report[u"qtPresentationByStage"_s] = presentationStages;
-        const bool performanceGateEnforced = !OffscreenSurface::Enabled && seconds == 120
-                && scenario != "matrix"_L1 && d.window.requestedFormat().swapInterval() > 0
+        const bool performanceGateEnforced = !observeOnly && !OffscreenSurface::Enabled
+                && seconds == 120 && scenario != "matrix"_L1
+                && d.window.requestedFormat().swapInterval() > 0
                 && d.window.effectiveDevicePixelRatio() == 1;
         report[u"performanceGateEnforced"_s] = performanceGateEnforced;
         report[u"performanceGatePassed"_s] =

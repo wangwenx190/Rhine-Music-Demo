@@ -1,6 +1,6 @@
 # 总览状态、投影与局部合成
 
-本文负责OverviewController/标签与折叠；公用相机和帧源分别见scene.md/motion.md，欠验归迁移计划R19-P（R34/R35按后端分工）。
+本文负责OverviewController/标签与折叠；公用相机和帧源分别见scene.md/motion.md，欠验归迁移计划R19-P（R35/R36按后端分工）。
 
 ## 来源与状态
 

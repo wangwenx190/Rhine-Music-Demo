@@ -31,11 +31,16 @@ class StartupVerificationTest(unittest.TestCase):
         return dict(functionalPassed=True, samplingComplete=True, backend=6, dpr=args.dpr,
                     scenario=args.scenario, stressRequested=args.stress,
                     samplingRequestedSeconds=args.seconds, samplingSeconds=args.seconds,
-                    switches=30 if args.stress else 3, rebuilds=10 if args.stress else 2,
+                    switches=0 if args.observe_only else 30 if args.stress else 3,
+                    rebuilds=0 if args.observe_only else 10 if args.stress else 2,
                     stages={args.scenario: {"cpuSubmit": {"count": 100}}},
                     swapIntervalRequested=0 if args.mode == "uncapped" else 1,
                     qsgNoVsyncRequested=args.mode == "uncapped", nativeSamplingValid=True,
-                    performanceGateEnforced=args.formal, performanceGatePassed=True)
+                    performanceGateEnforced=args.formal, performanceGatePassed=True,
+                    observationOnly=args.observe_only, windowPolicy={"passed": True},
+                    continuouslyExposedDuringSampling=True, samplingStartedNs=1, samplingEndedNs=3,
+                    guiFrames=[{"atNs": 1, "clockFrame": 1}, {"atNs": 2, "clockFrame": 2}],
+                    synchronizationTimestampsNs=[1, 2], qtPresentationTimestampsNs=[1, 2])
 
     def test_scopes_have_distinct_defaults_and_acceptance(self):
         for options, expected in [((), (30, 1)), (("--stress",), (0, 1)),
@@ -88,6 +93,29 @@ class StartupVerificationTest(unittest.TestCase):
         report["performanceGatePassed"] = True
         report["performanceGateEnforced"] = False
         self.assertFalse(VERIFY.validate_report(report, args, 0))
+
+    def test_observation_omits_replay_and_requires_all_timing_streams(self):
+        args = self.arguments("--observe-only", "--mode", "vsync", "--scenario", "night-wave",
+                              "--seconds", "12")
+        self.assertTrue(VERIFY.validate_report(self.report(args), args, 0))
+        for field, value in [("switches", 3), ("rebuilds", 2), ("observationOnly", False),
+                             ("continuouslyExposedDuringSampling", False), ("guiFrames", []),
+                             ("synchronizationTimestampsNs", []), ("qtPresentationTimestampsNs", []),
+                             ("guiFrames", [{"atNs": 4}, {"atNs": 5}]),
+                             ("synchronizationTimestampsNs", [2, 1]),
+                             ("windowPolicy", {"passed": False}), ("performanceGateEnforced", True)]:
+            with self.subTest(field=field):
+                report = self.report(args)
+                report[field] = value
+                self.assertFalse(VERIFY.validate_report(report, args, 0))
+        invalid = [("--observe-only",),
+                   ("--observe-only", "--mode", "vsync", "--scenario", "night-detail"),
+                   ("--observe-only", "--mode", "vsync", "--scenario", "night-wave", "--runs", "3"),
+                   ("--observe-only", "--formal"), ("--observe-only", "--stress")]
+        for options in invalid:
+            with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    self.arguments(*options)
 
     def test_native_stress_requires_requested_transitions_and_full_pressure(self):
         args = self.arguments("--stress", "--mode", "vsync", "--lifecycle")

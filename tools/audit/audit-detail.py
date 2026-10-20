@@ -139,7 +139,7 @@ for platform_name, platform_check in platforms.items():
                      "sourcePath": path, "lineOrSymbol": symbol,
                      "sourceSha256": hashlib.sha256(content).hexdigest(), "evidence": evidence,
                      "result": "static-audit-passed", "limitations":
-                     "Target native checks remain R34 except the explicitly listed macOS runtime reports"})
+                     "Target native checks remain R35/R36 except the explicitly listed macOS runtime reports"})
     output = root / f"verification/{platform_name}-static/detail"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")

@@ -23,4 +23,4 @@
 - `rhi-shell-gpu`保留61源状态（sourceIndex 2、4–57、60–65）、6排序/2隔离、1×/4×alpha和十次SG重建；sourceIndex的direct-material例外独立保持正确颜色域。10数学样本覆盖LTC/GGX/DFG/shadow、view-roll0/45，LTC≤.001，其余max(1e-6,abs(expected)×.001)；投影≤2逻辑px，alpha中心≤1/255/黑边≤原一码值，透明洞不写depth、4×有部分覆盖。
 - `rhi-flicker-gpu`使用真实SceneItem/匿名9×64库与封面；1/7/8/9实例跨批量边界、1×/4×及双主题/640×480和1280×720，静止/波浪/浏览/总览/详情连续检查。当前完整序列1200帧，正常光学与覆盖探针均有效，missing/nonfinite精确0、shade>100，运动不重建无关资源。
 - 独立光学诊断`rhi-flicker-audit 输出目录 --optics-only`只证明其光学断言；其他未覆盖断言另保留，不能将局部报告写为完整通过。旧GL R16F诊断问题的修正归occlusion.md，不能继续把其旧非有限字节当产品缺陷或把optics-only当完整通过。
-- 入口按test-gates.md选实际隐藏/窗口组；`audit-rhi-optics.py`/`audit-rhi-flicker.py`检查源适配/历史与平台分支。跨平台欠验与完整窗口/呈现要求归计划R34。
+- 入口按test-gates.md选实际隐藏/窗口组；`audit-rhi-optics.py`/`audit-rhi-flicker.py`检查源适配/历史与平台分支。跨平台欠验与完整窗口/呈现要求归计划R35/R36。

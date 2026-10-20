@@ -106,7 +106,7 @@
     "geometryInstanceBytes": 112,
     "aoSampleExecution": "Fixed 16/32/64 indices retain all seed=417 samples and accumulation order; radius is loop-invariant",
     "nativeAtlasProof": "Actual D3D11 UpdateSubresource destination boxes/row pitch plus completed whole-page GPU reads; physical bus traffic not measured",
-    "performanceScope": "Historical Windows R10C renderer-only 120s throughput evidence; not current source acceptance. Local CPU diagnostics use rhi-postprocess-audit --profile; full product/VSYNC remains R28/R34.",
+    "performanceScope": "Historical Windows R10C renderer-only 120s throughput evidence; not current source acceptance. Local CPU diagnostics use rhi-postprocess-audit --profile; full product/VSYNC remains R28/R36.",
     "evidence": "verification/windows/rhi-postprocess/release-runtime.json",
     "regressions": [
       "verification/windows/rhi-postprocess/release-prestage.json",
@@ -115,8 +115,8 @@
     "manifest": "resources/manifests/rhi-postprocess.json",
     "evidenceIndex": "verification/windows/rhi-postprocess/evidence-index.json",
     "rebuild": "ctest --preset qt-release-render -R '^rhi-postprocess-gpu$'",
-    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: non-OpenGL R34, OpenGL R35.",
-    "linux": "Target latest-Kit Vulkan build/runtime remains R34; explicit OpenGL runtime remains R35.",
+    "macos": "Current reliable hidden Metal/OpenGL checks; native window/VSYNC and final product matrix follow the migration plan: non-OpenGL R36, OpenGL R35.",
+    "linux": "Target latest-Kit Vulkan build/runtime remains R36; explicit OpenGL runtime remains R35.",
     "coverage": "docs/contracts/source-fidelity-review.md#r19d4b2-msaaresolve与旧门禁覆盖"
   },
   "productIntegration": {

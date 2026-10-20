@@ -1,6 +1,6 @@
 # Linux开发与部署操作
 
-本文只管Linux工具、部署和平台操作；Kit规则见[native-bootstrap.md](../contracts/native-bootstrap.md)，后端选择见[render-backend.md](../contracts/render-backend.md)。目标欠验及门槛集中在迁移计划R32-P，非OpenGL归R34，OpenGL归R35；其他系统的构建或qsb翻译不能替代Linux执行。
+本文只管Linux工具、部署和平台操作；Kit规则见[native-bootstrap.md](../contracts/native-bootstrap.md)，后端选择见[render-backend.md](../contracts/render-backend.md)。目标欠验及门槛集中在迁移计划R32-P，非OpenGL归R36，OpenGL归R35；其他系统的构建或qsb翻译不能替代Linux执行。
 
 ## 环境与构建
 
@@ -68,4 +68,4 @@ QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 | 生命周期/资源 | 同一窗口hide/minimize/restore、跨屏DPR及resize/画质/主题变化后输出有效；资源/寿命先静态审计，重复SG/视觉重建仅按test-gates.md补具体未决行为。 |
 | 呈现/性能 | xcb/Wayland各自核对实际上下文/swapchain、附件/格式/MSAA/resolve与正常呈现，共用无会话依赖结果。性能先按performance.md静态审计，具体未决问题才最小实测，不默认追加吞吐/计时；未知显示/GPU完成/driver显存保留null。 |
 
-需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL动态图形/窗口入口归R35，实际启用Vulkan的同项归R34，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tools/build/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。
+需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL动态图形/窗口入口归R35，实际启用Vulkan的同项归R36，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tools/build/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。

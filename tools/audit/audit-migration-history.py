@@ -126,7 +126,7 @@ for platform, platform_id, path, symbol, reason in [
         rows.append(dict(checkId=identity, requirement=evidence, platform=platform,
                          sourcePath=source, lineOrSymbol=marker, sourceSha256=digest(data),
                          evidence=evidence, result="static-audit-passed",
-                         limitations="Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R34."))
+                         limitations="Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R35/R36."))
     matrices[platform] = rows
 OUTPUT.mkdir(parents=True, exist_ok=True)
 (OUTPUT / "source-matrix.json").write_text(json.dumps(dict(

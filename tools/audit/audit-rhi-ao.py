@@ -56,7 +56,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     rows = []
     for check_id, path, symbol, conclusion in CHECKS + [(check_id, "cmake/Platform.cmake", marker,
             "Native Kit/compiler/API branches remain. Real target Windows/D3D11 and Linux/GL "
-            "environments are absent on this host; exact target matrix is retained for R34.")]:
+            "environments are absent on this host; exact target matrix is retained for R35/R36.")]:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):
             raise SystemExit(f"Audit source drift: {path}::{symbol}")

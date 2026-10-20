@@ -134,14 +134,15 @@ int main(int argc, char **argv)
         bool validSeconds = true;
         const double seconds =
                 argc >= 4 ? QString::fromLocal8Bit(argv[3]).toDouble(&validSeconds) : 0;
-        return (argc == 3 || argc == 4 || argc == 5) && validSeconds
+        const bool observeOnly = argc == 6 && QString::fromLocal8Bit(argv[5]) == "observe"_L1;
+        return (argc == 3 || argc == 4 || argc == 5 || observeOnly) && validSeconds
                 ? reviewStartup(
                           app, QString::fromLocal8Bit(argv[2]), seconds,
                           { { u"applicationSetupMs"_s, applicationNs / 1e6 },
                             { u"fontAndArgumentSetupMs"_s, (fontsNs - applicationNs) / 1e6 },
                             { u"scope"_s,
                               u"Review main entry through QGuiApplication and embedded font/argument setup; excludes pre-main loader, anonymous fixture generation, model/cover/render preparation and native presentation."_s } },
-                          argc == 5 ? QString::fromLocal8Bit(argv[4]) : u"matrix"_s)
+                          argc >= 5 ? QString::fromLocal8Bit(argv[4]) : u"matrix"_s, observeOnly)
                 : 2;
     }
     if (app.arguments().contains(u"--opening"_s))

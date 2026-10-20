@@ -57,7 +57,7 @@ for host, platform_guard in {
     entries = CHECKS + [(check_id, path, symbol,
                         "Native platform build/window/GPU branches remain real implementations; "
                         "macOS uses the true hidden Metal/OpenGL helper; missing Cocoa multisample-texture storage selects the stock same-format 4x buffer/resolve path. Windows/D3D11 and "
-                        "Linux/OpenGL target execution remains R34, not proved by macOS.")]
+                        "Linux/OpenGL target execution remains R35, not proved by macOS.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

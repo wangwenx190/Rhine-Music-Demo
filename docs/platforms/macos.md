@@ -1,6 +1,6 @@
 # macOS开发与部署操作
 
-本文只管macOS工具、应用入口与系统差异。Kit/C++23规则见[native-bootstrap.md](../contracts/native-bootstrap.md)，测试范围与复用见[test-gates.md](../contracts/test-gates.md)，未完成实机门槛集中于迁移计划R31-P、R34与R35。
+本文只管macOS工具、应用入口与系统差异。Kit/C++23规则见[native-bootstrap.md](../contracts/native-bootstrap.md)，测试范围与复用见[test-gates.md](../contracts/test-gates.md)，未完成实机门槛集中于迁移计划R31-P、R35与R36。
 
 ## 开发环境与构建
 

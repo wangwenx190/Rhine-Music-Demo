@@ -47,9 +47,9 @@ CHECKS = [
      "Cancellation stops timers/disconnects sources, advances slot serials and clears batch data; two reusable source owners die on their event-loop thread. Shutdown joins only at teardown. All production media work uses public platform-neutral Qt API; target backend support/error semantics still require native Windows/Linux tests."),
 ]
 PLATFORMS = {
-    "windows": ("WIN-01", "Wide paths/UNC and QSaveFile replacement rely on Qt; MSVC same-Kit build and actual Windows media backend, Unicode/ACL/timeout/cover parsing remain R22-P in R34."),
+    "windows": ("WIN-01", "Wide paths/UNC and QSaveFile replacement rely on Qt; MSVC same-Kit build and actual Windows media backend, Unicode/ACL/timeout/cover parsing remain R22-P in R36."),
     "macos": ("MAC-01", "Apple Silicon Release exercises Qt Multimedia and event-loop thread, real RIFF/ID3 CoverArtImage loading, generation replacement and hidden Metal shared regressions; no audio output or foreground window is needed for metadata."),
-    "linux": ("LNX-01", "UTF-8/case-sensitive paths use Qt and existing native filesystem hash. Target compiler/plugins/audio format errors and permissions remain R22-P in R34. No OpenGL context is needed by metadata/import tests; graphical regressions remain R35."),
+    "linux": ("LNX-01", "UTF-8/case-sensitive paths use Qt and existing native filesystem hash. Target compiler/plugins/audio format errors and permissions remain R22-P in R36. No OpenGL context is needed by metadata/import tests; graphical regressions remain R35."),
 }
 reference = ROOT.parent / "Rhine-Music-Database/Qt/tests/UiChecks.cpp"
 reference_info = dict(available=reference.exists(), sourcePath="Qt/tests/UiChecks.cpp",

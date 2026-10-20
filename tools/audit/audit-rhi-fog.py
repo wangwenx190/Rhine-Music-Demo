@@ -43,7 +43,7 @@ CHECKS = [
      "No QML binding, input, clock, motion or default quality changes."),
     ("PERF-07", "tools/review/RhiFogAudit.cpp", "cycle < 10",
      "Real hidden invalidation/rebuild checks restore fog uniforms and valid geometry ten times. "
-     "No new owned resource to leak. Native window, VSYNC and unavailable target hardware remain R34."),
+     "No new owned resource to leak. Native window, VSYNC and unavailable target hardware remain R35/R36."),
 ]
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
@@ -52,7 +52,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Qt Kit is selected dynamically. Shared std140/qsb API adapters preserve "
                         "color semantics; five shader target translations are static evidence only. "
-                        "D3D11/Linux hardware execution and normal presentation stay R34.")]
+                        "D3D11/Linux hardware execution and normal presentation stay R35/R36.")]
     for check_id, path, symbol, conclusion in entries:
         content = (ROOT / path).read_bytes()
         if " ".join(symbol.split()) not in " ".join(content.decode().split()):

@@ -1,6 +1,6 @@
 # 验证输出与Git边界
 
-本文只维护产物保留规则；来源映射归web-baseline.md，采样含义归performance.md，欠验归迁移计划R34/R35。
+本文只维护产物保留规则；来源映射归web-baseline.md，采样含义归performance.md，欠验归迁移计划R35/R36。
 
 - Git保留源码、产品资产、真正测试输入、必要参数/来源契约和简明结论。截图/差分/逐帧JSON/场景导出/原始性能序列/日志/机器矩阵/hash清单为本地输出，不提交。
 - `verification/`、`docs/media/`、`docs/contracts/web-scenes/`及legacy-web对应输出均忽略。需要原始证据时本地或仓库外归档，失败不能覆盖或改写为通过。

@@ -13,7 +13,7 @@
 - `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/resource-stress，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
 - fast/full/render清YALAHOO_VERIFY_VISIBLE/FOREGROUND/LIFECYCLE/STRESS；常规入口排除resource-stress，fast/full/render另排除native-visible，fast另排除render-integration。stress preset仅选择隐藏resource-stress；其他系统的原生压力用组件显式工具运行。macOS默认可见OFF，disabled如实暂缓；默认窗口策略只调用hiddenNativeWindow槽。
 - 先按被测行为、依赖、输入和运行条件判断已有结果是否仍有效，并尽可能复用。无关模块、Git版本号或重新链接导致二进制hash变化，本身不使结果失效；相关逻辑/输入/依赖或环境变化仅使对应结果失效。不影响行为的注释、文档或脚本注释改动无需专门运行测试；脚本逻辑变化检查其参数、错误传播与实际入口；代码逻辑变更只执行必要的对应检查。共享代码沿实际调用链确定范围，不自动扩大到fast集或完整回归。功能回放与性能问题分别选择；局部成本、计时、资源增长及重复重建压力先满足performance.md的静态未决门槛，不默认各跑一次。显式压力入口为verify-startup的--stress、verify-detail/overview的--lifecycle，报告实际完成次数；已有有效结果复用，真实失败仍保留。
-- OpenGL动态检查统一由迁移计划R35执行，R20–R34只运行适用的非OpenGL生产后端；Linux默认OpenGL动态入口同样后置。算法/源码/模块/构建和qsb跨目标静态检查照常执行；这不减少R35的原门槛。
+- OpenGL动态检查统一由迁移计划R35执行，非OpenGL动态欠验由R36执行；Linux默认OpenGL动态入口同样后置。算法/源码/模块/构建和qsb跨目标静态检查照常执行；这不减少R35的原门槛。
 - 对需要新验证的受影响行为按风险选择尺寸/主题/DPR，只覆盖其实际依赖的范围；未被改动触及的最终目标矩阵结果继续复用，未执行的目标门槛仍保留。报告区分本次实际、复用、未选、暂缓及原因。首次目标验收先区分已有共用证据与目标特有缺口，仅补后者；组件所列完整工具状态集不自动成为首次验收清单。必须实际运行才能确定的功能/画质/设备事实仍保留，不能以代表组合冒称全部通过。格式与官方qmllint的适用选择归code-style.md，同样不扩大为功能回归。
 
 ## 积欠项的合并与矩阵选择

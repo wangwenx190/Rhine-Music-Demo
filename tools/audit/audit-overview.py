@@ -115,7 +115,7 @@ platforms = {
     "windows": ("WIN-01", "cmake/Platform.cmake", "WIN32",
                 "No new OS API enters product/blur paths; MSVC/C++23, Qt resources and D3D11 bindings "
                 "remain. Native D3D11/OpenGL quality, input/focus, DPR and restores need Windows Kit/GPU; "
-                "run verify-overview.py and its --visual resource/structure mode there. Static audit passed, runtime R34."),
+                "run verify-overview.py and its --visual resource/structure mode there. Static audit passed, runtime R35/R36."),
     "macos": ("MAC-01", "src/app/VerificationWindowMac.mm", "foregroundVerification() ? NSApplicationActivationPolicyRegular",
               "Authorized verification uses Regular before QGuiApplication, then ordinary native window "
               "level and explicit show activation. Default remains Prohibited/nonactivating/bottom and "
@@ -124,7 +124,7 @@ platforms = {
     "linux": ("LNX-01", "cmake/Platform.cmake", "UNIX",
               "All new classes/QML/shaders use real Qt implementations on Linux; no dummy backend or "
               "platform bypass. Existing OpenGL and XDG/resource branches remain. X11/xcb and Wayland "
-              "DPR/focus/input/capture/restore and GL output quality requires native compositor/Kit (R34)."),
+              "DPR/focus/input/capture/restore and GL output quality requires native compositor/Kit (R35)."),
 }
 for name, platform_check in platforms.items():
     rows = []
@@ -136,7 +136,7 @@ for name, platform_check in platforms.items():
                      "sourcePath": path, "lineOrSymbol": symbol,
                      "sourceSha256": hashlib.sha256(content).hexdigest(), "evidence": evidence,
                      "result": "static-audit-passed", "limitations":
-                     "Native scope only as listed in runtime-evidence; other required target checks remain R34"})
+                     "Native scope only as listed in runtime-evidence; other required target checks remain R35/R36"})
     output = root / f"verification/{name}-static/overview"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")

@@ -14,7 +14,7 @@
 
 `probeOptionalGraphicsBackend`在QGuiApplication后、任何Quick窗口前对Vulkan及Windows显式D3D12一次初始化临时QRhi并核对生产RGBA16F/R16F/D32F附件能力。Vulkan使用临时QVulkanInstance，要求Qt Vulkan特性、SDK开发头及运行时/驱动；macOS可使用MoltenVK，但仅安装MoltenVK不能给未启用Vulkan的Qt构建添加该特性。显式请求初始化或格式失败时退出；仅Linux未显式指定时允许默认Vulkan失败后提示并更新实际API为OpenGL。
 
-探测资源在GUI启动阶段释放，生产实例/设备仍由Qt场景图拥有，不跨线程传递探测资源。生产渲染器记录实际QRhi后端和设备，验证报告按实际API与选择值核对。初始化不证明surface/swapchain、呈现或完整画质；D3D11/Metal及实际启用的D3D12/Vulkan动态检查归R34，OpenGL归R35。平台部署与运行操作仅在各平台文档维护。后端选择的无GPU检查为Release `graphics-backend`，不创建上下文或窗口。
+探测资源在GUI启动阶段释放，生产实例/设备仍由Qt场景图拥有，不跨线程传递探测资源。生产渲染器记录实际QRhi后端和设备，验证报告按实际API与选择值核对。初始化不证明surface/swapchain、呈现或完整画质；D3D11/Metal及实际启用的D3D12/Vulkan动态检查归R36，OpenGL归R35。平台部署与运行操作仅在各平台文档维护。后端选择的无GPU检查为Release `graphics-backend`，不创建上下文或窗口。
 
 依据：[Qt QRhi后端与能力](https://doc.qt.io/qt-6/qrhi.html)、[Qt Quick显式D3D12选择](https://www.qt.io/blog/direct3d-12-support-in-qt-6.6)。
 

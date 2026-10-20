@@ -56,7 +56,7 @@ for platform, target in [("windows", "D3D11"), ("macos", "Metal"), ("linux", "Op
         checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
                            sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
                            sourceSha256=source_hashes[path], result="source-reviewed",
-                           limitations=f"Target {target} runtime independent. Native/physical/VSYNC gaps: R28-P in R34; all OpenGL dynamic checks: R35."))
+                           limitations=f"Target {target} runtime independent. Native/physical/VSYNC gaps: R28-P in R36; all OpenGL dynamic checks: R35."))
     output = ROOT / "verification" / f"{platform}-static" / "startup"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, sourceSha256=source_hashes,

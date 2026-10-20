@@ -102,7 +102,7 @@ CHECKS = [
      'cannot replace an old package, rename failure restores it. Qt production SG/render owns '
      'GL/Vulkan resources, DPR/surface changes invalidate compatible keys, stale callbacks use epochs. '
      'No native restore, normal VSYNC, physical latency or target memory result is inferred; '
-     'R32-P retains non-OpenGL build/media/deploy in R34 and xcb/Wayland OpenGL dynamics in R35.'),
+     'R32-P retains non-OpenGL build/media/deploy in R36 and xcb/Wayland OpenGL dynamics in R35.'),
 ]
 
 
@@ -188,7 +188,7 @@ def main():
                                line=source[:source.index(symbol)].count('\n') + 1,
                                sourceSha256=hashes[path], evidence=conclusion, result='source-reviewed',
                                limitations=('Linux native compilation/deployment/media and optional '
-                                            'Vulkan: R32-P/R34; OpenGL xcb/Wayland: R32-P/R35.'
+                                            'Vulkan: R32-P/R36; OpenGL xcb/Wayland: R32-P/R35.'
                                             if platform == 'linux' else
                                             'Linux-only ELF/install/probe branches N/A; shared startup/launcher '
                                             'and import closure reviewed. Actual host results recorded separately; '

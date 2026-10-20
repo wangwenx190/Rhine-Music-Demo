@@ -63,7 +63,7 @@ for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'),
         rows.append(dict(checkId=identity, requirement=reason, platform=platform, sourcePath=path,
                          lineOrSymbol=symbol, evidence=reason,
                          sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed',
-                         limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R34 retains missing targets.'))
+                         limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R35/R36 retains missing targets.'))
     output = ROOT / 'verification' / f'{platform}-static' / 'browse-navigation'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, checks=rows), indent=2) + '\n')

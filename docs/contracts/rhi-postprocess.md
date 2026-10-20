@@ -18,7 +18,7 @@
 - AO raw/blur为R16F，normal/depth随AO尺寸，full DOF深度独立且仅全分辨率兼容时共用。kernel仅创建时写入std140的offset80，固定1104-byte块；每个pass动态80-byte前缀，不保留闲置kernel纹理。
 - 颜色ping/pong仅在生命周期不重叠时复用，pass各有uniform/SRB/目标。Bokeh-only一个全尺寸RGBA16F ping/一个uniform，常态80bytes；SMAA-only三个单采样全尺寸RGBA16F目标、两张无mip RGBA8 lookup、三个uniform，常态240bytes，载荷估算`24×width×height+370424`bytes。
 - 相机/focus/aperture/主题数值/输入内容变化只更新uniform，不重建兼容目标；尺寸/核/启用状态/实际输入附件身份变化才重建对应图。关闭通道不保留其附件；Review中间目标只读访问在普通构建返回nullptr，不改变跨编译单元类声明。
-- qsb由同一最新Kit生成SPIR-V/GLSL330/ES300/HLSL50/MSL12；位置invariant的两个geometry顶点独用MSL2.1。各语言翻译是静态证据，目标运行依计划R34。
+- qsb由同一最新Kit生成SPIR-V/GLSL330/ES300/HLSL50/MSL12；位置invariant的两个geometry顶点独用MSL2.1。各语言翻译是静态证据，目标运行依计划R35/R36。
 
 ## 上传核验
 

@@ -34,7 +34,7 @@ CHECKS = [
     ("PERF-06", "qml/Yalahoo/Music/pages/MusicStage.qml", "stage.inputRouter.ownsFocus()",
      "Input ownership is reused for Space; controls own seek/volume/device input. Track row accent checks album+track identity. Preview never seeks on each move, release commits once; source changes cancel old drag. Header/scene do not query media per frame."),
     ("PERF-07", "src/app/main.cpp", "QCoreApplication::aboutToQuit",
-     "Quit stops media before storage teardown. Visual rebuild/hide does not own media lifetime. No-output defer/reconnect, pause/stop, stale events and orphan queue are explicitly tested. Platform-specific hardware/backends/physical input remain R24-P, with graphics split under R34/R35."),
+     "Quit stops media before storage teardown. Visual rebuild/hide does not own media lifetime. No-output defer/reconnect, pause/stop, stale events and orphan queue are explicitly tested. Platform-specific hardware/backends/physical input remain R24-P, with graphics split under R35/R36."),
 ]
 paths = sorted({path for _, path, _, _ in CHECKS} | {
     "CMakeLists.txt", "cmake/Assets.cmake", "cmake/BrowseQml.cmake", "cmake/TestPolicy.cmake",
@@ -55,9 +55,9 @@ for path in ["src/music-player.ts", "src/music-app.ts"]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
     frozen.append(dict(sourcePath=path, revision=revision, sourceSha256=hashlib.sha256(data).hexdigest()))
 for platform, identity, target in [
-    ("macos", "MAC-01", "Actual public Qt backend and Metal hidden results remain local reports; physical unplug, output listening and native input/window/DPR remain R24-P/R34."),
-    ("windows", "WIN-01", "Public Qt APIs use real native devices with no old private layout patch. Target compiler/plugins/audio backend/physical output and D3D11 remain R24-P/R34; OpenGL graphics remain R35."),
-    ("linux", "LNX-01", "Local URLs and Qt Multimedia use native backend/device support. Native compiler/audio plugin/PipeWire or PulseAudio/ALSA availability and output remain R24-P/R34; GL GUI/input/lifecycle remain R35."),
+    ("macos", "MAC-01", "Actual public Qt backend and Metal hidden results remain local reports; physical unplug, output listening and native input/window/DPR remain R24-P/R36."),
+    ("windows", "WIN-01", "Public Qt APIs use real native devices with no old private layout patch. Target compiler/plugins/audio backend/physical output and D3D11 remain R24-P/R36; OpenGL graphics remain R35."),
+    ("linux", "LNX-01", "Local URLs and Qt Multimedia use native backend/device support. Native compiler/audio plugin/PipeWire or PulseAudio/ALSA availability and output remain R24-P/R36; GL GUI/input/lifecycle remain R35."),
 ]:
     rows = []
     for check_id, path, symbol, requirement in CHECKS + [(identity, "src/media/PlaybackController.cpp", "void PlaybackController::applyDevices", target)]:

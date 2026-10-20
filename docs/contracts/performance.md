@@ -104,6 +104,8 @@ Linux的X11/Wayland分别完成实际窗口/输入/呈现检查，不为会话�
 
 `startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效。`startup-qml`（`ui-audit --startup 新目录 [0或12..120秒] [matrix或固定场景名]`）加载真实MusicStage；普通回放覆盖三次换片、缓存回选、暂停/播放各一次完整视觉root/SG重建、源revision/意图保留、renderer释放及资源回落。滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize仍走真实组件；隐藏、空闲零工作需要观察窗口，不以立即检查代替。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音合成WAV，禁止私人库。`audit-startup.py`维护COMMON/PERF三平台来源绑定。
 
+`verify-startup.py --observe-only --mode vsync|uncapped --scenario day-wave|night-wave --seconds 12..120`只观察一个原生波浪场景：同一576专辑/有界实体池使用qrc封面，无歌曲、大封面生成、功能回放、换片、root重建或固定暖机，不能与formal/stress合用。底层为`ui-audit --startup 新目录 秒数 场景 observe`。只记录真实FrameClock帧回调、afterSynchronizing、RHI提交、frameSwapped及窗口事件；一个时限timer结束观测，不驱动渲染或轮询。三个原始时间流须在采样区间内有递增样本，持续曝光与窗口策略独立验收；短观察不执行长期性能门槛，不解释历史异常为已修复。`samples[].clockFrame`是在GUI接收遥测时读取的计数，精确GUI时序使用独立`guiFrames[].atNs`。
+
 | 目的 | 显式入口（Python工具需`--backend`及全新`--output`） | 结论 |
 | --- | --- | --- |
 | 局部诊断 | `verify-startup.py --mode offscreen`；原生模式指定相关`--scenario` | 仅静态未决项确实需要该观测时选择；现有默认30秒不是任务要求，先按问题收窄入口 |

@@ -119,7 +119,7 @@ def main():
                                sourcePath=path, lineOrSymbol=symbol,
                                line=source[:source.index(symbol)].count("\n") + 1,
                                evidence=evidence, result="source-reviewed", sourceSha256=hashes[path],
-                               limitations="Windows PE/build/deploy/device/presentation: R30-P (R34); OpenGL: R35. "
+                               limitations="Windows PE/build/deploy/device/presentation: R30-P (R36); OpenGL: R35. "
                                + ("This platform is outside the Windows packaging branch; shared resource/startup impact only."
                                   if platform != "windows" else "No native Windows execution on this host inferred.")))
         output = ROOT / "verification" / f"{platform}-static" / "windows-deployment"

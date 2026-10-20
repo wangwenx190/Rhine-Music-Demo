@@ -22,6 +22,8 @@ def parse_arguments(argv=None):
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--formal", action="store_true", help="One 120-second normal VSYNC acceptance sample")
     scope.add_argument("--stress", action="store_true", help="One resource stress replay without timed sampling")
+    scope.add_argument("--observe-only", action="store_true",
+                       help="Observe one native wave scenario without functional replay or large input generation")
     parser.add_argument("--seconds", type=int)
     parser.add_argument("--runs", type=int, choices=(1, 3),
                         help="One run by default; three only for an explicit comparison or fixed recheck")
@@ -48,6 +50,9 @@ def parse_arguments(argv=None):
             parser.error("Native sampling requires --scenario with one fixed day/night scenario")
     if not args.stress and args.mode != "offscreen" and args.scenario == "matrix":
         parser.error("Choose one fixed scenario for native sampling")
+    if args.observe_only and (args.mode == "offscreen" or args.scenario not in ("day-wave", "night-wave")
+                              or args.runs != 1):
+        parser.error("Observation requires one native day-wave/night-wave run")
     if args.mode == "offscreen":
         if platform.system() != "Darwin":
             parser.error("The genuine hidden RenderControl entry is currently implemented on macOS only")
@@ -61,7 +66,7 @@ def parse_arguments(argv=None):
 
 
 def validate_report(report, args, exit_code):
-    expected_switches, expected_rebuilds = (30, 10) if args.stress else (3, 2)
+    expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (30, 10) if args.stress else (3, 2)
     valid = (exit_code == 0 and report.get("functionalPassed") is True
              and report.get("samplingComplete") is True
              and report.get("backend") == BACKEND_IDS[args.backend]
@@ -69,6 +74,7 @@ def validate_report(report, args, exit_code):
              and report.get("scenario") == args.scenario
              and report.get("stressRequested") is args.stress
              and report.get("samplingRequestedSeconds") == args.seconds
+             and report.get("observationOnly", False) is args.observe_only
              and report.get("switches") == expected_switches
              and report.get("rebuilds") == expected_rebuilds)
     if args.seconds:
@@ -84,6 +90,18 @@ def validate_report(report, args, exit_code):
     if args.formal:
         valid = (valid and report.get("performanceGateEnforced") is True
                  and report.get("performanceGatePassed") is True)
+    if args.observe_only:
+        start, end = report.get("samplingStartedNs", 0), report.get("samplingEndedNs", 0)
+        streams = [[frame.get("atNs", 0) for frame in report.get("guiFrames", [])],
+                   report.get("synchronizationTimestampsNs", []),
+                   report.get("qtPresentationTimestampsNs", [])]
+        during_sampling = [[stamp for stamp in stream if start <= stamp <= end] for stream in streams]
+        valid = (valid and report.get("windowPolicy", {}).get("passed") is True
+                 and report.get("performanceGateEnforced") is False
+                 and report.get("continuouslyExposedDuringSampling") is True
+                 and start > 0 and end > start
+                 and all(len(stream) >= 2 and all(a < b for a, b in zip(stream, stream[1:]))
+                         for stream in during_sampling))
     return bool(valid)
 
 
@@ -120,9 +138,12 @@ def main(argv=None):
                     binarySha256=hashlib.sha256(executable.read_bytes()).hexdigest(),
                     sourceSha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in sorted(source_files) if p.is_file()},
-                    fixture="StartupAudit::fixture: generated 576 albums/96 distinct 2048-square JPEGs; test::wave(600000), no private library",
+                    fixture=("StartupAudit::fixture: 576 albums with embedded qrc covers, no audio or generated large covers"
+                             if args.observe_only else
+                             "StartupAudit::fixture: generated 576 albums/96 distinct 2048-square JPEGs; test::wave(600000), no private library"),
                     backend=args.backend, dpr=args.dpr, mode=args.mode, scenario=args.scenario, seconds=args.seconds,
-                    formalRequested=args.formal, stressRequested=args.stress, formalAcceptancePassed=None,
+                    formalRequested=args.formal, stressRequested=args.stress, observationOnly=args.observe_only,
+                    formalAcceptancePassed=None,
                     foreground=args.foreground, lifecycle=args.lifecycle, requestedRuns=args.runs,
                     runs=[], completed=False, passed=False)
     manifest_path = args.output / "manifest.json"
@@ -136,7 +157,10 @@ def main(argv=None):
         output = args.output / f"run-{index}"
         with (args.output / f"run-{index}.log").open("w", encoding="utf-8") as log:
             try:
-                result = subprocess.run([str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario],
+                command = [str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario]
+                if args.observe_only:
+                    command.append("observe")
+                result = subprocess.run(command,
                                         cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
                                         timeout=1200, check=False)
                 code = result.returncode

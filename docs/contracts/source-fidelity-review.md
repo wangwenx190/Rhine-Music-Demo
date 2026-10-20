@@ -36,7 +36,7 @@
 | R16B2 | `509afe8` | R19F保留Canvas有效可见性/窗口断连和三次成本采样；候选逐面重shaping的语义限制明确。 |
 | R16B2V | `07514a5` | R19F以QTextLine实际混合ascent确认主字体基线修正；恢复标题尺寸保留，撤回的采样不恢复。 |
 | R16B2V-P | 任务见 `07514a5`；未找到独立完成提交 | Windows 未收口像素任务已被后续契约替代；共享字体/基线代码由 R19F 追踪，不恢复原图门禁。 |
-| R16B2W | 任务见 `509afe8`；未找到独立完成提交 | 没有独立生产选型；已有共享 DPR/生命周期和工具改动归 R19F，D3D11 目标实机仍归 R34。 |
+| R16B2W | 任务见 `509afe8`；未找到独立完成提交 | 没有独立生产选型；已有共享 DPR/生命周期和工具改动归 R19F，D3D11 目标实机仍归 R36。 |
 | R16B3 | 任务见 `2abb4f6`；未找到独立完成提交 | Windows OpenGL 未独立完成；共享 GL 适配及候选代码归 R19F/D，目标实机仍归 R35。 |
 | R16M1 | `c7e9b61`；前置 `6740abc` | R19F保留RenderControl真实target DPR、Review隐藏状态消费和字体head身份；不外推屏幕呈现。 |
 | R16M2 | `b9a5ea7` | R19F以源PostScript面与实际run head/advance确认AppleColorEmoji公开选择；缺字体回滚，保留。 |
@@ -309,7 +309,7 @@ Canvas Painter的采用依据为源矩形/路径表达、固定值同步、rende
 | albumAbout/producerBlock与离线Provider边界 | 独立离线badge；保留介绍/备注/目录/流派/来源/许可。已有制作资料按源人名/来源分组、trackId索引、角色/URL与未细分署名可读，行虚拟化避免全量委托；展开的多曲目署名使用有界高度的嵌套ListView，这是保留全部本地资料的原生有界适配。查询不执行，原lookup JSON和未知状态仍展示；联网执行保持暂缓；设置与资料异步路由见library-data.md。 |
 | 原生文字/资源适配 | 公共ArchiveText分数字号/整行shaping保留；曲目CSS normal以实际resolved ascent/descent分别取整，缓存有界，不加按截图调出的偏移。局部backdrop附件随可见Loader销毁，尺寸/DPR不改变3D目标键。 |
 
-macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R34/R17-P，Linux/OpenGL归R35的R17-P，不外推为全平台通过。
+macOS Metal/OpenGL隐藏RenderControl的九尺寸/双主题/三target DPR结构、万曲有界委托、Qt tab输入/滚动钳制、退出/重开及十次恢复已实际验证；自身正常输出无异常裁切或额外模糊。物理屏幕DPR/键鼠触控、原生同窗口/系统焦点与Windows/D3D11的目标补验归R36/R17-P，Linux/OpenGL归R35的R17-P，不外推为全平台通过。
 
 ## R19H 全历史闭包与保留适配
 
@@ -420,6 +420,16 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 
 本机Release已实际执行启动/帧源/封面/开场/实验状态和隐藏Metal生产图集、片头、诊断与完整舞台生命周期回归；三次串行120秒隐藏成本回放保留独立原始样本。初始化、准备时延、GUI/同步/Quick提交/endFrame等待、RHI提交及资源描述符分别记账；不将其解释为原生VSYNC、物理输入/显示或driver显存验收。
 
+当前非OpenGL阶段的提交链判定如下；这些源码结论与历史呈现异常的原因分开，未决事实只由计划R28-P维护。
+
+| 当前源码边界 | 静态判定 |
+| --- | --- |
+| StartupCoordinator::schedule/applyPending → LibrarySession | 单个queued通知与一个最新不可变快照；没有pending时不进入库替换。Film冻结、隐藏与恢复门槛不引入周期等待或逐帧扫描。 |
+| MusicStage.FrameAnimation → FrameClock::advance → SceneAdapter::publish → SceneItem::schedule/updatePolish | 原生唯一帧源、GUI失效合并与最新revision提交；正常波浪的实体工作集至多436，不读取封面文件或等待解码。不能从这条源码链推断Qt原生曝光和驱动调度的实际时序。 |
+| RhiItem::submit → Renderer::synchronize/renderFrame → SceneItem::configureTelemetry | render仅使用同步快照，上传有界；无捕获稳态不做GPU读回/finish。遥测邮箱至多128个样本，queued通知合并且epoch拒绝旧结果，GUI接收时刻与render提交时刻是不同事实。 |
+| StartupAudit::Driver::wait / AuditWindow::record | 原生等待由真实frameSwapped排队评估，FrameAnimation继续由Qt驱动；旧失败缺失的曝光/GUI时序不能用末尾windowPolicy或GUI接收时的clockFrame补证。该范围内未确定能解释原始间断的产品源码缺陷。 |
+| StartupAudit原生observe分支 → verify-startup | 只缩小诊断驱动与匿名输入，复用同一生产MusicStage/RHI；独立时间流和失败证据保留不改变源运动、画质、渲染图或正常播放器行为。 |
+
 ## R29 · 整场GUI来源与状态闭包
 
 | 生产范围 | 来源与当前判定 |
@@ -457,4 +467,4 @@ REFDB-06仅参考UiChecks中静止、绘制后失效、隐藏恢复、缓存回�
 | GraphicsBackend → QGuiApplication → BackendCapabilities → Qt生产场景图 | Linux默认Vulkan；默认或显式Vulkan的一次初始化/附件格式探测有明确回退，探测资源不进入生产render线程。源渲染图/效果/相机/运动/控制器不变，Vulkan初始化不代表窗口/swapchain或完整产品验收。 |
 | 根sh/演示/实验启动器 → 包优先/Release开发回退 | 保留参数、Unicode/空格和退出码，包内查找路径不借外部Qt/媒体库；显示会话、XDG及音频路由保持调用者选择。播放器不引入Python/ELF工具等开发运行依赖。 |
 
-COMMON/LNX/PERF源码审计覆盖非Windows路径、大小写/权限/数据根、媒体状态/关闭、触控板、字体和Canvas缓存/线程/资源图；实际产品导入闭包与qsb跨目标变体由同Kit检查。主机macOS的Release、官方产品qmllint、默认隐藏策略与Metal独立后处理、生产包加载回归只证明受影响共享入口。Linux原生编译/打包/ELF与真实媒体成功路径、Vulkan编译/设备及xcb/Wayland图形/窗口/输入/性能尚需目标环境，完整保留于R32-P并按R34/R35分工；无新增冻结源效果例外。
+COMMON/LNX/PERF源码审计覆盖非Windows路径、大小写/权限/数据根、媒体状态/关闭、触控板、字体和Canvas缓存/线程/资源图；实际产品导入闭包与qsb跨目标变体由同Kit检查。主机macOS的Release、官方产品qmllint、默认隐藏策略与Metal独立后处理、生产包加载回归只证明受影响共享入口。Linux原生编译/打包/ELF与真实媒体成功路径、Vulkan编译/设备及xcb/Wayland图形/窗口/输入/性能尚需目标环境，完整保留于R32-P并按R35/R36分工；无新增冻结源效果例外。

@@ -68,7 +68,7 @@ for platform, platform_check in platforms.items():
             "sourceSha256": hashlib.sha256(content).hexdigest(), "evidence": evidence,
             "result": "static-audit-passed",
             "limitations": "Manual parameter/call-chain scope only; actual runs are listed separately "
-                           "in source-fidelity-review.md. Target runtime remains R34/R19C2/D.",
+                           "in source-fidelity-review.md. Target runtime remains R35/R36/R19C2/D.",
         })
     output = root / f"verification/{platform}-static/material-parameters"
     output.mkdir(parents=True, exist_ok=True)
@@ -77,5 +77,5 @@ for platform, platform_check in platforms.items():
         f"# R19C1 {platform} static parameter audit\n\n"
         + "\n\n".join(f"{row['checkId']} `{row['sourcePath']}::{row['lineOrSymbol']}`: "
                        + row['evidence'] for row in rows)
-        + "\n\nStatic audit passed; native target runtime is separate (R34).\n")
+        + "\n\nStatic audit passed; native target runtime is separate (R35/R36).\n")
 print("R19C1 static matrices generated for Windows, macOS and Linux")

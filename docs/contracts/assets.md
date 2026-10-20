@@ -58,7 +58,7 @@ font.pixelSize: 24
 
 ## 资产检查
 
-`assets`检查manifest/qrc hash、完整GLB/Qt mesh属性/三批次/纸面间隙、四物理字体表/字重/shaping、功能SVG与无声媒体加载；`branding`检查独立原创资产。准备CLI见本文，通用Kit/构建/窗口规则只引用公共契约；平台剩余验收归计划R34/R19A-P。
+`assets`检查manifest/qrc hash、完整GLB/Qt mesh属性/三批次/纸面间隙、四物理字体表/字重/shaping、功能SVG与无声媒体加载；`branding`检查独立原创资产。准备CLI见本文，通用Kit/构建/窗口规则只引用公共契约；平台剩余验收归计划R36/R19A-P。
 
 ## 写入前的冻结来源保护
 
