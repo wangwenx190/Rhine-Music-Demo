@@ -1,3 +1,6 @@
+// Connects presentation readiness to selected-case motion. The narrow bridge keeps UI lifecycle
+// decisions separate from archive simulation.
+
 #pragma once
 
 namespace yalahoo {

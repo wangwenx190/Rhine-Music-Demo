@@ -1,3 +1,7 @@
+// Checks extraction, interrupted exchange and return-copy state independently of rendered
+// images. Explicit fixture literals are independent inputs or expected results; timing bounds
+// have named constants.
+
 #include "PresentationController.h"
 #include "MotionController.h"
 #include "SelectionController.h"

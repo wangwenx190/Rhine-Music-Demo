@@ -1,3 +1,6 @@
+// Exposes immutable bundled pixels to the Quick 3D review materials. Texture ownership follows
+// the Qt object tree rather than temporary image buffers.
+
 #pragma once
 #include <QQuick3DTextureData>
 #include <QtQml/qqmlregistration.h>

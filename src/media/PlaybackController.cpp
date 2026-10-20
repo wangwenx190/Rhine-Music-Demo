@@ -9,13 +9,19 @@
 #include <cmath>
 #include <utility>
 
+namespace {
+// Previous restarts the current track only after the authored playback-position threshold.
+constexpr auto DefaultSongVolume = .65f;
+constexpr auto RestartPreviousThresholdMilliseconds = 3000;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
     : QObject(parent), m_library(library), m_devices(this), m_output(this), m_player(this)
 {
-    m_output.setVolume(.65f);
+    m_output.setVolume(DefaultSongVolume);
     m_player.setPlaybackRate(1);
     m_player.setAudioOutput(&m_output);
     connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {
@@ -407,7 +413,7 @@ void PlaybackController::previous()
 {
     if (!track())
         return;
-    if (position() > 3000) {
+    if (position() > RestartPreviousThresholdMilliseconds) {
         seek(0);
         return;
     }
@@ -516,6 +522,8 @@ void PlaybackController::refreshDevices()
 {
     applyDevices(QMediaDevices::audioOutputs(), QMediaDevices::defaultAudioOutput());
 }
+// Choose a surviving explicit device first, then the system default. A route change preserves
+// source identity, valid position and the newest pause/stop intent across backend reloads.
 void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
                                       const QAudioDevice &systemDefault)
 {

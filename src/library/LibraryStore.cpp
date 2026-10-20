@@ -20,11 +20,20 @@
 #include <QtConcurrentRun>
 #include <utility>
 
+namespace {
+// Bound metadata batches and validate persisted network configuration before committing it.
+constexpr auto MetadataBatchMiB = 8;
+constexpr auto BytesPerKiB = 1024;
+constexpr auto MaximumContactCharacters = 500;
+constexpr auto DefaultHttpProxyPort = 8080;
+constexpr auto MaximumTcpPort = 65535;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-constexpr qint64 maximumCacheBytes = 256 * 1024 * 1024;
+constexpr qint64 maximumCacheBytes = 256 * BytesPerKiB * BytesPerKiB;
 }
 struct LibraryStore::Private final
 {
@@ -105,7 +114,7 @@ void LibraryStore::stageMetadata(const ProviderResult &result)
     d->m_metadataBytes -= d->m_metadataPending.value(key).payloadBytes;
     d->m_metadataPending.insert(key, result);
     d->m_metadataBytes += result.payloadBytes;
-    if (d->m_metadataBytes >= 8 * 1024 * 1024)
+    if (d->m_metadataBytes >= MetadataBatchMiB * BytesPerKiB * BytesPerKiB)
         commitMetadata();
 }
 void LibraryStore::commitMetadata()
@@ -169,7 +178,7 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
     }
     if (patch.contains(u"musicBrainzContact"_s)) {
         const auto contact = patch.value(u"musicBrainzContact"_s).toString();
-        if (contact.size() > 500 || contact.contains(QChar::CarriageReturn)
+        if (contact.size() > MaximumContactCharacters || contact.contains(QChar::CarriageReturn)
             || contact.contains(QChar::LineFeed)) {
             report(QCoreApplication::translate(
                     "Yalahoo", "The metadata contact must be one line of at most 500 characters."));
@@ -180,7 +189,8 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
         const QUrl proxy(patch.value(u"proxyUrl"_s).toString());
         if (!proxy.isValid() || proxy.scheme() != "http"_L1 || proxy.host().isEmpty()
             || !proxy.userInfo().isEmpty() || proxy.hasQuery() || proxy.hasFragment()
-            || proxy.port(8080) < 1 || proxy.port(8080) > 65535
+            || proxy.port(DefaultHttpProxyPort) < 1
+            || proxy.port(DefaultHttpProxyPort) > MaximumTcpPort
             || (!proxy.path().isEmpty() && proxy.path() != "/"_L1)) {
             report(QCoreApplication::translate("Yalahoo", "Enter a valid HTTP proxy URL."));
             return false;
@@ -366,6 +376,8 @@ LibraryStore::JobResult LibraryStore::write(const QString &path, Snapshot snapsh
                 + file.errorString();
     return result;
 }
+// One worker owns all filesystem transactions. Prefer the latest scan intent and coalesce saves,
+// so canceled work cannot create an unbounded queue or overwrite a newer accepted snapshot.
 void LibraryStore::schedule()
 {
     if (d->m_active != Kind::None) {
@@ -429,6 +441,8 @@ void LibraryStore::schedule()
     }
     Q_EMIT statusChanged();
 }
+// Completion is a publication boundary: accept only the job generation still owned by this store.
+// Scheduling the next coalesced intent happens after the candidate has been reconciled.
 void LibraryStore::complete()
 {
     const auto kind = std::exchange(d->m_active, Kind::None);

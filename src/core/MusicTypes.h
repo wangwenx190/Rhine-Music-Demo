@@ -1,3 +1,6 @@
+// Defines library value records and immutable shared snapshots. Parsing validates a candidate
+// before publication and preserves unknown JSON fields.
+
 #pragma once
 
 #include <QJsonObject>

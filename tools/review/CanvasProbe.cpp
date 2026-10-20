@@ -8,7 +8,7 @@
 using namespace Qt::StringLiterals;
 
 namespace {
-CanvasProbeStats stats;
+constinit CanvasProbeStats stats;
 class ProbeRenderer final : public QCanvasPainterItemRenderer
 {
     Q_DISABLE_COPY_MOVE(ProbeRenderer)

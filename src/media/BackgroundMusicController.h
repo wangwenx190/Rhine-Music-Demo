@@ -1,3 +1,6 @@
+// Owns the independent Qt Multimedia background-music route. Visibility and user preferences
+// control its intent without changing song playback.
+
 #pragma once
 #include <QAudioOutput>
 #include <QAudioDevice>
@@ -7,6 +10,11 @@
 #include <QTimer>
 
 namespace yalahoo {
+namespace backgroundAudio {
+// Independent background-audio preference, normalized to unity.
+inline constexpr auto DefaultVolume = .18;
+}
+
 class AudioAmbienceTest;
 class BackgroundMusicController : public QObject
 {
@@ -66,7 +74,7 @@ private:
     QElapsedTimer m_elapsed;
     QString m_error;
     SongActivity m_song = SongActivity::Stopped;
-    double m_volume = .18, m_from = 0, m_target = 0;
+    double m_volume = backgroundAudio::DefaultVolume, m_from = 0, m_target = 0;
     int m_duration = 0;
     bool m_enabled = true, m_active = false, m_available = false, m_refreshPending = false;
 };

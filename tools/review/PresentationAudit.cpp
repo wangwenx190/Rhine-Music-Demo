@@ -22,6 +22,16 @@
 #include <QTest>
 #include <atomic>
 
+namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int ModelDeadlineMilliseconds = 3000;
+}
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int EventPollMilliseconds = 10;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -154,8 +164,8 @@ int reviewPresentation(QGuiApplication &, const QString &output)
             return OffscreenSurface::Enabled ? frames.size() > previous
                                              : presentedFrame.load() >= requested;
         };
-        while (!completed() && timer.elapsed() < 3000)
-            QTest::qWait(10);
+        while (!completed() && timer.elapsed() < ModelDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
         return completed();
     };
     bool passed = true;

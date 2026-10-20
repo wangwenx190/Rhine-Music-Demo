@@ -14,6 +14,23 @@
 #include <QSaveFile>
 #include <functional>
 
+namespace {
+// Probe settling delays and deadline are distinct from the explicit viewport fixture matrix.
+constexpr auto CaptureSettleMilliseconds = 850;
+constexpr auto ResizeSettleMilliseconds = 300;
+constexpr auto ReviewDeadlineMilliseconds = 60000;
+constexpr auto DecimalBase = 10;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    CaptureFailed = 5,
+    ReportFailed = 6,
+    ReviewTimedOut = 7
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -50,7 +67,7 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
                     && verification::windowPolicySatisfied(window);
             QSaveFile file(output + "/report.json"_L1);
             if (!file.open(QIODevice::WriteOnly)) {
-                app.exit(5);
+                app.exit(CaptureFailed);
                 return;
             }
             file.write(
@@ -64,15 +81,15 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
                                            QJsonObject::fromVariantMap(library.browseInfo()) },
                                          { u"qtVersion"_s, QString::fromUtf8(qVersion()) } })
                             .toJson());
-            app.exit(file.commit() && passed ? 0 : 6);
+            app.exit(file.commit() && passed ? 0 : ReportFailed);
             return;
         }
         window.resize(sizes[index / 2]);
         scene.lighting()->setNight(index % 2 != 0);
         // Both palette and lighting use the source 650ms transition.
-        QTimer::singleShot(850, &reviewLifetime, [&] {
+        QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
             const auto image = window.grabWindow();
-            const QString name = u"product-%1.png"_s.arg(index, 2, 10, '0'_L1);
+            const QString name = u"product-%1.png"_s.arg(index, 2, DecimalBase, '0'_L1);
             const bool valid = !image.isNull() && image.save(output + '/'_L1 + name)
                     && window.size() == sizes[index / 2]
                     && verification::windowPolicySatisfied(window)
@@ -90,11 +107,11 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
         });
     };
     window.show();
-    QTimer::singleShot(300, &reviewLifetime, [&] {
+    QTimer::singleShot(ResizeSettleMilliseconds, &reviewLifetime, [&] {
         auto *button = visualItem(window.contentItem(), u"nightButton"_s);
         if (!button) {
             qCWarning(yalahoo::logApp, "Browse theme button is missing");
-            app.exit(6);
+            app.exit(ReportFailed);
             return;
         }
         const auto point = button->mapToScene({ button->width() / 2, button->height() / 2 });
@@ -107,8 +124,8 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
         passed &= scene.lighting()->night();
         next();
     });
-    QTimer::singleShot(60000, &reviewLifetime, [&] {
-        app.exit(7);
+    QTimer::singleShot(ReviewDeadlineMilliseconds, &reviewLifetime, [&] {
+        app.exit(ReviewTimedOut);
     });
     return app.exec();
 }

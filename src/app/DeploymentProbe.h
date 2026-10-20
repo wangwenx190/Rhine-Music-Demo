@@ -1,3 +1,6 @@
+// Inspects the deployed runtime and its loaded Qt resources. Reports concrete plugin, path and
+// module facts from the running package.
+
 #pragma once
 #include <QString>
 #include <QStringList>

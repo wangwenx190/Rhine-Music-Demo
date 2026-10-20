@@ -1,3 +1,6 @@
+// Evaluates the exact critically damped spring solution. Position and velocity advance
+// analytically, avoiding frame-rate-dependent Euler integration.
+
 #pragma once
 
 namespace yalahoo {

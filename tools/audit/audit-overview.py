@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """R19 source/call-chain audit with exact hashes and separately scoped runtime evidence."""
+from shader_parameters import numeric_source
 import argparse
 import hashlib
 import json
@@ -39,6 +40,7 @@ for source in golden["sources"]:
     if hashlib.sha256(content).hexdigest() != source["sha256"]:
         raise SystemExit(f"Frozen source drift: {source['path']}")
 shader = (root / "resources/shaders/overview-blur.frag").read_text()
+shader = numeric_source(shader)
 weights = [float(value) for value in re.findall(r"\* ([0-9]+\.[0-9]+);", shader)]
 if len(weights) != 19 or abs(weights[0] + 2 * sum(weights[1:]) - 1) > 1e-10:
     raise SystemExit("Gaussian kernel normalization/tap guard failed")
@@ -67,7 +69,7 @@ checks = [
      "collision and projection inputs. Unit, isolated QML and real App replays check source math, structure, lifecycle and behavior; "
      "1e-6/2px remain structural gates. Source screenshots are rough references only; no pixel/SSIM comparison is executed or required. "
      "Complete 3D source/quality and product performance remain MAC-VISIBLE-3D/R28; image scores are not gates."),
-    ("PERF-01", "src/render/OverviewController.cpp", "std::ceil(center - 4.5)",
+    ("PERF-01", "src/render/OverviewController.cpp", "std::ceil(center - VisibleHalfLanes)",
      "Projection enumerates the nine-lane neighborhood (at most ten inclusive boundary integers, "
      "with zero-extent endpoints) and indexes canonical columns; no C/N traversal occurs. Collision "
      "admission is capped to nine candidates, stable sorting caches keys, and <=90 overlap comparisons "

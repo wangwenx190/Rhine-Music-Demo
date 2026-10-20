@@ -1,3 +1,6 @@
+// Lays out genre chips as cached model rows using actual font metrics. Reflow depends on width,
+// font and content rather than delegate-side repeated measurement.
+
 #pragma once
 #include <QAbstractListModel>
 #include <QFont>

@@ -1,3 +1,6 @@
+// Builds the anonymous bundled demonstration library. Stable fixture identities use qrc assets
+// and never read or persist the user music library.
+
 #pragma once
 #include "MusicTypes.h"
 namespace yalahoo {

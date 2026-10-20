@@ -1,7 +1,51 @@
+#include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "SelectionLighting.h"
 #include <QVector4D>
 #include <algorithm>
+
+namespace {
+// Palette intensities preserve source light units; sRGB encoding/decoding uses the standard piecewise transfer.
+constexpr auto SrgbDecodeKnee = .04045;
+constexpr auto SrgbLinearSlope = 12.92;
+constexpr auto SrgbOffset = .055;
+constexpr auto SrgbScale = 1.055;
+constexpr auto SrgbExponent = 2.4;
+constexpr auto AnchorFollowRate = 5;
+constexpr auto NightEnvironment = .16;
+constexpr auto DayEnvironment = .25;
+constexpr auto AreaTargetDrop = .25;
+constexpr auto NightKey = .30;
+constexpr auto DayKey = .45;
+constexpr auto NightHemisphere = .21;
+constexpr auto DayHemisphere = .32;
+constexpr auto NightSpotSourceIntensity = 130;
+constexpr auto DaySpotSourceIntensity = 180;
+constexpr auto SpotUnitScale = 64;
+constexpr auto NightAreaIntensity = 24;
+constexpr auto DayAreaIntensity = 34;
+constexpr auto NightScatter = .72;
+constexpr auto NightPrintAmbient = .12;
+constexpr auto DayPrintAmbient = .5;
+constexpr auto NightExposure = 1.08;
+constexpr auto DayExposure = 1.05;
+constexpr auto ThemeTransitionSeconds = .65;
+constexpr auto MinimumRibbonWidth = .6;
+constexpr auto MaximumRibbonWidth = 2.5;
+constexpr auto MaximumRibbonOffset = 6;
+constexpr auto ThemeBezierIterations = 6;
+constexpr auto MinimumRibbonSeconds = .4;
+constexpr auto MaximumRibbonSeconds = 2.4;
+constexpr auto AreaHeightOffset = .5;
+constexpr auto HybridAreaGain = .3;
+constexpr auto AreaLightForwardOffset = .44;
+constexpr auto SrgbEncodeKnee = .0031308;
+constexpr auto ThemeBezierCubic = 1.6;
+constexpr auto ThemeBezierQuadratic = 1.8;
+constexpr auto ThemeBezierLinear = 1.2;
+constexpr auto ThemeBezierDerivativeQuadratic = 4.8;
+constexpr auto ThemeBezierDerivativeLinear = 3.6;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -11,16 +55,17 @@ SceneVector linear(QLatin1StringView hex)
 {
     const QColor c(hex);
     auto decode = [](double s) {
-        return s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
+        return s <= SrgbDecodeKnee ? s / SrgbLinearSlope
+                                   : std::pow((s + SrgbOffset) / SrgbScale, SrgbExponent);
     };
     return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
 }
 void followVector(SceneVector &value, SceneVector &velocity, SceneVector target, double dt)
 {
-    const double decay = std::exp(-5 * dt);
-    const auto delta = value - target, impulse = velocity + delta * 5;
+    const double decay = std::exp(-AnchorFollowRate * dt);
+    const auto delta = value - target, impulse = velocity + delta * AnchorFollowRate;
     value = target + (delta + impulse * dt) * decay;
-    velocity = (velocity - impulse * (5 * dt)) * decay;
+    velocity = (velocity - impulse * (AnchorFollowRate * dt)) * decay;
 }
 }
 SceneVector LightingPalette::floorColor(QStringView theme)
@@ -33,14 +78,14 @@ LightingPalette LightingPalette::theme(bool night)
 {
     LightingPalette p;
     p.warmth = night ? 0 : 1;
-    p.environment = night ? .16 : .25;
-    p.key = night ? .30 : .45;
-    p.hemisphere = night ? .21 : .32;
-    p.spot = (night ? 130 : 180) * 64;
-    p.area = night ? 24 : 34;
-    p.scatter = night ? .72 : 1;
-    p.printAmbient = night ? .12 : .5;
-    p.exposure = night ? 1.08 : 1.05;
+    p.environment = night ? NightEnvironment : DayEnvironment;
+    p.key = night ? NightKey : DayKey;
+    p.hemisphere = night ? NightHemisphere : DayHemisphere;
+    p.spot = (night ? NightSpotSourceIntensity : DaySpotSourceIntensity) * SpotUnitScale;
+    p.area = night ? NightAreaIntensity : DayAreaIntensity;
+    p.scatter = night ? NightScatter : 1;
+    p.printAmbient = night ? NightPrintAmbient : DayPrintAmbient;
+    p.exposure = night ? NightExposure : DayExposure;
     p.keyColor = linear(night ? "#e5f0ff"_L1 : "#fff7ed"_L1);
     p.skyColor = linear(night ? "#e2eeff"_L1 : "#fffaf5"_L1);
     p.groundColor = linear(night ? "#56708c"_L1 : "#b4a18c"_L1);
@@ -54,13 +99,23 @@ SelectionLighting::SelectionLighting(QObject *parent)
     : QObject(parent), m_palette(LightingPalette::theme(false)), m_from(m_palette), m_to(m_palette)
 {
 }
+// Invert the authored cubic Bezier x coordinate with bounded Newton iterations.
+// The polynomial and derivative coefficients come from the source control points.
 double SelectionLighting::themeProgress(double t)
 {
     t = std::clamp(t, 0.0, 1.0);
     double c = t;
-    for (int n = 0; n < 6; ++n)
-        c = std::clamp(c - (((1.6 * c - 1.8) * c + 1.2) * c - t) / ((4.8 * c - 3.6) * c + 1.2), 0.0,
-                       1.0);
+    for (int n = 0; n < ThemeBezierIterations; ++n)
+        c = std::clamp(
+                c
+                        - (((ThemeBezierCubic * c - ThemeBezierQuadratic) * c + ThemeBezierLinear)
+                                   * c
+                           - t)
+                                / ((ThemeBezierDerivativeQuadratic * c
+                                    - ThemeBezierDerivativeLinear)
+                                           * c
+                                   + ThemeBezierLinear),
+                0.0, 1.0);
     return t == 1 ? 1 : c * c * (3 - 2 * c);
 }
 void SelectionLighting::setNight(bool night)
@@ -73,7 +128,7 @@ void SelectionLighting::setNight(bool night)
     m_elapsed = 0;
     if (m_reduced) {
         m_palette = m_to;
-        m_elapsed = .65;
+        m_elapsed = ThemeTransitionSeconds;
     }
     Q_EMIT nightChanged();
     Q_EMIT changed();
@@ -83,7 +138,7 @@ void SelectionLighting::setReducedMotion(bool reduced)
     m_reduced = reduced;
     if (reduced) {
         m_palette = m_to;
-        m_elapsed = .65;
+        m_elapsed = ThemeTransitionSeconds;
         Q_EMIT changed();
     }
 }
@@ -102,13 +157,14 @@ void SelectionLighting::setSettings(RowLightingSettings s)
     auto valid = [](double n, double previous, double lo, double hi) {
         return std::isfinite(n) ? std::clamp(n, lo, hi) : previous;
     };
-    if (int(s.mode) < 0 || int(s.mode) > 3)
+    if (int(s.mode) < 0 || int(s.mode) > int(RowLightingMode::Hybrid))
         s.mode = m_settings.mode;
     s.strength = valid(s.strength, m_settings.strength, 0, 2);
-    s.width = valid(s.width, m_settings.width, .6, 2.5);
-    s.offset = valid(s.offset, m_settings.offset, -6, 6);
+    s.width = valid(s.width, m_settings.width, MinimumRibbonWidth, MaximumRibbonWidth);
+    s.offset = valid(s.offset, m_settings.offset, -MaximumRibbonOffset, MaximumRibbonOffset);
     s.fill = valid(s.fill, m_settings.fill, 0, 1);
-    s.transitionDuration = valid(s.transitionDuration, m_settings.transitionDuration, .4, 2.4);
+    s.transitionDuration = valid(s.transitionDuration, m_settings.transitionDuration,
+                                 MinimumRibbonSeconds, MaximumRibbonSeconds);
     const auto before = settings();
     m_settings = s;
     ribbon.settings = s;
@@ -165,10 +221,10 @@ void SelectionLighting::setComparing(bool value)
 }
 void SelectionLighting::advanceTheme(double dt)
 {
-    if (!std::isfinite(dt) || dt < 0 || m_elapsed >= .65)
+    if (!std::isfinite(dt) || dt < 0 || m_elapsed >= ThemeTransitionSeconds)
         return;
-    m_elapsed = std::min(.65, m_elapsed + dt);
-    const double t = themeProgress(m_elapsed / .65);
+    m_elapsed = std::min(ThemeTransitionSeconds, m_elapsed + dt);
+    const double t = themeProgress(m_elapsed / ThemeTransitionSeconds);
 #define NUMBER(name) m_palette.name = m_from.name + (m_to.name - m_from.name) * t
 #define COLOR(name) m_palette.name = m_from.name * (1 - t) + m_to.name * t
     NUMBER(warmth);
@@ -222,7 +278,7 @@ void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, Scene
 double SelectionLighting::areaIntensity() const
 {
     const double gain = ribbon.settings.mode == RowLightingMode::Area ? 1
-            : ribbon.settings.mode == RowLightingMode::Hybrid         ? .3
+            : ribbon.settings.mode == RowLightingMode::Hybrid         ? HybridAreaGain
                                                                       : 0;
     return m_visible ? m_palette.area * ribbon.settings.strength * gain * (1 - m_detail) : 0;
 }
@@ -234,18 +290,26 @@ QVector4D SelectionLighting::rowSettings() const
 QVector3D SelectionLighting::areaPosition() const
 {
     const auto &p = ribbon.column;
-    return SceneVector{ p.x, p.y + 1.85 + 3.35 / 2 + .5, p.z + ribbon.settings.offset * .62 + .44 }
+    return SceneVector{
+        p.x, p.y + sceneGeometry::HingeHeight + sceneGeometry::CaseHeight / 2 + AreaHeightOffset,
+        p.z + ribbon.settings.offset * sceneGeometry::RowSpacing + AreaLightForwardOffset
+    }
             .qt();
 }
 QVector3D SelectionLighting::areaTarget() const
 {
     const auto &p = ribbon.column;
-    return SceneVector{ p.x, p.y + 1.85 + 3.35 / 2 - .25, p.z + ribbon.settings.offset * .62 }.qt();
+    return SceneVector{ p.x,
+                        p.y + sceneGeometry::HingeHeight + sceneGeometry::CaseHeight / 2
+                                - AreaTargetDrop,
+                        p.z + ribbon.settings.offset * sceneGeometry::RowSpacing }
+            .qt();
 }
 QColor SelectionLighting::backgroundColor() const
 {
     auto encode = [](double l) {
-        return l <= .0031308 ? 12.92 * l : 1.055 * std::pow(l, 1 / 2.4) - .055;
+        return l <= SrgbEncodeKnee ? SrgbLinearSlope * l
+                                   : SrgbScale * std::pow(l, 1 / SrgbExponent) - SrgbOffset;
     };
     return QColor::fromRgbF(encode(m_palette.background.x), encode(m_palette.background.y),
                             encode(m_palette.background.z));

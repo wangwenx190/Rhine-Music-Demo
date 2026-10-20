@@ -3,6 +3,17 @@
 #include <QSet>
 #include <cmath>
 
+namespace {
+// Candidate matching requires authored score/duration tolerances and bounded remote lists.
+constexpr auto MaximumReleaseCandidates = 10;
+constexpr auto MinimumSearchScore = 95;
+constexpr auto MillisecondsPerSecond = 1000.;
+constexpr auto MaximumReleaseRecordings = 2000;
+constexpr auto TrackDurationToleranceSeconds = 3;
+constexpr auto MaximumGenres = 128;
+constexpr auto MaximumCredits = 4096;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -42,8 +53,9 @@ QJsonArray musicBrainzCandidates(const Album &album, const QJsonObject &search)
     for (const auto &value : search.value(u"releases"_s).toArray()) {
         const auto candidate = value.toObject();
         const auto id = candidate.value(u"id"_s).toString();
-        if (!seen.contains(id) && candidates.size() < 10 && basicMatch(album, candidate)
-            && candidate.value(u"score"_s).toVariant().toInt() >= 95
+        if (!seen.contains(id) && candidates.size() < MaximumReleaseCandidates
+            && basicMatch(album, candidate)
+            && candidate.value(u"score"_s).toVariant().toInt() >= MinimumSearchScore
             && (album.tracks.isEmpty()
                 || candidate.value(u"track-count"_s).toInt(-1) == album.tracks.size())) {
             seen.insert(id);
@@ -64,6 +76,8 @@ QJsonArray musicBrainzCandidates(const Album &album, const QJsonObject &search)
     }
     return candidates;
 }
+// Require a plausible album identity and compatible track durations before accepting a release.
+// Search rank alone cannot establish that two editions contain the same recordings.
 QString musicBrainzRelease(const Album &album, const QJsonObject &search)
 {
     const auto candidates = musicBrainzCandidates(album, search);
@@ -99,10 +113,10 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
                       track.value(u"title"_s).toString(recording.value(u"title"_s).toString()),
                       medium.value(u"position"_s).toInt(), track.value(u"position"_s).toInt(),
                       track.value(u"length"_s).toDouble(recording.value(u"length"_s).toDouble())
-                              / 1000. });
+                              / MillisecondsPerSecond });
         }
     }
-    if (recordings.size() > 2000
+    if (recordings.size() > MaximumReleaseRecordings
         || (!album.tracks.isEmpty() && recordings.size() != album.tracks.size()))
         return result;
     QList<qsizetype> matches;
@@ -115,7 +129,9 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
                 || (track.discNumber && *track.discNumber != remote.disc)
                 || (track.trackNumber && *track.trackNumber != remote.position)
                 || (track.duration > 0
-                    && (remote.duration <= 0 || std::abs(track.duration - remote.duration) > 3)))
+                    && (remote.duration <= 0
+                        || std::abs(track.duration - remote.duration)
+                                > TrackDurationToleranceSeconds)))
                 continue;
             possible.append(i);
         }
@@ -134,7 +150,7 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
     const auto collectGenres = [&](const QJsonObject &object) {
         for (const auto &value : object.value(u"genres"_s).toArray()) {
             const auto name = value.toObject().value(u"name"_s).toString();
-            if (!name.isEmpty() && !seenGenres.contains(name) && genres.size() < 128) {
+            if (!name.isEmpty() && !seenGenres.contains(name) && genres.size() < MaximumGenres) {
                 seenGenres.insert(name);
                 genres.append(name);
             }
@@ -196,7 +212,7 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
             auto name = relation.value(creditField).toString();
             if (name.isEmpty())
                 name = artist.value(u"name"_s).toString();
-            if (name.isEmpty() || !roles.contains(role) || credits.size() >= 4096)
+            if (name.isEmpty() || !roles.contains(role) || credits.size() >= MaximumCredits)
                 continue;
             const auto attributes = relation.value(u"attributes"_s).toArray();
             QStringList labels;

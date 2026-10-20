@@ -1,3 +1,6 @@
+// Selects and validates the native graphics API before creating Qt windows. Explicit backend
+// requests fail when unavailable instead of silently changing rendering semantics.
+
 #pragma once
 #include <QString>
 #include "Logging.h"

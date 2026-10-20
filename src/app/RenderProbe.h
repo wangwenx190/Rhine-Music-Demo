@@ -1,3 +1,6 @@
+// Provides deterministic render inputs and output collection for review. Readback completion is
+// treated separately from submitting a frame.
+
 #pragma once
 #include <QQuick3DInstancing>
 #include <QQuick3DTextureData>

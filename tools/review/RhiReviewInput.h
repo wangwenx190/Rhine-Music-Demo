@@ -1,3 +1,6 @@
+// Builds bounded deterministic RHI review inputs from anonymous fixtures. Parsed options
+// describe real backend capabilities rather than fabricated output.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;

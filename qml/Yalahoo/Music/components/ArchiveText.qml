@@ -1,3 +1,6 @@
+// Preserves fractional source font metrics while supplying Qt with an integer pixel size. Local
+// scale and baseline padding retain the source line box and whole-run shaping.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music

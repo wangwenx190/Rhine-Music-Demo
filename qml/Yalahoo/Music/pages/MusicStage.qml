@@ -1,3 +1,6 @@
+// Connects one visual frame source to the shared C++ clock. Hidden windows stop visual updates
+// while the independent media controllers preserve playback intent.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music

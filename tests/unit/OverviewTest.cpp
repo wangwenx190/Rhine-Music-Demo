@@ -1,3 +1,7 @@
+// Checks analytic camera framing and bounded label admission against independent expected source
+// values. Explicit fixture literals are independent inputs or expected results; timing bounds
+// have named constants.
+
 #include "MotionController.h"
 #include "SelectionController.h"
 #include "OverviewController.h"

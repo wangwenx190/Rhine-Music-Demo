@@ -7,6 +7,12 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Polling supplements native display events; unsupported explicit output remains a process failure.
+constexpr auto DisplayPollMilliseconds = 1000;
+constexpr auto DisplayConfigurationExitCode = 23;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -21,7 +27,7 @@ DisplayOutput::DisplayOutput(std::unique_ptr<DisplayMonitor> monitor, QObject *p
     };
     // Native events cover topology/mode changes; current headroom/white level may
     // have no notification. One coarse query per second also covers that case.
-    m_poll.setInterval(1000);
+    m_poll.setInterval(DisplayPollMilliseconds);
     m_poll.setTimerType(Qt::CoarseTimer);
     connect(&m_poll, &QTimer::timeout, this, &DisplayOutput::refresh);
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this] {
@@ -103,7 +109,7 @@ void DisplayOutput::attach(QQuickWindow &window)
                                 qCWarning(yalahoo::logRender,
                                           "Scene graph initialization failed: %s",
                                           qPrintable(message));
-                                QCoreApplication::exit(23);
+                                QCoreApplication::exit(DisplayConfigurationExitCode);
                             }
                         },
                         Qt::QueuedConnection);

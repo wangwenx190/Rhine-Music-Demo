@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Source guards plus reviewed R17 call-chain deductions; outputs stay local."""
+from shader_parameters import numeric_source
 import hashlib
 import math
 import re
@@ -51,6 +52,7 @@ weights = [math.exp(-i * i / (2 * sigma * sigma)) for i in range(int(3 * sigma) 
 total = weights[0] + 2 * sum(weights[1:])
 weights = [weight / total for weight in weights]
 shader = (root / "resources/shaders/detail-tabs-blur.frag").read_text()
+shader = numeric_source(shader)
 actual_weights = [float(x) for x in re.findall(r"\)\s+\* ([0-9.]+);", shader)]
 actual_offsets = [float(x) for x in re.findall(r"sampleStep \* ([0-9.]+)", shader)][::2]
 expected_weights = [weights[0]] + [weights[i] + weights[i + 1] for i in range(1, len(weights), 2)]

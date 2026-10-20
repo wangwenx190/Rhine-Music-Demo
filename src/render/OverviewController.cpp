@@ -1,3 +1,4 @@
+#include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "OverviewController.h"
@@ -7,6 +8,32 @@
 #include <algorithm>
 #include <numbers>
 
+namespace {
+// Overview framing and visibility thresholds use source scene units and normalized progress.
+constexpr auto TransformBezierFirstX = .4;
+constexpr auto TransformBezierSecondX = .2;
+constexpr auto FadeBezierControlX = .25;
+constexpr auto FadeBezierFirstY = .1;
+constexpr auto InteractionReadyProgress = .75;
+constexpr auto OverviewSpringRate = 6.5;
+constexpr auto NavigationSlideSeconds = .36;
+constexpr auto NavigationFadeSeconds = .28;
+constexpr auto ChromeRevealProgress = .12;
+constexpr auto BrowseRevealProgress = .02;
+constexpr auto ColumnFoldProgress = .65;
+constexpr auto LabelTopPadding = .65;
+constexpr auto VisibleHalfLanes = 4.5;
+constexpr auto OverviewYawDegrees = 28;
+constexpr auto OverviewElevationDegrees = 43;
+constexpr auto OverviewAimDepth = 1.8;
+constexpr auto OverviewAimZ = 1.5;
+constexpr auto OverviewCameraDistance = 172;
+constexpr auto MinimumOverviewSpan = 16.8;
+constexpr auto PortraitOverviewSpan = 17.5;
+constexpr auto FirstArchiveRow = 12.0;
+constexpr auto ArchiveLastRowOffset = 11;
+}
+
 namespace yalahoo {
 namespace {
 QEasingCurve bezier(double x1, double y1, double x2, double y2)
@@ -15,15 +42,26 @@ QEasingCurve bezier(double x1, double y1, double x2, double y2)
     result.addCubicBezierSegment({ x1, y1 }, { x2, y2 }, { 1, 1 });
     return result;
 }
-const auto transformCurve = bezier(.4, 0, .2, 1);
-const auto fadeCurve = bezier(.25, .1, .25, 1);
+// Qt's spline storage is initialized lazily and reused without per-frame allocation.
+const QEasingCurve &transformCurve()
+{
+    static const auto value = bezier(TransformBezierFirstX, 0, TransformBezierSecondX, 1);
+    return value;
+}
+// Qt's spline storage is initialized lazily and reused without per-frame allocation.
+const QEasingCurve &fadeCurve()
+{
+    static const auto value = bezier(FadeBezierControlX, FadeBezierFirstY, FadeBezierControlX, 1);
+    return value;
+}
 }
 
 OverviewController::OverviewController(MotionController *motion, QObject *parent)
     : QObject(parent), m_motion(motion), m_clock(motion ? motion->clock() : nullptr)
 {
     QEasingCurve curve(QEasingCurve::BezierSpline);
-    curve.addCubicBezierSegment({ .4, 0 }, { .2, 1 }, { 1, 1 });
+    curve.addCubicBezierSegment({ TransformBezierFirstX, 0 }, { TransformBezierSecondX, 1 },
+                                { 1, 1 });
     m_chrome.setEnterCurve(curve);
     if (m_clock) {
         connect(m_clock, &FrameClock::frame, this, [this](double, double dt) {
@@ -74,7 +112,7 @@ bool OverviewController::active() const
 }
 bool OverviewController::ready() const
 {
-    return m_active && progress() > .75;
+    return m_active && progress() > InteractionReadyProgress;
 }
 double OverviewController::progress() const
 {
@@ -164,24 +202,29 @@ void OverviewController::albumClicked()
 }
 void OverviewController::advance(double dt, bool reduced)
 {
+    // Navigation opacity and position retarget from their displayed values on every reversal.
+    constexpr auto NavigationHiddenOffsetPixels = 6;
+
     if (!std::isfinite(dt) || dt < 0)
         return;
     if (reduced)
         m_progress.finish(m_active ? 1 : 0);
     else if (m_active || m_progress.value != 0 || m_progress.velocity != 0)
-        m_progress.update(m_active ? 1 : 0, 6.5, dt);
-    m_navigationTime = reduced ? .36 : std::min(.36, m_navigationTime + dt);
+        m_progress.update(m_active ? 1 : 0, OverviewSpringRate, dt);
+    m_navigationTime = reduced ? NavigationSlideSeconds
+                               : std::min(NavigationSlideSeconds, m_navigationTime + dt);
 
     m_navOpacity = m_navFrom
             + ((m_active ? 0 : 1) - m_navFrom)
-                    * fadeCurve.valueForProgress(std::min(1.0, m_navigationTime / .28));
+                    * fadeCurve().valueForProgress(
+                            std::min(1.0, m_navigationTime / NavigationFadeSeconds));
     m_navOffset = m_navOffsetFrom
-            + ((m_active ? -6 : 0) - m_navOffsetFrom)
-                    * transformCurve.valueForProgress(m_navigationTime / .36);
+            + ((m_active ? -NavigationHiddenOffsetPixels : 0) - m_navOffsetFrom)
+                    * transformCurve().valueForProgress(m_navigationTime / NavigationSlideSeconds);
 }
 void OverviewController::synchronize(double dt, bool reduced)
 {
-    if (m_active && progress() > .12 && !m_chromeShown) {
+    if (m_active && progress() > ChromeRevealProgress && !m_chromeShown) {
         m_chromeShown = true;
         m_chrome.show(reduced);
         Q_EMIT focusRequested(true);
@@ -197,8 +240,8 @@ void OverviewController::synchronize(double dt, bool reduced)
                         ready(), dt, reduced);
     }
     if (m_revealPending && !m_active && m_scene && m_selection && m_presentation
-        && m_presentation->archiveEnabled() && progress() < .02 && m_selection->archiveReady()
-        && m_scene->settled()) {
+        && m_presentation->archiveEnabled() && progress() < BrowseRevealProgress
+        && m_selection->archiveReady() && m_scene->settled()) {
         m_revealPending = false;
         m_presentation->browseSurface()->show(reduced);
         Q_EMIT focusRequested(false);
@@ -213,7 +256,7 @@ void OverviewController::reset()
     m_labelsDirty = true;
     m_chrome.reset(false);
     m_labels.clear();
-    m_navigationTime = .36;
+    m_navigationTime = NavigationSlideSeconds;
     m_navFrom = m_navOpacity = 1;
     m_navOffsetFrom = m_navOffset = 0;
     notify();
@@ -233,7 +276,9 @@ double OverviewController::columnExtent(double lane, double centerLane, double p
         const double t = std::clamp(value, 0.0, 1.0);
         return t * t * t * (t * (t * 6 - 15) + 10);
     };
-    return 1 - smoother(progress / .65) * (1 - smoother(4.5 - std::abs(lane - centerLane)));
+    return 1
+            - smoother(progress / ColumnFoldProgress)
+            * (1 - smoother(VisibleHalfLanes - std::abs(lane - centerLane)));
 }
 CameraPose OverviewController::framing(CameraPose base, double width, double height,
                                        double progress)
@@ -243,15 +288,19 @@ CameraPose OverviewController::framing(CameraPose base, double width, double hei
         return base;
     const double aspect = std::max(1.0, width) / std::max(1.0, height);
     constexpr double radians = std::numbers::pi / 180;
-    const SceneVector wide{ -std::sin(28 * radians) * std::cos(43 * radians),
-                            std::sin(43 * radians),
-                            std::cos(28 * radians) * std::cos(43 * radians) };
+    const SceneVector wide{
+        -std::sin(OverviewYawDegrees * radians) * std::cos(OverviewElevationDegrees * radians),
+        std::sin(OverviewElevationDegrees * radians),
+        std::cos(OverviewYawDegrees * radians) * std::cos(OverviewElevationDegrees * radians)
+    };
     const double distance = (base.position - base.aim).length();
     const auto direction =
             ((base.position - base.aim).normalized() * (1 - p) + wide * p).normalized();
-    const auto aim = base.aim * (1 - p) + SceneVector{ 0, -1.8, -1.5 } * p;
-    return { aim + direction * (distance + (172 - distance) * p), aim,
-             base.span + (std::max(16.8, 17.5 / aspect) - base.span) * p };
+    const auto aim = base.aim * (1 - p) + SceneVector{ 0, -OverviewAimDepth, -OverviewAimZ } * p;
+    return {
+        aim + direction * (distance + (OverviewCameraDistance - distance) * p), aim,
+        base.span + (std::max(MinimumOverviewSpan, PortraitOverviewSpan / aspect) - base.span) * p
+    };
 }
 QVector<OverviewColumn> OverviewController::projectColumns() const
 {
@@ -265,7 +314,8 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
     const double center = m_selection->centerLane();
     QSet<int> seen;
     // Enumerate physical candidates, then map to canonical IDs. Never scan C library columns.
-    for (double physical = std::ceil(center - 4.5); physical <= center + 4.5; physical += 1) {
+    for (double physical = std::ceil(center - VisibleHalfLanes);
+         physical <= center + VisibleHalfLanes; physical += 1) {
         if (m_selection->realistic() && (physical < 0 || physical >= count))
             continue;
         const int lane = ArchivePool::wrap(physical, count);
@@ -281,11 +331,15 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
         const double extent = m_selection->columnExtent(physical);
         const double row = m_selection->browseRow(lane);
         const double anchorRow = m_selection->realistic()
-                ? std::clamp(row, 12.0, double(11 + pool.rowCount(lane)))
+                ? std::clamp(row, FirstArchiveRow,
+                             double(ArchiveLastRowOffset + pool.rowCount(lane)))
                 : row;
-        const auto point = m_scene->projectWorldPoint({ float((physical - center) * 5.2),
-                                                        float(-4.6 + .175 + (3.35 + .65) * extent),
-                                                        float((anchorRow - row) * .62 - 2.17) });
+        const auto point = m_scene->projectWorldPoint(
+                { float((physical - center) * sceneGeometry::ColumnSpacing),
+                  float(-sceneGeometry::FloorDepth + sceneGeometry::CaseBottom
+                        + (sceneGeometry::CaseHeight + LabelTopPadding) * extent),
+                  float((anchorRow - row) * sceneGeometry::RowSpacing
+                        - sceneGeometry::ArchiveDepth) });
         if (!std::isfinite(point.x()) || point.z() < -1 || point.z() > 1)
             continue;
         result.append({ lane, column.label, pool.rowCount(lane), point.x(), point.y(), extent,

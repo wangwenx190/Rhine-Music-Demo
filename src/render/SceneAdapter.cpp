@@ -1,3 +1,4 @@
+#include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "FrameClock.h"
 #include "SelectionController.h"
@@ -10,6 +11,67 @@
 #include <numbers>
 #include <limits>
 #include <chrono>
+
+namespace {
+// Camera framing follows source-space layout; projection converts to Qt only at the matrix boundary.
+constexpr auto DegreesPerHalfTurn = 180;
+constexpr auto BrowseSpan = 7.33;
+constexpr auto DetailSpan = 5.9;
+constexpr auto PortraitMinimumDetailSpan = 6.3;
+constexpr auto PortraitCaseSpan = 3.7;
+constexpr auto MinimumPortraitContentHeight = 100.0;
+constexpr auto PortraitDetailHeightRatio = .54;
+constexpr auto PortraitDetailChromePixels = 156;
+constexpr auto PortraitPreviewSpan = 8.4;
+constexpr auto StandardAspectWidth = 16.0;
+constexpr auto CameraFollowRate = 9;
+constexpr auto AspectHeightUnits = 9;
+constexpr auto BrowseYawDegrees = 59;
+constexpr auto DetailYawDegrees = 8;
+constexpr auto BrowseElevationDegrees = 25;
+constexpr auto BrowseFogFarOffset = 25;
+constexpr auto DetailElevationDegrees = 20;
+constexpr auto BrowseAimX = 1.091;
+constexpr auto BrowseAimY = .045;
+constexpr auto BrowseAimZ = .481;
+constexpr auto PortraitPreviewLift = .4;
+constexpr auto PortraitPreviewY = .36;
+constexpr auto UltrawideAspectWidth = 21.0;
+constexpr auto WideAimRightRatio = .035;
+constexpr auto PositionSettledTolerance = .035;
+constexpr auto AimVelocityTolerance = .035;
+constexpr auto SpanVelocityTolerance = .035;
+constexpr auto BrowseAimUpRatio = .08;
+constexpr auto UltrawideAimUpGain = .02;
+constexpr auto PointerParallaxDistance = .12;
+constexpr auto InspectionLiftPadding = .12;
+constexpr auto LandscapeDetailX = .25;
+constexpr auto PortraitDetailY = .27;
+constexpr auto PortraitDetailTopPixels = 34;
+constexpr auto CompactDetailY = .49;
+constexpr auto DesktopDetailYPixels = 560.0;
+constexpr auto ReferenceHeightPixels = 1080;
+constexpr auto BrowseCameraDistance = 140;
+constexpr auto DetailCameraDistance = 72;
+constexpr auto LaneOrbitSpeedScale = 2.5;
+constexpr auto LaneOrbitAmplitude = .018;
+constexpr auto VectorAxes = 3;
+constexpr auto RowOrbitSpeedScale = 3;
+constexpr auto RowOrbitAmplitude = .006;
+constexpr auto AimSettledTolerance = .006;
+constexpr auto OrbitFollowRate = 6;
+constexpr auto SpanSettledTolerance = .008;
+constexpr auto PositionVelocityTolerance = .09;
+constexpr auto BrowseFogNearOffset = 5;
+constexpr auto DetailFogFarOffset = 12;
+constexpr auto MinimumFovSpan = .1;
+constexpr auto LocalLightAimX = 2.085f;
+constexpr auto LocalLightAimY = 2.252f;
+constexpr auto LightOffsetX = 48;
+constexpr auto LightOffsetY = 17.6f;
+constexpr auto LightOffsetZ = 36;
+constexpr auto ParallelRayTolerance = 1e-10;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -72,16 +134,16 @@ void SceneAdapter::recordNavigationCommit(quint64 revision)
     Q_EMIT frameChanged();
 }
 namespace {
-constexpr double radians = std::numbers::pi / 180;
-std::array<double, 3> components(SceneVector v)
+constexpr double radians = std::numbers::pi / DegreesPerHalfTurn;
+std::array<double, VectorAxes> components(SceneVector v)
 {
     return { v.x, v.y, v.z };
 }
-SceneVector values(const std::array<ScalarSpring, 3> &s)
+SceneVector values(const std::array<ScalarSpring, VectorAxes> &s)
 {
     return { s[0].value, s[1].value, s[2].value };
 }
-SceneVector velocities(const std::array<ScalarSpring, 3> &s)
+SceneVector velocities(const std::array<ScalarSpring, VectorAxes> &s)
 {
     return { s[0].velocity, s[1].velocity, s[2].velocity };
 }
@@ -107,43 +169,67 @@ SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
             }
         });
 }
+// Derive source-space camera aim and span before blending detail and overview framing.
+// Portrait layout changes framing, while the render viewport remains the actual content size.
 CameraPose SceneAdapter::target() const
 {
     const double w = m_layout.width(), h = m_layout.height(), aspect = w / h, d = m_detail;
-    const double baseSpan = 7.33 + (5.9 - 7.33) * d;
-    const double portraitDetailSpan =
-            std::max(6.3 / aspect, 3.7 * h / std::max(100.0, .54 * h - 156));
+    const double baseSpan = BrowseSpan + (DetailSpan - BrowseSpan) * d;
+    const double portraitDetailSpan = std::max(
+            PortraitMinimumDetailSpan / aspect,
+            PortraitCaseSpan * h
+                    / std::max(MinimumPortraitContentHeight,
+                               PortraitDetailHeightRatio * h - PortraitDetailChromePixels));
     const double span = m_layout.portrait()
-            ? std::max(baseSpan, 8.4 / aspect + (portraitDetailSpan - 8.4 / aspect) * d)
-            : std::max(baseSpan, baseSpan * (16.0 / 9) / aspect);
-    const double yaw = (59 * radians + m_yaw.value) * (1 - d) + 8 * radians * d;
-    const double elevation = (25 * radians + m_elevation.value) * (1 - d) + 20 * radians * d;
+            ? std::max(baseSpan,
+                       PortraitPreviewSpan / aspect
+                               + (portraitDetailSpan - PortraitPreviewSpan / aspect) * d)
+            : std::max(baseSpan, baseSpan * (StandardAspectWidth / AspectHeightUnits) / aspect);
+    const double yaw =
+            (BrowseYawDegrees * radians + m_yaw.value) * (1 - d) + DetailYawDegrees * radians * d;
+    const double elevation = (BrowseElevationDegrees * radians + m_elevation.value) * (1 - d)
+            + DetailElevationDegrees * radians * d;
     const SceneVector direction{ -std::sin(yaw) * std::cos(elevation), std::sin(elevation),
                                  std::cos(yaw) * std::cos(elevation) };
     const auto right = cross({ 0, 1, 0 }, direction).normalized(),
                up = cross(direction, right).normalized();
-    SceneVector aim{ -1.091, -.045, .481 };
+    SceneVector aim{ -BrowseAimX, -BrowseAimY, BrowseAimZ };
     if (m_layout.portrait()) {
-        aim = { 0, -4.6 + settlingWave(0, 26.56) + .4 + 1.85, -2.17 };
-        aim = aim + up * ((.36 - .5) * span);
+        aim = { 0,
+                -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
+                        + PortraitPreviewLift + sceneGeometry::HingeHeight,
+                -sceneGeometry::ArchiveDepth };
+        aim = aim + up * ((PortraitPreviewY - .5) * span);
     } else {
-        const double wide = smooth((aspect - 16.0 / 9) / (21.0 / 9 - 16.0 / 9));
-        aim = aim + right * (.035 * wide * span * aspect) + up * ((.08 + .02 * wide) * span);
+        const double wide = smooth((aspect - StandardAspectWidth / AspectHeightUnits)
+                                   / (UltrawideAspectWidth / AspectHeightUnits
+                                      - StandardAspectWidth / AspectHeightUnits));
+        aim = aim + right * (WideAimRightRatio * wide * span * aspect)
+                + up * ((BrowseAimUpRatio + UltrawideAimUpGain * wide) * span);
     }
-    SceneVector detailAim{ 0, -4.6 + settlingWave(0, 26.56) + (3.35 + .12) + 1.85, -2.17 };
-    const double detailX = m_layout.portrait() ? .5 : .25;
-    const double detailY = m_layout.portrait() ? .27 + 34 / h
-            : m_layout.compact()               ? .49
-                                               : 560.0 / 1080;
+    SceneVector detailAim{ 0,
+                           -sceneGeometry::FloorDepth
+                                   + settlingWave(0, sceneGeometry::SettledSceneSeconds)
+                                   + (sceneGeometry::CaseHeight + InspectionLiftPadding)
+                                   + sceneGeometry::HingeHeight,
+                           -sceneGeometry::ArchiveDepth };
+    const double detailX = m_layout.portrait() ? .5 : LandscapeDetailX;
+    const double detailY = m_layout.portrait() ? PortraitDetailY + PortraitDetailTopPixels / h
+            : m_layout.compact()               ? CompactDetailY
+                                               : DesktopDetailYPixels / ReferenceHeightPixels;
     detailAim = detailAim + right * ((.5 - detailX) * w * span / h) + up * ((detailY - .5) * span);
     aim = aim * (1 - d) + detailAim * d;
-    auto pose =
-            OverviewController::framing({ aim + direction * (140 + (72 - 140) * d), aim, span }, w,
-                                        h, m_selection ? m_selection->overviewProgress() : 0);
+    auto pose = OverviewController::framing(
+            { aim
+                      + direction
+                              * (BrowseCameraDistance
+                                 + (DetailCameraDistance - BrowseCameraDistance) * d),
+              aim, span },
+            w, h, m_selection ? m_selection->overviewProgress() : 0);
     auto position = pose.position;
     if (!m_reduced && d == 0) {
-        position.x += m_pointerX * .12;
-        position.y -= m_pointerY * .12;
+        position.x += m_pointerX * PointerParallaxDistance;
+        position.y -= m_pointerY * PointerParallaxDistance;
     }
     return { position, pose.aim, pose.span };
 }
@@ -225,15 +311,19 @@ void SceneAdapter::advance(double dt)
             m_selection->updateDetailReadiness(dt, true);
         return;
     }
-    m_yaw.update(std::clamp(m_laneSpeed / 2.5, -1.0, 1.0) * .018 * (1 - m_detail), 6, dt);
-    m_elevation.update(std::clamp(m_rowSpeed / 3, -1.0, 1.0) * .006 * (1 - m_detail), 6, dt);
+    m_yaw.update(std::clamp(m_laneSpeed / LaneOrbitSpeedScale, -1.0, 1.0) * LaneOrbitAmplitude
+                         * (1 - m_detail),
+                 OrbitFollowRate, dt);
+    m_elevation.update(std::clamp(m_rowSpeed / RowOrbitSpeedScale, -1.0, 1.0) * RowOrbitAmplitude
+                               * (1 - m_detail),
+                       OrbitFollowRate, dt);
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
-    for (int i = 0; i < 3; ++i) {
-        m_position[i].update(p[i], 9, dt);
-        m_aim[i].update(a[i], 9, dt);
+    for (int i = 0; i < VectorAxes; ++i) {
+        m_position[i].update(p[i], CameraFollowRate, dt);
+        m_aim[i].update(a[i], CameraFollowRate, dt);
     }
-    m_span.update(goal.span, 9, dt);
+    m_span.update(goal.span, CameraFollowRate, dt);
     publish();
     if (m_managedDetail && m_selection)
         m_selection->updateDetailReadiness(dt, settled());
@@ -258,7 +348,7 @@ void SceneAdapter::observe(CameraPose pose, double dt)
 {
     // Observe authored poses in the existing browse springs; the final hold clears velocity.
     const auto p = components(pose.position), a = components(pose.aim);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < VectorAxes; ++i) {
         m_position[i].velocity = dt > 0 ? (p[i] - m_position[i].value) / dt : 0;
         m_aim[i].velocity = dt > 0 ? (a[i] - m_aim[i].value) / dt : 0;
         m_position[i].value = p[i];
@@ -272,7 +362,7 @@ void SceneAdapter::snapToTarget()
 {
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < VectorAxes; ++i) {
         m_position[i].finish(p[i]);
         m_aim[i].finish(a[i]);
     }
@@ -282,20 +372,29 @@ void SceneAdapter::snapToTarget()
 bool SceneAdapter::settled() const
 {
     const auto goal = target();
-    return (values(m_position) - goal.position).length() < .035
-            && (values(m_aim) - goal.aim).length() < .006
-            && std::abs(m_span.value - goal.span) < .008 && velocities(m_position).length() < .09
-            && velocities(m_aim).length() < .035 && std::abs(m_span.velocity) < .035;
+    return (values(m_position) - goal.position).length() < PositionSettledTolerance
+            && (values(m_aim) - goal.aim).length() < AimSettledTolerance
+            && std::abs(m_span.value - goal.span) < SpanSettledTolerance
+            && velocities(m_position).length() < PositionVelocityTolerance
+            && velocities(m_aim).length() < AimVelocityTolerance
+            && std::abs(m_span.velocity) < SpanVelocityTolerance;
 }
 void SceneAdapter::publish()
 {
     const SceneVector position = values(m_position), aim = values(m_aim);
     const double renderedDistance = (position - aim).length();
-    const double fogNear = renderedDistance + 5 * (1 - m_detail) - m_detail;
-    const double fogFar = renderedDistance + 25 * (1 - m_detail) + 12 * m_detail;
+    const double fogNear = renderedDistance + BrowseFogNearOffset * (1 - m_detail) - m_detail;
+    const double fogFar =
+            renderedDistance + BrowseFogFarOffset * (1 - m_detail) + DetailFogFarOffset * m_detail;
     const SceneVector caseOrigin = m_selection
             ? m_selection->selectedPosition()
-            : SceneVector{ 0, -4.6 + settlingWave(0, 26.56) + .9 + (3.47 - .9) * m_detail, -2.17 };
+            : SceneVector{
+                  0,
+                  -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
+                          + sceneGeometry::PreviewLift
+                          + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift) * m_detail,
+                  -sceneGeometry::ArchiveDepth
+              };
     if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
         && m_frame.hasArchivePool == bool(m_selection) && m_frame.camera.position == position
         && m_frame.camera.aim == aim && m_frame.camera.span == m_span.value
@@ -313,7 +412,8 @@ void SceneAdapter::publish()
     m_frame.fogNear = fogNear;
     m_frame.fogFar = fogFar;
     const double distance = std::max(1.0, renderedDistance);
-    m_frame.fieldOfView = 2 * std::atan(std::max(.1, m_span.value) / (2 * distance)) / radians;
+    m_frame.fieldOfView =
+            2 * std::atan(std::max(MinimumFovSpan, m_span.value) / (2 * distance)) / radians;
     m_frame.view.setToIdentity();
     m_frame.view.lookAt(cameraPosition(), cameraAim(), { 0, 1, 0 });
     m_frame.cameraRotation =
@@ -348,14 +448,15 @@ void SceneAdapter::updateLighting(double dt)
     auto input = m_lightingInput;
     if (!m_explicitLightingInput) {
         input.origin = m_frame.casePosition;
-        input.row = input.origin.z / .62;
-        input.lane = input.origin.x / 5.2;
+        input.row = input.origin.z / sceneGeometry::RowSpacing;
+        input.lane = input.origin.x / sceneGeometry::ColumnSpacing;
     }
     input.reduced = m_reduced || input.reduced;
     input.cinematic = m_openingTime.has_value();
     input.introTime = m_openingTime;
-    const auto localAim = m_caseRotation.rotatedVector({ -2.085f, 2.252f, 0 });
-    const auto offset = cameraRotation().rotatedVector({ -48, -17.6f, 36 });
+    const auto localAim = m_caseRotation.rotatedVector({ -LocalLightAimX, LocalLightAimY, 0 });
+    const auto offset =
+            cameraRotation().rotatedVector({ -LightOffsetX, -LightOffsetY, LightOffsetZ });
     m_lighting.update(input, input.origin + SceneVector{ localAim.x(), localAim.y(), localAim.z() },
                       { offset.x(), offset.y(), offset.z() }, m_detail, dt);
 }
@@ -391,9 +492,13 @@ QVariantMap SceneAdapter::hitTest(double x, double y) const
     const auto end = (inverse * QVector4D(float(nx), float(ny), 1, 1)).toVector3DAffine();
     const auto delta = end - start;
     double enter = 0, exit = 1;
-    const std::array<double, 3> lo{ -2.225, .175, -.07 }, hi{ 2.225, 3.525, .07 };
-    for (int i = 0; i < 3; ++i) {
-        if (std::abs(delta[i]) < 1e-10) {
+    const std::array<double, VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
+                                             sceneGeometry::CaseBottom,
+                                             -sceneGeometry::CaseHalfDepth },
+            hi{ sceneGeometry::CaseHalfWidth, sceneGeometry::CaseTop,
+                sceneGeometry::CaseHalfDepth };
+    for (int i = 0; i < VectorAxes; ++i) {
+        if (std::abs(delta[i]) < ParallelRayTolerance) {
             if (start[i] < lo[i] || start[i] > hi[i])
                 return { };
         } else {

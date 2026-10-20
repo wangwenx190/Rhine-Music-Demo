@@ -23,6 +23,16 @@
 #include <QSignalSpy>
 #include <stdexcept>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int ReviewDeadlineMilliseconds = 60000;
+}
+
+namespace {
+// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
+constexpr auto NanosecondsPerMillisecond = 1e6;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -124,7 +134,7 @@ public:
         QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
         if (prepare)
             prepare(0);
-        deadline.start(60000);
+        deadline.start(ReviewDeadlineMilliseconds);
         surface.requestFrame();
         loop.exec();
         require(rendered == count, "Opening frame deadline");
@@ -142,7 +152,7 @@ public:
         });
         QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
         opening.replay();
-        deadline.start(60000);
+        deadline.start(ReviewDeadlineMilliseconds);
         surface.requestFrame();
         loop.exec();
         require(opening.film(), "Production renderer/cover readiness did not start the film");
@@ -324,8 +334,9 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
                     { u"api"_s,
                       quick ? u"QtQuick.Shape.CurveRenderer"_s : u"C++ Canvas Painter"_s },
                     { u"frames"_s, 32 },
-                    { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / 1e6 },
-                    { u"canvasPaintMs"_s, (openingInkStats().paintNs.load() - before) / 1e6 },
+                    { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / NanosecondsPerMillisecond },
+                    { u"canvasPaintMs"_s,
+                      (openingInkStats().paintNs.load() - before) / NanosecondsPerMillisecond },
                     { u"canvasPaints"_s, qint64(openingInkStats().paints.load() - paints) },
                     { u"gpuCompleteMs"_s, QJsonValue::Null },
                     { u"scope"_s,

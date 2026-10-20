@@ -1,3 +1,6 @@
+// Routes keyboard, wheel and pointer intent to the active navigation context. Modal and detail
+// ownership prevent hidden surfaces from consuming input.
+
 #pragma once
 #include "ArchivePool.h"
 #include <QPointer>
@@ -8,6 +11,11 @@ class QWheelEvent;
 class QKeyEvent;
 
 namespace yalahoo {
+namespace inputTiming {
+// A far-past sentinel starts a new wheel burst without accumulated input.
+inline constexpr auto InactiveGestureTime = 1e20;
+}
+
 class SelectionController;
 class InputRouter final : public QObject
 {
@@ -54,7 +62,7 @@ private:
     QPointer<SelectionController> m_selection;
     QPointer<QQuickWindow> m_window;
     QElapsedTimer m_timer;
-    double m_remainder = 0, m_lastTime = -1e20;
+    double m_remainder = 0, m_lastTime = -inputTiming::InactiveGestureTime;
     int m_direction = 0, m_context = -1;
     int m_rowDirection = 0, m_columnDirection = 0, m_navigationDirection = 0;
     bool m_enabled = true;

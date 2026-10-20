@@ -1,9 +1,25 @@
+// Header geometry follows the final source CSS breakpoints in logical pixels. The transport
+// title owns its width animation while play/stop hit targets stay anchored.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music
 
 Item {
     id: root
+    // Source breakpoints and SVG view-box coordinates are independent of actual window DPR.
+    readonly property real compactWidthPixels: 1100
+    readonly property real wideWidthPixels: 1700
+    readonly property real smallWidthPixels: 700
+    readonly property real brandViewWidth: 816
+    readonly property real brandCapitalHeight: 104
+    readonly property real brandBaseline: 188
+    readonly property real brandViewHeight: 208
+    readonly property real compactTransportReservedPixels: 610
+    readonly property real desktopTransportReservedPixels: 760
+    readonly property real smallTransportReservedPixels: 340
+    readonly property real portraitTransportReservedPixels: 320
+
     required property LayoutMetrics metrics
     required property DesignTokens tokens
     property string playingTitle: ""
@@ -19,38 +35,42 @@ Item {
     readonly property TitleReelMotion transportController: song.reelController
     signal actionRequested(string action)
     signal themeRequested(bool night)
-    readonly property bool narrow: metrics.width <= 1100
-    readonly property real margin: metrics.portrait ? 20 : metrics.width >= 1700 ? 60 : narrow ? 25 :
-                                                                                                 40
+    readonly property bool narrow: metrics.width <= root.compactWidthPixels
+    readonly property real margin: metrics.portrait ? 20 : metrics.width >= root.wideWidthPixels
+                                                      ? 60 : narrow ? 25 : 40
 
-    readonly property real brandHeight: metrics.portrait ? 24 : metrics.width >= 1700 ? 39 : narrow
-                                                                                        ? 25 : 31
-    readonly property real navGap: metrics.portrait ? 6 : narrow ? 15 : metrics.width >= 1700 ? 30 :
-                                                                                                25
+    readonly property real brandHeight: metrics.portrait ? 24 : metrics.width
+                                                           >= root.wideWidthPixels ? 39 : narrow
+                                                                                     ? 25 : 31
+    readonly property real navGap: metrics.portrait ? 6 : narrow ? 15 : metrics.width
+                                                                   >= root.wideWidthPixels ? 30 : 25
 
     x: margin
-    y: metrics.portrait ? 22 : metrics.width >= 1700 ? 48 : narrow ? 26 : 33
+    y: metrics.portrait ? 22 : metrics.width >= root.wideWidthPixels ? 48 : narrow ? 26 : 33
     width: metrics.width - margin * 2
     height: metrics.portrait ? 84 : brand.height
     objectName: "archiveHeader"
     Item {
         id: brand
         objectName: "brandContainer"
-        width: root.brandHeight * 816 / 104
-        height: root.brandHeight + 5 + (root.narrow ? 7 : root.metrics.width >= 1700 ? 11 : 9) * 1.5
+        width: root.brandHeight * root.brandViewWidth / root.brandCapitalHeight
+        height: root.brandHeight + 5 + (root.narrow ? 7 : root.metrics.width >= root.wideWidthPixels
+                                                      ? 11 : 9) * 1.5
         ArchiveVectorImage {
             objectName: "brandLogo"
             // Keep the capital-height slot and full SVG descent; no crop of the accents.
-            y: root.brandHeight + 3 - root.brandHeight * 188 / 104
+            y: root.brandHeight + 3 - root.brandHeight * root.brandBaseline
+               / root.brandCapitalHeight
+
             width: parent.width
-            height: root.brandHeight * 208 / 104
+            height: root.brandHeight * root.brandViewHeight / root.brandCapitalHeight
             source: "qrc:/assets/branding/logo-" + (root.tokens.night ? "dark" : "light") + ".svg"
         }
         ArchiveText {
             tokens: root.tokens
             y: root.brandHeight + 5
             text: qsTr("MUSIC ARCHIVE / PERSONAL MUSIC TERMINAL")
-            cssPixelSize: root.narrow ? 7 : root.metrics.width >= 1700 ? 11 : 9
+            cssPixelSize: root.narrow ? 7 : root.metrics.width >= root.wideWidthPixels ? 11 : 9
             cssLineHeight: cssPixelSize * 1.5
             font.letterSpacing: root.metrics.portrait ? 1 : 1.8
         }
@@ -79,7 +99,7 @@ Item {
             iconName: "folder"
             width: root.metrics.portrait ? 28 : implicitWidth
             showText: !root.metrics.portrait
-            cssPixelSize: root.narrow ? 11 : root.metrics.width >= 1700 ? 14 : 12
+            cssPixelSize: root.narrow ? 11 : root.metrics.width >= root.wideWidthPixels ? 14 : 12
             onClicked: root.actionRequested("library")
         }
         ArchiveButton {
@@ -95,7 +115,7 @@ Item {
             iconName: "search"
             width: root.metrics.portrait ? 28 : implicitWidth
             showText: !root.metrics.portrait
-            cssPixelSize: root.narrow ? 11 : root.metrics.width >= 1700 ? 14 : 12
+            cssPixelSize: root.narrow ? 11 : root.metrics.width >= root.wideWidthPixels ? 14 : 12
             onClicked: root.actionRequested("search")
         }
         ThemeSwitch {
@@ -106,7 +126,7 @@ Item {
                 y: root.chromeOffset
             }
             tokens: root.tokens
-            width: root.metrics.portrait ? 104 : root.narrow ? 100 : 108
+            width: root.metrics.portrait ? root.brandCapitalHeight : root.narrow ? 100 : 108
             height: root.metrics.portrait || !root.narrow ? 31 : 30
             y: (nav.height - height) / 2
             onThemeRequested: night => root.themeRequested(night)
@@ -131,19 +151,23 @@ Item {
             objectName: "minimalTransport"
             readonly property real songCap: root.metrics.portrait ? Math.max(0, Math.min(280,
                                                                                          root.metrics.width
-                                                                                         - 320)) : root.metrics.width
-                                                                    <= 700 ? Math.max(0, Math.min(
-                                                                                          100, root.metrics.width
-                                                                                          - 340)) : root.narrow
-                                                                             ? Math.max(0, Math.min(
-                                                                                            180, root.metrics.width
-                                                                                            - 610)) : Math.max(
-                                                                                   0, Math.min(240,
-                                                                                               root.metrics.width
-                                                                                               - 760))
+                                                                                         - root.portraitTransportReservedPixels)) :
+                                                                    root.metrics.width
+                                                                    <= root.smallWidthPixels
+                                                                    ? Math.max(0, Math.min(100,
+                                                                                           root.metrics.width
+                                                                                           - root.smallTransportReservedPixels)) :
+                                                                      root.narrow ? Math.max(0,
+                                                                                             Math.min(180,
+                                                                                                      root.metrics.width
+                                                                                                      - root.compactTransportReservedPixels)) :
+                                                                                    Math.max(0,
+                                                                                             Math.min(240,
+                                                                                                      root.metrics.width
+                                                                                                      - root.desktopTransportReservedPixels))
             readonly property real songWidth: song.width
-            width: root.metrics.portrait ? root.width - 28 - 28 - 104 - 28 - root.navGap * 4 : 12
-                                           + songWidth + 29 * 2 + 7
+            width: root.metrics.portrait ? root.width - 28 - 28 - root.brandCapitalHeight - 28 - root.navGap
+                                           * 4 : 12 + songWidth + 29 * 2 + 7
             height: 29
             y: (nav.height - (height - (root.metrics.portrait ? 0 : 5))) / 2 - (
                    root.metrics.portrait ? 0 : 5)
@@ -161,7 +185,7 @@ Item {
                 x: root.metrics.portrait ? parent.width - 49 - transport.songWidth : 13
                 title: root.playingTitle
                 cap: transport.songCap
-                pixelSize: root.metrics.width <= 700 ? 10 : root.narrow ? 11 : 12
+                pixelSize: root.metrics.width <= root.smallWidthPixels ? 10 : root.narrow ? 11 : 12
                 onLocateRequested: root.actionRequested("locate-song")
             }
             TransportMotion {
@@ -174,7 +198,7 @@ Item {
             }
             ArchiveButton {
                 objectName: "playButton"
-                iconSize: root.metrics.width <= 700 ? 15 : 17
+                iconSize: root.metrics.width <= root.smallWidthPixels ? 15 : 17
                 opacity: hovered || root.playing ? 1 : 0.8
                 tokens: root.tokens
                 x: parent.width - width * 2 - (root.metrics.portrait ? 1 : 6)
@@ -185,7 +209,7 @@ Item {
                 contentItem: Item {
                     ArchiveVectorImage {
                         anchors.centerIn: parent
-                        width: root.metrics.width <= 700 ? 15 : 17
+                        width: root.metrics.width <= root.smallWidthPixels ? 15 : 17
                         height: width
                         opacity: 1 - iconMotion.pauseOpacity
                         scale: .7 + .3 * opacity
@@ -194,7 +218,7 @@ Item {
                     }
                     ArchiveVectorImage {
                         anchors.centerIn: parent
-                        width: root.metrics.width <= 700 ? 15 : 17
+                        width: root.metrics.width <= root.smallWidthPixels ? 15 : 17
                         height: width
                         opacity: iconMotion.pauseOpacity
                         scale: .7 + .3 * opacity
@@ -206,7 +230,7 @@ Item {
             }
             ArchiveButton {
                 objectName: "stopButton"
-                iconSize: root.metrics.width <= 700 ? 15 : 17
+                iconSize: root.metrics.width <= root.smallWidthPixels ? 15 : 17
                 opacity: hovered ? 1 : 0.8
                 tokens: root.tokens
                 x: parent.width - width

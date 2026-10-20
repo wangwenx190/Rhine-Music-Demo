@@ -1,3 +1,6 @@
+// Draws the prepared ruler through Qt Canvas Painter. GUI synchronization transfers owned
+// values; rendering never queries live controller state.
+
 #pragma once
 #include "RulerController.h"
 #include <QCanvasPainterItem>

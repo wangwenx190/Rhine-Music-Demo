@@ -1,3 +1,6 @@
+// Defines asynchronous album metadata requests, capabilities and results. Tokens identify the
+// accepted request so cancellation and replacement remain explicit.
+
 #pragma once
 #include "MusicTypes.h"
 #include <QObject>

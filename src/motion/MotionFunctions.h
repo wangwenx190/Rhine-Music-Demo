@@ -1,5 +1,14 @@
+// Defines the source-derived scalar motion fields in seconds and scene units. Pure functions
+// keep wave envelopes and handoff timing independent of rendering.
+
 #pragma once
 namespace yalahoo {
+namespace motionField {
+// The default cinematic focus uses the source archive coordinate origin.
+inline constexpr auto DefaultCenterRow = 12;
+inline constexpr auto DefaultFocusLane = 2;
+}
+
 double smooth(double t);
 double archiveWave(double row, double lane, double time);
 double extraction(double time);
@@ -10,7 +19,9 @@ double selectionWave(double distance, double age);
 double rippleEnvelope(double distance, double age);
 double columnStrength(double lane, double focus, double progress = 1);
 double idleWave(double row, double lane, double time);
-double cinematicField(double row, double lane, double time, double center = 12, double focus = 2);
+double cinematicField(double row, double lane, double time,
+                      double center = motionField::DefaultCenterRow,
+                      double focus = motionField::DefaultFocusLane);
 inline constexpr double InspectionLift = 4.05;
 inline constexpr double AlignmentEpsilon = .001;
 double returnStep(double angle, double dt, bool reduced = false);

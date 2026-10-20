@@ -1,3 +1,6 @@
+// Locates a stable track ID in a virtualized list and coordinates focus. Revision-aware geometry
+// correction follows Qt polish without scanning unrealized delegates.
+
 #pragma once
 #include <QObject>
 #include <QString>

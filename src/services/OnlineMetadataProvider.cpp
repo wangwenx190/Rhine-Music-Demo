@@ -16,6 +16,16 @@
 #include <optional>
 #include <utility>
 
+namespace {
+// Limits bound remote response expansion; cache and retry ages are measured in UTC.
+constexpr auto MaximumOutstandingRequests = 8;
+constexpr auto PositiveCacheDays = 30;
+constexpr auto MaximumQueryFieldCharacters = 512;
+constexpr auto MaximumCandidatePages = 12;
+constexpr auto MaximumPerformers = 50;
+constexpr auto RetryDelaySeconds = 60;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -94,7 +104,7 @@ public:
     }
     void enqueue(AlbumQuery query, RequestToken token, MetadataKind kind)
     {
-        if (m_waiting.size() + int(m_active.has_value()) >= 8)
+        if (m_waiting.size() + int(m_active.has_value()) >= MaximumOutstandingRequests)
             return;
         Job job;
         job.query = std::move(query);
@@ -185,7 +195,7 @@ private:
         const bool positive = cached.status == ProviderStatus::Matched
                 || cached.status == ProviderStatus::Partial;
         const auto expiry = expires.isValid() ? expires
-                : checked.isValid()           ? checked.addDays(positive ? 30 : 1)
+                : checked.isValid()           ? checked.addDays(positive ? PositiveCacheDays : 1)
                                               : QDateTime();
         const bool fresh = expiry.isValid() ? expiry > QDateTime::currentDateTimeUtc() : positive;
         const bool hasCache = kind != MetadataKind::Credits || !state.isEmpty();
@@ -213,7 +223,8 @@ private:
             finish(false);
             return;
         }
-        if (album.title.size() > 512 || album.artist.size() > 512) {
+        if (album.title.size() > MaximumQueryFieldCharacters
+            || album.artist.size() > MaximumQueryFieldCharacters) {
             job.result.status = ProviderStatus::Uncertain;
             job.result.error = tr(
                     "Album titles and artist names must be at most 512 characters for online queries.");
@@ -414,7 +425,7 @@ private:
                 if (object.contains(u"missing"_s) || object.value(u"pageid"_s).toInteger() <= 0)
                     continue;
                 if (!seen.contains(object.value(u"pageid"_s).toInteger())
-                    && job.pages.size() < 12) {
+                    && job.pages.size() < MaximumCandidatePages) {
                     seen.insert(object.value(u"pageid"_s).toInteger());
                     job.pages.append(page);
                 }
@@ -459,7 +470,7 @@ private:
                 }
                 performers.removeDuplicates();
             }
-            if (performers.size() > 50) {
+            if (performers.size() > MaximumPerformers) {
                 job.uncertain = true;
                 assess();
             } else if (performers.isEmpty()) {
@@ -488,7 +499,7 @@ private:
             const auto now = QDateTime::currentDateTimeUtc();
             result.checkedAt = now.toString(Qt::ISODateWithMs);
             if (result.status == ProviderStatus::Error && result.retryAt.isEmpty())
-                result.retryAt = now.addSecs(60).toString(Qt::ISODateWithMs);
+                result.retryAt = now.addSecs(RetryDelaySeconds).toString(Qt::ISODateWithMs);
             const auto field = result.kind == MetadataKind::Introduction ? u"introduction"_s
                     : result.kind == MetadataKind::Credits               ? u"creditsLookup"_s
                                                                          : u"online"_s;
@@ -526,7 +537,7 @@ private:
                                  : now.addDays(result.status == ProviderStatus::Matched
                                                                || result.status
                                                                        == ProviderStatus::Partial
-                                                       ? 30
+                                                       ? PositiveCacheDays
                                                        : 1)
                                            .toString(Qt::ISODateWithMs));
             result.payload.insert(field, state);
@@ -607,11 +618,13 @@ ProviderCapabilities OnlineMetadataProvider::capabilities() const
 {
     return { d->m_enabled, true, true, true, true };
 }
+// Reserve capacity in the GUI facade before posting to the network thread.
+// The token remains the acceptance key even if cancellation races with a queued reply.
 bool OnlineMetadataProvider::request(AlbumQuery query, RequestToken token, MetadataKind kind)
 {
     if (d->m_pending.contains(token))
         return d->m_pending.value(token) == kind;
-    if (d->m_outstanding.size() >= 8 || d->m_outstanding.contains(token))
+    if (d->m_outstanding.size() >= MaximumOutstandingRequests || d->m_outstanding.contains(token))
         return false;
     d->m_outstanding.insert(token);
     query.enabled = d->m_enabled && query.enabled;

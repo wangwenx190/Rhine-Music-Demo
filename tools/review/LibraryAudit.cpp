@@ -42,6 +42,19 @@
 #include <QTest>
 #include <atomic>
 
+namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int FrameDeadlineMilliseconds = 5000;
+constexpr int MediaDeadlineMilliseconds = 10000;
+constexpr int InputDeadlineMilliseconds = 2000;
+constexpr int ModelDeadlineMilliseconds = 3000;
+}
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int EventPollMilliseconds = 5;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -294,8 +307,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         surface.requestFrame();
         QElapsedTimer wait;
         wait.start();
-        while (rendered.size() == before && wait.elapsed() < 5000)
-            QTest::qWait(5);
+        while (rendered.size() == before && wait.elapsed() < FrameDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
         return rendered.size() > before;
     };
     const auto renderSettingsTarget = [&] {
@@ -360,8 +373,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 button->mapToScene({ button->width() / 2, button->height() / 2 }).toPoint());
         QElapsedTimer loaded;
         loaded.start();
-        while (!song->playing() && loaded.elapsed() < 10000)
-            QTest::qWait(5);
+        while (!song->playing() && loaded.elapsed() < MediaDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
         check(u"reference-license-resource"_s,
               QFile::exists(u":/assets/licenses/qt-playback-reference-NOTICE.md"_s));
         check(u"actual-play-button"_s, song->playing() && song->trackId() == "track-0"_L1);
@@ -371,8 +384,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         QTest::keyClick(&window, Qt::Key_Space);
         QElapsedTimer resumed;
         resumed.start();
-        while (!song->playing() && resumed.elapsed() < 5000)
-            QTest::qWait(5);
+        while (!song->playing() && resumed.elapsed() < FrameDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
         check(u"space-resumes"_s, song->playing());
         playback.clear();
     }
@@ -554,8 +567,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                        u"introduction"_s)[u"status"_s]
                                                    .toString()
                                            != statusName(status)
-                                   && timer.elapsed() < 2000)
-                                QTest::qWait(5);
+                                   && timer.elapsed() < InputDeadlineMilliseconds)
+                                QTest::qWait(EventPollMilliseconds);
                             check(u"injected-status-render"_s, render());
                             auto *state =
                                     visual(window.contentItem(), u"introductionMetadataState"_s);
@@ -581,8 +594,9 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         }
                         QElapsedTimer queryTimer;
                         queryTimer.start();
-                        while (library.metadataBusy() && queryTimer.elapsed() < 3000)
-                            QTest::qWait(5);
+                        while (library.metadataBusy()
+                               && queryTimer.elapsed() < ModelDeadlineMilliseconds)
+                            QTest::qWait(EventPollMilliseconds);
                         check(u"current-query-qt-input"_s,
                               injected.lastQueryEnabled
                                       && injected.introductionRequests == previousRequests + 1
@@ -600,8 +614,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         }
                         queryTimer.restart();
                         while (library.metadataProgress()[u"active"_s].toBool()
-                               && queryTimer.elapsed() < 3000)
-                            QTest::qWait(5);
+                               && queryTimer.elapsed() < ModelDeadlineMilliseconds)
+                            QTest::qWait(EventPollMilliseconds);
                         check(u"batch-query-qt-input"_s,
                               library.metadataProgress()[u"kind"_s].toString() == "introduction"_L1
                                       && library.metadataProgress()[u"completed"_s].toInt()
@@ -613,8 +627,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         QElapsedTimer timer;
                         timer.start();
                         while (library.metadataProgress()[u"active"_s].toBool()
-                               && timer.elapsed() < 3000)
-                            QTest::qWait(5);
+                               && timer.elapsed() < ModelDeadlineMilliseconds)
+                            QTest::qWait(EventPollMilliseconds);
                         check(u"batch-progress"_s,
                               !library.metadataProgress()[u"active"_s].toBool()
                                       && library.metadataProgress()[u"completed"_s].toInt()
@@ -962,8 +976,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 QElapsedTimer timer;
                 timer.start();
                 while ((!oldScene.isNull() || !visual(appWindow->contentItem(), u"nativeScene"_s))
-                       && timer.elapsed() < 2000)
-                    QTest::qWait(5);
+                       && timer.elapsed() < InputDeadlineMilliseconds)
+                    QTest::qWait(EventPollMilliseconds);
                 check(u"reload-rebuilds-visual"_s,
                       oldScene.isNull() && visual(appWindow->contentItem(), u"nativeScene"_s));
                 check(u"reload-preserves-media-quality"_s,

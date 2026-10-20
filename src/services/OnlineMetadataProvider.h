@@ -1,3 +1,6 @@
+// Runs bounded asynchronous metadata requests on a dedicated network thread. Tokens and
+// cancellation guard every publication back to the GUI facade.
+
 #pragma once
 #include <memory>
 #include "IMetadataProvider.h"

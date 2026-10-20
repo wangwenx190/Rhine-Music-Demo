@@ -23,6 +23,11 @@
 #include <QTimer>
 #include <QWheelEvent>
 
+namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int FrameDeadlineMilliseconds = 5000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -279,7 +284,7 @@ int reviewExperiments(const QString &output)
     check(u"diagnostics-on"_s, render() && native->diagnosticsEnabled());
     QElapsedTimer sampling;
     sampling.start();
-    while (native->diagnosticValues().isEmpty() && sampling.elapsed() < 5000)
+    while (native->diagnosticValues().isEmpty() && sampling.elapsed() < FrameDeadlineMilliseconds)
         if (!render())
             break;
     const auto values = native->diagnosticValues();

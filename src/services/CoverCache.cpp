@@ -19,6 +19,42 @@
 #include <cmath>
 #include <limits>
 
+namespace {
+// Cover geometry uses a 1024-unit fallback canvas; color conversion follows the sRGB transfer curve.
+constexpr auto CoverTilePixels = 256;
+constexpr auto ByteChannelValues = 256;
+constexpr auto MaximumFallbackTitleCharacters = 256;
+constexpr auto FallbackCanvasUnits = 1024;
+constexpr auto DecodeRetryMilliseconds = 10;
+constexpr auto MaximumIdentityCharacters = 1024;
+constexpr auto BytesPerMiB = 1024 * 1024;
+constexpr auto MaximumPathCharacters = 32768;
+constexpr auto WorkingBytesPerOutputPixel = 36;
+constexpr auto FallbackMarginDivisor = 64.0;
+constexpr auto FallbackInsetPixels = 16;
+constexpr auto FallbackInnerPixels = 992;
+constexpr auto FallbackStrokeDivisor = 180;
+constexpr auto FallbackDiscCenterY = .43;
+constexpr auto FallbackDiscRadius = .2;
+constexpr auto FallbackSpindleRadius = .04;
+constexpr auto PointsPerInch = 72;
+constexpr auto FallbackMaximumLabelWidth = .83;
+constexpr auto FallbackTitleSizeRatio = .045;
+constexpr auto FallbackTitleY = .8;
+constexpr auto FallbackCaptionSize = .025;
+constexpr auto FallbackCaptionY = .87;
+constexpr auto SrgbDecodeKnee = .04045;
+constexpr auto SrgbLinearSlope = 12.92;
+constexpr auto SrgbOffset = .055;
+constexpr auto SrgbScale = 1.055;
+constexpr auto SrgbExponent = 2.4;
+constexpr auto SrgbEncodeKnee = .0031308;
+constexpr auto ByteChannelScale = 255.0;
+constexpr auto FloatByteChannelScale = 255.0f;
+constexpr auto MaximumChannelByte = 255;
+constexpr auto TileMipLevels = 8;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -45,7 +81,7 @@ qint64 CoverPixels::byteSize() const
 struct CoverCache::Job final
 {
     QString key, identity, path, title;
-    int resolution = 256;
+    int resolution = CoverTilePixels;
     quint64 generation = 0;
     std::shared_ptr<std::atomic_bool> wanted;
 };
@@ -96,7 +132,7 @@ CoverCache::CoverCache(QObject *parent) : QObject(parent), d(std::make_unique<Pr
     d->m_state = std::make_shared<State>();
     d->m_state->receiver = this;
     d->m_retry.setSingleShot(true);
-    d->m_retry.setInterval(10);
+    d->m_retry.setInterval(DecodeRetryMilliseconds);
     connect(&d->m_retry, &QTimer::timeout, this, &CoverCache::pump);
 }
 CoverCache::~CoverCache()
@@ -142,9 +178,11 @@ CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, i
 }
 bool CoverCache::request(QString identity, QString path, int resolution, QString title)
 {
-    if (identity.isEmpty() || identity.size() > 1024 || path.size() > 32768 || title.size() > 256
+    if (identity.isEmpty() || identity.size() > MaximumIdentityCharacters
+        || path.size() > MaximumPathCharacters || title.size() > MaximumFallbackTitleCharacters
         || (resolution <= 0 || (resolution & (resolution - 1)) != 0)
-        || qint64(resolution) > std::numeric_limits<qint64>::max() / resolution / 36) {
+        || qint64(resolution)
+                > std::numeric_limits<qint64>::max() / resolution / WorkingBytesPerOutputPixel) {
         ++d->m_rejected;
         return false;
     }
@@ -250,7 +288,7 @@ qint64 CoverCache::workingSetEstimateFor(int resolution)
 {
     // Requested paint/mip working storage only. Source decoder and color-conversion
     // allocations are independent and are not a process-memory reservation.
-    return qint64(resolution) * resolution * 36;
+    return qint64(resolution) * resolution * WorkingBytesPerOutputPixel;
 }
 QImage CoverCache::paint(const QImage &source, int resolution, const QString &title)
 {
@@ -260,7 +298,7 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
     image.fill(Qt::transparent);
     QPainter painter(&image);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    const qreal margin = resolution / 64.0;
+    const qreal margin = resolution / FallbackMarginDivisor;
     const QRectF box(margin, margin, resolution - 2 * margin, resolution - 2 * margin);
     if (!source.isNull()) {
         const qreal scale = qMin(box.width() / source.width(), box.height() / source.height());
@@ -269,54 +307,63 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
                           source);
     } else {
         // The source paints fallback text in a 1024 logical canvas at both resolutions.
-        constexpr qreal logical = 1024;
+        constexpr qreal logical = FallbackCanvasUnits;
         painter.scale(resolution / logical, resolution / logical);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.fillRect(QRectF(16, 16, 992, 992), QColor("#c9c9c4"_L1));
-        painter.setPen(QPen(QColor("#f8f7f1"_L1), logical / 180));
-        painter.drawEllipse(QPointF(logical * .5, logical * .43), logical * .2, logical * .2);
-        painter.drawEllipse(QPointF(logical * .5, logical * .43), logical * .04, logical * .04);
+        painter.fillRect(QRectF(FallbackInsetPixels, FallbackInsetPixels, FallbackInnerPixels,
+                                FallbackInnerPixels),
+                         QColor("#c9c9c4"_L1));
+        painter.setPen(QPen(QColor("#f8f7f1"_L1), logical / FallbackStrokeDivisor));
+        painter.drawEllipse(QPointF(logical * .5, logical * FallbackDiscCenterY),
+                            logical * FallbackDiscRadius, logical * FallbackDiscRadius);
+        painter.drawEllipse(QPointF(logical * .5, logical * FallbackDiscCenterY),
+                            logical * FallbackSpindleRadius, logical * FallbackSpindleRadius);
         painter.setPen(QColor("#3f4849"_L1));
         QFont font(u"sans-serif"_s);
         font.setWeight(QFont::Medium);
         auto label = [&](const QString &text, qreal pixels, qreal baseline) {
-            font.setPointSizeF(pixels * 72 / painter.device()->logicalDpiY());
+            font.setPointSizeF(pixels * PointsPerInch / painter.device()->logicalDpiY());
             painter.setFont(font);
             const qreal width = QFontMetricsF(font, painter.device()).horizontalAdvance(text);
             painter.save();
             painter.translate(logical / 2, baseline);
-            painter.scale(qMin(1.0, logical * .83 / qMax(1.0, width)), 1);
+            painter.scale(qMin(1.0, logical * FallbackMaximumLabelWidth / qMax(1.0, width)), 1);
             painter.drawText(QPointF(-width / 2, 0), text);
             painter.restore();
         };
         label(title.isEmpty() ? QCoreApplication::translate("Yalahoo", "No album cover")
-                              : graphemePrefix(title, 256),
-              logical * .045, logical * .8);
+                              : graphemePrefix(title, MaximumFallbackTitleCharacters),
+              logical * FallbackTitleSizeRatio, logical * FallbackTitleY);
         font.setWeight(QFont::Normal);
-        label(u"LOCAL COLLECTION / NO COVER"_s, logical * .025, logical * .87);
+        label(u"LOCAL COLLECTION / NO COVER"_s, logical * FallbackCaptionSize,
+              logical * FallbackCaptionY);
     }
     return image;
 }
+// Filter linear-light premultiplied color and alpha together before returning to sRGB.
+// Each destination pixel integrates its source footprint, avoiding dark fringes at transparent edges.
 QList<QImage> CoverCache::makeMipmaps(const QImage &image)
 {
     // Decode sRGB before area reduction; alpha remains premultiplied in linear light.
     // Independent chains never incorporate pixels belonging to another atlas slot.
     const auto source = image.convertToFormat(QImage::Format_RGBA8888);
     const auto decode = [](double v) {
-        return v <= .04045 ? v / 12.92 : std::pow((v + .055) / 1.055, 2.4);
+        return v <= SrgbDecodeKnee ? v / SrgbLinearSlope
+                                   : std::pow((v + SrgbOffset) / SrgbScale, SrgbExponent);
     };
     const auto encode = [](double v) {
-        return v <= .0031308 ? v * 12.92 : 1.055 * std::pow(v, 1.0 / 2.4) - .055;
+        return v <= SrgbEncodeKnee ? v * SrgbLinearSlope
+                                   : SrgbScale * std::pow(v, 1.0 / SrgbExponent) - SrgbOffset;
     };
-    std::array<float, 256> decoded;
-    for (int i = 0; i < 256; ++i)
-        decoded[i] = float(decode(i / 255.0));
+    std::array<float, ByteChannelValues> decoded;
+    for (int i = 0; i < ByteChannelValues; ++i)
+        decoded[i] = float(decode(i / ByteChannelScale));
     QImage linear(source.size(), QImage::Format_RGBA32FPx4_Premultiplied);
     for (int y = 0; y < source.height(); ++y) {
         const auto *input = source.constScanLine(y);
         auto *row = reinterpret_cast<float *>(linear.scanLine(y));
         for (int x = 0; x < source.width(); ++x) {
-            const float alpha = input[4 * x + 3] / 255.0f;
+            const float alpha = input[4 * x + 3] / FloatByteChannelScale;
             for (int c = 0; c < 3; ++c)
                 row[4 * x + c] = decoded[input[4 * x + c]] * alpha;
             row[4 * x + 3] = alpha;
@@ -350,10 +397,13 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
                     output[4 * x + c] = float(sum[c] / (sx * sy));
                 const double alpha = output[4 * x + 3];
                 for (int c = 0; c < 3; ++c)
-                    bytes[4 * x + c] = uchar(std::clamp(
-                            qRound(alpha > 0 ? encode(output[4 * x + c] / alpha) * alpha * 255 : 0),
-                            0, 255));
-                bytes[4 * x + 3] = uchar(std::clamp(qRound(alpha * 255), 0, 255));
+                    bytes[4 * x + c] =
+                            uchar(std::clamp(qRound(alpha > 0 ? encode(output[4 * x + c] / alpha)
+                                                                    * alpha * MaximumChannelByte
+                                                              : 0),
+                                             0, MaximumChannelByte));
+                bytes[4 * x + 3] = uchar(
+                        std::clamp(qRound(alpha * MaximumChannelByte), 0, MaximumChannelByte));
             }
         }
         levels.append(std::move(encoded));
@@ -361,6 +411,8 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
     }
     return levels;
 }
+// Decode into worker-owned pixels, then publish an immutable snapshot.
+// Cancellation/generation checks protect the facade; decoded byte limits protect allocation.
 CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &state)
 {
     if (job.generation != state->generation.load() || !job.wanted->load())
@@ -404,17 +456,18 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     pixels->image = paint(source, job.resolution, job.title);
     pixels->image.setColorSpace(QColorSpace::SRgb);
     pixels->mipmaps = makeMipmaps(pixels->image);
-    if (job.resolution > 256) {
-        for (int y = 0; y < job.resolution; y += 256)
-            for (int x = 0; x < job.resolution; x += 256) {
+    if (job.resolution > CoverTilePixels) {
+        for (int y = 0; y < job.resolution; y += CoverTilePixels)
+            for (int x = 0; x < job.resolution; x += CoverTilePixels) {
                 CoverMipTile tile;
                 tile.origin = { x, y };
-                tile.image = pixels->image.copy(x, y, 256, 256);
+                tile.image = pixels->image.copy(x, y, CoverTilePixels, CoverTilePixels);
                 for (int level = 1; level <= pixels->mipmaps.size(); ++level) {
                     const auto &mip = pixels->mipmaps[level - 1];
-                    if (level <= 8)
-                        tile.mipmaps.append(
-                                mip.copy(x >> level, y >> level, 256 >> level, 256 >> level));
+                    if (level <= TileMipLevels)
+                        tile.mipmaps.append(mip.copy(x >> level, y >> level,
+                                                     CoverTilePixels >> level,
+                                                     CoverTilePixels >> level));
                     else if (x == 0 && y == 0)
                         tile.mipmaps.append(mip);
                 }
@@ -425,6 +478,8 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
         return { };
     return pixels;
 }
+// A completed decode may belong to a replaced request or a destroyed facade.
+// Check identity and generation before caching or notifying the GUI consumer.
 void CoverCache::complete(const Job &job, CoverSnapshot pixels)
 {
     --d->m_active;
@@ -475,7 +530,7 @@ QJsonObject CoverCache::statistics() const
              { u"peakInFlightWorkingSetEstimateBytes"_s, d->m_peakWorkingSetBytes },
              { u"imageAllocationLimitBytes"_s,
                QImageReader::allocationLimit() > 0
-                       ? QJsonValue(qint64(QImageReader::allocationLimit()) * 1024 * 1024)
+                       ? QJsonValue(qint64(QImageReader::allocationLimit()) * BytesPerMiB)
                        : QJsonValue(QJsonValue::Null) },
              { u"peakReaderReturnedBytesPerJob"_s, d->m_peakReaderBytes },
              { u"decoderScaledResults"_s, d->m_decoderScaledResults },

@@ -1,3 +1,6 @@
+// Coordinates extraction, inspection and return of the selected case. Interrupted transitions
+// preserve displayed motion and return copies own their remaining trajectory.
+
 #pragma once
 #include "QuinticTrack.h"
 

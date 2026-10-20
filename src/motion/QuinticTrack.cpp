@@ -2,23 +2,39 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Travel policy and settling thresholds from the scalar motion contract.
+constexpr auto MinimumTravelSeconds = 1.4;
+constexpr auto RowsPerTravelLane = 8;
+constexpr auto AdditionalTravelLaneRange = 7;
+constexpr auto MinimumTrackSeconds = .001;
+constexpr auto SettledPositionTolerance = .008;
+constexpr auto SettledVelocityTolerance = .025;
+constexpr auto SpringCompletionTolerance = 1e-8;
+}
+
 namespace yalahoo {
 double archiveTravelDuration(double lanes, double rows)
 {
-    return 1.4 + std::clamp((std::hypot(lanes, rows / 8) - 1) / 7, 0.0, 1.0);
+    return MinimumTravelSeconds
+            + std::clamp((std::hypot(lanes, rows / RowsPerTravelLane) - 1)
+                                 / AdditionalTravelLaneRange,
+                         0.0, 1.0);
 }
 void QuinticTrack::observe(Kinematics state)
 {
     if (!m_active)
         m_state = state;
 }
+// Solve the endpoint constraints x(T)=target, v(T)=a(T)=0 while retaining x/v/a at t=0.
+// The literal polynomial coefficients below come from that linear solve, not tuning.
 bool QuinticTrack::retarget(double target, double duration)
 {
     if (m_hasTarget && target == m_target)
         return false;
     m_hasTarget = true;
     m_target = target;
-    m_duration = std::max(.001, duration);
+    m_duration = std::max(MinimumTrackSeconds, duration);
     m_elapsed = 0;
     m_active = true;
     const double t = m_duration, t2 = t * t;
@@ -37,6 +53,8 @@ bool QuinticTrack::retarget(double target, double duration)
     };
     return true;
 }
+// Evaluate the quintic and its analytic derivatives at the same elapsed time.
+// The integer factors are polynomial powers and derivative coefficients.
 void QuinticTrack::update(double dt, bool reduced)
 {
     if (!m_active)
@@ -75,8 +93,8 @@ void QuinticTrack::reset()
 }
 bool ColumnScalar::settled() const
 {
-    return !guided() && std::abs(m_spring.value - m_target) < .008
-            && std::abs(m_spring.velocity) < .025;
+    return !guided() && std::abs(m_spring.value - m_target) < SettledPositionTolerance
+            && std::abs(m_spring.velocity) < SettledVelocityTolerance;
 }
 bool ColumnScalar::retarget(double target, bool guided, double duration, double rate)
 {
@@ -105,7 +123,8 @@ void ColumnScalar::update(double dt, bool reduced)
         static_cast<Kinematics &>(m_spring) = m_track.state();
     } else {
         m_spring.update(m_target, m_rate, dt);
-        if (std::abs(m_spring.value - m_target) < 1e-8 && std::abs(m_spring.velocity) < 1e-8)
+        if (std::abs(m_spring.value - m_target) < SpringCompletionTolerance
+            && std::abs(m_spring.velocity) < SpringCompletionTolerance)
             finish();
     }
 }

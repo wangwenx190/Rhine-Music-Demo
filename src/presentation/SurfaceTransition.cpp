@@ -4,6 +4,22 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Offsets are logical pixels; interrupted opacity determines the remaining authored duration.
+constexpr auto RightEntryOffsetPixels = 24;
+constexpr auto BottomEntryOffsetPixels = 10;
+constexpr auto RightExitOffsetPixels = 32;
+constexpr auto BottomExitOffsetPixels = 6;
+constexpr auto MinimumInterruptedMilliseconds = 72.0;
+constexpr auto MillisecondsPerSecond = 1000;
+constexpr auto ExitBezierFirstX = .4;
+constexpr auto BrowseBezierFirstX = .45;
+constexpr auto BrowseBezierSecondX = .25;
+constexpr auto EnterBezierFirstX = .22;
+constexpr auto EnterBezierSecondX = .36;
+constexpr auto CompletionEpsilonSeconds = 1e-10;
+}
+
 namespace yalahoo {
 SurfaceTransition::SurfaceTransition(double enterMs, double exitMs, bool right, bool browse,
                                      QObject *parent)
@@ -26,23 +42,24 @@ void SurfaceTransition::run(bool show, bool reduced, std::function<void()> finis
     m_finished = std::move(finished); // Drops the obsolete completion before replacing its state.
     m_show = show;
     m_fromOpacity = hidden ? 0 : m_opacity;
-    m_fromOffset = hidden ? (m_right ? 24 : 10) : m_offset;
-    m_toOffset = show ? 0 : (m_right ? 32 : 6);
+    m_fromOffset = hidden ? (m_right ? RightEntryOffsetPixels : BottomEntryOffsetPixels) : m_offset;
+    m_toOffset = show ? 0 : (m_right ? RightExitOffsetPixels : BottomExitOffsetPixels);
     const double base = show ? m_enterMs : m_exitMs;
     m_duration =
-            (interrupted ? std::max(72.0,
+            (interrupted ? std::max(MinimumInterruptedMilliseconds,
                                     base * std::sqrt(std::abs((show ? 1.0 : 0.0) - m_fromOpacity)))
                          : base)
-            / 1000;
+            / MillisecondsPerSecond;
     m_ease = QEasingCurve(QEasingCurve::BezierSpline);
     if (!show) {
-        m_ease.addCubicBezierSegment({ .4, 0 }, { 1, 1 }, { 1, 1 });
+        m_ease.addCubicBezierSegment({ ExitBezierFirstX, 0 }, { 1, 1 }, { 1, 1 });
     } else if (m_enterCurve) {
         m_ease = *m_enterCurve;
     } else if (m_browse) {
-        m_ease.addCubicBezierSegment({ .45, 0 }, { .25, 1 }, { 1, 1 });
+        m_ease.addCubicBezierSegment({ BrowseBezierFirstX, 0 }, { BrowseBezierSecondX, 1 },
+                                     { 1, 1 });
     } else {
-        m_ease.addCubicBezierSegment({ .22, 1 }, { .36, 1 }, { 1, 1 });
+        m_ease.addCubicBezierSegment({ EnterBezierFirstX, 1 }, { EnterBezierSecondX, 1 }, { 1, 1 });
     }
     m_elapsed = 0;
     m_opacity = m_fromOpacity;
@@ -60,7 +77,7 @@ void SurfaceTransition::advance(double seconds)
     if (!m_running || !std::isfinite(seconds) || seconds <= 0)
         return;
     m_elapsed = std::min(m_duration, m_elapsed + seconds);
-    if (m_duration - m_elapsed < 1e-10) {
+    if (m_duration - m_elapsed < CompletionEpsilonSeconds) {
         finish();
         return;
     }
@@ -69,6 +86,8 @@ void SurfaceTransition::advance(double seconds)
     m_offset = m_fromOffset + (m_toOffset - m_fromOffset) * t;
     Q_EMIT changed();
 }
+// Move the completion out before emitting: changed() can synchronously replace this transition.
+// Only invoke the captured completion when its revision still owns the terminal state.
 void SurfaceTransition::finish()
 {
     if (!m_running)

@@ -1,3 +1,6 @@
+// Presents immutable library snapshots as Qt item models. Snapshot replacement and model
+// notifications happen together on the GUI thread.
+
 #pragma once
 #include "MusicTypes.h"
 #include <QAbstractListModel>
@@ -5,6 +8,11 @@
 #include <QVariantList>
 
 namespace yalahoo {
+namespace libraryColumns {
+// The padded physical stride keeps wrapped columns independent.
+inline constexpr auto DefaultSlotStride = 32;
+}
+
 enum class SortMode {
     Genre,
     Artist,
@@ -19,7 +27,7 @@ struct LibraryOrder final
 {
     QList<int> indices;
     QList<LibraryColumn> columns;
-    int slotStride = 32;
+    int slotStride = libraryColumns::DefaultSlotStride;
 };
 QString normalizedKey(const QString &value);
 LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode);

@@ -7,6 +7,21 @@
 #include <QPointF>
 #include <cmath>
 
+namespace {
+// Distance bounds the scroll duration; highlight timing is independent of list realization.
+constexpr auto MaximumScrollSeconds = .7;
+constexpr auto ScrollBaseSeconds = .32;
+constexpr auto HighlightFadeInSeconds = .32;
+constexpr auto ScrollSecondsPerPixel = .00012;
+constexpr auto ReducedHighlightSeconds = 1.1;
+constexpr auto HighlightLifetimeSeconds = 2.;
+constexpr auto HighlightBezierFirstX = .42;
+constexpr auto HighlightBezierSecondX = .58;
+constexpr auto HighlightHoldEndSeconds = .48;
+constexpr auto HighlightFadeEndSeconds = .88;
+constexpr auto HighlightFadeSeconds = .4;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -89,7 +104,8 @@ void TrackFocusController::beginReveal(quint64 revision, double start, double ta
     m_start = m_scrollY = start;
     m_target = target;
     m_elapsed = 0;
-    m_duration = std::min(.7, .32 + std::abs(target - start) * .00012);
+    m_duration = std::min(MaximumScrollSeconds,
+                          ScrollBaseSeconds + std::abs(target - start) * ScrollSecondsPerPixel);
     m_scrolling = true;
     Q_EMIT changed();
     if (revision != m_revision || !m_scrolling)
@@ -164,7 +180,7 @@ void TrackFocusController::advance(double dt)
             startHighlight();
     } else if (m_pulsing) {
         m_elapsed += dt;
-        if (m_elapsed >= (m_reduced ? 1.1 : 2.)) {
+        if (m_elapsed >= (m_reduced ? ReducedHighlightSeconds : HighlightLifetimeSeconds)) {
             cancel();
             return;
         }
@@ -172,13 +188,17 @@ void TrackFocusController::advance(double dt)
             const double t = std::fmod(m_elapsed, 1.);
             static const QEasingCurve ease = [] {
                 QEasingCurve curve(QEasingCurve::BezierSpline);
-                curve.addCubicBezierSegment({ .42, 0 }, { .58, 1 }, { 1, 1 });
+                curve.addCubicBezierSegment({ HighlightBezierFirstX, 0 },
+                                            { HighlightBezierSecondX, 1 }, { 1, 1 });
                 return curve;
             }();
-            m_highlight = t < .32 ? ease.valueForProgress(t / .32)
-                    : t < .48     ? 1
-                    : t < .88     ? 1 - ease.valueForProgress((t - .48) / .4)
-                                  : 0;
+            m_highlight = t < HighlightFadeInSeconds
+                    ? ease.valueForProgress(t / HighlightFadeInSeconds)
+                    : t < HighlightHoldEndSeconds ? 1
+                    : t < HighlightFadeEndSeconds ? 1
+                            - ease.valueForProgress((t - HighlightHoldEndSeconds)
+                                                    / HighlightFadeSeconds)
+                                                  : 0;
             Q_EMIT changed();
         }
     }

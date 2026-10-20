@@ -1,3 +1,6 @@
+// Builds backend-neutral camera, geometry and material frame snapshots. Source-space math is
+// isolated from Qt projection and native backend conventions.
+
 #pragma once
 #include "FrameClock.h"
 #include "LayoutMetrics.h"

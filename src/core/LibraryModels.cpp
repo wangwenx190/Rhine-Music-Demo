@@ -6,6 +6,12 @@
 #include <algorithm>
 #include <numeric>
 
+namespace {
+// Column partitioning follows the source album grouping; ordinal labels are decimal.
+constexpr auto AlbumsPerColumn = 12;
+constexpr auto DecimalBase = 10;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -57,13 +63,12 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         });
     }
     if (mode == SortMode::Album) {
-        for (int start = 0; start < result.indices.size(); start += 12) {
-            const int end = std::min(start + 12, int(result.indices.size()));
-            LibraryColumn column{
-                u"album:%1"_s.arg(start / 12),
-                u"%1\u2013%2"_s.arg(start + 1, 2, 10, '0'_L1).arg(end, 2, 10, '0'_L1),
-                { }
-            };
+        for (int start = 0; start < result.indices.size(); start += AlbumsPerColumn) {
+            const int end = std::min(start + AlbumsPerColumn, int(result.indices.size()));
+            LibraryColumn column{ u"album:%1"_s.arg(start / AlbumsPerColumn),
+                                  u"%1\u2013%2"_s.arg(start + 1, 2, DecimalBase, '0'_L1)
+                                          .arg(end, 2, DecimalBase, '0'_L1),
+                                  { } };
             for (int i = start; i < end; ++i)
                 column.albumIds.append(snapshot.albums[result.indices[i]].id);
             result.columns.append(column);
@@ -102,7 +107,8 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         }
     }
     for (const auto &column : result.columns)
-        result.slotStride = std::max(result.slotStride, int(column.albumIds.size()) + 12);
+        result.slotStride =
+                std::max(result.slotStride, int(column.albumIds.size()) + AlbumsPerColumn);
     return result;
 }
 QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString &input,

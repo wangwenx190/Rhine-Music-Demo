@@ -1,3 +1,6 @@
+// Exports scene geometry and projection from the production adapter. Source-space expectations
+// remain separate from backend-specific output measurements.
+
 #pragma once
 #include <QString>
 class QGuiApplication;

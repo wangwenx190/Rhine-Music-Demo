@@ -1,3 +1,6 @@
+// Converts local pointer gestures into bounded inspection rotation. Grab/cancel state prevents
+// an interrupted gesture from modifying a later selection.
+
 #pragma once
 #include <QPointF>
 

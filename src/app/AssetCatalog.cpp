@@ -9,14 +9,29 @@
 #include <QMap>
 #include <QRawFont>
 
+namespace {
+// CSS weights identify the bundled physical font faces rather than Qt synthetic weight guesses.
+constexpr auto RegularCssWeight = 400;
+constexpr auto LightCssWeight = 300;
+constexpr auto DemiBoldCssWeight = 600;
+constexpr auto BoldCssWeight = 700;
+constexpr auto RequiredFontFaces = 4;
+constexpr auto PhysicalFaceProbePixels = 24;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
-QMap<int, QFont> faceFonts;
+// Defer font/cache storage until a caller has initialized the Qt GUI/font services.
+QMap<int, QFont> &faceFonts()
+{
+    static QMap<int, QFont> value;
+    return value;
+}
 }
 QFont yalahoo::assetFont(int cssWeight)
 {
-    return faceFonts.value(cssWeight, faceFonts.value(400));
+    return faceFonts().value(cssWeight, faceFonts().value(RegularCssWeight));
 }
 
 bool yalahoo::initializeAssetFonts()
@@ -32,7 +47,7 @@ bool yalahoo::initializeAssetFonts()
     if (error.error != QJsonParseError::NoError || !document.isObject())
         return false;
     const auto fonts = document.object()[u"fonts"_s].toArray();
-    if (fonts.size() != 4)
+    if (fonts.size() != RequiredFontFaces)
         return false;
     QList<int> registered;
     QMap<int, QFont> preparedFaces;
@@ -54,7 +69,8 @@ bool yalahoo::initializeAssetFonts()
         QFont font(face[u"family"_s].toString());
         font.setStyleName(face[u"styleName"_s].toString());
         font.setWeight(QFont::Weight(face[u"sfntWeight"_s].toInt()));
-        const QRawFont reference(":/assets/"_L1 + path, 24, QFont::PreferNoHinting);
+        const QRawFont reference(":/assets/"_L1 + path, PhysicalFaceProbePixels,
+                                 QFont::PreferNoHinting);
         if (!reference.isValid())
             return rollback();
         const char *table = reference.fontTable("CFF ").isEmpty() ? "glyf" : "CFF ";
@@ -90,7 +106,8 @@ bool yalahoo::initializeAssetFonts()
         font.setHintingPreference(QFont::PreferNoHinting);
         preparedFaces.insert(face[u"cssWeight"_s].toInt(), font);
     }
-    if (preparedFaces.keys() != QList<int>{ 300, 400, 600, 700 })
+    if (preparedFaces.keys()
+        != QList<int>{ LightCssWeight, RegularCssWeight, DemiBoldCssWeight, BoldCssWeight })
         return rollback();
 #ifdef Q_OS_MACOS
     // Chromium's source path uses AppleColorEmoji, not CoreText's wider private UI face.
@@ -102,8 +119,8 @@ bool yalahoo::initializeAssetFonts()
     }
     QFontDatabase::setApplicationEmojiFontFamilies({ emojiFamily });
 #endif
-    faceFonts = preparedFaces;
-    QGuiApplication::setFont(assetFont(400));
+    faceFonts() = preparedFaces;
+    QGuiApplication::setFont(assetFont(RegularCssWeight));
     initialized = true;
     return true;
 }

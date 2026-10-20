@@ -6,11 +6,17 @@
 #include <atomic>
 #include <algorithm>
 
+namespace {
+// Side padding is in em units and is converted back through the glyph local scale.
+constexpr auto GlyphSidePaddingEm = .15;
+constexpr auto GlyphTotalPaddingEm = .3;
+}
+
 namespace yalahoo {
 namespace {
-std::atomic<int> nodes{ 0 };
-std::atomic<quint64> rebuilds{ 0 };
-std::atomic<quint64> reused{ 0 };
+constinit std::atomic<int> nodes{ 0 };
+constinit std::atomic<quint64> rebuilds{ 0 };
+constinit std::atomic<quint64> reused{ 0 };
 struct FaceNode final
 {
     QSGTransformNode *transform = nullptr;
@@ -120,8 +126,9 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                 ++rebuilds;
             }
             target.clip->setClipRect(
-                    { -face.glyph.size * .15 / face.glyph.scale, 0,
-                      (m_slot->capacityWidth + face.glyph.size * .3) / face.glyph.scale,
+                    { -face.glyph.size * GlyphSidePaddingEm / face.glyph.scale, 0,
+                      (m_slot->capacityWidth + face.glyph.size * GlyphTotalPaddingEm)
+                              / face.glyph.scale,
                       face.glyph.height / face.glyph.scale });
             node->appendChildNode(target.transform);
             node->faces.append(target);

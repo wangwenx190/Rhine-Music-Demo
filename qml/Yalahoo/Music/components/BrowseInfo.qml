@@ -1,3 +1,6 @@
+// Lays out source browse metadata using actual logical viewport dimensions. Text metrics and
+// source CSS overrides determine the anchors without screenshot-derived correction.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T

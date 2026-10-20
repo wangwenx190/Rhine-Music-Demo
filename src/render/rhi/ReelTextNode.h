@@ -1,3 +1,6 @@
+// Builds scene-graph text nodes from already shaped glyph runs. Nodes own rendering resources
+// while GUI text layout remains outside the render callback.
+
 #pragma once
 #include <QColor>
 class QSGTextNode;

@@ -1,3 +1,6 @@
+// Builds anonymous production scene and cover inputs for RHI review. Coherent revisions exercise
+// actual upload paths without reading a private library.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;

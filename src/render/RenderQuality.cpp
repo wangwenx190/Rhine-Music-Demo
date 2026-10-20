@@ -4,6 +4,12 @@
 #include <limits>
 #include <stdexcept>
 
+namespace {
+// Shadow power-of-two growth is bounded before conversion to the native integer dimension.
+constexpr auto DefaultDepthOfFieldPercent = 100;
+constexpr auto MaximumShadowSideShift = 30;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -12,7 +18,7 @@ RenderQuality::RenderQuality(QObject *parent) : QObject(parent)
 }
 void RenderQuality::configure(const QVariantMap &input)
 {
-    const auto value = input.value(u"depthOfField"_s, 100);
+    const auto value = input.value(u"depthOfField"_s, DefaultDepthOfFieldPercent);
     bool valid = false;
     const double amount = value.toDouble(&valid);
     if (!valid || value.metaType().id() == QMetaType::QString
@@ -47,7 +53,7 @@ int RenderQuality::shadows() const
     // throughout resizes within the same power-of-two interval.
     const qint64 demand = qint64(std::max(m_size.width(), m_size.height())) * 2;
     qint64 side = 1;
-    while (side < demand && side < (qint64(1) << 30))
+    while (side < demand && side < (qint64(1) << MaximumShadowSideShift))
         side *= 2;
     return int(side);
 }

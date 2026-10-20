@@ -3,6 +3,33 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Admission hysteresis keeps retiring labels stable while collision checks reserve entry-button width.
+constexpr auto EntryBezierFirstX = .4;
+constexpr auto EntryBezierSecondX = .2;
+constexpr auto OpacityBezierControlX = .25;
+constexpr auto OpacityBezierFirstY = .1;
+constexpr auto EntryButtonWidthPixels = 76;
+constexpr auto EntryHiddenOffsetPixels = 6;
+constexpr auto CandidateCountWithBoundary = 10;
+constexpr auto HorizontalCollisionGapPixels = 10;
+constexpr auto NarrowViewportPixels = 600;
+constexpr auto NarrowLabelWidthPixels = 116;
+constexpr auto LabelWidthPixels = 160;
+constexpr auto RetainedExtentThreshold = .06;
+constexpr auto NewExtentThreshold = .12;
+constexpr auto RetainedLeftSlackPixels = 18;
+constexpr auto AdmissionInsetPixels = 14;
+constexpr auto NewRightInsetPixels = 34;
+constexpr auto TopInsetPixels = 115;
+constexpr auto RetainedVerticalSlackPixels = 20;
+constexpr auto BottomInsetPixels = 112;
+constexpr auto VerticalCollisionPixels = 62;
+constexpr auto MaximumVisibleLabels = 9;
+constexpr auto EntrySlideSeconds = .42;
+constexpr auto EntryFadeSeconds = .32;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -13,14 +40,25 @@ QEasingCurve curve(double x1, double y1, double x2, double y2)
     result.addCubicBezierSegment({ x1, y1 }, { x2, y2 }, { 1, 1 });
     return result;
 }
-const auto entryCurve = curve(.4, 0, .2, 1);
-const auto opacityCurve = curve(.25, .1, .25, 1);
+// Qt's spline storage is initialized lazily and reused without per-frame allocation.
+const QEasingCurve &entryCurve()
+{
+    static const auto value = curve(EntryBezierFirstX, 0, EntryBezierSecondX, 1);
+    return value;
+}
+// Qt's spline storage is initialized lazily and reused without per-frame allocation.
+const QEasingCurve &opacityCurve()
+{
+    static const auto value =
+            curve(OpacityBezierControlX, OpacityBezierFirstY, OpacityBezierControlX, 1);
+    return value;
+}
 }
 OverviewLabelsModel::OverviewLabelsModel(QObject *parent) : QAbstractListModel(parent)
 {
     for (auto &slot : m_slots) {
         slot = std::make_unique<Slot>();
-        slot->fade.setEnterCurve(entryCurve);
+        slot->fade.setEnterCurve(entryCurve());
     }
 }
 int OverviewLabelsModel::rowCount(const QModelIndex &parent) const
@@ -75,22 +113,24 @@ QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
     case Offset:
         return s.fade.offset();
     case EntryWidth:
-        return 76 * s.entry;
+        return EntryButtonWidthPixels * s.entry;
     case EntryOpacity:
         return s.entryOpacity;
     case EntryOffset:
-        return -6 * (1 - s.entry);
+        return -EntryHiddenOffsetPixels * (1 - s.entry);
     default:
         return { };
     }
 }
+// Prioritize expanded/selected labels before collision admission. Retained anchors use looser
+// visibility bounds so small projection changes do not repeatedly destroy and recreate a card.
 QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(QVector<OverviewColumn> columns,
                                                            double width, double height,
                                                            const QSet<int> &retained, int expanded)
 {
     // The inclusive physical interval has ten candidates at a half-lane boundary.
     // Cull its zero-extent endpoints after priority sorting; never truncate a selected ID.
-    columns.resize(std::min(columns.size(), qsizetype(10)));
+    columns.resize(std::min(columns.size(), qsizetype(CandidateCountWithBoundary)));
     struct Candidate final
     {
         OverviewColumn column;
@@ -108,25 +148,31 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(QVector<OverviewColum
             return a.column.selected;
         return a.centerDistance < b.centerDistance;
     });
-    const double labelWidth = width < 600 ? 116 : 160;
+    const double labelWidth =
+            width < NarrowViewportPixels ? NarrowLabelWidthPixels : LabelWidthPixels;
     QVector<OverviewColumn> accepted;
     for (const auto &candidate : candidates) {
         const auto &c = candidate.column;
         const bool keep = retained.contains(c.lane);
         if (!std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.extent)
-            || c.extent <= (keep ? .06 : .12))
+            || c.extent <= (keep ? RetainedExtentThreshold : NewExtentThreshold))
             continue;
-        if (c.x < labelWidth / 2 + (keep ? -18 : 14)
-            || c.x > width - labelWidth / 2 - 76 - (keep ? 14 : 34) || c.y < 115 - (keep ? 20 : 0)
-            || c.y > height - 112 + (keep ? 20 : 0))
+        if (c.x < labelWidth / 2 + (keep ? -RetainedLeftSlackPixels : AdmissionInsetPixels)
+            || c.x > width - labelWidth / 2 - EntryButtonWidthPixels
+                            - (keep ? AdmissionInsetPixels : NewRightInsetPixels)
+            || c.y < TopInsetPixels - (keep ? RetainedVerticalSlackPixels : 0)
+            || c.y > height - BottomInsetPixels + (keep ? RetainedVerticalSlackPixels : 0))
             continue;
         const double left = c.x - labelWidth / 2;
-        const double right = c.x + labelWidth / 2 + (c.lane == expanded ? 76 : 0);
+        const double right =
+                c.x + labelWidth / 2 + (c.lane == expanded ? EntryButtonWidthPixels : 0);
         const bool collision = std::any_of(accepted.cbegin(), accepted.cend(), [&](const auto &o) {
-            return left < o.x + labelWidth / 2 + (o.lane == expanded ? 76 : 0) + 10
-                    && right + 10 > o.x - labelWidth / 2 && std::abs(o.y - c.y) < 62;
+            return left < o.x + labelWidth / 2 + (o.lane == expanded ? EntryButtonWidthPixels : 0)
+                            + HorizontalCollisionGapPixels
+                    && right + HorizontalCollisionGapPixels > o.x - labelWidth / 2
+                    && std::abs(o.y - c.y) < VerticalCollisionPixels;
         });
-        if (!collision && accepted.size() < 9)
+        if (!collision && accepted.size() < MaximumVisibleLabels)
             accepted.append(c);
     }
     std::sort(accepted.begin(), accepted.end(), [](const auto &a, const auto &b) {
@@ -200,15 +246,16 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
             s.entryTime = s.opacityTime = 0;
             s.entryTarget = target;
         }
-        s.entryTime = std::min(.42, s.entryTime + dt);
-        s.opacityTime = std::min(.32, s.opacityTime + dt);
+        s.entryTime = std::min(EntrySlideSeconds, s.entryTime + dt);
+        s.opacityTime = std::min(EntryFadeSeconds, s.opacityTime + dt);
         s.entry = reduced ? target
                           : s.entryFrom
-                        + (target - s.entryFrom) * entryCurve.valueForProgress(s.entryTime / .42);
+                        + (target - s.entryFrom)
+                                * entryCurve().valueForProgress(s.entryTime / EntrySlideSeconds);
         s.entryOpacity = reduced ? target
                                  : s.opacityFrom
                         + (target - s.opacityFrom)
-                                * opacityCurve.valueForProgress(s.opacityTime / .32);
+                                * opacityCurve().valueForProgress(s.opacityTime / EntryFadeSeconds);
         if (previouslyLive[row] || s.column.lane >= 0 || s.fade.running())
             Q_EMIT dataChanged(index(row), index(row));
     }
@@ -257,7 +304,8 @@ int OverviewLabelsModel::liveCount() const
 bool OverviewLabelsModel::running() const
 {
     return std::any_of(m_slots.cbegin(), m_slots.cend(), [](const auto &s) {
-        return s->fade.running() || s->entryTime < .42 || s->opacityTime < .32;
+        return s->fade.running() || s->entryTime < EntrySlideSeconds
+                || s->opacityTime < EntryFadeSeconds;
     });
 }
 

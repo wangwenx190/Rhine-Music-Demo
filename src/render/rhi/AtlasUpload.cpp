@@ -1,3 +1,4 @@
+#include "RenderData.h"
 #include "AtlasUpload.h"
 #include "RhiApi.h"
 #include <bit>
@@ -5,8 +6,8 @@
 namespace yalahoo::rhi {
 void AtlasUploadQueue::reset(QSize size, quint64 generation)
 {
-    require(size.width() > 0 && size.height() > 0 && size.width() % 256 == 0
-                    && size.height() % 256 == 0 && generation > 0,
+    require(size.width() > 0 && size.height() > 0 && size.width() % renderData::CoverTilePixels == 0
+                    && size.height() % renderData::CoverTilePixels == 0 && generation > 0,
             "Invalid atlas dimensions/generation");
     m_size = size;
     m_generation = generation;
@@ -19,13 +20,16 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
 {
     for (const auto &u : uploads) {
         if (u.generation != m_generation || !u.lease || !u.serial || u.slot < 0
-            || u.slot >= (m_size.width() / 256) * (m_size.height() / 256)
-            || u.pixels.size() != QSize(256, 256)) {
+            || u.slot >= (m_size.width() / renderData::CoverTilePixels)
+                            * (m_size.height() / renderData::CoverTilePixels)
+            || u.pixels.size() != QSize(renderData::CoverTilePixels, renderData::CoverTilePixels)) {
             ++m_rejected;
             continue;
         }
-        const QPoint destination((u.slot % (m_size.width() / 256)) * 256,
-                                 (u.slot / (m_size.width() / 256)) * 256);
+        const QPoint destination((u.slot % (m_size.width() / renderData::CoverTilePixels))
+                                         * renderData::CoverTilePixels,
+                                 (u.slot / (m_size.width() / renderData::CoverTilePixels))
+                                         * renderData::CoverTilePixels);
         QSize levelSize = m_size;
         const int levels = int(std::bit_width(unsigned(qMax(m_size.width(), m_size.height())))) - 1;
         if (u.mipmaps.size() > levels) {
@@ -64,6 +68,8 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
         m_pending[u.slot] = std::move(detached);
     }
 }
+// Drain only a bounded batch; retain newer queued tiles for the next frame.
+// Initialization and incremental budgets include all submitted mip bytes.
 QVector<AtlasUpload> AtlasUploadQueue::take(bool initializing)
 {
     QVector<AtlasUpload> batch;
@@ -98,7 +104,10 @@ quint64 AtlasUploadQueue::rejected() const
 }
 void AtlasUploadQueue::expect(int slot, quint64 lease)
 {
-    require(slot >= 0 && slot < (m_size.width() / 256) * (m_size.height() / 256) && lease > 0,
+    require(slot >= 0
+                    && slot < (m_size.width() / renderData::CoverTilePixels)
+                                    * (m_size.height() / renderData::CoverTilePixels)
+                    && lease > 0,
             "Invalid expected atlas lease");
     if (lease > m_leases.value(slot)) {
         m_leases[slot] = lease;
@@ -112,9 +121,12 @@ bool AtlasUploadQueue::ready(int slot, quint64 lease) const
 }
 bool AtlasUploadQueue::ready(QRect tile, quint64 lease) const
 {
-    for (int y = tile.y(); y < tile.y() + tile.height(); y += 256)
-        for (int x = tile.x(); x < tile.x() + tile.width(); x += 256)
-            if (!ready((y / 256) * (m_size.width() / 256) + x / 256, lease))
+    for (int y = tile.y(); y < tile.y() + tile.height(); y += renderData::CoverTilePixels)
+        for (int x = tile.x(); x < tile.x() + tile.width(); x += renderData::CoverTilePixels)
+            if (!ready((y / renderData::CoverTilePixels)
+                                       * (m_size.width() / renderData::CoverTilePixels)
+                               + x / renderData::CoverTilePixels,
+                       lease))
                 return false;
     return true;
 }

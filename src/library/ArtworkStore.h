@@ -1,3 +1,6 @@
+// Stores validated artwork by content hash on a worker thread. Atomic writes target the
+// application cache and never modify source images or music.
+
 #pragma once
 #include <QImage>
 #include <QUrl>

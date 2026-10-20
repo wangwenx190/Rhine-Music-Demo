@@ -1,3 +1,6 @@
+// Owns song playback intent, queue position and output-device selection. Backend notifications
+// are reconciled with the latest requested track and pause/stop intent.
+
 #pragma once
 #include "MusicTypes.h"
 #include "BackgroundMusicController.h"

@@ -1,3 +1,6 @@
+// Virtualized tracks and credits use C++ identity and focus state. Layout completion precedes
+// saved-scroll restoration so estimated delegate heights cannot move the requested row.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T
@@ -5,6 +8,13 @@ import Yalahoo.Music
 
 Item {
     id: root
+    // Credit packing and scrollbar occupancy are logical CSS geometry, not native control metrics.
+    readonly property real creditColumnStridePixels: 236
+    readonly property real creditColumnGapPixels: 26
+    readonly property real scrollbarOccupancyPixels: 11
+    readonly property real creditTrackRowPixels: 80
+    readonly property real creditPopupHeightRatio: 0.7
+
     clip: true
     property real contentOpacity: 1
     required property DesignTokens tokens
@@ -25,7 +35,8 @@ Item {
     readonly property var layoutHeader: currentView ? currentView.headerItem : null
     // Resolve thin-scrollbar occupancy after layout, outside the width binding.
     property bool scrollable: false
-    readonly property real contentWidth: Math.max(0, width - (scrollable ? 11 : 0))
+    readonly property real contentWidth: Math.max(0, width - (scrollable
+                                                              ? root.scrollbarOccupancyPixels : 0))
     function updateScrollbar(): void {
         scrollable = currentView && currentView.contentHeight > currentView.height;
     }
@@ -33,10 +44,12 @@ Item {
                                                  + layoutHeader.tabsY : 0
     readonly property var producerGroups: detailModel.album.producerGroups || []
     readonly property int creditColumns: Math.max(1, Math.min(producerGroups.length, Math.floor((contentWidth
-                                                                                                 + 26) / 236)))
+                                                                                                 + root.creditColumnGapPixels)
+                                                                                                / root.creditColumnStridePixels)))
     function saveScroll(): void {
         savedScroll = currentView ? currentView.contentY - currentView.originY : 0;
     }
+    // Reconcile originY after forceLayout: virtualized rows may change the estimated content extent.
     function restoreScroll(): void {
         if (!currentView)
             return;
@@ -284,7 +297,7 @@ Item {
                 x: 0
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.number
-                cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
+                cssPixelSize: root.viewportWidth >= 1700 ? root.scrollbarOccupancyPixels : 9
                 color: root.tokens.muted
             }
             Column {
@@ -301,7 +314,8 @@ Item {
                     objectName: "detailTrackTitle"
                     text: row.trackTitle
                     cssPixelSize: root.viewportWidth >= 1700 ? 14 : root.viewportWidth <= 1100
-                                                               && root.viewportWidth > 700 ? 10 : 11
+                                                               && root.viewportWidth > 700 ? 10 :
+                                                                                             root.scrollbarOccupancyPixels
                     cssLineHeight: root.detailModel.normalLineHeight(row.trackTitle, font)
                                    * fontScale
                     elide: Text.ElideRight
@@ -335,7 +349,7 @@ Item {
                 width: root.durationWidth
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.duration
-                cssPixelSize: root.viewportWidth >= 1700 ? 11 : 9
+                cssPixelSize: root.viewportWidth >= 1700 ? root.scrollbarOccupancyPixels : 9
                 horizontalAlignment: Text.AlignRight
                 color: root.tokens.muted
             }
@@ -365,7 +379,7 @@ Item {
             opacity: root.contentOpacity
             required property int index
             width: root.contentWidth
-            spacing: 26
+            spacing: root.creditColumnGapPixels
             Repeater {
                 model: Math.min(root.creditColumns, root.producerGroups.length - creditRow.index
                                 * root.creditColumns)
@@ -377,7 +391,8 @@ Item {
                                                                       * root.creditColumns + index]
                     property bool expanded: false
                     onCreditChanged: expanded = false
-                    width: (root.contentWidth - 26 * (root.creditColumns - 1)) / root.creditColumns
+                    width: (root.contentWidth - root.creditColumnGapPixels * (root.creditColumns
+                                                                              - 1)) / root.creditColumns
                     spacing: 4
                     bottomPadding: 18
                     ArchiveText {
@@ -411,7 +426,7 @@ Item {
                         visible: person.credit.tracks.length > 1
                         text: (person.expanded ? qsTr("Hide credited tracks \u2212") : qsTr(
                                                      "Show credited tracks +"))
-                        cssPixelSize: 11
+                        cssPixelSize: root.scrollbarOccupancyPixels
                         onClicked: person.expanded = !person.expanded
                         Accessible.expanded: person.expanded
                     }
@@ -420,15 +435,16 @@ Item {
                         width: parent.width
                         visible: person.credit.tracks.length === 1
                         text: person.credit.tracks.length === 1 ? person.credit.tracks[0] : ""
-                        cssPixelSize: 11
+                        cssPixelSize: root.scrollbarOccupancyPixels
                         cssLineHeight: cssPixelSize * 1.7
                         wrapMode: Text.WrapAnywhere
                     }
                     ListView {
                         visible: person.expanded && person.credit.tracks.length > 1
                         width: parent.width
-                        height: visible ? Math.min(root.height * 0.7, person.credit.tracks.length * 80) :
-                                          0
+                        height: visible ? Math.min(root.height * root.creditPopupHeightRatio,
+                                                   person.credit.tracks.length
+                                                   * root.creditTrackRowPixels) : 0
                         clip: true
                         reuseItems: true
                         cacheBuffer: 100
@@ -439,7 +455,7 @@ Item {
                             tokens: root.tokens
                             width: ListView.view.width
                             text: modelData
-                            cssPixelSize: 11
+                            cssPixelSize: root.scrollbarOccupancyPixels
                             cssLineHeight: cssPixelSize * 1.7
                             bottomPadding: 12
                             wrapMode: Text.WrapAnywhere
@@ -455,7 +471,7 @@ Item {
                         visible: person.credit.unscoped.length > 0
                         text: qsTr("Credits without track assignments \u00b7 %1").arg(
                                   person.credit.unscoped.join(" \u00b7 "))
-                        cssPixelSize: 11
+                        cssPixelSize: root.scrollbarOccupancyPixels
                         cssLineHeight: cssPixelSize * 1.7
                         wrapMode: Text.WrapAnywhere
                         color: root.tokens.muted

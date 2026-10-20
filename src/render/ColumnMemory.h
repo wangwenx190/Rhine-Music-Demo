@@ -1,3 +1,6 @@
+// Remembers a selected album by stable column key. Snapshot reconciliation removes identities
+// that no longer belong to their remembered column.
+
 #pragma once
 #include <QtClassHelperMacros>
 #include <QHash>

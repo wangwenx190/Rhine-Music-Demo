@@ -1,3 +1,6 @@
+// Defines the backend-neutral rendering boundary and frame inputs. Business state is prepared
+// before backend submission rather than queried from render callbacks.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;

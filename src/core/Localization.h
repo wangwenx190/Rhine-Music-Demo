@@ -1,3 +1,6 @@
+// Loads bundled Qt translations before user-visible objects are constructed. The translator
+// owner must outlive every object that uses the installed catalog.
+
 #pragma once
 
 #include <QLocale>

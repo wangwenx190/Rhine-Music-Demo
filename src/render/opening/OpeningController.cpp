@@ -4,6 +4,14 @@
 #include "SceneAdapter.h"
 #include "OpeningController.h"
 
+namespace {
+// The independent opening clock stops at its authored endpoint; chrome uses a separate reveal interval.
+constexpr auto TerminalSceneSeconds = 27.12;
+constexpr auto OpeningDurationSeconds = 11.6;
+constexpr auto ChromeRevealSeconds = .72;
+constexpr auto RevealCompletionEpsilonSeconds = 1e-9;
+}
+
 namespace yalahoo {
 OpeningController::OpeningController(MotionController *motion, SceneAdapter *scene,
                                      SelectionController *selection, QObject *parent)
@@ -32,10 +40,10 @@ void OpeningController::replay()
     m_selection->cancelDrag();
     m_scene->setPointer(0, 0);
     // Warm the actual settled production pipeline before starting the fixed film clock.
-    m_selection->setOpeningTime(27.12);
+    m_selection->setOpeningTime(TerminalSceneSeconds);
     if (revision != m_revision)
         return;
-    m_scene->setOpeningTime(27.12);
+    m_scene->setOpeningTime(TerminalSceneSeconds);
     if (revision != m_revision)
         return;
     Q_EMIT changed();
@@ -70,7 +78,7 @@ void OpeningController::sample(double dt)
 {
     const auto revision = m_revision;
     const auto phase = m_phase;
-    const double shot = std::min(27.12, openingSceneTime(m_time));
+    const double shot = std::min(TerminalSceneSeconds, openingSceneTime(m_time));
     m_selection->setOpeningTime(shot);
     if (revision == m_revision && phase == m_phase)
         m_scene->setOpeningTime(shot, dt);
@@ -83,13 +91,13 @@ void OpeningController::advance(double dt)
         sample(dt);
         if (revision != m_revision || !film())
             return;
-        if (m_time == 11.6)
+        if (m_time == OpeningDurationSeconds)
             finishFilm(false);
         else
             Q_EMIT changed();
     } else if (m_phase == Phase::Reveal) {
-        m_reveal = std::min(.72, m_reveal + dt);
-        if (.72 - m_reveal < 1e-9)
+        m_reveal = std::min(ChromeRevealSeconds, m_reveal + dt);
+        if (ChromeRevealSeconds - m_reveal < RevealCompletionEpsilonSeconds)
             complete();
         else
             Q_EMIT changed();
@@ -100,7 +108,7 @@ void OpeningController::finishFilm(bool skipped)
     if (!film())
         return;
     const auto revision = m_revision;
-    m_time = 11.6;
+    m_time = OpeningDurationSeconds;
     if (skipped)
         sample(0);
     if (revision != m_revision || !film())
@@ -128,7 +136,7 @@ void OpeningController::complete()
 {
     const auto revision = m_revision;
     m_phase = Phase::Done;
-    m_reveal = .72;
+    m_reveal = ChromeRevealSeconds;
     Q_EMIT changed();
     if (revision == m_revision && m_phase == Phase::Done)
         Q_EMIT completed();

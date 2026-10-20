@@ -1,3 +1,4 @@
+#include "RenderData.h"
 #include "Postprocess.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"
@@ -7,7 +8,36 @@
 #include <algorithm>
 #include <cstring>
 
+namespace {
+// Source postprocessing parameters retain their original scalar precision and uniform order.
+constexpr auto AoMinimumDistance = .001f;
+constexpr auto AoMaximumDistance = .035f;
+constexpr auto MaximumBokehBlur = .011f;
+constexpr auto AoCompositeStrength = .22f;
+}
+
 using namespace Qt::StringLiterals;
+
+namespace {
+// Shader resource binding numbers match the postprocessing shader declarations.
+enum PostBinding {
+    PostInputBinding = 0,
+    PostUniformBinding = 1,
+    PostDepthBinding = 2,
+    PostNormalBinding = 3,
+    PostSamplesBinding = 4,
+    PostNoiseBinding = 5,
+    PostAuxiliaryBinding = 6,
+    PostAreaBinding = 7,
+    PostSearchBinding = 8
+};
+constexpr int UniformAlignmentBytes = 16;
+constexpr int UniformVectorScalars = 4;
+constexpr int MaximumKernelSamples = 64;
+constexpr int PostPrefixBytes = 80;
+constexpr int KernelScalarCount = 256;
+constexpr int FullscreenTriangleVertices = 3;
+}
 
 namespace yalahoo::rhi {
 namespace {
@@ -43,17 +73,19 @@ struct Pass final
     Owned<QRhiShaderResourceBindings> bindings;
     Owned<QRhiGraphicsPipeline> pipeline;
 };
-struct alignas(16) PostPrefix final
+struct alignas(UniformAlignmentBytes) PostPrefix final
 {
-    float size[4], clip[4], ao[4], dof[4], options[4];
+    float size[UniformVectorScalars], clip[UniformVectorScalars], ao[UniformVectorScalars],
+            dof[UniformVectorScalars], options[UniformVectorScalars];
 };
-struct alignas(16) PostUniform final
+struct alignas(UniformAlignmentBytes) PostUniform final
 {
     PostPrefix prefix;
-    float kernel[64][4];
+    float kernel[MaximumKernelSamples][UniformVectorScalars];
 };
-static_assert(sizeof(PostPrefix) == 80);
-static_assert(sizeof(PostUniform) == 1104 && offsetof(PostUniform, kernel) == 80);
+static_assert(sizeof(PostPrefix) == PostPrefixBytes);
+static_assert(sizeof(PostUniform) == renderData::PostUniformBytes
+              && offsetof(PostUniform, kernel) == PostPrefixBytes);
 }
 struct Postprocess::State final
 {
@@ -72,7 +104,7 @@ struct Postprocess::State final
     QRhiTexture *output = nullptr;
     bool upload = true;
     qint64 uniformUploadBytes = 0;
-    std::array<float, 256> kernelValues{ };
+    std::array<float, KernelScalarCount> kernelValues{ };
     std::vector<Pass> passes;
     void add(const QString &name, ColorTarget &target, QRhiTexture *input, QRhiTexture *auxiliary)
     {
@@ -85,19 +117,26 @@ struct Postprocess::State final
         p.bindings.reset(api->newShaderResourceBindings());
         const auto fragment = QRhiShaderResourceBinding::FragmentStage;
         p.bindings->setBindings(
-                { QRhiShaderResourceBinding::sampledTexture(0, fragment, input, linear.get()),
-                  QRhiShaderResourceBinding::uniformBuffer(1, fragment, p.uniform.get()),
-                  QRhiShaderResourceBinding::sampledTexture(
-                          2, fragment, p.name == "bokeh"_L1 ? dofDepth : aoDepth, nearest.get()),
-                  QRhiShaderResourceBinding::sampledTexture(3, fragment, normal, nearest.get()),
-                  QRhiShaderResourceBinding::sampledTexture(4, fragment, source, nearest.get()),
-                  QRhiShaderResourceBinding::sampledTexture(
-                          5, fragment, noise ? noise.get() : source, repeat.get()),
-                  QRhiShaderResourceBinding::sampledTexture(6, fragment, auxiliary, linear.get()),
-                  QRhiShaderResourceBinding::sampledTexture(7, fragment, area ? area.get() : source,
+                { QRhiShaderResourceBinding::sampledTexture(PostInputBinding, fragment, input,
                                                             linear.get()),
+                  QRhiShaderResourceBinding::uniformBuffer(PostUniformBinding, fragment,
+                                                           p.uniform.get()),
                   QRhiShaderResourceBinding::sampledTexture(
-                          8, fragment, search ? search.get() : source, nearest.get()) });
+                          PostDepthBinding, fragment, p.name == "bokeh"_L1 ? dofDepth : aoDepth,
+                          nearest.get()),
+                  QRhiShaderResourceBinding::sampledTexture(PostNormalBinding, fragment, normal,
+                                                            nearest.get()),
+                  QRhiShaderResourceBinding::sampledTexture(PostSamplesBinding, fragment, source,
+                                                            nearest.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          PostNoiseBinding, fragment, noise ? noise.get() : source, repeat.get()),
+                  QRhiShaderResourceBinding::sampledTexture(PostAuxiliaryBinding, fragment,
+                                                            auxiliary, linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          PostAreaBinding, fragment, area ? area.get() : source, linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(PostSearchBinding, fragment,
+                                                            search ? search.get() : source,
+                                                            nearest.get()) });
         require(p.bindings->create(), "Postprocess bindings failed");
         p.pipeline.reset(api->newGraphicsPipeline());
         const auto path = ":/rhi/"_L1 + name + ".frag.qsb"_L1;
@@ -167,11 +206,13 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
         require(dest->create(), "Postprocess lookup failed");
     };
     if (s.samples) {
-        texture(p.noise, QRhiTexture::RGBA32F, { 4, 4 });
+        texture(p.noise, QRhiTexture::RGBA32F, { renderData::NoiseSide, renderData::NoiseSide });
     }
     if (s.smaa) {
-        texture(p.area, QRhiTexture::RGBA8, { 160, 560 });
-        texture(p.search, QRhiTexture::RGBA8, { 66, 33 });
+        texture(p.area, QRhiTexture::RGBA8,
+                { renderData::SmaaAreaWidth, renderData::SmaaAreaHeight });
+        texture(p.search, QRhiTexture::RGBA8,
+                { renderData::SmaaSearchWidth, renderData::SmaaSearchHeight });
     }
     auto *current = color;
     int ping = 0;
@@ -206,7 +247,8 @@ void Postprocess::render(QRhiCommandBuffer *cb)
             const auto bytes =
                     preparedAssets().bytes.value(":/rhi/environment/"_L1 + name + ".rgba32f"_L1);
             require(bytes.size()
-                            == texture->pixelSize().width() * texture->pixelSize().height() * 16,
+                            == texture->pixelSize().width() * texture->pixelSize().height()
+                                    * renderData::VectorBytes,
                     "Invalid AO lookup size");
             updates->uploadTexture(texture,
                                    { { 0, 0, QRhiTextureSubresourceUploadDescription(bytes) } });
@@ -215,7 +257,8 @@ void Postprocess::render(QRhiCommandBuffer *cb)
             const auto bytes =
                     preparedAssets().bytes.value(":/rhi/environment/ssao-kernel-"_L1
                                                  + QString::number(s.samples) + ".rgba32f"_L1);
-            require(bytes.size() == s.samples * 16, "Invalid source AO kernel size");
+            require(bytes.size() == s.samples * renderData::VectorBytes,
+                    "Invalid source AO kernel size");
             std::memcpy(p.kernelValues.data(), bytes.constData(), bytes.size());
             floats(p.noise.get(), "ssao-noise-"_L1 + QString::number(s.samples));
         }
@@ -234,12 +277,13 @@ void Postprocess::render(QRhiCommandBuffer *cb)
         const auto size = pass.target->texture->pixelSize();
         PostPrefix u{ { float(size.width()), float(size.height()), s.projectionX, s.projectionY },
                       { s.nearPlane, s.farPlane, p.api->isYUpInFramebuffer() ? 1.0f : -1.0f, 0 },
-                      { float(s.samples), s.radius, .001f, .035f },
-                      { s.focus, s.aperture, .011f, float(s.size.width()) / s.size.height() },
-                      { .22f, 0, 0, 0 } };
+                      { float(s.samples), s.radius, AoMinimumDistance, AoMaximumDistance },
+                      { s.focus, s.aperture, MaximumBokehBlur,
+                        float(s.size.width()) / s.size.height() },
+                      { AoCompositeStrength, 0, 0, 0 } };
         if (firstUpload
             && (pass.name == "ssao"_L1 || pass.name == "ssao16"_L1 || pass.name == "ssao64"_L1)) {
-            const int bytes = s.samples * 16;
+            const int bytes = s.samples * renderData::VectorBytes;
             updates->updateDynamicBuffer(pass.uniform.get(), offsetof(PostUniform, kernel), bytes,
                                          p.kernelValues.data());
             p.uniformUploadBytes += bytes;
@@ -258,7 +302,7 @@ void Postprocess::render(QRhiCommandBuffer *cb)
         cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
         cb->setGraphicsPipeline(pass.pipeline.get());
         cb->setShaderResources();
-        cb->draw(3);
+        cb->draw(FullscreenTriangleVertices);
         cb->endPass();
     }
 }
@@ -323,13 +367,15 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
                                  expected)
                         != pass.bindings->cendBindings();
             };
-            const bool chainMatches = matches(0, expectedInput, p.linear.get())
-                    && matches(6, expectedAuxiliary, p.linear.get())
-                    && matches(2, pass.name == "bokeh"_L1 ? p.dofDepth : p.aoDepth,
+            const bool chainMatches = matches(PostInputBinding, expectedInput, p.linear.get())
+                    && matches(PostAuxiliaryBinding, expectedAuxiliary, p.linear.get())
+                    && matches(PostDepthBinding, pass.name == "bokeh"_L1 ? p.dofDepth : p.aoDepth,
                                p.nearest.get());
             bool feedback = false;
             const auto *target = pass.target->texture.get();
-            for (int binding : { 0, 2, 3, 4, 5, 6, 7, 8 }) {
+            for (int binding :
+                 { PostInputBinding, PostDepthBinding, PostNormalBinding, PostSamplesBinding,
+                   PostNoiseBinding, PostAuxiliaryBinding, PostAreaBinding, PostSearchBinding }) {
                 for (auto *sampler : { p.linear.get(), p.nearest.get(), p.repeat.get() }) {
                     const auto candidate = QRhiShaderResourceBinding::sampledTexture(
                             binding, QRhiShaderResourceBinding::FragmentStage,

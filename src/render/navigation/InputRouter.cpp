@@ -7,6 +7,24 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Normalize wheel units once and bound gesture accumulation before issuing navigation intent.
+constexpr auto InactiveGestureTime = 1e20;
+constexpr auto WheelBurstGapMilliseconds = 200;
+constexpr auto MaximumWheelDeltaPixels = 144.0;
+constexpr auto PixelsPerWheelStep = 48;
+constexpr auto MaximumLaneMagnitude = 1e9;
+constexpr auto FirstArchiveRow = 12.0;
+constexpr auto ArchiveRowEndOffset = 11.0;
+constexpr auto MaximumRowMagnitude = 1e12;
+constexpr auto WheelStepPixels = 48.0;
+constexpr auto AngleDeltaPerDetent = 120;
+constexpr auto NanosecondsPerMillisecond = 1e6;
+constexpr auto MinimumSwipePixels = 36;
+constexpr auto SwipeAxisDominance = 1.3;
+constexpr auto MaximumSwipeMilliseconds = 1400;
+}
+
 namespace yalahoo {
 namespace {
 bool ownsInput(QQuickItem *item, bool wheel)
@@ -94,20 +112,21 @@ void InputRouter::reset()
 {
     m_remainder = 0;
     m_direction = 0;
-    m_lastTime = -1e20;
+    m_lastTime = -InactiveGestureTime;
 }
 int InputRouter::consume(double delta, double milliseconds)
 {
     if (!std::isfinite(delta) || !std::isfinite(milliseconds) || delta == 0)
         return 0;
     const int direction = delta > 0 ? 1 : -1;
-    if (milliseconds - m_lastTime > 200 || milliseconds < m_lastTime || direction != m_direction)
+    if (milliseconds - m_lastTime > WheelBurstGapMilliseconds || milliseconds < m_lastTime
+        || direction != m_direction)
         m_remainder = 0;
     m_lastTime = milliseconds;
     m_direction = direction;
-    m_remainder += std::min(std::abs(delta), 144.0) * direction;
-    const int steps = int(m_remainder / 48);
-    m_remainder -= steps * 48;
+    m_remainder += std::min(std::abs(delta), MaximumWheelDeltaPixels) * direction;
+    const int steps = int(m_remainder / PixelsPerWheelStep);
+    m_remainder -= steps * PixelsPerWheelStep;
     return steps;
 }
 bool InputRouter::commit(int direction, bool column)
@@ -120,7 +139,7 @@ bool InputRouter::commit(int direction, bool column)
     const auto base = m_pending.value_or(m_selection->cell());
     if (column) {
         if ((direction != -1 && direction != 1) || m_selection->pool().columnCount() < 2
-            || std::abs(base.lane + direction) > 1e9)
+            || std::abs(base.lane + direction) > MaximumLaneMagnitude)
             return false;
         const auto target = m_selection->columnTarget(int(base.lane + direction));
         return target && queue(*target);
@@ -143,8 +162,8 @@ bool InputRouter::queue(ArchiveCell target)
     if (!count)
         return false;
     if (m_selection->realistic())
-        target.row = std::clamp(target.row, 12.0, 11.0 + count);
-    if (std::floor(target.row) != target.row || std::abs(target.row) > 1e12)
+        target.row = std::clamp(target.row, FirstArchiveRow, ArchiveRowEndOffset + count);
+    if (std::floor(target.row) != target.row || std::abs(target.row) > MaximumRowMagnitude)
         return false;
     m_pending = target;
     flush();
@@ -185,14 +204,14 @@ bool InputRouter::wheel(QWheelEvent *event, QQuickWindow *window)
     }
     const QPointF delta = !event->pixelDelta().isNull()
             ? QPointF(event->pixelDelta())
-            : QPointF(event->angleDelta()) * (48.0 / 120);
+            : QPointF(event->angleDelta()) * (WheelStepPixels / AngleDeltaPerDetent);
     if (std::abs(delta.x()) >= std::abs(delta.y()) || delta.y() == 0) {
         reset();
         return false;
     }
     if (event->phase() == Qt::ScrollBegin)
         reset();
-    const int steps = consume(-delta.y(), m_timer.nsecsElapsed() / 1e6);
+    const int steps = consume(-delta.y(), m_timer.nsecsElapsed() / NanosecondsPerMillisecond);
     if (steps)
         commit(steps, false);
     if (event->phase() == Qt::ScrollEnd)
@@ -239,8 +258,9 @@ bool InputRouter::swipe(QPointF delta, double milliseconds)
     reset();
     const double major = std::max(std::abs(delta.x()), std::abs(delta.y()));
     const double minor = std::min(std::abs(delta.x()), std::abs(delta.y()));
-    if (!std::isfinite(major) || !std::isfinite(milliseconds) || milliseconds < 0 || major < 36
-        || major < minor * 1.3 || milliseconds > 1400)
+    if (!std::isfinite(major) || !std::isfinite(milliseconds) || milliseconds < 0
+        || major < MinimumSwipePixels || major < minor * SwipeAxisDominance
+        || milliseconds > MaximumSwipeMilliseconds)
         return false;
     const bool column = std::abs(delta.x()) > std::abs(delta.y());
     return commit((column ? delta.x() : delta.y()) < 0 ? 1 : -1, column);

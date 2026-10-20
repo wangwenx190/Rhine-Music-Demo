@@ -1,3 +1,6 @@
+// Exercises whole-run text rendering through Qt Canvas Painter. The probe reports actual
+// layout/paint work without changing production title selection.
+
 #pragma once
 #include "TitleReel.h"
 #include <QCanvasPainterItem>

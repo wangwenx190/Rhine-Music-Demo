@@ -2,6 +2,13 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Readiness requires camera and lift to remain settled across the authored hold interval.
+constexpr auto PlacementSourceSeconds = 1.45;
+constexpr auto PlacementSpeed = 1.05;
+constexpr auto ReadinessHoldSeconds = .08;
+}
+
 namespace yalahoo {
 DetailMotion::DetailMotion()
 {
@@ -12,7 +19,7 @@ void DetailMotion::reset()
     m_phase = Phase::Archive;
     m_settledFor = 0;
     m_placement.reset();
-    m_placement.retarget(0, 1.45 / 1.05);
+    m_placement.retarget(0, PlacementSourceSeconds / PlacementSpeed);
     m_placement.finish();
 }
 bool DetailMotion::placed() const
@@ -55,15 +62,17 @@ void DetailMotion::advance(double dt, bool reduced, bool aligned)
         m_phase = Phase::ReturningArray;
         m_settledFor = 0;
     }
-    m_placement.retarget(holdsDetail() ? 1 : 0, 1.45 / 1.05);
+    m_placement.retarget(holdsDetail() ? 1 : 0, PlacementSourceSeconds / PlacementSpeed);
     m_placement.update(dt, reduced);
 }
+// Do not expose content merely because placement elapsed: camera and lift must both settle.
+// Reset the hold whenever either becomes active, including an interrupted selection.
 void DetailMotion::updateReadiness(double dt, bool cameraSettled, bool liftSettled, bool reduced)
 {
     if (!std::isfinite(dt) || dt < 0)
         return;
     m_settledFor = cameraSettled && liftSettled ? m_settledFor + dt : 0;
-    if (!cameraSettled || !liftSettled || (!reduced && m_settledFor < .08))
+    if (!cameraSettled || !liftSettled || (!reduced && m_settledFor < ReadinessHoldSeconds))
         return;
     const auto previous = m_phase;
     if (m_phase == Phase::Placing)

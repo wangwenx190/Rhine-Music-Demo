@@ -1,3 +1,6 @@
+// Animates ruler ordinals and input feedback using scalar state. The shared frame clock
+// preserves deterministic retargeting and reduced-motion endpoints.
+
 #pragma once
 #include "FrameClock.h"
 #include <QPointer>
@@ -6,11 +9,18 @@
 #include <array>
 
 namespace yalahoo {
+namespace ordinalMotion {
+// The source trajectory has 48 intervals and at most ten decimal wheels.
+inline constexpr auto TrackSampleCount = 49;
+inline constexpr auto TransitionSeconds = .460;
+inline constexpr auto MaximumDecimalDigits = 10;
+}
+
 // Frozen rolling-number's 49-point critically damped track, sampled by the shared clock.
 struct OrdinalTrack final
 {
-    std::array<double, 49> points{ };
-    double value = 0, velocity = 0, target = 0, elapsed = .460;
+    std::array<double, ordinalMotion::TrackSampleCount> points{ };
+    double value = 0, velocity = 0, target = 0, elapsed = ordinalMotion::TransitionSeconds;
     void retarget(double to, bool instant);
     void advance(double dt);
 };
@@ -58,7 +68,7 @@ private:
     void publish();
     QPointer<FrameClock> m_clock;
     QMetaObject::Connection m_connection;
-    std::array<OrdinalTrack, 10> m_tracks;
+    std::array<OrdinalTrack, ordinalMotion::MaximumDecimalDigits> m_tracks;
     QVariantList m_faces;
     int m_value = 1, m_previous = 1, m_digits = 2, m_direction = 0, m_count = 2;
     bool m_reduced = false, m_active = true, m_initialized = false;

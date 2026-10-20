@@ -33,7 +33,30 @@
 using namespace Qt::StringLiterals;
 
 namespace {
-QString repository;
+// ICO/ICNS fields are binary container offsets and lengths, independent of the fixture icon sizes.
+constexpr quint32 IcoHeaderBytes = 6;
+constexpr quint32 IcoEntryBytes = 16;
+constexpr quint32 IcoDirectoryBytes = 118;
+constexpr int IcoEntryCount = 7;
+constexpr int IcoMaximumDimension = 256;
+constexpr int IcoColorBits = 32;
+constexpr int IcoLengthOffset = 8;
+constexpr int IcoPayloadOffset = 12;
+constexpr int IcoPlanesOffset = 4;
+constexpr int IcoColorBitsOffset = 6;
+constexpr int IcnsHeaderBytes = 8;
+constexpr int ContainerWordBytes = 4;
+constexpr int NativeWindowPaintMilliseconds = 100;
+constexpr int NativeWindowDeadlineMilliseconds = 750;
+}
+
+namespace {
+// Construct on first access; no namespace-scope runtime initialization is required.
+QString &repository()
+{
+    static QString value;
+    return value;
+}
 void require(bool condition, const QString &message)
 {
     if (!condition)
@@ -179,9 +202,11 @@ QByteArray png(const QImage &image)
 }
 QString sourceForSize(int size)
 {
-    return repository + "/resources/branding/"_L1
+    return repository() + "/resources/branding/"_L1
             + (size <= 32 ? "icon-small.svg"_L1 : "icon.svg"_L1);
 }
+// Write each PNG block once, then encode directory lengths/offsets in the container byte order.
+// ICO stores the largest dimension as zero; ICNS chunk lengths include their own type/length header.
 void exportContainers(const QString &directory)
 {
     const QList<int> sizes{ 16, 24, 32, 48, 64, 128, 256 };
@@ -190,15 +215,15 @@ void exportContainers(const QString &directory)
     le16(ico, 1);
     le16(ico, quint16(sizes.size()));
     QList<QByteArray> blocks;
-    quint32 offset = 6 + quint32(sizes.size()) * 16;
+    quint32 offset = IcoHeaderBytes + quint32(sizes.size()) * IcoEntryBytes;
     for (int size : sizes) {
         const auto block = png(render(sourceForSize(size), { size, size }));
-        ico.append(char(size == 256 ? 0 : size));
-        ico.append(char(size == 256 ? 0 : size));
+        ico.append(char(size == IcoMaximumDimension ? 0 : size));
+        ico.append(char(size == IcoMaximumDimension ? 0 : size));
         ico.append(char(0));
         ico.append(char(0));
         le16(ico, 1);
-        le16(ico, 32);
+        le16(ico, IcoColorBits);
         le32(ico, quint32(block.size()));
         le32(ico, offset);
         offset += quint32(block.size());
@@ -213,11 +238,11 @@ void exportContainers(const QString &directory)
     for (int i = 0; i < macSizes.size(); ++i) {
         const auto block = png(render(sourceForSize(macSizes[i]), { macSizes[i], macSizes[i] }));
         chunks.append(types[i]);
-        be32(chunks, quint32(block.size()) + 8);
+        be32(chunks, quint32(block.size()) + IcnsHeaderBytes);
         chunks.append(block);
     }
     QByteArray icns("icns"_ba);
-    be32(icns, quint32(chunks.size()) + 8);
+    be32(icns, quint32(chunks.size()) + IcnsHeaderBytes);
     icns.append(chunks);
     write(directory + "/yalahoo.icns"_L1, icns);
 }
@@ -226,21 +251,21 @@ QJsonArray verifyContainers(const QString &directory)
     QJsonArray result;
     const auto ico = read(directory + "/yalahoo.ico"_L1);
     const auto bytes = reinterpret_cast<const uchar *>(ico.constData());
-    require(ico.size() >= 118 && qFromLittleEndian<quint16>(bytes) == 0
+    require(ico.size() >= IcoDirectoryBytes && qFromLittleEndian<quint16>(bytes) == 0
                     && qFromLittleEndian<quint16>(bytes + 2) == 1
-                    && qFromLittleEndian<quint16>(bytes + 4) == 7,
+                    && qFromLittleEndian<quint16>(bytes + IcoPlanesOffset) == IcoEntryCount,
             u"ICO directory header invalid"_s);
-    quint32 next = 118;
+    quint32 next = IcoDirectoryBytes;
     const QList<int> sizes{ 16, 24, 32, 48, 64, 128, 256 };
-    for (int i = 0; i < 7; ++i) {
-        const auto entry = bytes + 6 + i * 16;
-        int size = entry[0] == 0 ? 256 : entry[0];
-        const auto length = qFromLittleEndian<quint32>(entry + 8);
-        const auto offset = qFromLittleEndian<quint32>(entry + 12);
+    for (int i = 0; i < IcoEntryCount; ++i) {
+        const auto entry = bytes + IcoHeaderBytes + i * IcoEntryBytes;
+        int size = entry[0] == 0 ? IcoMaximumDimension : entry[0];
+        const auto length = qFromLittleEndian<quint32>(entry + IcoLengthOffset);
+        const auto offset = qFromLittleEndian<quint32>(entry + IcoPayloadOffset);
         require(size == sizes[i] && entry[1] == entry[0] && entry[2] == 0 && entry[3] == 0
-                        && qFromLittleEndian<quint16>(entry + 4) == 1
-                        && qFromLittleEndian<quint16>(entry + 6) == 32 && offset == next
-                        && quint64(offset) + length <= quint64(ico.size()),
+                        && qFromLittleEndian<quint16>(entry + IcoPlanesOffset) == 1
+                        && qFromLittleEndian<quint16>(entry + IcoColorBitsOffset) == IcoColorBits
+                        && offset == next && quint64(offset) + length <= quint64(ico.size()),
                 u"ICO entry invalid"_s);
         const auto image = QImage::fromData(ico.mid(offset, length), "PNG");
         require(image.size() == QSize(size, size) && image.hasAlphaChannel(), u"ICO PNG invalid"_s);
@@ -254,22 +279,23 @@ QJsonArray verifyContainers(const QString &directory)
     }
     require(next == ico.size(), u"ICO trailing bytes"_s);
     const auto icns = read(directory + "/yalahoo.icns"_L1);
-    require(icns.size() >= 8 && icns.first(4) == "icns"_ba
-                    && qFromBigEndian<quint32>(
-                               reinterpret_cast<const uchar *>(icns.constData() + 4))
+    require(icns.size() >= IcnsHeaderBytes && icns.first(ContainerWordBytes) == "icns"_ba
+                    && qFromBigEndian<quint32>(reinterpret_cast<const uchar *>(
+                               icns.constData() + ContainerWordBytes))
                             == icns.size(),
             u"ICNS header invalid"_s);
-    qsizetype cursor = 8;
+    qsizetype cursor = IcnsHeaderBytes;
     const QList<QByteArray> types{ "ic07"_ba, "ic08"_ba, "ic09"_ba, "ic10"_ba };
     const QList<int> macSizes{ 128, 256, 512, 1024 };
     for (int i = 0; i < 4; ++i) {
-        require(cursor + 8 <= icns.size(), u"ICNS truncated header"_s);
-        const auto type = icns.mid(cursor, 4);
+        require(cursor + IcnsHeaderBytes <= icns.size(), u"ICNS truncated header"_s);
+        const auto type = icns.mid(cursor, ContainerWordBytes);
         const auto length = qFromBigEndian<quint32>(
-                reinterpret_cast<const uchar *>(icns.constData() + cursor + 4));
-        require(type == types[i] && length >= 8 && cursor + length <= icns.size(),
+                reinterpret_cast<const uchar *>(icns.constData() + cursor + ContainerWordBytes));
+        require(type == types[i] && length >= IcnsHeaderBytes && cursor + length <= icns.size(),
                 u"ICNS block invalid"_s);
-        const auto image = QImage::fromData(icns.mid(cursor + 8, length - 8), "PNG");
+        const auto image = QImage::fromData(
+                icns.mid(cursor + IcnsHeaderBytes, length - IcnsHeaderBytes), "PNG");
         require(image.size() == QSize(macSizes[i], macSizes[i]) && image.hasAlphaChannel()
                         && sameDerivativePixels(
                                 image,
@@ -288,7 +314,7 @@ QJsonArray verifyContainers(const QString &directory)
 using yalahoo::parseBrandCenterline;
 QJsonObject revealMapping()
 {
-    QXmlStreamReader xml(read(repository + "/resources/branding/logo-reveal.svg"_L1));
+    QXmlStreamReader xml(read(repository() + "/resources/branding/logo-reveal.svg"_L1));
     QJsonArray paths;
     QString group;
     double total = 0;
@@ -410,18 +436,18 @@ int main(int argc, char **argv)
         require(args.size() >= 2,
                 u"Usage: export-branding <repository> [--verify-only] [--report <path>] "
                 "[--window-preview]"_s);
-        repository = QDir(args[1]).absolutePath();
+        repository() = QDir(args[1]).absolutePath();
         const bool verifyOnly = args.contains(u"--verify-only"_s);
-        QString report = repository + "/verification/windows/branding/export-report.json"_L1;
+        QString report = repository() + "/verification/windows/branding/export-report.json"_L1;
         if (args.contains(u"--report"_s)) {
             int i = args.indexOf(u"--report"_s);
             require(i + 1 < args.size(), u"Missing report path"_s);
             report = args[i + 1];
         }
         require(!QFile::exists(report) || QFile::remove(report), u"Cannot clear previous report"_s);
-        const QString branding = repository + "/resources/branding/"_L1;
-        const QString media = repository + "/docs/media/branding/"_L1;
-        const QString icons = repository + "/resources/icons/yalahoo"_L1;
+        const QString branding = repository() + "/resources/branding/"_L1;
+        const QString media = repository() + "/docs/media/branding/"_L1;
+        const QString icons = repository() + "/resources/icons/yalahoo"_L1;
         QJsonArray svgs;
         const QStringList files{ u"icon-master.svg"_s,     u"icon.svg"_s,
                                  u"icon-small.svg"_s,      u"icon-mono.svg"_s,
@@ -703,12 +729,12 @@ int main(int argc, char **argv)
             require(!verifyOnly, u"Window preview requires export mode"_s);
             PreviewWindow window(board);
             window.show();
-            QTimer::singleShot(100, &window, [&] {
+            QTimer::singleShot(NativeWindowPaintMilliseconds, &window, [&] {
                 window.hide();
                 window.show();
             });
             bool grabbed = false;
-            QTimer::singleShot(750, &app, [&] {
+            QTimer::singleShot(NativeWindowDeadlineMilliseconds, &app, [&] {
                 try {
                     require(window.isExposed(), u"Qt proof window not exposed"_s);
                     require(yalahoo::verification::windowPolicySatisfied(window),
@@ -740,14 +766,14 @@ int main(int argc, char **argv)
         if (verifyOnly) {
             const auto manifest =
                     QJsonDocument::fromJson(
-                            read(repository + "/resources/manifests/branding.json"_L1))
+                            read(repository() + "/resources/manifests/branding.json"_L1))
                             .object();
             const auto entries = manifest[u"entries"_s].toArray();
             require(entries.size() == 36 && manifest[u"displayName"_s] == u"yalahOO!!!"_s,
                     u"Brand manifest inventory invalid"_s);
             for (const auto &value : entries) {
                 const auto entry = value.toObject();
-                const auto bytes = read(repository + "/"_L1 + entry[u"path"_s].toString());
+                const auto bytes = read(repository() + "/"_L1 + entry[u"path"_s].toString());
                 require(bytes.size() == entry[u"bytes"_s].toDouble()
                                 && QString::fromUtf8(QCryptographicHash::hash(
                                                              bytes, QCryptographicHash::Sha256)
@@ -761,7 +787,7 @@ int main(int argc, char **argv)
             const QStringList trees{ u"resources/branding"_s, u"resources/icons/yalahoo"_s };
             for (const auto &tree : trees) {
                 std::function<void(const QString &)> visit = [&](const QString &relative) {
-                    QDir current(repository + "/"_L1 + relative);
+                    QDir current(repository() + "/"_L1 + relative);
                     for (const auto &file : current.entryInfoList(
                                  QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
                         const QString path = relative + "/"_L1 + file.fileName();
@@ -785,7 +811,7 @@ int main(int argc, char **argv)
                 };
                 visit(tree);
             }
-            write(repository + "/resources/manifests/branding.json"_L1,
+            write(repository() + "/resources/manifests/branding.json"_L1,
                   QJsonDocument(QJsonObject{ { u"schemaVersion"_s, 1 },
                                              { u"displayName"_s, u"yalahOO!!!"_s },
                                              { u"authoring"_s,

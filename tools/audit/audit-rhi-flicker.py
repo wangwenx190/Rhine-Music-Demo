@@ -30,7 +30,7 @@ CHECKS = [
     ("PERF-03", "tools/review/RhiFlickerAudit.cpp", "Frame/probe change rebuilt render targets",
      "Actual resourceGeneration must stay fixed across each 60-frame sequence; shader pipelines "
      "may specialize for diagnostics but no render targets are reallocated by selector values."),
-    ("PERF-04", "src/render/rhi/RhiItem.cpp", "visibilityProbeShader != (input.opticalProbe == 10)",
+    ("PERF-04", "src/render/rhi/RhiItem.cpp", "visibilityProbeShader != (input.opticalProbe == VisibilityProbe)",
      "Only explicit Review diagnostic mode enables visibility color writes. Target/attachment "
      "ownership, opaque capture isolation, resolve/mips and readback deduplication are unchanged."),
     ("PERF-05", "resources/shaders/rhi/geometry.vert", "invariant gl_Position;",

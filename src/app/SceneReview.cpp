@@ -19,6 +19,31 @@
 #include <atomic>
 #include <memory>
 
+namespace {
+// Static fixture count and scalar tolerances validate source geometry independently of actual pixel coverage.
+constexpr auto StaticPoseCount = 48;
+constexpr auto DynamicFramesPerSecond = 120;
+constexpr auto PositionTolerance = 1e-3;
+constexpr auto FovTolerance = 1e-4;
+constexpr auto CaptureInsetPixels = 40;
+constexpr auto MaximumChannelByte = 255;
+constexpr auto UnitCubeDiagonal = 1.7320508075688772;
+constexpr auto DepthPackingErrorUnits = 3.0;
+constexpr auto MinimumForegroundPixels = 100;
+constexpr auto ReviewDeadlineMilliseconds = 80000;
+constexpr auto PollIntervalMilliseconds = 10;
+constexpr auto DecimalBase = 10;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    InvalidReviewInput = 9,
+    ReviewFailed = 10,
+    ReviewTimedOut = 11
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -27,16 +52,16 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
 {
     QFile input(fixture);
     if (!input.open(QIODevice::ReadOnly))
-        return 9;
+        return InvalidReviewInput;
     const auto fixtureBytes = input.readAll();
     const auto oracle = QJsonDocument::fromJson(fixtureBytes).object();
     auto cases = oracle[u"cases"_s].toArray();
-    if (cases.size() != 48)
-        return 9;
+    if (cases.size() != StaticPoseCount)
+        return InvalidReviewInput;
     // Render every 1/120-second state of the interrupted dolly on Windows too.
     for (auto value : oracle[u"sequences"_s].toArray()) {
         const auto sequence = value.toObject();
-        if (sequence[u"fps"_s].toInt() != 120)
+        if (sequence[u"fps"_s].toInt() != DynamicFramesPerSecond)
             continue;
         for (auto sample : sequence[u"samples"_s].toArray()) {
             auto c = sample.toObject();
@@ -53,7 +78,7 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
     auto *view = window.findChild<rhi::SceneItem *>(u"nativeScene"_s);
     auto *layoutLabel = window.findChild<QObject *>(u"layoutProbe"_s);
     if (!view || !layoutLabel)
-        return 9;
+        return InvalidReviewInput;
     const QString folder = QFileInfo(report).absolutePath();
     QDir().mkpath(folder);
     const auto frames = std::make_shared<std::atomic<int>>(0);
@@ -72,7 +97,7 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         if (index >= cases.size())
             return;
         const auto c = cases[index].toObject();
-        if (index == 48) {
+        if (index == StaticPoseCount) {
             scene.setReducedMotion(false);
             scene.observe({ { -62.26, 35.98, 43.28 },
                             { -.5, 1.1, .4 },
@@ -99,16 +124,16 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         }
         const auto c = cases[index].toObject();
         const bool dynamic = c[u"dynamic"_s].toBool();
-        const bool capture = !dynamic || index == 48 || index == 108 || index == 198 || index == 288
-                || index == 408;
+        const bool capture = !dynamic || index == StaticPoseCount || index == 108 || index == 198
+                || index == 288 || index == 408;
         const QImage image = capture ? window.grabWindow() : QImage{ };
         const bool bindings = window.width() == c[u"width"_s].toInt()
                 && window.height() == c[u"height"_s].toInt() && view->width() == window.width()
                 && view->height() == window.height()
                 && layoutLabel->property("text").toString().startsWith(scene.layout()->kind())
                 && (view->input().scene.camera.position.qt() - scene.cameraPosition()).length()
-                        < 1e-3
-                && std::abs(view->input().scene.fieldOfView - scene.fieldOfView()) < 1e-4;
+                        < PositionTolerance
+                && std::abs(view->input().scene.fieldOfView - scene.fieldOfView()) < FovTolerance;
         bool points = true;
         QJsonArray projections;
         for (auto value : c[u"projections"_s].toArray()) {
@@ -134,32 +159,32 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
         int pixels = 0;
         const auto rgb = image.convertToFormat(QImage::Format_RGB32);
         // Diagnostic labels must not stand in for missing mesh pixels.
-        const int inset = qRound(40 * window.devicePixelRatio());
+        const int inset = qRound(CaptureInsetPixels * window.devicePixelRatio());
         const auto background = image.isNull() ? QColor() : image.pixelColor(image.width() - 1, 0);
         for (int y = inset; y < rgb.height() - inset; ++y)
             for (int x = 0; x < rgb.width(); ++x) {
                 const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
                 // geometryDiagnostic writes a packed unit view normal for every face.
                 // A green-only test loses valid purple/front-facing normals during the dolly.
-                const double nx = 2.0 * qRed(color) / 255 - 1;
-                const double ny = 2.0 * qGreen(color) / 255 - 1;
-                const double nz = 2.0 * qBlue(color) / 255 - 1;
+                const double nx = 2.0 * qRed(color) / MaximumChannelByte - 1;
+                const double ny = 2.0 * qGreen(color) / MaximumChannelByte - 1;
+                const double nz = 2.0 * qBlue(color) / MaximumChannelByte - 1;
                 const int difference = std::abs(qRed(color) - background.red())
                         + std::abs(qGreen(color) - background.green())
                         + std::abs(qBlue(color) - background.blue());
-                constexpr double packedNormalTolerance =
-                        2 * 1.7320508075688772 / 255 + 3.0 / (255 * 255);
+                constexpr double packedNormalTolerance = 2 * UnitCubeDiagonal / MaximumChannelByte
+                        + DepthPackingErrorUnits / (MaximumChannelByte * MaximumChannelByte);
                 if (difference > 9
                     && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
                     ++pixels;
             }
-        const QString file = u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, 10, '0'_L1)
+        const QString file = u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, DecimalBase, '0'_L1)
                                      .arg(window.width())
                                      .arg(window.height())
                                      .arg(scene.detail());
         const bool saved = !capture || (!image.isNull() && image.save(folder + "/"_L1 + file));
         const bool passed = bindings && points && saved && view->errorText().isEmpty()
-                && (!capture || pixels > 100);
+                && (!capture || pixels > MinimumForegroundPixels);
         pass = pass && passed;
         results.append(QJsonObject{ { u"index"_s, index },
                                     { u"width"_s, window.width() },
@@ -212,16 +237,16 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                             .toJson());
             committed = output.commit();
         }
-        app.exit(pass && committed ? 0 : 10);
+        app.exit(pass && committed ? 0 : ReviewFailed);
     });
     QTimer timeout;
     timeout.setSingleShot(true);
     QObject::connect(&timeout, &QTimer::timeout, &app, [&] {
-        app.exit(11);
+        app.exit(ReviewTimedOut);
     });
     next();
-    poll.start(10);
-    timeout.start(80000);
+    poll.start(PollIntervalMilliseconds);
+    timeout.start(ReviewDeadlineMilliseconds);
     const int code = app.exec();
     // The shared counter also covers a callback already in progress during exit.
     QObject::disconnect(renderedConnection);

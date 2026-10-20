@@ -1,3 +1,7 @@
+// Uses temporary directory trees to verify stable identity, cancellation and transactional scan
+// publication. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
 #include "DirectoryScanner.h"
 #include "LibrarySession.h"
 #include "LibraryStore.h"
@@ -14,6 +18,13 @@
 #include <QTest>
 #include <QTimer>
 #include <filesystem>
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int LargeScanDeadlineMilliseconds = 20000;
+constexpr int EventPollMilliseconds = 10;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -79,10 +90,10 @@ void DirectoryScannerTest::panelRootPaths()
     QVERIFY(store.setRootPaths(u"\n"_s + music + u"\n"_s + music + u"\n"_s));
     QCOMPARE(store.rootPaths(), QStringList{ music });
     QCOMPARE(store.localPath(QUrl::fromLocalFile(music)), music);
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(store.roots().size(), 1);
     QVERIFY(store.setRootPaths(u""_s));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(store.rootPaths().isEmpty());
 }
 void DirectoryScannerTest::rootValidation()
@@ -334,7 +345,7 @@ void DirectoryScannerTest::storeRoundTripAndResponsiveness()
     });
     heartbeat.start();
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(root) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 20000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), LargeScanDeadlineMilliseconds);
     heartbeat.stop();
     QCOMPARE(ready.size(), 1);
     QCOMPARE(saved.size(), 1);
@@ -348,7 +359,7 @@ void DirectoryScannerTest::storeRoundTripAndResponsiveness()
     LibraryStore loaded(cache);
     QSignalSpy loadedReady(&loaded, &LibraryStore::snapshotReady);
     loaded.load();
-    QTRY_VERIFY_WITH_TIMEOUT(!loaded.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!loaded.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(loadedReady.size(), 1);
     QCOMPARE(toJson(*loaded.snapshot()),
              QJsonDocument::fromJson(get(cache + u"/library-index.json"_s)).object());
@@ -367,7 +378,7 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(a) }));
     for (int i = 0; i < 100; ++i)
         QVERIFY(store.setRoots({ QUrl::fromLocalFile(i == 99 ? b : a) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 1);
     QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
     const auto bytes = get(data + "/library-index.json"_L1);
@@ -375,7 +386,7 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     // Cancel after the worker finishes but before its queued completion is delivered.
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(a) }));
     store.cancel();
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 0);
     QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
     QCOMPARE(get(data + u"/library-index.json"_s), bytes);
@@ -383,7 +394,7 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     LibraryStore reloaded(data);
     reloaded.load();
     QVERIFY(reloaded.setRoots({ QUrl::fromLocalFile(b) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!reloaded.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!reloaded.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(toJson(*reloaded.snapshot()).value(u"albums"_s),
              toJson(*store.snapshot()).value(u"albums"_s));
 }
@@ -402,7 +413,7 @@ void DirectoryScannerTest::badCacheAndWriteFailure()
         QSignalSpy failed(&store, &LibraryStore::failed);
         // setRoots itself must protect an existing bad cache, even without explicit load().
         QVERIFY(store.setRoots({ QUrl::fromLocalFile(root) }));
-        QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
         QVERIFY(failed.size() > 0);
         QCOMPARE(store.snapshot()->albums.size(), 1);
         QCOMPARE(get(cache), bytes);
@@ -411,14 +422,14 @@ void DirectoryScannerTest::badCacheAndWriteFailure()
     QVERIFY(QDir().mkpath(cache));
     LibraryStore failedRead(data);
     failedRead.load();
-    QTRY_VERIFY_WITH_TIMEOUT(!failedRead.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!failedRead.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(!failedRead.error().isEmpty());
     // A source file in place of the data directory makes cache writes fail safely.
     const QString blockedData = temporary.path() + "/blocked"_L1;
     QVERIFY(put(blockedData, "unchanged"_ba));
     LibraryStore failedWrite(blockedData);
     QVERIFY(failedWrite.setRoots({ QUrl::fromLocalFile(root) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!failedWrite.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!failedWrite.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(!failedWrite.error().isEmpty());
     QCOMPARE(get(blockedData), "unchanged"_ba);
 }
@@ -430,7 +441,7 @@ void DirectoryScannerTest::atomicSaveFailure()
     QVERIFY(put(root + u"/first.mp3"_s));
     LibraryStore store(data);
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(root) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(store.error().isEmpty());
     const auto original = get(cache);
     QVERIFY(!original.isEmpty());
@@ -449,7 +460,7 @@ void DirectoryScannerTest::atomicSaveFailure()
     QElapsedTimer deadline;
     deadline.start();
     while (store.busy() && deadline.elapsed() < 10000)
-        QTest::qWait(10);
+        QTest::qWait(EventPollMilliseconds);
     const bool idle = !store.busy(), failed = !store.error().isEmpty();
     QVERIFY(QFile::setPermissions(protectedPath, permissions));
     QVERIFY(idle);
@@ -473,11 +484,11 @@ void DirectoryScannerTest::destruction()
         LibraryStore store(data);
         QSignalSpy ready(&store, &LibraryStore::snapshotReady);
         QVERIFY(store.setRoots({ QUrl::fromLocalFile(root) }));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
     }
     LibraryStore loaded(data);
     loaded.load();
-    QTRY_VERIFY_WITH_TIMEOUT(!loaded.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!loaded.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(loaded.snapshot()->albums.size(), 1);
 }
 int main(int argc, char **argv)

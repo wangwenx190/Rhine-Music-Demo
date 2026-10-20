@@ -1,3 +1,6 @@
+// Drives deterministic production RHI inputs and collects owned readbacks. Submission,
+// completion and renderer recreation are separate lifecycle facts.
+
 #pragma once
 #include <QtClassHelperMacros>
 #include <QString>

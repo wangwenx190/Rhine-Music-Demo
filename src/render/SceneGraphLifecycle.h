@@ -1,3 +1,6 @@
+// Tracks scene-graph epochs and visual visibility transitions. Invalidation is distinct from a
+// local renderer generation that may restart at one.
+
 #pragma once
 #include <QObject>
 #include <QPointer>

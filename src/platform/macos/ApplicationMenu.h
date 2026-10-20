@@ -1,3 +1,6 @@
+// Installs native macOS commands and routes editing to the focused Qt editor. Menu ownership and
+// callbacks remain tied to the application window lifetime.
+
 #pragma once
 #include <QtClassHelperMacros>
 #include <functional>

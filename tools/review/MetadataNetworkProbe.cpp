@@ -9,6 +9,19 @@
 #include <QTextStream>
 #include <QTimer>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int RenderDeadlineMilliseconds = 120000;
+}
+
+namespace {
+// Explicit public query inputs are bounded before JSON parsing and provider dispatch.
+constexpr auto MaximumReleaseYear = 9999;
+constexpr auto BytesPerKiB = 1024;
+constexpr auto MaximumQueryTracks = 2000;
+constexpr auto DescriptionPreviewCharacters = 300;
+}
+
 using namespace Qt::StringLiterals;
 int main(int argc, char **argv)
 {
@@ -36,18 +49,19 @@ int main(int argc, char **argv)
     if (parser.isSet(u"year"_s)) {
         bool valid = false;
         const int year = parser.value(u"year"_s).toInt(&valid);
-        if (!valid || year < 1 || year > 9999)
+        if (!valid || year < 1 || year > MaximumReleaseYear)
             return 7;
         query.album.year = year;
     }
     if (parser.isSet(u"tracks"_s)) {
         QFile file(parser.value(u"tracks"_s));
-        if (!file.open(QIODevice::ReadOnly) || file.size() > 1024 * 1024)
+        if (!file.open(QIODevice::ReadOnly) || file.size() > BytesPerKiB * BytesPerKiB)
             return 7;
         QJsonParseError error;
-        const auto document = QJsonDocument::fromJson(file.read(1024 * 1024 + 1), &error);
+        const auto document =
+                QJsonDocument::fromJson(file.read(BytesPerKiB * BytesPerKiB + 1), &error);
         if (error.error != QJsonParseError::NoError || !document.isArray()
-            || document.array().size() > 2000)
+            || document.array().size() > MaximumQueryTracks)
             return 7;
         for (const auto &value : document.array()) {
             const auto object = value.toObject();
@@ -78,19 +92,20 @@ int main(int argc, char **argv)
     QObject::connect(
             &provider, &yalahoo::IMetadataProvider::resultReady, &app,
             [&](const yalahoo::ProviderResult &result) {
-                const QJsonObject report{
-                    { u"kind"_s, kind },
-                    { u"status"_s, yalahoo::statusName(result.status) },
-                    { u"source"_s, result.source },
-                    { u"checkedAt"_s, result.checkedAt },
-                    { u"retryAt"_s, result.retryAt },
-                    { u"error"_s, result.error },
-                    { u"description"_s,
-                      result.payload.value(u"description"_s).toString().left(300) },
-                    { u"credits"_s, result.payload.value(u"producers"_s).toArray().size() },
-                    { u"online"_s, result.payload.value(u"online"_s) },
-                    { u"genres"_s, result.payload.value(u"genres"_s) }
-                };
+                const QJsonObject report{ { u"kind"_s, kind },
+                                          { u"status"_s, yalahoo::statusName(result.status) },
+                                          { u"source"_s, result.source },
+                                          { u"checkedAt"_s, result.checkedAt },
+                                          { u"retryAt"_s, result.retryAt },
+                                          { u"error"_s, result.error },
+                                          { u"description"_s,
+                                            result.payload.value(u"description"_s)
+                                                    .toString()
+                                                    .left(DescriptionPreviewCharacters) },
+                                          { u"credits"_s,
+                                            result.payload.value(u"producers"_s).toArray().size() },
+                                          { u"online"_s, result.payload.value(u"online"_s) },
+                                          { u"genres"_s, result.payload.value(u"genres"_s) } };
                 QTextStream(stdout) << QJsonDocument(report).toJson();
                 app.exit(result.status == yalahoo::ProviderStatus::Matched
                                          || result.status == yalahoo::ProviderStatus::Partial
@@ -103,7 +118,7 @@ int main(int argc, char **argv)
                                                     : provider.requestEnrichment(query, token);
     if (!accepted)
         return 3;
-    QTimer::singleShot(120000, &app, [&] {
+    QTimer::singleShot(RenderDeadlineMilliseconds, &app, [&] {
         app.exit(4);
     });
     return app.exec();

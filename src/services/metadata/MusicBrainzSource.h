@@ -1,3 +1,6 @@
+// Parses and ranks MusicBrainz release candidates using album identity. Pure extraction keeps
+// remote schema interpretation separate from transport and persistence.
+
 #pragma once
 #include "IMetadataProvider.h"
 

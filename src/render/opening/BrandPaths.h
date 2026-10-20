@@ -1,3 +1,6 @@
+// Defines the bundled brand outline as literal path data. Opening rendering reuses these paths
+// without loading mutable global graphics objects.
+
 #pragma once
 #include <QPainterPath>
 #include <QRegularExpression>

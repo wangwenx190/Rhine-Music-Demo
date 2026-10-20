@@ -1,3 +1,6 @@
+// Animates opacity and offset from the currently displayed state. One frame source drives
+// reversible enter/exit curves and reduced-motion completion.
+
 #pragma once
 #include <QObject>
 #include <QEasingCurve>

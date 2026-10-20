@@ -1,8 +1,20 @@
+// Converts the logical viewport into the source layout coordinate system. Breakpoints and
+// portrait insets are computed once and exposed as typed properties.
+
 #pragma once
 #include <QObject>
 #include <QString>
 
 namespace yalahoo {
+namespace layoutMetrics {
+// Breakpoints use actual logical content dimensions, never DPR-scaled pixels.
+inline constexpr auto PortraitAspectBoundary = 1.05;
+inline constexpr auto CompactWidthPixels = 1100;
+inline constexpr auto CoarseCompactHeightPixels = 600;
+inline constexpr auto InitialWidthPixels = 960;
+inline constexpr auto InitialHeightPixels = 640;
+}
+
 // viewport-layout.ts, in actual window content logical pixels (never DPR pixels).
 class LayoutMetrics : public QObject
 {
@@ -32,11 +44,12 @@ public:
     }
     bool portrait() const
     {
-        return m_width / m_height < 1.05;
+        return m_width / m_height < layoutMetrics::PortraitAspectBoundary;
     }
     bool compact() const
     {
-        return portrait() || m_width < 1100 || (m_coarse && m_height < 600);
+        return portrait() || m_width < layoutMetrics::CompactWidthPixels
+                || (m_coarse && m_height < layoutMetrics::CoarseCompactHeightPixels);
     }
     QString kind() const;
     double layoutScale() const;
@@ -50,7 +63,8 @@ Q_SIGNALS:
     void changed();
 
 private:
-    double m_width = 960, m_height = 640;
+    double m_width = layoutMetrics::InitialWidthPixels,
+           m_height = layoutMetrics::InitialHeightPixels;
     bool m_coarse = false, m_cinematic = false;
 };
 }

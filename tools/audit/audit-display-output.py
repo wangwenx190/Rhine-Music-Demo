@@ -25,7 +25,7 @@ CHECKS = [
     ('COMMON-05', 'cmake/TestPolicy.cmake', 'display-transfer',
      'Five-pixel GPU and one small native window have separate labels. Target hardware '
      'and system notifications remain HDR-OUTPUT-P; no full/GL/performance claim.'),
-    ('PERF-01', 'src/render/rhi/DisplayOutput.cpp', 'm_poll.setInterval(1000)',
+    ('PERF-01', 'src/render/rhi/DisplayOutput.cpp', 'm_poll.setInterval(DisplayPollMilliseconds)',
      'Visible-only coarse query is O(displays) on Windows, O(1) for NSScreen/cached Wayland; '
      'no per-frame OS query, roundtrip, synchronous event dispatch or background decoding.'),
     ('PERF-02', 'src/platform/linux/DisplayMonitor.cpp', 'm_notifyPending',

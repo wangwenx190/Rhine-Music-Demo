@@ -1,3 +1,6 @@
+// Accounts for actual CPU-to-GPU transfer regions and byte counts. Initialization, replay and
+// incremental uploads retain distinct diagnostic semantics.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -9,6 +12,11 @@ using Qt::StringLiterals::operator""_s;
 #endif
 
 namespace yalahoo::rhi {
+namespace transferStorage {
+// Atlas transfer accounting includes the actual uploaded RGBA region payload.
+inline constexpr auto RgbaBytesPerPixel = 4;
+}
+
 // Inspect the actual backend commands, not the caller's image payload or upload counters.
 // Completed readbacks in the Review tool prove these commands executed successfully.
 inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture *texture,
@@ -38,7 +46,8 @@ inline QJsonObject nativeTransfers(QRhi *api, QRhiCommandBuffer *cb, QRhiTexture
                     u.hasDstBox ? int(box.right) : qMax(1, texture->pixelSize().width() >> level);
             const int bottom =
                     u.hasDstBox ? int(box.bottom) : qMax(1, texture->pixelSize().height() >> level);
-            const auto count = qint64(right - left) * (bottom - top) * 4;
+            const auto count =
+                    qint64(right - left) * (bottom - top) * transferStorage::RgbaBytesPerPixel;
             bytes += count;
             regions.append(QJsonObject{ { u"level"_s, level },
                                         { u"left"_s, left },

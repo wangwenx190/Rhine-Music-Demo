@@ -1,3 +1,6 @@
+// Adapts Quick 3D review capability flags to the actual OpenGL context. Changes are restricted
+// to the review renderer and retain requested sample counts.
+
 #pragma once
 #include <QLoggingCategory>
 #include <QString>
@@ -18,7 +21,7 @@ using Qt::StringLiterals::operator""_s;
 namespace yalahoo::review {
 Q_STATIC_LOGGING_CATEGORY(logReviewGl, "yalahoo.render", QtInfoMsg)
 #if defined(Q_OS_MACOS)
-class ReviewRhiResourceAccess final : public QRhiResource
+class ReviewRhiResourceAccess : public QRhiResource
 {
 public:
     static QRhiImplementation *implementation(const QRhiResource &resource)

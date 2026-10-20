@@ -77,18 +77,65 @@
 #include <memory>
 #include <utility>
 
+namespace {
+// Runtime-review timers drive bounded anonymous probes; product playback uses its own public Qt state.
+constexpr auto MaximumRecordedDiagnostics = 1024;
+constexpr auto DefaultSongVolume = .65;
+constexpr auto DefaultBackgroundVolume = .18;
+constexpr auto DefaultFeedbackVolume = .22;
+constexpr auto MotionRetargetMilliseconds = 400;
+constexpr auto MotionPauseMilliseconds = 700;
+constexpr auto MotionResumeMilliseconds = 1100;
+constexpr auto MotionReducedMilliseconds = 1200;
+constexpr auto OpeningPauseMilliseconds = 1500;
+constexpr auto FinalRetargetMilliseconds = 1700;
+constexpr auto FinalMotionMilliseconds = 2000;
+constexpr auto SceneSettleMilliseconds = 1000;
+constexpr auto OpeningDurationSeconds = 11.6;
+constexpr auto MotionReportDeadlineMilliseconds = 10000;
+constexpr auto RuntimeReportDelayMilliseconds = 2500;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    QmlCreationFailed = 2,
+    RootWindowMissing = 3,
+    RuntimeReportOpenFailed = 4,
+    RuntimeVerificationFailed = 5,
+    AssetFontInitializationFailed = 6,
+    InvalidCommandLine = 7,
+    SceneReviewUnavailable = 8,
+    SceneInputMissing = 9,
+    MaterialInputMissing = 12,
+    IntegrationInputMissing = 20,
+    GraphicsBackendUnavailable = 22,
+    AppVerificationFailed = 25
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
-QMutex diagnosticsMutex;
-QStringList diagnostics;
+// Construct on first access; no namespace-scope runtime initialization is required.
+QMutex &diagnosticsMutex()
+{
+    static QMutex value;
+    return value;
+}
+// Construct on first access; no namespace-scope runtime initialization is required.
+QStringList &diagnostics()
+{
+    static QStringList value;
+    return value;
+}
 QtMessageHandler diagnosticSink = nullptr;
 void recordDiagnostic(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
-    const QMutexLocker lock(&diagnosticsMutex);
-    if (diagnostics.size() == 1024)
-        diagnostics.removeFirst();
-    diagnostics.append(message);
+    const QMutexLocker lock(&diagnosticsMutex());
+    if (diagnostics().size() == MaximumRecordedDiagnostics)
+        diagnostics().removeFirst();
+    diagnostics().append(message);
     if (diagnosticSink)
         diagnosticSink(type, context, message);
 }
@@ -116,7 +163,7 @@ int main(int argc, char **argv)
                             << "platform=" << QSysInfo::prettyProductName()
                             << "architecture=" << QSysInfo::currentCpuArchitecture();
     if (!yalahoo::selectGraphicsBackend())
-        return 22;
+        return GraphicsBackendUnavailable;
     QGuiApplication app(argc, argv);
     auto globalFont = QGuiApplication::font();
     globalFont.setStyleStrategy(
@@ -126,7 +173,7 @@ int main(int argc, char **argv)
     yalahoo::DisplayOutput displayOutput;
     const yalahoo::Localization localization;
     if (!yalahoo::probeOptionalGraphicsBackend())
-        return 22;
+        return GraphicsBackendUnavailable;
     QIcon applicationIcon;
     for (const int size : { 16, 24, 32, 48, 64, 128, 256, 512, 1024 }) {
         applicationIcon.addFile(u":/assets/icons/yalahoo/png/yalahoo-%1.png"_s.arg(size),
@@ -138,7 +185,7 @@ int main(int argc, char **argv)
     });
     if (!yalahoo::initializeAssetFonts()) {
         qCCritical(yalahoo::logApp) << "Embedded MiSans font registration failed";
-        return 6;
+        return AssetFontInitializationFailed;
     }
     QCommandLineParser parser;
     parser.setApplicationDescription(
@@ -257,7 +304,7 @@ int main(int argc, char **argv)
                            .contains(option)) {
                 qCWarning(yalahoo::logApp,
                           "Demonstration cannot be combined with data or verification options");
-                return 7;
+                return InvalidCommandLine;
             }
         }
     }
@@ -268,9 +315,9 @@ int main(int argc, char **argv)
     if (parser.isSet(u"verify-filled"_s)
         && (!parser.isSet(u"verify-runtime"_s) || parser.isSet(u"verify-library"_s)
             || parser.isSet(u"verify-motion"_s)))
-        return 7;
+        return InvalidCommandLine;
     if (parser.isSet(u"verify-shading"_s) && !parser.isSet(u"verify-runtime"_s))
-        return 7;
+        return InvalidCommandLine;
     // Outlive the engine and its render-thread callbacks during teardown.
     std::atomic<int> frames{ 0 };
     std::atomic<int> api{ QSGRendererInterface::Unknown };
@@ -298,10 +345,10 @@ int main(int argc, char **argv)
     });
     if (parser.isSet(u"verify-library"_s)) {
         if (!parser.isSet(u"verify-runtime"_s))
-            return 7;
+            return InvalidCommandLine;
         QFile input(parser.value(u"verify-library"_s));
         if (!input.open(QIODevice::ReadOnly))
-            return 7;
+            return InvalidCommandLine;
         QJsonParseError parseError;
         const auto document = QJsonDocument::fromJson(input.readAll(), &parseError);
         yalahoo::LibrarySnapshot snapshot;
@@ -310,7 +357,7 @@ int main(int argc, char **argv)
             || !yalahoo::readLibrary(
                     document.object().value(u"libraries"_s).toObject().value(u"mixed"_s).toObject(),
                     snapshot, &error))
-            return 7;
+            return InvalidCommandLine;
         library.setSnapshot(std::move(snapshot));
         library.search(u"Typography"_s);
         if (!library.snapshot()->albums.isEmpty())
@@ -361,15 +408,15 @@ int main(int argc, char **argv)
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir::isAbsolutePath(dataRoot)) {
             qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
-            return 7;
+            return InvalidCommandLine;
         }
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
         const auto applyAudio = [&] {
             const auto audio = preferences->audio();
-            playback.setVolume(audio.value(u"volume"_s).toDouble(.65));
-            background.setVolume(audio.value(u"bgmVolume"_s).toDouble(.18));
+            playback.setVolume(audio.value(u"volume"_s).toDouble(DefaultSongVolume));
+            background.setVolume(audio.value(u"bgmVolume"_s).toDouble(DefaultBackgroundVolume));
             background.setEnabled(audio.value(u"bgm"_s).toBool(true));
-            sounds.setVolume(audio.value(u"soundVolume"_s).toDouble(.22));
+            sounds.setVolume(audio.value(u"soundVolume"_s).toDouble(DefaultFeedbackVolume));
             sounds.setEnabled(audio.value(u"sound"_s).toBool(true));
         };
         applyAudio();
@@ -447,27 +494,27 @@ int main(int argc, char **argv)
         if (parser.isSet(u"import-preferences"_s))
             if (!preferences->importJson(
                         QUrl::fromLocalFile(parser.value(u"import-preferences"_s))))
-                return 7;
+                return InvalidCommandLine;
         if (parser.isSet(u"import-legacy"_s)
             && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
             qCWarning(yalahoo::logApp, "--import-legacy cannot be combined with scan options");
-            return 7;
+            return InvalidCommandLine;
         }
         libraryStore->load();
         if (parser.isSet(u"import-legacy"_s)) {
             if (!libraryStore->importLegacy(QUrl::fromLocalFile(parser.value(u"import-legacy"_s))))
-                return 7;
+                return InvalidCommandLine;
         } else if (parser.isSet(u"music-root"_s)) {
             QList<QUrl> roots;
             for (const auto &path : parser.values(u"music-root"_s)) {
                 if (!QDir::isAbsolutePath(path)) {
                     qCWarning(yalahoo::logApp, "--music-root requires absolute paths");
-                    return 7;
+                    return InvalidCommandLine;
                 }
                 roots.append(QUrl::fromLocalFile(path));
             }
             if (!libraryStore->setRoots(roots))
-                return 7;
+                return InvalidCommandLine;
         } else if (parser.isSet(u"rescan-library"_s)) {
             const auto once = std::make_shared<QMetaObject::Connection>();
             *once = QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady,
@@ -630,7 +677,7 @@ int main(int argc, char **argv)
 #ifdef YALAHOO_REVIEW
     if (parser.isSet(u"verify-materials"_s)) {
         if (!parser.isSet(u"material-report"_s))
-            return 12;
+            return MaterialInputMissing;
         return yalahoo::reviewMaterials(app, scene, parser.value(u"verify-materials"_s),
                                         parser.value(u"material-report"_s));
     }
@@ -646,16 +693,16 @@ int main(int argc, char **argv)
             &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
             [] {
                 qCCritical(yalahoo::logApp) << "QML application creation failed";
-                QCoreApplication::exit(2);
+                QCoreApplication::exit(QmlCreationFailed);
             },
             Qt::QueuedConnection);
     engine.loadFromModule("Yalahoo.Music",
                           verificationRun && !appVerification ? "BootstrapProbe" : "App");
     if (engine.rootObjects().isEmpty())
-        return 2;
+        return QmlCreationFailed;
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if (!window)
-        return 3;
+        return RootWindowMissing;
     if (!verificationRun) {
         displayOutput.attach(*window);
         window->show();
@@ -690,7 +737,7 @@ int main(int argc, char **argv)
                          });
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
-        return 7;
+        return InvalidCommandLine;
     if (parser.isSet(u"verify-app"_s)) {
         QTimer::singleShot(0, &engine, [&] {
             const auto find = [](auto &&self, QQuickItem *item,
@@ -713,7 +760,7 @@ int main(int argc, char **argv)
             if (!passed)
                 qCCritical(yalahoo::logApp) << "Hidden product QML creation or composition failed"
                                             << deploymentWarnings;
-            app.exit(passed ? 0 : 25);
+            app.exit(passed ? 0 : AppVerificationFailed);
         });
         return app.exec();
     }
@@ -737,13 +784,13 @@ int main(int argc, char **argv)
         bool ok = false;
         const auto seconds = parser.value(u"integration-seconds"_s).toDouble(&ok);
         if (!ok)
-            return 20;
+            return IntegrationInputMissing;
         return yalahoo::reviewIntegration(app, *window, scene,
                                           parser.value(u"verify-integration"_s), seconds);
     }
     if (parser.isSet(u"verify-scene"_s)) {
         if (!parser.isSet(u"scene-report"_s))
-            return 9;
+            return SceneInputMissing;
         return yalahoo::reviewScene(app, *window, scene, parser.value(u"verify-scene"_s),
                                     parser.value(u"scene-report"_s));
     }
@@ -751,7 +798,7 @@ int main(int argc, char **argv)
 
     if (parser.isSet(u"verify-motion"_s)) {
         if (!parser.isSet(u"verify-runtime"_s))
-            return 8;
+            return SceneReviewUnavailable;
         QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, &app, [&](double dt, double) {
             if (awaitingResume) {
                 resumeDiscarded = resumeDiscarded && dt == 0;
@@ -765,12 +812,12 @@ int main(int argc, char **argv)
                          });
         motion.clock()->startOpening();
         motion.travel(7.44, 15.6, 12, 3);
-        QTimer::singleShot(400, window, [&] {
+        QTimer::singleShot(MotionRetargetMilliseconds, window, [&] {
             window->hide();
             pausedTime = motion.clock()->visualTime();
             pausedFrames = motion.clock()->frameCount();
         });
-        QTimer::singleShot(700, window, [&] {
+        QTimer::singleShot(MotionPauseMilliseconds, window, [&] {
             motionEvidence.insert(u"hiddenPaused"_s,
                                   !motion.clock()->active()
                                           && pausedTime == motion.clock()->visualTime()
@@ -778,15 +825,15 @@ int main(int argc, char **argv)
             awaitingResume = true;
             window->show();
         });
-        QTimer::singleShot(1100, window, [&] {
+        QTimer::singleShot(MotionResumeMilliseconds, window, [&] {
             motion.clock()->setSpeed(2);
         });
-        QTimer::singleShot(1200, window, [&] {
+        QTimer::singleShot(MotionReducedMilliseconds, window, [&] {
             window->showMinimized();
             pausedTime = motion.clock()->visualTime();
             pausedFrames = motion.clock()->frameCount();
         });
-        QTimer::singleShot(1500, window, [&] {
+        QTimer::singleShot(OpeningPauseMilliseconds, window, [&] {
             motionEvidence.insert(u"minimizedPaused"_s,
                                   !motion.clock()->active()
                                           && pausedTime == motion.clock()->visualTime()
@@ -794,10 +841,10 @@ int main(int argc, char **argv)
             awaitingResume = true;
             window->showNormal();
         });
-        QTimer::singleShot(1700, window, [&] {
+        QTimer::singleShot(FinalRetargetMilliseconds, window, [&] {
             motion.travel(-.62, -5.2, -1, -1);
         });
-        QTimer::singleShot(2000, window, [&] {
+        QTimer::singleShot(FinalMotionMilliseconds, window, [&] {
             motion.setReducedMotion(true);
         });
     }
@@ -813,7 +860,7 @@ int main(int argc, char **argv)
     if (parser.isSet(u"verify-runtime"_s)) {
         window->show();
         const QString report = parser.value(u"verify-runtime"_s);
-        QTimer::singleShot(1000, window, [window] {
+        QTimer::singleShot(SceneSettleMilliseconds, window, [window] {
             auto *button = window->findChild<QQuickItem *>(u"interactionProbe"_s);
             if (!button)
                 return;
@@ -879,8 +926,8 @@ int main(int argc, char **argv)
             }
             QStringList recorded;
             {
-                const QMutexLocker lock(&diagnosticsMutex);
-                recorded = diagnostics;
+                const QMutexLocker lock(&diagnosticsMutex());
+                recorded = diagnostics();
             }
             motionEvidence.insert(u"finalWindowVisibility"_s, int(window->visibility()));
             motionEvidence.insert(u"clockActive"_s, motion.clock()->active());
@@ -889,7 +936,8 @@ int main(int argc, char **argv)
                     || (motionEvidence.value(u"hiddenPaused"_s).toBool()
                         && motionEvidence.value(u"minimizedPaused"_s).toBool() && resumeDiscarded
                         && resumeSamples == 2 && !motion.moving() && motion.rail() == -.62
-                        && motion.column() == -5.2 && motion.clock()->openingTime() == 11.6
+                        && motion.column() == -5.2
+                        && motion.clock()->openingTime() == OpeningDurationSeconds
                         && !completionRevisions.isEmpty()
                         && completionRevisions.last().toInteger() == qint64(motion.revision())
                         && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
@@ -968,12 +1016,12 @@ int main(int argc, char **argv)
                 reportData.insert(u"poolInstances"_s, scene.frame().instances.size());
             QSaveFile output(report);
             if (!output.open(QIODevice::WriteOnly)) {
-                app.exit(4);
+                app.exit(RuntimeReportOpenFailed);
                 return;
             }
             output.write(QJsonDocument(reportData).toJson());
             const bool committed = output.commit();
-            app.exit(passed && committed ? 0 : 5);
+            app.exit(passed && committed ? 0 : RuntimeVerificationFailed);
         };
         if (parser.isSet(u"verify-motion"_s)) {
             QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, window,
@@ -982,9 +1030,9 @@ int main(int argc, char **argv)
                                      && scene.settled())
                                      QTimer::singleShot(0, window, writeRuntimeReport);
                              });
-            QTimer::singleShot(10000, window, writeRuntimeReport);
+            QTimer::singleShot(MotionReportDeadlineMilliseconds, window, writeRuntimeReport);
         } else {
-            QTimer::singleShot(2500, window, writeRuntimeReport);
+            QTimer::singleShot(RuntimeReportDelayMilliseconds, window, writeRuntimeReport);
         }
     }
     const int result = app.exec();

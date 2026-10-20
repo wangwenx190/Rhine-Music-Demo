@@ -1,3 +1,6 @@
+// Builds source-derived optical material parameters and uniform data. Entity-local clarity and
+// lighting remain independent of global presentation progress.
+
 #pragma once
 #include <QVector3D>
 #include <QVector4D>

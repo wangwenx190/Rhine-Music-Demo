@@ -34,6 +34,11 @@
 #include <QMutex>
 #include <QMutexLocker>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int RestoreSettleMilliseconds = 200;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -654,7 +659,7 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
                 surface.hide();
                 window.releaseResources();
             }
-            QTimer::singleShot(200, &app, [&] {
+            QTimer::singleShot(RestoreSettleMilliseconds, &app, [&] {
                 const bool released =
                         yalahoo::ReelInk::liveNodes() == 0 && canvasTitleStats().renderers == 0;
                 passed &= released;

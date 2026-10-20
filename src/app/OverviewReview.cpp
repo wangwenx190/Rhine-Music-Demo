@@ -23,6 +23,75 @@
 #include <QMutex>
 #include <QMutexLocker>
 
+namespace {
+// Explicit viewport fixture inputs remain literal data; admission and waiting tolerances are named policy.
+constexpr auto ReviewWidthPixels = 1280;
+constexpr auto ReviewHeightPixels = 720;
+constexpr auto LifecycleRebuildCount = 10;
+constexpr auto ViewportSetupFrames = 10;
+constexpr auto BytesPerKiB = 1024;
+constexpr auto MaximumLiveLabels = 18;
+constexpr auto RetainedLeftSlackPixels = 18;
+constexpr auto LabelBudgetWidth = 308;
+constexpr auto LabelBudgetHeight = 129;
+constexpr auto LabelColorBudgetBytes = 5721408;
+constexpr auto LabelAttachmentBudgetBytes = 17164224;
+constexpr auto LabelResizeBudgetBytes = 34328448;
+constexpr auto InitialSettleFrames = 30;
+constexpr auto OpenedProgressThreshold = .999;
+constexpr auto ClosedProgressThreshold = .001;
+constexpr auto TransportPositionTolerance = .01;
+constexpr auto ExpandedSettleFrames = 35;
+constexpr auto CaseHingeHeight = 1.85f;
+constexpr auto HorizontalHitInsetPixels = 50;
+constexpr auto TopHitInsetPixels = 230;
+constexpr auto BottomHitInsetPixels = 140;
+constexpr auto ReversalSettleFrames = 8;
+constexpr auto MinimumMotionSpeed = .25;
+constexpr auto MaximumMotionSpeed = 3;
+constexpr auto ResizeSettleFrames = 20;
+constexpr auto EntryWidthPixels = 76;
+constexpr auto LabelRightInsetPixels = 14;
+constexpr auto HiddenSettleMilliseconds = 40;
+constexpr auto ShortcutSettleFrames = 5;
+constexpr auto ReviewDeadlineMilliseconds = 120000;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    InvalidReviewInput = 4,
+    CaptureFailed = 5,
+    ReportFailed = 6
+};
+}
+
+namespace {
+// Ordered review states retain their report ordinals; names describe each awaited fact.
+enum ReviewStage {
+    AwaitInitialFrame = 0,
+    AwaitOverview = 1,
+    AwaitExpandedEntry = 2,
+    AwaitBrowseFocus = 3,
+    AwaitReenteredOverview = 4,
+    AwaitColumnNavigation = 5,
+    AwaitEscape = 6,
+    ClickArchiveCase = 7,
+    AwaitCaseReturn = 8,
+    ReverseOverview = 9,
+    ReverseAgain = 10,
+    ReduceOverviewMotion = 11,
+    ResizeViewport = 12,
+    CheckViewport = 13,
+    PrepareWindowCycle = 14,
+    AwaitWindowCycle = 15,
+    AwaitOverviewRelease = 16,
+    AwaitShortcutExit = 17,
+    AwaitLabelRelease = 18,
+    OverviewComplete = 19
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -44,15 +113,16 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), u"nativeScene"_s));
     auto *selection = scene.selection();
     if (!native || !selection)
-        return 4;
+        return InvalidReviewInput;
     QDir().mkpath(output);
     native->setTelemetryEnabled(true);
     window.setPersistentGraphics(false);
     window.setPersistentSceneGraph(false);
-    window.resize(1280, 720);
+    window.resize(ReviewWidthPixels, ReviewHeightPixels);
     const bool initialNight = qEnvironmentVariableIntValue("YALAHOO_VERIFY_NIGHT") == 1;
-    const int requestedCycles =
-            qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 0;
+    const int requestedCycles = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1
+            ? LifecycleRebuildCount
+            : 0;
     scene.lighting()->setNight(initialNight);
     window.setProperty("reviewPlayingTitle",
                        u"\u6b63\u5728\u64ad\u653e \u00b7 \u56fa\u5b9a\u4f4d\u7f6e"_s);
@@ -62,7 +132,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     QStringList warnings;
     QElapsedTimer time;
     time.start();
-    int stage = 0, frames = 0, sizeIndex = 0, cycle = 0, peakLabels = 0;
+    int stage = AwaitInitialFrame, frames = 0, sizeIndex = 0, cycle = 0, peakLabels = 0;
     int visibleLane = -1;
     quint64 priorSubmission = 0;
     double pausedProgress = 0;
@@ -71,9 +141,15 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     QMutex positionsMutex;
     QPointF synchronizedPlay, synchronizedStop;
     bool passed = true, finished = false;
-    const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
-                              { 960, 900 },   { 930, 900 },   { 390, 844 },
-                              { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
+    const QList<QSize> sizes{ { 1920, 1080 },
+                              { ReviewWidthPixels, ReviewHeightPixels },
+                              { 995, 858 },
+                              { 960, 900 },
+                              { 930, 900 },
+                              { 390, 844 },
+                              { 320, ReviewHeightPixels },
+                              { 2560, 1080 },
+                              { 3440, 1440 } };
     const auto check = [&](const QString &name, bool result) {
         passed &= result;
         checks.append(
@@ -137,7 +213,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         if (finished)
             return;
         finished = true;
-        check(u"sequence-completed"_s, stage == 19);
+        check(u"sequence-completed"_s, stage == OverviewComplete);
         check(u"requested-lifecycle-cycles"_s, cycle == requestedCycles);
         check(u"playback-isolated"_s, playback == library.playbackTrackId());
         check(u"qml-warnings"_s, warnings.isEmpty());
@@ -155,7 +231,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         }
         check(u"overview-keeps-render-targets"_s,
               generations.size() == 1 && postprocess.size() == 1);
-        check(u"upload-burst"_s, peakUpload <= 2 * 1024 * 1024);
+        check(u"upload-burst"_s, peakUpload <= 2 * BytesPerKiB * BytesPerKiB);
         QJsonObject report{
             { u"passed"_s, passed },
             { u"configuration"_s, u"Release"_s },
@@ -175,13 +251,13 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
               QJsonObject{
                       { u"scope"_s,
                         u"Separate Qt Quick crop/horizontal layers; descriptor estimate, not driver allocation"_s },
-                      { u"maximumSlots"_s, 18 },
+                      { u"maximumSlots"_s, MaximumLiveLabels },
                       { u"texturesPerSlot"_s, 2 },
-                      { u"width"_s, 308 },
-                      { u"height"_s, 129 },
-                      { u"rgba8PayloadBytesUpperBound"_s, 5721408 },
-                      { u"withDepthStencilUpperBoundBytes"_s, 17164224 },
-                      { u"resizeOverlapUpperBoundBytes"_s, 34328448 },
+                      { u"width"_s, LabelBudgetWidth },
+                      { u"height"_s, LabelBudgetHeight },
+                      { u"rgba8PayloadBytesUpperBound"_s, LabelColorBudgetBytes },
+                      { u"withDepthStencilUpperBoundBytes"_s, LabelAttachmentBudgetBytes },
+                      { u"resizeOverlapUpperBoundBytes"_s, LabelResizeBudgetBytes },
                       { u"actualDriverAllocationBytes"_s, QJsonValue::Null } } },
             { u"peakAtlasUploadBytes"_s, peakUpload },
             { u"durationMs"_s, time.elapsed() },
@@ -194,11 +270,11 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         };
         QSaveFile file(output + "/report.json"_L1);
         if (!file.open(QIODevice::WriteOnly)) {
-            app.exit(5);
+            app.exit(CaptureFailed);
             return;
         }
         file.write(QJsonDocument(report).toJson());
-        app.exit(file.commit() && passed ? 0 : 6);
+        app.exit(file.commit() && passed ? 0 : ReportFailed);
     };
     QObject::connect(qmlEngine(&window), &QQmlEngine::warnings, &lifetime,
                      [&](const QList<QQmlError> &errors) {
@@ -240,11 +316,11 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                                            { u"labels"_s, overview.labels()->liveCount() },
                                            { u"frameRevision"_s, qint64(scene.frameRevision()) } });
                 peakLabels = std::max(peakLabels, overview.labels()->liveCount());
-                if (overview.labels()->liveCount() > 18)
+                if (overview.labels()->liveCount() > MaximumLiveLabels)
                     check(u"label-capacity"_s, false);
                 switch (stage) {
-                case 0:
-                    if (!ready() || frames < 30)
+                case AwaitInitialFrame:
+                    if (!ready() || frames < InitialSettleFrames)
                         return;
                     {
                         QMutexLocker lock(&positionsMutex);
@@ -256,14 +332,16 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     check(u"toggle-enter"_s, overview.active());
                     ++stage;
                     break;
-                case 1:
-                    if (!ready() || overview.progress() < .999)
+                case AwaitOverview:
+                    if (!ready() || overview.progress() < OpenedProgressThreshold)
                         return;
                     {
                         QMutexLocker lock(&positionsMutex);
                         check(u"fixed-transport-buttons"_s,
-                              QLineF(playPosition, synchronizedPlay).length() <= .01
-                                      && QLineF(stopPosition, synchronizedStop).length() <= .01);
+                              QLineF(playPosition, synchronizedPlay).length()
+                                              <= TransportPositionTolerance
+                                      && QLineF(stopPosition, synchronizedStop).length()
+                                              <= TransportPositionTolerance);
                     }
                     visibleLane = firstLane();
                     check(u"visible-label"_s, visibleLane >= 0);
@@ -275,8 +353,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     frames = 0;
                     ++stage;
                     break;
-                case 2:
-                    if (frames < 35)
+                case AwaitExpandedEntry:
+                    if (frames < ExpandedSettleFrames)
                         return;
                     capture(u"expanded"_s);
                     button("overviewEnter-"_L1 + QString::number(visibleLane));
@@ -284,8 +362,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                           !overview.active() && !presentation.wantsDetail());
                     ++stage;
                     break;
-                case 3:
-                    if (!ready() || overview.progress() > .001
+                case AwaitBrowseFocus:
+                    if (!ready() || overview.progress() > ClosedProgressThreshold
                         || !presentation.browseSurface()->shown())
                         return;
                     check(u"return-focus"_s,
@@ -293,36 +371,38 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     key(Qt::Key_V);
                     ++stage;
                     break;
-                case 4:
-                    if (!ready() || overview.progress() < .999)
+                case AwaitReenteredOverview:
+                    if (!ready() || overview.progress() < OpenedProgressThreshold)
                         return;
                     button(u"overviewNext"_s);
                     check(u"column-navigation-stays-overview"_s,
                           overview.active() && !overview.labels()->canEnter(visibleLane));
                     ++stage;
                     break;
-                case 5:
+                case AwaitColumnNavigation:
                     if (!ready())
                         return;
                     key(Qt::Key_Escape);
                     check(u"escape-return"_s, !overview.active());
                     ++stage;
                     break;
-                case 6:
-                    if (!ready() || overview.progress() > .001)
+                case AwaitEscape:
+                    if (!ready() || overview.progress() > ClosedProgressThreshold)
                         return;
                     key(Qt::Key_V);
                     ++stage;
                     break;
-                case 7: {
-                    if (!ready() || overview.progress() < .999)
+                case ClickArchiveCase: {
+                    if (!ready() || overview.progress() < OpenedProgressThreshold)
                         return;
                     bool clicked = false;
                     for (const auto &instance : selection->instances()) {
-                        const auto point =
-                                scene.projectWorldPoint(instance.transform.map({ 0, 1.85f, 0 }));
-                        if (point.x() < 50 || point.x() > window.width() - 50 || point.y() < 230
-                            || point.y() > window.height() - 140)
+                        const auto point = scene.projectWorldPoint(
+                                instance.transform.map({ 0, CaseHingeHeight, 0 }));
+                        if (point.x() < HorizontalHitInsetPixels
+                            || point.x() > window.width() - HorizontalHitInsetPixels
+                            || point.y() < TopHitInsetPixels
+                            || point.y() > window.height() - BottomHitInsetPixels)
                             continue;
                         if (!scene.hitTest(point.x(), point.y()).isEmpty()) {
                             clickPoint({ point.x(), point.y() });
@@ -334,45 +414,45 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     ++stage;
                     break;
                 }
-                case 8:
-                    if (!ready() || overview.progress() > .001)
+                case AwaitCaseReturn:
+                    if (!ready() || overview.progress() > ClosedProgressThreshold)
                         return;
                     overview.setActive(true);
                     frames = 0;
                     ++stage;
                     break;
-                case 9:
-                    if (frames < 8)
+                case ReverseOverview:
+                    if (frames < ReversalSettleFrames)
                         return;
                     overview.setActive(false);
-                    motion.clock()->setSpeed(.25);
+                    motion.clock()->setSpeed(MinimumMotionSpeed);
                     frames = 0;
                     ++stage;
                     break;
-                case 10:
-                    if (frames < 8)
+                case ReverseAgain:
+                    if (frames < ReversalSettleFrames)
                         return;
                     overview.setActive(true);
-                    motion.clock()->setSpeed(3);
+                    motion.clock()->setSpeed(MaximumMotionSpeed);
                     ++stage;
                     break;
-                case 11:
+                case ReduceOverviewMotion:
                     motion.setReducedMotion(true);
                     check(u"reduced-finishes-progress"_s, overview.progress() == 1);
                     selection->setRealistic(true);
                     frames = 0;
                     ++stage;
                     break;
-                case 12:
-                    if (!ready() || frames < 10)
+                case ResizeViewport:
+                    if (!ready() || frames < ViewportSetupFrames)
                         return;
                     window.resize(sizes[sizeIndex]);
                     scene.lighting()->setNight(sizeIndex % 2 ? !initialNight : initialNight);
                     frames = 0;
                     ++stage;
                     break;
-                case 13: {
-                    if (!ready() || frames < 20)
+                case CheckViewport: {
+                    if (!ready() || frames < ResizeSettleFrames)
                         return;
                     QVector<QRectF> occupied;
                     for (int row = 0; row < overview.labels()->rowCount(); ++row) {
@@ -391,26 +471,28 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         }
                         const auto rect = label->mapRectToScene(label->boundingRect());
                         check(u"label-inside-viewport"_s,
-                              rect.left() >= -18 && rect.right() + 76 <= window.width() - 14);
+                              rect.left() >= -RetainedLeftSlackPixels
+                                      && rect.right() + EntryWidthPixels
+                                              <= window.width() - LabelRightInsetPixels);
                         for (const auto &other : occupied)
                             check(u"labels-do-not-overlap"_s, !rect.intersects(other));
                         occupied.append(rect);
                     }
                     capture("size-"_L1 + QString::number(sizeIndex));
                     if (++sizeIndex < sizes.size())
-                        stage = 12;
+                        stage = ResizeViewport;
                     else {
-                        window.resize(1280, 720);
+                        window.resize(ReviewWidthPixels, ReviewHeightPixels);
                         ++stage;
                     }
                     break;
                 }
-                case 14:
+                case PrepareWindowCycle:
                     if (!ready())
                         return;
                     if (!requestedCycles) {
                         overview.setActive(false);
-                        stage = 16;
+                        stage = AwaitOverviewRelease;
                         break;
                     }
                     pausedProgress = overview.progress();
@@ -419,7 +501,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     window.releaseResources();
                     window.destroy();
                     ++stage;
-                    QTimer::singleShot(40, &lifetime, [&] {
+                    QTimer::singleShot(HiddenSettleMilliseconds, &lifetime, [&] {
                         check(u"hidden-clock-paused"_s,
                               !motion.clock()->active() && overview.progress() == pausedProgress);
                         window.create();
@@ -427,33 +509,33 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         window.update();
                     });
                     break;
-                case 15:
+                case AwaitWindowCycle:
                     if (!ready() || quint64(samples.size()) <= priorSubmission
                         || !window.isExposed())
                         return;
                     if (++cycle < requestedCycles)
-                        stage = 14;
+                        stage = PrepareWindowCycle;
                     else {
                         capture(u"restored"_s);
                         overview.setActive(false);
                         ++stage;
                     }
                     break;
-                case 16:
+                case AwaitOverviewRelease:
                     if (!ready() || overview.progress() != 0)
                         return;
                     overview.setActive(true);
                     frames = 0;
                     ++stage;
                     break;
-                case 17:
-                    if (!ready() || frames < 5)
+                case AwaitShortcutExit:
+                    if (!ready() || frames < ShortcutSettleFrames)
                         return;
                     key(Qt::Key_V);
                     check(u"v-return"_s, !overview.active());
                     ++stage;
                     break;
-                case 18:
+                case AwaitLabelRelease:
                     if (!ready() || overview.labels()->liveCount() != 0)
                         return;
                     check(u"labels-release"_s, overview.labels()->liveCount() == 0);
@@ -467,7 +549,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                 }
             },
             Qt::QueuedConnection);
-    QTimer::singleShot(120000, &lifetime, finish);
+    QTimer::singleShot(ReviewDeadlineMilliseconds, &lifetime, finish);
     window.show();
     const int result = app.exec();
     QObject::disconnect(positions);

@@ -10,6 +10,13 @@
 #include <algorithm>
 #include <vector>
 
+namespace {
+// Windows SDR white level uses thousandths of its 80-nit reference; retry topology races only finitely.
+constexpr auto MaximumTopologyRetries = 3;
+constexpr auto WindowsReferenceWhiteNits = 80;
+constexpr auto SdrWhiteLevelScale = 1000;
+}
+
 namespace yalahoo {
 class WindowsDisplayMonitor final : public DisplayMonitor, public QAbstractNativeEventFilter
 {
@@ -61,7 +68,8 @@ public:
         std::vector<DISPLAYCONFIG_PATH_INFO> paths;
         std::vector<DISPLAYCONFIG_MODE_INFO> modes;
         LONG status = ERROR_INSUFFICIENT_BUFFER;
-        for (int retry = 0; retry < 3 && status == ERROR_INSUFFICIENT_BUFFER; ++retry) {
+        for (int retry = 0; retry < MaximumTopologyRetries && status == ERROR_INSUFFICIENT_BUFFER;
+             ++retry) {
             if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)
                 != ERROR_SUCCESS)
                 return { };
@@ -87,7 +95,7 @@ public:
             level.header = { DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(level),
                              path.targetInfo.adapterId, path.targetInfo.id };
             if (DisplayConfigGetDeviceInfo(&level.header) == ERROR_SUCCESS)
-                white = float(level.SDRWhiteLevel) * 80 / 1000;
+                white = float(level.SDRWhiteLevel) * WindowsReferenceWhiteNits / SdrWhiteLevelScale;
             break;
         }
         if (white <= 0)
@@ -112,7 +120,7 @@ public:
                 if (description.ColorSpace != DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
                     || description.MaxLuminance <= 0)
                     return { };
-                return { true, false, white / 80,
+                return { true, false, white / WindowsReferenceWhiteNits,
                          std::max(1.0f, description.MaxLuminance / white) };
             }
         }

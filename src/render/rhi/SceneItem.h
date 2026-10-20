@@ -1,3 +1,6 @@
+// Connects production scene snapshots, cover leases and RHI rendering. GUI synchronization
+// publishes coherent revisions without render-thread access to live models.
+
 #pragma once
 #include "RhiItem.h"
 #include "SceneAdapter.h"
@@ -7,6 +10,17 @@
 #include <QPointer>
 
 namespace yalahoo::rhi {
+namespace sceneAtlas {
+// The fixed archive plus owned detail tiles determine the initial atlas allocation.
+inline constexpr auto MaximumAtlasSide = 8192;
+inline constexpr auto CaseCapacity = 436;
+inline constexpr auto BaseColumns = 24;
+inline constexpr auto OwnedCoverCount = 4;
+inline constexpr auto TilePixels = 256;
+inline constexpr auto BaseWidthPixels = 6144;
+inline constexpr auto InitialHeightPixels = 6656;
+}
+
 class SceneItem : public RhiItem
 {
     Q_OBJECT
@@ -147,16 +161,17 @@ private:
         QVector<AtlasUpload> uploads;
         bool highResolutionFailed = false;
     };
-    AtlasAllocator m_atlas{ 8192, 436, 24 };
+    AtlasAllocator m_atlas{ sceneAtlas::MaximumAtlasSide, sceneAtlas::CaseCapacity,
+                            sceneAtlas::BaseColumns };
     QHash<QString, AtlasLease> m_poolLeases;
     QHash<QString, QPair<QString, QString>> m_poolSources;
     // Ready identities map to whether the tile contains real artwork rather than a placeholder.
     QHash<QString, bool> m_readyCovers;
-    std::array<OwnedCover, 4> m_ownedCovers;
+    std::array<OwnedCover, sceneAtlas::OwnedCoverCount> m_ownedCovers;
     quint64 m_ownedSerial = 0;
-    int m_detailResolution = 256;
-    int m_ownedSide = 256;
-    QSize m_atlasSize{ 6144, 6656 };
+    int m_detailResolution = sceneAtlas::TilePixels;
+    int m_ownedSide = sceneAtlas::TilePixels;
+    QSize m_atlasSize{ sceneAtlas::BaseWidthPixels, sceneAtlas::InitialHeightPixels };
     quint64 m_activeObject = 0;
     QPointer<SelectionController> m_poolSelection;
     QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;

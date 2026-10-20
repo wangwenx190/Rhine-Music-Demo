@@ -1,3 +1,6 @@
+// Coordinates title layout, rolling slots and visibility completion. Whole-run shaping and
+// revision-aware cached state preserve glyph identity through interruption.
+
 #pragma once
 #include "TextLayoutAdapter.h"
 #include "FrameClock.h"
@@ -8,12 +11,21 @@
 #include <array>
 
 namespace yalahoo {
+namespace reelMotion {
+// Default source reel sampling and layout bounds, in seconds and logical pixels.
+inline constexpr auto TransitionSeconds = .460;
+inline constexpr auto TrackSampleCount = 49;
+inline constexpr auto InitialFaceCapacity = 3;
+inline constexpr auto DefaultFontPixels = 28;
+inline constexpr auto DefaultLayoutBudgetPixels = 300;
+}
+
 struct ReelTrack final
 {
-    double start = 0, initialVelocity = 0, target = 0, elapsed = .460;
-    double duration = .460;
+    double start = 0, initialVelocity = 0, target = 0, elapsed = reelMotion::TransitionSeconds;
+    double duration = reelMotion::TransitionSeconds;
     bool sampled = false;
-    std::array<double, 49> points{ };
+    std::array<double, reelMotion::TrackSampleCount> points{ };
     struct Sample final
     {
         double value = 0, velocity = 0;
@@ -58,7 +70,7 @@ public:
     ReelTrack roll, x, y, viewport, alpha, entry;
     bool transport = false;
     bool blurOnEntry = false;
-    std::array<double, 49> blurPoints{ };
+    std::array<double, reelMotion::TrackSampleCount> blurPoints{ };
     double capacityWidth = 0, capacityHeight = 0;
     quint64 revision = 0;
     bool active = false;
@@ -85,7 +97,7 @@ Q_SIGNALS:
 
 private:
     QVariantList m_values;
-    int m_faceCapacity = 3;
+    int m_faceCapacity = reelMotion::InitialFaceCapacity;
 };
 class TitleReel : public QAbstractListModel, public QQmlParserStatus
 {
@@ -174,7 +186,8 @@ private:
     QMetaObject::Connection m_connection;
     QString m_text, m_displayed;
     QFont m_font, m_subtitle;
-    double m_size = 28, m_width = 300, m_budget = 300, m_dpr = 1;
+    double m_size = reelMotion::DefaultFontPixels, m_width = reelMotion::DefaultLayoutBudgetPixels,
+           m_budget = reelMotion::DefaultLayoutBudgetPixels, m_dpr = 1;
     bool m_narrow = false, m_transport = false, m_reduced = false, m_active = true;
     bool m_complete = false, m_scheduled = false, m_instant = true;
     bool m_finishPending = false;

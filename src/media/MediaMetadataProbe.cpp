@@ -14,6 +14,15 @@
 #include <algorithm>
 #include <array>
 
+namespace {
+// Bound work per event-loop turn and each backend probe without starting playback.
+constexpr auto ArtworkIdHexCharacters = 24;
+constexpr auto MillisecondsPerSecond = 1000;
+constexpr auto MaximumTracksPerPump = 64;
+constexpr auto ProbeTimeoutMilliseconds = 8000;
+constexpr auto UnnumberedTrackSortKey = 9999;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -100,7 +109,7 @@ void resolveGenres(LibrarySnapshot &snapshot)
                         + QString::fromUtf8(
                                 QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
                                         .toHex()
-                                        .first(24));
+                                        .first(ArtworkIdHexCharacters));
                 if (!ids.contains(id)) {
                     Genre genre;
                     genre.id = id;
@@ -134,7 +143,8 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
         track.trackNumber = number;
     const auto duration = metadata.value(QMediaMetaData::Duration).toLongLong();
     if (value.durationMs > 0 || duration > 0)
-        track.duration = double(value.durationMs > 0 ? value.durationMs : duration) / 1000;
+        track.duration =
+                double(value.durationMs > 0 ? value.durationMs : duration) / MillisecondsPerSecond;
     const auto bitrate = metadata.value(QMediaMetaData::AudioBitRate).toInt();
     if (bitrate > 0)
         track.bitrate = bitrate;
@@ -255,7 +265,8 @@ private:
         // Admit a bounded slice per event turn, even when a large cached library needs no IO.
         int visited = 0;
         for (auto &slot : m_slots) {
-            while (!slot.busy && m_album < m_next.albums.size() && visited++ < 64) {
+            while (!slot.busy && m_album < m_next.albums.size()
+                   && visited++ < MaximumTracksPerPump) {
                 auto &album = m_next.albums[m_album];
                 if (m_track == 0 && !album.offline)
                     prepareAlbum(album);
@@ -299,12 +310,12 @@ private:
                                     },
                                     Qt::QueuedConnection);
                         });
-                slot.timer->start(8000);
+                slot.timer->start(ProbeTimeoutMilliseconds);
                 slot.source->open(track.sourceUrl);
             }
         }
         if (m_album < m_next.albums.size()) {
-            if (visited >= 64)
+            if (visited >= MaximumTracksPerPump)
                 QMetaObject::invokeMethod(this, &ProbeWorker::pump, Qt::QueuedConnection);
             return;
         }
@@ -336,8 +347,10 @@ private:
             }
             std::stable_sort(
                     album.tracks.begin(), album.tracks.end(), [](const Track &a, const Track &b) {
-                        return std::pair(a.discNumber.value_or(1), a.trackNumber.value_or(9999))
-                                < std::pair(b.discNumber.value_or(1), b.trackNumber.value_or(9999));
+                        return std::pair(a.discNumber.value_or(1),
+                                         a.trackNumber.value_or(UnnumberedTrackSortKey))
+                                < std::pair(b.discNumber.value_or(1),
+                                            b.trackNumber.value_or(UnnumberedTrackSortKey));
                     });
             if (!album.tracks.isEmpty()) {
                 const auto &first = album.tracks.first();
@@ -450,6 +463,8 @@ void MediaMetadataProbe::start(Snapshot snapshot, QString root, ScanCancellation
             },
             Qt::QueuedConnection);
 }
+// Invalidate acceptance before clearing backend sources: clear() may emit synchronous status changes.
+// No completion from the canceled generation may replace the caller snapshot.
 void MediaMetadataProbe::cancel()
 {
     QMetaObject::invokeMethod(

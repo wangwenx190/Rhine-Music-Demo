@@ -1,3 +1,6 @@
+// Describes renderer-owned attachments and buffers for diagnostics. Byte estimates remain
+// distinct from driver allocation and transient readback ownership.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -7,6 +10,14 @@ using Qt::StringLiterals::operator""_s;
 #include <QSet>
 
 namespace yalahoo::rhi {
+namespace pixelStorage {
+// Uncompressed format payload bytes; backend-private depth uses a conservative upper bound.
+inline constexpr auto HalfRgbaOrDepthStencilBytes = 8;
+inline constexpr auto FloatRgbaBytes = 16;
+inline constexpr auto RgbaOrFloatScalarBytes = 4;
+inline constexpr auto HalfScalarBytes = 2;
+}
+
 // Descriptor payload estimate, not measured VRAM. Includes full mip chains and MSAA storage.
 class ResourceInventory final
 {
@@ -21,7 +32,8 @@ public:
         if (mips) {
             auto mip = size;
             while (mip.width() > 1 || mip.height() > 1) {
-                mip = { qMax(1, mip.width() / 2), qMax(1, mip.height() / 2) };
+                mip = { qMax(1, mip.width() / pixelStorage::HalfScalarBytes),
+                        qMax(1, mip.height() / pixelStorage::HalfScalarBytes) };
                 pixels += qint64(mip.width()) * mip.height();
                 ++levels;
             }
@@ -43,7 +55,8 @@ public:
         if (texture->flags().testFlag(QRhiTexture::MipMapped)) {
             auto mip = size;
             while (mip.width() > 1 || mip.height() > 1) {
-                mip = { qMax(1, mip.width() / 2), qMax(1, mip.height() / 2) };
+                mip = { qMax(1, mip.width() / pixelStorage::HalfScalarBytes),
+                        qMax(1, mip.height() / pixelStorage::HalfScalarBytes) };
                 pixels += qint64(mip.width()) * mip.height();
                 ++levels;
             }
@@ -82,22 +95,22 @@ private:
         case QRhiTexture::UnknownFormat:
             // QRhiRenderBuffer may not expose its backend depth format. D32FS8 is the
             // conservative supported depth/stencil upper bound; report format=0 explicitly.
-            return 8;
+            return pixelStorage::HalfRgbaOrDepthStencilBytes;
         case QRhiTexture::RGBA16F:
         case QRhiTexture::D32FS8:
-            return 8;
+            return pixelStorage::HalfRgbaOrDepthStencilBytes;
         case QRhiTexture::RGBA32F:
-            return 16;
+            return pixelStorage::FloatRgbaBytes;
         case QRhiTexture::D16:
         case QRhiTexture::R16F:
-            return 2;
+            return pixelStorage::HalfScalarBytes;
         case QRhiTexture::RGBA8:
         case QRhiTexture::BGRA8:
         case QRhiTexture::R32F:
         case QRhiTexture::D32F:
         case QRhiTexture::D24S8:
         case QRhiTexture::D24:
-            return 4;
+            return pixelStorage::RgbaOrFloatScalarBytes;
         default:
             require(false, "Cannot estimate selected attachment format");
             return 0;

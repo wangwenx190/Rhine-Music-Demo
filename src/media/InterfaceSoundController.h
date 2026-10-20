@@ -1,3 +1,6 @@
+// Plays bundled UI feedback through an independent Qt Multimedia route. Trigger policy avoids
+// synthesizing delayed sounds for events that occurred while muted.
+
 #pragma once
 #include <QMediaDevices>
 #include <QAudioDevice>
@@ -7,6 +10,12 @@
 #include <memory>
 
 namespace yalahoo {
+namespace feedbackAudio {
+// Bounded simultaneous feedback voices and normalized default volume.
+inline constexpr auto VoiceCount = 4;
+inline constexpr auto DefaultVolume = .22;
+}
+
 class AudioAmbienceTest;
 class InterfaceSoundController : public QObject
 {
@@ -43,8 +52,8 @@ private:
     void refreshOutput();
     QMediaDevices m_devices;
     QHash<QString, QUrl> m_sources;
-    std::array<std::unique_ptr<QSoundEffect>, 4> m_pool;
-    double m_volume = .22;
+    std::array<std::unique_ptr<QSoundEffect>, feedbackAudio::VoiceCount> m_pool;
+    double m_volume = feedbackAudio::DefaultVolume;
     bool m_enabled = true, m_refreshPending = false;
 };
 }

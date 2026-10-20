@@ -29,7 +29,7 @@ CHECKS = [
     ("PERF-02", "src/render/rhi/RhiItem.h", "bool fogEnabled = false",
      "Immutable value snapshot, no worker, queue, disk, synchronization wait or new product readback. "
      "Review uses normal event completion, at most two existing pending batches."),
-    ("PERF-03", "src/render/rhi/RhiItem.cpp", "offsetof(Uniform, fog) == 816",
+    ("PERF-03", "src/render/rhi/RhiItem.cpp", "offsetof(Uniform, fog) == FogOffsetBytes",
      "Append one std140 vec4: 832 bytes. Previous offsets remain; upload uses existing aligned "
      "written prefix and bounded uniform capacity. Actual stride depends on backend alignment."),
     ("PERF-04", "resources/shaders/rhi/opaque.frag", "sceneFog(outgoing, viewDepth)",

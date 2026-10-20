@@ -14,6 +14,16 @@
 #include <chrono>
 #include <filesystem>
 
+namespace {
+// Stable identity and fingerprint encoding must match the frozen on-disk library protocol.
+constexpr auto UnnumberedTrackSortKey = 9999;
+constexpr auto UnpreferredCoverRank = 3;
+constexpr auto MaximumLibraryRoots = 64;
+constexpr auto StableIdHexCharacters = 24;
+constexpr auto MillisecondsPerSecond = 1000;
+constexpr auto NanosecondsPerMillisecond = 1e6;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -54,9 +64,14 @@ bool stopped(const ScanCancellation &cancel)
 {
     return cancel && cancel->load(std::memory_order_relaxed);
 }
-const QSet<QString> audioExtensions{ u"ape"_s,  u"wv"_s,   u"wma"_s, u"flac"_s, u"wav"_s, u"m4a"_s,
-                                     u"mp4"_s,  u"alac"_s, u"dsf"_s, u"dff"_s,  u"mp3"_s, u"aac"_s,
-                                     u"aiff"_s, u"aif"_s,  u"ogg"_s, u"opus"_s };
+// The extension index allocates Qt storage only when a scan actually needs it.
+const QSet<QString> &audioExtensions()
+{
+    static const QSet<QString> value{ u"ape"_s,  u"wv"_s,   u"wma"_s, u"flac"_s, u"wav"_s, u"m4a"_s,
+                                      u"mp4"_s,  u"alac"_s, u"dsf"_s, u"dff"_s,  u"mp3"_s, u"aac"_s,
+                                      u"aiff"_s, u"aif"_s,  u"ogg"_s, u"opus"_s };
+    return value;
+}
 
 struct Walker final
 {
@@ -151,8 +166,10 @@ struct Walker final
         std::sort(album.tracks.begin(), album.tracks.end(), [this](const Track &a, const Track &b) {
             if (a.discNumber.value_or(1) != b.discNumber.value_or(1))
                 return a.discNumber.value_or(1) < b.discNumber.value_or(1);
-            if (a.trackNumber.value_or(9999) != b.trackNumber.value_or(9999))
-                return a.trackNumber.value_or(9999) < b.trackNumber.value_or(9999);
+            if (a.trackNumber.value_or(UnnumberedTrackSortKey)
+                != b.trackNumber.value_or(UnnumberedTrackSortKey))
+                return a.trackNumber.value_or(UnnumberedTrackSortKey)
+                        < b.trackNumber.value_or(UnnumberedTrackSortKey);
             return less(a.relativePath, b.relativePath);
         });
         if (!old) {
@@ -190,7 +207,7 @@ struct Walker final
                 directories.append(path);
             if (fs::is_regular_file(status)) {
                 ++filesVisited;
-                if (audioExtensions.contains(QFileInfo(name).suffix().toLower()))
+                if (audioExtensions().contains(QFileInfo(name).suffix().toLower()))
                     files.append(path);
                 const auto extension = QFileInfo(name).suffix().toLower();
                 if (extension == "png"_L1 || extension == "jpg"_L1 || extension == "jpeg"_L1
@@ -213,7 +230,7 @@ struct Walker final
         QHash<QString, int> imageRanks;
         for (const auto &image : images) {
             const auto rank = preferred.indexOf(QFileInfo(image).completeBaseName().toLower());
-            imageRanks.insert(image, rank < 0 ? 3 : int(rank));
+            imageRanks.insert(image, rank < 0 ? UnpreferredCoverRank : int(rank));
         }
         std::sort(images.begin(), images.end(),
                   [this, &imageRanks](const QString &a, const QString &b) {
@@ -244,7 +261,7 @@ struct Walker final
 bool DirectoryScanner::normalizeRoots(const QList<QUrl> &input, QList<QUrl> &output, QString &error)
 {
     error.clear();
-    if (input.size() > 64) {
+    if (input.size() > MaximumLibraryRoots) {
         error = QCoreApplication::translate("Yalahoo", "At most 64 music directories are allowed.");
         return false;
     }
@@ -278,8 +295,9 @@ QString DirectoryScanner::stableId(const QString &prefix, const QString &absolut
     // Hash native separators exactly as Node path.resolve did on the target OS.
     const auto bytes = QDir::toNativeSeparators(absolutePath).toUtf8();
     return prefix + '-'_L1
-            + QString::fromUtf8(
-                    QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex().first(24));
+            + QString::fromUtf8(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256)
+                                        .toHex()
+                                        .first(StableIdHexCharacters));
 }
 QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *error)
 {
@@ -300,8 +318,8 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
             const auto nanoseconds =
                     std::chrono::duration_cast<std::chrono::nanoseconds>(epoch - seconds).count();
             // Match Node's seconds*1000 + nanoseconds/1e6 without narrowing the epoch to ns.
-            const double ms = static_cast<double>(seconds.count()) * 1000
-                    + static_cast<double>(nanoseconds) / 1e6;
+            const double ms = static_cast<double>(seconds.count()) * MillisecondsPerSecond
+                    + static_cast<double>(nanoseconds) / NanosecondsPerMillisecond;
             auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
             encoded = encoded.mid(1, encoded.size() - 2);
             if (error)
@@ -313,6 +331,8 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
         *error = fileError(absolutePath, ec);
     return { };
 }
+// Build a candidate snapshot off-thread and roll back an unreadable root as a whole.
+// Cancellation publishes no partial library; the owner validates the generation before acceptance.
 ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
                                   const ScanCancellation &cancel)
 {

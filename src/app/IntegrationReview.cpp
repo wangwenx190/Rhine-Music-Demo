@@ -24,6 +24,30 @@
 #include <algorithm>
 #include <limits>
 
+namespace {
+// Bounded diagnostics preserve observed facts; elapsed time and native refresh cadence use explicit units.
+constexpr auto MinimumSampleSeconds = 12;
+constexpr auto MaximumSampleSeconds = 120;
+constexpr auto MaximumDiagnosticSamples = 40000;
+constexpr auto MillisecondsPerSecond = 1000;
+constexpr auto NanosecondsPerMillisecond = 1e6;
+constexpr auto FirstInputDelayMilliseconds = 350;
+constexpr auto FallbackRefreshHertz = 60;
+constexpr auto LifecycleRebuildCount = 10;
+constexpr auto FinalizeDelayMilliseconds = 200;
+constexpr auto MinimumObservedSamples = 100;
+constexpr auto FinalizeDeadlineMilliseconds = 60000;
+constexpr auto QuitObservationMilliseconds = 3000;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    InvalidReviewInput = 20,
+    IntegrationReviewFailed = 21
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -79,8 +103,8 @@ void click(QQuickWindow &window, const QString &name)
 int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter &scene,
                       const QString &output, double seconds)
 {
-    if (!std::isfinite(seconds) || seconds < 12 || seconds > 120)
-        return 20;
+    if (!std::isfinite(seconds) || seconds < MinimumSampleSeconds || seconds > MaximumSampleSeconds)
+        return InvalidReviewInput;
     QPointer<QQuickWindow> window = &initialWindow;
     QQmlComponent component(qmlEngine(&initialWindow));
     component.loadFromModule("Yalahoo.Music", "BootstrapProbe");
@@ -96,7 +120,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     std::function<void()> bindWindow;
     auto *item = window->findChild<rhi::SceneItem *>("nativeScene");
     if (!item || window->isVisible() || !verification::windowPolicySatisfied(*window))
-        return 20;
+        return InvalidReviewInput;
     QDir().mkpath(output);
     item->setTelemetryEnabled(true);
     window->setPersistentGraphics(false);
@@ -121,7 +145,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 window, &QQuickWindow::frameSwapped, window,
                 [events] {
                     std::scoped_lock lock(events->mutex);
-                    if (events->swapped.size() < 40000)
+                    if (events->swapped.size() < MaximumDiagnosticSamples)
                         events->swapped.append(nowNs());
                     else
                         events->overflow = true;
@@ -164,12 +188,13 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 item, &rhi::SceneItem::frameSubmitted, window, [&, epoch](QJsonObject sample) {
                     if (epoch != windowEpoch)
                         return;
-                    if (samples.size() >= 40000) {
+                    if (samples.size() >= MaximumDiagnosticSamples) {
                         passed = false;
                         return;
                     }
                     const auto revision = quint64(sample[u"inputRevision"_s].toInteger());
-                    const auto sampleStage = elapsed.elapsed() < (seconds + 1) * 1000
+                    const auto sampleStage =
+                            elapsed.elapsed() < (seconds + 1) * MillisecondsPerSecond
                             ? inputStages.value(revision, u"startup"_s)
                             : stage;
                     sample[u"stage"_s] = sampleStage;
@@ -196,7 +221,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                         firstSubmittedNs.insert(revision, sample[u"submittedNs"_s].toInteger());
                         const double latency = (sample[u"submittedNs"_s].toInteger()
                                                 - sample[u"inputReceivedNs"_s].toInteger())
-                                / 1e6;
+                                / NanosecondsPerMillisecond;
                         sample[u"inputToQtSubmitMs"_s] = latency;
                         inputLatency[sampleStage].append(latency);
                     }
@@ -205,9 +230,10 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                     samples.append(sample);
                     if (acknowledged) {
                         awaiting = { };
-                        QTimer::singleShot(350, Qt::PreciseTimer, window, [&] {
-                            nextAction();
-                        });
+                        QTimer::singleShot(FirstInputDelayMilliseconds, Qt::PreciseTimer, window,
+                                           [&] {
+                                               nextAction();
+                                           });
                     }
                 });
         QObject::connect(item, &rhi::RhiItem::renderFailed, window, [&](const QString &message) {
@@ -216,13 +242,15 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         });
     };
     bindWindow();
-    const double period = 1000 / (window->screen() ? window->screen()->refreshRate() : 60);
+    const double period = MillisecondsPerSecond
+            / (window->screen() ? window->screen()->refreshRate() : FallbackRefreshHertz);
     // Drive actions once via Qt timers. Production FrameAnimation remains the only frame source.
     for (int i = 0; i < 4; ++i)
-        QTimer::singleShot(int((.5 + i * seconds / 4) * 1000), Qt::PreciseTimer, window, [&, i] {
-            changeStage(i);
-        });
-    const int baseTime = int((seconds + 1) * 1000);
+        QTimer::singleShot(int((.5 + i * seconds / 4) * MillisecondsPerSecond), Qt::PreciseTimer,
+                           window, [&, i] {
+                               changeStage(i);
+                           });
+    const int baseTime = int((seconds + 1) * MillisecondsPerSecond);
     const QVector<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                 { 960, 900 },   { 930, 900 },   { 390, 844 },
                                 { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
@@ -269,7 +297,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             item->update();
             actions.append(QJsonObject{
                     { u"stage"_s, stage }, { u"depthOfField"_s, strength }, { u"atNs"_s, after } });
-        } else if (index < sizes.size() + effectStrengths.size() + 10) {
+        } else if (index < sizes.size() + effectStrengths.size() + LifecycleRebuildCount) {
             stage = "rebuild"_L1;
             const auto after = nowNs();
             awaiting = [&, after](const QJsonObject &sample) {
@@ -295,7 +323,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             if (!window) {
                 passed = false;
                 qCWarning(yalahoo::logApp) << component.errors();
-                app.exit(21);
+                app.exit(IntegrationReviewFailed);
                 return;
             }
             verification::prepareWindow(*window, true);
@@ -316,7 +344,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                     QJsonObject{ { u"stage"_s, stage },
                                  { u"iteration"_s, index - sizes.size() - effectStrengths.size() },
                                  { u"policy"_s, verification::windowPolicy(*window) } });
-            QTimer::singleShot(200, Qt::PreciseTimer, window, [&] {
+            QTimer::singleShot(FinalizeDelayMilliseconds, Qt::PreciseTimer, window, [&] {
                 window->show();
                 passed = passed && verification::windowPolicySatisfied(*window);
             });
@@ -327,9 +355,10 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
     finish = [&] {
         const auto screenshot = window->grabWindow();
         passed = passed && screenshot.save(output + "/integration.png"_L1)
-                && verification::windowPolicySatisfied(*window) && samples.size() > 100
-                && receivedInputs.size() == 4 && coalesced == 0 && baseBytes == finalBytes
-                && observedEffects.size() == 4 && rebuilt == 10;
+                && verification::windowPolicySatisfied(*window)
+                && samples.size() > MinimumObservedSamples && receivedInputs.size() == 4
+                && coalesced == 0 && baseBytes == finalBytes && observedEffects.size() == 4
+                && rebuilt == LifecycleRebuildCount;
         for (const auto &size : sizes)
             passed = passed
                     && observedSizes.contains(u"%1x%2"_s.arg(size.width()).arg(size.height()));
@@ -354,7 +383,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                     if (time >= it.value())
                         name = inputStages.value(it.key());
                 if (previous && time < normalEnd && name != "startup"_L1)
-                    cadence[name].append((time - previous) / 1e6);
+                    cadence[name].append((time - previous) / NanosecondsPerMillisecond);
                 swappedEvents.append(QJsonObject{ { u"swappedNs"_s, time } });
                 previous = time;
             }
@@ -388,7 +417,8 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             { u"estimatedFinalBytes"_s, finalBytes },
             { u"actions"_s, actions },
             { u"samplingComplete"_s,
-              coalesced == 0 && samples.size() > 100 && receivedInputs.size() == 4 },
+              coalesced == 0 && samples.size() > MinimumObservedSamples
+                      && receivedInputs.size() == 4 },
             { u"samples"_s, samples },
             { u"frameEvents"_s, swappedEvents },
             { u"distributions"_s, distributions },
@@ -400,19 +430,20 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         if (opened)
             file.write(QJsonDocument(report).toJson());
         const bool saved = opened && file.commit();
-        app.exit(passed && saved ? 0 : 21);
+        app.exit(passed && saved ? 0 : IntegrationReviewFailed);
     };
     QTimer::singleShot(baseTime, Qt::PreciseTimer, window, [&] {
         nextAction();
     });
-    QTimer::singleShot(baseTime + 60000, Qt::PreciseTimer, &reviewLifetime, [&] {
-        passed = false;
-        actions.append(
-                QJsonObject{ { u"error"_s, u"Lifecycle submission acknowledgment timed out"_s } });
-        finish();
-    });
+    QTimer::singleShot(
+            baseTime + FinalizeDeadlineMilliseconds, Qt::PreciseTimer, &reviewLifetime, [&] {
+                passed = false;
+                actions.append(QJsonObject{
+                        { u"error"_s, u"Lifecycle submission acknowledgment timed out"_s } });
+                finish();
+            });
     window->show();
-    QTimer::singleShot(3000, Qt::PreciseTimer, window, [&] {
+    QTimer::singleShot(QuitObservationMilliseconds, Qt::PreciseTimer, window, [&] {
         actions.append(QJsonObject{ { u"stage"_s, u"first-show"_s },
                                     { u"windowPolicy"_s, verification::windowPolicy(*window) } });
         if (samples.isEmpty()) {

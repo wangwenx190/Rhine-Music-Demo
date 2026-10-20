@@ -1,3 +1,6 @@
+// Reads imported geometry and compares its structural invariants. Buffer bounds and coordinate
+// conversion are checked before accessing binary records.
+
 #pragma once
 #include <QByteArray>
 #include <QJsonArray>

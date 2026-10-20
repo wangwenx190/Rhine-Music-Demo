@@ -1,3 +1,6 @@
+// Supplies the explicit offline metadata behavior through the provider interface. Results
+// preserve missing/offline distinctions rather than inventing remote content.
+
 #pragma once
 #include "IMetadataProvider.h"
 #include <QHash>

@@ -1,3 +1,7 @@
+// Composes the selected album presentation from the C++ detail model. Readiness gates
+// visibility; tab geometry and virtualized content remain tied to the active presentation
+// revision.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music
@@ -5,6 +9,12 @@ import "../components"
 
 FocusScope {
     id: root
+    // Responsive geometry follows the final source detail CSS and actual logical content width.
+    readonly property real portraitInsetRatio: 0.04
+    readonly property real portraitTitleHeightRatio: 0.54
+    readonly property real titleFontWidthRatio: 0.0245
+    readonly property real wideWidthPixels: 1700
+
     required property LayoutMetrics metrics
     required property DesignTokens tokens
     required property PresentationController presentation
@@ -43,13 +53,16 @@ FocusScope {
         presentation.layoutReady(revision);
     }
     readonly property var album: detailModel.album
-    readonly property real contentLeft: metrics.portrait ? Math.max(22, Math.min(42, width * 0.04)) :
+    readonly property real contentLeft: metrics.portrait ? Math.max(22, Math.min(42, width
+                                                                                 * root.portraitInsetRatio)) :
                                                            width * 0.52
-    readonly property real contentRight: metrics.portrait ? Math.max(18, Math.min(42, width * 0.04)) : width * (
-                                                                width <= 1100 ? 0.04 : 0.045)
-    readonly property real contentTop: metrics.portrait ? height * 0.5 : width >= 1700 ? 210 :
-                                                                                         width <= 1100
-                                                                                         ? 132 : 170
+    readonly property real contentRight: metrics.portrait ? Math.max(18, Math.min(42, width * root.portraitInsetRatio)) : width
+                                                            * (width <= 1100
+                                                               ? root.portraitInsetRatio : 0.045)
+    readonly property real contentTop: metrics.portrait ? height * 0.5 : width
+                                                          >= root.wideWidthPixels ? 210 : width
+                                                                                    <= 1100 ? 132 :
+                                                                                              170
     visible: presentation.detailSurface.shown
     opacity: presentation.detailSurface.opacity
     enabled: presentation.detailEnabled
@@ -97,7 +110,7 @@ FocusScope {
                 color: Qt.rgba(root.tokens.page.r, root.tokens.page.g, root.tokens.page.b, 0)
             }
             GradientStop {
-                position: Math.min(1, 34 / Math.max(1, root.height * 0.54))
+                position: Math.min(1, 34 / Math.max(1, root.height * root.portraitTitleHeightRatio))
                 color: root.tokens.page
             }
         }
@@ -108,7 +121,7 @@ FocusScope {
         x: {
             if (root.metrics.portrait || root.width <= 700)
                 return 22;
-            if (root.width >= 1700)
+            if (root.width >= root.wideWidthPixels)
                 return 62;
             return root.width <= 1100 ? 27 : 42;
         }
@@ -117,12 +130,12 @@ FocusScope {
                 return 118;
             if (root.width <= 700)
                 return 87;
-            if (root.width >= 1700)
+            if (root.width >= root.wideWidthPixels)
                 return 144;
             return root.width <= 1100 ? 91 : 112;
         }
         text: qsTr("\u2190 Back to shelf     Esc")
-        cssPixelSize: root.width <= 700 ? 9 : root.width >= 1700 ? 12 : 10
+        cssPixelSize: root.width <= 700 ? 9 : root.width >= root.wideWidthPixels ? 12 : 10
         onClicked: root.backRequested()
     }
     Column {
@@ -159,7 +172,8 @@ FocusScope {
         y: root.contentTop
         width: Math.max(0, root.width - root.contentLeft - root.contentRight - (root.metrics.portrait
                                                                                 ? 5 : 9))
-        height: Math.max(0, root.height - y - (root.metrics.portrait ? 28 : root.width >= 1700 ? 75 :
+        height: Math.max(0, root.height - y - (root.metrics.portrait ? 28 : root.width
+                                                                       >= root.wideWidthPixels ? 75 :
                                                                                                  root.width
                                                                                                  <= 1100 ? 40 :
                                                                                                            52))
@@ -230,7 +244,7 @@ FocusScope {
                     tokens: root.tokens
                     width: parent.width
                     text: root.album.mainTitle || root.album.title || ""
-                    cssPixelSize: Math.min(39, Math.max(24, root.width * 0.0245))
+                    cssPixelSize: Math.min(39, Math.max(24, root.width * root.titleFontWidthRatio))
                     cssLineHeight: cssPixelSize * 1.22
                     font.styleName: root.tokens.demibold.styleName
                     font.weight: root.tokens.demibold.weight
@@ -268,7 +282,8 @@ FocusScope {
                     text: root.album.artist || ""
                     width: Math.min(implicitWidth, parent.width - (offline.visible ? offline.width + 12 :
                                                                                      0))
-                    cssPixelSize: root.width <= 700 ? 12 : root.width >= 1700 ? 17 : 14
+                    cssPixelSize: root.width <= 700 ? 12 : root.width >= root.wideWidthPixels ? 17 :
+                                                                                                14
                     wrapMode: Text.Wrap
                 }
                 Rectangle {
@@ -317,7 +332,8 @@ FocusScope {
                             width: parent.width
                             text: parent.modelData.label
                             objectName: "detailFactLabel"
-                            cssPixelSize: root.width >= 1700 ? 9 : root.width <= 700 ? 6 : 7
+                            cssPixelSize: root.width >= root.wideWidthPixels ? 9 : root.width
+                                                                               <= 700 ? 6 : 7
                             font.letterSpacing: 0.6
                             color: root.tokens.muted
                             wrapMode: Text.Wrap
@@ -327,7 +343,8 @@ FocusScope {
                             width: parent.width
                             text: parent.modelData.value
                             objectName: "detailFactValue"
-                            cssPixelSize: root.width >= 1700 ? 13 : root.width <= 1100 ? 10 : 11
+                            cssPixelSize: root.width >= root.wideWidthPixels ? 13 : root.width
+                                                                               <= 1100 ? 10 : 11
                             cssLineHeight: cssPixelSize * 1.5
                             wrapMode: Text.WrapAnywhere
                         }
@@ -492,7 +509,8 @@ FocusScope {
                             id: tabText
                             tokens: root.tokens
                             text: qsTr("Track list")
-                            cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
+                            cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width
+                                                                               <= 1100 ? 10 : 11
                             color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
                         }
                     }
@@ -526,7 +544,8 @@ FocusScope {
                         ArchiveText {
                             tokens: root.tokens
                             text: qsTr("Album introductions")
-                            cssPixelSize: root.width >= 1700 ? 14 : root.width <= 1100 ? 10 : 11
+                            cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width
+                                                                               <= 1100 ? 10 : 11
                             color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
                         }
                     }

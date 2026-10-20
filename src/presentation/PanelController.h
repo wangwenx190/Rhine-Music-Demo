@@ -1,6 +1,15 @@
+// Coordinates modal panel intent and the shared surface transition. Focus and visibility are
+// released only when the exit transition has completed.
+
 #pragma once
 #include "SurfaceTransition.h"
 namespace yalahoo {
+namespace panelMotion {
+// Modal panel transition timing from the source presentation.
+inline constexpr auto EnterMilliseconds = 300;
+inline constexpr auto ExitMilliseconds = 200;
+}
+
 class PanelController final : public QObject
 {
     Q_OBJECT
@@ -26,7 +35,8 @@ Q_SIGNALS:
     void closed();
 
 private:
-    SurfaceTransition m_surface{ 300, 200, false, false, this };
+    SurfaceTransition m_surface{ panelMotion::EnterMilliseconds, panelMotion::ExitMilliseconds,
+                                 false, false, this };
     QString m_panel;
     bool m_reduced = false;
 };

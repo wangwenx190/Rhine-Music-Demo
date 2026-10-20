@@ -1,3 +1,6 @@
+// Coordinates archive travel across synchronized scalar tracks. Retargeting preserves displayed
+// derivatives and one frame clock drives all updates.
+
 #pragma once
 #include "FrameClock.h"
 #include "QuinticTrack.h"
@@ -5,8 +8,16 @@
 
 namespace yalahoo {
 // rail, column, shoulder, lane in frozen ARCHIVE_TRACK_KEYS order.
-using ArchiveValues = std::array<double, 4>;
-using ArchiveSprings = std::array<ScalarSpring, 4>;
+// The four synchronized tracks retain the source rail/column/shoulder/lane ABI.
+enum ArchiveAxis {
+    RailAxis,
+    ColumnAxis,
+    ShoulderAxis,
+    LaneAxis,
+    ArchiveAxisCount
+};
+using ArchiveValues = std::array<double, ArchiveAxisCount>;
+using ArchiveSprings = std::array<ScalarSpring, ArchiveAxisCount>;
 class ArchiveMotion final
 {
 public:
@@ -22,7 +33,7 @@ public:
     {
         return m_tracks[0].duration();
     }
-    std::array<Kinematics, 4> state() const;
+    std::array<Kinematics, ArchiveAxisCount> state() const;
     void observe(const ArchiveSprings &springs, const ArchiveValues &targets,
                  const ArchiveValues &rates);
     bool retarget(const ArchiveSprings &springs, const ArchiveValues &targets);
@@ -32,7 +43,7 @@ public:
     void reset();
 
 private:
-    std::array<QuinticTrack, 4> m_tracks;
+    std::array<QuinticTrack, ArchiveAxisCount> m_tracks;
     ArchiveValues m_targets{ };
     bool m_hasTarget = false;
     bool m_active = false;
@@ -65,11 +76,11 @@ public:
     }
     double rail() const
     {
-        return m_springs[0].value;
+        return m_springs[RailAxis].value;
     }
     double column() const
     {
-        return m_springs[1].value;
+        return m_springs[ColumnAxis].value;
     }
     quint64 revision() const
     {

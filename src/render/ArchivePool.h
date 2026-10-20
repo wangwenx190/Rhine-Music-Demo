@@ -1,3 +1,6 @@
+// Maps a bounded physical archive pool onto canonical library cells. Wrapping preserves stable
+// identity while recycled instances limit scene work.
+
 #pragma once
 #include "LibraryModels.h"
 #include <QMatrix4x4>

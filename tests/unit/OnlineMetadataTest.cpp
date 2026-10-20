@@ -1,3 +1,7 @@
+// Uses an in-process HTTP fixture to verify provider pacing, cancellation, matching and cache
+// provenance. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
 #include "OnlineMetadataProvider.h"
 #include "LibrarySession.h"
 #include "LibraryStore.h"
@@ -19,11 +23,25 @@
 #include <algorithm>
 #include <memory>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int BackendDeadlineMilliseconds = 5000;
+constexpr int QueuedEventObservationMilliseconds = 100;
+}
+
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
 namespace {
-const auto releaseId = u"11111111-1111-4111-8111-111111111111"_s;
-const auto groupId = u"22222222-2222-4222-8222-222222222222"_s;
+const QString &releaseId()
+{
+    static const auto value = u"11111111-1111-4111-8111-111111111111"_s;
+    return value;
+}
+const QString &groupId()
+{
+    static const auto value = u"22222222-2222-4222-8222-222222222222"_s;
+    return value;
+}
 Album sampleAlbum()
 {
     Album album;
@@ -32,7 +50,7 @@ Album sampleAlbum()
     album.artist = u"Test Artist"_s;
     album.year = 2001;
     album.genreId = u"manual"_s;
-    album.online = { { u"releaseId"_s, releaseId } };
+    album.online = { { u"releaseId"_s, releaseId() } };
     Track track;
     track.id = u"track-fixture"_s;
     track.albumId = album.id;
@@ -54,7 +72,7 @@ QJsonObject relation(const QString &role, const QString &name)
     return { { u"type"_s, role },
              { u"target-credit"_s, u""_s },
              { u"target-type"_s, u"artist"_s },
-             { u"artist"_s, QJsonObject{ { u"id"_s, releaseId }, { u"name"_s, name } } } };
+             { u"artist"_s, QJsonObject{ { u"id"_s, releaseId() }, { u"name"_s, name } } } };
 }
 QJsonObject sampleRelease()
 {
@@ -72,11 +90,11 @@ QJsonObject sampleRelease()
                              { u"length"_s, 200000 },
                              { u"recording"_s, recording } };
     const QJsonObject medium{ { u"position"_s, 1 }, { u"tracks"_s, QJsonArray{ track } } };
-    return { { u"id"_s, releaseId },
+    return { { u"id"_s, releaseId() },
              { u"title"_s, u"Test Album"_s },
              { u"date"_s, u"2001-01-01"_s },
              { u"artist-credit"_s, QJsonArray{ QJsonObject{ { u"name"_s, u"Test Artist"_s } } } },
-             { u"release-group"_s, QJsonObject{ { u"id"_s, groupId } } },
+             { u"release-group"_s, QJsonObject{ { u"id"_s, groupId() } } },
              { u"relations"_s, QJsonArray{ relation(u"producer"_s, u"Album Producer"_s) } },
              { u"media"_s, QJsonArray{ medium } } };
 }
@@ -239,9 +257,9 @@ private Q_SLOTS:
         release.insert(u"track-count"_s, 1);
         release.insert(u"score"_s, 100);
         QCOMPARE(musicBrainzRelease(sampleAlbum(), { { u"releases"_s, QJsonArray{ release } } }),
-                 releaseId);
+                 releaseId());
         auto other = release;
-        other.insert(u"id"_s, groupId);
+        other.insert(u"id"_s, groupId());
         QVERIFY(musicBrainzRelease(sampleAlbum(),
                                    { { u"releases"_s, QJsonArray{ release, other } } })
                         .isEmpty());
@@ -313,7 +331,7 @@ private Q_SLOTS:
         refresh.force = true;
         QVERIFY(provider.requestCredits(refresh, { 3, 1, album.id }));
         provider.cancel({ 3, 1, album.id });
-        QTest::qWait(100);
+        QTest::qWait(QueuedEventObservationMilliseconds);
         QVERIFY(delivered.isEmpty());
         provider.configure({ { u"networkEnabled"_s, false } });
         QVERIFY(provider.requestCredits(queryFor(album), { 4, 1, album.id }));
@@ -335,7 +353,7 @@ private Q_SLOTS:
                 first.insert(u"score"_s, 100);
                 first.insert(u"track-count"_s, 1);
                 auto second = first;
-                second.insert(u"id"_s, groupId);
+                second.insert(u"id"_s, groupId());
                 return Response{ json({ { u"count"_s, 2 },
                                         { u"releases"_s, QJsonArray{ first, second } } }),
                                  200,
@@ -344,7 +362,7 @@ private Q_SLOTS:
             }
             if (request.url().path().contains(u"release-group"_s))
                 return Response{
-                    json({ { u"id"_s, groupId },
+                    json({ { u"id"_s, groupId() },
                            { u"genres"_s,
                              QJsonArray{ QJsonObject{ { u"name"_s, u"rock"_s } } } } }),
                     200,
@@ -352,7 +370,7 @@ private Q_SLOTS:
                     { }
                 };
             auto release = sampleRelease();
-            release.insert(u"id"_s, groupId);
+            release.insert(u"id"_s, groupId());
             return Response{ json(release), 200, 0, { } };
         };
         OnlineMetadataProvider provider(nullptr, [server] {
@@ -374,16 +392,17 @@ private Q_SLOTS:
         QCOMPARE(
                 session.metadataFor(album.id, u"credits"_s)[u"releaseCandidates"_s].toList().size(),
                 2);
-        QVERIFY(session.requestMetadata(album.id, u"credits"_s, true, groupId));
-        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, 5000);
+        QVERIFY(session.requestMetadata(album.id, u"credits"_s, true, groupId()));
+        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, BackendDeadlineMilliseconds);
         const auto matched = qvariant_cast<ProviderResult>(delivered.takeFirst()[0]);
         QCOMPARE(matched.status, ProviderStatus::Partial);
-        QCOMPARE(session.resolvedAlbum(album.id).creditsLookup[u"releaseId"_s].toString(), groupId);
+        QCOMPARE(session.resolvedAlbum(album.id).creditsLookup[u"releaseId"_s].toString(),
+                 groupId());
         QVERIFY(session.metadataFor(album.id, u"credits"_s)[u"releaseCandidates"_s]
                         .toList()
                         .isEmpty());
         QVERIFY(session.requestMetadata(album.id, u"enrichment"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, BackendDeadlineMilliseconds);
         const auto enriched = qvariant_cast<ProviderResult>(delivered.first()[0]);
         QCOMPARE(enriched.status, ProviderStatus::Matched);
         QCOMPARE(session.resolvedAlbum(album.id).genreId, u"manual"_s);
@@ -463,7 +482,7 @@ private Q_SLOTS:
         auto corrected = queryFor(album);
         corrected.configuration.insert(u"proxyEnabled"_s, false);
         QVERIFY(provider.requestCredits(corrected, { 3, 1, album.id }));
-        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, BackendDeadlineMilliseconds);
         QCOMPARE(qvariant_cast<ProviderResult>(delivered.first()[0]).status,
                  ProviderStatus::Partial);
         QCOMPARE(server->count(), 2);
@@ -488,7 +507,7 @@ private Q_SLOTS:
         QSignalSpy delivered(&provider, &IMetadataProvider::resultReady);
         const auto album = sampleAlbum();
         QVERIFY(provider.requestIntroduction(queryFor(album), { 1, 1, album.id }));
-        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(delivered.size(), 1, BackendDeadlineMilliseconds);
         const auto result = qvariant_cast<ProviderResult>(delivered.first()[0]);
         QCOMPARE(result.status, ProviderStatus::Matched);
         QCOMPARE(result.source[u"name"_s].toString(), u"Wikipedia"_s);

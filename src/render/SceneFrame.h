@@ -1,3 +1,6 @@
+// Defines the value snapshot consumed by rendering and hit testing. Explicit scene vectors
+// preserve source-space precision before conversion at the Qt boundary.
+
 #pragma once
 #include <QMatrix4x4>
 #include <QQuaternion>
@@ -6,6 +9,15 @@
 #include <cmath>
 #include "ArchivePool.h"
 namespace yalahoo {
+namespace sceneDefaults {
+// Default source camera and logical frame bounds before the first viewport update.
+inline constexpr auto BrowseSpan = 7.33;
+inline constexpr auto WidthPixels = 960;
+inline constexpr auto HeightPixels = 640;
+inline constexpr auto NearPlane = 5;
+inline constexpr auto FarPlane = 300;
+}
+
 struct SceneVector final
 {
     double x = 0, y = 0, z = 0;
@@ -46,7 +58,7 @@ inline SceneVector cross(SceneVector a, SceneVector b)
 struct CameraPose final
 {
     SceneVector position, aim;
-    double span = 7.33;
+    double span = sceneDefaults::BrowseSpan;
 };
 // Immutable value snapshot: future renderers copy this at synchronization.
 struct SceneFrame final
@@ -60,8 +72,9 @@ struct SceneFrame final
     SceneVector casePosition;
     QQuaternion cameraRotation;
     QMatrix4x4 view, projection, caseTransform;
-    double width = 960, height = 640, fieldOfView = 0;
-    double nearPlane = 5, farPlane = 300;
+    double width = sceneDefaults::WidthPixels, height = sceneDefaults::HeightPixels,
+           fieldOfView = 0;
+    double nearPlane = sceneDefaults::NearPlane, farPlane = sceneDefaults::FarPlane;
     double fogNear = 0, fogFar = 0;
     bool portrait = false;
     bool hasArchivePool = false;

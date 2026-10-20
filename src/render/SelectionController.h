@@ -1,3 +1,6 @@
+// Maps stable album selection onto physical archive instances and cover leases. It coordinates
+// navigation and scene invalidation without changing playback intent.
+
 #pragma once
 #include "ArchivePool.h"
 #include "MotionController.h"
@@ -12,6 +15,12 @@
 #include <limits>
 
 namespace yalahoo {
+namespace selectionDefaults {
+// The browse field begins at the source settled pose.
+inline constexpr auto SettledSceneSeconds = 26.56;
+inline constexpr auto PreviewLift = .9;
+}
+
 class OverviewController;
 class SelectionController final : public QObject
 {
@@ -152,9 +161,9 @@ private:
     bool m_managedDetail = false, m_navigationLift = false;
     QVector<Pulse> m_pulses;
     ScalarSpring m_lift;
-    double m_time = 0, m_scanTime = 26.56, m_scanBlend = 0;
+    double m_time = 0, m_scanTime = selectionDefaults::SettledSceneSeconds, m_scanBlend = 0;
     double m_lastInteraction = 0, m_idleGain = 0, m_pulseGain = 1, m_rotation = 0;
-    double m_liftTarget = .9, m_detail = 0;
+    double m_liftTarget = selectionDefaults::PreviewLift, m_detail = 0;
     std::optional<double> m_openingTime;
     std::optional<double> m_returnY;
     quint64 m_revision = 0, m_objectSerial = ArchivePool::capacity;

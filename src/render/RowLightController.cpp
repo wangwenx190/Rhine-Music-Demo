@@ -2,7 +2,25 @@
 #include "MotionFunctions.h"
 #include <algorithm>
 #include <numbers>
+namespace {
+// The damping factor maps the authored duration to the critical spring response.
+constexpr auto CriticalDampingDurationFactor = 4.743864518390578;
+constexpr auto IntroReturnStartSeconds = 24.15;
+constexpr auto IntroStartRows = 9;
+constexpr auto IntroTravelRows = 27;
+constexpr auto RibbonLaneWidth = 27;
+constexpr auto IntroStartSeconds = 22.2;
+constexpr auto IntroTravelSeconds = 1.95;
+constexpr auto IntroReturnRows = 18;
+constexpr auto IntroReturnSeconds = 1.6;
+constexpr auto ArchiveRowSpacing = .62;
+constexpr auto ArchiveColumnSpacing = 5.2;
+constexpr auto LaneEnvelopePower = 6;
+}
+
 namespace yalahoo {
+// Project velocity onto the remaining travel direction and clamp the analytic spring result.
+// This prevents a retarget from overshooting or briefly moving away from the selected row.
 double RowLightController::follow(ScalarSpring &s, double target, double dt, double duration)
 {
     const double previous = s.value, distance = target - previous;
@@ -10,7 +28,7 @@ double RowLightController::follow(ScalarSpring &s, double target, double dt, dou
         s.velocity = 0;
         return previous;
     }
-    const double rate = 4.743864518390578 / duration, direction = distance > 0 ? 1 : -1;
+    const double rate = CriticalDampingDurationFactor / duration, direction = distance > 0 ? 1 : -1;
     const double velocity =
             std::min(std::max(0.0, s.velocity * direction), rate * std::abs(distance)) * direction;
     const double elapsed = std::max(0.0, dt), impulse = velocity - rate * distance,
@@ -24,7 +42,10 @@ double RowLightController::follow(ScalarSpring &s, double target, double dt, dou
 }
 double RowLightController::introOffset(double t)
 {
-    return t < 24.15 ? -9 + 27 * smooth((t - 22.2) / 1.95) : 18 * (1 - smooth((t - 24.15) / 1.6));
+    return t < IntroReturnStartSeconds
+            ? -IntroStartRows
+                    + IntroTravelRows * smooth((t - IntroStartSeconds) / IntroTravelSeconds)
+            : IntroReturnRows * (1 - smooth((t - IntroReturnStartSeconds) / IntroReturnSeconds));
 }
 void RowLightController::reset()
 {
@@ -41,7 +62,7 @@ void RowLightController::update(const RowLightingInput &i, double dt)
         reset();
         return;
     }
-    const double nextBasis = i.origin.z - i.row * .62;
+    const double nextBasis = i.origin.z - i.row * ArchiveRowSpacing;
     const bool intro = !i.reduced && i.introTime.has_value();
     if (!initialized || i.reduced || i.cinematic || opening) {
         row.finish(i.row);
@@ -50,7 +71,7 @@ void RowLightController::update(const RowLightingInput &i, double dt)
         if (basis
             && (i.independentColumns != independent
                 || (i.independentColumns && i.lane != basisLane)))
-            row.value += (*basis - nextBasis) / .62;
+            row.value += (*basis - nextBasis) / ArchiveRowSpacing;
         follow(row, i.row, dt, settings.transitionDuration);
         follow(lane, i.lane, dt, settings.transitionDuration);
     }
@@ -62,13 +83,14 @@ void RowLightController::update(const RowLightingInput &i, double dt)
     basisLane = i.lane;
     independent = i.independentColumns;
     column = i.origin;
-    column.z += (row.value - i.row) * .62;
-    column.x += (lane.value - i.lane) * 5.2;
+    column.z += (row.value - i.row) * ArchiveRowSpacing;
+    column.x += (lane.value - i.lane) * ArchiveColumnSpacing;
 }
 double RowLightController::sample(SceneVector origin) const
 {
-    const double r = (origin.z - column.z - settings.offset * .62) / (.5 * settings.width * .62),
-                 l = (origin.x - column.x) / 27;
-    return std::exp(-std::numbers::ln2 * r * r) * std::exp(-std::pow(l, 6));
+    const double r = (origin.z - column.z - settings.offset * ArchiveRowSpacing)
+            / (.5 * settings.width * ArchiveRowSpacing),
+                 l = (origin.x - column.x) / RibbonLaneWidth;
+    return std::exp(-std::numbers::ln2 * r * r) * std::exp(-std::pow(l, LaneEnvelopePower));
 }
 }

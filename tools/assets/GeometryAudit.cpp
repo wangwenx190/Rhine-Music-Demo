@@ -12,6 +12,28 @@
 #include <set>
 #include <stdexcept>
 
+namespace {
+// Binary protocol tags and component formats are validated before any indexed geometry access.
+constexpr auto GlbMagic = 0x46546c67;
+constexpr auto GlbJsonChunk = 0x4e4f534a;
+constexpr auto GlbBinaryChunk = 0x004e4942;
+constexpr auto GlbUnsignedShort = 5123;
+constexpr auto GlbUnsignedInt = 5125;
+constexpr auto GlbFloat = 5126;
+constexpr auto QtMeshMagic = 3365961549;
+constexpr auto InterleavedVertexBytes = 32;
+constexpr auto QtMeshHeaderBytes = 12;
+constexpr auto AttributeStrideBytes = 12;
+constexpr auto GlbVersion = 2;
+constexpr auto GlbTriangles = 4;
+constexpr auto QtMeshVersion = 7;
+constexpr auto QtTriangleTopology = 7;
+constexpr auto QtWinding = 2;
+constexpr auto QtUnsignedShort = 3;
+constexpr auto QtUnsignedInt = 5;
+constexpr auto QtFloatComponentType = 10;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo::assets {
@@ -55,7 +77,7 @@ struct Reader final
     // four bytes when the payload is already aligned.
     void qtAlign()
     {
-        take(4 - ((offset - 12) % 4));
+        take(4 - ((offset - QtMeshHeaderBytes) % 4));
     }
 };
 QJsonObject summary(const Batch &batch)
@@ -88,17 +110,20 @@ void saveFile(const QString &path, const QByteArray &bytes)
     require(file.open(QIODevice::WriteOnly), "Cannot write asset");
     require(file.write(bytes) == bytes.size() && file.commit(), "Cannot commit asset");
 }
+// Validate each accessor against both its buffer view and the binary payload before reading.
+// The accepted layout is deliberately narrow: unsupported transforms or sparse data require explicit adaptation.
 QVector<Batch> readGlb(const QByteArray &bytes)
 {
     Reader r{ bytes };
-    require(r.u32() == 0x46546c67 && r.u32() == 2 && r.u32() == bytes.size(), "Invalid GLB header");
+    require(r.u32() == GlbMagic && r.u32() == GlbVersion && r.u32() == bytes.size(),
+            "Invalid GLB header");
     const auto jsonSize = r.u32();
-    require(r.u32() == 0x4e4f534a, "Missing GLB JSON");
+    require(r.u32() == GlbJsonChunk, "Missing GLB JSON");
     QJsonParseError error;
     const auto document = QJsonDocument::fromJson(r.take(jsonSize), &error);
     require(error.error == QJsonParseError::NoError && document.isObject(), "Invalid GLB JSON");
     const auto binSize = r.u32();
-    require(r.u32() == 0x004e4942, "Missing GLB BIN");
+    require(r.u32() == GlbBinaryChunk, "Missing GLB BIN");
     const auto bin = r.take(binSize);
     require(r.offset == bytes.size(), "Unsupported GLB chunks");
     const auto root = document.object();
@@ -125,7 +150,7 @@ QVector<Batch> readGlb(const QByteArray &bytes)
                                     : components == 2 ? "VEC2"_L1
                                                       : "VEC3"_L1),
                 "Invalid accessor dimensions");
-        const int size = componentType == 5123 ? 2 : 4;
+        const int size = componentType == GlbUnsignedShort ? 2 : 4;
         const int stride = view[u"byteStride"_s].toInt(components * size),
                   count = a[u"count"_s].toInt();
         const int viewStart = view[u"byteOffset"_s].toInt(),
@@ -144,11 +169,11 @@ QVector<Batch> readGlb(const QByteArray &bytes)
         const auto primitives = mesh[u"primitives"_s].toArray();
         require(primitives.size() == 1, "Expected one primitive per shell batch");
         const auto p = primitives[0].toObject();
-        require(p[u"mode"_s].toInt(4) == 4, "Expected triangles");
+        require(p[u"mode"_s].toInt(GlbTriangles) == GlbTriangles, "Expected triangles");
         const auto attributes = p[u"attributes"_s].toObject();
-        const auto pos = accessor(attributes[u"POSITION"_s].toInt(-1), 3, 5126);
-        const auto norm = accessor(attributes[u"NORMAL"_s].toInt(-1), 3, 5126);
-        const auto uv = accessor(attributes[u"TEXCOORD_0"_s].toInt(-1), 2, 5126);
+        const auto pos = accessor(attributes[u"POSITION"_s].toInt(-1), 3, GlbFloat);
+        const auto norm = accessor(attributes[u"NORMAL"_s].toInt(-1), 3, GlbFloat);
+        const auto uv = accessor(attributes[u"TEXCOORD_0"_s].toInt(-1), 2, GlbFloat);
         require(pos[2] == norm[2] && pos[2] == uv[2], "Attribute count mismatch");
         Batch b;
         const auto materials = root[u"materials"_s].toArray();
@@ -173,12 +198,12 @@ QVector<Batch> readGlb(const QByteArray &bytes)
         const int indexId = p[u"indices"_s].toInt(-1);
         require(indexId >= 0 && indexId < accessors.size(), "Missing indices");
         const int type = accessors[indexId].toObject()[u"componentType"_s].toInt();
-        require(type == 5123 || type == 5125, "Unsupported indices");
+        require(type == GlbUnsignedShort || type == GlbUnsignedInt, "Unsupported indices");
         const auto idx = accessor(indexId, 1, type);
         require(idx[2] % 3 == 0, "Incomplete triangle");
         for (int i = 0; i < idx[2]; ++i) {
             Reader ir{ bin, idx[0] + i * idx[1] };
-            auto id = type == 5123 ? ir.u16() : ir.u32();
+            auto id = type == GlbUnsignedShort ? ir.u16() : ir.u32();
             require(id < quint32(b.vertices.size()), "Index out of range");
             b.indices.append(id);
         }
@@ -193,10 +218,10 @@ Batch readQtMesh(const QByteArray &bytes)
     // No Qt private headers, symbols or renderer dependency. A new file layout
     // fails explicitly; update this preparation-only inspector after probing.
     Reader r{ bytes };
-    require(r.u32() == 3365961549 && r.u16() == 7 && r.u16() == 0,
+    require(r.u32() == QtMeshMagic && r.u16() == QtMeshVersion && r.u16() == 0,
             "Unsupported Qt mesh format; adapt inspector to selected Kit");
     const auto payloadSize = r.u32();
-    require(payloadSize <= bytes.size() - 12, "Truncated mesh payload");
+    require(payloadSize <= bytes.size() - QtMeshHeaderBytes, "Truncated mesh payload");
     require(r.u32() == 0, "Unexpected morph attributes");
     const auto attrCount = r.u32(), stride = r.u32();
     require(r.u32() == 0, "Unexpected morph data");
@@ -206,13 +231,15 @@ Batch readQtMesh(const QByteArray &bytes)
     const auto indexSize = r.u32();
     require(r.u32() == 0 && r.u32() == 1, "Expected one subset");
     r.u32();
-    require(r.u32() == 0 && r.u32() == 7 && r.u32() == 2, "Unsupported mesh topology");
-    require(attrCount == 3 && stride == 32 && vertexSize % stride == 0
-                    && (indexType == 5 || indexType == 3),
+    require(r.u32() == 0 && r.u32() == QtTriangleTopology && r.u32() == QtWinding,
+            "Unsupported mesh topology");
+    require(attrCount == 3 && stride == InterleavedVertexBytes && vertexSize % stride == 0
+                    && (indexType == QtUnsignedInt || indexType == QtUnsignedShort),
             "Unsupported mesh attributes");
     for (quint32 i = 0; i < attrCount; ++i) {
         r.u32();
-        require(r.u32() == 10 && r.u32() == (i == 2 ? 2u : 3u) && r.u32() == i * 12,
+        require(r.u32() == QtFloatComponentType && r.u32() == (i == 2 ? 2u : 3u)
+                        && r.u32() == i * AttributeStrideBytes,
                 "Unexpected vertex layout");
     }
     r.qtAlign();
@@ -230,7 +257,7 @@ Batch readQtMesh(const QByteArray &bytes)
         b.vertices.append(v);
     }
     r.qtAlign();
-    const int indexStride = indexType == 3 ? 2 : 4;
+    const int indexStride = indexType == QtUnsignedShort ? 2 : 4;
     require(indexSize % (3 * indexStride) == 0 && indexSize <= bytes.size() - r.offset,
             "Truncated indices");
     for (quint32 i = 0; i < indexSize / indexStride; ++i) {

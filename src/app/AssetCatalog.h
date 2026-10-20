@@ -1,8 +1,19 @@
+// Registers bundled fonts and resolves their physical faces. Registration is transactional so
+// missing assets cannot leave a partially usable catalog.
+
 #pragma once
 #include <QFont>
 #include <QObject>
 #include <QtQml/qqmlregistration.h>
 namespace yalahoo {
+namespace assetFontWeight {
+// These are CSS numeric weights from the bundled font manifest.
+inline constexpr auto Light = 300;
+inline constexpr auto Regular = 400;
+inline constexpr auto DemiBold = 600;
+inline constexpr auto Bold = 700;
+}
+
 // Registers the four embedded faces before constructing the QML engine.
 // Does not read the file system or mutate user data.
 bool initializeAssetFonts();
@@ -22,19 +33,19 @@ public:
     using QObject::QObject;
     QFont light() const
     {
-        return assetFont(300);
+        return assetFont(assetFontWeight::Light);
     }
     QFont regular() const
     {
-        return assetFont(400);
+        return assetFont(assetFontWeight::Regular);
     }
     QFont demibold() const
     {
-        return assetFont(600);
+        return assetFont(assetFontWeight::DemiBold);
     }
     QFont bold() const
     {
-        return assetFont(700);
+        return assetFont(assetFontWeight::Bold);
     }
 };
 }

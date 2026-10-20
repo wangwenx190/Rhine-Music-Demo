@@ -1,8 +1,17 @@
+// Coordinates the opening timeline and one-time input handoff. Resource readiness, skip and
+// reduced motion share the same terminal-state protocol.
+
 #pragma once
 #include <QObject>
 #include "OpeningFrame.h"
 
 namespace yalahoo {
+namespace openingTiming {
+// Opaque two-dimensional content blocks three-dimensional submissions until its fade begins.
+inline constexpr auto OpaqueEndSeconds = 6.32;
+inline constexpr auto ChromeRevealSeconds = .72;
+}
+
 class SceneAdapter;
 class MotionController;
 class SelectionController;
@@ -35,7 +44,7 @@ public:
     }
     bool sceneOccluded() const
     {
-        return film() && time() < 6.32;
+        return film() && time() < openingTiming::OpaqueEndSeconds;
     }
     double time() const
     {
@@ -43,9 +52,10 @@ public:
     }
     double revealTime() const
     {
-        return m_phase == Phase::Reveal                            ? m_reveal
-                : m_phase == Phase::Done || m_phase == Phase::Idle ? .72
-                                                                   : 0;
+        return m_phase == Phase::Reveal ? m_reveal
+                : m_phase == Phase::Done || m_phase == Phase::Idle
+                ? openingTiming::ChromeRevealSeconds
+                : 0;
     }
     QVariantMap drawing() const
     {

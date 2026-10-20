@@ -6,6 +6,11 @@
 #include <QQuickWindow>
 #include <QSaveFile>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int NativeEventSettleMilliseconds = 50;
+}
+
 using namespace Qt::StringLiterals;
 #if defined(Q_OS_WIN)
 #  include <windows.h>
@@ -74,7 +79,7 @@ private Q_SLOTS:
         if (passed) {
             for (int cycle = 0; cycle < 10; ++cycle) {
                 window.hide();
-                QTest::qWait(50);
+                QTest::qWait(NativeEventSettleMilliseconds);
                 record(u"hide-%1"_s.arg(cycle), !window.isVisible());
                 window.releaseResources();
                 window.destroy();
@@ -104,7 +109,7 @@ private Q_SLOTS:
             show(u"show-normal"_s);
         }
         window.hide();
-        QTest::qWait(50);
+        QTest::qWait(NativeEventSettleMilliseconds);
         record(u"final-hide"_s, !window.isVisible());
         QSaveFile output(QString::fromUtf8(VISIBLE_WINDOW_REPORT));
         QVERIFY(output.open(QIODevice::WriteOnly));

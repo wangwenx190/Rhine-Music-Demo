@@ -1,3 +1,6 @@
+// Exercises overview framing, label admission and return navigation. Captures share production
+// state and preserve the verification window lifecycle.
+
 #pragma once
 #include <QString>
 class QGuiApplication;

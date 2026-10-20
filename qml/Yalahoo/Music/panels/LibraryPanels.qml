@@ -1,3 +1,6 @@
+// Lazily hosts library/search panels and routes their modal input ownership. Provider and
+// library work remain in C++ services instead of delegate callbacks.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T

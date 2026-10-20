@@ -2,6 +2,15 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// The public motion contract clamps speed and wall-clock intervals before publication.
+constexpr auto MinimumMotionSpeed = .25;
+constexpr auto MaximumMotionSpeed = 3.0;
+constexpr auto MaximumFrameSeconds = .05;
+constexpr auto OpeningDurationSeconds = 11.6;
+constexpr auto OpeningCompletionEpsilonSeconds = 1e-9;
+}
+
 namespace yalahoo {
 void FrameClock::requestVisualFrame()
 {
@@ -29,7 +38,7 @@ void FrameClock::setSpeed(double speed)
 {
     if (!std::isfinite(speed))
         return;
-    speed = std::clamp(speed, .25, 3.0);
+    speed = std::clamp(speed, MinimumMotionSpeed, MaximumMotionSpeed);
     if (speed == m_speed)
         return;
     m_speed = speed;
@@ -41,7 +50,7 @@ void FrameClock::advance(double frameSeconds)
         return;
     // Consume before callbacks so invalidation raised during this frame survives sleep.
     m_workPending = false;
-    double dt = std::clamp(frameSeconds, 0.0, .05);
+    double dt = std::clamp(frameSeconds, 0.0, MaximumFrameSeconds);
     if (m_discardNext) {
         dt = 0;
         m_discardNext = false;
@@ -49,8 +58,8 @@ void FrameClock::advance(double frameSeconds)
     const double motionDt = dt * m_speed;
     m_visualTime += motionDt;
     if (m_openingRunning) {
-        m_openingTime = std::min(11.6, m_openingTime + dt);
-        if (11.6 - m_openingTime < 1e-9)
+        m_openingTime = std::min(OpeningDurationSeconds, m_openingTime + dt);
+        if (OpeningDurationSeconds - m_openingTime < OpeningCompletionEpsilonSeconds)
             finishOpening();
     }
     ++m_frameCount;
@@ -70,7 +79,7 @@ void FrameClock::finishOpening()
 {
     if (!m_openingRunning)
         return;
-    m_openingTime = 11.6;
+    m_openingTime = OpeningDurationSeconds;
     m_openingRunning = false;
     Q_EMIT openingChanged();
     Q_EMIT openingFinished();

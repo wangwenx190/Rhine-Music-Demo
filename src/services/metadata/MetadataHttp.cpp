@@ -8,6 +8,24 @@
 #include <QNetworkRequest>
 #include <QSet>
 
+namespace {
+// Host pacing and a hard deadline bound each request; HTTP ranges use exclusive upper bounds.
+constexpr auto HostSpacingMilliseconds = 1100;
+constexpr auto DefaultHttpProxyPort = 8080;
+constexpr auto MaximumTcpPort = 65535;
+constexpr auto MaximumContactCharacters = 500;
+constexpr auto TransferTimeoutMilliseconds = 12000;
+constexpr auto RequestDeadlineMilliseconds = 15000;
+constexpr auto HttpSuccessBegin = 200;
+constexpr auto HttpSuccessEnd = 300;
+constexpr auto HttpTooManyRequests = 429;
+constexpr auto HttpUnavailable = 503;
+constexpr auto MaximumRetryDays = 7;
+constexpr auto HoursPerDay = 24;
+constexpr auto SecondsPerHour = 3600;
+constexpr auto FallbackRetrySeconds = 60;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -60,6 +78,8 @@ void MetadataHttp::get(const QUrl &url, const QString &contact, const QJsonObjec
     m_error.clear();
     m_delay.start(0);
 }
+// Pace requests by service host and configure the selected proxy before creating the reply.
+// The independent deadline also bounds stalls that never produce another network progress event.
 void MetadataHttp::start()
 {
     static const QSet<QString> hosts{ u"musicbrainz.org"_s, u"zh.wikipedia.org"_s,
@@ -82,7 +102,7 @@ void MetadataHttp::start()
         m_delay.start(int(wait));
         return;
     }
-    m_next.insert(key, m_clock.elapsed() + 1100);
+    m_next.insert(key, m_clock.elapsed() + HostSpacingMilliseconds);
     const auto mode = m_configuration.value(u"proxyMode"_s).toString(u"system"_s);
     if ((m_configuration.contains(u"proxyEnabled"_s)
          && !m_configuration.value(u"proxyEnabled"_s).isBool())
@@ -98,13 +118,14 @@ void MetadataHttp::start()
         const QUrl proxy(m_configuration.value(u"proxyUrl"_s).toString());
         if (!proxy.isValid() || proxy.scheme() != "http"_L1 || proxy.host().isEmpty()
             || !proxy.userInfo().isEmpty() || proxy.hasQuery() || proxy.hasFragment()
-            || proxy.port(8080) < 1 || proxy.port(8080) > 65535
+            || proxy.port(DefaultHttpProxyPort) < 1
+            || proxy.port(DefaultHttpProxyPort) > MaximumTcpPort
             || (!proxy.path().isEmpty() && proxy.path() != "/"_L1)) {
             Q_EMIT completed({ { }, tr("Invalid HTTP proxy address."), { } });
             return;
         }
-        m_network->setProxy(
-                QNetworkProxy(QNetworkProxy::HttpProxy, proxy.host(), quint16(proxy.port(8080))));
+        m_network->setProxy(QNetworkProxy(QNetworkProxy::HttpProxy, proxy.host(),
+                                          quint16(proxy.port(DefaultHttpProxyPort))));
     }
     QNetworkRequest request(m_url);
     QString contact = m_contact.simplified();
@@ -112,20 +133,22 @@ void MetadataHttp::start()
     contact.remove('\n'_L1);
     if (contact.isEmpty())
         contact = u"https://github.com/wangwenx190/Rhine-Music-Demo"_s;
-    request.setRawHeader("User-Agent"_ba, "yalahoo/1.0 ("_ba + contact.left(500).toUtf8() + ")"_ba);
+    request.setRawHeader("User-Agent"_ba,
+                         "yalahoo/1.0 ("_ba + contact.left(MaximumContactCharacters).toUtf8()
+                                 + ")"_ba);
     request.setRawHeader("Accept"_ba, "application/json"_ba);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::ManualRedirectPolicy);
     request.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
     request.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
     request.setAttribute(QNetworkRequest::AuthenticationReuseAttribute, QNetworkRequest::Manual);
-    request.setTransferTimeout(12000);
+    request.setTransferTimeout(TransferTimeoutMilliseconds);
     request.setDecompressedSafetyCheckThreshold(maximumResponseBytes);
     m_reply = m_network->get(request);
     m_reply->setReadBufferSize(maximumResponseBytes + 1);
     connect(m_reply, &QNetworkReply::readyRead, this, &MetadataHttp::read);
     connect(m_reply, &QNetworkReply::finished, this, &MetadataHttp::finish);
-    m_deadline.start(15000);
+    m_deadline.start(RequestDeadlineMilliseconds);
 }
 void MetadataHttp::read()
 {
@@ -151,22 +174,23 @@ void MetadataHttp::finish()
     response.error = m_error;
     if (response.error.isEmpty() && status == 0 && reply->error() != QNetworkReply::NoError)
         response.error = tr("Cannot connect to %1: %2").arg(m_url.host(), reply->errorString());
-    if (response.error.isEmpty() && (status < 200 || status >= 300))
+    if (response.error.isEmpty() && (status < HttpSuccessBegin || status >= HttpSuccessEnd))
         response.error = tr("%1 returned HTTP %2.").arg(m_url.host()).arg(status);
     if (response.error.isEmpty() && reply->error() != QNetworkReply::NoError)
         response.error = tr("Cannot connect to %1: %2").arg(m_url.host(), reply->errorString());
     const auto retryHeader = QString::fromUtf8(reply->rawHeader("Retry-After"_ba));
-    if (status == 429 || status == 503 || !retryHeader.isEmpty()) {
+    if (status == HttpTooManyRequests || status == HttpUnavailable || !retryHeader.isEmpty()) {
         bool numeric = false;
         const auto seconds = retryHeader.toLongLong(&numeric);
         const auto now = QDateTime::currentDateTimeUtc();
-        auto retry = numeric && seconds >= 0 && seconds <= 7 * 24 * 3600
+        auto retry = numeric && seconds >= 0
+                        && seconds <= MaximumRetryDays * HoursPerDay * SecondsPerHour
                 ? now.addSecs(seconds)
                 : QDateTime::fromString(retryHeader, Qt::RFC2822Date);
         if (!retry.isValid() || retry < now)
-            retry = now.addSecs(60);
+            retry = now.addSecs(FallbackRetrySeconds);
         // Cap service suspension to seven days and never retry automatically.
-        retry = std::min(retry, now.addDays(7));
+        retry = std::min(retry, now.addDays(MaximumRetryDays));
         m_cooldown.insert(service(m_url), retry);
         response.retryAt = retry.toString(Qt::ISODateWithMs);
     }
@@ -180,7 +204,8 @@ void MetadataHttp::finish()
             if (response.data.contains(u"error"_s)) {
                 response.error = tr("The metadata service reported an API error.");
                 if (response.data.value(u"error"_s).toObject().value(u"code"_s) == "maxlag"_L1) {
-                    const auto retry = QDateTime::currentDateTimeUtc().addSecs(60);
+                    const auto retry =
+                            QDateTime::currentDateTimeUtc().addSecs(FallbackRetrySeconds);
                     m_cooldown.insert(service(m_url), retry);
                     response.retryAt = retry.toString(Qt::ISODateWithMs);
                 }

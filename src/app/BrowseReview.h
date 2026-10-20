@@ -1,3 +1,6 @@
+// Runs the browse structure probe against the production scene. Captures use anonymous inputs
+// and report their actual verification window policy.
+
 #pragma once
 #include <QString>
 class QGuiApplication;

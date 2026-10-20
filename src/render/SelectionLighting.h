@@ -1,3 +1,6 @@
+// Evaluates source-derived theme lighting and selection fields. Pure parameters are converted
+// into render inputs without per-frame resource construction.
+
 #pragma once
 #include "RowLightController.h"
 #include "FrameClock.h"
@@ -6,10 +9,27 @@
 #include <QVector4D>
 #include <QVariantMap>
 namespace yalahoo {
+namespace lightingDefaults {
+// Default day palette uses source light units; theme interpolation takes seconds.
+inline constexpr auto Environment = .25;
+inline constexpr auto Key = .45;
+inline constexpr auto Hemisphere = .32;
+inline constexpr auto Fill = .045;
+inline constexpr auto SpotIntensity = 180;
+inline constexpr auto SpotUnitScale = 64;
+inline constexpr auto AreaIntensity = 34;
+inline constexpr auto PrintAmbient = .5;
+inline constexpr auto Exposure = 1.05;
+inline constexpr auto TransitionSeconds = .65;
+}
+
 struct LightingPalette final
 {
-    double warmth = 1, environment = .25, key = .45, hemisphere = .32, fill = .045;
-    double spot = 180 * 64, area = 34, scatter = 1, printAmbient = .5, exposure = 1.05;
+    double warmth = 1, environment = lightingDefaults::Environment, key = lightingDefaults::Key,
+           hemisphere = lightingDefaults::Hemisphere, fill = lightingDefaults::Fill;
+    double spot = lightingDefaults::SpotIntensity * lightingDefaults::SpotUnitScale,
+           area = lightingDefaults::AreaIntensity, scatter = 1,
+           printAmbient = lightingDefaults::PrintAmbient, exposure = lightingDefaults::Exposure;
     SceneVector keyColor, skyColor, groundColor, spotColor, scatterColor, background;
     SceneVector floor;
     static SceneVector floorColor(QStringView theme);
@@ -172,7 +192,7 @@ private:
     RowLightingSettings m_settings;
     bool m_comparing = false;
     LightingPalette m_palette, m_from, m_to;
-    double m_elapsed = .65, m_detail = 0;
+    double m_elapsed = lightingDefaults::TransitionSeconds, m_detail = 0;
     SceneVector m_anchor, m_column, m_offset, m_anchorVelocity, m_columnVelocity;
     bool m_night = false, m_reduced = false, m_initialized = false, m_visible = true;
 };

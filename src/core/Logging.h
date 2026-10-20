@@ -1,3 +1,6 @@
+// Owns the process log sink, bounded file rotation and terminal formatting. Shutdown restores
+// the previous Qt handler before releasing its file state.
+
 #pragma once
 
 #include <QLoggingCategory>
@@ -5,6 +8,14 @@
 #include <memory>
 
 namespace yalahoo {
+namespace loggingPolicy {
+// Default bounded file-log retention policy.
+inline constexpr auto SegmentMiB = 8;
+inline constexpr auto BytesPerKiB = 1024;
+inline constexpr auto ArchiveCount = 4;
+inline constexpr auto RetentionDays = 14;
+}
+
 Q_DECLARE_LOGGING_CATEGORY(logApp)
 Q_DECLARE_LOGGING_CATEGORY(logRender)
 Q_DECLARE_LOGGING_CATEGORY(logLibrary)
@@ -19,9 +30,10 @@ public:
     struct Options final
     {
         QString directory;
-        qint64 segmentBytes = 8 * 1024 * 1024;
-        int archiveCount = 4;
-        int retentionDays = 14;
+        qint64 segmentBytes =
+                loggingPolicy::SegmentMiB * loggingPolicy::BytesPerKiB * loggingPolicy::BytesPerKiB;
+        int archiveCount = loggingPolicy::ArchiveCount;
+        int retentionDays = loggingPolicy::RetentionDays;
     };
     LoggingSession();
     explicit LoggingSession(Options options);

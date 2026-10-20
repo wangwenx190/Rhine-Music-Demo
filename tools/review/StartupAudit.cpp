@@ -47,6 +47,21 @@
 #include <chrono>
 #include <stdexcept>
 
+namespace {
+// Diagnostic reservoirs retain a bounded recent observation window.
+constexpr int MaximumLifecycleEvents = 512;
+constexpr int MaximumFrameSamples = 40000;
+
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+}
+
+namespace {
+// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
+constexpr auto NanosecondsPerMillisecond = 1e6;
+constexpr auto NanosecondsPerSecond = 1e9;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -177,7 +192,7 @@ public:
                         == int(QGuiApplication::applicationState()))
                 return;
         }
-        if (events.size() == 512) {
+        if (events.size() == MaximumLifecycleEvents) {
             eventOverflow = true;
             return;
         }
@@ -233,7 +248,7 @@ public:
         surface.measurementEnabled = !windowLifecycle;
         QObject::connect(&surface, &OffscreenSurface::frameMeasured, &window,
                          [&](QJsonObject costs) {
-                             if (timings.size() >= 40000)
+                             if (timings.size() >= MaximumFrameSamples)
                                  overflow = true;
                              else {
                                  costs[u"stage"_s] = stage;
@@ -245,7 +260,7 @@ public:
                 &window, &QQuickWindow::frameSwapped, &window,
                 [samples = presented] {
                     const QMutexLocker lock(&samples->mutex);
-                    if (samples->times.size() == 40000)
+                    if (samples->times.size() == MaximumFrameSamples)
                         samples->overflow = true;
                     else
                         samples->times.append(nowNs());
@@ -338,7 +353,7 @@ public:
         native->setTelemetryEnabled(true);
         QObject::connect(
                 native, &rhi::SceneItem::frameSubmitted, root.get(), [&](QJsonObject sample) {
-                    if (samples.size() >= 40000) {
+                    if (samples.size() >= MaximumFrameSamples) {
                         overflow = true;
                         return;
                     }
@@ -388,7 +403,7 @@ public:
         surface.hide();
         window.releaseResources();
         if (!OffscreenSurface::Enabled && rhi::sceneSubmissionStats().renderers.load() > 0) {
-            deadline.start(10000);
+            deadline.start(AsyncDeadlineMilliseconds);
             invalidation.exec();
         }
     }
@@ -760,7 +775,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         Driver d(input);
         if (observeOnly) {
             QObject::connect(d.motion.clock(), &FrameClock::advanced, &d.window, [&] {
-                if (guiFrames.size() == 40000)
+                if (guiFrames.size() == MaximumFrameSamples)
                     d.overflow = true;
                 else
                     guiFrames.append(QJsonObject{
@@ -771,7 +786,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     &d.window, &QQuickWindow::afterSynchronizing, &d.window,
                     [samples = d.presented] {
                         const QMutexLocker lock(&samples->mutex);
-                        if (samples->synchronized.size() == 40000)
+                        if (samples->synchronized.size() == MaximumFrameSamples)
                             samples->overflow = true;
                         else
                             samples->synchronized.append(nowNs());
@@ -814,7 +829,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         d.wait([&] {
             return d.opening.film();
         });
-        report[u"preparationMs"_s] = preparation.nsecsElapsed() / 1e6;
+        report[u"preparationMs"_s] = preparation.nsecsElapsed() / NanosecondsPerMillisecond;
         check("initial-consistent-snapshot",
               d.library.snapshot()->albums.size() == 576
                       && d.startup.statistics()[u"appliedSnapshots"_s].toInt() == 1);
@@ -1082,7 +1097,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             int stageIndex = -1, eventIndex = -1;
             sampling.start();
             const auto replay = [&](double duration) {
-                const auto elapsed = sampling.nsecsElapsed() / 1e9;
+                const auto elapsed = sampling.nsecsElapsed() / NanosecondsPerSecond;
                 if (elapsed >= duration)
                     return true;
                 const int index =
@@ -1154,7 +1169,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         true, int(seconds * 1000 + 30000), true);
             }
             report[u"samplingEndedNs"_s] = nowNs();
-            report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / 1e9;
+            report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / NanosecondsPerSecond;
             report[u"sampleStartIndex"_s] = startSample;
             report[u"quickTimingStartIndex"_s] = startTiming;
             report[u"fixedStages"_s] = QJsonArray::fromStringList(stages);
@@ -1206,7 +1221,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 inputs.insert(revision);
                 inputLatency[name].append((sample[u"submittedNs"_s].toInteger()
                                            - sample[u"inputReceivedNs"_s].toInteger())
-                                          / 1e6);
+                                          / NanosecondsPerMillisecond);
             }
         }
         QJsonObject stages;
@@ -1242,7 +1257,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                 if (previous < report[u"samplingStartedNs"_s].toInteger()
                     || current > report[u"samplingEndedNs"_s].toInteger())
                     continue;
-                const double dt = (current - previous) / 1e6;
+                const double dt = (current - previous) / NanosecondsPerMillisecond;
                 intervals.append(dt);
                 for (qsizetype j = actions.size() - 1; j >= 0; --j) {
                     const auto action = actions[j].toObject();

@@ -4,6 +4,13 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Timer ticks only wake the fade; actual progress uses monotonic elapsed milliseconds.
+constexpr auto FadeTickMilliseconds = 24;
+constexpr auto FadeInMilliseconds = 650;
+constexpr auto FadeOutMilliseconds = 220;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -14,7 +21,7 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
     m_player.setAudioOutput(&m_output);
     m_player.setLoops(QMediaPlayer::Infinite);
     m_player.setPlaybackRate(1);
-    m_fade.setInterval(24);
+    m_fade.setInterval(FadeTickMilliseconds);
     m_fade.setTimerType(Qt::PreciseTimer);
     connect(&m_fade, &QTimer::timeout, this, &BackgroundMusicController::advanceFade);
     connect(&m_player, &QMediaPlayer::playbackStateChanged, this, [this] {
@@ -124,7 +131,7 @@ void BackgroundMusicController::reconcile()
         return;
     m_target = target;
     m_from = m_output.volume();
-    m_duration = target > 0 ? 650 : 220;
+    m_duration = target > 0 ? FadeInMilliseconds : FadeOutMilliseconds;
     m_elapsed.start();
     if (target > 0) {
         if (m_player.source().isEmpty() || m_player.error() != QMediaPlayer::NoError)

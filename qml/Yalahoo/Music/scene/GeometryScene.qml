@@ -1,3 +1,6 @@
+// Quick 3D review scene consumes the same C++ camera/entity snapshots as production. Source
+// coordinates are converted once; backend projection remains Qt-owned.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick3D

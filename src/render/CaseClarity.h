@@ -1,3 +1,6 @@
+// Tracks source-derived clarity independently for each case lifecycle. Selected and returning
+// cases retain their own reveal state instead of sharing a global detail value.
+
 #pragma once
 #include <optional>
 

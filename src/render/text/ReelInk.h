@@ -1,3 +1,6 @@
+// Draws shaped title runs through Qt Canvas Painter. Visibility gates layout and painting;
+// synchronized owned values isolate GUI and render lifetimes.
+
 #pragma once
 #include "TitleReel.h"
 #include <QQuickItem>

@@ -23,6 +23,16 @@
 #include <QSaveFile>
 #include <QMouseEvent>
 
+namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int FrameDeadlineMilliseconds = 5000;
+}
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int EventPollMilliseconds = 10;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -99,8 +109,8 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
         QElapsedTimer timer;
         timer.start();
         while ((OffscreenSurface::Enabled ? frames.size() : swaps.size()) <= before
-               && timer.elapsed() < 5000)
-            QTest::qWait(10);
+               && timer.elapsed() < FrameDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
         return (OffscreenSurface::Enabled ? frames.size() : swaps.size()) > before;
     };
     for (bool night : { false, true }) {

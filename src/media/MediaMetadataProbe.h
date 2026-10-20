@@ -1,3 +1,6 @@
+// Collects metadata using public Qt Multimedia APIs without starting playback. Generation
+// checks, timeouts and cancellation isolate late backend notifications.
+
 #pragma once
 #include <memory>
 #include "DirectoryScanner.h"

@@ -1,3 +1,6 @@
+// Drives deterministic detail transitions through the production controllers. Captures retain
+// request identity so interrupted transitions cannot publish stale evidence.
+
 #pragma once
 #include <QString>
 class QGuiApplication;

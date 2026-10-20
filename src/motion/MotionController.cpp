@@ -1,10 +1,16 @@
 #include "FrameClock.h"
 #include "MotionController.h"
 
+namespace {
+// Convert world displacement to column/row travel before selecting a common duration.
+constexpr auto ArchiveColumnSpacing = 5.2;
+constexpr auto ArchiveRowSpacing = .62;
+}
+
 namespace yalahoo {
-std::array<Kinematics, 4> ArchiveMotion::state() const
+std::array<Kinematics, ArchiveAxisCount> ArchiveMotion::state() const
 {
-    std::array<Kinematics, 4> result;
+    std::array<Kinematics, ArchiveAxisCount> result;
     for (size_t i = 0; i < result.size(); ++i)
         result[i] = m_tracks[i].state();
     return result;
@@ -24,8 +30,9 @@ bool ArchiveMotion::retarget(const ArchiveSprings &springs, const ArchiveValues 
 {
     if (m_hasTarget && m_targets == targets)
         return false;
-    const double duration = archiveTravelDuration((targets[1] - springs[1].value) / 5.2,
-                                                  (targets[0] - springs[0].value) / .62);
+    const double duration = archiveTravelDuration(
+            (targets[ColumnAxis] - springs[ColumnAxis].value) / ArchiveColumnSpacing,
+            (targets[RailAxis] - springs[RailAxis].value) / ArchiveRowSpacing);
     for (size_t i = 0; i < m_tracks.size(); ++i) {
         auto state = m_tracks[i].state();
         state.value = springs[i].value;
@@ -46,7 +53,7 @@ void ArchiveMotion::update(ArchiveSprings &springs, double dt, bool reduced)
         m_tracks[i].update(dt, reduced);
         static_cast<Kinematics &>(springs[i]) = m_tracks[i].state();
     }
-    m_active = m_tracks[0].active();
+    m_active = m_tracks[RailAxis].active();
 }
 void ArchiveMotion::translate(const ArchiveValues &offset)
 {

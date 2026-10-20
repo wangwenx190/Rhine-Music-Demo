@@ -1,3 +1,6 @@
+// Publishes one bounded monotonic frame interval to visual controllers. Resume discards the
+// suspended interval; opening time and speed-scaled motion remain distinct.
+
 #pragma once
 #include <QObject>
 

@@ -1,3 +1,7 @@
+// Validates typed library parsing and atomic persistence while retaining unknown document
+// fields. Explicit fixture literals are independent inputs or expected results; timing bounds
+// have named constants.
+
 #include "Localization.h"
 #include "LibrarySession.h"
 #include "GenreRowsModel.h"

@@ -1,3 +1,6 @@
+// Composes the authored opening layers from one C++ timeline snapshot. Opacity and blur overlap
+// deliberately; they do not create independent completion timers.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T

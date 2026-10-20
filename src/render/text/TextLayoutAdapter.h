@@ -1,3 +1,6 @@
+// Shapes whole text runs and groups glyphs without losing grapheme context. Cached layout
+// retains fallback-font identity, baselines and color-glyph descriptors.
+
 #pragma once
 #include <QFont>
 #include <QGlyphRun>

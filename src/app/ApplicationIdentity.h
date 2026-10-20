@@ -1,3 +1,6 @@
+// Establishes product names before Qt resolves settings and application paths. Literal
+// identifiers keep branding separate from persistent technical identity.
+
 #pragma once
 #include <QGuiApplication>
 #include <QObject>

@@ -1,3 +1,6 @@
+// Coordinates immutable library models, browsing and metadata requests. Stable identities and
+// request tokens separate navigation from persistence and playback.
+
 #pragma once
 #include "LibraryModels.h"
 #include "IMetadataProvider.h"

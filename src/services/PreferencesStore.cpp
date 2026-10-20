@@ -12,6 +12,16 @@
 #include <QTimer>
 #include <cmath>
 
+namespace {
+// Persisted defaults match the owning controllers; byte limits apply before JSON parsing.
+constexpr auto BytesPerKiB = 1024;
+constexpr auto DefaultSongVolume = .65;
+constexpr auto DefaultBackgroundVolume = .18;
+constexpr auto DefaultFeedbackVolume = .22;
+constexpr auto MinimumMotionSpeed = .25;
+constexpr auto MaximumMotionSpeed = 3;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -36,7 +46,7 @@ PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
     if (file.exists()) {
         QJsonParseError parse;
         const bool opened = file.open(QIODevice::ReadOnly);
-        const auto document = opened && file.size() <= 1024 * 1024
+        const auto document = opened && file.size() <= BytesPerKiB * BytesPerKiB
                 ? QJsonDocument::fromJson(file.readAll(), &parse)
                 : QJsonDocument();
         if (!opened || document.isNull() || !document.isObject()) {
@@ -106,11 +116,11 @@ QVariantMap PreferencesStore::values() const
                         { u"rememberColumnPosition"_s, true },
                         { u"reduced"_s, false },
                         { u"motionSpeed"_s, 1.0 },
-                        { u"volume"_s, .65 },
+                        { u"volume"_s, DefaultSongVolume },
                         { u"bgm"_s, true },
-                        { u"bgmVolume"_s, .18 },
+                        { u"bgmVolume"_s, DefaultBackgroundVolume },
                         { u"sound"_s, true },
-                        { u"soundVolume"_s, .22 } };
+                        { u"soundVolume"_s, DefaultFeedbackVolume } };
     for (auto it = d->m_document.begin(); it != d->m_document.end(); ++it)
         values.insert(it.key(), it.value());
     return values.toVariantMap();
@@ -139,8 +149,8 @@ QString PreferencesStore::validate(const QJsonObject &document)
         const auto value = document.value(key);
         if (!value.isUndefined()
             && (!value.isDouble() || !std::isfinite(value.toDouble())
-                || value.toDouble() < (QString(key) == "motionSpeed"_L1 ? .25 : 0)
-                || value.toDouble() > (QString(key) == "motionSpeed"_L1 ? 3 : 1)))
+                || value.toDouble() < (QString(key) == "motionSpeed"_L1 ? MinimumMotionSpeed : 0)
+                || value.toDouble() > (QString(key) == "motionSpeed"_L1 ? MaximumMotionSpeed : 1)))
             return QCoreApplication::translate("Yalahoo", "Invalid preference number: ") + key;
     }
     if (document.contains(u"lighting"_s)) {
@@ -262,15 +272,15 @@ bool PreferencesStore::importJson(const QUrl &url)
     d->m_import.setFuture(QtConcurrent::run(&d->m_worker, [path = url.toLocalFile()] {
         using Result = QPair<QJsonObject, QString>;
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly) || file.size() > 1024 * 1024)
+        if (!file.open(QIODevice::ReadOnly) || file.size() > BytesPerKiB * BytesPerKiB)
             return Result{ { },
                            QCoreApplication::translate(
                                    "Yalahoo",
                                    "Cannot read preference JSON, or it exceeds 1 MiB.") };
-        const auto bytes = file.read(1024 * 1024 + 1);
+        const auto bytes = file.read(BytesPerKiB * BytesPerKiB + 1);
         QJsonParseError parse;
         const auto document = QJsonDocument::fromJson(bytes, &parse);
-        if (bytes.size() > 1024 * 1024 || file.error() != QFileDevice::NoError
+        if (bytes.size() > BytesPerKiB * BytesPerKiB || file.error() != QFileDevice::NoError
             || parse.error != QJsonParseError::NoError || !document.isObject())
             return Result{ { },
                            QCoreApplication::translate(
@@ -284,6 +294,8 @@ bool PreferencesStore::importJson(const QUrl &url)
     }));
     return true;
 }
+// Write a complete validated candidate with QSaveFile. Failure leaves the previous file intact;
+// this helper returns the actual persistence error rather than reporting a successful preference update.
 QString PreferencesStore::write(const QString &path, const QJsonObject &document)
 {
     if (!QDir().mkpath(QFileInfo(path).absolutePath()))
@@ -295,7 +307,7 @@ QString PreferencesStore::write(const QString &path, const QJsonObject &document
     QSaveFile file(path);
     file.setDirectWriteFallback(false);
     const auto bytes = QJsonDocument(document).toJson();
-    if (bytes.size() > 1024 * 1024)
+    if (bytes.size() > BytesPerKiB * BytesPerKiB)
         return QCoreApplication::translate(
                 "Yalahoo", "Preferences exceed 1 MiB. The original file was preserved.");
     if (!file.open(QIODevice::WriteOnly)

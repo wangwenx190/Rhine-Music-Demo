@@ -1,3 +1,6 @@
+// Coordinates overview camera framing, navigation chrome and column entry. Label projection
+// follows scene revisions and navigation remains independent of playback.
+
 #pragma once
 #include "OverviewLabelsModel.h"
 #include "ScalarSpring.h"
@@ -5,6 +8,14 @@
 #include <QPointer>
 
 namespace yalahoo {
+namespace overviewMotion {
+// Chrome and camera tracks share a frame source while preserving independent source timing.
+inline constexpr auto NotificationFields = 5;
+inline constexpr auto ChromeEnterMilliseconds = 460;
+inline constexpr auto ChromeExitMilliseconds = 240;
+inline constexpr auto NavigationSlideSeconds = .36;
+}
+
 class MotionController;
 class SceneAdapter;
 class SelectionController;
@@ -50,19 +61,21 @@ Q_SIGNALS:
 
 private:
     void notify();
-    std::array<double, 5> m_notified{ -1, -1, -1, -1, -1 };
+    std::array<double, overviewMotion::NotificationFields> m_notified{ -1, -1, -1, -1, -1 };
     QPointer<MotionController> m_motion;
     QPointer<FrameClock> m_clock;
     QPointer<SceneAdapter> m_scene;
     QPointer<SelectionController> m_selection;
     QPointer<PresentationController> m_presentation;
     OverviewLabelsModel m_labels;
-    SurfaceTransition m_chrome{ 460, 240, false, false };
+    SurfaceTransition m_chrome{ overviewMotion::ChromeEnterMilliseconds,
+                                overviewMotion::ChromeExitMilliseconds, false, false };
     ScalarSpring m_progress;
     bool m_active = false, m_chromeShown = false, m_revealPending = false;
     quint64 m_sceneRevision = 0;
     bool m_labelsDirty = true;
-    double m_navigationTime = .36, m_navFrom = 1, m_navOpacity = 1;
+    double m_navigationTime = overviewMotion::NavigationSlideSeconds, m_navFrom = 1,
+           m_navOpacity = 1;
     double m_navOffsetFrom = 0, m_navOffset = 0;
 };
 }

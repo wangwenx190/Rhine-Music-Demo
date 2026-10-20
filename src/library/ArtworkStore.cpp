@@ -8,6 +8,12 @@
 #include <QImageReader>
 #include <QSaveFile>
 
+namespace {
+// Compare decoded storage against the Qt allocation limit, not compressed image size.
+constexpr auto BytesPerKiB = 1024;
+constexpr auto DecodedRgbaBytesPerPixel = 4;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -19,8 +25,9 @@ bool withinImageAllocationLimit(const QImage &image)
     const auto limit = QImageReader::allocationLimit();
     if (limit == 0)
         return true;
-    const qint64 bytes = qint64(limit) * 1024 * 1024;
-    return image.sizeInBytes() <= bytes && qint64(image.width()) * image.height() <= bytes / 4;
+    const qint64 bytes = qint64(limit) * BytesPerKiB * BytesPerKiB;
+    return image.sizeInBytes() <= bytes
+            && qint64(image.width()) * image.height() <= bytes / DecodedRgbaBytesPerPixel;
 }
 QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &root, QString *error)
 {

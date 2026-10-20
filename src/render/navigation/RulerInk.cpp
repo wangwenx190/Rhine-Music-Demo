@@ -4,6 +4,16 @@
 #include <QCanvasPath>
 #include <QElapsedTimer>
 
+namespace {
+// Cache the three authored tick shapes; per-frame state only selects and transforms them.
+constexpr auto NarrowRestingHeight = 8.0;
+constexpr auto RestingHeight = 10.0;
+constexpr auto NarrowActiveHeight = 21.0;
+constexpr auto ActiveHeight = 30.0;
+constexpr auto NarrowHoverHeight = 16.0;
+constexpr auto HoverHeight = 22.0;
+}
+
 namespace yalahoo {
 namespace {
 RulerInkStats stats;
@@ -32,7 +42,9 @@ protected:
             cachedTick = drawing.tick;
             invalidatePaths = true;
             const bool narrow = cachedTick == 2;
-            heights = { narrow ? 8.0 : 10.0, narrow ? 21.0 : 30.0, narrow ? 16.0 : 22.0 };
+            heights = { narrow ? NarrowRestingHeight : RestingHeight,
+                        narrow ? NarrowActiveHeight : ActiveHeight,
+                        narrow ? NarrowHoverHeight : HoverHeight };
             for (int i = 0; i < 3; ++i) {
                 rects[i].clear();
                 rects[i].rect(0, 0, drawing.tick, heights[i]);

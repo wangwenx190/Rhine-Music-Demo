@@ -1,3 +1,6 @@
+// Builds a library snapshot from local directory trees on a worker. Cancellation and
+// transactional roots prevent partial scans from appearing as deletions.
+
 #pragma once
 
 #include "MusicTypes.h"

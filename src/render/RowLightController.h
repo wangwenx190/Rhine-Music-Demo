@@ -1,8 +1,19 @@
+// Evaluates bounded per-row lighting pulses from selection events. Elapsed-time envelopes avoid
+// retaining an unbounded history of UI interactions.
+
 #pragma once
 #include "SceneFrame.h"
 #include "ScalarSpring.h"
 #include <optional>
 namespace yalahoo {
+namespace rowLightDefaults {
+// Source guided-row lighting defaults, independent of viewport/DPR.
+inline constexpr auto Strength = 1.3;
+inline constexpr auto WidthRows = 1.35;
+inline constexpr auto OffsetRows = .3;
+inline constexpr auto TransitionSeconds = 1.1;
+}
+
 enum class RowLightingMode {
     Baseline,
     Area,
@@ -12,7 +23,9 @@ enum class RowLightingMode {
 struct RowLightingSettings final
 {
     RowLightingMode mode = RowLightingMode::Guided;
-    double strength = 1.3, width = 1.35, offset = .3, fill = 1, transitionDuration = 1.1;
+    double strength = rowLightDefaults::Strength, width = rowLightDefaults::WidthRows,
+           offset = rowLightDefaults::OffsetRows, fill = 1,
+           transitionDuration = rowLightDefaults::TransitionSeconds;
 };
 struct RowLightingInput final
 {

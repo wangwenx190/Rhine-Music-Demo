@@ -18,6 +18,11 @@
 #include <QTimer>
 #include <cmath>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int BackendDeadlineMilliseconds = 5000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -64,7 +69,7 @@ int reviewControls(const QString &output)
             loop.quit();
         });
         QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        timeout.start(5000);
+        timeout.start(BackendDeadlineMilliseconds);
         surface.requestFrame();
         loop.exec();
         return rendered;

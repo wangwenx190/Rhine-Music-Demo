@@ -3,12 +3,20 @@
 #include <array>
 #include <cmath>
 
+namespace {
+// Returning cases decay independently; only negligible clarity is snapped to zero.
+constexpr auto ReturnDecayRate = 9;
+constexpr auto InvisibleClarityThreshold = .0001;
+}
+
 namespace yalahoo {
 namespace {
 constexpr double start = 34.12, end = 39.56, rate = 1.5;
 constexpr std::array<std::array<double, 2>, 6> knots{
     { { 38.84, 0 }, { 38.92, .28 }, { 39, .51 }, { 39.16, .74 }, { 39.32, .94 }, { 39.56, 1 } }
 };
+// Use a weighted harmonic mean of neighboring secants (monotone cubic interpolation).
+// Flat or sign-changing secants get zero tangent so the reveal cannot overshoot its knots.
 constexpr double slope(size_t i)
 {
     if (i == 0 || i == knots.size() - 1)
@@ -67,8 +75,8 @@ void CaseClarity::advance(double dt, bool ready, bool reduced)
     if (!std::isfinite(dt) || dt < 0)
         return;
     if (!m_active) {
-        m_value = reduced ? 0 : m_value * std::exp(-dt * 9);
-        if (m_value < .0001)
+        m_value = reduced ? 0 : m_value * std::exp(-dt * ReturnDecayRate);
+        if (m_value < InvisibleClarityThreshold)
             m_value = 0;
         return;
     }
@@ -84,7 +92,9 @@ void CaseClarity::advance(double dt, bool ready, bool reduced)
     if (m_elapsed) {
         const double time = start + *m_elapsed * rate;
         const double value = reveal(time);
-        m_value = value > m_value ? value : time >= end ? 1 : m_value * std::exp(-dt * 9);
+        m_value = value > m_value ? value
+                : time >= end     ? 1
+                                  : m_value * std::exp(-dt * ReturnDecayRate);
     }
 }
 }

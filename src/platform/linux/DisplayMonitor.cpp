@@ -12,6 +12,11 @@
 #  include <cstring>
 #  include <unistd.h>
 
+namespace {
+// PQ content uses the protocol reference white; missing luminance information is not inferred.
+constexpr auto PqReferenceWhiteNits = 203.0f;
+}
+
 namespace yalahoo {
 // Observe the compositor's output description on Qt's existing connection. Qt
 // retains sole ownership of the window's color-management surface and dispatch.
@@ -205,7 +210,8 @@ private:
             && self.m_peak > self.m_reference) {
             // Prefer PQ/Rec.2020 on Linux HDR compositors. The protocol anchors
             // its standard 203-nit PQ white (80 for linear) to the output white.
-            self.m_state = { true, pq, pq ? 203.0f : 1.0f, self.m_peak / self.m_reference };
+            self.m_state = { true, pq, pq ? PqReferenceWhiteNits : 1.0f,
+                             self.m_peak / self.m_reference };
             self.m_state.allowLinearFallback = linear;
         } else {
             self.m_state = { };

@@ -1,3 +1,6 @@
+// Serializes scanning, metadata probing and atomic persistence on one worker. Generations reject
+// stale results while pending intents are coalesced to bound work.
+
 #pragma once
 #include <memory>
 

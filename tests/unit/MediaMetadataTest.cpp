@@ -1,3 +1,7 @@
+// Uses controllable anonymous backends to test timeout, cancellation and late metadata
+// publication. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
 #include "ArtworkStore.h"
 #include "LegacyImporter.h"
 #include "LibraryStore.h"
@@ -22,6 +26,13 @@
 #include <QTimer>
 #include <atomic>
 #include <filesystem>
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int EnrichmentDeadlineMilliseconds = 15000;
+constexpr int ProbeTimeoutDeadlineMilliseconds = 11000;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -210,7 +221,7 @@ void MediaMetadataTest::publicMetadataAndPriority()
     next.albums[0].tracks[0].bitsPerSample = 24;
     next.albums[0].tracks[0].fields.insert(u"future"_s, 9);
     probe.start(std::make_shared<const LibrarySnapshot>(next), temp.filePath(u"native"_s), { }, 1);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
     const auto result = resultOf(done);
     QVERIFY(result);
     QCOMPARE(stats->created, 2);
@@ -234,7 +245,7 @@ void MediaMetadataTest::publicMetadataAndPriority()
     QCOMPARE(result->albums[0].tracks[0].fields.value(u"future"_s).toInt(), 9);
     const auto opens = stats->opens.load();
     probe.start(result, temp.filePath(u"native"_s), { }, 2);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, AsyncDeadlineMilliseconds);
     QCOMPARE(stats->opens, opens);
     QCOMPARE(stats->created, 2);
     QCOMPARE(resultOf(done, 1)->albums[0].coverUrl, result->albums[0].coverUrl);
@@ -242,7 +253,7 @@ void MediaMetadataTest::publicMetadataAndPriority()
     const auto changed =
             DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, result, { }).snapshot;
     probe.start(changed, temp.filePath(u"native"_s), { }, 3);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 3, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 3, AsyncDeadlineMilliseconds);
     QCOMPARE(stats->opens, opens);
     for (const auto &album : resultOf(done, 2)->albums)
         QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
@@ -251,7 +262,7 @@ void MediaMetadataTest::publicMetadataAndPriority()
     const auto withoutExternal =
             DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, resultOf(done, 2), { }).snapshot;
     probe.start(withoutExternal, temp.filePath(u"native"_s), { }, 4);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 4, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 4, AsyncDeadlineMilliseconds);
     QCOMPARE(stats->opens, opens + 2);
     for (const auto &album : resultOf(done, 3)->albums)
         QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
@@ -276,7 +287,7 @@ void MediaMetadataTest::realSilentAndInvalid()
     });
     heartbeat.start(1);
     probe.start(scanned(root), temp.filePath(u"native"_s), { }, 3);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, EnrichmentDeadlineMilliseconds);
     const auto result = resultOf(done);
     QCOMPARE(result->albums.size(), 1);
     QCOMPARE(result->albums.first().tracks.size(), 2);
@@ -311,7 +322,7 @@ void MediaMetadataTest::realEmbeddedPriority()
     MediaMetadataProbe probe;
     QSignalSpy done(&probe, &MediaMetadataProbe::finished);
     probe.start(scanned(root), temp.filePath(u"native"_s), { }, 7);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, EnrichmentDeadlineMilliseconds);
     for (const auto &album : resultOf(done)->albums) {
         QVERIFY(!album.coverUrl.isEmpty());
         QCOMPARE(QImage(album.coverUrl.toLocalFile()).pixelColor(0, 0),
@@ -328,7 +339,7 @@ void MediaMetadataTest::timeout()
     MediaMetadataProbe probe(nullptr, factory(stats, { }, -1));
     QSignalSpy done(&probe, &MediaMetadataProbe::finished);
     probe.start(scanned(temp.filePath(u"root"_s)), temp.filePath(u"native"_s), { }, 4);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 11000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, ProbeTimeoutDeadlineMilliseconds);
     const auto track = resultOf(done)->albums.first().tracks.first();
     QCOMPARE(track.mediaSupport, MediaSupport::Unknown);
     QCOMPARE(track.fields.value(u"_probeStatus"_s).toString(), u"timeout"_s);
@@ -354,7 +365,7 @@ void MediaMetadataTest::cancellationAndReuse()
     cancel->store(true);
     probe.cancel();
     probe.start(snapshot, temp.filePath(u"native"_s), { }, 11);
-    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, AsyncDeadlineMilliseconds);
     QVERIFY(done[0][2].toBool());
     QVERIFY(!resultOf(done));
     QCOMPARE(done[1][0].toULongLong(), 11);
@@ -571,7 +582,7 @@ void MediaMetadataTest::storeImportAndPreferences()
         session.setSnapshot(*snapshot);
     });
     QVERIFY(store.importLegacy(QUrl::fromLocalFile(source)));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 1);
     QCOMPARE(resets.size(), 1);
     QCOMPARE(store.snapshot()->fields.value(u"future"_s).toInt(), 42);
@@ -629,7 +640,7 @@ void MediaMetadataTest::storeProbeReplacement()
         }
     });
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(rootA) }));
-    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), EnrichmentDeadlineMilliseconds);
     QVERIFY(replaced);
     QCOMPARE(ready.size(), 1);
     QCOMPARE(store.snapshot()->albums.size(), 1);

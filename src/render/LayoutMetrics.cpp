@@ -2,6 +2,19 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Logical layout values come from the final production CSS override, not screenshot measurements.
+constexpr auto ReferenceWidthPixels = 1920;
+constexpr auto ReferenceHeightPixels = 1080;
+constexpr auto PortraitInsetRatio = .04;
+constexpr auto MinimumPortraitInsetPixels = 23.0;
+constexpr auto MaximumPortraitInsetPixels = 42.0;
+constexpr auto PortraitTextOverhangPixels = 12;
+constexpr auto LandscapeInformationXRatio = .68633333;
+constexpr auto MinimumLandscapeRightPixels = 24.0;
+constexpr auto LandscapeRightRatio = .022;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -14,25 +27,30 @@ QString LayoutMetrics::kind() const
 }
 double LayoutMetrics::layoutScale() const
 {
-    return m_cinematic  ? std::min(m_width / 1920, m_height / 1080)
+    return m_cinematic  ? std::min(m_width / ReferenceWidthPixels, m_height / ReferenceHeightPixels)
             : compact() ? 1
-                        : m_height / 1080;
+                        : m_height / ReferenceHeightPixels;
 }
 double LayoutMetrics::referenceWidth() const
 {
-    return m_cinematic ? 1920 : m_width / layoutScale();
+    return m_cinematic ? ReferenceWidthPixels : m_width / layoutScale();
 }
 double LayoutMetrics::referenceHeight() const
 {
-    return m_cinematic ? 1080 : m_height / layoutScale();
+    return m_cinematic ? ReferenceHeightPixels : m_height / layoutScale();
 }
 double LayoutMetrics::informationX() const
 {
-    return portrait() ? std::clamp(.04 * m_width, 23.0, 42.0) - 12 : .68633333 * m_width;
+    return portrait() ? std::clamp(PortraitInsetRatio * m_width, MinimumPortraitInsetPixels,
+                                   MaximumPortraitInsetPixels)
+                    - PortraitTextOverhangPixels
+                      : LandscapeInformationXRatio * m_width;
 }
 double LayoutMetrics::informationRight() const
 {
-    return portrait() ? std::clamp(.04 * m_width, 23.0, 42.0) : std::max(24.0, .022 * m_width);
+    return portrait() ? std::clamp(PortraitInsetRatio * m_width, MinimumPortraitInsetPixels,
+                                   MaximumPortraitInsetPixels)
+                      : std::max(MinimumLandscapeRightPixels, LandscapeRightRatio * m_width);
 }
 void LayoutMetrics::setViewport(double width, double height, bool coarse, bool cinematic)
 {

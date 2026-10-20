@@ -3,17 +3,30 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Invert CSS Bezier x before evaluating y; geometry, opacity and icon tracks retain independent timing.
+constexpr auto EaseControlX = .25;
+constexpr auto TransformFirstX = .4;
+constexpr auto EaseFirstY = .1;
+constexpr auto TransformSecondX = .2;
+constexpr auto BezierSearchSteps = 48;
+constexpr auto HiddenOffsetPixels = 18;
+constexpr auto GeometryDurationSeconds = .640;
+constexpr auto OpacityDurationSeconds = .400;
+constexpr auto IconDurationSeconds = .180;
+}
+
 namespace yalahoo {
 namespace {
 double bezier(double x, bool ease)
 {
-    const double x1 = ease ? .25 : .4, y1 = ease ? .1 : 0;
-    const double x2 = ease ? .25 : .2;
+    const double x1 = ease ? EaseControlX : TransformFirstX, y1 = ease ? EaseFirstY : 0;
+    const double x2 = ease ? EaseControlX : TransformSecondX;
     const auto cubic = [](double t, double a, double b) {
         return 3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * b + t * t * t;
     };
     double low = 0, high = 1;
-    for (int i = 0; i < 48; ++i) {
+    for (int i = 0; i < BezierSearchSteps; ++i) {
         const double t = (low + high) / 2;
         if (cubic(t, x1, x2) < x)
             low = t;
@@ -56,7 +69,7 @@ TransportMotion::TransportMotion(QObject *parent) : QObject(parent)
 {
     m_alpha.ease = true;
     m_icon.ease = true;
-    m_offset.move(18, .640, true);
+    m_offset.move(HiddenOffsetPixels, GeometryDurationSeconds, true);
 }
 void TransportMotion::classBegin()
 {
@@ -163,10 +176,10 @@ bool TransportMotion::moving() const
 void TransportMotion::retarget()
 {
     const bool instant = !m_complete || m_reduced || !m_active;
-    m_width.move(m_shown ? m_targetWidth : 0, .640, instant);
-    m_alpha.move(m_shown ? 1 : 0, .400, instant);
-    m_offset.move(m_shown ? 0 : 18, .640, instant);
-    m_icon.move(m_playing ? 1 : 0, .180, instant);
+    m_width.move(m_shown ? m_targetWidth : 0, GeometryDurationSeconds, instant);
+    m_alpha.move(m_shown ? 1 : 0, OpacityDurationSeconds, instant);
+    m_offset.move(m_shown ? 0 : HiddenOffsetPixels, GeometryDurationSeconds, instant);
+    m_icon.move(m_playing ? 1 : 0, IconDurationSeconds, instant);
     Q_EMIT inputChanged();
     Q_EMIT changed();
 }
@@ -182,10 +195,10 @@ void TransportMotion::advance(double dt)
 }
 void TransportMotion::finish()
 {
-    m_width.move(m_shown ? m_targetWidth : 0, .640, true);
-    m_alpha.move(m_shown ? 1 : 0, .400, true);
-    m_offset.move(m_shown ? 0 : 18, .640, true);
-    m_icon.move(m_playing ? 1 : 0, .180, true);
+    m_width.move(m_shown ? m_targetWidth : 0, GeometryDurationSeconds, true);
+    m_alpha.move(m_shown ? 1 : 0, OpacityDurationSeconds, true);
+    m_offset.move(m_shown ? 0 : HiddenOffsetPixels, GeometryDurationSeconds, true);
+    m_icon.move(m_playing ? 1 : 0, IconDurationSeconds, true);
     Q_EMIT changed();
 }
 }

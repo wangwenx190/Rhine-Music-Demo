@@ -1,3 +1,6 @@
+// Validates and publishes product rendering and interaction preferences. Partial configuration
+// updates preserve unrelated settings and notify only changed values.
+
 #pragma once
 #include <QObject>
 #include <QVariantMap>

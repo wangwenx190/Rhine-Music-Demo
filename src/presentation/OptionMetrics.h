@@ -1,3 +1,6 @@
+// Caches natural option widths for self-drawn selection controls. Model and font changes
+// invalidate measurements without duplicating input behavior.
+
 #pragma once
 #include <QFont>
 #include <QObject>

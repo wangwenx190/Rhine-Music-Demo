@@ -1,3 +1,6 @@
+// Binds product preferences to typed C++ settings commands. Visual reload and media intent have
+// separate owners so editing quality does not recreate playback.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music

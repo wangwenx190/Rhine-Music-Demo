@@ -14,6 +14,18 @@
 #include <QSaveFile>
 #include <QTimer>
 
+namespace {
+// The deployment probe waits only for bounded metadata loading; it never starts song playback.
+constexpr auto MediaProbeDeadlineMilliseconds = 20000;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    DeploymentVerificationFailed = 24
+};
+}
+
 using namespace Qt::StringLiterals;
 
 #ifdef Q_OS_MACOS
@@ -119,7 +131,7 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
                 && output.write(QJsonDocument(report).toJson()) > 0 && output.commit();
         media.stop();
         media.setSource({ });
-        app.exit(passed && saved ? 0 : 24);
+        app.exit(passed && saved ? 0 : DeploymentVerificationFailed);
     };
     QObject::connect(&media, &QMediaPlayer::mediaStatusChanged, &app, [&](auto status) {
         if (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia) {
@@ -132,7 +144,7 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
     QObject::connect(&media, &QMediaPlayer::errorOccurred, &media, [&] {
         QTimer::singleShot(0, &media, finish);
     });
-    QTimer::singleShot(20000, &media, finish);
+    QTimer::singleShot(MediaProbeDeadlineMilliseconds, &media, finish);
     QTimer::singleShot(0, &media, [&] {
         // No audio output is attached, and play() is never called.
         media.setSource(QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));

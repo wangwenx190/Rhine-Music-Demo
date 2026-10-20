@@ -1,3 +1,6 @@
+// Measures a deterministic Canvas Painter scene through its real renderer. Counters distinguish
+// synchronization, painting and owned image memory.
+
 #pragma once
 #include <QCanvasPainterItem>
 #include <QtQml/qqmlregistration.h>

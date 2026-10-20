@@ -4,13 +4,18 @@
 #include "SceneAdapter.h"
 #include "LibrarySession.h"
 
+namespace {
+// Browse chrome waits until the overview camera has substantially returned and archive state is ready.
+constexpr auto BrowseRevealProgress = .02;
+}
+
 namespace yalahoo {
 PresentationPorts detailPorts(SceneAdapter &scene, SelectionController &selection,
                               LibrarySession &library)
 {
     PresentationPorts ports;
     ports.archiveReady = [&selection] {
-        return selection.overviewProgress() < .02 && selection.archiveReady();
+        return selection.overviewProgress() < BrowseRevealProgress && selection.archiveReady();
     };
     ports.archiveInteractive = [&selection] {
         return selection.archiveInteractive();

@@ -1,3 +1,7 @@
+// Verifies whole-run shaping, interrupted slot motion and visibility/cache lifecycle on
+// anonymous text. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
 #include "FrameClock.h"
 #include "TextLayoutAdapter.h"
 #include "TitleReel.h"

@@ -1,3 +1,6 @@
+// Derives physical render-target sizes and quality parameters from logical output. Explicit
+// bounds protect integer dimensions and attachment allocation.
+
 #pragma once
 #include <QObject>
 #include <QSize>
@@ -5,6 +8,14 @@
 #include <QVariantMap>
 
 namespace yalahoo {
+namespace renderQuality {
+// The default output follows the source quality contract without a DPR-dependent sample reduction.
+inline constexpr auto AoSamples = 64;
+inline constexpr auto InitialWidthPixels = 960;
+inline constexpr auto InitialHeightPixels = 640;
+inline constexpr auto DefaultDepthOfFieldPercent = 100;
+}
+
 // Physical output dimensions are independent of artistic effect controls.
 class RenderQuality : public QObject
 {
@@ -27,7 +38,7 @@ public:
     int shadows() const;
     int aoSamples() const
     {
-        return 64;
+        return renderQuality::AoSamples;
     }
     QSize targetSize() const
     {
@@ -37,7 +48,7 @@ Q_SIGNALS:
     void changed();
 
 private:
-    QSize m_size{ 960, 640 };
-    double m_depthOfField = 100;
+    QSize m_size{ renderQuality::InitialWidthPixels, renderQuality::InitialHeightPixels };
+    double m_depthOfField = renderQuality::DefaultDepthOfFieldPercent;
 };
 }

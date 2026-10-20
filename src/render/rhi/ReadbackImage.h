@@ -1,3 +1,6 @@
+// Converts validated RHI readback bytes into owned RGBA images. Format, stride and orientation
+// handling preserve scalar precision before final display quantization.
+
 #pragma once
 #include <QImage>
 

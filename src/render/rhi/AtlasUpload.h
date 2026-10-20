@@ -1,3 +1,6 @@
+// Coalesces dirty atlas tiles into bounded backend upload batches. Initialization and replay are
+// distinct from incremental updates to avoid redundant transfers.
+
 #pragma once
 #include <QImage>
 #include <QJsonArray>

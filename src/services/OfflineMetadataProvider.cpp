@@ -3,6 +3,11 @@
 #include <QTimer>
 #include <utility>
 
+namespace {
+// The offline facade keeps the same bounded request contract as the online provider.
+constexpr auto MaximumPendingMetadataRequests = 8;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -95,7 +100,7 @@ bool OfflineMetadataProvider::request(AlbumQuery query, RequestToken token, Meta
     for (const auto &pending : std::as_const(m_pending))
         if (pending.token == token)
             return true;
-    if (m_pending.size() >= 8)
+    if (m_pending.size() >= MaximumPendingMetadataRequests)
         return false;
     const auto albumIndex = m_albumIndices.value(token.albumId, -1);
     m_pending.append({ std::move(query), std::move(token), kind, m_cache, albumIndex });

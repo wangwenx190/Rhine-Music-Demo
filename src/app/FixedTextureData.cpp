@@ -1,3 +1,4 @@
+#include "RenderData.h"
 #include "Logging.h"
 #include "FixedTextureData.h"
 #include <QFile>
@@ -5,6 +6,12 @@
 #include <QSize>
 #include <QImage>
 #include <cstring>
+
+namespace {
+// Review lookups use the same bundled payload dimensions as production RHI.
+constexpr auto SourceRgbaFloatBytes = 16;
+
+}
 
 using namespace Qt::StringLiterals;
 
@@ -14,7 +21,11 @@ void FixedTextureData::setAsset(const QString &asset)
         return;
     if (asset == "smaa-area"_L1 || asset == "smaa-search"_L1) {
         QImage image(":/assets/postprocess/"_L1 + asset + ".png"_L1);
-        const QSize expected = asset == "smaa-area"_L1 ? QSize(160, 560) : QSize(66, 33);
+        const QSize expected = asset == "smaa-area"_L1
+                ? QSize(yalahoo::rhi::renderData::SmaaAreaWidth,
+                        yalahoo::rhi::renderData::SmaaAreaHeight)
+                : QSize(yalahoo::rhi::renderData::SmaaSearchWidth,
+                        yalahoo::rhi::renderData::SmaaSearchHeight);
         if (image.size() != expected) {
             qCWarning(yalahoo::logRender, "Invalid SMAA lookup texture");
             return;
@@ -32,17 +43,18 @@ void FixedTextureData::setAsset(const QString &asset)
     }
     QSize size;
     if (asset == "room-pmrem"_L1)
-        size = { 768, 1024 };
+        size = { yalahoo::rhi::renderData::EnvironmentWidth,
+                 yalahoo::rhi::renderData::EnvironmentHeight };
     else if (asset == "dfg"_L1)
-        size = { 16, 16 };
+        size = { yalahoo::rhi::renderData::DfgSide, yalahoo::rhi::renderData::DfgSide };
     else if (asset == "ltc1"_L1 || asset == "ltc2"_L1)
-        size = { 64, 64 };
+        size = { yalahoo::rhi::renderData::LtcSide, yalahoo::rhi::renderData::LtcSide };
     else if (asset.startsWith(u"ssao-kernel-"_s)
              && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
         size = { asset.section('-'_L1, -1).toInt(), 1 };
     else if (asset.startsWith(u"ssao-noise-"_s)
              && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
-        size = { 4, 4 };
+        size = { yalahoo::rhi::renderData::NoiseSide, yalahoo::rhi::renderData::NoiseSide };
     else {
         qCWarning(yalahoo::logRender, "Unknown fixed material texture");
         return;
@@ -53,14 +65,15 @@ void FixedTextureData::setAsset(const QString &asset)
         return;
     }
     auto bytes = file.readAll();
-    if (bytes.size() != size.width() * size.height() * 16) {
+    if (bytes.size() != size.width() * size.height() * SourceRgbaFloatBytes) {
         qCWarning(yalahoo::logRender, "Invalid fixed material texture size");
         return;
     }
 #if Q_BYTE_ORDER == Q_BIG_ENDIAN
-    for (qsizetype i = 0; i < bytes.size(); i += 4) {
+    constexpr auto FloatScalarBytes = 4;
+    for (qsizetype i = 0; i < bytes.size(); i += FloatScalarBytes) {
         quint32 word = qFromLittleEndian<quint32>(bytes.constData() + i);
-        std::memcpy(bytes.data() + i, &word, 4);
+        std::memcpy(bytes.data() + i, &word, FloatScalarBytes);
     }
 #endif
     m_asset = asset;

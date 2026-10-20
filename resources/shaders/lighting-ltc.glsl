@@ -1,3 +1,11 @@
+// The rational LTC fit approximates theta/sin(theta)/(2*pi); epsilon protects grazing angles.
+const float LtcNumeratorConstant = 0.8543985;
+const float LtcNumeratorLinear = 0.4965155;
+const float LtcNumeratorQuadratic = 0.0145206;
+const float LtcDenominatorConstant = 3.4175940;
+const float LtcDenominatorLinear = 4.1616724;
+const float LtcAngularEpsilon = 1e-7;
+
 float LTC_ClippedSphereFormFactor(const in vec3 f)
 {
 
@@ -17,11 +25,12 @@ vec3 LTC_EdgeVectorFormFactor(const in vec3 v1, const in vec3 v2)
     float y = abs(x);
 
     // rational polynomial approximation to theta / sin( theta ) / 2PI
-    float a = 0.8543985 + (0.4965155 + 0.0145206 * y) * y;
-    float b = 3.4175940 + (4.1616724 + y) * y;
+    float a = LtcNumeratorConstant + (LtcNumeratorLinear + LtcNumeratorQuadratic * y) * y;
+    float b = LtcDenominatorConstant + (LtcDenominatorLinear + y) * y;
     float v = a / b;
 
-    float theta_sintheta = (x > 0.0) ? v : 0.5 * inversesqrt(max(1.0 - x * x, 1e-7)) - v;
+    float theta_sintheta =
+            (x > 0.0) ? v : 0.5 * inversesqrt(max(1.0 - x * x, LtcAngularEpsilon)) - v;
 
     return cross(v1, v2) * theta_sintheta;
 }

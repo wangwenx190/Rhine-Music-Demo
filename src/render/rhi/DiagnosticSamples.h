@@ -1,3 +1,6 @@
+// Keeps bounded diagnostic samples and computes their distributions. Measurements describe
+// observed submissions and never imply unknown GPU completion times.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -8,6 +11,14 @@ using Qt::StringLiterals::operator""_s;
 #include <optional>
 
 namespace yalahoo::rhi {
+namespace diagnosticSampling {
+// Quantiles describe only observed samples; batch time bounds GUI diagnostic publication.
+inline constexpr auto MedianQuantile = .5;
+inline constexpr auto HighQuantile = .95;
+inline constexpr auto TailQuantile = .99;
+inline constexpr auto BatchMilliseconds = 500;
+}
+
 // Fixed-size nearest-rank distributions. No allocations or JSON on the render hot path.
 class DiagnosticSeries final
 {
@@ -30,9 +41,9 @@ public:
         };
         return { { u"count"_s, count },
                  { u"discarded"_s, m_seen - count },
-                 { u"p50"_s, percentile(.5) },
-                 { u"p95"_s, percentile(.95) },
-                 { u"p99"_s, percentile(.99) } };
+                 { u"p50"_s, percentile(diagnosticSampling::MedianQuantile) },
+                 { u"p95"_s, percentile(diagnosticSampling::HighQuantile) },
+                 { u"p99"_s, percentile(diagnosticSampling::TailQuantile) } };
     }
     int seen() const
     {
@@ -76,7 +87,7 @@ public:
         m_batch.selectedBytes += sample.selectedBytes;
         m_batch.uniformBytes += sample.uniformBytes;
         m_batch.elapsedMs = sample.submittedMs - m_start;
-        if (m_batch.elapsedMs < 500)
+        if (m_batch.elapsedMs < diagnosticSampling::BatchMilliseconds)
             return std::nullopt;
         const auto result = m_batch;
         m_batch = { };

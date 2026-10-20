@@ -20,6 +20,11 @@
 #include <QDir>
 #include <cstdio>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int ReviewDeadlineMilliseconds = 60000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -145,7 +150,7 @@ int main(int argc, char **argv)
                 QObject::connect(&timeout, &QTimer::timeout, &wait, &QEventLoop::quit);
                 checkReady();
                 if (!ready) {
-                    timeout.start(60000);
+                    timeout.start(ReviewDeadlineMilliseconds);
                     driver.surface->requestFrame();
                     wait.exec();
                 }

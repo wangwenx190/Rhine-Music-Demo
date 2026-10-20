@@ -44,16 +44,39 @@
 #include <QMutexLocker>
 #include <rhi/qrhi.h>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int LayoutSettleMilliseconds = 150;
+constexpr int TeardownObservationMilliseconds = 300;
+constexpr int InteractionSettleMilliseconds = 1200;
+constexpr int ReviewDeadlineMilliseconds = 60000;
+}
+
+namespace {
+// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
+constexpr auto NanosecondsPerMillisecond = 1e6;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
-QJsonArray diagnostics;
-QMutex diagnosticsMutex;
+// Construct on first access; no namespace-scope runtime initialization is required.
+QJsonArray &diagnostics()
+{
+    static QJsonArray value;
+    return value;
+}
+// Construct on first access; no namespace-scope runtime initialization is required.
+QMutex &diagnosticsMutex()
+{
+    static QMutex value;
+    return value;
+}
 void message(QtMsgType type, const QMessageLogContext &, const QString &text)
 {
-    const QMutexLocker lock(&diagnosticsMutex);
+    const QMutexLocker lock(&diagnosticsMutex());
     if (type == QtWarningMsg || type == QtCriticalMsg || type == QtFatalMsg)
-        diagnostics.append(text);
+        diagnostics().append(text);
     std::fprintf(stderr, "%s\n", text.toUtf8().constData());
 }
 QQuickItem *findItem(QQuickItem *root, const QString &name)
@@ -115,7 +138,12 @@ int main(int argc, char **argv)
         return 2;
     const auto fontsNs = bootstrapTimer.nsecsElapsed();
     qputenv("QCPAINTER_DEBUG_COLLECT", "0"_ba);
-    qInstallMessageHandler(message);
+    const auto previousMessageHandler = qInstallMessageHandler(message);
+    // Restore before application teardown or function-static diagnostic storage destruction.
+    // Every early return after installation follows this same ownership boundary.
+    const auto restoreMessageHandler = qScopeGuard([previousMessageHandler] {
+        qInstallMessageHandler(previousMessageHandler);
+    });
     if (app.arguments().contains(u"--controls"_s))
         return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--experiments"_s))
@@ -149,8 +177,9 @@ int main(int argc, char **argv)
         return (argc == 3 || argc == 4 || argc == 5 || observeOnly) && validSeconds
                 ? reviewStartup(
                           app, QString::fromLocal8Bit(argv[2]), seconds,
-                          { { u"applicationSetupMs"_s, applicationNs / 1e6 },
-                            { u"fontAndArgumentSetupMs"_s, (fontsNs - applicationNs) / 1e6 },
+                          { { u"applicationSetupMs"_s, applicationNs / NanosecondsPerMillisecond },
+                            { u"fontAndArgumentSetupMs"_s,
+                              (fontsNs - applicationNs) / NanosecondsPerMillisecond },
                             { u"scope"_s,
                               u"Review main entry through QGuiApplication and embedded font/argument setup; excludes pre-main loader, anonymous fixture generation, model/cover/render preparation and native presentation."_s } },
                           argc >= 5 ? QString::fromLocal8Bit(argv[4]) : u"matrix"_s, observeOnly)
@@ -291,7 +320,7 @@ int main(int argc, char **argv)
             window.resize(size);
             root->setSize(size);
             root->setProperty("night", index % 2 == 1);
-            QTimer::singleShot(150, &app, [&, index, size] {
+            QTimer::singleShot(LayoutSettleMilliseconds, &app, [&, index, size] {
                 const auto image = surface.grab();
                 const QString file = u"browse-%1.png"_s.arg(index, 2, 10, '0'_L1);
                 const auto info = bounds(root, u"browseInfo"_s);
@@ -329,7 +358,7 @@ int main(int argc, char **argv)
                         "playingTitle",
                         u"\u64ad\u653e\u4e2d\u7684\u957f\u6b4c\u66f2\u6807\u9898\u4fdd\u6301\u6309\u94ae\u4f4d\u7f6e"_s
                                 .repeated(5));
-                QTimer::singleShot(150, &app, [&, play, stop, size] {
+                QTimer::singleShot(LayoutSettleMilliseconds, &app, [&, play, stop, size] {
                     const auto afterPlay = bounds(root, u"playButton"_s);
                     const auto afterStop = bounds(root, u"stopButton"_s);
                     const bool fixed = play == afterPlay && stop == afterStop;
@@ -370,12 +399,12 @@ int main(int argc, char **argv)
             guiStateNs = guiTimer.nsecsElapsed();
             // Canvas2D's available/onPaint work is queued after item creation.
             // Read the settled submitted texture, rather than the creation frame.
-            QTimer::singleShot(300, &app, [&] {
+            QTimer::singleShot(TeardownObservationMilliseconds, &app, [&] {
                 captureRequested = true;
                 root->setProperty("captureRevision", root->property("captureRevision").toInt() + 1);
                 surface.requestFrame();
             });
-            QTimer::singleShot(1200, &app, [&, index] {
+            QTimer::singleShot(InteractionSettleMilliseconds, &app, [&, index] {
                 QImage image;
                 {
                     const QMutexLocker lock(&captureMutex);
@@ -480,7 +509,7 @@ int main(int argc, char **argv)
             root->findChild<QQuickItem *>("probeLoader")->setSize({ 420, 200 });
             root->setSize({ 420, 200 });
             ++requestedCaptureRevision;
-            QTimer::singleShot(150, &app, [&] {
+            QTimer::singleShot(LayoutSettleMilliseconds, &app, [&] {
                 captureRequested = true;
                 root->setProperty("captureRevision", root->property("captureRevision").toInt() + 1);
                 surface.requestFrame();
@@ -576,8 +605,8 @@ int main(int argc, char **argv)
         }
         QJsonArray capturedDiagnostics;
         {
-            const QMutexLocker lock(&diagnosticsMutex);
-            capturedDiagnostics = diagnostics;
+            const QMutexLocker lock(&diagnosticsMutex());
+            capturedDiagnostics = diagnostics();
         }
         passed &= released && yalahoo::verification::windowPolicySatisfied(window) && swapped > 0
                 && capturedDiagnostics.isEmpty();
@@ -633,7 +662,7 @@ int main(int argc, char **argv)
     QTimer::singleShot(0, &app, [&] {
         next();
     });
-    QTimer::singleShot(60000, &app, [&] {
+    QTimer::singleShot(ReviewDeadlineMilliseconds, &app, [&] {
         app.exit(7);
     });
     return app.exec();

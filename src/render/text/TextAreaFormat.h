@@ -1,9 +1,17 @@
+// Exposes text-editor formatting state to self-drawn QML controls. Native Qt editing, undo and
+// input-method behavior remain with the editor.
+
 #pragma once
 #include <QObject>
 #include <QPointer>
 #include <QQuickTextDocument>
 
 namespace yalahoo {
+namespace textAreaMetrics {
+// The source editor line box is independent of Qt native styling.
+inline constexpr auto DefaultLineHeightPixels = 20.4;
+}
+
 // CSS line boxes for the plain-text editor; Qt keeps selection, IME and undo ownership.
 class TextAreaFormat : public QObject
 {
@@ -27,7 +35,7 @@ Q_SIGNALS:
 private:
     void apply(int position, int added, bool all);
     QPointer<QQuickTextDocument> m_document;
-    qreal m_lineHeight = 20.4;
+    qreal m_lineHeight = textAreaMetrics::DefaultLineHeightPixels;
     bool m_applying = false;
     QMetaObject::Connection m_connection;
 };

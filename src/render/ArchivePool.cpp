@@ -4,6 +4,13 @@
 #include <numeric>
 #include <QSet>
 
+namespace {
+// Bound period growth before using floating wrap; source rows are offset from the physical pool origin.
+constexpr auto CenteredPoolRows = 32;
+constexpr auto FirstAlbumRow = 12;
+constexpr auto MaximumExactRowPeriod = 1000000;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -23,7 +30,7 @@ double ArchivePool::nearestOccurrence(double value, double center, double period
 ArchiveCell ArchivePool::poolCell(int index)
 {
     constexpr std::array<int, lanes> order{ 0, 1, 2, 3, 4, -2, -1, 5, 6 };
-    return { double(order.at(index / rows)), double(index % rows - (rows - 32) / 2) };
+    return { double(order.at(index / rows)), double(index % rows - (rows - CenteredPoolRows) / 2) };
 }
 ArchiveCell ArchivePool::visibleCell(int index, ArchiveCell center)
 {
@@ -51,12 +58,13 @@ void ArchivePool::setColumns(QList<LibraryColumn> columns)
     for (int lane = 0; lane < m_columns.size(); ++lane) {
         const auto &ids = m_columns[lane].albumIds;
         for (int row = 0; row < ids.size(); ++row)
-            m_locations.insert(ids[row], { double(lane), double(row + 12) });
+            m_locations.insert(ids[row], { double(lane), double(row + FirstAlbumRow) });
         if (std::isfinite(m_rowPeriod)) {
             const auto count = qMax(1, int(ids.size()));
             const auto next =
                     qint64(m_rowPeriod) / std::gcd(qint64(m_rowPeriod), qint64(count)) * count;
-            m_rowPeriod = next > 1000000 ? std::numeric_limits<double>::infinity() : double(next);
+            m_rowPeriod = next > MaximumExactRowPeriod ? std::numeric_limits<double>::infinity()
+                                                       : double(next);
         }
     }
 }
@@ -65,7 +73,7 @@ QString ArchivePool::albumAt(ArchiveCell cell) const
     if (m_columns.isEmpty())
         return { };
     const auto &ids = m_columns[wrap(cell.lane, int(m_columns.size()))].albumIds;
-    return ids.isEmpty() ? QString() : ids[wrap(cell.row - 12, int(ids.size()))];
+    return ids.isEmpty() ? QString() : ids[wrap(cell.row - FirstAlbumRow, int(ids.size()))];
 }
 std::optional<ArchiveCell> ArchivePool::location(const QString &id) const
 {
@@ -96,7 +104,9 @@ QString ArchivePool::realAlbumAt(ArchiveCell cell) const
         || std::floor(cell.row) != cell.row)
         return { };
     const auto &ids = m_columns[int(cell.lane)].albumIds;
-    return cell.row >= 12 && cell.row < 12 + ids.size() ? ids[int(cell.row - 12)] : QString();
+    return cell.row >= FirstAlbumRow && cell.row < FirstAlbumRow + ids.size()
+            ? ids[int(cell.row - FirstAlbumRow)]
+            : QString();
 }
 void ArchivePool::update(ArchiveCell center, const std::array<double, lanes> *columnRows)
 {

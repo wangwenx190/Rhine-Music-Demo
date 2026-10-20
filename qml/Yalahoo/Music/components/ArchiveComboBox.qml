@@ -1,3 +1,6 @@
+// Self-drawn visuals wrap Qt Templates selection and input behavior. Option metrics measure
+// natural width without reimplementing model lookup or focus handling.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Shapes

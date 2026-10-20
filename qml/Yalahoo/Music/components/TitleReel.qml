@@ -1,3 +1,6 @@
+// Composes C++-shaped title slots and color-glyph overlays. Layer dimensions use actual DPR;
+// hidden slots retain only the state needed for a later reveal.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music
@@ -79,6 +82,7 @@ Item {
                                                        || root.Window.window.visible)
 
             layer.smooth: true
+            // The offscreen target uses physical pixels; logical glyph geometry remains unchanged.
             layer.textureSize: Qt.size(Math.ceil(width * root.controller.dpr), Math.ceil(height
                                                                                          * root.controller.dpr))
 

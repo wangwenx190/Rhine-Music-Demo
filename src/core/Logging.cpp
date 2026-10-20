@@ -20,6 +20,19 @@
 #  include <unistd.h>
 #endif
 
+namespace {
+// Bound sink writes/retention work; continuation-byte masking preserves complete UTF-8 records.
+#ifdef Q_OS_WIN
+constexpr auto BytesPerKiB = 1024;
+constexpr auto AnsiResetSequenceBytes = 4;
+#endif
+constexpr auto CleanupIntervalSeconds = 3600;
+constexpr auto Utf8ContinuationMask = 0xc0;
+constexpr auto Utf8ContinuationTag = 0x80;
+constexpr auto MinimumLogSegmentBytes = 256;
+constexpr auto MaximumLogArchives = 32;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -30,7 +43,12 @@ Q_LOGGING_CATEGORY(logMedia, "yalahoo.media", QtInfoMsg)
 Q_LOGGING_CATEGORY(logSettings, "yalahoo.settings", QtInfoMsg)
 
 namespace {
-QMutex sinkMutex;
+// Construct on first access; no namespace-scope runtime initialization is required.
+QMutex &sinkMutex()
+{
+    static QMutex value;
+    return value;
+}
 
 bool prepareConsole()
 {
@@ -65,7 +83,7 @@ void consoleWrite(QtMsgType type, const QByteArray &bytes, bool color)
     const auto write = [output](const char *data, qsizetype size) {
         while (size > 0) {
             DWORD written = 0;
-            const auto count = DWORD(std::min<qsizetype>(size, 1024 * 1024));
+            const auto count = DWORD(std::min<qsizetype>(size, BytesPerKiB * BytesPerKiB));
             if (!WriteFile(output, data, count, &written, nullptr) || !written)
                 break;
             data += written;
@@ -75,7 +93,7 @@ void consoleWrite(QtMsgType type, const QByteArray &bytes, bool color)
     write(sequence, qsizetype(std::char_traits<char>::length(sequence)));
     write(bytes.constData(), bytes.size());
     if (*sequence)
-        write("\033[0m", 4);
+        write("\033[0m", AnsiResetSequenceBytes);
 #else
     std::fputs(sequence, stderr);
     std::fwrite(bytes.constData(), 1, size_t(bytes.size()), stderr);
@@ -108,7 +126,7 @@ struct LoggingSession::State final
     void cleanup()
     {
         const auto now = QDateTime::currentDateTimeUtc();
-        nextCleanup = now.addSecs(3600);
+        nextCleanup = now.addSecs(CleanupIntervalSeconds);
         const auto cutoff = now.addDays(-options.retentionDays);
         const QRegularExpression owned(
                 u"^(yalahoo-\\d{8}T\\d{9}Z-\\d+-[0-9a-f-]{36})\\.\\d+\\.log$"_s);
@@ -191,7 +209,8 @@ struct LoggingSession::State final
             const qint64 room = options.segmentBytes - file.size();
             auto count = qsizetype(std::min<qint64>(room, bytes.size() - offset));
             while (count && offset + count < bytes.size()
-                   && (static_cast<unsigned char>(bytes[offset + count]) & 0xc0) == 0x80)
+                   && (static_cast<unsigned char>(bytes[offset + count]) & Utf8ContinuationMask)
+                           == Utf8ContinuationTag)
                 --count;
             if (!count) {
                 if (!rotate())
@@ -211,7 +230,7 @@ struct LoggingSession::State final
     static void message(QtMsgType type, const QMessageLogContext &context, const QString &message)
     {
         // Qt can invoke this concurrently from GUI, render and worker threads.
-        const QMutexLocker lock(&sinkMutex);
+        const QMutexLocker lock(&sinkMutex());
         auto bytes = qFormatLogMessage(type, context, message).toUtf8();
         if (bytes.isNull())
             return;
@@ -233,8 +252,8 @@ LoggingSession::LoggingSession(Options options) : m_state(std::make_unique<State
         options.directory =
                 QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
                         .filePath(u"logs"_s);
-    options.segmentBytes = std::max<qint64>(256, options.segmentBytes);
-    options.archiveCount = std::clamp(options.archiveCount, 1, 32);
+    options.segmentBytes = std::max<qint64>(MinimumLogSegmentBytes, options.segmentBytes);
+    options.archiveCount = std::clamp(options.archiveCount, 1, MaximumLogArchives);
     options.retentionDays = std::max(1, options.retentionDays);
     m_state->options = std::move(options);
     m_state->color = prepareConsole();
@@ -263,7 +282,7 @@ LoggingSession::LoggingSession(Options options) : m_state(std::make_unique<State
         }
     }
     {
-        const QMutexLocker lock(&sinkMutex);
+        const QMutexLocker lock(&sinkMutex());
         Q_ASSERT(!State::active);
         State::active = m_state.get();
         m_state->previous = qInstallMessageHandler(State::message);
@@ -277,7 +296,7 @@ LoggingSession::LoggingSession(Options options) : m_state(std::make_unique<State
 LoggingSession::~LoggingSession()
 {
     qCInfo(logApp) << "Logging stopped";
-    const QMutexLocker lock(&sinkMutex);
+    const QMutexLocker lock(&sinkMutex());
     qInstallMessageHandler(m_state->previous);
     State::active = nullptr;
 }

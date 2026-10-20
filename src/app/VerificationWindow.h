@@ -1,3 +1,6 @@
+// Applies the selected verification window policy before application creation and first show.
+// Native guards preserve that policy when Qt replaces surfaces or window flags.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;

@@ -1,3 +1,6 @@
+// Queries actual native graphics capabilities before allocating production targets. Unsupported
+// explicit requests produce actionable failure rather than altered quality.
+
 #pragma once
 #include <QSGRendererInterface>
 

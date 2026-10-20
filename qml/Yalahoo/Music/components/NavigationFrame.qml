@@ -1,3 +1,6 @@
+// Aligns source ruler, ordinal wheels and column text using real font metrics. C++ owns
+// navigation and trajectory state; QML composes the measured visual boxes.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music

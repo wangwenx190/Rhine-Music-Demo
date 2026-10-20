@@ -6,6 +6,16 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Formatting uses decimal units; cached line heights account for key storage and entry overhead.
+constexpr auto LineCacheEntryOverheadBytes = 64;
+constexpr auto MaximumDisplayDurationSeconds = 1e12;
+constexpr auto SecondsPerMinute = 60;
+constexpr auto DecimalBase = 10;
+constexpr auto FormatSignificantDigits = 8;
+constexpr auto MetricPrefixScale = 1000;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -62,15 +72,18 @@ double DetailModel::normalLineHeight(const QString &text, const QFont &font)
     // CSS normal line boxes round the resolved ascent/descent independently.
     const double height =
             line.isValid() ? std::round(line.ascent()) + std::round(line.descent()) : 0;
-    const qsizetype cost = key.size() * 2 + 64;
+    const qsizetype cost = key.size() * 2 + LineCacheEntryOverheadBytes;
     if (cost <= m_lineHeights.maxCost())
         m_lineHeights.insert(key, new double(height), int(cost));
     return height;
 }
 QString DetailModel::time(double seconds)
 {
-    const qint64 value = std::isfinite(seconds) ? qint64(std::clamp(seconds, 0.0, 1e12)) : 0;
-    return u"%1:%2"_s.arg(value / 60).arg(value % 60, 2, 10, '0'_L1);
+    const qint64 value = std::isfinite(seconds)
+            ? qint64(std::clamp(seconds, 0.0, MaximumDisplayDurationSeconds))
+            : 0;
+    return u"%1:%2"_s.arg(value / SecondsPerMinute)
+            .arg(value % SecondsPerMinute, 2, DecimalBase, '0'_L1);
 }
 int DetailModel::rowCount(const QModelIndex &parent) const
 {
@@ -86,7 +99,7 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
     case TrackId:
         return track.id;
     case Number:
-        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2, 10, '0'_L1);
+        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2, DecimalBase, '0'_L1);
     case Title:
         return track.title;
     case Artist:
@@ -184,8 +197,8 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                 if (unit == "kbps"_L1)
                     scaled = std::round(scaled);
                 else if (unit == "kHz"_L1)
-                    scaled = std::round(scaled * 10) / 10;
-                return QString::number(scaled, 'g', 8);
+                    scaled = std::round(scaled * DecimalBase) / DecimalBase;
+                return QString::number(scaled, 'g', FormatSignificantDigits);
             };
             return number(*low) + " "_L1 + unit
                     + (*low == *high ? QString() : u"\u2013"_s + number(*high) + " "_L1 + unit);
@@ -205,9 +218,9 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
         fact(QCoreApplication::translate("Yalahoo", "RESOLUTION / Bit depth and sample rate"),
              (lossy ? QCoreApplication::translate("Yalahoo", "Lossy encoding")
                     : display(minBits, maxBits, 1, u"bit"_s))
-                     + " / "_L1 + display(minRate, maxRate, 1000, u"kHz"_s));
+                     + " / "_L1 + display(minRate, maxRate, MetricPrefixScale, u"kHz"_s));
         fact(QCoreApplication::translate("Yalahoo", "BITRATE"),
-             display(minBitrate, maxBitrate, 1000, u"kbps"_s));
+             display(minBitrate, maxBitrate, MetricPrefixScale, u"kbps"_s));
         fact(QCoreApplication::translate("Yalahoo", "DURATION / Total time"), time(duration));
         for (const auto &producer : a.producers) {
             producers.append(QVariantMap{

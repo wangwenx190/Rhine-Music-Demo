@@ -1,3 +1,6 @@
+// Loads and atomically saves validated product preferences. Unknown fields survive partial
+// updates and source music paths are never rewritten.
+
 #pragma once
 #include <memory>
 #include <QObject>

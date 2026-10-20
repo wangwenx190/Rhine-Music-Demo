@@ -1,3 +1,6 @@
+// Checks production floor projection, lighting and shadow reception. Analytic expectations use
+// the actual camera and distinguish world-space from pixel tolerances.
+
 // Included by RhiShadowAudit after its independent source PCF reference.
 // All values below derive from Three 0.183.2 MeshStandardMaterial, not rendered references.
 struct FloorLookup final

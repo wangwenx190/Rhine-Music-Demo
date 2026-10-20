@@ -1,3 +1,4 @@
+#include "RenderData.h"
 #include "RhiItem.h"
 #include "Logging.h"
 #include "ReadbackImage.h"
@@ -26,35 +27,158 @@
 #include <algorithm>
 #include <cstdio>
 
+namespace {
+// Geometry and source lighting parameters retain their original float precision at GPU upload.
+constexpr auto CaseHalfWidth = 2.225f;
+constexpr auto CaseBottom = .175f;
+constexpr auto CaseTop = 3.525f;
+constexpr auto CaseHalfDepth = .07f;
+constexpr auto NanosecondsPerMillisecond = 1e6;
+constexpr auto EmptyBoundsMagnitude = 1e6f;
+constexpr auto PaperLeftMagnitude = 1.36f;
+constexpr auto PaperRight = 1.7f;
+constexpr auto PaperBottom = .32f;
+constexpr auto PaperFront = .027f;
+constexpr auto PaperTop = 3.38f;
+constexpr auto ReviewFloorDepth = .05f;
+constexpr auto ProductFloorHalfExtent = 100;
+constexpr auto ProductFloorDepth = 4.63f;
+constexpr auto ShadowNormalBias = .035f;
+constexpr auto ShadowDepthBias = .0003f;
+constexpr auto RibbonLaneWidth = 27;
+constexpr auto ArchiveRowSpacing = .62f;
+constexpr auto GaussianHalfMaximumExponent = .6931471805599453f;
+constexpr auto LightDistanceHeight = 3.35f;
+constexpr auto LightDistanceDepth = 5.5f;
+constexpr auto MinimumPrintAmbient = .08f;
+constexpr auto AreaModeBoundary = 1.5f;
+constexpr auto HybridModeBoundary = 2.5f;
+constexpr auto ShelfAmbientBlend = .25f;
+constexpr auto CoreLaneWidth = 3.2f;
+constexpr auto LaneFieldPower = 4.0f;
+constexpr auto SpillLaneWidth = 7.2f;
+constexpr auto HotRowWidth = 1.1f;
+constexpr auto NeighborRowWidth = 2.4f;
+constexpr auto CoreLightGain = .58f;
+constexpr auto SpillLightGain = .42f;
+constexpr auto CoreAmbientFloor = .12f;
+constexpr auto MillisecondsPerSecond = 1000;
+}
+
 using namespace Qt::StringLiterals;
 
 #if defined(Q_OS_WIN)
 #  include <rhi/qrhi_platform.h>
 #endif
 
+namespace {
+constexpr float ShadowStrength = PaperBottom;
+constexpr float FloorRoughness = .95f;
+// The ordinal order matches the capture texture/output tables; aliases share a readback owner.
+enum CaptureField {
+    OpaqueColorField,
+    OpaqueNormalField,
+    OpaqueDepthField,
+    ShadowField,
+    CompositeColorField,
+    CompositeNormalField,
+    CompositeDepthField,
+    PostprocessedField,
+    AtlasField,
+    RawAoField,
+    BlurredAoField,
+    AoNormalField,
+    AoDepthField,
+    DofDepthField,
+    CaptureFieldCount
+};
+// Draw kinds are the production frame.glsl material selectors, including the shadow sentinel.
+enum DrawKind {
+    ShadowKind = -1,
+    PaperKind,
+    PreviewPaperKind,
+    ReviewFloorKind,
+    LidKind,
+    SpineKind,
+    TrayKind,
+    ProductFloorKind
+};
+enum FrameBinding {
+    FrameUniformBinding,
+    CoverBinding,
+    EnvironmentBinding,
+    ShadowBinding,
+    CaptureBinding,
+    DfgBinding,
+    LtcFirstBinding,
+    LtcSecondBinding
+};
+constexpr int VectorScalars = 4;
+constexpr int MatrixScalars = 16;
+constexpr int CaseSurfaceCount = 3;
+constexpr int ClipPlaneCount = 6;
+constexpr int UniformBytes = 832;
+constexpr int BackgroundOffsetBytes = 320;
+constexpr int OpticsOffsetBytes = 544;
+constexpr int NativeVpOffsetBytes = 560;
+constexpr int ScatterOffsetBytes = 736;
+constexpr int FogOffsetBytes = 816;
+constexpr int UniformBaseCount = 8;
+constexpr int NormalOffsetBytes = 12;
+constexpr int UvOffsetBytes = 24;
+constexpr int InstanceMatrixSecondOffsetBytes = 32;
+constexpr int InstanceMatrixThirdOffsetBytes = 48;
+constexpr int InstanceUvOffsetBytes = 64;
+constexpr int InstanceLightOffsetBytes = 80;
+constexpr int InstanceSecondaryLightOffsetBytes = 96;
+constexpr int MaximumOpticalProbe = 13;
+constexpr int VisibilityProbe = 10;
+constexpr int MinimumBatchedEntities = 8;
+constexpr int FullscreenTriangleVertices = 3;
+constexpr int ExtraGeometryVertices = 15;
+constexpr int ExtraGeometryIndices = 21;
+constexpr int ExtraDrawUniforms = 6;
+constexpr int ShadowFilterRadius = 4;
+constexpr int HalfRgbaBytes = 8;
+constexpr int ReviewFloorHalfExtent = 6;
+constexpr int VectorAxes = 3;
+constexpr int LightDistanceWidth = 6;
+constexpr int MinimumAoSamples = 16;
+constexpr int MediumAoSamples = 32;
+constexpr int MaximumAoSamples = 64;
+}
+
 namespace yalahoo::rhi {
 namespace {
-SceneSubmissionStats submissionStats;
+constinit SceneSubmissionStats submissionStats;
 template <class T>
 using Owned = std::unique_ptr<T>;
 // Exactly matches frame.glsl; avoid compiler-dependent QVector3D/std140 packing.
-struct alignas(16) Uniform final
+struct alignas(renderData::VectorBytes) Uniform final
 {
-    float mvp[16], model[16], view[16], lightMvp[16], lightVP[16];
-    float background[4], rowSettings[4], rowColumn[4], lightColumn[4], spotPosition[4],
-            spotTarget[4], spotColor[4];
-    float keyColor[4], skyColor[4], groundColor[4], lightIntensities[4], settings[4], clip[4],
-            draw[4], optics[4];
-    float nativeVP[16], camera[4], tint[4], attenuation[4], material[4], coat[4], areaPosition[4],
-            areaTarget[4], scatter[4], coverUv[4], paperSize[4], originLight0[4], originLight1[4],
-            fog[4];
+    float mvp[MatrixScalars], model[MatrixScalars], view[MatrixScalars], lightMvp[MatrixScalars],
+            lightVP[MatrixScalars];
+    float background[VectorScalars], rowSettings[VectorScalars], rowColumn[VectorScalars],
+            lightColumn[VectorScalars], spotPosition[VectorScalars], spotTarget[VectorScalars],
+            spotColor[VectorScalars];
+    float keyColor[VectorScalars], skyColor[VectorScalars], groundColor[VectorScalars],
+            lightIntensities[VectorScalars], settings[VectorScalars], clip[VectorScalars],
+            draw[VectorScalars], optics[VectorScalars];
+    float nativeVP[MatrixScalars], camera[VectorScalars], tint[VectorScalars],
+            attenuation[VectorScalars], material[VectorScalars], coat[VectorScalars],
+            areaPosition[VectorScalars], areaTarget[VectorScalars], scatter[VectorScalars],
+            coverUv[VectorScalars], paperSize[VectorScalars], originLight0[VectorScalars],
+            originLight1[VectorScalars], fog[VectorScalars];
 };
-static_assert(sizeof(Uniform) == 832 && offsetof(Uniform, background) == 320
-              && offsetof(Uniform, optics) == 544 && offsetof(Uniform, nativeVP) == 560
-              && offsetof(Uniform, scatter) == 736 && offsetof(Uniform, fog) == 816);
+static_assert(sizeof(Uniform) == UniformBytes
+              && offsetof(Uniform, background) == BackgroundOffsetBytes
+              && offsetof(Uniform, optics) == OpticsOffsetBytes
+              && offsetof(Uniform, nativeVP) == NativeVpOffsetBytes
+              && offsetof(Uniform, scatter) == ScatterOffsetBytes
+              && offsetof(Uniform, fog) == FogOffsetBytes);
 void copy(float *to, const QMatrix4x4 &m)
 {
-    std::memcpy(to, m.constData(), 64);
+    std::memcpy(to, m.constData(), renderData::MatrixBytes);
 }
 void copy(float *to, QVector3D v, float w = 0)
 {
@@ -83,8 +207,8 @@ struct Target final
     bool prepass = false;
     QSize size;
     Owned<QRhiTexture> color, normal, depth;
-    std::array<Owned<QRhiTexture>, 3> multisample;
-    std::array<Owned<QRhiRenderBuffer>, 3> multisampleBuffers;
+    std::array<Owned<QRhiTexture>, CaseSurfaceCount> multisample;
+    std::array<Owned<QRhiRenderBuffer>, CaseSurfaceCount> multisampleBuffers;
     std::shared_ptr<QRhiRenderBuffer> z;
     Owned<QRhiTexture> hardwareDepth;
     Owned<QRhiRenderPassDescriptor> pass;
@@ -109,17 +233,17 @@ struct Pending final
 {
     Q_DISABLE_COPY_MOVE(Pending)
     Pending() = default;
-    std::array<QRhiReadbackResult, 14> results;
+    std::array<QRhiReadbackResult, CaptureFieldCount> results;
     Capture capture;
     std::function<void(Capture)> deliver;
     std::function<void(QString)> failed;
     int remaining = 0;
-    std::array<int, 14> readbackOwner;
+    std::array<int, CaptureFieldCount> readbackOwner;
     int drainFrames = 0;
     bool yUp = false;
     int opticalProbe = 0;
     bool captureShadowDepth = false;
-    std::array<QSize, 14> logicalReadbackSizes;
+    std::array<QSize, CaptureFieldCount> logicalReadbackSizes;
 };
 QByteArray floatTextureBytes(const QString &path, qsizetype expected)
 {
@@ -134,10 +258,10 @@ QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &ent
     // Keep every logical identity and its global sort; skip only provably off-screen draws.
     for (int i = 0; i < entities.size(); ++i) {
         const auto matrix = input.scene.projection * input.scene.view * entities[i];
-        std::array<bool, 6> outside{ true, true, true, true, true, true };
-        for (float x : { -2.225f, 2.225f })
-            for (float y : { .175f, 3.525f })
-                for (float z : { -.07f, .07f }) {
+        std::array<bool, ClipPlaneCount> outside{ true, true, true, true, true, true };
+        for (float x : { -CaseHalfWidth, CaseHalfWidth })
+            for (float y : { CaseBottom, CaseTop })
+                for (float z : { -CaseHalfDepth, CaseHalfDepth }) {
                     const auto v = matrix * QVector4D(x, y, z, 1);
                     outside[0] = outside[0] && v.x() < -v.w();
                     outside[1] = outside[1] && v.x() > v.w();
@@ -166,6 +290,8 @@ public:
         if (api && !pending.empty())
             api->finish();
     }
+    // Synchronization runs with GUI state blocked: copy one coherent revision here.
+    // Render callbacks use only that value snapshot and owned native resources.
     void synchronize(QQuickRhiItem *item) override
     {
         QElapsedTimer sync;
@@ -217,8 +343,10 @@ public:
                 reportFailure(error.what());
             }
         }
-        synchronizationMs = sync.isValid() ? sync.nsecsElapsed() / 1e6 : 0;
+        synchronizationMs = sync.isValid() ? sync.nsecsElapsed() / NanosecondsPerMillisecond : 0;
     }
+    // Rebuild only when native resources or attachment compatibility change.
+    // Initialization validates the resource plan before submitting any partial graph.
     void initialize(QRhiCommandBuffer *cb) override
     {
         if (failedRenderer || input.sceneOccluded)
@@ -229,6 +357,8 @@ public:
             reportFailure(error.what());
         }
     }
+    // Keep pass dependencies ordered and retain capture state until real readback completion.
+    // Submission timing alone never establishes GPU completion or display presentation.
     void render(QRhiCommandBuffer *cb) override
     {
         if (failedRenderer)
@@ -312,7 +442,7 @@ private:
     Owned<QRhiBuffer> vertices, indices, uniforms, outputUniform;
     Owned<QRhiBuffer> instanceBuffer;
     Owned<QRhiTexture> cover, environment, dfg, ltc1, ltc2;
-    std::array<Owned<QRhiTexture>, 14> alignedReadbacks;
+    std::array<Owned<QRhiTexture>, CaptureFieldCount> alignedReadbacks;
     int readbackPackAlignment = 0;
     quint64 alignedReadbackRevision = 0;
     Owned<QRhiSampler> linear, nearest, mipLinear, shadowCompare;
@@ -334,7 +464,7 @@ private:
     bool targetsHaveShells = false;
     bool areaShader = false, opticsProbeShader = false, visibilityProbeShader = false;
     bool diagnosticTargets = false;
-    std::array<Uniform, 8> uniformBases;
+    std::array<Uniform, UniformBaseCount> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
     QVector<QMatrix4x4> lightEntities;
     QByteArray uniformScratch;
@@ -372,16 +502,23 @@ void Renderer::enqueueAtlas()
         || expectedFallbackLeases != input.fallbackCoverLeases) {
         for (int i = 0; i < input.coverLeases.size(); ++i) {
             const auto tile = input.coverTiles[i];
-            for (int y = tile.y(); y < tile.y() + tile.height(); y += 256)
-                for (int x = tile.x(); x < tile.x() + tile.width(); x += 256)
-                    atlasQueue.expect((y / 256) * (input.atlasSize.width() / 256) + x / 256,
+            for (int y = tile.y(); y < tile.y() + tile.height(); y += renderData::CoverTilePixels)
+                for (int x = tile.x(); x < tile.x() + tile.width();
+                     x += renderData::CoverTilePixels)
+                    atlasQueue.expect((y / renderData::CoverTilePixels)
+                                                      * (input.atlasSize.width()
+                                                         / renderData::CoverTilePixels)
+                                              + x / renderData::CoverTilePixels,
                                       input.coverLeases[i]);
         }
         expectedAtlasGeneration = atlasGeneration;
         for (int i = 0; i < input.fallbackCoverTiles.size(); ++i) {
             const auto tile = input.fallbackCoverTiles[i];
-            atlasQueue.expect((tile.y() / 256) * (input.atlasSize.width() / 256) + tile.x() / 256,
-                              input.fallbackCoverLeases[i]);
+            atlasQueue.expect(
+                    (tile.y() / renderData::CoverTilePixels)
+                                    * (input.atlasSize.width() / renderData::CoverTilePixels)
+                            + tile.x() / renderData::CoverTilePixels,
+                    input.fallbackCoverLeases[i]);
         }
         expectedCoverLeases = input.coverLeases;
         expectedCoverTiles = input.coverTiles;
@@ -491,9 +628,10 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
         desc.setColorAttachments({ target.color.get() });
     if (samples > 1) {
         QVector<QRhiColorAttachment> attachments;
-        const std::array<QRhiTexture *, 3> resolves{ target.color.get(), target.normal.get(),
-                                                     target.depth.get() };
-        for (int i = 0; i < (mrt ? 3 : 1); ++i) {
+        const std::array<QRhiTexture *, CaseSurfaceCount> resolves{ target.color.get(),
+                                                                    target.normal.get(),
+                                                                    target.depth.get() };
+        for (int i = 0; i < (mrt ? CaseSurfaceCount : 1); ++i) {
             QRhiColorAttachment attachment;
             const auto *context = QOpenGLContext::currentContext();
             const bool textureStorageAvailable = api->backend() != QRhi::OpenGLES2
@@ -554,22 +692,24 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
                                                         : u":/rhi/geometry.vert.qsb"_s)) },
                          { QRhiShaderStage::Fragment, shader(fragment) } });
     QRhiVertexInputLayout layout;
-    layout.setBindings({ { 32 } });
+    layout.setBindings({ { renderData::VertexBytes } });
     layout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float3, 0 },
-                           { 0, 1, QRhiVertexInputAttribute::Float3, 12 },
-                           { 0, 2, QRhiVertexInputAttribute::Float2, 24 } });
+                           { 0, 1, QRhiVertexInputAttribute::Float3, NormalOffsetBytes },
+                           { 0, 2, QRhiVertexInputAttribute::Float2, UvOffsetBytes } });
     if (instanced) {
-        layout.setBindings({ { 32 }, { 112, QRhiVertexInputBinding::PerInstance } });
-        layout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float3, 0 },
-                               { 0, 1, QRhiVertexInputAttribute::Float3, 12 },
-                               { 0, 2, QRhiVertexInputAttribute::Float2, 24 },
-                               { 1, 3, QRhiVertexInputAttribute::Float4, 0 },
-                               { 1, 4, QRhiVertexInputAttribute::Float4, 16 },
-                               { 1, 5, QRhiVertexInputAttribute::Float4, 32 },
-                               { 1, 6, QRhiVertexInputAttribute::Float4, 48 },
-                               { 1, 7, QRhiVertexInputAttribute::Float4, 64 },
-                               { 1, 8, QRhiVertexInputAttribute::Float4, 80 },
-                               { 1, 9, QRhiVertexInputAttribute::Float4, 96 } });
+        layout.setBindings({ { renderData::VertexBytes },
+                             { renderData::InstanceBytes, QRhiVertexInputBinding::PerInstance } });
+        layout.setAttributes(
+                { { 0, 0, QRhiVertexInputAttribute::Float3, 0 },
+                  { 0, 1, QRhiVertexInputAttribute::Float3, NormalOffsetBytes },
+                  { 0, 2, QRhiVertexInputAttribute::Float2, UvOffsetBytes },
+                  { 1, 3, QRhiVertexInputAttribute::Float4, 0 },
+                  { 1, 4, QRhiVertexInputAttribute::Float4, renderData::VectorBytes },
+                  { 1, 5, QRhiVertexInputAttribute::Float4, InstanceMatrixSecondOffsetBytes },
+                  { 1, 6, QRhiVertexInputAttribute::Float4, InstanceMatrixThirdOffsetBytes },
+                  { 1, 7, QRhiVertexInputAttribute::Float4, InstanceUvOffsetBytes },
+                  { 1, 8, QRhiVertexInputAttribute::Float4, InstanceLightOffsetBytes },
+                  { 1, 9, QRhiVertexInputAttribute::Float4, InstanceSecondaryLightOffsetBytes } });
     }
     p->setVertexInputLayout(layout);
     p->setShaderResourceBindings(bindings);
@@ -639,9 +779,11 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 "Native resource dimensions exceed GPU capabilities");
         require(api->supportedSampleCounts().contains(input.captureSamples),
                 "Requested resource plan uses unsupported MSAA");
-        qint64 geometryBytes = 15 * 32 + 21 * 4;
+        qint64 geometryBytes = ExtraGeometryVertices * renderData::VertexBytes
+                + ExtraGeometryIndices * renderData::FloatBytes;
         for (const auto &batch : preparedAssets().geometry)
-            geometryBytes += batch.vertices.size() * 32 + batch.indices.size() * 4;
+            geometryBytes += batch.vertices.size() * renderData::VertexBytes
+                    + batch.indices.size() * renderData::FloatBytes;
         const qint64 previousPlanBytes =
                 allocationPlan.value(u"estimatedBytesUpperBound"_s).toInteger();
         allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
@@ -661,20 +803,22 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         vertexBytes.clear();
         indexBytes.clear();
         auto append = [&](const assets::Batch &batch) {
-            const auto base = quint32(vertexBytes.size() / 32);
-            Mesh mesh{ quint32(indexBytes.size() / 4), quint32(batch.indices.size()) };
-            QVector3D minimum(1e6f, 1e6f, 1e6f), maximum(-1e6f, -1e6f, -1e6f);
+            const auto base = quint32(vertexBytes.size() / renderData::VertexBytes);
+            Mesh mesh{ quint32(indexBytes.size() / renderData::FloatBytes),
+                       quint32(batch.indices.size()) };
+            QVector3D minimum(EmptyBoundsMagnitude, EmptyBoundsMagnitude, EmptyBoundsMagnitude),
+                    maximum(-EmptyBoundsMagnitude, -EmptyBoundsMagnitude, -EmptyBoundsMagnitude);
             for (const auto &v : batch.vertices)
-                for (int axis = 0; axis < 3; ++axis) {
+                for (int axis = 0; axis < VectorAxes; ++axis) {
                     minimum[axis] = std::min(minimum[axis], v[axis]);
                     maximum[axis] = std::max(maximum[axis], v[axis]);
                 }
             mesh.center = (minimum + maximum) * .5f;
             vertexBytes.append(reinterpret_cast<const char *>(batch.vertices.constData()),
-                               batch.vertices.size() * 32);
+                               batch.vertices.size() * renderData::VertexBytes);
             for (auto index : batch.indices) {
                 index += base;
-                indexBytes.append(reinterpret_cast<const char *>(&index), 4);
+                indexBytes.append(reinterpret_cast<const char *>(&index), renderData::FloatBytes);
             }
             return mesh;
         };
@@ -683,23 +827,29 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         spine = append(batches[1]);
         tray = append(batches[2]);
         assets::Batch quad;
-        quad.vertices = { { { -1.36f, .32f, .027f, 0, 0, 1, 0, 1 } },
-                          { { 1.7f, .32f, .027f, 0, 0, 1, 1, 1 } },
-                          { { 1.7f, 3.38f, .027f, 0, 0, 1, 1, 0 } },
-                          { { -1.36f, 3.38f, .027f, 0, 0, 1, 0, 0 } } };
+        quad.vertices = { { { -PaperLeftMagnitude, PaperBottom, PaperFront, 0, 0, 1, 0, 1 } },
+                          { { PaperRight, PaperBottom, PaperFront, 0, 0, 1, 1, 1 } },
+                          { { PaperRight, PaperTop, PaperFront, 0, 0, 1, 1, 0 } },
+                          { { -PaperLeftMagnitude, PaperTop, PaperFront, 0, 0, 1, 0, 0 } } };
         quad.indices = { 0, 1, 2, 0, 2, 3 };
         paper = append(quad);
-        quad.vertices = { { { -6, -.05f, 6, 0, 1, 0, 0, 0 } },
-                          { { 6, -.05f, 6, 0, 1, 0, 1, 0 } },
-                          { { 6, -.05f, -6, 0, 1, 0, 1, 1 } },
-                          { { -6, -.05f, -6, 0, 1, 0, 0, 1 } } };
+        quad.vertices = {
+            { { -ReviewFloorHalfExtent, -ReviewFloorDepth, ReviewFloorHalfExtent, 0, 1, 0, 0, 0 } },
+            { { ReviewFloorHalfExtent, -ReviewFloorDepth, ReviewFloorHalfExtent, 0, 1, 0, 1, 0 } },
+            { { ReviewFloorHalfExtent, -ReviewFloorDepth, -ReviewFloorHalfExtent, 0, 1, 0, 1, 1 } },
+            { { -ReviewFloorHalfExtent, -ReviewFloorDepth, -ReviewFloorHalfExtent, 0, 1, 0, 0, 1 } }
+        };
         floor = append(quad);
         // PlaneGeometry(200, 200), rotation.x=-PI/2, position.y=-4.63.
         // Baked once into the shared immutable geometry; never a shadow caster.
-        quad.vertices = { { { -100, -4.63f, 100, 0, 1, 0, 0, 0 } },
-                          { { 100, -4.63f, 100, 0, 1, 0, 1, 0 } },
-                          { { 100, -4.63f, -100, 0, 1, 0, 1, 1 } },
-                          { { -100, -4.63f, -100, 0, 1, 0, 0, 1 } } };
+        quad.vertices = { { { -ProductFloorHalfExtent, -ProductFloorDepth, ProductFloorHalfExtent,
+                              0, 1, 0, 0, 0 } },
+                          { { ProductFloorHalfExtent, -ProductFloorDepth, ProductFloorHalfExtent, 0,
+                              1, 0, 1, 0 } },
+                          { { ProductFloorHalfExtent, -ProductFloorDepth, -ProductFloorHalfExtent,
+                              0, 1, 0, 1, 1 } },
+                          { { -ProductFloorHalfExtent, -ProductFloorDepth, -ProductFloorHalfExtent,
+                              0, 1, 0, 0, 1 } } };
         productFloor = append(quad);
         quad.vertices = { { { -1, -1, 0, 0, 0, 1, 0, 0 } },
                           { { 3, -1, 0, 0, 0, 1, 2, 0 } },
@@ -714,13 +864,17 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         require(indices->create(), "RHI index buffer failed");
         uniformStride = api->ubufAligned(sizeof(Uniform));
         uniforms.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                      uniformStride * (436 * 3 + 6)));
+                                      uniformStride
+                                              * (renderData::MaximumCaseEntities * CaseSurfaceCount
+                                                 + ExtraDrawUniforms)));
         require(uniforms->create(), "RHI uniform buffer failed");
         uniformScratch = QByteArray(uniforms->size(), '\0');
         instanceBuffer.reset(
-                api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 436 * 112));
+                api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
+                               renderData::MaximumCaseEntities * renderData::InstanceBytes));
         require(instanceBuffer->create(), "RHI instance buffer failed");
-        outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32));
+        outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                                           renderData::OutputUniformBytes));
         require(outputUniform->create(), "Output uniform buffer failed");
         linear.reset(api->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
                                      QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
@@ -737,11 +891,14 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                                         QRhiSampler::Linear, QRhiSampler::ClampToEdge,
                                         QRhiSampler::ClampToEdge));
         require(mipLinear->create(), "Capture mip sampler failed");
-        environment.reset(api->newTexture(QRhiTexture::RGBA16F, { 768, 1024 }));
+        environment.reset(
+                api->newTexture(QRhiTexture::RGBA16F,
+                                { renderData::EnvironmentWidth, renderData::EnvironmentHeight }));
         require(environment->create(), "Room environment texture failed");
         for (auto *t : { &dfg, &ltc1, &ltc2 }) {
             t->reset(api->newTexture(QRhiTexture::RGBA32F,
-                                     t == &dfg ? QSize(16, 16) : QSize(64, 64)));
+                                     t == &dfg ? QSize(renderData::DfgSide, renderData::DfgSide)
+                                               : QSize(renderData::LtcSide, renderData::LtcSide)));
             require((*t)->create(), "Shell lookup texture failed");
         }
     }
@@ -769,7 +926,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             QVector<QRhiShaderResourceBinding> values(bindings->cbeginBindings(),
                                                       bindings->cendBindings());
             values[1] = QRhiShaderResourceBinding::sampledTexture(
-                    1,
+                    CoverBinding,
                     QRhiShaderResourceBinding::VertexStage
                             | QRhiShaderResourceBinding::FragmentStage,
                     cover.get(), input.filterCovers ? mipLinear.get() : linear.get());
@@ -850,21 +1007,24 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         geometryBindings->setBindings(
                 { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
                           0, stages, uniforms.get(), sizeof(Uniform)),
-                  QRhiShaderResourceBinding::sampledTexture(1, stages, cover.get(),
+                  QRhiShaderResourceBinding::sampledTexture(CoverBinding, stages, cover.get(),
                                                             input.filterCovers ? mipLinear.get()
                                                                                : linear.get()),
                   QRhiShaderResourceBinding::sampledTexture(
-                          2, QRhiShaderResourceBinding::FragmentStage, environment.get(),
+                          EnvironmentBinding, QRhiShaderResourceBinding::FragmentStage,
+                          environment.get(), linear.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          ShadowBinding, QRhiShaderResourceBinding::FragmentStage,
+                          shadow.hardwareDepth.get(), shadowCompare.get()),
+                  QRhiShaderResourceBinding::sampledTexture(
+                          DfgBinding, QRhiShaderResourceBinding::FragmentStage, dfg.get(),
                           linear.get()),
                   QRhiShaderResourceBinding::sampledTexture(
-                          3, QRhiShaderResourceBinding::FragmentStage, shadow.hardwareDepth.get(),
-                          shadowCompare.get()),
+                          LtcFirstBinding, QRhiShaderResourceBinding::FragmentStage, ltc1.get(),
+                          linear.get()),
                   QRhiShaderResourceBinding::sampledTexture(
-                          5, QRhiShaderResourceBinding::FragmentStage, dfg.get(), linear.get()),
-                  QRhiShaderResourceBinding::sampledTexture(
-                          6, QRhiShaderResourceBinding::FragmentStage, ltc1.get(), linear.get()),
-                  QRhiShaderResourceBinding::sampledTexture(
-                          7, QRhiShaderResourceBinding::FragmentStage, ltc2.get(), linear.get()) });
+                          LtcSecondBinding, QRhiShaderResourceBinding::FragmentStage, ltc2.get(),
+                          linear.get()) });
         require(geometryBindings->create(), "Geometry bindings failed");
         shadowBindings.reset(api->newShaderResourceBindings());
         shadowBindings->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
@@ -885,20 +1045,21 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             shellBindings->setBindings(
                     { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
                               0, stages, uniforms.get(), sizeof(Uniform)),
-                      QRhiShaderResourceBinding::sampledTexture(1, stages, cover.get(),
+                      QRhiShaderResourceBinding::sampledTexture(CoverBinding, stages, cover.get(),
                                                                 linear.get()),
-                      QRhiShaderResourceBinding::sampledTexture(2, fragment, environment.get(),
-                                                                linear.get()),
+                      QRhiShaderResourceBinding::sampledTexture(EnvironmentBinding, fragment,
+                                                                environment.get(), linear.get()),
+                      QRhiShaderResourceBinding::sampledTexture(ShadowBinding, fragment,
+                                                                shadow.hardwareDepth.get(),
+                                                                shadowCompare.get()),
                       QRhiShaderResourceBinding::sampledTexture(
-                              3, fragment, shadow.hardwareDepth.get(), shadowCompare.get()),
-                      QRhiShaderResourceBinding::sampledTexture(4, fragment, opaque.color.get(),
-                                                                mipLinear.get()),
-                      QRhiShaderResourceBinding::sampledTexture(5, fragment, dfg.get(),
+                              CaptureBinding, fragment, opaque.color.get(), mipLinear.get()),
+                      QRhiShaderResourceBinding::sampledTexture(DfgBinding, fragment, dfg.get(),
                                                                 linear.get()),
-                      QRhiShaderResourceBinding::sampledTexture(6, fragment, ltc1.get(),
-                                                                linear.get()),
-                      QRhiShaderResourceBinding::sampledTexture(7, fragment, ltc2.get(),
-                                                                linear.get()) });
+                      QRhiShaderResourceBinding::sampledTexture(LtcFirstBinding, fragment,
+                                                                ltc1.get(), linear.get()),
+                      QRhiShaderResourceBinding::sampledTexture(LtcSecondBinding, fragment,
+                                                                ltc2.get(), linear.get()) });
             require(shellBindings->create(), "Shell bindings failed");
             shellPipeline = pipeline(composite, shellBindings.get(), false, true);
             areaShader = input.areaIntensity > 0;
@@ -931,15 +1092,16 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require(coverageInstances->create(), "Instanced visibility pipeline failed");
             copyBindings.reset(api->newShaderResourceBindings());
             copyBindings->setBindings(
-                    { QRhiShaderResourceBinding::sampledTexture(0, fragment, opaque.color.get(),
-                                                                nearest.get()),
-                      QRhiShaderResourceBinding::uniformBuffer(1, fragment, outputUniform.get()),
+                    { QRhiShaderResourceBinding::sampledTexture(FrameUniformBinding, fragment,
+                                                                opaque.color.get(), nearest.get()),
+                      QRhiShaderResourceBinding::uniformBuffer(CoverBinding, fragment,
+                                                               outputUniform.get()),
                       QRhiShaderResourceBinding::sampledTexture(
-                              2, fragment,
+                              EnvironmentBinding, fragment,
                               diagnosticTargets ? opaque.normal.get() : opaque.color.get(),
                               nearest.get()),
                       QRhiShaderResourceBinding::sampledTexture(
-                              3, fragment,
+                              ShadowBinding, fragment,
                               diagnosticTargets ? opaque.depth.get() : opaque.color.get(),
                               nearest.get()) });
             require(copyBindings->create(), "Opaque copy bindings failed");
@@ -966,8 +1128,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         opticsProbeShader = input.opticalProbe > 0;
     }
 #ifdef YALAHOO_RHI_AUDIT
-    if (input.shells && visibilityProbeShader != (input.opticalProbe == 10)) {
-        visibilityProbeShader = input.opticalProbe == 10;
+    if (input.shells && visibilityProbeShader != (input.opticalProbe == VisibilityProbe)) {
+        visibilityProbeShader = input.opticalProbe == VisibilityProbe;
         for (int instanced = 0; instanced < 2; ++instanced) {
             auto *p = instanced ? coverageInstances.get() : coveragePipeline.get();
             p->setShaderStages(
@@ -1050,9 +1212,11 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     outputBindings.reset();
     outputBindings.reset(api->newShaderResourceBindings());
     outputBindings->setBindings(
-            { QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage,
+            { QRhiShaderResourceBinding::sampledTexture(FrameUniformBinding,
+                                                        QRhiShaderResourceBinding::FragmentStage,
                                                         resolvedColor, linear.get()),
-              QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage,
+              QRhiShaderResourceBinding::uniformBuffer(CoverBinding,
+                                                       QRhiShaderResourceBinding::FragmentStage,
                                                        outputUniform.get()) });
     require(outputBindings->create(), "Output bindings failed");
     outputPipeline.reset(api->newGraphicsPipeline());
@@ -1092,17 +1256,19 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.clip,
          QVector4D(float(input.scene.nearPlane), float(input.scene.farPlane),
                    api->isYUpInFramebuffer() ? 1 : 0, api->isClipDepthZeroToOne() ? 1 : 0));
-    copy(u.draw, QVector4D(float(kind), input.shadows ? 1 : 0, float(shadowSize), 4));
-    copy(u.optics, QVector4D(input.spotIntensity, .32f, .035f, -.0003f));
+    copy(u.draw,
+         QVector4D(float(kind), input.shadows ? 1 : 0, float(shadowSize), ShadowFilterRadius));
+    copy(u.optics,
+         QVector4D(input.spotIntensity, ShadowStrength, ShadowNormalBias, -ShadowDepthBias));
     copy(u.nativeVP, nativeVP);
     copy(u.camera, input.scene.camera.position.qt(), input.exposure);
-    if (kind == 6) {
+    if (kind == ProductFloorKind) {
         copy(u.tint, input.floorColor);
-        copy(u.material, QVector4D(0, .95f, 0, 0));
+        copy(u.material, QVector4D(0, FloorRoughness, 0, 0));
         copy(u.coat, QVector4D(0, 0, 0, input.environmentIntensity));
     } else {
-        const auto material = shellMaterial(std::clamp(kind - 3, 0, 2), input.warmth, input.clarity,
-                                            input.environmentIntensity);
+        const auto material = shellMaterial(std::clamp(kind - LidKind, 0, 2), input.warmth,
+                                            input.clarity, input.environmentIntensity);
         copy(u.tint, material.tint);
         copy(u.attenuation, material.attenuation);
         copy(u.material, material.transport);
@@ -1112,7 +1278,9 @@ Uniform Renderer::uniformTemplate(int kind) const
     copy(u.areaTarget, input.areaTarget, input.lightingEnabled ? 1 : 0);
     copy(u.scatter, input.scatterColor, input.scatterStrength);
     copy(u.coverUv, QVector4D(0, 0, 1, 1));
-    const QSize pixels = input.atlasGeneration ? QSize(256, 256) : input.cover.size();
+    const QSize pixels = input.atlasGeneration
+            ? QSize(renderData::CoverTilePixels, renderData::CoverTilePixels)
+            : input.cover.size();
     copy(u.paperSize,
          QVector4D(float(pixels.width()), float(pixels.height()), input.coverPainted ? 1 : 0,
                    float(input.opticalProbe)));
@@ -1135,7 +1303,7 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
             && !atlasQueue.ready(tile, effectiveCoverLeases[entity]))
             copy(u.coverUv, QVector4D());
     }
-    if (kind == 3 && entity >= 0 && input.scene.individualMaterials
+    if (kind == LidKind && entity >= 0 && input.scene.individualMaterials
         && entity < input.scene.instances.size()) {
         // Only the lid roughness depends on clarity. Preserve the cached material
         // template and all other optical parameters; no QColor or resource rebuild.
@@ -1192,19 +1360,22 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (uploadGeometry) {
         updates->uploadStaticBuffer(vertices.get(), vertexBytes);
         updates->uploadStaticBuffer(indices.get(), indexBytes);
-        const auto roomHalf =
-                floatTextureBytes(u":/rhi/environment/room-pmrem.rgba16f"_s, 768 * 1024 * 8);
+        const auto roomHalf = floatTextureBytes(
+                u":/rhi/environment/room-pmrem.rgba16f"_s,
+                renderData::EnvironmentWidth * renderData::EnvironmentHeight * HalfRgbaBytes);
         updates->uploadTexture(environment.get(),
                                QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
                                        0, 0, QRhiTextureSubresourceUploadDescription(roomHalf)) }));
-        const std::array<QRhiTexture *, 3> lookup{ dfg.get(), ltc1.get(), ltc2.get() };
-        const std::array<QString, 3> names{ u":/rhi/environment/dfg.rgba32f"_s,
-                                            u":/rhi/environment/ltc1.rgba32f"_s,
-                                            u":/rhi/environment/ltc2.rgba32f"_s };
+        const std::array<QRhiTexture *, CaseSurfaceCount> lookup{ dfg.get(), ltc1.get(),
+                                                                  ltc2.get() };
+        const std::array<QString, CaseSurfaceCount> names{ u":/rhi/environment/dfg.rgba32f"_s,
+                                                           u":/rhi/environment/ltc1.rgba32f"_s,
+                                                           u":/rhi/environment/ltc2.rgba32f"_s };
         for (int i = 0; i < 3; ++i) {
             const auto bytes = floatTextureBytes(names[i],
                                                  lookup[i]->pixelSize().width()
-                                                         * lookup[i]->pixelSize().height() * 16);
+                                                         * lookup[i]->pixelSize().height()
+                                                         * renderData::VectorBytes);
             updates->uploadTexture(
                     lookup[i],
                     QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
@@ -1217,10 +1388,13 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     uploadRegions = { };
     if (atlasGeneration) {
         for (const auto &u : atlasQueue.take(input.initializingAtlas)) {
-            const QPoint destination((u.slot % (input.atlasSize.width() / 256)) * 256,
-                                     (u.slot / (input.atlasSize.width() / 256)) * 256);
+            const QPoint destination(
+                    (u.slot % (input.atlasSize.width() / renderData::CoverTilePixels))
+                            * renderData::CoverTilePixels,
+                    (u.slot / (input.atlasSize.width() / renderData::CoverTilePixels))
+                            * renderData::CoverTilePixels);
             QRhiTextureSubresourceUploadDescription region(u.pixels);
-            region.setSourceSize({ 256, 256 });
+            region.setSourceSize({ renderData::CoverTilePixels, renderData::CoverTilePixels });
             region.setDestinationTopLeft(destination);
             updates->uploadTexture(cover.get(), { { 0, 0, region } });
             if (input.filterCovers) {
@@ -1235,8 +1409,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             uploadRegions.append(QJsonObject{ { u"slot"_s, u.slot },
                                               { u"x"_s, destination.x() },
                                               { u"y"_s, destination.y() },
-                                              { u"width"_s, 256 },
-                                              { u"height"_s, 256 },
+                                              { u"width"_s, renderData::CoverTilePixels },
+                                              { u"height"_s, renderData::CoverTilePixels },
                                               { u"bytes"_s, AtlasUploadQueue::tileBytes },
                                               { u"lease"_s, qint64(u.lease) },
                                               { u"serial"_s, qint64(u.serial) } });
@@ -1274,13 +1448,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (entities.isEmpty() && !input.poolFrame)
         entities.append(input.scene.caseTransform);
     const auto visible = visibleEntities(input, entities);
-    require(entities.size() <= 436, "RHI visible pool capacity exceeded");
+    require(entities.size() <= renderData::MaximumCaseEntities,
+            "RHI visible pool capacity exceeded");
     shadowDirty = shadowDirty || shadowEntities != entities || cachedShadows != input.shadows;
-    const bool batched = entities.size() >= 8;
+    const bool batched = entities.size() >= MinimumBatchedEntities;
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
     nativeLightVP = api->clipSpaceCorrMatrix() * canonicalLightVP;
-    for (int kind = -1; kind <= 6; ++kind)
+    for (int kind = ShadowKind; kind <= ProductFloorKind; ++kind)
         uniformBases[kind + 1] = uniformTemplate(kind);
     const QVector4D printSettings(input.printAmbient, input.rowDetail, input.rowFill, 0);
     if (lightEntities != entities || cachedRowSettings != input.rowSettings
@@ -1289,39 +1464,44 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         entityLight0.clear();
         entityLight1.clear();
         for (const auto &model : entities) {
-            const auto origin = model.column(3).toVector3D();
-            const float row = (origin.z() - input.rowColumn.z() - input.rowSettings.w() * .62f)
-                    / (.5f * input.rowSettings.z() * .62f);
-            const float lane = (origin.x() - input.rowColumn.x()) / 27;
+            const auto origin = model.column(VectorAxes).toVector3D();
+            const float row =
+                    (origin.z() - input.rowColumn.z() - input.rowSettings.w() * ArchiveRowSpacing)
+                    / (.5f * input.rowSettings.z() * ArchiveRowSpacing);
+            const float lane = (origin.x() - input.rowColumn.x()) / RibbonLaneWidth;
             const float lane2 = lane * lane;
-            const float field =
-                    std::exp(-.6931471805599453f * row * row) * std::exp(-lane2 * lane2 * lane2);
-            const auto distance = (origin - input.lightColumn) / QVector3D(6, 3.35f, 5.5f);
+            const float field = std::exp(-GaussianHalfMaximumExponent * row * row)
+                    * std::exp(-lane2 * lane2 * lane2);
+            const auto distance = (origin - input.lightColumn)
+                    / QVector3D(LightDistanceWidth, LightDistanceHeight, LightDistanceDepth);
             const float printLight = std::exp(-QVector3D::dotProduct(distance, distance));
             const auto mix = [](float a, float b, float t) {
                 return a * (1 - t) + b * t;
             };
             const float baseline = mix(input.printAmbient, 1, printLight);
-            const float ambient = std::max(.08f, input.printAmbient * .5f);
-            const float fill = input.rowSettings.x() > 1.5f && input.rowSettings.x() < 2.5f
+            const float ambient = std::max(MinimumPrintAmbient, input.printAmbient * .5f);
+            const float fill = input.rowSettings.x() > AreaModeBoundary
+                            && input.rowSettings.x() < HybridModeBoundary
                     ? input.rowFill
                     : 0;
             const float fieldExposure = mix(mix(ambient, baseline, fill), 1,
                                             std::clamp(input.rowSettings.y() * field, 0.0f, 1.0f));
-            const float shelf = input.rowSettings.x() < 1.5f
-                    ? mix(ambient, input.printAmbient, .25f)
+            const float shelf = input.rowSettings.x() < AreaModeBoundary
+                    ? mix(ambient, input.printAmbient, ShelfAmbientBlend)
                     : fieldExposure;
             const float printExposure =
                     input.rowSettings.x() < .5f ? baseline : mix(shelf, baseline, input.rowDetail);
             const float laneDistance = std::abs(origin.x() - input.lightColumn.x());
-            const float core = std::exp(-std::pow(laneDistance / 3.2f, 4.0f));
-            const float spill = std::exp(-std::pow(laneDistance / 7.2f, 4.0f));
+            const float core = std::exp(-std::pow(laneDistance / CoreLaneWidth, LaneFieldPower));
+            const float spill = std::exp(-std::pow(laneDistance / SpillLaneWidth, LaneFieldPower));
             const float z = origin.z() - input.lightColumn.z();
-            const float rowLight = std::exp(-std::pow(z / 5.5f, 2.0f));
-            const float hot = std::exp(-std::pow(z / 1.1f, 2.0f));
-            const float neighbor = std::exp(-std::pow(z / 2.4f, 2.0f));
-            entityLight0.append({ field, printExposure, .58f * core + .42f * spill,
-                                  .58f * core * mix(.12f, 1, rowLight) + .42f * spill * neighbor });
+            const float rowLight = std::exp(-std::pow(z / LightDistanceDepth, 2.0f));
+            const float hot = std::exp(-std::pow(z / HotRowWidth, 2.0f));
+            const float neighbor = std::exp(-std::pow(z / NeighborRowWidth, 2.0f));
+            entityLight0.append({ field, printExposure,
+                                  CoreLightGain * core + SpillLightGain * spill,
+                                  CoreLightGain * core * mix(CoreAmbientFloor, 1, rowLight)
+                                          + SpillLightGain * spill * neighbor });
             entityLight1.append({ hot, 0, 0, 0 });
         }
         lightEntities = entities;
@@ -1367,7 +1547,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (!batched)
         for (int i = 0; i < entities.size(); ++i)
             opaqueOffsets.append(append(entities[i], input.geometryDiagnostic ? 1 : 0, i));
-    const auto floorOffset = append({ }, input.productFloor ? 6 : 2);
+    const auto floorOffset = append({ }, input.productFloor ? ProductFloorKind : ReviewFloorKind);
     struct ShellDraw final
     {
         Mesh mesh;
@@ -1379,16 +1559,16 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     };
     QVector<ShellDraw> shells;
     if (input.shells) {
-        shells.reserve(entities.size() * 3);
+        shells.reserve(entities.size() * CaseSurfaceCount);
         require(entities.size() == 1 || input.entityIds.size() == entities.size(),
                 "Shell instances require stable IDs");
         for (int i : opaqueOrder) {
-            const std::array<Mesh, 3> meshes{ lid, spine, tray };
+            const std::array<Mesh, CaseSurfaceCount> meshes{ lid, spine, tray };
             const auto id = input.entityIds.isEmpty() ? 0 : input.entityIds[i];
-            for (int surface = 0; surface < 3; ++surface) {
+            for (int surface = 0; surface < CaseSurfaceCount; ++surface) {
                 const auto mesh = meshes[surface];
                 const auto center = input.scene.view * entities[i] * QVector4D(mesh.center, 1);
-                shells.append({ mesh, visible[i] ? append(entities[i], 3 + surface, i) : 0,
+                shells.append({ mesh, visible[i] ? append(entities[i], LidKind + surface, i) : 0,
                                 -center.z(), id, surface, i });
             }
         }
@@ -1407,12 +1587,12 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     const auto batchGeometryOffset = append({ }, 1);
     const int visibleCount = int(std::count(visible.begin(), visible.end(), true));
     if (batched) {
-        QByteArray instances(entities.size() * 112, '\0');
+        QByteArray instances(entities.size() * renderData::InstanceBytes, '\0');
         int instanceCursor = 0;
         auto instance = [&](int i) {
-            auto *destination = instances.data() + instanceCursor++ * 112;
-            std::memcpy(destination, entities[i].constData(), 64);
-            float uv[4] = { 0, 0, 1, 1 };
+            auto *destination = instances.data() + instanceCursor++ * renderData::InstanceBytes;
+            std::memcpy(destination, entities[i].constData(), renderData::MatrixBytes);
+            float uv[VectorScalars] = { 0, 0, 1, 1 };
             if (input.atlasGeneration) {
                 const auto tile = effectiveCoverTiles[i];
                 copy(uv,
@@ -1424,12 +1604,13 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                     && !atlasQueue.ready(tile, effectiveCoverLeases[i]))
                     copy(uv, QVector4D());
             }
-            std::memcpy(destination + 64, uv, 16);
-            float light[4];
+            std::memcpy(destination + InstanceUvOffsetBytes, uv, renderData::VectorBytes);
+            float light[VectorScalars];
             copy(light, entityLight0[i]);
-            std::memcpy(destination + 80, light, 16);
+            std::memcpy(destination + InstanceLightOffsetBytes, light, renderData::VectorBytes);
             copy(light, entityLight1[i]);
-            std::memcpy(destination + 96, light, 16);
+            std::memcpy(destination + InstanceSecondaryLightOffsetBytes, light,
+                        renderData::VectorBytes);
         };
         for (int i : opaqueOrder)
             if (visible[i])
@@ -1550,7 +1731,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->setViewport({ 0, 0, float(targetSize.width()), float(targetSize.height()) });
         cb->setGraphicsPipeline(copyPipeline.get());
         cb->setShaderResources(copyBindings.get());
-        cb->draw(3);
+        cb->draw(FullscreenTriangleVertices);
         if (recordCapture)
             opticalEvents.append(u"composite-copy"_s);
         if (!input.geometryDiagnostic) {
@@ -1614,7 +1795,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     cb->setViewport({ 0, 0, float(renderTarget()->pixelSize().width()),
                       float(renderTarget()->pixelSize().height()) });
     cb->setShaderResources();
-    cb->draw(3);
+    cb->draw(FullscreenTriangleVertices);
     cb->endPass();
     if (deliver && input.request != capturedRequest && pending.size() < 2) {
         capturedRequest = input.request;
@@ -1703,7 +1884,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 ? post.graph(input.shells ? composite.color.get() : opaque.color.get())
                 : QJsonObject();
         const auto expectedOutput = QRhiShaderResourceBinding::sampledTexture(
-                0, QRhiShaderResourceBinding::FragmentStage, outputSource, linear.get());
+                FrameUniformBinding, QRhiShaderResourceBinding::FragmentStage, outputSource,
+                linear.get());
         p->capture.metadata[u"outputBindingMatches"_s] = outputSource
                         == (input.postprocess
                                     ? post.output()
@@ -1724,7 +1906,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         }
         if (input.shells) {
             const auto expectedBinding = QRhiShaderResourceBinding::sampledTexture(
-                    4, QRhiShaderResourceBinding::FragmentStage, opaque.color.get(),
+                    CaptureBinding, QRhiShaderResourceBinding::FragmentStage, opaque.color.get(),
                     mipLinear.get());
             bool noBlend = true;
             for (auto blend = shellPipeline->cbeginTargetBlends();
@@ -1793,7 +1975,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                            : QJsonValue(qint64(effectiveCoverLeases[i])) } });
         }
         p->capture.metadata[u"effectiveCoverRegions"_s] = effectiveRegions;
-        const std::array<QRhiTexture *, 14> textures{
+        const std::array<QRhiTexture *, CaptureFieldCount> textures{
             opaque.color.get(),
             opaque.normal.get(),
             opaque.depth.get(),
@@ -1901,8 +2083,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         p->capture.metadata[u"readbackPackAlignment"_s] = readbackPackAlignment;
         QJsonArray alignedCopies;
         p->readbackOwner.fill(-1);
-        for (int i = 0; i < 14; ++i) {
-            if ((i == 8 && !input.captureAtlas) || (i == 13 && !input.captureFloorDepth))
+        for (int i = 0; i < CaptureFieldCount; ++i) {
+            if ((i == AtlasField && !input.captureAtlas)
+                || (i == DofDepthField && !input.captureFloorDepth))
                 continue;
             int owner = i;
             for (int prior = 0; prior < i; ++prior)
@@ -1917,14 +2100,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             p->results[i].completed = [weak = std::weak_ptr<Pending>(p), i] {
                 if (auto state = weak.lock()) {
                     try {
-                        const auto image = readbackImage(state->results[i], state->yUp, i == 8,
-                                                         state->logicalReadbackSizes[i]);
-                        if (i == 3 && state->captureShadowDepth) {
+                        const auto image =
+                                readbackImage(state->results[i], state->yUp, i == AtlasField,
+                                              state->logicalReadbackSizes[i]);
+                        if (i == ShadowField && state->captureShadowDepth) {
                             require(state->results[i].format == QRhiTexture::R32F,
                                     "Shadow math capture must retain R32F precision");
                             state->capture.shadowDepth = state->results[i].data;
                         }
-                        if (i == 4 && state->opticalProbe > 0) {
+                        if (i == CompositeColorField && state->opticalProbe > 0) {
                             const auto &readback = state->results[i];
                             require(readback.format == QRhiTexture::RGBA16F
                                             || readback.format == QRhiTexture::RGBA32F,
@@ -1933,7 +2117,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                             const int x = readback.pixelSize.width() / 2;
                             const int y = readback.pixelSize.height() / 2;
                             const qsizetype offset = (qsizetype(y) * readback.pixelSize.width() + x)
-                                    * 4 * components;
+                                    * renderData::FloatBytes * components;
                             QJsonArray values;
                             for (int channel = 0; channel < 3; ++channel) {
                                 float value;
@@ -1945,7 +2129,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                                     value = float(half);
                                 } else {
                                     std::memcpy(&value,
-                                                readback.data.constData() + offset + channel * 4,
+                                                readback.data.constData() + offset
+                                                        + channel * renderData::FloatBytes,
                                                 4);
                                 }
                                 require(std::isfinite(value), "Nonfinite optical math probe");
@@ -1953,7 +2138,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                             }
                             state->capture.metadata[u"opticalProbeSample"_s] = values;
                         }
-                        const std::array<QImage *, 14> outputs{
+                        const std::array<QImage *, CaptureFieldCount> outputs{
                             &state->capture.color,          &state->capture.normal,
                             &state->capture.depth,          &state->capture.shadow,
                             &state->capture.composite,      &state->capture.compositeNormal,
@@ -1962,7 +2147,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                             &state->capture.blurredAo,      &state->capture.aoNormal,
                             &state->capture.aoDepth,        &state->capture.dofDepth
                         };
-                        for (int field = 0; field < 14; ++field)
+                        for (int field = 0; field < CaptureFieldCount; ++field)
                             if (state->readbackOwner[field] == i)
                                 *outputs[field] = image;
                     } catch (const std::runtime_error &error) {
@@ -2035,13 +2220,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         diagnose({ std::chrono::duration<double, std::milli>(
                            std::chrono::steady_clock::now().time_since_epoch())
                            .count(),
-                   cpu.nsecsElapsed() / 1e6, synchronizationMs, gpu > 0 ? gpu * 1000 : -1,
-                   frameUploadBytes, selectedUploadBytes, qint64(cursor) });
+                   cpu.nsecsElapsed() / NanosecondsPerMillisecond, synchronizationMs,
+                   gpu > 0 ? gpu * MillisecondsPerSecond : -1, frameUploadBytes,
+                   selectedUploadBytes, qint64(cursor) });
     }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{
-                { u"cpuSubmitMs"_s, cpu.nsecsElapsed() / 1e6 },
+                { u"cpuSubmitMs"_s, cpu.nsecsElapsed() / NanosecondsPerMillisecond },
                 { u"synchronizationMs"_s, synchronizationMs },
                 { u"frameRevision"_s, qint64(input.scene.revision) },
                 { u"submission"_s, qint64(synchronizedSubmission) },
@@ -2064,7 +2250,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { u"coverSnapshotCopies"_s, qint64(coverSnapshotCopies) },
                 { u"coverSnapshotShares"_s, qint64(coverSnapshotShares) },
                 { u"postprocessRevision"_s, qint64(post.revision()) },
-                { u"gpuFrameMs"_s, gpu > 0 ? QJsonValue(gpu * 1000) : QJsonValue() },
+                { u"gpuFrameMs"_s,
+                  gpu > 0 ? QJsonValue(gpu * MillisecondsPerSecond) : QJsonValue() },
                 { u"atlasPending"_s, atlasQueue.pending() },
                 { u"atlasUploadBytes"_s, frameUploadBytes },
                 { u"selectedUploadBytes"_s, selectedUploadBytes },
@@ -2076,6 +2263,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { u"resources"_s, resourceInventory() } });
     }
 }
+// Count owned resources once by native identity. Byte estimates describe application storage;
+// driver padding, compositor memory and GPU completion remain separate unknown facts.
 QJsonObject Renderer::resourceInventory()
 {
     if (inventoryGeneration == generation && inventoryPostRevision == post.revision()
@@ -2220,14 +2409,18 @@ void RhiItem::submit(Input input, QSize target)
                         && input.coverLeases.size() == input.entities.size()),
             "Atlas fallback/entity mismatch");
     for (const auto &tile : input.fallbackCoverTiles)
-        require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.size() == QSize(256, 256)
-                        && tile.x() % 256 == 0 && tile.y() % 256 == 0,
+        require(QRect(QPoint(), input.atlasSize).contains(tile)
+                        && tile.size()
+                                == QSize(renderData::CoverTilePixels, renderData::CoverTilePixels)
+                        && tile.x() % renderData::CoverTilePixels == 0
+                        && tile.y() % renderData::CoverTilePixels == 0,
                 "Atlas fallback outside page");
-    require(input.entities.size() <= 436, "RHI visible pool capacity exceeded");
+    require(input.entities.size() <= renderData::MaximumCaseEntities,
+            "RHI visible pool capacity exceeded");
     require(!input.cover.isNull() || input.atlasGeneration,
             "Missing cover at RHI synchronization boundary");
-    require(input.aoSamples == 0 || input.aoSamples == 16 || input.aoSamples == 32
-                    || input.aoSamples == 64,
+    require(input.aoSamples == 0 || input.aoSamples == MinimumAoSamples
+                    || input.aoSamples == MediumAoSamples || input.aoSamples == MaximumAoSamples,
             "Invalid RHI AO kernel size");
     if (input.atlasGeneration) {
         require(m_input.atlasGeneration != input.atlasGeneration
@@ -2237,13 +2430,15 @@ void RhiItem::submit(Input input, QSize target)
         require(input.coverLeases.isEmpty() || input.coverLeases.size() == input.entities.size(),
                 "Atlas lease/entity mismatch");
         require(input.atlasSize.width() > 0 && input.atlasSize.height() > 0
-                        && input.atlasSize.width() % 256 == 0
-                        && input.atlasSize.height() % 256 == 0,
+                        && input.atlasSize.width() % renderData::CoverTilePixels == 0
+                        && input.atlasSize.height() % renderData::CoverTilePixels == 0,
                 "Atlas size must use whole tiles");
         for (const auto &tile : input.coverTiles)
             require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.width() == tile.height()
-                            && tile.width() >= 256 && (tile.width() & (tile.width() - 1)) == 0
-                            && tile.x() % 256 == 0 && tile.y() % 256 == 0,
+                            && tile.width() >= renderData::CoverTilePixels
+                            && (tile.width() & (tile.width() - 1)) == 0
+                            && tile.x() % renderData::CoverTilePixels == 0
+                            && tile.y() % renderData::CoverTilePixels == 0,
                     "Atlas tile outside page");
     }
     require(target.width() > 0 && target.height() > 0, "Invalid RHI target size");
@@ -2252,7 +2447,7 @@ void RhiItem::submit(Input input, QSize target)
                     || (std::isfinite(input.scene.fogNear) && std::isfinite(input.scene.fogFar)
                         && input.scene.fogFar > input.scene.fogNear),
             "Invalid scene fog range");
-    require(input.opticalProbe >= 0 && input.opticalProbe <= 13
+    require(input.opticalProbe >= 0 && input.opticalProbe <= MaximumOpticalProbe
                     && (input.opticalProbe == 0 || input.shells),
             "Invalid optical math probe");
 #ifndef YALAHOO_RHI_AUDIT

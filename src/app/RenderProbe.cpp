@@ -1,4 +1,19 @@
 #include "RenderProbe.h"
+namespace {
+// Anonymous tile colors make incremental texture changes visible without loading a private cover.
+constexpr auto AtlasSidePixels = 2048;
+constexpr auto TileSidePixels = 256;
+constexpr auto TilesPerRow = 8;
+constexpr auto RgbaChannels = 4;
+constexpr auto BaseRed = 40;
+constexpr auto RedStepPerTile = 3;
+constexpr auto BaseGreen = 180;
+constexpr auto BaseBlue = 70;
+constexpr auto UpdatedRed = 230;
+constexpr auto UpdatedGreen = 30;
+constexpr auto UpdatedBlue = 90;
+}
+
 void RenderProbeInstances::setPositions(const QVariantList &positions)
 {
     m_buffer.clear();
@@ -14,17 +29,18 @@ void RenderProbeInstances::setPositions(const QVariantList &positions)
 RenderProbeAtlas::RenderProbeAtlas(QQuick3DObject *parent)
     : QQuick3DTextureData(parent), m_pixels(pageBytes, '\0')
 {
-    setSize({ 2048, 2048 });
+    setSize({ AtlasSidePixels, AtlasSidePixels });
     setFormat(RGBA8);
     setHasTransparency(false);
     // 64 deterministic tiles, no user music/artwork. Byte RGBA has no endian dependency.
-    for (int y = 0; y < 2048; ++y)
-        for (int x = 0; x < 2048; ++x) {
-            const int i = (y * 2048 + x) * 4, tile = (y / 256) * 8 + x / 256;
-            m_pixels[i] = char(40 + tile * 3);
-            m_pixels[i + 1] = char(180 - tile * 2);
-            m_pixels[i + 2] = char(70 + tile * 2);
-            m_pixels[i + 3] = char(-1);
+    for (int y = 0; y < AtlasSidePixels; ++y)
+        for (int x = 0; x < AtlasSidePixels; ++x) {
+            const int i = (y * AtlasSidePixels + x) * RgbaChannels,
+                      tile = (y / TileSidePixels) * TilesPerRow + x / TileSidePixels;
+            m_pixels[i] = char(BaseRed + tile * RedStepPerTile);
+            m_pixels[i + 1] = char(BaseGreen - tile * 2);
+            m_pixels[i + 2] = char(BaseBlue + tile * 2);
+            m_pixels[i + RedStepPerTile] = char(-1);
         }
     setPhase(0);
 }
@@ -33,12 +49,12 @@ void RenderProbeAtlas::setPhase(int phase)
     if (phase == m_phase)
         return;
     m_phase = phase;
-    for (int y = 0; y < 256; ++y)
-        for (int x = 0; x < 256; ++x) {
-            const int i = (y * 2048 + x) * 4;
-            m_pixels[i] = char(phase ? 230 : 40);
-            m_pixels[i + 1] = char(phase ? 30 : 180);
-            m_pixels[i + 2] = char(phase ? 90 : 70);
+    for (int y = 0; y < TileSidePixels; ++y)
+        for (int x = 0; x < TileSidePixels; ++x) {
+            const int i = (y * AtlasSidePixels + x) * RgbaChannels;
+            m_pixels[i] = char(phase ? UpdatedRed : BaseRed);
+            m_pixels[i + 1] = char(phase ? UpdatedGreen : BaseGreen);
+            m_pixels[i + 2] = char(phase ? UpdatedBlue : BaseBlue);
         }
     setTextureData(m_pixels);
     update();

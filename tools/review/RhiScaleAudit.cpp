@@ -15,6 +15,11 @@
 #include <cmath>
 #include <cstdio>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int ReviewDeadlineMilliseconds = 60000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -92,7 +97,7 @@ void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     inspect();
     if (!ready) {
-        timeout.start(60000);
+        timeout.start(ReviewDeadlineMilliseconds);
         driver.surface->requestFrame();
         loop.exec();
     }

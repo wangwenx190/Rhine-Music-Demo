@@ -27,6 +27,15 @@
 #include <cmath>
 #include <stdexcept>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int CaptureSettleMilliseconds = 60;
+constexpr int LayoutSettleMilliseconds = 120;
+constexpr int RestoreSettleMilliseconds = 200;
+constexpr int ReviewDeadlineMilliseconds = 60000;
+constexpr int CleanupDeadlineMilliseconds = 1000;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -275,7 +284,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
         }
         if (stationaryPending) {
             if (stationaryWarmup-- > 0) {
-                QTimer::singleShot(60, &reviewLifetime, [&] {
+                QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
                     requested = true;
                     root->setProperty("marker", root->property("marker").toInt() + 1);
                     surface->requestFrame();
@@ -285,7 +294,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             stationaryPending = false;
             stationaryPaints = yalahoo::rulerInkStats().paints;
             controller->advance(.05);
-            QTimer::singleShot(120, &reviewLifetime, [&] {
+            QTimer::singleShot(LayoutSettleMilliseconds, &reviewLifetime, [&] {
                 const quint64 paints = yalahoo::rulerInkStats().paints;
                 invariants.append(QJsonObject{ { u"name"_s, u"stationary-paint"_s },
                                                { u"before"_s, qint64(stationaryPaints) },
@@ -367,7 +376,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                     }
                     root->setParentItem(window->contentItem());
                     root->setProperty("overflow", true);
-                    QTimer::singleShot(60, &reviewLifetime, [&] {
+                    QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
                         const auto hidden = controller->state();
                         controller->advance(.05);
                         const bool unchanged = hidden == controller->state();
@@ -404,7 +413,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                     window.reset();
                     oldSurface.reset();
                     renderControl.reset();
-                    QTimer::singleShot(200, &reviewLifetime, [&] {
+                    QTimer::singleShot(RestoreSettleMilliseconds, &reviewLifetime, [&] {
                         const int remaining = yalahoo::rulerInkStats().renderers;
                         invariants.append(QJsonObject{ { u"name"_s, u"renderer-release"_s },
                                                        { u"remaining"_s, remaining },
@@ -467,7 +476,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             root->setProperty("mode", mode);
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
-            QTimer::singleShot(60, &reviewLifetime, [&] {
+            QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
                 surface->requestFrame();
@@ -539,7 +548,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
                 continue;
             modeSyncStart = syncNs;
             modeRenderStart = renderNs;
-            QTimer::singleShot(60, &reviewLifetime, [&] {
+            QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
                 requested = true;
                 root->setProperty("marker", root->property("marker").toInt() + 1);
                 surface->requestFrame();
@@ -552,7 +561,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             controller->advance(1.0 / 120);
         root->setProperty("overflow", true);
         stationaryPending = true;
-        QTimer::singleShot(60, &reviewLifetime, [&] {
+        QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
             surface->requestFrame();
@@ -561,13 +570,13 @@ int reviewRuler(QGuiApplication &app, const QString &output)
     requestLifecycle = [&] {
         root->setProperty("mode", lifecycleMode);
         root->setProperty("ordinal", lifecycleMode == 0 ? 123 : lifecycleMode == 1 ? 907 : 42);
-        QTimer::singleShot(60, &reviewLifetime, [&] {
+        QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
             requested = true;
             root->setProperty("marker", root->property("marker").toInt() + 1);
             surface->requestFrame();
         });
     };
-    QTimer::singleShot(60000, &reviewLifetime, [&] {
+    QTimer::singleShot(ReviewDeadlineMilliseconds, &reviewLifetime, [&] {
         app.exit(10);
     });
     surface->show();
@@ -586,7 +595,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             QEventLoop cleanup;
             QObject::connect(window.get(), &QQuickWindow::frameSwapped, &cleanup, &QEventLoop::quit,
                              Qt::QueuedConnection);
-            QTimer::singleShot(1000, &cleanup, &QEventLoop::quit);
+            QTimer::singleShot(CleanupDeadlineMilliseconds, &cleanup, &QEventLoop::quit);
             surface->requestFrame();
             cleanup.exec();
         }

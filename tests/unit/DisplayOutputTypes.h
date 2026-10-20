@@ -1,3 +1,6 @@
+// Registers the test-owned display facade as a QML foreign type.
+// QML observes the injected owner and cannot construct a second output coordinator.
+
 #pragma once
 #include "DisplayOutput.h"
 #include <QtQml/qqmlregistration.h>

@@ -1,3 +1,6 @@
+// Retains bounded independent copies of cases returning to the archive. Each copy owns its
+// motion and clarity until it can safely rejoin the array.
+
 #pragma once
 #include "ArchivePool.h"
 #include "ScalarSpring.h"

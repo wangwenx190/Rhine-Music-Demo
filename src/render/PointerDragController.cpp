@@ -3,6 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Input uses logical pixels; yaw and follow rates stay independent of device pixel ratio.
+constexpr auto RadiansPerLogicalPixel = .004;
+constexpr auto MaximumInspectionYaw = .8;
+constexpr auto ClickSlopLogicalPixels = 6;
+constexpr auto InspectionFollowRate = 2.8;
+}
+
 namespace yalahoo {
 namespace {
 bool finite(QPointF p)
@@ -27,9 +35,11 @@ bool PointerDragController::move(QPointF point, int pointerId)
 {
     if (!finite(point) || pointerId != m_pointer || !dragging())
         return false;
-    m_target = std::clamp(m_target + (point.x() - m_previous.x()) * .004, -.8, .8);
+    m_target = std::clamp(m_target + (point.x() - m_previous.x()) * RadiansPerLogicalPixel,
+                          -MaximumInspectionYaw, MaximumInspectionYaw);
     m_previous = point;
-    m_moved |= std::hypot(point.x() - m_start.x(), point.y() - m_start.y()) > 6;
+    m_moved |=
+            std::hypot(point.x() - m_start.x(), point.y() - m_start.y()) > ClickSlopLogicalPixels;
     return true;
 }
 bool PointerDragController::release(QPointF point, int pointerId)
@@ -37,7 +47,8 @@ bool PointerDragController::release(QPointF point, int pointerId)
     if (pointerId != m_pointer || !dragging())
         return false;
     const bool click = finite(point) && !m_moved
-            && std::hypot(point.x() - m_start.x(), point.y() - m_start.y()) <= 6;
+            && std::hypot(point.x() - m_start.x(), point.y() - m_start.y())
+                    <= ClickSlopLogicalPixels;
     cancel();
     return click;
 }
@@ -57,7 +68,8 @@ double PointerDragController::advance(double rotation, double dt, bool inspectin
         return rotation;
     if (reduced)
         return inspecting ? m_target : 0;
-    return inspecting ? rotation + (m_target - rotation) * (1 - std::exp(-dt * 2.8))
-                      : returnStep(rotation, dt, false);
+    return inspecting
+            ? rotation + (m_target - rotation) * (1 - std::exp(-dt * InspectionFollowRate))
+            : returnStep(rotation, dt, false);
 }
 }

@@ -11,6 +11,32 @@
 #include <QPainterPathStroker>
 #include <numbers>
 
+namespace {
+// View boxes and stable path IDs come from bundled brand geometry; ring dashes use source arc lengths.
+constexpr auto DoubleRoundTripDigits = 17;
+constexpr auto ExpectedRevealEntries = 17;
+constexpr auto LastBrandPathId = 19;
+constexpr auto OrbitRingPathId = 101;
+constexpr auto OrbitCrossPathId = 104;
+constexpr auto BrandViewWidth = 816;
+constexpr auto BrandViewHeight = 208;
+constexpr auto OrbitViewWidth = 520;
+constexpr auto OrbitLineWidthPixels = 1.2;
+constexpr auto DegreesPerHalfTurn = 180;
+constexpr auto OuterOrbitRadius = 236;
+constexpr auto InnerOrbitRadius = 207;
+constexpr auto OrbitDotRadius = 4;
+constexpr auto OrbitDashCount = 4;
+constexpr auto CrossMinimum = 252;
+constexpr auto CrossCenter = 260;
+constexpr auto CrossMaximum = 268;
+constexpr auto TopDotPathId = 102;
+constexpr auto BottomDotPathId = 103;
+constexpr auto CrossLineWidthPixels = 1.1;
+constexpr auto DefaultPathWidth = 16;
+constexpr auto PointPathLengthThreshold = .02;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -21,7 +47,8 @@ QString svgPath(const QPainterPath &p)
     QString result;
     auto point = [&](int i) {
         const auto e = p.elementAt(i);
-        return QString::number(e.x, 'g', 17) + " "_L1 + QString::number(e.y, 'g', 17) + " "_L1;
+        return QString::number(e.x, 'g', DoubleRoundTripDigits) + " "_L1
+                + QString::number(e.y, 'g', DoubleRoundTripDigits) + " "_L1;
     };
     for (int i = 0; i < p.elementCount(); ++i) {
         const auto e = p.elementAt(i);
@@ -78,13 +105,14 @@ protected:
             return;
         p->resetClipping();
         if (rebuildPaths) {
-            for (int i = 1; i <= 19; ++i)
+            for (int i = 1; i <= LastBrandPathId; ++i)
                 p->removePathGroup(i);
-            for (int i = 101; i <= 104; ++i)
+            for (int i = OrbitRingPathId; i <= OrbitCrossPathId; ++i)
                 p->removePathGroup(i);
-            const double fit = std::min(size.width() / 816, size.height() / 208);
-            brandTransform = QTransform::fromTranslate((size.width() - 816 * fit) / 2,
-                                                       (size.height() - 208 * fit) / 2);
+            const double fit =
+                    std::min(size.width() / BrandViewWidth, size.height() / BrandViewHeight);
+            brandTransform = QTransform::fromTranslate((size.width() - BrandViewWidth * fit) / 2,
+                                                       (size.height() - BrandViewHeight * fit) / 2);
             brandTransform.scale(fit, fit);
             logicalPaths.clear();
             for (const auto &path : paths) {
@@ -115,7 +143,8 @@ protected:
 private:
     void drawMark(QCanvasPainter *p)
     {
-        const double scale = std::min(size.width() / 816, size.height() / 208);
+        const double scale =
+                std::min(size.width() / BrandViewWidth, size.height() / BrandViewHeight);
         // Bake the SVG-to-logical transform into cached geometry. The module's cached
         // stroke path also applies the state scale to stroke width before the vertex
         // transform; identity-scale drawing preserves the authored width and AA fringe.
@@ -155,47 +184,47 @@ private:
     }
     void drawOrbit(QCanvasPainter *p)
     {
-        const double scale = size.width() / 520;
+        const double scale = size.width() / OrbitViewWidth;
         p->setStrokeStyle(ink);
-        p->setLineWidth(1.2 * scale);
+        p->setLineWidth(OrbitLineWidthPixels * scale);
         p->save();
         p->translate(size.width() / 2, size.height() / 2);
-        p->rotate(state.orbitTurn * std::numbers::pi / 180);
+        p->rotate(state.orbitTurn * std::numbers::pi / DegreesPerHalfTurn);
         QCanvasPath outer;
         if (state.orbitDraw > 0) {
-            outer.arc(0, 0, 236 * scale, 0, 2 * std::numbers::pi * state.orbitDraw);
+            outer.arc(0, 0, OuterOrbitRadius * scale, 0, 2 * std::numbers::pi * state.orbitDraw);
             p->stroke(outer);
         }
         if (inner.isEmpty()) {
             // SVG dasharray repeats around circumference, starting at positive X.
-            constexpr double circumference = 2 * std::numbers::pi * 207;
+            constexpr double circumference = 2 * std::numbers::pi * InnerOrbitRadius;
             double offset = 0;
             int dash = 0;
-            const std::array<double, 4> lengths{ 142, 91, 380, 95 };
+            const std::array<double, OrbitDashCount> lengths{ 142, 91, 380, 95 };
             while (offset < circumference) {
-                const double end = std::min(circumference, offset + lengths[dash % 4]);
+                const double end = std::min(circumference, offset + lengths[dash % OrbitDashCount]);
                 if (dash % 2 == 0)
-                    inner.arc(0, 0, 207 * scale, offset / 207, end / 207,
-                              QCanvasPainter::PathWinding::ClockWise,
+                    inner.arc(0, 0, InnerOrbitRadius * scale, offset / InnerOrbitRadius,
+                              end / InnerOrbitRadius, QCanvasPainter::PathWinding::ClockWise,
                               QCanvasPainter::PathConnection::NotConnected);
                 offset = end;
                 ++dash;
             }
-            top.circle(0, -236 * scale, 4 * scale);
-            bottom.circle(0, 236 * scale, 4 * scale);
-            cross.moveTo(252 * scale, 260 * scale);
-            cross.lineTo(268 * scale, 260 * scale);
-            cross.moveTo(260 * scale, 252 * scale);
-            cross.lineTo(260 * scale, 268 * scale);
+            top.circle(0, -OuterOrbitRadius * scale, OrbitDotRadius * scale);
+            bottom.circle(0, OuterOrbitRadius * scale, OrbitDotRadius * scale);
+            cross.moveTo(CrossMinimum * scale, CrossCenter * scale);
+            cross.lineTo(CrossMaximum * scale, CrossCenter * scale);
+            cross.moveTo(CrossCenter * scale, CrossMinimum * scale);
+            cross.lineTo(CrossCenter * scale, CrossMaximum * scale);
         }
-        p->stroke(inner, 101);
+        p->stroke(inner, OrbitRingPathId);
         p->setFillStyle(ink);
-        p->fill(top, 102);
+        p->fill(top, TopDotPathId);
         p->setFillStyle(accent);
-        p->fill(bottom, 103);
+        p->fill(bottom, BottomDotPathId);
         p->restore();
-        p->setLineWidth(1.1 * scale);
-        p->stroke(cross, 104);
+        p->setLineWidth(CrossLineWidthPixels * scale);
+        p->stroke(cross, OrbitCrossPathId);
     }
     QVector<OpeningPath> paths;
     QVector<QCanvasPath> logicalPaths;
@@ -226,7 +255,7 @@ QVector<OpeningPath> loadOpeningPaths()
     QVector<OpeningPath> paths;
     QXmlStreamReader xml(svg.readAll());
     QString stroke;
-    double width = 16;
+    double width = DefaultPathWidth;
     while (!xml.atEnd()) {
         xml.readNext();
         if (!xml.isStartElement())
@@ -252,14 +281,15 @@ QVector<OpeningPath> loadOpeningPaths()
                     qCFatal(yalahoo::logRender, "Invalid embedded opening centerline: %s",
                             error.what());
                 }
-                path.point = path.centerline.length() < .02;
+                path.point = path.centerline.length() < PointPathLengthThreshold;
                 path.start = entry.value(u"start"_s).toDouble();
                 path.end = entry.value(u"end"_s).toDouble();
             }
             paths.append(std::move(path));
         }
     }
-    if (xml.hasError() || entries.size() != 17 || paths.size() != 19)
+    if (xml.hasError() || entries.size() != ExpectedRevealEntries
+        || paths.size() != LastBrandPathId)
         qCFatal(yalahoo::logRender, "Invalid opening brand mapping");
     return paths;
 }

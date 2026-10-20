@@ -1,24 +1,28 @@
+#include "RenderData.h"
 #include "AtlasAllocator.h"
 #include <stdexcept>
 #include <limits>
 
 namespace yalahoo::rhi {
 namespace {
-std::atomic<quint64> nextGeneration{ 0 };
+constinit std::atomic<quint64> nextGeneration{ 0 };
 }
 AtlasAllocator::AtlasAllocator(int maximumTextureSize, int capacity, int pageTiles)
 {
-    if (maximumTextureSize < 256 || capacity < 1 || capacity > 436 || pageTiles < 1
-        || pageTiles > std::numeric_limits<int>::max() / 256)
+    if (maximumTextureSize < renderData::CoverTilePixels || capacity < 1
+        || capacity > renderData::MaximumCaseEntities || pageTiles < 1
+        || pageTiles > std::numeric_limits<int>::max() / renderData::CoverTilePixels)
         throw std::invalid_argument("GPU cannot hold a cover tile or invalid atlas capacity");
-    const int side = qMin(pageTiles, maximumTextureSize / 256);
+    const int side = qMin(pageTiles, maximumTextureSize / renderData::CoverTilePixels);
     if (qint64(side) * side > std::numeric_limits<int>::max())
         throw std::invalid_argument("Atlas page slot count exceeds the supported integer range");
-    m_size = { side * 256, side * 256 };
+    m_size = { side * renderData::CoverTilePixels, side * renderData::CoverTilePixels };
     m_slotsPerPage = side * side;
     m_slots.resize(capacity);
     reset();
 }
+// A lease identifies both the physical slot generation and the cover-content generation.
+// Reusing a slot invalidates every older lease even when its album identity later reappears.
 AtlasLease AtlasAllocator::acquire(const QString &identity, quint64 coverGeneration)
 {
     if (identity.isEmpty())
@@ -74,8 +78,10 @@ void AtlasAllocator::release(const AtlasLease &lease)
 bool AtlasAllocator::publish(const AtlasLease &lease, CoverSnapshot pixels)
 {
     auto *slot = find(lease);
-    if (!slot || !pixels || pixels->identity != lease.identity || pixels->resolution != 256
-        || pixels->generation != slot->coverGeneration || pixels->image.size() != QSize(256, 256)
+    if (!slot || !pixels || pixels->identity != lease.identity
+        || pixels->resolution != renderData::CoverTilePixels
+        || pixels->generation != slot->coverGeneration
+        || pixels->image.size() != QSize(renderData::CoverTilePixels, renderData::CoverTilePixels)
         || pixels->image.format() != QImage::Format_RGBA8888_Premultiplied)
         return false;
     if (slot->pixels == pixels)
@@ -126,8 +132,10 @@ QVector<AtlasUpload> AtlasAllocator::replay(int page) const
 }
 QRect AtlasAllocator::tile(const AtlasLease &lease) const
 {
-    const int side = m_size.width() / 256;
-    return { (lease.slot % side) * 256, (lease.slot / side) * 256, 256, 256 };
+    const int side = m_size.width() / renderData::CoverTilePixels;
+    return { (lease.slot % side) * renderData::CoverTilePixels,
+             (lease.slot / side) * renderData::CoverTilePixels, renderData::CoverTilePixels,
+             renderData::CoverTilePixels };
 }
 QSize AtlasAllocator::pageSize() const
 {

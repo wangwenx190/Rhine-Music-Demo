@@ -6,6 +6,12 @@
 #include <algorithm>
 #include <utility>
 
+namespace {
+// Row packing uses measured ink width plus the source chip padding and inter-chip gap.
+constexpr auto ChipHorizontalPaddingPixels = 22;
+constexpr auto ChipGapPixels = 7;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -57,13 +63,17 @@ void GenreRowsModel::setWidth(double width)
     rewrap();
     Q_EMIT widthChanged();
 }
+// Measure once per content/font revision, including source chip padding. Rewrap reuses these
+// widths, so resizing does not repeatedly shape the same label for every candidate row.
 void GenreRowsModel::measure()
 {
     const QFontMetricsF metrics(m_font);
     m_labels.clear();
     m_labels.reserve(m_genres.size() + 1);
     const auto append = [this, &metrics](const QString &id, const QString &name) {
-        m_labels.append({ id, name, std::ceil(metrics.horizontalAdvance(name)) + 22 });
+        m_labels.append(
+                { id, name,
+                  std::ceil(metrics.horizontalAdvance(name)) + ChipHorizontalPaddingPixels });
     };
     append({ }, QCoreApplication::translate("Yalahoo", "All"));
     for (const auto &value : std::as_const(m_genres)) {
@@ -79,14 +89,14 @@ void GenreRowsModel::rewrap()
     double used = 0;
     for (const auto &label : std::as_const(m_labels)) {
         const double size = std::min(m_width, label.width);
-        if (!row.isEmpty() && used + 7 + size > m_width) {
+        if (!row.isEmpty() && used + ChipGapPixels + size > m_width) {
             rows.append(row);
             row.clear();
             used = 0;
         }
         row.append(QVariantMap{
                 { u"id"_s, label.id }, { u"name"_s, label.name }, { u"size"_s, size } });
-        used += (row.size() > 1 ? 7 : 0) + size;
+        used += (row.size() > 1 ? ChipGapPixels : 0) + size;
     }
     if (!row.isEmpty())
         rows.append(row);

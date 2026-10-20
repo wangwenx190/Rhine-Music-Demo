@@ -1,3 +1,6 @@
+// Wraps low-level RHI resource validation and shader loading. Failure is reported before
+// partially initialized native resources can be submitted.
+
 #pragma once
 // All limited-compatibility APIs are isolated here and in this directory.
 #include <rhi/qrhi.h>
@@ -6,6 +9,17 @@
 #include <stdexcept>
 #include <memory>
 namespace yalahoo::rhi {
+namespace shadowCamera {
+// Source directional-light projection is independent of the viewer camera.
+inline constexpr auto PositionXMagnitude = 6;
+inline constexpr auto PositionY = 14;
+inline constexpr auto PositionZMagnitude = 5;
+inline constexpr auto HalfWidth = 16;
+inline constexpr auto HalfHeight = 15;
+inline constexpr auto NearPlane = .1f;
+inline constexpr auto FarPlane = 45;
+}
+
 inline void require(bool ok, const char *reason)
 {
     if (!ok)
@@ -23,13 +37,16 @@ QShader shader(const QString &path);
 inline QMatrix4x4 lightView()
 {
     QMatrix4x4 m;
-    m.lookAt({ -6, 14, -5 }, { 0, 0, 0 }, { 0, 1, 0 });
+    m.lookAt({ -shadowCamera::PositionXMagnitude, shadowCamera::PositionY,
+               -shadowCamera::PositionZMagnitude },
+             { 0, 0, 0 }, { 0, 1, 0 });
     return m;
 }
 inline QMatrix4x4 lightProjection()
 {
     QMatrix4x4 m;
-    m.ortho(-16, 16, -15, 15, .1f, 45);
+    m.ortho(-shadowCamera::HalfWidth, shadowCamera::HalfWidth, -shadowCamera::HalfHeight,
+            shadowCamera::HalfHeight, shadowCamera::NearPlane, shadowCamera::FarPlane);
     return m;
 }
 }

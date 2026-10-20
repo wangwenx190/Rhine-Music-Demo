@@ -1,9 +1,17 @@
+// Overlapping source gradients preserve text contrast across portrait and landscape layouts.
+// Colors interpolate in the shared palette while geometry stays in logical pixels.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import Yalahoo.Music
 
 Item {
     id: root
+    // Portrait fade locations follow the measured callout rather than a fixed screen-space mask.
+    readonly property real transitionMilliseconds: 650
+    readonly property real portraitFadeLeadRatio: 0.12
+    readonly property real portraitFadeTailRatio: 0.07
+
     required property LayoutMetrics metrics
     required property DesignTokens tokens
     property real calloutTop: 0
@@ -12,7 +20,7 @@ Item {
     Behavior on sideVeilOpacity {
         enabled: !root.tokens.reducedMotion && root.visible
         NumberAnimation {
-            duration: 650 / root.tokens.motionSpeed
+            duration: root.transitionMilliseconds / root.tokens.motionSpeed
             easing.type: Easing.BezierSpline
             easing.bezierCurve: [0.4, 0, 0.2, 1, 1, 1]
         }
@@ -23,11 +31,13 @@ Item {
         visible: root.metrics.portrait
         gradient: Gradient {
             GradientStop {
-                position: Math.max(0, (root.calloutTop - root.height * 0.12) / root.height)
+                position: Math.max(0, (root.calloutTop - root.height * root.portraitFadeLeadRatio)
+                                   / root.height)
                 color: "transparent"
             }
             GradientStop {
-                position: Math.max(0, (root.calloutTop + root.height * 0.07) / root.height)
+                position: Math.max(0, (root.calloutTop + root.height * root.portraitFadeTailRatio)
+                                   / root.height)
                 color: root.tokens.veil
             }
             GradientStop {

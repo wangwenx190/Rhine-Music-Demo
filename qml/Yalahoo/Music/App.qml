@@ -1,3 +1,6 @@
+// The production root owns window presentation and injects long-lived C++ services. Visual
+// reloads replace the scene layer while playback and library controllers retain their identity.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T

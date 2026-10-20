@@ -1,3 +1,6 @@
+// Registers the C++ types and foreign Qt types used by the QML module. Registration exposes
+// narrow typed interfaces without giving QML ownership of services.
+
 #pragma once
 #include "OptionMetrics.h"
 #include "GenreRowsModel.h"

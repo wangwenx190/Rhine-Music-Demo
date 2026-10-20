@@ -10,6 +10,28 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Whole-run shaping preserves ligatures/fallback fonts; a bounded two-stage search fits the source layout.
+constexpr auto DefaultTranslationBudgetPixels = 300;
+constexpr auto EmojiPlaneBegin = 0x1f000;
+constexpr auto EmojiPresentationSelector = 0xfe0f;
+constexpr auto TransportLineHeightPixels = 29;
+constexpr auto MaximumMainLines = 3;
+constexpr auto LayoutKeyCopyCount = 3;
+constexpr auto UnboundedLineWidth = 1e9;
+constexpr auto MainLineHeightRatio = 1.4;
+constexpr auto MainLetterSpacingPixels = .6;
+constexpr auto SubtitleSizeRatio = .45;
+constexpr auto SubtitleLineHeightRatio = 1.45;
+constexpr auto SubtitleLetterSpacingEm = .01;
+constexpr auto SubtitleGapEm = .48;
+constexpr auto NarrowMinimumFontPixels = 18.0;
+constexpr auto MinimumFontPixels = 20.0;
+constexpr auto CoarseSearchSteps = 8;
+constexpr auto FineSearchSteps = 16;
+constexpr auto MaximumLayoutEntries = 96;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -21,7 +43,8 @@ struct Part final
     int lines = 0;
 };
 Part shape(const QString &text, QFont font, double size, double width, double ratio, double spacing,
-           bool translation, bool oneLine, bool clamp, bool collect = true, double budget = 300)
+           bool translation, bool oneLine, bool clamp, bool collect = true,
+           double budget = DefaultTranslationBudgetPixels)
 {
     Part part;
     if (text.isEmpty())
@@ -37,7 +60,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         const auto cluster = text.mid(graphemes[i], graphemes[i + 1] - graphemes[i]);
         bool emoji = false;
         for (const auto code : cluster.toUcs4())
-            emoji |= code >= 0x1f000 || code == 0xfe0f;
+            emoji |= code >= EmojiPlaneBegin || code == EmojiPresentationSelector;
         if (emoji) {
             QTextCharFormat format;
             // Frozen CSS font-synthesis:none keeps a regular color-font fallback regular.
@@ -53,14 +76,16 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
     option.setFlags(QTextOption::IncludeTrailingSpaces);
     layout.setTextOption(option);
     layout.setCacheEnabled(true);
-    const double lineHeight = oneLine && ratio == 0 ? 29 : size * ratio;
+    const double lineHeight = oneLine && ratio == 0 ? TransportLineHeightPixels : size * ratio;
     layout.beginLayout();
-    const int limit = oneLine ? 1 : translation ? int(std::ceil(budget / (size * ratio))) + 1 : 3;
+    const int limit = oneLine ? 1
+            : translation     ? int(std::ceil(budget / (size * ratio))) + 1
+                              : MaximumMainLines;
     for (int index = 0; index < limit; ++index) {
         auto line = layout.createLine();
         if (!line.isValid())
             break;
-        line.setLineWidth(oneLine ? 1e9 : width / scale);
+        line.setLineWidth(oneLine ? UnboundedLineWidth : width / scale);
         // CSS half leading uses the primary face. Fallback ascent must not move its ink.
         const QFontMetricsF metrics(font);
         const double ascent = metrics.ascent() * scale;
@@ -226,11 +251,15 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     const auto candidate = [&](double candidateSize, bool clamp, bool collect = false) {
         TitleLayout value;
         value.size = candidateSize;
-        auto first = shape(parts.first, main, candidateSize, width, transport ? 0 : 1.4,
-                           transport ? 0 : -.6, false, transport, clamp, collect, budget);
-        auto second = shape(parts.second, subtitle, candidateSize * .45, width, 1.45,
-                            candidateSize * .45 * .01, true, false, clamp, collect, budget);
-        const double gap = parts.second.isEmpty() ? 0 : candidateSize * .45 * .48;
+        auto first = shape(
+                parts.first, main, candidateSize, width, transport ? 0 : MainLineHeightRatio,
+                transport ? 0 : -MainLetterSpacingPixels, false, transport, clamp, collect, budget);
+        auto second = shape(parts.second, subtitle, candidateSize * SubtitleSizeRatio, width,
+                            SubtitleLineHeightRatio,
+                            candidateSize * SubtitleSizeRatio * SubtitleLetterSpacingEm, true,
+                            false, clamp, collect, budget);
+        const double gap =
+                parts.second.isEmpty() ? 0 : candidateSize * SubtitleSizeRatio * SubtitleGapEm;
         for (auto &glyph : second.glyphs)
             glyph.y += first.height + gap;
         value.glyphs = first.glyphs + second.glyphs;
@@ -255,14 +284,15 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
             result.glyphs =
                     shape(result.fitted, main, size, width, 0, 0, false, true, false).glyphs;
         }
-        result.height = 29;
+        result.height = TransportLineHeightPixels;
     } else {
         result = candidate(size, false);
         if (result.mainLines > 2 || result.height > budget + 1) {
-            const double minimum = std::min(size, narrow ? 18.0 : 20.0);
+            const double minimum =
+                    std::min(size, narrow ? NarrowMinimumFontPixels : MinimumFontPixels);
             int fit = -1;
-            for (int i = 1; i <= 8; ++i) {
-                result = candidate(size - (size - minimum) * i / 8, false);
+            for (int i = 1; i <= CoarseSearchSteps; ++i) {
+                result = candidate(size - (size - minimum) * i / CoarseSearchSteps, false);
                 if (result.mainLines <= 2 && result.height <= budget + 1) {
                     fit = i;
                     break;
@@ -271,10 +301,10 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
             if (fit < 0)
                 result = candidate(minimum, true);
             else {
-                const double high = size - (size - minimum) * (fit - 1) / 8;
-                const double low = size - (size - minimum) * fit / 8;
-                for (int i = 1; i <= 16; ++i) {
-                    result = candidate(high - (high - low) * i / 16, false);
+                const double high = size - (size - minimum) * (fit - 1) / CoarseSearchSteps;
+                const double low = size - (size - minimum) * fit / CoarseSearchSteps;
+                for (int i = 1; i <= FineSearchSteps; ++i) {
+                    result = candidate(high - (high - low) * i / FineSearchSteps, false);
                     if (result.mainLines <= 2 && result.height <= budget + 1)
                         break;
                 }
@@ -283,7 +313,7 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
         result = candidate(result.size, result.overflow, true);
         result.height = std::min(result.height, budget);
     }
-    qsizetype bytes = sizeof(TitleLayout) + keyBytes.size() * 3 + text.size() * 2;
+    qsizetype bytes = sizeof(TitleLayout) + keyBytes.size() * LayoutKeyCopyCount + text.size() * 2;
     for (const auto &glyph : result.glyphs) {
         bytes += sizeof(TitleGlyph) + (glyph.text.size() + glyph.key.size()) * 2;
         for (const auto &run : glyph.renderRuns)
@@ -295,7 +325,7 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
         return cached == key || !m_cache.contains(cached);
     });
     // Entry and byte LRU bounds complement each other; oversized inputs are never cached.
-    if (m_keys.size() >= 96)
+    if (m_keys.size() >= MaximumLayoutEntries)
         m_cache.remove(m_keys.takeFirst());
     if (bytes <= CacheBytes) {
         m_cache.insert(key, new TitleLayout(result), int(bytes));

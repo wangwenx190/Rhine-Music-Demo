@@ -27,6 +27,12 @@
 #include <cstdio>
 #include <atomic>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int ReviewDeadlineMilliseconds = 60000;
+constexpr int WorkerDrainDeadlineMilliseconds = 30000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -181,7 +187,7 @@ int main(int argc, char **argv)
             if (ready)
                 return;
             surface.requestFrame();
-            timeout.start(60000);
+            timeout.start(ReviewDeadlineMilliseconds);
             loop.exec();
             require(ready, "Pool cover preparation timed out");
         };
@@ -199,7 +205,7 @@ int main(int argc, char **argv)
             item->submit(std::move(input),
                          { item->fixedColorBufferWidth(), item->fixedColorBufferHeight() });
             surface.requestFrame();
-            timeout.start(30000);
+            timeout.start(WorkerDrainDeadlineMilliseconds);
             loop.exec();
             state->loop = nullptr;
             require(state->capture.has_value(), "Pool capture timed out");

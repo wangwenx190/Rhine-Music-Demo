@@ -1,3 +1,8 @@
+// Standard transfer/ACES fit constants retain their source precision and operation order.
+const float SrgbLinearSlope = 12.92;
+const float SrgbScale = 1.055;
+const float SrgbExponent = 2.4;
+
 vec3 RRTAndODTFit(vec3 v)
 {
 
@@ -37,7 +42,8 @@ vec3 ACESFilmicToneMapping(vec3 color)
 
 vec3 linearToSrgb(vec3 c)
 {
-    return mix(12.92 * c, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
+    return mix(SrgbLinearSlope * c,
+               SrgbScale * pow(max(c, vec3(0.0)), vec3(1.0 / SrgbExponent)) - 0.055,
                step(vec3(0.0031308), c));
 }
 void MAIN()

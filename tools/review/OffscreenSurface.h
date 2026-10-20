@@ -1,6 +1,14 @@
+// Owns a hidden Qt Quick RenderControl target and its native attachments. Epoch-aware
+// asynchronous readbacks remain bounded across resize and root replacement.
+
 #pragma once
 #include "ReadbackImage.h"
 #include <QString>
+
+namespace offscreenUnits {
+// Elapsed measurements cover only the observed RenderControl calls.
+inline constexpr auto NanosecondsPerMillisecond = 1e6;
+}
 using Qt::StringLiterals::operator""_s;
 #include <QQuickRenderControl>
 #include <QQuickRenderTarget>
@@ -237,11 +245,16 @@ private:
         const qint64 rendered = measurementEnabled ? timer.nsecsElapsed() : 0;
         m_control.endFrame();
         if (measurementEnabled)
-            Q_EMIT frameMeasured({ { u"polishMs"_s, polished / 1e6 },
-                                   { u"beginFrameMs"_s, (begun - polished) / 1e6 },
-                                   { u"syncMs"_s, (synced - begun) / 1e6 },
-                                   { u"quickRenderMs"_s, (rendered - synced) / 1e6 },
-                                   { u"endFrameMs"_s, (timer.nsecsElapsed() - rendered) / 1e6 } });
+            Q_EMIT frameMeasured(
+                    { { u"polishMs"_s, polished / offscreenUnits::NanosecondsPerMillisecond },
+                      { u"beginFrameMs"_s,
+                        (begun - polished) / offscreenUnits::NanosecondsPerMillisecond },
+                      { u"syncMs"_s, (synced - begun) / offscreenUnits::NanosecondsPerMillisecond },
+                      { u"quickRenderMs"_s,
+                        (rendered - synced) / offscreenUnits::NanosecondsPerMillisecond },
+                      { u"endFrameMs"_s,
+                        (timer.nsecsElapsed() - rendered)
+                                / offscreenUnits::NanosecondsPerMillisecond } });
         Q_EMIT frameRendered();
     }
     QQuickWindow &m_window;

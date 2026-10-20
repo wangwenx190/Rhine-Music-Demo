@@ -21,6 +21,40 @@
 #include <functional>
 #include <chrono>
 
+namespace {
+// Stage deadlines bound event-driven review completion; injected inputs target only this window.
+constexpr auto ReviewWidthPixels = 1280;
+constexpr auto ReviewHeightPixels = 720;
+constexpr auto StageDeadlineMilliseconds = 10000;
+constexpr auto SwipeDeadlineMilliseconds = 1400;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    InvalidReviewInput = 4,
+    RulerObjectMissing = 5,
+    RulerSlotsMissing = 6,
+    CaptureFailed = 7,
+    ReportFailed = 8
+};
+}
+
+namespace {
+// Ordered review states retain their report ordinals; names describe each awaited fact.
+enum ReviewStage {
+    AwaitInitialFrame = 0,
+    CheckWheelBurst = 1,
+    CheckOpposedWheel = 2,
+    CheckFiniteColumn = 3,
+    CheckWheelCap = 4,
+    CheckRulerClick = 5,
+    CheckSwipe = 6,
+    CheckHidden = 7,
+    CheckRestored = 8
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -42,7 +76,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     auto *selection = scene.selection();
     auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), u"nativeScene"_s));
     if (!selection || !native || !find(window.contentItem(), u"productionRulerInk"_s))
-        return 4;
+        return InvalidReviewInput;
     LibrarySnapshot fixture;
     for (int lane = 0; lane < 2; ++lane) {
         Genre genre;
@@ -60,12 +94,12 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     }
     library.setSnapshot(std::move(fixture));
     selection->setRealistic(false);
-    window.resize(1280, 720);
+    window.resize(ReviewWidthPixels, ReviewHeightPixels);
     native->setTelemetryEnabled(true);
     const auto playback = library.playbackTrackId();
     bool passed = true;
     QJsonArray samples, checks, inputs;
-    int step = 0;
+    int step = AwaitInitialFrame;
     QObject scope;
     QTimer deadline;
     deadline.setSingleShot(true);
@@ -118,7 +152,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     const auto finish = [&] {
         QSaveFile file(output + "/report.json"_L1);
         if (!file.open(QIODevice::WriteOnly)) {
-            app.exit(7);
+            app.exit(CaptureFailed);
             return;
         }
         file.write(
@@ -133,18 +167,18 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
                                 { u"scope"_s,
                                   u"Actual Release App path. Event-driven input receipt, navigation commit and corresponding Qt frame submission are distinct; screen display time is unavailable."_s } })
                         .toJson());
-        app.exit(file.commit() && passed ? 0 : 8);
+        app.exit(file.commit() && passed ? 0 : ReportFailed);
     };
     advanceWhenReady = [&] {
         if (!waiting || queued)
             return;
-        const bool ready = step == 0 ? window.isExposed() && !samples.isEmpty()
-                : step == 7          ? !window.isVisible() && !ruler.active()
-                : step == 8
-                ? window.isExposed() && ruler.active() && !samples.isEmpty()
+        const bool ready = step == AwaitInitialFrame ? window.isExposed() && !samples.isEmpty()
+                : step == CheckHidden                ? !window.isVisible() && !ruler.active()
+                : step == CheckRestored ? window.isExposed() && ruler.active() && !samples.isEmpty()
                         && samples.last().toObject()[u"submittedNs"_s].toInteger()
                                 >= restoreStartedNs
-                : hasSubmission() && (step != 4 || !ruler.state()[u"moving"_s].toBool());
+                                        : hasSubmission()
+                        && (step != CheckWheelCap || !ruler.state()[u"moving"_s].toBool());
         if (!ready)
             return;
         waiting = false;
@@ -175,11 +209,11 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     };
     next = [&] {
         switch (step++) {
-        case 0:
+        case AwaitInitialFrame:
             for (int i = 0; i < 4; ++i)
                 wheel(-12, -120);
             break;
-        case 1:
+        case CheckWheelBurst:
             check(u"pixelDelta-priority-48px"_s, selection->albumId() == "a0-1"_L1);
             checkSubmission(u"pixelDelta-corresponding-submission"_s);
             for (int i = 0; i < 8; ++i)
@@ -187,12 +221,12 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
             for (int i = 0; i < 5; ++i)
                 key(Qt::Key_Up);
             break;
-        case 2:
+        case CheckOpposedWheel:
             check(u"rapid-reversal-latest-target"_s, selection->albumId() == "a0-4"_L1);
             checkSubmission(u"reversal-corresponding-submission"_s);
             key(Qt::Key_Right);
             break;
-        case 3: {
+        case CheckFiniteColumn: {
             check(u"keyboard-column"_s, selection->cell().lane == 1);
             checkSubmission(u"column-corresponding-submission"_s);
             const auto before = selection->albumId();
@@ -203,7 +237,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
             std::unique_ptr<QObject> object(component.create());
             auto *text = qobject_cast<QQuickItem *>(object.get());
             if (!text) {
-                app.exit(5);
+                app.exit(RulerObjectMissing);
                 return;
             }
             text->setParentItem(window.contentItem());
@@ -216,7 +250,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
             wheel(0, -1200);
             break;
         }
-        case 4: {
+        case CheckWheelCap: {
             check(u"wheel-event-cap-and-finite-end"_s, selection->cell().row == 15);
             checkSubmission(u"finite-end-corresponding-submission"_s);
             int first = -1;
@@ -227,7 +261,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
                     first = i;
             auto *button = find(window.contentItem(), u"rulerSlot%1"_s.arg(first));
             if (!button) {
-                app.exit(6);
+                app.exit(RulerSlotsMissing);
                 return;
             }
             const auto point = button->mapToScene({ button->width() / 2, button->height() / 2 });
@@ -239,27 +273,27 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
             QCoreApplication::sendEvent(&window, &release);
             break;
         }
-        case 5:
+        case CheckRulerClick:
             check(u"production-ruler-click"_s, selection->cell().row == 12);
             checkSubmission(u"ruler-click-corresponding-submission"_s);
-            input.swipe({ 0, -36 }, 1400);
+            input.swipe({ 0, -36 }, SwipeDeadlineMilliseconds);
             window.resize(390, 844);
             scene.lighting()->setNight(true);
             break;
-        case 6:
+        case CheckSwipe:
             check(u"touch-common-boundary"_s, selection->cell().row == 13);
             checkSubmission(u"touch-corresponding-submission"_s);
             check(u"portrait-narrow"_s, ruler.narrow() && scene.layout()->portrait());
             window.grabWindow().save(output + "/portrait-night.png"_L1);
             window.hide();
             break;
-        case 7:
+        case CheckHidden:
             check(u"hidden-ruler-no-input"_s, !ruler.active());
             window.releaseResources();
             restoreStartedNs = now();
             window.show();
             break;
-        case 8: {
+        case CheckRestored: {
             check(u"restore-production-ruler"_s, ruler.active() && ruler.narrow());
             check(u"navigation-playback-independent"_s, library.playbackTrackId() == playback);
             check(u"window-policy"_s, verification::windowPolicySatisfied(window));
@@ -272,12 +306,12 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
         }
         }
         waiting = true;
-        deadline.start(10000);
+        deadline.start(StageDeadlineMilliseconds);
         window.update();
         advanceWhenReady();
     };
     waiting = true;
-    deadline.start(10000);
+    deadline.start(StageDeadlineMilliseconds);
     window.show();
     window.update();
     return app.exec();

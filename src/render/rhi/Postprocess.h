@@ -1,3 +1,6 @@
+// Owns the RHI postprocessing resource graph and pass submission. Attachments, uniforms and
+// sampling dependencies are rebuilt only when their inputs change.
+
 #pragma once
 #include "RhiApi.h"
 #include <QJsonArray>
@@ -6,14 +9,24 @@
 #include <vector>
 
 namespace yalahoo::rhi {
+namespace postDefaults {
+// Source scene clip/focus distances and postprocessing defaults.
+inline constexpr auto NearPlane = 5;
+inline constexpr auto FarPlane = 300;
+inline constexpr auto FocusDistance = 25;
+inline constexpr auto Aperture = .0003f;
+inline constexpr auto AoRadius = .18f;
+}
+
 class ResourceInventory;
 struct PostSettings final
 {
     QSize size;
     int samples = 0;
-    float nearPlane = 5, farPlane = 300, focus = 25, aperture = .0003f;
+    float nearPlane = postDefaults::NearPlane, farPlane = postDefaults::FarPlane,
+          focus = postDefaults::FocusDistance, aperture = postDefaults::Aperture;
     float projectionX = 1, projectionY = 1;
-    float radius = .18f;
+    float radius = postDefaults::AoRadius;
     bool bokeh = false, smaa = false;
 };
 class Postprocess final

@@ -1,3 +1,6 @@
+// Coordinates SDR/HDR output negotiation and transfer parameters. Output changes retain business
+// state while surface changes follow explicit epochs.
+
 #pragma once
 #include "DisplayState.h"
 #include <QPointer>

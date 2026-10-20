@@ -1,3 +1,6 @@
+// Validates production postprocessing output against analytic expectations. Format, coordinate
+// and sampling tolerances remain explicit at each comparison.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;

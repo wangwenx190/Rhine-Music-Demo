@@ -1,3 +1,6 @@
+// Projects bounded C++ label slots into self-drawn cards. The first click expands an entry
+// action; the second click commits column navigation.
+
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T

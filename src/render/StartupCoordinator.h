@@ -1,3 +1,6 @@
+// Gates opening handoff on current resource and scene readiness. Revision checks reject
+// readiness from a superseded startup or library request.
+
 #pragma once
 #include <QObject>
 #include "MusicTypes.h"

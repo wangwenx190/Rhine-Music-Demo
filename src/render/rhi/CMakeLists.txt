@@ -7,6 +7,7 @@ qt_add_library(
     DisplayOutput.h
     DisplayState.h
     RhiItem.cpp
+    RenderData.h
     RhiItem.h
     SceneItem.cpp
     SceneItem.h

@@ -4,6 +4,12 @@
 #include <QSet>
 #include <QUrl>
 
+namespace {
+// Bound title fan-out and accepted extract size before exposing remote text to the UI.
+constexpr auto MaximumSearchTitles = 6;
+constexpr auto MaximumExtractCharacters = 8000;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -19,7 +25,7 @@ QStringList wikipediaTitles(const Album &album)
         result.append(matches.next().captured(1).trimmed());
     result.removeAll(QString());
     result.removeDuplicates();
-    return result.mid(0, 6);
+    return result.mid(0, MaximumSearchTitles);
 }
 QStringList wikidataClaims(const QJsonObject &entity, const QString &property)
 {
@@ -94,8 +100,8 @@ ProviderResult wikipediaMetadata(const Album &album, const QJsonArray &pages,
             continue;
         const auto extract = page.value(u"extract"_s).toString().trimmed();
         const auto first = extract.section('\n'_L1, 0, 0);
-        if (extract.isEmpty() || extract.size() > 8000 || !first.contains(albumWords)
-            || first.contains(songWords))
+        if (extract.isEmpty() || extract.size() > MaximumExtractCharacters
+            || !first.contains(albumWords) || first.contains(songWords))
             continue;
         const auto performerIds = wikidataClaims(entity, u"P175"_s);
         bool performerMatches = false, performersComplete = true;

@@ -13,6 +13,19 @@
 #include <QFileInfo>
 #include <stdexcept>
 
+namespace {
+// Preparation validates the manifest inventory and bounds child-tool execution before publishing outputs.
+#ifdef Q_OS_WIN
+constexpr auto BytesPerKiB = 1024;
+#endif
+constexpr auto ToolStartDeadlineMilliseconds = 5000;
+constexpr auto ToolCompletionDeadlineMilliseconds = 60000;
+constexpr auto ExpectedAssetInputs = 24;
+constexpr auto PhysicalFontProbePixels = 24;
+constexpr auto SourcePathPrefixCharacters = 11;
+constexpr auto ResourcePathPrefixCharacters = 7;
+}
+
 using namespace Qt::StringLiterals;
 
 #ifdef Q_OS_WIN
@@ -41,7 +54,7 @@ QByteArray unpackFont(const QByteArray &packed)
         throw std::runtime_error("DirectWrite WOFF2 unpack failed");
     UINT64 size = 0;
     result = stream->GetFileSize(&size);
-    if (FAILED(result) || size > 64 * 1024 * 1024)
+    if (FAILED(result) || size > 64 * BytesPerKiB * BytesPerKiB)
         throw std::runtime_error("Invalid font size");
     const void *fragment = nullptr;
     void *context = nullptr;
@@ -53,11 +66,14 @@ QByteArray unpackFont(const QByteArray &packed)
     return bytes;
 }
 #endif
+// Wait for a bounded child process and require its actual exit status before accepting output.
+// A manifest hash or pre-existing file cannot substitute for a successful preparation command.
 QByteArray execute(const QString &program, const QStringList &arguments)
 {
     QProcess process;
     process.start(program, arguments);
-    if (!process.waitForStarted(5000) || !process.waitForFinished(60000)
+    if (!process.waitForStarted(ToolStartDeadlineMilliseconds)
+        || !process.waitForFinished(ToolCompletionDeadlineMilliseconds)
         || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
         throw std::runtime_error((u"Asset tool failed: "_s + program + '\n'_L1
                                   + QString::fromUtf8(process.readAllStandardError()))
@@ -97,12 +113,13 @@ void verifyFrozenInputs(const QDir &root)
         const auto entry = value.toObject();
         addInput(entry[u"source"_s].toString(), entry[u"sha256"_s].toString());
     }
-    if (inputs.size() != 24)
+    if (inputs.size() != ExpectedAssetInputs)
         throw std::runtime_error("Incomplete frozen asset inputs");
     for (auto input = inputs.cbegin(); input != inputs.cend(); ++input) {
-        const auto frozen = execute(u"git"_s,
-                                    { u"-C"_s, root.absolutePath(), u"show"_s,
-                                      revision + ':'_L1 + input.key().mid(11) });
+        const auto frozen =
+                execute(u"git"_s,
+                        { u"-C"_s, root.absolutePath(), u"show"_s,
+                          revision + ':'_L1 + input.key().mid(SourcePathPrefixCharacters) });
         if (hash(frozen) != input.value()
             || hash(readFile(root.filePath(input.key()))) != input.value())
             throw std::runtime_error(
@@ -176,7 +193,7 @@ int main(int argc, char **argv)
         QVector<Batch> imported;
         for (int i = 0; i < 3; ++i) {
             const QString path = u"models/meshes/meshes_%1__mesh.mesh"_s.arg(i);
-            const auto data = readFile(output + '/'_L1 + path.mid(7));
+            const auto data = readFile(output + '/'_L1 + path.mid(ResourcePathPrefixCharacters));
             imported.append(readQtMesh(data));
             add(path, data, model, u"selected Kit balsam; preserve mesh topology and attributes"_s);
         }
@@ -246,7 +263,7 @@ int main(int argc, char **argv)
             const int id = QFontDatabase::addApplicationFontFromData(bytes);
             if (id < 0 || !QFontDatabase::applicationFontFamilies(id).contains(u"MiSans"_s))
                 throw std::runtime_error("Prepared MiSans cannot load");
-            QRawFont raw(bytes, 24, QFont::PreferNoHinting);
+            QRawFont raw(bytes, PhysicalFontProbePixels, QFont::PreferNoHinting);
             const auto os2 = raw.fontTable("OS/2");
             if (!raw.isValid() || os2.size() < 6)
                 throw std::runtime_error("Prepared font lacks OS/2 metadata");
@@ -258,8 +275,8 @@ int main(int argc, char **argv)
             QString styleName;
             const char *outlineTable = raw.fontTable("CFF ").isEmpty() ? "glyf" : "CFF ";
             for (const auto &style : QFontDatabase::styles(raw.familyName())) {
-                const auto selected =
-                        QRawFont::fromFont(QFontDatabase::font(raw.familyName(), style, 24));
+                const auto selected = QRawFont::fromFont(
+                        QFontDatabase::font(raw.familyName(), style, PhysicalFontProbePixels));
                 if (selected.fontTable(outlineTable) == raw.fontTable(outlineTable)) {
                     styleName = style;
                     break;

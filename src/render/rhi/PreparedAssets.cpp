@@ -1,8 +1,15 @@
+#include "RenderData.h"
 #include "PreparedAssets.h"
 #include <QDirIterator>
 #include <QtEndian>
 #include <QFloat16>
 #include <cstring>
+
+namespace {
+// Bundled source floats are little-endian; the prepared environment converts source RGBA32F to its GPU format.
+constexpr auto FloatPayloadBytes = 4;
+constexpr auto SourceEnvironmentBytesPerPixel = 16;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -31,11 +38,12 @@ const PreparedAssets &preparedAssets()
                 result.images.insert(path, image);
             } else {
                 if (path.endsWith(u".rgba32f"_s)) {
-                    require(bytes.size() % 4 == 0, "Invalid embedded float payload");
+                    require(bytes.size() % FloatPayloadBytes == 0,
+                            "Invalid embedded float payload");
 #if Q_BYTE_ORDER == Q_BIG_ENDIAN
-                    for (qsizetype i = 0; i < bytes.size(); i += 4) {
+                    for (qsizetype i = 0; i < bytes.size(); i += FloatPayloadBytes) {
                         const auto word = qFromLittleEndian<quint32>(bytes.constData() + i);
-                        std::memcpy(bytes.data() + i, &word, 4);
+                        std::memcpy(bytes.data() + i, &word, FloatPayloadBytes);
                     }
 #endif
                 }
@@ -46,11 +54,14 @@ const PreparedAssets &preparedAssets()
                 assets::readGlb(result.bytes.value(u":/rhi/models/music-case-v040.glb"_s));
         result.bytes.remove(u":/rhi/models/music-case-v040.glb"_s);
         const auto room = result.bytes.value(u":/rhi/environment/room-pmrem.rgba32f"_s);
-        require(room.size() == 768 * 1024 * 16, "Invalid PMREM input");
+        require(room.size()
+                        == renderData::EnvironmentWidth * renderData::EnvironmentHeight
+                                * SourceEnvironmentBytesPerPixel,
+                "Invalid PMREM input");
         QByteArray halfBytes(room.size() / 2, '\0');
-        for (qsizetype i = 0; i < room.size() / 4; ++i) {
+        for (qsizetype i = 0; i < room.size() / FloatPayloadBytes; ++i) {
             float value;
-            std::memcpy(&value, room.constData() + i * 4, 4);
+            std::memcpy(&value, room.constData() + i * FloatPayloadBytes, FloatPayloadBytes);
             const qfloat16 half(value);
             require(float(half) == value, "PMREM conversion changes source values");
             std::memcpy(halfBytes.data() + i * 2, &half, 2);

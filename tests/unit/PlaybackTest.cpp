@@ -1,3 +1,7 @@
+// Exercises Qt Multimedia state against generated local audio and explicitly invalid anonymous
+// input. Explicit fixture literals are independent inputs or expected results; timing bounds
+// have named constants.
+
 #include "LibrarySession.h"
 #include "PlaybackController.h"
 #include "AudioFixture.h"
@@ -8,6 +12,12 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <cmath>
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int BackendDeadlineMilliseconds = 5000;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -60,8 +70,8 @@ private Q_SLOTS:
                  "No real output device; native playback gate remains unverified");
         QVERIFY(f.player.isAvailable());
         f.player.toggle();
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.position() > 100, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), AsyncDeadlineMilliseconds);
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.position() > 100, BackendDeadlineMilliseconds);
         QCOMPARE(f.player.mediaSupport(), MediaSupport::Supported);
         QVERIFY(!f.player.playTrack(u"missing"_s, u"track-0"_s));
         QVERIFY(f.player.playing());
@@ -107,7 +117,7 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(f.player.m_player.mediaStatus() == QMediaPlayer::LoadedMedia
                                          || f.player.m_player.mediaStatus()
                                                  == QMediaPlayer::BufferedMedia,
-                                 10000);
+                                 AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
         QCOMPARE(f.player.m_player.playbackRate(), 1.);
     }
@@ -140,7 +150,7 @@ private Q_SLOTS:
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         QTRY_COMPARE(f.player.trackId(), u"track-2"_s);
-        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
         f.player.stop();
         QVERIFY(f.player.error().isEmpty());
@@ -162,11 +172,11 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(f.player.m_player.mediaStatus() == QMediaPlayer::LoadedMedia
                                          || f.player.m_player.mediaStatus()
                                                  == QMediaPlayer::BufferedMedia,
-                                 10000);
+                                 AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
         QVERIFY(!f.player.requested());
         f.player.toggle();
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), AsyncDeadlineMilliseconds);
         QTRY_VERIFY(f.player.seekable());
         f.player.seek(1500);
         f.player.pause();
@@ -182,7 +192,7 @@ private Q_SLOTS:
         f.player.applyDevices({ }, { });
         QVERIFY(f.player.requested());
         f.player.applyDevices(real, systemDefault);
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), AsyncDeadlineMilliseconds);
         f.player.pause();
         const auto id = QString::fromUtf8(real.first().id().toBase64());
         QVERIFY(f.player.selectDevice(id));
@@ -209,12 +219,12 @@ private Q_SLOTS:
         QVERIFY(f.player.outputAvailable());
         QSignalSpy changed(&f.player, &PlaybackController::currentChanged);
         QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(f.player.trackId(), u"track-2"_s, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(f.player.trackId(), u"track-2"_s, AsyncDeadlineMilliseconds);
         QCOMPARE(changed.size(), 2);
-        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
         f.player.retry();
-        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), AsyncDeadlineMilliseconds);
         f.player.stop();
         QVERIFY(!f.player.seekable());
         f.player.seek(2000);

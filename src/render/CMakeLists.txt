@@ -12,6 +12,7 @@ qt_add_library(
     SceneAdapter.cpp
     SceneAdapter.h
     SceneFrame.h
+    SceneGeometry.h
     opening/OpeningFrame.cpp
     opening/OpeningFrame.h
     opening/OpeningController.cpp

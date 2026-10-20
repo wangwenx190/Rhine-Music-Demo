@@ -1,3 +1,6 @@
+// Builds bounded ruler ticks, labels and navigation state in C++. Source-derived geometry is
+// published to the painter rather than recomputed in QML.
+
 #pragma once
 #include "ScalarSpring.h"
 #include "SelectionController.h"
@@ -5,6 +8,15 @@
 #include <array>
 
 namespace yalahoo {
+namespace rulerGeometry {
+// Logical source tick geometry and a bounded overscanned physical pool.
+inline constexpr auto PhysicalTickCount = 16;
+inline constexpr auto TickPixels = 3;
+inline constexpr auto GapPixels = 8;
+inline constexpr auto ActiveHeightPixels = 30;
+inline constexpr auto InactiveRippleTime = 1e20;
+}
+
 class InputRouter;
 struct RulerMark final
 {
@@ -14,8 +26,9 @@ struct RulerMark final
 };
 struct RulerDrawing final
 {
-    std::array<RulerMark, 16> marks;
-    double width = 0, tick = 3, gap = 8, height = 30;
+    std::array<RulerMark, rulerGeometry::PhysicalTickCount> marks;
+    double width = 0, tick = rulerGeometry::TickPixels, gap = rulerGeometry::GapPixels,
+           height = rulerGeometry::ActiveHeightPixels;
     bool overflow = false;
     bool operator==(const RulerDrawing &) const = default;
 };
@@ -54,7 +67,7 @@ private:
     {
         double ordinal = 0, x = 0;
         ScalarSpring offset, presence, height, opacity;
-        double revealAt = 0, rippleAt = -1e20;
+        double revealAt = 0, rippleAt = -rulerGeometry::InactiveRippleTime;
         bool pointer = false, focused = false;
     };
     void synchronize(bool groupChanged = false);
@@ -68,7 +81,7 @@ private:
     QPointer<MotionController> m_motion;
     QPointer<SelectionController> m_selection;
     QPointer<InputRouter> m_router;
-    std::array<Slot, 16> m_slots;
+    std::array<Slot, rulerGeometry::PhysicalTickCount> m_slots;
     RulerDrawing m_drawing;
     QVariantList m_slotStates;
     ScalarSpring m_scroll, m_width;

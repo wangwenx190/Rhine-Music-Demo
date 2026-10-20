@@ -1,3 +1,7 @@
+// Exercises bounded decode queues, stale generations, color-correct mipmaps and cache ownership.
+// Explicit fixture literals are independent inputs or expected results; timing bounds have named
+// constants.
+
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -15,6 +19,12 @@
 #include <QSaveFile>
 #include <QTemporaryDir>
 #include <QtTest>
+
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int WorkerDrainDeadlineMilliseconds = 30000;
+}
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
@@ -184,7 +194,7 @@ private Q_SLOTS:
         QCOMPARE(cache.statistics()[u"decodeStarts"_s].toInt(), 0);
         QCOMPARE(cache.statistics()[u"pending"_s].toInt(), 20);
         cache.setSuspended(false);
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 20, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 20, AsyncDeadlineMilliseconds);
         QCOMPARE(cache.statistics()[u"pending"_s].toInt(), 0);
         QCOMPARE(cache.statistics()[u"active"_s].toInt(), 0);
         QVERIFY(cache.statistics()[u"peakActive"_s].toInt() <= CoverCache::concurrency);
@@ -209,7 +219,8 @@ private Q_SLOTS:
         adapter.reset();
         QVERIFY(!item.adapter());
         QTRY_COMPARE_WITH_TIMEOUT(
-                item.coverStatistics()[u"cache"_s].toObject()[u"active"_s].toInt(), 0, 10000);
+                item.coverStatistics()[u"cache"_s].toObject()[u"active"_s].toInt(), 0,
+                AsyncDeadlineMilliseconds);
         QVERIFY(!window.isVisible());
     }
     void containAndTransparency()
@@ -275,7 +286,7 @@ private Q_SLOTS:
             QVERIFY(cache.request(id, directory.filePath(id + u".jpg"_s), 256));
             QVERIFY(cache.request(id, directory.filePath(id + u".jpg"_s), 256));
         }
-        timeout.start(30000);
+        timeout.start(WorkerDrainDeadlineMilliseconds);
         loop.exec();
         QCOMPARE(ready.size(), 96);
         input.stop();
@@ -324,7 +335,7 @@ private Q_SLOTS:
             cache.cancel(QString::number(i));
         }
         QVERIFY(cache.request(u"final"_s, path, 1024));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, AsyncDeadlineMilliseconds);
         const auto final = qvariant_cast<CoverSnapshot>(spy.first().first());
         QCOMPARE(final->identity, u"final"_s);
         QCOMPARE(final->generation, cache.generation());
@@ -337,7 +348,7 @@ private Q_SLOTS:
             closing.reset();
         }
         QVERIFY(cache.request(u"after-close"_s, path, 256));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, AsyncDeadlineMilliseconds);
     }
     void imageAllocationPolicy_data()
     {
@@ -357,7 +368,7 @@ private Q_SLOTS:
         CoverCache cache;
         QSignalSpy spy(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"cover"_s, path, 256));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, AsyncDeadlineMilliseconds);
         const auto pixels = qvariant_cast<CoverSnapshot>(spy.first().first());
         const auto limit = QImageReader::allocationLimit();
         bool configured = false;
@@ -391,7 +402,7 @@ private Q_SLOTS:
         QVERIFY(cache.request(u"missing"_s, directory.filePath(u"missing.png"_s), 256,
                               u"Missing album"_s));
         QVERIFY(cache.request(u"absent"_s, u""_s, 256, u"No cover album"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 2, AsyncDeadlineMilliseconds);
         for (const auto &call : spy) {
             const auto p = qvariant_cast<CoverSnapshot>(call.first());
             QVERIFY(!p->error.isEmpty());
@@ -421,7 +432,7 @@ private Q_SLOTS:
         CoverCache cache;
         QSignalSpy spy(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"tagged"_s, path, 256));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, AsyncDeadlineMilliseconds);
         const auto p = qvariant_cast<CoverSnapshot>(spy.first().first());
         QCOMPARE(p->image.pixelColor(128, 128), expected);
     }
@@ -435,7 +446,7 @@ private Q_SLOTS:
         CoverCache cache;
         QSignalSpy spy(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"small"_s, path, 1024));
-        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.size(), 1, AsyncDeadlineMilliseconds);
         const auto p = qvariant_cast<CoverSnapshot>(spy.first().first());
         QCOMPARE(p->readerReturnedBytes, 64 * 128 * 4);
         QCOMPARE(p->image.size(), QSize(1024, 1024));
@@ -489,12 +500,12 @@ private Q_SLOTS:
         CoverCache cache;
         QSignalSpy ready(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"a"_s, { }, 256, u"Old title"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
         const auto old = cache.lookup(u"a"_s, { }, 256, u"Old title"_s);
         QVERIFY(old);
         QVERIFY(!cache.lookup(u"a"_s, { }, 256, u"New title"_s));
         QVERIFY(cache.request(u"a"_s, { }, 256, u"New title"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, AsyncDeadlineMilliseconds);
         const auto changed = cache.lookup(u"a"_s, { }, 256, u"New title"_s);
         QVERIFY(changed && changed != old);
         QCOMPARE(cache.lookup(u"a"_s, { }, 256, u"Old title"_s), old);
@@ -511,13 +522,13 @@ private Q_SLOTS:
         CoverCache cache;
         QSignalSpy ready(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"broken"_s, brokenPath, 256, u"Old title"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
         const auto old = cache.lookup(u"broken"_s, brokenPath, 256, u"Old title"_s);
         QVERIFY(old && !old->error.isEmpty());
         QCOMPARE(old->fallbackTitle, u"Old title"_s);
         QVERIFY(!cache.lookup(u"broken"_s, brokenPath, 256, u"New title"_s));
         QVERIFY(cache.request(u"broken"_s, brokenPath, 256, u"New title"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, AsyncDeadlineMilliseconds);
         const auto changed = cache.lookup(u"broken"_s, brokenPath, 256, u"New title"_s);
         QVERIFY(changed && changed != old);
         QCOMPARE(changed->fallbackTitle, u"New title"_s);
@@ -526,7 +537,7 @@ private Q_SLOTS:
         const auto validPath = directory.filePath(u"valid.png"_s);
         QVERIFY(image.save(validPath));
         QVERIFY(cache.request(u"valid"_s, validPath, 256, u"Original title"_s));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 3, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 3, AsyncDeadlineMilliseconds);
         const auto valid = cache.lookup(u"valid"_s, validPath, 256, u"Original title"_s);
         QVERIFY(valid && valid->error.isEmpty());
         const auto decodes = cache.statistics().value(u"decodeStarts"_s);
@@ -557,7 +568,7 @@ private Q_SLOTS:
         QSignalSpy ready(&cache, &CoverCache::ready);
         QVERIFY(cache.request(u"a"_s, path, 256));
         QVERIFY(cache.request(u"b"_s, path, 256));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, AsyncDeadlineMilliseconds);
         const auto stable = cache.lookup(u"b"_s, path, 256);
         const auto old = cache.lookup(u"a"_s, path, 256);
         SelectedCoverPool owners;
@@ -569,7 +580,7 @@ private Q_SLOTS:
         QVERIFY(!cache.lookup(u"a"_s, path, 256));
         QCOMPARE(cache.lookup(u"b"_s, path, 256), stable);
         QVERIFY(cache.request(u"a"_s, path, 256));
-        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 3, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 3, AsyncDeadlineMilliseconds);
         const auto changed = cache.lookup(u"a"_s, path, 256);
         QVERIFY(changed != old);
         QVERIFY(owners.upgrade(selected, changed));
@@ -612,7 +623,7 @@ private Q_SLOTS:
                 (item.publishNow(),
                  item.coverStatistics()[u"ready"_s].toInt() == 2
                          && item.coverStatistics()[u"selectedDetailed"_s].toBool()),
-                10000);
+                AsyncDeadlineMilliseconds);
         const auto before = item.input();
         const auto decodes =
                 item.coverStatistics().value(u"cache"_s).toObject().value(u"decodeStarts"_s);
@@ -631,7 +642,8 @@ private Q_SLOTS:
         selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
         item.publishNow();
         QTRY_VERIFY_WITH_TIMEOUT(
-                (item.publishNow(), item.coverStatistics()[u"ready"_s].toInt() == 2), 10000);
+                (item.publishNow(), item.coverStatistics()[u"ready"_s].toInt() == 2),
+                AsyncDeadlineMilliseconds);
         const auto after = item.input();
         QCOMPARE(after.atlasGeneration, before.atlasGeneration);
         int changed = 0, stable = 0;

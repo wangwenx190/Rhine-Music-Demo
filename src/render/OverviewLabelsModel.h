@@ -1,3 +1,6 @@
+// Admits and animates a bounded set of projected column labels. Collision hysteresis and
+// retiring slots preserve stable identities through entry/exit overlap.
+
 #pragma once
 #include "SurfaceTransition.h"
 #include <QAbstractListModel>
@@ -6,6 +9,12 @@
 #include <memory>
 
 namespace yalahoo {
+namespace overviewLabelTiming {
+// Card exits may complete before their independently animated entry buttons.
+inline constexpr auto EnterMilliseconds = 460;
+inline constexpr auto ExitMilliseconds = 240;
+}
+
 struct OverviewColumn final
 {
     int lane = -1;
@@ -57,7 +66,8 @@ private:
     struct Slot final
     {
         OverviewColumn column;
-        SurfaceTransition fade{ 460, 240, false, false };
+        SurfaceTransition fade{ overviewLabelTiming::EnterMilliseconds,
+                                overviewLabelTiming::ExitMilliseconds, false, false };
         bool wanted = false;
         double entryTime = 0, entryFrom = 0, entry = 0;
         double opacityTime = 0, opacityFrom = 0, entryOpacity = 0;

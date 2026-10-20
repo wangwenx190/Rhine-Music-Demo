@@ -1,8 +1,17 @@
+// Interpolates scalar travel with continuous position, velocity and acceleration. A quintic
+// endpoint solve preserves displayed derivatives when travel is interrupted.
+
 #pragma once
 #include "ScalarSpring.h"
 #include <array>
 
 namespace yalahoo {
+namespace columnMotion {
+// Default finite-column motion policy, in seconds and inverse seconds.
+inline constexpr auto DefaultTravelSeconds = 1.4;
+inline constexpr auto DefaultFollowRate = 3.7;
+}
+
 double archiveTravelDuration(double lanes, double rows);
 
 // Rest-to-rest endpoint, preserving the displayed x/v/a on interruption.
@@ -71,7 +80,9 @@ public:
         return m_track.active();
     }
     bool settled() const;
-    bool retarget(double target, bool guided = false, double duration = 1.4, double rate = 3.7);
+    bool retarget(double target, bool guided = false,
+                  double duration = columnMotion::DefaultTravelSeconds,
+                  double rate = columnMotion::DefaultFollowRate);
     void update(double dt, bool reduced = false);
     void translate(double offset);
     void finish();
@@ -80,6 +91,6 @@ private:
     ScalarSpring m_spring;
     QuinticTrack m_track;
     double m_target;
-    double m_rate = 3.7;
+    double m_rate = columnMotion::DefaultFollowRate;
 };
 }

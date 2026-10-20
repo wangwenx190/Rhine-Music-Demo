@@ -1,3 +1,7 @@
+// Checks ruler geometry, wheel normalization and decimal trajectory state using deterministic
+// inputs. Explicit fixture literals are independent inputs or expected results; timing bounds
+// have named constants.
+
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "SelectionController.h"

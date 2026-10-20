@@ -16,6 +16,11 @@
 #include <optional>
 #include <stdexcept>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int WorkerDrainDeadlineMilliseconds = 30000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
@@ -89,7 +94,7 @@ int main(int argc, char **argv)
             input.request = ++state->request;
             item->submit(std::move(input), { 960, 720 });
             window.show();
-            timeout.start(30000);
+            timeout.start(WorkerDrainDeadlineMilliseconds);
             loop.exec();
             state->loop = nullptr;
             require(state->capture.has_value(), "Cover GPU timeout");

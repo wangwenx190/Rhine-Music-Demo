@@ -1,3 +1,6 @@
+// Renders the opening brand paths with Qt Canvas Painter. Immutable path snapshots cross the
+// GUI/render boundary and hidden items stop visual work.
+
 #pragma once
 #include "OpeningFrame.h"
 #include <QCanvasPainterItem>
@@ -8,12 +11,17 @@
 using Qt::StringLiterals::operator""_L1;
 
 namespace yalahoo {
+namespace openingInkMetrics {
+// Stroke widths are source SVG view-box units before logical viewport scaling.
+inline constexpr auto DefaultStrokeWidth = 16;
+}
+
 struct OpeningPath final
 {
     QPainterPath centerline;
     QCanvasPath full;
     QString fullSvg;
-    double start = 0, end = 1, width = 16;
+    double start = 0, end = 1, width = openingInkMetrics::DefaultStrokeWidth;
     bool accent = false, decoration = false, point = false;
 };
 struct OpeningInkStats final

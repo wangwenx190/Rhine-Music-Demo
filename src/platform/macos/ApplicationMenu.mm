@@ -25,20 +25,33 @@ using namespace Qt::StringLiterals;
 @end
 
 namespace {
+// Tags identify menu commands independently of their localized titles and native selectors.
+enum EditCommand {
+    UndoCommand = 1,
+    RedoCommand,
+    CutCommand,
+    CopyCommand,
+    PasteCommand,
+    SelectAllCommand
+};
+constexpr NSInteger EditCommandCount = 6;
+}
+
+namespace {
 const char *editMethod(NSInteger tag)
 {
     switch (tag) {
-    case 1:
+    case UndoCommand:
         return "undo";
-    case 2:
+    case RedoCommand:
         return "redo";
-    case 3:
+    case CutCommand:
         return "cut";
-    case 4:
+    case CopyCommand:
         return "copy";
-    case 5:
+    case PasteCommand:
         return "paste";
-    case 6:
+    case SelectAllCommand:
         return "selectAll";
     default:
         return nullptr;
@@ -120,17 +133,17 @@ NSMenuItem *addItem(NSMenu *menu, NSString *title, NSString *key, SEL action, id
     const auto *method = editMethod(item.tag);
     if (!focus || !method || focus->metaObject()->indexOfMethod(QByteArray(method) + "()"_ba) < 0)
         return NO;
-    if (item.tag == 4)
+    if (item.tag == CopyCommand)
         return !focus->property("selectedText").toString().isEmpty();
-    if (item.tag == 6)
+    if (item.tag == SelectAllCommand)
         return !focus->property("text").toString().isEmpty();
     if (focus->property("readOnly").toBool())
         return NO;
-    if (item.tag == 1)
+    if (item.tag == UndoCommand)
         return focus->property("canUndo").toBool();
-    if (item.tag == 2)
+    if (item.tag == RedoCommand)
         return focus->property("canRedo").toBool();
-    if (item.tag == 3)
+    if (item.tag == CutCommand)
         return !focus->property("selectedText").toString().isEmpty();
     return focus->property("canPaste").toBool();
 }
@@ -235,12 +248,12 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
         QCoreApplication::translate("Yalahoo", "Select All").toNSString()
     ];
     const NSArray<NSString *> *keys = @[ @"z", @"z", @"x", @"c", @"v", @"a" ];
-    for (NSInteger index = 0; index < 6; ++index) {
+    for (NSInteger index = 0; index < EditCommandCount; ++index) {
         auto *item = addItem(edit, titles[index], keys[index], @selector(edit:), m_state->target);
         item.tag = index + 1;
-        if (index == 1)
+        if (index + 1 == RedoCommand)
             item.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
-        if (index == 1 || index == 4)
+        if (index + 1 == RedoCommand || index + 1 == PasteCommand)
             [edit addItem:[NSMenuItem separatorItem]];
     }
     auto *windowMenu =

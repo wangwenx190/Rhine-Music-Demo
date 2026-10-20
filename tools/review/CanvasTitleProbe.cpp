@@ -5,7 +5,7 @@
 #include <QFontMetricsF>
 #include <QQuickWindow>
 namespace {
-CanvasTitleStats stats;
+constinit CanvasTitleStats stats;
 struct Slot final
 {
     QList<yalahoo::ReelSlot::Face> faces;

@@ -1,3 +1,6 @@
+// Serializes provider HTTP work with bounded replies and cancellation. Host pacing, proxy
+// configuration and request identity are enforced on the network thread.
+
 #pragma once
 #include <QElapsedTimer>
 #include <QUrl>

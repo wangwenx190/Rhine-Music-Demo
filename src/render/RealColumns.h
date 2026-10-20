@@ -1,8 +1,16 @@
+// Models finite library columns and their scalar navigation state. Stable album identity
+// survives layout changes without introducing a second frame source.
+
 #pragma once
 #include "ArchivePool.h"
 #include "QuinticTrack.h"
 
 namespace yalahoo {
+namespace realColumnGeometry {
+// Canonical source row coordinates begin at the first album offset.
+inline constexpr auto FirstAlbumRow = 12;
+}
+
 // Frozen MusicRealColumns semantics, sampled lazily at the shared motion time.
 class RealColumns final
 {
@@ -23,14 +31,14 @@ private:
     struct Column final
     {
         int count = 0;
-        double midpoint = 12;
+        double midpoint = realColumnGeometry::FirstAlbumRow;
         ColumnScalar row, activity;
         double sampledAt = 0;
         quint64 reducedEpoch = 0;
     };
     Column *sample(int lane) const;
     mutable QList<Column> m_columns;
-    ArchiveCell m_selected{ -1, 12 };
+    ArchiveCell m_selected{ -1, realColumnGeometry::FirstAlbumRow };
     double m_time = 0;
     quint64 m_reducedEpoch = 0;
 };

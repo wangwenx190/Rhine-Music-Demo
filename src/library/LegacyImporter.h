@@ -1,3 +1,6 @@
+// Reads an explicitly selected legacy library into current value records. Import writes only the
+// destination data root and preserves unrelated JSON fields.
+
 #pragma once
 #include "DirectoryScanner.h"
 

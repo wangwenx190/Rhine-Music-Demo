@@ -1,3 +1,6 @@
+// Decodes artwork on a bounded shared worker pool and publishes immutable pixels. Generations,
+// cancellation and a byte-limited cache reject stale results without blocking GUI teardown.
+
 #pragma once
 #include <QImage>
 #include <QList>
@@ -7,6 +10,11 @@
 #include <memory>
 
 namespace yalahoo {
+namespace coverCache {
+// Each incremental atlas tile has this physical pixel extent.
+inline constexpr auto TilePixels = 256;
+}
+
 // Values published once by the worker; consumers only share immutable, owned pixels.
 struct CoverMipTile final
 {
@@ -18,7 +26,7 @@ struct CoverPixels final
 {
     QString identity, path, error, fallbackTitle;
     quint64 generation = 0;
-    int resolution = 256;
+    int resolution = coverCache::TilePixels;
     QSize sourceSize;
     bool decoderScaling = false;
     qint64 readerReturnedBytes = 0;

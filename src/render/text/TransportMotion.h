@@ -1,3 +1,6 @@
+// Animates transport-title state from the common frame clock. Reversible scalar tracks retain
+// displayed derivatives and stop work while hidden.
+
 #pragma once
 #include "FrameClock.h"
 #include <QPointer>

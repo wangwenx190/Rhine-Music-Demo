@@ -1,4 +1,5 @@
 """Audit the production opening's source, state, bounded drawing and RHI handoff."""
+from shader_parameters import numeric_source
 import argparse
 import hashlib
 import json
@@ -13,7 +14,7 @@ CHECKS = [
     ('COMMON-03', 'resources/shaders/opening-paper.frag', 'vec2(0.51, 0.44)', 'Source radial-gradient uses normalized elliptical farthest-corner geometry. Same-Kit CMake bakes all shader variants; no new 3D pass, projection convention or target format.'),
     ('COMMON-04', 'src/render/opening/OpeningController.cpp', 'm_motion->clock()->startOpening()', 'Opening only changes scene/motion/input state. No media source, play, PCM, network, output-device or song writes; existing playback IDs remain stable in production replay.'),
     ('COMMON-05', 'tools/review/OpeningAudit.cpp', 'first-3d-frame-after-opaque-rebuild', 'Actual MusicStage/SceneItem readiness and ten scene graph rebuilds check resumed 3D work. Own output quality, source math, state, resource and platform evidence remain separate.'),
-    ('PERF-01', 'src/render/opening/OpeningInk.cpp', 'paths.size() != 19', 'Exactly 17 reveal centerlines plus two final decorations; constant dash ring and at most 432+4 scene instances. Preparation and film never scan the full library.'),
+    ('PERF-01', 'src/render/opening/OpeningInk.cpp', 'paths.size() != LastBrandPathId', 'Exactly 17 reveal centerlines plus two final decorations; constant dash ring and at most 432+4 scene instances. Preparation and film never scan the full library.'),
     ('PERF-02', 'src/render/rhi/SceneItem.cpp', 'token != guard->m_preparationToken', 'Async preparation receipts reject stale token/submission and require current cover readiness and drained uploads. GUI/render hot paths perform no IO/decode/wait/readback; prepare updates only continue a nonempty bounded atlas queue.'),
     ('PERF-03', 'src/render/rhi/SceneItem.cpp', 'if (m_sceneOccluded)', 'Opaque film stops pool preparation and GUI submission. Immutable RHI values and cached paths persist; normal frame uploads retain existing tile budget. No model/material/texture rebuild from film time.'),
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'opening-canvas-color-upper-bound', 'Bounded Canvas RGBA8+depth/stencil and two skip blur crops join the resource descriptor plan; scene targets remain owned by existing renderer. Opening plan changes only recalculate descriptors, not PSO/targets; unknown driver VRAM stays null.'),
@@ -51,6 +52,7 @@ if render.index('if (input.sceneOccluded)') >= render.index('renderFrame(cb)'):
 if 'input.cover.isNull() && !input.atlasGeneration' not in renderer:
     raise SystemExit('Opaque reconstruction must initialize RHI from resumed input')
 blur = (ROOT / 'resources/shaders/opening-blur.frag').read_text()
+blur = numeric_source(blur)
 weights = [float(value) for value in re.findall(r'\)\s*\* ([0-9.]+);', blur)]
 if len(weights) != 16 or abs(weights[0] + 2 * sum(weights[1:]) - 1) > 1e-12:
     raise SystemExit('Skip blur Gaussian is not normalized or complete')

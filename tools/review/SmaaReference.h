@@ -1,3 +1,6 @@
+// Evaluates the source SMAA equations on deterministic sample images. Reference sampling and
+// coordinate conventions match the production shader algorithm.
+
 #pragma once
 // Independent double-precision transcription of locked Three.js SMAAShader.js (MIT).
 // Original algorithm authors and license: resources/licenses/three-LICENSE.

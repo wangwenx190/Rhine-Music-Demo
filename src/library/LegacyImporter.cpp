@@ -8,18 +8,25 @@
 #include <QJsonDocument>
 #include <QSet>
 
+namespace {
+// Version bounds describe accepted source documents; optional sidecars have a smaller byte limit.
+constexpr auto BytesPerKiB = 1024;
+constexpr auto MinimumLibraryVersion = 3;
+constexpr auto MaximumLibraryVersion = 4;
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-constexpr qint64 maximumJsonBytes = 256 * 1024 * 1024;
+constexpr qint64 maximumJsonBytes = 256 * BytesPerKiB * BytesPerKiB;
 bool readObject(const QString &path, QJsonObject &output, QString &error, bool optional = false)
 {
     QFile file(path);
     if (optional && !file.exists())
         return true;
     QJsonParseError parse;
-    const auto limit = optional ? qint64(1024 * 1024) : maximumJsonBytes;
+    const auto limit = optional ? qint64(BytesPerKiB * BytesPerKiB) : maximumJsonBytes;
     if (!file.open(QIODevice::ReadOnly) || file.size() > limit) {
         error = QCoreApplication::translate(
                         "Yalahoo",
@@ -181,7 +188,7 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
             const auto version = track.value(u"_metadataVersion"_s).toInt();
             if (!absolute(path)
                 || QDir::cleanPath(QFileInfo(path).absolutePath()) != QDir::cleanPath(folder)
-                || (version != 3 && version != 4))
+                || (version != MinimumLibraryVersion && version != MaximumLibraryVersion))
                 return fail(QCoreApplication::translate(
                         "Yalahoo",
                         "Legacy tracks require direct native paths and v3/v4 metadata."));

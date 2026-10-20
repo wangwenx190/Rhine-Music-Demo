@@ -18,6 +18,11 @@
 #include <QtTest>
 #include <stdexcept>
 
+namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+}
+
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo::assets;
@@ -247,7 +252,7 @@ private Q_SLOTS:
         player.setSource(QUrl("qrc:/assets/audio/"_L1 + file));
         QTRY_VERIFY_WITH_TIMEOUT(player.mediaStatus() == QMediaPlayer::LoadedMedia
                                          || player.mediaStatus() == QMediaPlayer::InvalidMedia,
-                                 10000);
+                                 AsyncDeadlineMilliseconds);
         QCOMPARE(player.error(), QMediaPlayer::NoError);
         QCOMPARE(player.mediaStatus(), QMediaPlayer::LoadedMedia);
         QVERIFY(player.duration() > 1000);

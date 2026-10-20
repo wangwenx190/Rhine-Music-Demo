@@ -1,3 +1,6 @@
+// Defines the platform-neutral display capability snapshot and monitor boundary. Missing native
+// information yields a fresh SDR state rather than stale HDR values.
+
 #pragma once
 #include <QObject>
 #include <functional>

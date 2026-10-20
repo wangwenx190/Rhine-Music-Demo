@@ -1,3 +1,4 @@
+#include "RenderData.h"
 #include "SelectionLighting.h"
 #include "RenderQuality.h"
 #include "SceneAdapter.h"
@@ -21,6 +22,30 @@
 #include <memory>
 #include <limits>
 #include <cmath>
+
+namespace {
+// Projected paper demand uses physical DPR; owned covers reserve two rows beyond the fixed base atlas.
+constexpr auto AtlasBaseWidthPixels = 6144;
+constexpr auto AtlasBaseColumns = 24;
+constexpr auto MillisecondsPerSecond = 1000.0;
+constexpr auto MaximumFeedbackSamples = 128;
+constexpr auto ClickSlopPixels = 6;
+constexpr auto PaperBottom = .32f;
+constexpr auto PaperTop = 3.38f;
+constexpr auto PaperLeftMagnitude = 1.36f;
+constexpr auto PaperRight = 1.70f;
+constexpr auto PaperFront = .027f;
+constexpr auto PaperTileExtent = 64;
+constexpr auto PaperInteriorExtent = 62;
+constexpr auto MaximumResolutionShift = 29;
+constexpr auto RgbaBytesPerPixel = 4;
+constexpr auto CaptureSamples = 4;
+constexpr auto PaperCornerCount = 4;
+constexpr auto BytesPerKiB = 1024;
+constexpr auto BrowseAperture = .0003;
+constexpr auto DetailApertureGain = .0005;
+constexpr auto PercentScale = 100;
+}
 
 using namespace Qt::StringLiterals;
 
@@ -128,7 +153,9 @@ void SceneItem::refreshTextResources()
     schedule();
 }
 SceneItem::SceneItem(QQuickItem *parent)
-    : RhiItem(parent), m_cover(256, 256, QImage::Format_RGBA8888_Premultiplied)
+    : RhiItem(parent),
+      m_cover(renderData::CoverTilePixels, renderData::CoverTilePixels,
+              QImage::Format_RGBA8888_Premultiplied)
 {
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this,
             &SceneItem::configureDiagnostics);
@@ -150,7 +177,7 @@ SceneItem::SceneItem(QQuickItem *parent)
             }
             const auto &instances = m_adapter->frame().instances;
             const auto activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
-            if (pixels->resolution == 256) {
+            if (pixels->resolution == renderData::CoverTilePixels) {
                 const auto lease = m_poolLeases.constFind(pixels->identity);
                 if (lease != m_poolLeases.cend() && m_atlas.publish(*lease, pixels))
                     m_readyCovers.insert(pixels->identity, pixels->error.isEmpty());
@@ -257,8 +284,8 @@ void SceneItem::resetPool()
     m_readyCovers.clear();
     m_atlas.reset();
     m_ownedCovers = { };
-    m_ownedSide = 256;
-    m_detailResolution = 256;
+    m_ownedSide = renderData::CoverTilePixels;
+    m_detailResolution = renderData::CoverTilePixels;
     m_activeObject = 0;
     ++m_coverRevision;
     schedule();
@@ -298,6 +325,8 @@ void SceneItem::refreshPool()
     ++m_coverRevision;
     schedule();
 }
+// Resolve leases by stable identity and content generation. Detailed tiles share an owned image
+// snapshot, so a GUI publication never borrows pixels from a temporary cache lookup.
 void SceneItem::preparePool(Input &in)
 {
     auto *selection = m_adapter->selection();
@@ -362,11 +391,12 @@ void SceneItem::preparePool(Input &in)
         in.fallbackCoverTiles[index] = tile;
         in.fallbackCoverLeases[index] = coverLease;
         if (!m_readyCovers.contains(id)) {
-            if (auto pixels = m_covers.lookup(id, source.first, 256, source.second)) {
+            if (auto pixels = m_covers.lookup(id, source.first, renderData::CoverTilePixels,
+                                              source.second)) {
                 if (m_atlas.publish(lease, pixels))
                     m_readyCovers.insert(id, pixels->error.isEmpty());
             } else if (m_covers.hasPendingCapacity())
-                m_covers.request(id, source.first, 256, source.second);
+                m_covers.request(id, source.first, renderData::CoverTilePixels, source.second);
         }
         if (instance.owned) {
             auto it = std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(),
@@ -381,9 +411,11 @@ void SceneItem::preparePool(Input &in)
                 if (it != m_ownedCovers.end()) {
                     it->objectId = instance.objectId;
                     it->lease = ++m_ownedSerial;
-                    it->pixels = m_coverPool.acquire(
-                            id, m_covers.lookup(id, source.first, 256, source.second),
-                            m_covers.generation());
+                    it->pixels = m_coverPool.acquire(id,
+                                                     m_covers.lookup(id, source.first,
+                                                                     renderData::CoverTilePixels,
+                                                                     source.second),
+                                                     m_covers.generation());
                 }
             }
             if (it != m_ownedCovers.end() && it->pixels) {
@@ -400,18 +432,20 @@ void SceneItem::preparePool(Input &in)
                         m_covers.request(id, source.first, m_detailResolution, source.second);
                 }
                 const auto pixels = it->pixels->pixels;
-                if (pixels && pixels->resolution > 256) {
+                if (pixels && pixels->resolution > renderData::CoverTilePixels) {
                     const int block = int(it - m_ownedCovers.begin());
-                    const int top = ((6144 + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
+                    const int top =
+                            ((AtlasBaseWidthPixels + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
                     tile = { (block % 2) * m_ownedSide, top + (block / 2) * m_ownedSide,
                              pixels->resolution, pixels->resolution };
                     coverLease = it->lease;
                     if (it->tiledPixels != pixels || it->tiledRegion != tile) {
                         it->uploads.clear();
                         for (const auto &part : pixels->tiles) {
-                            const int slot = ((tile.y() + part.origin.y()) / 256)
-                                            * (m_atlasSize.width() / 256)
-                                    + (tile.x() + part.origin.x()) / 256;
+                            const int slot =
+                                    ((tile.y() + part.origin.y()) / renderData::CoverTilePixels)
+                                            * (m_atlasSize.width() / renderData::CoverTilePixels)
+                                    + (tile.x() + part.origin.x()) / renderData::CoverTilePixels;
                             it->uploads.append({ m_atlas.generation(), it->lease, ++m_ownedSerial,
                                                  slot, part.image, true, part.mipmaps });
                         }
@@ -434,7 +468,9 @@ void SceneItem::preparePool(Input &in)
     // the render queue rejects known revisions before conversion or upload.
     auto thumbnails = m_atlas.replay(0);
     for (auto &upload : thumbnails)
-        upload.slot = (upload.slot / 24) * (m_atlasSize.width() / 256) + upload.slot % 24;
+        upload.slot = (upload.slot / AtlasBaseColumns)
+                        * (m_atlasSize.width() / renderData::CoverTilePixels)
+                + upload.slot % AtlasBaseColumns;
     in.atlasUploads += thumbnails;
     in.immutableCover = true;
 }
@@ -542,7 +578,7 @@ void SceneItem::configureDiagnostics()
                             { u"submissions"_s, batch.submissions },
                             { u"elapsedMs"_s, batch.elapsedMs },
                             { u"submissionRate"_s,
-                              batch.intervals.seen() * 1000.0 / batch.elapsedMs },
+                              batch.intervals.seen() * MillisecondsPerSecond / batch.elapsedMs },
                             { u"atlasUploadBytes"_s, batch.atlasBytes },
                             { u"selectedUploadBytes"_s, batch.selectedBytes },
                             { u"uniformUploadBytes"_s, batch.uniformBytes },
@@ -584,7 +620,7 @@ void SceneItem::configureTelemetry()
         QPointer<SceneItem> guard(this);
         profiled = [mailbox, guard, epoch](QJsonObject sample) {
             const QMutexLocker lock(&mailbox->mutex);
-            if (mailbox->samples.size() == 128) {
+            if (mailbox->samples.size() == MaximumFeedbackSamples) {
                 mailbox->samples.removeFirst();
                 ++mailbox->coalesced;
             }
@@ -807,7 +843,7 @@ void SceneItem::mouseMoveEvent(QMouseEvent *event)
     }
     if (m_mouseStart) {
         const auto delta = event->position() - *m_mouseStart;
-        m_mouseMoved |= std::hypot(delta.x(), delta.y()) > 6;
+        m_mouseMoved |= std::hypot(delta.x(), delta.y()) > ClickSlopPixels;
         event->accept();
     } else
         event->ignore();
@@ -820,7 +856,7 @@ void SceneItem::mouseReleaseEvent(QMouseEvent *event)
         event->accept();
     } else if (m_mouseStart) {
         const auto delta = event->position() - *m_mouseStart;
-        const bool click = !m_mouseMoved && std::hypot(delta.x(), delta.y()) <= 6;
+        const bool click = !m_mouseMoved && std::hypot(delta.x(), delta.y()) <= ClickSlopPixels;
         m_mouseStart.reset();
         event->setAccepted(click && selectAt(event->position()));
     } else
@@ -903,11 +939,13 @@ void SceneItem::touchEvent(QTouchEvent *event)
         m_touchStart.reset();
         const bool swiped = m_inputRouter
                 && m_inputRouter->swipe(delta, double(event->timestamp() - m_touchTimestamp));
-        if (!swiped && std::hypot(delta.x(), delta.y()) <= 6)
+        if (!swiped && std::hypot(delta.x(), delta.y()) <= ClickSlopPixels)
             selectAt(point.position());
     }
     event->accept();
 }
+// Prepare a coherent scene/cover snapshot on the GUI thread after layout. Hidden or opaque
+// opening states return before pool preparation; only the renderer owns native submission resources.
 void SceneItem::updatePolish()
 try {
     if (!m_renderingActive || !m_adapter || !window() || !isVisible() || width() <= 0
@@ -942,15 +980,15 @@ try {
     }
     // Cover demand follows the projected paper at native DPR, including its source inset.
     // A power-of-two cache tier avoids decoding again for every animation pixel.
-    double demand = 256;
+    double demand = renderData::CoverTilePixels;
     const auto &frame = adapter.frame();
     const auto vp = frame.projection * frame.view;
     const auto inspect = [&](const QMatrix4x4 &model) {
-        std::array<QPointF, 4> points;
+        std::array<QPointF, PaperCornerCount> points;
         int index = 0;
-        for (float y : { .32f, 3.38f })
-            for (float x : { -1.36f, 1.70f }) {
-                const auto clip = vp * model * QVector4D(x, y, .027f, 1);
+        for (float y : { PaperBottom, PaperTop })
+            for (float x : { -PaperLeftMagnitude, PaperRight }) {
+                const auto clip = vp * model * QVector4D(x, y, PaperFront, 1);
                 if (clip.w() <= 0)
                     return;
                 points[index++] = QPointF(clip.x() / clip.w() * width() * .5,
@@ -959,7 +997,8 @@ try {
         for (const auto edge : { std::pair{ 0, 1 }, { 0, 2 }, { 1, 3 }, { 2, 3 } })
             demand = std::max(demand,
                               QLineF(points[edge.first], points[edge.second]).length()
-                                      * window()->effectiveDevicePixelRatio() * 64 / 62);
+                                      * window()->effectiveDevicePixelRatio() * PaperTileExtent
+                                      / PaperInteriorExtent);
     };
     if (frame.instances.isEmpty())
         inspect(frame.caseTransform);
@@ -967,20 +1006,21 @@ try {
         for (const auto &instance : frame.instances)
             if (instance.owned)
                 inspect(instance.transform);
-    m_detailResolution = 256;
-    while (m_detailResolution < demand && m_detailResolution < (1 << 29))
+    m_detailResolution = renderData::CoverTilePixels;
+    while (m_detailResolution < demand && m_detailResolution < (1 << MaximumResolutionShift))
         m_detailResolution *= 2;
     const auto allocationLimit = QImageReader::allocationLimit();
     if (allocationLimit > 0
-        && qint64(m_detailResolution) * m_detailResolution * 4
-                > qint64(allocationLimit) * 1024 * 1024)
+        && qint64(m_detailResolution) * m_detailResolution * RgbaBytesPerPixel
+                > qint64(allocationLimit) * BytesPerKiB * BytesPerKiB)
         throw std::runtime_error("Projected cover exceeds the image allocation capability");
     m_ownedSide = std::max(m_ownedSide, m_detailResolution);
     for (const auto &owned : m_ownedCovers)
         if (owned.pixels && owned.pixels->pixels)
             m_ownedSide = std::max(m_ownedSide, owned.pixels->pixels->resolution);
-    const int top = ((6144 + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
-    const QSize nextAtlasSize(std::max(6144, 2 * m_ownedSide), top + 2 * m_ownedSide);
+    const int top = ((AtlasBaseWidthPixels + m_ownedSide - 1) / m_ownedSide) * m_ownedSide;
+    const QSize nextAtlasSize(std::max(AtlasBaseWidthPixels, 2 * m_ownedSide),
+                              top + 2 * m_ownedSide);
     if (nextAtlasSize != m_atlasSize) {
         m_atlasSize = nextAtlasSize;
         m_atlas.advanceGeneration();
@@ -998,7 +1038,7 @@ try {
             if (m_coverPool.upgrade(m_selectedCover, pixels))
                 m_cover = pixels->image;
         } else {
-            m_covers.request(identity, path, 256);
+            m_covers.request(identity, path, renderData::CoverTilePixels);
             m_covers.request(identity, path, m_detailResolution);
         }
     }
@@ -1035,7 +1075,7 @@ try {
     in.floorColor = l.palette().floor.qt();
     in.shells = !m_geometryOnly;
     in.showPaper = !m_geometryOnly;
-    in.captureSamples = 4;
+    in.captureSamples = CaptureSamples;
     in.hdrHeadroom = hdrHeadroom();
     in.hdrActive = hdrActive();
     if (in.hdrActive)
@@ -1056,8 +1096,8 @@ try {
     }
 #endif
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
-    in.aperture = float((.0003 + .0005 * adapter.detail())
-                        * settings.value(u"depthOfField"_s).toDouble() / 100);
+    in.aperture = float((BrowseAperture + DetailApertureGain * adapter.detail())
+                        * settings.value(u"depthOfField"_s).toDouble() / PercentScale);
     in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
     in.background = l.backgroundLinear();
     in.keyColor = l.keyColor();

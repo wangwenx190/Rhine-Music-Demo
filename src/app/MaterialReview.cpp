@@ -31,6 +31,46 @@
 #include <cmath>
 #include <memory>
 
+namespace {
+// Source parameter/projection expectations are independent from capture coverage and readback success.
+constexpr auto DefaultWidthPixels = 960;
+constexpr auto DefaultHeightPixels = 720;
+constexpr auto SourceMaterialCaseCount = 90;
+constexpr auto LifecycleRestoreCount = 10;
+constexpr auto DefaultAoRadius = .18;
+constexpr auto ProbeFovDegrees = 32;
+constexpr auto DegreesPerTurn = 360;
+constexpr auto LightOffsetX = 48;
+constexpr auto LightOffsetY = 17.6f;
+constexpr auto LightOffsetZ = 36;
+constexpr auto LocalLightAimX = 2.085;
+constexpr auto LocalLightAimY = 2.252;
+constexpr auto MaximumChannelByte = 255;
+constexpr auto SrgbDecodeKnee = .04045;
+constexpr auto SrgbLinearSlope = 12.92;
+constexpr auto SrgbOffset = .055;
+constexpr auto SrgbScale = 1.055;
+constexpr auto SrgbExponent = 2.4;
+constexpr auto SrgbEncodeKnee = .0031308;
+constexpr auto ForegroundDifferenceThreshold = 9;
+constexpr auto MinimumForegroundPixels = 100;
+constexpr auto ParameterTolerance = 1e-6;
+constexpr auto FocusTolerance = 1e-4;
+constexpr auto ApertureTolerance = 1e-10;
+constexpr auto PostprocessDeadlineMilliseconds = 600000;
+constexpr auto MaterialDeadlineMilliseconds = 120000;
+}
+
+namespace {
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    InvalidReviewInput = 12,
+    ReviewFailed = 13,
+    ReviewTimedOut = 14,
+    CaptureFailed = 15
+};
+}
+
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -49,7 +89,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
 {
     QFile input(fixture);
     if (!input.open(QIODevice::ReadOnly))
-        return 12;
+        return InvalidReviewInput;
     const auto bytes = input.readAll();
     const auto oracle = QJsonDocument::fromJson(bytes).object();
     const bool backendReview = oracle[u"renderBackend"_s].toBool();
@@ -61,14 +101,14 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     for (const auto &value : cases) {
         const auto state = value.toObject();
         if (state[u"position"_s].toArray().size() != 3)
-            return 12;
+            return InvalidReviewInput;
         if (!backendReview && !occlusionReview && !postprocessReview
             && (state[u"parameters"_s].toArray().size() != 3
                 || state[u"projections"_s].toArray().size() != 5))
-            return 12;
+            return InvalidReviewInput;
     }
-    if (cases.isEmpty() || (!lightingReview && cases.size() != 90))
-        return 12;
+    if (cases.isEmpty() || (!lightingReview && cases.size() != SourceMaterialCaseCount))
+        return InvalidReviewInput;
     if (!lightingReview)
         for (int coverIndex : { 1, 6, 11 })
             for (double light : { 0.0, 0.25, 2.0 }) {
@@ -93,7 +133,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         ++windowEpoch;
         window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? &control : nullptr);
         verification::prepareWindow(*window, true);
-        window->resize(960, 720);
+        window->resize(DefaultWidthPixels, DefaultHeightPixels);
         window->setPersistentSceneGraph(false);
         window->setPersistentGraphics(false);
         auto nextSurface = std::make_unique<OffscreenSurface>(*window, control);
@@ -134,7 +174,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     auto *view = qobject_cast<QQuickItem *>(object.get());
     if (!view) {
         qCWarning(yalahoo::logRender) << component.errors();
-        return 12;
+        return InvalidReviewInput;
     }
     view->setParent(window->contentItem());
     view->setParentItem(window->contentItem());
@@ -155,7 +195,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                     QVariant::fromValue(static_cast<QQuick3DTextureData *>(atlas.get())) } }));
         if (!pool) {
             qCWarning(yalahoo::logRender) << component.errors();
-            return 12;
+            return InvalidReviewInput;
         }
         auto *node = qobject_cast<QQuick3DObject *>(pool.get());
         node->setParentItem(window->findChild<QQuick3DObject *>("inspectionCase")->parentItem());
@@ -165,7 +205,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     int index = -1, start = 0;
     QJsonArray results, restores;
     int restore = 0, previousInvalidations = 0;
-    const int restoreCount = backendReview ? 0 : lightingReview ? 1 : 10;
+    const int restoreCount = backendReview ? 0 : lightingReview ? 1 : LifecycleRestoreCount;
     bool pass = true;
     double maxProjection = 0;
     const auto applyState = [&] {
@@ -207,14 +247,15 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         view->setProperty("reviewDisableBokeh", c[u"disableBokeh"_s].toBool());
         view->setProperty("reviewDisableSmaa", c[u"disableSmaa"_s].toBool());
         view->setProperty("reviewAntialiasing", c.value(u"aaMode"_s).toInt(1));
-        const int w = c.value(u"width"_s).toInt(960), h = c.value(u"height"_s).toInt(720);
+        const int w = c.value(u"width"_s).toInt(DefaultWidthPixels),
+                  h = c.value(u"height"_s).toInt(DefaultHeightPixels);
         window->resize(w, h);
         view->setProperty("shadowsEnabled",
                           (occlusionReview || backendReview) && c.value(u"shadows"_s).toBool());
         view->setProperty("occlusionChannel", c.value(u"channel"_s).toInt());
         view->setProperty("renderNear", c.value(u"clipNear"_s).toDouble(scene.clipNear()));
         view->setProperty("renderFar", c.value(u"clipFar"_s).toDouble(scene.clipFar()));
-        view->setProperty("aoRadius", c.value(u"kernelRadius"_s).toDouble(.18));
+        view->setProperty("aoRadius", c.value(u"kernelRadius"_s).toDouble(DefaultAoRadius));
         view->setProperty("shadowProbe", c.value(u"shadowProbe"_s).toBool());
         view->setProperty("reviewNeighbors",
                           c[u"instancePool"_s].toBool()
@@ -234,18 +275,22 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         const auto p = c[u"position"_s].toArray();
         const SceneVector pos{ p[0].toDouble(), p[1].toDouble(), p[2].toDouble() },
                 aim = caseOrigin + SceneVector{ 0, 1.85, 0 };
-        scene.layout()->setViewport(c.value(u"width"_s).toInt(960),
-                                    c.value(u"height"_s).toInt(720));
-        scene.observe({ pos, aim, 2 * (pos - aim).length() * std::tan(32 * std::acos(-1.0) / 360) },
+        scene.layout()->setViewport(c.value(u"width"_s).toInt(DefaultWidthPixels),
+                                    c.value(u"height"_s).toInt(DefaultHeightPixels));
+        scene.observe({ pos, aim,
+                        2 * (pos - aim).length()
+                                * std::tan(ProbeFovDegrees * std::acos(-1.0) / DegreesPerTurn) },
                       0);
         if (occlusionReview || postprocessReview)
-            scene.quality()->resize(c.value(u"width"_s).toInt(960), c.value(u"height"_s).toInt(720),
+            scene.quality()->resize(c.value(u"width"_s).toInt(DefaultWidthPixels),
+                                    c.value(u"height"_s).toInt(DefaultHeightPixels),
                                     window->devicePixelRatio());
         if (lightingReview) {
-            const auto offset = scene.cameraRotation().rotatedVector({ -48, -17.6f, 36 });
+            const auto offset = scene.cameraRotation().rotatedVector(
+                    { -LightOffsetX, -LightOffsetY, LightOffsetZ });
             RowLightingInput i;
             i.reduced = true;
-            scene.lighting()->update(i, { -2.085, 2.252, 0 },
+            scene.lighting()->update(i, { -LocalLightAimX, LocalLightAimY, 0 },
                                      { offset.x(), offset.y(), offset.z() },
                                      c[u"detail"_s].toDouble(), 0);
         }
@@ -283,7 +328,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         if (actual.isNull() || actual.size() != window->size() * window->devicePixelRatio()) {
             qCWarning(yalahoo::logRender)
                     << "Material output/readback size mismatch" << actual.size();
-            app.exit(15);
+            app.exit(CaptureFailed);
             return;
         }
         int paperProbeError = 0;
@@ -294,11 +339,15 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             const QImage ink(u":/review/paper-probe.png"_s);
             const auto sample = ink.pixelColor(0, 0);
             auto channel = [light](double s) {
-                s /= 255;
-                double l = s <= .04045 ? s / 12.92 : std::pow((s + .055) / 1.055, 2.4);
+                s /= MaximumChannelByte;
+                double l = s <= SrgbDecodeKnee
+                        ? s / SrgbLinearSlope
+                        : std::pow((s + SrgbOffset) / SrgbScale, SrgbExponent);
                 l *= std::min(1.0, light);
-                return qRound(255
-                              * (l <= .0031308 ? 12.92 * l : 1.055 * std::pow(l, 1 / 2.4) - .055));
+                return qRound(MaximumChannelByte
+                              * (l <= SrgbEncodeKnee
+                                         ? SrgbLinearSlope * l
+                                         : SrgbScale * std::pow(l, 1 / SrgbExponent) - SrgbOffset));
             };
             const auto actualCenter =
                     actual.pixelColor(qRound(center.x() * window->devicePixelRatio()),
@@ -316,11 +365,12 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                 const QColor a = QColor::fromRgb(row[x]);
                 if (std::abs(a.red() - background.red()) + std::abs(a.green() - background.green())
                             + std::abs(a.blue() - background.blue())
-                    > 9)
+                    > ForegroundDifferenceThreshold)
                     ++foreground;
             }
         }
-        valid = valid && (occlusionReview || postprocessReview || foreground > 100);
+        valid = valid
+                && (occlusionReview || postprocessReview || foreground > MinimumForegroundPixels);
         double webProjection = 0;
         for (auto value : c[u"projections"_s].toArray()) {
             const auto p = value.toObject();
@@ -348,7 +398,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                 parameters = parameters
                         && std::abs(material->property(name).toDouble()
                                     - p[QString::fromUtf8(name)].toDouble())
-                                <= 1e-6;
+                                <= ParameterTolerance;
             }
         }
         valid = valid && parameters;
@@ -370,8 +420,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         const double focus = bokeh->property("focus").toDouble(),
                      aperture = bokeh->property("aperture").toDouble();
         if (postprocessReview)
-            valid = valid && std::abs(focus - c[u"focus"_s].toDouble()) < 1e-4
-                    && std::abs(aperture - c[u"aperture"_s].toDouble()) < 1e-10;
+            valid = valid && std::abs(focus - c[u"focus"_s].toDouble()) < FocusTolerance
+                    && std::abs(aperture - c[u"aperture"_s].toDouble()) < ApertureTolerance;
         QJsonObject quick3DTarget;
         {
             const QMutexLocker lock(&targetMutex);
@@ -460,7 +510,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                       { u"materialReview"_s, true } }));
             view = qobject_cast<QQuickItem *>(object.get());
             if (!view) {
-                app.exit(12);
+                app.exit(InvalidReviewInput);
                 return;
             }
             view->setParent(window->contentItem());
@@ -500,16 +550,17 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                             .toJson());
             saved = file.commit();
         }
-        app.exit(pass && saved ? 0 : 13);
+        app.exit(pass && saved ? 0 : ReviewFailed);
     };
     QTimer timeout;
     timeout.setSingleShot(true);
     QObject::connect(&timeout, &QTimer::timeout, &app, [&] {
-        app.exit(14);
+        app.exit(ReviewTimedOut);
     });
     bindFrames();
     next();
-    timeout.start(postprocessReview ? 600000 : 120000);
+    timeout.start(postprocessReview ? PostprocessDeadlineMilliseconds
+                                    : MaterialDeadlineMilliseconds);
     surface->show();
     const int code = app.exec();
     surface->hide();

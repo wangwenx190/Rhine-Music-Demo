@@ -1,3 +1,6 @@
+// Extracts Wikipedia and Wikidata identities, claims and titles. Pure parsing retains provider
+// provenance without issuing network requests.
+
 #pragma once
 #include "IMetadataProvider.h"
 

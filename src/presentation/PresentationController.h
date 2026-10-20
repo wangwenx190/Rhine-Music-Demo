@@ -1,3 +1,6 @@
+// Coordinates browse, detail and modal presentation around stable album identity. Revisions
+// prevent interrupted readiness work from revealing stale content.
+
 #pragma once
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -6,6 +9,17 @@ using Qt::StringLiterals::operator""_L1;
 #include <optional>
 
 namespace yalahoo {
+namespace presentationMotion {
+// Surface and tab tracks use independent source-authored time windows.
+inline constexpr auto BrowseEnterMilliseconds = 720;
+inline constexpr auto BrowseExitMilliseconds = 140;
+inline constexpr auto DetailEnterMilliseconds = 360;
+inline constexpr auto DetailExitMilliseconds = 240;
+inline constexpr auto TabSlideSeconds = .18;
+inline constexpr auto TabInitialOpacity = .35;
+inline constexpr auto TabFadeSeconds = .15;
+}
+
 struct PresentationSelection final
 {
     QString albumId, trackId;
@@ -124,16 +138,20 @@ private:
     void prepareMenu();
     void showMenu();
     PresentationPorts m_ports;
-    SurfaceTransition m_browse{ 720, 140, false, true, this };
-    SurfaceTransition m_detail{ 360, 240, true, false, this };
+    SurfaceTransition m_browse{ presentationMotion::BrowseEnterMilliseconds,
+                                presentationMotion::BrowseExitMilliseconds, false, true, this };
+    SurfaceTransition m_detail{ presentationMotion::DetailEnterMilliseconds,
+                                presentationMotion::DetailExitMilliseconds, true, false, this };
     QString m_phase = u"archive"_s;
     std::optional<PresentationSelection> m_pending;
     quint64 m_revision = 0, m_layoutRevision = 0;
     bool m_wantsDetail = false, m_browseHidden = false, m_cameraEntered = false;
     bool m_layoutReady = false, m_reduced = false;
     double m_tabX = 0, m_tabWidth = 0, m_tabFromX = 0, m_tabFromWidth = 0;
-    double m_tabTargetX = 0, m_tabTargetWidth = 0, m_tabElapsed = .18;
-    double m_tabOpacity = 1, m_tabFadeFrom = .35, m_tabFadeElapsed = .15;
+    double m_tabTargetX = 0, m_tabTargetWidth = 0,
+           m_tabElapsed = presentationMotion::TabSlideSeconds;
+    double m_tabOpacity = 1, m_tabFadeFrom = presentationMotion::TabInitialOpacity,
+           m_tabFadeElapsed = presentationMotion::TabFadeSeconds;
     int m_depth = 0;
 };
 }

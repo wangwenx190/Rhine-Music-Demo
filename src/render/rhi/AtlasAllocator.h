@@ -1,3 +1,6 @@
+// Assigns bounded atlas slots to cover identities through explicit leases. Generation checks
+// reject stale tiles after eviction or atlas recreation.
+
 #pragma once
 #include "AtlasUpload.h"
 #include "CoverCache.h"
@@ -5,6 +8,12 @@
 #include <memory>
 
 namespace yalahoo::rhi {
+namespace atlasDefaults {
+// Default array capacity excludes independently owned selected/returning covers.
+inline constexpr auto ArrayCapacity = 432;
+inline constexpr auto PageTileSide = 8;
+}
+
 struct AtlasLease final
 {
     quint64 generation = 0, lease = 0;
@@ -17,7 +26,8 @@ class AtlasAllocator final
 {
     Q_DISABLE_COPY_MOVE(AtlasAllocator)
 public:
-    explicit AtlasAllocator(int maximumTextureSize, int capacity = 432, int pageTiles = 8);
+    explicit AtlasAllocator(int maximumTextureSize, int capacity = atlasDefaults::ArrayCapacity,
+                            int pageTiles = atlasDefaults::PageTileSide);
     AtlasLease acquire(const QString &identity, quint64 coverGeneration = 1);
     void release(const AtlasLease &lease);
     bool publish(const AtlasLease &lease, CoverSnapshot pixels);

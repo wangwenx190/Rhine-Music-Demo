@@ -1,3 +1,7 @@
+// Checks exact spring/quintic motion against independent source samples and interruption
+// invariants. Explicit fixture literals are independent inputs or expected results; timing
+// bounds have named constants.
+
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "MotionFunctions.h"
