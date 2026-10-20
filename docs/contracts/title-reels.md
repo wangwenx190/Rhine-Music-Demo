@@ -31,7 +31,7 @@ Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/c
 ## 检查与范围
 
 - `ctest --preset qt-release -R '^title-reels$'`覆盖grapheme/连字/组合字、长文省略、缓存容量、20/30/60/120fps/打断/反转/速度/减少动态/复用、宽度通知、hide合并与恢复取消。
-- 生产组件检查覆盖20项双主题文字、18项九尺寸页眉、一次120帧活动/缓存、隐藏零文字工作、独立一次十次恢复和最终节点/renderer释放。主题/DPR/布局矩阵与压力范围按test-gates.md选择，候选路径仅用于具体问题或明确选型，明确成本对比才用`--cost-runs 3`；范围选择器实施归迁移计划R34-T2。轨迹≤1e-6、结构≤1逻辑px。实际播放与定位由[playback.md](playback.md)和[library-data.md](library-data.md)验证，匿名歌名事件不能替代。
+- 生产组件检查覆盖20项双主题文字、18项九尺寸页眉及隐藏/恢复和节点/renderer释放。成本、缓存工作量和寿命先按performance.md静态审计，真实运行未决项才作最小观测；工具的120帧/十次压力不是默认验收次数。主题/DPR/布局矩阵与压力范围按test-gates.md选择，候选路径仅用于具体问题或明确选型，实际所需成本观测按performance.md选择，不因存在`--cost-runs 3`而固定三次；范围选择器实施归迁移计划R34-T2。轨迹≤1e-6、结构≤1逻辑px。实际播放与定位由[playback.md](playback.md)和[library-data.md](library-data.md)验证，匿名歌名事件不能替代。
 - 工具候选Text/fillText重新按字面shaping，不能因共用控制器布局就认定整行语义等价；当前生产为glyph+彩色Text/CurveRendering/实际DPR槽层。候选语义/实际质量与成本分开判断，跨平台选型按后端分工在R34/R35。
 - 源数据导出`node tools/review/export-title.mjs --dpr 数值 --output 新目录`；原生驱动`node tools/build/verify-title.mjs --backend <目标后端> --dpr 数值 --source 源目录 --output 新目录`。导出器只生成`source-structure-font-metrics-motion-v1`结构、DOM字体框和数值轨迹，不生成浏览器PNG或放大轮廓；旧报告须重新导出。原生入口不读取参考图，保留自身输出供质量检查，自动passed只表示结构/运动/资源等非图像门槛。
 - 静态来源/调用链入口`python3 tools/audit/audit-title-source.py`；每个原生输出目录再执行`node tools/audit/audit-title.mjs 输出目录`，独立核对源DOM字体框、主字体基线与彩色字体身份、同Kit qsb变体。Windows薄入口`verify-r16.ps1`/`audit-r16.ps1`转交相同检查，不得使用诊断放行与像素成绩；详细参数以脚本为准。实际DPR读取窗口报告；`--visible`遵守公共窗口策略。
