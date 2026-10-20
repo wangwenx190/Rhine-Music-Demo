@@ -65,7 +65,7 @@ with (args.output / 'run.log').open('w', encoding='utf-8') as log:
         code = 'timeout'
 report_path = args.output / 'matrix/report.json'
 report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.is_file() else {}
-backend_ids = dict(metal=6, d3d11=4, opengl=3, vulkan=5)
+backend_ids = dict(metal=6, d3d11=4, d3d12=8, opengl=3, vulkan=5)
 sizes = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
          (390, 844), (320, 720), (2560, 1080), (3440, 1440))
 if args.narrow:

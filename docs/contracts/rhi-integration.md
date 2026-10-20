@@ -26,12 +26,14 @@
 - 遥测与诊断在隐藏/恢复时重起分段，GUI邮箱回调按各自epoch拒绝旧结果；callbackRevision参与changed-only提交，静止恢复同样刷新render持有的回调。
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
-- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进输入/尺寸/画质/重建，等待各步提交确认；FrameAnimation仍唯一帧源，无processEvents/msleep轮询。检查九尺寸/四画质/双主题/十次完整QML根窗口重建；重建后重新绑定输入/遥测，旧窗口回调按epoch拒绝，核对新renderer首批封面上传与资源回落，报告实际覆盖，短单盒输入不能冒充完整产品。
-- `rhi-postprocess-audit --profile`是独立分通道GPU诊断，不能混入正常120秒性能样本；当前非像素入口和范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。
+- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/四画质/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。计时、功能与压力的实际分支拆分归计划R34-T1，不能在每次计时中重复完整矩阵；短单盒输入不能冒充完整产品。
+- `rhi-postprocess-audit --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外与18.35/20.98ms待复现由performance契约和R34维护。
 
 ## 目标尺度与生产阵列检查
 
 `ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原始画质与双主题，另含50/125/200 scale、半分辨率AO及高画质SMAA。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R34/R35分工。
+
+九尺寸布局、主题和DPR边界按test-gates.md分开选择；实现入口的范围选择器归计划R34-T3，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、半AO/full DOF/CoC等真实耦合边界仍须独立覆盖。
 
 独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单、limited和最终缩放。核对实际线性/clamp封面无mip、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；256缩略图与1024独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集generation与稳态零上传保持。普通产品不增加读回或诊断遍历。
 
@@ -39,9 +41,9 @@
 
 ## 整场GUI重放
 
-`python3 tools/build/verify-gui.py --backend metal|d3d11|opengl|vulkan --output 全新目录`运行Review的`ui-audit --gui`。macOS当轮获可见授权时添加`--visible --foreground`运行原生窗口；默认保持隐藏。它复用StartupAudit的生产MusicStage驱动、唯一FrameClock、实际SceneItem与匿名576专辑库，仅使用qrc横/竖/方封面。后端执行分工与默认窗口策略由test-gates.md和迁移计划管理。
+`python3 tools/build/verify-gui.py --backend metal|d3d11|d3d12|opengl|vulkan --output 全新目录`运行Review的`ui-audit --gui`。macOS当轮获可见授权时添加`--visible --foreground`运行原生窗口；默认保持隐藏。它复用StartupAudit的生产MusicStage驱动、唯一FrameClock、实际SceneItem与匿名576专辑库，仅使用qrc横/竖/方封面。后端执行分工与默认窗口策略由test-gates.md和迁移计划管理。
 
-九尺寸×双主题×填充/真实列共36状态，隐藏目标按尺寸轮换代表DPR1/1.5/2；native入口只记录实际屏幕DPR。每状态以自身Qt键鼠事件核对正反导航、总览进退、详情打开/返回，连选最后意图、搜索模态隔离及浏览播放隔离；采集浏览/总览/详情/搜索，填充模式另采完整片头的二维与三维检查点，共180份自身输出。详情须等入场透明度达到1，完全遮挡期检查clear提交语义，不能要求重新上传被遮挡的三维快照。运动数值、CSS结构、连续渲染质量与这些检查点分别验收。
+源状态集合为九尺寸×双主题×填充/真实列共36状态、180份自身输出；隐藏目标按尺寸轮换代表DPR1/1.5/2，native只记录实际屏幕DPR。执行矩阵按test-gates.md选择；范围选择及几何/完整交互分离归计划R34-T5。关键输出覆盖浏览/总览/详情/搜索，填充模式另含二维/三维片头；代表状态以自身Qt键鼠事件核对正反导航、总览进退、详情打开/返回、连选最后意图、搜索模态及浏览播放隔离。详情须等入场透明度达到1，完全遮挡期检查clear提交语义，不能要求重新上传被遮挡的三维快照。运动数值、CSS结构、连续渲染质量分别验收。
 
 报告保留实际viewport/DPR、有限矩阵、实体/清晰封面容量、renderer代次、资源描述符与旧新重叠估算、独立GUI/同步/提交成本和最终释放；显式读回发生在帧完成后的检查点，不计入帧成本。manifest保存源码/资产/二进制/图像hash和失败退出状态，不覆盖已有目录。此入口没有原生呈现、物理输入或显存实测，不替代performance.md的正式产品矩阵。
 

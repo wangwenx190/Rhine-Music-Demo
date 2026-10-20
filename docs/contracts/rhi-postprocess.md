@@ -32,4 +32,4 @@ TransferAudit在适用D3D11目标命令列表按原生纹理筛UpdateSubresource
 - 稳态图像/代次复用、每pass80-byte前缀、focus/aperture/exposure更新不重建，关闭释放AO/DOF/后处理；十次真实SG失效后组合资源及输出恢复。实际alpha几何部分覆盖、透明洞/黑边的解析门槛归rhi-shell.md，不用截图边缘分数。
 - 保留可控64tile初始化、432实例、全可见池和1/7/8/31/32/33/64/432容量、单tile替换/还原/逆序、resize不重传、generation拒绝及第九tile背压；自身atlas整页读回验证区域更新，D3D11额外核对native命令。缺primary租约的合法采集metadata为null；fallback要求完整两组租约。
 - `rhi-flicker-gpu`实际SceneItem以original/high两画质覆盖源启用条件和组合图，并保留双主题/小大场景/静止/波浪/浏览/总览/详情1200帧。目标尺度与BLUR修正的独立集成入口见rhi-integration.md；SG失效不冒充同原生窗口恢复或VSYNC。
-- `python3 tools/audit/audit-rhi-resolve.py`输出本地历史/三平台COMMON/PERF矩阵；`rhi-postprocess-audit 新目录 --profile`可选三次独立批次、六通道局部CPU提交诊断，不执行图像分数/120秒产品门槛。Qt呈现、GPU完成/driver显存、显示延迟及完整产品指标依performance.md。
+- `python3 tools/audit/audit-rhi-resolve.py`输出本地历史/三平台COMMON/PERF矩阵；六通道局部CPU提交诊断只在具体成本调查时选择，默认一次，明确A/B比较才显式三次；`rhi-postprocess-audit --profile`的次数选择器实施归计划R34-T2。不执行图像分数/120秒产品门槛。Qt呈现、GPU完成/driver显存、显示延迟及完整产品指标依performance.md。

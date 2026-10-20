@@ -39,7 +39,9 @@ class StartupVerificationTest(unittest.TestCase):
 
     def test_scopes_have_distinct_defaults_and_acceptance(self):
         for options, expected in [((), (30, 1)), (("--stress",), (0, 1)),
-                                  (("--formal", "--mode", "vsync", "--scenario", "day-wave"), (120, 3))]:
+                                  (("--formal", "--mode", "vsync", "--scenario", "day-wave"), (120, 1)),
+                                  (("--formal", "--mode", "vsync", "--scenario", "day-wave",
+                                    "--runs", "3"), (120, 3))]:
             with self.subTest(options=options):
                 args = self.arguments(*options)
                 self.assertEqual((args.seconds, args.runs), expected)
@@ -48,7 +50,8 @@ class StartupVerificationTest(unittest.TestCase):
     def test_invalid_scope_combinations_stop_before_execution(self):
         combinations = [("--stress", "--seconds", "30"), ("--stress", "--runs", "3"),
                         ("--formal",), ("--formal", "--stress"), ("--lifecycle",),
-                        ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--runs", "1"),
+                        ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--runs", "2"),
+                        ("--runs", "10"),
                         ("--formal", "--mode", "uncapped", "--scenario", "day-wave"),
                         ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--seconds", "30"),
                         ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--dpr", "2")]
@@ -95,18 +98,25 @@ class StartupVerificationTest(unittest.TestCase):
         report["switches"] = 3
         self.assertFalse(VERIFY.validate_report(report, args, 0))
 
-    def test_formal_batch_preserves_first_failure_and_never_retries_to_green(self):
+    def test_formal_runs_preserve_failure_without_implicit_retries(self):
+        for runs in (1, 3):
+            with self.subTest(runs=runs):
+                self.check_formal_runs(runs)
+
+    def check_formal_runs(self, runs):
         script = self.root / "tools/build/verify-startup.py"
-        script.parent.mkdir(parents=True)
+        script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("# fixture\n", encoding="utf-8")
         cache = self.root / "build/release/CMakeCache.txt"
-        cache.parent.mkdir(parents=True)
+        cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(f"YALAHOO_SELECTED_QT:PATH={self.root}\nCMAKE_BUILD_TYPE:STRING=Release\n", encoding="utf-8")
         executable = cache.parent / "tools/ui-audit"
-        executable.parent.mkdir()
+        executable.parent.mkdir(exist_ok=True)
         executable.write_text("fixture", encoding="utf-8")
         options = ["--backend", "metal", "--formal", "--mode", "vsync", "--scenario", "night-wave",
-                   "--output", str(self.root / "result")]
+                   "--output", str(self.root / f"result-{runs}")]
+        if runs == 3:
+            options += ["--runs", "3"]
         args = VERIFY.parse_arguments(options)
         calls = []
 
@@ -127,9 +137,9 @@ class StartupVerificationTest(unittest.TestCase):
                 patch.dict(VERIFY.os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(VERIFY.main(options), 1)
-        manifest = json.loads((self.root / "result/manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(calls), 3)
-        self.assertEqual([run["passed"] for run in manifest["runs"]], [False, True, True])
+        manifest = json.loads((self.root / f"result-{runs}/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(calls), runs)
+        self.assertEqual([run["passed"] for run in manifest["runs"]], [False] + [True] * (runs - 1))
         self.assertTrue(manifest["completed"])
         self.assertFalse(manifest["formalAcceptancePassed"])
         self.assertFalse(manifest["passed"])

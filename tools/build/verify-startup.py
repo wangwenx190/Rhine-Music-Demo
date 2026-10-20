@@ -20,10 +20,11 @@ def parse_arguments(argv=None):
     parser.add_argument("--mode", choices=("offscreen", "vsync", "uncapped"), default="offscreen")
     parser.add_argument("--scenario", choices=["matrix", *SCENARIOS])
     scope = parser.add_mutually_exclusive_group()
-    scope.add_argument("--formal", action="store_true", help="120-second, three-run normal VSYNC acceptance")
+    scope.add_argument("--formal", action="store_true", help="One 120-second normal VSYNC acceptance sample")
     scope.add_argument("--stress", action="store_true", help="One resource stress replay without timed sampling")
     parser.add_argument("--seconds", type=int)
-    parser.add_argument("--runs", type=int)
+    parser.add_argument("--runs", type=int, choices=(1, 3),
+                        help="One run by default; three only for an explicit comparison or fixed recheck")
     parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
     parser.add_argument("--foreground", action="store_true")
     parser.add_argument("--lifecycle", action="store_true", help="Add native hide/minimize to --stress")
@@ -32,17 +33,14 @@ def parse_arguments(argv=None):
     if args.seconds is None:
         args.seconds = 0 if args.stress else 120 if args.formal else 30
     if args.runs is None:
-        args.runs = 3 if args.formal else 1
-    if not 1 <= args.runs <= 10:
-        parser.error("runs must be 1..10")
+        args.runs = 1
     if args.stress:
         if args.seconds != 0 or args.runs != 1:
             parser.error("Resource stress runs once without timed sampling (--seconds 0 --runs 1)")
     elif not 12 <= args.seconds <= 120:
         parser.error("seconds must be 12..120")
-    if args.formal and (args.seconds != 120 or args.runs < 3
-                        or args.mode != "vsync" or args.dpr != 1):
-        parser.error("Formal acceptance requires normal VSYNC, DPR 1, 120 seconds and >=3 runs")
+    if args.formal and (args.seconds != 120 or args.mode != "vsync" or args.dpr != 1):
+        parser.error("Formal acceptance requires normal VSYNC, DPR 1 and 120 seconds")
     if args.scenario is None:
         if args.mode == "offscreen" or args.stress:
             args.scenario = "matrix"
