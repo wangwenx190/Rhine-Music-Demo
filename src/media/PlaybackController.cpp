@@ -511,8 +511,9 @@ QVariantList PlaybackController::devices() const
 }
 bool PlaybackController::selectDevice(const QString &id)
 {
-    const auto decoded = QByteArray::fromBase64(id.toUtf8());
-    if (!id.isEmpty() && decoded.toBase64() != id.toUtf8())
+    const auto encoded = id.toUtf8();
+    const auto decoded = QByteArray::fromBase64(encoded);
+    if (!id.isEmpty() && decoded.toBase64() != encoded)
         return false;
     if (!id.isEmpty()
         && std::none_of(m_outputs.cbegin(), m_outputs.cend(), [&](const auto &device) {

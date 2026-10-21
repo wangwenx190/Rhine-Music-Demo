@@ -159,15 +159,16 @@ quint64 CoverCache::generation() const
 CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, int resolution,
                                  const QString &title)
 {
-    if (!path.isEmpty()) {
-        auto artwork = d->m_cache.find(key(identity, path, resolution, { }));
-        if (artwork != d->m_cache.end() && artwork->pixels->error.isEmpty()) {
-            artwork->used = ++d->m_clock;
-            return artwork->pixels;
-        }
+    if (!path.isEmpty() && !title.isEmpty()) {
+        if (auto artwork = lookupCached(key(identity, path, resolution, { }), true))
+            return artwork;
     }
-    auto it = d->m_cache.find(key(identity, path, resolution, title));
-    if (it == d->m_cache.end())
+    return lookupCached(key(identity, path, resolution, title));
+}
+CoverSnapshot CoverCache::lookupCached(const QString &cacheKey, bool requireArtwork)
+{
+    auto it = d->m_cache.find(cacheKey);
+    if (it == d->m_cache.end() || (requireArtwork && !it->pixels->error.isEmpty()))
         return { };
     it->used = ++d->m_clock;
     return it->pixels;
@@ -182,8 +183,12 @@ bool CoverCache::request(QString identity, QString path, int resolution, QString
         ++d->m_rejected;
         return false;
     }
+    if (!path.isEmpty() && !title.isEmpty()) {
+        if (lookupCached(key(identity, path, resolution, { }), true))
+            return true;
+    }
     const auto cacheKey = key(identity, path, resolution, title);
-    if (lookup(identity, path, resolution, title))
+    if (lookupCached(cacheKey))
         return true;
     const auto running = d->m_running.constFind(cacheKey);
     if (running != d->m_running.cend() && running->generation == generation()
