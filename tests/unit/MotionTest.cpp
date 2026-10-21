@@ -10,7 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <algorithm>
@@ -393,10 +393,7 @@ private Q_SLOTS:
                                   { u"maxVelocityError"_s, maxError[1] },
                                   { u"maxAccelerationError"_s, maxError[2] },
                                   { u"tolerance"_s, 1e-6 } };
-        QSaveFile output(QString::fromUtf8(MOTION_REPORT));
-        QVERIFY(output.open(QIODevice::WriteOnly));
-        output.write(QJsonDocument(report).toJson());
-        QVERIFY(output.commit());
+        QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(MOTION_REPORT), QJsonDocument(report)));
     }
 };
 QTEST_GUILESS_MAIN(MotionTest)

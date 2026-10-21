@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <numbers>
 #include <limits>
-#include <chrono>
+#include "MonotonicTime.h"
 
 using namespace Qt::StringLiterals;
 
@@ -115,18 +115,14 @@ void SceneAdapter::setSelection(SelectionController *selection)
 void SceneAdapter::recordInput()
 {
     ++m_frame.inputRevision;
-    m_frame.inputReceivedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                      std::chrono::steady_clock::now().time_since_epoch())
-                                      .count();
+    m_frame.inputReceivedNs = yalahoo::monotonicNanoseconds();
     Q_EMIT frameChanged();
 }
 void SceneAdapter::recordNavigationCommit(quint64 revision)
 {
     m_frame.navigationRevision = revision;
     m_frame.navigationInputRevision = m_frame.inputRevision;
-    m_frame.navigationCommittedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                            std::chrono::steady_clock::now().time_since_epoch())
-                                            .count();
+    m_frame.navigationCommittedNs = yalahoo::monotonicNanoseconds();
     Q_EMIT frameChanged();
 }
 SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)

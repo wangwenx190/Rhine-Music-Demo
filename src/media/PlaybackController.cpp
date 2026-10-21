@@ -19,26 +19,24 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
-    : QObject(parent), m_library(library), m_devices(this), m_output(this), m_player(this)
+    : QObject(parent),
+      m_library(library),
+      m_devices(this),
+      m_outputRefresh(this),
+      m_output(this),
+      m_player(this)
 {
     m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
     m_player.setPlaybackRate(1);
     m_player.setAudioOutput(&m_output);
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
-            &PlaybackController::scheduleOutputRefresh);
+    m_outputRefresh.setSingleShot(true);
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, &m_outputRefresh,
+            qOverload<>(&QTimer::start));
+    connect(&m_outputRefresh, &QTimer::timeout, this, &PlaybackController::refreshDevices);
     connect(&m_output, &QAudioOutput::volumeChanged, this, &PlaybackController::volumeChanged);
     refreshDevices();
 }
-void PlaybackController::scheduleOutputRefresh()
-{
-    if (m_refreshPending)
-        return;
-    m_refreshPending = true;
-    QTimer::singleShot(0, this, [this] {
-        m_refreshPending = false;
-        refreshDevices();
-    });
-}
+
 PlaybackController::~PlaybackController()
 {
     ++m_revision;

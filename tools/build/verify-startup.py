@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Separate product diagnostics, resource stress and formal presentation sampling."""
-from native_replay import BACKEND_IDS
+from native_replay import BACKEND_IDS, cmake_cache, executable_path, replay_environment
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import platform
 import subprocess
@@ -107,30 +106,18 @@ def validate_report(report, args, exit_code):
 
 def main(argv=None):
     args = parse_arguments(argv)
-    cache_path = ROOT / "build/release/CMakeCache.txt"
-    cache = dict(line.split("=", 1) for line in cache_path.read_text(encoding="utf-8").splitlines()
-                 if "=" in line and not line.startswith(("#", "//")))
+    cache = cmake_cache(ROOT)
     kit = Path(cache["YALAHOO_SELECTED_QT:PATH"])
-    executable = ROOT / "build/release/tools" / ("ui-audit.exe" if platform.system() == "Windows" else "ui-audit")
+    executable = executable_path(ROOT, tool="ui-audit")
     if cache.get("CMAKE_BUILD_TYPE:STRING") != "Release" or not executable.is_file():
         raise SystemExit("Build the latest native Kit qt-release ui-audit first")
     args.output.mkdir(parents=True)
-    environment = os.environ.copy()
-    environment.update({"QSG_RHI_BACKEND": args.backend, "QT_SCALE_FACTOR": str(args.dpr),
-                        "QT_PLUGIN_PATH": str(kit / "plugins"),
-                        "YALAHOO_VERIFY_VISIBLE": "0" if args.mode == "offscreen" else "1",
-                        "YALAHOO_VERIFY_FOREGROUND": "1" if args.foreground else "0",
-                        "YALAHOO_VERIFY_LIFECYCLE": "1" if args.lifecycle else "0",
-                        "YALAHOO_VERIFY_STRESS": "1" if args.stress else "0",
-                        "QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM": "1",
-                        "QSG_RENDER_LOOP": "basic" if platform.system() == "Darwin" and args.backend == "opengl" else "threaded",
-                        "QCPAINTER_DEBUG_COLLECT": "0"})
+    environment = replay_environment(kit, args.backend, args.dpr, args.foreground)
+    environment.update(YALAHOO_VERIFY_VISIBLE="0" if args.mode == "offscreen" else "1",
+                       YALAHOO_VERIFY_LIFECYCLE="1" if args.lifecycle else "0",
+                       YALAHOO_VERIFY_STRESS="1" if args.stress else "0")
     if args.mode == "uncapped":
         environment["QSG_NO_VSYNC"] = "1"
-    else:
-        environment.pop("QSG_NO_VSYNC", None)
-    if platform.system() == "Windows":
-        environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
     source_files = [*ROOT.glob("src/**/*.cpp"), *ROOT.glob("src/**/*.h"), *ROOT.glob("qml/**/*.qml"),
                     *ROOT.glob("resources/shaders/**/*"), ROOT / "tools/review/StartupAudit.cpp",
                     ROOT / "tools/review/OffscreenSurface.h", Path(__file__).resolve()]

@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
 """Inspect a relocatable Linux product; system ABI/driver libraries remain external."""
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
+from package_support import digest
 
 
 def run(*args, env=None):
     return subprocess.run([str(value) for value in args], env=env, check=True,
                           capture_output=True, text=True).stdout.strip()
-
-
-def digest(path):
-    value = hashlib.sha256()
-    with path.open('rb') as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b''):
-            value.update(block)
-    return value.hexdigest()
 
 
 def inventory(root):

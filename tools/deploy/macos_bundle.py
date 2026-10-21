@@ -1,11 +1,12 @@
 """Normalize deployment paths/metadata and inspect a self-contained macOS bundle."""
-import hashlib
 import json
 from pathlib import Path
 import plistlib
 import re
 import shutil
 import subprocess
+from package_support import digest
+
 
 MACHO = {bytes.fromhex(value) for value in
          ('feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf')}
@@ -13,14 +14,6 @@ MACHO = {bytes.fromhex(value) for value in
 
 def run(*arguments):
     return subprocess.check_output([str(value) for value in arguments], text=True).strip()
-
-
-def digest(path):
-    checksum = hashlib.sha256()
-    with path.open('rb') as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b''):
-            checksum.update(block)
-    return checksum.hexdigest()
 
 
 def inventory(root):

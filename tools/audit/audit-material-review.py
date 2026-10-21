@@ -12,7 +12,7 @@ CHECKS = [
     ("COMMON-02", "src/app/MaterialReview.cpp", 'component.loadFromModule',
      "GeometryScene, constant test ink, meshes and environments come from qrc. Committed "
      "source-state fixtures replace browser screenshots; no disk music, network or browser is read."),
-    ("COMMON-03", "src/app/MaterialReview.cpp", 'actual.size() != window->size()',
+    ("COMMON-03", "src/app/MaterialReview.cpp", 'actual.size() != state.window->size()',
      "Actual physical dimensions are checked against logical size times real target DPR. "
      "Independent Quick3D/CPU/source projections retain the two-logical-pixel bound."),
     ("COMMON-04", "src/app/main.cpp", 'reviewMaterials(app, scene',

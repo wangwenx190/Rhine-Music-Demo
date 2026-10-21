@@ -21,6 +21,14 @@ constexpr auto HighlightBezierSecondX = .58;
 constexpr auto HighlightHoldEndSeconds = .48;
 constexpr auto HighlightFadeEndSeconds = .88;
 constexpr auto HighlightFadeSeconds = .4;
+double centeredListTarget(double origin, double rowTop, double rowHeight, double viewportHeight,
+                          double headerHeight, double low, double high)
+{
+    const double offset =
+            headerHeight + std::max(0., (viewportHeight - headerHeight - rowHeight) / 2);
+    return std::clamp(rowTop - origin - offset, low, high);
+}
+
 }
 
 using namespace Qt::StringLiterals;
@@ -126,9 +134,8 @@ void TrackFocusController::beginListReveal(quint64 revision, double startRelativ
     m_listOrigin = origin;
     m_listLow = low;
     m_listHigh = high;
-    const double offset =
-            headerHeight + std::max(0., (viewportHeight - headerHeight - rowHeight) / 2);
-    m_listTarget = std::clamp(rowTop - origin - offset, low, high);
+    m_listTarget =
+            centeredListTarget(origin, rowTop, rowHeight, viewportHeight, headerHeight, low, high);
     m_listOffset = 0;
     beginReveal(revision, startRelative + origin, m_listTarget + origin);
 }
@@ -141,9 +148,9 @@ void TrackFocusController::refineListReveal(double origin, double rowTop, double
     if (!std::isfinite(high))
         high = m_listHigh;
     high = std::max(m_listLow, high);
-    const double offset =
-            headerHeight + std::max(0., (viewportHeight - headerHeight - rowHeight) / 2);
-    m_listOffset = std::clamp(rowTop - origin - offset, m_listLow, high) - m_listTarget;
+    m_listOffset = centeredListTarget(origin, rowTop, rowHeight, viewportHeight, headerHeight,
+                                      m_listLow, high)
+            - m_listTarget;
 }
 double TrackFocusController::listScrollY(double origin) const
 {
@@ -187,12 +194,8 @@ void TrackFocusController::advance(double dt)
         }
         if (!m_reduced) {
             const double t = std::fmod(m_elapsed, 1.);
-            static const QEasingCurve ease = [] {
-                QEasingCurve curve(QEasingCurve::BezierSpline);
-                curve.addCubicBezierSegment({ HighlightBezierFirstX, 0 },
-                                            { HighlightBezierSecondX, 1 }, { 1, 1 });
-                return curve;
-            }();
+            static const auto ease =
+                    cubicBezier(HighlightBezierFirstX, 0, HighlightBezierSecondX, 1);
             m_highlight = t < HighlightFadeInSeconds
                     ? ease.valueForProgress(t / HighlightFadeInSeconds)
                     : t < HighlightHoldEndSeconds ? 1

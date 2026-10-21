@@ -89,7 +89,7 @@ CHECKS = [
      'startup snapshot admission, SceneItem rendering and cover work. GUI controls keep existing '
      'virtualization/focus/input ownership. Native settings shares the existing panel, and native Edit '
      'targets only the current Qt editor; no hidden polling or input timer is added.'),
-    ('PERF-07', 'tools/deploy/macos.py', 'backup = ROOT',
+    ('PERF-07', 'tools/deploy/package_support.py', 'def install_package(staging, output)',
      'Staging/scan trees have explicit ownership; build/deploy/dependency/probe failure cannot replace '
      'an existing package. Rename failure restores the previous package. Runtime menu dies before '
      'engine/controllers, clears native targets and restores retained system menu. Existing render '

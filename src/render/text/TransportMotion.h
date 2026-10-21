@@ -62,6 +62,7 @@ Q_SIGNALS:
 
 private:
     void retarget();
+    void move(bool instant);
     QPointer<FrameClock> m_clock;
     QMetaObject::Connection m_connection;
     TransportTrack m_width, m_alpha, m_offset, m_icon;

@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
-    ("COMMON-01", "tools/review/CMakeLists.txt", "qt_add_executable(rhi-audit",
+    ("COMMON-01", "tools/review/CMakeLists.txt", "yalahoo_rhi_review(rhi-audit",
      "Opaque Review uses the same YalahooRhi/Qt native Kit. GuiPrivate is selected by the existing capability probe."),
     ("COMMON-02", "tools/review/RhiAudit.cpp", "Input fixture",
      "Only committed demo artwork and source-derived scene values enter the driver. Models, "

@@ -9,16 +9,66 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/deploy'))
 import linux as linux_deploy
 import macos_bundle
+import package_support
 
 
 def run(*arguments, **kwargs):
     return subprocess.check_output([str(value) for value in arguments], text=True, **kwargs)
+
+
+class PackageSupportTest(unittest.TestCase):
+    def test_install_replaces_whole_package_and_restores_on_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            output, staging = base / "product", base / "staging"
+            output.mkdir()
+            (output / "old").write_text("old")
+            staging.mkdir()
+            (staging / "new").write_text("new")
+            rename = Path.rename
+
+            def fail_install(path, target):
+                if path == staging:
+                    raise OSError("fixture installation failure")
+                return rename(path, target)
+
+            with patch.object(Path, "rename", fail_install), self.assertRaises(OSError):
+                package_support.install_package(staging, output)
+            self.assertEqual((output / "old").read_text(), "old")
+            self.assertTrue((staging / "new").is_file())
+            self.assertEqual(set(base.iterdir()), {staging, output})
+            package_support.install_package(staging, output)
+            self.assertEqual(set(output.iterdir()), {output / "new"})
+            self.assertEqual(set(base.iterdir()), {output})
+
+    def test_probe_records_process_failure_timeout_and_invalid_report(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo probe space-") as temporary:
+            base = Path(temporary)
+            script = base / "probe.py"
+            cases = [('{"passed": true}', 0, False), ('{broken', 0, False),
+                     ('[]', 0, False), ('{"passed": true}', 7, False), ('', 0, True)]
+            for index, (report, code, timeout) in enumerate(cases):
+                output = base / str(index)
+                output.mkdir()
+                script.write_text("import pathlib, sys, time\n"
+                                  f"pathlib.Path(sys.argv[2]).write_text({report!r})\n"
+                                  + ("time.sleep(30)\n" if timeout else f"sys.exit({code})\n"))
+                probe = package_support.run_probe([sys.executable, script], output, os.environ,
+                                                   timeout=.1 if timeout else 5)
+                self.assertEqual(probe.timed_out, timeout)
+                if not timeout:
+                    self.assertEqual(probe.exit_code, code)
+                if report.startswith('{"passed"'):
+                    self.assertTrue(probe.report["passed"])
+                else:
+                    self.assertEqual(probe.report, {})
 
 
 class UnixDeploymentTest(unittest.TestCase):

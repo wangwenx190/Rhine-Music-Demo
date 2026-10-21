@@ -20,3 +20,14 @@ function(yalahoo_add_assets target)
         ${YALAHOO_ASSET_FILES}
     )
 endfunction()
+
+# Product and UI Review consume the same shader-resource closure.
+function(yalahoo_add_ui_shaders target)
+    set(files)
+    foreach(name IN ITEMS display-output.frag opening-paper.frag opening-blur.frag edge-fade.frag
+            reel-slot.frag overview-blur.frag detail-tabs-blur.frag panel-blur.frag panel-shadow.frag ${ARGN})
+        list(APPEND files "${PROJECT_SOURCE_DIR}/resources/shaders/${name}")
+    endforeach()
+    qt_add_shaders(${target} ui_shaders PREFIX /assets/shaders
+        BASE "${PROJECT_SOURCE_DIR}/resources/shaders" FILES ${files})
+endfunction()

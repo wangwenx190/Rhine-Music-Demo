@@ -23,6 +23,24 @@ double packet(double distance)
     return LeadingAmplitude * bell(distance, LeadingWidthRows)
             - TrailingAmplitude * bell(distance - TrailingOffsetRows, TrailingWidthRows);
 }
+// Both selection routes use the same packet; only authored motion parameters differ.
+struct SelectionWaveParameters final
+{
+    double amplitude, fadeInSeconds, decayPerSecond, rowsPerSecond;
+};
+double travellingSelectionWave(double distance, double age, SelectionWaveParameters parameters)
+{
+    constexpr auto LifetimeSeconds = 3.2;
+    constexpr auto RadiansPerRow = .58;
+    constexpr auto WidthRows = 3.4;
+    if (age < 0 || age > LifetimeSeconds)
+        return 0;
+    const double phase = distance - age * parameters.rowsPerSecond;
+    return parameters.amplitude * smooth(age / parameters.fadeInSeconds)
+            * std::exp(-age * parameters.decayPerSecond) * std::cos(phase * RadiansPerRow)
+            * bell(phase, WidthRows);
+}
+
 }
 // Quintic smoothstep 6t^5-15t^4+10t^3 has zero first and second endpoint derivatives.
 double smooth(double t)
@@ -96,37 +114,11 @@ double settlingWave(double distance, double time)
 }
 double baselineSelectionWave(double distance, double age)
 {
-    // A bounded travelling cosine packet decays in age and Gaussian row distance.
-    constexpr auto LifetimeSeconds = 3.2;
-    constexpr auto Amplitude = .8;
-    constexpr auto FadeInSeconds = .2;
-    constexpr auto DecayPerSecond = 1.15;
-    constexpr auto RowsPerSecond = 8;
-    constexpr auto RadiansPerRow = .58;
-    constexpr auto WidthRows = 3.4;
-
-    if (age < 0 || age > LifetimeSeconds)
-        return 0;
-    return Amplitude * smooth(age / FadeInSeconds) * std::exp(-age * DecayPerSecond)
-            * std::cos((distance - age * RowsPerSecond) * RadiansPerRow)
-            * bell(distance - age * RowsPerSecond, WidthRows);
+    return travellingSelectionWave(distance, age, { .8, .2, 1.15, 8 });
 }
 double musicSelectionWave(double distance, double age)
 {
-    // The music route uses its authored lower amplitude and slower propagation.
-    constexpr auto LifetimeSeconds = 3.2;
-    constexpr auto Amplitude = .32;
-    constexpr auto FadeInSeconds = .46;
-    constexpr auto DecayPerSecond = 1.35;
-    constexpr auto RowsPerSecond = 5.5;
-    constexpr auto RadiansPerRow = .58;
-    constexpr auto WidthRows = 3.4;
-
-    if (age < 0 || age > LifetimeSeconds)
-        return 0;
-    return Amplitude * smooth(age / FadeInSeconds) * std::exp(-age * DecayPerSecond)
-            * std::cos((distance - age * RowsPerSecond) * RadiansPerRow)
-            * bell(distance - age * RowsPerSecond, WidthRows);
+    return travellingSelectionWave(distance, age, { .32, .46, 1.35, 5.5 });
 }
 double selectionWave(double distance, double age)
 {

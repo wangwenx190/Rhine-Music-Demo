@@ -13,7 +13,7 @@
 #include <QQuickWindow>
 #include <QFile>
 #include <QDir>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QTimer>
@@ -452,39 +452,33 @@ auto finishRulerAudit(bool &passed, QJsonObject &finalPolicy, int &initialized, 
                       std::atomic<qint64> &syncNs, std::atomic<qint64> &renderNs)
 {
     passed &= finalPolicy[u"passed"_s].toBool() && initialized >= 11 && invalidated >= 10;
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly)) {
-        app.exit(8);
-        return;
-    }
     const auto &stats = yalahoo::rulerInkStats();
-    file.write(
-            QJsonDocument(
-                    QJsonObject{
-                            { u"passed"_s, passed },
-                            { u"offscreen"_s, OffscreenSurface::Enabled },
-                            { u"offscreenResourcePlan"_s, finalSurface },
-                            { u"maximumStateError"_s, maximumStateError },
-                            { u"ordinalError"_s, ordinalError },
-                            { u"initialized"_s, initialized },
-                            { u"invalidated"_s, invalidated },
-                            { u"captures"_s, captures },
-                            { u"lifecycle"_s, lifecycleChecks },
-                            { u"invariants"_s, invariants },
-                            { u"dpr"_s, finalDpr },
-                            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                            { u"windowPolicy"_s, finalPolicy },
-                            { u"canvasPaints"_s, qint64(stats.paints) },
-                            { u"canvasSyncs"_s, qint64(stats.syncs) },
-                            { u"canvasPaintCpuNs"_s, qint64(stats.paintNs) },
-                            { u"canvasSyncCpuNs"_s, qint64(stats.syncNs) },
-                            { u"quickSyncCpuNs"_s, qint64(syncNs) },
-                            { u"quickRenderCpuNs"_s, qint64(renderNs) },
-                            { u"gpuNanoseconds"_s, QJsonValue::Null },
-                            { u"measurementScope"_s,
-                              u"Local CPU diagnostics include setup and discrete readback submission frames; GPU completion and display latency are unavailable."_s } })
-                    .toJson());
-    app.exit(file.commit() && passed ? 0 : 9);
+    const bool saved = yalahoo::writeJsonFile(
+            output + "/report.json"_L1,
+            QJsonDocument(QJsonObject{
+                    { u"passed"_s, passed },
+                    { u"offscreen"_s, OffscreenSurface::Enabled },
+                    { u"offscreenResourcePlan"_s, finalSurface },
+                    { u"maximumStateError"_s, maximumStateError },
+                    { u"ordinalError"_s, ordinalError },
+                    { u"initialized"_s, initialized },
+                    { u"invalidated"_s, invalidated },
+                    { u"captures"_s, captures },
+                    { u"lifecycle"_s, lifecycleChecks },
+                    { u"invariants"_s, invariants },
+                    { u"dpr"_s, finalDpr },
+                    { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                    { u"windowPolicy"_s, finalPolicy },
+                    { u"canvasPaints"_s, qint64(stats.paints) },
+                    { u"canvasSyncs"_s, qint64(stats.syncs) },
+                    { u"canvasPaintCpuNs"_s, qint64(stats.paintNs) },
+                    { u"canvasSyncCpuNs"_s, qint64(stats.syncNs) },
+                    { u"quickSyncCpuNs"_s, qint64(syncNs) },
+                    { u"quickRenderCpuNs"_s, qint64(renderNs) },
+                    { u"gpuNanoseconds"_s, QJsonValue::Null },
+                    { u"measurementScope"_s,
+                      u"Local CPU diagnostics include setup and discrete readback submission frames; GPU completion and display latency are unavailable."_s } }));
+    app.exit(saved && passed ? 0 : 9);
 }
 
 auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,

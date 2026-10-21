@@ -9,7 +9,7 @@
 #include <QLineF>
 #include <QImageReader>
 #include <QQuickRenderTarget>
-#include <chrono>
+#include "MonotonicTime.h"
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QScreen>
@@ -661,9 +661,7 @@ void SceneItem::configureDiagnostics()
     m_presentedConnection = connect(
             window(), &QQuickWindow::frameSwapped, this,
             [mailbox] {
-                const auto now = std::chrono::duration<double, std::milli>(
-                                         std::chrono::steady_clock::now().time_since_epoch())
-                                         .count();
+                const auto now = yalahoo::monotonicMilliseconds();
                 const QMutexLocker lock(&mailbox->mutex);
                 if (mailbox->previousPresentation)
                     mailbox->presented.add(now - *mailbox->previousPresentation);

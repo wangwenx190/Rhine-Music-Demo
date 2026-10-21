@@ -4,6 +4,8 @@
 #include <QJsonDocument>
 #include <QJsonValue>
 #include <QStringList>
+#include <algorithm>
+#include <iterator>
 
 using namespace Qt::StringLiterals;
 
@@ -57,23 +59,27 @@ QString contentText(const QVariantMap &result)
 }
 QString metadataStatusText(const QString &status)
 {
-    if (status == "Deferred"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Deferred");
-    if (status == "Matched"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Matched");
-    if (status == "Partial"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Partial");
-    if (status == "NotFound"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Not found");
-    if (status == "Uncertain"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Uncertain");
-    if (status == "Error"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Error");
-    if (status == "Cancelled"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Cancelled");
-    if (status == "Pending"_L1)
-        return QCoreApplication::translate("MetadataStatus", "Pending");
-    return status;
+    struct StatusText final
+    {
+        QLatin1StringView status;
+        const char *text;
+    };
+    static constexpr StatusText texts[] = {
+        { "Deferred"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Deferred") },
+        { "Matched"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Matched") },
+        { "Partial"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Partial") },
+        { "NotFound"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Not found") },
+        { "Uncertain"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Uncertain") },
+        { "Error"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Error") },
+        { "Cancelled"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Cancelled") },
+        { "Pending"_L1, QT_TRANSLATE_NOOP("MetadataStatus", "Pending") }
+    };
+    const auto found =
+            std::find_if(std::begin(texts), std::end(texts), [&status](const StatusText &entry) {
+                return entry.status == status;
+            });
+    return found == std::end(texts) ? status
+                                    : QCoreApplication::translate("MetadataStatus", found->text);
 }
 QVariantMap metadataPresentation(QVariantMap result, const QString &albumTitle)
 {

@@ -88,7 +88,7 @@ checks = [
     ("COMMON-05", "tools/review/PresentationAudit.cpp", "QTest::mouseClick",
      "Frozen production DOM/CSS boxes and native hierarchy are compared independently <=1 logical px. "
      "Actual Qt tab input, clamped scroll, bounded virtualization and lifecycle are distinct from own-output quality. No image matching."),
-    ("PERF-01", "src/presentation/DetailModel.cpp", "case DiscHeading:",
+    ("PERF-01", "src/presentation/DetailModel.cpp", "self.m_album->tracks[row - 1].discNumber.value_or(1)",
      "Hot-path update has constant phase/readiness work. Prepare visits one selected album's "
      "tracks and credits once to calculate facts; rows read one immutable track by index. Disc "
      "headings compare only the preceding track. No sorting, decoding or file I/O runs per frame."),

@@ -8,9 +8,9 @@ import platform
 import shutil
 import subprocess
 import tempfile
-import uuid
 import xml.etree.ElementTree as ET
-from macos_bundle import digest, inspect_bundle, inventory, normalize_bundle, run, strip_bundle
+from macos_bundle import inspect_bundle, inventory, normalize_bundle, run, strip_bundle
+from package_support import digest, install_package
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -85,7 +85,7 @@ def main():
         closure = inspect_bundle(bundle)
         closure.update(normalization)
         (build / 'deployment-dependencies.json').write_text(json.dumps(closure, indent=2) + '\n')
-        for name in ('verify-macos.py', 'macos_bundle.py'):
+        for name in ('verify-macos.py', 'macos_bundle.py', 'package_support.py'):
             shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
         (staging / 'README.md').write_text('''# yalahOO!!!
 
@@ -107,17 +107,7 @@ Complete manual checks and source build steps: docs/platforms/macos.md in the re
         (staging / 'package.json').write_text(json.dumps(package, indent=2) + '\n')
         # A real clean child probe must pass before replacing an existing package.
         subprocess.run(['python3', str(staging / 'verify-macos.py'), '--package', str(staging)], check=True)
-        backup = ROOT / 'out' / ('macos-previous-' + uuid.uuid4().hex)
-        if output.exists():
-            output.rename(backup)
-        try:
-            staging.rename(output)
-        except BaseException:
-            if backup.exists() and not output.exists():
-                backup.rename(output)
-            raise
-        if backup.exists():
-            shutil.rmtree(backup)
+        install_package(staging, output)
     print(f'macOS production package: {output}')
 
 

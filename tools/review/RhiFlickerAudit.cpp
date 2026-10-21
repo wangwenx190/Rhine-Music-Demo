@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
 #include "SceneAdapter.h"
@@ -18,7 +19,7 @@
 #include <QGuiApplication>
 #include <QFile>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QDir>
 #include <cstdio>
 
@@ -29,10 +30,6 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-void check(bool condition, const char *message)
-{
-    RhiCaptureHarness::require(condition, message);
-}
 QJsonObject coverage(const Capture &capture)
 {
     int missing = 0, shaded = 0, nonfinite = 0;
@@ -51,11 +48,10 @@ QJsonObject coverage(const Capture &capture)
 
 void writeFailureMetadata(const QString &output, const QJsonObject &metadata)
 {
-    QSaveFile failed(output + "/failed-metadata.json"_L1);
-    if (!failed.open(QIODevice::WriteOnly))
-        return;
-    failed.write(QJsonDocument(metadata).toJson());
-    failed.commit();
+    const bool saved =
+            yalahoo::writeJsonFile(output + "/failed-metadata.json"_L1, QJsonDocument(metadata));
+    if (!saved)
+        qWarning("Cannot save failure metadata");
 }
 auto runFlickerAudit(int &argc, char **&argv)
 {
@@ -70,9 +66,9 @@ auto runFlickerAudit(int &argc, char **&argv)
         OffscreenSurface::Enabled = false;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
-        check(QDir().mkpath(output), "Cannot create diagnostic output");
+        require(QDir().mkpath(output), "Cannot create diagnostic output");
         QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
-        check(file.open(QIODevice::ReadOnly), "Missing source input");
+        require(file.open(QIODevice::ReadOnly), "Missing source input");
         auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         QJsonArray isolated;
         {
@@ -104,9 +100,9 @@ auto runFlickerAudit(int &argc, char **&argv)
                             sample[u"shaded"_s].toInt(), sample[u"nonfinite"_s].toInt());
                     result.composite.save(output
                                           + u"/isolated-%1-%2.png"_s.arg(count).arg(samples));
-                    check(sample[u"missing"_s].toInt() == 0 && sample[u"shaded"_s].toInt() > 100
-                                  && sample[u"nonfinite"_s].toInt() == 0,
-                          "Visibility fragments lost at Equal shading or nonfinite optics");
+                    require(sample[u"missing"_s].toInt() == 0 && sample[u"shaded"_s].toInt() > 100
+                                    && sample[u"nonfinite"_s].toInt() == 0,
+                            "Visibility fragments lost at Equal shading or nonfinite optics");
                 }
             }
         }
@@ -159,7 +155,7 @@ auto runFlickerAudit(int &argc, char **&argv)
                 if (!ready)
                     std::fprintf(stderr, "%s\n",
                                  QJsonDocument(item->coverStatistics()).toJson().constData());
-                check(ready, "Production covers not ready");
+                require(ready, "Production covers not ready");
             }
             motion.clock()->setActive(true);
             motion.clock()->advance(1.0 / 60);
@@ -189,8 +185,8 @@ auto runFlickerAudit(int &argc, char **&argv)
                         // Publish the current production snapshot before taking its oracle.
                         item->ensurePolished();
                         auto input = item->input();
-                        check(input.scene.revision == adapter.frame().revision,
-                              "Production snapshot is stale after polish");
+                        require(input.scene.revision == adapter.frame().revision,
+                                "Production snapshot is stale after polish");
                         input.opticalProbe = frame < 30 ? 10 : 0;
                         if (opticsOnly) {
                             input.postprocess = false;
@@ -230,46 +226,47 @@ auto runFlickerAudit(int &argc, char **&argv)
                                            << uploaded[u"focus"_s] << "aperture" << aperture
                                            << input.aperture << uploaded[u"aperture"_s]
                                            << "uploaded" << uploaded;
-                            check(bokehMatches,
-                                  "Actual production Bokeh uniform/depth differs from frozen source");
+                            require(bokehMatches,
+                                    "Actual production Bokeh uniform/depth differs from frozen source");
                         }
                         const auto floor = result.metadata[u"productFloor"_s].toObject();
-                        check(input.productFloor && floor[u"enabled"_s].toBool()
-                                      && floor[u"opaqueIndices"_s].toInt() == 6
-                                      && (opticsOnly
-                                          || (floor[u"aoIndices"_s].toInt() == 6
-                                              && floor[u"dofIndices"_s].toInt() == 6)),
-                              "Production floor omitted from capture or post geometry");
+                        require(input.productFloor && floor[u"enabled"_s].toBool()
+                                        && floor[u"opaqueIndices"_s].toInt() == 6
+                                        && (opticsOnly
+                                            || (floor[u"aoIndices"_s].toInt() == 6
+                                                && floor[u"dofIndices"_s].toInt() == 6)),
+                                "Production floor omitted from capture or post geometry");
                         for (int c = 0; c < 3; ++c)
-                            check(floor[u"color"_s].toArray()[c].toDouble()
-                                          == adapter.lighting()->palette().floor.qt()[c],
-                                  "Production floor uses stale theme color");
-                        check(input.fogEnabled, "Production scene did not enable authored fog");
+                            require(floor[u"color"_s].toArray()[c].toDouble()
+                                            == adapter.lighting()->palette().floor.qt()[c],
+                                    "Production floor uses stale theme color");
+                        require(input.fogEnabled, "Production scene did not enable authored fog");
                         const double distance =
                                 (input.scene.camera.position - input.scene.camera.aim).length();
-                        check(std::abs(input.scene.fogNear
-                                       - (distance + 5 * (1 - adapter.detail()) - adapter.detail()))
-                                              < 1e-10
-                                      && std::abs(input.scene.fogFar
-                                                  - (distance + 25 * (1 - adapter.detail())
-                                                     + 12 * adapter.detail()))
-                                              < 1e-10,
-                              "Production fog is not anchored to the rendered camera");
-                        check(item->errorText().isEmpty(), "Production renderer failed");
-                        check(result.metadata.contains(u"opticalProbeSample"_s)
-                                      == (input.opticalProbe != 0),
-                              "Capture used the wrong optical mode");
+                        require(std::abs(input.scene.fogNear
+                                         - (distance + 5 * (1 - adapter.detail())
+                                            - adapter.detail()))
+                                                < 1e-10
+                                        && std::abs(input.scene.fogFar
+                                                    - (distance + 25 * (1 - adapter.detail())
+                                                       + 12 * adapter.detail()))
+                                                < 1e-10,
+                                "Production fog is not anchored to the rendered camera");
+                        require(item->errorText().isEmpty(), "Production renderer failed");
+                        require(result.metadata.contains(u"opticalProbeSample"_s)
+                                        == (input.opticalProbe != 0),
+                                "Capture used the wrong optical mode");
                         const auto actualGeneration =
                                 result.metadata[u"resourceGeneration"_s].toInteger();
                         if (generation >= 0)
-                            check(generation == actualGeneration,
-                                  "Frame/probe change rebuilt render targets");
+                            require(generation == actualGeneration,
+                                    "Frame/probe change rebuilt render targets");
                         generation = actualGeneration;
-                        check(result.metadata[u"visibleEntities"_s].toInt() >= 8,
-                              "Missing batched production overlap");
-                        check(result.metadata[u"atlasUploadBytes"_s].toInteger()
-                                      <= AtlasUploadQueue::steadyBudget,
-                              "Unbounded cover uploads");
+                        require(result.metadata[u"visibleEntities"_s].toInt() >= 8,
+                                "Missing batched production overlap");
+                        require(result.metadata[u"atlasUploadBytes"_s].toInteger()
+                                        <= AtlasUploadQueue::steadyBudget,
+                                "Unbounded cover uploads");
                         auto sample = input.opticalProbe ? coverage(result) : QJsonObject{ };
                         if (input.opticalProbe) {
                             if (sample[u"missing"_s].toInt() || sample[u"nonfinite"_s].toInt()
@@ -284,10 +281,10 @@ auto runFlickerAudit(int &argc, char **&argv)
                                 result.composite.save(output + "/failed-visibility.png"_L1);
                                 writeFailureMetadata(output, result.metadata);
                             }
-                            check(sample[u"missing"_s].toInt() == 0
-                                          && sample[u"nonfinite"_s].toInt() == 0
-                                          && sample[u"shaded"_s].toInt() > 100,
-                                  "Production overlap has Equal holes or nonfinite optics");
+                            require(sample[u"missing"_s].toInt() == 0
+                                            && sample[u"nonfinite"_s].toInt() == 0
+                                            && sample[u"shaded"_s].toInt() > 100,
+                                    "Production overlap has Equal holes or nonfinite optics");
                         }
                         sample[u"frame"_s] = frame;
                         sample[u"diagnostic"_s] = input.opticalProbe != 0;
@@ -306,13 +303,14 @@ auto runFlickerAudit(int &argc, char **&argv)
                                             input.background.z() };
                         frames.append(sample);
                         if (frame % 15 == 1 && input.opticalProbe == 0)
-                            check((opticsOnly ? result.composite : driver.surface->grab())
-                                          .save(output
-                                                + u"/production-%1-%2-%3-%4.png"_s.arg(size.width())
-                                                          .arg(night)
-                                                          .arg(stage)
-                                                          .arg(frame)),
-                                  "Cannot save own continuous output");
+                            require((opticsOnly ? result.composite : driver.surface->grab())
+                                            .save(output
+                                                  + u"/production-%1-%2-%3-%4.png"_s
+                                                            .arg(size.width())
+                                                            .arg(night)
+                                                            .arg(stage)
+                                                            .arg(frame)),
+                                    "Cannot save own continuous output");
                     }
                     std::fprintf(stderr, "Production %dx%d night=%d stage=%d passed 60 frames\n",
                                  size.width(), size.height(), night, stage);
@@ -329,17 +327,16 @@ auto runFlickerAudit(int &argc, char **&argv)
             }
             item->captured = { };
         }
-        QSaveFile report(output + "/runtime.json"_L1);
-        check(report.open(QIODevice::WriteOnly), "Cannot write report");
-        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19C2C"_s },
-                                                { u"passed"_s, true },
-                                                { u"opticsOnly"_s, opticsOnly },
-                                                { u"isolatedOnly"_s, isolatedOnly },
-                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                                { u"isolated"_s, isolated },
-                                                { u"sequences"_s, sequences } })
-                             .toJson());
-        check(report.commit(), "Cannot commit report");
+        require(yalahoo::writeJsonFile(
+                        output + "/runtime.json"_L1,
+                        QJsonDocument(QJsonObject{ { u"round"_s, u"R19C2C"_s },
+                                                   { u"passed"_s, true },
+                                                   { u"opticsOnly"_s, opticsOnly },
+                                                   { u"isolatedOnly"_s, isolatedOnly },
+                                                   { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                                   { u"isolated"_s, isolated },
+                                                   { u"sequences"_s, sequences } })),
+                "Cannot commit report");
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "%s\n", error.what());

@@ -1,6 +1,7 @@
 """R19 source/call-chain audit with exact hashes and separately scoped runtime evidence."""
 #!/usr/bin/env python3
 import argparse
+from audit_support import source_check
 import hashlib
 import json
 from pathlib import Path
@@ -131,14 +132,9 @@ platforms = {
 for name, platform_check in platforms.items():
     rows = []
     for check_id, path, symbol, evidence in checks + [platform_check]:
-        content = (root / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{symbol}")
-        rows.append({"checkId": check_id, "requirement": evidence, "platform": name,
-                     "sourcePath": path, "lineOrSymbol": symbol,
-                     "sourceSha256": hashlib.sha256(content).hexdigest(), "evidence": evidence,
-                     "result": "static-audit-passed", "limitations":
-                     "Native scope only as listed in runtime-evidence; other required target checks remain R36"})
+        rows.append(source_check(root, path, symbol, checkId=check_id, requirement=evidence,
+                                 platform=name, evidence=evidence, result="static-audit-passed",
+                                 limitations="Native scope only as listed in runtime-evidence; other required target checks remain R36"))
     output = root / f"verification/{name}-static/overview"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")

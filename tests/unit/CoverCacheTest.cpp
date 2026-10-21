@@ -17,7 +17,7 @@
 #include <QImageReader>
 #include <QEventLoop>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -366,10 +366,7 @@ private Q_SLOTS:
         report[u"scope"_s] =
                 u"96 independent 2048-square JPEG sources; GUI event timer responsiveness, no scanout claim"_s;
         report[u"passed"_s] = true;
-        QSaveFile file(QString::fromUtf8(COVER_REPORT));
-        QVERIFY(file.open(QIODevice::WriteOnly));
-        file.write(QJsonDocument(report).toJson());
-        QVERIFY(file.commit());
+        QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(COVER_REPORT), QJsonDocument(report)));
     }
     void cancellationAndClose()
     {

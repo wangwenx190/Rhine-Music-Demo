@@ -6,7 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <numbers>
@@ -236,19 +236,17 @@ private Q_SLOTS:
     }
     void cleanupTestCase()
     {
-        QSaveFile output(QString::fromUtf8(SCENE_REPORT));
-        QVERIFY(output.open(QIODevice::WriteOnly));
-        output.write(QJsonDocument(QJsonObject{ { u"targetCases"_s, 48 },
-                                                { u"navigationTargets"_s, 36 },
-                                                { u"maxNavigationTargetError"_s, maxNavigation },
-                                                { u"cameraSamples"_s, 694 },
-                                                { u"projectionPoints"_s, 528 },
-                                                { u"maxProjectionPixels"_s, maxProjection },
-                                                { u"maxTargetError"_s, maxPose },
-                                                { u"maxCameraPositionAimError"_s, maxMotion },
-                                                { u"maxFovError"_s, maxFov } })
-                             .toJson());
-        QVERIFY(output.commit());
+        QVERIFY(yalahoo::writeJsonFile(
+                QString::fromUtf8(SCENE_REPORT),
+                QJsonDocument(QJsonObject{ { u"targetCases"_s, 48 },
+                                           { u"navigationTargets"_s, 36 },
+                                           { u"maxNavigationTargetError"_s, maxNavigation },
+                                           { u"cameraSamples"_s, 694 },
+                                           { u"projectionPoints"_s, 528 },
+                                           { u"maxProjectionPixels"_s, maxProjection },
+                                           { u"maxTargetError"_s, maxPose },
+                                           { u"maxCameraPositionAimError"_s, maxMotion },
+                                           { u"maxFovError"_s, maxFov } })));
     }
 };
 QTEST_GUILESS_MAIN(SceneTest)

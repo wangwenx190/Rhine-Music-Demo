@@ -12,7 +12,7 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 InterfaceSoundController::InterfaceSoundController(QObject *parent)
-    : QObject(parent), m_devices(this)
+    : QObject(parent), m_devices(this), m_outputRefresh(this)
 {
     // One small, trusted embedded manifest is read at construction, never on an event.
     QFile manifest(u":/assets/audio/interface-events.json"_s);
@@ -40,20 +40,13 @@ InterfaceSoundController::InterfaceSoundController(QObject *parent)
             });
         }
     }
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
-            &InterfaceSoundController::scheduleOutputRefresh);
+    m_outputRefresh.setSingleShot(true);
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, &m_outputRefresh,
+            qOverload<>(&QTimer::start));
+    connect(&m_outputRefresh, &QTimer::timeout, this, &InterfaceSoundController::refreshOutput);
     refreshOutput();
 }
-void InterfaceSoundController::scheduleOutputRefresh()
-{
-    if (m_refreshPending)
-        return;
-    m_refreshPending = true;
-    QTimer::singleShot(0, this, [this] {
-        m_refreshPending = false;
-        refreshOutput();
-    });
-}
+
 InterfaceSoundController::~InterfaceSoundController()
 {
     stop();

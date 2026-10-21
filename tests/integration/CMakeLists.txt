@@ -1,80 +1,24 @@
-qt_add_executable(
-    AssetTest
-    AssetTest.cpp
-    "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
-    "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp"
-)
-target_include_directories(
-    AssetTest
-    PRIVATE
-    "${PROJECT_SOURCE_DIR}/tools/assets"
-    "${PROJECT_SOURCE_DIR}/src/app"
-)
-target_link_libraries(
-    AssetTest
-    PRIVATE
-    YalahooCore
-    Qt6::Gui
-    Qt6::Test
-    Qt6::Quick3D
-    Qt6::Qml
-    Qt6::Svg
-    Qt6::Multimedia
-)
+yalahoo_unit_test(AssetTest assets
+    SOURCES "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
+        "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp"
+    INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/src/app"
+    LIBRARIES YalahooCore Qt6::Gui Qt6::Quick3D Qt6::Qml Qt6::Svg Qt6::Multimedia
+    REPORT assets-test.xml TIMEOUT 90
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/verification"
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AssetTest)
-yalahoo_platform(AssetTest)
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/verification")
-add_test(
-    NAME
-    assets
-    COMMAND
-    AssetTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/assets-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(
-    assets
-    PROPERTIES
-    TIMEOUT
-    90
-    WORKING_DIRECTORY
-    "${CMAKE_BINARY_DIR}/verification"
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-)
-qt_add_executable(LibraryQmlTest LibraryQmlTest.cpp)
 add_test(NAME ui-drawing COMMAND ui-audit "${CMAKE_BINARY_DIR}/verification/ui-drawing" --representative)
-add_test(NAME ruler-drawing COMMAND ui-audit --ruler "${CMAKE_BINARY_DIR}/verification/ruler-drawing")
-set_tests_properties(ruler-drawing PROPERTIES TIMEOUT 120
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(ruler-drawing --ruler ruler-drawing 120 THREADED)
 # Match migration verification's render loop and explicit native scale factor.
 # Factor 1 keeps the screen's real DPR; it does not force a DPR1 framebuffer.
 set_tests_properties(ui-drawing PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1")
-target_link_libraries(LibraryQmlTest PRIVATE YalahooCore Qt6::Qml Qt6::Quick Qt6::Test)
-target_compile_definitions(LibraryQmlTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(LibraryQmlTest)
-add_test(
-    NAME
-    library-qml
-    COMMAND
-    LibraryQmlTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/library-qml-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(
-    library-qml
-    PROPERTIES
-    TIMEOUT
-    30
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-)
+yalahoo_unit_test(LibraryQmlTest library-qml
+    LIBRARIES YalahooCore Qt6::Qml Qt6::Quick
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    REPORT library-qml-test.xml TIMEOUT 30
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 add_test(
     NAME
     branding
@@ -94,11 +38,7 @@ set_tests_properties(
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
 )
 
-add_test(NAME presentation-qml COMMAND ui-audit --presentation
-    "${CMAKE_BINARY_DIR}/verification/presentation")
-set_tests_properties(presentation-qml PROPERTIES TIMEOUT 90
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(presentation-qml --presentation presentation 90)
 
 add_test(NAME runtime-detail COMMAND Yalahoo --verify-detail
     "${CMAKE_BINARY_DIR}/verification/detail-product")
@@ -112,39 +52,20 @@ set_tests_properties(runtime-overview PROPERTIES TIMEOUT 150
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_NO_VSYNC="
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
 
-add_test(NAME overview-qml COMMAND ui-audit --overview
-    "${CMAKE_BINARY_DIR}/verification/overview-qml")
-set_tests_properties(overview-qml PROPERTIES TIMEOUT 120
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(overview-qml --overview overview-qml 120)
 
 add_test(NAME opening-qml COMMAND ui-audit --opening "${CMAKE_BINARY_DIR}/verification/opening")
 set_tests_properties(opening-qml PROPERTIES TIMEOUT 900 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QCPAINTER_DEBUG_COLLECT=0")
 
-add_test(NAME library-panels-qml COMMAND ui-audit --library "${CMAKE_BINARY_DIR}/verification/library-panels")
-set_tests_properties(library-panels-qml PROPERTIES TIMEOUT 240
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(library-panels-qml --library library-panels 240 THREADED)
 
-add_test(NAME playback-qml COMMAND ui-audit --playback "${CMAKE_BINARY_DIR}/verification/playback-qml")
-set_tests_properties(playback-qml PROPERTIES TIMEOUT 240
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(playback-qml --playback playback-qml 240 THREADED)
 
-add_test(NAME settings-qml COMMAND ui-audit --settings "${CMAKE_BINARY_DIR}/verification/settings-qml" --representative)
-set_tests_properties(settings-qml PROPERTIES TIMEOUT 240
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(settings-qml --settings settings-qml 240 THREADED ARGUMENTS --representative)
 
-add_test(NAME experiments-qml COMMAND ui-audit --experiments "${CMAKE_BINARY_DIR}/verification/experiments-qml")
-set_tests_properties(experiments-qml PROPERTIES TIMEOUT 240
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(experiments-qml --experiments experiments-qml 240 THREADED)
 
-add_test(NAME controls-qml COMMAND ui-audit --controls "${CMAKE_BINARY_DIR}/verification/controls-qml")
-set_tests_properties(controls-qml PROPERTIES TIMEOUT 60
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
+yalahoo_ui_test(controls-qml --controls controls-qml 60 THREADED)
 
 add_test(NAME startup-qml COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup")
 add_test(NAME startup-stress COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup-stress")

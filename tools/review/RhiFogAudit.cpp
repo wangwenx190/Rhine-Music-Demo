@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "ReviewApplication.h"
 #include "SelectionLighting.h"
 #include "RhiFogAudit.h"
@@ -7,7 +8,7 @@
 #include <QGuiApplication>
 #include <QFile>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QDir>
 #include <algorithm>
 #include <cmath>
@@ -24,7 +25,7 @@ double viewDepth(const Input &input, const Capture &capture)
 {
     const auto &image = capture.compositeDepth;
     const auto color = image.pixelColor(image.width() / 2, image.height() / 2);
-    RhiCaptureHarness::require(color != QColor(Qt::white), "Fog math sample missed shell geometry");
+    yalahoo::require(color != QColor(Qt::white), "Fog math sample missed shell geometry");
     const double depth = (color.red() * 65536. + color.green() * 256. + color.blue()) / 16777215.;
     return input.scene.nearPlane + depth * (input.scene.farPlane - input.scene.nearPlane);
 }
@@ -35,9 +36,9 @@ auto runFogAudit(int &argc, char **&argv)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
-        RhiCaptureHarness::require(QDir().mkpath(output), "Cannot create fog output");
+        yalahoo::require(QDir().mkpath(output), "Cannot create fog output");
         QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
-        RhiCaptureHarness::require(file.open(QIODevice::ReadOnly), "Missing fog input");
+        yalahoo::require(file.open(QIODevice::ReadOnly), "Missing fog input");
         const auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
         RhiCaptureHarness driver;
         QJsonArray results, rebuilds;
@@ -79,18 +80,16 @@ auto runFogAudit(int &argc, char **&argv)
                                 expected[i] = expected[i] <= .0031308f
                                         ? expected[i] * 12.92f
                                         : float(1.055 * std::pow(expected[i], 1 / 2.4) - .055);
-                        RhiCaptureHarness::require(actual.size() == 3, "Missing float fog sample");
+                        yalahoo::require(actual.size() == 3, "Missing float fog sample");
                         double error = 0;
                         for (int i = 0; i < 3; ++i)
                             error = std::max(error, std::abs(actual[i].toDouble() - expected[i]));
                         // RGBA16F rounding plus RGB24 depth reconstruction; no image reference.
-                        RhiCaptureHarness::require(error < .001,
-                                                   "Fog/color order differs from source math");
+                        yalahoo::require(error < .001, "Fog/color order differs from source math");
                         maxError = std::max(maxError, error);
                         const auto current = capture.metadata[u"resourceGeneration"_s].toInteger();
                         if (generation >= 0)
-                            RhiCaptureHarness::require(current == generation,
-                                                       "Fog rebuilt render targets");
+                            yalahoo::require(current == generation, "Fog rebuilt render targets");
                         generation = current;
                         results.append(QJsonObject{ { u"night"_s, night },
                                                     { u"fraction"_s, fraction },
@@ -107,7 +106,7 @@ auto runFogAudit(int &argc, char **&argv)
             input.fogEnabled = true;
             auto ordinary = driver.capture(input, { 960, 720 });
             checkSubmittedFog(input, ordinary);
-            RhiCaptureHarness::require(
+            yalahoo::require(
                     driver.surface->grab().save(output + (night ? "/night.png"_L1 : "/day.png"_L1)),
                     "Cannot save own fog output");
             last = input;
@@ -115,26 +114,25 @@ auto runFogAudit(int &argc, char **&argv)
         for (int cycle = 0; cycle < 10; ++cycle) {
             driver.rebuild();
             const auto capture = driver.capture(last, { 960, 720 });
-            RhiCaptureHarness::require(driver.rebuilt(),
-                                       "Fog lifecycle did not invalidate real scene graph");
+            yalahoo::require(driver.rebuilt(), "Fog lifecycle did not invalidate real scene graph");
             checkSubmittedFog(last, capture);
-            RhiCaptureHarness::require(viewDepth(last, capture) < last.scene.farPlane,
-                                       "Fog lifecycle lost geometry");
+            yalahoo::require(viewDepth(last, capture) < last.scene.farPlane,
+                             "Fog lifecycle lost geometry");
             rebuilds.append(capture.metadata);
         }
-        QSaveFile report(output + "/runtime.json"_L1);
-        RhiCaptureHarness::require(report.open(QIODevice::WriteOnly), "Cannot open fog report");
-        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19D2"_s },
-                                                { u"passed"_s, true },
-                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                                { u"rebuilds"_s, rebuilds },
-                                                { u"maxError"_s, maxError },
-                                                { u"cases"_s, results },
-                                                { u"offscreen"_s, driver.surface->diagnostics() },
-                                                { u"windowPolicy"_s,
-                                                  verification::windowPolicy(*driver.window) } })
-                             .toJson());
-        RhiCaptureHarness::require(report.commit(), "Cannot write fog report");
+        yalahoo::require(
+                yalahoo::writeJsonFile(output + "/runtime.json"_L1,
+                                       QJsonDocument(QJsonObject{
+                                               { u"round"_s, u"R19D2"_s },
+                                               { u"passed"_s, true },
+                                               { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                               { u"rebuilds"_s, rebuilds },
+                                               { u"maxError"_s, maxError },
+                                               { u"cases"_s, results },
+                                               { u"offscreen"_s, driver.surface->diagnostics() },
+                                               { u"windowPolicy"_s,
+                                                 verification::windowPolicy(*driver.window) } })),
+                "Cannot write fog report");
         std::printf("Fog/color source math passed %lld states, max error %.9f\n", results.size(),
                     maxError);
         return 0;

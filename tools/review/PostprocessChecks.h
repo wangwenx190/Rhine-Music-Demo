@@ -10,7 +10,6 @@ using Qt::StringLiterals::operator""_s;
 namespace yalahoo::review {
 inline void checkPostprocessGraph(const rhi::Input &input, const rhi::Capture &capture)
 {
-    const auto require = RhiCaptureHarness::require;
     require(capture.metadata[u"outputBindingMatches"_s].toBool(), "Final output binding is stale");
     const auto graph = capture.metadata[u"postprocessGraph"_s].toObject();
     if (!input.postprocess) {

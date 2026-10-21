@@ -13,7 +13,7 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QFile>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSet>
 #include <cmath>
 #include <cstdio>
@@ -25,7 +25,6 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-const auto check = RhiCaptureHarness::require;
 QJsonArray pair(QSize size)
 {
     return { size.width(), size.height() };
@@ -65,7 +64,7 @@ QList<QSize> sourceSizes()
          { "visual.json", "visual-dpr-1.json", "visual-dpr-1.5.json", "visual-dpr-2.json" }) {
         QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/postprocess/"_L1
                    + QString::fromUtf8(name));
-        check(file.open(QIODevice::ReadOnly), "Missing postprocess source size input");
+        require(file.open(QIODevice::ReadOnly), "Missing postprocess source size input");
         for (const auto &value :
              QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray()) {
             const auto row = value.toObject();
@@ -76,7 +75,7 @@ QList<QSize> sourceSizes()
                 sizes.append(size);
         }
     }
-    check(sizes.size() == 9, "Postprocess input must contain all nine source sizes");
+    require(sizes.size() == 9, "Postprocess input must contain all nine source sizes");
     return sizes;
 }
 void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
@@ -100,7 +99,7 @@ void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
         driver.surface->requestFrame();
         loop.exec();
     }
-    check(ready, "Anonymous production covers did not become ready");
+    require(ready, "Anonymous production covers did not become ready");
 }
 void checkCoverFiltering()
 {
@@ -133,22 +132,22 @@ void checkCoverFiltering()
         input.atlasUploads.append({ 1, 1, 1, slot, image, true, CoverCache::makeMipmaps(image) });
     }
     const auto result = driver.capture(input, { 193, 129 });
-    check(result.metadata[u"sampling"_s].toObject()[u"coverTileLocalMipmaps"_s].toBool(),
-          "Production cover filtering is not bound to the mipmapped texture");
+    require(result.metadata[u"sampling"_s].toObject()[u"coverTileLocalMipmaps"_s].toBool(),
+            "Production cover filtering is not bound to the mipmapped texture");
     int redPixels = 0;
     for (int y = 0; y < result.color.height(); ++y)
         for (int x = 0; x < result.color.width(); ++x) {
             const auto color = result.color.pixelColor(x, y);
             if (color.redF() > .5f) {
-                check(color.blueF() < .005f, "Cover mip filtering sampled a neighboring tile");
+                require(color.blueF() < .005f, "Cover mip filtering sampled a neighboring tile");
                 ++redPixels;
             }
         }
-    check(redPixels > 16, "Cover filtering probe did not draw the paper");
+    require(redPixels > 16, "Cover filtering probe did not draw the paper");
     input.atlasUploads.clear();
     const auto stable = driver.capture(input, { 193, 129 });
-    check(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
-          "Stable cover filtering regenerated or reuploaded mip levels");
+    require(stable.metadata[u"atlasUploadBytes"_s].toInteger() == 0,
+            "Stable cover filtering regenerated or reuploaded mip levels");
 }
 QJsonObject captureState(QSize logical, double requestedDpr, const QString &output, int index)
 {
@@ -174,8 +173,8 @@ QJsonObject captureState(QSize logical, double requestedDpr, const QString &outp
     driver.replay(2);
     waitForCovers(driver, item);
     const double dpr = driver.window->effectiveDevicePixelRatio();
-    check(!OffscreenSurface::Enabled || dpr == requestedDpr,
-          "Actual target DPR differs from request");
+    require(!OffscreenSurface::Enabled || dpr == requestedDpr,
+            "Actual target DPR differs from request");
     const auto expected = sourceTarget(logical, dpr);
     const QSize displayPixels = logical * dpr;
     QJsonArray themes;
@@ -186,36 +185,36 @@ QJsonObject captureState(QSize logical, double requestedDpr, const QString &outp
         for (int frame = 0; frame < 45; ++frame)
             motion.clock()->advance(1.0 / 60);
         driver.replay(2);
-        check(quality->targetSize() == expected
-                      && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
-                              == expected,
-              "SceneItem output differs from current native physical dimensions");
+        require(quality->targetSize() == expected
+                        && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
+                                == expected,
+                "SceneItem output differs from current native physical dimensions");
         const auto input = item->input();
         const auto capture = driver.capture(input, expected);
         checkPostprocessGraph(input, capture);
-        check(item->errorText().isEmpty() && input.bokeh && input.aoSamples == 64 && input.smaa
-                      && input.captureSamples == 4,
-              "Scale audit changed authored effects or failed rendering");
+        require(item->errorText().isEmpty() && input.bokeh && input.aoSamples == 64 && input.smaa
+                        && input.captureSamples == 4,
+                "Scale audit changed authored effects or failed rendering");
         const auto bokeh = capture.metadata[u"submittedBokeh"_s].toObject();
-        check(bokeh[u"width"_s].toInt() == expected.width()
-                      && bokeh[u"height"_s].toInt() == expected.height()
-                      && bokeh[u"depthWidth"_s].toInt() == expected.width()
-                      && bokeh[u"depthHeight"_s].toInt() == expected.height()
-                      && bokeh[u"focus"_s].toDouble() == input.focus
-                      && bokeh[u"aperture"_s].toDouble() == input.aperture
-                      && bokeh[u"maxblur"_s].toDouble() == double(.011f)
-                      && bokeh[u"aspect"_s].toDouble()
-                              == float(expected.width()) / expected.height(),
-              "Bokeh uses logical pixels or stale full-resolution depth");
+        require(bokeh[u"width"_s].toInt() == expected.width()
+                        && bokeh[u"height"_s].toInt() == expected.height()
+                        && bokeh[u"depthWidth"_s].toInt() == expected.width()
+                        && bokeh[u"depthHeight"_s].toInt() == expected.height()
+                        && bokeh[u"focus"_s].toDouble() == input.focus
+                        && bokeh[u"aperture"_s].toDouble() == input.aperture
+                        && bokeh[u"maxblur"_s].toDouble() == double(.011f)
+                        && bokeh[u"aspect"_s].toDouble()
+                                == float(expected.width()) / expected.height(),
+                "Bokeh uses logical pixels or stale full-resolution depth");
         const auto sampling = capture.metadata[u"sampling"_s].toObject();
-        check(sampling[u"coverTileLocalMipmaps"_s].toBool()
-                      && sampling[u"captureTrilinearClamp"_s].toBool(),
-              "Cover or transmission filtering differs from source");
+        require(sampling[u"coverTileLocalMipmaps"_s].toBool()
+                        && sampling[u"captureTrilinearClamp"_s].toBool(),
+                "Cover or transmission filtering differs from source");
         const auto optical = capture.metadata[u"opticalGraph"_s].toObject();
-        check(optical[u"captureMips"_s].toBool() && optical[u"captureBindingMatches"_s].toBool(),
-              "Transmission capture lost its own mip chain or sampler binding");
-        check(capture.metadata[u"visibleEntities"_s].toInt() >= 8,
-              "Scale audit did not render the anonymous overlapping array");
+        require(optical[u"captureMips"_s].toBool() && optical[u"captureBindingMatches"_s].toBool(),
+                "Transmission capture lost its own mip chain or sampler binding");
+        require(capture.metadata[u"visibleEntities"_s].toInt() >= 8,
+                "Scale audit did not render the anonymous overlapping array");
         const auto resources = capture.metadata[u"resources"_s].toObject();
         QSet<QString> found;
         for (const auto &value : resources[u"entries"_s].toArray()) {
@@ -223,22 +222,23 @@ QJsonObject captureState(QSize logical, double requestedDpr, const QString &outp
             const auto name = entry[u"name"_s].toString();
             if (name.startsWith(u"opaque-"_s) || name.startsWith(u"shell-composite-"_s)
                 || name.startsWith(u"qt-item-"_s) || name.startsWith(u"dof-geometry-"_s)) {
-                check(QSize(entry[u"width"_s].toInt(), entry[u"height"_s].toInt()) == expected,
-                      "Physical geometry/output attachment has an unintended scale");
+                require(QSize(entry[u"width"_s].toInt(), entry[u"height"_s].toInt()) == expected,
+                        "Physical geometry/output attachment has an unintended scale");
                 found.insert(name);
             }
             if (name == "cover-or-atlas"_L1)
-                check(entry[u"mipLevels"_s].toInt() > 1,
-                      "Atlas is missing independent cover mip levels");
+                require(entry[u"mipLevels"_s].toInt() > 1,
+                        "Atlas is missing independent cover mip levels");
         }
-        check(found.contains(u"opaque-color-resolve"_s) && found.contains(u"qt-item-color"_s),
-              "Actual target inventory is missing");
+        require(found.contains(u"opaque-color-resolve"_s) && found.contains(u"qt-item-color"_s),
+                "Actual target inventory is missing");
         const auto finalImage = driver.surface->grab();
-        check(finalImage.size() == displayPixels, "Final compositor ignored actual target DPR");
+        require(finalImage.size() == displayPixels, "Final compositor ignored actual target DPR");
         const QString filename = u"/state-%1-%2.png"_s.arg(index).arg(night);
-        check(finalImage.save(output + filename), "Cannot save own final compositor output");
+        require(finalImage.save(output + filename), "Cannot save own final compositor output");
         const auto actualGeneration = capture.metadata[u"resourceGeneration"_s].toInteger();
-        check(generation < 0 || actualGeneration == generation, "Theme rebuilt compatible targets");
+        require(generation < 0 || actualGeneration == generation,
+                "Theme rebuilt compatible targets");
         generation = actualGeneration;
         themes.append(QJsonObject{ { u"night"_s, night },
                                    { u"image"_s, filename.mid(1) },
@@ -300,22 +300,22 @@ QJsonArray dprTransitions()
         if (!item->errorText().isEmpty())
             std::fprintf(stderr, "Production scene error: %s\n",
                          item->errorText().toUtf8().constData());
-        check(driver.window->effectiveDevicePixelRatio() == dpr
-                      && adapter.quality()->targetSize() == expected
-                      && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
-                              == expected,
-              "DPR change without resize failed to repolish the production target");
+        require(driver.window->effectiveDevicePixelRatio() == dpr
+                        && adapter.quality()->targetSize() == expected
+                        && QSize(item->fixedColorBufferWidth(), item->fixedColorBufferHeight())
+                                == expected,
+                "DPR change without resize failed to repolish the production target");
         const auto input = item->input();
         const auto result = driver.capture(input, expected);
         checkPostprocessGraph(input, result);
-        check(sourceState(input) == originalState,
-              "Same-window DPR transition changed source geometry, camera or optics");
-        check((input.atlasSize == atlasSize ? input.atlasGeneration == atlasGeneration
-                                            : input.atlasGeneration != atlasGeneration)
-                      && result.metadata[u"atlasUploadBytes"_s].toInteger()
-                              <= AtlasUploadQueue::steadyBudget
-                      && driver.surface->grab().size() == QSize(640, 480) * dpr,
-              "DPR change used a stale atlas generation or final compositor dimensions");
+        require(sourceState(input) == originalState,
+                "Same-window DPR transition changed source geometry, camera or optics");
+        require((input.atlasSize == atlasSize ? input.atlasGeneration == atlasGeneration
+                                              : input.atlasGeneration != atlasGeneration)
+                        && result.metadata[u"atlasUploadBytes"_s].toInteger()
+                                <= AtlasUploadQueue::steadyBudget
+                        && driver.surface->grab().size() == QSize(640, 480) * dpr,
+                "DPR change used a stale atlas generation or final compositor dimensions");
         atlasGeneration = input.atlasGeneration;
         atlasSize = input.atlasSize;
         states.append(QJsonObject{ { u"dpr"_s, dpr },
@@ -335,10 +335,10 @@ auto runScaleAudit(int &argc, char **&argv)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
-        check(QDir().mkpath(output), "Cannot create scale output directory");
-        check(argc == 2 || QByteArray(argv[2]) == "--representative"
-                      || QByteArray(argv[2]) == "--filtering-only",
-              "Unsupported native-size audit option");
+        require(QDir().mkpath(output), "Cannot create scale output directory");
+        require(argc == 2 || QByteArray(argv[2]) == "--representative"
+                        || QByteArray(argv[2]) == "--filtering-only",
+                "Unsupported native-size audit option");
         const auto coverSampling = checkLinearCoverSampling();
         checkCoverFiltering();
         const bool filteringOnly = argc == 3 && QByteArray(argv[2]) == "--filtering-only";
@@ -356,18 +356,16 @@ auto runScaleAudit(int &argc, char **&argv)
                 const auto themes = state[u"themes"_s].toArray();
                 if (!sourceThemes.isEmpty())
                     for (int i = 0; i < themes.size(); ++i)
-                        check(themes[i].toObject()[u"sourceState"_s]
-                                      == sourceThemes[i].toObject()[u"sourceState"_s],
-                              "DPR changed source camera, motion, entity identities or optics");
+                        require(themes[i].toObject()[u"sourceState"_s]
+                                        == sourceThemes[i].toObject()[u"sourceState"_s],
+                                "DPR changed source camera, motion, entity identities or optics");
                 sourceThemes = themes;
                 states.append(state);
             }
         }
-        QSaveFile file(output + "/runtime.json"_L1);
-        check(file.open(QIODevice::WriteOnly), "Cannot open scale report");
-        file.write(
-                QJsonDocument(
-                        QJsonObject{
+        require(yalahoo::writeJsonFile(
+                        output + "/runtime.json"_L1,
+                        QJsonDocument(QJsonObject{
                                 { u"round"_s, u"R19D4C"_s },
                                 { u"passed"_s, true },
                                 { u"states"_s, states },
@@ -376,9 +374,8 @@ auto runScaleAudit(int &argc, char **&argv)
                                 { u"filteringOnly"_s, filteringOnly },
                                 { u"nativeDprMatrixPending"_s, !OffscreenSurface::Enabled },
                                 { u"scope"_s,
-                                  u"Own RenderControl/native output, actual attachments and source math; no physical display/VSYNC or measured VRAM claim"_s } })
-                        .toJson());
-        check(file.commit(), "Cannot commit scale report");
+                                  u"Own RenderControl/native output, actual attachments and source math; no physical display/VSYNC or measured VRAM claim"_s } })),
+                "Cannot commit scale report");
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "Scale audit: %s\n", error.what());

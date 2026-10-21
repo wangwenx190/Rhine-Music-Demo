@@ -38,7 +38,7 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <atomic>
@@ -1077,11 +1077,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         { u"deviceCount"_s, song->devices().size() - 1 },
                         { u"scope"_s,
                           u"actual public Qt playback and controls; no physical unplug or listening claim"_s } });
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly))
-        return 5;
-    file.write(QJsonDocument(report).toJson());
-    if (!file.commit())
+    if (!yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report)))
         return 5;
     object.reset();
     surface.hide();

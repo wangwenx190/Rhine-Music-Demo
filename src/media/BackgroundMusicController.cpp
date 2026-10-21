@@ -15,7 +15,12 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 BackgroundMusicController::BackgroundMusicController(QObject *parent)
-    : QObject(parent), m_devices(this), m_output(this), m_player(this), m_fade(this)
+    : QObject(parent),
+      m_devices(this),
+      m_outputRefresh(this),
+      m_output(this),
+      m_player(this),
+      m_fade(this)
 {
     m_output.setVolume(0);
     m_player.setAudioOutput(&m_output);
@@ -44,20 +49,13 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
                 Q_EMIT silenceReached();
                 Q_EMIT stateChanged();
             });
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
-            &BackgroundMusicController::scheduleOutputRefresh);
+    m_outputRefresh.setSingleShot(true);
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, &m_outputRefresh,
+            qOverload<>(&QTimer::start));
+    connect(&m_outputRefresh, &QTimer::timeout, this, &BackgroundMusicController::refreshOutput);
     refreshOutput();
 }
-void BackgroundMusicController::scheduleOutputRefresh()
-{
-    if (m_refreshPending)
-        return;
-    m_refreshPending = true;
-    QTimer::singleShot(0, this, [this] {
-        m_refreshPending = false;
-        refreshOutput();
-    });
-}
+
 BackgroundMusicController::~BackgroundMusicController()
 {
     stop();

@@ -26,7 +26,7 @@ CHECKS = [
      "Only authored light settings persist through the existing coalesced worker. Frame lighting.changed and compare press/release do not write preferences. Numeric settings change uniforms without copying covers or rebuilding the pool; motion changes preserve trajectory revision/x/v/a."),
     ("PERF-04", "src/render/rhi/RhiItem.cpp", "if (diagnose)",
      "Diagnostic callback runs after ordinary production submission using existing requested-upload counts and lastCompletedGpuTime. No pass/texture/buffer/capture is introduced; unavailable GPU timing remains absent. CPU timer starts only for explicit Review profiling or live diagnostics."),
-    ("PERF-05", "src/render/SelectionLighting.cpp", "if (settings() != before)",
+    ("PERF-05", "src/render/SelectionLighting.cpp", "if (m_settings != before)",
      "Equal authored settings emit no persistence or visual invalidation. Existing source normalization and guided preset remain authoritative; temporary comparison changes actual mode only and restores the latest authored snapshot without resetting spring state."),
     ("PERF-06", "qml/Yalahoo/Music/panels/ExperimentPanels.qml", "property bool navigationInputOwner: true",
      "One bounded ScrollView owns pointer/wheel/keyboard input through existing InputRouter ancestry checks. No new frame source/timer or per-frame QML serialization. Closing destroys the loader; hidden/modal/opening state pauses diagnostics and restores temporary comparison."),

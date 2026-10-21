@@ -25,12 +25,20 @@ def executable_path(root=ROOT, tool=None):
     return root / "build/release/bin" / relative.get(platform.system(), "yalahoo")
 
 
+def cmake_cache(root=ROOT):
+    lines = (root / "build/release/CMakeCache.txt").read_text(encoding="utf-8").splitlines()
+    return dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith(("#", "//")))
+
+
 def replay_environment(kit, backend, dpr, foreground=False):
     environment = os.environ.copy()
     environment.update(QSG_RHI_BACKEND=backend, QT_SCALE_FACTOR=str(dpr),
                        QT_PLUGIN_PATH=str(kit / "plugins"),
                        YALAHOO_VERIFY_FOREGROUND="1" if foreground else "0",
                        QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM="1",
+                       YALAHOO_VERIFY_VISIBLE="0", YALAHOO_VERIFY_LIFECYCLE="0",
+                       YALAHOO_VERIFY_WINDOW_LIFECYCLE="0", YALAHOO_VERIFY_STRESS="0",
+                       QCPAINTER_DEBUG_COLLECT="0",
                        QSG_RENDER_LOOP="basic" if platform.system() == "Darwin" and backend == "opengl" else "threaded")
     environment.pop("QSG_NO_VSYNC", None)
     if platform.system() == "Windows":

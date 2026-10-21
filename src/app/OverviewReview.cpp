@@ -23,7 +23,7 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QQmlEngine>
 #include <QQmlError>
 #include <QMutex>
@@ -61,7 +61,6 @@ constexpr auto ReviewDeadlineMilliseconds = 120000;
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 4,
-    CaptureFailed = 5,
     ReportFailed = 6
 };
 
@@ -190,13 +189,9 @@ auto finishOverviewReview(OverviewReviewState &state, auto &check)
         { u"measurementScope"_s,
           u"Qt frame/renderer telemetry and own-window PNG; no input-to-photon or measured VRAM"_s }
     };
-    QSaveFile file(state.output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly)) {
-        state.app.exit(CaptureFailed);
-        return;
-    }
-    file.write(QJsonDocument(report).toJson());
-    state.app.exit(file.commit() && state.passed ? 0 : ReportFailed);
+    const bool saved =
+            yalahoo::writeJsonFile(state.output + "/report.json"_L1, QJsonDocument(report));
+    state.app.exit(saved && state.passed ? 0 : ReportFailed);
 }
 
 template <typename ReadyFunction, typename ButtonFunction, typename CheckFunction,

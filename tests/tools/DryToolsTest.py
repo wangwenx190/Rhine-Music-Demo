@@ -3,6 +3,7 @@ import argparse
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -51,6 +52,16 @@ class ReplayTest(unittest.TestCase):
             result = native_replay.run_replays(argparse.ArgumentParser(), self.args,
                                                "--verify-test", lambda report, args: report.get("dpr") == args.dpr)
         return result, json.loads((self.args.output / "manifest.json").read_text())
+
+    def test_replay_environment_does_not_inherit_visible_or_stress_authorization(self):
+        flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_STRESS",
+                 "YALAHOO_VERIFY_LIFECYCLE", "YALAHOO_VERIFY_WINDOW_LIFECYCLE")
+        with patch.dict(os.environ, {**dict.fromkeys(flags, "1"), "QSG_NO_VSYNC": "1"}):
+            environment = native_replay.replay_environment(self.root / "kit", "metal", 1)
+            self.assertTrue(all(environment[flag] == "0" for flag in flags))
+            self.assertNotIn("QSG_NO_VSYNC", environment)
+            self.assertEqual(native_replay.replay_environment(self.root, "metal", 1, True)
+                             ["YALAHOO_VERIFY_FOREGROUND"], "1")
 
     def test_success_requires_matching_report(self):
         result, manifest = self.run_replay(json.dumps(dict(passed=True, backend="metal", dpr=1)))

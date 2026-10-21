@@ -31,7 +31,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QScreen>
@@ -55,6 +55,12 @@ constexpr int InteractionSettleMilliseconds = 1200;
 
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
+
+quint64 probePaintCount(QQuickItem *root, int mode)
+{
+    return mode == 0 ? canvasProbeStats().paints.load()
+                     : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong();
+}
 
 // Construct on first access; no namespace-scope runtime initialization is required.
 QJsonArray &diagnostics()
@@ -332,32 +338,22 @@ auto runUiAssertions(int &step, QList<QSize> &sizes, yalahoo::LayoutMetrics &met
         return;
     }
     if (phase == 1) {
-        stationaryPaints = lifecycleMode == 0
-                ? canvasProbeStats().paints.load()
-                : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong();
+        stationaryPaints = probePaintCount(root, lifecycleMode);
         wait(400);
         return;
     }
     if (phase == 2) {
-        const bool stable = lifecycleMode == 0
-                ? canvasProbeStats().paints == stationaryPaints
-                : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong()
-                        == stationaryPaints;
+        const bool stable = probePaintCount(root, lifecycleMode) == stationaryPaints;
         passed &= stable;
         lifecycle.append(
                 QJsonObject{ { u"operation"_s, u"stationary"_s }, { u"passed"_s, stable } });
         surface.hide();
-        stationaryPaints = lifecycleMode == 0
-                ? canvasProbeStats().paints.load()
-                : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong();
+        stationaryPaints = probePaintCount(root, lifecycleMode);
         wait(250);
         return;
     }
     if (phase == 3) {
-        const bool stable = lifecycleMode == 0
-                ? canvasProbeStats().paints == stationaryPaints
-                : root->findChild<QObject *>("canvasJs")->property("paintCount").toULongLong()
-                        == stationaryPaints;
+        const bool stable = probePaintCount(root, lifecycleMode) == stationaryPaints;
         passed &= stable;
         lifecycle.append(QJsonObject{ { u"operation"_s, u"hidden"_s }, { u"passed"_s, stable } });
         window.releaseResources();
@@ -505,13 +501,7 @@ auto runUiAssertions(int &step, QList<QSize> &sizes, yalahoo::LayoutMetrics &met
                        { u"imageBytes"_s, qint64(canvasProbeStats().imageBytes.load()) },
                        { u"imageCount"_s, qint64(canvasProbeStats().imageCount.load()) } } }
     };
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly)) {
-        app.exit(5);
-        return;
-    }
-    file.write(QJsonDocument(report).toJson());
-    const bool saved = file.commit();
+    const bool saved = yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report));
     app.exit(passed && saved ? 0 : 6);
 }
 

@@ -2,6 +2,7 @@
 // completion and renderer recreation are separate lifecycle facts.
 
 #pragma once
+#include "Require.h"
 #include <QtClassHelperMacros>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -137,11 +138,6 @@ public:
     bool rebuilt() const
     {
         return invalidations > previousInvalidations;
-    }
-    static void require(bool condition, const char *message)
-    {
-        if (!condition)
-            throw std::runtime_error(message);
     }
 
 private:

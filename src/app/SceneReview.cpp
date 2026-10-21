@@ -15,7 +15,7 @@
 #include <QMetaObject>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSGRendererInterface>
 #include <QTimer>
 #include <atomic>
@@ -199,28 +199,22 @@ auto finishSceneReview(SceneReviewState &state, auto &next, auto &poll)
     const auto api = state.window.rendererInterface()->graphicsApi();
     state.pass = state.pass && QSGRendererInterface::isApiRhiBased(api);
     state.pass = state.pass && verification::windowPolicySatisfied(state.window);
-    QSaveFile output(state.report);
-    bool committed = output.open(QIODevice::WriteOnly);
-    if (committed) {
-        output.write(
-                QJsonDocument(QJsonObject{ { u"passed"_s, state.pass },
-                                           { u"windowPolicy"_s,
-                                             verification::windowPolicy(state.window) },
-                                           { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                           { u"platform"_s, QGuiApplication::platformName() },
-                                           { u"graphicsApi"_s, int(api) },
-                                           { u"baseline"_s, state.oracle[u"baseline"_s] },
-                                           { u"fixtureSha256"_s,
-                                             QString::fromUtf8(QCryptographicHash::hash(
-                                                                       state.fixtureBytes,
-                                                                       QCryptographicHash::Sha256)
-                                                                       .toHex()) },
-                                           { u"maxQtCpuPixels"_s, state.maxQt },
-                                           { u"maxWebPixels"_s, state.maxWeb },
-                                           { u"cases"_s, state.results } })
-                        .toJson());
-        committed = output.commit();
-    }
+    const bool committed = yalahoo::writeJsonFile(
+            state.report,
+            QJsonDocument(QJsonObject{
+                    { u"passed"_s, state.pass },
+                    { u"windowPolicy"_s, verification::windowPolicy(state.window) },
+                    { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                    { u"platform"_s, QGuiApplication::platformName() },
+                    { u"graphicsApi"_s, int(api) },
+                    { u"baseline"_s, state.oracle[u"baseline"_s] },
+                    { u"fixtureSha256"_s,
+                      QString::fromUtf8(QCryptographicHash::hash(state.fixtureBytes,
+                                                                 QCryptographicHash::Sha256)
+                                                .toHex()) },
+                    { u"maxQtCpuPixels"_s, state.maxQt },
+                    { u"maxWebPixels"_s, state.maxWeb },
+                    { u"cases"_s, state.results } }));
     state.app.exit(state.pass && committed ? 0 : ReviewFailed);
 }
 }

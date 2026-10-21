@@ -11,7 +11,7 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickTextDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <QTextBlock>
@@ -203,15 +203,13 @@ int reviewControls(const QString &output)
     surface.hide();
     root->setParentItem(nullptr);
     object.reset();
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly))
-        return 4;
-    file.write(QJsonDocument(QJsonObject{ { u"passed"_s, passed },
-                                          { u"checks"_s, checks },
-                                          { u"windowPolicy"_s, policy },
-                                          { u"qtVersion"_s, QString::fromUtf8(QT_VERSION_STR) },
-                                          { u"themeEnvironment"_s,
-                                            qEnvironmentVariable("QT_QUICK_CONTROLS_STYLE") } })
-                       .toJson());
-    return file.commit() && passed ? 0 : 5;
+    const bool saved = yalahoo::writeJsonFile(
+            output + "/report.json"_L1,
+            QJsonDocument(QJsonObject{
+                    { u"passed"_s, passed },
+                    { u"checks"_s, checks },
+                    { u"windowPolicy"_s, policy },
+                    { u"qtVersion"_s, QString::fromUtf8(QT_VERSION_STR) },
+                    { u"themeEnvironment"_s, qEnvironmentVariable("QT_QUICK_CONTROLS_STYLE") } }));
+    return saved && passed ? 0 : 5;
 }

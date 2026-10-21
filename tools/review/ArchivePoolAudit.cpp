@@ -1,3 +1,5 @@
+#include "Require.h"
+#include "JsonFile.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
 #include "SceneAdapter.h"
@@ -16,7 +18,6 @@
 #include <QJsonDocument>
 #include <QPointer>
 #include <QQuickWindow>
-#include <QSaveFile>
 #include <QTimer>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -35,11 +36,6 @@ using namespace yalahoo;
 using namespace yalahoo::rhi;
 
 namespace {
-void require(bool condition, const char *reason)
-{
-    if (!condition)
-        throw std::runtime_error(reason);
-}
 Snapshot library(int count)
 {
     LibrarySnapshot result;
@@ -89,11 +85,9 @@ auto runArchivePoolAuditCapture(SceneItem *&item, std::shared_ptr<Wait> &state,
     state->loop = nullptr;
     require(state->capture.has_value(), "Pool capture timed out");
     if (!verification::windowPolicySatisfied(window)) {
-        QSaveFile failure(output + "/window-policy-failure.json"_L1);
-        if (failure.open(QIODevice::WriteOnly)) {
-            failure.write(QJsonDocument(verification::windowPolicy(window)).toJson());
-            failure.commit();
-        }
+        if (!yalahoo::writeJsonFile(output + "/window-policy-failure.json"_L1,
+                                    QJsonDocument(verification::windowPolicy(window))))
+            qWarning("Cannot save window policy failure report");
         throw std::runtime_error("Pool window policy violated");
     }
     auto result = std::move(*state->capture);
@@ -383,10 +377,8 @@ auto runArchivePoolAudit(int &argc, char **&argv, QGuiApplication &app)
                                 { u"windowPolicy"_s, verification::windowPolicy(window) },
                                 { u"offscreen"_s, surface.diagnostics() },
                                 { u"submissionSamples"_s, submissionSamples } };
-            QSaveFile reportFile(output + "/runtime.json"_L1);
-            require(reportFile.open(QIODevice::WriteOnly), "Cannot write finite audit");
-            reportFile.write(QJsonDocument(report).toJson());
-            require(reportFile.commit(), "Cannot commit finite audit");
+            require(yalahoo::writeJsonFile(output + "/runtime.json"_L1, QJsonDocument(report)),
+                    "Cannot commit finite audit");
             return 0;
         }
         require(stable.metadata[u"drawCount"_s].toInt() == 432,
@@ -688,10 +680,8 @@ auto runArchivePoolAudit(int &argc, char **&argv, QGuiApplication &app)
             { u"scope"_s,
               u"Production pool matrices, picking, uploads, optical identities and resource/lifecycle; own-render images for quality inspection, no image matching or presentation performance"_s }
         };
-        QSaveFile file(output + "/runtime.json"_L1);
-        require(file.open(QIODevice::WriteOnly), "Cannot save pool report");
-        file.write(QJsonDocument(report).toJson());
-        require(file.commit(), "Cannot commit pool report");
+        require(yalahoo::writeJsonFile(output + "/runtime.json"_L1, QJsonDocument(report)),
+                "Cannot commit pool report");
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "Pool audit failure: %s\n", error.what());

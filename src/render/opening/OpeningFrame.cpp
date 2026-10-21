@@ -4,6 +4,7 @@
 #include "OpeningTimeline.h"
 #include "SceneGeometry.h"
 #include "OpeningFrame.h"
+#include "EasingCurve.h"
 #include "MotionFunctions.h"
 #include <algorithm>
 #include <numbers>
@@ -226,16 +227,8 @@ double openingReveal(double elapsed, double delay)
     constexpr auto SecondBezierX = .36;
 
     const double x = unit(elapsed, delay, RevealEndSeconds);
-    // Invert CSS cubic-bezier(.22,1,.36,1), retaining the authored stagger endpoint.
-    double lo = 0, hi = 1;
-    for (int i = 0; i < BezierSearchSteps; ++i) {
-        const double t = (lo + hi) * .5, u = 1 - t;
-        const double bx = 3 * u * u * t * FirstBezierX + 3 * u * t * t * SecondBezierX + t * t * t;
-        if (bx < x)
-            lo = t;
-        else
-            hi = t;
-    }
-    return x == 0 ? 0 : x == 1 ? 1 : 1 - std::pow(1 - (lo + hi) * .5, 3);
+    return x == 0 || x == 1
+            ? x
+            : sampleCubicBezier(x, { FirstBezierX, 1 }, { SecondBezierX, 1 }, BezierSearchSteps);
 }
 }

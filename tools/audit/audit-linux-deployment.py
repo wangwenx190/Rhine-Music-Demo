@@ -97,7 +97,7 @@ CHECKS = [
      'Invisible/minimized/suspended visual layers stop tick/paint/cover admission; latest state '
      'is coalesced on restore while media continues. No frame timer, alternate input or QML control '
      'is introduced by platform deployment.'),
-    ('PERF-07', 'tools/deploy/linux.py', 'backup = ROOT',
+    ('PERF-07', 'tools/deploy/package_support.py', 'def install_package(staging, output)',
      'Owned staging precedes complete closure and real product probe; build/install/ELF/child failure '
      'cannot replace an old package, rename failure restores it. Qt production SG/render owns '
      'GL/Vulkan resources, DPR/surface changes invalidate compatible keys, stale callbacks use epochs. '

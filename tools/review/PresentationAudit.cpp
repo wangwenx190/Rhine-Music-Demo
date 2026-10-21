@@ -17,7 +17,7 @@
 #include <QQuickItem>
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <atomic>
@@ -419,9 +419,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
                         { u"windowPolicy"_s, policy },
                         { u"resourcePlan"_s, surface.diagnostics() },
                         { u"presentOrVsyncVerified"_s, false } };
-    QSaveFile file(QDir(output).filePath(u"report.json"_s));
-    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
-        || !file.commit())
+    if (!yalahoo::writeJsonFile(QDir(output).filePath(u"report.json"_s), QJsonDocument(report)))
         return 5;
     return passed ? 0 : 6;
 }

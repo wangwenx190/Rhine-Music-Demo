@@ -1,4 +1,5 @@
-#include "FrameClock.h"
+#include "FrameConnection.h"
+#include "EasingCurve.h"
 #include "TransportMotion.h"
 #include <algorithm>
 #include <cmath>
@@ -20,18 +21,7 @@ double bezier(double x, bool ease)
 {
     const double x1 = ease ? EaseControlX : TransformFirstX, y1 = ease ? EaseFirstY : 0;
     const double x2 = ease ? EaseControlX : TransformSecondX;
-    const auto cubic = [](double t, double a, double b) {
-        return 3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * b + t * t * t;
-    };
-    double low = 0, high = 1;
-    for (int i = 0; i < BezierSearchSteps; ++i) {
-        const double t = (low + high) / 2;
-        if (cubic(t, x1, x2) < x)
-            low = t;
-        else
-            high = t;
-    }
-    return cubic((low + high) / 2, y1, 1);
+    return sampleCubicBezier(x, { x1, y1 }, { x2, 1 }, BezierSearchSteps);
 }
 }
 double TransportTrack::value() const
@@ -83,15 +73,8 @@ FrameClock *TransportMotion::clock() const
 }
 void TransportMotion::setClock(FrameClock *clock)
 {
-    if (m_clock == clock)
-        return;
-    disconnect(m_connection);
-    m_clock = clock;
-    if (clock)
-        m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
-            advance(dt);
-        });
-    Q_EMIT inputChanged();
+    if (bindFrameClock(this, m_clock, m_connection, clock))
+        Q_EMIT inputChanged();
 }
 double TransportMotion::targetWidth() const
 {
@@ -173,13 +156,16 @@ bool TransportMotion::moving() const
 }
 void TransportMotion::retarget()
 {
-    const bool instant = !m_complete || m_reduced || !m_active;
+    move(!m_complete || m_reduced || !m_active);
+    Q_EMIT inputChanged();
+    Q_EMIT changed();
+}
+void TransportMotion::move(bool instant)
+{
     m_width.move(m_shown ? m_targetWidth : 0, GeometryDurationSeconds, instant);
     m_alpha.move(m_shown ? 1 : 0, OpacityDurationSeconds, instant);
     m_offset.move(m_shown ? 0 : HiddenOffsetPixels, GeometryDurationSeconds, instant);
     m_icon.move(m_playing ? 1 : 0, IconDurationSeconds, instant);
-    Q_EMIT inputChanged();
-    Q_EMIT changed();
 }
 void TransportMotion::advance(double dt)
 {
@@ -193,10 +179,7 @@ void TransportMotion::advance(double dt)
 }
 void TransportMotion::finish()
 {
-    m_width.move(m_shown ? m_targetWidth : 0, GeometryDurationSeconds, true);
-    m_alpha.move(m_shown ? 1 : 0, OpacityDurationSeconds, true);
-    m_offset.move(m_shown ? 0 : HiddenOffsetPixels, GeometryDurationSeconds, true);
-    m_icon.move(m_playing ? 1 : 0, IconDurationSeconds, true);
+    move(true);
     Q_EMIT changed();
 }
 }

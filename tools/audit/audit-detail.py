@@ -1,6 +1,7 @@
 """R18 reviewed call-chain deductions, frozen-source guards and local run evidence."""
 #!/usr/bin/env python3
 import argparse
+from audit_support import source_check
 import hashlib
 import json
 from pathlib import Path
@@ -82,7 +83,7 @@ checks = [
      "buffers, lookup and Qt item output. Replay checks fixed target/postprocess generations during "
      "motion and <=2MiB upload batches; context recreation legitimately creates new resources. "
      "Driver allocations/swapchain/compositor remain unmeasured, not zero."),
-    ("PERF-05", "src/render/DetailMotion.cpp", "1.45 / 1.05",
+    ("PERF-05", "src/render/DetailMotion.cpp", "PlacementSourceSeconds / PlacementSpeed",
      "Frozen MusicPlacementMotion uses the existing C2 quintic kernel at its authored duration, "
      "clamped visible progress drives lift/yaw/elevation/span/aim simultaneously, and camera remains "
      "rate-nine damped. Detail rail/lift/copies use rate nine; preview/return retain 4.2/4.5. "
@@ -94,7 +95,7 @@ checks = [
      "cannot masquerade as a click. Multi-touch/cancel/ungrab cancels gesture ownership. Pointer yaw "
      "is +/-0.8 at .004 radians/logical pixel with 2.8 exponential follow; release retains source "
      "target. Detail buttons derive the next target from pending ID and honor real-column bounds."),
-    ("PERF-07", "src/app/DetailReview.cpp", "delete window;",
+    ("PERF-07", "src/app/DetailReview.cpp", "delete state.window;",
      "Ten surface cycles and ten complete App/QML root-window rebuilds wait for actual submission and matching "
      "cover owners; readiness cannot substitute an old polish's lease set. Last-window deletion guarantees "
      "actual graph/device cleanup, while the basic loop may retain a shared context across surfaces. "
@@ -132,14 +133,9 @@ platforms = {
 for platform_name, platform_check in platforms.items():
     rows = []
     for check_id, path, symbol, evidence in checks + [platform_check]:
-        content = (root / path).read_bytes()
-        if symbol not in content.decode():
-            raise SystemExit(f"Source drift: {path}::{symbol}")
-        rows.append({"checkId": check_id, "requirement": evidence, "platform": platform_name,
-                     "sourcePath": path, "lineOrSymbol": symbol,
-                     "sourceSha256": hashlib.sha256(content).hexdigest(), "evidence": evidence,
-                     "result": "static-audit-passed", "limitations":
-                     "Target native checks remain R36 except the explicitly listed macOS runtime reports"})
+        rows.append(source_check(root, path, symbol, checkId=check_id, requirement=evidence,
+                                 platform=platform_name, evidence=evidence, result="static-audit-passed",
+                                 limitations="Target native checks remain R36 except the explicitly listed macOS runtime reports"))
     output = root / f"verification/{platform_name}-static/detail"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")

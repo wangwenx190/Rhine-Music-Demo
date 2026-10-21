@@ -23,18 +23,22 @@ Item {
     property bool showNavigation: true
     property bool contentEnabled: true
     property SurfaceTransition surface: null
+    readonly property bool chromeEnabled: contentEnabled && (!overviewController ||
+                                                             !overviewController.active)
+    readonly property bool chromeVisible: (!surface || surface.shown) && (!opening || opening.revealTime
+                                                                          > 0)
+    function chromeOpacity(delay: real): real {
+        return (surface ? surface.opacity : 1) * (opening ? opening.chrome(opening.revealTime,
+                                                                           delay) : 1);
+    }
     readonly property TitleReelMotion titleController: info.titleController
     readonly property TitleReelMotion transportController: header.transportController
     signal actionRequested(string action)
     signal themeRequested(bool night)
     ReadingVeil {
-        opacity: (root.surface ? root.surface.opacity : 1) * (root.opening ? root.opening.chrome(
-                                                                                 root.opening.revealTime,
-                                                                                 0) : 1)
-        enabled: root.contentEnabled && (!root.overviewController ||
-                                         !root.overviewController.active)
-        visible: (!root.surface || root.surface.shown) && (!root.opening || root.opening.revealTime
-                                                           > 0)
+        opacity: root.chromeOpacity(0)
+        enabled: root.chromeEnabled
+        visible: root.chromeVisible
 
         anchors.fill: parent
         metrics: root.metrics
@@ -86,13 +90,9 @@ Item {
         transform: Translate {
             y: root.opening ? 8 * (1 - root.opening.chrome(root.opening.revealTime, 0.06)) : 0
         }
-        opacity: (root.surface ? root.surface.opacity : 1) * (root.opening ? root.opening.chrome(
-                                                                                 root.opening.revealTime,
-                                                                                 0.06) : 1)
-        enabled: root.contentEnabled && (!root.overviewController ||
-                                         !root.overviewController.active)
-        visible: (!root.surface || root.surface.shown) && (!root.opening || root.opening.revealTime
-                                                           > 0)
+        opacity: root.chromeOpacity(0.06)
+        enabled: root.chromeEnabled
+        visible: root.chromeVisible
         metrics: root.metrics
         tokens: root.tokens
         album: root.album
@@ -103,13 +103,9 @@ Item {
         onOpenRequested: root.actionRequested("open")
     }
     Footer {
-        opacity: (root.surface ? root.surface.opacity : 1) * (root.opening ? root.opening.chrome(
-                                                                                 root.opening.revealTime,
-                                                                                 0.09) : 1)
-        enabled: root.contentEnabled && (!root.overviewController ||
-                                         !root.overviewController.active)
-        visible: (!root.surface || root.surface.shown) && (!root.opening || root.opening.revealTime
-                                                           > 0)
+        opacity: root.chromeOpacity(0.09)
+        enabled: root.chromeEnabled
+        visible: root.chromeVisible
 
         metrics: root.metrics
         tokens: root.tokens
@@ -117,11 +113,8 @@ Item {
     }
     NavigationFrame {
         id: navigation
-        opacity: (root.surface ? root.surface.opacity : 1) * (root.opening ? root.opening.chrome(
-                                                                                 root.opening.revealTime,
-                                                                                 0.11) : 1)
-        enabled: root.contentEnabled && (!root.overviewController ||
-                                         !root.overviewController.active)
+        opacity: root.chromeOpacity(0.11)
+        enabled: root.chromeEnabled
         metrics: root.metrics
         tokens: root.tokens
         albumCount: root.album.columnCount || root.albumCount
@@ -133,8 +126,6 @@ Item {
         columnLabel: root.album.columnLabel || ""
         columnNumber: root.album.columnNumber || 1
         columnCount: root.album.columnTotal || 1
-        visible: root.showNavigation && (!root.surface || root.surface.shown) && (!root.opening
-                                                                                  || root.opening.revealTime
-                                                                                  > 0)
+        visible: root.showNavigation && root.chromeVisible
     }
 }

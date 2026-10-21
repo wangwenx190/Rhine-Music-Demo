@@ -1,3 +1,4 @@
+#include "JsonFile.h"
 #include "FrameClock.h"
 #include "OffscreenSurface.h"
 #include "TitleAudit.h"
@@ -17,7 +18,6 @@
 #include <QQmlProperty>
 #include <QDir>
 #include <QFile>
-#include <QSaveFile>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QElapsedTimer>
@@ -242,11 +242,8 @@ auto advanceTitleAudit(int &step, const int &staticSteps, QJsonArray &cases, QQu
                 { u"geometry"_s, geometry },
                 { u"layers"_s, layers },
                 { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
-        QSaveFile progress(output + "/captures.json"_L1);
-        if (progress.open(QIODevice::WriteOnly)) {
-            progress.write(QJsonDocument(captures).toJson());
-            progress.commit();
-        }
+        if (!yalahoo::writeJsonFile(output + "/captures.json"_L1, QJsonDocument(captures)))
+            qWarning("Cannot save diagnostic JSON");
         costs.append(QJsonObject{ { u"mode"_s, mode },
                                   { u"guiStateNs"_s, guiNs },
                                   { u"syncCpuNs"_s, double(syncNs.load() - beginSync) },
@@ -530,26 +527,24 @@ auto finalizeTitleAudit(const QString &output, int &step, const int &staticSteps
                         std::atomic<int> &drain, QQuickWindow &window,
                         std::atomic<bool> &restorePending, const double &dpr, QGuiApplication &app)
 {
-    QSaveFile file(output + "/timeout.json"_L1);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(QJsonDocument(QJsonObject{ { u"passed"_s, false },
-                                              { u"step"_s, step },
-                                              { u"staticSteps"_s, staticSteps },
-                                              { u"animationSteps"_s, animationSteps },
-                                              { u"headerSteps"_s, headerSteps },
-                                              { u"warmFrames"_s, warmFrames },
-                                              { u"requested"_s, requested.load() },
-                                              { u"inFlight"_s, inFlight.load() },
-                                              { u"drain"_s, drain.load() },
-                                              { u"visible"_s, window.isVisible() },
-                                              { u"exposed"_s, window.isExposed() },
-                                              { u"restorePending"_s, restorePending.load() },
-                                              { u"dpr"_s, dpr },
-                                              { u"windowPolicy"_s,
-                                                yalahoo::verification::windowPolicy(window) } })
-                           .toJson());
-        file.commit();
-    }
+    if (!yalahoo::writeJsonFile(
+                output + "/timeout.json"_L1,
+                QJsonDocument(QJsonObject{
+                        { u"passed"_s, false },
+                        { u"step"_s, step },
+                        { u"staticSteps"_s, staticSteps },
+                        { u"animationSteps"_s, animationSteps },
+                        { u"headerSteps"_s, headerSteps },
+                        { u"warmFrames"_s, warmFrames },
+                        { u"requested"_s, requested.load() },
+                        { u"inFlight"_s, inFlight.load() },
+                        { u"drain"_s, drain.load() },
+                        { u"visible"_s, window.isVisible() },
+                        { u"exposed"_s, window.isExposed() },
+                        { u"restorePending"_s, restorePending.load() },
+                        { u"dpr"_s, dpr },
+                        { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) } })))
+        qWarning("Cannot save diagnostic JSON");
     app.exit(7);
 }
 
@@ -562,38 +557,33 @@ auto finishTitleAudit_observeFrame(bool &passed, const QString &output, QGuiAppl
 {
     const bool released = yalahoo::ReelInk::liveNodes() == 0 && canvasTitleStats().renderers == 0;
     passed &= released;
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly)) {
-        app.exit(5);
-        return;
-    }
-    file.write(QJsonDocument(
-                       QJsonObject{
-                               { u"passed"_s, passed },
-                               { u"motionError"_s, motionError },
-                               { u"dpr"_s, window.devicePixelRatio() },
-                               { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                               { u"offscreen"_s, OffscreenSurface::Enabled },
-                               { u"renderProtocol"_s,
-                                 OffscreenSurface::Enabled ? u"render-control-gui-thread"_s
-                                                           : u"native-window"_s },
-                               { u"offscreenResourcePlan"_s, surface.diagnostics() },
-                               { u"backend"_s,
-                                 QString::fromUtf8(yalahoo::graphicsBackendName(
-                                         window.rendererInterface()->graphicsApi())) },
-                               { u"sourceDirectory"_s, sourceDirectory },
-                               { u"captures"_s, captures },
-                               { u"lifecycle"_s, lifecycle },
-                               { u"animatedCosts"_s, animatedCosts },
-                               { u"headerChecks"_s, headerChecks },
-                               { u"costs"_s, costs },
-                               { u"released"_s, released },
-                               { u"canvasSyncCpuNs"_s, double(canvasTitleStats().syncNs.load()) },
-                               { u"canvasPaintCpuNs"_s, double(canvasTitleStats().paintNs.load()) },
-                               { u"canvasPaints"_s, double(canvasTitleStats().paints.load()) },
-                               { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) } })
-                       .toJson());
-    app.exit(file.commit() && passed ? 0 : 6);
+    const bool saved = yalahoo::writeJsonFile(
+            output + "/report.json"_L1,
+            QJsonDocument(QJsonObject{
+                    { u"passed"_s, passed },
+                    { u"motionError"_s, motionError },
+                    { u"dpr"_s, window.devicePixelRatio() },
+                    { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                    { u"offscreen"_s, OffscreenSurface::Enabled },
+                    { u"renderProtocol"_s,
+                      OffscreenSurface::Enabled ? u"render-control-gui-thread"_s
+                                                : u"native-window"_s },
+                    { u"offscreenResourcePlan"_s, surface.diagnostics() },
+                    { u"backend"_s,
+                      QString::fromUtf8(yalahoo::graphicsBackendName(
+                              window.rendererInterface()->graphicsApi())) },
+                    { u"sourceDirectory"_s, sourceDirectory },
+                    { u"captures"_s, captures },
+                    { u"lifecycle"_s, lifecycle },
+                    { u"animatedCosts"_s, animatedCosts },
+                    { u"headerChecks"_s, headerChecks },
+                    { u"costs"_s, costs },
+                    { u"released"_s, released },
+                    { u"canvasSyncCpuNs"_s, double(canvasTitleStats().syncNs.load()) },
+                    { u"canvasPaintCpuNs"_s, double(canvasTitleStats().paintNs.load()) },
+                    { u"canvasPaints"_s, double(canvasTitleStats().paints.load()) },
+                    { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) } }));
+    app.exit(saved && passed ? 0 : 6);
 }
 
 auto finishTitleAudit(int &step, const int &staticSteps, const int &animationSteps,

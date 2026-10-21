@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -164,7 +165,7 @@ class StartupVerificationTest(unittest.TestCase):
         with patch.object(VERIFY, "ROOT", self.root), patch.object(VERIFY, "__file__", str(script)), \
                 patch.object(VERIFY.platform, "platform", return_value="test-platform"), \
                 patch.object(VERIFY.subprocess, "run", side_effect=sample), \
-                patch.dict(VERIFY.os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
+                patch.dict(os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(VERIFY.main(options), 1)
         manifest = json.loads((self.root / f"result-{runs}/manifest.json").read_text(encoding="utf-8"))

@@ -77,6 +77,19 @@ Item {
         Accessible.role: Accessible.StaticText
         Accessible.name: root.tokens.displayName
     }
+    component NavigationButton: ArchiveButton {
+        opacity: root.chromeOpacity
+        enabled: root.chromeEnabled
+        transform: Translate {
+            y: root.chromeOffset
+        }
+        tokens: root.tokens
+        height: root.metrics.portrait ? 32 : 17
+        y: (nav.height - height) / 2
+        width: root.metrics.portrait ? 28 : implicitWidth
+        showText: !root.metrics.portrait
+        cssPixelSize: root.narrow ? 11 : root.metrics.width >= root.wideWidthPixels ? 14 : 12
+    }
     Row {
         id: nav
         objectName: "headerNavigation"
@@ -86,36 +99,14 @@ Item {
         y: root.metrics.portrait ? brand.height + 12 : root.narrow ? 3 : 7
         spacing: root.navGap
         height: root.metrics.portrait ? 32 : root.narrow ? 30 : 31
-        ArchiveButton {
-            opacity: root.chromeOpacity
-            enabled: root.chromeEnabled
-            transform: Translate {
-                y: root.chromeOffset
-            }
-            tokens: root.tokens
-            height: root.metrics.portrait ? 32 : 17
-            y: (nav.height - height) / 2
+        NavigationButton {
             text: qsTr("Library")
             iconName: "folder"
-            width: root.metrics.portrait ? 28 : implicitWidth
-            showText: !root.metrics.portrait
-            cssPixelSize: root.narrow ? 11 : root.metrics.width >= root.wideWidthPixels ? 14 : 12
             onClicked: root.actionRequested("library")
         }
-        ArchiveButton {
-            opacity: root.chromeOpacity
-            enabled: root.chromeEnabled
-            transform: Translate {
-                y: root.chromeOffset
-            }
-            tokens: root.tokens
-            height: root.metrics.portrait ? 32 : 17
-            y: (nav.height - height) / 2
+        NavigationButton {
             text: qsTr("Search")
             iconName: "search"
-            width: root.metrics.portrait ? 28 : implicitWidth
-            showText: !root.metrics.portrait
-            cssPixelSize: root.narrow ? 11 : root.metrics.width >= root.wideWidthPixels ? 14 : 12
             onClicked: root.actionRequested("search")
         }
         ThemeSwitch {
@@ -131,19 +122,12 @@ Item {
             y: (nav.height - height) / 2
             onThemeRequested: night => root.themeRequested(night)
         }
-        ArchiveButton {
-            opacity: root.chromeOpacity
-            enabled: root.chromeEnabled
-            transform: Translate {
-                y: root.chromeOffset
-            }
-            tokens: root.tokens
-            height: root.metrics.portrait ? 32 : 17
-            y: (nav.height - height) / 2
+        NavigationButton {
             text: qsTr("Playback and quality settings")
             iconName: "settings"
             width: root.metrics.portrait ? 28 : 17
             showText: false
+            cssPixelSize: 16
             onClicked: root.actionRequested("settings")
         }
         Item {

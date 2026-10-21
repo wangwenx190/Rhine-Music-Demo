@@ -20,7 +20,7 @@ CHECKS = [
      "Actual Qt Ogg and anonymous WAV test the silence gate, pause/stop/queue completion and navigation isolation. Test-only short WAV exercises four QSoundEffects and saturation. Missing resources, independent settings and persistence have separate assertions; no physical output/listening claim."),
     ("PERF-01", "src/media/InterfaceSoundController.h", "std::array<std::unique_ptr<QSoundEffect>, feedbackAudio::VoiceCount> m_pool",
      "Event hash lookup plus at most four slots is constant bounded work, drops saturation with no pending queue. Manifest scanned once at construction; no library traversal, per-frame audio polling or media allocation on actions."),
-    ("PERF-02", "src/media/BackgroundMusicController.cpp", "m_refreshPending",
+    ("PERF-02", "src/media/BackgroundMusicController.cpp", "m_outputRefresh.setSingleShot(true)",
      "Public Qt owns decode/output threads. One coalesced device refresh per controller; one 24ms volume timer only while fading, elapsed-time progress. Necessary audio continues without visual ticks; GUI audio hot paths never wait/read files/pump events."),
     ("PERF-03", "src/services/PreferencesStore.cpp", "void PreferencesStore::setAudio",
      "Only changed audio fields merge into the existing implicitly shared JSON; one worker plus one coalesced latest save. Import copies audio values before notifications, preserving current values and unknown extensions. UI observes settings separately from fade output volume."),

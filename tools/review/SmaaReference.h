@@ -2,6 +2,7 @@
 // coordinate conventions match the production shader algorithm.
 
 #pragma once
+#include "ImageSampling.h"
 // Independent double-precision transcription of locked Three.js SMAAShader.js (MIT).
 // Original algorithm authors and license: resources/licenses/three-LICENSE.
 #include <QImage>
@@ -27,21 +28,7 @@ struct Image final
     }
     Pixel sample(double x, double y) const
     {
-        x -= .5;
-        y -= .5;
-        const int ix = int(std::floor(x)), iy = int(std::floor(y));
-        const double fx = x - ix, fy = y - iy;
-        Pixel result{ };
-        for (int row = 0; row < 2; ++row) {
-            for (int column = 0; column < 2; ++column) {
-                const auto &p = pixels[std::clamp(iy + row, 0, size.height() - 1) * size.width()
-                                       + std::clamp(ix + column, 0, size.width() - 1)];
-                const double weight = (row ? fy : 1 - fy) * (column ? fx : 1 - fx);
-                for (int c = 0; c < 4; ++c)
-                    result[c] += p[c] * weight;
-            }
-        }
-        return result;
+        return yalahoo::review::sampleBilinear(pixels, size, x, y);
     }
     void quantize()
     {

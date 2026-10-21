@@ -10,10 +10,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import uuid
 import xml.etree.ElementTree as ET
-
 sys.dont_write_bytecode = True
+from package_support import install_package
 from linux_package import (clean_environment, dependencies, elf_files, inspect_package,
                            inventory, is_system, requires_bundle, run)
 
@@ -122,7 +121,7 @@ def main():
         if qt_licenses is None:
             raise RuntimeError('Selected Qt installation attribution directory is missing')
         shutil.copytree(qt_licenses, licenses / 'Qt')
-        for name in ('verify-linux.py', 'linux_package.py'):
+        for name in ('verify-linux.py', 'linux_package.py', 'package_support.py'):
             shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
         closure = inspect_package(staging)
         (build / 'deployment-dependencies.json').write_text(json.dumps(closure, indent=2) + '\n')
@@ -144,17 +143,7 @@ No desktop registration, system package installation or driver/audio change is m
             configuration='Release', review=False, files=inventory(staging)), indent=2) + '\n')
         subprocess.run([sys.executable, str(staging / 'verify-linux.py'),
                         '--package', str(staging)], check=True)
-        backup = ROOT / 'out' / ('linux-previous-' + uuid.uuid4().hex)
-        if output.exists():
-            output.rename(backup)
-        try:
-            staging.rename(output)
-        except BaseException:
-            if backup.exists() and not output.exists():
-                backup.rename(output)
-            raise
-        if backup.exists():
-            shutil.rmtree(backup)
+        install_package(staging, output)
     print(f'Linux production package: {output}')
 
 

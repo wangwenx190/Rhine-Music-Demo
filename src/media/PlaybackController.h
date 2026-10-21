@@ -2,6 +2,7 @@
 // are reconciled with the latest requested track and pause/stop intent.
 
 #pragma once
+#include <QTimer>
 #include "MusicTypes.h"
 #include "BackgroundMusicController.h"
 #include <QPointer>
@@ -143,7 +144,6 @@ Q_SIGNALS:
 
 private:
     void restoreOutput(const QAudioDevice &selected);
-    void scheduleOutputRefresh();
     friend class PlaybackTest;
     enum class Intent {
         Stopped,
@@ -165,6 +165,7 @@ private:
     QMetaObject::Connection m_silenceConnection;
     LibrarySession *m_library;
     QMediaDevices m_devices;
+    QTimer m_outputRefresh;
     QAudioOutput m_output;
     QMediaPlayer m_player;
     QList<QMetaObject::Connection> m_connections;
@@ -180,6 +181,6 @@ private:
     quint64 m_revision = 0, m_endedRevision = 0;
     int m_index = -1;
     qint64 m_position = 0, m_lastPosition = 0, m_duration = 0, m_restore = -1, m_preview = 0;
-    bool m_seekable = false, m_dragging = false, m_unavailable = true, m_refreshPending = false;
+    bool m_seekable = false, m_dragging = false, m_unavailable = true;
 };
 }

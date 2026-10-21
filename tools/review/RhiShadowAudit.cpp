@@ -1,3 +1,5 @@
+#include "Require.h"
+#include "JsonFile.h"
 #include "ReviewApplication.h"
 #include "RhiShadowAudit.h"
 #include "RhiReviewInput.h"
@@ -6,7 +8,6 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QFile>
-#include <QSaveFile>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QtEndian>
@@ -22,17 +23,13 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-void check(bool ok, const char *why)
-{
-    RhiCaptureHarness::require(ok, why);
-}
 // Independent scalar transcription of locked Three PCF: compare first, then bilinear filter.
 // The input is this run's R32F canonical geometry depth, never an old rendered reference.
 QJsonObject validateProjection(const Input &input, const Capture &capture)
 {
     static const auto geometry = assets::readGlb(assets::readFile(
             (QString::fromUtf8(FIXTURE_ROOT)) + "/resources/models/music-case-v040.glb"_L1));
-    check(geometry[2].name == "Optical_Diffuser"_L1, "Shadow source caster identity changed");
+    require(geometry[2].name == "Optical_Diffuser"_L1, "Shadow source caster identity changed");
     QMatrix4x4 view, projection;
     view.lookAt({ -6, 14, -5 }, { 0, 0, 0 }, { 0, 1, 0 });
     projection.ortho(-16, 16, -15, 15, .1f, 45);
@@ -95,7 +92,7 @@ QJsonObject validateProjection(const Input &input, const Capture &capture)
             float actual;
             std::memcpy(&actual, capture.shadowDepth.constData() + (row * input.shadowSize + x) * 4,
                         4);
-            check(winner, "Missing source caster triangle");
+            require(winner, "Missing source caster triangle");
             const auto ab = winner->b - winner->a, ac = winner->c - winner->a;
             const double dx = (ab.z() * ac.y() - ac.z() * ab.y()) / winner->area / input.shadowSize;
             const double dy = (ab.x() * ac.z() - ac.x() * ab.z()) / winner->area / input.shadowSize;
@@ -105,7 +102,7 @@ QJsonObject validateProjection(const Input &input, const Capture &capture)
             // error in physical shadow texels, using the established two-pixel projection gate.
             // Constant-depth planes have no position/depth conversion and retain 2e-6 depth.
             if (slope < 1e-10)
-                check(error < 2e-6, "Constant source caster depth is incorrect");
+                require(error < 2e-6, "Constant source caster depth is incorrect");
             else
                 worstPixels = std::max(worstPixels, error / slope);
             worst = std::max(worst, std::abs(expected - actual));
@@ -113,8 +110,8 @@ QJsonObject validateProjection(const Input &input, const Capture &capture)
         }
     std::fprintf(stderr, "Caster %d projection points=%d depth=%.9g texels=%.9g\n",
                  input.shadowSize, points, worst, worstPixels);
-    check(points > 5 && worstPixels <= 2,
-          "Shadow caster projection/backface depth differs from source geometry");
+    require(points > 5 && worstPixels <= 2,
+            "Shadow caster projection/backface depth differs from source geometry");
     return { { u"points"_s, points },
              { u"maxDepthError"_s, worst },
              { u"maxProjectionTexels"_s, worstPixels } };
@@ -135,7 +132,7 @@ double pcf(const Capture &capture, double u, double v, double depth, int size)
                 yy = size - 1 - yy;
             float stored;
             std::memcpy(&stored, capture.shadowDepth.constData() + (yy * size + xx) * 4, 4);
-            check(std::isfinite(stored), "Nonfinite source shadow depth");
+            require(std::isfinite(stored), "Nonfinite source shadow depth");
             sum += (depth <= stored ? 1 : 0) * (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy);
         }
     return sum;
@@ -172,12 +169,12 @@ double shadowReference(const Capture &capture, QVector3D world, int x, int y, QS
 QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
 {
     const int map = input.shadowSize;
-    check(capture.shadowDepth.size() == map * map * 4, "Missing unquantized shadow readback");
+    require(capture.shadowDepth.size() == map * map * 4, "Missing unquantized shadow readback");
     if (!input.shadows)
         for (qsizetype offset = 0; offset < capture.shadowDepth.size(); offset += 4) {
             float value;
             std::memcpy(&value, capture.shadowDepth.constData() + offset, 4);
-            check(value == 1, "Disabled caster cache did not clear canonical depth");
+            require(value == 1, "Disabled caster cache did not clear canonical depth");
         }
     const auto inverse = (input.scene.projection * input.scene.view).inverted();
     int points = 0, shadowed = 0, filtered = 0;
@@ -205,9 +202,9 @@ QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
     std::fprintf(stderr, "Shadow %d math points=%d occluded=%d filtered=%d max=%.9f\n", map, points,
                  shadowed, filtered, worst);
     // RGBA16F -> RGBA8 diagnostics plus float matrix/IGN and hardware PCF rounding.
-    check(points > 1000 && worst <= 2.0 / 255, "Shadow PCF differs from source scalar math");
+    require(points > 1000 && worst <= 2.0 / 255, "Shadow PCF differs from source scalar math");
     if (input.shadows)
-        check(shadowed > 20 && filtered > 5, "Shadow math did not exercise PCF edges");
+        require(shadowed > 20 && filtered > 5, "Shadow math did not exercise PCF edges");
     return { { u"points"_s, points },
              { u"occluded"_s, shadowed },
              { u"filtered"_s, filtered },
@@ -245,8 +242,8 @@ ShadowSubmission submitDepthOnly(RhiCaptureHarness &driver, Input input, QSize s
         const QMutexLocker lock(&mailbox->mutex);
         profile = mailbox->profile;
     }
-    check(!profile.isEmpty(), "Missing depth-only shadow resource snapshot");
-    check(verification::windowPolicySatisfied(*driver.window), "Depth-only window policy failed");
+    require(!profile.isEmpty(), "Missing depth-only shadow resource snapshot");
+    require(verification::windowPolicySatisfied(*driver.window), "Depth-only window policy failed");
     return { profile, driver.surface->grab() };
 }
 qint64 checkShadowAttachments(const QJsonObject &resources, int size, bool diagnostic)
@@ -262,21 +259,21 @@ qint64 checkShadowAttachments(const QJsonObject &resources, int size, bool diagn
             const bool depth = name == depthName;
             depths += int(depth);
             colors += int(!depth);
-            check(row[u"format"_s].toInt() == int(depth ? QRhiTexture::D32F : QRhiTexture::R32F)
-                          && row[u"width"_s].toInt() == size && row[u"height"_s].toInt() == size
-                          && row[u"samples"_s].toInt() == 1
-                          && row[u"estimatedBytes"_s].toInteger() == qint64(size) * size * 4,
-                  "Shadow attachment descriptor or byte estimate is incorrect");
+            require(row[u"format"_s].toInt() == int(depth ? QRhiTexture::D32F : QRhiTexture::R32F)
+                            && row[u"width"_s].toInt() == size && row[u"height"_s].toInt() == size
+                            && row[u"samples"_s].toInt() == 1
+                            && row[u"estimatedBytes"_s].toInteger() == qint64(size) * size * 4,
+                    "Shadow attachment descriptor or byte estimate is incorrect");
         }
-        check(depths == 1 && colors == int(diagnostic),
-              "Shadow diagnostic color escaped its capture lifetime");
+        require(depths == 1 && colors == int(diagnostic),
+                "Shadow diagnostic color escaped its capture lifetime");
     };
     checkEntries(resources[u"entries"_s].toArray(), u"shadow-hardware-depth"_s,
                  u"shadow-color-resolve"_s);
     checkEntries(resources[u"preallocationPlan"_s].toObject()[u"entries"_s].toArray(),
                  u"shadow-depth"_s, u"shadow-readback-color"_s);
     const auto id = resources[u"shadowDepthResourceId"_s].toInteger();
-    check(id > 0, "Missing actual shadow depth resource identity");
+    require(id > 0, "Missing actual shadow depth resource identity");
     return id;
 }
 QJsonArray checkShadowAttachmentLifetime(RhiCaptureHarness &driver, const QJsonObject &source)
@@ -301,14 +298,14 @@ QJsonArray checkShadowAttachmentLifetime(RhiCaptureHarness &driver, const QJsonO
         const auto production = submitDepthOnly(driver, input, size);
         const auto depthId = checkShadowAttachments(production.profile[u"resources"_s].toObject(),
                                                     input.shadowSize, false);
-        check(production.profile[u"shadowRendered"_s].toBool(),
-              "Depth-only shadow did not rasterize its initial caster state");
+        require(production.profile[u"shadowRendered"_s].toBool(),
+                "Depth-only shadow did not rasterize its initial caster state");
         auto reference = driver.capture(input, size);
         checkSubmittedShadow(input, reference);
-        check(checkShadowAttachments(reference.metadata[u"resources"_s].toObject(),
-                                     input.shadowSize, true)
-                      == depthId,
-              "Enabling diagnostic color replaced the sampled shadow depth");
+        require(checkShadowAttachments(reference.metadata[u"resources"_s].toObject(),
+                                       input.shadowSize, true)
+                        == depthId,
+                "Enabling diagnostic color replaced the sampled shadow depth");
         validateProjection(input, reference);
         validateMath(input, reference, size);
         // The same-run canonical map supplies compare-first PCF math, independently checked
@@ -316,36 +313,36 @@ QJsonArray checkShadowAttachmentLifetime(RhiCaptureHarness &driver, const QJsonO
         reference.color = production.color;
         const auto math = validateMath(input, reference, size);
         const auto restored = submitDepthOnly(driver, input, size);
-        check(checkShadowAttachments(restored.profile[u"resources"_s].toObject(), input.shadowSize,
-                                     false)
-                              == depthId
-                      && !restored.profile[u"shadowRendered"_s].toBool(),
-              "Disabling capture replaced or redrew cached shadow depth");
+        require(checkShadowAttachments(restored.profile[u"resources"_s].toObject(),
+                                       input.shadowSize, false)
+                                == depthId
+                        && !restored.profile[u"shadowRendered"_s].toBool(),
+                "Disabling capture replaced or redrew cached shadow depth");
         reference.color = restored.color;
         validateMath(input, reference, size);
         input.entities[0].translate(.1f, 0, 0);
         const auto moved = submitDepthOnly(driver, input, size);
-        check(moved.profile[u"shadowRendered"_s].toBool(),
-              "Depth-only caster motion did not update shadow depth");
+        require(moved.profile[u"shadowRendered"_s].toBool(),
+                "Depth-only caster motion did not update shadow depth");
         reference = driver.capture(input, size);
         reference.color = moved.color;
         validateMath(input, reference, size);
         input.shadows = false;
         const auto disabled = submitDepthOnly(driver, input, size);
-        check(disabled.profile[u"shadowRendered"_s].toBool(),
-              "Disabling depth-only shadows did not clear the map");
+        require(disabled.profile[u"shadowRendered"_s].toBool(),
+                "Disabling depth-only shadows did not clear the map");
         input.entities[0].translate(.1f, 0, 0);
         const auto cached = submitDepthOnly(driver, input, size);
-        check(!cached.profile[u"shadowRendered"_s].toBool(),
-              "Disabled depth-only caster motion redrew the map");
+        require(!cached.profile[u"shadowRendered"_s].toBool(),
+                "Disabled depth-only caster motion redrew the map");
         input.shadows = true;
         input.shadowSize = 512;
         const auto resized = submitDepthOnly(driver, input, size);
-        check(resized.profile[u"shadowRendered"_s].toBool()
-                      && checkShadowAttachments(resized.profile[u"resources"_s].toObject(),
-                                                input.shadowSize, false)
-                              != depthId,
-              "Depth-only shadow resize did not replace and render its depth target");
+        require(resized.profile[u"shadowRendered"_s].toBool()
+                        && checkShadowAttachments(resized.profile[u"resources"_s].toObject(),
+                                                  input.shadowSize, false)
+                                != depthId,
+                "Depth-only shadow resize did not replace and render its depth target");
         reference = driver.capture(input, size);
         validateProjection(input, reference);
         reference.color = resized.color;
@@ -375,33 +372,35 @@ Capture checkShadowTransition(RhiCaptureHarness &driver, const Input &input, QSi
         std::fprintf(stderr, "Shadow transition %s expected redraw=%d actual=%s\n",
                      transition.label, transition.redraw,
                      QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
-    check(state[u"rendered"_s].toBool() == transition.redraw && state[u"bindingMatches"_s].toBool(),
-          "Shadow dirty state or sampled attachment is incorrect");
-    check((state[u"resourceRevision"_s] != oldState[u"resourceRevision"_s])
-                  == transition.replaceShadow,
-          "Shadow resource replacement escaped its compatibility key");
-    check((current.metadata[u"resourceGeneration"_s] != previous.metadata[u"resourceGeneration"_s])
-                  == transition.replaceMain,
-          "Screen target replacement escaped its compatibility key");
+    require(state[u"rendered"_s].toBool() == transition.redraw
+                    && state[u"bindingMatches"_s].toBool(),
+            "Shadow dirty state or sampled attachment is incorrect");
+    require((state[u"resourceRevision"_s] != oldState[u"resourceRevision"_s])
+                    == transition.replaceShadow,
+            "Shadow resource replacement escaped its compatibility key");
+    require((current.metadata[u"resourceGeneration"_s]
+             != previous.metadata[u"resourceGeneration"_s])
+                    == transition.replaceMain,
+            "Screen target replacement escaped its compatibility key");
     if (!transition.replaceMain)
-        check(current.metadata[u"postprocessRevision"_s]
-                      == previous.metadata[u"postprocessRevision"_s],
-              "A shadow-only change rebuilt the postprocess graph");
+        require(current.metadata[u"postprocessRevision"_s]
+                        == previous.metadata[u"postprocessRevision"_s],
+                "A shadow-only change rebuilt the postprocess graph");
     if (!transition.redraw) {
-        check(state[u"separateCasterUniforms"_s].toInt() == 0,
-              "A clean shadow uploaded separate caster uniforms");
-        check(!current.shadowDepth.isEmpty() && current.shadowDepth == previous.shadowDepth,
-              "A clean shadow lost its retained depth contents");
+        require(state[u"separateCasterUniforms"_s].toInt() == 0,
+                "A clean shadow uploaded separate caster uniforms");
+        require(!current.shadowDepth.isEmpty() && current.shadowDepth == previous.shadowDepth,
+                "A clean shadow lost its retained depth contents");
     }
     if (!input.shadows && transition.redraw)
         for (qsizetype offset = 0; offset < current.shadowDepth.size(); offset += sizeof(float)) {
             float depth;
             std::memcpy(&depth, current.shadowDepth.constData() + offset, sizeof(depth));
-            check(depth == 1, "A disabled shadow target retained caster depth");
+            require(depth == 1, "A disabled shadow target retained caster depth");
         }
     if (QByteArray(transition.label) == "caster")
-        check(current.shadowDepth != previous.shadowDepth,
-              "A moving caster did not change actual shadow depth");
+        require(current.shadowDepth != previous.shadowDepth,
+                "A moving caster did not change actual shadow depth");
     return current;
 }
 QJsonArray checkShadowInvalidation(RhiCaptureHarness &driver, const QJsonObject &source,
@@ -430,8 +429,8 @@ QJsonArray checkShadowInvalidation(RhiCaptureHarness &driver, const QJsonObject 
         QSize size(193, 129);
         auto previous = driver.capture(input, size);
         // Establish the current caster state before comparing later transitions.
-        check(previous.metadata[u"shadowState"_s].toObject()[u"bindingMatches"_s].toBool(),
-              "Initial shadow attachment is not bound to the scene");
+        require(previous.metadata[u"shadowState"_s].toObject()[u"bindingMatches"_s].toBool(),
+                "Initial shadow attachment is not bound to the scene");
         const auto capture = [&](ShadowTransition transition) {
             previous = checkShadowTransition(driver, input, size, previous, transition);
             states.append(QJsonObject{
@@ -474,8 +473,8 @@ QJsonArray checkShadowInvalidation(RhiCaptureHarness &driver, const QJsonObject 
         input.shadows = true;
         capture({ "enable", true, false, false });
         capture({ "enabled-stable", false, false, false });
-        check(previous.color.save(output + u"/casters-%1.png"_s.arg(count)),
-              "Cannot save own shadow invalidation output");
+        require(previous.color.save(output + u"/casters-%1.png"_s.arg(count)),
+                "Cannot save own shadow invalidation output");
     }
     return states;
 }
@@ -485,9 +484,9 @@ auto runShadowAudit(int &argc, char **&argv)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
-        check(QDir().mkpath(output), "Cannot create shadow output");
+        require(QDir().mkpath(output), "Cannot create shadow output");
         QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
-        check(file.open(QIODevice::ReadOnly), "Missing anonymous shadow fixture");
+        require(file.open(QIODevice::ReadOnly), "Missing anonymous shadow fixture");
         auto c = QJsonDocument::fromJson(file.readAll())
                          .object()[u"cases"_s]
                          .toArray()[0]
@@ -497,23 +496,23 @@ auto runShadowAudit(int &argc, char **&argv)
         c[u"clipFar"_s] = 100;
         c[u"layer"_s] = u"paper"_s;
         const QByteArray option = argc == 3 ? QByteArray(argv[2]) : QByteArray();
-        check(option.isEmpty() || option == "--invalidation-only" || option == "--attachments-only",
-              "Unsupported shadow audit option");
+        require(option.isEmpty() || option == "--invalidation-only"
+                        || option == "--attachments-only",
+                "Unsupported shadow audit option");
         RhiCaptureHarness driver;
         const auto invalidation = option == "--attachments-only"
                 ? checkShadowAttachmentLifetime(driver, c)
                 : checkShadowInvalidation(driver, c, output);
         if (argc == 3) {
-            QSaveFile report(output + "/runtime.json"_L1);
-            check(report.open(QIODevice::WriteOnly), "Cannot open shadow invalidation report");
-            report.write(
-                    QJsonDocument(QJsonObject{ { u"passed"_s, true },
-                                               { u"states"_s, invalidation },
-                                               { u"offscreen"_s, driver.surface->diagnostics() },
-                                               { u"windowPolicy"_s,
-                                                 verification::windowPolicy(*driver.window) } })
-                            .toJson());
-            check(report.commit(), "Cannot write shadow invalidation report");
+            require(yalahoo::writeJsonFile(
+                            output + "/runtime.json"_L1,
+                            QJsonDocument(
+                                    QJsonObject{ { u"passed"_s, true },
+                                                 { u"states"_s, invalidation },
+                                                 { u"offscreen"_s, driver.surface->diagnostics() },
+                                                 { u"windowPolicy"_s,
+                                                   verification::windowPolicy(*driver.window) } })),
+                    "Cannot write shadow invalidation report");
             return 0;
         }
         const auto floors = runFloorAudit(driver, c, output);
@@ -548,12 +547,12 @@ auto runShadowAudit(int &argc, char **&argv)
                     auto math = validateMath(input, capture, size);
                     math[u"projection"_s] = validateProjection(input, capture);
                     auto same = driver.capture(input, size);
-                    check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                  && same.metadata[u"shadowState"_s]
-                                                  .toObject()[u"separateCasterUniforms"_s]
-                                                  .toInt()
-                                          == 0,
-                          "Unchanged caster pool redrew or reuploaded shadow uniforms");
+                    require(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                    && same.metadata[u"shadowState"_s]
+                                                    .toObject()[u"separateCasterUniforms"_s]
+                                                    .toInt()
+                                            == 0,
+                            "Unchanged caster pool redrew or reuploaded shadow uniforms");
                     math[u"initialUniformUploadBytes"_s] =
                             capture.metadata[u"uniformUploadBytes"_s];
                     math[u"cachedUniformUploadBytes"_s] = same.metadata[u"uniformUploadBytes"_s];
@@ -561,14 +560,14 @@ auto runShadowAudit(int &argc, char **&argv)
                     input.scene.view.rotate(.5f, 0, 1, 0);
                     input.keyColor *= .9f;
                     same = driver.capture(input, size);
-                    check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                  && same.metadata[u"resourceGeneration"_s] == generation,
-                          "Receiver camera/light color invalidated shadow resources");
+                    require(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                    && same.metadata[u"resourceGeneration"_s] == generation,
+                            "Receiver camera/light color invalidated shadow resources");
                     input.entities[0].translate(.1f, 0, 0);
                     same = driver.capture(input, size);
-                    check(same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                  && same.metadata[u"resourceGeneration"_s] == generation,
-                          "Animated caster failed to update cached shadow");
+                    require(same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                    && same.metadata[u"resourceGeneration"_s] == generation,
+                            "Animated caster failed to update cached shadow");
                     input.shadows = false;
                     const auto off = driver.capture(input, size);
                     checkSubmittedShadow(input, off);
@@ -582,9 +581,9 @@ auto runShadowAudit(int &argc, char **&argv)
                     math[u"metadata"_s] = capture.metadata;
                     results.append(math);
                     if (count == 9 && map == 2048)
-                        check(capture.color.save(output
-                                                 + (night ? "/night.png"_L1 : "/day.png"_L1)),
-                              "Cannot save own shadow output");
+                        require(capture.color.save(output
+                                                   + (night ? "/night.png"_L1 : "/day.png"_L1)),
+                                "Cannot save own shadow output");
                     last = input;
                 }
             }
@@ -593,24 +592,23 @@ auto runShadowAudit(int &argc, char **&argv)
         for (int cycle = 0; cycle < 10; ++cycle) {
             driver.rebuild();
             const auto capture = driver.capture(last, size);
-            check(driver.rebuilt(), "Shadow lifecycle did not invalidate real scene graph");
+            require(driver.rebuilt(), "Shadow lifecycle did not invalidate real scene graph");
             checkSubmittedShadow(last, capture);
             lifecycle.append(validateMath(last, capture, size));
         }
-        QSaveFile report(output + "/runtime.json"_L1);
-        check(report.open(QIODevice::WriteOnly), "Cannot open shadow report");
-        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19D3A"_s },
-                                                { u"passed"_s, true },
-                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                                { u"cases"_s, results },
-                                                { u"floors"_s, floors },
-                                                { u"invalidation"_s, invalidation },
-                                                { u"rebuilds"_s, lifecycle },
-                                                { u"offscreen"_s, driver.surface->diagnostics() },
-                                                { u"windowPolicy"_s,
-                                                  verification::windowPolicy(*driver.window) } })
-                             .toJson());
-        check(report.commit(), "Cannot write shadow report");
+        require(yalahoo::writeJsonFile(output + "/runtime.json"_L1,
+                                       QJsonDocument(QJsonObject{
+                                               { u"round"_s, u"R19D3A"_s },
+                                               { u"passed"_s, true },
+                                               { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                               { u"cases"_s, results },
+                                               { u"floors"_s, floors },
+                                               { u"invalidation"_s, invalidation },
+                                               { u"rebuilds"_s, lifecycle },
+                                               { u"offscreen"_s, driver.surface->diagnostics() },
+                                               { u"windowPolicy"_s,
+                                                 verification::windowPolicy(*driver.window) } })),
+                "Cannot write shadow report");
         std::printf("Shadow source math/cache passed %lld states and ten rebuilds\n",
                     results.size());
         return 0;

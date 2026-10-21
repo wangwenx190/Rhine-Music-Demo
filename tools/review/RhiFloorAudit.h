@@ -10,9 +10,9 @@ struct FloorLookup final
     FloorLookup(const char *path, int w, int h) : width(w), height(h)
     {
         QFile file(QString::fromUtf8(path));
-        check(file.open(QIODevice::ReadOnly), "Missing floor source lookup");
+        yalahoo::require(file.open(QIODevice::ReadOnly), "Missing floor source lookup");
         pixels = file.readAll();
-        check(pixels.size() == w * h * 16, "Invalid floor source lookup");
+        yalahoo::require(pixels.size() == w * h * 16, "Invalid floor source lookup");
     }
     QVector3D sample(double u, double v) const
     {
@@ -71,7 +71,7 @@ QVector3D floorEnvironment(QVector3D direction, double roughness)
         break;
     }
     // Floor only uses roughness .95 (reflection) and 1 (diffuse), the first source segment.
-    check(roughness >= .8 && roughness <= 1, "Unexpected floor PMREM roughness");
+    yalahoo::require(roughness >= .8 && roughness <= 1, "Unexpected floor PMREM roughness");
     const double mip = (1 - roughness) * 5 - 2;
     const auto level = [&](int m) {
         const double filter = std::max(4 - m, 0), side = std::exp2(std::max(m, 4));
@@ -173,15 +173,16 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
 {
     checkSubmittedShadow(input, capture);
     const auto state = capture.metadata[u"productFloor"_s].toObject();
-    check(state[u"enabled"_s].toBool() && state[u"kind"_s].toInt() == 6
-                  && std::abs(state[u"roughness"_s].toDouble() - .95) < 1e-7
-                  && state[u"opaqueIndices"_s].toInt() == 6 && !state[u"castsShadow"_s].toBool(),
-          "Missing source floor draw/material or unexpected caster");
-    check(capture.metadata[u"captureDrawKinds"_s].toArray().contains(6),
-          "Floor omitted from capture");
+    yalahoo::require(state[u"enabled"_s].toBool() && state[u"kind"_s].toInt() == 6
+                             && std::abs(state[u"roughness"_s].toDouble() - .95) < 1e-7
+                             && state[u"opaqueIndices"_s].toInt() == 6
+                             && !state[u"castsShadow"_s].toBool(),
+                     "Missing source floor draw/material or unexpected caster");
+    yalahoo::require(capture.metadata[u"captureDrawKinds"_s].toArray().contains(6),
+                     "Floor omitted from capture");
     for (int c = 0; c < 3; ++c)
-        check(state[u"color"_s].toArray()[c].toDouble() == input.floorColor[c],
-              "Stale floor theme");
+        yalahoo::require(state[u"color"_s].toArray()[c].toDouble() == input.floorColor[c],
+                         "Stale floor theme");
     int points = 0, occluded = 0;
     double worst = 0, worstDepth = 0, worstProjection = 0;
     for (int y = 5; y < size.height(); y += 13)
@@ -204,15 +205,16 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
             worstDepth = std::max(worstDepth, std::abs(depth - actualDepth));
             worstProjection = std::max(worstProjection, std::abs(depth - actualDepth) / slope);
             // The source projection contract is in physical pixels, including tilted planes.
-            check(slope > 1e-8 && std::abs(depth - actualDepth) / slope <= 2,
-                  "Floor source plane projection differs by more than two physical pixels");
+            yalahoo::require(
+                    slope > 1e-8 && std::abs(depth - actualDepth) / slope <= 2,
+                    "Floor source plane projection differs by more than two physical pixels");
             const auto normal = capture.normal.pixelColor(x, y);
             const auto n = input.scene.view.mapVector({ 0, 1, 0 }).normalized() * .5f
                     + QVector3D(.5f, .5f, .5f);
-            check(std::abs(normal.redF() - n.x()) <= 1.0 / 255
-                          && std::abs(normal.greenF() - n.y()) <= 1.0 / 255
-                          && std::abs(normal.blueF() - n.z()) <= 1.0 / 255,
-                  "Floor source normal changed");
+            yalahoo::require(std::abs(normal.redF() - n.x()) <= 1.0 / 255
+                                     && std::abs(normal.greenF() - n.y()) <= 1.0 / 255
+                                     && std::abs(normal.blueF() - n.z()) <= 1.0 / 255,
+                             "Floor source normal changed");
             if (math) {
                 const double shadow = shadowReference(capture, world, x, y, size);
                 occluded += shadow < .99;
@@ -231,13 +233,14 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
     std::fprintf(stderr, "Floor %dx%d points=%d occluded=%d math=%d error=%.9g\n", size.width(),
                  size.height(), points, occluded, math, worst);
     if (math && input.shadows)
-        check(occluded > 0, "Floor math did not exercise actual received shadows");
-    check(points > 100 && worst <= 3.0 / 255, "Floor standard PBR/fog differs from source math");
+        yalahoo::require(occluded > 0, "Floor math did not exercise actual received shadows");
+    yalahoo::require(points > 100 && worst <= 3.0 / 255,
+                     "Floor standard PBR/fog differs from source math");
     if (input.postprocess) {
-        check(state[u"aoIndices"_s].toInt() == 6 && state[u"dofIndices"_s].toInt() == 6,
-              "Floor omitted from post geometry submission");
+        yalahoo::require(state[u"aoIndices"_s].toInt() == 6 && state[u"dofIndices"_s].toInt() == 6,
+                         "Floor omitted from post geometry submission");
         for (const auto *image : { &capture.aoDepth, &capture.dofDepth }) {
-            check(!image->isNull(), "Missing actual floor AO/DOF attachment");
+            yalahoo::require(!image->isNull(), "Missing actual floor AO/DOF attachment");
             const int x = image->width() / 2, y = image->height() * 3 / 4;
             const auto world = floorPoint(input, x, y, image->size());
             const double expected = -(input.scene.view * QVector4D(world, 1)).z();
@@ -248,8 +251,8 @@ QJsonObject validateFloor(const Input &input, const Capture &capture, QSize size
             const double next =
                     -(input.scene.view * QVector4D(floorPoint(input, x, y + 1, image->size()), 1))
                              .z();
-            check(std::abs(actual - expected) / std::abs(next - expected) <= 2,
-                  "Floor omitted from actual AO/DOF geometry");
+            yalahoo::require(std::abs(actual - expected) / std::abs(next - expected) <= 2,
+                             "Floor omitted from actual AO/DOF geometry");
         }
     }
     return { { u"points"_s, points },
@@ -310,15 +313,16 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
                 results.append(row);
                 const auto generation = capture.metadata[u"resourceGeneration"_s];
                 const auto same = driver.capture(input, size);
-                check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool(),
-                      "Floor invalidated caster cache");
+                yalahoo::require(
+                        !same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool(),
+                        "Floor invalidated caster cache");
                 input.floorColor *= .9f;
                 const auto changed = driver.capture(input, size);
-                check(changed.metadata[u"resourceGeneration"_s] == generation
-                              && !changed.metadata[u"shadowState"_s]
-                                          .toObject()[u"rendered"_s]
-                                          .toBool(),
-                      "Floor color rebuilt targets or shadow map");
+                yalahoo::require(changed.metadata[u"resourceGeneration"_s] == generation
+                                         && !changed.metadata[u"shadowState"_s]
+                                                     .toObject()[u"rendered"_s]
+                                                     .toBool(),
+                                 "Floor color rebuilt targets or shadow map");
                 validateFloor(input, changed, size, true);
                 input.shadows = false;
                 validateFloor(input, driver.capture(input, size), size, true);
@@ -332,9 +336,10 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
             {
                 auto capture = driver.capture(input, size);
                 validateFloor(input, capture, size, false);
-                check(capture.postprocessed.save(
-                              output + u"/floor-%1-%2.png"_s.arg(size.width()).arg(theme)),
-                      "Cannot save own floor output");
+                yalahoo::require(
+                        capture.postprocessed.save(
+                                output + u"/floor-%1-%2.png"_s.arg(size.width()).arg(theme)),
+                        "Cannot save own floor output");
             }
             last = input;
         }
@@ -342,7 +347,7 @@ QJsonArray runFloorAudit(RhiCaptureHarness &driver, QJsonObject c, const QString
     for (int cycle = 0; cycle < 10; ++cycle) {
         driver.rebuild();
         const auto capture = driver.capture(last, { 960, 720 });
-        check(driver.rebuilt(), "Floor rebuild did not invalidate scene graph");
+        yalahoo::require(driver.rebuilt(), "Floor rebuild did not invalidate scene graph");
         validateFloor(last, capture, { 960, 720 }, false);
     }
     return results;

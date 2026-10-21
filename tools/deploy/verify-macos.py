@@ -5,13 +5,14 @@ import json
 import os
 from pathlib import Path
 import platform
-import subprocess
 import tempfile
 import sys
 
 # The verifier must not mutate the package when importing its helper.
 sys.dont_write_bytecode = True
 from macos_bundle import inspect_bundle, verify_inventory
+
+from package_support import run_probe
 
 
 def main():
@@ -38,19 +39,9 @@ def main():
                        QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM='1',
                        YALAHOO_VERIFY_FOREGROUND='0', QCPAINTER_DEBUG_COLLECT='0')
     program = bundle / 'Contents/MacOS/yalahoo'
-    timed_out = False
-    with (output / 'stdout.txt').open('w') as stdout, (output / 'stderr.txt').open('w') as stderr:
-        process = subprocess.Popen([str(program), '--verify-deployment', str(output / 'report.json')],
-                                   cwd=output, env=environment, stdout=stdout, stderr=stderr)
-        try:
-            code = process.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            process.kill()
-            code = process.wait()
-    report = output / 'report.json'
-    passed = not timed_out and code == 0 and report.is_file() and json.loads(report.read_text())['passed']
-    evidence = dict(passed=passed, exitCode=code, timedOut=timed_out, qtVersion=metadata['qtVersion'],
+    probe = run_probe([program], output, environment)
+    passed = not probe.timed_out and probe.exit_code == 0 and bool(probe.report.get('passed'))
+    evidence = dict(passed=passed, exitCode=probe.exit_code, timedOut=probe.timed_out, qtVersion=metadata['qtVersion'],
                     os=platform.platform(), cleanPath=environment['PATH'],
                     workingDirectoryOutsidePackage=True, closure=closure)
     (output / 'environment.json').write_text(json.dumps(evidence, indent=2) + '\n')

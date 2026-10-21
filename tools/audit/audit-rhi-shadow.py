@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
-    ("COMMON-01", "tools/review/CMakeLists.txt", "target_link_libraries(rhi-shadow-audit PRIVATE YalahooRhi Qt6::GuiPrivate)",
+    ("COMMON-01", "tools/review/CMakeLists.txt", "yalahoo_rhi_review(rhi-shadow-audit",
      "Review-only executable uses existing native RHI/Qt targets, moc and same-Kit qrc/qsb. "
      "yalahoo_platform supplies each native helper. Production shaders remain in YalahooRhi "
      "and selectors are rejected outside Review; no third-party or platform-forced product path."),

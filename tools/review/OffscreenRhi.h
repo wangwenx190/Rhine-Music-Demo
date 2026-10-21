@@ -2,6 +2,7 @@
 // Declaration order destroys QRhi before its fallback OpenGL surface or Vulkan instance.
 
 #pragma once
+#include "Require.h"
 #include "RhiApi.h"
 #include <QOffscreenSurface>
 #include <QQuickWindow>
@@ -52,7 +53,7 @@ public:
         case QSGRendererInterface::Vulkan: {
             m_vulkan.setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
             m_vulkan.setApiVersion(QVersionNumber(1, 1));
-            rhi::require(m_vulkan.create(), "Cannot create Vulkan instance");
+            yalahoo::require(m_vulkan.create(), "Cannot create Vulkan instance");
             QRhiVulkanInitParams params;
             params.inst = &m_vulkan;
             m_api.reset(QRhi::create(QRhi::Vulkan, &params));
@@ -62,7 +63,7 @@ public:
         default:
             break;
         }
-        rhi::require(bool(m_api), "Cannot create selected offscreen RHI backend");
+        yalahoo::require(bool(m_api), "Cannot create selected offscreen RHI backend");
     }
     QRhi *get() const
     {

@@ -27,7 +27,7 @@
 #include <QMutexLocker>
 #include <QQuickItem>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSGRendererInterface>
 #include <QTimer>
 #include <algorithm>
@@ -433,37 +433,29 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
         return;
     }
     pass = pass && warnings.isEmpty() && verification::windowPolicySatisfied(*state.window);
-    QSaveFile file(state.report);
-    bool saved = file.open(QIODevice::WriteOnly);
-    if (saved) {
-        file.write(
-                QJsonDocument(
-                        QJsonObject{
-                                { u"renderBackendContract"_s,
-                                  QJsonObject::fromVariantMap(
-                                          state.scene.renderBackendContract()) },
-                                { u"passed"_s, pass },
-                                { u"validation"_s, u"source-state-and-own-output"_s },
-                                { u"warnings"_s, QJsonArray::fromStringList(warnings) },
-                                { u"offscreen"_s, state.surface->diagnostics() },
-                                { u"windowPolicy"_s, verification::windowPolicy(*state.window) },
-                                { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                { u"graphicsApi"_s,
-                                  int(state.window->rendererInterface()->graphicsApi()) },
-                                { u"dpr"_s, state.window->devicePixelRatio() },
-                                { u"width"_s, state.window->width() },
-                                { u"height"_s, state.window->height() },
-                                { u"baseline"_s, state.oracle[u"baseline"_s] },
-                                { u"fixtureSha256"_s,
-                                  QString::fromUtf8(QCryptographicHash::hash(
-                                                            state.bytes, QCryptographicHash::Sha256)
-                                                            .toHex()) },
-                                { u"maxProjectionPixels"_s, maxProjection },
-                                { u"cases"_s, results },
-                                { u"restores"_s, restores } })
-                        .toJson());
-        saved = file.commit();
-    }
+    const bool saved = yalahoo::writeJsonFile(
+            state.report,
+            QJsonDocument(QJsonObject{
+                    { u"renderBackendContract"_s,
+                      QJsonObject::fromVariantMap(state.scene.renderBackendContract()) },
+                    { u"passed"_s, pass },
+                    { u"validation"_s, u"source-state-and-own-output"_s },
+                    { u"warnings"_s, QJsonArray::fromStringList(warnings) },
+                    { u"offscreen"_s, state.surface->diagnostics() },
+                    { u"windowPolicy"_s, verification::windowPolicy(*state.window) },
+                    { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                    { u"graphicsApi"_s, int(state.window->rendererInterface()->graphicsApi()) },
+                    { u"dpr"_s, state.window->devicePixelRatio() },
+                    { u"width"_s, state.window->width() },
+                    { u"height"_s, state.window->height() },
+                    { u"baseline"_s, state.oracle[u"baseline"_s] },
+                    { u"fixtureSha256"_s,
+                      QString::fromUtf8(
+                              QCryptographicHash::hash(state.bytes, QCryptographicHash::Sha256)
+                                      .toHex()) },
+                    { u"maxProjectionPixels"_s, maxProjection },
+                    { u"cases"_s, results },
+                    { u"restores"_s, restores } }));
     state.app.exit(pass && saved ? 0 : ReviewFailed);
 }
 

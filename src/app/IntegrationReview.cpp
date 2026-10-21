@@ -1,3 +1,4 @@
+#include "MonotonicTime.h"
 #include "ReviewSupport.h"
 #include "Units.h"
 #include "SceneAdapter.h"
@@ -17,7 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QMouseEvent>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QScreen>
 #include <QTimer>
 #include <memory>
@@ -209,7 +210,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
     if (index < sizes.size()) {
         state.stage = u"resize"_s;
         const QSize size = sizes[index];
-        const auto after = yalahoo::review::nowNs();
+        const auto after = yalahoo::monotonicNanoseconds();
         state.awaiting = [size, after](const QJsonObject &sample) {
             return sample[u"submittedNs"_s].toInteger() >= after
                     && sample[u"logicalWidth"_s].toDouble() == size.width()
@@ -224,7 +225,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
     } else if (index < sizes.size() + effectStrengths.size()) {
         state.stage = u"quality"_s;
         const int strength = effectStrengths[index - sizes.size()];
-        const auto after = yalahoo::review::nowNs();
+        const auto after = yalahoo::monotonicNanoseconds();
         state.awaiting = [&, strength, after](const QJsonObject &sample) {
             const auto target = state.scene.quality()->targetSize();
             const bool match = sample[u"submittedNs"_s].toInteger() >= after
@@ -248,7 +249,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
     } else if (index
                < sizes.size() + effectStrengths.size() + yalahoo::review::LifecycleRebuildCount) {
         state.stage = u"rebuild"_s;
-        const auto after = yalahoo::review::nowNs();
+        const auto after = yalahoo::monotonicNanoseconds();
         state.awaiting = [&, after](const QJsonObject &sample) {
             const bool match = sample[u"submittedNs"_s].toInteger() >= after
                     && sample[u"resourceGeneration"_s].toInteger() == 1
@@ -379,11 +380,8 @@ auto finishIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &p
         { u"scope"_s,
           u"R10D one-case production bootstrap, both themes, real QML input to Qt command submission. frameSwapped is not scanout; no measured input-to-photon or compositor latency. This probe does not cover the full array/search/presentation/scanning product paths; full product budgets and baseline/noise remain R28. GPU memory values are descriptor estimates, not measured VRAM."_s }
     };
-    QSaveFile file(state.output + "/runtime.json"_L1);
-    const bool opened = file.open(QIODevice::WriteOnly);
-    if (opened)
-        file.write(QJsonDocument(report).toJson());
-    const bool saved = opened && file.commit();
+    const bool saved =
+            yalahoo::writeJsonFile(state.output + "/runtime.json"_L1, QJsonDocument(report));
     state.app.exit(state.passed && saved ? 0 : IntegrationReviewFailed);
 }
 
@@ -395,7 +393,7 @@ auto bindIntegrationSwaps(QMetaObject::Connection &swapped, QPointer<QQuickWindo
             [events] {
                 std::scoped_lock lock(events->mutex);
                 if (events->swapped.size() < MaximumDiagnosticSamples)
-                    events->swapped.append(yalahoo::review::nowNs());
+                    events->swapped.append(yalahoo::monotonicNanoseconds());
                 else
                     events->overflow = true;
             },

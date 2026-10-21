@@ -13,7 +13,7 @@
 #include <QTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <functional>
 
 using namespace Qt::StringLiterals;
@@ -26,7 +26,6 @@ constexpr auto ResizeSettleMilliseconds = 300;
 
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
-    CaptureFailed = 5,
     ReportFailed = 6,
     ReviewTimedOut = 7
 };
@@ -65,23 +64,18 @@ auto advanceBrowseCapture(BrowseReviewState &state)
         state.passed &= info && !state.library.browseInfo().isEmpty()
                 && state.library.playbackTrackId() == state.playback
                 && verification::windowPolicySatisfied(state.window);
-        QSaveFile file(state.output + "/report.json"_L1);
-        if (!file.open(QIODevice::WriteOnly)) {
-            state.app.exit(CaptureFailed);
-            return;
-        }
-        file.write(QJsonDocument(
-                           QJsonObject{
-                                   { u"passed"_s, state.passed },
-                                   { u"captures"_s, state.captures },
-                                   { u"windowPolicy"_s, verification::windowPolicy(state.window) },
-                                   { u"playbackUnchanged"_s,
-                                     state.library.playbackTrackId() == state.playback },
-                                   { u"browseInfo"_s,
-                                     QJsonObject::fromVariantMap(state.library.browseInfo()) },
-                                   { u"qtVersion"_s, QString::fromUtf8(qVersion()) } })
-                           .toJson());
-        state.app.exit(file.commit() && state.passed ? 0 : ReportFailed);
+        const bool saved = yalahoo::writeJsonFile(
+                state.output + "/report.json"_L1,
+                QJsonDocument(QJsonObject{
+                        { u"passed"_s, state.passed },
+                        { u"captures"_s, state.captures },
+                        { u"windowPolicy"_s, verification::windowPolicy(state.window) },
+                        { u"playbackUnchanged"_s,
+                          state.library.playbackTrackId() == state.playback },
+                        { u"browseInfo"_s,
+                          QJsonObject::fromVariantMap(state.library.browseInfo()) },
+                        { u"qtVersion"_s, QString::fromUtf8(qVersion()) } }));
+        state.app.exit(saved && state.passed ? 0 : ReportFailed);
         return;
     }
     state.window.resize(state.sizes[state.index / 2]);

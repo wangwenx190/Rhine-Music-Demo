@@ -72,6 +72,39 @@ FocusScope {
         root.backRequested();
         event.accepted = true;
     }
+    component DetailTab: ArchiveButton {
+        id: tab
+        required property int tabIndex
+        readonly property color ink: root.activeTab === tabIndex ? root.tokens.ink :
+                                                                   root.tokens.muted
+
+        tokens: root.tokens
+        height: tabBar.height - 7
+        onXChanged: tabBar.syncIndicator(false)
+        onWidthChanged: tabBar.syncIndicator(false)
+        contentItem: Row {
+            spacing: 6
+            topPadding: 15
+            ArchiveText {
+                tokens: root.tokens
+                text: (tab.tabIndex + 1).toString().padStart(2, "0")
+                cssPixelSize: 8
+                color: tab.ink
+            }
+            ArchiveText {
+                id: label
+                tokens: root.tokens
+                text: tab.text
+                cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width <= 1100 ? 10 : 11
+                color: tab.ink
+            }
+        }
+        implicitWidth: contentItem.implicitWidth
+        implicitHeight: label.implicitHeight
+        onClicked: root.setTab(tabIndex)
+        Accessible.role: Accessible.PageTab
+        Accessible.selected: root.activeTab === tabIndex
+    }
     Connections {
         target: root.presentation
         function onPrepared() {
@@ -488,72 +521,21 @@ FocusScope {
                 id: tabs
                 y: 6
                 spacing: root.width <= 1100 ? 14 : 22
-                ArchiveButton {
+                DetailTab {
                     id: trackTab
-                    onXChanged: tabBar.syncIndicator(false)
-                    onWidthChanged: tabBar.syncIndicator(false)
+                    tabIndex: 0
                     objectName: "detailTracksTab"
-                    tokens: root.tokens
                     text: qsTr("Track list")
-                    height: tabBar.height - 7
-                    contentItem: Row {
-                        spacing: 6
-                        topPadding: 15
-                        ArchiveText {
-                            tokens: root.tokens
-                            text: "01"
-                            cssPixelSize: 8
-                            color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
-                        }
-                        ArchiveText {
-                            id: tabText
-                            tokens: root.tokens
-                            text: qsTr("Track list")
-                            cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width
-                                                                               <= 1100 ? 10 : 11
-                            color: root.activeTab === 0 ? root.tokens.ink : root.tokens.muted
-                        }
-                    }
-                    implicitWidth: contentItem.implicitWidth
-                    implicitHeight: tabText.implicitHeight
-                    onClicked: root.setTab(0)
-                    Accessible.role: Accessible.PageTab
-                    Accessible.selected: root.activeTab === 0
                     Keys.onRightPressed: {
                         root.setTab(1);
                         aboutTab.forceActiveFocus();
                     }
                 }
-                ArchiveButton {
+                DetailTab {
                     id: aboutTab
-                    onXChanged: tabBar.syncIndicator(false)
-                    onWidthChanged: tabBar.syncIndicator(false)
+                    tabIndex: 1
                     objectName: "detailAboutTab"
-                    tokens: root.tokens
                     text: qsTr("Album introductions")
-                    height: trackTab.height
-                    contentItem: Row {
-                        spacing: 6
-                        topPadding: 15
-                        ArchiveText {
-                            tokens: root.tokens
-                            text: "02"
-                            cssPixelSize: 8
-                            color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
-                        }
-                        ArchiveText {
-                            tokens: root.tokens
-                            text: qsTr("Album introductions")
-                            cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width
-                                                                               <= 1100 ? 10 : 11
-                            color: root.activeTab === 1 ? root.tokens.ink : root.tokens.muted
-                        }
-                    }
-                    implicitWidth: contentItem.implicitWidth
-                    implicitHeight: trackTab.implicitHeight
-                    onClicked: root.setTab(1)
-                    Accessible.role: Accessible.PageTab
-                    Accessible.selected: root.activeTab === 1
                     Keys.onLeftPressed: {
                         root.setTab(0);
                         trackTab.forceActiveFocus();

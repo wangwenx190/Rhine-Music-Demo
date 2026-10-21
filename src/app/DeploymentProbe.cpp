@@ -11,7 +11,7 @@
 #include <QMediaPlayer>
 #include <QQmlEngine>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QTimer>
 
 using namespace Qt::StringLiterals;
@@ -132,9 +132,7 @@ auto finishDeploymentProbe(DeploymentState &state)
           u"Hidden product QML/resources and real media load; no GPU, playback, device, or presentation claim"_s }
     };
     QDir().mkpath(QFileInfo(state.reportPath).absolutePath());
-    QSaveFile output(state.reportPath);
-    const bool saved = output.open(QIODevice::WriteOnly)
-            && output.write(QJsonDocument(report).toJson()) > 0 && output.commit();
+    const bool saved = yalahoo::writeJsonFile(state.reportPath, QJsonDocument(report));
     state.media.stop();
     state.media.setSource({ });
     state.app.exit(passed && saved ? 0 : DeploymentVerificationFailed);

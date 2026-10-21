@@ -15,7 +15,7 @@
 #include <QGuiApplication>
 #include <QElapsedTimer>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QDir>
 #include <QSysInfo>
 #include <cstring>
@@ -279,11 +279,9 @@ auto runSmaaAudit(int &argc, char **&argv)
         for (const auto *window : QGuiApplication::topLevelWindows())
             require(!window->isVisible(), "SMAA exposed a native window");
         require(!QGuiApplication::focusWindow(), "SMAA focused a window");
-        QSaveFile report(output + "/runtime.json"_L1);
-        require(report.open(QIODevice::WriteOnly), "Cannot open SMAA report");
-        report.write(
-                QJsonDocument(
-                        QJsonObject{
+        require(yalahoo::writeJsonFile(
+                        output + "/runtime.json"_L1,
+                        QJsonDocument(QJsonObject{
                                 { u"passed"_s, true },
                                 { u"round"_s, u"R19D4B1"_s },
                                 { u"qt"_s, QString::fromUtf8(qVersion()) },
@@ -296,9 +294,8 @@ auto runSmaaAudit(int &argc, char **&argv)
                                 { u"visibleWindows"_s, 0 },
                                 { u"measurement"_s,
                                   u"CPU command recording only; no GPU/present/VSYNC timing"_s },
-                                { u"cases"_s, rows } })
-                        .toJson());
-        require(report.commit(), "Cannot save SMAA report");
+                                { u"cases"_s, rows } })),
+                "Cannot save SMAA report");
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "%s\n", error.what());

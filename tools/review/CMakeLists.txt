@@ -28,164 +28,50 @@ qt_add_qml_module(ui-audit URI Yalahoo.Music VERSION 1.0 RESOURCE_PREFIX /qt/qml
     SOURCES CanvasProbe.h CanvasTitleProbe.h "${PROJECT_SOURCE_DIR}/src/app/QmlTypes.h" "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.h"
     "${PROJECT_SOURCE_DIR}/src/app/ApplicationIdentity.h")
 target_compile_definitions(ui-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-qt_add_shaders(ui-audit navigation_shaders PREFIX /assets/shaders
-    BASE "${PROJECT_SOURCE_DIR}/resources/shaders"
-    FILES "${PROJECT_SOURCE_DIR}/resources/shaders/opening-paper.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/display-output.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/opening-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-shadow.frag")
+yalahoo_add_ui_shaders(ui-audit)
+# Native RHI probes share executable policy; only real dependencies vary below.
+function(yalahoo_rhi_review target)
+    qt_add_executable(${target} ${ARGN})
+    target_link_libraries(${target} PRIVATE YalahooRhi)
+    target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
+    yalahoo_platform(${target})
+endfunction()
+
 if(YALAHOO_REVIEW)
-    qt_add_executable(archive-pool-audit ArchivePoolAudit.cpp OffscreenSurface.h)
-    target_link_libraries(archive-pool-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(archive-pool-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(archive-pool-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(archive-pool-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(archive-pool-audit)
-    qt_add_resources(archive-pool-audit pool_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(cover-audit CoverAudit.cpp)
-    target_link_libraries(cover-audit PRIVATE YalahooRhi)
-    target_include_directories(cover-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    set_target_properties(cover-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(cover-audit)
-    qt_add_executable(rhi-postprocess-audit RhiPostprocessAudit.cpp RhiReviewInput.h RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-postprocess-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-postprocess-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(rhi-postprocess-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-postprocess-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-postprocess-audit)
-    qt_add_resources(rhi-postprocess-audit rhi_post_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-bokeh-audit RhiBokehAudit.cpp OffscreenRhi.h)
-    target_link_libraries(rhi-bokeh-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-bokeh-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
-        "${PROJECT_SOURCE_DIR}/tools/assets")
-    target_compile_definitions(rhi-bokeh-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-bokeh-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-bokeh-audit)
-    qt_add_executable(rhi-smaa-audit RhiSmaaAudit.cpp OffscreenRhi.h SmaaReference.h)
-    target_link_libraries(rhi-smaa-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-smaa-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
-        "${PROJECT_SOURCE_DIR}/tools/assets")
-    target_compile_definitions(rhi-smaa-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-smaa-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-smaa-audit)
-    qt_add_executable(rhi-ao-audit RhiAoAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-ao-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-ao-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(rhi-ao-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-ao-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-ao-audit)
-    qt_add_resources(rhi-ao-audit ao_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-fog-audit RhiFogAudit.cpp RhiFogAudit.h RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-fog-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-fog-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(rhi-fog-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-fog-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-fog-audit)
-    qt_add_resources(rhi-fog-audit fog_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-shadow-audit RhiShadowAudit.cpp RhiShadowAudit.h RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-shadow-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-shadow-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
-        "${PROJECT_SOURCE_DIR}/tools/assets")
-    target_compile_definitions(rhi-shadow-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-shadow-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-shadow-audit)
-    qt_add_resources(rhi-shadow-audit shadow_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-flicker-audit RhiFlickerAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-flicker-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-flicker-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(rhi-flicker-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-flicker-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-flicker-audit)
-    qt_add_resources(rhi-flicker-audit flicker_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-scale-audit RhiScaleAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-scale-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-scale-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
-        "${PROJECT_SOURCE_DIR}/tools/assets")
-    target_compile_definitions(rhi-scale-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(rhi-scale-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-scale-audit)
-    qt_add_resources(rhi-scale-audit scale_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-shell-audit RhiShellAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
-    target_link_libraries(rhi-shell-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    target_include_directories(rhi-shell-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_compile_definitions(rhi-shell-audit PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-    set_target_properties(
-        rhi-shell-audit
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools"
-        WIN32_EXECUTABLE
-        FALSE
-        MACOSX_BUNDLE
-        FALSE
-    )
-    yalahoo_platform(rhi-shell-audit)
-    qt_add_resources(
-        rhi-shell-audit
-        rhi_shell_covers
-        PREFIX
-        /assets
-        BASE
-        "${PROJECT_SOURCE_DIR}/resources"
-        FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png"
-    )
-    qt_add_executable(rhi-audit RhiAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
-    target_include_directories(rhi-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    target_link_libraries(rhi-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
-    set_target_properties(rhi-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(rhi-audit)
-    qt_add_resources(rhi-audit rhi_opaque_covers PREFIX /assets
-        BASE "${PROJECT_SOURCE_DIR}/resources" FILES
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
-        "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
+    yalahoo_rhi_review(archive-pool-audit ArchivePoolAudit.cpp OffscreenSurface.h)
+    yalahoo_rhi_review(cover-audit CoverAudit.cpp)
+    yalahoo_rhi_review(rhi-postprocess-audit RhiPostprocessAudit.cpp RhiReviewInput.h RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-bokeh-audit RhiBokehAudit.cpp OffscreenRhi.h ImageSampling.h)
+    yalahoo_rhi_review(rhi-smaa-audit RhiSmaaAudit.cpp OffscreenRhi.h SmaaReference.h ImageSampling.h)
+    yalahoo_rhi_review(rhi-ao-audit RhiAoAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-fog-audit RhiFogAudit.cpp RhiFogAudit.h RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-shadow-audit RhiShadowAudit.cpp RhiShadowAudit.h RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-flicker-audit RhiFlickerAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-scale-audit RhiScaleAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-shell-audit RhiShellAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    yalahoo_rhi_review(rhi-audit RhiAudit.cpp RhiCaptureHarness.h OffscreenSurface.h)
+    set(rhi_fixture_targets archive-pool-audit rhi-postprocess-audit rhi-bokeh-audit
+        rhi-smaa-audit rhi-ao-audit rhi-fog-audit rhi-shadow-audit rhi-flicker-audit
+        rhi-scale-audit rhi-shell-audit)
+    foreach(target IN LISTS rhi_fixture_targets)
+        target_compile_definitions(${target} PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+    endforeach()
+    foreach(target IN ITEMS ${rhi_fixture_targets} rhi-audit)
+        target_link_libraries(${target} PRIVATE Qt6::GuiPrivate)
+    endforeach()
+    foreach(target IN ITEMS rhi-bokeh-audit rhi-smaa-audit rhi-shadow-audit rhi-scale-audit)
+        target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/tools/assets")
+    endforeach()
+    foreach(target IN ITEMS archive-pool-audit rhi-postprocess-audit rhi-ao-audit
+            rhi-fog-audit rhi-shadow-audit rhi-flicker-audit rhi-scale-audit rhi-shell-audit rhi-audit)
+        qt_add_resources(${target} review_covers PREFIX /assets
+            BASE "${PROJECT_SOURCE_DIR}/resources" FILES
+            "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
+            "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
+            "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
+    endforeach()
 endif()
 
 qt_add_executable(metadata-network-probe MetadataNetworkProbe.cpp)

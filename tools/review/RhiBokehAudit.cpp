@@ -1,3 +1,4 @@
+#include "ImageSampling.h"
 #include "OffscreenRhi.h"
 #include "ReviewApplication.h"
 #include <QQuickWindow>
@@ -15,7 +16,7 @@
 #include <QFloat16>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QDir>
 #include <algorithm>
 #include <array>
@@ -77,20 +78,7 @@ struct Inputs final
     }
     Pixel sample(double u, double v) const
     {
-        const double x = u * size.width() - .5, y = v * size.height() - .5;
-        const int ix = int(std::floor(x)), iy = int(std::floor(y));
-        const double fx = x - ix, fy = y - iy;
-        Pixel result{ };
-        for (int row = 0; row < 2; ++row) {
-            for (int column = 0; column < 2; ++column) {
-                const auto &p = colors[std::clamp(iy + row, 0, size.height() - 1) * size.width()
-                                       + std::clamp(ix + column, 0, size.width() - 1)];
-                const double weight = (row ? fy : 1 - fy) * (column ? fx : 1 - fx);
-                for (int c = 0; c < 4; ++c)
-                    result[c] += p[c] * weight;
-            }
-        }
-        return result;
+        return yalahoo::review::sampleBilinear(colors, size, u * size.width(), v * size.height());
     }
 };
 QRhiReadbackResult capture(QRhi *api, Postprocess &post, Inputs &input)
@@ -277,11 +265,9 @@ auto runBokehAudit(int &argc, char **&argv)
             visibleWindows += window->isVisible();
         require(visibleWindows == 0 && !QGuiApplication::focusWindow(),
                 "Offscreen Bokeh verification exposed or focused a window");
-        QSaveFile report(output + "/runtime.json"_L1);
-        require(report.open(QIODevice::WriteOnly), "Cannot open Bokeh report");
-        report.write(
-                QJsonDocument(
-                        QJsonObject{
+        require(yalahoo::writeJsonFile(
+                        output + "/runtime.json"_L1,
+                        QJsonDocument(QJsonObject{
                                 { u"passed"_s, true },
                                 { u"round"_s, u"R19D4A"_s },
                                 { u"backend"_s, int(api->backend()) },
@@ -290,9 +276,8 @@ auto runBokehAudit(int &argc, char **&argv)
                                 { u"visibleWindows"_s, visibleWindows },
                                 { u"measurement"_s,
                                   u"production Postprocess in real QRhi offscreen frames; no presentation timing"_s },
-                                { u"cases"_s, results } })
-                        .toJson());
-        require(report.commit(), "Cannot save Bokeh report");
+                                { u"cases"_s, results } })),
+                "Cannot save Bokeh report");
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "%s\n", error.what());

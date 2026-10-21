@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "ReviewSupport.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
@@ -17,7 +18,7 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QEventLoop>
 #include <QTimer>
 #include <QKeyEvent>
@@ -32,11 +33,6 @@ namespace {
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
 
-void require(bool value, const char *message)
-{
-    if (!value)
-        throw std::runtime_error(message);
-}
 class Driver final
 {
     Q_DISABLE_COPY_MOVE(Driver)
@@ -396,10 +392,8 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
                             { u"backend"_s, int(d.window.rendererInterface()->graphicsApi()) },
                             { u"normalVsync"_s, QJsonValue::Null },
                             { u"physicalDisplay"_s, QJsonValue::Null } };
-        QSaveFile file(output + "/report.json"_L1);
-        require(file.open(QIODevice::WriteOnly), "Cannot open opening report");
-        file.write(QJsonDocument(report).toJson());
-        require(file.commit(), "Cannot commit opening report");
+        require(yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report)),
+                "Cannot commit opening report");
     } catch (const std::exception &error) {
         qCritical("Opening audit: %s", error.what());
         return 3;

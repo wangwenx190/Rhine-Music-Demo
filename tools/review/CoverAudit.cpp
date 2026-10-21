@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
 #include "CoverCache.h"
@@ -13,7 +14,7 @@
 #include <QJsonDocument>
 #include <QPointer>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QTimer>
 #include <optional>
 #include <stdexcept>
@@ -24,11 +25,6 @@ using namespace yalahoo;
 using namespace yalahoo::rhi;
 
 namespace {
-void require(bool condition, const char *reason)
-{
-    if (!condition)
-        throw std::runtime_error(reason);
-}
 CoverSnapshot pixels(const QString &id, QColor color)
 {
     auto p = std::make_shared<CoverPixels>();
@@ -247,10 +243,8 @@ auto runCoverAudit(int &argc, char **&argv)
                             { u"restored"_s, restored.metadata },
                             { u"rebuilt"_s, rebuilt.metadata },
                             { u"measuredVramBytes"_s, QJsonValue() } };
-        QSaveFile file(output + "/runtime.json"_L1);
-        require(file.open(QIODevice::WriteOnly), "Cannot save cover GPU report");
-        file.write(QJsonDocument(report).toJson());
-        require(file.commit(), "Cannot commit cover GPU report");
+        require(yalahoo::writeJsonFile(output + "/runtime.json"_L1, QJsonDocument(report)),
+                "Cannot commit cover GPU report");
         item->captured = { };
         window.hide();
         return 0;

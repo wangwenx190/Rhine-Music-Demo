@@ -112,21 +112,8 @@ set(review_dependencies)
 if(YALAHOO_REVIEW)
     set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
     set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
-    set(material_qml_files)
-    foreach(
-        name
-        CaseMaterials
-        GlassMaterial
-        LightingMaterial
-        CaseGeometry
-        OcclusionPrepass
-        SsaoEffect
-        PostprocessEffect
-    )
-        set(file "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/${name}.qml")
-        set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "scene/${name}.qml")
-        list(APPEND material_qml_files "${file}")
-    endforeach()
+    yalahoo_qml_group(material_qml_files scene CaseMaterials GlassMaterial LightingMaterial
+        CaseGeometry OcclusionPrepass SsaoEffect PostprocessEffect)
     qt_add_resources(
         Yalahoo
         material_assets
@@ -200,25 +187,7 @@ qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     RESOURCE_PREFIX /qt/qml
     QML_FILES "${app_qml}" "${bootstrap_qml}" "${probe_window_qml}" ${browse_qml_files} ${review_qml_files}
     SOURCES QmlTypes.h ApplicationIdentity.h ${review_sources})
-qt_add_shaders(
-    Yalahoo
-    r02_shader_probe
-    PREFIX
-    /assets/shaders
-    BASE
-    "${PROJECT_SOURCE_DIR}/resources/shaders"
-    FILES
-    "${PROJECT_SOURCE_DIR}/resources/shaders/probe.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/display-output.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/opening-paper.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/opening-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/edge-fade.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/reel-slot.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/overview-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/detail-tabs-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-blur.frag"
-    "${PROJECT_SOURCE_DIR}/resources/shaders/panel-shadow.frag"
-)
+yalahoo_add_ui_shaders(Yalahoo probe.frag)
 target_link_libraries(
     Yalahoo
     PRIVATE

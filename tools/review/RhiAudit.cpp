@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "ReviewApplication.h"
 #include "RhiCaptureHarness.h"
 #include "SceneAdapter.h"
@@ -6,7 +7,7 @@
 #include <QDir>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <cstdio>
 #include <cmath>
 
@@ -17,10 +18,6 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-void check(bool ok, const char *reason)
-{
-    RhiCaptureHarness::require(ok, reason);
-}
 Input fixture(QSize size, bool night, bool low, const QString &cover)
 {
     SceneAdapter scene;
@@ -113,7 +110,7 @@ auto runOpaqueAudit(int &argc, char **&argv)
         const QString output = QString::fromLocal8Bit(argv[1]);
         QDir().mkpath(output);
         RhiCaptureHarness driver;
-        check(driver.window->devicePixelRatio() == 1, "Opaque diagnostics require actual DPR1");
+        require(driver.window->devicePixelRatio() == 1, "Opaque diagnostics require actual DPR1");
         QJsonArray cases, sizes, shadows, rebuilds, inkProbes;
         double worstDepth = 0, worstNormal = 0, worstProjection = 0;
         for (bool night : { false, true })
@@ -124,18 +121,18 @@ auto runOpaqueAudit(int &argc, char **&argv)
                         auto in = fixture(size, night, low, cover);
                         in.geometryDiagnostic = channel != 0;
                         const auto gpu = driver.capture(in, size);
-                        check(gpu.metadata[u"uniqueReadbackTextures"_s].toInt() == 4
-                                      && gpu.metadata[u"readbackFieldSlots"_s].toInt() == 12,
-                              "Opaque diagnostic readback duplicated an aliased texture");
-                        check(gpu.color.constBits() == gpu.composite.constBits()
-                                      && gpu.color.constBits() == gpu.postprocessed.constBits()
-                                      && gpu.normal.constBits() == gpu.compositeNormal.constBits()
-                                      && gpu.depth.constBits() == gpu.compositeDepth.constBits(),
-                              "Aliased diagnostic fields copied their pixel storage");
+                        require(gpu.metadata[u"uniqueReadbackTextures"_s].toInt() == 4
+                                        && gpu.metadata[u"readbackFieldSlots"_s].toInt() == 12,
+                                "Opaque diagnostic readback duplicated an aliased texture");
+                        require(gpu.color.constBits() == gpu.composite.constBits()
+                                        && gpu.color.constBits() == gpu.postprocessed.constBits()
+                                        && gpu.normal.constBits() == gpu.compositeNormal.constBits()
+                                        && gpu.depth.constBits() == gpu.compositeDepth.constBits(),
+                                "Aliased diagnostic fields copied their pixel storage");
                         const auto inventory = gpu.metadata[u"resources"_s].toObject();
-                        check(inventory[u"estimatedCurrentBytes"_s].toDouble() > 0
-                                      && inventory[u"measuredVramBytes"_s].isNull(),
-                              "Missing descriptor inventory or fabricated driver memory");
+                        require(inventory[u"estimatedCurrentBytes"_s].toDouble() > 0
+                                        && inventory[u"measuredVramBytes"_s].isNull(),
+                                "Missing descriptor inventory or fabricated driver memory");
                         int attachments = 0;
                         for (const auto &entry : inventory[u"entries"_s].toArray()) {
                             const auto resource = entry.toObject();
@@ -147,14 +144,14 @@ auto runOpaqueAudit(int &argc, char **&argv)
                             const auto format = name == "opaque-color-resolve"_L1
                                     ? QRhiTexture::RGBA16F
                                     : QRhiTexture::RGBA8;
-                            check(resource[u"format"_s].toInt() == int(format)
-                                          && resource[u"samples"_s].toInt() == 1
-                                          && resource[u"mipLevels"_s].toInt() == 1
-                                          && resource[u"width"_s].toInt() == size.width()
-                                          && resource[u"height"_s].toInt() == size.height(),
-                                  "Actual diagnostic attachment format or dimensions changed");
+                            require(resource[u"format"_s].toInt() == int(format)
+                                            && resource[u"samples"_s].toInt() == 1
+                                            && resource[u"mipLevels"_s].toInt() == 1
+                                            && resource[u"width"_s].toInt() == size.width()
+                                            && resource[u"height"_s].toInt() == size.height(),
+                                    "Actual diagnostic attachment format or dimensions changed");
                         }
-                        check(attachments == 3, "Missing opaque diagnostic attachments");
+                        require(attachments == 3, "Missing opaque diagnostic attachments");
                         const auto actual = channel == 0 ? gpu.color
                                 : channel == 1           ? gpu.normal
                                                          : gpu.depth;
@@ -162,8 +159,8 @@ auto runOpaqueAudit(int &argc, char **&argv)
                                                    .arg(night ? "night"_L1 : "day"_L1,
                                                         low ? "low"_L1 : "front"_L1, cover)
                                                    .arg(channel);
-                        check(actual.save(output + "/"_L1 + label + ".png"_L1),
-                              "Cannot save own output");
+                        require(actual.save(output + "/"_L1 + label + ".png"_L1),
+                                "Cannot save own output");
                         if (channel == 1) {
                             const auto point = projected(in, { .17f, 1.85f, .07f }, size);
                             const auto observed = gpu.normal.pixelColor(point);
@@ -173,12 +170,12 @@ auto runOpaqueAudit(int &argc, char **&argv)
                                       std::abs(observed.greenF() - (expected.y() * .5 + .5)),
                                       std::abs(observed.blueF() - (expected.z() * .5 + .5)) });
                             worstNormal = std::max(worstNormal, error);
-                            check(error <= 1.0 / 255, "Known plane normal is incorrect");
+                            require(error <= 1.0 / 255, "Known plane normal is incorrect");
                             if (!low) {
                                 const double projection = cornerError(in, gpu.normal);
                                 worstProjection = std::max(worstProjection, projection);
-                                check(projection <= 2,
-                                      "Authored corner projection exceeds two pixels");
+                                require(projection <= 2,
+                                        "Authored corner projection exceeds two pixels");
                             }
                         }
                         if (channel == 2 && !low) {
@@ -186,10 +183,10 @@ auto runOpaqueAudit(int &argc, char **&argv)
                             const double expected = (12 - .070 - .1) / (100 - .1);
                             const double error = std::abs(observed - expected);
                             worstDepth = std::max(worstDepth, error);
-                            check(error < 2e-6, "Known authored front-plane depth is incorrect");
+                            require(error < 2e-6, "Known authored front-plane depth is incorrect");
                         }
                         // Opaque color must contain actual content, not an empty background target.
-                        check(depthAt(gpu.depth, 480, 360) < 1, "Missing opaque content");
+                        require(depthAt(gpu.depth, 480, 360) < 1, "Missing opaque content");
                         cases.append(QJsonObject{ { u"scene"_s, label },
                                                   { u"channel"_s, channel },
                                                   { u"metadata"_s, gpu.metadata } });
@@ -220,7 +217,7 @@ auto runOpaqueAudit(int &argc, char **&argv)
                 const double error = std::max({ std::abs(observed.redF() - linear(ink.redF())),
                                                 std::abs(observed.greenF() - linear(ink.greenF())),
                                                 std::abs(observed.blueF() - linear(ink.blueF())) });
-                check(error <= 1.0 / 255, "Paper source decode/diffuse clamp is incorrect");
+                require(error <= 1.0 / 255, "Paper source decode/diffuse clamp is incorrect");
                 inkProbes.append(QJsonObject{ { u"ink"_s, ink.name() },
                                               { u"irradiance"_s, irradiance },
                                               { u"linearError"_s, error } });
@@ -244,8 +241,8 @@ auto runOpaqueAudit(int &argc, char **&argv)
         driver.submitWithoutCapture(changed, baseSize);
         driver.replay(3);
         const auto blue = driver.surface->grab().pixelColor(480, 360);
-        check(red.red() > red.blue() + 20 && blue.blue() > blue.red() + 20,
-              "Same-request cover revision was ignored");
+        require(red.red() > red.blue() + 20 && blue.blue() > blue.red() + 20,
+                "Same-request cover revision was ignored");
         for (bool night : { false, true })
             for (int map : { 1024, 2048, 4096 }) {
                 auto in = fixture(baseSize, night, true, u"square"_s);
@@ -271,18 +268,18 @@ auto runOpaqueAudit(int &argc, char **&argv)
                         minimum = std::min(minimum, value);
                         shadowed += value < .99;
                     }
-                check(shadowed > 100 && minimum >= .675 && minimum <= .70,
-                      "Source shadow strength/caster projection failed");
+                require(shadowed > 100 && minimum >= .675 && minimum <= .70,
+                        "Source shadow strength/caster projection failed");
                 in.shadows = false;
                 const auto off = driver.capture(in, baseSize);
                 for (int y = 0; y < baseSize.height(); ++y)
                     for (int x = 0; x < baseSize.width(); ++x)
                         if (depthAt(off.depth, x, y) < 1)
-                            check(off.color.pixelColor(x, y).redF() >= 254.0 / 255,
-                                  "Disabled shadow receiver is not white");
+                            require(off.color.pixelColor(x, y).redF() >= 254.0 / 255,
+                                    "Disabled shadow receiver is not white");
                 const auto label = u"shadow-%1-%2"_s.arg(night ? "night"_L1 : "day"_L1).arg(map);
-                check(on.color.save(output + "/"_L1 + label + ".png"_L1),
-                      "Cannot save shadow output");
+                require(on.color.save(output + "/"_L1 + label + ".png"_L1),
+                        "Cannot save shadow output");
                 shadows.append(QJsonObject{ { u"scene"_s, label },
                                             { u"shadowedReceiverPixels"_s, shadowed },
                                             { u"minimumFactor"_s, minimum },
@@ -292,8 +289,8 @@ auto runOpaqueAudit(int &argc, char **&argv)
         for (int cycle = 0; cycle < 10; ++cycle) {
             driver.rebuild();
             const auto restored = driver.capture(stableInput, baseSize);
-            check(driver.rebuilt(), "Scene graph was not actually invalidated");
-            check(depthAt(restored.depth, 480, 360) < 1, "Context rebuild lost opaque geometry");
+            require(driver.rebuilt(), "Scene graph was not actually invalidated");
+            require(depthAt(restored.depth, 480, 360) < 1, "Context rebuild lost opaque geometry");
             rebuilds.append(restored.metadata);
         }
         const QJsonObject report{ { u"round"_s, u"R19C2B1"_s },
@@ -314,10 +311,8 @@ auto runOpaqueAudit(int &argc, char **&argv)
                                   { u"knownPlaneDepthError"_s, worstDepth },
                                   { u"knownPlaneNormalError"_s, worstNormal },
                                   { u"maxCornerProjectionPixels"_s, worstProjection } };
-        QSaveFile file(output + "/runtime.json"_L1);
-        check(file.open(QIODevice::WriteOnly), "Cannot open RHI report");
-        file.write(QJsonDocument(report).toJson());
-        check(file.commit(), "Cannot commit RHI report");
+        require(yalahoo::writeJsonFile(output + "/runtime.json"_L1, QJsonDocument(report)),
+                "Cannot commit RHI report");
         std::puts("Opaque source mathematics, own output and resource checks passed.");
         return 0;
     } catch (const std::exception &error) {

@@ -69,7 +69,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QRawFont>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSGRendererInterface>
 #include <QStandardPaths>
 #include <QSysInfo>
@@ -100,7 +100,6 @@ constexpr auto RuntimeReportDelayMilliseconds = 2500;
 enum ReviewExit {
     QmlCreationFailed = 2,
     RootWindowMissing = 3,
-    RuntimeReportOpenFailed = 4,
     RuntimeVerificationFailed = 5,
     AssetFontInitializationFailed = 6,
     InvalidCommandLine = 7,
@@ -345,13 +344,7 @@ auto writeRuntimeEvidence(RuntimeReviewState &state)
     reportData.insert(u"filledProbe"_s, state.parser.isSet(u"verify-filled"_s));
     if (state.scene.selection())
         reportData.insert(u"poolInstances"_s, state.scene.frame().instances.size());
-    QSaveFile output(state.report);
-    if (!output.open(QIODevice::WriteOnly)) {
-        state.app.exit(RuntimeReportOpenFailed);
-        return;
-    }
-    output.write(QJsonDocument(reportData).toJson());
-    const bool committed = output.commit();
+    const bool committed = yalahoo::writeJsonFile(state.report, QJsonDocument(reportData));
     state.app.exit(passed && committed ? 0 : RuntimeVerificationFailed);
 }
 }

@@ -18,7 +18,7 @@
 #include <QJsonDocument>
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <QTimer>
@@ -314,15 +314,13 @@ int reviewExperiments(const QString &output)
                       return rhi::sceneSubmissionStats().renderers.load() == 0;
                   },
                   5000));
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly))
-        return 4;
-    file.write(QJsonDocument(
-                       QJsonObject{ { u"passed"_s, passed },
-                                    { u"checks"_s, checks },
-                                    { u"diagnosticSample"_s, QJsonObject::fromVariantMap(values) },
-                                    { u"windowPolicy"_s, windowPolicy },
-                                    { u"offscreen"_s, OffscreenSurface::Enabled } })
-                       .toJson());
-    return file.commit() && passed ? 0 : 5;
+    const bool saved = yalahoo::writeJsonFile(
+            output + "/report.json"_L1,
+            QJsonDocument(
+                    QJsonObject{ { u"passed"_s, passed },
+                                 { u"checks"_s, checks },
+                                 { u"diagnosticSample"_s, QJsonObject::fromVariantMap(values) },
+                                 { u"windowPolicy"_s, windowPolicy },
+                                 { u"offscreen"_s, OffscreenSurface::Enabled } }));
+    return saved && passed ? 0 : 5;
 }

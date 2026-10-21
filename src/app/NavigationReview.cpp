@@ -1,3 +1,4 @@
+#include "MonotonicTime.h"
 #include <algorithm>
 #include <iterator>
 #include "ReviewSupport.h"
@@ -18,7 +19,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QDir>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <functional>
@@ -36,7 +37,6 @@ enum ReviewExit {
     InvalidReviewInput = 4,
     RulerObjectMissing = 5,
     RulerSlotsMissing = 6,
-    CaptureFailed = 7,
     ReportFailed = 8
 };
 
@@ -347,7 +347,7 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
     qint64 restoreStartedNs = 0;
     std::function<void()> next;
     std::function<void()> advanceWhenReady;
-    const auto now = yalahoo::review::nowNs;
+    const auto now = yalahoo::monotonicNanoseconds;
     QObject::connect(&input, &InputRouter::navigationCommitted, &scope, [&](quint64 revision) {
         inputs.append(QJsonObject{ { u"navigationRevision"_s, qint64(revision) },
                                    { u"inputRevision"_s, qint64(scene.frame().inputRevision) },
@@ -387,24 +387,18 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
         check(name, hasSubmission());
     };
     const auto finish = [&] {
-        QSaveFile file(output + "/report.json"_L1);
-        if (!file.open(QIODevice::WriteOnly)) {
-            app.exit(CaptureFailed);
-            return;
-        }
-        file.write(
-                QJsonDocument(
-                        QJsonObject{
-                                { u"passed"_s, passed },
-                                { u"checks"_s, checks },
-                                { u"inputs"_s, inputs },
-                                { u"frames"_s, samples },
-                                { u"windowPolicy"_s, verification::windowPolicy(window) },
-                                { u"coverStatistics"_s, native->coverStatistics() },
-                                { u"scope"_s,
-                                  u"Actual Release App path. Event-driven input receipt, navigation commit and corresponding Qt frame submission are distinct; screen display time is unavailable."_s } })
-                        .toJson());
-        app.exit(file.commit() && passed ? 0 : ReportFailed);
+        const bool saved = yalahoo::writeJsonFile(
+                output + "/report.json"_L1,
+                QJsonDocument(QJsonObject{
+                        { u"passed"_s, passed },
+                        { u"checks"_s, checks },
+                        { u"inputs"_s, inputs },
+                        { u"frames"_s, samples },
+                        { u"windowPolicy"_s, verification::windowPolicy(window) },
+                        { u"coverStatistics"_s, native->coverStatistics() },
+                        { u"scope"_s,
+                          u"Actual Release App path. Event-driven input receipt, navigation commit and corresponding Qt frame submission are distinct; screen display time is unavailable."_s } }));
+        app.exit(saved && passed ? 0 : ReportFailed);
     };
     NavigationReviewState state{
         waiting,  queued, step,    window,    samples, ruler,           restoreStartedNs,

@@ -1,3 +1,5 @@
+#include "MonotonicTime.h"
+#include "Require.h"
 #include "ReviewSupport.h"
 #include "SceneAdapter.h"
 #include "FrameClock.h"
@@ -31,7 +33,7 @@
 #include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QTemporaryDir>
 #include <QSignalSpy>
 #include <QScreen>
@@ -62,11 +64,6 @@ constexpr int AsyncDeadlineMilliseconds = 10000;
 constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto NanosecondsPerSecond = 1e9;
 
-void require(bool value, const char *message)
-{
-    if (!value)
-        throw std::runtime_error(message);
-}
 QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
 {
     if (values.isEmpty())
@@ -177,7 +174,7 @@ public:
         }
         events.append(
                 QJsonObject{ { u"kind"_s, kind },
-                             { u"atNs"_s, yalahoo::review::nowNs() },
+                             { u"atNs"_s, yalahoo::monotonicNanoseconds() },
                              { u"exposed"_s, isExposed() },
                              { u"visible"_s, isVisible() },
                              { u"state"_s, int(windowState()) },
@@ -207,6 +204,13 @@ protected:
         return result;
     }
 };
+bool renderersReleased()
+{
+    return rhi::sceneSubmissionStats().renderers.load() == 0
+            && rulerInkStats().renderers.load() == 0 && openingInkStats().renderers.load() == 0
+            && ReelInk::liveNodes() == 0;
+}
+
 class Driver final
 {
     Q_DISABLE_COPY_MOVE(Driver)
@@ -231,7 +235,7 @@ public:
                                  overflow = true;
                              else {
                                  costs[u"stage"_s] = stage;
-                                 costs[u"atNs"_s] = yalahoo::review::nowNs();
+                                 costs[u"atNs"_s] = yalahoo::monotonicNanoseconds();
                                  timings.append(costs);
                              }
                          });
@@ -242,7 +246,7 @@ public:
                     if (samples->times.size() == MaximumFrameSamples)
                         samples->overflow = true;
                     else
-                        samples->times.append(yalahoo::review::nowNs());
+                        samples->times.append(yalahoo::monotonicNanoseconds());
                 },
                 Qt::DirectConnection);
         QObject::connect(&library, &LibrarySession::snapshotChanged, &selection, [&] {
@@ -399,7 +403,7 @@ public:
         QTimer deadline;
         deadline.setSingleShot(true);
         bool done = false, pending = false;
-        qint64 nextTickNs = yalahoo::review::nowNs();
+        qint64 nextTickNs = yalahoo::monotonicNanoseconds();
         const auto evaluate = [&] {
             pending = false;
             if (done)
@@ -423,7 +427,7 @@ public:
             pending = true;
             // Local RenderControl replay has an explicit 60Hz cadence; it is not native VSYNC.
             if (paced && OffscreenSurface::Enabled) {
-                const auto now = yalahoo::review::nowNs();
+                const auto now = yalahoo::monotonicNanoseconds();
                 nextTickNs = qMax(nextTickNs + 16666667, now);
                 const int delay = int((nextTickNs - now + 999999) / 1000000);
                 QTimer::singleShot(delay, Qt::PreciseTimer, &loop, evaluate);
@@ -711,7 +715,7 @@ auto reviewStartupReplay(QElapsedTimer &sampling, const QStringList &stages,
             d.panels.open(u"search"_s);
         actions.append(QJsonObject{ { u"stage"_s, d.stage },
                                     { u"elapsedSeconds"_s, elapsed },
-                                    { u"atNs"_s, yalahoo::review::nowNs() } });
+                                    { u"atNs"_s, yalahoo::monotonicNanoseconds() } });
     }
     const int event = int(elapsed * 3);
     if (event != eventIndex) {
@@ -849,7 +853,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     d.overflow = true;
                 else
                     guiFrames.append(QJsonObject{
-                            { u"atNs"_s, yalahoo::review::nowNs() },
+                            { u"atNs"_s, yalahoo::monotonicNanoseconds() },
                             { u"clockFrame"_s, qint64(d.motion.clock()->frameCount()) } });
             });
             QObject::connect(
@@ -859,7 +863,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         if (samples->synchronized.size() == MaximumFrameSamples)
                             samples->overflow = true;
                         else
-                            samples->synchronized.append(yalahoo::review::nowNs());
+                            samples->synchronized.append(yalahoo::monotonicNanoseconds());
                     },
                     Qt::DirectConnection);
         }
@@ -1180,7 +1184,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             }
             const auto startSample = d.samples.size(), startTiming = d.timings.size();
             sampling.restart();
-            report[u"samplingStartedNs"_s] = yalahoo::review::nowNs();
+            report[u"samplingStartedNs"_s] = yalahoo::monotonicNanoseconds();
             d.window.record(u"sampling-start"_s);
             if (observeOnly) {
                 replay(seconds);
@@ -1197,7 +1201,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         },
                         true, int(seconds * 1000 + 30000), true);
             }
-            report[u"samplingEndedNs"_s] = yalahoo::review::nowNs();
+            report[u"samplingEndedNs"_s] = yalahoo::monotonicNanoseconds();
             report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / NanosecondsPerSecond;
             report[u"sampleStartIndex"_s] = startSample;
             report[u"quickTimingStartIndex"_s] = startTiming;
@@ -1382,9 +1386,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
     report[u"functionalPassed"_s] = passed;
     report[u"checks"_s] = checks;
     report[u"resourceCheckpoints"_s] = resources;
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
-        || !file.commit())
+    if (!yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report)))
         return 2;
     return passed ? 0 : 1;
 }
@@ -1458,10 +1460,7 @@ int reviewWindowLifecycle(const QString &output)
         check("stop-releases-song", d.playback.source().isEmpty() && !d.playback.requested());
         d.destroyRoot();
         report[u"releasedCounters"_s] = counters();
-        check("released-owned-renderers",
-              d.failure.isEmpty() && rhi::sceneSubmissionStats().renderers.load() == 0
-                      && rulerInkStats().renderers.load() == 0
-                      && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
+        check("released-owned-renderers", d.failure.isEmpty() && renderersReleased());
     } catch (const std::exception &error) {
         passed = false;
         report[u"error"_s] = QString::fromUtf8(error.what());
@@ -1469,9 +1468,7 @@ int reviewWindowLifecycle(const QString &output)
     }
     report[u"passed"_s] = passed;
     report[u"checks"_s] = checks;
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
-        || !file.commit())
+    if (!yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report)))
         return 2;
     return passed ? 0 : 1;
 }
@@ -1731,10 +1728,7 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
         check("window-policy", verification::windowPolicySatisfied(d.window));
         d.destroyRoot();
         report[u"releasedCounters"_s] = counters();
-        check("released-owned-renderers",
-              d.failure.isEmpty() && rhi::sceneSubmissionStats().renderers.load() == 0
-                      && rulerInkStats().renderers.load() == 0
-                      && openingInkStats().renderers.load() == 0 && ReelInk::liveNodes() == 0);
+        check("released-owned-renderers", d.failure.isEmpty() && renderersReleased());
     } catch (const std::exception &error) {
         passed = false;
         report[u"error"_s] = QString::fromUtf8(error.what());
@@ -1743,9 +1737,7 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
     report[u"passed"_s] = passed;
     report[u"checks"_s] = checks;
     report[u"captures"_s] = captures;
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0
-        || !file.commit())
+    if (!yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report)))
         return 2;
     return passed ? 0 : 1;
 }

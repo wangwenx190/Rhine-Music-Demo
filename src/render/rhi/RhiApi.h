@@ -2,6 +2,7 @@
 // partially initialized native resources can be submitted.
 
 #pragma once
+#include "Require.h"
 // All limited-compatibility APIs are isolated here and in this directory.
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
@@ -20,11 +21,6 @@ inline constexpr auto NearPlane = .1f;
 inline constexpr auto FarPlane = 45;
 }
 
-inline void require(bool ok, const char *reason)
-{
-    if (!ok)
-        throw std::runtime_error(reason);
-}
 struct ResourceUpdateDeleter final
 {
     void operator()(QRhiResourceUpdateBatch *batch) const noexcept

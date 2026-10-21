@@ -1,3 +1,4 @@
+#include "Require.h"
 #include "GeometryAudit.h"
 #include <QDir>
 #include <QFile>
@@ -36,11 +37,6 @@ constexpr auto QtUnsignedShort = 3;
 constexpr auto QtUnsignedInt = 5;
 constexpr auto QtFloatComponentType = 10;
 
-void require(bool ok, const char *message)
-{
-    if (!ok)
-        throw std::runtime_error(message);
-}
 struct Reader final
 {
     const QByteArray &bytes;

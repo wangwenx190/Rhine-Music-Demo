@@ -9,7 +9,7 @@
 #include "ResourcePlan.h"
 #include <QPointer>
 #include <QQuickWindow>
-#include <chrono>
+#include "MonotonicTime.h"
 #include <limits>
 #include "RhiApi.h"
 #include "ShellMaterial.h"
@@ -2444,9 +2444,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         update();
     if (diagnose) {
         const auto gpu = cb->lastCompletedGpuTime();
-        diagnose({ std::chrono::duration<double, std::milli>(
-                           std::chrono::steady_clock::now().time_since_epoch())
-                           .count(),
+        diagnose({ yalahoo::monotonicMilliseconds(),
                    cpu.nsecsElapsed() / yalahoo::units::NanosecondsPerMillisecond,
                    synchronizationMs, gpu > 0 ? gpu * yalahoo::units::MillisecondsPerSecond : -1,
                    frameUploadBytes, selectedUploadBytes, qint64(cursor) });
@@ -2471,10 +2469,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { u"navigationRevision"_s, qint64(input.scene.navigationRevision) },
                 { u"navigationInputRevision"_s, qint64(input.scene.navigationInputRevision) },
                 { u"navigationCommittedNs"_s, input.scene.navigationCommittedNs },
-                { u"submittedNs"_s,
-                  qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 std::chrono::steady_clock::now().time_since_epoch())
-                                 .count()) },
+                { u"submittedNs"_s, qint64(yalahoo::monotonicNanoseconds()) },
                 { u"coverSnapshotCopies"_s, qint64(coverSnapshotCopies) },
                 { u"coverSnapshotShares"_s, qint64(coverSnapshotShares) },
                 { u"postprocessRevision"_s, qint64(post.revision()) },

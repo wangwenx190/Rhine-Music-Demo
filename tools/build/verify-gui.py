@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Run one integrated GUI matrix and preserve its inputs, output and failure status."""
-from native_replay import BACKEND_IDS
+from native_replay import BACKEND_IDS, cmake_cache, executable_path, replay_environment
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import platform
 import subprocess
@@ -24,21 +23,14 @@ if args.foreground and not args.visible:
     parser.error('--foreground requires --visible')
 if args.output.exists():
     parser.error('Choose a fresh output directory; preserve failed runs')
-cache = dict(line.split('=', 1) for line in (ROOT / 'build/release/CMakeCache.txt').read_text(encoding='utf-8').splitlines()
-             if '=' in line and not line.startswith(('#', '//')))
+cache = cmake_cache(ROOT)
 kit = Path(cache['YALAHOO_SELECTED_QT:PATH'])
-executable = ROOT / 'build/release/tools' / ('ui-audit.exe' if platform.system() == 'Windows' else 'ui-audit')
+executable = executable_path(ROOT, tool='ui-audit')
 if cache.get('CMAKE_BUILD_TYPE:STRING') != 'Release' or not executable.is_file():
     parser.error('Build the latest native Kit Release ui-audit first')
 args.output.mkdir(parents=True)
-env = os.environ.copy()
-env.update(QSG_RHI_BACKEND=args.backend, QT_SCALE_FACTOR='1',
-           QT_PLUGIN_PATH=str(kit / 'plugins'), YALAHOO_VERIFY_FOREGROUND='1' if args.foreground else '0',
-           YALAHOO_VERIFY_VISIBLE='1' if args.visible else '0', QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM='1',
-           QSG_RENDER_LOOP='basic' if platform.system() == 'Darwin' and args.backend == 'opengl' else 'threaded')
-env.pop('QSG_NO_VSYNC', None)
-if platform.system() == 'Windows':
-    env['PATH'] = str(kit / 'bin') + os.pathsep + env.get('PATH', '')
+env = replay_environment(kit, args.backend, 1, args.foreground)
+env['YALAHOO_VERIFY_VISIBLE'] = '1' if args.visible else '0'
 files = [*ROOT.glob('src/**/*'), *ROOT.glob('qml/**/*.qml'), *ROOT.glob('resources/**/*'),
          ROOT / 'tools/review/StartupAudit.cpp', ROOT / 'tools/review/OffscreenSurface.h',
          ROOT / 'tools/review/UiAudit.cpp', Path(__file__).resolve()]

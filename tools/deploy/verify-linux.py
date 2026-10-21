@@ -4,12 +4,13 @@ import argparse
 import json
 from pathlib import Path
 import platform
-import subprocess
 import sys
 import tempfile
 
 sys.dont_write_bytecode = True
 from linux_package import clean_environment, inspect_package, verify_inventory
+
+from package_support import run_probe
 
 
 def main():
@@ -34,27 +35,16 @@ def main():
                        YALAHOO_VERIFY_FOREGROUND='0', QCPAINTER_DEBUG_COLLECT='0',
                        XDG_DATA_HOME=str(output / 'xdg-data'), XDG_CONFIG_HOME=str(output / 'xdg-config'),
                        XDG_CACHE_HOME=str(output / 'xdg-cache'))
-    timed_out = False
-    with (output / 'stdout.txt').open('w') as stdout, (output / 'stderr.txt').open('w') as stderr:
-        process = subprocess.Popen([str(package / 'yalahoo.sh'), '--verify-deployment',
-                                    str(output / 'report.json')], cwd=output, env=environment,
-                                   stdout=stdout, stderr=stderr)
-        try:
-            code = process.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            process.kill()
-            code = process.wait()
-    report = output / 'report.json'
-    data = json.loads(report.read_text()) if report.is_file() else {}
+    probe = run_probe([package / 'yalahoo.sh'], output, environment)
+    data = probe.report
     # The runtime probe lists all loaded ELF images; static ldd alone cannot see dlopen.
-    passed = not timed_out and code == 0 and data.get('passed') and bool(data.get('loadedImages'))
+    passed = not probe.timed_out and probe.exit_code == 0 and data.get('passed') and bool(data.get('loadedImages'))
     if data.get('qtVersion') != metadata['qtVersion'] or data.get('platformPlugin') != 'offscreen':
         passed = False
     for path in data.get('pluginPaths', []) + data.get('qmlPaths', []):
         if not path.startswith('qrc:') and not Path(path).resolve().is_relative_to(package):
             passed = False
-    evidence = dict(passed=bool(passed), exitCode=code, timedOut=timed_out,
+    evidence = dict(passed=bool(passed), exitCode=probe.exit_code, timedOut=probe.timed_out,
                     qtVersion=metadata['qtVersion'], os=platform.platform(), closure=closure,
                     workingDirectoryOutsidePackage=True, scope='No GPU/context/playback/device/presentation')
     (output / 'environment.json').write_text(json.dumps(evidence, indent=2) + '\n')

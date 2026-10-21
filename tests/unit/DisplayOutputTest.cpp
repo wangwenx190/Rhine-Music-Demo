@@ -5,7 +5,7 @@
 #include <QtTest>
 #include <QQmlApplicationEngine>
 #include <QJsonDocument>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QFile>
 #include <QOffscreenSurface>
 #include <QDir>
@@ -326,18 +326,15 @@ private Q_SLOTS:
         QVERIFY(policy[u"passed"_s].toBool());
         const auto reportPath = QString::fromUtf8(DISPLAY_OUTPUT_REPORT);
         QVERIFY(QDir().mkpath(QFileInfo(reportPath).absolutePath()));
-        QSaveFile report(reportPath);
-        QVERIFY(report.open(QIODevice::WriteOnly));
-        report.write(
+        QVERIFY(yalahoo::writeJsonFile(
+                reportPath,
                 QJsonDocument(QJsonObject{ { u"systemHdr"_s, system.enabled },
                                            { u"actualHdr"_s, actualHdr },
                                            { u"whiteScale"_s, system.whiteScale },
                                            { u"headroom"_s, system.headroom },
                                            { u"graphicsApi"_s, int(QQuickWindow::graphicsApi()) },
                                            { u"invalidations"_s, invalidations.size() },
-                                           { u"windowPolicy"_s, policy } })
-                        .toJson());
-        QVERIFY(report.commit());
+                                           { u"windowPolicy"_s, policy } })));
         window->hide();
         window->releaseResources();
     }

@@ -60,12 +60,12 @@ Q_SIGNALS:
     void silenceReached();
 
 private:
-    void scheduleOutputRefresh();
     friend class AudioAmbienceTest;
     void reconcile();
     void advanceFade();
     void refreshOutput();
     QMediaDevices m_devices;
+    QTimer m_outputRefresh;
     QAudioOutput m_output;
     QMediaPlayer m_player;
     QTimer m_fade;
@@ -74,6 +74,6 @@ private:
     SongActivity m_song = SongActivity::Stopped;
     double m_volume = yalahoo::productDefaults::DefaultBackgroundVolume, m_from = 0, m_target = 0;
     int m_duration = 0;
-    bool m_enabled = true, m_active = false, m_available = false, m_refreshPending = false;
+    bool m_enabled = true, m_active = false, m_available = false;
 };
 }

@@ -7,7 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <limits>
 
 using namespace Qt::StringLiterals;
@@ -141,16 +141,14 @@ private Q_SLOTS:
                                                           field[u"dz"_s].toDouble() })
                                            - field[u"value"_s].toDouble()));
         }
-        QSaveFile report(QString::fromUtf8(LIGHTING_REPORT));
-        QVERIFY(report.open(QIODevice::WriteOnly));
-        report.write(QJsonDocument(QJsonObject{ { u"samples"_s, samples },
-                                                { u"fields"_s, data[u"fields"_s].toArray().size() },
-                                                { u"trajectoryError"_s, trajectoryError },
-                                                { u"paletteError"_s, paletteError },
-                                                { u"gpuUniformPositionError"_s, positionError },
-                                                { u"fieldError"_s, fieldError } })
-                             .toJson());
-        QVERIFY(report.commit());
+        QVERIFY(yalahoo::writeJsonFile(
+                QString::fromUtf8(LIGHTING_REPORT),
+                QJsonDocument(QJsonObject{ { u"samples"_s, samples },
+                                           { u"fields"_s, data[u"fields"_s].toArray().size() },
+                                           { u"trajectoryError"_s, trajectoryError },
+                                           { u"paletteError"_s, paletteError },
+                                           { u"gpuUniformPositionError"_s, positionError },
+                                           { u"fieldError"_s, fieldError } })));
         QVERIFY2(trajectoryError <= 1e-6, qPrintable(QString::number(trajectoryError, 'g', 12)));
         QVERIFY2(paletteError <= 1e-6, qPrintable(QString::number(paletteError, 'g', 12)));
         QVERIFY(positionError <= 1e-4);

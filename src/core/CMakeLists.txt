@@ -3,6 +3,9 @@ qt_add_library(
     STATIC
     Logging.cpp
     Logging.h
+    Require.h
+    MonotonicTime.h
+    JsonFile.h
     Units.h
     ColorTransfer.h
     CoverPixels.h

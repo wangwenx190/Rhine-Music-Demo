@@ -1,6 +1,7 @@
 // Executes the production cover sampler with analytic UVs. The independent scalar reference
 // decodes stored bytes before interpolation; no scene projection or image scoring is involved.
 #pragma once
+#include "Require.h"
 #include "OffscreenRhi.h"
 #include "PreparedAssets.h"
 #include "CoverCache.h"
@@ -100,11 +101,11 @@ inline QJsonObject checkLinearCoverSampling()
     std::unique_ptr<QRhiTexture> output(
             api->newTexture(QRhiTexture::RGBA16F, outputSize, 1,
                             QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource));
-    rhi::require(atlas->create() && output->create(), "Cannot create cover sampling targets");
+    yalahoo::require(atlas->create() && output->create(), "Cannot create cover sampling targets");
     std::unique_ptr<QRhiTextureRenderTarget> target(api->newTextureRenderTarget({ output.get() }));
     std::unique_ptr<QRhiRenderPassDescriptor> pass(target->newCompatibleRenderPassDescriptor());
     target->setRenderPassDescriptor(pass.get());
-    rhi::require(target->create(), "Cannot create cover sampling render target");
+    yalahoo::require(target->create(), "Cannot create cover sampling render target");
     std::array<Probe, ProbeCount * 2> uniforms;
     std::copy(probes.begin(), probes.end(), uniforms.begin());
     std::fill(uniforms.begin() + ProbeCount, uniforms.end(), Probe{ 1, 0, 0, .375f });
@@ -113,24 +114,24 @@ inline QJsonObject checkLinearCoverSampling()
     std::unique_ptr<QRhiSampler> sampler(
             api->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest, QRhiSampler::None,
                             QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
-    rhi::require(buffer->create() && sampler->create(), "Cannot create cover sampling inputs");
+    yalahoo::require(buffer->create() && sampler->create(), "Cannot create cover sampling inputs");
     std::unique_ptr<QRhiShaderResourceBindings> bindings(api->newShaderResourceBindings());
     bindings->setBindings(
             { QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage,
                                                         atlas.get(), sampler.get()),
               QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage,
                                                        buffer.get()) });
-    rhi::require(bindings->create(), "Cannot create cover sampling bindings");
+    yalahoo::require(bindings->create(), "Cannot create cover sampling bindings");
     std::unique_ptr<QRhiGraphicsPipeline> pipeline(api->newGraphicsPipeline());
     pipeline->setShaderStages(
             { { QRhiShaderStage::Vertex, rhi::shader(u":/rhi/output.vert.qsb"_s) },
               { QRhiShaderStage::Fragment, rhi::shader(u":/rhi/CoverSamplingProbe.frag.qsb"_s) } });
     pipeline->setShaderResourceBindings(bindings.get());
     pipeline->setRenderPassDescriptor(pass.get());
-    rhi::require(pipeline->create(), "Cannot create cover sampling pipeline");
+    yalahoo::require(pipeline->create(), "Cannot create cover sampling pipeline");
     QRhiCommandBuffer *cb = nullptr;
-    rhi::require(api->beginOffscreenFrame(&cb) == QRhi::FrameOpSuccess,
-                 "Cannot begin cover sampling frame");
+    yalahoo::require(api->beginOffscreenFrame(&cb) == QRhi::FrameOpSuccess,
+                     "Cannot begin cover sampling frame");
     auto *updates = api->nextResourceUpdateBatch();
     for (int level = 0; level < levels.size(); ++level) {
         const auto &image = levels[level];
@@ -152,9 +153,9 @@ inline QJsonObject checkLinearCoverSampling()
     auto *reads = api->nextResourceUpdateBatch();
     reads->readBackTexture(QRhiReadbackDescription(output.get()), &readback);
     cb->resourceUpdate(reads);
-    rhi::require(api->endOffscreenFrame() == QRhi::FrameOpSuccess
-                         && readback.data.size() == ProbeCount * 8,
-                 "Cannot read cover sampling output");
+    yalahoo::require(api->endOffscreenFrame() == QRhi::FrameOpSuccess
+                             && readback.data.size() == ProbeCount * 8,
+                     "Cannot read cover sampling output");
     double maximumError = 0;
     for (int index = 0; index < ProbeCount; ++index) {
         const auto expected = reference(levels, probes[index]);
@@ -162,12 +163,12 @@ inline QJsonObject checkLinearCoverSampling()
             qfloat16 value;
             std::memcpy(&value, readback.data.constData() + index * 8 + channel * 2, 2);
             const double actual = float(value);
-            rhi::require(std::isfinite(actual), "Nonfinite linear cover sampling output");
+            yalahoo::require(std::isfinite(actual), "Nonfinite linear cover sampling output");
             maximumError = std::max(maximumError, std::abs(expected[channel] - actual));
         }
     }
-    rhi::require(maximumError < .001,
-                 "Cover filtering differs from linear premultiplied interpolation");
+    yalahoo::require(maximumError < .001,
+                     "Cover filtering differs from linear premultiplied interpolation");
     return { { u"probes"_s, ProbeCount }, { u"maximumError"_s, maximumError } };
 }
 }

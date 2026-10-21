@@ -21,7 +21,7 @@
 #include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QSaveFile>
+#include "JsonFile.h"
 #include <QMouseEvent>
 
 namespace {
@@ -316,9 +316,6 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                         { u"retired"_s, retired },
                         { u"resourcePlan"_s, surface.diagnostics() },
                         { u"windowPolicy"_s, verification::windowPolicy(window) } };
-    QSaveFile file(output + "/report.json"_L1);
-    if (!file.open(QIODevice::WriteOnly))
-        return 4;
-    file.write(QJsonDocument(report).toJson());
-    return file.commit() && passed ? 0 : 6;
+    const bool saved = yalahoo::writeJsonFile(output + "/report.json"_L1, QJsonDocument(report));
+    return saved && passed ? 0 : 6;
 }

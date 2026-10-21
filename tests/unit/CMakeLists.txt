@@ -1,4 +1,3 @@
-qt_add_executable(IdentityTest IdentityTest.cpp)
 qt_add_executable(DisplayOutputTest DisplayOutputTest.cpp)
 target_include_directories(DisplayOutputTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(DisplayOutputTest PRIVATE YalahooRhi Qt6::Test Qt6::GuiPrivate Qt6::QuickVectorImage)
@@ -28,20 +27,16 @@ set_tests_properties(display-output-visible PROPERTIES ENVIRONMENT "YALAHOO_VERI
 yalahoo_unit_test(LocalizationTest localization
     LIBRARIES YalahooCore Qt6::Qml
     TIMEOUT 30)
-qt_add_executable(TitleTest TitleTest.cpp "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
-target_include_directories(TitleTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(TitleTest PRIVATE YalahooText Qt6::Test)
+yalahoo_unit_test(TitleTest title-reels
+    SOURCES "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp"
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
+    LIBRARIES YalahooText TIMEOUT 60)
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(TitleTest)
-yalahoo_platform(TitleTest)
-add_test(NAME title-reels COMMAND TitleTest)
-set_tests_properties(title-reels PROPERTIES TIMEOUT 60)
-qt_add_executable(NavigationTest NavigationTest.cpp)
-target_include_directories(NavigationTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(NavigationTest PRIVATE YalahooNavigation Qt6::Test)
-yalahoo_platform(NavigationTest)
-add_test(NAME navigation COMMAND NavigationTest)
-set_tests_properties(navigation PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(NavigationTest navigation
+    LIBRARIES YalahooNavigation
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
+    TIMEOUT 60)
 yalahoo_unit_test(CoverCacheTest cover-cache
     LIBRARIES YalahooRhi
     DEFINITIONS COVER_REPORT="${CMAKE_BINARY_DIR}/verification/cover-cache.json"
@@ -71,82 +66,58 @@ yalahoo_unit_test(RhiMaterialTest rhi-material-parameters
 if(YALAHOO_REVIEW)
     add_test(NAME real-columns-gpu COMMAND archive-pool-audit
         "${CMAKE_BINARY_DIR}/verification/real-columns" --real-columns)
-    set_tests_properties(real-columns-gpu PROPERTIES TIMEOUT 240
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME archive-pool-gpu COMMAND archive-pool-audit
         "${CMAKE_BINARY_DIR}/verification/archive-pool")
-    set_tests_properties(archive-pool-gpu PROPERTIES TIMEOUT 240
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME cover-gpu COMMAND cover-audit "${CMAKE_BINARY_DIR}/verification/covers")
-    set_tests_properties(cover-gpu PROPERTIES TIMEOUT 180
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded")
     add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
-    set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 180
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME rhi-transient-attachments-gpu COMMAND rhi-postprocess-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-transient-attachments" --attachments-only)
-    set_tests_properties(rhi-transient-attachments-gpu PROPERTIES TIMEOUT 60
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME rhi-bokeh-gpu COMMAND rhi-bokeh-audit "${CMAKE_BINARY_DIR}/verification/rhi-bokeh")
-    set_tests_properties(rhi-bokeh-gpu PROPERTIES TIMEOUT 120
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-smaa-gpu COMMAND rhi-smaa-audit "${CMAKE_BINARY_DIR}/verification/rhi-smaa")
-    set_tests_properties(rhi-smaa-gpu PROPERTIES TIMEOUT 120
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-ao-gpu COMMAND rhi-ao-audit "${CMAKE_BINARY_DIR}/verification/rhi-ao")
-    set_tests_properties(rhi-ao-gpu PROPERTIES TIMEOUT 120
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-fog-gpu COMMAND rhi-fog-audit "${CMAKE_BINARY_DIR}/verification/rhi-fog")
-    set_tests_properties(rhi-fog-gpu PROPERTIES TIMEOUT 120
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-shadow-gpu COMMAND rhi-shadow-audit "${CMAKE_BINARY_DIR}/verification/rhi-shadow")
-    set_tests_properties(rhi-shadow-gpu PROPERTIES TIMEOUT 120
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-shadow-attachments-gpu COMMAND rhi-shadow-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-shadow-attachments" --attachments-only)
-    set_tests_properties(rhi-shadow-attachments-gpu PROPERTIES TIMEOUT 60
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
-        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
-    set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
-        FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
     add_test(NAME rhi-shell-submission-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-shell-submission" --isolated-only)
-    set_tests_properties(rhi-shell-submission-gpu PROPERTIES TIMEOUT 60
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
-        FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
     add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-scale" --representative)
-    set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT 600
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
-        FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
     add_test(NAME rhi-shell-gpu COMMAND rhi-shell-audit
         "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
         "${CMAKE_BINARY_DIR}/verification/rhi-shell")
-    set_tests_properties(rhi-shell-gpu PROPERTIES TIMEOUT 240
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME rhi-opaque-gpu COMMAND rhi-audit "${CMAKE_BINARY_DIR}/verification/rhi")
-    set_tests_properties(
-        rhi-opaque-gpu
-        PROPERTIES
-        TIMEOUT
-        180
-        ENVIRONMENT
-        "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
-    )
+
+    set_tests_properties(real-columns-gpu archive-pool-gpu rhi-shell-gpu PROPERTIES TIMEOUT "240")
+
+    set_tests_properties(real-columns-gpu archive-pool-gpu cover-gpu rhi-opaque-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded")
+
+    set_tests_properties(real-columns-gpu archive-pool-gpu rhi-postprocess-gpu rhi-transient-attachments-gpu rhi-shell-gpu PROPERTIES FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+
+    set_tests_properties(cover-gpu rhi-postprocess-gpu rhi-opaque-gpu PROPERTIES TIMEOUT "180")
+
+    set_tests_properties(rhi-postprocess-gpu rhi-transient-attachments-gpu rhi-shell-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded")
+
+    set_tests_properties(rhi-transient-attachments-gpu rhi-shadow-attachments-gpu rhi-shell-submission-gpu PROPERTIES TIMEOUT "60")
+
+    set_tests_properties(rhi-bokeh-gpu rhi-smaa-gpu rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu PROPERTIES TIMEOUT "120")
+
+    set_tests_properties(rhi-bokeh-gpu rhi-smaa-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
+
+    set_tests_properties(rhi-bokeh-gpu rhi-smaa-gpu rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu rhi-shadow-attachments-gpu PROPERTIES FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
+
+    set_tests_properties(rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu rhi-shadow-attachments-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1")
+
+    set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT "420")
+
+    set_tests_properties(rhi-flicker-gpu rhi-shell-submission-gpu rhi-scale-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1")
+
+    set_tests_properties(rhi-flicker-gpu rhi-shell-submission-gpu rhi-scale-gpu PROPERTIES FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
+
+    set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT "600")
 endif()
 qt_add_executable(RenderQualityTest RenderQualityTest.cpp)
 target_link_libraries(RenderQualityTest PRIVATE YalahooScene Qt6::Test)
@@ -302,21 +273,9 @@ if(YALAHOO_REVIEW)
         )
     endforeach()
 endif()
-target_link_libraries(IdentityTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
-yalahoo_platform(IdentityTest)
-add_test(NAME identity COMMAND IdentityTest)
-qt_add_executable(ModuleProbe ModuleProbe.cpp)
-target_link_libraries(
-    ModuleProbe
-    PRIVATE
-    Qt6::Gui
-    Qt6::Test
-    Qt6::Quick3D
-    Qt6::Multimedia
-    Qt6::ShaderTools
-)
-yalahoo_platform(ModuleProbe)
-add_test(NAME module-link-and-plugins COMMAND ModuleProbe)
+yalahoo_unit_test(IdentityTest identity LIBRARIES YalahooCore Qt6::Gui)
+yalahoo_unit_test(ModuleProbe module-link-and-plugins
+    LIBRARIES Qt6::Gui Qt6::Quick3D Qt6::Multimedia Qt6::ShaderTools)
 add_test(NAME production-app-root COMMAND Yalahoo --verify-app)
 set_tests_properties(production-app-root PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
@@ -346,26 +305,11 @@ add_test(
     "${CMAKE_BINARY_DIR}/verification/runtime.json"
 )
 set_tests_properties(runtime PROPERTIES TIMEOUT 30)
-qt_add_executable(MotionTest MotionTest.cpp)
-target_link_libraries(MotionTest PRIVATE YalahooCore Qt6::Test)
-target_compile_definitions(
-    MotionTest
-    PRIVATE
-    FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    MOTION_REPORT="${CMAKE_BINARY_DIR}/verification/motion-errors.json"
-)
-yalahoo_platform(MotionTest)
-add_test(
-    NAME
-    motion
-    COMMAND
-    MotionTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/motion-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(motion PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(MotionTest motion
+    LIBRARIES YalahooCore
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" MOTION_REPORT="${CMAKE_BINARY_DIR}/verification/motion-errors.json"
+    REPORT motion-test.xml
+    TIMEOUT 60)
 add_test(
     NAME
     runtime-motion
@@ -392,31 +336,14 @@ set_tests_properties(
     ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
-qt_add_executable(LibraryDataTest LibraryDataTest.cpp)
 yalahoo_unit_test(DirectoryScannerTest directory-scanner
     LIBRARIES YalahooCore
     TIMEOUT 90)
-target_link_libraries(LibraryDataTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
-target_compile_definitions(LibraryDataTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(LibraryDataTest)
-add_test(
-    NAME
-    library-data
-    COMMAND
-    LibraryDataTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/library-data-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(
-    library-data
-    PROPERTIES
-    TIMEOUT
-    60
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-)
+yalahoo_unit_test(LibraryDataTest library-data
+    LIBRARIES YalahooCore Qt6::Gui
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    REPORT library-data-test.xml TIMEOUT 60
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 add_test(
     NAME
     runtime-library
@@ -436,26 +363,11 @@ set_tests_properties(
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
 
-qt_add_executable(LightingTest LightingTest.cpp)
-target_link_libraries(LightingTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(
-    LightingTest
-    PRIVATE
-    FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    LIGHTING_REPORT="${CMAKE_BINARY_DIR}/verification/lighting-errors.json"
-)
-yalahoo_platform(LightingTest)
-add_test(
-    NAME
-    lighting
-    COMMAND
-    LightingTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/lighting-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(lighting PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(LightingTest lighting
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" LIGHTING_REPORT="${CMAKE_BINARY_DIR}/verification/lighting-errors.json"
+    REPORT lighting-test.xml
+    TIMEOUT 60)
 
 if(YALAHOO_REVIEW)
     add_test(NAME runtime-rhi-integration COMMAND Yalahoo --verify-integration
@@ -465,16 +377,14 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
 endif()
-qt_add_executable(ArchivePoolTest ArchivePoolTest.cpp)
 yalahoo_unit_test(RealColumnsTest real-columns
     LIBRARIES YalahooScene
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     TIMEOUT 60)
-target_link_libraries(ArchivePoolTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(ArchivePoolTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(ArchivePoolTest)
-add_test(NAME archive-pool COMMAND ArchivePoolTest)
-set_tests_properties(archive-pool PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(ArchivePoolTest archive-pool
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    TIMEOUT 60)
 add_test(NAME runtime-filled COMMAND Yalahoo --verify-runtime
     "${CMAKE_BINARY_DIR}/verification/runtime-filled/runtime.json" --verify-shading --verify-filled)
 set_tests_properties(runtime-filled PROPERTIES TIMEOUT 60
@@ -500,21 +410,17 @@ yalahoo_unit_test(MediaMetadataTest media-metadata
 yalahoo_unit_test(TrackFocusTest track-focus
     LIBRARIES YalahooScene
     TIMEOUT 60)
-qt_add_executable(PlaybackTest PlaybackTest.cpp)
-target_include_directories(PlaybackTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
-target_link_libraries(PlaybackTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(PlaybackTest)
-add_test(NAME playback COMMAND PlaybackTest)
-set_tests_properties(playback PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
+yalahoo_unit_test(PlaybackTest playback
+    LIBRARIES YalahooCore
+    INCLUDES "${PROJECT_SOURCE_DIR}/tests/support"
+    TIMEOUT 90 SERIAL)
 
-qt_add_executable(AudioAmbienceTest AudioAmbienceTest.cpp)
-target_include_directories(AudioAmbienceTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
-target_link_libraries(AudioAmbienceTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(AudioAmbienceTest)
+yalahoo_unit_test(AudioAmbienceTest audio-ambience
+    LIBRARIES YalahooCore
+    INCLUDES "${PROJECT_SOURCE_DIR}/tests/support"
+    TIMEOUT 90 SERIAL)
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AudioAmbienceTest)
-add_test(NAME audio-ambience COMMAND AudioAmbienceTest)
-set_tests_properties(audio-ambience PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
 
 yalahoo_unit_test(SingleInstanceTest single-instance
     LIBRARIES YalahooCore
@@ -523,12 +429,10 @@ yalahoo_unit_test(SingleInstanceTest single-instance
 yalahoo_unit_test(SettingsTest settings
     LIBRARIES YalahooScene
     TIMEOUT 60)
-qt_add_executable(ExperimentTest ExperimentTest.cpp)
-target_include_directories(ExperimentTest PRIVATE "${PROJECT_SOURCE_DIR}/src/render/rhi")
-target_link_libraries(ExperimentTest PRIVATE YalahooScene Qt6::Test)
-yalahoo_platform(ExperimentTest)
-add_test(NAME experiments COMMAND ExperimentTest)
-set_tests_properties(experiments PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(ExperimentTest experiments
+    LIBRARIES YalahooScene
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/render/rhi"
+    TIMEOUT 60)
 
 yalahoo_unit_test(StartupTest startup
     LIBRARIES YalahooScene
@@ -546,13 +450,13 @@ add_test(NAME logging-terminal COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/LoggingTerminalTest.py" "$<TARGET_FILE:LoggingTest>")
 set_tests_properties(logging logging-terminal PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
 
-qt_add_executable(GraphicsBackendTest GraphicsBackendTest.cpp)
-target_include_directories(GraphicsBackendTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-target_link_libraries(GraphicsBackendTest PRIVATE YalahooRhi Qt6::Test)
-yalahoo_platform(GraphicsBackendTest)
-add_test(NAME graphics-backend COMMAND GraphicsBackendTest)
-set_tests_properties(graphics-backend PROPERTIES TIMEOUT 10)
+yalahoo_unit_test(GraphicsBackendTest graphics-backend
+    LIBRARIES YalahooRhi
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
+    TIMEOUT 10)
 
 yalahoo_unit_test(OnlineMetadataTest online-metadata
     LIBRARIES YalahooCore  Qt6::Network
     TIMEOUT 60)
+
+yalahoo_unit_test(JsonFileTest json-file LIBRARIES YalahooCore)

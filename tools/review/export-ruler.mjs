@@ -1,6 +1,5 @@
-import {sourceServer, launchBrowser, wait} from './browser-source.mjs';
+import {withSourcePage, rollingNumberSource, wait} from './browser-source.mjs';
 import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
-import {CDP} from './cdp.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -41,129 +40,71 @@ const html =
     +
     '</head><body><div id="album-ticks"></div><script type="module">' + harness
     + '</script></body></html>';
-const server = await sourceServer(frozen, html);
-const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
-const profile = path.join(root, 'build/ruler-profile-' + process.pid);
-const processHandle = await launchBrowser(profile, {diagnostics: true});
-processHandle.stderr.on('data', bytes => console.error(bytes.toString()));
-processHandle.on('exit', (code, signal) => console.error('Browser exited', code, signal));
-let browser, page;
-try {
-    const port = (await wait(() => fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')))
-                     .split('\n');
-    browser = await CDP.connect('ws://127.0.0.1:' + port[0] + port[1]);
-    console.log('Browser connected');
-    const version = await browser.send('Browser.getVersion');
-    console.log('Browser version read');
-
-    const {targetId} = await browser.send('Target.createTarget', {url: 'about:blank'});
-    const targets = await (await fetch('http://127.0.0.1:' + port[0] + '/json/list')).json();
-    page = await CDP.connect(targets.find((entry) => entry.id === targetId).webSocketDebuggerUrl);
-    console.log('Page connected');
-    console.log('Enabling Runtime');
-    await page.send('Runtime.enable');
-    console.log('Runtime enabled');
-    page.on('Runtime.exceptionThrown',
-            (event) => console.error(JSON.stringify(event.exceptionDetails)));
-    console.log('Enabling Page');
-    await page.send('Page.enable');
-    console.log('Page enabled');
-    await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
-    page.on('Fetch.requestPaused', (e) => {
-        const local = e.request.url.startsWith(origin + '/') || /^(data|blob):/.test(e.request.url);
-        void page.send(
-            local ? 'Fetch.continueRequest' : 'Fetch.failRequest',
-            {requestId: e.requestId, ...(local ? {} : {errorReason: 'BlockedByClient'})});
-    });
-    await page.send('Page.navigate', {url: origin + '/browse-ui'});
-    console.log('Frozen browse harness navigating');
-    await wait(() => page.evaluate('window.ready'));
-    const fixture = JSON.parse(
-        await fs.readFile(path.join(root, 'tests/fixtures/navigation/ruler.json'), 'utf8'));
-    const captures = [];
-    for (const dpr of [1, 1.5, 2]) {
-        for (const narrow of [false, true]) {
-            for (const night of [false, true]) {
-                await page.send('Emulation.setDeviceMetricsOverride', {
-                    width: narrow ? 390 : 1280,
-                    height: 80,
-                    deviceScaleFactor: dpr,
-                    mobile: false
-                });
-                const density = '?density=' + dpr + '&narrow=' + narrow + '&night=' + night;
-                await page.send('Page.navigate', {url: origin + '/browse-ui' + density});
-                await wait(() => page.evaluate('window.ready && location.search === '
-                                               + JSON.stringify(density)
-                                               + ' && window.devicePixelRatio === ' + dpr));
-                for (const test of fixture.cases) {
-                    for (const fps of [20, 30, 60, 120]) {
-                        await page.evaluate('window.resetRuler(' + narrow + ',' + night + ')');
-                        const states = [];
-                        for (let i = 0; i < test.operations.length; ++i) {
-                            const op = test.operations[i];
-                            const state = await page.evaluate(
-                                'window.rulerOperation(' + JSON.stringify(op) + ',' + fps + ','
-                                + (dpr === 1 && !narrow && !night && fps === 120) + ')');
-                            const capture = fps === 120 && (i === 0 || Boolean(op.frames));
-                            states.push({op, state, capture});
+await withSourcePage(
+    frozen, html,
+    path.join(root, 'build/ruler-profile-' + process.pid), async ({page, version, origin}) => {
+        const captures = [];
+        for (const dpr of [1, 1.5, 2]) {
+            for (const narrow of [false, true]) {
+                for (const night of [false, true]) {
+                    await page.send('Emulation.setDeviceMetricsOverride', {
+                        width: narrow ? 390 : 1280,
+                        height: 80,
+                        deviceScaleFactor: dpr,
+                        mobile: false
+                    });
+                    const density = '?density=' + dpr + '&narrow=' + narrow + '&night=' + night;
+                    await page.send('Page.navigate', {url: origin + '/browse-ui' + density});
+                    await wait(() => page.evaluate('window.ready && location.search === '
+                                                   + JSON.stringify(density)
+                                                   + ' && window.devicePixelRatio === ' + dpr));
+                    for (const test of fixture.cases) {
+                        for (const fps of [20, 30, 60, 120]) {
+                            await page.evaluate('window.resetRuler(' + narrow + ',' + night + ')');
+                            const states = [];
+                            for (let i = 0; i < test.operations.length; ++i) {
+                                const op = test.operations[i];
+                                const state = await page.evaluate(
+                                    'window.rulerOperation(' + JSON.stringify(op) + ',' + fps + ','
+                                    + (dpr === 1 && !narrow && !night && fps === 120) + ')');
+                                const capture = fps === 120 && (i === 0 || Boolean(op.frames));
+                                states.push({op, state, capture});
+                            }
+                            captures.push({name: test.name, dpr, narrow, night, fps, states});
                         }
-                        captures.push({name: test.name, dpr, narrow, night, fps, states});
                     }
                 }
             }
         }
-    }
-    const dependencyRoot = path.join(root, 'legacy-web/node_modules/@kitlangton/rolling-number');
-    const dependencyPackage =
-        JSON.parse(await fs.readFile(path.join(dependencyRoot, 'package.json'), 'utf8'));
-    const frozenLock = JSON.parse(
-        execFrozenGit(['show', baseline + ':package-lock.json'], {cwd: root, encoding: 'utf8'}));
-    if (dependencyPackage.version
-        !== frozenLock.packages['node_modules/@kitlangton/rolling-number'].version)
-        throw Error('Installed rolling-number differs from the frozen lock');
-    const dependency =
-        await fs.readFile(path.join(dependencyRoot, 'dist/chunk-vm1v7ncb.js'), 'utf8');
-    sources.rollingNumber = createHash('sha256').update(dependency).digest('hex');
-    const trackSource =
-        dependency.slice(dependency.indexOf('function L('), dependency.indexOf('function fe('));
-    const sampleSource =
-        dependency.slice(dependency.indexOf('function J('), dependency.indexOf('function Q('));
-    if (!trackSource.startsWith('function L(') || !sampleSource.startsWith('function J('))
-        throw Error('Frozen rolling-number pure track symbols were not found');
-    const oracle = Function(trackSource + sampleSource + '; return {track:L, sample:J};')();
-    const ordinalSamples = [];
-    let track = {target: 0, duration: 0, points: [0, 0]}, elapsed = 0,
-        state = {position: 0, velocity: 0};
-    const operations = [
-        {target: 1, instant: true}, {target: 7}, {dt: .123}, {target: -2}, {dt: .1}, {target: 9},
-        {dt: .3}, {target: 9}, {dt: .16}, {target: 0}, {dt: .460}
-    ];
-    for (const op of operations) {
-        if (op.dt !== undefined) {
-            elapsed += op.dt * 1000;
-            state = oracle.sample(track, elapsed);
-        } else if (op.instant || op.target !== track.target) {
-            track = oracle.track(state.position, op.target, state.velocity, op.instant ? 0 : 460);
-            elapsed = 0;
-            state = oracle.sample(track, 0);
+        const dependency = await rollingNumberSource(sources);
+        const trackSource =
+            dependency.slice(dependency.indexOf('function L('), dependency.indexOf('function fe('));
+        const sampleSource =
+            dependency.slice(dependency.indexOf('function J('), dependency.indexOf('function Q('));
+        if (!trackSource.startsWith('function L(') || !sampleSource.startsWith('function J('))
+            throw Error('Frozen rolling-number pure track symbols were not found');
+        const oracle = Function(trackSource + sampleSource + '; return {track:L, sample:J};')();
+        const ordinalSamples = [];
+        let track = {target: 0, duration: 0, points: [0, 0]}, elapsed = 0,
+            state = {position: 0, velocity: 0};
+        const operations = [
+            {target: 1, instant: true}, {target: 7}, {dt: .123}, {target: -2}, {dt: .1},
+            {target: 9}, {dt: .3}, {target: 9}, {dt: .16}, {target: 0}, {dt: .460}
+        ];
+        for (const op of operations) {
+            if (op.dt !== undefined) {
+                elapsed += op.dt * 1000;
+                state = oracle.sample(track, elapsed);
+            } else if (op.instant || op.target !== track.target) {
+                track =
+                    oracle.track(state.position, op.target, state.velocity, op.instant ? 0 : 460);
+                elapsed = 0;
+                state = oracle.sample(track, 0);
+            }
+            ordinalSamples.push({op, value: state.position, velocity: state.velocity});
         }
-        ordinalSamples.push({op, value: state.position, velocity: state.velocity});
-    }
-    await fs.writeFile(
-        path.join(output, 'report.json'),
-        JSON.stringify({baseline, sources, version, captures, ordinalSamples}, null, 2) + '\n');
-    console.log('Frozen ruler scenarios: ' + captures.length);
-} catch (error) {
-    console.error('Ruler export failed:', error);
-    throw error;
-} finally {
-    page?.close();
-    if (browser) {
-        await browser.send('Browser.close')
-            .catch(() => {
-                   });
-        browser.close();
-    }
-    processHandle.kill();
-    await server.close();
-}
+        await fs.writeFile(
+            path.join(output, 'report.json'),
+            JSON.stringify({baseline, sources, version, captures, ordinalSamples}, null, 2) + '\n');
+        console.log('Frozen ruler scenarios: ' + captures.length);
+    }, {diagnostics: true});

@@ -4,7 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QQuickWindow>
-#include <QSaveFile>
+#include "JsonFile.h"
 
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
@@ -119,8 +119,6 @@ private Q_SLOTS:
         window.hide();
         QTest::qWait(NativeEventSettleMilliseconds);
         record(u"final-hide"_s, !window.isVisible());
-        QSaveFile output(QString::fromUtf8(VISIBLE_WINDOW_REPORT));
-        QVERIFY(output.open(QIODevice::WriteOnly));
         const QJsonObject report{
             { u"passed"_s, passed },
             { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
@@ -130,8 +128,8 @@ private Q_SLOTS:
             { u"stages"_s, stages },
             { u"desktopCaptured"_s, false }
         };
-        QVERIFY(output.write(QJsonDocument(report).toJson()) > 0);
-        QVERIFY(output.commit());
+        QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(VISIBLE_WINDOW_REPORT),
+                                       QJsonDocument(report)));
         QVERIFY2(passed,
                  "Visible window policy/exposure/present failed; see native-window-visible.json");
     }
