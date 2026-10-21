@@ -63,6 +63,110 @@ void checkResolve(const Capture &capture, int samples, bool shells)
                 check(a[u"resolveSamples"_s].toInt() == 0, "Single sample has redundant resolve");
         }
     }
+    if (!shells)
+        return;
+    const auto opaque = graph[0].toObject()[u"attachments"_s].toArray();
+    const auto composite = graph[1].toObject()[u"attachments"_s].toArray();
+    for (int i = 0; i < opaque.size(); ++i) {
+        const auto a = opaque[i].toObject(), b = composite[i].toObject();
+        check((a[u"resourceId"_s] == b[u"resourceId"_s]) == (samples > 1),
+              "Opaque/composite transient MSAA sharing is incorrect");
+        if (samples > 1)
+            check(a[u"resolveResourceId"_s] != b[u"resolveResourceId"_s],
+                  "Opaque capture resolve aliases composite output");
+    }
+}
+void checkTransientInventory(const QJsonObject &resources, QSize size, int samples, bool diagnostic)
+{
+    qint64 actualBytes = 0, plannedBytes = 0;
+    for (const auto &entry : resources[u"entries"_s].toArray()) {
+        const auto row = entry.toObject();
+        if (row[u"name"_s].toString().contains("-msaa-"_L1))
+            actualBytes += row[u"estimatedBytes"_s].toInteger();
+    }
+    for (const auto &entry : resources[u"preallocationPlan"_s].toObject()[u"entries"_s].toArray()) {
+        const auto row = entry.toObject();
+        if (row[u"name"_s].toString().endsWith("-msaa"_L1))
+            plannedBytes += row[u"estimatedBytes"_s].toInteger();
+    }
+    // One RGBA16F MSAA target, plus two RGBA8 channels only in diagnostic sessions.
+    const qint64 expected = samples > 1
+            ? qint64(size.width()) * size.height() * samples * (diagnostic ? 16 : 8)
+            : 0;
+    check(actualBytes == expected && plannedBytes == expected,
+          "Actual/preallocation inventories do not count shared MSAA exactly once");
+}
+QJsonObject checkProductionAttachments(Input input, QSize size)
+{
+    struct Snapshot final
+    {
+        std::mutex mutex;
+        QJsonObject resources;
+    };
+    auto snapshot = std::make_shared<Snapshot>();
+    RhiCaptureHarness driver;
+    driver.item->captured = { };
+    driver.item->profiled = [snapshot](QJsonObject sample) {
+        std::scoped_lock lock(snapshot->mutex);
+        snapshot->resources = sample[u"resources"_s].toObject();
+    };
+    input.profile = true;
+    input.rawOutput = false;
+    driver.replay(1, [&](int) {
+        driver.submitWithoutCapture(input, size);
+    });
+    QJsonObject resources;
+    {
+        std::scoped_lock lock(snapshot->mutex);
+        resources = snapshot->resources;
+    }
+    checkTransientInventory(resources, size, input.captureSamples, false);
+    const auto output = driver.surface->grab();
+    check(output.size() == size, "Production attachment output missing");
+    const auto expected = outputReference(input.background, input.exposure);
+    const auto pixel = output.pixelColor(0, 0);
+    const std::array<double, 3> actual{ pixel.redF(), pixel.greenF(), pixel.blueF() };
+    for (int channel = 0; channel < 3; ++channel) {
+        const auto linear = expected[channel];
+        const double srgb =
+                linear <= .0031308 ? linear * 12.92 : 1.055 * std::pow(linear, 1 / 2.4) - .055;
+        check(std::abs(actual[channel] - srgb) <= 1.0 / 255 && pixel.alpha() == 255,
+              "Production resolve changed final background color");
+    }
+    check(verification::windowPolicySatisfied(*driver.window), "Production window policy failed");
+    return resources;
+}
+QJsonObject checkAttachments(const QJsonArray &sourceCases)
+{
+    RhiCaptureHarness driver;
+    auto input = fixture(sourceCases[3].toObject());
+    input.shadows = false;
+    input.postprocess = true;
+    input.aoSamples = 32;
+    input.bokeh = input.smaa = true;
+    QJsonArray states;
+    // Resize and both single/multisample paths exercise reuse without unrelated stress.
+    for (const QSize size : { QSize(321, 241), QSize(241, 321) }) {
+        input.scene.projection.setToIdentity();
+        input.scene.projection.perspective(32, float(size.width()) / size.height(), 5, 300);
+        for (int samples : { 1, 4 }) {
+            input.captureSamples = samples;
+            const auto capture = driver.capture(input, size);
+            checkResolve(capture, samples, true);
+            checkPostprocessGraph(input, capture);
+            checkTransientInventory(capture.metadata[u"resources"_s].toObject(), size, samples,
+                                    true);
+            states.append(QJsonObject{
+                    { u"diagnostic"_s, capture.metadata },
+                    { u"productionResources"_s, checkProductionAttachments(input, size) } });
+        }
+    }
+    return { { u"passed"_s, true },
+             { u"scope"_s,
+               u"transient-attachments-only; no performance sampling or lifecycle stress"_s },
+             { u"states"_s, states },
+             { u"offscreen"_s, driver.surface->diagnostics() },
+             { u"windowPolicy"_s, verification::windowPolicy(*driver.window) } };
 }
 QJsonObject distribution(QVector<double> values)
 {
@@ -81,7 +185,8 @@ auto runPostprocessAudit(int &argc, char **&argv)
         return 0;
     }
     const bool profile = argc == 3 && QByteArray(argv[2]) == "--profile"_ba;
-    if (argc != 2 && !profile)
+    const bool attachmentsOnly = argc == 3 && QByteArray(argv[2]) == "--attachments-only"_ba;
+    if (argc != 2 && !profile && !attachmentsOnly)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
@@ -91,6 +196,15 @@ auto runPostprocessAudit(int &argc, char **&argv)
         const auto original = read((QString::fromUtf8(FIXTURE_ROOT))
                                    + "/tests/fixtures/render-backend/visual.json"_L1);
         const auto sourceCases = original[u"cases"_s].toArray();
+        if (attachmentsOnly) {
+            const auto report = checkAttachments(sourceCases);
+            QSaveFile file(output + "/runtime.json"_L1);
+            check(file.open(QIODevice::WriteOnly), "Cannot write attachment report");
+            file.write(QJsonDocument(report).toJson());
+            check(file.commit(), "Cannot commit attachment report");
+            std::puts("Shared MSAA, independent resolves and production attachments passed.");
+            return 0;
+        }
         RhiCaptureHarness driver;
         QJsonArray states, rebuilds;
         auto input = fixture(sourceCases[3].toObject());

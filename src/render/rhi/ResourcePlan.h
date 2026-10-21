@@ -38,22 +38,23 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedTexture(u"shadow-depth"_s, shadow, QRhiTexture::D32F);
     if (diagnostic)
         plan.plannedTexture(u"shadow-readback-color"_s, shadow, QRhiTexture::R32F);
-    auto color = [&](const QString &name, bool mips) {
+    auto color = [&](const QString &name, bool mips, bool allocateMultisample) {
         plan.plannedTexture(name + "-resolve"_L1, size, QRhiTexture::RGBA16F, 1, mips);
-        if (in.captureSamples > 1)
+        if (in.captureSamples > 1 && allocateMultisample)
             plan.plannedTexture(name + "-msaa"_L1, size, QRhiTexture::RGBA16F, in.captureSamples);
         if (diagnostic)
             for (const auto &channel : { u"normal"_s, u"depth"_s }) {
                 plan.plannedTexture(name + "-"_L1 + channel, size, QRhiTexture::RGBA8);
-                if (in.captureSamples > 1)
+                if (in.captureSamples > 1 && allocateMultisample)
                     plan.plannedTexture(name + "-"_L1 + channel + "-msaa"_L1, size,
                                         QRhiTexture::RGBA8, in.captureSamples);
             }
     };
-    color(u"opaque"_s, in.shells);
+    color(u"opaque"_s, in.shells, true);
     if (in.shells)
-        color(u"composite"_s, false);
-    // Shared opaque/composite depth is counted once. Backend-private depth format upper bound.
+        color(u"composite"_s, false, false);
+    // Opaque/composite share transient MSAA color and depth, but never resolve images.
+    // Backend-private depth uses its format upper bound.
     plan.plannedTexture(u"shared-main-depth-upper-bound"_s, size, QRhiTexture::D32FS8,
                         in.captureSamples);
     plan.plannedTexture(u"cover-or-atlas"_s, in.atlasGeneration ? in.atlasSize : in.cover.size(),

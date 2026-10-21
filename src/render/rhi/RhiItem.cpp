@@ -188,8 +188,9 @@ struct Target final
     bool prepass = false;
     QSize size;
     Owned<QRhiTexture> color, normal, depth;
-    std::array<Owned<QRhiTexture>, yalahoo::rhi::renderData::CaseSurfaceCount> multisample;
-    std::array<Owned<QRhiRenderBuffer>, yalahoo::rhi::renderData::CaseSurfaceCount>
+    std::array<std::shared_ptr<QRhiTexture>, yalahoo::rhi::renderData::CaseSurfaceCount>
+            multisample;
+    std::array<std::shared_ptr<QRhiRenderBuffer>, yalahoo::rhi::renderData::CaseSurfaceCount>
             multisampleBuffers;
     std::shared_ptr<QRhiRenderBuffer> z;
     Owned<QRhiTexture> hardwareDepth;
@@ -444,7 +445,7 @@ private:
     void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
                     QRhiTexture::Format format = QRhiTexture::RGBA16F,
-                    std::shared_ptr<QRhiRenderBuffer> sharedDepth = { });
+                    const Target *sharedAttachments = nullptr);
     Owned<QRhiGraphicsPipeline> pipeline(Target &target, QRhiShaderResourceBindings *bindings,
                                          bool shadow, bool shell = false, bool instanced = false);
     Uniform uniform(const QMatrix4x4 &model, int kind, int entity = -1) const;
@@ -617,7 +618,7 @@ void Renderer::reset()
     expectedCoverTiles.clear();
 }
 void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, bool mips,
-                          QRhiTexture::Format format, std::shared_ptr<QRhiRenderBuffer> sharedDepth)
+                          QRhiTexture::Format format, const Target *sharedAttachments)
 {
     target.reset();
     target.mrt = mrt;
@@ -634,8 +635,17 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
     };
     if (!target.prepass)
         target.color = texture(format, mips);
-    if (sharedDepth) {
-        target.z = sharedDepth;
+    if (sharedAttachments) {
+        require(sharedAttachments->rt && sharedAttachments->size == size
+                        && sharedAttachments->mrt == mrt
+                        && sharedAttachments->rt->sampleCount() == samples
+                        && sharedAttachments->color->format() == format,
+                "Shared transient attachments are incompatible");
+        target.z = sharedAttachments->z;
+        // Only resolved opaque color survives into the composite pass. Its MSAA
+        // storage can be cleared/reused; each pass retains its own resolve images.
+        target.multisample = sharedAttachments->multisample;
+        target.multisampleBuffers = sharedAttachments->multisampleBuffers;
     } else {
         target.z.reset(api->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, samples));
         require(target.z->create(), "Cannot create RHI depth attachment");
@@ -658,6 +668,15 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
         };
         for (int i = 0; i < (mrt ? yalahoo::rhi::renderData::CaseSurfaceCount : 1); ++i) {
             QRhiColorAttachment attachment;
+            if (sharedAttachments) {
+                if (target.multisample[i])
+                    attachment.setTexture(target.multisample[i].get());
+                else
+                    attachment.setRenderBuffer(target.multisampleBuffers[i].get());
+                attachment.setResolveTexture(resolves[i]);
+                attachments.append(attachment);
+                continue;
+            }
             const auto *context = QOpenGLContext::currentContext();
             const bool textureStorageAvailable = api->backend() != QRhi::OpenGLES2
                     || (context && context->getProcAddress("glTexStorage2DMultisample"));
@@ -684,8 +703,8 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
     desc.setDepthStencilBuffer(target.z.get());
     target.rt.reset(api->newTextureRenderTarget(
             desc,
-            sharedDepth ? QRhiTextureRenderTarget::PreserveDepthStencilContents
-                        : QRhiTextureRenderTarget::Flags()));
+            sharedAttachments ? QRhiTextureRenderTarget::PreserveDepthStencilContents
+                              : QRhiTextureRenderTarget::Flags()));
     target.pass.reset(target.rt->newCompatibleRenderPassDescriptor());
     target.rt->setRenderPassDescriptor(target.pass.get());
     require(target.rt->create(), "Cannot create RHI render target");
@@ -1166,7 +1185,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         makeTarget(opaque, targetSize, diagnosticTargets, captureSamples, input.shells);
         if (input.shells)
             makeTarget(composite, targetSize, diagnosticTargets, captureSamples, false,
-                       QRhiTexture::RGBA16F, opaque.z);
+                       QRhiTexture::RGBA16F, &opaque);
         else
             composite.reset();
         require(std::max(coverSize.width(), coverSize.height())
@@ -1627,10 +1646,20 @@ void Renderer::drawShellPass(QRhiCommandBuffer *cb, const QVector<ShellDraw> &sh
     }
     if (recordCapture && !input.geometryDiagnostic)
         opticalEvents.append(u"shell-shading"_s);
-    if (!input.geometryDiagnostic)
-        for (const auto &draw : shells)
-            if (visible[draw.entity])
-                drawMesh(cb, shellPipeline.get(), shellBindings.get(), draw.mesh, draw.offset);
+    if (!input.geometryDiagnostic && visibleCount) {
+        // Preserve the global depth/identity/surface sequence. Pipeline and geometry
+        // are constant across this sequence; only the uniform offset changes.
+        cb->setGraphicsPipeline(shellPipeline.get());
+        const QRhiCommandBuffer::VertexInput vertex(vertices.get(), 0);
+        cb->setVertexInput(0, 1, &vertex, indices.get(), 0, QRhiCommandBuffer::IndexUInt32);
+        for (const auto &draw : shells) {
+            if (!visible[draw.entity])
+                continue;
+            const QRhiCommandBuffer::DynamicOffset dynamic{ 0, draw.offset };
+            cb->setShaderResources(shellBindings.get(), 1, &dynamic);
+            cb->drawIndexed(draw.mesh.count, 1, draw.mesh.start);
+        }
+    }
     cb->endPass();
 }
 void Renderer::drawShadowPass(QRhiCommandBuffer *cb, bool batched, quint32 batchGeometryOffset,
@@ -2085,6 +2114,12 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                         { u"samples"_s, texture ? texture->sampleCount() : buffer->sampleCount() },
                         { u"width"_s, size.width() },
                         { u"height"_s, size.height() },
+                        { u"resourceId"_s,
+                          qint64(texture ? texture->globalResourceId()
+                                         : buffer->globalResourceId()) },
+                        { u"resolveResourceId"_s,
+                          resolved ? QJsonValue(qint64(resolved->globalResourceId()))
+                                   : QJsonValue() },
                         { u"resolveFormat"_s, resolved ? int(resolved->format()) : 0 },
                         { u"resolveSamples"_s, resolved ? resolved->sampleCount() : 0 },
                         { u"resolveWidth"_s, resolved ? resolved->pixelSize().width() : 0 },
@@ -2477,7 +2512,7 @@ QJsonObject Renderer::resourceInventory()
         { u"resizeOldPlusNewUpperBoundBytes"_s, current + previousResourceBytes },
         { u"measuredVramBytes"_s, QJsonValue() },
         { u"scope"_s,
-          u"Descriptor payloads; shared depth counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency. Qt UI attachment estimates and their full old+new plan are separate in preallocationPlan."_s }
+          u"Descriptor payloads; shared depth and transient MSAA counted once. Format 0 depth/stencil uses 8-byte upper bound. Excludes driver padding, PSO/SRB storage and Qt window swapchain/compositor (not observable here). Old+new is a conservative replacement overlap, not measured residency. Qt UI attachment estimates and their full old+new plan are separate in preallocationPlan."_s }
     };
     previousResourceBytes = current;
     inventoryGeneration = generation;

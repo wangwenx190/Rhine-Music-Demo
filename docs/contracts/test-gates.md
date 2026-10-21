@@ -44,7 +44,7 @@
 | 实际入口 | 分类 |
 | --- | --- |
 | rhi-bokeh-gpu、rhi-smaa-gpu | 直接QRhi offscreen，各平台入口均无可见窗口；实际后端能力另验 |
-| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、ui-drawing、ruler-drawing、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
+| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、ui-drawing、ruler-drawing、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/shell-submission/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
 
 整场GUI显式入口为`python3 tools/build/verify-gui.py`，范围与采集语义见[rhi-integration.md](rhi-integration.md)；它不隐式加入fast/full集合。
 

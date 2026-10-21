@@ -87,6 +87,11 @@ if(YALAHOO_REVIEW)
     set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 180
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
+    add_test(NAME rhi-transient-attachments-gpu COMMAND rhi-postprocess-audit
+        "${CMAKE_BINARY_DIR}/verification/rhi-transient-attachments" --attachments-only)
+    set_tests_properties(rhi-transient-attachments-gpu PROPERTIES TIMEOUT 60
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
+        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
     add_test(NAME rhi-bokeh-gpu COMMAND rhi-bokeh-audit "${CMAKE_BINARY_DIR}/verification/rhi-bokeh")
     set_tests_properties(rhi-bokeh-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
@@ -115,6 +120,11 @@ if(YALAHOO_REVIEW)
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
+        FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
+    add_test(NAME rhi-shell-submission-gpu COMMAND rhi-flicker-audit
+        "${CMAKE_BINARY_DIR}/verification/rhi-shell-submission" --isolated-only)
+    set_tests_properties(rhi-shell-submission-gpu PROPERTIES TIMEOUT 60
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
         FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
     add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit

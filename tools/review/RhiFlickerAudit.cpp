@@ -63,7 +63,8 @@ auto runFlickerAudit(int &argc, char **&argv)
         yalahoo::CoverCache::finishDecoders();
     });
     const bool opticsOnly = argc == 3 && QString::fromLocal8Bit(argv[2]) == "--optics-only"_L1;
-    if (argc != 2 && !opticsOnly)
+    const bool isolatedOnly = argc == 3 && QByteArray(argv[2]) == "--isolated-only"_ba;
+    if (argc != 2 && !opticsOnly && !isolatedOnly)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
@@ -110,7 +111,9 @@ auto runFlickerAudit(int &argc, char **&argv)
             }
         }
         QJsonArray sequences;
-        for (QSize size : { QSize(640, 480), QSize(1280, 720) }) {
+        const QList<QSize> sizes =
+                isolatedOnly ? QList<QSize>() : QList<QSize>{ { 640, 480 }, { 1280, 720 } };
+        for (QSize size : sizes) {
             MotionController motion;
             OverviewController overview(&motion);
             SelectionController selection(&motion);
@@ -331,6 +334,7 @@ auto runFlickerAudit(int &argc, char **&argv)
         report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19C2C"_s },
                                                 { u"passed"_s, true },
                                                 { u"opticsOnly"_s, opticsOnly },
+                                                { u"isolatedOnly"_s, isolatedOnly },
                                                 { u"qt"_s, QString::fromUtf8(qVersion()) },
                                                 { u"isolated"_s, isolated },
                                                 { u"sequences"_s, sequences } })
