@@ -6,16 +6,14 @@
 #include <algorithm>
 #include <utility>
 
-namespace {
-// Row packing uses measured ink width plus the source chip padding and inter-chip gap.
-constexpr auto ChipHorizontalPaddingPixels = 22;
-constexpr auto ChipGapPixels = 7;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+// Row packing uses measured ink width plus the source chip padding and inter-chip gap.
+constexpr auto ChipHorizontalPaddingPixels = 22;
+constexpr auto ChipGapPixels = 7;
+
 constexpr int entriesRole = Qt::UserRole + 1;
 }
 GenreRowsModel::GenreRowsModel(QObject *parent) : QAbstractListModel(parent)

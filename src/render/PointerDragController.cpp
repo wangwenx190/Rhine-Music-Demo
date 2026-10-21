@@ -3,16 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
+namespace yalahoo {
 namespace {
 // Input uses logical pixels; yaw and follow rates stay independent of device pixel ratio.
 constexpr auto RadiansPerLogicalPixel = .004;
 constexpr auto MaximumInspectionYaw = .8;
 constexpr auto ClickSlopLogicalPixels = 6;
 constexpr auto InspectionFollowRate = 2.8;
-}
 
-namespace yalahoo {
-namespace {
 bool finite(QPointF p)
 {
     return std::isfinite(p.x()) && std::isfinite(p.y());

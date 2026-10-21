@@ -4,6 +4,7 @@
 #include <QCanvasPath>
 #include <QElapsedTimer>
 
+namespace yalahoo {
 namespace {
 // Cache the three authored tick shapes; per-frame state only selects and transforms them.
 constexpr auto NarrowRestingHeight = 8.0;
@@ -12,10 +13,7 @@ constexpr auto NarrowActiveHeight = 21.0;
 constexpr auto ActiveHeight = 30.0;
 constexpr auto NarrowHoverHeight = 16.0;
 constexpr auto HoverHeight = 22.0;
-}
 
-namespace yalahoo {
-namespace {
 RulerInkStats stats;
 class Renderer final : public QCanvasPainterItemRenderer
 {

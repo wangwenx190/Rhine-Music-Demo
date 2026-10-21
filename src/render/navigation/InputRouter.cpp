@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
+namespace yalahoo {
 namespace {
 // Normalize wheel units once and bound gesture accumulation before issuing navigation intent.
 constexpr auto WheelBurstGapMilliseconds = 200;
@@ -22,10 +23,7 @@ constexpr auto AngleDeltaPerDetent = 120;
 constexpr auto MinimumSwipePixels = 36;
 constexpr auto SwipeAxisDominance = 1.3;
 constexpr auto MaximumSwipeMilliseconds = 1400;
-}
 
-namespace yalahoo {
-namespace {
 bool ownsInput(QQuickItem *item, bool wheel)
 {
     for (auto *node = item; node; node = node->parentItem()) {

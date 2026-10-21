@@ -35,9 +35,7 @@ enum EditCommand {
     SelectAllCommand
 };
 constexpr NSInteger EditCommandCount = 6;
-}
 
-namespace {
 const char *editMethod(NSInteger tag)
 {
     switch (tag) {

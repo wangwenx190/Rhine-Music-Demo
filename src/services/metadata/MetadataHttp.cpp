@@ -9,6 +9,9 @@
 #include <QNetworkRequest>
 #include <QSet>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Host pacing and a hard deadline bound each request; HTTP ranges use exclusive upper bounds.
 constexpr auto HostSpacingMilliseconds = 1100;
@@ -22,12 +25,7 @@ constexpr auto MaximumRetryDays = 7;
 constexpr auto HoursPerDay = 24;
 constexpr auto SecondsPerHour = 3600;
 constexpr auto FallbackRetrySeconds = 60;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 constexpr qint64 maximumResponseBytes = 2 * 1024 * 1024;
 QString service(const QUrl &url)
 {

@@ -22,17 +22,14 @@
 #include <QtConcurrentRun>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 constexpr qint64 maximumCacheBytes =
         256LL * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB;
 // Bound metadata batches and validate persisted network configuration before committing it.
 constexpr auto MetadataBatchMiB = 8;
-}
-
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 }
 struct LibraryStore::Private final
 {

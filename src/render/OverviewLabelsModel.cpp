@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Admission hysteresis keeps retiring labels stable while collision checks reserve entry-button width.
 constexpr auto EntryBezierFirstX = .4;
@@ -29,12 +32,7 @@ constexpr auto VerticalCollisionPixels = 62;
 constexpr auto MaximumVisibleLabels = 9;
 constexpr auto EntrySlideSeconds = .42;
 constexpr auto EntryFadeSeconds = .32;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &entryCurve()
 {

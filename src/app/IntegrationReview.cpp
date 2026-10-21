@@ -25,6 +25,9 @@
 #include <algorithm>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Bounded diagnostics preserve observed facts; elapsed time and native refresh cadence use explicit units.
 constexpr auto MinimumSampleSeconds = 12;
@@ -36,20 +39,13 @@ constexpr auto FinalizeDelayMilliseconds = 200;
 constexpr auto MinimumObservedSamples = 100;
 constexpr auto FinalizeDeadlineMilliseconds = 60000;
 constexpr auto QuitObservationMilliseconds = 3000;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 20,
     IntegrationReviewFailed = 21
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 QJsonObject distribution(QVector<double> values, double period)
 {
     if (values.isEmpty())

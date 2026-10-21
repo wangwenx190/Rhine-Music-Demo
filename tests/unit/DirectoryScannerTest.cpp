@@ -20,17 +20,15 @@
 #include <QTimer>
 #include <filesystem>
 
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int AsyncDeadlineMilliseconds = 10000;
 constexpr int LargeScanDeadlineMilliseconds = 20000;
 constexpr int EventPollMilliseconds = 10;
-}
 
-using namespace Qt::StringLiterals;
-
-using namespace yalahoo;
-namespace {
 bool put(const QString &path, const QByteArray &bytes = "anonymous audio fixture"_ba)
 {
     if (!QDir().mkpath(QFileInfo(path).absolutePath()))

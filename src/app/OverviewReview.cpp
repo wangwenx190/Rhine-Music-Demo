@@ -52,18 +52,14 @@ constexpr auto LabelRightInsetPixels = 14;
 constexpr auto HiddenSettleMilliseconds = 40;
 constexpr auto ShortcutSettleFrames = 5;
 constexpr auto ReviewDeadlineMilliseconds = 120000;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 4,
     CaptureFailed = 5,
     ReportFailed = 6
 };
-}
 
-namespace {
 // Ordered review states retain their report ordinals; names describe each awaited fact.
 enum ReviewStage {
     AwaitInitialFrame = 0,
@@ -91,8 +87,6 @@ enum ReviewStage {
 
 using namespace Qt::StringLiterals;
 
-namespace {
-}
 int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                             OverviewController &overview, PresentationController &presentation,
                             LibrarySession &library, MotionController &motion,

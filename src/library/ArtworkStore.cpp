@@ -9,15 +9,13 @@
 #include <QImageReader>
 #include <QSaveFile>
 
-namespace {
-// Compare decoded storage against the Qt allocation limit, not compressed image size.
-constexpr auto DecodedRgbaBytesPerPixel = 4;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+// Compare decoded storage against the Qt allocation limit, not compressed image size.
+constexpr auto DecodedRgbaBytesPerPixel = 4;
+
 bool withinImageAllocationLimit(const QImage &image)
 {
     // Embedded artwork is already decoded by Qt Multimedia. Apply the same

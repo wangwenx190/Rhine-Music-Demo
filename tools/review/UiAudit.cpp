@@ -45,21 +45,17 @@
 #include <QMutexLocker>
 #include <rhi/qrhi.h>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int LayoutSettleMilliseconds = 150;
 constexpr int TeardownObservationMilliseconds = 300;
 constexpr int InteractionSettleMilliseconds = 1200;
-}
 
-namespace {
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 // Construct on first access; no namespace-scope runtime initialization is required.
 QJsonArray &diagnostics()
 {

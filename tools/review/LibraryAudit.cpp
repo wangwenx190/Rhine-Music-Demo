@@ -43,23 +43,19 @@
 #include <QTest>
 #include <atomic>
 
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
 namespace {
 // Event-driven probe waits are bounded independently of injected fixture values.
 constexpr int FrameDeadlineMilliseconds = 5000;
 constexpr int MediaDeadlineMilliseconds = 10000;
 constexpr int InputDeadlineMilliseconds = 2000;
 constexpr int ModelDeadlineMilliseconds = 3000;
-}
 
-namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int EventPollMilliseconds = 5;
-}
 
-using namespace Qt::StringLiterals;
-
-using namespace yalahoo;
-namespace {
 // Test-only injection. No networking objects or production registration.
 class SampleProvider final : public IMetadataProvider
 {

@@ -12,9 +12,7 @@
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int RenderDeadlineMilliseconds = 120000;
-}
 
-namespace {
 // Explicit public query inputs are bounded before JSON parsing and provider dispatch.
 constexpr auto MaximumReleaseYear = 9999;
 constexpr auto BytesPerKiB = 1024;

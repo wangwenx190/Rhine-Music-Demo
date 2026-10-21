@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Whole-run shaping preserves ligatures/fallback fonts; a bounded two-stage search fits the source layout.
 constexpr auto DefaultTranslationBudgetPixels = 300;
@@ -30,12 +33,7 @@ constexpr auto MinimumFontPixels = 20.0;
 constexpr auto CoarseSearchSteps = 8;
 constexpr auto FineSearchSteps = 16;
 constexpr auto MaximumLayoutEntries = 96;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 struct Part final
 {
     QList<TitleGlyph> glyphs;

@@ -12,6 +12,9 @@
 #include <QPainterPathStroker>
 #include <numbers>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // View boxes and stable path IDs come from bundled brand geometry; ring dashes use source arc lengths.
 constexpr auto DoubleRoundTripDigits = 17;
@@ -35,12 +38,7 @@ constexpr auto BottomDotPathId = 103;
 constexpr auto CrossLineWidthPixels = 1.1;
 constexpr auto DefaultPathWidth = 16;
 constexpr auto PointPathLengthThreshold = .02;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 OpeningInkStats stats;
 QString svgPath(const QPainterPath &p)
 {

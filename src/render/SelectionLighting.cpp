@@ -5,6 +5,9 @@
 #include <QVector4D>
 #include <algorithm>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Palette intensities preserve source light units; sRGB encoding/decoding uses the standard piecewise transfer.
 constexpr auto AnchorFollowRate = 5;
@@ -39,12 +42,7 @@ constexpr auto ThemeBezierQuadratic = 1.8;
 constexpr auto ThemeBezierLinear = 1.2;
 constexpr auto ThemeBezierDerivativeQuadratic = 4.8;
 constexpr auto ThemeBezierDerivativeLinear = 3.6;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 SceneVector linear(QLatin1StringView hex)
 {
     const QColor c(hex);

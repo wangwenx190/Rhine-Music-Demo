@@ -35,6 +35,9 @@
 #include <cmath>
 #include <memory>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Source parameter/projection expectations are independent from capture coverage and readback success.
 constexpr auto DefaultWidthPixels = 960;
@@ -50,9 +53,7 @@ constexpr auto FocusTolerance = 1e-4;
 constexpr auto ApertureTolerance = 1e-10;
 constexpr auto PostprocessDeadlineMilliseconds = 600000;
 constexpr auto MaterialDeadlineMilliseconds = 120000;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 12,
@@ -60,12 +61,7 @@ enum ReviewExit {
     ReviewTimedOut = 14,
     CaptureFailed = 15
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 QVector3D project(QQuickItem *view, QVector3D world)
 {
     QVector3D result;
@@ -73,7 +69,6 @@ QVector3D project(QQuickItem *view, QVector3D world)
                               Q_ARG(QVector3D, world));
     return result;
 }
-
 }
 int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fixture,
                     const QString &report)

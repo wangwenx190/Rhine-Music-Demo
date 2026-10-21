@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Formatting uses decimal units; cached line heights account for key storage and entry overhead.
 constexpr auto LineCacheEntryOverheadBytes = 64;
@@ -14,12 +17,7 @@ constexpr auto MaximumDisplayDurationSeconds = 1e12;
 constexpr auto SecondsPerMinute = 60;
 constexpr auto FormatSignificantDigits = 8;
 constexpr auto MetricPrefixScale = 1000;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int trackCount = 0)
 {
     const QString status = lookup.value(u"status"_s).toString(u"unqueried"_s);

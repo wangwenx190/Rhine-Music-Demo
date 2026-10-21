@@ -16,24 +16,20 @@
 #include <QSaveFile>
 #include <functional>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // Probe settling delays and deadline are distinct from the explicit viewport fixture matrix.
 constexpr auto CaptureSettleMilliseconds = 850;
 constexpr auto ResizeSettleMilliseconds = 300;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     CaptureFailed = 5,
     ReportFailed = 6,
     ReviewTimedOut = 7
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 QQuickItem *visualItem(QQuickItem *root, const QString &name)
 {
     if (root->objectName() == name)

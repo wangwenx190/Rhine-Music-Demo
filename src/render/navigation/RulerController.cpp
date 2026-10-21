@@ -8,6 +8,9 @@
 #include <cmath>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // The fixed physical tick pool includes overscan; presence hysteresis prevents visible recycling.
 constexpr auto PositionTolerance = .001;
@@ -35,12 +38,7 @@ constexpr auto LastVisibleOrdinalOffset = 11.0;
 constexpr auto WideTickPixels = 3;
 constexpr auto NarrowGapPixels = 6;
 constexpr auto NarrowActiveHeightPixels = 21;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 bool approach(ScalarSpring &s, double target, double dt, bool instant)
 {
     if (instant

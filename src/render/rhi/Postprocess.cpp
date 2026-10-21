@@ -8,17 +8,16 @@
 #include <algorithm>
 #include <cstring>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo::rhi {
 namespace {
 // Source postprocessing parameters retain their original scalar precision and uniform order.
 constexpr auto AoMinimumDistance = .001f;
 constexpr auto AoMaximumDistance = .035f;
 constexpr auto MaximumBokehBlur = .011f;
 constexpr auto AoCompositeStrength = .22f;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 // Shader resource binding numbers match the postprocessing shader declarations.
 enum PostBinding {
     PostInputBinding = 0,
@@ -36,10 +35,7 @@ constexpr int UniformVectorScalars = 4;
 constexpr int MaximumKernelSamples = 64;
 constexpr int PostPrefixBytes = 80;
 constexpr int KernelScalarCount = 256;
-}
 
-namespace yalahoo::rhi {
-namespace {
 template <class T>
 using Owned = std::unique_ptr<T>;
 struct ColorTarget final

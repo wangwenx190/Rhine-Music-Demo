@@ -21,18 +21,6 @@
 #  include <unistd.h>
 #endif
 
-namespace {
-// Bound sink writes/retention work; continuation-byte masking preserves complete UTF-8 records.
-#ifdef Q_OS_WIN
-constexpr auto AnsiResetSequenceBytes = 4;
-#endif
-constexpr auto CleanupIntervalSeconds = 3600;
-constexpr auto Utf8ContinuationMask = 0xc0;
-constexpr auto Utf8ContinuationTag = 0x80;
-constexpr auto MinimumLogSegmentBytes = 256;
-constexpr auto MaximumLogArchives = 32;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
@@ -43,6 +31,16 @@ Q_LOGGING_CATEGORY(logMedia, "yalahoo.media", QtInfoMsg)
 Q_LOGGING_CATEGORY(logSettings, "yalahoo.settings", QtInfoMsg)
 
 namespace {
+// Bound sink writes/retention work; continuation-byte masking preserves complete UTF-8 records.
+#ifdef Q_OS_WIN
+constexpr auto AnsiResetSequenceBytes = 4;
+#endif
+constexpr auto CleanupIntervalSeconds = 3600;
+constexpr auto Utf8ContinuationMask = 0xc0;
+constexpr auto Utf8ContinuationTag = 0x80;
+constexpr auto MinimumLogSegmentBytes = 256;
+constexpr auto MaximumLogArchives = 32;
+
 // Construct on first access; no namespace-scope runtime initialization is required.
 QMutex &sinkMutex()
 {

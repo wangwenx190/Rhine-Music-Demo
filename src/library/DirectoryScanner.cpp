@@ -16,17 +16,15 @@
 #include <chrono>
 #include <filesystem>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Stable identity and fingerprint encoding must match the frozen on-disk library protocol.
 constexpr auto UnpreferredCoverRank = 3;
 constexpr auto MaximumLibraryRoots = 64;
 constexpr auto StableIdHexCharacters = 24;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 namespace fs = std::filesystem;
 fs::path nativePath(const QString &value)
 {

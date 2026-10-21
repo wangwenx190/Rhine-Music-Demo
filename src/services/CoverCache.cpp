@@ -21,6 +21,9 @@
 #include <cmath>
 #include <limits>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Cover geometry uses a 1024-unit fallback canvas; color conversion follows the sRGB transfer curve.
 constexpr auto ByteChannelValues = 256;
@@ -47,11 +50,18 @@ constexpr auto FallbackCaptionY = .87;
 constexpr auto ByteChannelScale = 255.0;
 constexpr auto FloatByteChannelScale = 255.0f;
 constexpr auto TileMipLevels = 8;
+
+QThreadPool &decodePool()
+{
+    static QThreadPool pool;
+    static const bool configured = [] {
+        pool.setMaxThreadCount(CoverCache::concurrency);
+        return true;
+    }();
+    Q_UNUSED(configured);
+    return pool;
 }
-
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
+}
 qint64 CoverPixels::byteSize() const
 {
     qint64 bytes = 0;
@@ -92,18 +102,6 @@ struct CoverCache::State final
     CoverCache *receiver = nullptr;
     std::atomic<quint64> generation{ 1 };
 };
-namespace {
-QThreadPool &decodePool()
-{
-    static QThreadPool pool;
-    static const bool configured = [] {
-        pool.setMaxThreadCount(CoverCache::concurrency);
-        return true;
-    }();
-    Q_UNUSED(configured);
-    return pool;
-}
-}
 struct CoverCache::Private final
 {
     Q_DISABLE_COPY_MOVE(Private)

@@ -13,6 +13,14 @@
 #include <QFileInfo>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
+#ifdef Q_OS_WIN
+#  include <dwrite_3.h>
+#  include <wrl/client.h>
+#endif
+
+using namespace yalahoo::assets;
 namespace {
 // Preparation validates the manifest inventory and bounds child-tool execution before publishing outputs.
 #ifdef Q_OS_WIN
@@ -24,17 +32,7 @@ constexpr auto ExpectedAssetInputs = 24;
 constexpr auto PhysicalFontProbePixels = 24;
 constexpr auto SourcePathPrefixCharacters = 11;
 constexpr auto ResourcePathPrefixCharacters = 7;
-}
 
-using namespace Qt::StringLiterals;
-
-#ifdef Q_OS_WIN
-#  include <dwrite_3.h>
-#  include <wrl/client.h>
-#endif
-
-using namespace yalahoo::assets;
-namespace {
 QString hash(const QByteArray &bytes)
 {
     return QString::fromUtf8(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());

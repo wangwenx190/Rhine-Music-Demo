@@ -24,15 +24,13 @@
 #include <QSignalSpy>
 #include <stdexcept>
 
-namespace {
-// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
-constexpr auto NanosecondsPerMillisecond = 1e6;
-}
-
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
+// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
+constexpr auto NanosecondsPerMillisecond = 1e6;
+
 void require(bool value, const char *message)
 {
     if (!value)

@@ -48,9 +48,7 @@ constexpr int IcnsHeaderBytes = 8;
 constexpr int ContainerWordBytes = 4;
 constexpr int NativeWindowPaintMilliseconds = 100;
 constexpr int NativeWindowDeadlineMilliseconds = 750;
-}
 
-namespace {
 // Construct on first access; no namespace-scope runtime initialization is required.
 QString &repository()
 {

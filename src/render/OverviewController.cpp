@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <numbers>
 
+namespace yalahoo {
 namespace {
 // Overview framing and visibility thresholds use source scene units and normalized progress.
 constexpr auto TransformBezierFirstX = .4;
@@ -31,10 +32,7 @@ constexpr auto OverviewCameraDistance = 172;
 constexpr auto MinimumOverviewSpan = 16.8;
 constexpr auto PortraitOverviewSpan = 17.5;
 constexpr auto ArchiveLastRowOffset = 11;
-}
 
-namespace yalahoo {
-namespace {
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &transformCurve()
 {

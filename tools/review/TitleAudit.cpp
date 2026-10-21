@@ -34,14 +34,12 @@
 #include <QMutex>
 #include <QMutexLocker>
 
-namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int RestoreSettleMilliseconds = 200;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int RestoreSettleMilliseconds = 200;
+
 double trackError(const QJsonArray &samples)
 {
     double error = 0;

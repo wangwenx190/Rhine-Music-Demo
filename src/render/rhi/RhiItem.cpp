@@ -29,6 +29,13 @@
 #include <algorithm>
 #include <cstdio>
 
+using namespace Qt::StringLiterals;
+
+#if defined(Q_OS_WIN)
+#  include <rhi/qrhi_platform.h>
+#endif
+
+namespace yalahoo::rhi {
 namespace {
 constexpr float ShadowStrength = yalahoo::rhi::renderData::PaperBottom;
 // Geometry and source lighting parameters retain their original float precision at GPU upload.
@@ -54,15 +61,7 @@ constexpr auto NeighborRowWidth = 2.4f;
 constexpr auto CoreLightGain = .58f;
 constexpr auto SpillLightGain = .42f;
 constexpr auto CoreAmbientFloor = .12f;
-}
 
-using namespace Qt::StringLiterals;
-
-#if defined(Q_OS_WIN)
-#  include <rhi/qrhi_platform.h>
-#endif
-
-namespace {
 constexpr float FloorRoughness = .95f;
 // The ordinal order matches the capture texture/output tables; aliases share a readback owner.
 enum CaptureField {
@@ -131,10 +130,7 @@ constexpr int LightDistanceWidth = 6;
 constexpr int MinimumAoSamples = 16;
 constexpr int MediumAoSamples = 32;
 constexpr int MaximumAoSamples = 64;
-}
 
-namespace yalahoo::rhi {
-namespace {
 constinit SceneSubmissionStats submissionStats;
 template <class T>
 using Owned = std::unique_ptr<T>;
@@ -2325,7 +2321,6 @@ QJsonObject Renderer::resourceInventory()
     inventoryCoverRevision = coverResourceRevision;
     return cachedInventory;
 }
-
 }
 SceneSubmissionStats &sceneSubmissionStats()
 {

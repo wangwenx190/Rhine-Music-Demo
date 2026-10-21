@@ -17,9 +17,7 @@
 namespace {
 // The deployment probe waits only for bounded metadata loading; it never starts song playback.
 constexpr auto MediaProbeDeadlineMilliseconds = 20000;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     DeploymentVerificationFailed = 24

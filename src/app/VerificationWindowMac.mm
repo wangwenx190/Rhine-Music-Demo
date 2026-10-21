@@ -7,16 +7,6 @@
 
 using namespace Qt::StringLiterals;
 
-namespace {
-constexpr NSInteger VerificationLevel = NSNormalWindowLevel - 1;
-pid_t foregroundPid = 0;
-bool activationObserved = false;
-bool focusObserved = false;
-id activationObserver = nil;
-id workspaceActivationObserver = nil;
-int externalForegroundChanges = 0;
-}
-
 // Observe public Cocoa properties synchronously: Qt can reset the level or replace
 // the NSWindow while showing/recreating it, after the QWindow Show event.
 @interface YalahooVerificationObserver : NSObject {
@@ -27,6 +17,74 @@ int externalForegroundChanges = 0;
 - (void)bindWindow;
 - (void)focusChanged:(NSNotification *)notification;
 @end
+
+namespace {
+constexpr NSInteger VerificationLevel = NSNormalWindowLevel - 1;
+pid_t foregroundPid = 0;
+bool activationObserved = false;
+bool focusObserved = false;
+id activationObserver = nil;
+id workspaceActivationObserver = nil;
+int externalForegroundChanges = 0;
+
+class NativeWindowGuard final : public QObject
+{
+    Q_DISABLE_COPY_MOVE(NativeWindowGuard)
+public:
+    explicit NativeWindowGuard(QWindow &window) : QObject(&window), m_window(window)
+    {
+        setObjectName("yalahooVerificationNativeGuard");
+        window.installEventFilter(this);
+    }
+    ~NativeWindowGuard() override
+    {
+        [m_observer release];
+    }
+    void bind()
+    {
+        if (!m_window.handle())
+            return;
+        if (!m_observer)
+            m_observer = [[YalahooVerificationObserver alloc]
+                    initWithView:reinterpret_cast<NSView *>(m_window.winId())];
+        [m_observer bindWindow];
+    }
+
+protected:
+    bool eventFilter(QObject *, QEvent *event) override
+    {
+        if (event->type() == QEvent::PlatformSurface) {
+            const auto *surface = static_cast<QPlatformSurfaceEvent *>(event);
+            if (surface->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed) {
+                [m_observer release];
+                m_observer = nil;
+            } else {
+                bind();
+            }
+        } else if (event->type() == QEvent::Show || event->type() == QEvent::WinIdChange) {
+            bind();
+            if (event->type() == QEvent::Show && yalahoo::verification::foregroundVerification()) {
+                QTimer::singleShot(0, this, [this] {
+                    if (!m_window.isVisible())
+                        return;
+                    [NSApp unhide:nil];
+                    if (@available(macOS 14.0, *))
+                        [NSApp activate];
+                    else
+                        [NSApp activateIgnoringOtherApps:YES];
+                    m_window.raise();
+                    m_window.requestActivate();
+                });
+            }
+        }
+        return false;
+    }
+
+private:
+    QWindow &m_window;
+    YalahooVerificationObserver *m_observer = nil;
+};
+}
 
 @implementation YalahooVerificationObserver
 - (instancetype)initWithView:(NSView *)nativeView
@@ -87,66 +145,6 @@ int externalForegroundChanges = 0;
     [super dealloc];
 }
 @end
-
-namespace {
-class NativeWindowGuard final : public QObject
-{
-    Q_DISABLE_COPY_MOVE(NativeWindowGuard)
-public:
-    explicit NativeWindowGuard(QWindow &window) : QObject(&window), m_window(window)
-    {
-        setObjectName("yalahooVerificationNativeGuard");
-        window.installEventFilter(this);
-    }
-    ~NativeWindowGuard() override
-    {
-        [m_observer release];
-    }
-    void bind()
-    {
-        if (!m_window.handle())
-            return;
-        if (!m_observer)
-            m_observer = [[YalahooVerificationObserver alloc]
-                    initWithView:reinterpret_cast<NSView *>(m_window.winId())];
-        [m_observer bindWindow];
-    }
-
-protected:
-    bool eventFilter(QObject *, QEvent *event) override
-    {
-        if (event->type() == QEvent::PlatformSurface) {
-            const auto *surface = static_cast<QPlatformSurfaceEvent *>(event);
-            if (surface->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed) {
-                [m_observer release];
-                m_observer = nil;
-            } else {
-                bind();
-            }
-        } else if (event->type() == QEvent::Show || event->type() == QEvent::WinIdChange) {
-            bind();
-            if (event->type() == QEvent::Show && yalahoo::verification::foregroundVerification()) {
-                QTimer::singleShot(0, this, [this] {
-                    if (!m_window.isVisible())
-                        return;
-                    [NSApp unhide:nil];
-                    if (@available(macOS 14.0, *))
-                        [NSApp activate];
-                    else
-                        [NSApp activateIgnoringOtherApps:YES];
-                    m_window.raise();
-                    m_window.requestActivate();
-                });
-            }
-        }
-        return false;
-    }
-
-private:
-    QWindow &m_window;
-    YalahooVerificationObserver *m_observer = nil;
-};
-}
 
 void yalahoo::verification::prepareNativeApplication()
 {

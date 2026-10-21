@@ -4,6 +4,9 @@
 #include <QSet>
 #include <cmath>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Candidate matching requires authored score/duration tolerances and bounded remote lists.
 constexpr auto MaximumReleaseCandidates = 10;
@@ -12,19 +15,7 @@ constexpr auto MaximumReleaseRecordings = 2000;
 constexpr auto TrackDurationToleranceSeconds = 3;
 constexpr auto MaximumGenres = 128;
 constexpr auto MaximumCredits = 4096;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-QString metadataName(const QString &text)
-{
-    auto result = text.normalized(QString::NormalizationForm_KC).toCaseFolded();
-    static const QRegularExpression punctuation(u"[\\s\\p{P}\\p{S}]"_s);
-    result.remove(punctuation);
-    return result;
-}
-namespace {
 QString artistName(const QJsonObject &object)
 {
     QString result;
@@ -45,6 +36,13 @@ bool basicMatch(const Album &album, const QJsonObject &release)
             && metadataName(artistName(release)) == metadataName(album.artist)
             && (!album.year || date.isEmpty() || date.startsWith(QString::number(*album.year)));
 }
+}
+QString metadataName(const QString &text)
+{
+    auto result = text.normalized(QString::NormalizationForm_KC).toCaseFolded();
+    static const QRegularExpression punctuation(u"[\\s\\p{P}\\p{S}]"_s);
+    result.remove(punctuation);
+    return result;
 }
 QJsonArray musicBrainzCandidates(const Album &album, const QJsonObject &search)
 {

@@ -9,6 +9,8 @@
 #include <QMap>
 #include <QRawFont>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // CSS weights identify the bundled physical font faces rather than Qt synthetic weight guesses.
 constexpr auto RegularCssWeight = 400;
@@ -17,11 +19,7 @@ constexpr auto DemiBoldCssWeight = 600;
 constexpr auto BoldCssWeight = 700;
 constexpr auto RequiredFontFaces = 4;
 constexpr auto PhysicalFaceProbePixels = 24;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 // Defer font/cache storage until a caller has initialized the Qt GUI/font services.
 QMap<int, QFont> &faceFonts()
 {

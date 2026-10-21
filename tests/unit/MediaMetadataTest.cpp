@@ -28,17 +28,15 @@
 #include <atomic>
 #include <filesystem>
 
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int AsyncDeadlineMilliseconds = 10000;
 constexpr int EnrichmentDeadlineMilliseconds = 15000;
 constexpr int ProbeTimeoutDeadlineMilliseconds = 11000;
-}
 
-using namespace Qt::StringLiterals;
-
-using namespace yalahoo;
-namespace {
 bool put(const QString &path, const QByteArray &bytes)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());

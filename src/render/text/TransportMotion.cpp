@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+namespace yalahoo {
 namespace {
 // Invert CSS Bezier x before evaluating y; geometry, opacity and icon tracks retain independent timing.
 constexpr auto EaseControlX = .25;
@@ -14,10 +15,7 @@ constexpr auto HiddenOffsetPixels = 18;
 constexpr auto GeometryDurationSeconds = .640;
 constexpr auto OpacityDurationSeconds = .400;
 constexpr auto IconDurationSeconds = .180;
-}
 
-namespace yalahoo {
-namespace {
 double bezier(double x, bool ease)
 {
     const double x1 = ease ? EaseControlX : TransformFirstX, y1 = ease ? EaseFirstY : 0;

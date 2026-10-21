@@ -16,17 +16,15 @@
 #include <algorithm>
 #include <array>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Bound work per event-loop turn and each backend probe without starting playback.
 constexpr auto ArtworkIdHexCharacters = 24;
 constexpr auto MaximumTracksPerPump = 64;
 constexpr auto ProbeTimeoutMilliseconds = 8000;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 class QtMetadataSource final : public MetadataSource
 {
     Q_DISABLE_COPY_MOVE(QtMetadataSource)

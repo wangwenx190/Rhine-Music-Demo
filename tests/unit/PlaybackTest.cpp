@@ -13,16 +13,13 @@
 #include <QTest>
 #include <cmath>
 
-namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int AsyncDeadlineMilliseconds = 10000;
-constexpr int BackendDeadlineMilliseconds = 5000;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int AsyncDeadlineMilliseconds = 10000;
+constexpr int BackendDeadlineMilliseconds = 5000;
 
 struct Fixture final
 {

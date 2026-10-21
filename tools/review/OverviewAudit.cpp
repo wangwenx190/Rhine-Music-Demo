@@ -27,9 +27,7 @@
 namespace {
 // Event-driven probe waits are bounded independently of injected fixture values.
 constexpr int FrameDeadlineMilliseconds = 5000;
-}
 
-namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int EventPollMilliseconds = 10;
 }
@@ -37,8 +35,6 @@ constexpr int EventPollMilliseconds = 10;
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
-namespace {
-}
 int reviewOverviewVisual(QGuiApplication &, const QString &output)
 {
     QDir().mkpath(output);

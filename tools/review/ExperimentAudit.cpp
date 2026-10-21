@@ -32,8 +32,6 @@ constexpr int FrameDeadlineMilliseconds = 5000;
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
-namespace {
-}
 int reviewExperiments(const QString &output)
 {
     QDir().mkpath(output);

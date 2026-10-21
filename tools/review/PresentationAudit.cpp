@@ -22,20 +22,16 @@
 #include <QTest>
 #include <atomic>
 
-namespace {
-// Event-driven probe waits are bounded independently of injected fixture values.
-constexpr int ModelDeadlineMilliseconds = 3000;
-}
-
-namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int EventPollMilliseconds = 10;
-}
-
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int ModelDeadlineMilliseconds = 3000;
+
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int EventPollMilliseconds = 10;
+
 QQuickItem *findVisual(QQuickItem *item, const QString &name)
 {
     if (item->objectName() == name)

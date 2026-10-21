@@ -9,18 +9,16 @@
 #include <QJsonDocument>
 #include <QSet>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 constexpr qint64 maximumJsonBytes =
         256LL * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB;
 // Version bounds describe accepted source documents; optional sidecars have a smaller byte limit.
 constexpr auto MinimumLibraryVersion = 3;
 constexpr auto MaximumLibraryVersion = 4;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 bool readObject(const QString &path, QJsonObject &output, QString &error, bool optional = false)
 {
     QFile file(path);

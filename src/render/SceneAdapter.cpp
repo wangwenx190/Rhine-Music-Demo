@@ -15,6 +15,9 @@
 #include <limits>
 #include <chrono>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Camera framing follows source-space layout; projection converts to Qt only at the matrix boundary.
 constexpr auto DetailSpan = 5.9;
@@ -54,11 +57,21 @@ constexpr auto PositionVelocityTolerance = .09;
 constexpr auto BrowseFogNearOffset = 5;
 constexpr auto DetailFogFarOffset = 12;
 constexpr auto MinimumFovSpan = .1;
+
+constexpr double radians = std::numbers::pi / yalahoo::units::DegreesPerHalfTurn;
+std::array<double, yalahoo::units::VectorAxes> components(SceneVector v)
+{
+    return { v.x, v.y, v.z };
 }
-
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
+SceneVector values(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
+{
+    return { s[0].value, s[1].value, s[2].value };
+}
+SceneVector velocities(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
+{
+    return { s[0].velocity, s[1].velocity, s[2].velocity };
+}
+}
 SelectionController *SceneAdapter::selection() const
 {
     return m_selection;
@@ -115,21 +128,6 @@ void SceneAdapter::recordNavigationCommit(quint64 revision)
                                             std::chrono::steady_clock::now().time_since_epoch())
                                             .count();
     Q_EMIT frameChanged();
-}
-namespace {
-constexpr double radians = std::numbers::pi / yalahoo::units::DegreesPerHalfTurn;
-std::array<double, yalahoo::units::VectorAxes> components(SceneVector v)
-{
-    return { v.x, v.y, v.z };
-}
-SceneVector values(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
-{
-    return { s[0].value, s[1].value, s[2].value };
-}
-SceneVector velocities(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
-{
-    return { s[0].velocity, s[1].velocity, s[2].velocity };
-}
 }
 SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
 {

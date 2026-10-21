@@ -17,6 +17,9 @@
 #include <optional>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Limits bound remote response expansion; cache and retry ages are measured in UTC.
 constexpr auto PositiveCacheDays = 30;
@@ -24,12 +27,7 @@ constexpr auto MaximumQueryFieldCharacters = 512;
 constexpr auto MaximumCandidatePages = 12;
 constexpr auto MaximumPerformers = 50;
 constexpr auto RetryDelaySeconds = 60;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 QUrl endpoint(const QString &base, const QList<QPair<QString, QString>> &parameters)
 {
     QUrl url(base);

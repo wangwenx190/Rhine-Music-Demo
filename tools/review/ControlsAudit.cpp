@@ -27,8 +27,6 @@ constexpr int BackendDeadlineMilliseconds = 5000;
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
-namespace {
-}
 int reviewControls(const QString &output)
 {
     QDir().mkpath(output);

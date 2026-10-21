@@ -23,15 +23,13 @@
 #include <algorithm>
 #include <memory>
 
+using namespace Qt::StringLiterals;
+using namespace yalahoo;
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int BackendDeadlineMilliseconds = 5000;
 constexpr int QueuedEventObservationMilliseconds = 100;
-}
 
-using namespace Qt::StringLiterals;
-using namespace yalahoo;
-namespace {
 const QString &releaseId()
 {
     static const auto value = u"11111111-1111-4111-8111-111111111111"_s;

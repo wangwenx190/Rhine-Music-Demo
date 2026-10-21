@@ -25,9 +25,7 @@ namespace {
 // Stage deadlines bound event-driven review completion; injected inputs target only this window.
 constexpr auto StageDeadlineMilliseconds = 10000;
 constexpr auto SwipeDeadlineMilliseconds = 1400;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 4,
@@ -36,9 +34,7 @@ enum ReviewExit {
     CaptureFailed = 7,
     ReportFailed = 8
 };
-}
 
-namespace {
 // Ordered review states retain their report ordinals; names describe each awaited fact.
 enum ReviewStage {
     AwaitInitialFrame = 0,
@@ -55,8 +51,6 @@ enum ReviewStage {
 
 using namespace Qt::StringLiterals;
 
-namespace {
-}
 int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                               LibrarySession &library, InputRouter &input, RulerController &ruler,
                               const QString &output)

@@ -32,9 +32,7 @@ constexpr auto UnitCubeDiagonal = 1.7320508075688772;
 constexpr auto DepthPackingErrorUnits = 3.0;
 constexpr auto ReviewDeadlineMilliseconds = 80000;
 constexpr auto PollIntervalMilliseconds = 10;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 9,

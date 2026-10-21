@@ -7,13 +7,11 @@
 #include <atomic>
 #include <algorithm>
 
+namespace yalahoo {
 namespace {
 // Side padding is in em units and is converted back through the glyph local scale.
 constexpr auto GlyphTotalPaddingEm = .3;
-}
 
-namespace yalahoo {
-namespace {
 constinit std::atomic<int> nodes{ 0 };
 constinit std::atomic<quint64> rebuilds{ 0 };
 constinit std::atomic<quint64> reused{ 0 };

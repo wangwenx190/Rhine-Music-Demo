@@ -47,6 +47,9 @@
 #include <memory>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
 namespace {
 // Diagnostic reservoirs retain a bounded recent observation window.
 constexpr int MaximumLifecycleEvents = 512;
@@ -54,18 +57,11 @@ constexpr int MaximumFrameSamples = 40000;
 
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int AsyncDeadlineMilliseconds = 10000;
-}
 
-namespace {
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto NanosecondsPerSecond = 1e9;
-}
 
-using namespace Qt::StringLiterals;
-
-using namespace yalahoo;
-namespace {
 void require(bool value, const char *message)
 {
     if (!value)
@@ -689,7 +685,6 @@ void verifyNativeWindowLifecycle(Driver &d, const std::function<void(const char 
     }
     d.playback.pause();
 }
-
 }
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                   const QJsonObject &bootstrap, const QString &scenario, bool observeOnly)

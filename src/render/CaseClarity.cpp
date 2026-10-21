@@ -3,14 +3,12 @@
 #include <array>
 #include <cmath>
 
+namespace yalahoo {
 namespace {
 // Returning cases decay independently; only negligible clarity is snapped to zero.
 constexpr auto ReturnDecayRate = 9;
 constexpr auto InvisibleClarityThreshold = .0001;
-}
 
-namespace yalahoo {
-namespace {
 constexpr double start = 34.12, end = 39.56, rate = 1.5;
 constexpr std::array<std::array<double, 2>, 6> knots{
     { { 38.84, 0 }, { 38.92, .28 }, { 39, .51 }, { 39.16, .74 }, { 39.32, .94 }, { 39.56, 1 } }

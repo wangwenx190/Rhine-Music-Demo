@@ -79,6 +79,8 @@
 #include <memory>
 #include <utility>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // Runtime-review timers drive bounded anonymous probes; product playback uses its own public Qt state.
 constexpr auto MaximumRecordedDiagnostics = 1024;
@@ -92,9 +94,7 @@ constexpr auto FinalMotionMilliseconds = 2000;
 constexpr auto SceneSettleMilliseconds = 1000;
 constexpr auto MotionReportDeadlineMilliseconds = 10000;
 constexpr auto RuntimeReportDelayMilliseconds = 2500;
-}
 
-namespace {
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     QmlCreationFailed = 2,
@@ -110,11 +110,7 @@ enum ReviewExit {
     GraphicsBackendUnavailable = 22,
     AppVerificationFailed = 25
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 // Construct on first access; no namespace-scope runtime initialization is required.
 QMutex &diagnosticsMutex()
 {

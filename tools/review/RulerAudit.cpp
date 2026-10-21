@@ -28,17 +28,15 @@
 #include <cmath>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int CaptureSettleMilliseconds = 60;
 constexpr int LayoutSettleMilliseconds = 120;
 constexpr int RestoreSettleMilliseconds = 200;
 constexpr int CleanupDeadlineMilliseconds = 1000;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace {
 double stateError(const QVariantMap &actual, const QJsonObject &expected)
 {
     double error = 0;
@@ -60,7 +58,6 @@ double stateError(const QVariantMap &actual, const QJsonObject &expected)
     }
     return error;
 }
-
 }
 int reviewRuler(QGuiApplication &app, const QString &output)
 {

@@ -12,6 +12,9 @@
 #include <set>
 #include <stdexcept>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo::assets {
 namespace {
 // Binary protocol tags and component formats are validated before any indexed geometry access.
 constexpr auto GlbMagic = 0x46546c67;
@@ -32,12 +35,7 @@ constexpr auto QtWinding = 2;
 constexpr auto QtUnsignedShort = 3;
 constexpr auto QtUnsignedInt = 5;
 constexpr auto QtFloatComponentType = 10;
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo::assets {
-namespace {
 void require(bool ok, const char *message)
 {
     if (!ok)
