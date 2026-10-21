@@ -27,6 +27,7 @@ using namespace yalahoo;
 using namespace yalahoo::rhi;
 using smaa_reference::Image;
 using smaa_reference::Pixel;
+
 namespace {
 Image analytic(QSize size, int pattern)
 {
@@ -206,9 +207,7 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
              { u"cpuSubmitNs"_s, submitNs },
              { u"uniformUploadBytes"_s, post.uniformUploadBytes() } };
 }
-}
 
-namespace {
 auto runSmaaAudit(int &argc, char **&argv)
 {
     if (argc != 2)

@@ -85,9 +85,7 @@ void click(QQuickWindow &window, const QString &name)
     QCoreApplication::sendEvent(&window, &press);
     QCoreApplication::sendEvent(&window, &release);
 }
-}
 
-namespace {
 struct Events final
 {
     std::mutex mutex;
@@ -136,7 +134,6 @@ struct IntegrationReviewState final
     std::shared_ptr<Events> &events;
 };
 
-namespace {
 auto observeIntegrationFrame(const quint64 &epoch, IntegrationReviewState &state,
                              QJsonObject sample)
 {
@@ -189,7 +186,7 @@ auto observeIntegrationFrame(const quint64 &epoch, IntegrationReviewState &state
         });
     }
 }
-}
+
 auto bindIntegrationWindow(IntegrationReviewState &state)
 {
     const auto epoch = ++state.windowEpoch;
@@ -390,9 +387,6 @@ auto finishIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &p
     state.app.exit(state.passed && saved ? 0 : IntegrationReviewFailed);
 }
 
-}
-
-namespace {
 auto bindIntegrationSwaps(QMetaObject::Connection &swapped, QPointer<QQuickWindow> &window,
                           const std::shared_ptr<Events> &events)
 {
@@ -408,6 +402,7 @@ auto bindIntegrationSwaps(QMetaObject::Connection &swapped, QPointer<QQuickWindo
             Qt::DirectConnection);
 }
 }
+
 int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter &scene,
                       const QString &output, double seconds)
 {

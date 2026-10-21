@@ -14,16 +14,6 @@
 #include <QSaveFile>
 #include <QTimer>
 
-namespace {
-// The deployment probe waits only for bounded metadata loading; it never starts song playback.
-constexpr auto MediaProbeDeadlineMilliseconds = 20000;
-
-// Nonzero process results are part of the standalone review command protocol.
-enum ReviewExit {
-    DeploymentVerificationFailed = 24
-};
-}
-
 using namespace Qt::StringLiterals;
 
 #ifdef Q_OS_MACOS
@@ -34,6 +24,14 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+// The deployment probe waits only for bounded metadata loading; it never starts song playback.
+constexpr auto MediaProbeDeadlineMilliseconds = 20000;
+
+// Nonzero process results are part of the standalone review command protocol.
+enum ReviewExit {
+    DeploymentVerificationFailed = 24
+};
+
 // Shared references remain valid until this review event loop has stopped.
 struct DeploymentState final
 {
@@ -141,11 +139,10 @@ auto finishDeploymentProbe(DeploymentState &state)
     state.media.setSource({ });
     state.app.exit(passed && saved ? 0 : DeploymentVerificationFailed);
 }
+}
 
-}
-}
-int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const QString &reportPath,
-                              const QStringList &qmlWarnings)
+int verifyDeployment(QGuiApplication &app, QQuickWindow &window, const QString &reportPath,
+                     const QStringList &qmlWarnings)
 {
     QMediaPlayer media;
     bool finished = false;
@@ -171,4 +168,5 @@ int yalahoo::verifyDeployment(QGuiApplication &app, QQuickWindow &window, const 
         media.setSource(QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
     });
     return app.exec();
+}
 }

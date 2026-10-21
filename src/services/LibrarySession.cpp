@@ -27,6 +27,13 @@ QVariantMap metadataValue(const ProviderResult &result)
              { u"retryAt"_s, result.retryAt },
              { u"error"_s, result.error } };
 }
+
+void retainIntroduction(QVariantMap &value, QVariantMap &payload, const Album &resolved)
+{
+    payload.insert(u"description"_s, resolved.description);
+    if (!resolved.descriptionSource.isEmpty())
+        value.insert(u"source"_s, resolved.descriptionSource.toVariantMap());
+}
 }
 QVariantMap LibrarySession::metadata() const
 {
@@ -35,14 +42,7 @@ QVariantMap LibrarySession::metadata() const
         result.insert(it.key(), metadataValue(it.value()));
     return result;
 }
-namespace {
-void retainIntroduction(QVariantMap &value, QVariantMap &payload, const Album &resolved)
-{
-    payload.insert(u"description"_s, resolved.description);
-    if (!resolved.descriptionSource.isEmpty())
-        value.insert(u"source"_s, resolved.descriptionSource.toVariantMap());
-}
-}
+
 LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
     : QObject(parent),
       m_provider(provider),

@@ -27,6 +27,7 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+
 namespace {
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
@@ -171,9 +172,7 @@ public:
     QStringList warnings;
     QJsonArray samples;
 };
-}
 
-namespace {
 auto observeOpeningFrame(Driver &d, yalahoo::OpeningInk *&ink, QJsonArray &costs,
                          const QString &output, bool quick)
 {

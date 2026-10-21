@@ -69,9 +69,7 @@ QVector3D project(QQuickItem *view, QVector3D world)
                               Q_ARG(QVector3D, world));
     return result;
 }
-}
 
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct MaterialReviewState final
 {
@@ -469,9 +467,6 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
     state.app.exit(pass && saved ? 0 : ReviewFailed);
 }
 
-}
-
-namespace {
 auto bindMaterialFrames(quint64 &windowEpoch, std::unique_ptr<OffscreenSurface> &surface,
                         QObject &reviewLifetime, std::function<void()> &collectFrame)
 {
@@ -482,6 +477,7 @@ auto bindMaterialFrames(quint64 &windowEpoch, std::unique_ptr<OffscreenSurface> 
     });
 }
 }
+
 int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fixture,
                     const QString &report)
 {

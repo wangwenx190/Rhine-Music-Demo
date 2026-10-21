@@ -33,6 +33,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 using namespace yalahoo::rhi;
+
 namespace {
 void require(bool condition, const char *reason)
 {
@@ -59,9 +60,6 @@ Snapshot library(int count)
     }
     return std::make_shared<const LibrarySnapshot>(std::move(result));
 }
-}
-
-namespace {
 
 struct Wait final
 {

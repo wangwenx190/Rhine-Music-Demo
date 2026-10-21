@@ -16,6 +16,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 void check(bool ok, const char *why)
 {
@@ -208,9 +209,7 @@ QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
              { u"filtered"_s, filtered },
              { u"maxError"_s, worst } };
 }
-}
 
-namespace {
 auto runShadowAudit(int &argc, char **&argv)
 {
     if (argc != 2)

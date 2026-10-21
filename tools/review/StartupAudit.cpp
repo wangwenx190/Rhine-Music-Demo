@@ -686,9 +686,7 @@ void verifyNativeWindowLifecycle(Driver &d, const std::function<void(const char 
     }
     d.playback.pause();
 }
-}
 
-namespace {
 auto reviewStartupReplay(QElapsedTimer &sampling, const QStringList &stages,
                          const QStringList &allStages, int &stageIndex, Driver &d,
                          QJsonArray &actions, int &eventIndex, double duration)
@@ -735,7 +733,48 @@ auto reviewStartupReplay(QElapsedTimer &sampling, const QStringList &stages,
     }
     return false;
 }
+
+auto reviewGuiCapture(Driver &d, QString &context, auto &check, const QString &output,
+                      QJsonArray &captures, const QString &phase)
+{
+    d.setStage(context + "-"_L1 + phase);
+    d.frames(2);
+    d.native->ensurePolished();
+    check("no-render-error", d.native->errorText().isEmpty());
+    const auto &frame = d.native->input().scene;
+    check("current-production-snapshot",
+          (d.opening.sceneOccluded() ? d.native->input().sceneOccluded
+                                     : frame.revision == d.scene.frame().revision)
+                  && frame.width == d.window.width() && frame.height == d.window.height());
+    bool finite = true;
+    for (float value : std::span(frame.projection.constData(), 16))
+        finite &= std::isfinite(value);
+    for (const auto &instance : frame.instances)
+        for (float value : std::span(instance.transform.constData(), 16))
+            finite &= std::isfinite(value);
+    check("finite-bounded-geometry", finite && frame.instances.size() <= ArchivePool::capacity + 4);
+    check("bounded-owned-covers", d.native->coverStatistics()[u"owned"_s].toInt() <= 4);
+    const auto image = d.surface.grab();
+    const auto file = context + "-"_L1 + phase + ".png"_L1;
+    require(!image.isNull() && image.save(output + "/"_L1 + file), "Cannot capture own GUI output");
+    const auto dpr = d.window.effectiveDevicePixelRatio();
+    check("actual-output-dimensions", image.size() == d.window.size() * dpr);
+    captures.append(QJsonObject{ { u"state"_s, context },
+                                 { u"phase"_s, phase },
+                                 { u"image"_s, file },
+                                 { u"width"_s, d.window.width() },
+                                 { u"height"_s, d.window.height() },
+                                 { u"dpr"_s, dpr },
+                                 { u"night"_s, d.scene.lighting()->night() },
+                                 { u"realistic"_s, d.selection.realistic() },
+                                 { u"selection"_s, d.selection.albumId() },
+                                 { u"instances"_s, frame.instances.size() },
+                                 { u"covers"_s, d.native->coverStatistics() },
+                                 { u"resources"_s, d.lastResources },
+                                 { u"submission"_s, qint64(d.native->submission()) } });
 }
+}
+
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                   const QJsonObject &bootstrap, const QString &scenario, bool observeOnly)
 {
@@ -1437,47 +1476,6 @@ int reviewWindowLifecycle(const QString &output)
     return passed ? 0 : 1;
 }
 
-namespace {
-auto reviewGuiCapture(Driver &d, QString &context, auto &check, const QString &output,
-                      QJsonArray &captures, const QString &phase)
-{
-    d.setStage(context + "-"_L1 + phase);
-    d.frames(2);
-    d.native->ensurePolished();
-    check("no-render-error", d.native->errorText().isEmpty());
-    const auto &frame = d.native->input().scene;
-    check("current-production-snapshot",
-          (d.opening.sceneOccluded() ? d.native->input().sceneOccluded
-                                     : frame.revision == d.scene.frame().revision)
-                  && frame.width == d.window.width() && frame.height == d.window.height());
-    bool finite = true;
-    for (float value : std::span(frame.projection.constData(), 16))
-        finite &= std::isfinite(value);
-    for (const auto &instance : frame.instances)
-        for (float value : std::span(instance.transform.constData(), 16))
-            finite &= std::isfinite(value);
-    check("finite-bounded-geometry", finite && frame.instances.size() <= ArchivePool::capacity + 4);
-    check("bounded-owned-covers", d.native->coverStatistics()[u"owned"_s].toInt() <= 4);
-    const auto image = d.surface.grab();
-    const auto file = context + "-"_L1 + phase + ".png"_L1;
-    require(!image.isNull() && image.save(output + "/"_L1 + file), "Cannot capture own GUI output");
-    const auto dpr = d.window.effectiveDevicePixelRatio();
-    check("actual-output-dimensions", image.size() == d.window.size() * dpr);
-    captures.append(QJsonObject{ { u"state"_s, context },
-                                 { u"phase"_s, phase },
-                                 { u"image"_s, file },
-                                 { u"width"_s, d.window.width() },
-                                 { u"height"_s, d.window.height() },
-                                 { u"dpr"_s, dpr },
-                                 { u"night"_s, d.scene.lighting()->night() },
-                                 { u"realistic"_s, d.selection.realistic() },
-                                 { u"selection"_s, d.selection.albumId() },
-                                 { u"instances"_s, frame.instances.size() },
-                                 { u"covers"_s, d.native->coverStatistics() },
-                                 { u"resources"_s, d.lastResources },
-                                 { u"submission"_s, qint64(d.native->submission()) } });
-}
-}
 int reviewGui(const QString &output, bool narrowOnly, bool representative)
 {
     // The same driver and production stage serve cold-start and integrated GUI checks.

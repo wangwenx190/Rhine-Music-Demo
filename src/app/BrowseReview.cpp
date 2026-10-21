@@ -18,6 +18,7 @@
 
 using namespace Qt::StringLiterals;
 
+namespace yalahoo {
 namespace {
 // Probe settling delays and deadline are distinct from the explicit viewport fixture matrix.
 constexpr auto CaptureSettleMilliseconds = 850;
@@ -40,10 +41,7 @@ QQuickItem *visualItem(QQuickItem *root, const QString &name)
     }
     return nullptr;
 }
-}
 
-namespace yalahoo {
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct BrowseReviewState final
 {
@@ -107,11 +105,10 @@ auto advanceBrowseCapture(BrowseReviewState &state)
         QTimer::singleShot(0, &state.reviewLifetime, state.next);
     });
 }
+}
 
-}
-}
-int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
-                          LibrarySession &library, const QString &output)
+int reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
+                 LibrarySession &library, const QString &output)
 {
     QObject reviewLifetime;
     QDir().mkpath(output);
@@ -150,4 +147,5 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
         app.exit(ReviewTimedOut);
     });
     return app.exec();
+}
 }

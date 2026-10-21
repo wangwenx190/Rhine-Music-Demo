@@ -18,6 +18,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 double viewDepth(const Input &input, const Capture &capture)
 {
@@ -27,9 +28,7 @@ double viewDepth(const Input &input, const Capture &capture)
     const double depth = (color.red() * 65536. + color.green() * 256. + color.blue()) / 16777215.;
     return input.scene.nearPlane + depth * (input.scene.farPlane - input.scene.nearPlane);
 }
-}
 
-namespace {
 auto runFogAudit(int &argc, char **&argv)
 {
     if (argc != 2)

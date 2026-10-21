@@ -208,23 +208,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
     }
     return part;
 }
-}
-TextLayoutAdapter::TextLayoutAdapter() : m_cache(CacheBytes)
-{
-}
-QList<int> TextLayoutAdapter::boundaries(const QString &text)
-{
-    QTextBoundaryFinder finder(QTextBoundaryFinder::Grapheme, text);
-    QList<int> result{ 0 };
-    for (int position = finder.toNextBoundary(); position >= 0; position = finder.toNextBoundary())
-        result.append(position);
-    return result;
-}
-QPair<QString, QString> TextLayoutAdapter::titleParts(const QString &text)
-{
-    return albumTitleParts(text);
-}
-namespace {
+
 void fitTransportText(TitleLayout &result, const QFont &main, double size, double width)
 {
     if (result.naturalWidth <= width)
@@ -265,6 +249,22 @@ TitleLayout fitTitle(const auto &candidate, double size, double minimum, double 
     return result;
 }
 }
+TextLayoutAdapter::TextLayoutAdapter() : m_cache(CacheBytes)
+{
+}
+QList<int> TextLayoutAdapter::boundaries(const QString &text)
+{
+    QTextBoundaryFinder finder(QTextBoundaryFinder::Grapheme, text);
+    QList<int> result{ 0 };
+    for (int position = finder.toNextBoundary(); position >= 0; position = finder.toNextBoundary())
+        result.append(position);
+    return result;
+}
+QPair<QString, QString> TextLayoutAdapter::titleParts(const QString &text)
+{
+    return albumTitleParts(text);
+}
+
 TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                                        const QFont &subtitle, double size, double width,
                                        double budget, bool narrow, double dpr, bool transport)

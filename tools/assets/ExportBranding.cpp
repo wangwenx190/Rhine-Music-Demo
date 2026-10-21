@@ -423,9 +423,7 @@ public:
         backing.flush(QRect(QPoint(), size()));
     }
 };
-}
 
-namespace {
 auto makeBrandPreview(PreviewWindow &window, const QString &media, QJsonObject &result,
                       bool &grabbed, QGuiApplication &app)
 {
@@ -453,9 +451,7 @@ auto makeBrandPreview(PreviewWindow &window, const QString &media, QJsonObject &
     }
     app.quit();
 }
-}
 
-namespace {
 auto writeBrandAssets(std::function<void(const QString &)> &visit, QJsonArray &entries,
                       QString const &tree, const QString &relative)
 {
@@ -481,6 +477,7 @@ auto writeBrandAssets(std::function<void(const QString &)> &visit, QJsonArray &e
     }
 }
 }
+
 int main(int argc, char **argv)
 {
     yalahoo::verification::prepareApplication();

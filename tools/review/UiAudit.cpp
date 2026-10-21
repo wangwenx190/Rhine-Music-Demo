@@ -107,9 +107,7 @@ QJsonObject bounds(QQuickItem *root, const QString &name)
                                                       : fontMetrics.descent() },
              { u"implicitHeight"_s, item->implicitHeight() } };
 }
-}
 
-namespace {
 auto bindUiFrames(std::atomic<bool> &captureRequested, std::atomic<bool> &captureInFlight,
                   OffscreenSurface &surface, std::atomic<int> &drainFramesRemaining,
                   std::atomic<int> &requestedCaptureRevision, QRhiReadbackResult &readback,
@@ -143,9 +141,6 @@ auto bindUiFrames(std::atomic<bool> &captureRequested, std::atomic<bool> &captur
     batch->readBackTexture(surface.readbackDescription(), &readback);
     commandBuffer->resourceUpdate(batch);
 }
-}
-
-namespace {
 
 auto runUiAssertionsObserveFrame(OffscreenSurface &surface, const int &index, QQuickItem *&root,
                                  const QString &output, yalahoo::LayoutMetrics &metrics,
@@ -519,9 +514,7 @@ auto runUiAssertions(int &step, QList<QSize> &sizes, yalahoo::LayoutMetrics &met
     const bool saved = file.commit();
     app.exit(passed && saved ? 0 : 6);
 }
-}
 
-namespace {
 auto mainWait(QGuiApplication &app, std::function<void()> &next, int ms)
 {
     QTimer::singleShot(ms, &app, [&] {
@@ -529,6 +522,7 @@ auto mainWait(QGuiApplication &app, std::function<void()> &next, int ms)
     });
 }
 }
+
 int main(int argc, char **argv)
 {
     QElapsedTimer bootstrapTimer;

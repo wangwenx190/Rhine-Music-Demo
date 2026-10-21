@@ -33,6 +33,9 @@
 #include <QThread>
 #include <memory>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Anonymous review geometry, bounded lifecycle counts and timeouts are independent of product policy.
 constexpr auto ExpectedDetailedCoverPixels = 1024;
@@ -84,12 +87,7 @@ enum ReviewStage {
     AwaitHiddenWindow = 18,
     AwaitRestoredWindow = 19
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct DetailReviewState final
 {
@@ -485,7 +483,6 @@ void advanceDetailAwaitArchive(auto &context)
     return;
 }
 
-namespace {
 auto observeHiddenDetailWindow(DetailReviewState &state, auto &check)
 {
     const bool hidden = !state.window->isExposed() && !state.native->renderingActive()
@@ -513,7 +510,7 @@ auto observeHiddenDetailWindow(DetailReviewState &state, auto &check)
                 state.window->update();
             });
 }
-}
+
 void advanceDetailPrepareWindowCycle(auto &context)
 {
     DetailReviewState &state = context.state;
@@ -682,7 +679,6 @@ void advanceDetailDefault(auto &)
     return;
 }
 
-namespace {
 auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &check, auto &finish,
                         auto &recordAction, auto &ready, auto &capture, auto &mouse, auto &button)
 {
@@ -762,7 +758,7 @@ auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &ch
             advanceDetailDefault(context);
     }
 }
-}
+
 auto bindDetailWindow(DetailReviewState &state, auto &check, auto &finish, auto &recordAction,
                       auto &ready, auto &capture, auto &mouse, auto &button)
 {
@@ -800,12 +796,11 @@ auto bindDetailWindow(DetailReviewState &state, auto &check, auto &finish, auto 
             },
             Qt::QueuedConnection);
 }
+}
 
-}
-}
-int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter &scene,
-                          LibrarySession &library, PresentationController &presentation,
-                          MotionController &motion, const QString &output)
+int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter &scene,
+                 LibrarySession &library, PresentationController &presentation,
+                 MotionController &motion, const QString &output)
 {
     auto *window = &initialWindow;
     auto *engine = qobject_cast<QQmlApplicationEngine *>(qmlEngine(window));
@@ -970,4 +965,5 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
         native->setTelemetryEnabled(false);
     app.setQuitOnLastWindowClosed(quitOnClose);
     return result;
+}
 }

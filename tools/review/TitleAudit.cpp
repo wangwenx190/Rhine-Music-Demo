@@ -200,9 +200,7 @@ double rollingError(const QJsonArray &samples)
     }
     return error;
 }
-}
 
-namespace {
 auto advanceTitleAudit(int &step, const int &staticSteps, QJsonArray &cases, QQuickWindow &window,
                        const QString &output, yalahoo::TitleReel &controller, QQuickItem *&root,
                        bool &passed, QJsonArray &captures, QJsonArray &costs, qint64 &guiNs,
@@ -374,9 +372,6 @@ auto advanceTitleAudit(int &step, const int &staticSteps, QJsonArray &cases, QQu
         next();
     });
 }
-}
-
-namespace {
 
 auto bindTitleFramesObserveFrame(QRhiReadbackResult &readback, const bool &flip,
                                  std::atomic<bool> &inFlight, std::atomic<int> &drain,
@@ -420,9 +415,6 @@ auto bindTitleFrames(std::atomic<bool> &requested, std::atomic<bool> &inFlight,
     batch->readBackTexture(surface.readbackDescription(), &readback);
     commandBuffer->resourceUpdate(batch);
 }
-}
-
-namespace {
 
 auto recordHeaderPositions(QQuickItem *&root, QMutex &positionsMutex,
                            QPointF &synchronizedPlayPosition, QPointF &synchronizedStopPosition,
@@ -531,9 +523,7 @@ auto captureTitleLayouts(int &warmFrames, bool &animationRun, bool &headerRun, i
         surface.requestFrame();
     }
 }
-}
 
-namespace {
 auto finalizeTitleAudit(const QString &output, int &step, const int &staticSteps,
                         const int &animationSteps, const int &headerSteps, int &warmFrames,
                         std::atomic<bool> &requested, std::atomic<bool> &inFlight,
@@ -562,9 +552,6 @@ auto finalizeTitleAudit(const QString &output, int &step, const int &staticSteps
     }
     app.exit(7);
 }
-}
-
-namespace {
 
 auto finishTitleAudit_observeFrame(bool &passed, const QString &output, QGuiApplication &app,
                                    const double &motionError, QQuickWindow &window,
@@ -743,9 +730,7 @@ auto finishTitleAudit(int &step, const int &staticSteps, const int &animationSte
     root->setProperty("marker", ++marker);
     surface.requestFrame();
 }
-}
 
-namespace {
 auto reviewTitleObserveFrame(QQuickWindow &window, std::atomic<bool> &restorePending,
                              OffscreenSurface &surface, QQuickItem *&root, int &marker)
 {
@@ -761,6 +746,7 @@ auto reviewTitleObserveFrame(QQuickWindow &window, std::atomic<bool> &restorePen
             Qt::QueuedConnection);
 }
 }
+
 int reviewTitle(QGuiApplication &app, const QString &output, const QString &source)
 {
     const int costRuns = qEnvironmentVariableIsSet("YALAHOO_VERIFY_COST_RUNS")

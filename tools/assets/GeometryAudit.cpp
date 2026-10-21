@@ -94,24 +94,9 @@ QJsonObject summary(const Batch &batch)
              { u"min"_s, QJsonArray{ low[0], low[1], low[2] } },
              { u"max"_s, QJsonArray{ high[0], high[1], high[2] } } };
 }
-}
-QByteArray readFile(const QString &path)
-{
-    QFile file(path);
-    require(file.open(QIODevice::ReadOnly), "Cannot open asset");
-    return file.readAll();
-}
-void saveFile(const QString &path, const QByteArray &bytes)
-{
-    require(QDir().mkpath(QFileInfo(path).absolutePath()), "Cannot create asset directory");
-    QSaveFile file(path);
-    require(file.open(QIODevice::WriteOnly), "Cannot write asset");
-    require(file.write(bytes) == bytes.size() && file.commit(), "Cannot commit asset");
-}
+
 // Validate each accessor against both its buffer view and the binary payload before reading.
 // The accepted layout is deliberately narrow: unsupported transforms or sparse data require explicit adaptation.
-
-namespace {
 auto readGeometryAccessor(const QJsonArray &accessors, const QJsonArray &views,
                           const QByteArray &bin, int index, int components, int componentType)
 {
@@ -142,6 +127,20 @@ auto readGeometryAccessor(const QJsonArray &accessors, const QJsonArray &views,
     return std::array<qsizetype, 3>{ qsizetype(viewStart) + localStart, stride, count };
 }
 }
+QByteArray readFile(const QString &path)
+{
+    QFile file(path);
+    require(file.open(QIODevice::ReadOnly), "Cannot open asset");
+    return file.readAll();
+}
+void saveFile(const QString &path, const QByteArray &bytes)
+{
+    require(QDir().mkpath(QFileInfo(path).absolutePath()), "Cannot create asset directory");
+    QSaveFile file(path);
+    require(file.open(QIODevice::WriteOnly), "Cannot write asset");
+    require(file.write(bytes) == bytes.size() && file.commit(), "Cannot commit asset");
+}
+
 QVector<Batch> readGlb(const QByteArray &bytes)
 {
     Reader r{ bytes };

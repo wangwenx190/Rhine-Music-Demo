@@ -27,6 +27,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 using namespace yalahoo::rhi;
+
 namespace {
 using Pixel = std::array<double, 4>;
 struct Inputs final
@@ -180,9 +181,7 @@ QJsonObject verify(const Inputs &input, const PostSettings &settings,
              { u"focus"_s, settings.focus },
              { u"aperture"_s, settings.aperture } };
 }
-}
 
-namespace {
 auto runBokehAudit(int &argc, char **&argv)
 {
     if (argc != 2)

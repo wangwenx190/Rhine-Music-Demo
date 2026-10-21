@@ -21,6 +21,10 @@
 #include <atomic>
 #include <memory>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
+
 namespace {
 // Static fixture count and scalar tolerances validate source geometry independently of actual pixel coverage.
 constexpr auto StaticPoseCount = 48;
@@ -39,13 +43,7 @@ enum ReviewExit {
     ReviewFailed = 10,
     ReviewTimedOut = 11
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct SceneReviewState final
 {
@@ -225,7 +223,6 @@ auto finishSceneReview(SceneReviewState &state, auto &next, auto &poll)
     }
     state.app.exit(state.pass && committed ? 0 : ReviewFailed);
 }
-
 }
 int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 const QString &fixture, const QString &report)

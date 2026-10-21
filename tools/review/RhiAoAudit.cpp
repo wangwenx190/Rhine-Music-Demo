@@ -18,6 +18,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 QVector<float> values(const QString &name)
 {
@@ -122,9 +123,7 @@ QJsonObject sourceMath(const Input &input, const Capture &capture)
              { u"contacts"_s, contacts },
              { u"maximumError"_s, maximum } };
 }
-}
 
-namespace {
 auto runAoAudit(int &argc, char **&argv)
 {
     if (argc != 2)

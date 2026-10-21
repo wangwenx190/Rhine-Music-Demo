@@ -19,16 +19,14 @@
 #include <QTimer>
 #include <cmath>
 
-namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int BackendDeadlineMilliseconds = 5000;
-}
-
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 
 namespace {
+// Bounds for asynchronous completion and event delivery; fixture values remain independent.
+constexpr int BackendDeadlineMilliseconds = 5000;
+
 auto renderControlsFrame(OffscreenSurface &surface)
 {
     QEventLoop loop;

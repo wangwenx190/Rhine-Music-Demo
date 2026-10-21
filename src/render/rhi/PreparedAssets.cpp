@@ -5,16 +5,14 @@
 #include <QFloat16>
 #include <cstring>
 
-namespace {
-// Bundled source floats are little-endian; the prepared environment converts source RGBA32F to its GPU format.
-constexpr auto FloatPayloadBytes = 4;
-constexpr auto SourceEnvironmentBytesPerPixel = 16;
-}
-
 using namespace Qt::StringLiterals;
 
 namespace yalahoo::rhi {
 namespace {
+// Bundled source floats are little-endian; the prepared environment converts source RGBA32F to its GPU format.
+constexpr auto FloatPayloadBytes = 4;
+constexpr auto SourceEnvironmentBytesPerPixel = 16;
+
 PreparedAssets loadPreparedAssets()
 {
     PreparedAssets result;

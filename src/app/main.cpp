@@ -181,9 +181,7 @@ void recordDiagnostic(QtMsgType type, const QMessageLogContext &context, const Q
     if (diagnosticSink)
         diagnosticSink(type, context, message);
 }
-}
 
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct RuntimeReviewState final
 {
@@ -356,7 +354,6 @@ auto writeRuntimeEvidence(RuntimeReviewState &state)
     const bool committed = output.commit();
     state.app.exit(passed && committed ? 0 : RuntimeVerificationFailed);
 }
-
 }
 int main(int argc, char **argv)
 {

@@ -20,6 +20,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 void check(bool condition, const char *message)
 {
@@ -72,9 +73,7 @@ QJsonObject distribution(QVector<double> values)
              { u"p95Ms"_s, values[int((values.size() - 1) * .95)] },
              { u"maxMs"_s, values.last() } };
 }
-}
 
-namespace {
 auto runPostprocessAudit(int &argc, char **&argv)
 {
     if (argc == 2 && QByteArray(argv[1]) == "--adapters"_ba) {

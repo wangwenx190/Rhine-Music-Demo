@@ -9,15 +9,12 @@
 #include <QImage>
 #include <cstring>
 
+using namespace Qt::StringLiterals;
+
 namespace {
 // Review lookups use the same bundled payload dimensions as production RHI.
 constexpr auto SourceRgbaFloatBytes = 16;
 
-}
-
-using namespace Qt::StringLiterals;
-
-namespace {
 QSize fixedTextureSize(const QString &asset)
 {
     using namespace yalahoo::rhi::renderData;

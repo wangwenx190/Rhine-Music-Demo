@@ -29,6 +29,9 @@
 #include <QMutex>
 #include <QMutexLocker>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Explicit viewport fixture inputs remain literal data; admission and waiting tolerances are named policy.
 constexpr auto ViewportSetupFrames = 10;
@@ -85,12 +88,7 @@ enum ReviewStage {
     AwaitLabelRelease = 18,
     OverviewComplete = 19
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct OverviewReviewState final
 {
@@ -626,13 +624,11 @@ auto advanceOverviewReview(OverviewReviewState &state, auto &check, auto &ready,
             advanceOverviewDefault(context);
     }
 }
+}
 
-}
-}
-int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
-                            OverviewController &overview, PresentationController &presentation,
-                            LibrarySession &library, MotionController &motion,
-                            const QString &output)
+int reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
+                   OverviewController &overview, PresentationController &presentation,
+                   LibrarySession &library, MotionController &motion, const QString &output)
 {
     auto *native = qobject_cast<rhi::SceneItem *>(
             yalahoo::review::findVisual(window.contentItem(), u"nativeScene"_s));
@@ -809,4 +805,5 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     QObject::disconnect(positions);
     native->setTelemetryEnabled(false);
     return result;
+}
 }

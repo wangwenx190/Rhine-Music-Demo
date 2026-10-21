@@ -22,6 +22,7 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 using namespace yalahoo::rhi;
+
 namespace {
 void require(bool condition, const char *reason)
 {
@@ -37,9 +38,6 @@ CoverSnapshot pixels(const QString &id, QColor color)
     p->image.fill(color);
     return p;
 }
-}
-
-namespace {
 
 struct Wait final
 {

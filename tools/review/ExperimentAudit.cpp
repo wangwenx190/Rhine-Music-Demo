@@ -24,16 +24,14 @@
 #include <QTimer>
 #include <QWheelEvent>
 
-namespace {
-// Event-driven probe waits are bounded independently of injected fixture values.
-constexpr int FrameDeadlineMilliseconds = 5000;
-}
-
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 
 namespace {
+// Event-driven probe waits are bounded independently of injected fixture values.
+constexpr int FrameDeadlineMilliseconds = 5000;
+
 auto renderExperimentFrame(QJsonObject &lastSample, yalahoo::rhi::SceneItem *&native,
                            OffscreenSurface &surface, QQuickWindow &window,
                            MotionController &motion, SceneAdapter &scene)

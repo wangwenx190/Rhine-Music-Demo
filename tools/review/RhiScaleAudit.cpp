@@ -22,6 +22,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 const auto check = RhiCaptureHarness::require;
 QJsonArray pair(QSize size)
@@ -323,9 +324,7 @@ QJsonArray dprTransitions()
     }
     return states;
 }
-}
 
-namespace {
 auto runScaleAudit(int &argc, char **&argv)
 {
     const auto coverShutdown = qScopeGuard([] {

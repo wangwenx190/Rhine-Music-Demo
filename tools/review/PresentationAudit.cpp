@@ -25,6 +25,7 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+
 namespace {
 // Event-driven probe waits are bounded independently of injected fixture values.
 constexpr int ModelDeadlineMilliseconds = 3000;
@@ -42,9 +43,7 @@ QQuickItem *findVisual(QQuickItem *item, const QString &name)
     }
     return nullptr;
 }
-}
 
-namespace {
 auto renderPresentationFrame(QSignalSpy &frames, QSignalSpy &swaps,
                              std::atomic<quint64> &requestedFrame, OffscreenSurface &surface,
                              std::atomic<quint64> &presentedFrame)

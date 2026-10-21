@@ -17,6 +17,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 void check(bool ok, const char *message)
 {
@@ -99,9 +100,7 @@ double directReference(bool multiscatter)
     }
     return result;
 }
-}
 
-namespace {
 double opticalProbeReference(int probe, int rotation)
 {
     struct Probe final

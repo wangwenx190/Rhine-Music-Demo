@@ -106,9 +106,6 @@ public:
         });
     }
 };
-}
-
-namespace {
 
 auto collectSettingsSample(const qint64 &previous, const quint64 &inputRevision,
                            const QSize &expected, bool &ready, QEventLoop &loop,
@@ -152,9 +149,7 @@ auto renderSettingsFrame(yalahoo::rhi::SceneItem *&settingsScene, SceneAdapter &
     QObject::disconnect(connection);
     return rendered && ready;
 }
-}
 
-namespace {
 auto reviewLibraryObserveFrame(const std::shared_ptr<std::atomic<bool>> &deviceCaptured,
                                QQuickRenderControl &control, QQuickWindow &window)
 {
@@ -175,9 +170,7 @@ auto reviewLibraryObserveFrame(const std::shared_ptr<std::atomic<bool>> &deviceC
             },
             Qt::QueuedConnection);
 }
-}
 
-namespace {
 struct NativeFrames final
 {
     std::atomic<quint64> synchronized{ 0 };
@@ -204,9 +197,7 @@ auto reviewLibraryRender(const std::shared_ptr<NativeFrames> &nativeFrames,
         QTest::qWait(EventPollMilliseconds);
     return rendered.size() > before;
 }
-}
 
-namespace {
 auto verifySettingsInputs(auto &check, auto &renderSettingsTarget, QJsonObject &lastSettingsSample,
                           yalahoo::rhi::SceneItem *&settingsScene,
                           QJsonArray &settingsResourceSamples, QQuickWindow &window,
@@ -361,6 +352,7 @@ auto verifySettingsInputs(auto &check, auto &renderSettingsTarget, QJsonObject &
                   && library.metadataProgress()[u"completed"_s].toInt() == snapshot.albums.size());
 }
 }
+
 int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerification,
                   bool settingsVerification, bool representative)
 {

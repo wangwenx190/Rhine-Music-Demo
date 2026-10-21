@@ -58,9 +58,6 @@ double stateError(const QVariantMap &actual, const QJsonObject &expected)
     }
     return error;
 }
-}
-
-namespace {
 
 auto advanceRulerAuditReleaseWindow(std::unique_ptr<OffscreenSurface> &surface,
                                     std::unique_ptr<QQuickWindow> &window, QJsonObject &finalPolicy,
@@ -331,9 +328,6 @@ auto advanceRulerAudit(
         next();
     }
 }
-}
-
-namespace {
 
 auto bindRulerFramesObserveFrameObserveFrame(QRhiReadbackResult &readback, const bool &flip,
                                              QMutex &imageMutex, QImage &image,
@@ -450,9 +444,7 @@ auto bindRulerFrames(quint64 &windowEpoch, std::unique_ptr<QQuickWindow> &window
         }
     });
 }
-}
 
-namespace {
 auto finishRulerAudit(bool &passed, QJsonObject &finalPolicy, int &initialized, int &invalidated,
                       const QString &output, QGuiApplication &app, QJsonObject &finalSurface,
                       double &maximumStateError, double &ordinalError, QJsonArray &captures,
@@ -494,9 +486,7 @@ auto finishRulerAudit(bool &passed, QJsonObject &finalPolicy, int &initialized, 
                     .toJson());
     app.exit(file.commit() && passed ? 0 : 9);
 }
-}
 
-namespace {
 auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
                         std::unique_ptr<QQuickWindow> &window, int &stateIndex,
                         std::unique_ptr<QObject> &object,
@@ -586,9 +576,7 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
         surface->requestFrame();
     });
 }
-}
 
-namespace {
 auto reviewRulerObserveFrame(QQuickItem *&root, int &lifecycleMode, QObject &reviewLifetime,
                              std::atomic<bool> &requested,
                              std::unique_ptr<OffscreenSurface> &surface)
@@ -602,6 +590,7 @@ auto reviewRulerObserveFrame(QQuickItem *&root, int &lifecycleMode, QObject &rev
     });
 }
 }
+
 int reviewRuler(QGuiApplication &app, const QString &output)
 {
     const QString web =

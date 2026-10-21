@@ -23,6 +23,9 @@
 #include <QJsonArray>
 #include <functional>
 
+using namespace Qt::StringLiterals;
+
+namespace yalahoo {
 namespace {
 // Stage deadlines bound event-driven review completion; injected inputs target only this window.
 constexpr auto StageDeadlineMilliseconds = 10000;
@@ -49,12 +52,7 @@ enum ReviewStage {
     CheckHidden = 7,
     CheckRestored = 8
 };
-}
 
-using namespace Qt::StringLiterals;
-
-namespace yalahoo {
-namespace {
 // Shared references remain valid until this review event loop has stopped.
 struct NavigationReviewState final
 {
@@ -306,12 +304,11 @@ auto advanceNavigationReview(NavigationReviewState &state, auto &wheel, auto &ch
     state.window.update();
     state.advanceWhenReady();
 }
+}
 
-}
-}
-int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
-                              LibrarySession &library, InputRouter &input, RulerController &ruler,
-                              const QString &output)
+int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
+                     LibrarySession &library, InputRouter &input, RulerController &ruler,
+                     const QString &output)
 {
     QDir().mkpath(output);
     auto *selection = scene.selection();
@@ -439,4 +436,5 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     window.show();
     window.update();
     return app.exec();
+}
 }

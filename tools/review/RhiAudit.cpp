@@ -15,6 +15,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 void check(bool ok, const char *reason)
 {
@@ -101,9 +102,7 @@ QPoint projected(const Input &in, QVector3D world, QSize size)
     return { qRound((clip.x() / clip.w() + 1) * .5 * size.width()),
              qRound((1 - clip.y() / clip.w()) * .5 * size.height()) };
 }
-}
 
-namespace {
 auto runOpaqueAudit(int &argc, char **&argv)
 {
     if (argc != 2)

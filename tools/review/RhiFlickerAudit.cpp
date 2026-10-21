@@ -27,6 +27,7 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 using namespace yalahoo::rhi;
 using namespace yalahoo::review;
+
 namespace {
 void check(bool condition, const char *message)
 {
@@ -48,9 +49,6 @@ QJsonObject coverage(const Capture &capture)
     return { { u"missing"_s, missing }, { u"shaded"_s, shaded }, { u"nonfinite"_s, nonfinite } };
 }
 
-}
-
-namespace {
 void writeFailureMetadata(const QString &output, const QJsonObject &metadata)
 {
     QSaveFile failed(output + "/failed-metadata.json"_L1);
