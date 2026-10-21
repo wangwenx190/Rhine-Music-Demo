@@ -1,3 +1,7 @@
+#include "LayoutMetrics.h"
+#include "CameraFraming.h"
+#include "Units.h"
+#include "OpeningTimeline.h"
 #include "SceneGeometry.h"
 #include "OpeningFrame.h"
 #include "MotionFunctions.h"
@@ -48,9 +52,7 @@ OpeningFrame openingFrame(double time)
     constexpr auto OrbitScaleGain = .1;
     constexpr auto InitialOrbitScale = .9;
     constexpr auto OrbitScaleEndSeconds = 2.8;
-    constexpr auto TitleEnterOffsetPixels = 18;
     constexpr auto TitleExitOffsetPixels = 8;
-    constexpr auto TitleClipPercent = 100;
     constexpr auto SubtitleEnterStartSeconds = 3.18;
     constexpr auto SubtitleEnterEndSeconds = 3.8;
     constexpr auto SubtitleExitStartSeconds = 5.56;
@@ -76,8 +78,9 @@ OpeningFrame openingFrame(double time)
     f.orbitScale = InitialOrbitScale
             + OrbitScaleGain * settle(unit(t, OrbitStartSeconds, OrbitScaleEndSeconds));
     f.title = in * (1 - out);
-    f.titleY = TitleEnterOffsetPixels * (1 - in) - TitleExitOffsetPixels * out;
-    f.titleClip = TitleClipPercent * (1 - in);
+    f.titleY = yalahoo::openingFrameDefaults::TitleEnterOffsetPixels * (1 - in)
+            - TitleExitOffsetPixels * out;
+    f.titleClip = yalahoo::openingFrameDefaults::TitleClipPercent * (1 - in);
     f.subtitle = openingSmooth(unit(t, SubtitleEnterStartSeconds, SubtitleEnterEndSeconds))
             * (1 - openingSmooth(unit(t, SubtitleExitStartSeconds, SubtitleExitEndSeconds)));
     return f;
@@ -101,22 +104,18 @@ QVariantMap OpeningFrame::values() const
 double openingSceneTime(double time)
 {
     // Map the independent two-dimensional opening clock into the source three-dimensional timeline.
-    constexpr auto SceneTimelineOriginSeconds = 21.92;
     constexpr auto ArrayPhaseStartSeconds = 6.4;
 
-    return SceneTimelineOriginSeconds + std::max(0.0, time - ArrayPhaseStartSeconds);
+    return yalahoo::openingTimeline::SceneOriginSeconds
+            + std::max(0.0, time - ArrayPhaseStartSeconds);
 }
 CameraPose openingCamera(double sceneTime, double width, double height, SceneVector selected)
 {
     // Blend source orbit, settling and preview poses in world coordinates before applying aspect framing.
-    constexpr auto TerminalSceneSeconds = 27.12;
     constexpr auto OrbitStartSeconds = 22.6;
     constexpr auto OrbitDurationSeconds = 1.6;
     constexpr auto SettleStartSeconds = 24.25;
     constexpr auto SettleDurationSeconds = 2.25;
-    constexpr auto PreviewStartSeconds = 25.3;
-    constexpr auto PreviewDurationSeconds = 1.42;
-    constexpr auto DegreesPerHalfTurn = 180;
     constexpr auto InitialYawDegrees = 89;
     constexpr auto OrbitYawDegrees = 22;
     constexpr auto SettleYawDegrees = 8;
@@ -130,18 +129,13 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
     constexpr auto InitialSpan = 10.8;
     constexpr auto OrbitSpan = 10.3;
     constexpr auto SettledSpan = 7.33;
-    constexpr auto PortraitAspectBoundary = 1.05;
     constexpr auto PanDurationSeconds = 1.05;
-    constexpr auto PortraitSpan = 8.4;
-    constexpr auto StandardAspectWidth = 16.0;
-    constexpr auto AspectHeightUnits = 9;
     constexpr auto InitialCameraDistance = 28;
     constexpr auto OrbitDistanceGain = 7;
     constexpr auto SettledCameraDistance = 140;
     constexpr auto ArrayAimXMagnitude = 1.091;
     constexpr auto InitialArrayAimDepth = 2.55;
     constexpr auto OrbitAimHeightGain = .4;
-    constexpr auto PortraitPreviewLift = .4;
     constexpr auto SettledArrayAimDepth = .045;
     constexpr auto InitialArrayAimZ = 2.48;
     constexpr auto SettledArrayAimZ = .481;
@@ -152,7 +146,6 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
     constexpr auto LeadAimEnterSeconds = .8;
     constexpr auto AnchorBlendStartSeconds = 25.05;
     constexpr auto AnchorBlendEndSeconds = 27.3;
-    constexpr auto ReferenceHeightPixels = 1080;
     constexpr auto CaseWidth = 4.45;
     constexpr auto InitialAnchorXPixels = 840;
     constexpr auto FinalAnchorXPixels = 518;
@@ -161,17 +154,14 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
     constexpr auto InitialAnchorYPixels = 340;
     constexpr auto FinalAnchorYPixels = 288;
     constexpr auto AnchorBlendSeconds = .35;
-    constexpr auto PortraitPreviewY = .36;
-    constexpr auto UltrawideAspectWidth = 21.0;
-    constexpr auto WideAimRightRatio = .035;
-    constexpr auto BrowseAimUpRatio = .08;
-    constexpr auto UltrawideAimUpGain = .02;
 
-    const double shot = std::min(sceneTime, TerminalSceneSeconds), aspect = width / height;
+    const double shot = std::min(sceneTime, yalahoo::openingTimeline::TerminalSceneSeconds),
+                 aspect = width / height;
     const double orbit = smooth((shot - OrbitStartSeconds) / OrbitDurationSeconds),
                  settle = smooth((shot - SettleStartSeconds) / SettleDurationSeconds);
-    const double intro = smooth((shot - PreviewStartSeconds) / PreviewDurationSeconds);
-    const double radians = std::numbers::pi / DegreesPerHalfTurn;
+    const double intro = smooth((shot - yalahoo::openingTimeline::PreviewStartSeconds)
+                                / yalahoo::openingTimeline::PreviewDurationSeconds);
+    const double radians = std::numbers::pi / yalahoo::units::DegreesPerHalfTurn;
     const double yaw =
             (InitialYawDegrees - OrbitYawDegrees * orbit - SettleYawDegrees * settle) * radians;
     const double elevation =
@@ -181,15 +171,17 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
              - OrbitElevationDegrees * orbit - SettleElevationDegrees * settle
              + PreviewElevationDegrees * intro)
             * radians;
-    const SceneVector direction{ -std::sin(yaw) * std::cos(elevation), std::sin(elevation),
-                                 std::cos(yaw) * std::cos(elevation) };
-    const auto right = cross({ 0, 1, 0 }, direction).normalized(),
-               up = cross(direction, right).normalized();
+    const auto basis = cameraFraming::basis(yaw, elevation);
+    const auto &direction = basis.direction, &right = basis.right, &up = basis.up;
     const double sourceSpan =
             (InitialSpan + (OrbitSpan - InitialSpan) * orbit) * (1 - settle) + SettledSpan * settle;
-    const double span = aspect < PortraitAspectBoundary
-            ? std::max(sourceSpan, PortraitSpan / aspect)
-            : std::max(sourceSpan, sourceSpan * (StandardAspectWidth / AspectHeightUnits) / aspect);
+    const double span = aspect < yalahoo::layoutMetrics::PortraitAspectBoundary
+            ? std::max(sourceSpan, yalahoo::cameraFraming::PortraitPreviewSpan / aspect)
+            : std::max(sourceSpan,
+                       sourceSpan
+                               * (yalahoo::cameraFraming::StandardAspectWidth
+                                  / yalahoo::cameraFraming::AspectHeightUnits)
+                               / aspect);
     const double distance = (InitialCameraDistance + OrbitDistanceGain * orbit) * (1 - settle)
             + SettledCameraDistance * settle;
     SceneVector array{ -ArrayAimXMagnitude,
@@ -202,7 +194,7 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
                        * smooth((shot - LeadAimStartSeconds) / LeadAimEnterSeconds));
     if (shot >= AnchorBlendStartSeconds && shot <= AnchorBlendEndSeconds) {
         const double pan = smooth((shot - PanStartSeconds) / PanDurationSeconds),
-                     scale = ReferenceHeightPixels / sourceSpan;
+                     scale = yalahoo::cameraFraming::ReferenceHeightPixels / sourceSpan;
         auto anchor = selected
                 + SceneVector{ -CaseWidth / 2,
                                sceneGeometry::HingeHeight + sceneGeometry::CaseHeight / 2, 0 };
@@ -220,21 +212,8 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
         const double blend = smooth((shot - AnchorBlendStartSeconds) / AnchorBlendSeconds);
         aim = aim * (1 - blend) + anchor * blend;
     }
-    auto preview = array;
-    if (aspect < PortraitAspectBoundary)
-        preview = SceneVector{ 0,
-                               -sceneGeometry::FloorDepth
-                                       + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                                       + PortraitPreviewLift + sceneGeometry::HingeHeight,
-                               -sceneGeometry::ArchiveDepth }
-                + up * ((PortraitPreviewY - .5) * span);
-    else {
-        const double wide = smooth((aspect - StandardAspectWidth / AspectHeightUnits)
-                                   / (UltrawideAspectWidth / AspectHeightUnits
-                                      - StandardAspectWidth / AspectHeightUnits));
-        preview = preview + right * (WideAimRightRatio * wide * span * aspect)
-                + up * ((BrowseAimUpRatio + UltrawideAimUpGain * wide) * span);
-    }
+    const auto preview = cameraFraming::browseAim(
+            array, basis, span, aspect, aspect < yalahoo::layoutMetrics::PortraitAspectBoundary);
     aim = aim * (1 - intro) + preview * intro;
     return { aim + direction * distance, aim, span };
 }

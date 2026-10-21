@@ -3,6 +3,12 @@ qt_add_library(
     STATIC
     Logging.cpp
     Logging.h
+    Units.h
+    ColorTransfer.h
+    CoverPixels.h
+    ProductDefaults.h
+    MetadataConfiguration.h
+    SceneGeometry.h
     AppIdentity.cpp
     AppIdentity.h
     MusicTypes.cpp

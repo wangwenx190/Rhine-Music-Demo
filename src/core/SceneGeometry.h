@@ -17,4 +17,9 @@ inline constexpr double HingeHeight = 1.85;
 inline constexpr double PreviewLift = .9;
 inline constexpr double InspectionLift = 3.47;
 inline constexpr double SettledSceneSeconds = 26.56;
+inline constexpr auto FirstAlbumRow = 12;
+inline constexpr auto DetailFollowRate = 9.0;
+inline constexpr auto BrowseFollowRate = 3.7;
+inline constexpr auto InspectionLiftPadding = .12;
+inline constexpr auto ParallelRayTolerance = 1e-10;
 }

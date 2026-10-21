@@ -2,6 +2,7 @@
 // treated separately from submitting a frame.
 
 #pragma once
+#include "CoverPixels.h"
 #include <QQuick3DInstancing>
 #include <QQuick3DTextureData>
 #include <QVariantList>
@@ -40,7 +41,7 @@ public:
         return m_submissions;
     }
     static constexpr int pageBytes = 2048 * 2048 * 4;
-    static constexpr int tileBytes = 256 * 256 * 4;
+    static constexpr int tileBytes = yalahoo::coverPixels::TileBytes;
 
 private:
     QByteArray m_pixels;

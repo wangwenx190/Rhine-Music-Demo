@@ -1,3 +1,5 @@
+#include "EasingCurve.h"
+#include "Units.h"
 #include "FrameClock.h"
 #include "SurfaceTransition.h"
 #include <QPointF>
@@ -11,7 +13,6 @@ constexpr auto BottomEntryOffsetPixels = 10;
 constexpr auto RightExitOffsetPixels = 32;
 constexpr auto BottomExitOffsetPixels = 6;
 constexpr auto MinimumInterruptedMilliseconds = 72.0;
-constexpr auto MillisecondsPerSecond = 1000;
 constexpr auto ExitBezierFirstX = .4;
 constexpr auto BrowseBezierFirstX = .45;
 constexpr auto BrowseBezierSecondX = .25;
@@ -49,17 +50,15 @@ void SurfaceTransition::run(bool show, bool reduced, std::function<void()> finis
             (interrupted ? std::max(MinimumInterruptedMilliseconds,
                                     base * std::sqrt(std::abs((show ? 1.0 : 0.0) - m_fromOpacity)))
                          : base)
-            / MillisecondsPerSecond;
-    m_ease = QEasingCurve(QEasingCurve::BezierSpline);
+            / yalahoo::units::MillisecondsPerSecond;
     if (!show) {
-        m_ease.addCubicBezierSegment({ ExitBezierFirstX, 0 }, { 1, 1 }, { 1, 1 });
+        m_ease = cubicBezier(ExitBezierFirstX, 0, 1, 1);
     } else if (m_enterCurve) {
         m_ease = *m_enterCurve;
     } else if (m_browse) {
-        m_ease.addCubicBezierSegment({ BrowseBezierFirstX, 0 }, { BrowseBezierSecondX, 1 },
-                                     { 1, 1 });
+        m_ease = cubicBezier(BrowseBezierFirstX, 0, BrowseBezierSecondX, 1);
     } else {
-        m_ease.addCubicBezierSegment({ EnterBezierFirstX, 1 }, { EnterBezierSecondX, 1 }, { 1, 1 });
+        m_ease = cubicBezier(EnterBezierFirstX, 1, EnterBezierSecondX, 1);
     }
     m_elapsed = 0;
     m_opacity = m_fromOpacity;

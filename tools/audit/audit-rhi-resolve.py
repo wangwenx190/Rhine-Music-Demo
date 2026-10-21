@@ -1,4 +1,5 @@
 """Record the traced MSAA/resolve and component coverage boundary, without image oracles."""
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -51,14 +52,7 @@ for platform, marker in [("windows", "WIN32"), ("macos", "YalahooVerification"),
         (platform.upper() + "-01", "cmake/Platform.cmake", marker,
          "Native backend/compiler closure preserved. Same latest-Kit target build, shaders, actual format/resolve and transfer execution required; host cross-compilation is not target execution.")
     ]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Resolve audit source drift: {path}::{symbol}")
-        rows.append(dict(checkId=identity, requirement=identity.split("-")[0], platform=platform,
-                         sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), evidence=evidence,
-                         result="static-audit-passed",
-                         limitations="Runtime separate. No BLUR-01/DPR/native restore/VSYNC/full product performance closure; target gaps remain R36."))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=identity.split('-')[0], platform=platform, evidence=evidence, result='static-audit-passed', limitations='Runtime separate. No BLUR-01/DPR/native restore/VSYNC/full product performance closure; target gaps remain R36.'))
     output = ROOT / "verification" / f"{platform}-static" / "rhi-resolve"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")

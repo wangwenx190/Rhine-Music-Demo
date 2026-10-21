@@ -1,4 +1,5 @@
 """Recover the reviewed Git/plan closure; keep provenance separate from runtime acceptance."""
+from audit_support import source_check
 import hashlib
 import json
 import re
@@ -120,13 +121,7 @@ for platform, platform_id, path, symbol, reason in [
 ]:
     rows = []
     for identity, source, marker, evidence in CHECKS + [(platform_id, path, symbol, reason)]:
-        data = (ROOT / source).read_bytes()
-        if marker not in data.decode():
-            raise SystemExit(f"Re-review changed symbol: {source}::{marker}")
-        rows.append(dict(checkId=identity, requirement=evidence, platform=platform,
-                         sourcePath=source, lineOrSymbol=marker, sourceSha256=digest(data),
-                         evidence=evidence, result="static-audit-passed",
-                         limitations="Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R36."))
+        rows.append(source_check(ROOT, source, marker, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R36.'))
     matrices[platform] = rows
 OUTPUT.mkdir(parents=True, exist_ok=True)
 (OUTPUT / "source-matrix.json").write_text(json.dumps(dict(

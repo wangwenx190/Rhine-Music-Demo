@@ -1,3 +1,7 @@
+#include "CameraFraming.h"
+#include "ReviewSupport.h"
+#include "ColorTransfer.h"
+#include "Units.h"
 #include "RowLightController.h"
 #include "Logging.h"
 #include "MaterialReview.h"
@@ -40,20 +44,7 @@ constexpr auto LifecycleRestoreCount = 10;
 constexpr auto DefaultAoRadius = .18;
 constexpr auto ProbeFovDegrees = 32;
 constexpr auto DegreesPerTurn = 360;
-constexpr auto LightOffsetX = 48;
-constexpr auto LightOffsetY = 17.6f;
-constexpr auto LightOffsetZ = 36;
-constexpr auto LocalLightAimX = 2.085;
-constexpr auto LocalLightAimY = 2.252;
-constexpr auto MaximumChannelByte = 255;
-constexpr auto SrgbDecodeKnee = .04045;
-constexpr auto SrgbLinearSlope = 12.92;
-constexpr auto SrgbOffset = .055;
-constexpr auto SrgbScale = 1.055;
-constexpr auto SrgbExponent = 2.4;
-constexpr auto SrgbEncodeKnee = .0031308;
 constexpr auto ForegroundDifferenceThreshold = 9;
-constexpr auto MinimumForegroundPixels = 100;
 constexpr auto ParameterTolerance = 1e-6;
 constexpr auto FocusTolerance = 1e-4;
 constexpr auto ApertureTolerance = 1e-10;
@@ -287,10 +278,13 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                                     window->devicePixelRatio());
         if (lightingReview) {
             const auto offset = scene.cameraRotation().rotatedVector(
-                    { -LightOffsetX, -LightOffsetY, LightOffsetZ });
+                    { -yalahoo::cameraFraming::LightOffsetX, -yalahoo::cameraFraming::LightOffsetY,
+                      yalahoo::cameraFraming::LightOffsetZ });
             RowLightingInput i;
             i.reduced = true;
-            scene.lighting()->update(i, { -LocalLightAimX, LocalLightAimY, 0 },
+            scene.lighting()->update(i,
+                                     { -yalahoo::cameraFraming::LocalLightAimX,
+                                       yalahoo::cameraFraming::LocalLightAimY, 0 },
                                      { offset.x(), offset.y(), offset.z() },
                                      c[u"detail"_s].toDouble(), 0);
         }
@@ -339,15 +333,10 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             const QImage ink(u":/review/paper-probe.png"_s);
             const auto sample = ink.pixelColor(0, 0);
             auto channel = [light](double s) {
-                s /= MaximumChannelByte;
-                double l = s <= SrgbDecodeKnee
-                        ? s / SrgbLinearSlope
-                        : std::pow((s + SrgbOffset) / SrgbScale, SrgbExponent);
+                s /= yalahoo::units::MaximumChannelByte;
+                double l = colorTransfer::decode(s);
                 l *= std::min(1.0, light);
-                return qRound(MaximumChannelByte
-                              * (l <= SrgbEncodeKnee
-                                         ? SrgbLinearSlope * l
-                                         : SrgbScale * std::pow(l, 1 / SrgbExponent) - SrgbOffset));
+                return qRound(yalahoo::units::MaximumChannelByte * colorTransfer::encode(l));
             };
             const auto actualCenter =
                     actual.pixelColor(qRound(center.x() * window->devicePixelRatio()),
@@ -370,7 +359,8 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
             }
         }
         valid = valid
-                && (occlusionReview || postprocessReview || foreground > MinimumForegroundPixels);
+                && (occlusionReview || postprocessReview
+                    || foreground > yalahoo::review::MinimumForegroundPixels);
         double webProjection = 0;
         for (auto value : c[u"projections"_s].toArray()) {
             const auto p = value.toObject();

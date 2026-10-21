@@ -1,14 +1,12 @@
+#include "OpeningTimeline.h"
+#include "ProductDefaults.h"
 #include "FrameClock.h"
 #include <algorithm>
 #include <cmath>
 
 namespace {
 // The public motion contract clamps speed and wall-clock intervals before publication.
-constexpr auto MinimumMotionSpeed = .25;
-constexpr auto MaximumMotionSpeed = 3.0;
 constexpr auto MaximumFrameSeconds = .05;
-constexpr auto OpeningDurationSeconds = 11.6;
-constexpr auto OpeningCompletionEpsilonSeconds = 1e-9;
 }
 
 namespace yalahoo {
@@ -38,7 +36,8 @@ void FrameClock::setSpeed(double speed)
 {
     if (!std::isfinite(speed))
         return;
-    speed = std::clamp(speed, MinimumMotionSpeed, MaximumMotionSpeed);
+    speed = std::clamp(speed, yalahoo::productDefaults::MinimumMotionSpeed,
+                       yalahoo::productDefaults::MaximumMotionSpeed);
     if (speed == m_speed)
         return;
     m_speed = speed;
@@ -58,8 +57,9 @@ void FrameClock::advance(double frameSeconds)
     const double motionDt = dt * m_speed;
     m_visualTime += motionDt;
     if (m_openingRunning) {
-        m_openingTime = std::min(OpeningDurationSeconds, m_openingTime + dt);
-        if (OpeningDurationSeconds - m_openingTime < OpeningCompletionEpsilonSeconds)
+        m_openingTime = std::min(yalahoo::openingTimeline::DurationSeconds, m_openingTime + dt);
+        if (yalahoo::openingTimeline::DurationSeconds - m_openingTime
+            < yalahoo::openingTimeline::CompletionEpsilonSeconds)
             finishOpening();
     }
     ++m_frameCount;
@@ -79,7 +79,7 @@ void FrameClock::finishOpening()
 {
     if (!m_openingRunning)
         return;
-    m_openingTime = OpeningDurationSeconds;
+    m_openingTime = yalahoo::openingTimeline::DurationSeconds;
     m_openingRunning = false;
     Q_EMIT openingChanged();
     Q_EMIT openingFinished();

@@ -1,3 +1,4 @@
+#include "Units.h"
 #include "MusicBrainzSource.h"
 #include <QRegularExpression>
 #include <QSet>
@@ -7,7 +8,6 @@ namespace {
 // Candidate matching requires authored score/duration tolerances and bounded remote lists.
 constexpr auto MaximumReleaseCandidates = 10;
 constexpr auto MinimumSearchScore = 95;
-constexpr auto MillisecondsPerSecond = 1000.;
 constexpr auto MaximumReleaseRecordings = 2000;
 constexpr auto TrackDurationToleranceSeconds = 3;
 constexpr auto MaximumGenres = 128;
@@ -113,7 +113,7 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
                       track.value(u"title"_s).toString(recording.value(u"title"_s).toString()),
                       medium.value(u"position"_s).toInt(), track.value(u"position"_s).toInt(),
                       track.value(u"length"_s).toDouble(recording.value(u"length"_s).toDouble())
-                              / MillisecondsPerSecond });
+                              / yalahoo::units::MillisecondsPerSecond });
         }
     }
     if (recordings.size() > MaximumReleaseRecordings

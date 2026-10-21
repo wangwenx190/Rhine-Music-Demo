@@ -5,6 +5,10 @@ set(yalahoo_render_integration_tests startup-qml startup-stress controls-qml exp
 foreach(directory IN ITEMS "${PROJECT_SOURCE_DIR}" tests/unit tests/integration)
     get_property(native_tests DIRECTORY "${directory}" PROPERTY TESTS)
     foreach(test IN LISTS native_tests)
+        if(WIN32)
+            set_property(TEST "${test}" DIRECTORY "${directory}" APPEND PROPERTY ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
+        endif()
         set(needs_native_window FALSE)
         if(test MATCHES "^(rhi-(bokeh|smaa)|display-transfer)-gpu$")
             # Direct QRhi offscreen frames do not create native windows on any platform.

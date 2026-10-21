@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 """Bind the R30 deployment source review; native Windows execution remains independent."""
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json

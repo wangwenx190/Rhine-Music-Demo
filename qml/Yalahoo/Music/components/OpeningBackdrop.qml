@@ -15,19 +15,14 @@ Item {
     readonly property real targetWidth: width + 60
     readonly property real targetHeight: height + 60
     clip: true
-    ShaderEffectSource {
+    BackdropTexture {
         id: crop
-        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
-        mipmap: true
+        hdrActive: root.hdrActive
+        outputDpr: root.outputDpr
         sourceItem: root.sceneSource
         sourceRect: Qt.rect(root.sceneX - 30, root.sceneY - 30, root.targetWidth, root.targetHeight)
         width: root.targetWidth
         height: root.targetHeight
-        textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
-                                                                            * root.outputDpr))
-
-        visible: false
-        smooth: true
     }
     ShaderEffect {
         id: horizontal
@@ -44,18 +39,14 @@ Item {
         property real paperAlpha: root.paperAlpha
         fragmentShader: "qrc:/assets/shaders/opening-blur.frag.qsb"
     }
-    ShaderEffectSource {
+    BackdropTexture {
         id: horizontalTexture
-        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
-        mipmap: true
+        hdrActive: root.hdrActive
+        outputDpr: root.outputDpr
         sourceItem: horizontal
-        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
-                                 root.targetHeight * root.outputDpr))
         width: root.targetWidth
         height: root.targetHeight
-        visible: false
         hideSource: true
-        smooth: true
     }
     ShaderEffect {
         x: -30

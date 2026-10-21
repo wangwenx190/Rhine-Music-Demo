@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -24,11 +25,6 @@
 #include <stdexcept>
 
 namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int ReviewDeadlineMilliseconds = 60000;
-}
-
-namespace {
 // Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
 constexpr auto NanosecondsPerMillisecond = 1e6;
 }
@@ -41,15 +37,6 @@ void require(bool value, const char *message)
 {
     if (!value)
         throw std::runtime_error(message);
-}
-QQuickItem *find(QQuickItem *root, const QString &name)
-{
-    if (root->objectName() == name)
-        return root;
-    for (auto *child : root->childItems())
-        if (auto *item = find(child, name))
-            return item;
-    return nullptr;
 }
 class Driver final
 {
@@ -98,7 +85,8 @@ public:
         motion.clock()->advance(0);
         root->setParentItem(window.contentItem());
         root->setSize(window.size());
-        native = qobject_cast<rhi::SceneItem *>(find(root.get(), u"nativeScene"_s));
+        native = qobject_cast<rhi::SceneItem *>(
+                yalahoo::review::findVisual(root.get(), u"nativeScene"_s));
         require(native, "Missing production SceneItem");
         native->setTelemetryEnabled(true);
         QObject::connect(native, &rhi::SceneItem::frameSubmitted, &window, [&](QJsonObject sample) {
@@ -134,7 +122,7 @@ public:
         QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
         if (prepare)
             prepare(0);
-        deadline.start(ReviewDeadlineMilliseconds);
+        deadline.start(yalahoo::review::DefaultDeadlineMilliseconds);
         surface.requestFrame();
         loop.exec();
         require(rendered == count, "Opening frame deadline");
@@ -152,7 +140,7 @@ public:
         });
         QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
         opening.replay();
-        deadline.start(ReviewDeadlineMilliseconds);
+        deadline.start(yalahoo::review::DefaultDeadlineMilliseconds);
         surface.requestFrame();
         loop.exec();
         require(opening.film(), "Production renderer/cover readiness did not start the film");
@@ -223,7 +211,8 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         check(u"resting-camera"_s, d.scene.settled());
         check(u"focus-restored"_s,
               d.window.activeFocusItem() != nullptr
-                      && d.window.activeFocusItem() != find(d.root.get(), u"openingSkip"_s));
+                      && d.window.activeFocusItem()
+                              != yalahoo::review::findVisual(d.root.get(), u"openingSkip"_s));
         check(u"scene-resumed"_s, rhi::sceneSubmissionStats().rendered.load() > warmDraws);
         d.ready();
         for (double time : { 6.4, 7.2, 9.0, 11.6 }) {
@@ -277,13 +266,16 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
                             check(u"static-slogan-zero-canvas-work"_s,
                                   openingInkStats().paints.load() == paints);
                         }
-                        const auto *skip = find(d.root.get(), u"openingSkip"_s);
+                        const auto *skip =
+                                yalahoo::review::findVisual(d.root.get(), u"openingSkip"_s);
                         check("bounded-skip-backdrop-"_L1 + name,
                               skip && skip->width() + 60 <= 220 && skip->height() + 60 <= 120);
-                        const auto *headerNav = find(d.root.get(), u"headerNavigation"_s);
+                        const auto *headerNav =
+                                yalahoo::review::findVisual(d.root.get(), u"headerNavigation"_s);
                         check("chrome-hidden-during-film-"_L1 + name,
                               headerNav && !headerNav->isVisible());
-                        const auto *mark = find(d.root.get(), u"openingMark"_s);
+                        const auto *mark =
+                                yalahoo::review::findVisual(d.root.get(), u"openingMark"_s);
                         check("brand-container-"_L1 + name,
                               mark
                                       && std::abs(mark->width()
@@ -307,7 +299,8 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         d.ready();
         d.seek(.95);
         d.frames(2);
-        auto *ink = qobject_cast<OpeningInk *>(find(d.root.get(), u"openingBrandInk"_s));
+        auto *ink = qobject_cast<OpeningInk *>(
+                yalahoo::review::findVisual(d.root.get(), u"openingBrandInk"_s));
         require(ink, "Missing production brand painter");
         const auto compare = [&](bool quick) {
             QQmlComponent component(&d.engine,
@@ -354,7 +347,8 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &tab);
         check(u"tab-focuses-skip"_s,
-              d.window.activeFocusItem() == find(d.root.get(), u"openingSkip"_s));
+              d.window.activeFocusItem()
+                      == yalahoo::review::findVisual(d.root.get(), u"openingSkip"_s));
         QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &enter);
         check(u"enter-skips-film"_s, !d.opening.film());

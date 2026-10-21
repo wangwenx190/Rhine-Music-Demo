@@ -1,3 +1,4 @@
+#include "IMetadataProvider.h"
 #include <QCoreApplication>
 #include "LibrarySession.h"
 #include "MetadataPresentation.h"
@@ -8,11 +9,6 @@
 #include <QThread>
 #include <QSet>
 #include <QTimer>
-
-namespace {
-// Bound accepted metadata intents so slow network work cannot grow the GUI queue.
-constexpr auto MaximumPendingMetadataRequests = 8;
-}
 
 using namespace Qt::StringLiterals;
 
@@ -294,7 +290,7 @@ quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &n
             cancelMetadata(request.token.requestId);
     if (m_generation != generation || m_snapshot != snapshot || m_provider != provider || !provider)
         return 0;
-    if (m_pending.size() >= MaximumPendingMetadataRequests)
+    if (m_pending.size() >= yalahoo::metadataLimits::MaximumPendingRequests)
         return 0;
     const RequestToken token{ ++m_requestId, m_generation, albumId };
     m_pending.insert(token.requestId, { token, kind });

@@ -1,3 +1,4 @@
+#include "EasingCurve.h"
 #include "FrameClock.h"
 #include "PresentationController.h"
 #include <tuple>
@@ -6,9 +7,6 @@
 
 namespace {
 // Tab retargeting starts from displayed geometry; fade and slide have independent durations.
-constexpr auto TabSlideSeconds = .18;
-constexpr auto TabFadeSeconds = .15;
-constexpr auto TabInitialOpacity = .35;
 constexpr auto TabBezierFirstX = .22;
 constexpr auto TabBezierSecondX = .36;
 }
@@ -42,15 +40,17 @@ void PresentationController::setTabIndicator(double x, double width, bool animat
     m_tabTargetWidth = width;
     m_tabElapsed = 0;
     if (!animate || m_reduced)
-        advanceTab(TabSlideSeconds);
+        advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
 }
 void PresentationController::revealTabContent()
 {
-    m_tabFadeFrom = m_tabFadeElapsed < TabFadeSeconds ? m_tabOpacity : TabInitialOpacity;
+    m_tabFadeFrom = m_tabFadeElapsed < yalahoo::presentationMotion::TabFadeSeconds
+            ? m_tabOpacity
+            : yalahoo::presentationMotion::TabInitialOpacity;
     m_tabFadeElapsed = 0;
     m_tabOpacity = m_reduced ? 1 : m_tabFadeFrom;
     if (m_reduced)
-        m_tabFadeElapsed = TabFadeSeconds;
+        m_tabFadeElapsed = yalahoo::presentationMotion::TabFadeSeconds;
     Q_EMIT tabIndicatorChanged();
 }
 void PresentationController::advanceTab(double dt)
@@ -58,24 +58,27 @@ void PresentationController::advanceTab(double dt)
     if (!std::isfinite(dt) || dt <= 0)
         return;
     static const QEasingCurve ease = [] {
-        QEasingCurve curve(QEasingCurve::BezierSpline);
-        curve.addCubicBezierSegment({ TabBezierFirstX, 1 }, { TabBezierSecondX, 1 }, { 1, 1 });
+        auto curve = cubicBezier(TabBezierFirstX, 1, TabBezierSecondX, 1);
         return curve;
     }();
     bool changed = false;
-    if (m_tabElapsed < TabSlideSeconds) {
-        m_tabElapsed = std::min(TabSlideSeconds, m_tabElapsed + dt);
-        const double t = ease.valueForProgress(m_tabElapsed / TabSlideSeconds);
+    if (m_tabElapsed < yalahoo::presentationMotion::TabSlideSeconds) {
+        m_tabElapsed = std::min(yalahoo::presentationMotion::TabSlideSeconds, m_tabElapsed + dt);
+        const double t =
+                ease.valueForProgress(m_tabElapsed / yalahoo::presentationMotion::TabSlideSeconds);
         const double x = m_tabFromX + (m_tabTargetX - m_tabFromX) * t;
         const double width = m_tabFromWidth + (m_tabTargetWidth - m_tabFromWidth) * t;
         changed = x != m_tabX || width != m_tabWidth;
         m_tabX = x;
         m_tabWidth = width;
     }
-    if (m_tabFadeElapsed < TabFadeSeconds) {
-        m_tabFadeElapsed = std::min(TabFadeSeconds, m_tabFadeElapsed + dt);
+    if (m_tabFadeElapsed < yalahoo::presentationMotion::TabFadeSeconds) {
+        m_tabFadeElapsed =
+                std::min(yalahoo::presentationMotion::TabFadeSeconds, m_tabFadeElapsed + dt);
         m_tabOpacity = m_tabFadeFrom
-                + (1 - m_tabFadeFrom) * ease.valueForProgress(m_tabFadeElapsed / TabFadeSeconds);
+                + (1 - m_tabFadeFrom)
+                        * ease.valueForProgress(m_tabFadeElapsed
+                                                / yalahoo::presentationMotion::TabFadeSeconds);
         changed = true;
     }
     if (changed)
@@ -288,7 +291,7 @@ void PresentationController::prepareMenu()
 {
     m_detail.reset(false);
     m_tabOpacity = 1;
-    m_tabFadeElapsed = TabFadeSeconds;
+    m_tabFadeElapsed = yalahoo::presentationMotion::TabFadeSeconds;
     Q_EMIT tabIndicatorChanged();
     m_layoutReady = false;
     ++m_layoutRevision;
@@ -322,7 +325,7 @@ void PresentationController::setReducedMotion(bool reduced)
         if (reduced) {
             m_browse.finish();
             m_detail.finish();
-            advanceTab(TabSlideSeconds);
+            advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
         }
     });
 }

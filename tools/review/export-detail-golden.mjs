@@ -1,33 +1,16 @@
+import {typescript as ts} from './frozen-source.mjs';
+import {FrozenSource, loadSource} from './frozen-source.mjs';
 // Verification input: execute the frozen placement/gate and production drag expressions.
-import {execFrozenGit} from './frozen-git.mjs';
-import {createHash} from 'node:crypto';
-import {createRequire} from 'node:module';
+import {baselineRevision} from './frozen-git.mjs';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const sources = [];
-function frozen(name) {
-    const text =
-        execFrozenGit(['show', `${baseline}:src/${name}.ts`], {cwd: root, encoding: 'utf8'});
-    sources.push({path: `src/${name}.ts`, sha256: createHash('sha256').update(text).digest('hex')});
-    return text;
-}
-function load(source, dependencies) {
-    const js =
-        ts.transpileModule(source, {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-          }).outputText;
-    const exports = {};
-    new Function('exports', 'require', js)(exports, id => {
-        if (!(id in dependencies))
-            throw new Error(`Unexpected dependency ${id}`);
-        return dependencies[id];
-    });
-    return exports;
-}
+const frozenSource = new FrozenSource(sources);
+const frozen = name => frozenSource.read(name);
+const load = loadSource;
 const motion = load(frozen('motion'), {});
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const camera = load(frozen('music-camera'), {

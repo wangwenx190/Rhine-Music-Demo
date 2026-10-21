@@ -1,3 +1,4 @@
+#include "Units.h"
 #include <QCoreApplication>
 #include "ArtworkStore.h"
 #include <QBuffer>
@@ -10,7 +11,6 @@
 
 namespace {
 // Compare decoded storage against the Qt allocation limit, not compressed image size.
-constexpr auto BytesPerKiB = 1024;
 constexpr auto DecodedRgbaBytesPerPixel = 4;
 }
 
@@ -25,7 +25,7 @@ bool withinImageAllocationLimit(const QImage &image)
     const auto limit = QImageReader::allocationLimit();
     if (limit == 0)
         return true;
-    const qint64 bytes = qint64(limit) * BytesPerKiB * BytesPerKiB;
+    const qint64 bytes = qint64(limit) * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB;
     return image.sizeInBytes() <= bytes
             && qint64(image.width()) * image.height() <= bytes / DecodedRgbaBytesPerPixel;
 }

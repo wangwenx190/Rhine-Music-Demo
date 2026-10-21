@@ -6,10 +6,12 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "tools/build/verify-startup.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("startup_verification", MODULE_PATH)
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)

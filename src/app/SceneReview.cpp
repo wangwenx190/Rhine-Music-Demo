@@ -1,3 +1,5 @@
+#include "ReviewSupport.h"
+#include "Units.h"
 #include "SceneReview.h"
 #include "SceneAdapter.h"
 #include "SceneItem.h"
@@ -26,13 +28,10 @@ constexpr auto DynamicFramesPerSecond = 120;
 constexpr auto PositionTolerance = 1e-3;
 constexpr auto FovTolerance = 1e-4;
 constexpr auto CaptureInsetPixels = 40;
-constexpr auto MaximumChannelByte = 255;
 constexpr auto UnitCubeDiagonal = 1.7320508075688772;
 constexpr auto DepthPackingErrorUnits = 3.0;
-constexpr auto MinimumForegroundPixels = 100;
 constexpr auto ReviewDeadlineMilliseconds = 80000;
 constexpr auto PollIntervalMilliseconds = 10;
-constexpr auto DecimalBase = 10;
 }
 
 namespace {
@@ -166,25 +165,29 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
                 // geometryDiagnostic writes a packed unit view normal for every face.
                 // A green-only test loses valid purple/front-facing normals during the dolly.
-                const double nx = 2.0 * qRed(color) / MaximumChannelByte - 1;
-                const double ny = 2.0 * qGreen(color) / MaximumChannelByte - 1;
-                const double nz = 2.0 * qBlue(color) / MaximumChannelByte - 1;
+                const double nx = 2.0 * qRed(color) / yalahoo::units::MaximumChannelByte - 1;
+                const double ny = 2.0 * qGreen(color) / yalahoo::units::MaximumChannelByte - 1;
+                const double nz = 2.0 * qBlue(color) / yalahoo::units::MaximumChannelByte - 1;
                 const int difference = std::abs(qRed(color) - background.red())
                         + std::abs(qGreen(color) - background.green())
                         + std::abs(qBlue(color) - background.blue());
-                constexpr double packedNormalTolerance = 2 * UnitCubeDiagonal / MaximumChannelByte
-                        + DepthPackingErrorUnits / (MaximumChannelByte * MaximumChannelByte);
+                constexpr double packedNormalTolerance =
+                        2 * UnitCubeDiagonal / yalahoo::units::MaximumChannelByte
+                        + DepthPackingErrorUnits
+                                / (yalahoo::units::MaximumChannelByte
+                                   * yalahoo::units::MaximumChannelByte);
                 if (difference > 9
                     && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
                     ++pixels;
             }
-        const QString file = u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, DecimalBase, '0'_L1)
-                                     .arg(window.width())
-                                     .arg(window.height())
-                                     .arg(scene.detail());
+        const QString file =
+                u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, yalahoo::units::DecimalBase, '0'_L1)
+                        .arg(window.width())
+                        .arg(window.height())
+                        .arg(scene.detail());
         const bool saved = !capture || (!image.isNull() && image.save(folder + "/"_L1 + file));
         const bool passed = bindings && points && saved && view->errorText().isEmpty()
-                && (!capture || pixels > MinimumForegroundPixels);
+                && (!capture || pixels > yalahoo::review::MinimumForegroundPixels);
         pass = pass && passed;
         results.append(QJsonObject{ { u"index"_s, index },
                                     { u"width"_s, window.width() },

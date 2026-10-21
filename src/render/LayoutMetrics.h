@@ -2,6 +2,7 @@
 // portrait insets are computed once and exposed as typed properties.
 
 #pragma once
+#include "SceneFrame.h"
 #include <QObject>
 #include <QString>
 
@@ -11,8 +12,6 @@ namespace layoutMetrics {
 inline constexpr auto PortraitAspectBoundary = 1.05;
 inline constexpr auto CompactWidthPixels = 1100;
 inline constexpr auto CoarseCompactHeightPixels = 600;
-inline constexpr auto InitialWidthPixels = 960;
-inline constexpr auto InitialHeightPixels = 640;
 }
 
 // viewport-layout.ts, in actual window content logical pixels (never DPR pixels).
@@ -63,8 +62,8 @@ Q_SIGNALS:
     void changed();
 
 private:
-    double m_width = layoutMetrics::InitialWidthPixels,
-           m_height = layoutMetrics::InitialHeightPixels;
+    double m_width = yalahoo::sceneDefaults::WidthPixels,
+           m_height = yalahoo::sceneDefaults::HeightPixels;
     bool m_coarse = false, m_cinematic = false;
 };
 }

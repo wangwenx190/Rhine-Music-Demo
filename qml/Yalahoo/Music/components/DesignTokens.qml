@@ -12,6 +12,17 @@ QtObject {
     readonly property real colorChannelMaximum: 255
 
     readonly property list<real> paletteCurve: [0.4, 0, 0.2, 1, 1, 1]
+    readonly property real editorWidth: 200
+    readonly property real editorLineHeight: 20.4
+    readonly property real editorHorizontalPadding: 14
+    readonly property real editorVerticalPadding: 13
+    readonly property real disabledControlOpacity: 0.38
+    readonly property font editorFont: Qt.font({
+                                                   family: regular.family,
+                                                   styleName: regular.styleName,
+                                                   weight: regular.weight,
+                                                   pixelSize: 12
+                                               })
     property bool night: false
     property bool hdrActive: false
     property bool reducedMotion: false

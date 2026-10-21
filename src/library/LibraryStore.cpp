@@ -1,3 +1,5 @@
+#include "MetadataConfiguration.h"
+#include "Units.h"
 #include "IMetadataProvider.h"
 #include <QCoreApplication>
 #include "LibraryStore.h"
@@ -21,19 +23,16 @@
 #include <utility>
 
 namespace {
+constexpr qint64 maximumCacheBytes =
+        256LL * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB;
 // Bound metadata batches and validate persisted network configuration before committing it.
 constexpr auto MetadataBatchMiB = 8;
-constexpr auto BytesPerKiB = 1024;
-constexpr auto MaximumContactCharacters = 500;
-constexpr auto DefaultHttpProxyPort = 8080;
-constexpr auto MaximumTcpPort = 65535;
 }
 
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-constexpr qint64 maximumCacheBytes = 256 * BytesPerKiB * BytesPerKiB;
 }
 struct LibraryStore::Private final
 {
@@ -114,7 +113,8 @@ void LibraryStore::stageMetadata(const ProviderResult &result)
     d->m_metadataBytes -= d->m_metadataPending.value(key).payloadBytes;
     d->m_metadataPending.insert(key, result);
     d->m_metadataBytes += result.payloadBytes;
-    if (d->m_metadataBytes >= MetadataBatchMiB * BytesPerKiB * BytesPerKiB)
+    if (d->m_metadataBytes
+        >= MetadataBatchMiB * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
         commitMetadata();
 }
 void LibraryStore::commitMetadata()
@@ -178,8 +178,8 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
     }
     if (patch.contains(u"musicBrainzContact"_s)) {
         const auto contact = patch.value(u"musicBrainzContact"_s).toString();
-        if (contact.size() > MaximumContactCharacters || contact.contains(QChar::CarriageReturn)
-            || contact.contains(QChar::LineFeed)) {
+        if (contact.size() > yalahoo::metadataConfiguration::MaximumContactCharacters
+            || contact.contains(QChar::CarriageReturn) || contact.contains(QChar::LineFeed)) {
             report(QCoreApplication::translate(
                     "Yalahoo", "The metadata contact must be one line of at most 500 characters."));
             return false;
@@ -187,11 +187,7 @@ bool LibraryStore::setMetadataConfiguration(const QVariantMap &configuration)
     }
     if (patch.contains(u"proxyUrl"_s) && !patch.value(u"proxyUrl"_s).toString().isEmpty()) {
         const QUrl proxy(patch.value(u"proxyUrl"_s).toString());
-        if (!proxy.isValid() || proxy.scheme() != "http"_L1 || proxy.host().isEmpty()
-            || !proxy.userInfo().isEmpty() || proxy.hasQuery() || proxy.hasFragment()
-            || proxy.port(DefaultHttpProxyPort) < 1
-            || proxy.port(DefaultHttpProxyPort) > MaximumTcpPort
-            || (!proxy.path().isEmpty() && proxy.path() != "/"_L1)) {
+        if (!metadataConfiguration::validProxy(proxy)) {
             report(QCoreApplication::translate("Yalahoo", "Enter a valid HTTP proxy URL."));
             return false;
         }

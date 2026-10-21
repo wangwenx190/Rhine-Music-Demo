@@ -25,19 +25,9 @@ add_test(NAME display-transfer-gpu COMMAND DisplayOutputTest transferShader)
 add_test(NAME display-output-visible COMMAND DisplayOutputTest nativeOutput)
 set_tests_properties(display-transfer-gpu display-output-visible PROPERTIES TIMEOUT 30)
 set_tests_properties(display-output-visible PROPERTIES ENVIRONMENT "YALAHOO_VERIFY_VISIBLE=1")
-if(WIN32)
-    set_tests_properties(display-transfer-gpu display-output-visible PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-qt_add_executable(LocalizationTest LocalizationTest.cpp)
-target_link_libraries(LocalizationTest PRIVATE YalahooCore Qt6::Qml Qt6::Test)
-yalahoo_platform(LocalizationTest)
-add_test(NAME localization COMMAND LocalizationTest)
-set_tests_properties(localization PROPERTIES TIMEOUT 30)
-if(WIN32)
-    set_tests_properties(localization PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
+yalahoo_unit_test(LocalizationTest localization
+    LIBRARIES YalahooCore Qt6::Qml
+    TIMEOUT 30)
 qt_add_executable(TitleTest TitleTest.cpp "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp")
 target_include_directories(TitleTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(TitleTest PRIVATE YalahooText Qt6::Test)
@@ -46,38 +36,18 @@ yalahoo_add_assets(TitleTest)
 yalahoo_platform(TitleTest)
 add_test(NAME title-reels COMMAND TitleTest)
 set_tests_properties(title-reels PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(title-reels PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 qt_add_executable(NavigationTest NavigationTest.cpp)
 target_include_directories(NavigationTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(NavigationTest PRIVATE YalahooNavigation Qt6::Test)
 yalahoo_platform(NavigationTest)
 add_test(NAME navigation COMMAND NavigationTest)
 set_tests_properties(navigation PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(navigation PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-qt_add_executable(CoverCacheTest CoverCacheTest.cpp)
-target_link_libraries(CoverCacheTest PRIVATE YalahooRhi Qt6::Test)
-target_compile_definitions(CoverCacheTest PRIVATE COVER_REPORT="${CMAKE_BINARY_DIR}/verification/cover-cache.json")
-yalahoo_platform(CoverCacheTest)
-add_test(NAME cover-cache COMMAND CoverCacheTest)
-set_tests_properties(cover-cache PROPERTIES TIMEOUT 90)
-if(WIN32)
-    set_tests_properties(cover-cache PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-qt_add_executable(AtlasUploadTest AtlasUploadTest.cpp)
-target_link_libraries(AtlasUploadTest PRIVATE YalahooRhi Qt6::Test)
-yalahoo_platform(AtlasUploadTest)
-add_test(NAME rhi-atlas-queue COMMAND AtlasUploadTest)
-if(WIN32)
-    set_tests_properties(rhi-atlas-queue PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
+yalahoo_unit_test(CoverCacheTest cover-cache
+    LIBRARIES YalahooRhi
+    DEFINITIONS COVER_REPORT="${CMAKE_BINARY_DIR}/verification/cover-cache.json"
+    TIMEOUT 90)
+yalahoo_unit_test(AtlasUploadTest rhi-atlas-queue
+    LIBRARIES YalahooRhi)
 qt_add_executable(VerificationWindowTest VerificationWindowTest.cpp)
 target_include_directories(VerificationWindowTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_link_libraries(VerificationWindowTest PRIVATE YalahooCore Qt6::Quick Qt6::Test)
@@ -94,150 +64,65 @@ if(NOT APPLE OR YALAHOO_MACOS_VISIBLE_TESTS)
 endif()
 if(WIN32)
     target_link_libraries(VerificationWindowTest PRIVATE user32)
-    set_property(
-        TEST verification-window-policy verification-window-visible
-        APPEND PROPERTY
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
 endif()
-qt_add_executable(RhiMaterialTest RhiMaterialTest.cpp)
-target_link_libraries(RhiMaterialTest PRIVATE YalahooRhi Qt6::Test Qt6::GuiPrivate)
-target_compile_definitions(RhiMaterialTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(RhiMaterialTest)
-add_test(NAME rhi-material-parameters COMMAND RhiMaterialTest)
-if(WIN32)
-    set_tests_properties(
-        rhi-material-parameters
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
+yalahoo_unit_test(RhiMaterialTest rhi-material-parameters
+    LIBRARIES YalahooRhi  Qt6::GuiPrivate
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 if(YALAHOO_REVIEW)
     add_test(NAME real-columns-gpu COMMAND archive-pool-audit
         "${CMAKE_BINARY_DIR}/verification/real-columns" --real-columns)
     set_tests_properties(real-columns-gpu PROPERTIES TIMEOUT 240
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-    if(WIN32)
-        set_tests_properties(real-columns-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     add_test(NAME archive-pool-gpu COMMAND archive-pool-audit
         "${CMAKE_BINARY_DIR}/verification/archive-pool")
     set_tests_properties(archive-pool-gpu PROPERTIES TIMEOUT 240
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-    if(WIN32)
-        set_tests_properties(archive-pool-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     add_test(NAME cover-gpu COMMAND cover-audit "${CMAKE_BINARY_DIR}/verification/covers")
     set_tests_properties(cover-gpu PROPERTIES TIMEOUT 180
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded")
-    if(WIN32)
-        set_tests_properties(cover-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
     set_tests_properties(rhi-postprocess-gpu PROPERTIES TIMEOUT 180
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-    if(WIN32)
-        set_tests_properties(rhi-postprocess-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     add_test(NAME rhi-bokeh-gpu COMMAND rhi-bokeh-audit "${CMAKE_BINARY_DIR}/verification/rhi-bokeh")
     set_tests_properties(rhi-bokeh-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(WIN32)
-        set_tests_properties(rhi-bokeh-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-bokeh-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-smaa-gpu COMMAND rhi-smaa-audit "${CMAKE_BINARY_DIR}/verification/rhi-smaa")
     set_tests_properties(rhi-smaa-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(WIN32)
-        set_tests_properties(rhi-smaa-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-smaa-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-ao-gpu COMMAND rhi-ao-audit "${CMAKE_BINARY_DIR}/verification/rhi-ao")
     set_tests_properties(rhi-ao-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(WIN32)
-        set_tests_properties(rhi-ao-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-ao-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-fog-gpu COMMAND rhi-fog-audit "${CMAKE_BINARY_DIR}/verification/rhi-fog")
     set_tests_properties(rhi-fog-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(WIN32)
-        set_tests_properties(rhi-fog-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-fog-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-shadow-gpu COMMAND rhi-shadow-audit "${CMAKE_BINARY_DIR}/verification/rhi-shadow")
     set_tests_properties(rhi-shadow-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
-    if(WIN32)
-        set_tests_properties(rhi-shadow-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-shadow-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
         FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
-    if(WIN32)
-        set_tests_properties(rhi-flicker-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-flicker-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-scale" --representative)
     set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT 600
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1"
         FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
-    if(WIN32)
-        set_tests_properties(rhi-scale-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    elseif(APPLE)
-        set_tests_properties(rhi-scale-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "DYLD_FRAMEWORK_PATH=set:${YALAHOO_SELECTED_QT}/lib")
-    endif()
     add_test(NAME rhi-shell-gpu COMMAND rhi-shell-audit
         "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
         "${CMAKE_BINARY_DIR}/verification/rhi-shell")
     set_tests_properties(rhi-shell-gpu PROPERTIES TIMEOUT 240
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-    if(WIN32)
-        set_tests_properties(rhi-shell-gpu PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     add_test(NAME rhi-opaque-gpu COMMAND rhi-audit "${CMAKE_BINARY_DIR}/verification/rhi")
     set_tests_properties(
         rhi-opaque-gpu
@@ -247,14 +132,6 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT
         "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
     )
-    if(WIN32)
-        set_tests_properties(
-            rhi-opaque-gpu
-            PROPERTIES
-            ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-        )
-    endif()
 endif()
 qt_add_executable(RenderQualityTest RenderQualityTest.cpp)
 target_link_libraries(RenderQualityTest PRIVATE YalahooScene Qt6::Test)
@@ -270,14 +147,6 @@ add_test(
     -o
     -,txt
 )
-if(WIN32)
-    set_tests_properties(
-        render-quality
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 qt_add_executable(SceneTest SceneTest.cpp)
 target_link_libraries(SceneTest PRIVATE YalahooScene Qt6::Test)
 target_compile_definitions(
@@ -298,14 +167,6 @@ add_test(
     -,txt
 )
 set_tests_properties(scene PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(
-        scene
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 if(YALAHOO_REVIEW)
     add_test(
         NAME
@@ -327,10 +188,6 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT
         "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
     )
-    if(WIN32)
-        set_tests_properties(runtime-render-backend PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
     foreach(dpr IN ITEMS 1 1.5 2)
         add_test(
             NAME
@@ -352,14 +209,6 @@ if(YALAHOO_REVIEW)
             ENVIRONMENT
             "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
         )
-        if(WIN32)
-            set_tests_properties(
-                runtime-postprocess-dpr-${dpr}
-                PROPERTIES
-                ENVIRONMENT_MODIFICATION
-                "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-            )
-        endif()
     endforeach()
     add_test(
         NAME
@@ -381,14 +230,6 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT
         "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
     )
-    if(WIN32)
-        set_tests_properties(
-            runtime-occlusion
-            PROPERTIES
-            ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-        )
-    endif()
     add_test(
         NAME
         runtime-materials
@@ -407,14 +248,6 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT
         "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
     )
-    if(WIN32)
-        set_tests_properties(
-            runtime-materials
-            PROPERTIES
-            ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-        )
-    endif()
     add_test(
         NAME
         runtime-lighting
@@ -433,14 +266,6 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT
         "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
     )
-    if(WIN32)
-        set_tests_properties(
-            runtime-lighting
-            PROPERTIES
-            ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-        )
-    endif()
     foreach(dpr IN ITEMS 1 1.5 2)
         add_test(
             NAME
@@ -460,14 +285,6 @@ if(YALAHOO_REVIEW)
             ENVIRONMENT
             "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
         )
-        if(WIN32)
-            set_tests_properties(
-                runtime-scene-dpr-${dpr}
-                PROPERTIES
-                ENVIRONMENT_MODIFICATION
-                "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-            )
-        endif()
     endforeach()
 endif()
 target_link_libraries(IdentityTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
@@ -488,10 +305,6 @@ add_test(NAME module-link-and-plugins COMMAND ModuleProbe)
 add_test(NAME production-app-root COMMAND Yalahoo --verify-app)
 set_tests_properties(production-app-root PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
-if(WIN32)
-    set_tests_properties(production-app-root PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 add_test(
     NAME
     shader-tools
@@ -518,17 +331,6 @@ add_test(
     "${CMAKE_BINARY_DIR}/verification/runtime.json"
 )
 set_tests_properties(runtime PROPERTIES TIMEOUT 30)
-if(WIN32)
-    set_tests_properties(
-        identity
-        module-link-and-plugins
-        shader-tools
-        runtime
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 qt_add_executable(MotionTest MotionTest.cpp)
 target_link_libraries(MotionTest PRIVATE YalahooCore Qt6::Test)
 target_compile_definitions(
@@ -566,20 +368,6 @@ set_tests_properties(
     ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
-if(WIN32)
-    set_tests_properties(
-        motion
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-    set_tests_properties(
-        runtime-motion
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 set_tests_properties(
     identity
     module-link-and-plugins
@@ -590,15 +378,9 @@ set_tests_properties(
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
 qt_add_executable(LibraryDataTest LibraryDataTest.cpp)
-qt_add_executable(DirectoryScannerTest DirectoryScannerTest.cpp)
-target_link_libraries(DirectoryScannerTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(DirectoryScannerTest)
-add_test(NAME directory-scanner COMMAND DirectoryScannerTest)
-set_tests_properties(directory-scanner PROPERTIES TIMEOUT 90)
-if(WIN32)
-    set_tests_properties(directory-scanner PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
+yalahoo_unit_test(DirectoryScannerTest directory-scanner
+    LIBRARIES YalahooCore
+    TIMEOUT 90)
 target_link_libraries(LibraryDataTest PRIVATE YalahooCore Qt6::Gui Qt6::Test)
 target_compile_definitions(LibraryDataTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 yalahoo_platform(LibraryDataTest)
@@ -620,14 +402,6 @@ set_tests_properties(
     ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
 )
-if(WIN32)
-    set_tests_properties(
-        library-data
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 add_test(
     NAME
     runtime-library
@@ -646,14 +420,6 @@ set_tests_properties(
     ENVIRONMENT
     "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
 )
-if(WIN32)
-    set_tests_properties(
-        runtime-library
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 
 qt_add_executable(LightingTest LightingTest.cpp)
 target_link_libraries(LightingTest PRIVATE YalahooScene Qt6::Test)
@@ -675,14 +441,6 @@ add_test(
     -,txt
 )
 set_tests_properties(lighting PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(
-        lighting
-        PROPERTIES
-        ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin"
-    )
-endif()
 
 if(YALAHOO_REVIEW)
     add_test(NAME runtime-rhi-integration COMMAND Yalahoo --verify-integration
@@ -691,110 +449,48 @@ if(YALAHOO_REVIEW)
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
         ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
         FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-    if(WIN32)
-        set_property(TEST runtime-rhi-integration APPEND PROPERTY ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-    endif()
 endif()
 qt_add_executable(ArchivePoolTest ArchivePoolTest.cpp)
-qt_add_executable(RealColumnsTest RealColumnsTest.cpp)
-target_link_libraries(RealColumnsTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(RealColumnsTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(RealColumnsTest)
-add_test(NAME real-columns COMMAND RealColumnsTest)
-set_tests_properties(real-columns PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(real-columns PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
+yalahoo_unit_test(RealColumnsTest real-columns
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    TIMEOUT 60)
 target_link_libraries(ArchivePoolTest PRIVATE YalahooScene Qt6::Test)
 target_compile_definitions(ArchivePoolTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 yalahoo_platform(ArchivePoolTest)
 add_test(NAME archive-pool COMMAND ArchivePoolTest)
 set_tests_properties(archive-pool PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(archive-pool PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 add_test(NAME runtime-filled COMMAND Yalahoo --verify-runtime
     "${CMAKE_BINARY_DIR}/verification/runtime-filled/runtime.json" --verify-shading --verify-filled)
 set_tests_properties(runtime-filled PROPERTIES TIMEOUT 60
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0")
-if(WIN32)
-    set_tests_properties(runtime-filled PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
-qt_add_executable(PresentationTest PresentationTest.cpp)
-target_link_libraries(PresentationTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(PresentationTest)
-add_test(NAME presentation COMMAND PresentationTest)
-set_tests_properties(presentation PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(presentation PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
-qt_add_executable(DetailMotionTest DetailMotionTest.cpp)
-target_link_libraries(DetailMotionTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(DetailMotionTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(DetailMotionTest)
-add_test(NAME detail-motion COMMAND DetailMotionTest)
-set_tests_properties(detail-motion PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(detail-motion PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
-qt_add_executable(OverviewTest OverviewTest.cpp)
-target_link_libraries(OverviewTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(OverviewTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(OverviewTest)
-add_test(NAME overview COMMAND OverviewTest)
-set_tests_properties(overview PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(overview PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-qt_add_executable(OpeningTest OpeningTest.cpp)
-target_link_libraries(OpeningTest PRIVATE YalahooOpening Qt6::Test)
-target_compile_definitions(OpeningTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(OpeningTest)
-add_test(NAME opening COMMAND OpeningTest)
-if(WIN32)
-    set_tests_properties(opening PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
-qt_add_executable(MediaMetadataTest MediaMetadataTest.cpp)
-target_link_libraries(MediaMetadataTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(MediaMetadataTest)
-add_test(NAME media-metadata COMMAND MediaMetadataTest)
-set_tests_properties(media-metadata PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
-if(WIN32)
-    set_tests_properties(media-metadata PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
-qt_add_executable(TrackFocusTest TrackFocusTest.cpp)
-target_link_libraries(TrackFocusTest PRIVATE YalahooScene Qt6::Test)
-yalahoo_platform(TrackFocusTest)
-add_test(NAME track-focus COMMAND TrackFocusTest)
-set_tests_properties(track-focus PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(track-focus PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
+yalahoo_unit_test(PresentationTest presentation
+    LIBRARIES YalahooCore
+    TIMEOUT 60)
+yalahoo_unit_test(DetailMotionTest detail-motion
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    TIMEOUT 60)
+yalahoo_unit_test(OverviewTest overview
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    TIMEOUT 60)
+yalahoo_unit_test(OpeningTest opening
+    LIBRARIES YalahooOpening
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
+yalahoo_unit_test(MediaMetadataTest media-metadata
+    LIBRARIES YalahooCore
+    TIMEOUT 90 SERIAL)
+yalahoo_unit_test(TrackFocusTest track-focus
+    LIBRARIES YalahooScene
+    TIMEOUT 60)
 qt_add_executable(PlaybackTest PlaybackTest.cpp)
 target_include_directories(PlaybackTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
 target_link_libraries(PlaybackTest PRIVATE YalahooCore Qt6::Test)
 yalahoo_platform(PlaybackTest)
 add_test(NAME playback COMMAND PlaybackTest)
 set_tests_properties(playback PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
-if(WIN32)
-    set_tests_properties(playback PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
 qt_add_executable(AudioAmbienceTest AudioAmbienceTest.cpp)
 target_include_directories(AudioAmbienceTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
@@ -804,57 +500,32 @@ include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AudioAmbienceTest)
 add_test(NAME audio-ambience COMMAND AudioAmbienceTest)
 set_tests_properties(audio-ambience PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
-if(WIN32)
-    set_tests_properties(audio-ambience PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
-qt_add_executable(SettingsTest SettingsTest.cpp)
-target_link_libraries(SettingsTest PRIVATE YalahooScene Qt6::Test)
-yalahoo_platform(SettingsTest)
-add_test(NAME settings COMMAND SettingsTest)
-set_tests_properties(settings PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(settings PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
+yalahoo_unit_test(SettingsTest settings
+    LIBRARIES YalahooScene
+    TIMEOUT 60)
 qt_add_executable(ExperimentTest ExperimentTest.cpp)
 target_include_directories(ExperimentTest PRIVATE "${PROJECT_SOURCE_DIR}/src/render/rhi")
 target_link_libraries(ExperimentTest PRIVATE YalahooScene Qt6::Test)
 yalahoo_platform(ExperimentTest)
 add_test(NAME experiments COMMAND ExperimentTest)
 set_tests_properties(experiments PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(experiments PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
-qt_add_executable(StartupTest StartupTest.cpp)
-target_link_libraries(StartupTest PRIVATE YalahooScene Qt6::Test)
-yalahoo_platform(StartupTest)
-add_test(NAME startup COMMAND StartupTest)
-set_tests_properties(startup PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(startup PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
-
-qt_add_executable(LoggingTest LoggingTest.cpp)
-target_link_libraries(LoggingTest PRIVATE YalahooCore Qt6::Test)
-yalahoo_platform(LoggingTest)
-add_test(NAME logging COMMAND LoggingTest)
+yalahoo_unit_test(StartupTest startup
+    LIBRARIES YalahooScene
+    TIMEOUT 60)
+yalahoo_unit_test(LoggingTest logging
+    LIBRARIES YalahooCore)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME dry-tools COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/DryToolsTest.py")
+set_tests_properties(dry-tools PROPERTIES TIMEOUT 10)
 add_test(NAME startup-verification COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/StartupVerificationTest.py")
 set_tests_properties(startup-verification PROPERTIES TIMEOUT 10)
 add_test(NAME logging-terminal COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/LoggingTerminalTest.py" "$<TARGET_FILE:LoggingTest>")
 set_tests_properties(logging logging-terminal PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
-if(WIN32)
-    set_tests_properties(logging logging-terminal PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
 qt_add_executable(GraphicsBackendTest GraphicsBackendTest.cpp)
 target_include_directories(GraphicsBackendTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
@@ -862,17 +533,7 @@ target_link_libraries(GraphicsBackendTest PRIVATE YalahooRhi Qt6::Test)
 yalahoo_platform(GraphicsBackendTest)
 add_test(NAME graphics-backend COMMAND GraphicsBackendTest)
 set_tests_properties(graphics-backend PROPERTIES TIMEOUT 10)
-if(WIN32)
-    set_tests_properties(graphics-backend PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
 
-qt_add_executable(OnlineMetadataTest OnlineMetadataTest.cpp)
-target_link_libraries(OnlineMetadataTest PRIVATE YalahooCore Qt6::Test Qt6::Network)
-yalahoo_platform(OnlineMetadataTest)
-add_test(NAME online-metadata COMMAND OnlineMetadataTest)
-set_tests_properties(online-metadata PROPERTIES TIMEOUT 60)
-if(WIN32)
-    set_tests_properties(online-metadata PROPERTIES ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${YALAHOO_SELECTED_QT}/bin")
-endif()
+yalahoo_unit_test(OnlineMetadataTest online-metadata
+    LIBRARIES YalahooCore  Qt6::Network
+    TIMEOUT 60)

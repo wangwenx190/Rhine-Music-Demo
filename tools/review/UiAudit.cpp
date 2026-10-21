@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "Localization.h"
 #include "ReadbackImage.h"
 #include "CoverCache.h"
@@ -49,7 +50,6 @@ namespace {
 constexpr int LayoutSettleMilliseconds = 150;
 constexpr int TeardownObservationMilliseconds = 300;
 constexpr int InteractionSettleMilliseconds = 1200;
-constexpr int ReviewDeadlineMilliseconds = 60000;
 }
 
 namespace {
@@ -662,7 +662,7 @@ int main(int argc, char **argv)
     QTimer::singleShot(0, &app, [&] {
         next();
     });
-    QTimer::singleShot(ReviewDeadlineMilliseconds, &app, [&] {
+    QTimer::singleShot(yalahoo::review::DefaultDeadlineMilliseconds, &app, [&] {
         app.exit(7);
     });
     return app.exec();

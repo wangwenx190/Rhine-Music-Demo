@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 """R18 reviewed call-chain deductions, frozen-source guards and local run evidence."""
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json

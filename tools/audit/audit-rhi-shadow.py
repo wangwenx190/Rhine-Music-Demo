@@ -1,5 +1,5 @@
 """Record source shadow graph, cache and API audit; generated matrices remain local."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
 
@@ -81,14 +81,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                         "D3D11/Linux hardware not inferred from macOS Metal/OpenGL. "
                         "Existing GL renderbuffer capability adaptation is retained.")]
     for check_id, path, symbol, conclusion in entries:
-        content = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, requirement=conclusion, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), evidence=conclusion,
-                         result="static-audit-passed", platform=host,
-                         limitations="Static graph/API evidence only; runtime reported separately. "
-                                     "Product ground remains R19D3B; DOF/AA/BLUR-01 remain D4."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=conclusion, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Static graph/API evidence only; runtime reported separately. Product ground remains R19D3B; DOF/AA/BLUR-01 remain D4.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-shadow"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

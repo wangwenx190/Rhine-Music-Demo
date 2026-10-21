@@ -1,16 +1,17 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {frozenReader} from './frozen-source.mjs';
+import {typescript as ts} from './frozen-source.mjs';
+import {sourceServer, launchBrowser, wait, sourceMarkup, sourceStyles, sourceHtml} from './browser-source.mjs';
+import {transpile} from './frozen-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {CDP} from './cdp.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
-import {createRequire} from 'node:module';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const overview = process.argv.includes('--overview');
 const presentation = process.argv.includes('--presentation');
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const frozen = path.join(root, 'build/browse-ui-web/legacy-web');
 const output = path.join(root, presentation ? 'verification/presentation-source'
                                : overview   ? 'verification/overview-source'
@@ -19,27 +20,10 @@ await fs.mkdir(output, {recursive: true});
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
 await fs.mkdir(path.join(frozen, 'public/fonts'), {recursive: true});
 const sources = {};
-const source = (name) => {
-    const text = execFrozenGit(['show', baseline + ':' + name], {cwd: root, encoding: 'utf8'});
-    sources[name] = createHash('sha256').update(text).digest('hex');
-    return text;
-};
+const source = frozenReader(sources);
 const appSource = source('src/music-app.ts');
-const template =
-    appSource.split('stage.innerHTML = `')[1].split('`;')[0].replace(' as Theme[]', '');
-const svg = (body) =>
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-    + body + '</svg>';
-const iconSource = appSource.split('const icons = ')[1].split('\n};')[0] + '\n}';
-const icons = Function('svg', 'return (' + iconSource + ')')(svg);
-const markup =
-    Function('icons', 'svg', 'preferences', 'themeNames', 'sortLabel', 'appVersion',
-             'return `' + template + '`')(icons, svg, {theme: 'day'}, {day: '暖昼', night: '深夜'},
-                                          {name: '音乐', column: '类型', code: 'GENRE'}, '0.4.1');
-const styles = [
-    'style', 'music', 'music-navigation-motion', 'music-navigation-ruler', 'music-transport-title',
-    'music-theme', 'music-theme-switch', 'music-overview'
-];
+const markup = sourceMarkup(appSource);
+const styles = sourceStyles;
 for (const name of styles) {
     // Reconstruct source assets from the frozen revision, never use mutable Web files.
     await fs.writeFile(path.join(frozen, 'src', name + '.css'), source('src/' + name + '.css'));
@@ -55,16 +39,12 @@ for (const weight of ['Light', 'Regular', 'Demibold', 'Bold']) {
     sources[name] = createHash('sha256').update(bytes).digest('hex');
     await fs.writeFile(path.join(frozen, name), bytes);
 }
-const {createServer} =
-    await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
 let harness = await fs.readFile(path.join(root, 'tools/review/'
                                                     + (presentation ? 'presentation-ui-harness.js'
                                                        : overview   ? 'overview-ui-harness.js'
                                                                     : 'browse-ui-harness.js')),
                                 'utf8');
 if (presentation) {
-    const ts =
-        createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
     const select = (text, names) => {
         const file = ts.createSourceFile('source.ts', text, ts.ScriptTarget.Latest, true);
         return file.statements
@@ -89,70 +69,11 @@ if (overview) {
     const anchorMarkup = ui.match(/anchor\.innerHTML = '([^']+)'/)[1];
     harness = 'const anchorMarkup = ' + JSON.stringify(anchorMarkup) + ';\n' + harness;
 }
-const html =
-    '<!doctype html><html><head><meta charset="utf-8">'
-    + styles.map((name) => '<link rel="stylesheet" href="/src/' + name + '.css">').join('')
-    + '<style>.music-app:not([data-layout="portrait"]) .theme-switch span{display:inline}</style>' +
-    '</head><body><div id="stage" class="music-app reduce-motion" data-mode="archive" data-theme="day">'
-    + markup + '</div><script type="module">' + harness + '</script></body></html>';
-const server = await createServer({
-    root: frozen,
-    configFile: false,
-    logLevel: 'error',
-    server: {host: '127.0.0.1', port: 0},
-    plugins: [{
-        name: 'browse-ui',
-        configureServer(s) {
-            s.middlewares.use('/browse-ui', (_, response) => {
-                response.setHeader('Content-Type', 'text/html; charset=utf-8');
-                response.end(html);
-            });
-        }
-    }]
-});
-await server.listen();
+const html = sourceHtml(markup, harness);
+const server = await sourceServer(frozen, html);
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
-let executable;
-for (const candidate
-         of [process.env.REVIEW_BROWSER,
-             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-             '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-             path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
-             path.join(process.env['PROGRAMFILES(X86)'] || '',
-                       'Microsoft/Edge/Application/msedge.exe')]
-             .filter(Boolean)) {
-    try {
-        await fs.access(candidate);
-        executable = candidate;
-        break;
-    } catch {
-    }
-}
-if (!executable)
-    throw Error('Installed browser required');
 const profile = path.join(root, 'build/browse-ui-profile-' + process.pid);
-await fs.mkdir(profile, {recursive: true});
-const processHandle =
-    spawn(executable,
-          [
-              '--headless=new', '--remote-debugging-port=0', '--user-data-dir=' + profile,
-              '--no-first-run', '--disable-background-networking', '--disable-component-update',
-              '--disable-extensions', 'about:blank'
-          ],
-          {windowsHide: true, stdio: 'ignore'});
-async function wait(probe) {
-    const deadline = Date.now() + 60000;
-    while (Date.now() < deadline) {
-        try {
-            const value = await probe();
-            if (value)
-                return value;
-        } catch {
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw Error('Browser capture timeout');
-}
+const processHandle = await launchBrowser(profile);
 let browser, page;
 try {
     const admissions = [];
@@ -160,12 +81,7 @@ try {
         (arg, index) => arg === '--overview-native' ? [process.argv[index + 1]] : []);
     for (const nativePath of overview ? nativePaths : []) {
         const native = JSON.parse(await fs.readFile(nativePath, 'utf8'));
-        const ts =
-            createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
-        const js =
-            ts.transpileModule(source('src/music-overview.ts'), {
-                  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-              }).outputText;
+        const js = transpile(source('src/music-overview.ts'));
         const exports = {};
         new Function('exports', 'require', js)(exports, name => {
             if (name !== 'three' && name !== './motion.ts')

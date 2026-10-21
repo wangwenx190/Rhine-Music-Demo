@@ -1,3 +1,4 @@
+#include "ColorTransfer.h"
 #include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "SelectionLighting.h"
@@ -6,11 +7,6 @@
 
 namespace {
 // Palette intensities preserve source light units; sRGB encoding/decoding uses the standard piecewise transfer.
-constexpr auto SrgbDecodeKnee = .04045;
-constexpr auto SrgbLinearSlope = 12.92;
-constexpr auto SrgbOffset = .055;
-constexpr auto SrgbScale = 1.055;
-constexpr auto SrgbExponent = 2.4;
 constexpr auto AnchorFollowRate = 5;
 constexpr auto NightEnvironment = .16;
 constexpr auto DayEnvironment = .25;
@@ -21,7 +17,6 @@ constexpr auto NightHemisphere = .21;
 constexpr auto DayHemisphere = .32;
 constexpr auto NightSpotSourceIntensity = 130;
 constexpr auto DaySpotSourceIntensity = 180;
-constexpr auto SpotUnitScale = 64;
 constexpr auto NightAreaIntensity = 24;
 constexpr auto DayAreaIntensity = 34;
 constexpr auto NightScatter = .72;
@@ -39,7 +34,6 @@ constexpr auto MaximumRibbonSeconds = 2.4;
 constexpr auto AreaHeightOffset = .5;
 constexpr auto HybridAreaGain = .3;
 constexpr auto AreaLightForwardOffset = .44;
-constexpr auto SrgbEncodeKnee = .0031308;
 constexpr auto ThemeBezierCubic = 1.6;
 constexpr auto ThemeBezierQuadratic = 1.8;
 constexpr auto ThemeBezierLinear = 1.2;
@@ -55,8 +49,7 @@ SceneVector linear(QLatin1StringView hex)
 {
     const QColor c(hex);
     auto decode = [](double s) {
-        return s <= SrgbDecodeKnee ? s / SrgbLinearSlope
-                                   : std::pow((s + SrgbOffset) / SrgbScale, SrgbExponent);
+        return colorTransfer::decode(s);
     };
     return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
 }
@@ -81,7 +74,8 @@ LightingPalette LightingPalette::theme(bool night)
     p.environment = night ? NightEnvironment : DayEnvironment;
     p.key = night ? NightKey : DayKey;
     p.hemisphere = night ? NightHemisphere : DayHemisphere;
-    p.spot = (night ? NightSpotSourceIntensity : DaySpotSourceIntensity) * SpotUnitScale;
+    p.spot = (night ? NightSpotSourceIntensity : DaySpotSourceIntensity)
+            * yalahoo::lightingDefaults::SpotUnitScale;
     p.area = night ? NightAreaIntensity : DayAreaIntensity;
     p.scatter = night ? NightScatter : 1;
     p.printAmbient = night ? NightPrintAmbient : DayPrintAmbient;
@@ -308,8 +302,7 @@ QVector3D SelectionLighting::areaTarget() const
 QColor SelectionLighting::backgroundColor() const
 {
     auto encode = [](double l) {
-        return l <= SrgbEncodeKnee ? SrgbLinearSlope * l
-                                   : SrgbScale * std::pow(l, 1 / SrgbExponent) - SrgbOffset;
+        return colorTransfer::encode(l);
     };
     return QColor::fromRgbF(encode(m_palette.background.x), encode(m_palette.background.y),
                             encode(m_palette.background.z));

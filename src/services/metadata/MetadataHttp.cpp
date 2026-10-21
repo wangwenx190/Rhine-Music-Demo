@@ -1,3 +1,4 @@
+#include "MetadataConfiguration.h"
 #include <QNetworkAccessManager>
 #include "MetadataHttp.h"
 #include <algorithm>
@@ -11,9 +12,6 @@
 namespace {
 // Host pacing and a hard deadline bound each request; HTTP ranges use exclusive upper bounds.
 constexpr auto HostSpacingMilliseconds = 1100;
-constexpr auto DefaultHttpProxyPort = 8080;
-constexpr auto MaximumTcpPort = 65535;
-constexpr auto MaximumContactCharacters = 500;
 constexpr auto TransferTimeoutMilliseconds = 12000;
 constexpr auto RequestDeadlineMilliseconds = 15000;
 constexpr auto HttpSuccessBegin = 200;
@@ -116,16 +114,13 @@ void MetadataHttp::start()
         m_network->setProxy(QNetworkProxy(QNetworkProxy::DefaultProxy));
     } else {
         const QUrl proxy(m_configuration.value(u"proxyUrl"_s).toString());
-        if (!proxy.isValid() || proxy.scheme() != "http"_L1 || proxy.host().isEmpty()
-            || !proxy.userInfo().isEmpty() || proxy.hasQuery() || proxy.hasFragment()
-            || proxy.port(DefaultHttpProxyPort) < 1
-            || proxy.port(DefaultHttpProxyPort) > MaximumTcpPort
-            || (!proxy.path().isEmpty() && proxy.path() != "/"_L1)) {
+        if (!metadataConfiguration::validProxy(proxy)) {
             Q_EMIT completed({ { }, tr("Invalid HTTP proxy address."), { } });
             return;
         }
-        m_network->setProxy(QNetworkProxy(QNetworkProxy::HttpProxy, proxy.host(),
-                                          quint16(proxy.port(DefaultHttpProxyPort))));
+        m_network->setProxy(QNetworkProxy(
+                QNetworkProxy::HttpProxy, proxy.host(),
+                quint16(proxy.port(yalahoo::metadataConfiguration::DefaultHttpProxyPort))));
     }
     QNetworkRequest request(m_url);
     QString contact = m_contact.simplified();
@@ -133,9 +128,12 @@ void MetadataHttp::start()
     contact.remove('\n'_L1);
     if (contact.isEmpty())
         contact = u"https://github.com/wangwenx190/Rhine-Music-Demo"_s;
-    request.setRawHeader("User-Agent"_ba,
-                         "yalahoo/1.0 ("_ba + contact.left(MaximumContactCharacters).toUtf8()
-                                 + ")"_ba);
+    request.setRawHeader(
+            "User-Agent"_ba,
+            "yalahoo/1.0 ("_ba
+                    + contact.left(yalahoo::metadataConfiguration::MaximumContactCharacters)
+                              .toUtf8()
+                    + ")"_ba);
     request.setRawHeader("Accept"_ba, "application/json"_ba);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::ManualRedirectPolicy);

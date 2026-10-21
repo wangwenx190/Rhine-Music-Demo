@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include <QWheelEvent>
 #include "NavigationReview.h"
 #include "InputRouter.h"
@@ -19,12 +20,9 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <functional>
-#include <chrono>
 
 namespace {
 // Stage deadlines bound event-driven review completion; injected inputs target only this window.
-constexpr auto ReviewWidthPixels = 1280;
-constexpr auto ReviewHeightPixels = 720;
 constexpr auto StageDeadlineMilliseconds = 10000;
 constexpr auto SwipeDeadlineMilliseconds = 1400;
 }
@@ -58,15 +56,6 @@ enum ReviewStage {
 using namespace Qt::StringLiterals;
 
 namespace {
-QQuickItem *find(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *result = find(child, name))
-            return result;
-    return nullptr;
-}
 }
 int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                               LibrarySession &library, InputRouter &input, RulerController &ruler,
@@ -74,8 +63,10 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
 {
     QDir().mkpath(output);
     auto *selection = scene.selection();
-    auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), u"nativeScene"_s));
-    if (!selection || !native || !find(window.contentItem(), u"productionRulerInk"_s))
+    auto *native = qobject_cast<rhi::SceneItem *>(
+            yalahoo::review::findVisual(window.contentItem(), u"nativeScene"_s));
+    if (!selection || !native
+        || !yalahoo::review::findVisual(window.contentItem(), u"productionRulerInk"_s))
         return InvalidReviewInput;
     LibrarySnapshot fixture;
     for (int lane = 0; lane < 2; ++lane) {
@@ -94,7 +85,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     }
     library.setSnapshot(std::move(fixture));
     selection->setRealistic(false);
-    window.resize(ReviewWidthPixels, ReviewHeightPixels);
+    window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
     native->setTelemetryEnabled(true);
     const auto playback = library.playbackTrackId();
     bool passed = true;
@@ -107,11 +98,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
     qint64 restoreStartedNs = 0;
     std::function<void()> next;
     std::function<void()> advanceWhenReady;
-    const auto now = [] {
-        return qint64(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              std::chrono::steady_clock::now().time_since_epoch())
-                              .count());
-    };
+    const auto now = yalahoo::review::nowNs;
     QObject::connect(&input, &InputRouter::navigationCommitted, &scope, [&](quint64 revision) {
         inputs.append(QJsonObject{ { u"navigationRevision"_s, qint64(revision) },
                                    { u"inputRevision"_s, qint64(scene.frame().inputRevision) },
@@ -259,7 +246,8 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
                 if (states[i].toMap()[u"enabled"_s].toBool()
                     && states[i].toMap()[u"ordinal"_s].toInt() == 0)
                     first = i;
-            auto *button = find(window.contentItem(), u"rulerSlot%1"_s.arg(first));
+            auto *button =
+                    yalahoo::review::findVisual(window.contentItem(), u"rulerSlot%1"_s.arg(first));
             if (!button) {
                 app.exit(RulerSlotsMissing);
                 return;

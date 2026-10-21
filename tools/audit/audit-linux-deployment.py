@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 """Trace Linux deployment and shared source chains; native target evidence stays separate."""
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json

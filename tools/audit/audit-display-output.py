@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 """Bind the reviewed display-output call chains to source hashes and baked shaders."""
+#!/usr/bin/env python3
 import hashlib
 import json
 import os

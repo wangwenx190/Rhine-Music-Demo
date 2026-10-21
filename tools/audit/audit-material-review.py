@@ -1,5 +1,5 @@
 """Bind the manually reviewed MaterialReview call chain to source hashes; output is local."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
 
@@ -59,14 +59,7 @@ for host, platform_guard in {
                         "macOS uses the true hidden Metal/OpenGL helper; missing Cocoa multisample-texture storage selects the stock same-format 4x buffer/resolve path. Windows/D3D11 and "
                         "Linux/OpenGL target execution remains R36, not proved by macOS.")]
     for check_id, path, symbol, conclusion in entries:
-        content = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Source audit drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), evidence=conclusion,
-                         result="static-audit-passed", platform=host,
-                         limitations="Review driver only; actual runs documented separately. "
-                                     "No VSYNC, production optical or target-device conclusion."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Review driver only; actual runs documented separately. No VSYNC, production optical or target-device conclusion.'))
     output = ROOT / "verification" / f"{host}-static" / "material-review"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

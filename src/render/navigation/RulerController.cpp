@@ -1,3 +1,4 @@
+#include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -12,13 +13,11 @@ namespace {
 constexpr auto PositionTolerance = .001;
 constexpr auto VelocityTolerance = .01;
 constexpr auto FollowRate = 18;
-constexpr auto PhysicalTickCount = 16;
 constexpr auto NarrowHoverHeightPixels = 16;
 constexpr auto TickStridePixels = 11;
 constexpr auto RestingHeightPixels = 10;
 constexpr auto RestingOpacity = .28;
 constexpr auto VisibleTickCount = 12;
-constexpr auto FirstAlbumRow = 12;
 constexpr auto SelectedLeadingTicks = 5;
 constexpr auto VisiblePresenceThreshold = .025;
 constexpr auto NarrowRestingHeightPixels = 8;
@@ -26,7 +25,6 @@ constexpr auto WideGapPixels = 8;
 constexpr auto NarrowTickPixels = 2;
 constexpr auto OverscanLeadingTicks = 2;
 constexpr auto RippleStaggerSeconds = .024;
-constexpr auto InactiveRippleTime = 1e20;
 constexpr auto RippleDurationSeconds = .560;
 constexpr auto RippleContraction = .4;
 constexpr auto HoverHeightPixels = 22;
@@ -37,7 +35,6 @@ constexpr auto LastVisibleOrdinalOffset = 11.0;
 constexpr auto WideTickPixels = 3;
 constexpr auto NarrowGapPixels = 6;
 constexpr auto NarrowActiveHeightPixels = 21;
-constexpr auto ActiveHeightPixels = 30;
 }
 
 using namespace Qt::StringLiterals;
@@ -60,7 +57,7 @@ RulerController::RulerController(MotionController *motion, SelectionController *
                                  QObject *parent)
     : QObject(parent), m_motion(motion), m_selection(selection)
 {
-    for (int i = 0; i < PhysicalTickCount; ++i) {
+    for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i) {
         m_slots[i].ordinal = i;
         m_slots[i].x = i * TickStridePixels;
         m_slots[i].height.finish(RestingHeightPixels);
@@ -102,14 +99,15 @@ void RulerController::synchronize(bool groupChanged)
     const int lane = ArchivePool::wrap(m_selection->cell().lane, pool.columnCount());
     const int count = pool.rowCount(m_selection->cell().lane);
     const auto location = pool.location(m_selection->albumId());
-    const double physical = m_selection->cell().row - FirstAlbumRow;
+    const double physical = m_selection->cell().row - yalahoo::sceneGeometry::FirstAlbumRow;
     const bool changedGroup = groupChanged || lane != m_lane;
-    const double occurrence = changedGroup ? (location ? location->row - FirstAlbumRow : 0)
-                                           : m_selected + physical - m_lastPhysical;
+    const double occurrence = changedGroup
+            ? (location ? location->row - yalahoo::sceneGeometry::FirstAlbumRow : 0)
+            : m_selected + physical - m_lastPhysical;
     m_lastPhysical = physical;
     m_lane = lane;
-    configure(count, location ? int(location->row - FirstAlbumRow) : 0, occurrence,
-              !m_selection->realistic(), changedGroup);
+    configure(count, location ? int(location->row - yalahoo::sceneGeometry::FirstAlbumRow) : 0,
+              occurrence, !m_selection->realistic(), changedGroup);
 }
 void RulerController::configure(int count, int row, double physicalRow, bool loop,
                                 bool groupChanged)
@@ -153,10 +151,10 @@ void RulerController::regroup(bool instant)
     m_scroll.finish(m_target);
     const double start =
             m_count > VisibleTickCount ? std::floor(m_scroll.value) - OverscanLeadingTicks : 0;
-    std::array<double, PhysicalTickCount> destinations;
-    std::array<bool, PhysicalTickCount> available;
+    std::array<double, yalahoo::rulerGeometry::PhysicalTickCount> destinations;
+    std::array<bool, yalahoo::rulerGeometry::PhysicalTickCount> available;
     available.fill(true);
-    for (int i = 0; i < PhysicalTickCount; ++i)
+    for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i)
         destinations[i] = start + i;
     std::stable_sort(destinations.begin(), destinations.end(), [&](double a, double b) {
         const bool av =
@@ -168,7 +166,7 @@ void RulerController::regroup(bool instant)
     for (double ordinal : destinations) {
         const double x = (ordinal - m_scroll.value) * step;
         int nearest = -1;
-        for (int i = 0; i < PhysicalTickCount; ++i)
+        for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i)
             if (available[i]
                 && (nearest < 0 || std::abs(m_slots[i].x - x) < std::abs(m_slots[nearest].x - x)))
                 nearest = i;
@@ -193,7 +191,7 @@ void RulerController::regroup(bool instant)
                 ? slot.presence.value < VisiblePresenceThreshold
                 : slot.presence.value > VisiblePresenceThreshold;
         slot.revealAt = m_time + (changesPresence ? delay : 0);
-        slot.rippleAt = instant ? -InactiveRippleTime : m_time + delay;
+        slot.rippleAt = instant ? -yalahoo::rulerGeometry::InactiveRippleTime : m_time + delay;
         slot.pointer = false;
     }
 }
@@ -202,7 +200,7 @@ void RulerController::recycle()
     if (m_count <= VisibleTickCount)
         return;
     const double start = std::floor(m_scroll.value) - OverscanLeadingTicks;
-    for (int n = 0; n < PhysicalTickCount; ++n) {
+    for (int n = 0; n < yalahoo::rulerGeometry::PhysicalTickCount; ++n) {
         const double ordinal = start + n;
         const bool present = std::any_of(m_slots.begin(), m_slots.end(), [ordinal](const Slot &s) {
             return s.ordinal == ordinal;
@@ -210,7 +208,7 @@ void RulerController::recycle()
         if (present)
             continue;
         auto free = std::find_if(m_slots.begin(), m_slots.end(), [&](const Slot &s) {
-            if (s.ordinal >= start && s.ordinal < start + PhysicalTickCount)
+            if (s.ordinal >= start && s.ordinal < start + yalahoo::rulerGeometry::PhysicalTickCount)
                 return false;
             const double x = (s.ordinal - m_scroll.value) * (m_drawing.tick + m_drawing.gap)
                     + s.offset.value;
@@ -227,7 +225,7 @@ void RulerController::recycle()
                                                   : RestingHeightPixels);
         free->opacity.finish(ordinal == m_selected ? 1 : RestingOpacity);
         free->revealAt = 0;
-        free->rippleAt = -InactiveRippleTime;
+        free->rippleAt = -yalahoo::rulerGeometry::InactiveRippleTime;
         free->pointer = free->focused = false;
     }
 }
@@ -245,12 +243,12 @@ void RulerController::render(double dt, bool instant)
     recycle();
     m_drawing.width = std::max(0.0, m_width.value);
     m_drawing.overflow = m_count > VisibleTickCount;
-    for (int i = 0; i < PhysicalTickCount; ++i) {
+    for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i) {
         auto &s = m_slots[i];
         auto &mark = m_drawing.marks[i];
         if (instant) {
             s.revealAt = m_time;
-            s.rippleAt = -InactiveRippleTime;
+            s.rippleAt = -yalahoo::rulerGeometry::InactiveRippleTime;
         }
         const bool revealed = m_time >= s.revealAt;
         moving = approach(s.presence, valid(s.ordinal) ? double(revealed) : double(!revealed), dt,
@@ -316,7 +314,8 @@ void RulerController::setNarrow(bool narrow)
     m_narrow = narrow;
     m_drawing.tick = narrow ? NarrowTickPixels : WideTickPixels;
     m_drawing.gap = narrow ? NarrowGapPixels : WideGapPixels;
-    m_drawing.height = narrow ? NarrowActiveHeightPixels : ActiveHeightPixels;
+    m_drawing.height =
+            narrow ? NarrowActiveHeightPixels : yalahoo::rulerGeometry::ActiveHeightPixels;
     m_width.value *= ratio;
     m_width.velocity *= ratio;
     for (auto &s : m_slots) {
@@ -355,8 +354,8 @@ QVariantList RulerController::slotStates() const
 void RulerController::publish()
 {
     QVariantList result;
-    result.reserve(PhysicalTickCount);
-    for (int i = 0; i < PhysicalTickCount; ++i) {
+    result.reserve(yalahoo::rulerGeometry::PhysicalTickCount);
+    for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i) {
         const auto &mark = m_drawing.marks[i];
         result.append(QVariantMap{ { u"x"_s, mark.x },
                                    { u"enabled"_s, m_active && mark.visible },
@@ -372,17 +371,17 @@ void RulerController::publish()
 }
 bool RulerController::click(int slot)
 {
-    if (!m_active || !m_selection || slot < 0 || slot >= PhysicalTickCount
+    if (!m_active || !m_selection || slot < 0 || slot >= yalahoo::rulerGeometry::PhysicalTickCount
         || !m_drawing.marks[slot].visible)
         return false;
     Q_EMIT inputReceived();
     const double ordinal = m_slots[slot].ordinal;
     if (m_router)
         return m_router->selectRow(m_selection->realistic()
-                                           ? ordinal + FirstAlbumRow
+                                           ? ordinal + yalahoo::sceneGeometry::FirstAlbumRow
                                            : m_selection->cell().row + ordinal - m_selected);
     return m_selection->realistic()
-            ? m_selection->navigateRow(ordinal + FirstAlbumRow)
+            ? m_selection->navigateRow(ordinal + yalahoo::sceneGeometry::FirstAlbumRow)
             : m_selection->navigateRow(m_selection->cell().row + ordinal - m_selected);
 }
 void RulerController::setInputRouter(InputRouter *router)
@@ -391,7 +390,7 @@ void RulerController::setInputRouter(InputRouter *router)
 }
 void RulerController::hover(int slot, bool pointer, bool focused)
 {
-    if (slot < 0 || slot >= PhysicalTickCount)
+    if (slot < 0 || slot >= yalahoo::rulerGeometry::PhysicalTickCount)
         return;
     auto &s = m_slots[slot];
     if (s.pointer == pointer && s.focused == focused)

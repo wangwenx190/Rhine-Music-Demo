@@ -1,3 +1,5 @@
+#include "SceneGeometry.h"
+#include "Units.h"
 #include <QQuickWindow>
 #include <QWheelEvent>
 #include "SelectionController.h"
@@ -9,17 +11,14 @@
 
 namespace {
 // Normalize wheel units once and bound gesture accumulation before issuing navigation intent.
-constexpr auto InactiveGestureTime = 1e20;
 constexpr auto WheelBurstGapMilliseconds = 200;
 constexpr auto MaximumWheelDeltaPixels = 144.0;
 constexpr auto PixelsPerWheelStep = 48;
 constexpr auto MaximumLaneMagnitude = 1e9;
-constexpr auto FirstArchiveRow = 12.0;
 constexpr auto ArchiveRowEndOffset = 11.0;
 constexpr auto MaximumRowMagnitude = 1e12;
 constexpr auto WheelStepPixels = 48.0;
 constexpr auto AngleDeltaPerDetent = 120;
-constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto MinimumSwipePixels = 36;
 constexpr auto SwipeAxisDominance = 1.3;
 constexpr auto MaximumSwipeMilliseconds = 1400;
@@ -112,7 +111,7 @@ void InputRouter::reset()
 {
     m_remainder = 0;
     m_direction = 0;
-    m_lastTime = -InactiveGestureTime;
+    m_lastTime = -yalahoo::inputTiming::InactiveGestureTime;
 }
 int InputRouter::consume(double delta, double milliseconds)
 {
@@ -162,7 +161,8 @@ bool InputRouter::queue(ArchiveCell target)
     if (!count)
         return false;
     if (m_selection->realistic())
-        target.row = std::clamp(target.row, FirstArchiveRow, ArchiveRowEndOffset + count);
+        target.row = std::clamp(target.row, double(yalahoo::sceneGeometry::FirstAlbumRow),
+                                ArchiveRowEndOffset + count);
     if (std::floor(target.row) != target.row || std::abs(target.row) > MaximumRowMagnitude)
         return false;
     m_pending = target;
@@ -211,7 +211,8 @@ bool InputRouter::wheel(QWheelEvent *event, QQuickWindow *window)
     }
     if (event->phase() == Qt::ScrollBegin)
         reset();
-    const int steps = consume(-delta.y(), m_timer.nsecsElapsed() / NanosecondsPerMillisecond);
+    const int steps =
+            consume(-delta.y(), m_timer.nsecsElapsed() / yalahoo::units::NanosecondsPerMillisecond);
     if (steps)
         commit(steps, false);
     if (event->phase() == Qt::ScrollEnd)

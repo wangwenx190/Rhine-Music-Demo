@@ -1,5 +1,6 @@
+#include "Units.h"
 #include "ReadbackImage.h"
-#include "RhiApi.h"
+#include "PixelStorage.h"
 #include <QFloat16>
 #include <algorithm>
 #include <cmath>
@@ -15,39 +16,22 @@ enum PixelChannel {
     AlphaChannel,
     RgbaChannels
 };
-constexpr int HalfScalarBytes = 2;
-constexpr int ScalarBytes = 4;
-constexpr int HalfRgbaBytes = 8;
-constexpr int FloatRgbaBytes = 16;
-constexpr int MaximumChannelByte = 255;
 }
 
 QImage readbackImage(const QRhiReadbackResult &result, bool yUp, bool uploaded, QSize logicalSize)
 {
     require(result.pixelSize.width() > 0 && result.pixelSize.height() > 0,
             "Empty RHI readback dimensions");
-    int bytesPerPixel = 0;
-    switch (result.format) {
-    case QRhiTexture::R16F:
-        bytesPerPixel = HalfScalarBytes;
-        break;
-    case QRhiTexture::R32F:
-    case QRhiTexture::RGBA8:
-    case QRhiTexture::BGRA8:
-        bytesPerPixel = ScalarBytes;
-        break;
-    case QRhiTexture::RGBA16F:
-        bytesPerPixel = HalfRgbaBytes;
-        break;
-    case QRhiTexture::RGBA32F:
-        bytesPerPixel = FloatRgbaBytes;
-        break;
-    default:
-        require(false, "Unsupported RHI readback format");
-    }
+    // Only image/readback formats are valid here; inventory also accepts depth descriptors.
+    require(result.format == QRhiTexture::R16F || result.format == QRhiTexture::R32F
+                    || result.format == QRhiTexture::RGBA8 || result.format == QRhiTexture::BGRA8
+                    || result.format == QRhiTexture::RGBA16F
+                    || result.format == QRhiTexture::RGBA32F,
+            "Unsupported RHI readback format");
+    const int pixelBytes = bytesPerPixel(result.format);
     const qint64 pixels = qint64(result.pixelSize.width()) * result.pixelSize.height();
-    require(pixels <= std::numeric_limits<qsizetype>::max() / bytesPerPixel
-                    && result.data.size() == pixels * bytesPerPixel,
+    require(pixels <= std::numeric_limits<qsizetype>::max() / pixelBytes
+                    && result.data.size() == pixels * pixelBytes,
             "Invalid RHI readback byte count");
     const auto size = logicalSize.isValid() ? logicalSize : result.pixelSize;
     require(size.width() > 0 && size.height() > 0 && size.width() <= result.pixelSize.width()
@@ -68,16 +52,16 @@ QImage readbackImage(const QRhiReadbackResult &result, bool yUp, bool uploaded, 
     require(!image.isNull(), "Cannot allocate RHI readback image");
     const bool scalar = result.format == QRhiTexture::R16F || result.format == QRhiTexture::R32F;
     const int channels = scalar ? 1 : RgbaChannels;
-    const int componentBytes = bytesPerPixel / channels;
+    const int componentBytes = pixelBytes / channels;
     for (int y = 0; y < image.height(); ++y) {
         const int sourceY = yUp ? image.height() - 1 - y : y;
         auto *destination = image.scanLine(y);
         for (int x = 0; x < image.width(); ++x) {
             const auto *source = result.data.constData()
-                    + (qsizetype(sourceY) * result.pixelSize.width() + x) * bytesPerPixel;
+                    + (qsizetype(sourceY) * result.pixelSize.width() + x) * pixelBytes;
             for (int channel = 0; channel < channels; ++channel) {
                 float value;
-                if (componentBytes == HalfScalarBytes) {
+                if (componentBytes == pixelStorage::HalfScalarBytes) {
                     qfloat16 half;
                     std::memcpy(&half, source + channel * componentBytes, sizeof(half));
                     value = float(half);
@@ -86,13 +70,14 @@ QImage readbackImage(const QRhiReadbackResult &result, bool yUp, bool uploaded, 
                 }
                 require(std::isfinite(value), "Nonfinite RHI readback channel");
                 // Clamp before integer conversion: finite HDR values can exceed integer range.
-                const auto byte =
-                        uchar(std::lround(std::clamp(value, 0.f, 1.f) * MaximumChannelByte));
+                const auto byte = uchar(std::lround(std::clamp(value, 0.f, 1.f)
+                                                    * yalahoo::units::MaximumChannelByte));
                 if (scalar) {
                     destination[x * RgbaChannels] = byte;
                     destination[x * RgbaChannels + GreenChannel] = byte;
                     destination[x * RgbaChannels + BlueChannel] = byte;
-                    destination[x * RgbaChannels + AlphaChannel] = MaximumChannelByte;
+                    destination[x * RgbaChannels + AlphaChannel] =
+                            yalahoo::units::MaximumChannelByte;
                 } else {
                     destination[x * RgbaChannels + channel] = byte;
                 }

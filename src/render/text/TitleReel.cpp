@@ -1,3 +1,5 @@
+#include "FrameConnection.h"
+#include "Units.h"
 #include "FrameClock.h"
 #include "TitleReel.h"
 #include <QSet>
@@ -8,17 +10,8 @@
 
 namespace {
 // Reel curves preserve the source sampled trajectory, velocity clamp and blur response.
-constexpr auto SampleIntervals = 48;
-constexpr auto LastInterpolationIndex = 47;
-constexpr auto TrackDecay = 10;
-constexpr auto VelocityLimitGain = 12;
-constexpr auto TrackAlignmentTolerance = .001;
-constexpr auto TrackSampleCount = 49;
-constexpr auto RealSampleIntervals = 48.0;
-constexpr auto GlyphSidePaddingEm = .15;
 constexpr auto GlyphPaddingEm = .3;
 constexpr auto SlotPaddingPixels = .3;
-constexpr auto ReelTransitionSeconds = .460;
 constexpr auto EmptyFadeDurationRatio = .65;
 constexpr auto EntryDelayFraction = .14;
 constexpr auto EntryActiveFraction = .86;
@@ -28,7 +21,6 @@ constexpr auto RollbackReferenceMilliseconds = 460;
 constexpr auto RollBlurSpeed = 24;
 constexpr auto BlurSpeedDivisor = 6;
 constexpr auto MaximumIdleSlots = 64;
-constexpr auto RgbaBytesPerPixel = 4;
 }
 
 using namespace Qt::StringLiterals;
@@ -38,25 +30,19 @@ ReelTrack::Sample ReelTrack::sample() const
 {
     if (!moving())
         return { target, 0 };
-    if (sampled) {
-        const double position = std::max(0.0, elapsed / duration) * SampleIntervals;
-        const int index = std::min(LastInterpolationIndex, int(position));
-        return { display(), (points[index + 1] - points[index]) * SampleIntervals / duration };
-    }
-    const double t = std::max(0.0, elapsed / duration);
-    const double delta = start - target;
-    const double advance = initialVelocity * duration + TrackDecay * delta;
-    const double decay = std::exp(-TrackDecay * t);
-    return { target + (delta + advance * t) * decay,
-             (advance - TrackDecay * (delta + advance * t)) * decay / duration };
+    if (sampled)
+        return sampledReel::interpolate(
+                points, std::max(0.0, elapsed / duration) * sampledReel::Intervals, duration);
+    return sampledReel::analytic(start, target, initialVelocity, duration,
+                                 std::max(0.0, elapsed / duration));
 }
 double ReelTrack::display() const
 {
     if (!moving())
         return target;
-    const double position = std::max(0.0, elapsed / duration) * SampleIntervals;
-    const int index = std::min(LastInterpolationIndex, int(position));
-    return points[index] + (points[index + 1] - points[index]) * (position - index);
+    return sampledReel::interpolate(
+                   points, std::max(0.0, elapsed / duration) * sampledReel::Intervals, duration)
+            .value;
 }
 void ReelTrack::move(double to, bool instant)
 {
@@ -67,26 +53,18 @@ void ReelTrack::move(double to, bool instant)
 void ReelTrack::move(double to, bool instant, Sample from)
 {
     start = from.value;
-    const double limit = std::max(std::abs(start - to), 1.0) * VelocityLimitGain / duration;
-    initialVelocity = std::clamp(from.velocity, -limit, limit);
+    initialVelocity = sampledReel::limitedVelocity(start - to, from.velocity, duration);
     target = to;
     elapsed = instant
-                    || (std::abs(to - start) < TrackAlignmentTolerance
-                        && std::abs(initialVelocity) < TrackAlignmentTolerance)
+                    || (std::abs(to - start) < sampledReel::AlignmentTolerance
+                        && std::abs(initialVelocity) < sampledReel::AlignmentTolerance)
             ? duration
             : 0;
     if (!moving()) {
         points.fill(target);
         return;
     }
-    for (int i = 0; i < TrackSampleCount; ++i) {
-        const double t = i / RealSampleIntervals;
-        points[i] = i == SampleIntervals ? target
-                                         : target
-                        + (start - target
-                           + (initialVelocity * duration + TrackDecay * (start - target)) * t)
-                                * std::exp(-TrackDecay * t);
-    }
+    sampledReel::fill(points, start, target, initialVelocity, duration);
 }
 void ReelTrack::advance(double dt)
 {
@@ -112,7 +90,7 @@ double ReelSlot::viewportHeight() const
 }
 double ReelSlot::padding() const
 {
-    return glyph.size * GlyphSidePaddingEm;
+    return glyph.size * sampledReel::GlyphSidePaddingEm;
 }
 bool ReelSlot::shown() const
 {
@@ -143,9 +121,10 @@ double ReelSlot::blurOpacity() const
     const auto &track = blurOnEntry ? entry : roll;
     if (!transport || !track.moving())
         return 0;
-    const double position = track.elapsed / track.duration * SampleIntervals;
-    const int index = std::min(LastInterpolationIndex, int(position));
-    return blurPoints[index] + (blurPoints[index + 1] - blurPoints[index]) * (position - index);
+    return sampledReel::interpolate(blurPoints,
+                                    track.elapsed / track.duration * sampledReel::Intervals,
+                                    track.duration)
+            .value;
 }
 bool ReelSlot::nativeInk() const
 {
@@ -195,8 +174,9 @@ void ReelSlot::rollTo(const TitleGlyph &next, bool instant)
     const double alphaTarget = next.text.isEmpty() ? 0 : 1;
     if (transport && alphaTarget != alpha.target) {
         const auto from = alpha.sample();
-        alpha.duration = next.text.isEmpty() ? ReelTransitionSeconds * EmptyFadeDurationRatio
-                                             : ReelTransitionSeconds;
+        alpha.duration = next.text.isEmpty()
+                ? sampledReel::TransitionSeconds * EmptyFadeDurationRatio
+                : sampledReel::TransitionSeconds;
         alpha.sampled = transport;
         alpha.move(alphaTarget, instant, from);
     } else if (transport && instant) {
@@ -220,19 +200,21 @@ void ReelSlot::rollTo(const TitleGlyph &next, bool instant)
         roll.move(0, true);
         entry.sampled = true;
         entry.move(0, false, { glyph.height, 0 });
-        for (int i = 0; i < TrackSampleCount; ++i) {
-            const double t = std::clamp(
-                    (i / RealSampleIntervals - EntryDelayFraction) / EntryActiveFraction, 0.0, 1.0);
-            entry.points[i] = i == SampleIntervals
-                    ? 0
-                    : glyph.height * (1 + TrackDecay * t) * std::exp(-TrackDecay * t);
+        for (int i = 0; i < sampledReel::SampleCount; ++i) {
+            const double t = std::clamp((double(i) / sampledReel::Intervals - EntryDelayFraction)
+                                                / EntryActiveFraction,
+                                        0.0, 1.0);
+            entry.points[i] = i == sampledReel::Intervals ? 0
+                                                          : glyph.height
+                            * (1 + sampledReel::Decay * t) * std::exp(-sampledReel::Decay * t);
         }
         blurOnEntry = true;
         blurPoints[0] = 0;
-        blurPoints[SampleIntervals] = 0;
-        for (int i = 1; i < SampleIntervals; ++i) {
-            const double speed = std::abs((entry.points[i + 1] - entry.points[i - 1])
-                                          * SampleIntervals / (2 * entry.duration * glyph.height));
+        blurPoints[sampledReel::Intervals] = 0;
+        for (int i = 1; i < sampledReel::Intervals; ++i) {
+            const double speed =
+                    std::abs((entry.points[i + 1] - entry.points[i - 1]) * sampledReel::Intervals
+                             / (2 * entry.duration * glyph.height));
             blurPoints[i] = std::clamp((speed - 1) / EntryBlurVelocityRange, 0.0, 1.0);
         }
         return;
@@ -245,7 +227,7 @@ void ReelSlot::rollTo(const TitleGlyph &next, bool instant)
     const double offset = faces.isEmpty() ? 0 : std::max(0.0, position - faces[first].offset);
     QList<TitleGlyph> values{ faces.isEmpty() ? TitleGlyph() : faces[first].glyph };
     for (int i = first + 1; i < faces.size(); ++i) {
-        if (faces[i].offset >= position + viewport.sample().value - TrackAlignmentTolerance)
+        if (faces[i].offset >= position + viewport.sample().value - sampledReel::AlignmentTolerance)
             break;
         values.append(faces[i].glyph);
     }
@@ -264,10 +246,10 @@ void ReelSlot::rollTo(const TitleGlyph &next, bool instant)
         blurOnEntry = false;
         const double speed = RollBlurSpeed;
         blurPoints[0] = previousBlur;
-        blurPoints[SampleIntervals] = 0;
-        for (int i = 1; i < SampleIntervals; ++i) {
+        blurPoints[sampledReel::Intervals] = 0;
+        for (int i = 1; i < sampledReel::Intervals; ++i) {
             const double blurVelocity =
-                    std::abs((roll.points[i + 1] - roll.points[i - 1]) * SampleIntervals
+                    std::abs((roll.points[i + 1] - roll.points[i - 1]) * sampledReel::Intervals
                              / (2 * roll.duration * std::max(1.0, glyph.height)));
             blurPoints[i] = std::clamp((blurVelocity - speed / BlurSpeedDivisor)
                                                / (speed - speed / BlurSpeedDivisor),
@@ -342,15 +324,8 @@ FrameClock *TitleReel::clock() const
 }
 void TitleReel::setClock(FrameClock *clock)
 {
-    if (m_clock == clock)
-        return;
-    disconnect(m_connection);
-    m_clock = clock;
-    if (clock)
-        m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
-            advance(dt);
-        });
-    Q_EMIT clockChanged();
+    if (bindFrameClock(this, m_clock, m_connection, clock))
+        Q_EMIT clockChanged();
 }
 QString TitleReel::text() const
 {
@@ -699,7 +674,8 @@ QVariantMap TitleReel::diagnostics() const
         faces += slot->faces.size();
         if (slot->shown())
             layerBytes += qint64(std::ceil(slot->capacityWidth * m_dpr))
-                    * qint64(std::ceil(slot->capacityHeight * m_dpr)) * RgbaBytesPerPixel;
+                    * qint64(std::ceil(slot->capacityHeight * m_dpr))
+                    * yalahoo::units::RgbaBytesPerPixel;
     }
     return { { u"slots"_s, slotCount() },
              { u"activeSlots"_s, active },

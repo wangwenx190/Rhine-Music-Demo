@@ -1,3 +1,4 @@
+#include "Units.h"
 #include <QCoreApplication>
 #include "LegacyImporter.h"
 #include "ArtworkStore.h"
@@ -9,8 +10,9 @@
 #include <QSet>
 
 namespace {
+constexpr qint64 maximumJsonBytes =
+        256LL * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB;
 // Version bounds describe accepted source documents; optional sidecars have a smaller byte limit.
-constexpr auto BytesPerKiB = 1024;
 constexpr auto MinimumLibraryVersion = 3;
 constexpr auto MaximumLibraryVersion = 4;
 }
@@ -19,14 +21,14 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-constexpr qint64 maximumJsonBytes = 256 * BytesPerKiB * BytesPerKiB;
 bool readObject(const QString &path, QJsonObject &output, QString &error, bool optional = false)
 {
     QFile file(path);
     if (optional && !file.exists())
         return true;
     QJsonParseError parse;
-    const auto limit = optional ? qint64(BytesPerKiB * BytesPerKiB) : maximumJsonBytes;
+    const auto limit = optional ? qint64(yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
+                                : maximumJsonBytes;
     if (!file.open(QIODevice::ReadOnly) || file.size() > limit) {
         error = QCoreApplication::translate(
                         "Yalahoo",

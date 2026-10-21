@@ -4,6 +4,9 @@ import json
 import re
 import sys
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader
 
 ROOT = Path(__file__).resolve().parents[2]
 source = ROOT / "legacy-web/node_modules/three/examples/jsm/shaders/BokehShader.js"
@@ -24,7 +27,7 @@ for x, y, ring in re.findall(pattern, body):
 if len(taps) != 41 or "gl_FragColor = col / 41.0" not in body:
     raise SystemExit("Locked source Bokeh structure changed")
 for relative in ["resources/shaders/bokeh.frag", "resources/shaders/rhi/bokeh.frag"]:
-    native = (ROOT / relative).read_text()
+    native = read_shader(ROOT / relative)
     # Whitespace is normalized separately; the source coordinates must not be fitted.
     compact = re.sub(r"\s+", "", native)
     source_body = body[body.index("vec2 aspectcorrect"):body.index("gl_FragColor = col / 41.0;")]

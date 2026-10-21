@@ -7,8 +7,12 @@ target_sources(
     QuinticTrack.h
     MotionFunctions.cpp
     MotionFunctions.h
+    SampledReelCurve.h
+    OpeningTimeline.h
+    EasingCurve.h
     FrameClock.cpp
     FrameClock.h
+    FrameConnection.h
     MotionController.cpp
     MotionController.h
 )

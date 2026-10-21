@@ -3,6 +3,7 @@
 
 #pragma once
 #include "OptionMetrics.h"
+#include "SourceOptics.h"
 #include "GenreRowsModel.h"
 #include "OpeningController.h"
 #include "StartupCoordinator.h"
@@ -320,4 +321,11 @@ struct SceneGraphLifecycleQml final
     Q_GADGET
     QML_FOREIGN(yalahoo::SceneGraphLifecycle)
     QML_NAMED_ELEMENT(SceneGraphLifecycle)
+};
+
+struct SourceOpticsQml final
+{
+    Q_GADGET
+    QML_FOREIGN(yalahoo::SourceOptics)
+    QML_NAMED_ELEMENT(SourceOptics)
 };

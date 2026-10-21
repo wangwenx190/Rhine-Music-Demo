@@ -36,3 +36,5 @@ HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR
 生产始终启用几何MSAA和SMAA；屏幕空间尺寸执行occlusion.md。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
 
 Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。
+
+`resources/shaders/gaussian-blur.glsl`统一执行各二维背景的有序高斯累加，各调用shader保留自己的来源sigma与成对权重表；审计从指定表读取核，不把其他vec2常量算作采样。RHI后处理入口通过`post-input.glsl`共享std140输入，并直接包含对应Quick3D核；SSAO的16/32/64入口以编译期宏选择`ssao-body.glsl`的完整有序样本。

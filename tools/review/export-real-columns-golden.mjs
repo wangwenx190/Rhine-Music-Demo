@@ -1,38 +1,29 @@
-import {execFrozenGit} from './frozen-git.mjs';
-import {createHash} from 'node:crypto';
-import {createRequire} from 'node:module';
+import {typescript as ts} from './frozen-source.mjs';
+import {FrozenSource, transpile} from './frozen-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const platform = process.platform === 'win32'    ? 'windows'
                  : process.platform === 'darwin' ? 'macos'
                                                  : 'linux';
 const sources = [];
 const modules = new Map();
+const frozenSource = new FrozenSource(sources);
 function load(name) {
     if (modules.has(name))
         return modules.get(name);
-    const source =
-        execFrozenGit(['show', `${baseline}:src/${name}.ts`], {cwd: root, encoding: 'utf8'});
-    sources.push(
-        {path: `src/${name}.ts`, sha256: createHash('sha256').update(source).digest('hex')});
-    const js =
-        ts.transpileModule(source, {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-          }).outputText;
     const exports = {};
     modules.set(name, exports);
-    new Function('exports', 'require', js)(exports, (id) => {
-        if (id === './data.ts')
-            return {};
-        return load(id.replace('./', '').replace('.ts', ''));
+    new Function('exports', 'require', transpile(frozenSource.read(name)))(exports, id => {
+        return id === './data.ts' ? {} : load(id.replace('./', '').replace('.ts', ''));
     });
     return exports;
 }
+
 const {MusicRealColumns} = load('music-real-columns');
 const motion = load('motion');
 const counts = [0, 1, 2, 3, 49, 106];

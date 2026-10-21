@@ -1,11 +1,13 @@
 """Audit the production opening's source, state, bounded drawing and RHI handoff."""
-from shader_parameters import numeric_source
+from audit_support import source_check
 import argparse
 import hashlib
 import json
-import re
 import subprocess
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader, gaussian_kernel
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
@@ -51,9 +53,8 @@ if render.index('if (input.sceneOccluded)') >= render.index('renderFrame(cb)'):
     raise SystemExit('Opaque guard is after 3D submission')
 if 'input.cover.isNull() && !input.atlasGeneration' not in renderer:
     raise SystemExit('Opaque reconstruction must initialize RHI from resumed input')
-blur = (ROOT / 'resources/shaders/opening-blur.frag').read_text()
-blur = numeric_source(blur)
-weights = [float(value) for value in re.findall(r'\)\s*\* ([0-9.]+);', blur)]
+blur = read_shader(ROOT / 'resources/shaders/opening-blur.frag')
+weights, _ = gaussian_kernel(blur)
 if len(weights) != 16 or abs(weights[0] + 2 * sum(weights[1:]) - 1) > 1e-12:
     raise SystemExit('Skip blur Gaussian is not normalized or complete')
 subprocess.run(['node', 'tools/review/export-opening-golden.mjs', '--check'], cwd=ROOT, check=True)
@@ -72,10 +73,7 @@ for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'),
     rows = []
     entries = CHECKS + [(dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[platform], 'cmake/Platform.cmake', marker, 'Same native shared implementation and platform branch; target compiler/deployment/runtime remain separate. Remaining target/backend runtime gates are assigned to R36; this audit creates no contexts.')]
     for identity, path, symbol, evidence in entries:
-        data = (ROOT / path).read_bytes()
-        if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
-            raise SystemExit(f'Opening source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=evidence, platform=platform, sourcePath=path, lineOrSymbol=symbol, evidence=evidence, sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing target/backend evidence remains R20-P/R36.'))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing target/backend evidence remains R20-P/R36.'))
     output = ROOT / 'verification' / f'{platform}-static' / 'opening'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(checks=rows, frozen=golden['sources'], reference=reference_info), indent=2) + '\n')

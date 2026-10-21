@@ -1,3 +1,6 @@
+#include "CameraFraming.h"
+#include "Units.h"
+#include "SceneFrame.h"
 #include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "FrameClock.h"
@@ -14,18 +17,13 @@
 
 namespace {
 // Camera framing follows source-space layout; projection converts to Qt only at the matrix boundary.
-constexpr auto DegreesPerHalfTurn = 180;
-constexpr auto BrowseSpan = 7.33;
 constexpr auto DetailSpan = 5.9;
 constexpr auto PortraitMinimumDetailSpan = 6.3;
 constexpr auto PortraitCaseSpan = 3.7;
 constexpr auto MinimumPortraitContentHeight = 100.0;
 constexpr auto PortraitDetailHeightRatio = .54;
 constexpr auto PortraitDetailChromePixels = 156;
-constexpr auto PortraitPreviewSpan = 8.4;
-constexpr auto StandardAspectWidth = 16.0;
 constexpr auto CameraFollowRate = 9;
-constexpr auto AspectHeightUnits = 9;
 constexpr auto BrowseYawDegrees = 59;
 constexpr auto DetailYawDegrees = 8;
 constexpr auto BrowseElevationDegrees = 25;
@@ -34,28 +32,19 @@ constexpr auto DetailElevationDegrees = 20;
 constexpr auto BrowseAimX = 1.091;
 constexpr auto BrowseAimY = .045;
 constexpr auto BrowseAimZ = .481;
-constexpr auto PortraitPreviewLift = .4;
-constexpr auto PortraitPreviewY = .36;
-constexpr auto UltrawideAspectWidth = 21.0;
-constexpr auto WideAimRightRatio = .035;
 constexpr auto PositionSettledTolerance = .035;
 constexpr auto AimVelocityTolerance = .035;
 constexpr auto SpanVelocityTolerance = .035;
-constexpr auto BrowseAimUpRatio = .08;
-constexpr auto UltrawideAimUpGain = .02;
 constexpr auto PointerParallaxDistance = .12;
-constexpr auto InspectionLiftPadding = .12;
 constexpr auto LandscapeDetailX = .25;
 constexpr auto PortraitDetailY = .27;
 constexpr auto PortraitDetailTopPixels = 34;
 constexpr auto CompactDetailY = .49;
 constexpr auto DesktopDetailYPixels = 560.0;
-constexpr auto ReferenceHeightPixels = 1080;
 constexpr auto BrowseCameraDistance = 140;
 constexpr auto DetailCameraDistance = 72;
 constexpr auto LaneOrbitSpeedScale = 2.5;
 constexpr auto LaneOrbitAmplitude = .018;
-constexpr auto VectorAxes = 3;
 constexpr auto RowOrbitSpeedScale = 3;
 constexpr auto RowOrbitAmplitude = .006;
 constexpr auto AimSettledTolerance = .006;
@@ -65,12 +54,6 @@ constexpr auto PositionVelocityTolerance = .09;
 constexpr auto BrowseFogNearOffset = 5;
 constexpr auto DetailFogFarOffset = 12;
 constexpr auto MinimumFovSpan = .1;
-constexpr auto LocalLightAimX = 2.085f;
-constexpr auto LocalLightAimY = 2.252f;
-constexpr auto LightOffsetX = 48;
-constexpr auto LightOffsetY = 17.6f;
-constexpr auto LightOffsetZ = 36;
-constexpr auto ParallelRayTolerance = 1e-10;
 }
 
 using namespace Qt::StringLiterals;
@@ -134,16 +117,16 @@ void SceneAdapter::recordNavigationCommit(quint64 revision)
     Q_EMIT frameChanged();
 }
 namespace {
-constexpr double radians = std::numbers::pi / DegreesPerHalfTurn;
-std::array<double, VectorAxes> components(SceneVector v)
+constexpr double radians = std::numbers::pi / yalahoo::units::DegreesPerHalfTurn;
+std::array<double, yalahoo::units::VectorAxes> components(SceneVector v)
 {
     return { v.x, v.y, v.z };
 }
-SceneVector values(const std::array<ScalarSpring, VectorAxes> &s)
+SceneVector values(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
 {
     return { s[0].value, s[1].value, s[2].value };
 }
-SceneVector velocities(const std::array<ScalarSpring, VectorAxes> &s)
+SceneVector velocities(const std::array<ScalarSpring, yalahoo::units::VectorAxes> &s)
 {
     return { s[0].velocity, s[1].velocity, s[2].velocity };
 }
@@ -174,7 +157,8 @@ SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
 CameraPose SceneAdapter::target() const
 {
     const double w = m_layout.width(), h = m_layout.height(), aspect = w / h, d = m_detail;
-    const double baseSpan = BrowseSpan + (DetailSpan - BrowseSpan) * d;
+    const double baseSpan = yalahoo::sceneDefaults::BrowseSpan
+            + (DetailSpan - yalahoo::sceneDefaults::BrowseSpan) * d;
     const double portraitDetailSpan = std::max(
             PortraitMinimumDetailSpan / aspect,
             PortraitCaseSpan * h
@@ -182,41 +166,35 @@ CameraPose SceneAdapter::target() const
                                PortraitDetailHeightRatio * h - PortraitDetailChromePixels));
     const double span = m_layout.portrait()
             ? std::max(baseSpan,
-                       PortraitPreviewSpan / aspect
-                               + (portraitDetailSpan - PortraitPreviewSpan / aspect) * d)
-            : std::max(baseSpan, baseSpan * (StandardAspectWidth / AspectHeightUnits) / aspect);
+                       yalahoo::cameraFraming::PortraitPreviewSpan / aspect
+                               + (portraitDetailSpan
+                                  - yalahoo::cameraFraming::PortraitPreviewSpan / aspect)
+                                       * d)
+            : std::max(baseSpan,
+                       baseSpan
+                               * (yalahoo::cameraFraming::StandardAspectWidth
+                                  / yalahoo::cameraFraming::AspectHeightUnits)
+                               / aspect);
     const double yaw =
             (BrowseYawDegrees * radians + m_yaw.value) * (1 - d) + DetailYawDegrees * radians * d;
     const double elevation = (BrowseElevationDegrees * radians + m_elevation.value) * (1 - d)
             + DetailElevationDegrees * radians * d;
-    const SceneVector direction{ -std::sin(yaw) * std::cos(elevation), std::sin(elevation),
-                                 std::cos(yaw) * std::cos(elevation) };
-    const auto right = cross({ 0, 1, 0 }, direction).normalized(),
-               up = cross(direction, right).normalized();
+    const auto basis = cameraFraming::basis(yaw, elevation);
+    const auto &direction = basis.direction, &right = basis.right, &up = basis.up;
     SceneVector aim{ -BrowseAimX, -BrowseAimY, BrowseAimZ };
-    if (m_layout.portrait()) {
-        aim = { 0,
-                -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                        + PortraitPreviewLift + sceneGeometry::HingeHeight,
-                -sceneGeometry::ArchiveDepth };
-        aim = aim + up * ((PortraitPreviewY - .5) * span);
-    } else {
-        const double wide = smooth((aspect - StandardAspectWidth / AspectHeightUnits)
-                                   / (UltrawideAspectWidth / AspectHeightUnits
-                                      - StandardAspectWidth / AspectHeightUnits));
-        aim = aim + right * (WideAimRightRatio * wide * span * aspect)
-                + up * ((BrowseAimUpRatio + UltrawideAimUpGain * wide) * span);
-    }
-    SceneVector detailAim{ 0,
-                           -sceneGeometry::FloorDepth
-                                   + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                                   + (sceneGeometry::CaseHeight + InspectionLiftPadding)
-                                   + sceneGeometry::HingeHeight,
-                           -sceneGeometry::ArchiveDepth };
+    aim = cameraFraming::browseAim(aim, basis, span, aspect, m_layout.portrait());
+    SceneVector detailAim{
+        0,
+        -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
+                + (sceneGeometry::CaseHeight + yalahoo::sceneGeometry::InspectionLiftPadding)
+                + sceneGeometry::HingeHeight,
+        -sceneGeometry::ArchiveDepth
+    };
     const double detailX = m_layout.portrait() ? .5 : LandscapeDetailX;
     const double detailY = m_layout.portrait() ? PortraitDetailY + PortraitDetailTopPixels / h
-            : m_layout.compact()               ? CompactDetailY
-                                               : DesktopDetailYPixels / ReferenceHeightPixels;
+            : m_layout.compact()
+            ? CompactDetailY
+            : DesktopDetailYPixels / yalahoo::cameraFraming::ReferenceHeightPixels;
     detailAim = detailAim + right * ((.5 - detailX) * w * span / h) + up * ((detailY - .5) * span);
     aim = aim * (1 - d) + detailAim * d;
     auto pose = OverviewController::framing(
@@ -319,7 +297,7 @@ void SceneAdapter::advance(double dt)
                        OrbitFollowRate, dt);
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
-    for (int i = 0; i < VectorAxes; ++i) {
+    for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
         m_position[i].update(p[i], CameraFollowRate, dt);
         m_aim[i].update(a[i], CameraFollowRate, dt);
     }
@@ -348,7 +326,7 @@ void SceneAdapter::observe(CameraPose pose, double dt)
 {
     // Observe authored poses in the existing browse springs; the final hold clears velocity.
     const auto p = components(pose.position), a = components(pose.aim);
-    for (int i = 0; i < VectorAxes; ++i) {
+    for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
         m_position[i].velocity = dt > 0 ? (p[i] - m_position[i].value) / dt : 0;
         m_aim[i].velocity = dt > 0 ? (a[i] - m_aim[i].value) / dt : 0;
         m_position[i].value = p[i];
@@ -362,7 +340,7 @@ void SceneAdapter::snapToTarget()
 {
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
-    for (int i = 0; i < VectorAxes; ++i) {
+    for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
         m_position[i].finish(p[i]);
         m_aim[i].finish(a[i]);
     }
@@ -454,9 +432,12 @@ void SceneAdapter::updateLighting(double dt)
     input.reduced = m_reduced || input.reduced;
     input.cinematic = m_openingTime.has_value();
     input.introTime = m_openingTime;
-    const auto localAim = m_caseRotation.rotatedVector({ -LocalLightAimX, LocalLightAimY, 0 });
-    const auto offset =
-            cameraRotation().rotatedVector({ -LightOffsetX, -LightOffsetY, LightOffsetZ });
+    const auto localAim =
+            m_caseRotation.rotatedVector({ -float(yalahoo::cameraFraming::LocalLightAimX),
+                                           float(yalahoo::cameraFraming::LocalLightAimY), 0 });
+    const auto offset = cameraRotation().rotatedVector({ -yalahoo::cameraFraming::LightOffsetX,
+                                                         -yalahoo::cameraFraming::LightOffsetY,
+                                                         yalahoo::cameraFraming::LightOffsetZ });
     m_lighting.update(input, input.origin + SceneVector{ localAim.x(), localAim.y(), localAim.z() },
                       { offset.x(), offset.y(), offset.z() }, m_detail, dt);
 }
@@ -492,13 +473,13 @@ QVariantMap SceneAdapter::hitTest(double x, double y) const
     const auto end = (inverse * QVector4D(float(nx), float(ny), 1, 1)).toVector3DAffine();
     const auto delta = end - start;
     double enter = 0, exit = 1;
-    const std::array<double, VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
-                                             sceneGeometry::CaseBottom,
-                                             -sceneGeometry::CaseHalfDepth },
+    const std::array<double, yalahoo::units::VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
+                                                             sceneGeometry::CaseBottom,
+                                                             -sceneGeometry::CaseHalfDepth },
             hi{ sceneGeometry::CaseHalfWidth, sceneGeometry::CaseTop,
                 sceneGeometry::CaseHalfDepth };
-    for (int i = 0; i < VectorAxes; ++i) {
-        if (std::abs(delta[i]) < ParallelRayTolerance) {
+    for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
+        if (std::abs(delta[i]) < yalahoo::sceneGeometry::ParallelRayTolerance) {
             if (start[i] < lo[i] || start[i] > hi[i])
                 return { };
         } else {

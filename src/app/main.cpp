@@ -1,3 +1,5 @@
+#include "OpeningTimeline.h"
+#include "ProductDefaults.h"
 #include "FrameClock.h"
 #include "SelectionController.h"
 #include "CoverCache.h"
@@ -80,9 +82,6 @@
 namespace {
 // Runtime-review timers drive bounded anonymous probes; product playback uses its own public Qt state.
 constexpr auto MaximumRecordedDiagnostics = 1024;
-constexpr auto DefaultSongVolume = .65;
-constexpr auto DefaultBackgroundVolume = .18;
-constexpr auto DefaultFeedbackVolume = .22;
 constexpr auto MotionRetargetMilliseconds = 400;
 constexpr auto MotionPauseMilliseconds = 700;
 constexpr auto MotionResumeMilliseconds = 1100;
@@ -91,7 +90,6 @@ constexpr auto OpeningPauseMilliseconds = 1500;
 constexpr auto FinalRetargetMilliseconds = 1700;
 constexpr auto FinalMotionMilliseconds = 2000;
 constexpr auto SceneSettleMilliseconds = 1000;
-constexpr auto OpeningDurationSeconds = 11.6;
 constexpr auto MotionReportDeadlineMilliseconds = 10000;
 constexpr auto RuntimeReportDelayMilliseconds = 2500;
 }
@@ -413,10 +411,14 @@ int main(int argc, char **argv)
         preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
         const auto applyAudio = [&] {
             const auto audio = preferences->audio();
-            playback.setVolume(audio.value(u"volume"_s).toDouble(DefaultSongVolume));
-            background.setVolume(audio.value(u"bgmVolume"_s).toDouble(DefaultBackgroundVolume));
+            playback.setVolume(
+                    audio.value(u"volume"_s).toDouble(yalahoo::productDefaults::DefaultSongVolume));
+            background.setVolume(
+                    audio.value(u"bgmVolume"_s)
+                            .toDouble(yalahoo::productDefaults::DefaultBackgroundVolume));
             background.setEnabled(audio.value(u"bgm"_s).toBool(true));
-            sounds.setVolume(audio.value(u"soundVolume"_s).toDouble(DefaultFeedbackVolume));
+            sounds.setVolume(audio.value(u"soundVolume"_s)
+                                     .toDouble(yalahoo::productDefaults::DefaultFeedbackVolume));
             sounds.setEnabled(audio.value(u"sound"_s).toBool(true));
         };
         applyAudio();
@@ -937,7 +939,8 @@ int main(int argc, char **argv)
                         && motionEvidence.value(u"minimizedPaused"_s).toBool() && resumeDiscarded
                         && resumeSamples == 2 && !motion.moving() && motion.rail() == -.62
                         && motion.column() == -5.2
-                        && motion.clock()->openingTime() == OpeningDurationSeconds
+                        && motion.clock()->openingTime()
+                                == yalahoo::openingTimeline::DurationSeconds
                         && !completionRevisions.isEmpty()
                         && completionRevisions.last().toInteger() == qint64(motion.revision())
                         && scene.reducedMotion() == motion.reducedMotion() && scene.settled()

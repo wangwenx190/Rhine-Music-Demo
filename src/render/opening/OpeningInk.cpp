@@ -1,3 +1,4 @@
+#include "Units.h"
 #include "Logging.h"
 #include "OpeningInk.h"
 #include "BrandPaths.h"
@@ -22,7 +23,6 @@ constexpr auto BrandViewWidth = 816;
 constexpr auto BrandViewHeight = 208;
 constexpr auto OrbitViewWidth = 520;
 constexpr auto OrbitLineWidthPixels = 1.2;
-constexpr auto DegreesPerHalfTurn = 180;
 constexpr auto OuterOrbitRadius = 236;
 constexpr auto InnerOrbitRadius = 207;
 constexpr auto OrbitDotRadius = 4;
@@ -189,7 +189,7 @@ private:
         p->setLineWidth(OrbitLineWidthPixels * scale);
         p->save();
         p->translate(size.width() / 2, size.height() / 2);
-        p->rotate(state.orbitTurn * std::numbers::pi / DegreesPerHalfTurn);
+        p->rotate(state.orbitTurn * std::numbers::pi / yalahoo::units::DegreesPerHalfTurn);
         QCanvasPath outer;
         if (state.orbitDraw > 0) {
             outer.arc(0, 0, OuterOrbitRadius * scale, 0, 2 * std::numbers::pi * state.orbitDraw);

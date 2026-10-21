@@ -2,6 +2,7 @@
 // ownership keep asynchronous updates separate from navigation.
 
 #pragma once
+#include "Units.h"
 #include <QObject>
 #include "MusicTypes.h"
 #include <QAbstractListModel>
@@ -12,7 +13,6 @@ namespace yalahoo {
 namespace detailText {
 // The line-height cache is bounded by estimated owned bytes.
 inline constexpr auto HeightCacheKiB = 256;
-inline constexpr auto BytesPerKiB = 1024;
 }
 
 class LibrarySession;
@@ -51,7 +51,8 @@ Q_SIGNALS:
     void albumChanged();
 
 private:
-    QCache<QString, double> m_lineHeights{ detailText::HeightCacheKiB * detailText::BytesPerKiB };
+    QCache<QString, double> m_lineHeights{ detailText::HeightCacheKiB
+                                           * yalahoo::units::BytesPerKiB };
     Snapshot m_snapshot;
     const Album *m_album = nullptr;
     Album m_resolved;

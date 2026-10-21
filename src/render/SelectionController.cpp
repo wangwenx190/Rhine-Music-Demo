@@ -1,3 +1,5 @@
+#include "Units.h"
+#include "OpeningTimeline.h"
 #include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
@@ -15,16 +17,13 @@ namespace {
 constexpr auto AdditionalCaseCapacity = 4;
 constexpr auto IdleReleaseRate = 4;
 constexpr auto MaximumPlaceholderTitleCharacters = 256;
-constexpr auto FirstAlbumRow = 12;
 constexpr auto RailOriginRow = 15.5;
 constexpr auto InvisibleCaseThreshold = .0001;
 constexpr auto AlreadyClearThreshold = .999;
-constexpr auto FirstAlbumRowPosition = 12.0;
 constexpr auto LastAlbumRowOffset = 11;
 constexpr auto MaximumCoordinateMagnitude = 1e12;
 constexpr auto DetailPlacementThreshold = .99;
 constexpr auto MaximumSelectionPulses = 6;
-constexpr auto InspectionLiftPadding = .12;
 constexpr auto MinimumHitExtent = .12;
 constexpr auto TrackPositionTolerance = .008;
 constexpr auto TrackVelocityTolerance = .025;
@@ -33,12 +32,9 @@ constexpr auto ActivityThreshold = .01;
 constexpr auto DetailOcclusionProgress = .9;
 constexpr auto NeighborRadiusRows = 5;
 constexpr auto NeighborClearance = .05;
-constexpr auto OpeningHandoffStartSeconds = 25.3;
-constexpr auto OpeningHandoffSeconds = 1.42;
 constexpr auto MaximumRippleDisplacement = .24;
 constexpr auto RippleLaneDistanceScale = 2.2;
 constexpr auto OpeningEntryDepth = 23;
-constexpr auto OpeningSceneStartSeconds = 21.92;
 constexpr auto OpeningEntrySeconds = .75;
 constexpr auto LiftPitchFadeDistance = .4;
 constexpr auto SlopePitchGain = .024;
@@ -47,13 +43,10 @@ constexpr auto PulseGainFollowRate = 8;
 constexpr auto RebaseCoordinateMagnitude = 2048;
 constexpr auto RebaseRowMagnitude = 2048.0;
 constexpr auto ReducedFollowRate = 35.0;
-constexpr auto DetailFollowRate = 9.0;
-constexpr auto BrowseFollowRate = 3.7;
 constexpr auto ShoulderFollowRate = 5.0;
 constexpr auto LaneFollowRate = 4.0;
 constexpr auto ScanBlendDecayRate = 3;
 constexpr auto TranslationColumn = 3;
-constexpr auto VectorAxes = 3;
 constexpr auto PulseLifetimeSeconds = 3.2;
 constexpr auto IdleDelaySeconds = 2.5;
 constexpr auto IdleAttackRate = .8;
@@ -63,7 +56,6 @@ constexpr auto ClarityReadyLift = 3.3;
 constexpr auto ReturnClarityDecayRate = 9;
 constexpr auto DetailLiftRate = 9;
 constexpr auto ReturnLiftRate = 4.5;
-constexpr auto ParallelRayTolerance = 1e-10;
 }
 
 using namespace Qt::StringLiterals;
@@ -113,8 +105,8 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
     m_poolObjects.clear();
     m_pulses.clear();
     m_origin = { 0, 0 };
-    m_cell = m_pool.location(oldId).value_or(
-            m_pool.location(firstId).value_or(ArchiveCell{ 0, FirstAlbumRow }));
+    m_cell = m_pool.location(oldId).value_or(m_pool.location(firstId).value_or(
+            ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow }));
     QList<int> counts;
     for (const auto &column : m_pool.columns())
         counts.append(int(column.albumIds.size()));
@@ -218,10 +210,11 @@ void SelectionController::setRememberColumnPosition(bool enabled)
 NavigationAvailability SelectionController::navigationAvailability() const
 {
     const auto location = m_pool.location(albumId());
-    return location ? NavigationAvailability::at(m_pool.rowCount(location->lane),
-                                                 int(location->row - FirstAlbumRow),
-                                                 m_pool.columnCount(), m_realistic)
-                    : NavigationAvailability{ };
+    return location
+            ? NavigationAvailability::at(m_pool.rowCount(location->lane),
+                                         int(location->row - yalahoo::sceneGeometry::FirstAlbumRow),
+                                         m_pool.columnCount(), m_realistic)
+            : NavigationAvailability{ };
 }
 bool SelectionController::canMovePrevious() const
 {
@@ -241,7 +234,7 @@ void SelectionController::setRealistic(bool realistic)
             (-m_motion->rail() - sceneGeometry::ArchiveDepth) / sceneGeometry::RowSpacing
             + RailOriginRow;
     m_realistic = realistic;
-    m_cell = canonical.value_or(ArchiveCell{ 0, FirstAlbumRow });
+    m_cell = canonical.value_or(ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow });
     const ArchiveCell shift{ old.lane - m_cell.lane, old.row - m_cell.row };
     m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
                           -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
@@ -292,8 +285,8 @@ bool SelectionController::albumNavigationEnabled(const QString &id, int directio
     const auto cell = m_pool.location(id.isEmpty() ? albumId() : id);
     return cell
             && NavigationAvailability::at(m_pool.rowCount(cell->lane),
-                                          int(cell->row - FirstAlbumRow), m_pool.columnCount(),
-                                          m_realistic)
+                                          int(cell->row - yalahoo::sceneGeometry::FirstAlbumRow),
+                                          m_pool.columnCount(), m_realistic)
                        .allowsRow(direction);
 }
 QString SelectionController::adjacentAlbum(const QString &id, int direction) const
@@ -369,7 +362,7 @@ std::optional<ArchiveCell> SelectionController::columnTarget(int lane, bool guid
     else
         row = std::floor(browseRow(canonicalLane) + .5);
     if (m_realistic)
-        row = std::clamp(row, FirstAlbumRowPosition,
+        row = std::clamp(row, double(yalahoo::sceneGeometry::FirstAlbumRow),
                          double(LastAlbumRowOffset + column.albumIds.size()));
     const double physicalLane = m_realistic ? double(canonicalLane)
             : guided
@@ -384,7 +377,9 @@ bool SelectionController::navigateRow(double row)
     if (!std::isfinite(row))
         return false;
     // Slider/touch/detail callers share the same finite boundary as directional input.
-    if (m_realistic && (row < FirstAlbumRow || row >= FirstAlbumRow + m_pool.rowCount(m_cell.lane)))
+    if (m_realistic
+        && (row < yalahoo::sceneGeometry::FirstAlbumRow
+            || row >= yalahoo::sceneGeometry::FirstAlbumRow + m_pool.rowCount(m_cell.lane)))
         return false;
     return selectCell({ m_cell.lane, row });
 }
@@ -466,7 +461,8 @@ void SelectionController::setDetail(double detail)
     m_detail = std::clamp(detail, 0.0, 1.0);
     // Frozen music scene: MUSIC_MODEL.height + 0.12 clears the shelf.
     setLift(sceneGeometry::PreviewLift
-            + (sceneGeometry::CaseHeight + InspectionLiftPadding - sceneGeometry::PreviewLift)
+            + (sceneGeometry::CaseHeight + yalahoo::sceneGeometry::InspectionLiftPadding
+               - sceneGeometry::PreviewLift)
                     * m_detail);
 }
 void SelectionController::returnSelected()
@@ -589,10 +585,11 @@ double SelectionController::field(double row, double lane) const
         return 0;
     const bool reduced = m_motion->reducedMotion();
     if (m_openingTime) {
-        const double intro =
-                smooth((*m_openingTime - OpeningHandoffStartSeconds) / OpeningHandoffSeconds);
-        const double opening = cinematicField(row - m_cell.row + FirstAlbumRow,
-                                              lane - m_cell.lane + 2, *m_openingTime);
+        const double intro = smooth((*m_openingTime - yalahoo::openingTimeline::PreviewStartSeconds)
+                                    / yalahoo::openingTimeline::PreviewDurationSeconds);
+        const double opening =
+                cinematicField(row - m_cell.row + yalahoo::sceneGeometry::FirstAlbumRow,
+                               lane - m_cell.lane + 2, *m_openingTime);
         const double resting = m_realistic
                 ? settlingWave(row - m_realColumns.row(int(lane)),
                                sceneGeometry::SettledSceneSeconds)
@@ -649,7 +646,8 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     const auto offset = displayOffset();
     const double entryZ = m_openingTime ? -OpeningEntryDepth
                     * std::pow(1
-                                       - std::clamp((*m_openingTime - OpeningSceneStartSeconds)
+                                       - std::clamp((*m_openingTime
+                                                     - yalahoo::openingTimeline::SceneOriginSeconds)
                                                             / OpeningEntrySeconds,
                                                     0.0, 1.0),
                                2)
@@ -732,7 +730,8 @@ ArchiveCell SelectionController::rebase()
     if (std::abs(m_cell.lane) > RebaseCoordinateMagnitude)
         shift.lane = std::floor((m_cell.lane - 2) / lanes + .5) * lanes;
     if (std::abs(m_cell.row) > std::max(RebaseRowMagnitude, period * 2))
-        shift.row = std::floor((m_cell.row - FirstAlbumRow) / period) * period;
+        shift.row =
+                std::floor((m_cell.row - yalahoo::sceneGeometry::FirstAlbumRow) / period) * period;
     if (shift == ArchiveCell{ 0, 0 })
         return shift;
     m_cell.lane -= shift.lane;
@@ -767,7 +766,8 @@ void SelectionController::setOpeningTime(std::optional<double> time)
         m_managedDetail = m_navigationLift = false;
         m_detailMotion.reset();
         m_clarity.select();
-        const double intro = smooth((*time - OpeningHandoffStartSeconds) / OpeningHandoffSeconds);
+        const double intro = smooth((*time - yalahoo::openingTimeline::PreviewStartSeconds)
+                                    / yalahoo::openingTimeline::PreviewDurationSeconds);
         m_lift.finish(extraction(*time) * (1 - intro) + sceneGeometry::PreviewLift * intro);
         m_liftTarget = sceneGeometry::PreviewLift;
         if (entering && m_motion) {
@@ -795,16 +795,18 @@ void SelectionController::advance(double dt)
                                  m_cell.lane };
     const bool detailNavigation = m_managedDetail && m_navigationLift && m_detailMotion.placed();
     const ArchiveValues rates{ reduced ? ReducedFollowRate
-                                       : detailNavigation ? DetailFollowRate
-                                                          : BrowseFollowRate,
+                                       : detailNavigation
+                                       ? yalahoo::sceneGeometry::DetailFollowRate
+                                       : yalahoo::sceneGeometry::BrowseFollowRate,
                                reduced ? ReducedFollowRate
-                                       : detailNavigation ? DetailFollowRate
-                                                          : BrowseFollowRate,
+                                       : detailNavigation
+                                       ? yalahoo::sceneGeometry::DetailFollowRate
+                                       : yalahoo::sceneGeometry::BrowseFollowRate,
                                reduced ? ReducedFollowRate
-                                       : detailNavigation ? DetailFollowRate
+                                       : detailNavigation ? yalahoo::sceneGeometry::DetailFollowRate
                                                           : ShoulderFollowRate,
                                reduced ? ReducedFollowRate
-                                       : detailNavigation ? DetailFollowRate
+                                       : detailNavigation ? yalahoo::sceneGeometry::DetailFollowRate
                                                           : LaneFollowRate };
     if (!m_motion->moving()) {
         auto springs = m_motion->springs();
@@ -968,13 +970,13 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
             continue;
         const auto localStart = localInverse.map(start), delta = localInverse.map(end) - localStart;
         double enter = 0, exit = 1;
-        const std::array<double, VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
-                                                 sceneGeometry::CaseBottom,
-                                                 -sceneGeometry::CaseHalfDepth },
+        const std::array<double, yalahoo::units::VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
+                                                                 sceneGeometry::CaseBottom,
+                                                                 -sceneGeometry::CaseHalfDepth },
                 hi{ sceneGeometry::CaseHalfWidth, sceneGeometry::CaseTop,
                     sceneGeometry::CaseHalfDepth };
-        for (int axis = 0; axis < VectorAxes; ++axis) {
-            if (std::abs(delta[axis]) < ParallelRayTolerance) {
+        for (int axis = 0; axis < yalahoo::units::VectorAxes; ++axis) {
+            if (std::abs(delta[axis]) < yalahoo::sceneGeometry::ParallelRayTolerance) {
                 if (localStart[axis] < lo[axis] || localStart[axis] > hi[axis])
                     exit = -1;
             } else {

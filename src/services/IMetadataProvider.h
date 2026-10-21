@@ -4,6 +4,7 @@
 #pragma once
 #include "MusicTypes.h"
 #include <QObject>
+#include <utility>
 
 namespace yalahoo {
 enum class MetadataKind {
@@ -65,13 +66,29 @@ public:
     IMetadataProvider() = default;
     using QObject::QObject;
     virtual ProviderCapabilities capabilities() const = 0;
-    [[nodiscard]] virtual bool requestIntroduction(AlbumQuery query, RequestToken token) = 0;
-    [[nodiscard]] virtual bool requestCredits(AlbumQuery query, RequestToken token) = 0;
-    [[nodiscard]] virtual bool requestEnrichment(AlbumQuery query, RequestToken token) = 0;
+    [[nodiscard]] bool requestIntroduction(AlbumQuery query, RequestToken token)
+    {
+        return request(std::move(query), std::move(token), MetadataKind::Introduction);
+    }
+    [[nodiscard]] bool requestCredits(AlbumQuery query, RequestToken token)
+    {
+        return request(std::move(query), std::move(token), MetadataKind::Credits);
+    }
+    [[nodiscard]] bool requestEnrichment(AlbumQuery query, RequestToken token)
+    {
+        return request(std::move(query), std::move(token), MetadataKind::Enrichment);
+    }
     virtual void cancel(RequestToken token) = 0;
+
+protected:
+    [[nodiscard]] virtual bool request(AlbumQuery query, RequestToken token, MetadataKind kind) = 0;
 Q_SIGNALS:
     void capabilitiesChanged();
     void resultReady(const yalahoo::ProviderResult &result);
 };
 }
 Q_DECLARE_METATYPE(yalahoo::ProviderResult)
+
+namespace yalahoo::metadataLimits {
+inline constexpr auto MaximumPendingRequests = 8;
+}

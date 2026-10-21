@@ -1,5 +1,5 @@
 """Source-hash guards for the manually reviewed opaque RHI boundary; outputs stay local."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
 
@@ -10,7 +10,7 @@ CHECKS = [
     ("COMMON-02", "tools/review/RhiAudit.cpp", "Input fixture",
      "Only committed demo artwork and source-derived scene values enter the driver. Models, "
      "environment/lookups and qsb stay qrc resources. No browser PNG, user music or network input."),
-    ("COMMON-03", "resources/shaders/rhi/geometry.vert", "transpose(inverse(mat3(f.model)))",
+    ("COMMON-03", "resources/shaders/rhi/geometry.vert", "transpose(inverse(mat3(model)))",
      "Source GLB positions/UVs are retained; normal inverse transpose and QRhi clip correction "
      "are necessary adaptations. View normal/linear depth tests use independent plane math."),
     ("COMMON-04", "tools/review/RhiCaptureHarness.h", "state->loop = nullptr;",
@@ -57,14 +57,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                         "runs macOS Metal RenderControl; Windows/D3D11 and Linux/OpenGL runtime "
                         "remain R36 when their compiler/device/window-manager environment is absent.")]
     for check_id, path, symbol, conclusion in entries:
-        content = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), evidence=conclusion,
-                         result="static-audit-passed", platform=host,
-                         limitations="Opaque driver/paper scope only; full optical source and "
-                                     "continuous flicker remain R19C2B2/C/D. Runtime is separate."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Opaque driver/paper scope only; full optical source and continuous flicker remain R19C2B2/C/D. Runtime is separate.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-opaque"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

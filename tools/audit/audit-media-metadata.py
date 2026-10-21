@@ -1,4 +1,6 @@
 """R22 source review bindings. Runtime results remain in CTest's local reports."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import re
@@ -7,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 mapping = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]
-baseline = mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+baseline = mapping[BASELINE]
 frozen = subprocess.check_output(["git", "show", f"{baseline}:scripts/music-library.mjs"], cwd=ROOT)
 probe = (ROOT / "src/media/MediaMetadataProbe.cpp").read_text()
 for forbidden in [r"\bThumbnailImage\b", r"\bQAudioOutput\b", r"\bQAudio(?:Sink|Decoder|BufferOutput)\b",
@@ -33,7 +35,7 @@ CHECKS = [
      "30MiB encoded input and valid dimensions precede file image decode; PNG/JPEG/WebP handlers enforce Qt's effective image allocation limit. Corrupt or allocation-rejected priority candidates fall back. Already-decoded embedded QImage is checked against the same effective limit before encoding, with opaque media decoder allocations explicitly outside public control. Content hash cache files and native index use owner-only QSaveFile; failures never mutate old source/song."),
     ("PERF-01", "src/media/MediaMetadataProbe.cpp", "void resolveGenres(LibrarySnapshot &snapshot)",
      "Snapshot cursor visits O(A+T) with two active slots, no per-track queued QObject/request list. Cached fingerprint plus Qt-version records skip media source loads. Image priority ranks and root-single case-folded stem lookup are indexed once, avoiding N*I audio/image scans. Track sorting costs sum(Ta log Ta); genre name/alias index avoids A*G normalization. Temporary indexes are O(A+T+genre aliases), covered by the bounded serialized library input."),
-    ("PERF-02", "src/library/LibraryStore.cpp", "m_probe.start(result.snapshot, m_dataRoot, m_cancel, generation)",
+    ("PERF-02", "src/library/LibraryStore.cpp", "d->m_probe.start(result.snapshot, d->m_dataRoot, d->m_cancel, generation)",
      "Store holds one scan/import/save job or metadata batch, one last intent and one coalesced accepted save. Probe owns a dedicated event-loop thread; metadata/images never touch GUI/render. The 64-record cached admission slice yields to cancellations; no per-track GUI callbacks, polling or GUI waits. Thread join occurs only at destruction."),
     ("PERF-03", "src/library/LibraryStore.cpp", "void LibraryStore::accept(JobResult result, Kind kind, quint64 generation)",
      "Scan -> complete metadata batch -> current-generation const snapshot -> one GUI model reset -> serialized atomic save. Stale scan/import/probe completion cannot publish or persist. LibraryStore::probing exposes preparation separately; roots changed during probe preserve only the latest intent."),
@@ -62,13 +64,7 @@ for platform, (check_id, explanation) in PLATFORMS.items():
     rows = []
     checks = CHECKS + [(check_id, "src/media/MediaMetadataProbe.cpp", "class QtMetadataSource final", explanation)]
     for identity, path, symbol, evidence in checks:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"R22 source drift: {path}::{symbol}")
-        rows.append(dict(checkId=identity, requirement=evidence, platform=platform,
-                         sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
-                         result="source-reviewed", sourceSha256=hashlib.sha256(data).hexdigest(),
-                         limitations="Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R36 gates."))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R36 gates.'))
     paths = ["src/media/CMakeLists.txt", "src/media/MediaMetadataProbe.h", "src/library/CMakeLists.txt",
              "src/library/DirectoryScanner.cpp", "src/library/LibraryStore.h", "src/library/LegacyImporter.h",
              "src/services/PreferencesStore.h", "src/app/main.cpp", "src/core/LibraryModels.cpp", "src/core/MusicTypes.cpp",

@@ -1,4 +1,6 @@
 """Review shared control ownership/cost paths; target runtime evidence is independent."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -41,7 +43,7 @@ paths |= {"src/app/CMakeLists.txt", "src/app/QmlTypes.h", "src/app/main.cpp",
 dependencies = [dict(sourcePath=path,
                      sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
                 for path in sorted(paths)]
-revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
 frozen = []
 for path in ("src/style.css", "src/music.css", "src/music-lighting-lab.css"):
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
@@ -52,13 +54,7 @@ for platform, rule in (("windows", "WIN-01"), ("macos", "MAC-01"), ("linux", "LN
     platform_check = (rule, "cmake/Platform.cmake", "APPLE" if platform == "macos" else "WIN32" if platform == "windows" else "UNIX",
                       "Platform bootstrap selects its native window/backend and module closure. Shared control input/visual code has no target omissions; actual compiler/plugins/physical input/IME/accessibility and window/DPR behavior require UI-CONTROLS-P on that system.")
     for check_id, path, symbol, evidence in CHECKS + [platform_check]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Control source drift: {path}::{symbol}")
-        checks.append(dict(checkId=check_id, platform=platform, sourcePath=path,
-                           lineOrSymbol=symbol, evidence=evidence,
-                           sourceSha256=hashlib.sha256(data).hexdigest(), result="source-reviewed",
-                           limitations="Target runtime/physical evidence remains separate under UI-CONTROLS-P."))
+        checks.append(source_check(ROOT, path, symbol, checkId=check_id, platform=platform, evidence=evidence, result='source-reviewed', limitations='Target runtime/physical evidence remains separate under UI-CONTROLS-P.'))
     output = ROOT / "verification" / f"{platform}-static" / "controls"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(

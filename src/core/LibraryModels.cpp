@@ -1,3 +1,4 @@
+#include "Units.h"
 #include <QCoreApplication>
 #include "LibraryModels.h"
 #include <QCollator>
@@ -9,7 +10,6 @@
 namespace {
 // Column partitioning follows the source album grouping; ordinal labels are decimal.
 constexpr auto AlbumsPerColumn = 12;
-constexpr auto DecimalBase = 10;
 }
 
 using namespace Qt::StringLiterals;
@@ -66,8 +66,9 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         for (int start = 0; start < result.indices.size(); start += AlbumsPerColumn) {
             const int end = std::min(start + AlbumsPerColumn, int(result.indices.size()));
             LibraryColumn column{ u"album:%1"_s.arg(start / AlbumsPerColumn),
-                                  u"%1\u2013%2"_s.arg(start + 1, 2, DecimalBase, '0'_L1)
-                                          .arg(end, 2, DecimalBase, '0'_L1),
+                                  u"%1\u2013%2"_s
+                                          .arg(start + 1, 2, yalahoo::units::DecimalBase, '0'_L1)
+                                          .arg(end, 2, yalahoo::units::DecimalBase, '0'_L1),
                                   { } };
             for (int i = start; i < end; ++i)
                 column.albumIds.append(snapshot.albums[result.indices[i]].id);

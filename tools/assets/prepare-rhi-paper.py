@@ -1,10 +1,13 @@
 """Adapt shared source paper math; preserve per-entity hoisting in the RHI variant."""
 import argparse
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader, tokens
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
-source = (ROOT / "resources/shaders/album-paper.frag").read_text()
+source = read_shader(ROOT / "resources/shaders/album-paper.frag")
 source = source[source.index("// BEGIN SHARED LIGHTING"):source.index("// END SHARED LIGHTING")]
 a = source.index("vec3 musicShell(")
 b = source.index("#define CUBEUV_MAX_MIP", a)
@@ -34,9 +37,6 @@ parser.add_argument("--check", action="store_true")
 args = parser.parse_args()
 target = ROOT / "resources/shaders/rhi/paper-lighting.glsl"
 if args.check:
-    def tokens(text):
-        text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-        return re.findall(r"[A-Za-z_][A-Za-z_0-9]*|(?:\d*\.\d+|\d+\.?\d*)(?:[eE][+-]?\d+)?|\S", text)
     if tokens(source) != tokens(target.read_text()):
         raise SystemExit("Stale RHI paper helper: regenerate and run the native formatter")
     print("RHI paper helper matches shared math with explicit uniform/hoisting adaptations")

@@ -1,4 +1,6 @@
 """Trace viewport units, cover/DOF filtering and D1-D4 history without source-image scores."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -6,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text())['revisions']
-BASELINE = MAPPING['57f4f845c20cce646a15dbf4008c2a162aaaf4e2']
+BASELINE = MAPPING[BASELINE]
 
 def historical(revision, path):
     data = subprocess.check_output(['git', 'show', f'{revision}:{path}'], cwd=ROOT)
@@ -65,12 +67,7 @@ CHECKS = [
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []
     for identity, path, symbol, evidence in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native backend/compiler branch preserved. Same-Kit target build and actual target GPU/window/DPR execution required; host qsb is translation only.')]:
-        data = (ROOT / path).read_bytes()
-        if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
-            raise SystemExit(f'Scale audit source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=evidence, platform=platform, sourcePath=path,
-                         lineOrSymbol=symbol, evidence=evidence, sourceSha256=hashlib.sha256(data).hexdigest(),
-                         result='static-audit-passed', limitations='Runtime/actual visual inspection separate; physical display, native DPR transitions, VSYNC and full product performance are not proved by offscreen output.'))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Runtime/actual visual inspection separate; physical display, native DPR transitions, VSYNC and full product performance are not proved by offscreen output.'))
     output = ROOT / 'verification' / f'{platform}-static' / 'rhi-scale'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(checks=rows, frozen=sources, history=history), indent=2) + '\n')

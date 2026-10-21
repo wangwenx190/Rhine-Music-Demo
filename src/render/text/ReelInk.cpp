@@ -1,3 +1,4 @@
+#include "SampledReelCurve.h"
 #include "ReelInk.h"
 #include "ReelTextNode.h"
 #include <QSGClipNode>
@@ -8,7 +9,6 @@
 
 namespace {
 // Side padding is in em units and is converted back through the glyph local scale.
-constexpr auto GlyphSidePaddingEm = .15;
 constexpr auto GlyphTotalPaddingEm = .3;
 }
 
@@ -126,7 +126,9 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                 ++rebuilds;
             }
             target.clip->setClipRect(
-                    { -face.glyph.size * GlyphSidePaddingEm / face.glyph.scale, 0,
+                    { -face.glyph.size * yalahoo::sampledReel::GlyphSidePaddingEm
+                              / face.glyph.scale,
+                      0,
                       (m_slot->capacityWidth + face.glyph.size * GlyphTotalPaddingEm)
                               / face.glyph.scale,
                       face.glyph.height / face.glyph.scale });

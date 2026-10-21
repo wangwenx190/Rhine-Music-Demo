@@ -2,6 +2,7 @@
 // revision-aware cached state preserve glyph identity through interruption.
 
 #pragma once
+#include "SampledReelCurve.h"
 #include "TextLayoutAdapter.h"
 #include "FrameClock.h"
 #include <QPointer>
@@ -13,8 +14,6 @@
 namespace yalahoo {
 namespace reelMotion {
 // Default source reel sampling and layout bounds, in seconds and logical pixels.
-inline constexpr auto TransitionSeconds = .460;
-inline constexpr auto TrackSampleCount = 49;
 inline constexpr auto InitialFaceCapacity = 3;
 inline constexpr auto DefaultFontPixels = 28;
 inline constexpr auto DefaultLayoutBudgetPixels = 300;
@@ -22,14 +21,11 @@ inline constexpr auto DefaultLayoutBudgetPixels = 300;
 
 struct ReelTrack final
 {
-    double start = 0, initialVelocity = 0, target = 0, elapsed = reelMotion::TransitionSeconds;
-    double duration = reelMotion::TransitionSeconds;
+    double start = 0, initialVelocity = 0, target = 0, elapsed = sampledReel::TransitionSeconds;
+    double duration = sampledReel::TransitionSeconds;
     bool sampled = false;
-    std::array<double, reelMotion::TrackSampleCount> points{ };
-    struct Sample final
-    {
-        double value = 0, velocity = 0;
-    };
+    sampledReel::Points points{ };
+    using Sample = sampledReel::Sample;
     Sample sample() const;
     double display() const;
     void move(double to, bool instant, Sample from);
@@ -70,7 +66,7 @@ public:
     ReelTrack roll, x, y, viewport, alpha, entry;
     bool transport = false;
     bool blurOnEntry = false;
-    std::array<double, reelMotion::TrackSampleCount> blurPoints{ };
+    sampledReel::Points blurPoints{ };
     double capacityWidth = 0, capacityHeight = 0;
     quint64 revision = 0;
     bool active = false;

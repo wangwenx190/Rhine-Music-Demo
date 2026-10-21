@@ -1,3 +1,7 @@
+#include "ReviewSupport.h"
+#include "SceneGeometry.h"
+#include "ProductDefaults.h"
+#include "Units.h"
 #include "MotionController.h"
 #include "DetailReview.h"
 #include "BackendCapabilities.h"
@@ -29,27 +33,19 @@
 
 namespace {
 // Anonymous review geometry, bounded lifecycle counts and timeouts are independent of product policy.
-constexpr auto ReviewWidthPixels = 1280;
-constexpr auto ReviewHeightPixels = 720;
 constexpr auto ExpectedDetailedCoverPixels = 1024;
-constexpr auto LifecycleRebuildCount = 10;
 constexpr auto ExpectedContextCount = 11;
 constexpr auto MaximumOwnedCovers = 4;
 constexpr auto NormalSwitchCount = 4;
 constexpr auto ReverseSwitchOrdinal = 3;
-constexpr auto MaximumMotionSpeed = 3;
-constexpr auto BytesPerKiB = 1024;
 constexpr auto MaximumReturningCases = 3;
 constexpr auto StressSwitchCount = 30;
-constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto ClearLidThreshold = .999;
-constexpr auto CaseHingeHeight = 1.85;
 constexpr auto DragDeltaX = 180;
 constexpr auto DragDeltaY = 70;
 constexpr auto MinimumDragRotation = .5;
 constexpr auto ReturnHeightTolerance = 1e-5;
 constexpr auto SwitchLiftThreshold = .1;
-constexpr auto MinimumMotionSpeed = .25;
 constexpr auto SlowMotionHoldNanoseconds = 350000000;
 constexpr auto HiddenSettleMilliseconds = 250;
 constexpr auto HiddenObservationMilliseconds = 150;
@@ -95,15 +91,6 @@ enum ReviewStage {
 using namespace Qt::StringLiterals;
 
 namespace {
-QQuickItem *find(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *found = find(child, name))
-            return found;
-    return nullptr;
-}
 }
 int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter &scene,
                           LibrarySession &library, PresentationController &presentation,
@@ -111,14 +98,15 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
 {
     auto *window = &initialWindow;
     auto *engine = qobject_cast<QQmlApplicationEngine *>(qmlEngine(window));
-    auto *native = qobject_cast<rhi::SceneItem *>(find(window->contentItem(), u"nativeScene"_s));
+    auto *native = qobject_cast<rhi::SceneItem *>(
+            yalahoo::review::findVisual(window->contentItem(), u"nativeScene"_s));
     auto *selection = scene.selection();
     if (!native || !selection || !engine)
         return InvalidReviewInput;
     QDir().mkpath(output);
     window->setPersistentGraphics(false);
     window->setPersistentSceneGraph(false);
-    window->resize(ReviewWidthPixels, ReviewHeightPixels);
+    window->resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
     scene.lighting()->setNight(qEnvironmentVariableIntValue("YALAHOO_VERIFY_NIGHT") == 1);
     native->setTelemetryEnabled(true);
     const auto playback = library.playbackTrackId();
@@ -168,7 +156,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
         QCoreApplication::sendEvent(window, &event);
     };
     const auto button = [&](const QString &name) {
-        auto *item = find(window->contentItem(), name);
+        auto *item = yalahoo::review::findVisual(window->contentItem(), name);
         if (!item || !item->isVisible() || !item->isEnabled()) {
             check("button-"_L1 + name, false);
             return;
@@ -208,9 +196,11 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
         finished = true;
         check(u"stage-completed"_s, stage == DetailComplete);
         if (lifecycleStress) {
-            check(u"ten-full-qml-window-rebuilds"_s, fullRebuilds == LifecycleRebuildCount);
+            check(u"ten-full-qml-window-rebuilds"_s,
+                  fullRebuilds == yalahoo::review::LifecycleRebuildCount);
             check(u"ten-product-context-restores"_s,
-                  rebuilds == LifecycleRebuildCount && contexts >= ExpectedContextCount);
+                  rebuilds == yalahoo::review::LifecycleRebuildCount
+                          && contexts >= ExpectedContextCount);
         } else {
             check(u"smoke-keeps-original-window"_s, fullRebuilds == 0 && rebuilds == 0);
         }
@@ -239,7 +229,8 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
         }
         check(u"transforms-do-not-rebuild-targets"_s,
               generations.size() == 1 && postRevisions.size() == 1);
-        check(u"bounded-upload-burst"_s, peakUpload <= 2 * BytesPerKiB * BytesPerKiB);
+        check(u"bounded-upload-burst"_s,
+              peakUpload <= 2 * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB);
         QJsonObject report{
             { u"passed"_s, passed },
             { u"configuration"_s, u"Release"_s },
@@ -367,11 +358,11 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                             return;
                         if (!initialReadinessRecorded) {
                             capture(u"opened"_s);
-                            latencies.append(
-                                    QJsonObject{ { u"action"_s, u"open"_s },
-                                                 { u"readyMs"_s,
-                                                   (time.nsecsElapsed() - actionAt)
-                                                           / NanosecondsPerMillisecond } });
+                            latencies.append(QJsonObject{
+                                    { u"action"_s, u"open"_s },
+                                    { u"readyMs"_s,
+                                      (time.nsecsElapsed() - actionAt)
+                                              / yalahoo::units::NanosecondsPerMillisecond } });
                             initialReadinessRecorded = true;
                         }
                         // Start the rotation from a clear selected lid, so the outgoing
@@ -382,7 +373,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         {
                             const auto center =
                                     scene.projectWorldPoint(scene.frame().caseTransform.map(
-                                            QVector3D(0, CaseHingeHeight, 0)));
+                                            QVector3D(0, yalahoo::sceneGeometry::HingeHeight, 0)));
                             dragStart = { center.x(), center.y() };
                             recordAction();
                             mouse(QEvent::MouseButtonPress, dragStart, Qt::LeftButton);
@@ -421,7 +412,8 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         latencies.append(QJsonObject{
                                 { u"action"_s, u"rotated-switch"_s },
                                 { u"readyMs"_s,
-                                  (time.nsecsElapsed() - actionAt) / NanosecondsPerMillisecond } });
+                                  (time.nsecsElapsed() - actionAt)
+                                          / yalahoo::units::NanosecondsPerMillisecond } });
                         switches = 1;
                         expected = selection->adjacentAlbum({ }, 1);
                         recordAction();
@@ -435,7 +427,8 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         latencies.append(QJsonObject{
                                 { u"action"_s, u"switch-%1"_s.arg(switches) },
                                 { u"readyMs"_s,
-                                  (time.nsecsElapsed() - actionAt) / NanosecondsPerMillisecond } });
+                                  (time.nsecsElapsed() - actionAt)
+                                          / yalahoo::units::NanosecondsPerMillisecond } });
                         ++switches;
                         if (switches < NormalSwitchCount) {
                             const int direction = switches == ReverseSwitchOrdinal ? -1 : 1;
@@ -471,7 +464,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         if (!ready())
                             return;
                         check(u"interrupted-return-search"_s, selection->albumId() == initialId);
-                        motion.clock()->setSpeed(MinimumMotionSpeed);
+                        motion.clock()->setSpeed(yalahoo::productDefaults::MinimumMotionSpeed);
                         recordAction();
                         presentation.stepAlbum(1);
                         ++stage;
@@ -479,7 +472,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                     case AwaitSlowMotion:
                         if (time.nsecsElapsed() - actionAt < SlowMotionHoldNanoseconds)
                             return;
-                        motion.clock()->setSpeed(MaximumMotionSpeed);
+                        motion.clock()->setSpeed(yalahoo::productDefaults::MaximumMotionSpeed);
                         motion.setReducedMotion(true);
                         ++stage;
                         break;
@@ -591,7 +584,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                                 { u"covers"_s, covers },
                                 { u"windowPolicy"_s, verification::windowPolicy(*window) },
                                 { u"lastSubmission"_s, samples.last() } });
-                        if (rebuilds < LifecycleRebuildCount)
+                        if (rebuilds < yalahoo::review::LifecycleRebuildCount)
                             stage = PrepareWindowCycle;
                         else {
                             capture(u"restored"_s);
@@ -614,9 +607,10 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         window = engine->rootObjects().isEmpty()
                                 ? nullptr
                                 : qobject_cast<QQuickWindow *>(engine->rootObjects().last());
-                        native = window ? qobject_cast<rhi::SceneItem *>(
-                                                  find(window->contentItem(), u"nativeScene"_s))
-                                        : nullptr;
+                        native = window
+                                ? qobject_cast<rhi::SceneItem *>(yalahoo::review::findVisual(
+                                          window->contentItem(), u"nativeScene"_s))
+                                : nullptr;
                         if (!window || !native) {
                             app.exit(RootCreationFailed);
                             return;
@@ -624,7 +618,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                         verification::prepareWindow(*window, true);
                         window->setPersistentGraphics(false);
                         window->setPersistentSceneGraph(false);
-                        window->resize(ReviewWidthPixels, ReviewHeightPixels);
+                        window->resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
                         bindWindow();
                         ++stage;
                         window->show();
@@ -636,7 +630,7 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                             || !window->isExposed())
                             return;
                         ++fullRebuilds;
-                        if (fullRebuilds < LifecycleRebuildCount)
+                        if (fullRebuilds < yalahoo::review::LifecycleRebuildCount)
                             stage = RebuildRoot;
                         else {
                             expected = selection->adjacentAlbum({ }, 1);
@@ -650,7 +644,9 @@ int yalahoo::reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, Sce
                             return;
                         check(u"native-restored-original-window"_s,
                               window == &initialWindow
-                                      && find(window->contentItem(), u"nativeScene"_s) == native);
+                                      && yalahoo::review::findVisual(window->contentItem(),
+                                                                     u"nativeScene"_s)
+                                              == native);
                         check(u"native-restored-window-policy"_s,
                               verification::windowPolicySatisfied(*window));
                         capture(u"window-restored-%1"_s.arg(windowTransition));

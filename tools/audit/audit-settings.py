@@ -1,4 +1,6 @@
 """Bind R26 source review to current symbols; runtime reports stay independent."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -48,7 +50,7 @@ for path in ["src/services/LibrarySession.cpp", "src/services/OfflineMetadataPro
     for name in ["QNetwork", "QProcess", "QDesktopServices"]:
         if name in source:
             raise SystemExit(f"Unexpected external request boundary: {path}: {name}")
-revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
 frozen = []
 for path in ["src/music-app.ts", "src/music.css", "src/quality-settings.ts", "src/music-motion-settings.ts"]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
@@ -60,13 +62,7 @@ for platform, platform_id in [("macos", "MAC-01"), ("windows", "WIN-01"), ("linu
     platform_check = (platform_id, "src/app/main.cpp", "yalahoo::SettingsController settings",
                       "Shared Qt/QML settings use platform-neutral paths/media/controls and existing backend selection. Target build/plugins, native keyboard/scroll/DPR and media survival need the target Kit/window/audio session. Missing targets retain R26-P under the R36 target/backend gates.")
     for check_id, path, symbol, evidence in CHECKS + [platform_check]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Settings source drift: {path}::{symbol}")
-        checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
-                           sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
-                           sourceSha256=hashlib.sha256(data).hexdigest(), result="source-reviewed",
-                           limitations="Source review is separate from target execution; physical input/display/audio/VSYNC and absent environments retain original R26-P gates."))
+        checks.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Source review is separate from target execution; physical input/display/audio/VSYNC and absent environments retain original R26-P gates.'))
     output = ROOT / "verification" / f"{platform}-static" / "settings"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, dependencies=dependencies, frozen=frozen), indent=2) + "\n")

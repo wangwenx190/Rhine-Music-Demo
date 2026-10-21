@@ -1,10 +1,10 @@
-import {execFrozenGit} from '../review/frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from '../review/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '../..');
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 const source = 'legacy-web/node_modules/three/examples/jsm/postprocessing/SMAAPass.js';
 const text = await fs.readFile(path.join(root, source), 'utf8');

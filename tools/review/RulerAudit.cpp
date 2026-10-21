@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "FrameClock.h"
 #include "RulerAudit.h"
 #include "RulerController.h"
@@ -32,7 +33,6 @@ namespace {
 constexpr int CaptureSettleMilliseconds = 60;
 constexpr int LayoutSettleMilliseconds = 120;
 constexpr int RestoreSettleMilliseconds = 200;
-constexpr int ReviewDeadlineMilliseconds = 60000;
 constexpr int CleanupDeadlineMilliseconds = 1000;
 }
 
@@ -576,7 +576,7 @@ int reviewRuler(QGuiApplication &app, const QString &output)
             surface->requestFrame();
         });
     };
-    QTimer::singleShot(ReviewDeadlineMilliseconds, &reviewLifetime, [&] {
+    QTimer::singleShot(yalahoo::review::DefaultDeadlineMilliseconds, &reviewLifetime, [&] {
         app.exit(10);
     });
     surface->show();

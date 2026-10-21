@@ -19,9 +19,6 @@ public:
         return { };
     }
     void setCache(Snapshot cache);
-    bool requestIntroduction(AlbumQuery query, RequestToken token) override;
-    bool requestCredits(AlbumQuery query, RequestToken token) override;
-    bool requestEnrichment(AlbumQuery query, RequestToken token) override;
     void cancel(RequestToken token) override;
 
 private:
@@ -33,7 +30,7 @@ private:
         Snapshot cache;
         qsizetype albumIndex = -1;
     };
-    bool request(AlbumQuery query, RequestToken token, MetadataKind kind);
+    bool request(AlbumQuery query, RequestToken token, MetadataKind kind) override;
     void dispatch();
     Snapshot m_cache;
     QHash<QString, qsizetype> m_albumIndices;

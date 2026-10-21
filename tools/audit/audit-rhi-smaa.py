@@ -1,10 +1,12 @@
 """Check locked SMAA source adaptation, lookup provenance and local platform matrices."""
+from audit_support import source_check
 import base64
 import hashlib
 import json
 import re
 import subprocess
 from pathlib import Path
+from audit_support import read_shader
 
 ROOT = Path(__file__).resolve().parents[2]
 manifest = json.loads((ROOT / "resources/manifests/postprocess.json").read_text())
@@ -53,7 +55,7 @@ for kind, name in [("edges", "SMAAEdgesShader"), ("weights", "SMAAWeightsShader"
     expected = expected.replace("sign( offset )", "sign( chosenOffset )")
     for prefix in ["resources/shaders", "resources/shaders/rhi"]:
         path = f"{prefix}/smaa-{kind}.frag"
-        text = (ROOT / path).read_text()
+        text = read_shader(ROOT / path)
         start = text.index("void SMAA")
         end = text.index("void MAIN()") if "void MAIN()" in text else text.index("void main()")
         if compact(text[start:end]) != compact(expected):
@@ -84,7 +86,7 @@ for revision, prefix in [("522a3f3", "resources/shaders"),
         path = f"{prefix}/smaa-{kind}.frag"
         data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
         text = compact(data.decode())
-        current = compact((ROOT / path).read_text())
+        current = compact(read_shader(ROOT / path))
         # Historical orientation adaptations are reviewed explicitly; preserve the source helpers.
         start = text.index("voidSMAA")
         end = text.index("voidMAIN()") if "voidMAIN()" in text else text.index("voidmain()")
@@ -114,15 +116,9 @@ for platform, symbol in [("windows", "QRhiD3D11InitParams"), ("macos", "QRhiMeta
                           ("linux", "QRhiGles2InitParams")]:
     rows = []
     for identity, path, symbol, evidence in checks + [
-            (platform.upper() + "-01", "tools/review/RhiSmaaAudit.cpp", symbol,
+            (platform.upper() + "-01", "tools/review/OffscreenRhi.h", symbol,
              "Real native QRhi selected; GL fallback outlives QRhi, no visible windows/swapchain. Target actual execution recorded separately; qsb is only static translation.")]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Source audit drift: {path}::{symbol}")
-        rows.append(dict(checkId=identity, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), evidence=evidence,
-                         platform=platform, result="static-audit-passed",
-                         limitations="Backend execution separate; no MSAA/resolve/BLUR-01/VSYNC closure."))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, evidence=evidence, platform=platform, result='static-audit-passed', limitations='Backend execution separate; no MSAA/resolve/BLUR-01/VSYNC closure.'))
     output = ROOT / "verification" / f"{platform}-static" / "rhi-smaa"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")

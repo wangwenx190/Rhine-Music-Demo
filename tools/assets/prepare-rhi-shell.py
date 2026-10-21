@@ -128,13 +128,21 @@ layout(location = 2) out vec4 depthOut;
 #include "shadow-filter.glsl"
 float keyShadow;
 '''
-(directory / 'shell.frag').write_text(prefix + source, encoding='utf-8', newline='\n')
-(directory / 'shell-basic.frag').write_text(prefix.replace('#define AREA_ENABLED 1',
-                                                         '#define AREA_ENABLED 0') + source,
-                                          encoding='utf-8', newline='\n')
-
-for name in ['shell', 'shell-basic']:
-    regular = (directory / (name + '.frag')).read_text()
-    early = regular.replace('#extension GL_GOOGLE_include_directive : require',
-                            '#extension GL_GOOGLE_include_directive : require\nlayout(early_fragment_tests) in;')
-    (directory / (name + '-early.frag')).write_text(early, newline='\n')
+# Floor and shell execute the same source LTC/GGX helpers.
+lighting_start = source.index('const float LtcNumeratorConstant')
+lighting_end = source.index('// END SHARED LIGHTING', lighting_start)
+notice = '// Derived from locked Three.js (MIT); resources/licenses/three-LICENSE.\n'
+(directory / 'shell-lighting.glsl').write_text(notice + source[lighting_start:lighting_end],
+                                               encoding='utf-8', newline='\n')
+source = source[:lighting_start] + '#include "shell-lighting.glsl"\n' + source[lighting_end:]
+(directory / 'shell-body.glsl').write_text(notice + prefix.split('\n', 1)[1] + source,
+                                           encoding='utf-8', newline='\n')
+for basic in (False, True):
+    for early in (False, True):
+        name = 'shell' + ('-basic' if basic else '') + ('-early' if early else '')
+        entry = '#version 440\n#extension GL_GOOGLE_include_directive : require\n'
+        if early:
+            entry += 'layout(early_fragment_tests) in;\n'
+        entry += '#define AREA_ENABLED ' + ('0' if basic else '1') + '\n'
+        entry += '#include "shell-body.glsl"\n'
+        (directory / (name + '.frag')).write_text(entry, encoding='utf-8', newline='\n')

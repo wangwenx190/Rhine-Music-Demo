@@ -1,18 +1,15 @@
 """R19E source provenance and call-path audit; runtime results are separate."""
-import hashlib
+from audit_support import BASELINE
+from audit_support import source_check
+from audit_support import historical as historical
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text())['revisions']
-BASELINE = MAPPING['57f4f845c20cce646a15dbf4008c2a162aaaf4e2']
+BASELINE = MAPPING[BASELINE]
 
 
-def historical(revision, path, reason):
-    data = subprocess.check_output(['git', 'show', f'{revision}:{path}'], cwd=ROOT)
-    return dict(revision=revision, sourcePath=path,
-                sourceSha256=hashlib.sha256(data).hexdigest(), evidence=reason)
 
 
 frozen = [historical(BASELINE, 'src/' + name, reason) for name, reason in [
@@ -43,10 +40,10 @@ history = [historical(rev, path, reason) for rev, path, reason in [
 CHECKS = [
     ('COMMON-01', 'tools/review/CMakeLists.txt', 'Qt6::CanvasPainter', 'Same discovered native Kit/C++23; C++ CanvasPainter production, Canvas2D only Review, QML/shader assets compiled in both closures.'),
     ('COMMON-02', 'qml/Yalahoo/Music/components/Header.qml', 'qrc:/assets/branding/logo-', 'Embedded fonts/icons/brand retain author/license chain; no current-directory or private-library dependency.'),
-    ('COMMON-03', 'qml/Yalahoo/Music/components/ArchiveButton.qml', 'width * outputDpr', 'SVG raster at actual window DPR; settings Curve Shape retains round caps/circle layering; no fourfold sampling or new target.'),
+    ('COMMON-03', 'qml/Yalahoo/Music/components/ArchiveButton.qml', 'ArchiveVectorImage {', 'SVG raster at actual window DPR; settings Curve Shape retains round caps/circle layering; no fourfold sampling or new target.'),
     ('COMMON-04', 'src/render/navigation/InputRouter.cpp', 'ownsInput', 'Qt routes native events before input owner/ancestor checks; navigation only reaches SelectionController. No media calls, queue or playback changes.'),
     ('COMMON-05', 'tools/review/compare-browse-structure.py', "delta <= 1", 'Frozen final CSS anchors, numeric motion and actual visual inspection are separate; reports never treat missing target execution as passed.'),
-    ('PERF-01', 'src/render/navigation/RulerController.cpp', 'result.reserve(PhysicalTickCount)', 'Fixed sixteen slots, O(16 squared) regroup and indexed album lookup; at most ten digits/two faces, no per-frame full-library scan.'),
+    ('PERF-01', 'src/render/navigation/RulerController.cpp', 'result.reserve(yalahoo::rulerGeometry::PhysicalTickCount)', 'Fixed sixteen slots, O(16 squared) regroup and indexed album lookup; at most ten digits/two faces, no per-frame full-library scan.'),
     ('PERF-02', 'src/render/navigation/InputRouter.cpp', 'm_pending = target', 'One replaceable absolute destination, bounded event step/remainder, cancel on library/mode and rebase through shared selection.'),
     ('PERF-03', 'src/render/navigation/RulerInk.cpp', 'controller()->drawing()', 'GUI/render sync copies only fixed drawing values/QColors; once-published implicit-shared QML slot list, no pixel copies or I/O in production paint.'),
     ('PERF-04', 'src/render/rhi/ResourcePlan.h', 'navigation-ruler-color', 'Existing 3D -> reading veils -> UI/ordinal/ruler composition. Fixed single-sample transparent Canvas attachment and bounded digit layers; actual-DPR descriptor budget, driver VRAM unknown.'),
@@ -57,13 +54,7 @@ CHECKS = [
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []
     for identity, path, symbol, reason in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Platform native compiler/backend branch preserved; host generation does not prove target execution.')]:
-        data = (ROOT / path).read_bytes()
-        if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
-            raise SystemExit(f'R19E source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=reason, platform=platform, sourcePath=path,
-                         lineOrSymbol=symbol, evidence=reason,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed',
-                         limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R36 retains missing targets.'))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=reason, platform=platform, evidence=reason, result='static-audit-passed', limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R36 retains missing targets.'))
     output = ROOT / 'verification' / f'{platform}-static' / 'browse-navigation'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, checks=rows), indent=2) + '\n')

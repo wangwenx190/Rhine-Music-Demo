@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Separate product diagnostics, resource stress and formal presentation sampling."""
+from native_replay import BACKEND_IDS
 import argparse
 import hashlib
 import json
@@ -9,7 +10,6 @@ import platform
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_IDS = {"metal": 6, "d3d11": 4, "d3d12": 8, "opengl": 3, "vulkan": 5}
 SCENARIOS = [f"{theme}-{action}" for theme in ("day", "night")
              for action in ("wave", "ruler", "detail", "switch", "overview", "search")]
 

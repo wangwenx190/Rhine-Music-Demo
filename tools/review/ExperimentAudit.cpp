@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "RowLightController.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
@@ -32,15 +33,6 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-QQuickItem *visual(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *found = visual(child, name))
-            return found;
-    return nullptr;
-}
 }
 int reviewExperiments(const QString &output)
 {
@@ -81,7 +73,8 @@ int reviewExperiments(const QString &output)
     OffscreenSurface surface(window, control);
     root->setParentItem(window.contentItem());
     input.attach(&window);
-    auto *native = qobject_cast<rhi::SceneItem *>(visual(root, u"nativeScene"_s));
+    auto *native =
+            qobject_cast<rhi::SceneItem *>(yalahoo::review::findVisual(root, u"nativeScene"_s));
     if (!native)
         return 3;
     QJsonObject lastSample;
@@ -164,9 +157,9 @@ int reviewExperiments(const QString &output)
                             { u"dpr"_s, dpr },
                             { u"night"_s, night } };
                 check(u"render"_s, render());
-                auto *panel = visual(root, u"experimentPanels"_s);
-                auto *lighting = visual(root, u"lightingPanel"_s);
-                auto *scroll = visual(root, u"experimentScroll"_s);
+                auto *panel = yalahoo::review::findVisual(root, u"experimentPanels"_s);
+                auto *lighting = yalahoo::review::findVisual(root, u"lightingPanel"_s);
+                auto *scroll = yalahoo::review::findVisual(root, u"experimentScroll"_s);
                 auto *flickable =
                         scroll ? scroll->property("contentItem").value<QQuickItem *>() : nullptr;
                 check(u"bounded-panel"_s,
@@ -204,8 +197,9 @@ int reviewExperiments(const QString &output)
                     flickable->setProperty("contentY", bottom);
                 }
                 check(u"bottom-render"_s, render());
-                auto *toggle = visual(root, u"diagnosticsToggle"_s);
-                auto *label = toggle ? visual(toggle, u"checkBoxCaption"_s) : nullptr;
+                auto *toggle = yalahoo::review::findVisual(root, u"diagnosticsToggle"_s);
+                auto *label = toggle ? yalahoo::review::findVisual(toggle, u"checkBoxCaption"_s)
+                                     : nullptr;
                 check(u"theme-control-text"_s,
                       label
                               && label->property("color").value<QColor>()
@@ -226,9 +220,9 @@ int reviewExperiments(const QString &output)
     if (OffscreenSurface::Enabled)
         surface.setDevicePixelRatio(1);
     check(u"interaction-render"_s, render());
-    auto *scroll = visual(root, u"experimentScroll"_s);
+    auto *scroll = yalahoo::review::findVisual(root, u"experimentScroll"_s);
     auto *flickable = scroll ? scroll->property("contentItem").value<QQuickItem *>() : nullptr;
-    auto *speed = visual(root, u"motionSpeedControl"_s);
+    auto *speed = yalahoo::review::findVisual(root, u"motionSpeedControl"_s);
     const auto cell = selection.cell();
     if (speed) {
         speed->forceActiveFocus();
@@ -236,7 +230,7 @@ int reviewExperiments(const QString &output)
     }
     check(u"speed-keyboard-owned"_s,
           speed && motion.clock()->speed() > 1 && selection.cell() == cell);
-    click(visual(root, u"motionReset"_s));
+    click(yalahoo::review::findVisual(root, u"motionReset"_s));
     check(u"speed-reset"_s, motion.clock()->speed() == 1);
     check(u"resource-baseline"_s, render() && !lastSample.isEmpty());
     const auto generation = lastSample[u"resourceGeneration"_s],
@@ -258,7 +252,7 @@ int reviewExperiments(const QString &output)
     if (flickable)
         flickable->setProperty("contentY", 180);
     check(u"comparison-ready"_s, render());
-    auto *compare = visual(root, u"lightingCompare"_s);
+    auto *compare = yalahoo::review::findVisual(root, u"lightingCompare"_s);
     if (compare) {
         compare->forceActiveFocus();
         QTest::keyPress(&window, Qt::Key_Space);
@@ -278,7 +272,7 @@ int reviewExperiments(const QString &output)
     root->setProperty("experimentsVisible", true);
     check(u"reopen"_s, render());
     scene.lighting()->resetSettings();
-    auto *panel = visual(root, u"experimentPanels"_s);
+    auto *panel = yalahoo::review::findVisual(root, u"experimentPanels"_s);
     if (panel)
         panel->setProperty("diagnostics", true);
     check(u"diagnostics-on"_s, render() && native->diagnosticsEnabled());

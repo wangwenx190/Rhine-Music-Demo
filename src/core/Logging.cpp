@@ -1,3 +1,4 @@
+#include "Units.h"
 #include "Logging.h"
 
 #include <QCoreApplication>
@@ -23,7 +24,6 @@
 namespace {
 // Bound sink writes/retention work; continuation-byte masking preserves complete UTF-8 records.
 #ifdef Q_OS_WIN
-constexpr auto BytesPerKiB = 1024;
 constexpr auto AnsiResetSequenceBytes = 4;
 #endif
 constexpr auto CleanupIntervalSeconds = 3600;
@@ -83,7 +83,8 @@ void consoleWrite(QtMsgType type, const QByteArray &bytes, bool color)
     const auto write = [output](const char *data, qsizetype size) {
         while (size > 0) {
             DWORD written = 0;
-            const auto count = DWORD(std::min<qsizetype>(size, BytesPerKiB * BytesPerKiB));
+            const auto count = DWORD(std::min<qsizetype>(
+                    size, yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB));
             if (!WriteFile(output, data, count, &written, nullptr) || !written)
                 break;
             data += written;

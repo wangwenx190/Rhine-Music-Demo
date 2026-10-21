@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "LibrarySession.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -78,21 +79,13 @@ public:
         enabled = value;
         Q_EMIT capabilitiesChanged();
     }
-    bool requestIntroduction(AlbumQuery query, RequestToken token) override
+    bool request(AlbumQuery query, RequestToken token, MetadataKind kind) override
     {
-        lastQueryEnabled = query.enabled;
-        ++introductionRequests;
-        deliver(token, MetadataKind::Introduction);
-        return true;
-    }
-    bool requestCredits(AlbumQuery, RequestToken token) override
-    {
-        deliver(token, MetadataKind::Credits);
-        return true;
-    }
-    bool requestEnrichment(AlbumQuery, RequestToken token) override
-    {
-        deliver(token, MetadataKind::Enrichment);
+        if (kind == MetadataKind::Introduction) {
+            lastQueryEnabled = query.enabled;
+            ++introductionRequests;
+        }
+        deliver(token, kind);
         return true;
     }
     void cancel(RequestToken) override
@@ -117,15 +110,6 @@ public:
         });
     }
 };
-QQuickItem *visual(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *found = visual(child, name))
-            return found;
-    return nullptr;
-}
 }
 int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerification,
                   bool settingsVerification, bool representative)
@@ -236,7 +220,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     }
     QJsonObject lastSettingsSample;
     QJsonArray settingsResourceSamples;
-    auto *settingsScene = qobject_cast<rhi::SceneItem *>(visual(root, u"nativeScene"_s));
+    auto *settingsScene =
+            qobject_cast<rhi::SceneItem *>(yalahoo::review::findVisual(root, u"nativeScene"_s));
     if (settingsVerification && settingsScene) {
         settingsScene->setTelemetryEnabled(true);
         QObject::connect(settingsScene, &rhi::SceneItem::frameSubmitted, root,
@@ -365,7 +350,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         window.resize(1280, 720);
         root->setSize({ 1280, 720 });
         render();
-        auto *button = visual(window.contentItem(), u"playButton"_s);
+        auto *button = yalahoo::review::findVisual(window.contentItem(), u"playButton"_s);
         if (!button)
             return 4;
         QTest::mouseClick(
@@ -413,8 +398,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 if (settingsVerification) {
                     panels.open(u"settings"_s);
                     check(u"render-settings"_s, render());
-                    auto *settingsPanel = visual(window.contentItem(), u"settingsPanel"_s);
-                    auto *pane = visual(window.contentItem(), u"libraryPanelSurface"_s);
+                    auto *settingsPanel =
+                            yalahoo::review::findVisual(window.contentItem(), u"settingsPanel"_s);
+                    auto *pane = yalahoo::review::findVisual(window.contentItem(),
+                                                             u"libraryPanelSurface"_s);
                     check(u"source-settings-panel"_s,
                           settingsPanel && pane
                                   && std::abs(pane->width()
@@ -423,15 +410,19 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                       size.width()
                                                               - (size.width() <= 700 ? 24. : 56.)))
                                           <= 1);
-                    auto *query = visual(window.contentItem(), u"introductionMetadataQuery"_s);
+                    auto *query = yalahoo::review::findVisual(window.contentItem(),
+                                                              u"introductionMetadataQuery"_s);
                     check(u"offline-query-disabled"_s, query && !query->isEnabled());
                     if (settingsPanel) {
                         settingsPanel->setProperty("musicBrainzExpanded", true);
                     }
                     check(u"expanded-settings-render"_s, render());
-                    auto *proxySwitch = visual(window.contentItem(), u"settingsProxyEnabled"_s);
-                    auto *proxyMode = visual(window.contentItem(), u"settingsProxyMode"_s);
-                    auto *proxyAddress = visual(window.contentItem(), u"settingsMetadataProxy"_s);
+                    auto *proxySwitch = yalahoo::review::findVisual(window.contentItem(),
+                                                                    u"settingsProxyEnabled"_s);
+                    auto *proxyMode = yalahoo::review::findVisual(window.contentItem(),
+                                                                  u"settingsProxyMode"_s);
+                    auto *proxyAddress = yalahoo::review::findVisual(window.contentItem(),
+                                                                     u"settingsMetadataProxy"_s);
                     check(u"proxy-default-enabled"_s,
                           proxySwitch && proxySwitch->property("checked").toBool());
                     check(u"proxy-default-system"_s,
@@ -451,7 +442,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                      scroll->property("contentHeight").toDouble()
                                                              - scroll->height()));
                     check(u"settings-bottom-render"_s, render());
-                    auto *contact = visual(window.contentItem(), u"settingsMetadataContact"_s);
+                    auto *contact = yalahoo::review::findVisual(window.contentItem(),
+                                                                u"settingsMetadataContact"_s);
                     check(u"configuration-reachable"_s,
                           settingsPanel && contact
                                   && settingsPanel->contains(settingsPanel->mapFromItem(
@@ -479,7 +471,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                 settingsScene ? settingsScene->input().atlasGeneration : 0;
                         settingsResourceSamples.append(baselineResources);
                         const auto focusSetting = [&](const QString &name) {
-                            auto *control = visual(window.contentItem(), name);
+                            auto *control = yalahoo::review::findVisual(window.contentItem(), name);
                             if (control && scroll) {
                                 const double y = control->mapToItem(scroll, QPointF()).y();
                                 scroll->setProperty(
@@ -514,7 +506,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         if (scroll)
                             scroll->setProperty("contentY", 0);
                         render();
-                        auto *theme = visual(window.contentItem(), u"settingsNightTheme"_s);
+                        auto *theme = yalahoo::review::findVisual(window.contentItem(),
+                                                                  u"settingsNightTheme"_s);
                         check(u"theme-control-present"_s, theme != nullptr);
                         if (theme) {
                             theme->forceActiveFocus();
@@ -570,14 +563,14 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                    && timer.elapsed() < InputDeadlineMilliseconds)
                                 QTest::qWait(EventPollMilliseconds);
                             check(u"injected-status-render"_s, render());
-                            auto *state =
-                                    visual(window.contentItem(), u"introductionMetadataState"_s);
+                            auto *state = yalahoo::review::findVisual(
+                                    window.contentItem(), u"introductionMetadataState"_s);
                             check(u"injected-status-ui"_s,
                                   state
                                           && state->property("text").toString().contains(
                                                   metadataStatusText(statusName(status))));
-                            auto *content =
-                                    visual(window.contentItem(), u"introductionMetadataContent"_s);
+                            auto *content = yalahoo::review::findVisual(
+                                    window.contentItem(), u"introductionMetadataContent"_s);
                             check(u"injected-content-ui"_s,
                                   content
                                           && content->property("text").toString().contains(
@@ -604,8 +597,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                              u"introduction"_s)[u"status"_s]
                                                       .toString()
                                               == "Matched"_L1);
-                        auto *batchQuery =
-                                visual(window.contentItem(), u"introductionMetadataBatch"_s);
+                        auto *batchQuery = yalahoo::review::findVisual(
+                                window.contentItem(), u"introductionMetadataBatch"_s);
                         check(u"batch-query-enabled"_s,
                               render() && batchQuery && batchQuery->isEnabled());
                         if (batchQuery) {
@@ -640,16 +633,21 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                           render() && !panels.surface()->shown() && input.enabled() && !oldPanel);
                     panels.open(u"settings"_s);
                     check(u"reverse-open-settings"_s,
-                          render() && visual(window.contentItem(), u"settingsPanel"_s));
+                          render()
+                                  && yalahoo::review::findVisual(window.contentItem(),
+                                                                 u"settingsPanel"_s));
                     panels.close();
                     check(u"settings-close"_s, render() && !panels.surface()->shown());
                     continue;
                 }
                 panels.open(u"search"_s);
                 check(u"render-search"_s, render());
-                auto *pane = visual(window.contentItem(), u"libraryPanelSurface"_s);
-                auto *query = visual(window.contentItem(), u"librarySearchInput"_s);
-                auto *results = visual(window.contentItem(), u"librarySearchResults"_s);
+                auto *pane =
+                        yalahoo::review::findVisual(window.contentItem(), u"libraryPanelSurface"_s);
+                auto *query =
+                        yalahoo::review::findVisual(window.contentItem(), u"librarySearchInput"_s);
+                auto *results = yalahoo::review::findVisual(window.contentItem(),
+                                                            u"librarySearchResults"_s);
                 if (!pane || !query || !results)
                     return 4;
                 check(u"source-panel-width"_s,
@@ -657,13 +655,13 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                - std::min(650., size.width() - (size.width() <= 700 ? 24. : 56.)))
                               <= 1);
                 auto *sceneItem = qobject_cast<rhi::SceneItem *>(
-                        visual(window.contentItem(), u"nativeScene"_s));
+                        yalahoo::review::findVisual(window.contentItem(), u"nativeScene"_s));
                 check(u"scene-error-free"_s, sceneItem && sceneItem->errorText().isEmpty());
                 check(u"panel-descriptor"_s,
                       sceneItem && sceneItem->input().panelLayerSize == size);
                 if (dpr == 1 && size == QSize(1280, 720) && !night) {
-                    QPointer<QQuickItem> first =
-                            visual(window.contentItem(), u"librarySearchResult-0"_s);
+                    QPointer<QQuickItem> first = yalahoo::review::findVisual(
+                            window.contentItem(), u"librarySearchResult-0"_s);
                     check(u"search-first-row"_s,
                           first && first->property("trackId").toString().isEmpty());
                     const QPoint press = first
@@ -675,7 +673,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     query->setProperty("text", u"Song"_s);
                     render();
                     check(u"search-row-reused"_s,
-                          first && first == visual(window.contentItem(), u"librarySearchResult-0"_s)
+                          first
+                                  && first
+                                          == yalahoo::review::findVisual(window.contentItem(),
+                                                                         u"librarySearchResult-0"_s)
                                   && first->property("trackId").toString() == "track-0"_L1);
                     QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, press);
                     check(u"search-replaced-press-canceled"_s,
@@ -718,7 +719,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                           surface.grab().save(
                                   output + u"/search-%1-%2.png"_s.arg(size.width()).arg(night)));
                 QPointer<QQuickItem> backdrop =
-                        visual(window.contentItem(), u"panelBackdropLoader"_s);
+                        yalahoo::review::findVisual(window.contentItem(), u"panelBackdropLoader"_s);
                 panels.close();
                 check(u"close-search"_s, render() && !panels.surface()->shown() && input.enabled());
                 if (dpr == 1 && size == QSize(1280, 720) && !night)
@@ -743,13 +744,17 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     for (const auto &name : { "bgmEnabled", "bgmVolume", "interfaceSoundEnabled",
                                               "interfaceSoundVolume" })
                         check(u"audio-setting-%1"_s.arg(name),
-                              visual(window.contentItem(), QString::fromUtf8(name)) != nullptr);
+                              yalahoo::review::findVisual(window.contentItem(),
+                                                          QString::fromUtf8(name))
+                                      != nullptr);
                     check(u"audio-independent-values"_s,
                           background.volume() == .18 && sounds.volume() == .22
                                   && song->volume() == double(.01f) && !sounds.available());
-                    auto *outputs = visual(window.contentItem(), u"songOutputDevices"_s);
+                    auto *outputs = yalahoo::review::findVisual(window.contentItem(),
+                                                                u"songOutputDevices"_s);
                     check(u"output-device-control"_s, outputs && outputs->isVisible());
-                    auto *settings = visual(window.contentItem(), u"audioSettingsPanel"_s);
+                    auto *settings = yalahoo::review::findVisual(window.contentItem(),
+                                                                 u"audioSettingsPanel"_s);
                     auto *scroll = settings
                             ? settings->property("contentItem").value<QQuickItem *>()
                             : nullptr;
@@ -773,7 +778,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     if (scroll)
                         scroll->setProperty("contentY", previousY);
                     check(u"audio-settings-top-render"_s, render());
-                    auto *progress = visual(window.contentItem(), u"songProgress"_s);
+                    auto *progress =
+                            yalahoo::review::findVisual(window.contentItem(), u"songProgress"_s);
                     check(u"playback-progress-control"_s,
                           progress && progress->isVisible() && progress->isEnabled());
                     if (dpr == 1 && (size.width() == 1280 || size.width() == 390))
@@ -828,7 +834,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
         selection.setColumns(library.albums()->order().columns, library.snapshot());
         panels.open(u"search"_s);
         check(u"large-genres-render"_s, render());
-        auto *genres = visual(window.contentItem(), u"libraryGenreFilters"_s);
+        auto *genres = yalahoo::review::findVisual(window.contentItem(), u"libraryGenreFilters"_s);
         int liveGenreRows = 0;
         if (genres)
             for (auto *child : genres->childItems())
@@ -870,7 +876,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
               window.activeFocusItem()
                       && window.activeFocusItem()->property("trackId").toString()
                               == "track-199"_L1);
-        auto *trackList = visual(window.contentItem(), u"detailTrackList"_s);
+        auto *trackList = yalahoo::review::findVisual(window.contentItem(), u"detailTrackList"_s);
         auto *trackView = trackList
                 ? qobject_cast<QQuickItem *>(trackList->property("currentView").value<QObject *>())
                 : nullptr;
@@ -928,7 +934,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                               <= 1);
         check(u"no-reextract"_s,
               presentation.layoutRevision() == layout && presentation.detailEnabled());
-        auto *tracks = visual(window.contentItem(), u"detailTrackList"_s);
+        auto *tracks = yalahoo::review::findVisual(window.contentItem(), u"detailTrackList"_s);
         if (tracks)
             QMetaObject::invokeMethod(tracks, "cancelReveal");
         check(u"user-cancel"_s, !focus.active());
@@ -971,15 +977,19 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             const int reloadCount =
                     qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
             for (int i = 0; i < reloadCount; ++i) {
-                QPointer<QQuickItem> oldScene = visual(appWindow->contentItem(), u"nativeScene"_s);
+                QPointer<QQuickItem> oldScene =
+                        yalahoo::review::findVisual(appWindow->contentItem(), u"nativeScene"_s);
                 settings.reload();
                 QElapsedTimer timer;
                 timer.start();
-                while ((!oldScene.isNull() || !visual(appWindow->contentItem(), u"nativeScene"_s))
+                while ((!oldScene.isNull()
+                        || !yalahoo::review::findVisual(appWindow->contentItem(), u"nativeScene"_s))
                        && timer.elapsed() < InputDeadlineMilliseconds)
                     QTest::qWait(EventPollMilliseconds);
                 check(u"reload-rebuilds-visual"_s,
-                      oldScene.isNull() && visual(appWindow->contentItem(), u"nativeScene"_s));
+                      oldScene.isNull()
+                              && yalahoo::review::findVisual(appWindow->contentItem(),
+                                                             u"nativeScene"_s));
                 check(u"reload-preserves-media-quality"_s,
                       song.get() == player && song->source() == source && song->trackId() == track
                               && song->requested() == requested && settings.values() == values);

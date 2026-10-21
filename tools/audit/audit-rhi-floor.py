@@ -1,8 +1,10 @@
 """Source/ownership audit for the product ground; runtime evidence remains separate."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
-import re
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader, tokens
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
@@ -20,7 +22,7 @@ CHECKS = [
      "One immutable quad (4 vertices, 6 indices), one uniform in the existing slot, O(1) draw per applicable geometry pass. Product work remains bounded by the existing pool."),
     ("PERF-02", "src/render/rhi/SceneItem.cpp", "in.floorColor = l.palette().floor.qt()",
      "GUI publishes values at synchronization; no GUI object access, disk, decode, worker waits or production readback on render hot path."),
-    ("PERF-03", "src/render/rhi/RhiItem.cpp", "input.productFloor ? 6 : 2",
+    ("PERF-03", "src/render/rhi/RhiItem.cpp", "input.productFloor ? ProductFloorKind : ReviewFloorKind",
      "Reuses one receiver uniform block; 152 additional immutable geometry bytes uploaded only with shared geometry initialization. Theme only updates existing uniform prefix, no image copies."),
     ("PERF-04", "src/render/rhi/RhiItem.cpp", "geometryBindings->setBindings",
      "Existing opaque SRB additionally binds existing DFG/LTC lookups; no new PSO/texture/target. Ground enters capture before resolve/mips, shared normal/depth and AO/DOF prepass; never a caster or sampled writable color attachment."),
@@ -32,11 +34,8 @@ CHECKS = [
      "Ten actual SG invalidations restore floor, capture and AO/full DOF geometry. Existing renderer owns/releases all shared resources, no per-floor lifetime or unbounded cache. Native window/VSYNC and unavailable target hardware remain R36."),
 ]
 # Verify the copied, source-derived LTC/GGX helper portion stays equivalent to the shared shell.
-def tokens(text):
-    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-    return re.findall(r"[A-Za-z_][A-Za-z_0-9]*|(?:\d*\.\d+|\d+\.?\d*)(?:[eE][+-]?\d+)?|\S", text)
-shell = (ROOT / "resources/shaders/rhi/shell.frag").read_text()
-floor = (ROOT / "resources/shaders/rhi/floor-lighting.glsl").read_text()
+shell = read_shader(ROOT / "resources/shaders/rhi/shell.frag")
+floor = read_shader(ROOT / "resources/shaders/rhi/floor-lighting.glsl")
 shared = shell[shell.index("float LTC_ClippedSphereFormFactor("):shell.index("// END SHARED LIGHTING")]
 adapted = floor[floor.index("float LTC_ClippedSphereFormFactor("):floor.index("vec3 floorRadiance(")]
 if tokens(shared) != tokens(adapted):
@@ -47,13 +46,7 @@ for host, platform_id, symbol in [("windows", "WIN-01", "WIN32"),
     rows = []
     for check_id, path, marker, evidence in CHECKS + [(platform_id, "cmake/Platform.cmake", symbol,
              "Same selected Kit, native helper and platform build closure retained; target runtime not inferred from macOS.")]:
-        content = (ROOT / path).read_bytes()
-        if " ".join(marker.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{marker}")
-        rows.append(dict(checkId=check_id, platform=host, sourcePath=path, lineOrSymbol=marker,
-                         requirement=evidence, evidence=evidence,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), result="static-audit-passed",
-                         limitations="Static source/ownership only; target GPU/window/runtime results are separate."))
+        rows.append(source_check(ROOT, path, marker, checkId=check_id, platform=host, requirement=evidence, evidence=evidence, result='static-audit-passed', limitations='Static source/ownership only; target GPU/window/runtime results are separate.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-floor"
     output.mkdir(parents=True, exist_ok=True)
     (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

@@ -1,3 +1,5 @@
+#include "ReviewSupport.h"
+#include "Units.h"
 #include "Logging.h"
 #include "BrowseReview.h"
 #include "LibrarySession.h"
@@ -18,8 +20,6 @@ namespace {
 // Probe settling delays and deadline are distinct from the explicit viewport fixture matrix.
 constexpr auto CaptureSettleMilliseconds = 850;
 constexpr auto ResizeSettleMilliseconds = 300;
-constexpr auto ReviewDeadlineMilliseconds = 60000;
-constexpr auto DecimalBase = 10;
 }
 
 namespace {
@@ -89,7 +89,8 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
         // Both palette and lighting use the source 650ms transition.
         QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
             const auto image = window.grabWindow();
-            const QString name = u"product-%1.png"_s.arg(index, 2, DecimalBase, '0'_L1);
+            const QString name =
+                    u"product-%1.png"_s.arg(index, 2, yalahoo::units::DecimalBase, '0'_L1);
             const bool valid = !image.isNull() && image.save(output + '/'_L1 + name)
                     && window.size() == sizes[index / 2]
                     && verification::windowPolicySatisfied(window)
@@ -124,7 +125,7 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
         passed &= scene.lighting()->night();
         next();
     });
-    QTimer::singleShot(ReviewDeadlineMilliseconds, &reviewLifetime, [&] {
+    QTimer::singleShot(yalahoo::review::DefaultDeadlineMilliseconds, &reviewLifetime, [&] {
         app.exit(ReviewTimedOut);
     });
     return app.exec();

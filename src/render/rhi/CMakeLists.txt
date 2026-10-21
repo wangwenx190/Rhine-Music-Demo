@@ -21,6 +21,8 @@ qt_add_library(
     AtlasAllocator.cpp
     Postprocess.cpp
     Postprocess.h
+    PostprocessDefaults.h
+    PixelStorage.h
     TransferAudit.h
     RhiApi.h
     ShellMaterial.cpp
@@ -136,14 +138,15 @@ qt_add_resources(
 
 if(YALAHOO_REVIEW)
     # Build-only wrapper executes production GLSL functions with independent math inputs.
-    set(optics_source "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell.frag")
+    set(optics_source "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell-body.glsl")
     set(optics_tail "${PROJECT_SOURCE_DIR}/tools/review/OpticsProbe.frag")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${optics_source}" "${optics_tail}")
     file(READ "${optics_source}" optics_body)
+    string(PREPEND optics_body "#version 440\n")
     string(REPLACE "void main()" "void productionShellMain()" optics_body "${optics_body}")
     file(READ "${optics_tail}" optics_probe_tail)
     string(APPEND optics_body "\n${optics_probe_tail}")
-    foreach(header frame shadow-filter fog color-output)
+    foreach(header shell-lighting frame shadow-filter fog color-output)
         set(optics_header_path "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/${header}.glsl")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${optics_header_path}")
         file(READ "${optics_header_path}" optics_header)

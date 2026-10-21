@@ -1,5 +1,7 @@
-#!/usr/bin/env python3
 """R29 production GUI source closure. Runtime and output quality are independent facts."""
+from audit_support import BASELINE
+from audit_support import source_check
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json
@@ -68,7 +70,7 @@ checks = [
      'All 36 states share the existing driver; final root/control invalidation requires zero scene/Canvas/text renderers. Default native window policy is checked. R28 owns repeated root/lifetime pressure; native same-window, physical input/VSYNC and missing targets stay in R29-P/R36.'),
 ]
 mapping = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text(encoding='utf-8'))['revisions']
-baseline = mapping['57f4f845c20cce646a15dbf4008c2a162aaaf4e2']
+baseline = mapping[BASELINE]
 source_path = 'src/music-overview.css'
 frozen = subprocess.check_output(['git', 'show', f'{baseline}:{source_path}'], cwd=ROOT)
 if '.music-app[data-mode="detail"] .music-view-toggle' not in frozen.decode():
@@ -83,13 +85,7 @@ for target, marker in (('windows', 'WIN32'), ('macos', 'YalahooVerification'), (
             (dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[target],
              'cmake/Platform.cmake', marker,
              'The actual native platform backend/build branch is retained; deployment is owned by R30/R31/R32. This host source audit cannot prove another target system, compiler, GPU or display session.')]:
-        data = (ROOT / path).read_bytes()
-        if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
-            raise SystemExit(f'GUI audit source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=evidence, platform=target, sourcePath=path,
-                         lineOrSymbol=symbol, evidence=evidence,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed',
-                         limitations='Current runtime scope is recorded separately; R29-P retains missing target/physical/presentation requirements.'))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=target, evidence=evidence, result='static-audit-passed', limitations='Current runtime scope is recorded separately; R29-P retains missing target/physical/presentation requirements.'))
     output = ROOT / f'verification/{target}-static/gui'
     output.mkdir(parents=True, exist_ok=True)
     (output / 'source-matrix.json').write_text(json.dumps(dict(

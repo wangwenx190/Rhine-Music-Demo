@@ -70,7 +70,7 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/square.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/portrait.png"
         "${PROJECT_SOURCE_DIR}/resources/demo-covers/landscape.png")
-    qt_add_executable(rhi-bokeh-audit RhiBokehAudit.cpp)
+    qt_add_executable(rhi-bokeh-audit RhiBokehAudit.cpp OffscreenRhi.h)
     target_link_libraries(rhi-bokeh-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(rhi-bokeh-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
         "${PROJECT_SOURCE_DIR}/tools/assets")
@@ -78,7 +78,7 @@ if(YALAHOO_REVIEW)
     set_target_properties(rhi-bokeh-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY
         "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
     yalahoo_platform(rhi-bokeh-audit)
-    qt_add_executable(rhi-smaa-audit RhiSmaaAudit.cpp SmaaReference.h)
+    qt_add_executable(rhi-smaa-audit RhiSmaaAudit.cpp OffscreenRhi.h SmaaReference.h)
     target_link_libraries(rhi-smaa-audit PRIVATE YalahooRhi Qt6::GuiPrivate)
     target_include_directories(rhi-smaa-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
         "${PROJECT_SOURCE_DIR}/tools/assets")

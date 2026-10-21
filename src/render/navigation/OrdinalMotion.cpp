@@ -1,3 +1,4 @@
+#include "FrameConnection.h"
 #include "FrameClock.h"
 #include "OrdinalMotion.h"
 #include "ArchivePool.h"
@@ -6,14 +7,7 @@
 
 namespace {
 // Ordinal rolling samples the source decay curve; decimal wrap remains distinct from track time.
-constexpr auto OrdinalTransitionSeconds = .460;
-constexpr auto VelocityLimitGain = 12;
-constexpr auto TrackSampleCount = 49;
-constexpr auto SampleIntervals = 48.0;
-constexpr auto LastSampleIndex = 48;
-constexpr auto LastInterpolationIndex = 47;
 constexpr auto DecimalRadix = 10;
-constexpr auto TrackDecay = 10;
 constexpr auto DigitAlignmentTolerance = .001;
 }
 
@@ -25,24 +19,16 @@ void OrdinalTrack::retarget(double to, bool instant)
     if (to == target && !instant)
         return;
     target = to;
-    elapsed = instant ? OrdinalTransitionSeconds : 0;
+    elapsed = instant ? sampledReel::TransitionSeconds : 0;
     if (instant) {
         value = to;
         velocity = 0;
         points.fill(to);
         return;
     }
-    const double delta = value - target;
-    const double cap =
-            std::max(std::abs(delta), 1.0) * VelocityLimitGain / OrdinalTransitionSeconds;
-    const double initialVelocity = std::clamp(velocity, -cap, cap) * OrdinalTransitionSeconds;
-    for (int i = 0; i < TrackSampleCount; ++i) {
-        const double t = i / SampleIntervals;
-        points[i] = i == LastSampleIndex ? target
-                                         : target
-                        + (delta + (initialVelocity + TrackDecay * delta) * t)
-                                * std::exp(-TrackDecay * t);
-    }
+    const double initialVelocity =
+            sampledReel::limitedVelocity(value - target, velocity, sampledReel::TransitionSeconds);
+    sampledReel::fill(points, value, target, initialVelocity, sampledReel::TransitionSeconds);
     // WAAPI exposes the first sampled segment immediately after replacing its track.
     advance(0);
 }
@@ -50,17 +36,18 @@ void OrdinalTrack::advance(double dt)
 {
     if (!std::isfinite(dt) || dt < 0)
         return;
-    elapsed = std::min(OrdinalTransitionSeconds, elapsed + dt);
-    if (elapsed >= std::nextafter(OrdinalTransitionSeconds, 0.0)) {
-        elapsed = OrdinalTransitionSeconds;
+    elapsed = std::min(sampledReel::TransitionSeconds, elapsed + dt);
+    if (elapsed >= std::nextafter(sampledReel::TransitionSeconds, 0.0)) {
+        elapsed = sampledReel::TransitionSeconds;
         value = target;
         velocity = 0;
         return;
     }
-    const double position = elapsed / OrdinalTransitionSeconds * LastSampleIndex;
-    const int i = std::min(LastInterpolationIndex, int(std::floor(position)));
-    value = points[i] + (points[i + 1] - points[i]) * (position - i);
-    velocity = (points[i + 1] - points[i]) * LastSampleIndex / OrdinalTransitionSeconds;
+    const auto sample = sampledReel::interpolate(
+            points, elapsed / sampledReel::TransitionSeconds * sampledReel::Intervals,
+            sampledReel::TransitionSeconds);
+    value = sample.value;
+    velocity = sample.velocity;
 }
 OrdinalMotion::OrdinalMotion(QObject *parent) : QObject(parent)
 {
@@ -79,15 +66,8 @@ FrameClock *OrdinalMotion::clock() const
 }
 void OrdinalMotion::setClock(FrameClock *clock)
 {
-    if (m_clock == clock)
-        return;
-    disconnect(m_connection);
-    m_clock = clock;
-    if (clock)
-        m_connection = connect(clock, &FrameClock::frame, this, [this](double, double dt) {
-            advance(dt);
-        });
-    Q_EMIT clockChanged();
+    if (bindFrameClock(this, m_clock, m_connection, clock))
+        Q_EMIT clockChanged();
 }
 int OrdinalMotion::value() const
 {
@@ -198,9 +178,9 @@ void OrdinalMotion::advance(double dt)
         return;
     bool moving = false;
     for (int i = 0; i < m_count; ++i)
-        if (m_tracks[i].elapsed < OrdinalTransitionSeconds) {
+        if (m_tracks[i].elapsed < sampledReel::TransitionSeconds) {
             m_tracks[i].advance(dt);
-            if (m_tracks[i].elapsed >= OrdinalTransitionSeconds)
+            if (m_tracks[i].elapsed >= sampledReel::TransitionSeconds)
                 m_tracks[i].retarget(ArchivePool::wrap(m_tracks[i].target, DecimalRadix), true);
             moving = true;
         }

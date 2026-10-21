@@ -1,3 +1,4 @@
+#include "../support/FileFixture.h"
 #include "RenderQuality.h"
 #include "SceneAdapter.h"
 #include "LibrarySession.h"
@@ -18,11 +19,6 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-QByteArray read(const QString &path)
-{
-    QFile file(path);
-    return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
-}
 bool put(const QString &path, const QByteArray &bytes)
 {
     QFile file(path);
@@ -78,16 +74,16 @@ private Q_SLOTS:
             QVERIFY(preferences.update(
                     { { u"renderQuality"_s, QVariantMap{ { u"depthOfField"_s, 150 } } } }));
             QTRY_COMPARE(saved.size(), 2);
-            auto json = QJsonDocument::fromJson(read(path)).object();
+            auto json = QJsonDocument::fromJson(yalahoo::test::readFile(path)).object();
             QCOMPARE(json[u"schemaVersion"_s].toInt(), 1);
             QCOMPARE(json[u"future"_s].toObject()[u"x"_s].toInt(), 8);
             QCOMPARE(json[u"renderQuality"_s].toObject()[u"futureQuality"_s].toInt(), 7);
-            QCOMPARE(read(source), bytes);
-            const auto before = read(path);
+            QCOMPARE(yalahoo::test::readFile(source), bytes);
+            const auto before = yalahoo::test::readFile(path);
             QVERIFY(!preferences.update({ { u"theme"_s, u"invalid"_s } }));
             QVERIFY(!preferences.update({ { u"motionSpeed"_s, true } }));
             QVERIFY(!preferences.update({ { u"soundVolume"_s, 2.0 } }));
-            QCOMPARE(read(path), before);
+            QCOMPARE(yalahoo::test::readFile(path), before);
             QVERIFY(preferences.importJson(QUrl::fromLocalFile(source)));
             QVERIFY(preferences.update({ { u"theme"_s, u"day"_s } }));
             QTRY_COMPARE(saved.size(), 3);
@@ -103,7 +99,7 @@ private Q_SLOTS:
             PreferencesStore damaged(directory.path());
             QVERIFY(!damaged.error().isEmpty());
             QVERIFY(!damaged.update({ { u"theme"_s, u"day"_s } }));
-            QCOMPARE(read(path), invalid);
+            QCOMPARE(yalahoo::test::readFile(path), invalid);
         }
     }
     void fieldRoutingAndVisualReload()

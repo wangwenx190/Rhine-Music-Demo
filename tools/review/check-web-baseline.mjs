@@ -1,4 +1,4 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = async (file) => JSON.parse(await fs.readFile(path.join(root, file), 'utf8'));
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-const expected = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const expected = baselineRevision;
 const fixtureBytes = await fs.readFile(
     path.join(root, 'tests/fixtures/web-baseline/anonymous.json'),
 );

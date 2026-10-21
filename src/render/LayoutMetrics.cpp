@@ -1,3 +1,4 @@
+#include "CameraFraming.h"
 #include "LayoutMetrics.h"
 #include <algorithm>
 #include <cmath>
@@ -5,7 +6,6 @@
 namespace {
 // Logical layout values come from the final production CSS override, not screenshot measurements.
 constexpr auto ReferenceWidthPixels = 1920;
-constexpr auto ReferenceHeightPixels = 1080;
 constexpr auto PortraitInsetRatio = .04;
 constexpr auto MinimumPortraitInsetPixels = 23.0;
 constexpr auto MaximumPortraitInsetPixels = 42.0;
@@ -27,9 +27,10 @@ QString LayoutMetrics::kind() const
 }
 double LayoutMetrics::layoutScale() const
 {
-    return m_cinematic  ? std::min(m_width / ReferenceWidthPixels, m_height / ReferenceHeightPixels)
+    return m_cinematic  ? std::min(m_width / ReferenceWidthPixels,
+                                   m_height / yalahoo::cameraFraming::ReferenceHeightPixels)
             : compact() ? 1
-                        : m_height / ReferenceHeightPixels;
+                        : m_height / yalahoo::cameraFraming::ReferenceHeightPixels;
 }
 double LayoutMetrics::referenceWidth() const
 {
@@ -37,7 +38,7 @@ double LayoutMetrics::referenceWidth() const
 }
 double LayoutMetrics::referenceHeight() const
 {
-    return m_cinematic ? ReferenceHeightPixels : m_height / layoutScale();
+    return m_cinematic ? yalahoo::cameraFraming::ReferenceHeightPixels : m_height / layoutScale();
 }
 double LayoutMetrics::informationX() const
 {

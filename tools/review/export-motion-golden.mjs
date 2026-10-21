@@ -1,14 +1,13 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {typescript as ts} from './frozen-source.mjs';
+import {transpile} from './frozen-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 // Verification-only: execute immutable Git blobs using the already frozen TS dependency.
-import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const sources = [];
 const frozen = (name) => {
     const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
@@ -32,10 +31,7 @@ const modules = {
     './archive-loop.ts': constants
 };
 for (const name of ['motion', 'music-archive-motion', 'music-real-columns', 'music-boot-timing']) {
-    const js =
-        ts.transpileModule(frozen(name), {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-          }).outputText;
+    const js = transpile(frozen(name));
     const exports = {};
     new Function('exports', 'require', js)(exports, (id) => {
         if (!modules[id])

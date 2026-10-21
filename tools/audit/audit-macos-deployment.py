@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 """Bind the macOS deployment call-chain review and actual product-QML closure."""
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json

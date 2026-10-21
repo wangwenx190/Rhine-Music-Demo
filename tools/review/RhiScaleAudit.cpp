@@ -1,3 +1,5 @@
+#include "ReviewSupport.h"
+#include "ReviewApplication.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -14,11 +16,6 @@
 #include <QSet>
 #include <cmath>
 #include <cstdio>
-
-namespace {
-// Bounds for asynchronous completion and event delivery; fixture values remain independent.
-constexpr int ReviewDeadlineMilliseconds = 60000;
-}
 
 using namespace Qt::StringLiterals;
 
@@ -97,7 +94,7 @@ void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     inspect();
     if (!ready) {
-        timeout.start(ReviewDeadlineMilliseconds);
+        timeout.start(yalahoo::review::DefaultDeadlineMilliseconds);
         driver.surface->requestFrame();
         loop.exec();
     }
@@ -329,61 +326,57 @@ QJsonArray dprTransitions()
 }
 int main(int argc, char **argv)
 {
-    verification::prepareApplication();
-    if (!selectGraphicsBackend())
-        return 2;
-    QGuiApplication app(argc, argv);
-    if (!yalahoo::probeOptionalGraphicsBackend())
-        return 22;
-    const auto coverShutdown = qScopeGuard([] {
-        yalahoo::CoverCache::finishDecoders();
-    });
-    if (argc != 2 && argc != 3)
-        return 2;
-    try {
-        const QString output = QString::fromLocal8Bit(argv[1]);
-        check(QDir().mkpath(output), "Cannot create scale output directory");
-        checkCoverFiltering();
-        const auto transitions = dprTransitions();
-        QJsonArray states;
-        const QList<double> dprs =
-                OffscreenSurface::Enabled ? QList<double>{ 1, 1.5, 2 } : QList<double>{ 0 };
-        check(argc == 2 || QByteArray(argv[2]) == "--representative",
-              "Unsupported native-size audit option");
-        const bool representative = argc == 3;
-        const auto sizes =
-                representative ? QList<QSize>{ { 321, 241 }, { 640, 480 } } : sourceSizes();
-        for (auto size : sizes) {
-            QJsonArray sourceThemes;
-            for (double dpr : dprs) {
-                const auto state = captureState(size, dpr, output, states.size());
-                const auto themes = state[u"themes"_s].toArray();
-                if (!sourceThemes.isEmpty())
-                    for (int i = 0; i < themes.size(); ++i)
-                        check(themes[i].toObject()[u"sourceState"_s]
-                                      == sourceThemes[i].toObject()[u"sourceState"_s],
-                              "DPR changed source camera, motion, entity identities or optics");
-                sourceThemes = themes;
-                states.append(state);
+    return yalahoo::review::runApplication(argc, argv, [&](QGuiApplication &) {
+        const auto coverShutdown = qScopeGuard([] {
+            yalahoo::CoverCache::finishDecoders();
+        });
+        if (argc != 2 && argc != 3)
+            return 2;
+        try {
+            const QString output = QString::fromLocal8Bit(argv[1]);
+            check(QDir().mkpath(output), "Cannot create scale output directory");
+            checkCoverFiltering();
+            const auto transitions = dprTransitions();
+            QJsonArray states;
+            const QList<double> dprs =
+                    OffscreenSurface::Enabled ? QList<double>{ 1, 1.5, 2 } : QList<double>{ 0 };
+            check(argc == 2 || QByteArray(argv[2]) == "--representative",
+                  "Unsupported native-size audit option");
+            const bool representative = argc == 3;
+            const auto sizes =
+                    representative ? QList<QSize>{ { 321, 241 }, { 640, 480 } } : sourceSizes();
+            for (auto size : sizes) {
+                QJsonArray sourceThemes;
+                for (double dpr : dprs) {
+                    const auto state = captureState(size, dpr, output, states.size());
+                    const auto themes = state[u"themes"_s].toArray();
+                    if (!sourceThemes.isEmpty())
+                        for (int i = 0; i < themes.size(); ++i)
+                            check(themes[i].toObject()[u"sourceState"_s]
+                                          == sourceThemes[i].toObject()[u"sourceState"_s],
+                                  "DPR changed source camera, motion, entity identities or optics");
+                    sourceThemes = themes;
+                    states.append(state);
+                }
             }
+            QSaveFile file(output + "/runtime.json"_L1);
+            check(file.open(QIODevice::WriteOnly), "Cannot open scale report");
+            file.write(
+                    QJsonDocument(
+                            QJsonObject{
+                                    { u"round"_s, u"R19D4C"_s },
+                                    { u"passed"_s, true },
+                                    { u"states"_s, states },
+                                    { u"dprTransitions"_s, transitions },
+                                    { u"nativeDprMatrixPending"_s, !OffscreenSurface::Enabled },
+                                    { u"scope"_s,
+                                      u"Own RenderControl/native output, actual attachments and source math; no physical display/VSYNC or measured VRAM claim"_s } })
+                            .toJson());
+            check(file.commit(), "Cannot commit scale report");
+            return 0;
+        } catch (const std::exception &error) {
+            std::fprintf(stderr, "Scale audit: %s\n", error.what());
+            return 1;
         }
-        QSaveFile file(output + "/runtime.json"_L1);
-        check(file.open(QIODevice::WriteOnly), "Cannot open scale report");
-        file.write(
-                QJsonDocument(
-                        QJsonObject{
-                                { u"round"_s, u"R19D4C"_s },
-                                { u"passed"_s, true },
-                                { u"states"_s, states },
-                                { u"dprTransitions"_s, transitions },
-                                { u"nativeDprMatrixPending"_s, !OffscreenSurface::Enabled },
-                                { u"scope"_s,
-                                  u"Own RenderControl/native output, actual attachments and source math; no physical display/VSYNC or measured VRAM claim"_s } })
-                        .toJson());
-        check(file.commit(), "Cannot commit scale report");
-        return 0;
-    } catch (const std::exception &error) {
-        std::fprintf(stderr, "Scale audit: %s\n", error.what());
-        return 1;
-    }
+    });
 }

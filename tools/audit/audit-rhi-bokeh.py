@@ -1,9 +1,13 @@
 """Audit Bokeh source, resource and platform edges; write only local matrices."""
+from audit_support import source_check
 import hashlib
 import json
 import re
 import subprocess
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
@@ -48,10 +52,10 @@ for revision, path in [("522a3f3", "resources/shaders/bokeh.frag"),
                        ("e98c798", "resources/shaders/rhi/bokeh.frag")]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
     text = re.sub(r"\s+", "", data.decode())
-    current = re.sub(r"\s+", "", (ROOT / path).read_text())
+    current = re.sub(r"\s+", "", read_shader(ROOT / path))
     historical_start = text.index("voidMAIN()") if "voidMAIN()" in text else text.index("voidmain()")
     current_start = current.index("voidMAIN()") if "voidMAIN()" in current else current.index("voidmain()")
-    if text[historical_start:] != current[current_start:]:
+    if text[historical_start:].replace("voidmain()", "voidMAIN()") != current[current_start:].replace("voidmain()", "voidMAIN()"):
         raise SystemExit(f"Unreviewed historical Bokeh algorithm drift: {revision}")
     history.append(dict(revision=revision, path=path, sha256=hashlib.sha256(data).hexdigest(),
                         conclusion="Bokeh body unchanged after whitespace normalization; adapters, allocations and actual production bindings audited separately."))
@@ -60,15 +64,9 @@ for host, check_id, marker in [("windows", "WIN-01", "QRhiD3D11InitParams"),
                                ("linux", "LNX-01", "QRhiGles2InitParams")]:
     rows = []
     for identity, path, symbol, evidence in CHECKS + [
-            (check_id, "tools/review/RhiBokehAudit.cpp", marker,
+            (check_id, "tools/review/OffscreenRhi.h", marker,
              "Native backend selected without a window/swapchain. GL fallback surface lifetime exceeds QRhi. Shared bindings, output Y handling and RGBA16F tested per actual backend; cross-target qsb is only static translation.")]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Source audit drift: {path}::{symbol}")
-        rows.append(dict(checkId=identity, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), evidence=evidence,
-                         platform=host, result="static-audit-passed",
-                         limitations="Actual backend execution reported separately. No SMAA/scale/BLUR-01/window/VSYNC/performance closure."))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, evidence=evidence, platform=host, result='static-audit-passed', limitations='Actual backend execution reported separately. No SMAA/scale/BLUR-01/window/VSYNC/performance closure.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-bokeh"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")

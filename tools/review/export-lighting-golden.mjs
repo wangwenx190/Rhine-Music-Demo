@@ -1,15 +1,13 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {typescript as ts} from './frozen-source.mjs';
+import {transpile} from './frozen-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 // Frozen source oracle; development only, no product Node dependency.
-import {execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {createRequire} from 'node:module';
 import * as THREE from '../../legacy-web/node_modules/three/build/three.module.js';
 import {RectAreaLightUniformsLib} from '../../legacy-web/node_modules/three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-const root = path.resolve(import.meta.dirname, '../..'),
-      baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
-const ts = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/typescript'));
+const root = path.resolve(import.meta.dirname, '../..'), baseline = baselineRevision;
 const sources = {}, modules = {
     three: THREE,
     'three/addons/lights/RectAreaLightUniformsLib.js': {RectAreaLightUniformsLib},
@@ -20,10 +18,7 @@ for (const name of ['music-model', 'theme-transition', 'music-row-lighting', 'mu
         encoding: 'utf8',
     });
     sources['src/' + name + '.ts'] = createHash('sha256').update(src).digest('hex');
-    const js =
-        ts.transpileModule(src, {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-          }).outputText;
+    const js = transpile(src);
     const exports = {};
     new Function('exports', 'require', js)(exports, (id) => {
         if (!(id in modules))

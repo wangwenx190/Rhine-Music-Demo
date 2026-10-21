@@ -2,6 +2,7 @@
 // publication. Explicit fixture literals are independent inputs or expected results; timing
 // bounds have named constants.
 
+#include "../support/FileFixture.h"
 #include "DirectoryScanner.h"
 #include "LibrarySession.h"
 #include "LibraryStore.h"
@@ -36,13 +37,6 @@ bool put(const QString &path, const QByteArray &bytes = "anonymous audio fixture
         return false;
     QFile file(path);
     return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
-}
-QByteArray get(const QString &path)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly))
-        return { };
-    return file.readAll();
 }
 Snapshot scan(const QString &root, Snapshot previous = { })
 {
@@ -213,7 +207,8 @@ void DirectoryScannerTest::fingerprintAndReuse()
                              QFileDevice::FileModificationTime));
     file.close();
     QCOMPARE(DirectoryScanner::fingerprint(path), u"3:1700000000123"_s);
-    const auto originalHash = QCryptographicHash::hash(get(path), QCryptographicHash::Sha256);
+    const auto originalHash =
+            QCryptographicHash::hash(yalahoo::test::readFile(path), QCryptographicHash::Sha256);
     auto first = scan(temporary.path());
     QVERIFY(first);
     auto previous = *first;
@@ -237,7 +232,8 @@ void DirectoryScannerTest::fingerprintAndReuse()
     QCOMPARE(second->scan.value(u"futureScanField"_s).toString(), u"retained"_s);
     QCOMPARE(second->genres.first().albumCount, std::optional<int>(1));
     QCOMPARE(second->albums.first().fields.value(u"futureAlbumField"_s).toInt(), 42);
-    QCOMPARE(QCryptographicHash::hash(get(path), QCryptographicHash::Sha256), originalHash);
+    QCOMPARE(QCryptographicHash::hash(yalahoo::test::readFile(path), QCryptographicHash::Sha256),
+             originalHash);
     QVERIFY(put(path, "changed source fixture"_ba));
     auto third = scan(temporary.path(), second);
     const auto &changed = third->albums.first().tracks.first();
@@ -362,7 +358,8 @@ void DirectoryScannerTest::storeRoundTripAndResponsiveness()
     QTRY_VERIFY_WITH_TIMEOUT(!loaded.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(loadedReady.size(), 1);
     QCOMPARE(toJson(*loaded.snapshot()),
-             QJsonDocument::fromJson(get(cache + u"/library-index.json"_s)).object());
+             QJsonDocument::fromJson(yalahoo::test::readFile(cache + u"/library-index.json"_s))
+                     .object());
     QCOMPARE(loaded.roots(), QList<QUrl>{ QUrl::fromLocalFile(root) });
     QCOMPARE(loaded.snapshot()->albums.size(), 1500);
 }
@@ -381,7 +378,7 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 1);
     QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
-    const auto bytes = get(data + "/library-index.json"_L1);
+    const auto bytes = yalahoo::test::readFile(data + "/library-index.json"_L1);
     ready.clear();
     // Cancel after the worker finishes but before its queued completion is delivered.
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(a) }));
@@ -389,7 +386,7 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 0);
     QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
-    QCOMPARE(get(data + u"/library-index.json"_s), bytes);
+    QCOMPARE(yalahoo::test::readFile(data + u"/library-index.json"_s), bytes);
     // Changing roots during cache loading must still reuse existing metadata.
     LibraryStore reloaded(data);
     reloaded.load();
@@ -416,7 +413,7 @@ void DirectoryScannerTest::badCacheAndWriteFailure()
         QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
         QVERIFY(failed.size() > 0);
         QCOMPARE(store.snapshot()->albums.size(), 1);
-        QCOMPARE(get(cache), bytes);
+        QCOMPARE(yalahoo::test::readFile(cache), bytes);
     }
     QVERIFY(QFile::remove(cache));
     QVERIFY(QDir().mkpath(cache));
@@ -431,7 +428,7 @@ void DirectoryScannerTest::badCacheAndWriteFailure()
     QVERIFY(failedWrite.setRoots({ QUrl::fromLocalFile(root) }));
     QTRY_VERIFY_WITH_TIMEOUT(!failedWrite.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(!failedWrite.error().isEmpty());
-    QCOMPARE(get(blockedData), "unchanged"_ba);
+    QCOMPARE(yalahoo::test::readFile(blockedData), "unchanged"_ba);
 }
 void DirectoryScannerTest::atomicSaveFailure()
 {
@@ -443,7 +440,7 @@ void DirectoryScannerTest::atomicSaveFailure()
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(root) }));
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(store.error().isEmpty());
-    const auto original = get(cache);
+    const auto original = yalahoo::test::readFile(cache);
     QVERIFY(!original.isEmpty());
     QVERIFY(put(root + u"/second.mp3"_s));
 #ifdef Q_OS_WIN
@@ -466,7 +463,7 @@ void DirectoryScannerTest::atomicSaveFailure()
     QVERIFY(idle);
     QVERIFY(failed);
     QCOMPARE(store.snapshot()->albums.size(), 2);
-    QCOMPARE(get(cache), original);
+    QCOMPARE(yalahoo::test::readFile(cache), original);
     QVERIFY(QDir(data).entryList(QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot)
             == QStringList{ u"library-index.json"_s });
 }

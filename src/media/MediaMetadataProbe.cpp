@@ -1,3 +1,5 @@
+#include "MusicTypes.h"
+#include "Units.h"
 #include "MediaMetadataProbe.h"
 #include <QThread>
 #include "ArtworkStore.h"
@@ -17,10 +19,8 @@
 namespace {
 // Bound work per event-loop turn and each backend probe without starting playback.
 constexpr auto ArtworkIdHexCharacters = 24;
-constexpr auto MillisecondsPerSecond = 1000;
 constexpr auto MaximumTracksPerPump = 64;
 constexpr auto ProbeTimeoutMilliseconds = 8000;
-constexpr auto UnnumberedTrackSortKey = 9999;
 }
 
 using namespace Qt::StringLiterals;
@@ -143,8 +143,8 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
         track.trackNumber = number;
     const auto duration = metadata.value(QMediaMetaData::Duration).toLongLong();
     if (value.durationMs > 0 || duration > 0)
-        track.duration =
-                double(value.durationMs > 0 ? value.durationMs : duration) / MillisecondsPerSecond;
+        track.duration = double(value.durationMs > 0 ? value.durationMs : duration)
+                / yalahoo::units::MillisecondsPerSecond;
     const auto bitrate = metadata.value(QMediaMetaData::AudioBitRate).toInt();
     if (bitrate > 0)
         track.bitrate = bitrate;
@@ -348,9 +348,12 @@ private:
             std::stable_sort(
                     album.tracks.begin(), album.tracks.end(), [](const Track &a, const Track &b) {
                         return std::pair(a.discNumber.value_or(1),
-                                         a.trackNumber.value_or(UnnumberedTrackSortKey))
-                                < std::pair(b.discNumber.value_or(1),
-                                            b.trackNumber.value_or(UnnumberedTrackSortKey));
+                                         a.trackNumber.value_or(
+                                                 yalahoo::libraryDefaults::UnnumberedTrackSortKey))
+                                < std::pair(
+                                        b.discNumber.value_or(1),
+                                        b.trackNumber.value_or(
+                                                yalahoo::libraryDefaults::UnnumberedTrackSortKey));
                     });
             if (!album.tracks.isEmpty()) {
                 const auto &first = album.tracks.first();

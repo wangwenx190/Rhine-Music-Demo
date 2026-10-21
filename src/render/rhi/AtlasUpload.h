@@ -2,6 +2,7 @@
 // distinct from incremental updates to avoid redundant transfers.
 
 #pragma once
+#include "CoverPixels.h"
 #include <QImage>
 #include <QJsonArray>
 #include <QMap>
@@ -44,7 +45,7 @@ public:
     bool ready(int slot, quint64 lease) const;
     bool ready(QRect tile, quint64 lease) const;
     static qint64 payloadBytes(const AtlasUpload &upload);
-    static constexpr qint64 tileBytes = 256 * 256 * 4;
+    static constexpr qint64 tileBytes = coverPixels::TileBytes;
     static constexpr qint64 steadyBudget = 2 * 1024 * 1024;
     static constexpr qint64 initialBudget = 16 * 1024 * 1024;
 

@@ -1,11 +1,15 @@
-#!/usr/bin/env python3
 """Source guards plus reviewed R17 call-chain deductions; outputs stay local."""
-from shader_parameters import numeric_source
+from audit_support import BASELINE
+from audit_support import historical as record
+#!/usr/bin/env python3
 import hashlib
 import math
 import re
 import json
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader, gaussian_kernel
 import sys
 import subprocess
 
@@ -22,10 +26,7 @@ source_report = Path(sys.argv[2]) if len(sys.argv) >= 3 else root / "verificatio
 subprocess.run([sys.executable, str(root / "tools/review/compare-presentation-structure.py"),
                 str(report_path), str(source_report), str(report_path.parent / "source-structure.json")], check=True)
 mapping = json.loads((root / "docs/contracts/history-rewrite.json").read_text())["revisions"]
-def record(revision, path, reason):
-    data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=root)
-    return dict(revision=revision, sourcePath=path, sourceSha256=hashlib.sha256(data).hexdigest(), evidence=reason)
-frozen = [record(mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"], "src/" + name, reason) for name, reason in [
+frozen = [record(mapping[BASELINE], "src/" + name, reason) for name, reason in [
     ("music-app.ts", "Production renderDetail, trackList, albumAbout, groupProducers, lookup states, setTab and sticky indicator."),
     ("music-theme-switch.css", "Final portrait back-button position overrides; explicit responsive font intent follows SDE-01."),
     ("music.css", "Final aspect and width rules, title override, facts, track borders and typography, offline badge and sticky sigma18 backdrop."),
@@ -45,16 +46,14 @@ history = [record(revision, path, reason) for revision, path, reason in [
     ("a04db48", "qml/Yalahoo/Music/components/ArchiveText.qml", "R19F fractional vector font metrics retained; CSS normal mixed-fallback line boxes now use separately rounded resolved ascent/descent."),
 ]]
 # Validate the local Gaussian from the authored CSS sigma, never source pixels.
-css = subprocess.check_output(["git", "show", mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"] + ":src/music.css"], cwd=root, text=True)
+css = subprocess.check_output(["git", "show", mapping[BASELINE] + ":src/music.css"], cwd=root, text=True)
 tabs_css = re.search(r"\.music-tabs \{([^}]+)\}", css).group(1)
 sigma = float(re.search(r"backdrop-filter: blur\(([0-9.]+)px\)", tabs_css).group(1))
 weights = [math.exp(-i * i / (2 * sigma * sigma)) for i in range(int(3 * sigma) + 1)]
 total = weights[0] + 2 * sum(weights[1:])
 weights = [weight / total for weight in weights]
-shader = (root / "resources/shaders/detail-tabs-blur.frag").read_text()
-shader = numeric_source(shader)
-actual_weights = [float(x) for x in re.findall(r"\)\s+\* ([0-9.]+);", shader)]
-actual_offsets = [float(x) for x in re.findall(r"sampleStep \* ([0-9.]+)", shader)][::2]
+shader = read_shader(root / "resources/shaders/detail-tabs-blur.frag")
+actual_weights, actual_offsets = gaussian_kernel(shader)
 expected_weights = [weights[0]] + [weights[i] + weights[i + 1] for i in range(1, len(weights), 2)]
 expected_offsets = [i + weights[i + 1] / (weights[i] + weights[i + 1]) for i in range(1, len(weights), 2)]
 if len(actual_weights) != len(expected_weights) or len(actual_offsets) != len(expected_offsets):

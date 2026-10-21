@@ -19,13 +19,10 @@ public:
     ~OnlineMetadataProvider() override;
     void configure(const QJsonObject &configuration);
     ProviderCapabilities capabilities() const override;
-    bool requestIntroduction(AlbumQuery query, RequestToken token) override;
-    bool requestCredits(AlbumQuery query, RequestToken token) override;
-    bool requestEnrichment(AlbumQuery query, RequestToken token) override;
     void cancel(RequestToken token) override;
 
 private:
-    bool request(AlbumQuery query, RequestToken token, MetadataKind kind);
+    bool request(AlbumQuery query, RequestToken token, MetadataKind kind) override;
     struct Private;
     std::unique_ptr<Private> d;
 };

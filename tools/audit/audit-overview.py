@@ -1,11 +1,12 @@
-#!/usr/bin/env python3
 """R19 source/call-chain audit with exact hashes and separately scoped runtime evidence."""
-from shader_parameters import numeric_source
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import json
 from pathlib import Path
-import re
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import read_shader, gaussian_kernel
 import subprocess
 
 root = Path(__file__).resolve().parents[2]
@@ -39,9 +40,8 @@ for source in golden["sources"]:
     content = subprocess.check_output(["git", "show", f"{revision}:{source['path']}"], cwd=root)
     if hashlib.sha256(content).hexdigest() != source["sha256"]:
         raise SystemExit(f"Frozen source drift: {source['path']}")
-shader = (root / "resources/shaders/overview-blur.frag").read_text()
-shader = numeric_source(shader)
-weights = [float(value) for value in re.findall(r"\* ([0-9]+\.[0-9]+);", shader)]
+shader = read_shader(root / "resources/shaders/overview-blur.frag")
+weights, _ = gaussian_kernel(shader)
 if len(weights) != 19 or abs(weights[0] + 2 * sum(weights[1:]) - 1) > 1e-10:
     raise SystemExit("Gaussian kernel normalization/tap guard failed")
 checks = [

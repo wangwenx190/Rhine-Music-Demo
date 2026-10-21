@@ -1,3 +1,5 @@
+#include "MusicTypes.h"
+#include "Units.h"
 #include <QCoreApplication>
 #include "DirectoryScanner.h"
 
@@ -16,12 +18,9 @@
 
 namespace {
 // Stable identity and fingerprint encoding must match the frozen on-disk library protocol.
-constexpr auto UnnumberedTrackSortKey = 9999;
 constexpr auto UnpreferredCoverRank = 3;
 constexpr auto MaximumLibraryRoots = 64;
 constexpr auto StableIdHexCharacters = 24;
-constexpr auto MillisecondsPerSecond = 1000;
-constexpr auto NanosecondsPerMillisecond = 1e6;
 }
 
 using namespace Qt::StringLiterals;
@@ -166,10 +165,10 @@ struct Walker final
         std::sort(album.tracks.begin(), album.tracks.end(), [this](const Track &a, const Track &b) {
             if (a.discNumber.value_or(1) != b.discNumber.value_or(1))
                 return a.discNumber.value_or(1) < b.discNumber.value_or(1);
-            if (a.trackNumber.value_or(UnnumberedTrackSortKey)
-                != b.trackNumber.value_or(UnnumberedTrackSortKey))
-                return a.trackNumber.value_or(UnnumberedTrackSortKey)
-                        < b.trackNumber.value_or(UnnumberedTrackSortKey);
+            if (a.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey)
+                != b.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey))
+                return a.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey)
+                        < b.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey);
             return less(a.relativePath, b.relativePath);
         });
         if (!old) {
@@ -318,8 +317,9 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
             const auto nanoseconds =
                     std::chrono::duration_cast<std::chrono::nanoseconds>(epoch - seconds).count();
             // Match Node's seconds*1000 + nanoseconds/1e6 without narrowing the epoch to ns.
-            const double ms = static_cast<double>(seconds.count()) * MillisecondsPerSecond
-                    + static_cast<double>(nanoseconds) / NanosecondsPerMillisecond;
+            const double ms =
+                    static_cast<double>(seconds.count()) * yalahoo::units::MillisecondsPerSecond
+                    + static_cast<double>(nanoseconds) / yalahoo::units::NanosecondsPerMillisecond;
             auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
             encoded = encoded.mid(1, encoded.size() - 2);
             if (error)

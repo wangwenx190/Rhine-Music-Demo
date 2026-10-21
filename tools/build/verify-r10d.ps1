@@ -5,6 +5,7 @@ param(
     [ValidateSet('d3d11', 'opengl')][string]$Backend = 'd3d11'
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ReviewSupport.ps1')
 if ($Seconds -lt 12) {
     throw 'Specify -Seconds 12..120 for a concrete unresolved timing question; no default performance sample.'
 }
@@ -16,10 +17,7 @@ if (Test-Path -LiteralPath $evidence) {
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8 = [Text.UTF8Encoding]::new($false)
 $names = @('PATH', 'QT_PLUGIN_PATH', 'QT_SCALE_FACTOR', 'QSG_RHI_BACKEND', 'QSG_NO_VSYNC', 'QSG_RENDER_LOOP', 'YALAHOO_VERIFY_VISIBLE', 'YALAHOO_VERIFY_FOREGROUND', 'YALAHOO_VERIFY_LIFECYCLE', 'YALAHOO_VERIFY_STRESS')
-$saved = @{}
-foreach ($name in $names) {
-    $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-}
+$saved = Save-ProcessEnvironment -Names $names
 Push-Location -LiteralPath $repository
 try {
     $chain = Get-Content -Raw -Encoding UTF8 build/release/toolchain.json | ConvertFrom-Json
@@ -98,8 +96,6 @@ try {
         throw 'Integration source/evidence audit failed'
     }
 } finally {
-    foreach ($name in $names) {
-        [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process')
-    }
+    Restore-ProcessEnvironment -Saved $saved
     Pop-Location
 }

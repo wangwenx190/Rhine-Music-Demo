@@ -1,3 +1,4 @@
+#include "EasingCurve.h"
 #include "FrameClock.h"
 #include "PresentationController.h"
 #include "LibrarySession.h"

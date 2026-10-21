@@ -1,3 +1,7 @@
+#include "ReviewSupport.h"
+#include "SceneGeometry.h"
+#include "ProductDefaults.h"
+#include "Units.h"
 #include "MotionController.h"
 #include "OverviewReview.h"
 #include "OverviewController.h"
@@ -25,11 +29,7 @@
 
 namespace {
 // Explicit viewport fixture inputs remain literal data; admission and waiting tolerances are named policy.
-constexpr auto ReviewWidthPixels = 1280;
-constexpr auto ReviewHeightPixels = 720;
-constexpr auto LifecycleRebuildCount = 10;
 constexpr auto ViewportSetupFrames = 10;
-constexpr auto BytesPerKiB = 1024;
 constexpr auto MaximumLiveLabels = 18;
 constexpr auto RetainedLeftSlackPixels = 18;
 constexpr auto LabelBudgetWidth = 308;
@@ -42,13 +42,10 @@ constexpr auto OpenedProgressThreshold = .999;
 constexpr auto ClosedProgressThreshold = .001;
 constexpr auto TransportPositionTolerance = .01;
 constexpr auto ExpandedSettleFrames = 35;
-constexpr auto CaseHingeHeight = 1.85f;
 constexpr auto HorizontalHitInsetPixels = 50;
 constexpr auto TopHitInsetPixels = 230;
 constexpr auto BottomHitInsetPixels = 140;
 constexpr auto ReversalSettleFrames = 8;
-constexpr auto MinimumMotionSpeed = .25;
-constexpr auto MaximumMotionSpeed = 3;
 constexpr auto ResizeSettleFrames = 20;
 constexpr auto EntryWidthPixels = 76;
 constexpr auto LabelRightInsetPixels = 14;
@@ -95,22 +92,14 @@ enum ReviewStage {
 using namespace Qt::StringLiterals;
 
 namespace {
-QQuickItem *find(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *found = find(child, name))
-            return found;
-    return nullptr;
-}
 }
 int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                             OverviewController &overview, PresentationController &presentation,
                             LibrarySession &library, MotionController &motion,
                             const QString &output)
 {
-    auto *native = qobject_cast<rhi::SceneItem *>(find(window.contentItem(), u"nativeScene"_s));
+    auto *native = qobject_cast<rhi::SceneItem *>(
+            yalahoo::review::findVisual(window.contentItem(), u"nativeScene"_s));
     auto *selection = scene.selection();
     if (!native || !selection)
         return InvalidReviewInput;
@@ -118,10 +107,10 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     native->setTelemetryEnabled(true);
     window.setPersistentGraphics(false);
     window.setPersistentSceneGraph(false);
-    window.resize(ReviewWidthPixels, ReviewHeightPixels);
+    window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
     const bool initialNight = qEnvironmentVariableIntValue("YALAHOO_VERIFY_NIGHT") == 1;
     const int requestedCycles = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1
-            ? LifecycleRebuildCount
+            ? yalahoo::review::LifecycleRebuildCount
             : 0;
     scene.lighting()->setNight(initialNight);
     window.setProperty("reviewPlayingTitle",
@@ -142,12 +131,12 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     QPointF synchronizedPlay, synchronizedStop;
     bool passed = true, finished = false;
     const QList<QSize> sizes{ { 1920, 1080 },
-                              { ReviewWidthPixels, ReviewHeightPixels },
+                              { yalahoo::review::WidthPixels, yalahoo::review::HeightPixels },
                               { 995, 858 },
                               { 960, 900 },
                               { 930, 900 },
                               { 390, 844 },
-                              { 320, ReviewHeightPixels },
+                              { 320, yalahoo::review::HeightPixels },
                               { 2560, 1080 },
                               { 3440, 1440 } };
     const auto check = [&](const QString &name, bool result) {
@@ -188,7 +177,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         QCoreApplication::sendEvent(&window, &release);
     };
     const auto button = [&](const QString &name) {
-        auto *item = find(window.contentItem(), name);
+        auto *item = yalahoo::review::findVisual(window.contentItem(), name);
         if (!item || !item->isVisible() || !item->isEnabled()) {
             check("button-"_L1 + name, false);
             return;
@@ -231,7 +220,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         }
         check(u"overview-keeps-render-targets"_s,
               generations.size() == 1 && postprocess.size() == 1);
-        check(u"upload-burst"_s, peakUpload <= 2 * BytesPerKiB * BytesPerKiB);
+        check(u"upload-burst"_s,
+              peakUpload <= 2 * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB);
         QJsonObject report{
             { u"passed"_s, passed },
             { u"configuration"_s, u"Release"_s },
@@ -289,8 +279,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     const auto positions = QObject::connect(
             &window, &QQuickWindow::afterSynchronizing, &window,
             [&] {
-                auto *play = find(window.contentItem(), u"playButton"_s);
-                auto *stop = find(window.contentItem(), u"stopButton"_s);
+                auto *play = yalahoo::review::findVisual(window.contentItem(), u"playButton"_s);
+                auto *stop = yalahoo::review::findVisual(window.contentItem(), u"stopButton"_s);
                 if (play && stop) {
                     QMutexLocker lock(&positionsMutex);
                     synchronizedPlay = play->mapToScene({ 0, 0 });
@@ -367,7 +357,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         || !presentation.browseSurface()->shown())
                         return;
                     check(u"return-focus"_s,
-                          find(window.contentItem(), u"overviewToggle"_s)->hasActiveFocus());
+                          yalahoo::review::findVisual(window.contentItem(), u"overviewToggle"_s)
+                                  ->hasActiveFocus());
                     key(Qt::Key_V);
                     ++stage;
                     break;
@@ -397,8 +388,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                         return;
                     bool clicked = false;
                     for (const auto &instance : selection->instances()) {
-                        const auto point = scene.projectWorldPoint(
-                                instance.transform.map({ 0, CaseHingeHeight, 0 }));
+                        const auto point = scene.projectWorldPoint(instance.transform.map(
+                                { 0, yalahoo::sceneGeometry::HingeHeight, 0 }));
                         if (point.x() < HorizontalHitInsetPixels
                             || point.x() > window.width() - HorizontalHitInsetPixels
                             || point.y() < TopHitInsetPixels
@@ -425,7 +416,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (frames < ReversalSettleFrames)
                         return;
                     overview.setActive(false);
-                    motion.clock()->setSpeed(MinimumMotionSpeed);
+                    motion.clock()->setSpeed(yalahoo::productDefaults::MinimumMotionSpeed);
                     frames = 0;
                     ++stage;
                     break;
@@ -433,7 +424,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (frames < ReversalSettleFrames)
                         return;
                     overview.setActive(true);
-                    motion.clock()->setSpeed(MaximumMotionSpeed);
+                    motion.clock()->setSpeed(yalahoo::productDefaults::MaximumMotionSpeed);
                     ++stage;
                     break;
                 case ReduceOverviewMotion:
@@ -463,8 +454,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                             continue;
                         const int lane =
                                 overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
-                        auto *label = find(window.contentItem(),
-                                           "overviewLabel-"_L1 + QString::number(lane));
+                        auto *label = yalahoo::review::findVisual(
+                                window.contentItem(), "overviewLabel-"_L1 + QString::number(lane));
                         if (!label) {
                             check(u"label-object"_s, false);
                             continue;
@@ -482,7 +473,7 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
                     if (++sizeIndex < sizes.size())
                         stage = ResizeViewport;
                     else {
-                        window.resize(ReviewWidthPixels, ReviewHeightPixels);
+                        window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
                         ++stage;
                     }
                     break;

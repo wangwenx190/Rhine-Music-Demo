@@ -2,6 +2,7 @@
 // publication. Explicit fixture literals are independent inputs or expected results; timing
 // bounds have named constants.
 
+#include "../support/FileFixture.h"
 #include "ArtworkStore.h"
 #include "LegacyImporter.h"
 #include "LibraryStore.h"
@@ -43,11 +44,6 @@ bool put(const QString &path, const QByteArray &bytes)
     QDir().mkpath(QFileInfo(path).absolutePath());
     QFile file(path);
     return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
-}
-QByteArray get(const QString &path)
-{
-    QFile file(path);
-    return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
 }
 QByteArray chunk(const char *name, QByteArray bytes)
 {
@@ -277,7 +273,7 @@ void MediaMetadataTest::realSilentAndInvalid()
     const auto wav = root + u"/\u4e13\u8f91/valid.wav"_s;
     QVERIFY(put(wav, wave()));
     QVERIFY(put(root + u"/\u4e13\u8f91/broken.wav"_s, "broken"_ba));
-    const auto original = get(wav);
+    const auto original = yalahoo::test::readFile(wav);
     MediaMetadataProbe probe;
     QSignalSpy done(&probe, &MediaMetadataProbe::finished);
     int ticks = 0;
@@ -303,7 +299,7 @@ void MediaMetadataTest::realSilentAndInvalid()
         }
     }
     QVERIFY(ticks > 0);
-    QCOMPARE(get(wav), original);
+    QCOMPARE(yalahoo::test::readFile(wav), original);
 }
 void MediaMetadataTest::realEmbeddedPriority()
 {
@@ -399,9 +395,9 @@ void MediaMetadataTest::artworkGuards()
     small.fill(Qt::transparent);
     const auto a = ArtworkStore::save(small, native, &error);
     QVERIFY(!a.isEmpty());
-    const auto before = get(a.toLocalFile());
+    const auto before = yalahoo::test::readFile(a.toLocalFile());
     QCOMPARE(ArtworkStore::save(small, native), a);
-    QCOMPARE(get(a.toLocalFile()), before);
+    QCOMPARE(yalahoo::test::readFile(a.toLocalFile()), before);
     small.fill(Qt::blue);
     QVERIFY(ArtworkStore::save(small, native) != a);
     QVERIFY(!ArtworkStore::save(small, temp.filePath(u"blocked/file"_s), &error).isEmpty());
@@ -503,7 +499,7 @@ void MediaMetadataTest::legacy()
     json.insert(u"version"_s, 1);
     json.insert(u"futureIndex"_s, 42);
     QVERIFY(put(source + u"/library-index.json"_s, QJsonDocument(json).toJson()));
-    const auto before = get(source + "/library-index.json"_L1);
+    const auto before = yalahoo::test::readFile(source + "/library-index.json"_L1);
     QVERIFY(put(
             source + u"/genre-rules.json"_s,
             QJsonDocument(QJsonObject{ { u"genres"_s,
@@ -541,7 +537,7 @@ void MediaMetadataTest::legacy()
     QVERIFY(!QFileInfo::exists(native + u"/pcm-cache"_s));
     QVERIFY(!imported.snapshot->onlineEnabled);
     QCOMPARE(imported.snapshot->fields.value(u"futureIndex"_s).toInt(), 42);
-    QCOMPARE(get(source + u"/library-index.json"_s), before);
+    QCOMPARE(yalahoo::test::readFile(source + u"/library-index.json"_s), before);
     QCOMPARE(QImage(actual.coverUrl.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
     // Rescan reuses imported fields and fingerprint; native probe fills only public metadata.
     const auto rescanned =
@@ -564,7 +560,8 @@ void MediaMetadataTest::legacyErrorsAndCancellation()
     const auto result = LegacyImporter::read(source, native, cancel);
     QVERIFY(result.cancelled);
     QVERIFY(!result.snapshot);
-    QCOMPARE(get(source + u"/library-index.json"_s), "{\"version\":1,\"albums\":[]}"_ba);
+    QCOMPARE(yalahoo::test::readFile(source + u"/library-index.json"_s),
+             "{\"version\":1,\"albums\":[]}"_ba);
 }
 void MediaMetadataTest::storeImportAndPreferences()
 {
@@ -586,7 +583,9 @@ void MediaMetadataTest::storeImportAndPreferences()
     QCOMPARE(ready.size(), 1);
     QCOMPARE(resets.size(), 1);
     QCOMPARE(store.snapshot()->fields.value(u"future"_s).toInt(), 42);
-    const auto cache = QJsonDocument::fromJson(get(native + "/library-index.json"_L1)).object();
+    const auto cache =
+            QJsonDocument::fromJson(yalahoo::test::readFile(native + "/library-index.json"_L1))
+                    .object();
     QCOMPARE(cache.value(u"nativeSchemaVersion"_s).toInt(), 1);
     PreferencesStore preferences(native);
     QSignalSpy imported(&preferences, &PreferencesStore::imported);
@@ -595,20 +594,20 @@ void MediaMetadataTest::storeImportAndPreferences()
     QVERIFY(put(
             exported,
             "{\"arrayMode\":\"realistic\",\"rememberColumnPosition\":false,\"future\":{\"x\":7}}"_ba));
-    const auto original = get(exported);
+    const auto original = yalahoo::test::readFile(exported);
     QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
     QTRY_COMPARE(imported.size(), 1);
     QTRY_VERIFY(saved.size() > 0);
     QVERIFY(preferences.realistic());
     QVERIFY(!preferences.rememberColumnPosition());
-    QCOMPARE(QJsonDocument::fromJson(get(native + u"/preferences.json"_s))
+    QCOMPARE(QJsonDocument::fromJson(yalahoo::test::readFile(native + u"/preferences.json"_s))
                      .object()
                      .value(u"future"_s)
                      .toObject()
                      .value(u"x"_s)
                      .toInt(),
              7);
-    QCOMPARE(get(exported), original);
+    QCOMPARE(yalahoo::test::readFile(exported), original);
     QSignalSpy errors(&preferences, &PreferencesStore::saveError);
     QVERIFY(put(exported, "[]"_ba));
     QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));

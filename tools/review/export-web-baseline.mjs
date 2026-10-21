@@ -1,5 +1,5 @@
 import {destination, serviceDestination} from './native-source-map.mjs';
-import {execFrozenGit} from './frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -19,7 +19,7 @@ const argumentsMap = Object.fromEntries(
 );
 const repo = path.resolve(argumentsMap['repo-root'] || path.join(here, '../..'));
 const web = path.resolve(argumentsMap['web-root'] || path.join(repo, 'legacy-web'));
-export const BASELINE = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+export const BASELINE = baselineRevision;
 const runRoot = path.join(repo, 'build/web-baseline');
 const frozen = path.join(runRoot, 'legacy-web');
 const contracts = path.join(repo, 'docs/contracts');
@@ -1164,7 +1164,7 @@ async function motionGolden() {
                                                               }));
     return {
         schemaVersion: 1,
-        baseline: '57f4f845c20cce646a15dbf4008c2a162aaaf4e2',
+        baseline: baselineRevision,
         sources: [
             'motion.ts:damp/musicSelectionWave',
             'music-archive-motion.ts:MusicArchiveMotion',

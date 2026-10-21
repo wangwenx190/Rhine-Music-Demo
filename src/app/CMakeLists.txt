@@ -13,6 +13,8 @@ qt_add_executable(
     DetailReview.h
     NavigationReview.cpp
     NavigationReview.h
+    ReviewSupport.h
+    ReviewApplication.h
 )
 if(YALAHOO_REVIEW)
     target_sources(
@@ -95,6 +97,8 @@ set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
 yalahoo_browse_qml(browse_qml_files)
 set(bootstrap_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/BootstrapProbe.qml")
+set(probe_window_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/ProbeWindow.qml")
+set_source_files_properties("${probe_window_qml}" PROPERTIES QT_RESOURCE_ALIAS ProbeWindow.qml)
 set_source_files_properties("${bootstrap_qml}" PROPERTIES QT_RESOURCE_ALIAS BootstrapProbe.qml)
 qt_add_resources(Yalahoo branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
     FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
@@ -194,7 +198,7 @@ endif()
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     DEPENDENCIES QtQuick ${review_dependencies}
     RESOURCE_PREFIX /qt/qml
-    QML_FILES "${app_qml}" "${bootstrap_qml}" ${browse_qml_files} ${review_qml_files}
+    QML_FILES "${app_qml}" "${bootstrap_qml}" "${probe_window_qml}" ${browse_qml_files} ${review_qml_files}
     SOURCES QmlTypes.h ApplicationIdentity.h ${review_sources})
 qt_add_shaders(
     Yalahoo

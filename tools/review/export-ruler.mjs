@@ -1,12 +1,11 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {sourceServer, launchBrowser, wait} from './browser-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {CDP} from './cdp.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 const root = path.resolve(import.meta.dirname, '../..');
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const frozen = path.join(root, 'build/ruler-web');
 const output = path.join(root, 'verification/windows/navigation/web');
 await fs.mkdir(path.join(frozen, 'src'), {recursive: true});
@@ -34,8 +33,6 @@ for (const name of ['music-ruler.ts', 'archive-loop.ts', 'music-motion-settings.
     }
     await fs.writeFile(path.join(frozen, 'src', name), text);
 }
-const {createServer} =
-    await import(pathToFileURL(path.join(root, 'legacy-web/node_modules/vite/dist/node/index.js')));
 const harness = await fs.readFile(path.join(root, 'tools/review/ruler-harness.js'), 'utf8');
 const html =
     '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/src/music-navigation-ruler.css">'
@@ -44,67 +41,12 @@ const html =
     +
     '</head><body><div id="album-ticks"></div><script type="module">' + harness
     + '</script></body></html>';
-const server = await createServer({
-    root: frozen,
-    configFile: false,
-    logLevel: 'error',
-    server: {host: '127.0.0.1', port: 0},
-    plugins: [{
-        name: 'ruler',
-        configureServer(s) {
-            s.middlewares.use('/browse-ui', (_, response) => {
-                response.setHeader('Content-Type', 'text/html; charset=utf-8');
-                response.end(html);
-            });
-        }
-    }]
-});
-await server.listen();
+const server = await sourceServer(frozen, html);
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
-let executable;
-for (const candidate
-         of [process.env.REVIEW_BROWSER,
-             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-             '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-             path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
-             path.join(process.env['PROGRAMFILES(X86)'] || '',
-                       'Microsoft/Edge/Application/msedge.exe')]
-             .filter(Boolean)) {
-    try {
-        await fs.access(candidate);
-        executable = candidate;
-        break;
-    } catch {
-    }
-}
-if (!executable)
-    throw Error('Installed browser required');
 const profile = path.join(root, 'build/ruler-profile-' + process.pid);
-await fs.mkdir(profile, {recursive: true});
-const processHandle =
-    spawn(executable,
-          [
-              '--headless=new', '--remote-debugging-port=0', '--user-data-dir=' + profile,
-              '--no-first-run', '--disable-background-networking', '--disable-component-update',
-              '--disable-extensions', '--disable-features=msEdgeSidebarV2,msEdgeStartupBoost',
-              'about:blank'
-          ],
-          {windowsHide: true, stdio: ['ignore', 'ignore', 'pipe']});
+const processHandle = await launchBrowser(profile, {diagnostics: true});
 processHandle.stderr.on('data', bytes => console.error(bytes.toString()));
 processHandle.on('exit', (code, signal) => console.error('Browser exited', code, signal));
-async function wait(probe) {
-    const deadline = Date.now() + 60000;
-    while (Date.now() < deadline) {
-        try {
-            const value = await probe();
-            if (value)
-                return value;
-        } catch {
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw Error('Browser capture timeout');
-}
 let browser, page;
 try {
     const port = (await wait(() => fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')))

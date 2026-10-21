@@ -8,7 +8,6 @@ import Yalahoo.Music
 Item {
     id: root
     // Portrait fade locations follow the measured callout rather than a fixed screen-space mask.
-    readonly property real transitionMilliseconds: 650
     readonly property real portraitFadeLeadRatio: 0.12
     readonly property real portraitFadeTailRatio: 0.07
 
@@ -20,9 +19,9 @@ Item {
     Behavior on sideVeilOpacity {
         enabled: !root.tokens.reducedMotion && root.visible
         NumberAnimation {
-            duration: root.transitionMilliseconds / root.tokens.motionSpeed
+            duration: root.tokens.paletteDuration
             easing.type: Easing.BezierSpline
-            easing.bezierCurve: [0.4, 0, 0.2, 1, 1, 1]
+            easing.bezierCurve: root.tokens.paletteCurve
         }
     }
     Rectangle {

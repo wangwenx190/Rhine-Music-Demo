@@ -1,4 +1,6 @@
 """R25 public Qt ambience source bindings; runtime facts are recorded separately."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -16,7 +18,7 @@ CHECKS = [
      "All play intents reach BGM before ready; ready holds backend play until silence, rechecks current source/status/intent. Pause/error suppress ambience, explicit stop/final queue end restore; intermediate queue changes keep Playing. One replaceable fade and context-bound callbacks prevent stale starts."),
     ("COMMON-05", "tests/unit/AudioAmbienceTest.cpp", "void realBgmGateInterruptionsAndHiddenPlayback()",
      "Actual Qt Ogg and anonymous WAV test the silence gate, pause/stop/queue completion and navigation isolation. Test-only short WAV exercises four QSoundEffects and saturation. Missing resources, independent settings and persistence have separate assertions; no physical output/listening claim."),
-    ("PERF-01", "src/media/InterfaceSoundController.h", "std::array<std::unique_ptr<QSoundEffect>, 4> m_pool",
+    ("PERF-01", "src/media/InterfaceSoundController.h", "std::array<std::unique_ptr<QSoundEffect>, feedbackAudio::VoiceCount> m_pool",
      "Event hash lookup plus at most four slots is constant bounded work, drops saturation with no pending queue. Manifest scanned once at construction; no library traversal, per-frame audio polling or media allocation on actions."),
     ("PERF-02", "src/media/BackgroundMusicController.cpp", "m_refreshPending",
      "Public Qt owns decode/output threads. One coalesced device refresh per controller; one 24ms volume timer only while fading, elapsed-time progress. Necessary audio continues without visual ticks; GUI audio hot paths never wait/read files/pump events."),
@@ -45,7 +47,7 @@ media = "\n".join((ROOT / path).read_text() for path in paths if path.startswith
 for forbidden in ["QAudioSink", "QAudioDecoder", "QAudioBufferOutput", "AVAudioEngine", "CoreAudio", "QtMultimedia/private", "QNetwork", "QProcess"]:
     if forbidden in media:
         raise SystemExit(f"Forbidden ambience backend: {forbidden}")
-revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
 frozen = []
 for path in ["src/music-player.ts", "src/music-app.ts"]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
@@ -54,13 +56,7 @@ dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).
 for platform, platform_id in [("macos", "MAC-01"), ("windows", "WIN-01"), ("linux", "LNX-01")]:
     checks = []
     for check_id, path, symbol, evidence in CHECKS + [(platform_id, "src/media/BackgroundMusicController.cpp", "void BackgroundMusicController::refreshOutput", "Public Qt default-device routing; actual native Qt plugin, devices and audio recovery require this target. Windows/Linux execution, physical route changes/listening and native minimize remain R25-P; GUI backend split remains R36.")]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Ambience source drift: {path}::{symbol}")
-        checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
-                           sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
-                           sourceSha256=hashlib.sha256(data).hexdigest(), result="source-reviewed",
-                           limitations="Source bindings only; actual Qt progress, physical devices, listening and native windows are separate. Missing target execution retains R25-P original gates."))
+        checks.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Source bindings only; actual Qt progress, physical devices, listening and native windows are separate. Missing target execution retains R25-P original gates.'))
     output = ROOT / "verification" / f"{platform}-static" / "audio-ambience"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, dependencies=dependencies, frozen=frozen), indent=2) + "\n")

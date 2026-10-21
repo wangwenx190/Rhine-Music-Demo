@@ -1,3 +1,4 @@
+#include "EasingCurve.h"
 #include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
@@ -16,7 +17,6 @@ constexpr auto FadeBezierControlX = .25;
 constexpr auto FadeBezierFirstY = .1;
 constexpr auto InteractionReadyProgress = .75;
 constexpr auto OverviewSpringRate = 6.5;
-constexpr auto NavigationSlideSeconds = .36;
 constexpr auto NavigationFadeSeconds = .28;
 constexpr auto ChromeRevealProgress = .12;
 constexpr auto BrowseRevealProgress = .02;
@@ -30,28 +30,22 @@ constexpr auto OverviewAimZ = 1.5;
 constexpr auto OverviewCameraDistance = 172;
 constexpr auto MinimumOverviewSpan = 16.8;
 constexpr auto PortraitOverviewSpan = 17.5;
-constexpr auto FirstArchiveRow = 12.0;
 constexpr auto ArchiveLastRowOffset = 11;
 }
 
 namespace yalahoo {
 namespace {
-QEasingCurve bezier(double x1, double y1, double x2, double y2)
-{
-    QEasingCurve result(QEasingCurve::BezierSpline);
-    result.addCubicBezierSegment({ x1, y1 }, { x2, y2 }, { 1, 1 });
-    return result;
-}
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &transformCurve()
 {
-    static const auto value = bezier(TransformBezierFirstX, 0, TransformBezierSecondX, 1);
+    static const auto value = cubicBezier(TransformBezierFirstX, 0, TransformBezierSecondX, 1);
     return value;
 }
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &fadeCurve()
 {
-    static const auto value = bezier(FadeBezierControlX, FadeBezierFirstY, FadeBezierControlX, 1);
+    static const auto value =
+            cubicBezier(FadeBezierControlX, FadeBezierFirstY, FadeBezierControlX, 1);
     return value;
 }
 }
@@ -59,10 +53,7 @@ const QEasingCurve &fadeCurve()
 OverviewController::OverviewController(MotionController *motion, QObject *parent)
     : QObject(parent), m_motion(motion), m_clock(motion ? motion->clock() : nullptr)
 {
-    QEasingCurve curve(QEasingCurve::BezierSpline);
-    curve.addCubicBezierSegment({ TransformBezierFirstX, 0 }, { TransformBezierSecondX, 1 },
-                                { 1, 1 });
-    m_chrome.setEnterCurve(curve);
+    m_chrome.setEnterCurve(transformCurve());
     if (m_clock) {
         connect(m_clock, &FrameClock::frame, this, [this](double, double dt) {
             advance(dt, m_motion->reducedMotion());
@@ -211,8 +202,9 @@ void OverviewController::advance(double dt, bool reduced)
         m_progress.finish(m_active ? 1 : 0);
     else if (m_active || m_progress.value != 0 || m_progress.velocity != 0)
         m_progress.update(m_active ? 1 : 0, OverviewSpringRate, dt);
-    m_navigationTime = reduced ? NavigationSlideSeconds
-                               : std::min(NavigationSlideSeconds, m_navigationTime + dt);
+    m_navigationTime = reduced
+            ? yalahoo::overviewMotion::NavigationSlideSeconds
+            : std::min(yalahoo::overviewMotion::NavigationSlideSeconds, m_navigationTime + dt);
 
     m_navOpacity = m_navFrom
             + ((m_active ? 0 : 1) - m_navFrom)
@@ -220,7 +212,8 @@ void OverviewController::advance(double dt, bool reduced)
                             std::min(1.0, m_navigationTime / NavigationFadeSeconds));
     m_navOffset = m_navOffsetFrom
             + ((m_active ? -NavigationHiddenOffsetPixels : 0) - m_navOffsetFrom)
-                    * transformCurve().valueForProgress(m_navigationTime / NavigationSlideSeconds);
+                    * transformCurve().valueForProgress(
+                            m_navigationTime / yalahoo::overviewMotion::NavigationSlideSeconds);
 }
 void OverviewController::synchronize(double dt, bool reduced)
 {
@@ -256,7 +249,7 @@ void OverviewController::reset()
     m_labelsDirty = true;
     m_chrome.reset(false);
     m_labels.clear();
-    m_navigationTime = NavigationSlideSeconds;
+    m_navigationTime = yalahoo::overviewMotion::NavigationSlideSeconds;
     m_navFrom = m_navOpacity = 1;
     m_navOffsetFrom = m_navOffset = 0;
     notify();
@@ -331,7 +324,7 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
         const double extent = m_selection->columnExtent(physical);
         const double row = m_selection->browseRow(lane);
         const double anchorRow = m_selection->realistic()
-                ? std::clamp(row, FirstArchiveRow,
+                ? std::clamp(row, double(yalahoo::sceneGeometry::FirstAlbumRow),
                              double(ArchiveLastRowOffset + pool.rowCount(lane)))
                 : row;
         const auto point = m_scene->projectWorldPoint(

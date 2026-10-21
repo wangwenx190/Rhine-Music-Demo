@@ -1,3 +1,4 @@
+#include "Units.h"
 #include "LibrarySession.h"
 #include <QCoreApplication>
 #include "DetailModel.h"
@@ -11,7 +12,6 @@ namespace {
 constexpr auto LineCacheEntryOverheadBytes = 64;
 constexpr auto MaximumDisplayDurationSeconds = 1e12;
 constexpr auto SecondsPerMinute = 60;
-constexpr auto DecimalBase = 10;
 constexpr auto FormatSignificantDigits = 8;
 constexpr auto MetricPrefixScale = 1000;
 }
@@ -83,7 +83,7 @@ QString DetailModel::time(double seconds)
             ? qint64(std::clamp(seconds, 0.0, MaximumDisplayDurationSeconds))
             : 0;
     return u"%1:%2"_s.arg(value / SecondsPerMinute)
-            .arg(value % SecondsPerMinute, 2, DecimalBase, '0'_L1);
+            .arg(value % SecondsPerMinute, 2, yalahoo::units::DecimalBase, '0'_L1);
 }
 int DetailModel::rowCount(const QModelIndex &parent) const
 {
@@ -99,7 +99,8 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
     case TrackId:
         return track.id;
     case Number:
-        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2, DecimalBase, '0'_L1);
+        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2,
+                           yalahoo::units::DecimalBase, '0'_L1);
     case Title:
         return track.title;
     case Artist:
@@ -197,7 +198,8 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                 if (unit == "kbps"_L1)
                     scaled = std::round(scaled);
                 else if (unit == "kHz"_L1)
-                    scaled = std::round(scaled * DecimalBase) / DecimalBase;
+                    scaled = std::round(scaled * yalahoo::units::DecimalBase)
+                            / yalahoo::units::DecimalBase;
                 return QString::number(scaled, 'g', FormatSignificantDigits);
             };
             return number(*low) + " "_L1 + unit

@@ -14,10 +14,7 @@ namespace yalahoo::rhi {
 namespace resourcePlanMetrics {
 // Descriptor dimensions include conservative UI layer bounds at the actual requested DPR.
 inline constexpr auto SmaaPassCount = 3;
-inline constexpr auto CaseSurfaceCount = 3;
 inline constexpr auto AoPassCount = 3;
-inline constexpr auto ExtraDrawUniforms = 6;
-inline constexpr auto OutputUniformBytes = 32;
 inline constexpr auto RulerWidthPixels = 130;
 inline constexpr auto RulerHeightPixels = 30;
 inline constexpr auto OrdinalWidthBoundPixels = 700;
@@ -73,10 +70,10 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedBuffer(
             u"draw-uniforms"_s,
             qint64(stride)
-                    * (renderData::MaximumCaseEntities * resourcePlanMetrics::CaseSurfaceCount
-                       + resourcePlanMetrics::ExtraDrawUniforms));
+                    * (renderData::MaximumCaseEntities * yalahoo::rhi::renderData::CaseSurfaceCount
+                       + yalahoo::rhi::renderData::ExtraDrawUniforms));
     plan.plannedBuffer(u"instances"_s, renderData::MaximumCaseEntities * renderData::InstanceBytes);
-    plan.plannedBuffer(u"output-uniform"_s, resourcePlanMetrics::OutputUniformBytes);
+    plan.plannedBuffer(u"output-uniform"_s, yalahoo::rhi::renderData::OutputUniformBytes);
     plan.plannedTexture(u"qt-item-output"_s, size,
                         in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8);
     plan.plannedTexture(u"qt-item-depth-upper-bound"_s, size, QRhiTexture::D32FS8);

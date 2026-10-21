@@ -1,4 +1,5 @@
 #version 440
+#extension GL_GOOGLE_include_directive : require
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf
@@ -34,53 +35,4 @@ const vec2 GaussianPairs[15] = vec2[](
         vec2(21.446456096848884, 0.007963966758459), vec2(23.441518887561841, 0.005083741370702),
         vec2(25.436593213737808, 0.003118232640085), vec2(27.431680016521753, 0.001837826583963),
         vec2(29.426780227320165, 0.001040809826805));
-void main()
-{
-    vec4 color = sampleBackdrop(qt_TexCoord0) * GaussianCenterWeight;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[0].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[0].x))
-            * GaussianPairs[0].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[1].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[1].x))
-            * GaussianPairs[1].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[2].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[2].x))
-            * GaussianPairs[2].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[3].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[3].x))
-            * GaussianPairs[3].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[4].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[4].x))
-            * GaussianPairs[4].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[5].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[5].x))
-            * GaussianPairs[5].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[6].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[6].x))
-            * GaussianPairs[6].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[7].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[7].x))
-            * GaussianPairs[7].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[8].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[8].x))
-            * GaussianPairs[8].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[9].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[9].x))
-            * GaussianPairs[9].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[10].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[10].x))
-            * GaussianPairs[10].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[11].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[11].x))
-            * GaussianPairs[11].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[12].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[12].x))
-            * GaussianPairs[12].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[13].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[13].x))
-            * GaussianPairs[13].y;
-    color += (sampleBackdrop(qt_TexCoord0 + sampleStep * GaussianPairs[14].x)
-              + sampleBackdrop(qt_TexCoord0 - sampleStep * GaussianPairs[14].x))
-            * GaussianPairs[14].y;
-    fragColor = color * qt_Opacity;
-}
+#include "gaussian-blur.glsl"

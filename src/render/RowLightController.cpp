@@ -1,3 +1,4 @@
+#include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "MotionFunctions.h"
 #include <algorithm>
@@ -13,8 +14,6 @@ constexpr auto IntroStartSeconds = 22.2;
 constexpr auto IntroTravelSeconds = 1.95;
 constexpr auto IntroReturnRows = 18;
 constexpr auto IntroReturnSeconds = 1.6;
-constexpr auto ArchiveRowSpacing = .62;
-constexpr auto ArchiveColumnSpacing = 5.2;
 constexpr auto LaneEnvelopePower = 6;
 }
 
@@ -62,7 +61,7 @@ void RowLightController::update(const RowLightingInput &i, double dt)
         reset();
         return;
     }
-    const double nextBasis = i.origin.z - i.row * ArchiveRowSpacing;
+    const double nextBasis = i.origin.z - i.row * yalahoo::sceneGeometry::RowSpacing;
     const bool intro = !i.reduced && i.introTime.has_value();
     if (!initialized || i.reduced || i.cinematic || opening) {
         row.finish(i.row);
@@ -71,7 +70,7 @@ void RowLightController::update(const RowLightingInput &i, double dt)
         if (basis
             && (i.independentColumns != independent
                 || (i.independentColumns && i.lane != basisLane)))
-            row.value += (*basis - nextBasis) / ArchiveRowSpacing;
+            row.value += (*basis - nextBasis) / yalahoo::sceneGeometry::RowSpacing;
         follow(row, i.row, dt, settings.transitionDuration);
         follow(lane, i.lane, dt, settings.transitionDuration);
     }
@@ -83,13 +82,13 @@ void RowLightController::update(const RowLightingInput &i, double dt)
     basisLane = i.lane;
     independent = i.independentColumns;
     column = i.origin;
-    column.z += (row.value - i.row) * ArchiveRowSpacing;
-    column.x += (lane.value - i.lane) * ArchiveColumnSpacing;
+    column.z += (row.value - i.row) * yalahoo::sceneGeometry::RowSpacing;
+    column.x += (lane.value - i.lane) * yalahoo::sceneGeometry::ColumnSpacing;
 }
 double RowLightController::sample(SceneVector origin) const
 {
-    const double r = (origin.z - column.z - settings.offset * ArchiveRowSpacing)
-            / (.5 * settings.width * ArchiveRowSpacing),
+    const double r = (origin.z - column.z - settings.offset * yalahoo::sceneGeometry::RowSpacing)
+            / (.5 * settings.width * yalahoo::sceneGeometry::RowSpacing),
                  l = (origin.x - column.x) / RibbonLaneWidth;
     return std::exp(-std::numbers::ln2 * r * r) * std::exp(-std::pow(l, LaneEnvelopePower));
 }

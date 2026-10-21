@@ -80,3 +80,7 @@ QString supportName(MediaSupport support);
 QPair<QString, QString> albumTitleParts(const QString &text);
 QString graphemePrefix(const QString &text, qsizetype maxCodeUnits);
 }
+
+namespace yalahoo::libraryDefaults {
+inline constexpr auto UnnumberedTrackSortKey = 9999;
+}

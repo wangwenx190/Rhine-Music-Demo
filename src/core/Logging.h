@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "Units.h"
 #include <QLoggingCategory>
 #include <QString>
 #include <memory>
@@ -11,7 +12,6 @@ namespace yalahoo {
 namespace loggingPolicy {
 // Default bounded file-log retention policy.
 inline constexpr auto SegmentMiB = 8;
-inline constexpr auto BytesPerKiB = 1024;
 inline constexpr auto ArchiveCount = 4;
 inline constexpr auto RetentionDays = 14;
 }
@@ -30,8 +30,8 @@ public:
     struct Options final
     {
         QString directory;
-        qint64 segmentBytes =
-                loggingPolicy::SegmentMiB * loggingPolicy::BytesPerKiB * loggingPolicy::BytesPerKiB;
+        qint64 segmentBytes = loggingPolicy::SegmentMiB * yalahoo::units::BytesPerKiB
+                * yalahoo::units::BytesPerKiB;
         int archiveCount = loggingPolicy::ArchiveCount;
         int retentionDays = loggingPolicy::RetentionDays;
     };

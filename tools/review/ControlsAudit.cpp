@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include <QQuickWindow>
 #include "ControlsAudit.h"
 #include "OffscreenSurface.h"
@@ -27,18 +28,6 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-QQuickItem *visual(QQuickItem *root, const QString &name)
-{
-    if (!root)
-        return nullptr;
-    if (root->objectName() == name)
-        return root;
-    for (auto *child : root->childItems()) {
-        if (auto *found = visual(child, name))
-            return found;
-    }
-    return nullptr;
-}
 }
 int reviewControls(const QString &output)
 {
@@ -129,7 +118,7 @@ int reviewControls(const QString &output)
     };
     inspectText(inspectText, button);
     check(u"shortcut-text-bounded"_s, textBounded);
-    auto *outline = visual(button, u"buttonFocusOutline"_s);
+    auto *outline = yalahoo::review::findVisual(button, u"buttonFocusOutline"_s);
     check(u"source-keyboard-outline"_s,
           outline && outline->isVisible() && outline->position() == QPointF(-6, -6)
                   && outline->size() == button->size() + QSizeF(12, 12));
@@ -178,8 +167,8 @@ int reviewControls(const QString &output)
     QTest::keyClick(&window, Qt::Key_F10, Qt::ShiftModifier);
     check(u"readonly-menu-render"_s, render());
     auto *menuContent = menu ? menu->property("contentItem").value<QQuickItem *>() : nullptr;
-    auto *cut = visual(menuContent, u"editActioncut"_s);
-    auto *paste = visual(menuContent, u"editActionpaste"_s);
+    auto *cut = yalahoo::review::findVisual(menuContent, u"editActioncut"_s);
+    auto *paste = yalahoo::review::findVisual(menuContent, u"editActionpaste"_s);
     check(u"readonly-menu-actions"_s, cut && paste && !cut->isEnabled() && !paste->isEnabled());
     QTest::keyClick(&window, Qt::Key_Escape);
     check(u"editor-menu-escape"_s, menu && !menu->property("visible").toBool());

@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "MotionController.h"
 #include "SelectionController.h"
 #include <QQuickWindow>
@@ -37,15 +38,6 @@ using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
-QQuickItem *find(QQuickItem *item, const QString &name)
-{
-    if (item->objectName() == name)
-        return item;
-    for (auto *child : item->childItems())
-        if (auto *found = find(child, name))
-            return found;
-    return nullptr;
-}
 }
 int reviewOverviewVisual(QGuiApplication &, const QString &output)
 {
@@ -164,16 +156,18 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                         continue;
                     const int lane =
                             overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
-                    auto *label = find(root, "overviewLabel-"_L1 + QString::number(lane));
+                    auto *label = yalahoo::review::findVisual(
+                            root, "overviewLabel-"_L1 + QString::number(lane));
                     if (!label)
                         return 4;
                     const QString suffix = QString::number(lane);
-                    auto *anchor = find(root, "overviewAnchor-"_L1 + suffix);
-                    auto *card = find(root, "overviewCard-"_L1 + suffix);
-                    auto *name = find(root, "overviewName-"_L1 + suffix);
-                    auto *count = find(root, "overviewCount-"_L1 + suffix);
-                    auto *entry = find(root, "overviewEnter-"_L1 + suffix);
-                    auto *backdrop = find(root, "overviewBackdrop-"_L1 + suffix);
+                    auto *anchor = yalahoo::review::findVisual(root, "overviewAnchor-"_L1 + suffix);
+                    auto *card = yalahoo::review::findVisual(root, "overviewCard-"_L1 + suffix);
+                    auto *name = yalahoo::review::findVisual(root, "overviewName-"_L1 + suffix);
+                    auto *count = yalahoo::review::findVisual(root, "overviewCount-"_L1 + suffix);
+                    auto *entry = yalahoo::review::findVisual(root, "overviewEnter-"_L1 + suffix);
+                    auto *backdrop =
+                            yalahoo::review::findVisual(root, "overviewBackdrop-"_L1 + suffix);
                     if (!anchor || !card || !name || !count || !entry || !backdrop)
                         return 4;
                     const auto rectangle = [](QQuickItem *item, QQuickItem *relative) {
@@ -201,7 +195,8 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                     QJsonArray textures;
                     for (const auto &textureName :
                          { "overviewCrop", "overviewHorizontalTexture" }) {
-                        auto *texture = find(backdrop, QString::fromUtf8(textureName));
+                        auto *texture = yalahoo::review::findVisual(backdrop,
+                                                                    QString::fromUtf8(textureName));
                         if (!texture)
                             return 4;
                         const auto target = texture->property("textureSize").toSize();
@@ -246,9 +241,10 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                                              { u"rois"_s, rois } });
                 if (expanded >= 0) {
                     const auto before = selection.albumId();
-                    auto *button = find(root,
-                                        (variant ? "overviewEnter-"_L1 : "overviewLabel-"_L1)
-                                                + QString::number(expanded));
+                    auto *button = yalahoo::review::findVisual(
+                            root,
+                            (variant ? "overviewEnter-"_L1 : "overviewLabel-"_L1)
+                                    + QString::number(expanded));
                     if (!button)
                         return 4;
                     const auto point =

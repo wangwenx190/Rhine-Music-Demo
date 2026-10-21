@@ -1,3 +1,4 @@
+#include "EasingCurve.h"
 #include "OverviewLabelsModel.h"
 #include <QPointF>
 #include <algorithm>
@@ -34,23 +35,17 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-QEasingCurve curve(double x1, double y1, double x2, double y2)
-{
-    QEasingCurve result(QEasingCurve::BezierSpline);
-    result.addCubicBezierSegment({ x1, y1 }, { x2, y2 }, { 1, 1 });
-    return result;
-}
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &entryCurve()
 {
-    static const auto value = curve(EntryBezierFirstX, 0, EntryBezierSecondX, 1);
+    static const auto value = cubicBezier(EntryBezierFirstX, 0, EntryBezierSecondX, 1);
     return value;
 }
 // Qt's spline storage is initialized lazily and reused without per-frame allocation.
 const QEasingCurve &opacityCurve()
 {
     static const auto value =
-            curve(OpacityBezierControlX, OpacityBezierFirstY, OpacityBezierControlX, 1);
+            cubicBezier(OpacityBezierControlX, OpacityBezierFirstY, OpacityBezierControlX, 1);
     return value;
 }
 }

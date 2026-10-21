@@ -1,4 +1,6 @@
 """Bind R27 source contracts to callable product paths; target runs remain independent."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -45,7 +47,7 @@ DEPENDENCIES = {
 } | {path for _, path, _, _ in CHECKS}
 DEPENDENCIES |= {str(path.relative_to(ROOT)) for path in (ROOT / "tools/launchers").glob("*")}
 DEPENDENCIES |= {"yalahoo.sh", "yalahoo.command", "yalahoo.ps1"}
-revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
 frozen = []
 for path in ["src/music-lighting-lab.ts", "src/music-motion-lab.ts", "src/music-lighting-lab.css",
              "src/music-motion-settings.ts", "src/music-row-lighting.ts", "src/music-app.ts"]:
@@ -60,13 +62,7 @@ for platform, platform_id, launcher in [("macos", "MAC-01", "yalahoo.command"),
                       "Native launcher selects its platform executable and configured Kit; Windows GUI uses Process.WaitForExit and ExitCode. Actual target compiler, PowerShell parser/FormatTools, plugins, GPU, physical input and normal presentation require that environment; source review does not waive R27-P.")
     checks = []
     for check_id, path, symbol, evidence in CHECKS + [platform_check]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Experiment source drift: {path}::{symbol}")
-        checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
-                           sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
-                           sourceSha256=hashlib.sha256(data).hexdigest(), result="source-reviewed",
-                           limitations="Runtime evidence is separate; missing target/physical/VSYNC checks remain R27-P without relaxed gates."))
+        checks.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Runtime evidence is separate; missing target/physical/VSYNC checks remain R27-P without relaxed gates.'))
     output = ROOT / "verification" / f"{platform}-static" / "experiments"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, dependencies=dependencies, frozen=frozen), indent=2) + "\n")

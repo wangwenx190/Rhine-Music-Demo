@@ -1,4 +1,6 @@
 """R24 public Qt playback source review; generated evidence remains local."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -49,7 +51,7 @@ paths = sorted({path for _, path, _, _ in CHECKS} | {
     "tests/support/AudioFixture.h", "resources/licenses/qt-playback-reference-NOTICE.md",
 })
 dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths]
-revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
 frozen = []
 for path in ["src/music-player.ts", "src/music-app.ts"]:
     data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
@@ -61,13 +63,7 @@ for platform, identity, target in [
 ]:
     rows = []
     for check_id, path, symbol, requirement in CHECKS + [(identity, "src/media/PlaybackController.cpp", "void PlaybackController::applyDevices", target)]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Playback source review drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, requirement=requirement, platform=platform,
-                         sourcePath=path, lineOrSymbol=symbol, evidence=requirement,
-                         result="source-reviewed", sourceSha256=hashlib.sha256(data).hexdigest(),
-                         limitations="Source review binding only; execution, output-list injection, physical devices and listening are distinct facts. Missing targets retain original R24-P gates."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=requirement, platform=platform, evidence=requirement, result='source-reviewed', limitations='Source review binding only; execution, output-list injection, physical devices and listening are distinct facts. Missing targets retain original R24-P gates.'))
     output = ROOT / "verification" / f"{platform}-static" / "playback"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, dependencies=dependencies, frozen=frozen), indent=2) + "\n")

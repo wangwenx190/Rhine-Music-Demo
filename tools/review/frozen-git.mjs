@@ -25,3 +25,10 @@ export function execFrozenGit(args, options = {}) {
                                   ));
     return execFileSync('git', resolved, options);
 }
+
+// The asset manifest owns the frozen production revision across every source exporter.
+export const baselineRevision =
+    JSON.parse(
+            readFileSync(new URL('../../resources/manifests/assets.json', import.meta.url), 'utf8'),
+            )
+        .baselineCommit;

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run one integrated GUI matrix and preserve its inputs, output and failure status."""
+from native_replay import BACKEND_IDS
 import argparse
 import hashlib
 import json
@@ -10,7 +11,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--backend', required=True, choices=('metal', 'd3d11', 'd3d12', 'opengl', 'vulkan'))
+parser.add_argument('--backend', required=True, choices=BACKEND_IDS)
 parser.add_argument('--narrow', action='store_true', help='Regress only viewports <=700 after a narrow-layout change')
 parser.add_argument('--representative', action='store_true', help='Check product integration at desktop, portrait boundary and narrow sizes')
 parser.add_argument('--visible', action='store_true', help='Use a native window on macOS')
@@ -71,7 +72,6 @@ with (args.output / 'run.log').open('w', encoding='utf-8') as log:
         code = 'timeout'
 report_path = args.output / 'matrix/report.json'
 report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.is_file() else {}
-backend_ids = dict(metal=6, d3d11=4, d3d12=8, opengl=3, vulkan=5)
 sizes = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
          (390, 844), (320, 720), (2560, 1080), (3440, 1440))
 if args.narrow:
@@ -85,7 +85,7 @@ expected = {(w, h, night, real, phase) for w, h in sizes for night in (False, Tr
 captures = report.get('captures', [])
 actual = {(c['width'], c['height'], c['night'], c['realistic'], c['phase']) for c in captures}
 images = [args.output / 'matrix' / c['image'] for c in captures]
-valid = (code == 0 and report.get('passed') and report.get('backend') == backend_ids[args.backend]
+valid = (code == 0 and report.get('passed') and report.get('backend') == BACKEND_IDS[args.backend]
          and actual == expected and len(captures) == len(expected) and all(p.is_file() for p in images))
 manifest.update(exitCode=code, completed=report_path.is_file(), passed=bool(valid),
                 capturedCheckpoints=len(captures), expectedCheckpoints=len(expected),

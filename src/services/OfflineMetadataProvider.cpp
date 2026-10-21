@@ -1,12 +1,8 @@
+#include "IMetadataProvider.h"
 #include <QCoreApplication>
 #include "OfflineMetadataProvider.h"
 #include <QTimer>
 #include <utility>
-
-namespace {
-// The offline facade keeps the same bounded request contract as the online provider.
-constexpr auto MaximumPendingMetadataRequests = 8;
-}
 
 using namespace Qt::StringLiterals;
 
@@ -75,18 +71,6 @@ void OfflineMetadataProvider::setCache(Snapshot cache)
         if (!m_albumIndices.contains(m_cache->albums[index].id))
             m_albumIndices.insert(m_cache->albums[index].id, index);
 }
-bool OfflineMetadataProvider::requestIntroduction(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Introduction);
-}
-bool OfflineMetadataProvider::requestCredits(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Credits);
-}
-bool OfflineMetadataProvider::requestEnrichment(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Enrichment);
-}
 void OfflineMetadataProvider::cancel(RequestToken token)
 {
     m_pending.removeIf([&token](const Pending &pending) {
@@ -100,7 +84,7 @@ bool OfflineMetadataProvider::request(AlbumQuery query, RequestToken token, Meta
     for (const auto &pending : std::as_const(m_pending))
         if (pending.token == token)
             return true;
-    if (m_pending.size() >= MaximumPendingMetadataRequests)
+    if (m_pending.size() >= yalahoo::metadataLimits::MaximumPendingRequests)
         return false;
     const auto albumIndex = m_albumIndices.value(token.albumId, -1);
     m_pending.append({ std::move(query), std::move(token), kind, m_cache, albumIndex });

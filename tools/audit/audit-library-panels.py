@@ -1,4 +1,6 @@
 """R23 source review bindings; runtime reports and generated matrices stay local."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import subprocess
@@ -6,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
-    ("COMMON-01", "cmake/BrowseQml.cmake", "foreach(name SearchPanel LibraryPanel LibraryPanels PanelHeading",
+    ("COMMON-01", "cmake/BrowseQml.cmake", "yalahoo_qml_group(group panels SearchPanel LibraryPanel LibraryPanels PanelHeading",
      "Both product and Review compile the same panels, foreign C++ types and qsb resources. No web process or new dependency; Qt Quick Dialogs was already in the native closure."),
     ("COMMON-02", "src/library/LibraryStore.cpp", "bool LibraryStore::setRootPaths",
      "Editor paths become local URLs in C++; the existing lexical absolute-path/64-root validation, worker scanner, immutable snapshot handoff and atomic data-root persistence remain authoritative. FolderDialog URLs round-trip through toLocalFile; no JavaScript URL decoding or source music writes."),
@@ -36,7 +38,7 @@ CHECKS = [
      "Panel layer size participates in descriptor invalidation without changing 3D target/PSO keys. Old plus new full plans include Qt UI upper bounds; actual RHI inventory, Qt/driver unknown storage and measured-VRAM null remain separate."),
 ]
 mapping = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]
-revision = mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+revision = mapping[BASELINE]
 frozen = []
 for name in ["src/music-search.ts", "src/music-track-focus.ts", "src/music-app.ts", "src/music.css", "src/ui-transitions.ts"]:
     data = subprocess.check_output(["git", "show", f"{revision}:{name}"], cwd=ROOT)
@@ -71,13 +73,7 @@ dependency_hashes = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / p
 for platform, (identity, evidence) in platforms.items():
     rows = []
     for check_id, path, symbol, requirement in CHECKS + [(identity, "src/app/main.cpp", "yalahoo::TrackFocusController trackFocus", evidence)]:
-        data = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"Source review drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, requirement=requirement, platform=platform,
-                         sourcePath=path, lineOrSymbol=symbol, evidence=requirement,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), result="source-reviewed",
-                         limitations="Source reasoning binding only; native builds/tests/physical display claims require their actual reports and R23-P gates."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=requirement, platform=platform, evidence=requirement, result='source-reviewed', limitations='Source reasoning binding only; native builds/tests/physical display claims require their actual reports and R23-P gates.'))
     target = ROOT / "verification" / f"{platform}-static" / "library-panels"
     target.mkdir(parents=True, exist_ok=True)
     (target / "source-matrix.json").write_text(json.dumps(dict(checks=rows, frozen=frozen, dependencies=dependency_hashes), indent=2) + "\n")

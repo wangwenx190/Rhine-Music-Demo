@@ -11,8 +11,10 @@ qt_add_library(
     OverviewLabelsModel.h
     SceneAdapter.cpp
     SceneAdapter.h
+    SourceOptics.h
+    OpticalParameters.h
     SceneFrame.h
-    SceneGeometry.h
+    CameraFraming.h
     opening/OpeningFrame.cpp
     opening/OpeningFrame.h
     opening/OpeningController.cpp

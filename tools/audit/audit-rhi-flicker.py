@@ -1,5 +1,5 @@
 """Record manually traced invariance/continuous rendering contracts, without GPU image oracles."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
 
@@ -52,14 +52,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                         "Native backend/compiler/window integration remains intact. Runtime is "
                         "macOS Metal/OpenGL hidden; D3D11 target execution remains R36; Linux OpenGL remains R36.")]
     for check_id, path, symbol, conclusion in entries:
-        content = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), evidence=conclusion,
-                         result="static-audit-passed", platform=host,
-                         limitations="Finite continuous hidden scope; no old image comparison, "
-                                     "normal presentation/VSYNC or untested target claim."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Finite continuous hidden scope; no old image comparison, normal presentation/VSYNC or untested target claim.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-flicker"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

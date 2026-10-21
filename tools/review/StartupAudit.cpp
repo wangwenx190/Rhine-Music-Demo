@@ -1,3 +1,4 @@
+#include "ReviewSupport.h"
 #include "SceneAdapter.h"
 #include "FrameClock.h"
 #include "LibrarySession.h"
@@ -44,7 +45,6 @@
 #include <algorithm>
 #include <span>
 #include <memory>
-#include <chrono>
 #include <stdexcept>
 
 namespace {
@@ -70,21 +70,6 @@ void require(bool value, const char *message)
 {
     if (!value)
         throw std::runtime_error(message);
-}
-qint64 nowNs()
-{
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                   std::chrono::steady_clock::now().time_since_epoch())
-            .count();
-}
-QQuickItem *find(QQuickItem *root, const QString &name)
-{
-    if (root->objectName() == name)
-        return root;
-    for (auto *child : root->childItems())
-        if (auto *item = find(child, name))
-            return item;
-    return nullptr;
 }
 QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
 {
@@ -198,7 +183,7 @@ public:
         }
         events.append(
                 QJsonObject{ { u"kind"_s, kind },
-                             { u"atNs"_s, nowNs() },
+                             { u"atNs"_s, yalahoo::review::nowNs() },
                              { u"exposed"_s, isExposed() },
                              { u"visible"_s, isVisible() },
                              { u"state"_s, int(windowState()) },
@@ -252,7 +237,7 @@ public:
                                  overflow = true;
                              else {
                                  costs[u"stage"_s] = stage;
-                                 costs[u"atNs"_s] = nowNs();
+                                 costs[u"atNs"_s] = yalahoo::review::nowNs();
                                  timings.append(costs);
                              }
                          });
@@ -263,7 +248,7 @@ public:
                     if (samples->times.size() == MaximumFrameSamples)
                         samples->overflow = true;
                     else
-                        samples->times.append(nowNs());
+                        samples->times.append(yalahoo::review::nowNs());
                 },
                 Qt::DirectConnection);
         QObject::connect(&library, &LibrarySession::snapshotChanged, &selection, [&] {
@@ -348,7 +333,8 @@ public:
         require(bool(root), "Cannot create production lifecycle stage");
         root->setParentItem(window.contentItem());
         root->setSize(window.size());
-        native = qobject_cast<rhi::SceneItem *>(find(root.get(), u"nativeScene"_s));
+        native = qobject_cast<rhi::SceneItem *>(
+                yalahoo::review::findVisual(root.get(), u"nativeScene"_s));
         require(native, "Production scene missing");
         native->setTelemetryEnabled(true);
         QObject::connect(
@@ -416,7 +402,7 @@ public:
         QTimer deadline;
         deadline.setSingleShot(true);
         bool done = false, pending = false;
-        qint64 nextTickNs = nowNs();
+        qint64 nextTickNs = yalahoo::review::nowNs();
         const auto evaluate = [&] {
             pending = false;
             if (done)
@@ -440,7 +426,7 @@ public:
             pending = true;
             // Local RenderControl replay has an explicit 60Hz cadence; it is not native VSYNC.
             if (paced && OffscreenSurface::Enabled) {
-                const auto now = nowNs();
+                const auto now = yalahoo::review::nowNs();
                 nextTickNs = qMax(nextTickNs + 16666667, now);
                 const int delay = int((nextTickNs - now + 999999) / 1000000);
                 QTimer::singleShot(delay, Qt::PreciseTimer, &loop, evaluate);
@@ -779,7 +765,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                     d.overflow = true;
                 else
                     guiFrames.append(QJsonObject{
-                            { u"atNs"_s, nowNs() },
+                            { u"atNs"_s, yalahoo::review::nowNs() },
                             { u"clockFrame"_s, qint64(d.motion.clock()->frameCount()) } });
             });
             QObject::connect(
@@ -789,7 +775,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         if (samples->synchronized.size() == MaximumFrameSamples)
                             samples->overflow = true;
                         else
-                            samples->synchronized.append(nowNs());
+                            samples->synchronized.append(yalahoo::review::nowNs());
                     },
                     Qt::DirectConnection);
         }
@@ -1118,7 +1104,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         d.panels.open(u"search"_s);
                     actions.append(QJsonObject{ { u"stage"_s, d.stage },
                                                 { u"elapsedSeconds"_s, elapsed },
-                                                { u"atNs"_s, nowNs() } });
+                                                { u"atNs"_s, yalahoo::review::nowNs() } });
                 }
                 const int event = int(elapsed * 3);
                 if (event != eventIndex) {
@@ -1151,7 +1137,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             }
             const auto startSample = d.samples.size(), startTiming = d.timings.size();
             sampling.restart();
-            report[u"samplingStartedNs"_s] = nowNs();
+            report[u"samplingStartedNs"_s] = yalahoo::review::nowNs();
             d.window.record(u"sampling-start"_s);
             if (observeOnly) {
                 replay(seconds);
@@ -1168,7 +1154,7 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         },
                         true, int(seconds * 1000 + 30000), true);
             }
-            report[u"samplingEndedNs"_s] = nowNs();
+            report[u"samplingEndedNs"_s] = yalahoo::review::nowNs();
             report[u"samplingSeconds"_s] = sampling.nsecsElapsed() / NanosecondsPerSecond;
             report[u"sampleStartIndex"_s] = startSample;
             report[u"quickTimingStartIndex"_s] = startTiming;
@@ -1501,7 +1487,7 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
             d.frames(2);
         };
         const auto click = [&](const QString &name) {
-            auto *item = find(d.root.get(), name);
+            auto *item = yalahoo::review::findVisual(d.root.get(), name);
             require(item && item->isVisible() && item->isEnabled(),
                     "GUI action target unavailable");
             const auto point = item->mapToScene({ item->width() / 2, item->height() / 2 });
@@ -1588,9 +1574,12 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
                     check("reverse-navigation", d.selection.albumId() == selected);
                     d.ready();
                     check("archive-overview-control-visible",
-                          find(d.root.get(), u"overviewToggle"_s)->isVisible());
-                    auto *albumStepper = find(d.root.get(), u"albumStepper"_s);
-                    auto *genreStepper = find(d.root.get(), u"genreStepper"_s);
+                          yalahoo::review::findVisual(d.root.get(), u"overviewToggle"_s)
+                                  ->isVisible());
+                    auto *albumStepper =
+                            yalahoo::review::findVisual(d.root.get(), u"albumStepper"_s);
+                    auto *genreStepper =
+                            yalahoo::review::findVisual(d.root.get(), u"genreStepper"_s);
                     require(albumStepper && genreStepper, "Navigation groups missing");
                     const auto albumBounds =
                             albumStepper->mapRectToScene(albumStepper->boundingRect());
@@ -1622,9 +1611,11 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
                     check("detail-content-fully-shown",
                           d.presentation.detailSurface()->opacity() == 1);
                     check("detail-hides-archive-overview-control",
-                          !find(d.root.get(), u"overviewToggle"_s)->isVisible());
-                    auto *back = find(d.root.get(), u"detailBack"_s);
-                    auto *navigation = find(d.root.get(), u"headerNavigation"_s);
+                          !yalahoo::review::findVisual(d.root.get(), u"overviewToggle"_s)
+                                   ->isVisible());
+                    auto *back = yalahoo::review::findVisual(d.root.get(), u"detailBack"_s);
+                    auto *navigation =
+                            yalahoo::review::findVisual(d.root.get(), u"headerNavigation"_s);
                     require(back && navigation, "Detail/header layout missing");
                     check("portrait-back-below-header",
                           !d.scene.layout()->portrait()
@@ -1651,7 +1642,8 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
                     d.root->forceActiveFocus(Qt::OtherFocusReason);
                     d.panels.open(u"search"_s);
                     advance(.5);
-                    auto *search = find(d.window.contentItem(), u"librarySearchInput"_s);
+                    auto *search = yalahoo::review::findVisual(d.window.contentItem(),
+                                                               u"librarySearchInput"_s);
                     require(search, "Search input missing");
                     search->setProperty("text", u"\u533f\u540d\u4e13\u8f91 2"_s);
                     const auto isolated = d.selection.albumId();
@@ -1693,8 +1685,8 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
             d.startup.receive(std::make_shared<const LibrarySnapshot>(replacement));
             d.frames(2);
             advance(3);
-            auto *navigation = find(d.root.get(), u"navigationFrame"_s);
-            auto *label = find(d.root.get(), u"navigationColumnLabel"_s);
+            auto *navigation = yalahoo::review::findVisual(d.root.get(), u"navigationFrame"_s);
+            auto *label = yalahoo::review::findVisual(d.root.get(), u"navigationColumnLabel"_s);
             require(navigation && label, "Navigation boundary items missing");
             check("long-label-wraps-and-bounds",
                   navigation->property("wrapped").toBool()

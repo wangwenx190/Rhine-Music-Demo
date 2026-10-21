@@ -1,3 +1,4 @@
+#include "SceneGeometry.h"
 #include "ArchivePool.h"
 #include <cmath>
 #include <limits>
@@ -7,7 +8,6 @@
 namespace {
 // Bound period growth before using floating wrap; source rows are offset from the physical pool origin.
 constexpr auto CenteredPoolRows = 32;
-constexpr auto FirstAlbumRow = 12;
 constexpr auto MaximumExactRowPeriod = 1000000;
 }
 
@@ -58,7 +58,9 @@ void ArchivePool::setColumns(QList<LibraryColumn> columns)
     for (int lane = 0; lane < m_columns.size(); ++lane) {
         const auto &ids = m_columns[lane].albumIds;
         for (int row = 0; row < ids.size(); ++row)
-            m_locations.insert(ids[row], { double(lane), double(row + FirstAlbumRow) });
+            m_locations.insert(
+                    ids[row],
+                    { double(lane), double(row + yalahoo::sceneGeometry::FirstAlbumRow) });
         if (std::isfinite(m_rowPeriod)) {
             const auto count = qMax(1, int(ids.size()));
             const auto next =
@@ -73,7 +75,9 @@ QString ArchivePool::albumAt(ArchiveCell cell) const
     if (m_columns.isEmpty())
         return { };
     const auto &ids = m_columns[wrap(cell.lane, int(m_columns.size()))].albumIds;
-    return ids.isEmpty() ? QString() : ids[wrap(cell.row - FirstAlbumRow, int(ids.size()))];
+    return ids.isEmpty()
+            ? QString()
+            : ids[wrap(cell.row - yalahoo::sceneGeometry::FirstAlbumRow, int(ids.size()))];
 }
 std::optional<ArchiveCell> ArchivePool::location(const QString &id) const
 {
@@ -104,8 +108,9 @@ QString ArchivePool::realAlbumAt(ArchiveCell cell) const
         || std::floor(cell.row) != cell.row)
         return { };
     const auto &ids = m_columns[int(cell.lane)].albumIds;
-    return cell.row >= FirstAlbumRow && cell.row < FirstAlbumRow + ids.size()
-            ? ids[int(cell.row - FirstAlbumRow)]
+    return cell.row >= yalahoo::sceneGeometry::FirstAlbumRow
+                    && cell.row < yalahoo::sceneGeometry::FirstAlbumRow + ids.size()
+            ? ids[int(cell.row - yalahoo::sceneGeometry::FirstAlbumRow)]
             : QString();
 }
 void ArchivePool::update(ArchiveCell center, const std::array<double, lanes> *columnRows)

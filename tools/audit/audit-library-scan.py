@@ -1,4 +1,6 @@
 """Bind the R21 source review to symbols/hashes; target execution remains separate."""
+from audit_support import BASELINE
+from audit_support import source_check
 import hashlib
 import json
 import re
@@ -7,11 +9,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 mapping = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]
-baseline = mapping["57f4f845c20cce646a15dbf4008c2a162aaaf4e2"]
+baseline = mapping[BASELINE]
 frozen = subprocess.check_output(["git", "show", f"{baseline}:scripts/music-library.mjs"], cwd=ROOT)
 scanner = (ROOT / "src/library/DirectoryScanner.cpp").read_text()
 source_extensions = set(re.findall(r"'\.([a-z0-9]+)'", frozen.decode().split("const BROWSER_EXTENSIONS")[0]))
-native_extensions = set(re.findall(r'"([a-z0-9]+)"', scanner.split("audioExtensions{")[1].split("};")[0]))
+native_extensions = set(re.findall(r'"([a-z0-9]+)"', scanner.split("const QSet<QString> &audioExtensions()")[1].split("};")[0]))
 if native_extensions != source_extensions or len(native_extensions) != 16:
     raise SystemExit("Frozen/native audio extensions differ")
 
@@ -32,7 +34,7 @@ CHECKS = [
      "One ID/path index over prior library, O(A+T) space; traversal O(D+F) plus per-directory sorting, at most 64 bounded root membership passes for rollback. Iterative heap frontier avoids stack depth growth; no frame-loop traversal."),
     ("PERF-02", "src/library/LibraryStore.cpp", "m_worker.setMaxThreadCount(1)",
      "One watcher/job, one latest scan intent and one accepted save slot. All iteration/read/JSON/write stays in worker. Cancellation checked per file/directory and while indexing previous records; no per-file GUI signals or GUI worker waiting. R22 metadata runs on its separate event-loop thread after this scan worker returns."),
-    ("PERF-03", "src/library/LibraryStore.cpp", "if (generation != m_generation || result.cancelled)",
+    ("PERF-03", "src/library/LibraryStore.cpp", "if (generation != d->m_generation || result.cancelled)",
      "Only current complete scan becomes const snapshot on GUI; stale result rejected before model replacement/save. Root changes during load retain baseline and cache safety but suppress obsolete display. Model resets once per accepted snapshot, never per file."),
     ("PERF-04", "src/library/DirectoryScanner.h", "Snapshot snapshot",
      "N/A for new GPU resources/passes. CPU live data is prior/current implicit-shared library, worker-built snapshot/index/frontier and one coalesced accepted save; serialize buffer exists only during single worker write. No new render allocation/upload path."),
@@ -56,13 +58,7 @@ for platform, platform_check in platform_checks.items():
     check_id, marker, evidence = platform_check
     rows = []
     for identity, source_path, symbol, explanation in CHECKS + [(check_id, "src/library/DirectoryScanner.cpp", marker, evidence)]:
-        data = (ROOT / source_path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(data.decode().split()):
-            raise SystemExit(f"R21 source drift: {source_path}::{symbol}")
-        rows.append(dict(checkId=identity, requirement=explanation, platform=platform,
-                         sourcePath=source_path, lineOrSymbol=symbol, evidence=explanation,
-                         result="source-reviewed", sourceSha256=hashlib.sha256(data).hexdigest(),
-                         limitations="Markers bind the manual source review; actual test/build execution is separate. R21-P retains missing target checks."))
+        rows.append(source_check(ROOT, source_path, symbol, checkId=identity, requirement=explanation, platform=platform, evidence=explanation, result='source-reviewed', limitations='Markers bind the manual source review; actual test/build execution is separate. R21-P retains missing target checks.'))
     dependencies = []
     for path in ["src/library/CMakeLists.txt", "src/library/LibraryStore.h", "src/library/DirectoryScanner.h",
                  "src/services/LibrarySession.cpp", "src/app/main.cpp", "src/render/StartupCoordinator.h",

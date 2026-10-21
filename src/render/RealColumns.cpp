@@ -1,14 +1,11 @@
+#include "SceneGeometry.h"
 #include "RealColumns.h"
 #include <algorithm>
 #include <cmath>
 
 namespace {
 // Finite column bounds are expressed in source row coordinates; detail and browse use different rates.
-constexpr auto FirstAlbumRow = 12;
-constexpr auto FirstAlbumRowPosition = 12.0;
 constexpr auto LastRowOffset = 11.;
-constexpr auto DetailFollowRate = 9;
-constexpr auto BrowseFollowRate = 3.7;
 }
 
 namespace yalahoo {
@@ -28,19 +25,22 @@ void RealColumns::reset(const QList<int> &counts, ArchiveCell selected,
             }
     }
     if (selected.lane >= 0) {
-        const double midpoint = FirstAlbumRow + (counts[int(selected.lane)] - 1) / 2.0;
-        selected.row =
-                std::clamp(std::isfinite(selected.row) ? selected.row : midpoint,
-                           FirstAlbumRowPosition, LastRowOffset + counts[int(selected.lane)]);
+        const double midpoint =
+                yalahoo::sceneGeometry::FirstAlbumRow + (counts[int(selected.lane)] - 1) / 2.0;
+        selected.row = std::clamp(std::isfinite(selected.row) ? selected.row : midpoint,
+                                  double(yalahoo::sceneGeometry::FirstAlbumRow),
+                                  LastRowOffset + counts[int(selected.lane)]);
     } else
-        selected.row = FirstAlbumRow;
+        selected.row = yalahoo::sceneGeometry::FirstAlbumRow;
     m_selected = selected;
     double distance = 0;
     for (int lane = 0; lane < counts.size(); ++lane) {
         const int count = std::max(0, counts[lane]);
-        const double midpoint = FirstAlbumRow + std::max(0, count - 1) / 2.0;
+        const double midpoint =
+                yalahoo::sceneGeometry::FirstAlbumRow + std::max(0, count - 1) / 2.0;
         const double target = lane == selected.lane && count > 0
-                ? std::clamp(selected.row, FirstAlbumRowPosition, LastRowOffset + count)
+                ? std::clamp(selected.row, double(yalahoo::sceneGeometry::FirstAlbumRow),
+                             LastRowOffset + count)
                 : midpoint;
         const double initial =
                 displayedRow && std::isfinite(*displayedRow) ? *displayedRow : target;
@@ -80,7 +80,8 @@ void RealColumns::select(ArchiveCell cell, bool guided, bool detail)
     auto *current = sample(int(cell.lane));
     if (!current || current->count == 0)
         return;
-    cell.row = std::clamp(cell.row, FirstAlbumRowPosition, LastRowOffset + current->count);
+    cell.row = std::clamp(cell.row, double(yalahoo::sceneGeometry::FirstAlbumRow),
+                          LastRowOffset + current->count);
     if (cell == m_selected)
         return;
     const bool changed = cell.lane != m_selected.lane;
@@ -91,7 +92,8 @@ void RealColumns::select(ArchiveCell cell, bool guided, bool detail)
                      changed && old ? std::abs(old->midpoint - old->row.state().value) : 0.0);
     const double duration =
             archiveTravelDuration(changed ? cell.lane - m_selected.lane : 0, distance);
-    const double rate = detail ? DetailFollowRate : BrowseFollowRate;
+    const double rate = detail ? yalahoo::sceneGeometry::DetailFollowRate
+                               : yalahoo::sceneGeometry::BrowseFollowRate;
     if (changed && old) {
         old->row.retarget(old->midpoint, continueGuided, duration, rate);
         old->activity.retarget(0, continueGuided, duration, rate);
@@ -114,7 +116,7 @@ double RealColumns::row(int lane, double overview) const
     return column ? column->row.state().value
                     + (column->midpoint - column->row.state().value)
                             * std::clamp(overview, 0.0, 1.0)
-                  : FirstAlbumRow;
+                  : yalahoo::sceneGeometry::FirstAlbumRow;
 }
 double RealColumns::activity(int lane) const
 {
@@ -124,7 +126,7 @@ double RealColumns::activity(int lane) const
 Kinematics RealColumns::rowState(int lane) const
 {
     const auto *column = sample(lane);
-    return column ? column->row.state() : Kinematics{ FirstAlbumRow, 0, 0 };
+    return column ? column->row.state() : Kinematics{ yalahoo::sceneGeometry::FirstAlbumRow, 0, 0 };
 }
 Kinematics RealColumns::activityState(int lane) const
 {

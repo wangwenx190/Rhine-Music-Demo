@@ -60,24 +60,8 @@
     },
     {
       "name": "qt-release",
-      "configurePreset": "qt-release",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      },
-      "filter": {
-        "exclude": {
-          "label": "native-visible|render-integration|resource-stress"
-        }
-      },
-      "environment": {
-        "YALAHOO_VERIFY_VISIBLE": "0",
-        "YALAHOO_VERIFY_FOREGROUND": "0",
-        "YALAHOO_VERIFY_LIFECYCLE": "0",
-        "YALAHOO_VERIFY_STRESS": "0"
-      }
+      "inherits": "qt-debug",
+      "configurePreset": "qt-release"
     },
     {
       "name": "qt-release-full",

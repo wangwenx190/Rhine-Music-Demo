@@ -1,3 +1,4 @@
+#include "../support/FileFixture.h"
 #include "Logging.h"
 #include "AppIdentity.h"
 #include <QCoreApplication>
@@ -16,13 +17,6 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 
 namespace {
-QByteArray read(const QString &path)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly))
-        return { };
-    return file.readAll();
-}
 int emitLogs(const QString &directory, const QString &mode)
 {
     LoggingSession::Options options;
@@ -93,7 +87,7 @@ private Q_SLOTS:
         QCOMPARE(output.count("worker-marker"), 24);
         const auto files = QDir(directory.path()).entryList({ u"*.log"_s }, QDir::Files);
         QCOMPARE(files.size(), 1);
-        QCOMPARE(read(QDir(directory.path()).filePath(files.first())), output);
+        QCOMPARE(yalahoo::test::readFile(QDir(directory.path()).filePath(files.first())), output);
     }
     void rotationRetentionAndActiveOwner()
     {
@@ -121,14 +115,14 @@ private Q_SLOTS:
         QVERIFY(!output.isEmpty());
         QVERIFY(!QFile::exists(oldPath));
         QVERIFY(QFile::exists(activePath));
-        QCOMPARE(read(unrelated), QByteArray("preserved"));
+        QCOMPARE(yalahoo::test::readFile(unrelated), QByteArray("preserved"));
         int segments = 0;
         for (const auto &file : root.entryInfoList({ u"yalahoo-*.log"_s }, QDir::Files)) {
             if (file.absoluteFilePath() == activePath)
                 continue;
             ++segments;
             QVERIFY(file.size() <= 512);
-            const auto bytes = read(file.absoluteFilePath());
+            const auto bytes = yalahoo::test::readFile(file.absoluteFilePath());
             QVERIFY(!bytes.contains("\033["));
             QCOMPARE(QString::fromUtf8(bytes).toUtf8(), bytes);
         }

@@ -2,6 +2,8 @@
 // renderer and asynchronous captures retain their completion state.
 
 #pragma once
+#include "SelectionLighting.h"
+#include "PostprocessDefaults.h"
 #include "SceneFrame.h"
 #include "DiagnosticSamples.h"
 #include "AtlasUpload.h"
@@ -15,13 +17,7 @@
 namespace yalahoo::rhi {
 namespace renderDefaults {
 // Standalone input defaults follow the source day palette and camera.
-inline constexpr auto FocusDistance = 25;
-inline constexpr auto Aperture = .0003f;
-inline constexpr auto AoRadius = .18f;
-inline constexpr auto PrintAmbient = .5f;
-inline constexpr auto EnvironmentIntensity = .25f;
 inline constexpr auto ShadowSide = 2048;
-inline constexpr auto Exposure = 1.05f;
 }
 
 QJsonArray adapterInventory();
@@ -64,18 +60,19 @@ struct Input final
             false; // Explicit Review capture; shares existing R32F readback bytes.
     bool postprocess = false, bokeh = false, smaa = false;
     int aoSamples = 0;
-    float focus = renderDefaults::FocusDistance, aperture = renderDefaults::Aperture;
-    float aoRadius = renderDefaults::AoRadius;
+    float focus = yalahoo::rhi::postDefaults::FocusDistance,
+          aperture = yalahoo::rhi::postDefaults::Aperture;
+    float aoRadius = yalahoo::rhi::postDefaults::AoRadius;
     QVector4D rowSettings;
     QVector3D rowColumn, lightColumn, spotPosition, spotTarget, spotColor;
     QVector3D keyColor, skyColor, groundColor, lightIntensities, background;
-    float printAmbient = renderDefaults::PrintAmbient, rowDetail = 0, rowFill = 1,
-          spotIntensity = 0, environmentIntensity = renderDefaults::EnvironmentIntensity;
+    float printAmbient = yalahoo::lightingDefaults::PrintAmbient, rowDetail = 0, rowFill = 1,
+          spotIntensity = 0, environmentIntensity = yalahoo::lightingDefaults::Environment;
     int shadowSize = renderDefaults::ShadowSide;
     int captureSamples = 1;
     int opticalProbe = 0; // Review-only selector, rejected by production builds.
-    float warmth = 1, clarity = 0, exposure = renderDefaults::Exposure, scatterStrength = 1,
-          areaIntensity = 0;
+    float warmth = 1, clarity = 0, exposure = yalahoo::lightingDefaults::Exposure,
+          scatterStrength = 1, areaIntensity = 0;
     QVector3D scatterColor, areaPosition, areaTarget;
     bool shells = false, showPaper = true, rawOutput = false;
     float hdrHeadroom = 1;

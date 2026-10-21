@@ -79,6 +79,7 @@ qt_add_translations(
     QT_TRANSLATION_CATALOGS qtbase qtdeclarative qtmultimedia
 )
 enable_testing()
+include(cmake/NativeTests.cmake)
 include(cmake/SourceFormat.cmake)
 add_subdirectory(tests/unit)
 add_subdirectory(tests/integration)

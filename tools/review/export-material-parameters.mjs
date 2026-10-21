@@ -1,5 +1,6 @@
+import {transpile} from './frozen-source.mjs';
 // Execute frozen material/theme functions without a browser or GPU image oracle.
-import {execFrozenGit} from './frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import fs from 'node:fs/promises';
@@ -7,7 +8,7 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '../..');
 const require = createRequire(path.join(root, 'legacy-web/package.json'));
 const ts = require('typescript'), THREE = require('three');
-const baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const baseline = baselineRevision;
 const sources = [], modules = {
     three: THREE
 };
@@ -19,10 +20,7 @@ for (const name
     });
     sources.push(
         {path: `src/${name}.ts`, sha256: createHash('sha256').update(source).digest('hex')});
-    const js =
-        ts.transpileModule(source, {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS},
-          }).outputText;
+    const js = transpile(source);
     const exports = {};
     new Function('exports', 'require', js)(exports, (id) => {
         if (!(id in modules))

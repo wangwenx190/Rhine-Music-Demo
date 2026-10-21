@@ -36,7 +36,6 @@ constexpr int UniformVectorScalars = 4;
 constexpr int MaximumKernelSamples = 64;
 constexpr int PostPrefixBytes = 80;
 constexpr int KernelScalarCount = 256;
-constexpr int FullscreenTriangleVertices = 3;
 }
 
 namespace yalahoo::rhi {
@@ -302,7 +301,7 @@ void Postprocess::render(QRhiCommandBuffer *cb)
         cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
         cb->setGraphicsPipeline(pass.pipeline.get());
         cb->setShaderResources();
-        cb->draw(FullscreenTriangleVertices);
+        cb->draw(yalahoo::rhi::renderData::FullscreenTriangleVertices);
         cb->endPass();
     }
 }

@@ -1,5 +1,5 @@
 """Bind manually reviewed source optics and capture edges to hashes; reports stay local."""
-import hashlib
+from audit_support import source_check
 import json
 from pathlib import Path
 
@@ -61,15 +61,7 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                         "prove static translation. Current actual GPU is macOS Metal; unavailable "
                         "D3D11 runtime stays R36; Linux GL runtime stays R36. No version or install path is pinned.")]
     for check_id, path, symbol, conclusion in entries:
-        content = (ROOT / path).read_bytes()
-        if " ".join(symbol.split()) not in " ".join(content.decode().split()):
-            raise SystemExit(f"Audit source drift: {path}::{symbol}")
-        rows.append(dict(checkId=check_id, sourcePath=path, lineOrSymbol=symbol,
-                         sourceSha256=hashlib.sha256(content).hexdigest(), evidence=conclusion,
-                         result="static-audit-passed", platform=host,
-                         limitations="Static source/graph scope; runtime listed separately. "
-                                     "No source screenshot comparison or claim that array "
-                                     "flicker/blur, fog, postprocessing or presentation is closed."))
+        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Static source/graph scope; runtime listed separately. No source screenshot comparison or claim that array flicker/blur, fog, postprocessing or presentation is closed.'))
     output = ROOT / "verification" / f"{host}-static" / "rhi-optics"
     output.mkdir(parents=True, exist_ok=True)
     (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")

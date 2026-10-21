@@ -1,3 +1,4 @@
+#include "ProductDefaults.h"
 #include "LibrarySession.h"
 #include <QCoreApplication>
 #include "PlaybackController.h"
@@ -11,7 +12,6 @@
 
 namespace {
 // Previous restarts the current track only after the authored playback-position threshold.
-constexpr auto DefaultSongVolume = .65f;
 constexpr auto RestartPreviousThresholdMilliseconds = 3000;
 }
 
@@ -21,7 +21,7 @@ namespace yalahoo {
 PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
     : QObject(parent), m_library(library), m_devices(this), m_output(this), m_player(this)
 {
-    m_output.setVolume(DefaultSongVolume);
+    m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
     m_player.setPlaybackRate(1);
     m_player.setAudioOutput(&m_output);
     connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {

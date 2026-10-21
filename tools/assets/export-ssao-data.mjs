@@ -1,11 +1,10 @@
-import {execFrozenGit} from '../review/frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from '../review/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
-const root = path.resolve(import.meta.dirname, '../..'),
-      baseline = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const root = path.resolve(import.meta.dirname, '../..'), baseline = baselineRevision;
 const {SSAOPass} = await import(pathToFileURL(
     path.join(root, 'legacy-web/node_modules/three/examples/jsm/postprocessing/SSAOPass.js'),
     ));

@@ -1,3 +1,5 @@
+#include "SceneGeometry.h"
+#include "Units.h"
 #include "RenderData.h"
 #include "RhiItem.h"
 #include "Logging.h"
@@ -28,25 +30,15 @@
 #include <cstdio>
 
 namespace {
+constexpr float ShadowStrength = yalahoo::rhi::renderData::PaperBottom;
 // Geometry and source lighting parameters retain their original float precision at GPU upload.
-constexpr auto CaseHalfWidth = 2.225f;
-constexpr auto CaseBottom = .175f;
-constexpr auto CaseTop = 3.525f;
-constexpr auto CaseHalfDepth = .07f;
-constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto EmptyBoundsMagnitude = 1e6f;
-constexpr auto PaperLeftMagnitude = 1.36f;
-constexpr auto PaperRight = 1.7f;
-constexpr auto PaperBottom = .32f;
-constexpr auto PaperFront = .027f;
-constexpr auto PaperTop = 3.38f;
 constexpr auto ReviewFloorDepth = .05f;
 constexpr auto ProductFloorHalfExtent = 100;
 constexpr auto ProductFloorDepth = 4.63f;
 constexpr auto ShadowNormalBias = .035f;
 constexpr auto ShadowDepthBias = .0003f;
 constexpr auto RibbonLaneWidth = 27;
-constexpr auto ArchiveRowSpacing = .62f;
 constexpr auto GaussianHalfMaximumExponent = .6931471805599453f;
 constexpr auto LightDistanceHeight = 3.35f;
 constexpr auto LightDistanceDepth = 5.5f;
@@ -62,7 +54,6 @@ constexpr auto NeighborRowWidth = 2.4f;
 constexpr auto CoreLightGain = .58f;
 constexpr auto SpillLightGain = .42f;
 constexpr auto CoreAmbientFloor = .12f;
-constexpr auto MillisecondsPerSecond = 1000;
 }
 
 using namespace Qt::StringLiterals;
@@ -72,7 +63,6 @@ using namespace Qt::StringLiterals;
 #endif
 
 namespace {
-constexpr float ShadowStrength = PaperBottom;
 constexpr float FloorRoughness = .95f;
 // The ordinal order matches the capture texture/output tables; aliases share a readback owner.
 enum CaptureField {
@@ -115,7 +105,6 @@ enum FrameBinding {
 };
 constexpr int VectorScalars = 4;
 constexpr int MatrixScalars = 16;
-constexpr int CaseSurfaceCount = 3;
 constexpr int ClipPlaneCount = 6;
 constexpr int UniformBytes = 832;
 constexpr int BackgroundOffsetBytes = 320;
@@ -134,14 +123,10 @@ constexpr int InstanceSecondaryLightOffsetBytes = 96;
 constexpr int MaximumOpticalProbe = 13;
 constexpr int VisibilityProbe = 10;
 constexpr int MinimumBatchedEntities = 8;
-constexpr int FullscreenTriangleVertices = 3;
 constexpr int ExtraGeometryVertices = 15;
 constexpr int ExtraGeometryIndices = 21;
-constexpr int ExtraDrawUniforms = 6;
 constexpr int ShadowFilterRadius = 4;
-constexpr int HalfRgbaBytes = 8;
 constexpr int ReviewFloorHalfExtent = 6;
-constexpr int VectorAxes = 3;
 constexpr int LightDistanceWidth = 6;
 constexpr int MinimumAoSamples = 16;
 constexpr int MediumAoSamples = 32;
@@ -207,8 +192,9 @@ struct Target final
     bool prepass = false;
     QSize size;
     Owned<QRhiTexture> color, normal, depth;
-    std::array<Owned<QRhiTexture>, CaseSurfaceCount> multisample;
-    std::array<Owned<QRhiRenderBuffer>, CaseSurfaceCount> multisampleBuffers;
+    std::array<Owned<QRhiTexture>, yalahoo::rhi::renderData::CaseSurfaceCount> multisample;
+    std::array<Owned<QRhiRenderBuffer>, yalahoo::rhi::renderData::CaseSurfaceCount>
+            multisampleBuffers;
     std::shared_ptr<QRhiRenderBuffer> z;
     Owned<QRhiTexture> hardwareDepth;
     Owned<QRhiRenderPassDescriptor> pass;
@@ -259,9 +245,11 @@ QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &ent
     for (int i = 0; i < entities.size(); ++i) {
         const auto matrix = input.scene.projection * input.scene.view * entities[i];
         std::array<bool, ClipPlaneCount> outside{ true, true, true, true, true, true };
-        for (float x : { -CaseHalfWidth, CaseHalfWidth })
-            for (float y : { CaseBottom, CaseTop })
-                for (float z : { -CaseHalfDepth, CaseHalfDepth }) {
+        for (float x :
+             { -yalahoo::sceneGeometry::CaseHalfWidth, yalahoo::sceneGeometry::CaseHalfWidth })
+            for (float y : { yalahoo::sceneGeometry::CaseBottom, yalahoo::sceneGeometry::CaseTop })
+                for (float z : { -yalahoo::sceneGeometry::CaseHalfDepth,
+                                 yalahoo::sceneGeometry::CaseHalfDepth }) {
                     const auto v = matrix * QVector4D(x, y, z, 1);
                     outside[0] = outside[0] && v.x() < -v.w();
                     outside[1] = outside[1] && v.x() > v.w();
@@ -343,7 +331,9 @@ public:
                 reportFailure(error.what());
             }
         }
-        synchronizationMs = sync.isValid() ? sync.nsecsElapsed() / NanosecondsPerMillisecond : 0;
+        synchronizationMs = sync.isValid()
+                ? sync.nsecsElapsed() / yalahoo::units::NanosecondsPerMillisecond
+                : 0;
     }
     // Rebuild only when native resources or attachment compatibility change.
     // Initialization validates the resource plan before submitting any partial graph.
@@ -628,10 +618,10 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
         desc.setColorAttachments({ target.color.get() });
     if (samples > 1) {
         QVector<QRhiColorAttachment> attachments;
-        const std::array<QRhiTexture *, CaseSurfaceCount> resolves{ target.color.get(),
-                                                                    target.normal.get(),
-                                                                    target.depth.get() };
-        for (int i = 0; i < (mrt ? CaseSurfaceCount : 1); ++i) {
+        const std::array<QRhiTexture *, yalahoo::rhi::renderData::CaseSurfaceCount> resolves{
+            target.color.get(), target.normal.get(), target.depth.get()
+        };
+        for (int i = 0; i < (mrt ? yalahoo::rhi::renderData::CaseSurfaceCount : 1); ++i) {
             QRhiColorAttachment attachment;
             const auto *context = QOpenGLContext::currentContext();
             const bool textureStorageAvailable = api->backend() != QRhi::OpenGLES2
@@ -809,7 +799,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             QVector3D minimum(EmptyBoundsMagnitude, EmptyBoundsMagnitude, EmptyBoundsMagnitude),
                     maximum(-EmptyBoundsMagnitude, -EmptyBoundsMagnitude, -EmptyBoundsMagnitude);
             for (const auto &v : batch.vertices)
-                for (int axis = 0; axis < VectorAxes; ++axis) {
+                for (int axis = 0; axis < yalahoo::units::VectorAxes; ++axis) {
                     minimum[axis] = std::min(minimum[axis], v[axis]);
                     maximum[axis] = std::max(maximum[axis], v[axis]);
                 }
@@ -827,10 +817,17 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         spine = append(batches[1]);
         tray = append(batches[2]);
         assets::Batch quad;
-        quad.vertices = { { { -PaperLeftMagnitude, PaperBottom, PaperFront, 0, 0, 1, 0, 1 } },
-                          { { PaperRight, PaperBottom, PaperFront, 0, 0, 1, 1, 1 } },
-                          { { PaperRight, PaperTop, PaperFront, 0, 0, 1, 1, 0 } },
-                          { { -PaperLeftMagnitude, PaperTop, PaperFront, 0, 0, 1, 0, 0 } } };
+        quad.vertices = {
+            { { -yalahoo::rhi::renderData::PaperLeftMagnitude,
+                yalahoo::rhi::renderData::PaperBottom, yalahoo::rhi::renderData::PaperFront, 0, 0,
+                1, 0, 1 } },
+            { { yalahoo::rhi::renderData::PaperRight, yalahoo::rhi::renderData::PaperBottom,
+                yalahoo::rhi::renderData::PaperFront, 0, 0, 1, 1, 1 } },
+            { { yalahoo::rhi::renderData::PaperRight, yalahoo::rhi::renderData::PaperTop,
+                yalahoo::rhi::renderData::PaperFront, 0, 0, 1, 1, 0 } },
+            { { -yalahoo::rhi::renderData::PaperLeftMagnitude, yalahoo::rhi::renderData::PaperTop,
+                yalahoo::rhi::renderData::PaperFront, 0, 0, 1, 0, 0 } }
+        };
         quad.indices = { 0, 1, 2, 0, 2, 3 };
         paper = append(quad);
         quad.vertices = {
@@ -863,10 +860,12 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 api->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, indexBytes.size()));
         require(indices->create(), "RHI index buffer failed");
         uniformStride = api->ubufAligned(sizeof(Uniform));
-        uniforms.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                      uniformStride
-                                              * (renderData::MaximumCaseEntities * CaseSurfaceCount
-                                                 + ExtraDrawUniforms)));
+        uniforms.reset(
+                api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                               uniformStride
+                                       * (renderData::MaximumCaseEntities
+                                                  * yalahoo::rhi::renderData::CaseSurfaceCount
+                                          + yalahoo::rhi::renderData::ExtraDrawUniforms)));
         require(uniforms->create(), "RHI uniform buffer failed");
         uniformScratch = QByteArray(uniforms->size(), '\0');
         instanceBuffer.reset(
@@ -1360,17 +1359,20 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (uploadGeometry) {
         updates->uploadStaticBuffer(vertices.get(), vertexBytes);
         updates->uploadStaticBuffer(indices.get(), indexBytes);
-        const auto roomHalf = floatTextureBytes(
-                u":/rhi/environment/room-pmrem.rgba16f"_s,
-                renderData::EnvironmentWidth * renderData::EnvironmentHeight * HalfRgbaBytes);
+        const auto roomHalf =
+                floatTextureBytes(u":/rhi/environment/room-pmrem.rgba16f"_s,
+                                  renderData::EnvironmentWidth * renderData::EnvironmentHeight
+                                          * pixelStorage::HalfRgbaOrDepthStencilBytes);
         updates->uploadTexture(environment.get(),
                                QRhiTextureUploadDescription({ QRhiTextureUploadEntry(
                                        0, 0, QRhiTextureSubresourceUploadDescription(roomHalf)) }));
-        const std::array<QRhiTexture *, CaseSurfaceCount> lookup{ dfg.get(), ltc1.get(),
-                                                                  ltc2.get() };
-        const std::array<QString, CaseSurfaceCount> names{ u":/rhi/environment/dfg.rgba32f"_s,
-                                                           u":/rhi/environment/ltc1.rgba32f"_s,
-                                                           u":/rhi/environment/ltc2.rgba32f"_s };
+        const std::array<QRhiTexture *, yalahoo::rhi::renderData::CaseSurfaceCount> lookup{
+            dfg.get(), ltc1.get(), ltc2.get()
+        };
+        const std::array<QString, yalahoo::rhi::renderData::CaseSurfaceCount> names{
+            u":/rhi/environment/dfg.rgba32f"_s, u":/rhi/environment/ltc1.rgba32f"_s,
+            u":/rhi/environment/ltc2.rgba32f"_s
+        };
         for (int i = 0; i < 3; ++i) {
             const auto bytes = floatTextureBytes(names[i],
                                                  lookup[i]->pixelSize().width()
@@ -1464,10 +1466,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         entityLight0.clear();
         entityLight1.clear();
         for (const auto &model : entities) {
-            const auto origin = model.column(VectorAxes).toVector3D();
-            const float row =
-                    (origin.z() - input.rowColumn.z() - input.rowSettings.w() * ArchiveRowSpacing)
-                    / (.5f * input.rowSettings.z() * ArchiveRowSpacing);
+            const auto origin = model.column(yalahoo::units::VectorAxes).toVector3D();
+            const float row = (origin.z() - input.rowColumn.z()
+                               - input.rowSettings.w() * yalahoo::sceneGeometry::RowSpacing)
+                    / (.5f * input.rowSettings.z() * yalahoo::sceneGeometry::RowSpacing);
             const float lane = (origin.x() - input.rowColumn.x()) / RibbonLaneWidth;
             const float lane2 = lane * lane;
             const float field = std::exp(-GaussianHalfMaximumExponent * row * row)
@@ -1559,13 +1561,14 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     };
     QVector<ShellDraw> shells;
     if (input.shells) {
-        shells.reserve(entities.size() * CaseSurfaceCount);
+        shells.reserve(entities.size() * yalahoo::rhi::renderData::CaseSurfaceCount);
         require(entities.size() == 1 || input.entityIds.size() == entities.size(),
                 "Shell instances require stable IDs");
         for (int i : opaqueOrder) {
-            const std::array<Mesh, CaseSurfaceCount> meshes{ lid, spine, tray };
+            const std::array<Mesh, yalahoo::rhi::renderData::CaseSurfaceCount> meshes{ lid, spine,
+                                                                                       tray };
             const auto id = input.entityIds.isEmpty() ? 0 : input.entityIds[i];
-            for (int surface = 0; surface < CaseSurfaceCount; ++surface) {
+            for (int surface = 0; surface < yalahoo::rhi::renderData::CaseSurfaceCount; ++surface) {
                 const auto mesh = meshes[surface];
                 const auto center = input.scene.view * entities[i] * QVector4D(mesh.center, 1);
                 shells.append({ mesh, visible[i] ? append(entities[i], LidKind + surface, i) : 0,
@@ -1731,7 +1734,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cb->setViewport({ 0, 0, float(targetSize.width()), float(targetSize.height()) });
         cb->setGraphicsPipeline(copyPipeline.get());
         cb->setShaderResources(copyBindings.get());
-        cb->draw(FullscreenTriangleVertices);
+        cb->draw(yalahoo::rhi::renderData::FullscreenTriangleVertices);
         if (recordCapture)
             opticalEvents.append(u"composite-copy"_s);
         if (!input.geometryDiagnostic) {
@@ -1795,7 +1798,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     cb->setViewport({ 0, 0, float(renderTarget()->pixelSize().width()),
                       float(renderTarget()->pixelSize().height()) });
     cb->setShaderResources();
-    cb->draw(FullscreenTriangleVertices);
+    cb->draw(yalahoo::rhi::renderData::FullscreenTriangleVertices);
     cb->endPass();
     if (deliver && input.request != capturedRequest && pending.size() < 2) {
         capturedRequest = input.request;
@@ -2220,14 +2223,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         diagnose({ std::chrono::duration<double, std::milli>(
                            std::chrono::steady_clock::now().time_since_epoch())
                            .count(),
-                   cpu.nsecsElapsed() / NanosecondsPerMillisecond, synchronizationMs,
-                   gpu > 0 ? gpu * MillisecondsPerSecond : -1, frameUploadBytes,
-                   selectedUploadBytes, qint64(cursor) });
+                   cpu.nsecsElapsed() / yalahoo::units::NanosecondsPerMillisecond,
+                   synchronizationMs, gpu > 0 ? gpu * yalahoo::units::MillisecondsPerSecond : -1,
+                   frameUploadBytes, selectedUploadBytes, qint64(cursor) });
     }
     if (input.profile && profile) {
         const auto gpu = cb->lastCompletedGpuTime();
         profile(QJsonObject{
-                { u"cpuSubmitMs"_s, cpu.nsecsElapsed() / NanosecondsPerMillisecond },
+                { u"cpuSubmitMs"_s,
+                  cpu.nsecsElapsed() / yalahoo::units::NanosecondsPerMillisecond },
                 { u"synchronizationMs"_s, synchronizationMs },
                 { u"frameRevision"_s, qint64(input.scene.revision) },
                 { u"submission"_s, qint64(synchronizedSubmission) },
@@ -2251,7 +2255,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { u"coverSnapshotShares"_s, qint64(coverSnapshotShares) },
                 { u"postprocessRevision"_s, qint64(post.revision()) },
                 { u"gpuFrameMs"_s,
-                  gpu > 0 ? QJsonValue(gpu * MillisecondsPerSecond) : QJsonValue() },
+                  gpu > 0 ? QJsonValue(gpu * yalahoo::units::MillisecondsPerSecond)
+                          : QJsonValue() },
                 { u"atlasPending"_s, atlasQueue.pending() },
                 { u"atlasUploadBytes"_s, frameUploadBytes },
                 { u"selectedUploadBytes"_s, selectedUploadBytes },

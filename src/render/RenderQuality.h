@@ -2,6 +2,7 @@
 // bounds protect integer dimensions and attachment allocation.
 
 #pragma once
+#include "SceneFrame.h"
 #include <QObject>
 #include <QSize>
 #include <QString>
@@ -11,8 +12,6 @@ namespace yalahoo {
 namespace renderQuality {
 // The default output follows the source quality contract without a DPR-dependent sample reduction.
 inline constexpr auto AoSamples = 64;
-inline constexpr auto InitialWidthPixels = 960;
-inline constexpr auto InitialHeightPixels = 640;
 inline constexpr auto DefaultDepthOfFieldPercent = 100;
 }
 
@@ -48,7 +47,7 @@ Q_SIGNALS:
     void changed();
 
 private:
-    QSize m_size{ renderQuality::InitialWidthPixels, renderQuality::InitialHeightPixels };
+    QSize m_size{ yalahoo::sceneDefaults::WidthPixels, yalahoo::sceneDefaults::HeightPixels };
     double m_depthOfField = renderQuality::DefaultDepthOfFieldPercent;
 };
 }

@@ -12,7 +12,7 @@ Quick3D Review的`scene/CaseMaterials.qml`持有三个共享壳体材质、一�
 | 侧脊 | .88→.84 | .25→.30 | .06→.08 | 4.5→3.2 | .16 / .20 |
 | 后托 | .80→.70 | .38→.46 | .038→.05 | 4.5→2 | .08 / .38 |
 
-IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独立计算密度与高光。详情只使主盖粗糙度趋向基础 .27 / 暖昼 .34，侧脊和后托不跟随。数值 warmth/clarity 都是连续输入，实际主题动画按 [灯光契约](lighting.md) 接入同一个 FrameClock。参数直接进入 QML 与生产 RHI uniform。R19C1 移除了 R07 的 ROI 搜索系数（环境/粗糙度 1.01、厚度 .91809、衰减距离 1.0201）；它们没有单位或算法依据，不再参与实现。IOR、颜色、封面与几何仍按冻结源码。
+IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独立计算密度与高光。详情只使主盖粗糙度趋向基础 .27 / 暖昼 .34，侧脊和后托不跟随。数值 warmth/clarity 都是连续输入，实际主题动画按 [灯光契约](lighting.md) 接入同一个 FrameClock。参数唯一由`src/render/OpticalParameters.h`的连续模板计算维护；`SourceOptics`缓存double结果供三个Quick3D材质读取，生产RHI以float实例化同一公式并上传uniform。R19C1 移除了 R07 的 ROI 搜索系数（环境/粗糙度 1.01、厚度 .91809、衰减距离 1.0201）；它们没有单位或算法依据，不再参与实现。IOR、颜色、封面与几何仍按冻结源码。
 
 暖昼表面色为 #fffdf8 / #e7e1d8 / #ece6dc；夜间为 #f6fbff / #f6fbff / #c6d6e5。暖昼衰减色 #f3e9db，夜间主盖/侧脊 #dceafd；后托保留原衰减色。QML color 作为线性 shader uniform，颜色插值发生在线性 shader 中。隔离材质Review的环境强度暖昼.48/深夜.68来自场景environmentIntensity覆盖，不再乘configure的.65；生产音乐环境强度由lighting.md定义。
 

@@ -2,6 +2,7 @@
 // synthesizing delayed sounds for events that occurred while muted.
 
 #pragma once
+#include "ProductDefaults.h"
 #include <QMediaDevices>
 #include <QAudioDevice>
 #include <QSoundEffect>
@@ -13,7 +14,6 @@ namespace yalahoo {
 namespace feedbackAudio {
 // Bounded simultaneous feedback voices and normalized default volume.
 inline constexpr auto VoiceCount = 4;
-inline constexpr auto DefaultVolume = .22;
 }
 
 class AudioAmbienceTest;
@@ -53,7 +53,7 @@ private:
     QMediaDevices m_devices;
     QHash<QString, QUrl> m_sources;
     std::array<std::unique_ptr<QSoundEffect>, feedbackAudio::VoiceCount> m_pool;
-    double m_volume = feedbackAudio::DefaultVolume;
+    double m_volume = yalahoo::productDefaults::DefaultFeedbackVolume;
     bool m_enabled = true, m_refreshPending = false;
 };
 }

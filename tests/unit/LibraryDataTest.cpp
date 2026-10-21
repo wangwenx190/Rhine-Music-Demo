@@ -36,25 +36,11 @@ public:
     {
         return { };
     }
-    bool requestIntroduction(AlbumQuery query, RequestToken token) override
+    bool request(AlbumQuery query, RequestToken token, MetadataKind kind) override
     {
         queries.append(query);
         requests.append(token);
-        kinds.append(MetadataKind::Introduction);
-        return true;
-    }
-    bool requestCredits(AlbumQuery query, RequestToken token) override
-    {
-        queries.append(query);
-        requests.append(token);
-        kinds.append(MetadataKind::Credits);
-        return true;
-    }
-    bool requestEnrichment(AlbumQuery query, RequestToken token) override
-    {
-        queries.append(query);
-        requests.append(token);
-        kinds.append(MetadataKind::Enrichment);
+        kinds.append(kind);
         return true;
     }
     void cancel(RequestToken token) override

@@ -6,7 +6,6 @@
 
 namespace {
 // Shadow power-of-two growth is bounded before conversion to the native integer dimension.
-constexpr auto DefaultDepthOfFieldPercent = 100;
 constexpr auto MaximumShadowSideShift = 30;
 }
 
@@ -18,7 +17,8 @@ RenderQuality::RenderQuality(QObject *parent) : QObject(parent)
 }
 void RenderQuality::configure(const QVariantMap &input)
 {
-    const auto value = input.value(u"depthOfField"_s, DefaultDepthOfFieldPercent);
+    const auto value =
+            input.value(u"depthOfField"_s, yalahoo::renderQuality::DefaultDepthOfFieldPercent);
     bool valid = false;
     const double amount = value.toDouble(&valid);
     if (!valid || value.metaType().id() == QMetaType::QString

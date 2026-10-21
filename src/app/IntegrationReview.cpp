@@ -1,3 +1,5 @@
+#include "ReviewSupport.h"
+#include "Units.h"
 #include "SceneAdapter.h"
 #include "Logging.h"
 #include "IntegrationReview.h"
@@ -18,7 +20,6 @@
 #include <QSaveFile>
 #include <QScreen>
 #include <QTimer>
-#include <chrono>
 #include <memory>
 #include <mutex>
 #include <algorithm>
@@ -29,11 +30,8 @@ namespace {
 constexpr auto MinimumSampleSeconds = 12;
 constexpr auto MaximumSampleSeconds = 120;
 constexpr auto MaximumDiagnosticSamples = 40000;
-constexpr auto MillisecondsPerSecond = 1000;
-constexpr auto NanosecondsPerMillisecond = 1e6;
 constexpr auto FirstInputDelayMilliseconds = 350;
 constexpr auto FallbackRefreshHertz = 60;
-constexpr auto LifecycleRebuildCount = 10;
 constexpr auto FinalizeDelayMilliseconds = 200;
 constexpr auto MinimumObservedSamples = 100;
 constexpr auto FinalizeDeadlineMilliseconds = 60000;
@@ -52,12 +50,6 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-qint64 nowNs()
-{
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                   std::chrono::steady_clock::now().time_since_epoch())
-            .count();
-}
 QJsonObject distribution(QVector<double> values, double period)
 {
     if (values.isEmpty())
@@ -146,7 +138,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 [events] {
                     std::scoped_lock lock(events->mutex);
                     if (events->swapped.size() < MaximumDiagnosticSamples)
-                        events->swapped.append(nowNs());
+                        events->swapped.append(yalahoo::review::nowNs());
                     else
                         events->overflow = true;
                 },
@@ -193,8 +185,8 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                         return;
                     }
                     const auto revision = quint64(sample[u"inputRevision"_s].toInteger());
-                    const auto sampleStage =
-                            elapsed.elapsed() < (seconds + 1) * MillisecondsPerSecond
+                    const auto sampleStage = elapsed.elapsed()
+                                    < (seconds + 1) * yalahoo::units::MillisecondsPerSecond
                             ? inputStages.value(revision, u"startup"_s)
                             : stage;
                     sample[u"stage"_s] = sampleStage;
@@ -221,7 +213,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                         firstSubmittedNs.insert(revision, sample[u"submittedNs"_s].toInteger());
                         const double latency = (sample[u"submittedNs"_s].toInteger()
                                                 - sample[u"inputReceivedNs"_s].toInteger())
-                                / NanosecondsPerMillisecond;
+                                / yalahoo::units::NanosecondsPerMillisecond;
                         sample[u"inputToQtSubmitMs"_s] = latency;
                         inputLatency[sampleStage].append(latency);
                     }
@@ -242,15 +234,15 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         });
     };
     bindWindow();
-    const double period = MillisecondsPerSecond
+    const double period = yalahoo::units::MillisecondsPerSecond
             / (window->screen() ? window->screen()->refreshRate() : FallbackRefreshHertz);
     // Drive actions once via Qt timers. Production FrameAnimation remains the only frame source.
     for (int i = 0; i < 4; ++i)
-        QTimer::singleShot(int((.5 + i * seconds / 4) * MillisecondsPerSecond), Qt::PreciseTimer,
-                           window, [&, i] {
+        QTimer::singleShot(int((.5 + i * seconds / 4) * yalahoo::units::MillisecondsPerSecond),
+                           Qt::PreciseTimer, window, [&, i] {
                                changeStage(i);
                            });
-    const int baseTime = int((seconds + 1) * MillisecondsPerSecond);
+    const int baseTime = int((seconds + 1) * yalahoo::units::MillisecondsPerSecond);
     const QVector<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                 { 960, 900 },   { 930, 900 },   { 390, 844 },
                                 { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
@@ -262,7 +254,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         if (index < sizes.size()) {
             stage = "resize"_L1;
             const QSize size = sizes[index];
-            const auto after = nowNs();
+            const auto after = yalahoo::review::nowNs();
             awaiting = [size, after](const QJsonObject &sample) {
                 return sample[u"submittedNs"_s].toInteger() >= after
                         && sample[u"logicalWidth"_s].toDouble() == size.width()
@@ -277,7 +269,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
         } else if (index < sizes.size() + effectStrengths.size()) {
             stage = "quality"_L1;
             const int strength = effectStrengths[index - sizes.size()];
-            const auto after = nowNs();
+            const auto after = yalahoo::review::nowNs();
             awaiting = [&, strength, after](const QJsonObject &sample) {
                 const auto target = scene.quality()->targetSize();
                 const bool match = sample[u"submittedNs"_s].toInteger() >= after
@@ -297,9 +289,10 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
             item->update();
             actions.append(QJsonObject{
                     { u"stage"_s, stage }, { u"depthOfField"_s, strength }, { u"atNs"_s, after } });
-        } else if (index < sizes.size() + effectStrengths.size() + LifecycleRebuildCount) {
+        } else if (index < sizes.size() + effectStrengths.size()
+                           + yalahoo::review::LifecycleRebuildCount) {
             stage = "rebuild"_L1;
-            const auto after = nowNs();
+            const auto after = yalahoo::review::nowNs();
             awaiting = [&, after](const QJsonObject &sample) {
                 const bool match = sample[u"submittedNs"_s].toInteger() >= after
                         && sample[u"resourceGeneration"_s].toInteger() == 1
@@ -358,7 +351,7 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                 && verification::windowPolicySatisfied(*window)
                 && samples.size() > MinimumObservedSamples && receivedInputs.size() == 4
                 && coalesced == 0 && baseBytes == finalBytes && observedEffects.size() == 4
-                && rebuilt == LifecycleRebuildCount;
+                && rebuilt == yalahoo::review::LifecycleRebuildCount;
         for (const auto &size : sizes)
             passed = passed
                     && observedSizes.contains(u"%1x%2"_s.arg(size.width()).arg(size.height()));
@@ -383,7 +376,8 @@ int reviewIntegration(QGuiApplication &app, QQuickWindow &initialWindow, SceneAd
                     if (time >= it.value())
                         name = inputStages.value(it.key());
                 if (previous && time < normalEnd && name != "startup"_L1)
-                    cadence[name].append((time - previous) / NanosecondsPerMillisecond);
+                    cadence[name].append((time - previous)
+                                         / yalahoo::units::NanosecondsPerMillisecond);
                 swappedEvents.append(QJsonObject{ { u"swappedNs"_s, time } });
                 previous = time;
             }

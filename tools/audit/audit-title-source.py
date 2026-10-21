@@ -1,18 +1,16 @@
 """R19F provenance and call-path review; runtime and visual quality remain separate."""
+from audit_support import BASELINE
+from audit_support import source_check
+from audit_support import historical as record
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text())['revisions']
-BASELINE = MAPPING['57f4f845c20cce646a15dbf4008c2a162aaaf4e2']
+BASELINE = MAPPING[BASELINE]
 
 
-def record(revision, path, reason):
-    data = subprocess.check_output(['git', 'show', f'{revision}:{path}'], cwd=ROOT)
-    return dict(revision=revision, sourcePath=path,
-                sourceSha256=hashlib.sha256(data).hexdigest(), evidence=reason)
 
 
 frozen = [record(BASELINE, 'src/' + name, reason) for name, reason in [
@@ -73,13 +71,7 @@ current = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
     rows = []
     for identity, path, symbol, reason in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native platform compiler/backend/resources preserved; cross-target shader generation is not target runtime.')]:
-        data = (ROOT / path).read_bytes()
-        if ' '.join(symbol.split()) not in ' '.join(data.decode().split()):
-            raise SystemExit(f'Title source drift: {path}::{symbol}')
-        rows.append(dict(checkId=identity, requirement=reason, platform=platform, sourcePath=path,
-                         lineOrSymbol=symbol, evidence=reason,
-                         sourceSha256=hashlib.sha256(data).hexdigest(), result='static-audit-passed',
-                         limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R36.'))
+        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=reason, platform=platform, evidence=reason, result='static-audit-passed', limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R36.'))
     directory = ROOT / 'verification' / f'{platform}-static' / 'title-reels' / 'r19f'
     directory.mkdir(parents=True, exist_ok=True)
     (directory / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, current=current, checks=rows), indent=2) + '\n')

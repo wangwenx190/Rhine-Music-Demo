@@ -21,7 +21,7 @@ public:
     {
         return { };
     }
-    bool requestIntroduction(AlbumQuery, RequestToken token) override
+    bool request(AlbumQuery, RequestToken token, MetadataKind) override
     {
         ProviderResult result;
         result.requestId = token.requestId;
@@ -32,14 +32,6 @@ public:
         Q_EMIT resultReady(
                 result); // Router guarantees queued delivery even for this test provider.
         return true;
-    }
-    bool requestCredits(AlbumQuery query, RequestToken token) override
-    {
-        return requestIntroduction(query, token);
-    }
-    bool requestEnrichment(AlbumQuery query, RequestToken token) override
-    {
-        return requestIntroduction(query, token);
     }
     void cancel(RequestToken) override
     {

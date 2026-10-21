@@ -6,6 +6,7 @@
 #include <cstring>
 #include <limits>
 #include "ShellMaterial.h"
+#include "SourceOptics.h"
 #include "SelectionLighting.h"
 #include <QtTest>
 #include <QQmlComponent>
@@ -72,6 +73,7 @@ private Q_SLOTS:
     {
         qmlRegisterUncreatableType<yalahoo::SelectionLighting>("Yalahoo.Music", 1, 0,
                                                                "SelectionLighting", u"Injected"_s);
+        qmlRegisterType<yalahoo::SourceOptics>("Yalahoo.Music", 1, 0, "SourceOptics");
         yalahoo::SelectionLighting lighting;
         QQmlEngine engine;
         QSignalSpy warnings(&engine, &QQmlEngine::warnings);

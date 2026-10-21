@@ -1,11 +1,6 @@
+#include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
-
-namespace {
-// Convert world displacement to column/row travel before selecting a common duration.
-constexpr auto ArchiveColumnSpacing = 5.2;
-constexpr auto ArchiveRowSpacing = .62;
-}
 
 namespace yalahoo {
 std::array<Kinematics, ArchiveAxisCount> ArchiveMotion::state() const
@@ -30,9 +25,10 @@ bool ArchiveMotion::retarget(const ArchiveSprings &springs, const ArchiveValues 
 {
     if (m_hasTarget && m_targets == targets)
         return false;
-    const double duration = archiveTravelDuration(
-            (targets[ColumnAxis] - springs[ColumnAxis].value) / ArchiveColumnSpacing,
-            (targets[RailAxis] - springs[RailAxis].value) / ArchiveRowSpacing);
+    const double duration = archiveTravelDuration((targets[ColumnAxis] - springs[ColumnAxis].value)
+                                                          / yalahoo::sceneGeometry::ColumnSpacing,
+                                                  (targets[RailAxis] - springs[RailAxis].value)
+                                                          / yalahoo::sceneGeometry::RowSpacing);
     for (size_t i = 0; i < m_tracks.size(); ++i) {
         auto state = m_tracks[i].state();
         state.value = springs[i].value;

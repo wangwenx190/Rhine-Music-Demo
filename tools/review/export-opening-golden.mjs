@@ -1,4 +1,5 @@
-import {execFrozenGit} from './frozen-git.mjs';
+import {transpile} from './frozen-source.mjs';
+import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
@@ -8,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const require = createRequire(import.meta.url);
 const ts = require(path.join(root, 'legacy-web/node_modules/typescript'));
 const THREE = require(path.join(root, 'legacy-web/node_modules/three'));
-const revision = '57f4f845c20cce646a15dbf4008c2a162aaaf4e2';
+const revision = baselineRevision;
 const sources = [];
 const frozen = (name) => {
     const text =
@@ -23,10 +24,7 @@ const modules = {
 };
 const load = (name) => {
     const text = frozen(name);
-    const js =
-        ts.transpileModule(text, {
-              compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS}
-          }).outputText;
+    const js = transpile(text);
     const exports = {};
     new Function('exports', 'require', js)(exports, (id) => {
         const result = modules[id] ?? modules[id.replace(/\.ts$/, '')];

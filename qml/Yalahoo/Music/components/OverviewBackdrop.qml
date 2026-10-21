@@ -13,17 +13,15 @@ Item {
     readonly property real targetWidth: labelWidth + 76 + 72
     readonly property real targetHeight: 57 + 72
     clip: true
-    ShaderEffectSource {
+    BackdropTexture {
         id: crop
-        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
-        mipmap: true
+        hdrActive: root.hdrActive
+        outputDpr: root.outputDpr
         objectName: "overviewCrop"
         sourceItem: root.sceneSource
         sourceRect: Qt.rect(root.sceneX - 36, root.sceneY - 36, root.targetWidth, root.targetHeight)
         width: root.targetWidth
         height: root.targetHeight
-        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
-                                 root.targetHeight * root.outputDpr))
         visible: false
         hideSource: false
         smooth: true
@@ -38,19 +36,15 @@ Item {
         property vector2d sampleStep: Qt.vector2d(1 / root.targetWidth, 0)
         fragmentShader: "qrc:/assets/shaders/overview-blur.frag.qsb"
     }
-    ShaderEffectSource {
+    BackdropTexture {
         id: horizontalTexture
-        format: root.hdrActive ? ShaderEffectSource.RGBA16F : ShaderEffectSource.RGBA8
-        mipmap: true
+        hdrActive: root.hdrActive
+        outputDpr: root.outputDpr
         objectName: "overviewHorizontalTexture"
         sourceItem: horizontal
-        textureSize: Qt.size(Math.round(root.targetWidth * root.outputDpr), Math.round(
-                                 root.targetHeight * root.outputDpr))
         width: root.targetWidth
         height: root.targetHeight
-        visible: false
         hideSource: true
-        smooth: true
     }
     ShaderEffect {
         x: -36

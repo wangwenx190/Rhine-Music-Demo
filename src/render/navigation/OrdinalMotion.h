@@ -2,6 +2,7 @@
 // preserves deterministic retargeting and reduced-motion endpoints.
 
 #pragma once
+#include "SampledReelCurve.h"
 #include "FrameClock.h"
 #include <QPointer>
 #include <QVariantList>
@@ -11,16 +12,14 @@
 namespace yalahoo {
 namespace ordinalMotion {
 // The source trajectory has 48 intervals and at most ten decimal wheels.
-inline constexpr auto TrackSampleCount = 49;
-inline constexpr auto TransitionSeconds = .460;
 inline constexpr auto MaximumDecimalDigits = 10;
 }
 
 // Frozen rolling-number's 49-point critically damped track, sampled by the shared clock.
 struct OrdinalTrack final
 {
-    std::array<double, ordinalMotion::TrackSampleCount> points{ };
-    double value = 0, velocity = 0, target = 0, elapsed = ordinalMotion::TransitionSeconds;
+    sampledReel::Points points{ };
+    double value = 0, velocity = 0, target = 0, elapsed = sampledReel::TransitionSeconds;
     void retarget(double to, bool instant);
     void advance(double dt);
 };

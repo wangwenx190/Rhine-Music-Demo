@@ -30,42 +30,6 @@
             <source>Output reached the size protection limit. Quality preferences are preserved.</source>
             <translation>输出达到尺寸保护上限，画质设置保持原值。</translation>
         </message>
-        <message>
-            <source>One album at a time</source>
-            <translation>一张一张，慢慢听</translation>
-        </message>
-        <message>
-            <source>Qt native runtime probe · QML / 3D / ShaderTools / Multimedia</source>
-            <translation>Qt 原生运行探针 · QML / 3D / ShaderTools / Multimedia</translation>
-        </message>
-        <message>
-            <source>Warm day</source>
-            <translation>暖昼</translation>
-        </message>
-        <message>
-            <source>Deep night</source>
-            <translation>深夜</translation>
-        </message>
-        <message>
-            <source>Real album columns</source>
-            <translation>真实专辑列</translation>
-        </message>
-        <message>
-            <source>Remember each column's position</source>
-            <translation>保留每列浏览位置</translation>
-        </message>
-        <message>
-            <source>Verify window interaction</source>
-            <translation>验证窗口交互</translation>
-        </message>
-        <message>
-            <source>Interaction received %1</source>
-            <translation>交互已响应 %1</translation>
-        </message>
-        <message>
-            <source>Anonymous library model · %1 albums</source>
-            <translation>匿名库模型 · %1 张专辑</translation>
-        </message>
     </context>
     <context>
         <name>Browse</name>
@@ -958,7 +922,7 @@
         </message>
     </context>
     <context>
-        <name>ResearchApp</name>
+        <name>ProbeWindow</name>
         <message>
             <source>One album at a time</source>
             <translation>一张一张，慢慢听</translation>
@@ -974,6 +938,14 @@
         <message>
             <source>Deep night</source>
             <translation>深夜</translation>
+        </message>
+        <message>
+            <source>Real album columns</source>
+            <translation>真实专辑列</translation>
+        </message>
+        <message>
+            <source>Remember each column's position</source>
+            <translation>保留每列浏览位置</translation>
         </message>
         <message>
             <source>Verify window interaction</source>

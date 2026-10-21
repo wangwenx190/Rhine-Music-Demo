@@ -1,3 +1,4 @@
+#include "IMetadataProvider.h"
 #include "OnlineMetadataProvider.h"
 #include <QThread>
 #include <QSet>
@@ -18,7 +19,6 @@
 
 namespace {
 // Limits bound remote response expansion; cache and retry ages are measured in UTC.
-constexpr auto MaximumOutstandingRequests = 8;
 constexpr auto PositiveCacheDays = 30;
 constexpr auto MaximumQueryFieldCharacters = 512;
 constexpr auto MaximumCandidatePages = 12;
@@ -104,7 +104,8 @@ public:
     }
     void enqueue(AlbumQuery query, RequestToken token, MetadataKind kind)
     {
-        if (m_waiting.size() + int(m_active.has_value()) >= MaximumOutstandingRequests)
+        if (m_waiting.size() + int(m_active.has_value())
+            >= yalahoo::metadataLimits::MaximumPendingRequests)
             return;
         Job job;
         job.query = std::move(query);
@@ -624,7 +625,8 @@ bool OnlineMetadataProvider::request(AlbumQuery query, RequestToken token, Metad
 {
     if (d->m_pending.contains(token))
         return d->m_pending.value(token) == kind;
-    if (d->m_outstanding.size() >= MaximumOutstandingRequests || d->m_outstanding.contains(token))
+    if (d->m_outstanding.size() >= yalahoo::metadataLimits::MaximumPendingRequests
+        || d->m_outstanding.contains(token))
         return false;
     d->m_outstanding.insert(token);
     query.enabled = d->m_enabled && query.enabled;
@@ -637,18 +639,6 @@ bool OnlineMetadataProvider::request(AlbumQuery query, RequestToken token, Metad
             },
             Qt::QueuedConnection);
     return true;
-}
-bool OnlineMetadataProvider::requestIntroduction(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Introduction);
-}
-bool OnlineMetadataProvider::requestCredits(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Credits);
-}
-bool OnlineMetadataProvider::requestEnrichment(AlbumQuery query, RequestToken token)
-{
-    return request(std::move(query), std::move(token), MetadataKind::Enrichment);
 }
 void OnlineMetadataProvider::cancel(RequestToken token)
 {
