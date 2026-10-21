@@ -101,6 +101,7 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow-instanced.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow.frag"
+    "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shadow-depth.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/ssao.frag"

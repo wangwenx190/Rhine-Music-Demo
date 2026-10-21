@@ -23,11 +23,15 @@
 
 ## 阴影
 
-当前产品阴影为单采样 D32F 硬件比较深度，另有 R32F canonical-depth 诊断颜色附件；过滤为Linear/LessOrEqual硬件PCF，保留源五点Vogel+IGN。灯(-6,14,-5)指向原点、正交范围[-16,16,-15,15,.1,45]、Front cull、Optical_Diffuser唯一caster、radius=4、normalBias=.035、bias=-.0003 和音乐入口 strength=.32 均取自冻结源码有效路径。
+当前产品阴影仅分配单采样 D32F 硬件比较深度，深度专用片元入口无颜色输出。只有安装显式 `captured` 回调的采集会话才创建并写入 R32F canonical-depth 诊断颜色附件；关闭采集即释放，不将该格式作为普通生产能力要求。过滤为Linear/LessOrEqual硬件PCF，保留源五点Vogel+IGN。灯(-6,14,-5)指向原点、正交范围[-16,16,-15,15,.1,45]、Front cull、Optical_Diffuser唯一caster、radius=4、normalBias=.035、bias=-.0003 和音乐入口 strength=.32 均取自冻结源码有效路径。
 
 `geometry.vert` 与实例化变体在每顶点按归一化世界法向偏移，再投影并插值 shadowCoord；片元只做透视除法、canonical→UV、depth bias、frustum 和 PCF。不能在片元重新归一化插值法向后投影。GL/Metal 的 UV、disk offset、IGN 原点翻转继续按实际 QRhi 能力执行；原生 clipSpaceCorrMatrix 只用于 raster。
 
 `rhi-shadow-gpu` 独立执行本次 R32F 深度上的标量源 PCF 数学，覆盖三种 map 尺寸、1/7/8/9 实体批量边界、开关/运动/接收相机与灯色变化、十次真实 SG 重建。`Input.captureShadowDepth` 默认 false，只在显式 Review 捕获时共享已有不可变 QByteArray，不增加 GPU readback 或深复制；QImage 仍按历史诊断格式输出。每次捕获检查真正上传的 paper/shell 参数、比较 sampler、cull 和两个附件的格式/尺寸；生产 `request=0` 不做这些诊断。无变化 caster 复用 map，并跳过非批量caster专用uniform生成/复制/上传，开启时实体变换、开关切换、阴影尺寸或renderer重建失效；关闭后仅在切换或附件新建时清空一次，实体运动不重复clear。阴影目标/PSO/绑定按自身尺寸独立持有，屏幕resize、几何MSAA及诊断布局变化保持兼容阴影；只改阴影尺寸时替换接收材质的采样绑定，保留屏幕附件与后处理图。资源清单按阴影资源revision失效。固定灯相机不依赖接收相机、主题色、焦点或封面。
+
+采集开关只重建阴影目标布局及其管线，尺寸不变时保留实际 D32F 资源及采样绑定；开启采集补画一次诊断颜色，关闭采集继续复用深度。资源预算按实际采集状态计入 R32F，实际清单用 QRhi 全局资源 ID 核对 D32F 身份。
+
+`ctest --preset qt-release-render -R '^rhi-shadow-attachments-gpu$'`或`rhi-shadow-audit 新目录 --attachments-only`在1/8实体两种提交路径检查普通生产→采集→普通生产、caster运动、阴影开关及尺寸变化；核对实际附件/预算、D32F身份和缓存，并以当次canonical深度与独立源几何/PCF数学验证真正无颜色附件时的Qt输出，不做图像相似度比较。
 
 `rhi-shadow-audit 新目录 --invalidation-only`在1/8实体两种提交路径定向检查resize、MSAA、不透明/壳体布局、相机/光色/焦点、封面、阴影尺寸、caster运动和开关的独立失效；核对实际采样绑定、资源revision、后处理复用、零独立caster uniform及关闭后的零重复clear，不附带完整光学/重建压力矩阵。
 

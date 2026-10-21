@@ -7,10 +7,14 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QtEndian>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <memory>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
@@ -210,6 +214,151 @@ QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
              { u"maxError"_s, worst } };
 }
 
+struct ShadowSubmission final
+{
+    QJsonObject profile;
+    QImage color;
+};
+ShadowSubmission submitDepthOnly(RhiCaptureHarness &driver, Input input, QSize size)
+{
+    struct Mailbox final
+    {
+        QMutex mutex;
+        QJsonObject profile;
+    };
+    const auto mailbox = std::make_shared<Mailbox>();
+    auto captured = std::move(driver.item->captured);
+    driver.item->captured = { };
+    driver.item->profiled = [mailbox](QJsonObject profile) {
+        const QMutexLocker lock(&mailbox->mutex);
+        mailbox->profile = std::move(profile);
+        return true;
+    };
+    input.profile = true;
+    driver.replay(1, [&](int) {
+        driver.submitWithoutCapture(input, size);
+    });
+    driver.item->profiled = { };
+    driver.item->captured = std::move(captured);
+    QJsonObject profile;
+    {
+        const QMutexLocker lock(&mailbox->mutex);
+        profile = mailbox->profile;
+    }
+    check(!profile.isEmpty(), "Missing depth-only shadow resource snapshot");
+    check(verification::windowPolicySatisfied(*driver.window), "Depth-only window policy failed");
+    return { profile, driver.surface->grab() };
+}
+qint64 checkShadowAttachments(const QJsonObject &resources, int size, bool diagnostic)
+{
+    const auto checkEntries = [&](const QJsonArray &entries, const QString &depthName,
+                                  const QString &colorName) {
+        int depths = 0, colors = 0;
+        for (const auto &value : entries) {
+            const auto row = value.toObject();
+            const auto name = row[u"name"_s].toString();
+            if (name != depthName && name != colorName)
+                continue;
+            const bool depth = name == depthName;
+            depths += int(depth);
+            colors += int(!depth);
+            check(row[u"format"_s].toInt() == int(depth ? QRhiTexture::D32F : QRhiTexture::R32F)
+                          && row[u"width"_s].toInt() == size && row[u"height"_s].toInt() == size
+                          && row[u"samples"_s].toInt() == 1
+                          && row[u"estimatedBytes"_s].toInteger() == qint64(size) * size * 4,
+                  "Shadow attachment descriptor or byte estimate is incorrect");
+        }
+        check(depths == 1 && colors == int(diagnostic),
+              "Shadow diagnostic color escaped its capture lifetime");
+    };
+    checkEntries(resources[u"entries"_s].toArray(), u"shadow-hardware-depth"_s,
+                 u"shadow-color-resolve"_s);
+    checkEntries(resources[u"preallocationPlan"_s].toObject()[u"entries"_s].toArray(),
+                 u"shadow-depth"_s, u"shadow-readback-color"_s);
+    const auto id = resources[u"shadowDepthResourceId"_s].toInteger();
+    check(id > 0, "Missing actual shadow depth resource identity");
+    return id;
+}
+QJsonArray checkShadowAttachmentLifetime(RhiCaptureHarness &driver, const QJsonObject &source)
+{
+    QJsonArray states;
+    const QSize size(640, 480);
+    for (int count : { 1, 8 }) {
+        auto input = fixture(source);
+        input.entities.clear();
+        input.entityIds.clear();
+        for (int index = 0; index < count; ++index) {
+            QMatrix4x4 model;
+            model.translate((index % 3 - 1) * 1.5f, 0, (index / 3 - 1) * .62f);
+            input.entities.append(model);
+            input.entityIds.append(index + 1);
+        }
+        input.shadowDiagnostic = true;
+        input.captureShadowDepth = true;
+        input.captureSamples = 1;
+        input.shadowSize = 1024;
+        input.shadows = true;
+        const auto production = submitDepthOnly(driver, input, size);
+        const auto depthId = checkShadowAttachments(production.profile[u"resources"_s].toObject(),
+                                                    input.shadowSize, false);
+        check(production.profile[u"shadowRendered"_s].toBool(),
+              "Depth-only shadow did not rasterize its initial caster state");
+        auto reference = driver.capture(input, size);
+        checkSubmittedShadow(input, reference);
+        check(checkShadowAttachments(reference.metadata[u"resources"_s].toObject(),
+                                     input.shadowSize, true)
+                      == depthId,
+              "Enabling diagnostic color replaced the sampled shadow depth");
+        validateProjection(input, reference);
+        validateMath(input, reference, size);
+        // The same-run canonical map supplies compare-first PCF math, independently checked
+        // against source triangles above. Inspect the actual depth-only Qt output with it.
+        reference.color = production.color;
+        const auto math = validateMath(input, reference, size);
+        const auto restored = submitDepthOnly(driver, input, size);
+        check(checkShadowAttachments(restored.profile[u"resources"_s].toObject(), input.shadowSize,
+                                     false)
+                              == depthId
+                      && !restored.profile[u"shadowRendered"_s].toBool(),
+              "Disabling capture replaced or redrew cached shadow depth");
+        reference.color = restored.color;
+        validateMath(input, reference, size);
+        input.entities[0].translate(.1f, 0, 0);
+        const auto moved = submitDepthOnly(driver, input, size);
+        check(moved.profile[u"shadowRendered"_s].toBool(),
+              "Depth-only caster motion did not update shadow depth");
+        reference = driver.capture(input, size);
+        reference.color = moved.color;
+        validateMath(input, reference, size);
+        input.shadows = false;
+        const auto disabled = submitDepthOnly(driver, input, size);
+        check(disabled.profile[u"shadowRendered"_s].toBool(),
+              "Disabling depth-only shadows did not clear the map");
+        input.entities[0].translate(.1f, 0, 0);
+        const auto cached = submitDepthOnly(driver, input, size);
+        check(!cached.profile[u"shadowRendered"_s].toBool(),
+              "Disabled depth-only caster motion redrew the map");
+        input.shadows = true;
+        input.shadowSize = 512;
+        const auto resized = submitDepthOnly(driver, input, size);
+        check(resized.profile[u"shadowRendered"_s].toBool()
+                      && checkShadowAttachments(resized.profile[u"resources"_s].toObject(),
+                                                input.shadowSize, false)
+                              != depthId,
+              "Depth-only shadow resize did not replace and render its depth target");
+        reference = driver.capture(input, size);
+        validateProjection(input, reference);
+        reference.color = resized.color;
+        validateMath(input, reference, size);
+        states.append(QJsonObject{ { u"entities"_s, count },
+                                   { u"depthOnly"_s, production.profile },
+                                   { u"captureDisabled"_s, restored.profile },
+                                   { u"resized"_s, resized.profile },
+                                   { u"sourcePcf"_s, math } });
+    }
+    return states;
+}
+
 struct ShadowTransition final
 {
     const char *label;
@@ -347,10 +496,13 @@ auto runShadowAudit(int &argc, char **&argv)
         c[u"clipNear"_s] = .1;
         c[u"clipFar"_s] = 100;
         c[u"layer"_s] = u"paper"_s;
-        check(argc == 2 || QByteArray(argv[2]) == "--invalidation-only",
+        const QByteArray option = argc == 3 ? QByteArray(argv[2]) : QByteArray();
+        check(option.isEmpty() || option == "--invalidation-only" || option == "--attachments-only",
               "Unsupported shadow audit option");
         RhiCaptureHarness driver;
-        const auto invalidation = checkShadowInvalidation(driver, c, output);
+        const auto invalidation = option == "--attachments-only"
+                ? checkShadowAttachmentLifetime(driver, c)
+                : checkShadowInvalidation(driver, c, output);
         if (argc == 3) {
             QSaveFile report(output + "/runtime.json"_L1);
             check(report.open(QIODevice::WriteOnly), "Cannot open shadow invalidation report");

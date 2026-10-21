@@ -16,7 +16,7 @@ CHECKS = [
     ("COMMON-03", "resources/shaders/rhi/geometry-instanced.vert", "layout(location = 9) out vec4 shadowCoord;",
      "Both production vertex layouts match opaque/four-shell fragment location 9. Existing "
      "invariant position and Equal color/visibility semantics remain. qsb emits five targets; "
-     "actual Y/depth correction, single-sample D32F and independent R32F graph manually expanded."),
+     "actual Y/depth correction, single-sample D32F and capture-only R32F graph manually expanded."),
     ("COMMON-04", "src/app/VerificationWindowMac.mm", "currentForegroundPid",
      "Shared window helper adds only PID diagnostics, no activation/layer/input policy changes. "
      "Renderer pending weak ownership, bounded readbacks and reset ordering retained. Media "
@@ -38,7 +38,8 @@ CHECKS = [
      "depth comparison, inclusive frustum and mix(1,shadow,.32). Canonical projection stays "
      "OpenGL; receiver UV, disk Y and IGN are converted together using actual backend Y flag."),
     ("SOURCE-04", "src/render/rhi/RhiItem.cpp", "shadowCompare->setTextureCompareOp",
-     "D32F depth comparison and separate R32F canonical diagnostic target remain single sample. "
+     "D32F depth comparison is single sample; only explicit capture creates the separate "
+     "single-sample R32F canonical diagnostic attachment. "
      "Front cull matches source FrontSide shadow backface rendering. Only tray/diffuser draws; "
      "no depth feedback or added polygon offset, source normal/depth bias stays receiver-side."),
     ("SOURCE-05", "tools/review/RhiShadowAudit.cpp", "Shadow PCF differs from source scalar math",
@@ -55,11 +56,16 @@ CHECKS = [
     ("PERF-03", "src/render/rhi/RhiItem.cpp", "state->capture.shadowDepth = state->results[i].data",
      "Opt-in scalar math shares existing immutable QByteArray, no extra GPU readback/copy. "
      "Receiver and actual paper/shell uploaded bytes are inspected only during explicit capture."),
-    ("PERF-04", "src/render/rhi/RhiItem.cpp", "makeTarget(shadow,",
-     "Graph remains caster->single-sample R32F+D32F->opaque/paper->resolve/mips->shell. "
-     "Shadow targets/pipelines use their own dimension key; screen resize/MSAA keep the cached map. "
-     "Shadow-only replacement updates sampled bindings without rebuilding screen/postprocess targets; camera/color/numeric "
-     "light changes do not invalidate fixed-light caster depth. Actual inventory includes both."),
+    ("PERF-04", "src/render/rhi/RhiItem.cpp", "bool(shadow.color) == diagnostic",
+     "Product graph uses D32F only; explicit capture adds R32F and its color-writing shader. "
+     "Capture layout toggles retain the actual D32F resource and sampled binding; enabling "
+     "capture redraws its diagnostic map, disabling capture releases R32F and keeps cached depth. "
+     "The preallocation plan and real inventory follow capture lifetime. Shadow dimensions "
+     "remain independent of screen resize/MSAA, receiver camera, light color and focus."),
+    ("PERF-04-RUNTIME", "tools/review/RhiShadowAudit.cpp", "checkShadowAttachmentLifetime",
+     "The attachments-only probe checks real production/capture layouts, descriptor bytes, "
+     "QRhi depth resource identity, motion, disabled caching and resizing for one and eight "
+     "casters. Same-run source geometry and scalar PCF validate depth-only Qt output; no image scores."),
     ("PERF-05", "src/render/rhi/RhiItem.cpp", "cachedShadows != input.shadows",
      "Enabled caster matrix change, shadow size/renderer generation or enabled toggle invalidates map. "
      "Disabled caster movement reuses the cleared map without another pass. "
@@ -94,12 +100,12 @@ for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                     f"{row['evidence']}" for row in rows) + "\n")
     (output / "runtime-checklist.md").write_text(
         "# Required target run\n\n"
-        "Use the latest native Qt Kit and Release only. Configure Review ON, build and run "
-        "check-format, Yalahoo_qmllint and ui-audit_qmllint.\n\n"
-        "Run the actual target backend's rhi-shadow-gpu, rhi-opaque-gpu, rhi-shell-gpu and "
-        "rhi-flicker-gpu via the appropriate hidden/visible preset and window contract. "
-        "Expected: source geometry projection <=2 physical shadow texels, constant depth "
-        "<2e-6, PCF <=2/255, original bias/strength/filter, no invalid cache updates, no "
-        "separate unchanged caster uniform uploads, ten real SG rebuilds and 1200 continuous "
-        "production frames. Normal windows/VSYNC and product ground remain separate tasks.\n")
+        "Use the latest native Qt Kit and Release with Review ON. Select affected checks "
+        "according to test-gates.md and the shared window policy.\n\n"
+        "For shadow attachment lifetime use rhi-shadow-audit NEW_DIRECTORY --attachments-only "
+        "or rhi-shadow-attachments-gpu. For cache compatibility use a separate directory with "
+        "--invalidation-only. Expected: D32F-only production, capture-only R32F, retained depth "
+        "identity across capture toggles, source geometry projection <=2 physical shadow texels, "
+        "constant depth <2e-6 and PCF <=2/255 with original bias/strength/filter. "
+        "Other component, native-window and physical-device gaps remain in R36.\n")
 print("Source shadow matrices generated")

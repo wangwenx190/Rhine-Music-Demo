@@ -13,7 +13,7 @@
 
 ## 通道资源
 
-- 生产颜色/中间颜色RGBA16F，view normal/RGB24 depth为RGBA8；shadow D32F比较+R32F canonical诊断。环境PMREM的源float值必须可被half精确表示才转换上传RGBA16F，不能拟合/量化丢精度。
+- 生产颜色/中间颜色RGBA16F，view normal/RGB24 depth为RGBA8；阴影深度与按需诊断附件见[rhi-opaque.md](rhi-opaque.md)。环境PMREM的源float值必须可被half精确表示才转换上传RGBA16F，不能拟合/量化丢精度。
 - 不透明捕获resolve/mips后供独立壳体颜色使用；合成复用非重叠通道硬件depth/stencil，preserve/load，禁止采样正写入的附件。
 - AO raw/blur为R16F，normal/depth与颜色同尺寸，full DOF深度在全尺寸兼容时共用。kernel仅创建时写入std140的offset80，固定1104-byte块；每个pass动态80-byte前缀，不保留闲置kernel纹理。
 - 颜色ping/pong仅在生命周期不重叠时复用，pass各有uniform/SRB/目标。Bokeh-only一个全尺寸RGBA16F ping/一个uniform，常态80bytes；SMAA-only三个单采样全尺寸RGBA16F目标、两张无mip RGBA8 lookup、三个uniform，常态240bytes，载荷估算`24×width×height+370424`bytes。

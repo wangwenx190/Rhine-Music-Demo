@@ -634,12 +634,7 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
     };
     if (!target.prepass)
         target.color = texture(format, mips);
-    if (format == QRhiTexture::R32F) {
-        target.hardwareDepth.reset(
-                api->newTexture(QRhiTexture::D32F, size, 1, QRhiTexture::RenderTarget));
-        require(target.hardwareDepth->create(),
-                "Cannot create source-compatible shadow depth texture");
-    } else if (sharedDepth) {
+    if (sharedDepth) {
         target.z = sharedDepth;
     } else {
         target.z.reset(api->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, samples));
@@ -686,10 +681,7 @@ void Renderer::makeTarget(Target &target, QSize size, bool mrt, int samples, boo
         }
         desc.setColorAttachments(attachments.cbegin(), attachments.cend());
     }
-    if (target.hardwareDepth)
-        desc.setDepthTexture(target.hardwareDepth.get());
-    else
-        desc.setDepthStencilBuffer(target.z.get());
+    desc.setDepthStencilBuffer(target.z.get());
     target.rt.reset(api->newTextureRenderTarget(
             desc,
             sharedDepth ? QRhiTextureRenderTarget::PreserveDepthStencilContents
@@ -702,9 +694,10 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
                                                bool isShadow, bool isShell, bool instanced)
 {
     Owned<QRhiGraphicsPipeline> p(api->newGraphicsPipeline());
-    QString fragment = isShadow ? u":/rhi/shadow.frag.qsb"_s
-            : target.prepass    ? u":/rhi/prepass.frag.qsb"_s
-                                : u":/rhi/opaque.frag.qsb"_s;
+    QString fragment = isShadow
+            ? (target.color ? u":/rhi/shadow.frag.qsb"_s : u":/rhi/shadow-depth.frag.qsb"_s)
+            : target.prepass ? u":/rhi/prepass.frag.qsb"_s
+                             : u":/rhi/opaque.frag.qsb"_s;
     if (isShell) {
         fragment = input.areaIntensity > 0 ? u":/rhi/shell"_s : u":/rhi/shell-basic"_s;
         if (api->backend() != QRhi::OpenGLES2 || api->isFeatureSupported(QRhi::Compute))
@@ -758,6 +751,8 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
             p->setTargetBlends({ { }, { }, { } });
         else
             p->setTargetBlends({ { } });
+    } else if (!target.color) {
+        p->setTargetBlends({ });
     }
     require(p->create(), "RHI graphics pipeline creation failed");
     return p;
@@ -801,12 +796,38 @@ void Renderer::replaceTextureBinding(int binding, QRhiTexture *texture, QRhiSamp
 void Renderer::prepareShadowResources()
 {
     const int requested = std::max(1, input.shadowSize);
-    if (shadow.rt && shadowSize == requested)
+    const bool diagnostic = bool(deliver);
+    const bool replaceDepth = !shadow.hardwareDepth || shadowSize != requested;
+    if (shadow.rt && !replaceDepth && bool(shadow.color) == diagnostic)
         return;
     shadowPipeline.reset();
     shadowInstances.reset();
+    // Capture changes only the diagnostic color layout. Preserve the sampled D32F and its
+    // cached contents; enabling capture redraws once to populate the new canonical-depth map.
+    shadow.rt.reset();
+    shadow.pass.reset();
+    shadow.color.reset();
     shadowSize = requested;
-    makeTarget(shadow, { shadowSize, shadowSize }, false, 1, false, QRhiTexture::R32F);
+    shadow.size = { shadowSize, shadowSize };
+    if (replaceDepth) {
+        shadow.hardwareDepth.reset(
+                api->newTexture(QRhiTexture::D32F, shadow.size, 1, QRhiTexture::RenderTarget));
+        require(shadow.hardwareDepth->create(),
+                "Cannot create source-compatible shadow depth texture");
+    }
+    QRhiTextureRenderTargetDescription description;
+    description.setDepthTexture(shadow.hardwareDepth.get());
+    if (diagnostic) {
+        shadow.color.reset(
+                api->newTexture(QRhiTexture::R32F, shadow.size, 1,
+                                QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource));
+        require(shadow.color->create(), "Cannot create shadow diagnostic color texture");
+        description.setColorAttachments({ shadow.color.get() });
+    }
+    shadow.rt.reset(api->newTextureRenderTarget(description));
+    shadow.pass.reset(shadow.rt->newCompatibleRenderPassDescriptor());
+    shadow.rt->setRenderPassDescriptor(shadow.pass.get());
+    require(shadow.rt->create(), "Cannot create shadow render target");
     if (!shadowBindings) {
         shadowBindings.reset(api->newShaderResourceBindings());
         const auto stages =
@@ -817,10 +838,11 @@ void Renderer::prepareShadowResources()
     }
     shadowPipeline = pipeline(shadow, shadowBindings.get(), true);
     shadowInstances = pipeline(shadow, shadowBindings.get(), true, false, true);
-    replaceTextureBinding(ShadowBinding, shadow.hardwareDepth.get(), shadowCompare.get());
+    if (replaceDepth)
+        replaceTextureBinding(ShadowBinding, shadow.hardwareDepth.get(), shadowCompare.get());
     ++shadowResourceRevision;
     cachedInventory = { };
-    shadowDirty = true;
+    shadowDirty = shadowDirty || replaceDepth || diagnostic;
 }
 void Renderer::prepareShellPipelines()
 {
@@ -931,10 +953,12 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize
         || plannedPanelLayer != input.panelLayerSize || plannedHdr != input.hdrActive
         || plannedDisplayLayer != input.displayLayerSize || !vertices) {
-        for (const auto format :
-             { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::R32F, QRhiTexture::D32F })
+        for (const auto format : { QRhiTexture::RGBA16F, QRhiTexture::RGBA8, QRhiTexture::D32F })
             require(api->isTextureFormatSupported(format, QRhiTexture::RenderTarget),
                     "Selected GPU lacks a required RHI target format");
+        if (deliver)
+            require(api->isTextureFormatSupported(QRhiTexture::R32F, QRhiTexture::RenderTarget),
+                    "Selected GPU lacks the shadow diagnostic color attachment");
         require(api->isTextureFormatSupported(QRhiTexture::RGBA32F),
                 "Selected GPU lacks required float lookup textures");
         if (input.postprocess && input.aoSamples)
@@ -2398,6 +2422,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 { u"selectedCoverHeight"_s, input.cover.height() },
                 { u"uniformUploadBytes"_s, qint64(cursor) },
                 { u"resourceGeneration"_s, qint64(generation) },
+                { u"shadowRendered"_s, shadowRendered },
                 { u"visibleEntities"_s, visibleCount },
                 { u"resources"_s, resourceInventory() } });
     }
@@ -2446,6 +2471,7 @@ QJsonObject Renderer::resourceInventory()
     const qint64 current = inventory.bytes();
     cachedInventory = {
         { u"preallocationPlan"_s, allocationPlan },
+        { u"shadowDepthResourceId"_s, qint64(shadow.hardwareDepth->globalResourceId()) },
         { u"entries"_s, inventory.entries() },
         { u"estimatedCurrentBytes"_s, current },
         { u"resizeOldPlusNewUpperBoundBytes"_s, current + previousResourceBytes },

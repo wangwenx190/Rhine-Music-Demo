@@ -36,7 +36,8 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     };
     const QSize shadow(qMax(1, in.shadowSize), qMax(1, in.shadowSize));
     plan.plannedTexture(u"shadow-depth"_s, shadow, QRhiTexture::D32F);
-    plan.plannedTexture(u"shadow-readback-color"_s, shadow, QRhiTexture::R32F);
+    if (diagnostic)
+        plan.plannedTexture(u"shadow-readback-color"_s, shadow, QRhiTexture::R32F);
     auto color = [&](const QString &name, bool mips) {
         plan.plannedTexture(name + "-resolve"_L1, size, QRhiTexture::RGBA16F, 1, mips);
         if (in.captureSamples > 1)

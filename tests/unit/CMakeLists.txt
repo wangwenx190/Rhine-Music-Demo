@@ -107,6 +107,11 @@ if(YALAHOO_REVIEW)
     set_tests_properties(rhi-shadow-gpu PROPERTIES TIMEOUT 120
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
         FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
+    add_test(NAME rhi-shadow-attachments-gpu COMMAND rhi-shadow-audit
+        "${CMAKE_BINARY_DIR}/verification/rhi-shadow-attachments" --attachments-only)
+    set_tests_properties(rhi-shadow-attachments-gpu PROPERTIES TIMEOUT 60
+        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
+        FAIL_REGULAR_EXPRESSION "Nonfinite;Failed to create;Shader baking failed")
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT 420
