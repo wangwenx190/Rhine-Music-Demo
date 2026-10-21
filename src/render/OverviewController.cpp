@@ -302,22 +302,21 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
     const int count = pool.columnCount();
     if (!count)
         return result;
+    result.reserve(std::min(count, int(2 * VisibleHalfLanes) + 1));
     const double center = m_selection->centerLane();
-    QSet<int> seen;
     // Enumerate physical candidates, then map to canonical IDs. Never scan C library columns.
     for (double physical = std::ceil(center - VisibleHalfLanes);
          physical <= center + VisibleHalfLanes; physical += 1) {
         if (m_selection->realistic() && (physical < 0 || physical >= count))
             continue;
         const int lane = ArchivePool::wrap(physical, count);
-        if (seen.contains(lane))
-            continue;
         const double nearest = m_selection->realistic()
                 ? lane
                 : std::floor((center - lane) / count + .5) * count + lane;
+        // One nearest physical occurrence exists per canonical lane, so this test
+        // also excludes duplicates without allocating an identity set each frame.
         if (physical != nearest || !pool.rowCount(lane))
             continue;
-        seen.insert(lane);
         const auto &column = pool.columns()[lane];
         const double extent = m_selection->columnExtent(physical);
         const double row = m_selection->browseRow(lane);

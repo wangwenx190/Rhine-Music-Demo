@@ -62,10 +62,10 @@ OpeningFrame openingFrame(double time)
     const double in = settle(unit(t, TitleEnterStartSeconds, TitleEnterEndSeconds)),
                  out = openingSmooth(unit(t, TitleExitStartSeconds, TitleExitEndSeconds));
     OpeningFrame f;
-    f.phase = t < LogoExitStartSeconds    ? "logo"_L1
-            : t < SloganPhaseStartSeconds ? "orbit"_L1
-            : t < ArrayPhaseStartSeconds  ? "slogan"_L1
-                                          : "array"_L1;
+    f.phase = t < LogoExitStartSeconds    ? u"logo"_s
+            : t < SloganPhaseStartSeconds ? u"orbit"_s
+            : t < ArrayPhaseStartSeconds  ? u"slogan"_s
+                                          : u"array"_s;
     f.background = 1 - openingSmooth(unit(t, TitleExitEndSeconds, BackgroundExitEndSeconds));
     f.mark = openingSmooth(unit(t, MarkEnterStartSeconds, MarkEnterEndSeconds))
             * (1 - openingSmooth(unit(t, LogoExitStartSeconds, MarkExitEndSeconds)));

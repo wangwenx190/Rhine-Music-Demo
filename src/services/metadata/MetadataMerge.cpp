@@ -9,7 +9,7 @@
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-ProviderResult cachedMetadata(const Album &album, MetadataKind kind, RequestToken token)
+ProviderResult cachedMetadata(const Album &album, MetadataKind kind, const RequestToken &token)
 {
     ProviderResult result;
     result.requestId = token.requestId;
@@ -37,7 +37,7 @@ ProviderResult cachedMetadata(const Album &album, MetadataKind kind, RequestToke
     if (kind != MetadataKind::Introduction && !state.value(u"sourceDetails"_s).toObject().isEmpty())
         result.source = state.value(u"sourceDetails"_s).toObject();
     const auto status = state.value(u"status"_s).toString().toLower();
-    static const std::pair<QLatin1StringView, ProviderStatus> statuses[] = {
+    static constexpr std::pair<QLatin1StringView, ProviderStatus> statuses[] = {
         { "matched"_L1, ProviderStatus::Matched },
         { "partial"_L1, ProviderStatus::Partial },
         { "not-found"_L1, ProviderStatus::NotFound },
@@ -87,10 +87,12 @@ void mergeCredits(Album &album, const ProviderResult &result, const QJsonObject 
     album.creditsLookup = state;
     if (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial) {
         QList<Producer> producers;
+        const auto incoming = result.payload.value(u"producers"_s).toArray();
+        producers.reserve(album.producers.size() + incoming.size());
         for (const auto &person : std::as_const(album.producers))
             if (person.source != "MusicBrainz"_L1)
                 producers.append(person);
-        for (const auto &value : result.payload.value(u"producers"_s).toArray()) {
+        for (const auto &value : incoming) {
             const auto object = value.toObject();
             if (object.value(u"source"_s).toString() != "MusicBrainz"_L1)
                 continue;

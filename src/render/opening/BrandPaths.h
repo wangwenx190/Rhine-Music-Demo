@@ -82,7 +82,7 @@ inline QPainterPath parseBrandCenterline(const QString &d)
                                              } } };
     Reader reader{ tokens, 0, { } };
     while (reader.at < tokens.size()) {
-        const auto name = tokens[reader.at++];
+        const auto &name = tokens[reader.at++];
         const auto command =
                 std::find_if(std::begin(commands), std::end(commands), [&](const Command &entry) {
                     return entry.name == name;

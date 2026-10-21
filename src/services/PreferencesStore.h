@@ -15,7 +15,7 @@ class PreferencesStore final : public QObject
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(PreferencesStore)
 public:
-    explicit PreferencesStore(QString dataRoot, QObject *parent = nullptr);
+    explicit PreferencesStore(const QString &dataRoot, QObject *parent = nullptr);
     ~PreferencesStore() override;
     Q_PROPERTY(QVariantMap values READ values NOTIFY changed FINAL)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged FINAL)

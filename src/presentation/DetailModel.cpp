@@ -147,7 +147,7 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
         int role;
         QVariant (*read)(const DetailModel &self, const Track &track, int row);
     };
-    static const RoleReader readers[] = {
+    static constexpr RoleReader readers[] = {
         { TrackId,
           [](const DetailModel &, const Track &track, int) -> QVariant {
               return track.id;
@@ -193,10 +193,12 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
 }
 QHash<int, QByteArray> DetailModel::roleNames() const
 {
-    return { { TrackId, "trackId"_ba },  { Number, "number"_ba },
-             { Title, "trackTitle"_ba }, { Artist, "artist"_ba },
-             { Format, "format"_ba },    { Duration, "duration"_ba },
-             { Disc, "disc"_ba },        { DiscHeading, "discHeading"_ba } };
+    static const QHash<int, QByteArray> roles = {
+        { TrackId, "trackId"_ba }, { Number, "number"_ba },          { Title, "trackTitle"_ba },
+        { Artist, "artist"_ba },   { Format, "format"_ba },          { Duration, "duration"_ba },
+        { Disc, "disc"_ba },       { DiscHeading, "discHeading"_ba }
+    };
+    return roles;
 }
 void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
 {
@@ -215,7 +217,9 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
     if (album) {
         const auto &a = *album;
         QVariantList facts, producers;
+        producers.reserve(a.producers.size());
         QHash<QString, QString> trackTitles;
+        trackTitles.reserve(a.tracks.size());
         const auto fact = [&](const QString &label, const QString &value) {
             facts.append(QVariantMap{ { u"label"_s, label }, { u"value"_s, value } });
         };
@@ -249,9 +253,11 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
             trackTitles.insert(track.id, track.title);
             const auto format =
                     track.codec.isEmpty() ? track.format : track.format + " / "_L1 + track.codec;
-            if (!format.isEmpty() && !formatSet.contains(format)) {
-                formats.append(format);
+            if (!format.isEmpty()) {
+                const auto count = formatSet.size();
                 formatSet.insert(format);
+                if (formatSet.size() != count)
+                    formats.append(format);
             }
             discs = std::max(discs, track.discNumber.value_or(1));
             duration += std::max(0.0, track.duration);
@@ -299,49 +305,48 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
         };
         QList<CreditGroup> grouped;
         QHash<QString, int> groupIndex;
-        for (const auto &value : producers) {
-            const auto producer = value.toMap();
-            const auto key = producer[u"name"_s]
-                                     .toString()
-                                     .trimmed()
-                                     .normalized(QString::NormalizationForm_KC)
-                                     .toLower()
-                    + QChar(0) + producer[u"source"_s].toString();
-            int index = groupIndex.value(key, -1);
-            if (index < 0) {
-                index = grouped.size();
-                groupIndex.insert(key, index);
-                grouped.append(CreditGroup{
-                        producer[u"name"_s].toString(), { }, { }, { }, { }, { }, { }, { }, { } });
+        const auto appendUnique = [](QStringList &values, QSet<QString> &keys,
+                                     const QString &text) {
+            if (text.isEmpty())
+                return;
+            const auto count = keys.size();
+            keys.insert(text);
+            if (keys.size() != count)
+                values.append(text);
+        };
+        for (const auto &producer : a.producers) {
+            const auto key =
+                    producer.name.trimmed().normalized(QString::NormalizationForm_KC).toLower()
+                    + QChar(0) + producer.source;
+            const auto entry = groupIndex.tryEmplace(key, int(grouped.size()));
+            const int index = *entry.iterator;
+            if (entry.inserted) {
+                grouped.append(
+                        CreditGroup{ producer.name, { }, { }, { }, { }, { }, { }, { }, { } });
             }
             auto &group = grouped[index];
-            const auto appendUnique = [](QStringList &values, QSet<QString> &keys,
-                                         const QString &text) {
-                if (!text.isEmpty() && !keys.contains(text)) {
-                    keys.insert(text);
-                    values.append(text);
-                }
-            };
-            appendUnique(group.roles, group.roleKeys, producer[u"role"_s].toString());
-            const auto source = producer[u"source"_s].toString();
-            const auto url = producer[u"url"_s].toString();
+            appendUnique(group.roles, group.roleKeys, producer.role);
+            const auto &source = producer.source;
+            const auto &url = producer.url;
             appendUnique(group.sources, group.sourceKeys,
                          source + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
-            const auto trackTitle = producer[u"trackTitle"_s].toString();
+            const auto trackTitle = trackTitles.value(producer.trackId, producer.trackTitle);
             if (trackTitle.isEmpty()) {
-                appendUnique(group.unscoped, group.unscopedKeys, producer[u"role"_s].toString());
+                appendUnique(group.unscoped, group.unscopedKeys, producer.role);
                 continue;
             }
-            const auto trackKey = producer[u"trackId"_s].toString() + QChar(0) + trackTitle
-                    + QChar(0) + producer[u"role"_s].toString() + QChar(0) + url;
-            if (group.trackKeys.contains(trackKey))
-                continue;
+            const auto trackKey = producer.trackId + QChar(0) + trackTitle + QChar(0)
+                    + producer.role + QChar(0) + url;
+            const auto count = group.trackKeys.size();
             group.trackKeys.insert(trackKey);
-            group.tracks.append(trackTitle + u" \u00b7 "_s + producer[u"role"_s].toString()
+            if (group.trackKeys.size() == count)
+                continue;
+            group.tracks.append(trackTitle + u" \u00b7 "_s + producer.role
                                 + QCoreApplication::translate("Yalahoo", "\nSource: ") + source
                                 + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
         }
         QVariantList groups;
+        groups.reserve(grouped.size());
         for (const auto &group : grouped)
             groups.append(QVariantMap{ { u"name"_s, group.name },
                                        { u"roles"_s, group.roles },

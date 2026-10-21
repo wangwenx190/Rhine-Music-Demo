@@ -40,35 +40,61 @@ struct Part final
     double height = 0, naturalWidth = 0;
     int lines = 0;
 };
-Part shape(const QString &text, QFont font, double size, double width, double ratio, double spacing,
-           bool translation, bool oneLine, bool clamp, bool collect = true,
-           double budget = DefaultTranslationBudgetPixels)
+struct TextAnalysis final
 {
-    Part part;
-    if (text.isEmpty())
-        return part;
-    font.setPixelSize(std::max(1, int(std::round(size))));
-    const double scale = size / font.pixelSize();
-    font.setHintingPreference(QFont::PreferNoHinting);
-    font.setLetterSpacing(QFont::AbsoluteSpacing, spacing / scale);
-    QTextLayout layout(text, font);
-    const auto graphemes = TextLayoutAdapter::boundaries(text);
+    QList<int> graphemes;
     QList<QTextLayout::FormatRange> formats;
+};
+// Grapheme boundaries and emoji styling depend on text, not on a candidate font size.
+TextAnalysis analyzeText(const QString &text)
+{
+    TextAnalysis result;
+    if (text.isEmpty())
+        return result;
+    result.graphemes = TextLayoutAdapter::boundaries(text);
+    const auto &graphemes = result.graphemes;
     for (int i = 0; i + 1 < graphemes.size(); ++i) {
-        const auto cluster = text.mid(graphemes[i], graphemes[i + 1] - graphemes[i]);
+        const auto cluster =
+                QStringView(text).sliced(graphemes[i], graphemes[i + 1] - graphemes[i]);
         bool emoji = false;
-        for (const auto code : cluster.toUcs4())
+        for (qsizetype offset = 0; offset < cluster.size(); ++offset) {
+            const auto character = cluster[offset];
+            char32_t code = character.unicode();
+            if (character.isHighSurrogate() && offset + 1 < cluster.size()
+                && cluster[offset + 1].isLowSurrogate())
+                code = QChar::surrogateToUcs4(character, cluster[++offset]);
             emoji |= code >= EmojiPlaneBegin || code == EmojiPresentationSelector;
+        }
         if (emoji) {
             QTextCharFormat format;
             // Frozen CSS font-synthesis:none keeps a regular color-font fallback regular.
             // The embedded primary faces still use their exact original SFNT weight/style.
             format.setFontWeight(QFont::Normal);
             format.setFontStyleName(u"Regular"_s);
-            formats.append({ graphemes[i], graphemes[i + 1] - graphemes[i], format });
+            result.formats.append({ graphemes[i], graphemes[i + 1] - graphemes[i], format });
         }
     }
-    layout.setFormats(formats);
+    return result;
+}
+Part shape(const QString &text, QFont font, double size, double width, double ratio, double spacing,
+           bool translation, bool oneLine, bool clamp, bool collect = true,
+           double budget = DefaultTranslationBudgetPixels, const TextAnalysis *analysis = nullptr)
+{
+    Part part;
+    if (text.isEmpty())
+        return part;
+    TextAnalysis local;
+    if (!analysis) {
+        local = analyzeText(text);
+        analysis = &local;
+    }
+    const auto &graphemes = analysis->graphemes;
+    font.setPixelSize(std::max(1, int(std::round(size))));
+    const double scale = size / font.pixelSize();
+    font.setHintingPreference(QFont::PreferNoHinting);
+    font.setLetterSpacing(QFont::AbsoluteSpacing, spacing / scale);
+    QTextLayout layout(text, font);
+    layout.setFormats(analysis->formats);
     QTextOption option;
     option.setWrapMode(oneLine ? QTextOption::NoWrap : QTextOption::WrapAtWordBoundaryOrAnywhere);
     option.setFlags(QTextOption::IncludeTrailingSpaces);
@@ -79,21 +105,20 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
     const int limit = oneLine ? 1
             : translation     ? int(std::ceil(budget / (size * ratio))) + 1
                               : MaximumMainLines;
+    const QFontMetricsF metrics(font);
+    const double ascent = metrics.ascent() * scale;
+    const double descent = metrics.descent() * scale;
+    double halfLeading = (lineHeight - std::round(ascent) - std::round(descent)) / 2;
+#ifdef Q_OS_MACOS
+    // Chromium/CoreText aligns the primary CSS font box to an integral logical pixel.
+    halfLeading = std::floor(halfLeading);
+#endif
     for (int index = 0; index < limit; ++index) {
         auto line = layout.createLine();
         if (!line.isValid())
             break;
         line.setLineWidth(oneLine ? UnboundedLineWidth : width / scale);
         // CSS half leading uses the primary face. Fallback ascent must not move its ink.
-        const QFontMetricsF metrics(font);
-        const double ascent = metrics.ascent() * scale;
-        const double descent = metrics.descent() * scale;
-        double halfLeading = (lineHeight - std::round(ascent) - std::round(descent)) / 2;
-#ifdef Q_OS_MACOS
-        // The frozen Chromium/CoreText face paints at the integral CSS font-box top.
-        // Keep the line height and shaping positions; only align its primary baseline.
-        halfLeading = std::floor(halfLeading);
-#endif
         const double top = halfLeading + std::round(ascent) - line.ascent() * scale;
         line.setPosition({ 0, (index * lineHeight + top) / scale });
         part.naturalWidth = std::max(part.naturalWidth, line.naturalTextWidth() * scale);
@@ -115,6 +140,8 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         const auto runs = line.glyphRuns(lineStart, line.textLength(), QTextLayout::RetrieveAll);
         QList<ResolvedGlyphRun> resolvedRuns;
         QList<bool> colorRuns;
+        resolvedRuns.reserve(runs.size());
+        colorRuns.reserve(runs.size());
         QMap<int, QList<QPair<int, int>>> groups;
         for (int runIndex = 0; runIndex < runs.size(); ++runIndex) {
             const auto &run = runs[runIndex];
@@ -170,22 +197,24 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             for (auto runGroup = runGroups.cbegin(); runGroup != runGroups.cend(); ++runGroup) {
                 const auto &source = resolvedRuns[runGroup.key()];
                 ResolvedGlyphRun run{ source.font, source.fontHead, { }, { }, source.flags };
+                run.indexes.reserve(runGroup->size());
+                run.positions.reserve(runGroup->size());
                 for (const int i : runGroup.value()) {
                     run.indexes.append(source.indexes[i]);
                     run.positions.append(source.positions[i]
                                          - QPointF(glyph.x / scale, glyph.y / scale));
                 }
-                glyph.renderRuns.append(run);
+                glyph.renderRuns.append(std::move(run));
                 colored |= colorRuns[runGroup.key()];
             }
             if (colored) {
                 glyph.colorGlyph = true;
                 // Qt Quick Text retains the fallback face's own inline baseline.
-                glyph.baseline += line.ascent() - QFontMetricsF(font).ascent();
+                glyph.baseline += line.ascent() - metrics.ascent();
                 glyph.font.setWeight(QFont::Normal);
                 glyph.font.setStyleName(u"Regular"_s);
             }
-            part.glyphs.append(glyph);
+            part.glyphs.append(std::move(glyph));
         }
         if (clamp && part.lines > visibleLines && index == visibleLines - 1) {
             const auto ellipsis =
@@ -203,7 +232,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
                     : 0;
             dot.y = index * lineHeight;
             dot.height = lineHeight;
-            part.glyphs.append(dot);
+            part.glyphs.append(std::move(dot));
         }
     }
     return part;
@@ -269,10 +298,9 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                                        const QFont &subtitle, double size, double width,
                                        double budget, bool narrow, double dpr, bool transport)
 {
-    QByteArray keyBytes;
-    QDataStream stream(&keyBytes, QIODevice::WriteOnly);
+    QByteArray key;
+    QDataStream stream(&key, QIODevice::WriteOnly);
     stream << text << main << subtitle << size << width << budget << narrow << dpr << transport;
-    const QString key = QString::fromUtf8(keyBytes.toBase64());
     if (auto *cached = m_cache.object(key)) {
         m_keys.removeAll(key);
         m_keys.append(key);
@@ -287,21 +315,25 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
         parts.first.replace(whitespace, u" "_s).remove(ends);
         parts.second.replace(whitespace, u" "_s).remove(ends);
     }
+    const auto firstAnalysis = analyzeText(parts.first);
+    const auto secondAnalysis = analyzeText(parts.second);
     const auto candidate = [&](double candidateSize, bool clamp, bool collect = false) {
         TitleLayout value;
         value.size = candidateSize;
-        auto first = shape(
-                parts.first, main, candidateSize, width, transport ? 0 : MainLineHeightRatio,
-                transport ? 0 : -MainLetterSpacingPixels, false, transport, clamp, collect, budget);
+        auto first =
+                shape(parts.first, main, candidateSize, width, transport ? 0 : MainLineHeightRatio,
+                      transport ? 0 : -MainLetterSpacingPixels, false, transport, clamp, collect,
+                      budget, &firstAnalysis);
         auto second = shape(parts.second, subtitle, candidateSize * SubtitleSizeRatio, width,
                             SubtitleLineHeightRatio,
                             candidateSize * SubtitleSizeRatio * SubtitleLetterSpacingEm, true,
-                            false, clamp, collect, budget);
+                            false, clamp, collect, budget, &secondAnalysis);
         const double gap =
                 parts.second.isEmpty() ? 0 : candidateSize * SubtitleSizeRatio * SubtitleGapEm;
         for (auto &glyph : second.glyphs)
             glyph.y += first.height + gap;
-        value.glyphs = first.glyphs + second.glyphs;
+        value.glyphs = std::move(first.glyphs);
+        value.glyphs += std::move(second.glyphs);
         value.mainLines = first.lines;
         value.height = first.height + gap + second.height;
         value.naturalWidth = first.naturalWidth;
@@ -321,7 +353,7 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
         result = candidate(result.size, result.overflow, true);
         result.height = std::min(result.height, budget);
     }
-    qsizetype bytes = sizeof(TitleLayout) + keyBytes.size() * LayoutKeyCopyCount + text.size() * 2;
+    qsizetype bytes = sizeof(TitleLayout) + key.size() * LayoutKeyCopyCount + text.size() * 2;
     for (const auto &glyph : result.glyphs) {
         bytes += sizeof(TitleGlyph) + (glyph.text.size() + glyph.key.size()) * 2;
         for (const auto &run : glyph.renderRuns)
@@ -329,7 +361,7 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                     + run.indexes.size() * (sizeof(quint32) + sizeof(QPointF));
     }
     // Byte-cost eviction can remove entries independently of the entry-count LRU.
-    m_keys.removeIf([this, &key](const QString &cached) {
+    m_keys.removeIf([this, &key](const QByteArray &cached) {
         return cached == key || !m_cache.contains(cached);
     });
     // Entry and byte LRU bounds complement each other; oversized inputs are never cached.

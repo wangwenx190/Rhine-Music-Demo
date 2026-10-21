@@ -13,6 +13,7 @@ void RealColumns::reset(const QList<int> &counts, ArchiveCell selected,
                         std::optional<double> displayedRow)
 {
     m_columns.clear();
+    m_columns.reserve(counts.size());
     m_time = 0;
     m_reducedEpoch = 0;
     if (!std::isfinite(selected.lane) || std::floor(selected.lane) != selected.lane

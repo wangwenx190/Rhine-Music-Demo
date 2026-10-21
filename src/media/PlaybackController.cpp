@@ -128,10 +128,13 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
     int target = -1;
     QList<Track> queue;
     QSet<QString> ids;
+    queue.reserve(album->tracks.size());
+    ids.reserve(album->tracks.size());
     for (const auto &entry : album->tracks) {
-        if (ids.contains(entry.id))
-            continue;
+        const auto count = ids.size();
         ids.insert(entry.id);
+        if (ids.size() == count)
+            continue;
         if (entry.id == trackId)
             target = int(queue.size());
         queue.append(entry);

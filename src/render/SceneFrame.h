@@ -22,15 +22,15 @@ struct SceneVector final
 {
     double x = 0, y = 0, z = 0;
     bool operator==(const SceneVector &) const = default;
-    SceneVector operator+(SceneVector b) const
+    constexpr SceneVector operator+(SceneVector b) const
     {
         return { x + b.x, y + b.y, z + b.z };
     }
-    SceneVector operator-(SceneVector b) const
+    constexpr SceneVector operator-(SceneVector b) const
     {
         return { x - b.x, y - b.y, z - b.z };
     }
-    SceneVector operator*(double s) const
+    constexpr SceneVector operator*(double s) const
     {
         return { x * s, y * s, z * s };
     }
@@ -47,11 +47,11 @@ struct SceneVector final
         return { float(x), float(y), float(z) };
     }
 };
-inline double dot(SceneVector a, SceneVector b)
+inline constexpr double dot(SceneVector a, SceneVector b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
-inline SceneVector cross(SceneVector a, SceneVector b)
+inline constexpr SceneVector cross(SceneVector a, SceneVector b)
 {
     return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }

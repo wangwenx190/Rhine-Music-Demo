@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <array>
 
 using namespace Qt::StringLiterals;
 
@@ -17,6 +18,27 @@ QVector3D linear(QLatin1StringView hex)
         return colorTransfer::decode(x);
     };
     return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
+}
+struct LinearColors final
+{
+    std::array<QVector3D, opticalSource::SurfaceCount> day, night;
+    QVector3D dayAttenuation, nightAttenuation;
+};
+const LinearColors &linearColors()
+{
+    // Hex endpoints are immutable. Decode at the original float precision once;
+    // per-frame material interpolation keeps the original arithmetic order.
+    static const auto colors = [] {
+        LinearColors result;
+        for (int surface = 0; surface < opticalSource::SurfaceCount; ++surface) {
+            result.day[surface] = linear(opticalSource::DayTint[surface]);
+            result.night[surface] = linear(opticalSource::NightTint[surface]);
+        }
+        result.dayAttenuation = linear(opticalSource::DayAttenuation);
+        result.nightAttenuation = linear(opticalSource::NightAttenuation);
+        return result;
+    }();
+    return colors;
 }
 }
 float lidRoughness(float warmth, float clarity)
@@ -31,13 +53,13 @@ ShellMaterial shellMaterial(int surface, float warmth, float clarity, float envi
         throw std::invalid_argument("Invalid RHI shell parameters");
     const float w = std::clamp(warmth, 0.0f, 1.0f), c = std::clamp(clarity, 0.0f, 1.0f);
     const auto source = opticalSource::parameters(surface, w, c);
+    const auto &colors = linearColors();
     ShellMaterial m;
-    m.tint = linear(opticalSource::NightTint[surface]) * (1 - w)
-            + linear(opticalSource::DayTint[surface]) * w;
-    m.attenuation = linear(surface == opticalSource::Tray ? opticalSource::DayAttenuation
-                                                          : opticalSource::NightAttenuation)
+    m.tint = colors.night[surface] * (1 - w) + colors.day[surface] * w;
+    m.attenuation =
+            (surface == opticalSource::Tray ? colors.dayAttenuation : colors.nightAttenuation)
                     * (1 - w)
-            + linear(opticalSource::DayAttenuation) * w;
+            + colors.dayAttenuation * w;
     m.transport = { source.transmission, source.roughness, source.thickness,
                     source.attenuationDistance };
     m.coat = { source.clearcoat, source.coatRoughness, float(surface), environment };

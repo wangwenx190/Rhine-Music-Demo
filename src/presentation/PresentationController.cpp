@@ -105,7 +105,7 @@ void PresentationController::open()
             if (m_ports.archiveReady()) {
                 beginOpen();
             } else {
-                m_phase = "selecting"_L1;
+                m_phase = u"selecting"_s;
                 m_browse.hide(m_reduced);
             }
         }
@@ -131,7 +131,7 @@ void PresentationController::selectPending(const QString &albumId, const QString
     if (m_phase == "archive"_L1) {
         const bool committed = commitSelection(false);
         if (openAfter || !committed) {
-            m_phase = "selecting"_L1;
+            m_phase = u"selecting"_s;
             m_browse.hide(m_reduced);
         }
         return;
@@ -204,7 +204,7 @@ void PresentationController::updatePresentation()
         && m_ports.archiveInteractive()) {
         if (m_pending && !commitSelection(false))
             return;
-        m_phase = "archive"_L1;
+        m_phase = u"archive"_s;
         m_browse.show(m_reduced);
         Q_EMIT focusRequested(false);
         return;
@@ -213,13 +213,13 @@ void PresentationController::updatePresentation()
         return;
     if (m_pending) {
         commitSelection(false);
-        m_phase = "selecting"_L1;
+        m_phase = u"selecting"_s;
         return;
     }
     if (m_wantsDetail) {
         beginOpen();
     } else {
-        m_phase = "archive"_L1;
+        m_phase = u"archive"_s;
         m_browse.show(m_reduced);
         Q_EMIT focusRequested(false);
     }
@@ -237,7 +237,7 @@ void PresentationController::browseHidden(quint64 revision)
             return;
         m_browseHidden = true;
         if (m_pending) {
-            m_phase = "selecting"_L1;
+            m_phase = u"selecting"_s;
             commitSelection(false);
             return;
         }
@@ -261,7 +261,7 @@ void PresentationController::switchHidden(quint64 revision)
             returnToArchive();
             return;
         }
-        m_phase = "switching"_L1;
+        m_phase = u"switching"_s;
         if (m_pending && commitSelection(true))
             prepareMenu();
     });
@@ -269,7 +269,7 @@ void PresentationController::switchHidden(quint64 revision)
 void PresentationController::beginOpen()
 {
     const auto revision = ++m_revision;
-    m_phase = "opening"_L1;
+    m_phase = u"opening"_s;
     m_browseHidden = m_cameraEntered = false;
     prepareMenu();
     m_browse.hide(m_reduced, [this, revision] {
@@ -281,7 +281,7 @@ void PresentationController::beginExit()
     if (m_phase == "hiding"_L1 || m_phase == "returning"_L1 || m_phase == "switch-hiding"_L1)
         return;
     const auto revision = ++m_revision;
-    m_phase = "hiding"_L1;
+    m_phase = u"hiding"_s;
     m_detail.hide(m_reduced, [revision, this] {
         detailHidden(revision);
     });
@@ -289,7 +289,7 @@ void PresentationController::beginExit()
 void PresentationController::beginDetailSwitch()
 {
     const auto revision = ++m_revision;
-    m_phase = "switch-hiding"_L1;
+    m_phase = u"switch-hiding"_s;
     if (!m_browseHidden) {
         m_browse.hide(m_reduced, [this, revision] {
             if (revision == m_revision)
@@ -314,7 +314,7 @@ bool PresentationController::commitSelection(bool detail)
 }
 void PresentationController::returnToArchive()
 {
-    m_phase = "returning"_L1;
+    m_phase = u"returning"_s;
     m_ports.returnCamera();
 }
 void PresentationController::prepareMenu()
@@ -329,7 +329,7 @@ void PresentationController::prepareMenu()
 }
 void PresentationController::showMenu()
 {
-    m_phase = "detail"_L1;
+    m_phase = u"detail"_s;
     m_detail.show(m_reduced);
     Q_EMIT focusRequested(true);
 }
@@ -340,7 +340,7 @@ void PresentationController::reset()
         ++m_layoutRevision;
         m_pending.reset();
         m_wantsDetail = m_browseHidden = m_cameraEntered = m_layoutReady = false;
-        m_phase = "archive"_L1;
+        m_phase = u"archive"_s;
         m_detail.reset(false);
         m_browse.reset(true);
         Q_EMIT prepared();

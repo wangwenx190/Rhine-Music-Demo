@@ -99,7 +99,8 @@ void LibrarySession::rebuildSummary()
 }
 int LibrarySession::trackIndex(const QString &albumId, const QString &trackId) const
 {
-    return int(m_trackIndices.value(albumId).value(trackId, -1));
+    const auto tracks = m_trackIndices.constFind(albumId);
+    return tracks == m_trackIndices.cend() ? -1 : int(tracks->value(trackId, -1));
 }
 bool LibrarySession::contains(const QString &albumId, const QString &trackId) const
 {
@@ -113,7 +114,7 @@ void LibrarySession::invalidate()
 {
     const auto pending = std::exchange(m_pending, { });
     if (m_batchActive)
-        m_batchStatus = "Cancelled"_L1;
+        m_batchStatus = u"Cancelled"_s;
     m_batchActive = false;
     m_batchRequest = 0;
     ++m_generation;
@@ -129,7 +130,9 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     invalidate();
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     m_genres.clear();
+    m_genres.reserve(m_snapshot->genres.size());
     QSet<QString> usedGenres;
+    usedGenres.reserve(m_snapshot->genres.size());
     for (const auto &entry : m_snapshot->albums)
         usedGenres.insert(entry.genreId);
     for (const auto &genre : m_snapshot->genres)
@@ -139,21 +142,21 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     rebuildSummary();
     m_albumIndices.clear();
     m_genreNames.clear();
+    m_genreNames.reserve(m_snapshot->genres.size());
     for (const auto &genre : m_snapshot->genres)
         m_genreNames.insert(genre.id, genreDisplayName(genre));
     m_trackIndices.clear();
+    m_trackIndices.reserve(m_snapshot->albums.size());
     m_albumIndices.reserve(m_snapshot->albums.size());
     for (qsizetype index = 0; index < m_snapshot->albums.size(); ++index) {
         const auto &entry = m_snapshot->albums[index];
-        if (m_albumIndices.contains(entry.id))
+        if (!m_albumIndices.tryEmplace(entry.id, index).inserted)
             continue;
-        m_albumIndices.insert(entry.id, index);
         if (!entry.tracks.isEmpty()) {
             QHash<QString, qsizetype> tracks;
             tracks.reserve(entry.tracks.size());
             for (qsizetype row = 0; row < entry.tracks.size(); ++row)
-                if (!tracks.contains(entry.tracks[row].id))
-                    tracks.insert(entry.tracks[row].id, row);
+                tracks.tryEmplace(entry.tracks[row].id, row);
             m_trackIndices.insert(entry.id, std::move(tracks));
         }
     }
@@ -344,7 +347,7 @@ void LibrarySession::cancelMetadata(quint64 requestId)
     if (m_batchRequest == requestId) {
         m_batchRequest = 0;
         m_batchActive = false;
-        m_batchStatus = "Cancelled"_L1;
+        m_batchStatus = u"Cancelled"_s;
         Q_EMIT metadataProgressChanged();
     }
     if (m_provider)
@@ -426,7 +429,7 @@ bool LibrarySession::requestMetadataBatch(const QString &kind, bool missingOnly)
     }
     m_batchNext = m_batchCompleted = m_batchErrors = 0;
     m_batchKind = kind;
-    m_batchStatus = "Pending"_L1;
+    m_batchStatus = u"Pending"_s;
     m_batchActive = true;
     advanceBatch();
     return true;
@@ -443,7 +446,7 @@ void LibrarySession::advanceBatch()
     m_batchRequest = requestMetadata(m_batchAlbums[m_batchNext++], m_batchKind);
     if (!m_batchRequest) {
         m_batchActive = false;
-        m_batchStatus = "Error"_L1;
+        m_batchStatus = u"Error"_s;
     }
     Q_EMIT metadataProgressChanged();
 }
@@ -465,8 +468,8 @@ QVariantMap LibrarySession::metadataFor(const QString &albumId, const QString &k
             }
         return metadataPresentation(std::move(value), entry->title);
     };
-    if (m_metadata.contains(key)) {
-        auto value = metadataValue(m_metadata.value(key));
+    if (const auto cached = m_metadata.constFind(key); cached != m_metadata.cend()) {
+        auto value = metadataValue(*cached);
         auto payload = value.value(u"payload"_s).toMap();
         const auto resolved = resolvedAlbum(albumId);
         if (kind == "introduction"_L1 && payload.value(u"description"_s).toString().isEmpty()
@@ -522,14 +525,16 @@ Album LibrarySession::resolvedAlbum(const QString &albumId) const
     }
     return resolved;
 }
-void LibrarySession::adoptMetadataConfiguration(Snapshot snapshot)
+void LibrarySession::adoptMetadataConfiguration(const Snapshot &snapshot)
 {
     if (!snapshot)
         return;
+    // Provider cancellation may reenter the session. Retain only the configuration
+    // value before callbacks rather than borrowing the caller's snapshot through them.
+    const auto configuration = snapshot->fields.value(u"metadataConfiguration"_s);
     invalidate();
     auto updated = *m_snapshot;
-    updated.fields.insert(u"metadataConfiguration"_s,
-                          snapshot->fields.value(u"metadataConfiguration"_s));
+    updated.fields.insert(u"metadataConfiguration"_s, configuration);
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(updated));
     ++m_metadataRevision;
     Q_EMIT metadataConfigurationChanged();

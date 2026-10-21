@@ -9,6 +9,7 @@
 - Frame std140为832bytes：前752保留，coverUv752、paperSize768、originLight0/1为784/800、fog816。C++ static_assert/offset与qsb reflection核对；顶点属性location保持连续前缀，保留未使用输入占位，避免stage linkage错位。
 - 几何instance112bytes：model四列、tile UV、两组origin light；固定436实体容量（432池+4接管），draw uniform容量`uniformStride*(436*3+6)`。CPU暂存复用，只写/上传有效aligned前缀，不清零/上传未使用容量。
 - 深度键每实体预计算一次，稳定ID排序；112-byte实例直接填值，不生成被丢弃的完整材质块。caster保留必要窗口外实体，阴影未失效跳过专用uniform和重画。
+- 可见性、深度键、绘制偏移及壳体顺序使用render独占暂存，容量随有界实体数复用，不交给异步采集。view×model、lightVP×model及有效封面UV按实体计算后供各表面复用，保持矩阵乘法结合顺序；纯实例路径跳过不用的逐实体light矩阵。
 - QRhiResourceUpdateBatch::updateDynamicBuffer指针重载返回前复制载荷，CPU暂存可跨帧复用；后端storage轮换由QRhi负责，不能持有/改写其内部存储。
 
 ## 通道资源

@@ -67,7 +67,7 @@ QString text(const QMediaMetaData &metadata, QMediaMetaData::Key key)
 {
     return metadata.stringValue(key).trimmed();
 }
-QString genreKey(QString value)
+QString genreKey(const QString &value)
 {
     static const QRegularExpression separators(u"[\\s\\p{P}\\p{S}]"_s);
     return value.trimmed().normalized(QString::NormalizationForm_KC).toLower().remove(separators);
@@ -89,13 +89,14 @@ QString resolveRawGenre(const Album &album, QHash<QString, QString> &names, QSet
                         QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
                                 .toHex()
                                 .first(ArtworkIdHexCharacters));
-        if (!ids.contains(id)) {
+        const auto count = ids.size();
+        ids.insert(id);
+        if (ids.size() != count) {
             Genre genre;
             genre.id = id;
             genre.name = name;
-            snapshot.genres.append(genre);
+            snapshot.genres.append(std::move(genre));
             names.insert(key, id);
-            ids.insert(id);
         }
     }
 
@@ -105,16 +106,18 @@ void resolveGenres(LibrarySnapshot &snapshot)
 {
     QHash<QString, QString> names;
     QSet<QString> ids;
+    ids.reserve(snapshot.genres.size());
     for (const auto &genre : snapshot.genres) {
         ids.insert(genre.id);
-        auto aliases = genre.aliases;
-        aliases.prepend(genre.id);
-        aliases.prepend(genre.name);
-        for (const auto &name : aliases) {
+        const auto addName = [&](const QString &name) {
             const auto key = genreKey(name);
-            if (!key.isEmpty() && !names.contains(key))
-                names.insert(key, genre.id);
-        }
+            if (!key.isEmpty())
+                names.tryEmplace(key, genre.id);
+        };
+        addName(genre.name);
+        addName(genre.id);
+        for (const auto &name : genre.aliases)
+            addName(name);
     }
     const auto overrides = snapshot.fields.value(u"genreOverrides"_s).toObject();
     QHash<QString, int> counts;
@@ -221,8 +224,9 @@ public:
     explicit ProbeWorker(MediaMetadataProbe::Factory factory) : m_factory(std::move(factory))
     {
     }
-    void begin(Snapshot snapshot, QString root, ScanCancellation cancel, quint64 generation)
+    void begin(const Snapshot &snapshot, QString root, ScanCancellation cancel, quint64 generation)
     {
+        // The queued start functor owns this immutable snapshot for the complete call.
         abort();
         m_next = snapshot ? *snapshot : LibrarySnapshot{ };
         m_root = std::move(root);

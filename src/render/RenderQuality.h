@@ -39,6 +39,10 @@ public:
     {
         return renderQuality::AoSamples;
     }
+    double depthOfField() const
+    {
+        return m_depthOfField;
+    }
     QSize targetSize() const
     {
         return m_size;

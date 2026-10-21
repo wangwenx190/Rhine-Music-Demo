@@ -54,7 +54,7 @@ void PreferencesStore::load()
             d->m_document = { };
     }
 }
-PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
+PreferencesStore::PreferencesStore(const QString &dataRoot, QObject *parent)
     : QObject(parent), d(std::make_unique<Private>())
 {
     d->m_path = QDir(dataRoot).filePath(u"preferences.json"_s);
@@ -131,11 +131,11 @@ QString PreferencesStore::validate(const QJsonObject &document)
         return QCoreApplication::translate(
                 "Yalahoo",
                 "Unsupported preferences schemaVersion. The original file was preserved.");
-    for (auto key :
+    for (const auto &key :
          { u"rememberColumnPosition"_s, u"reduced"_s, u"singleInstance"_s, u"bgm"_s, u"sound"_s })
         if (document.contains(key) && !document.value(key).isBool())
             return QCoreApplication::translate("Yalahoo", "Invalid preference switch type: ") + key;
-    const QList<QPair<QString, QStringList>> choices{
+    static const QList<QPair<QString, QStringList>> choices{
         { u"theme"_s, { u"day"_s, u"night"_s } },
         { u"sortMode"_s, { u"genre"_s, u"artist"_s, u"album"_s } },
         { u"arrayMode"_s, { u"filled"_s, u"realistic"_s } }
@@ -146,14 +146,14 @@ QString PreferencesStore::validate(const QJsonObject &document)
                 || !choice.second.contains(document.value(choice.first).toString())))
             return QCoreApplication::translate("Yalahoo", "Invalid preference option: ")
                     + choice.first;
-    for (auto key : { u"volume"_s, u"bgmVolume"_s, u"soundVolume"_s, u"motionSpeed"_s }) {
+    for (const auto &key : { u"volume"_s, u"bgmVolume"_s, u"soundVolume"_s, u"motionSpeed"_s }) {
         const auto value = document.value(key);
         if (!value.isUndefined()
             && (!value.isDouble() || !std::isfinite(value.toDouble())
-                || value.toDouble() < (QString(key) == "motionSpeed"_L1
+                || value.toDouble() < (key == "motionSpeed"_L1
                                                ? yalahoo::productDefaults::MinimumMotionSpeed
                                                : 0)
-                || value.toDouble() > (QString(key) == "motionSpeed"_L1
+                || value.toDouble() > (key == "motionSpeed"_L1
                                                ? yalahoo::productDefaults::MaximumMotionSpeed
                                                : 1)))
             return QCoreApplication::translate("Yalahoo", "Invalid preference number: ") + key;
@@ -163,10 +163,10 @@ QString PreferencesStore::validate(const QJsonObject &document)
             return QCoreApplication::translate("Yalahoo",
                                                "Lighting preferences must be an object.");
         const auto lighting = document.value(u"lighting"_s).toObject();
-        const QStringList modes{ u"baseline"_s, u"area"_s, u"guided"_s, u"hybrid"_s };
+        const auto &modes = productDefaults::lightingModes();
         if (lighting.contains(u"mode"_s) && !modes.contains(lighting.value(u"mode"_s).toString()))
             return QCoreApplication::translate("Yalahoo", "Invalid lighting mode.");
-        for (auto key :
+        for (const auto &key :
              { u"strength"_s, u"width"_s, u"offset"_s, u"fill"_s, u"transitionDuration"_s })
             if (lighting.contains(key)
                 && (!lighting.value(key).isDouble()
@@ -237,7 +237,7 @@ bool PreferencesStore::update(const QVariantMap &patch)
 void PreferencesStore::setAudio(const QJsonObject &audio)
 {
     QVariantMap patch;
-    for (auto key : { u"volume"_s, u"bgm"_s, u"bgmVolume"_s, u"sound"_s, u"soundVolume"_s })
+    for (const auto &key : { u"volume"_s, u"bgm"_s, u"bgmVolume"_s, u"sound"_s, u"soundVolume"_s })
         if (audio.contains(key))
             patch.insert(key, audio.value(key).toVariant());
     update(patch);

@@ -5,6 +5,7 @@
 
 #include <QCollator>
 #include <QCryptographicHash>
+#include <QByteArrayView>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -15,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <array>
 
 using namespace Qt::StringLiterals;
 
@@ -77,10 +79,12 @@ void resetTrackMetadata(Track &track, const QFileInfo &info)
     static const QRegularExpression disc(u"^(\\d{1,2})[-_](\\d{1,3})(?:[\\s._-]|$)"_s);
     const auto match = disc.match(info.fileName());
     if (match.hasMatch()) {
-        if (match.captured(1).toInt() > 0)
-            track.discNumber = match.captured(1).toInt();
-        if (match.captured(2).toInt() > 0)
-            track.trackNumber = match.captured(2).toInt();
+        const int discNumber = match.capturedView(1).toInt();
+        const int trackNumber = match.capturedView(2).toInt();
+        if (discNumber > 0)
+            track.discNumber = discNumber;
+        if (trackNumber > 0)
+            track.trackNumber = trackNumber;
     }
 }
 struct Walker final
@@ -98,6 +102,14 @@ struct Walker final
     {
         collator.setNumericMode(true);
         if (previous) {
+            albums.reserve(previous->albums.size());
+            qsizetype trackCount = 0;
+            for (const auto &album : previous->albums) {
+                if (stopped(cancel))
+                    return;
+                trackCount += album.tracks.size();
+            }
+            tracks.reserve(trackCount);
             for (const auto &album : previous->albums) {
                 if (stopped(cancel))
                     return;
@@ -127,16 +139,17 @@ struct Walker final
         album.fields.insert(u"_singleFile"_s, single);
         album.offline = false;
         QJsonArray candidates;
+        const QString singleStem = single ? QFileInfo(files.first()).completeBaseName() : QString();
         for (const auto &image : images) {
             if (!single
-                || QFileInfo(image).completeBaseName().compare(
-                           QFileInfo(files.first()).completeBaseName(), Qt::CaseInsensitive)
+                || QFileInfo(image).completeBaseName().compare(singleStem, Qt::CaseInsensitive)
                         == 0)
                 candidates.append(image);
         }
         album.fields.insert(u"_coverCandidates"_s, candidates);
         album.tracks.clear();
         album.tracks.reserve(files.size());
+        const QDir rootDirectory(root);
         for (const auto &file : files) {
             if (stopped(cancel))
                 return false;
@@ -156,7 +169,7 @@ struct Walker final
             track.id = DirectoryScanner::stableId(u"track"_s, file);
             track.albumId = id;
             track.sourceUrl = QUrl::fromLocalFile(file);
-            track.relativePath = QDir(root).relativeFilePath(file);
+            track.relativePath = rootDirectory.relativeFilePath(file);
             track.format = info.suffix().toUpper();
             track.fields.insert(u"_fingerprint"_s, stamp);
             if (!unchanged)
@@ -207,9 +220,9 @@ struct Walker final
                 directories.append(path);
             if (fs::is_regular_file(status)) {
                 ++filesVisited;
-                if (audioExtensions().contains(QFileInfo(name).suffix().toLower()))
-                    files.append(path);
                 const auto extension = QFileInfo(name).suffix().toLower();
+                if (audioExtensions().contains(extension))
+                    files.append(path);
                 if (extension == "png"_L1 || extension == "jpg"_L1 || extension == "jpeg"_L1
                     || extension == "webp"_L1)
                     images.append(path);
@@ -226,11 +239,15 @@ struct Walker final
                   [this](const QString &a, const QString &b) {
                       return less(a, b);
                   });
-        const QStringList preferred{ u"cover"_s, u"folder"_s, u"front"_s };
+        static constexpr std::array preferred{ "cover"_L1, "folder"_L1, "front"_L1 };
         QHash<QString, int> imageRanks;
+        imageRanks.reserve(images.size());
         for (const auto &image : images) {
-            const auto rank = preferred.indexOf(QFileInfo(image).completeBaseName().toLower());
-            imageRanks.insert(image, rank < 0 ? UnpreferredCoverRank : int(rank));
+            const auto stem = QFileInfo(image).completeBaseName().toLower();
+            const auto rank = std::find(preferred.cbegin(), preferred.cend(), stem);
+            imageRanks.insert(image,
+                              rank == preferred.cend() ? UnpreferredCoverRank
+                                                       : int(rank - preferred.cbegin()));
         }
         std::sort(images.begin(), images.end(),
                   [this, &imageRanks](const QString &a, const QString &b) {
@@ -239,6 +256,7 @@ struct Walker final
                   });
         if (folder == root) {
             QHash<QString, QStringList> singleImages;
+            singleImages.reserve(images.size());
             for (const auto &image : images)
                 singleImages[QFileInfo(image).completeBaseName().toCaseFolded()].append(image);
             for (const auto &file : files) {
@@ -266,6 +284,7 @@ bool DirectoryScanner::normalizeRoots(const QList<QUrl> &input, QList<QUrl> &out
         return false;
     }
     QStringList paths;
+    paths.reserve(input.size());
     for (const auto &url : input) {
         const auto path = QDir::fromNativeSeparators(url.toLocalFile());
         if (!url.isLocalFile() || !url.query().isEmpty() || !url.fragment().isEmpty()
@@ -281,6 +300,7 @@ bool DirectoryScanner::normalizeRoots(const QList<QUrl> &input, QList<QUrl> &out
             paths.append(clean);
     }
     QList<QUrl> result;
+    result.reserve(paths.size());
     for (const auto &path : paths) {
         if (std::none_of(paths.cbegin(), paths.cend(), [&](const QString &other) {
                 return path != other && within(path, other);
@@ -327,15 +347,15 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
     // Match Node's seconds*1000 + nanoseconds/1e6 without narrowing the epoch to ns.
     const double ms = static_cast<double>(seconds.count()) * yalahoo::units::MillisecondsPerSecond
             + static_cast<double>(nanoseconds) / yalahoo::units::NanosecondsPerMillisecond;
-    auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
-    encoded = encoded.mid(1, encoded.size() - 2);
+    const auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
     if (error)
         error->clear();
-    return QString::number(size) + ':'_L1 + QString::fromUtf8(encoded);
+    return QString::number(size) + ':'_L1
+            + QString::fromUtf8(QByteArrayView(encoded).sliced(1, encoded.size() - 2));
 }
 // Build a candidate snapshot off-thread and roll back an unreadable root as a whole.
 // Cancellation publishes no partial library; the owner validates the generation before acceptance.
-ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
+ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, const Snapshot &previous,
                                   const ScanCancellation &cancel)
 {
     ScanResult result;
@@ -349,6 +369,9 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
     LibrarySnapshot next = previous ? *previous : LibrarySnapshot{ };
     next.albums.clear();
     next.roots.clear();
+    if (previous)
+        next.albums.reserve(previous->albums.size());
+    next.roots.reserve(normalized.size());
     Walker walker(next, previous, cancel);
     for (const auto &url : normalized) {
         if (stopped(cancel))
@@ -379,9 +402,10 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
             next.albums.resize(start);
         }
         if (!ok && previous) {
-            for (auto album : previous->albums) {
-                if (!within(album.folder.toLocalFile(), root))
+            for (const auto &old : previous->albums) {
+                if (!within(old.folder.toLocalFile(), root))
                     continue;
+                auto album = old;
                 album.offline = true;
                 next.albums.append(std::move(album));
             }

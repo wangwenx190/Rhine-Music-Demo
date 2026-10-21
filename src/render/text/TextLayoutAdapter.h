@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QGlyphRun>
 #include <QCache>
+#include <QByteArray>
 
 namespace yalahoo {
 struct ResolvedGlyphRun final
@@ -56,8 +57,8 @@ public:
     void clear();
 
 private:
-    QCache<QString, TitleLayout> m_cache;
-    QStringList m_keys;
+    QCache<QByteArray, TitleLayout> m_cache;
+    QList<QByteArray> m_keys;
     quint64 m_misses = 0;
 };
 }

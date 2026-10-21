@@ -100,6 +100,7 @@ QUrl localUrl(const QString &value)
 QStringList strings(const QJsonArray &array)
 {
     QStringList result;
+    result.reserve(array.size());
     for (const auto &value : array)
         result.append(value.toString());
     return result;
@@ -170,7 +171,19 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
     library.credits = json.value(u"credits"_s).toObject();
     library.onlineEnabled = json.value(u"onlineEnabled"_s).toBool();
     QSet<QString> albumIds, trackIds, genreIds;
-    for (const auto &value : json.value(u"genres"_s).toArray()) {
+    const auto genres = json.value(u"genres"_s).toArray();
+    const auto albums = json.value(u"albums"_s).toArray();
+    const auto roots = json.value(u"roots"_s).toArray();
+    library.genres.reserve(genres.size());
+    library.albums.reserve(albums.size());
+    library.roots.reserve(roots.size());
+    genreIds.reserve(genres.size());
+    albumIds.reserve(albums.size());
+    qsizetype trackCount = 0;
+    for (const auto &value : albums)
+        trackCount += value.toObject().value(u"tracks"_s).toArray().size();
+    trackIds.reserve(trackCount);
+    for (const auto &value : genres) {
         const auto object = value.toObject();
         if (!value.isObject() || !validFields(object, QJsonValue::String, { "id"_L1, "name"_L1 })
             || !validStringArray(object.value("aliases"_L1)))
@@ -180,12 +193,13 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         Genre genre{ object.value(u"id"_s).toString(), object.value(u"name"_s).toString(),
                      strings(object.value(u"aliases"_s).toArray()),
                      integer(object, "albumCount"_L1), object };
-        if (genre.id.isEmpty() || genreIds.contains(genre.id))
-            return fail(u"Invalid or duplicate genre ID"_s);
+        const auto count = genreIds.size();
         genreIds.insert(genre.id);
-        library.genres.append(genre);
+        if (genre.id.isEmpty() || genreIds.size() == count)
+            return fail(u"Invalid or duplicate genre ID"_s);
+        library.genres.append(std::move(genre));
     }
-    for (const auto &value : json.value(u"albums"_s).toArray()) {
+    for (const auto &value : albums) {
         const auto object = value.toObject();
         Album album;
         if (!value.isObject()
@@ -205,9 +219,10 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         album.fields.remove(u"tracks"_s);
         album.fields.remove(u"producers"_s);
         album.id = object.value(u"id"_s).toString();
-        if (album.id.isEmpty() || albumIds.contains(album.id))
-            return fail(u"Invalid or duplicate album ID"_s);
+        const auto count = albumIds.size();
         albumIds.insert(album.id);
+        if (album.id.isEmpty() || albumIds.size() == count)
+            return fail(u"Invalid or duplicate album ID"_s);
         album.title = object.value(u"title"_s).toString();
         album.artist = object.value(u"artist"_s).toString();
         album.genreId = object.value(u"genreId"_s).toString();
@@ -227,7 +242,9 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         album.folder = localUrl(object.value(u"folderUrl"_s).toString(album.folderLabel));
         const QString cover = object.value(u"coverUrl"_s).toString();
         album.coverUrl = cover.startsWith("qrc:/"_L1) ? QUrl(cover) : localUrl(cover);
-        for (const auto &entry : object.value(u"tracks"_s).toArray()) {
+        const auto tracks = object.value(u"tracks"_s).toArray();
+        album.tracks.reserve(tracks.size());
+        for (const auto &entry : tracks) {
             const auto trackObject = entry.toObject();
             Track track;
             if (!entry.isObject()
@@ -240,9 +257,10 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             track.fields = trackObject;
             track.id = trackObject.value(u"id"_s).toString();
             track.albumId = trackObject.value(u"albumId"_s).toString(album.id);
-            if (track.id.isEmpty() || trackIds.contains(track.id) || track.albumId != album.id)
-                return fail(u"Invalid, duplicate or mismatched track ID"_s);
+            const auto count = trackIds.size();
             trackIds.insert(track.id);
+            if (track.id.isEmpty() || trackIds.size() == count || track.albumId != album.id)
+                return fail(u"Invalid, duplicate or mismatched track ID"_s);
             track.title = trackObject.value(u"title"_s).toString();
             track.artist = trackObject.value(u"artist"_s).toString();
             track.format = trackObject.value(u"format"_s).toString();
@@ -272,9 +290,11 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                 track.mediaSupport = MediaSupport::Supported;
             else if (support == "Unsupported"_L1)
                 track.mediaSupport = MediaSupport::Unsupported;
-            album.tracks.append(track);
+            album.tracks.append(std::move(track));
         }
-        for (const auto &entry : object.value(u"producers"_s).toArray()) {
+        const auto producers = object.value(u"producers"_s).toArray();
+        album.producers.reserve(producers.size());
+        for (const auto &entry : producers) {
             const auto p = entry.toObject();
             if (!entry.isObject()
                 || !validFields(p, QJsonValue::String,
@@ -286,9 +306,9 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                       p.value(u"source"_s).toString(), p.value(u"trackId"_s).toString(),
                       p.value(u"trackTitle"_s).toString(), p.value(u"url"_s).toString(), p });
         }
-        library.albums.append(album);
+        library.albums.append(std::move(album));
     }
-    for (const auto &entry : json.value(u"roots"_s).toArray()) {
+    for (const auto &entry : roots) {
         const auto r = entry.toObject();
         if (!entry.isObject()
             || !validFields(r, QJsonValue::String, { "path"_L1, "status"_L1, "error"_L1 }))
@@ -337,7 +357,7 @@ QJsonArray producerData(const QList<Producer> &entries)
         object.insert(u"trackId"_s, p.trackId);
         object.insert(u"trackTitle"_s, p.trackTitle);
         object.insert(u"url"_s, p.url);
-        result.append(object);
+        result.append(std::move(object));
     }
     return result;
 }
@@ -383,7 +403,7 @@ QJsonObject toJson(const LibrarySnapshot &library)
         object.insert(u"name"_s, g.name);
         object.insert(u"aliases"_s, QJsonArray::fromStringList(g.aliases));
         put(object, "albumCount"_L1, g.albumCount);
-        genres.append(object);
+        genres.append(std::move(object));
     }
     for (const auto &r : library.roots) {
         auto object = r.fields;
@@ -391,7 +411,7 @@ QJsonObject toJson(const LibrarySnapshot &library)
             object.insert(u"path"_s, r.path.toLocalFile());
         object.insert(u"status"_s, r.status);
         object.insert(u"error"_s, r.error);
-        roots.append(object);
+        roots.append(std::move(object));
     }
     json.insert(u"albums"_s, albums);
     json.insert(u"genres"_s, genres);

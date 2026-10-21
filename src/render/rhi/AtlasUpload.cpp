@@ -2,6 +2,7 @@
 #include "AtlasUpload.h"
 #include "RhiApi.h"
 #include <bit>
+#include <algorithm>
 
 namespace yalahoo::rhi {
 void AtlasUploadQueue::reset(QSize size, quint64 generation)
@@ -74,13 +75,14 @@ QVector<AtlasUpload> AtlasUploadQueue::take(bool initializing)
 {
     QVector<AtlasUpload> batch;
     const qint64 maximum = initializing ? initialBudget : steadyBudget;
+    batch.reserve(std::min(qsizetype(m_pending.size()), qsizetype(maximum / tileBytes)));
     qint64 bytes = 0;
     while (!m_pending.isEmpty()) {
-        const auto cost = payloadBytes(m_pending.first());
+        auto entry = m_pending.begin();
+        const auto cost = payloadBytes(*entry);
         if (bytes + cost > maximum)
             break;
         bytes += cost;
-        auto entry = m_pending.begin();
         m_uploadedLeases[entry.key()] = entry->lease;
         batch.append(std::move(entry.value()));
         m_pending.erase(entry);

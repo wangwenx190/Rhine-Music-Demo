@@ -108,7 +108,7 @@ void MetadataHttp::start()
     }
     if (!m_configuration.value(u"proxyEnabled"_s).toBool(true)) {
         m_network->setProxy(QNetworkProxy(QNetworkProxy::NoProxy));
-    } else if (m_configuration.value(u"proxyMode"_s).toString(u"system"_s) == "system"_L1) {
+    } else if (mode == "system"_L1) {
         m_network->setProxy(QNetworkProxy(QNetworkProxy::DefaultProxy));
     } else {
         const QUrl proxy(m_configuration.value(u"proxyUrl"_s).toString());

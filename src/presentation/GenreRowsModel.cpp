@@ -117,6 +117,7 @@ QVariant GenreRowsModel::data(const QModelIndex &index, int role) const
 }
 QHash<int, QByteArray> GenreRowsModel::roleNames() const
 {
-    return { { entriesRole, "entries"_ba } };
+    static const QHash<int, QByteArray> roles = { { entriesRole, "entries"_ba } };
+    return roles;
 }
 }

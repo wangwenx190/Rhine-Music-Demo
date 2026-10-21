@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iterator>
 #include <cmath>
+#include <limits>
 
 using namespace Qt::StringLiterals;
 
@@ -61,20 +62,21 @@ int OverviewLabelsModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> OverviewLabelsModel::roleNames() const
 {
-    return { { Lane, "lane"_ba },
-             { Name, "columnName"_ba },
-             { Count, "albumCount"_ba },
-             { X, "anchorX"_ba },
-             { Y, "anchorY"_ba },
-             { Extent, "extent"_ba },
-             { Selected, "selectedColumn"_ba },
-             { Interactive, "interactive"_ba },
-             { Expanded, "expanded"_ba },
-             { Fade, "fade"_ba },
-             { Offset, "offset"_ba },
-             { EntryWidth, "entryWidth"_ba },
-             { EntryOpacity, "entryOpacity"_ba },
-             { EntryOffset, "entryOffset"_ba } };
+    static const QHash<int, QByteArray> roles = { { Lane, "lane"_ba },
+                                                  { Name, "columnName"_ba },
+                                                  { Count, "albumCount"_ba },
+                                                  { X, "anchorX"_ba },
+                                                  { Y, "anchorY"_ba },
+                                                  { Extent, "extent"_ba },
+                                                  { Selected, "selectedColumn"_ba },
+                                                  { Interactive, "interactive"_ba },
+                                                  { Expanded, "expanded"_ba },
+                                                  { Fade, "fade"_ba },
+                                                  { Offset, "offset"_ba },
+                                                  { EntryWidth, "entryWidth"_ba },
+                                                  { EntryOpacity, "entryOpacity"_ba },
+                                                  { EntryOffset, "entryOffset"_ba } };
+    return roles;
 }
 QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
 {
@@ -87,61 +89,61 @@ QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
         int role;
         QVariant (*read)(const Slot &s, int expanded);
     };
-    static const RoleReader readers[] = { { Lane,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.lane;
-                                            } },
-                                          { Name,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.name;
-                                            } },
-                                          { Count,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.count;
-                                            } },
-                                          { X,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.x;
-                                            } },
-                                          { Y,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.y;
-                                            } },
-                                          { Extent,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.extent;
-                                            } },
-                                          { Selected,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.column.selected;
-                                            } },
-                                          { Interactive,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.wanted;
-                                            } },
-                                          { Expanded,
-                                            [](const Slot &s, int expanded) -> QVariant {
-                                                return s.column.lane == expanded && s.wanted;
-                                            } },
-                                          { Fade,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.fade.opacity();
-                                            } },
-                                          { Offset,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.fade.offset();
-                                            } },
-                                          { EntryWidth,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return EntryButtonWidthPixels * s.entry;
-                                            } },
-                                          { EntryOpacity,
-                                            [](const Slot &s, int) -> QVariant {
-                                                return s.entryOpacity;
-                                            } },
-                                          { EntryOffset, [](const Slot &s, int) -> QVariant {
-                                               return -EntryHiddenOffsetPixels * (1 - s.entry);
-                                           } } };
+    static constexpr RoleReader readers[] = { { Lane,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.lane;
+                                                } },
+                                              { Name,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.name;
+                                                } },
+                                              { Count,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.count;
+                                                } },
+                                              { X,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.x;
+                                                } },
+                                              { Y,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.y;
+                                                } },
+                                              { Extent,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.extent;
+                                                } },
+                                              { Selected,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.column.selected;
+                                                } },
+                                              { Interactive,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.wanted;
+                                                } },
+                                              { Expanded,
+                                                [](const Slot &s, int expanded) -> QVariant {
+                                                    return s.column.lane == expanded && s.wanted;
+                                                } },
+                                              { Fade,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.fade.opacity();
+                                                } },
+                                              { Offset,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.fade.offset();
+                                                } },
+                                              { EntryWidth,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return EntryButtonWidthPixels * s.entry;
+                                                } },
+                                              { EntryOpacity,
+                                                [](const Slot &s, int) -> QVariant {
+                                                    return s.entryOpacity;
+                                                } },
+                                              { EntryOffset, [](const Slot &s, int) -> QVariant {
+                                                   return -EntryHiddenOffsetPixels * (1 - s.entry);
+                                               } } };
     const auto reader =
             std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
                 return entry.role == role;
@@ -150,36 +152,44 @@ QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
 }
 // Prioritize expanded/selected labels before collision admission. Retained anchors use looser
 // visibility bounds so small projection changes do not repeatedly destroy and recreate a card.
-QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(QVector<OverviewColumn> columns,
+QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(const QVector<OverviewColumn> &columns,
                                                            double width, double height,
-                                                           const QSet<int> &retained, int expanded)
+                                                           std::span<const int> retained,
+                                                           int expanded)
 {
     // The inclusive physical interval has ten candidates at a half-lane boundary.
     // Cull its zero-extent endpoints after priority sorting; never truncate a selected ID.
-    columns.resize(std::min(columns.size(), qsizetype(CandidateCountWithBoundary)));
+    const auto count = std::min(columns.size(), qsizetype(CandidateCountWithBoundary));
     struct Candidate final
     {
-        OverviewColumn column;
+        qsizetype index;
         bool expanded;
         double centerDistance;
     };
-    QVector<Candidate> candidates;
-    candidates.reserve(columns.size());
-    for (const auto &column : columns)
-        candidates.append({ column, column.lane == expanded, std::abs(column.x - width / 2) });
-    std::stable_sort(candidates.begin(), candidates.end(), [](const auto &a, const auto &b) {
+    std::array<Candidate, CandidateCountWithBoundary> candidates;
+    for (qsizetype i = 0; i < count; ++i) {
+        const auto &column = columns[i];
+        candidates[i] = { i, column.lane == expanded,
+                          std::isfinite(column.x) ? std::abs(column.x - width / 2)
+                                                  : std::numeric_limits<double>::infinity() };
+    }
+    const auto end = candidates.begin() + count;
+    std::sort(candidates.begin(), end, [&columns](const auto &a, const auto &b) {
         if (a.expanded != b.expanded)
             return a.expanded;
-        if (a.column.selected != b.column.selected)
-            return a.column.selected;
-        return a.centerDistance < b.centerDistance;
+        if (columns[a.index].selected != columns[b.index].selected)
+            return columns[a.index].selected;
+        if (a.centerDistance != b.centerDistance)
+            return a.centerDistance < b.centerDistance;
+        return a.index < b.index;
     });
     const double labelWidth =
             width < NarrowViewportPixels ? NarrowLabelWidthPixels : LabelWidthPixels;
     QVector<OverviewColumn> accepted;
-    for (const auto &candidate : candidates) {
-        const auto &c = candidate.column;
-        const bool keep = retained.contains(c.lane);
+    accepted.reserve(std::min(count, qsizetype(MaximumVisibleLabels)));
+    for (auto it = candidates.begin(); it != end; ++it) {
+        const auto &c = columns[it->index];
+        const bool keep = std::find(retained.begin(), retained.end(), c.lane) != retained.end();
         if (!std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.extent)
             || c.extent <= (keep ? RetainedExtentThreshold : NewExtentThreshold))
             continue;
@@ -212,15 +222,15 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
     std::array<bool, capacity> previouslyLive;
     for (int row = 0; row < capacity; ++row)
         previouslyLive[row] = m_slots[row]->column.lane >= 0;
-    QSet<int> retained;
+    std::array<int, capacity> retained;
+    qsizetype retainedCount = 0;
     for (const auto &s : m_slots)
         if (s->wanted)
-            retained.insert(s->column.lane);
-    const auto visible = ready ? visibleLabels(columns, width, height, retained, m_expanded)
-                               : QVector<OverviewColumn>{ };
-    QSet<int> wanted;
-    for (const auto &c : visible)
-        wanted.insert(c.lane);
+            retained[retainedCount++] = s->column.lane;
+    const auto visible = ready
+            ? visibleLabels(columns, width, height, std::span(retained.data(), retainedCount),
+                            m_expanded)
+            : QVector<OverviewColumn>{ };
     for (auto &s : m_slots) {
         auto found = std::find_if(columns.cbegin(), columns.cend(), [&](const auto &c) {
             return c.lane == s->column.lane;
@@ -229,7 +239,9 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
             s->column = *found;
         else if (s->column.lane >= 0)
             s->column.extent = 0; // Never leave an old anchor visible across physical recycling.
-        if (s->wanted && !wanted.contains(s->column.lane)) {
+        if (s->wanted && std::none_of(visible.cbegin(), visible.cend(), [&](const auto &column) {
+                return column.lane == s->column.lane;
+            })) {
             s->wanted = false;
             s->fade.hide(reduced);
             if (m_expanded == s->column.lane)

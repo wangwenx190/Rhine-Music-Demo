@@ -24,7 +24,7 @@ public:
     static bool normalizeRoots(const QList<QUrl> &input, QList<QUrl> &output, QString &error);
     static QString stableId(const QString &prefix, const QString &absolutePath);
     static QString fingerprint(const QString &absolutePath, QString *error = nullptr);
-    static ScanResult scan(const QList<QUrl> &roots, Snapshot previous,
+    static ScanResult scan(const QList<QUrl> &roots, const Snapshot &previous,
                            const ScanCancellation &cancel);
 };
 }

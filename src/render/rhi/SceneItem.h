@@ -156,7 +156,7 @@ private:
                                  const QPointer<SceneItem> &guard, quint64 epoch);
     static void publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
                                    const QPointer<SceneItem> &guard, quint64 epoch);
-    void handleCoverReady(CoverSnapshot pixels);
+    void handleCoverReady(const CoverSnapshot &pixels);
     void bindWindow(QQuickWindow *window);
     static void queueDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
                                  const QPointer<SceneItem> &guard, const quint64 &epoch,

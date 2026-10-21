@@ -14,7 +14,7 @@ Quick3D Review的`scene/CaseMaterials.qml`持有三个共享壳体材质、一�
 
 IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独立计算密度与高光。详情只使主盖粗糙度趋向基础 .27 / 暖昼 .34，侧脊和后托不跟随。数值 warmth/clarity 都是连续输入，实际主题动画按 [灯光契约](lighting.md) 接入同一个 FrameClock。参数唯一由`src/render/OpticalParameters.h`的连续模板计算维护；`SourceOptics`缓存double结果供三个Quick3D材质读取，生产RHI以float实例化同一公式并上传uniform。R19C1 移除了 R07 的 ROI 搜索系数（环境/粗糙度 1.01、厚度 .91809、衰减距离 1.0201）；它们没有单位或算法依据，不再参与实现。IOR、颜色、封面与几何仍按冻结源码。
 
-暖昼表面色为 #fffdf8 / #e7e1d8 / #ece6dc；夜间为 #f6fbff / #f6fbff / #c6d6e5。暖昼衰减色 #f3e9db，夜间主盖/侧脊 #dceafd；后托保留原衰减色。QML color 作为线性 shader uniform，颜色插值发生在线性 shader 中。隔离材质Review的环境强度暖昼.48/深夜.68来自场景environmentIntensity覆盖，不再乘configure的.65；生产音乐环境强度由lighting.md定义。
+暖昼表面色为 #fffdf8 / #e7e1d8 / #ece6dc；夜间为 #f6fbff / #f6fbff / #c6d6e5。暖昼衰减色 #f3e9db，夜间主盖/侧脊 #dceafd；后托保留原衰减色。生产RHI按原float精度一次解码固定颜色端点，跨帧复用；连续颜色插值保留原计算顺序。QML color 作为线性 shader uniform，颜色插值发生在线性 shader 中。隔离材质Review的环境强度暖昼.48/深夜.68来自场景environmentIntensity覆盖，不再乘configure的.65；生产音乐环境强度由lighting.md定义。
 
 主盖局部 `d=max(abs(localXY-(.17,1.85))-(1.53,1.53))`，`p=1-smoothstep(.015,.15,d)`，纸面 LOD 因子为 `mix(1,.16,p)`。局部位置由同一 MODEL_MATRIX 关联实体；SCREEN_MIP_TEXTURE 的粗糙 LOD 乘 .92 的 IOR 修正和局部因子，再按实际捕获 textureSize 推导出的完整 mip 链钳制，bicubic floor/ceil 两次访问均不超过末级。没有噪声、屏幕固定模糊框或虚假的二维玻璃。
 

@@ -14,8 +14,9 @@ class OnlineMetadataProvider final : public IMetadataProvider
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(OnlineMetadataProvider)
 public:
-    explicit OnlineMetadataProvider(QObject *parent = nullptr,
-                                    std::function<QNetworkAccessManager *()> networkFactory = { });
+    explicit OnlineMetadataProvider(
+            QObject *parent = nullptr,
+            const std::function<QNetworkAccessManager *()> &networkFactory = { });
     ~OnlineMetadataProvider() override;
     void configure(const QJsonObject &configuration);
     ProviderCapabilities capabilities() const override;

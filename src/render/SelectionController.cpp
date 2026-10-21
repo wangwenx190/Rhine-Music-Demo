@@ -74,7 +74,7 @@ SelectionController::SelectionController(MotionController *motion, QObject *pare
         });
     }
 }
-void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snapshot)
+void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapshot &snapshot)
 {
     const auto oldId = albumId();
     QString firstId;
@@ -86,14 +86,17 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
     m_pool.setColumns(std::move(columns));
     m_coverSources.clear();
     if (snapshot)
+        m_coverSources.reserve(snapshot->albums.size());
+    if (snapshot)
         for (const auto &album : snapshot->albums) {
+            const auto entry = m_coverSources.tryEmplace(album.id);
+            if (!entry.inserted)
+                continue;
             const auto path = album.coverUrl.scheme() == "qrc"_L1 ? u":"_s + album.coverUrl.path()
                                                                   : album.coverUrl.toLocalFile();
-            if (!m_coverSources.contains(album.id))
-                m_coverSources.insert(
-                        album.id,
-                        { path, graphemePrefix(album.title, MaximumPlaceholderTitleCharacters),
-                          album.title });
+            *entry.iterator = { path,
+                                graphemePrefix(album.title, MaximumPlaceholderTitleCharacters),
+                                album.title };
         }
     m_returning.clear();
     m_drag.reset();
@@ -102,12 +105,13 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, Snapshot snap
     m_managedDetail = m_navigationLift = false;
     m_detail = 0;
     m_liftTarget = sceneGeometry::PreviewLift;
-    m_poolObjects.clear();
+    m_poolObjects.fill({ });
     m_pulses.clear();
     m_origin = { 0, 0 };
     m_cell = m_pool.location(oldId).value_or(m_pool.location(firstId).value_or(
             ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow }));
     QList<int> counts;
+    counts.reserve(m_pool.columns().size());
     for (const auto &column : m_pool.columns())
         counts.append(int(column.albumIds.size()));
     m_realColumns.reset(counts, m_cell);
@@ -239,12 +243,13 @@ void SelectionController::setRealistic(bool realistic)
     m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
                           -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
     QList<int> counts;
+    counts.reserve(m_pool.columns().size());
     for (const auto &column : m_pool.columns())
         counts.append(int(column.albumIds.size()));
     m_realColumns.reset(counts, m_cell, displayed - shift.row);
     m_origin = { 0, 0 };
     m_returning.clear();
-    m_poolObjects.clear();
+    m_poolObjects.fill({ });
     m_pulses.clear();
     Q_EMIT arrayModeChanged();
     publish();
@@ -921,16 +926,18 @@ void SelectionController::publish()
     m_pool.update(center, m_realistic ? &rows : nullptr);
     QVector<ArchiveInstance> next;
     next.reserve(ArchivePool::capacity + AdditionalCaseCapacity);
-    QHash<QPair<qint64, qint64>, quint64> objects;
-    objects.reserve(ArchivePool::capacity);
     for (auto instance : m_pool.instances()) {
         // Optical depth ties use the physical identity, which survives logical rebase.
         const auto physical = qMakePair(qint64(instance.cell.lane + m_origin.lane),
                                         qint64(instance.cell.row + m_origin.row));
-        instance.objectId = m_poolObjects.value(physical, 0);
-        if (!instance.objectId)
-            instance.objectId = ++m_objectSerial;
-        objects.insert(physical, instance.objectId);
+        const auto lane =
+                (physical.first % ArchivePool::lanes + ArchivePool::lanes) % ArchivePool::lanes;
+        const auto row =
+                (physical.second % ArchivePool::rows + ArchivePool::rows) % ArchivePool::rows;
+        auto &object = m_poolObjects[lane * ArchivePool::rows + row];
+        if (!object.objectId || object.physical != physical)
+            object = { physical, ++m_objectSerial };
+        instance.objectId = object.objectId;
         const bool hidden = instance.cell == m_cell
                 || std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
                                 return copy.cell == instance.cell;
@@ -940,7 +947,6 @@ void SelectionController::publish()
         instance.transform = transform(instance.cell);
         next.append(std::move(instance));
     }
-    m_poolObjects = std::move(objects);
     for (const auto &copy : m_returning)
         next.append({ copy.cell, copy.albumId, copy.objectId,
                       transform(copy.cell, copy.lift.value, copy.rotation), true, copy.clarity });

@@ -6,6 +6,7 @@
 #include <QImage>
 #include <QJsonArray>
 #include <QMap>
+#include <QHash>
 #include <QSize>
 #include <QVector>
 #include <utility>
@@ -52,9 +53,9 @@ public:
 private:
     QSize m_size;
     quint64 m_generation = 0, m_rejected = 0;
-    QMap<int, quint64> m_serials;
-    QMap<int, quint64> m_leases;
-    QMap<int, quint64> m_uploadedLeases;
+    QHash<int, quint64> m_serials;
+    QHash<int, quint64> m_leases;
+    QHash<int, quint64> m_uploadedLeases;
     QMap<int, AtlasUpload> m_pending;
 };
 }

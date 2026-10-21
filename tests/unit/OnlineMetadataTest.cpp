@@ -235,6 +235,36 @@ public:
     OnlineMetadataTest() = default;
 
 private Q_SLOTS:
+    void repeatedTrackTitlesStillRequireUniqueMatches()
+    {
+        auto album = sampleAlbum();
+        auto second = album.tracks.first();
+        second.id = u"track-second"_s;
+        second.trackNumber = 2;
+        album.tracks.append(second);
+        auto release = sampleRelease();
+        auto medium = release.value(u"media"_s).toArray().first().toObject();
+        const auto firstRemote = medium.value(u"tracks"_s).toArray().first().toObject();
+        auto secondRemote = firstRemote;
+        secondRemote.insert(u"position"_s, 2);
+        // Distinct spelling normalizes to the same title bucket.
+        secondRemote.insert(u"title"_s, u"TEST-SONG"_s);
+        medium.insert(u"tracks"_s, QJsonArray{ firstRemote, secondRemote });
+        release.insert(u"media"_s, QJsonArray{ medium });
+        const auto matched = musicBrainzMetadata(album, MetadataKind::Credits, release);
+        QCOMPARE(matched.status, ProviderStatus::Partial);
+        QCOMPARE(matched.payload.value(u"creditsLookup"_s)
+                         .toObject()
+                         .value(u"matchedTracks"_s)
+                         .toInt(),
+                 2);
+        album.tracks[0].trackNumber.reset();
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Uncertain);
+        album.tracks[0].trackNumber = 2;
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Uncertain);
+    }
     void creditsMatchTracksAndPreserveRoles()
     {
         auto album = sampleAlbum();

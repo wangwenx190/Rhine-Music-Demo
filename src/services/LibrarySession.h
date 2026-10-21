@@ -59,7 +59,7 @@ public:
     bool setPlaybackIds(const QString &albumId, const QString &trackId);
     Album resolvedAlbum(const QString &albumId) const;
     void adoptMetadataSnapshot(Snapshot snapshot);
-    void adoptMetadataConfiguration(Snapshot snapshot);
+    void adoptMetadataConfiguration(const Snapshot &snapshot);
     bool metadataBusy() const
     {
         return !m_pending.isEmpty();

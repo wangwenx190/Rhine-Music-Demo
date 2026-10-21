@@ -32,7 +32,8 @@ public:
     void release(const AtlasLease &lease);
     bool publish(const AtlasLease &lease, CoverSnapshot pixels);
     QVector<AtlasUpload> uploads(int page, bool initializing);
-    QVector<AtlasUpload> replay(int page) const;
+    // GUI-only immutable descriptor cache; destination stride participates in its key.
+    QVector<AtlasUpload> replay(int page, int destinationColumns = 0) const;
     QRect tile(const AtlasLease &lease) const;
     QSize pageSize() const;
     int pages() const;
@@ -53,10 +54,17 @@ private:
         bool dirty = false;
     };
     Slot *find(const AtlasLease &lease);
+    void invalidateReplay(int index);
+    struct Replay final
+    {
+        QVector<AtlasUpload> uploads;
+        int columns = 0;
+    };
     QSize m_size;
     int m_slotsPerPage = 0;
     QVector<Slot> m_slots;
     QHash<QString, int> m_identities;
+    mutable QVector<Replay> m_replays;
     quint64 m_generation = 0, m_lease = 0, m_serial = 0;
 };
 

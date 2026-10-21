@@ -16,6 +16,7 @@
 #include <QJsonArray>
 #include <QSignalSpy>
 #include <memory>
+#include <limits>
 
 using namespace Qt::StringLiterals;
 
@@ -147,12 +148,12 @@ private Q_SLOTS:
         }
         for (const auto value : source[u"labels"_s].toArray()) {
             const auto s = value.toObject();
-            QSet<int> retained;
+            QList<int> retained;
             for (const auto lane : s[u"retained"_s].toArray())
-                retained.insert(lane.toInt());
+                retained.append(lane.toInt());
             const auto visible = OverviewLabelsModel::visibleLabels(
                     columns(s[u"columns"_s].toArray()), s[u"width"_s].toDouble(),
-                    s[u"height"_s].toDouble(), retained,
+                    s[u"height"_s].toDouble(), std::span(retained.constData(), retained.size()),
                     s[u"expanded"_s].isNull() ? -1 : s[u"expanded"_s].toInt());
             QJsonArray actual;
             for (const auto &c : visible)
@@ -195,6 +196,21 @@ private Q_SLOTS:
         QVERIFY(std::any_of(visible.cbegin(), visible.cend(), [](const auto &c) {
             return c.lane == 9 && c.selected;
         }));
+    }
+    void collidingEqualPriorityLabelsPreserveInputOrder()
+    {
+        QVector<OverviewColumn> candidates{
+            { 99, u"invalid"_s, 3, std::numeric_limits<double>::quiet_NaN(), 300, 1, true },
+            { 7, u"first"_s, 3, 500, 300, 1, false },
+            { 8, u"second"_s, 3, 500, 300, 1, false }
+        };
+        auto visible = OverviewLabelsModel::visibleLabels(candidates, 1600, 900);
+        QCOMPARE(visible.size(), 1);
+        QCOMPARE(visible.first().lane, 7);
+        std::swap(candidates[1], candidates[2]);
+        visible = OverviewLabelsModel::visibleLabels(candidates, 1600, 900);
+        QCOMPARE(visible.size(), 1);
+        QCOMPARE(visible.first().lane, 8);
     }
     void frozenProductionProjection()
     {

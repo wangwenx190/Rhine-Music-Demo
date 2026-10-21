@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <limits>
 
@@ -67,10 +68,12 @@ qint64 CoverPixels::byteSize() const
     qint64 bytes = 0;
     QSet<qint64> seen;
     const auto count = [&](const QImage &pixels) {
-        if (!pixels.isNull() && !seen.contains(pixels.cacheKey())) {
-            seen.insert(pixels.cacheKey());
+        if (pixels.isNull())
+            return;
+        const auto previous = seen.size();
+        seen.insert(pixels.cacheKey());
+        if (seen.size() != previous)
             bytes += pixels.sizeInBytes();
-        }
     };
     count(image);
     for (const auto &mip : mipmaps)
@@ -93,6 +96,7 @@ struct CoverCache::Entry final
 {
     CoverSnapshot pixels;
     quint64 used = 0;
+    qint64 bytes = 0;
 };
 struct CoverCache::State final
 {
@@ -225,7 +229,7 @@ void CoverCache::invalidate(const QString &identity)
     cancel(identity);
     for (auto it = d->m_cache.begin(); it != d->m_cache.end();) {
         if (it->pixels->identity == identity) {
-            d->m_bytes -= it->pixels->byteSize();
+            d->m_bytes -= it->bytes;
             it = d->m_cache.erase(it);
         } else {
             ++it;
@@ -343,15 +347,15 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
     // Decode sRGB before area reduction; alpha remains premultiplied in linear light.
     // Independent chains never incorporate pixels belonging to another atlas slot.
     const auto source = image.convertToFormat(QImage::Format_RGBA8888);
-    const auto decode = [](double v) {
-        return colorTransfer::decode(v);
-    };
     const auto encode = [](double v) {
         return colorTransfer::encode(v);
     };
-    std::array<float, ByteChannelValues> decoded;
-    for (int i = 0; i < ByteChannelValues; ++i)
-        decoded[i] = float(decode(i / ByteChannelScale));
+    static const auto decoded = [] {
+        std::array<float, ByteChannelValues> values;
+        for (int i = 0; i < ByteChannelValues; ++i)
+            values[i] = float(colorTransfer::decode(i / ByteChannelScale));
+        return values;
+    }();
     QImage linear(source.size(), QImage::Format_RGBA32FPx4_Premultiplied);
     for (int y = 0; y < source.height(); ++y) {
         const auto *input = source.constScanLine(y);
@@ -364,6 +368,7 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
         }
     }
     QList<QImage> levels;
+    levels.reserve(std::bit_width(unsigned(qMax(source.width(), source.height()))));
     while (linear.width() > 1 || linear.height() > 1) {
         const QSize size(qMax(1, linear.width() / 2), qMax(1, linear.height() / 2));
         QImage next(size, linear.format());
@@ -374,15 +379,18 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
         for (int y = 0; y < size.height(); ++y) {
             auto *output = reinterpret_cast<float *>(next.scanLine(y));
             auto *bytes = encoded.scanLine(y);
+            const double y0 = y * sy, y1 = (y + 1) * sy;
+            const int endY = int(std::ceil(y1));
             for (int x = 0; x < size.width(); ++x) {
                 std::array<double, 4> sum{ };
                 const double x0 = x * sx, x1 = (x + 1) * sx;
-                const double y0 = y * sy, y1 = (y + 1) * sy;
-                for (int iy = int(y0); iy < int(std::ceil(y1)); ++iy) {
+                const int endX = int(std::ceil(x1));
+                for (int iy = int(y0); iy < endY; ++iy) {
                     const auto *row = reinterpret_cast<const float *>(linear.constScanLine(iy));
-                    for (int ix = int(x0); ix < int(std::ceil(x1)); ++ix) {
-                        const double weight = (std::min(x1, ix + 1.0) - std::max(x0, double(ix)))
-                                * (std::min(y1, iy + 1.0) - std::max(y0, double(iy)));
+                    const double weightY = std::min(y1, iy + 1.0) - std::max(y0, double(iy));
+                    for (int ix = int(x0); ix < endX; ++ix) {
+                        const double weight =
+                                (std::min(x1, ix + 1.0) - std::max(x0, double(ix))) * weightY;
                         for (int c = 0; c < 4; ++c)
                             sum[c] += row[4 * ix + c] * weight;
                     }
@@ -456,12 +464,17 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     pixels->image.setColorSpace(QColorSpace::SRgb);
     pixels->mipmaps = makeMipmaps(pixels->image);
     if (job.resolution > yalahoo::coverPixels::TileSide) {
+        const qsizetype tileSide = job.resolution / yalahoo::coverPixels::TileSide;
+        pixels->tiles.reserve(tileSide * tileSide);
         for (int y = 0; y < job.resolution; y += yalahoo::coverPixels::TileSide)
             for (int x = 0; x < job.resolution; x += yalahoo::coverPixels::TileSide) {
                 CoverMipTile tile;
                 tile.origin = { x, y };
                 tile.image = pixels->image.copy(x, y, yalahoo::coverPixels::TileSide,
                                                 yalahoo::coverPixels::TileSide);
+                tile.mipmaps.reserve(x == 0 && y == 0 ? pixels->mipmaps.size()
+                                                      : std::min(qsizetype(TileMipLevels),
+                                                                 pixels->mipmaps.size()));
                 for (int level = 1; level <= pixels->mipmaps.size(); ++level) {
                     const auto &mip = pixels->mipmaps[level - 1];
                     if (level <= TileMipLevels)
@@ -480,12 +493,13 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
 }
 // A completed decode may belong to a replaced request or a destroyed facade.
 // Check identity and generation before caching or notifying the GUI consumer.
-void CoverCache::complete(const Job &job, CoverSnapshot pixels)
+void CoverCache::complete(const Job &job, const CoverSnapshot &pixels)
 {
     --d->m_active;
     d->m_workingSetBytes -= workingSetEstimateFor(job.resolution);
-    if (d->m_running.value(job.key).wanted == job.wanted)
-        d->m_running.remove(job.key);
+    if (const auto running = d->m_running.find(job.key);
+        running != d->m_running.end() && running->wanted == job.wanted)
+        d->m_running.erase(running);
     if (job.generation != generation() || !job.wanted->load() || !pixels) {
         ++d->m_stale;
     } else {
@@ -494,7 +508,7 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
                 ? key(job.identity, job.path, job.resolution, { })
                 : job.key;
         if (const auto previous = d->m_cache.find(completedKey); previous != d->m_cache.end()) {
-            d->m_bytes -= previous->pixels->byteSize();
+            d->m_bytes -= previous->bytes;
             d->m_cache.erase(previous);
         }
         d->m_peakReaderBytes = qMax(d->m_peakReaderBytes, pixels->readerReturnedBytes);
@@ -505,10 +519,10 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
                                                      [](const Entry &left, const Entry &right) {
                                                          return left.used < right.used;
                                                      });
-                d->m_bytes -= oldest->pixels->byteSize();
+                d->m_bytes -= oldest->bytes;
                 d->m_cache.erase(oldest);
             }
-            d->m_cache.insert(completedKey, { pixels, ++d->m_clock });
+            d->m_cache.insert(completedKey, { pixels, ++d->m_clock, bytes });
             d->m_bytes += bytes;
         }
         const QPointer<CoverCache> guard(this);

@@ -68,8 +68,7 @@ void OfflineMetadataProvider::setCache(Snapshot cache)
     m_albumIndices.clear();
     m_albumIndices.reserve(m_cache->albums.size());
     for (qsizetype index = 0; index < m_cache->albums.size(); ++index)
-        if (!m_albumIndices.contains(m_cache->albums[index].id))
-            m_albumIndices.insert(m_cache->albums[index].id, index);
+        m_albumIndices.tryEmplace(m_cache->albums[index].id, index);
 }
 void OfflineMetadataProvider::cancel(RequestToken token)
 {

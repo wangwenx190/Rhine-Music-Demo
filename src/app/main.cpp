@@ -152,7 +152,7 @@ bool initializeLibraryCommands(const QCommandLineParser &parser, yalahoo::Librar
     } else if (parser.isSet(u"rescan-library"_s)) {
         const auto once = std::make_shared<QMetaObject::Connection>();
         *once = QObject::connect(&store, &yalahoo::LibraryStore::snapshotReady, &store,
-                                 [store = &store, once](yalahoo::Snapshot) {
+                                 [store = &store, once] {
                                      QObject::disconnect(*once);
                                      store->rescan();
                                  });
@@ -675,14 +675,14 @@ int main(int argc, char **argv)
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, provider.get(),
                          [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
-                                 yalahoo::Snapshot snapshot) {
+                                 const yalahoo::Snapshot &snapshot) {
                              online->configure(
                                      snapshot->fields.value(u"metadataConfiguration"_s).toObject());
                          });
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
                          provider.get(),
                          [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
-                                 yalahoo::Snapshot snapshot) {
+                                 const yalahoo::Snapshot &snapshot) {
                              online->configure(
                                      snapshot->fields.value(u"metadataConfiguration"_s).toObject());
                          });

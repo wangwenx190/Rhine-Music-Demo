@@ -78,7 +78,7 @@ private:
     static QString key(const QString &identity, const QString &path, int resolution,
                        const QString &title);
     void pump();
-    void complete(const Job &job, CoverSnapshot pixels);
+    void complete(const Job &job, const CoverSnapshot &pixels);
     struct Private;
     std::unique_ptr<Private> d;
 };

@@ -4,9 +4,9 @@
 #pragma once
 #include "SurfaceTransition.h"
 #include <QAbstractListModel>
-#include <QSet>
 #include <array>
 #include <memory>
+#include <span>
 
 namespace yalahoo {
 namespace overviewLabelTiming {
@@ -49,8 +49,9 @@ public:
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
-    static QVector<OverviewColumn> visibleLabels(QVector<OverviewColumn> columns, double width,
-                                                 double height, const QSet<int> &retained = { },
+    static QVector<OverviewColumn> visibleLabels(const QVector<OverviewColumn> &columns,
+                                                 double width, double height,
+                                                 std::span<const int> retained = { },
                                                  int expanded = -1);
     void update(const QVector<OverviewColumn> &columns, double width, double height, bool ready,
                 double dt, bool reduced);

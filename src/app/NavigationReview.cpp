@@ -354,10 +354,11 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
                                    { u"inputReceivedNs"_s, scene.frame().inputReceivedNs },
                                    { u"navigationCommittedNs"_s, now() } });
     });
-    QObject::connect(native, &rhi::SceneItem::frameSubmitted, &scope, [&](QJsonObject sample) {
-        samples.append(sample);
-        advanceWhenReady();
-    });
+    QObject::connect(native, &rhi::SceneItem::frameSubmitted, &scope,
+                     [&](const QJsonObject &sample) {
+                         samples.append(sample);
+                         advanceWhenReady();
+                     });
     const auto check = [&](const QString &name, bool value) {
         passed &= value;
         checks.append(
@@ -367,7 +368,7 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
                              { u"rulerSelected"_s, ruler.state()[u"selected"_s].toDouble() } });
     };
     const auto hasSubmission = [&] {
-        const auto frame = scene.frame();
+        const auto &frame = scene.frame();
         for (const auto &value : samples) {
             const auto sample = value.toObject();
             if (sample[u"navigationRevision"_s].toInteger() > 0

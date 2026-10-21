@@ -69,7 +69,7 @@ QString SceneItem::diagnosticText() const
     const auto &sample = m_diagnosticValues;
     if (!sample.value(u"submissions"_s).toULongLong())
         return QCoreApplication::translate("Yalahoo", "Waiting for valid rendering samples...");
-    const auto percentile = [&sample](QLatin1StringView series, QLatin1StringView key) {
+    const auto percentile = [&sample](const QString &series, const QString &key) {
         const auto values = sample.value(series).toMap();
         return values.value(u"count"_s).toUInt()
                 ? QString::number(values.value(key).toDouble(), 'f', 2) + " ms"_L1
@@ -77,17 +77,17 @@ QString SceneItem::diagnosticText() const
     };
     return QStringList{
         QCoreApplication::translate("Yalahoo", "RHI submission interval p50 / p95 / p99"),
-        percentile("submissionIntervals"_L1, "p50"_L1) + " / "_L1
-                + percentile("submissionIntervals"_L1, "p95"_L1) + " / "_L1
-                + percentile("submissionIntervals"_L1, "p99"_L1),
+        percentile(u"submissionIntervals"_s, u"p50"_s) + " / "_L1
+                + percentile(u"submissionIntervals"_s, u"p95"_s) + " / "_L1
+                + percentile(u"submissionIntervals"_s, u"p99"_s),
         QCoreApplication::translate("Yalahoo", "CPU submission p95 ")
-                + percentile("cpu"_L1, "p95"_L1)
+                + percentile(u"cpu"_s, u"p95"_s)
                 + QCoreApplication::translate("Yalahoo", " \u00b7 Sync p95 ")
-                + percentile("sync"_L1, "p95"_L1),
+                + percentile(u"sync"_s, u"p95"_s),
         QCoreApplication::translate("Yalahoo", "Completed GPU frame p95 ")
-                + percentile("gpu"_L1, "p95"_L1),
+                + percentile(u"gpu"_s, u"p95"_s),
         QCoreApplication::translate("Yalahoo", "Qt presentation event p95 ")
-                + percentile("qtFrameIntervals"_L1, "p95"_L1),
+                + percentile(u"qtFrameIntervals"_s, u"p95"_s),
         QCoreApplication::translate("Yalahoo", "Batch uploads: atlas / selected / uniform"),
         sample.value(u"atlasUploadBytes"_s).toString() + " / "_L1
                 + sample.value(u"selectedUploadBytes"_s).toString() + " / "_L1
@@ -264,7 +264,7 @@ void SceneItem::handlePoolCoverReady(const CoverSnapshot &pixels)
     schedule();
     return;
 }
-void SceneItem::handleCoverReady(CoverSnapshot pixels)
+void SceneItem::handleCoverReady(const CoverSnapshot &pixels)
 {
     if (m_poolMode) {
         handlePoolCoverReady(pixels);
@@ -289,7 +289,7 @@ SceneItem::SceneItem(QQuickItem *parent)
     setFocus(true);
     m_cover.fill(Qt::transparent);
     m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
-    connect(&m_covers, &CoverCache::ready, this, [this](CoverSnapshot pixels) {
+    connect(&m_covers, &CoverCache::ready, this, [this](const CoverSnapshot &pixels) {
         return handleCoverReady(pixels);
     });
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
@@ -411,6 +411,7 @@ std::pair<QRect, quint64> SceneItem::prepareOwnedCover(Input &in, const ArchiveI
     coverLease = it->lease;
     if (it->tiledPixels != pixels || it->tiledRegion != tile) {
         it->uploads.clear();
+        it->uploads.reserve(pixels->tiles.size());
         for (const auto &part : pixels->tiles) {
             const int slot = ((tile.y() + part.origin.y()) / renderData::CoverTilePixels)
                             * (m_atlasSize.width() / renderData::CoverTilePixels)
@@ -471,6 +472,8 @@ void SceneItem::preparePool(Input &in)
     QSet<QString> wanted;
     QSet<quint64> ownedIds;
     const int count = int(in.scene.instances.size());
+    wanted.reserve(count);
+    ownedIds.reserve(SelectedCoverPool::capacity);
     in.entities.resize(count);
     in.entityIds.resize(count);
     in.coverTiles.resize(count);
@@ -516,11 +519,12 @@ void SceneItem::preparePool(Input &in)
         const auto &instance = in.scene.instances[index];
         const auto &id = instance.albumId;
         const auto source = selection->coverSource(id);
-        if (!m_poolLeases.contains(id)) {
-            m_poolLeases.insert(id, m_atlas.acquire(id, m_covers.generation()));
+        const auto entry = m_poolLeases.tryEmplace(id);
+        if (entry.inserted) {
+            *entry.iterator = m_atlas.acquire(id, m_covers.generation());
             m_poolSources.insert(id, source);
         }
-        const auto lease = m_poolLeases.value(id);
+        const auto lease = *entry.iterator;
         auto tile = m_atlas.tile(lease);
         auto coverLease = lease.lease;
         in.fallbackCoverTiles[index] = tile;
@@ -543,12 +547,7 @@ void SceneItem::preparePool(Input &in)
     in.poolFrame = true;
     // Immutable replay handles render-context recreation and superseded GUI submissions;
     // the render queue rejects known revisions before conversion or upload.
-    auto thumbnails = m_atlas.replay(0);
-    for (auto &upload : thumbnails)
-        upload.slot = (upload.slot / yalahoo::rhi::sceneAtlas::BaseColumns)
-                        * (m_atlasSize.width() / renderData::CoverTilePixels)
-                + upload.slot % yalahoo::rhi::sceneAtlas::BaseColumns;
-    in.atlasUploads += thumbnails;
+    in.atlasUploads += m_atlas.replay(0, m_atlasSize.width() / renderData::CoverTilePixels);
     in.immutableCover = true;
 }
 void SceneItem::setInspectionEnabled(bool enabled)
@@ -731,7 +730,7 @@ void SceneItem::configureTelemetry()
         auto mailbox = std::make_shared<TelemetryMailbox>();
         QPointer<SceneItem> guard(this);
         profiled = [mailbox, guard, epoch](QJsonObject sample) {
-            return queueTelemetry(mailbox, guard, epoch, sample);
+            return queueTelemetry(mailbox, guard, epoch, std::move(sample));
         };
     }
 }
@@ -1041,13 +1040,14 @@ void SceneItem::requestDemoCover()
 double SceneItem::projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const
 {
     double demand = renderData::CoverTilePixels;
+    const auto projected = vp * model;
 
     std::array<QPointF, PaperCornerCount> points;
     int index = 0;
     for (float y : { yalahoo::rhi::renderData::PaperBottom, yalahoo::rhi::renderData::PaperTop })
         for (float x : { -yalahoo::rhi::renderData::PaperLeftMagnitude,
                          yalahoo::rhi::renderData::PaperRight }) {
-            const auto clip = vp * model * QVector4D(x, y, yalahoo::rhi::renderData::PaperFront, 1);
+            const auto clip = projected * QVector4D(x, y, yalahoo::rhi::renderData::PaperFront, 1);
             if (clip.w() <= 0)
                 return renderData::CoverTilePixels;
             points[index++] = QPointF(clip.x() / clip.w() * width() * .5,
@@ -1131,7 +1131,7 @@ try {
     const double dpr = window()->effectiveDevicePixelRatio();
     quality.resize(width(), height(), dpr);
     const auto &l = *adapter.lighting();
-    const auto settings = quality.values();
+    const double depthOfField = quality.depthOfField();
     Input in;
     in.preparationToken = m_preparing ? m_preparationToken : 0;
     in.openingLayerSize = QSize(
@@ -1170,7 +1170,7 @@ try {
     in.shadowSize = m_geometryOnly ? 1 : qMax(1, quality.shadows());
     in.postprocess = !m_geometryOnly;
     in.aoSamples = m_geometryOnly ? 0 : quality.aoSamples();
-    in.bokeh = !m_geometryOnly && settings.value(u"depthOfField"_s).toDouble() > 0;
+    in.bokeh = !m_geometryOnly && depthOfField > 0;
     in.smaa = !m_geometryOnly;
 #ifdef YALAHOO_RHI_AUDIT
     if (property("_yalahooReviewOpticsOnly").toBool()) {
@@ -1181,8 +1181,8 @@ try {
     }
 #endif
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
-    in.aperture = float((BrowseAperture + DetailApertureGain * adapter.detail())
-                        * settings.value(u"depthOfField"_s).toDouble() / PercentScale);
+    in.aperture = float((BrowseAperture + DetailApertureGain * adapter.detail()) * depthOfField
+                        / PercentScale);
     in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
     in.background = l.backgroundLinear();
     in.keyColor = l.keyColor();

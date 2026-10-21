@@ -40,7 +40,7 @@ inline constexpr auto FallbackExposure = 1.08;
 inline constexpr auto FallbackExposureWarmthLoss = .03;
 
 template <std::floating_point T>
-T lidRoughness(T warmth, T clarity)
+constexpr T lidRoughness(T warmth, T clarity)
 {
     return (T(FrostedRoughness) + T(FrostedWarmthGain) * warmth) * (1 - clarity)
             + (T(ClearRoughness) + T(ClearWarmthGain) * warmth) * clarity;
@@ -51,7 +51,7 @@ struct Parameters final
     T transmission, roughness, thickness, attenuationDistance, clearcoat, coatRoughness;
 };
 template <std::floating_point T>
-Parameters<T> parameters(int surface, T warmth, T clarity)
+constexpr Parameters<T> parameters(int surface, T warmth, T clarity)
 {
     const auto &source = Surfaces[surface];
     return { T(source.transmission) - T(source.transmissionLoss) * warmth,

@@ -2,8 +2,10 @@
 #include "SceneGeometry.h"
 #include "RowLightController.h"
 #include "SelectionLighting.h"
+#include "ProductDefaults.h"
 #include <QVector4D>
 #include <algorithm>
+#include <array>
 
 using namespace Qt::StringLiterals;
 
@@ -43,7 +45,7 @@ constexpr auto ThemeBezierLinear = 1.2;
 constexpr auto ThemeBezierDerivativeQuadratic = 4.8;
 constexpr auto ThemeBezierDerivativeLinear = 3.6;
 
-SceneVector linear(QLatin1StringView hex)
+SceneVector linear(const QString &hex)
 {
     const QColor c(hex);
     auto decode = [](double s) {
@@ -51,21 +53,7 @@ SceneVector linear(QLatin1StringView hex)
     };
     return { decode(c.redF()), decode(c.greenF()), decode(c.blueF()) };
 }
-void followVector(SceneVector &value, SceneVector &velocity, SceneVector target, double dt)
-{
-    const double decay = std::exp(-AnchorFollowRate * dt);
-    const auto delta = value - target, impulse = velocity + delta * AnchorFollowRate;
-    value = target + (delta + impulse * dt) * decay;
-    velocity = (velocity - impulse * (AnchorFollowRate * dt)) * decay;
-}
-}
-SceneVector LightingPalette::floorColor(QStringView theme)
-{
-    return linear(theme == u"night"          ? "#0b1828"_L1
-                          : theme == u"dusk" ? "#a6b8c0"_L1
-                                             : "#d8c9b9"_L1);
-}
-LightingPalette LightingPalette::theme(bool night)
+LightingPalette makePalette(bool night)
 {
     LightingPalette p;
     p.warmth = night ? 0 : 1;
@@ -78,14 +66,33 @@ LightingPalette LightingPalette::theme(bool night)
     p.scatter = night ? NightScatter : 1;
     p.printAmbient = night ? NightPrintAmbient : DayPrintAmbient;
     p.exposure = night ? NightExposure : DayExposure;
-    p.keyColor = linear(night ? "#e5f0ff"_L1 : "#fff7ed"_L1);
-    p.skyColor = linear(night ? "#e2eeff"_L1 : "#fffaf5"_L1);
-    p.groundColor = linear(night ? "#56708c"_L1 : "#b4a18c"_L1);
-    p.spotColor = linear(night ? "#dbe9ff"_L1 : "#ffe3b2"_L1);
-    p.scatterColor = linear(night ? "#cee5ff"_L1 : "#ffdba3"_L1);
-    p.background = linear(night ? "#07111f"_L1 : "#eae5e1"_L1);
-    p.floor = floorColor(night ? u"night" : u"day");
+    p.keyColor = linear(night ? u"#e5f0ff"_s : u"#fff7ed"_s);
+    p.skyColor = linear(night ? u"#e2eeff"_s : u"#fffaf5"_s);
+    p.groundColor = linear(night ? u"#56708c"_s : u"#b4a18c"_s);
+    p.spotColor = linear(night ? u"#dbe9ff"_s : u"#ffe3b2"_s);
+    p.scatterColor = linear(night ? u"#cee5ff"_s : u"#ffdba3"_s);
+    p.background = linear(night ? u"#07111f"_s : u"#eae5e1"_s);
+    p.floor = LightingPalette::floorColor(night ? u"night" : u"day");
     return p;
+}
+void followVector(SceneVector &value, SceneVector &velocity, SceneVector target, double dt)
+{
+    const double decay = std::exp(-AnchorFollowRate * dt);
+    const auto delta = value - target, impulse = velocity + delta * AnchorFollowRate;
+    value = target + (delta + impulse * dt) * decay;
+    velocity = (velocity - impulse * (AnchorFollowRate * dt)) * decay;
+}
+}
+SceneVector LightingPalette::floorColor(QStringView theme)
+{
+    static const std::array colors{ linear(u"#0b1828"_s), linear(u"#a6b8c0"_s),
+                                    linear(u"#d8c9b9"_s) };
+    return colors[theme == u"night" ? 0 : theme == u"dusk" ? 1 : 2];
+}
+LightingPalette LightingPalette::theme(bool night)
+{
+    static const std::array palettes{ makePalette(false), makePalette(true) };
+    return palettes[night];
 }
 SelectionLighting::SelectionLighting(QObject *parent)
     : QObject(parent), m_palette(LightingPalette::theme(false)), m_from(m_palette), m_to(m_palette)
@@ -136,7 +143,7 @@ void SelectionLighting::setReducedMotion(bool reduced)
 }
 QVariantMap SelectionLighting::settings() const
 {
-    const QStringList modes{ u"baseline"_s, u"area"_s, u"guided"_s, u"hybrid"_s };
+    const auto &modes = productDefaults::lightingModes();
     return { { u"mode"_s, modes[int(m_settings.mode)] },
              { u"strength"_s, m_settings.strength },
              { u"width"_s, m_settings.width },
@@ -170,7 +177,7 @@ void SelectionLighting::setSettings(RowLightingSettings s)
 bool SelectionLighting::configure(const QVariantMap &patch)
 {
     auto next = m_settings;
-    const QStringList modes{ u"baseline"_s, u"area"_s, u"guided"_s, u"hybrid"_s };
+    const auto &modes = productDefaults::lightingModes();
     for (auto it = patch.cbegin(); it != patch.cend(); ++it) {
         if (it.key() == "mode"_L1) {
             const auto index = modes.indexOf(it.value().toString());

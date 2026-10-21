@@ -23,10 +23,10 @@ QSize fixedTextureSize(const QString &asset)
         QLatin1StringView name;
         QSize size;
     };
-    const Entry fixed[] = { { "room-pmrem"_L1, { EnvironmentWidth, EnvironmentHeight } },
-                            { "dfg"_L1, { DfgSide, DfgSide } },
-                            { "ltc1"_L1, { LtcSide, LtcSide } },
-                            { "ltc2"_L1, { LtcSide, LtcSide } } };
+    static constexpr Entry fixed[] = { { "room-pmrem"_L1, { EnvironmentWidth, EnvironmentHeight } },
+                                       { "dfg"_L1, { DfgSide, DfgSide } },
+                                       { "ltc1"_L1, { LtcSide, LtcSide } },
+                                       { "ltc2"_L1, { LtcSide, LtcSide } } };
     const auto entry =
             std::find_if(std::begin(fixed), std::end(fixed), [&](const Entry &candidate) {
                 return candidate.name == asset;

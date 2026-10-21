@@ -22,7 +22,7 @@ worker 用统一方形逻辑画布绘制一次 contain+1/64 留边，生成拥�
 
 AtlasAllocator 最多 432 个槽位，页面每边最多 2048、按设备上限向下取整到 256；典型设备是七张 2048² 页面，最后一页仅有 48 个有效槽。较小 GPU 使用更多固定页面，不缩小 tile 精度；小于 256 的设备显式失败。真实 RHI 分配前仍核对当前设备的尺寸、格式、采样和累计 ResourcePlan，不能仅相信调用者的上限。
 
-acquire 引用计数固定身份槽，release 后可复用；重用分配单调 lease，publish 核对 allocator generation、identity、lease 和 decode generation。每槽 serial 单调，重复快照不重新标脏。uploads 每页提供有界增量，replay 仅为实际 scene graph 重建提供该页已就绪的不可变像素；不能把完整 CPU 页面合成后上传。
+acquire 引用计数固定身份槽，release 后可复用；重用分配单调 lease，publish 核对 allocator generation、identity、lease 和 decode generation。每槽 serial 单调，重复快照不重新标脏。uploads每页提供有界增量；replay缓存该页已就绪的不可变描述符，按实际目标列跨度映射slot，供合并提交及scene graph重建共享。身份准入/最后释放、像素发布、generation或目标跨度变化使缓存失效；释放与换代立即清除缓存持有的旧快照，已提交值保持独立有效期。不能把完整CPU页面合成后上传。
 
 RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次。重建重新播放当前 retained tile，旧结果不能污染新资源。旧 Review 未提供 coverLeases 的原始 fixture 保持历史语义。
 

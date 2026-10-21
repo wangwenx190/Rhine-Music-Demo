@@ -3,7 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
-#include <QSet>
+#include <utility>
 
 namespace {
 // Bound period growth before using floating wrap; source rows are offset from the physical pool origin.
@@ -41,28 +41,27 @@ ArchiveCell ArchivePool::visibleCell(int index, ArchiveCell center)
 void ArchivePool::setColumns(QList<LibraryColumn> columns)
 {
     m_columns = std::move(columns);
-    QSet<QString> identities;
+    m_locations.clear();
+    qsizetype count = 0;
+    for (const auto &column : std::as_const(m_columns))
+        count += column.albumIds.size();
+    m_locations.reserve(count);
+    m_rowPeriod = 1;
     for (int lane = 0; lane < m_columns.size(); ++lane) {
         auto &column = m_columns[lane];
         if (column.key.isEmpty())
             column.key = u"lane:%1"_s.arg(lane);
+        int row = yalahoo::sceneGeometry::FirstAlbumRow;
         column.albumIds.removeIf([&](const QString &id) {
-            if (id.isEmpty() || identities.contains(id))
+            if (id.isEmpty())
                 return true;
-            identities.insert(id);
+            if (!m_locations.tryEmplace(id, ArchiveCell{ double(lane), double(row) }).inserted)
+                return true;
+            ++row;
             return false;
         });
-    }
-    m_locations.clear();
-    m_rowPeriod = 1;
-    for (int lane = 0; lane < m_columns.size(); ++lane) {
-        const auto &ids = m_columns[lane].albumIds;
-        for (int row = 0; row < ids.size(); ++row)
-            m_locations.insert(
-                    ids[row],
-                    { double(lane), double(row + yalahoo::sceneGeometry::FirstAlbumRow) });
         if (std::isfinite(m_rowPeriod)) {
-            const auto count = qMax(1, int(ids.size()));
+            const auto count = qMax(1, int(column.albumIds.size()));
             const auto next =
                     qint64(m_rowPeriod) / std::gcd(qint64(m_rowPeriod), qint64(count)) * count;
             m_rowPeriod = next > MaximumExactRowPeriod ? std::numeric_limits<double>::infinity()

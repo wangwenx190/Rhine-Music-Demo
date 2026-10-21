@@ -58,7 +58,7 @@ bool inside(const QString &path, const QString &root)
 QString resolvedDestination(const QString &path)
 {
     const QFileInfo info(path);
-    const auto canonical = info.canonicalFilePath();
+    auto canonical = info.canonicalFilePath();
     if (!canonical.isEmpty())
         return canonical;
     const auto parent = info.absolutePath();
@@ -122,32 +122,40 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
                 "Unsupported legacy index version or albums format. The original files were preserved."));
     QJsonArray roots;
     QList<QUrl> rootUrls, normalized;
+    const auto oldRoots = index.value(u"roots"_s).toArray();
     const auto configured = config.value(u"roots"_s).toArray();
+    rootUrls.reserve(configured.isEmpty() ? oldRoots.size() : configured.size());
     if (config.contains(u"roots"_s) && !config.value(u"roots"_s).isArray())
         return fail(QCoreApplication::translate("Yalahoo", "Legacy roots must be an array."));
     if (!configured.isEmpty()) {
         for (const auto &root : configured)
             rootUrls.append(QUrl::fromLocalFile(root.toString()));
     } else {
-        for (const auto &root : index.value(u"roots"_s).toArray())
+        for (const auto &root : oldRoots)
             rootUrls.append(QUrl::fromLocalFile(
                     root.isString() ? root.toString()
                                     : root.toObject().value(u"path"_s).toString()));
     }
     if (!DirectoryScanner::normalizeRoots(rootUrls, normalized, result.error))
         return result;
+    QHash<QString, QJsonObject> rootMetadata;
+    rootMetadata.reserve(oldRoots.size());
+    for (const auto &value : oldRoots) {
+        const auto object = value.toObject();
+        rootMetadata.insert(object.value(u"path"_s).toString(), object);
+    }
     for (const auto &root : normalized) {
-        QJsonObject entry;
-        for (const auto &value : index.value(u"roots"_s).toArray())
-            if (value.toObject().value(u"path"_s).toString() == root.toLocalFile())
-                entry = value.toObject();
+        auto entry = rootMetadata.value(root.toLocalFile());
         entry.insert(u"path"_s, root.toString());
         roots.append(entry);
     }
     QJsonArray albums;
     QSet<QString> albumIds, trackIds;
     QHash<QString, QString> remappedAlbums;
-    for (const auto &value : index.value(u"albums"_s).toArray()) {
+    const auto oldAlbums = index.value(u"albums"_s).toArray();
+    albumIds.reserve(oldAlbums.size());
+    remappedAlbums.reserve(oldAlbums.size());
+    for (const auto &value : oldAlbums) {
         if (stopped()) {
             result.cancelled = true;
             return result;
@@ -171,12 +179,14 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
             return fail(QCoreApplication::translate(
                     "Yalahoo", "A legacy single track requires an absolute file path."));
         const auto albumId = DirectoryScanner::stableId(u"album"_s, identity);
-        if (albumIds.contains(albumId))
+        const auto albumCount = albumIds.size();
+        albumIds.insert(albumId);
+        if (albumIds.size() == albumCount)
             return fail(QCoreApplication::translate(
                     "Yalahoo", "The legacy index contains duplicate album paths."));
-        albumIds.insert(albumId);
         remappedAlbums.insert(album.value(u"id"_s).toString(), albumId);
         QHash<QString, QString> remappedTracks;
+        remappedTracks.reserve(oldTracks.size());
         QJsonArray tracks;
         for (const auto &entry : oldTracks) {
             if (stopped()) {
@@ -193,10 +203,11 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
                         "Yalahoo",
                         "Legacy tracks require direct native paths and v3/v4 metadata."));
             const auto id = DirectoryScanner::stableId(u"track"_s, path);
-            if (trackIds.contains(id))
+            const auto trackCount = trackIds.size();
+            trackIds.insert(id);
+            if (trackIds.size() == trackCount)
                 return fail(QCoreApplication::translate(
                         "Yalahoo", "The legacy index contains duplicate track paths."));
-            trackIds.insert(id);
             remappedTracks.insert(track.value(u"id"_s).toString(), id);
             track.insert(u"id"_s, id);
             track.insert(u"albumId"_s, albumId);
@@ -222,8 +233,8 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
         for (const auto &entry : album.value(u"producers"_s).toArray()) {
             auto person = entry.toObject();
             const auto old = person.value(u"trackId"_s).toString();
-            if (remappedTracks.contains(old))
-                person.insert(u"trackId"_s, remappedTracks.value(old));
+            if (const auto mapped = remappedTracks.constFind(old); mapped != remappedTracks.cend())
+                person.insert(u"trackId"_s, *mapped);
             producers.append(person);
         }
         album.insert(u"producers"_s, producers);
@@ -243,16 +254,18 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
     if (genres.isEmpty())
         genres = index.value(u"genres"_s).toArray();
     QSet<QString> genreIds;
+    genreIds.reserve(genres.size());
     for (const auto &genre : genres)
         genreIds.insert(genre.toObject().value(u"id"_s).toString());
     for (const auto &album : albums) {
         auto id = album.toObject().value(u"genreId"_s).toString();
         if (id.isEmpty())
-            id = "unclassified"_L1;
-        if (!genreIds.contains(id)) {
+            id = u"unclassified"_s;
+        const auto count = genreIds.size();
+        genreIds.insert(id);
+        if (genreIds.size() != count) {
             genres.append(QJsonObject{ { u"id"_s, id },
                                        { u"name"_s, id == "unclassified"_L1 ? QString{ } : id } });
-            genreIds.insert(id);
         }
     }
     auto overrides = rules.value(u"albumOverrides"_s).toObject();

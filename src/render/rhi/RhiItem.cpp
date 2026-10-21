@@ -234,13 +234,15 @@ QByteArray floatTextureBytes(const QString &path, qsizetype expected)
     require(bytes.size() == expected, "Invalid RHI float lookup bytes");
     return bytes;
 }
-QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &entities)
+void visibleEntities(const Input &input, const QVector<QMatrix4x4> &entities,
+                     QVector<bool> &visible)
 {
-    QVector<bool> visible(entities.size(), true);
+    visible.resize(entities.size());
+    const auto viewProjection = input.scene.projection * input.scene.view;
     // Conservative homogeneous clip test of the authored complete case bounds.
     // Keep every logical identity and its global sort; skip only provably off-screen draws.
     for (int i = 0; i < entities.size(); ++i) {
-        const auto matrix = input.scene.projection * input.scene.view * entities[i];
+        const auto matrix = viewProjection * entities[i];
         std::array<bool, ClipPlaneCount> outside{ true, true, true, true, true, true };
         for (float x :
              { -yalahoo::sceneGeometry::CaseHalfWidth, yalahoo::sceneGeometry::CaseHalfWidth })
@@ -259,7 +261,6 @@ QVector<bool> visibleEntities(const Input &input, const QVector<QMatrix4x4> &ent
             return v;
         });
     }
-    return visible;
 }
 struct ShellDraw final
 {
@@ -327,7 +328,7 @@ public:
         profile = source->profiled;
         diagnose = source->diagnosed;
         QPointer<RhiItem> guard(source);
-        failed = [guard](QString message) {
+        failed = [guard](const QString &message) {
             queueRenderFailure(guard, message);
         };
         distinctThread = QThread::currentThread() != source->thread();
@@ -393,7 +394,7 @@ private:
                                  Pending &pending, QJsonArray &alignedCopies);
 
     void writeInstanceData(QByteArray &instances, int &instanceCursor,
-                           QVector<QMatrix4x4> &entities, int i);
+                           const QVector<QMatrix4x4> &entities, int i);
     void drawOpaquePass(QRhiCommandBuffer *&cb, const bool &recordCapture,
                         QJsonArray &opticalEvents, auto &opaqueMeshDraw, const quint32 &bgOffset,
                         const quint32 &floorOffset, const bool &batched, auto &opaqueInstanceDraw,
@@ -497,6 +498,16 @@ private:
     std::array<Uniform, UniformBaseCount> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
     QVector<QMatrix4x4> lightEntities;
+    // Render-thread scratch never escapes to Input or queued captures. Unique containers
+    // retain their bounded capacity across frames, independently of immutable GUI snapshots.
+    QVector<bool> visible;
+    QVector<int> opaqueOrder;
+    QVector<float> depths;
+    QVector<ShellDraw> shells;
+    QVector<QMatrix4x4> viewModels;
+    QVector<QMatrix4x4> standaloneEntities, lightModels;
+    QVector<QVector4D> entityCoverUv;
+    QVector<quint32> shadowOffsets, opaqueOffsets, prepassOffsets;
     QByteArray uniformScratch, instanceScratch;
     QImage detachedCover;
     QVector4D cachedRowSettings, cachedPrintSettings;
@@ -1402,18 +1413,9 @@ Uniform Renderer::uniform(const QMatrix4x4 &model, int kind, int entity) const
     auto u = uniformBases[kind + 1];
     // mvp remains reserved in the std140 ABI; both geometry paths reuse world position.
     copy(u.model, model);
-    copy(u.lightMvp, nativeLightVP * model);
-    if (input.atlasGeneration && entity >= 0) {
-        const auto tile = effectiveCoverTiles[entity];
-        copy(u.coverUv,
-             QVector4D(float(tile.x()) / input.atlasSize.width(),
-                       float(tile.y()) / input.atlasSize.height(),
-                       float(tile.width()) / input.atlasSize.width(),
-                       float(tile.height()) / input.atlasSize.height()));
-        if (!effectiveCoverLeases.isEmpty()
-            && !atlasQueue.ready(tile, effectiveCoverLeases[entity]))
-            copy(u.coverUv, QVector4D());
-    }
+    copy(u.lightMvp, entity >= 0 ? lightModels[entity] : nativeLightVP * model);
+    if (input.atlasGeneration && entity >= 0)
+        copy(u.coverUv, entityCoverUv[entity]);
     if (kind == LidKind && entity >= 0 && input.scene.individualMaterials
         && entity < input.scene.instances.size()) {
         // Only the lid roughness depends on clarity. Preserve the cached material
@@ -1584,21 +1586,13 @@ void Renderer::drawOpaquePass(QRhiCommandBuffer *&cb, const bool &recordCapture,
         }
 }
 void Renderer::writeInstanceData(QByteArray &instances, int &instanceCursor,
-                                 QVector<QMatrix4x4> &entities, int i)
+                                 const QVector<QMatrix4x4> &entities, int i)
 {
     auto *destination = instances.data() + instanceCursor++ * renderData::InstanceBytes;
     std::memcpy(destination, entities[i].constData(), renderData::MatrixBytes);
     float uv[VectorScalars] = { 0, 0, 1, 1 };
-    if (input.atlasGeneration) {
-        const auto tile = effectiveCoverTiles[i];
-        copy(uv,
-             QVector4D(float(tile.x()) / input.atlasSize.width(),
-                       float(tile.y()) / input.atlasSize.height(),
-                       float(tile.width()) / input.atlasSize.width(),
-                       float(tile.height()) / input.atlasSize.height()));
-        if (!effectiveCoverLeases.isEmpty() && !atlasQueue.ready(tile, effectiveCoverLeases[i]))
-            copy(uv, QVector4D());
-    }
+    if (input.atlasGeneration)
+        copy(uv, entityCoverUv[i]);
     std::memcpy(destination + InstanceUvOffsetBytes, uv, renderData::VectorBytes);
     float light[VectorScalars];
     copy(light, entityLight0[i]);
@@ -1809,16 +1803,20 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     effectiveCoverTiles = input.coverTiles;
     effectiveCoverLeases = input.coverLeases;
     for (int i = 0; i < input.fallbackCoverTiles.size(); ++i)
-        if (!atlasQueue.ready(effectiveCoverTiles[i], effectiveCoverLeases[i])) {
+        if (!atlasQueue.ready(std::as_const(effectiveCoverTiles)[i],
+                              std::as_const(effectiveCoverLeases)[i])) {
             effectiveCoverTiles[i] = input.fallbackCoverTiles[i];
             effectiveCoverLeases[i] = input.fallbackCoverLeases[i];
         }
-    QVector<QMatrix4x4> entities = input.entities;
-    if (entities.isEmpty() && !input.poolFrame)
-        entities.append(input.scene.caseTransform);
-    const auto visible = visibleEntities(input, entities);
+    const bool standalone = input.entities.isEmpty() && !input.poolFrame;
+    if (standalone) {
+        standaloneEntities.resize(1);
+        standaloneEntities[0] = input.scene.caseTransform;
+    }
+    const auto &entities = standalone ? std::as_const(standaloneEntities) : input.entities;
     require(entities.size() <= renderData::MaximumCaseEntities,
             "RHI visible pool capacity exceeded");
+    visibleEntities(input, entities, visible);
     // Disabled shadows need one clear after toggling/reallocation, not on every caster movement.
     shadowDirty = shadowDirty || cachedShadows != input.shadows
             || (input.shadows && shadowEntities != entities);
@@ -1826,6 +1824,25 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
     nativeLightVP = api->clipSpaceCorrMatrix() * canonicalLightVP;
+    if (input.shells || !batched) {
+        lightModels.resize(entities.size());
+        for (int i = 0; i < entities.size(); ++i)
+            if (visible[i] || !batched)
+                lightModels[i] = nativeLightVP * entities[i];
+    }
+    if (input.atlasGeneration) {
+        entityCoverUv.resize(entities.size());
+        for (int i = 0; i < entities.size(); ++i) {
+            const auto tile = std::as_const(effectiveCoverTiles)[i];
+            entityCoverUv[i] = !effectiveCoverLeases.isEmpty()
+                            && !atlasQueue.ready(tile, std::as_const(effectiveCoverLeases)[i])
+                    ? QVector4D()
+                    : QVector4D(float(tile.x()) / input.atlasSize.width(),
+                                float(tile.y()) / input.atlasSize.height(),
+                                float(tile.width()) / input.atlasSize.width(),
+                                float(tile.height()) / input.atlasSize.height());
+        }
+    }
     for (int kind = ShadowKind; kind <= ProductFloorKind; ++kind)
         uniformBases[kind + 1] = uniformTemplate(kind);
     const QVector4D printSettings(input.printAmbient, input.rowDetail, input.rowFill, 0);
@@ -1834,6 +1851,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         || cachedLightColumn != input.lightColumn) {
         entityLight0.clear();
         entityLight1.clear();
+        entityLight0.reserve(entities.size());
+        entityLight1.reserve(entities.size());
         for (const auto &model : entities) {
             const auto origin = model.column(yalahoo::units::VectorAxes).toVector3D();
             const float row = (origin.z() - input.rowColumn.z()
@@ -1891,16 +1910,24 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         cursor += uniformStride;
         return offset;
     };
-    QVector<quint32> shadowOffsets, opaqueOffsets, prepassOffsets;
-    QVector<int> opaqueOrder;
-    opaqueOrder.reserve(entities.size());
+    shadowOffsets.clear();
+    opaqueOffsets.clear();
+    prepassOffsets.clear();
+    if (!batched) {
+        shadowOffsets.reserve(entities.size());
+        opaqueOffsets.reserve(entities.size());
+        prepassOffsets.reserve(entities.size());
+    }
+    opaqueOrder.resize(entities.size());
     for (int i = 0; i < entities.size(); ++i)
-        opaqueOrder.append(i);
+        opaqueOrder[i] = i;
     if (input.shells) {
-        QVector<float> depths;
-        depths.reserve(entities.size());
-        for (const auto &model : entities)
-            depths.append(-(input.scene.view * model * QVector4D(paper.center, 1)).z());
+        depths.resize(entities.size());
+        viewModels.resize(entities.size());
+        for (int i = 0; i < entities.size(); ++i) {
+            viewModels[i] = input.scene.view * entities[i];
+            depths[i] = -(viewModels[i] * QVector4D(paper.center, 1)).z();
+        }
         std::sort(opaqueOrder.begin(), opaqueOrder.end(), [&](int a, int b) {
             const float da = depths[a];
             const float db = depths[b];
@@ -1920,18 +1947,18 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             opaqueOffsets.append(append(entities[i], input.geometryDiagnostic ? 1 : 0, i));
     const auto floorOffset = append({ }, input.productFloor ? ProductFloorKind : ReviewFloorKind);
 
-    QVector<ShellDraw> shells;
+    shells.clear();
     if (input.shells) {
         shells.reserve(entities.size() * yalahoo::rhi::renderData::CaseSurfaceCount);
         require(entities.size() == 1 || input.entityIds.size() == entities.size(),
                 "Shell instances require stable IDs");
-        for (int i : opaqueOrder) {
-            const std::array<Mesh, yalahoo::rhi::renderData::CaseSurfaceCount> meshes{ lid, spine,
-                                                                                       tray };
+        const std::array<Mesh, yalahoo::rhi::renderData::CaseSurfaceCount> meshes{ lid, spine,
+                                                                                   tray };
+        for (int i : std::as_const(opaqueOrder)) {
             const auto id = input.entityIds.isEmpty() ? 0 : input.entityIds[i];
             for (int surface = 0; surface < yalahoo::rhi::renderData::CaseSurfaceCount; ++surface) {
                 const auto mesh = meshes[surface];
-                const auto center = input.scene.view * entities[i] * QVector4D(mesh.center, 1);
+                const auto center = viewModels[i] * QVector4D(mesh.center, 1);
                 shells.append({ mesh, visible[i] ? append(entities[i], LidKind + surface, i) : 0,
                                 -center.z(), id, surface, i });
             }
@@ -2658,9 +2685,11 @@ void RhiItem::submit(Input input, QSize target)
         require(input.entityIds.isEmpty() || input.entityIds.size() == input.entities.size(),
                 "Mismatched shell IDs");
         QSet<quint64> ids;
+        ids.reserve(input.entityIds.size());
         for (auto id : input.entityIds) {
-            require(!ids.contains(id), "Duplicate shell instance ID");
+            const auto previous = ids.size();
             ids.insert(id);
+            require(ids.size() != previous, "Duplicate shell instance ID");
         }
     }
     ++m_submission;

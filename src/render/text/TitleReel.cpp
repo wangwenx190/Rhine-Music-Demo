@@ -141,6 +141,8 @@ void ReelSlot::writeFaces(const QList<TitleGlyph> &values)
 {
     faces.clear();
     m_values.clear();
+    faces.reserve(values.size());
+    m_values.reserve(values.size());
     m_faceCapacity = std::max(m_faceCapacity, int(values.size()));
     double offset = 0;
     for (auto face : values) {
@@ -308,7 +310,8 @@ QVariant TitleReel::data(const QModelIndex &index, int role) const
 }
 QHash<int, QByteArray> TitleReel::roleNames() const
 {
-    return { { Qt::UserRole, "slotObject"_ba } };
+    static const QHash<int, QByteArray> roles = { { Qt::UserRole, "slotObject"_ba } };
+    return roles;
 }
 void TitleReel::classBegin()
 {
@@ -524,6 +527,7 @@ void TitleReel::reconcile()
     m_target = m_layout.measure(m_text, m_font, m_subtitle, m_size, m_width, m_budget, m_narrow,
                                 m_dpr, m_transport);
     QSet<QString> keys;
+    keys.reserve(m_target.glyphs.size());
     bool added = false;
     for (const auto &glyph : m_target.glyphs) {
         keys.insert(glyph.key);

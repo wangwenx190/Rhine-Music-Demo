@@ -48,6 +48,8 @@ AtlasLease AtlasAllocator::acquire(const QString &identity, quint64 coverGenerat
         m_identities.insert(identity, index);
     }
     auto &slot = m_slots[index];
+    if (!slot.references)
+        invalidateReplay(index);
     ++slot.references;
     return { m_generation,           slot.lease, coverGeneration, index / m_slotsPerPage,
              index % m_slotsPerPage, identity };
@@ -72,6 +74,7 @@ void AtlasAllocator::release(const AtlasLease &lease)
             m_identities.remove(slot->identity);
             slot->pixels.reset();
             slot->dirty = false;
+            invalidateReplay(lease.page * m_slotsPerPage + lease.slot);
         }
     }
 }
@@ -89,7 +92,15 @@ bool AtlasAllocator::publish(const AtlasLease &lease, CoverSnapshot pixels)
     slot->pixels = std::move(pixels);
     slot->serial = ++m_serial;
     slot->dirty = true;
+    invalidateReplay(lease.page * m_slotsPerPage + lease.slot);
     return true;
+}
+void AtlasAllocator::invalidateReplay(int index)
+{
+    auto &replay = m_replays[index / m_slotsPerPage];
+    // Drop cache ownership immediately; already submitted snapshots retain their own lifetime.
+    replay.uploads.clear();
+    replay.columns = 0;
 }
 QVector<AtlasUpload> AtlasAllocator::uploads(int page, bool initializing)
 {
@@ -116,19 +127,32 @@ QVector<AtlasUpload> AtlasAllocator::uploads(int page, bool initializing)
     }
     return batch;
 }
-QVector<AtlasUpload> AtlasAllocator::replay(int page) const
+QVector<AtlasUpload> AtlasAllocator::replay(int page, int destinationColumns) const
 {
-    QVector<AtlasUpload> batch;
     if (page < 0 || page >= pages())
-        return batch;
+        return { };
+    const int sourceColumns = m_size.width() / renderData::CoverTilePixels;
+    const int columns = destinationColumns ? destinationColumns : sourceColumns;
+    const int lastSlot = qMin(m_slotsPerPage, int(m_slots.size()) - page * m_slotsPerPage) - 1;
+    if (columns < sourceColumns
+        || qint64(lastSlot / sourceColumns) * columns + lastSlot % sourceColumns
+                > std::numeric_limits<int>::max())
+        throw std::invalid_argument("Replay destination stride exceeds the supported slot range");
+    auto &replay = m_replays[page];
+    if (replay.columns == columns)
+        return replay.uploads;
+    QVector<AtlasUpload> batch;
     for (int i = page * m_slotsPerPage; i < qMin((page + 1) * m_slotsPerPage, int(m_slots.size()));
          ++i) {
         const auto &slot = m_slots[i];
         if (slot.references && slot.pixels)
-            batch.append({ m_generation, slot.lease, slot.serial, i % m_slotsPerPage,
+            batch.append({ m_generation, slot.lease, slot.serial,
+                           ((i % m_slotsPerPage) / sourceColumns) * columns + i % sourceColumns,
                            slot.pixels->image, true, slot.pixels->mipmaps });
     }
-    return batch;
+    replay.uploads = std::move(batch);
+    replay.columns = columns;
+    return replay.uploads;
 }
 QRect AtlasAllocator::tile(const AtlasLease &lease) const
 {
@@ -153,12 +177,19 @@ void AtlasAllocator::reset()
 {
     m_generation = ++nextGeneration;
     m_identities.clear();
+    m_identities.reserve(m_slots.size());
+    m_replays.clear();
+    m_replays.resize(pages());
     for (auto &slot : m_slots)
         slot = { };
 }
 void AtlasAllocator::advanceGeneration()
 {
     m_generation = ++nextGeneration;
+    for (auto &replay : m_replays) {
+        replay.uploads.clear();
+        replay.columns = 0;
+    }
     for (auto &slot : m_slots)
         if (slot.references && slot.pixels)
             slot.dirty = true;

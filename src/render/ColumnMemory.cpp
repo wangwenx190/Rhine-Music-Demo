@@ -5,6 +5,7 @@ namespace yalahoo {
 void ColumnMemory::reset(const QList<LibraryColumn> &columns)
 {
     m_albums.clear();
+    m_albums.reserve(columns.size());
     for (const auto &column : columns)
         if (!column.albumIds.isEmpty())
             m_albums.insert(column.key, column.albumIds.first());

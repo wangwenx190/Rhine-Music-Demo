@@ -33,8 +33,10 @@ QString normalizedKey(const QString &value)
 void appendGenreColumns(LibraryOrder &result, const LibrarySnapshot &snapshot)
 {
     QSet<QString> used;
+    used.reserve(std::min(snapshot.genres.size(), snapshot.albums.size()));
     for (const auto &album : snapshot.albums)
         used.insert(album.genreId);
+    result.columns.reserve(used.size());
 
     for (const auto &genre : snapshot.genres) {
         if (used.remove(genre.id))
@@ -59,7 +61,8 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
     QStringList titles, artists;
     if (mode != SortMode::Genre) {
         titles.reserve(snapshot.albums.size());
-        artists.reserve(snapshot.albums.size());
+        if (mode == SortMode::Artist)
+            artists.reserve(snapshot.albums.size());
         for (const auto &album : snapshot.albums) {
             titles.append(normalizedKey(album.title));
             if (mode == SortMode::Artist)
@@ -78,6 +81,7 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         });
     }
     if (mode == SortMode::Album) {
+        result.columns.reserve((result.indices.size() + AlbumsPerColumn - 1) / AlbumsPerColumn);
         for (int start = 0; start < result.indices.size(); start += AlbumsPerColumn) {
             const int end = std::min(start + AlbumsPerColumn, int(result.indices.size()));
             LibraryColumn column{ u"album:%1"_s.arg(start / AlbumsPerColumn),
@@ -85,9 +89,10 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
                                           .arg(start + 1, 2, yalahoo::units::DecimalBase, '0'_L1)
                                           .arg(end, 2, yalahoo::units::DecimalBase, '0'_L1),
                                   { } };
+            column.albumIds.reserve(end - start);
             for (int i = start; i < end; ++i)
                 column.albumIds.append(snapshot.albums[result.indices[i]].id);
-            result.columns.append(column);
+            result.columns.append(std::move(column));
         }
     } else {
         if (mode == SortMode::Genre)
@@ -99,17 +104,16 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
         for (int index : result.indices) {
             const auto &album = snapshot.albums[index];
             const QString key = mode == SortMode::Artist ? artists[index] : album.genreId;
-            const auto column = columnByKey.constFind(key);
-            if (column == columnByKey.cend()) {
+            const auto column = columnByKey.tryEmplace(key, result.columns.size());
+            if (column.inserted) {
                 const QString label = album.artist.simplified();
-                columnByKey.insert(key, result.columns.size());
                 result.columns.append(
                         { key,
                           label.isEmpty() ? QCoreApplication::translate("Yalahoo", "Unknown artist")
                                           : label,
                           { album.id } });
             } else
-                result.columns[column.value()].albumIds.append(album.id);
+                result.columns[*column.iterator].albumIds.append(album.id);
         }
     }
     for (const auto &column : result.columns)
@@ -123,9 +127,12 @@ QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString
     // Deliberately no NFKC / whitespace folding: music-search.ts uses trim + lowercase.
     const QString query = input.trimmed().toLower();
     QHash<QString, QString> names;
+    names.reserve(snapshot.genres.size());
     for (const auto &genre : snapshot.genres)
         names.insert(genre.id, genreDisplayName(genre));
     QList<SearchResult> results;
+    if (query.isEmpty() && genreId.isEmpty())
+        results.reserve(snapshot.albums.size());
     for (const auto &album : snapshot.albums) {
         if (!genreId.isEmpty() && album.genreId != genreId)
             continue;
@@ -153,23 +160,24 @@ int AlbumListModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> AlbumListModel::roleNames() const
 {
-    return { { AlbumId, "albumId"_ba },
-             { Title, "title"_ba },
-             { Artist, "artist"_ba },
-             { Year, "year"_ba },
-             { GenreId, "genreId"_ba },
-             { CoverUrl, "coverUrl"_ba },
-             { Folder, "folder"_ba },
-             { Tracks, "tracks"_ba },
-             { Producers, "producers"_ba },
-             { Description, "description"_ba },
-             { DescriptionSource, "descriptionSource"_ba },
-             { Introduction, "introduction"_ba },
-             { CreditsLookup, "creditsLookup"_ba },
-             { Online, "online"_ba },
-             { LocalNote, "localNote"_ba },
-             { Offline, "offline"_ba },
-             { AlbumData, "albumData"_ba } };
+    static const QHash<int, QByteArray> roles = { { AlbumId, "albumId"_ba },
+                                                  { Title, "title"_ba },
+                                                  { Artist, "artist"_ba },
+                                                  { Year, "year"_ba },
+                                                  { GenreId, "genreId"_ba },
+                                                  { CoverUrl, "coverUrl"_ba },
+                                                  { Folder, "folder"_ba },
+                                                  { Tracks, "tracks"_ba },
+                                                  { Producers, "producers"_ba },
+                                                  { Description, "description"_ba },
+                                                  { DescriptionSource, "descriptionSource"_ba },
+                                                  { Introduction, "introduction"_ba },
+                                                  { CreditsLookup, "creditsLookup"_ba },
+                                                  { Online, "online"_ba },
+                                                  { LocalNote, "localNote"_ba },
+                                                  { Offline, "offline"_ba },
+                                                  { AlbumData, "albumData"_ba } };
+    return roles;
 }
 QVariant AlbumListModel::data(const QModelIndex &index, int role) const
 {
@@ -182,7 +190,7 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
         int role;
         QVariant (*read)(const Album &album);
     };
-    static const RoleReader readers[] = {
+    static constexpr RoleReader readers[] = {
         { AlbumId,
           [](const Album &album) -> QVariant {
               return album.id;
@@ -214,10 +222,11 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
         { Tracks,
           [](const Album &album) -> QVariant {
               QVariantList tracks;
+              tracks.reserve(album.tracks.size());
               for (const auto &track : album.tracks) {
                   auto map = toJson(track).toVariantMap();
                   map.insert(u"sourceUrl"_s, track.sourceUrl);
-                  tracks.append(map);
+                  tracks.append(std::move(map));
               }
               return tracks;
           } },
@@ -309,6 +318,7 @@ void AlbumListModel::setSortMode(SortMode mode)
 QVariantList AlbumListModel::columns() const
 {
     QVariantList result;
+    result.reserve(m_order.columns.size());
     int lane = 0;
     for (const auto &column : m_order.columns)
         result.append(QVariantMap{ { u"key"_s, column.key },
@@ -327,9 +337,12 @@ int SearchListModel::rowCount(const QModelIndex &parent) const
 }
 QHash<int, QByteArray> SearchListModel::roleNames() const
 {
-    return { { Kind, "kind"_ba },        { AlbumId, "albumId"_ba }, { TrackId, "trackId"_ba },
-             { Title, "title"_ba },      { Artist, "artist"_ba },   { CoverUrl, "coverUrl"_ba },
-             { Subtitle, "subtitle"_ba } };
+    static const QHash<int, QByteArray> roles = {
+        { Kind, "kind"_ba },        { AlbumId, "albumId"_ba }, { TrackId, "trackId"_ba },
+        { Title, "title"_ba },      { Artist, "artist"_ba },   { CoverUrl, "coverUrl"_ba },
+        { Subtitle, "subtitle"_ba }
+    };
+    return roles;
 }
 QVariant SearchListModel::data(const QModelIndex &index, int role) const
 {
@@ -386,15 +399,19 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
         m_trackIndices.clear();
         m_entries.clear();
         m_genreNames.clear();
+        m_genreNames.reserve(m_snapshot->genres.size());
+        qsizetype entryCount = m_snapshot->albums.size();
+        for (const auto &album : m_snapshot->albums)
+            entryCount += album.tracks.size();
+        m_entries.reserve(entryCount);
         for (const auto &genre : m_snapshot->genres)
             m_genreNames.insert(genre.id, genreDisplayName(genre));
         m_albumIndices.reserve(m_snapshot->albums.size());
         m_trackIndices.reserve(m_snapshot->albums.size());
         for (qsizetype i = 0; i < m_snapshot->albums.size(); ++i) {
             const auto &album = m_snapshot->albums[i];
-            if (m_albumIndices.contains(album.id))
+            if (!m_albumIndices.tryEmplace(album.id, i).inserted)
                 continue;
-            m_albumIndices.insert(album.id, i);
             const QString genre = m_genreNames.value(
                     album.genreId, QCoreApplication::translate("Yalahoo", "Unclassified"));
             m_entries.append({ { album.id, { } },
@@ -409,13 +426,14 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
             QHash<QString, qsizetype> tracks;
             tracks.reserve(album.tracks.size());
             for (qsizetype j = 0; j < album.tracks.size(); ++j)
-                if (!tracks.contains(album.tracks[j].id))
-                    tracks.insert(album.tracks[j].id, j);
+                tracks.tryEmplace(album.tracks[j].id, j);
             m_trackIndices.insert(album.id, std::move(tracks));
         }
     }
     const QString needle = query.trimmed().toLower();
     QList<SearchResult> results;
+    if (needle.isEmpty() && genreId.isEmpty())
+        results.reserve(m_snapshot->albums.size());
     for (const auto &entry : m_entries) {
         if (!genreId.isEmpty() && entry.genreId != genreId)
             continue;

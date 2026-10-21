@@ -65,7 +65,8 @@ LibraryStore::LibraryStore(QString dataRoot, QObject *parent)
                     return;
                 d->m_active = Kind::None;
                 d->m_cancel.reset();
-                accept({ snapshot, { }, d->m_filesVisited, cancelled }, Kind::Scan, generation);
+                accept({ std::move(snapshot), { }, d->m_filesVisited, cancelled }, Kind::Scan,
+                       generation);
                 schedule();
             });
     d->m_worker.setMaxThreadCount(1);
@@ -108,8 +109,9 @@ void LibraryStore::stageMetadata(const ProviderResult &result)
         || result.status == ProviderStatus::Cancelled)
         return;
     const auto key = result.albumId + '/'_L1 + kindName(result.kind);
-    d->m_metadataBytes -= d->m_metadataPending.value(key).payloadBytes;
-    d->m_metadataPending.insert(key, result);
+    const auto entry = d->m_metadataPending.tryEmplace(key);
+    d->m_metadataBytes -= entry.iterator->payloadBytes;
+    *entry.iterator = result;
     d->m_metadataBytes += result.payloadBytes;
     if (d->m_metadataBytes
         >= MetadataBatchMiB * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
@@ -228,6 +230,7 @@ void LibraryStore::load()
 QStringList LibraryStore::rootPaths() const
 {
     QStringList result;
+    result.reserve(d->m_roots.size());
     for (const auto &root : d->m_roots)
         result.append(root.toLocalFile());
     return result;
@@ -328,7 +331,7 @@ LibraryStore::JobResult LibraryStore::read(const QString &path)
     result.snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     return result;
 }
-LibraryStore::JobResult LibraryStore::write(const QString &path, Snapshot snapshot)
+LibraryStore::JobResult LibraryStore::write(const QString &path, const Snapshot &snapshot)
 {
     JobResult result;
     auto json = toJson(*snapshot);
@@ -521,7 +524,7 @@ void LibraryStore::complete()
     }
     schedule();
 }
-void LibraryStore::accept(JobResult result, Kind kind, quint64 generation)
+void LibraryStore::accept(const JobResult &result, Kind kind, quint64 generation)
 {
     if (generation != d->m_generation || result.cancelled)
         return;

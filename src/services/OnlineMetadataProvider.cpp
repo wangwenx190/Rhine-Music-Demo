@@ -584,7 +584,7 @@ struct OnlineMetadataProvider::Private final
     bool m_enabled = false;
 };
 OnlineMetadataProvider::OnlineMetadataProvider(
-        QObject *parent, std::function<QNetworkAccessManager *()> networkFactory)
+        QObject *parent, const std::function<QNetworkAccessManager *()> &networkFactory)
     : IMetadataProvider(parent), d(std::make_unique<Private>())
 {
     d->m_worker = new MetadataWorker(networkFactory ? networkFactory() : nullptr);
@@ -622,7 +622,7 @@ void OnlineMetadataProvider::configure(const QJsonObject &configuration)
     d->m_enabled = enabled;
     const auto pending = d->m_pending;
     for (auto it = pending.begin(); it != pending.end(); ++it) {
-        const auto token = it.key();
+        const auto &token = it.key();
         cancel(token);
         ProviderResult result;
         result.requestId = token.requestId;

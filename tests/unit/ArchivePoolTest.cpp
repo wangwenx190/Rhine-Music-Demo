@@ -295,6 +295,51 @@ private Q_SLOTS:
         selection.advance(0);
         QCOMPARE(selection.instances().size(), 432);
     }
+    void physicalObjectIdsSurviveOverlappingFrontiers()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns(columns({ 2, 3, 4 }));
+        selection.setLift(0);
+        QHash<QPair<qint64, qint64>, quint64> previous;
+        const auto verify = [&] {
+            QHash<QPair<qint64, qint64>, quint64> current;
+            QSet<quint64> identities;
+            const auto origin = selection.coordinateOrigin();
+            for (const auto &instance : selection.instances()) {
+                QVERIFY(!identities.contains(instance.objectId));
+                identities.insert(instance.objectId);
+                if (instance.owned)
+                    continue;
+                const auto physical = qMakePair(qint64(instance.cell.lane + origin.lane),
+                                                qint64(instance.cell.row + origin.row));
+                const auto before = previous.constFind(physical);
+                if (before != previous.cend())
+                    QCOMPARE(instance.objectId, *before);
+                current.insert(physical, instance.objectId);
+            }
+            previous = std::move(current);
+        };
+        verify();
+        for (const ArchiveCell target : { ArchiveCell{ 1, 13 },
+                                          { -1, -2 },
+                                          { 0, -1 },
+                                          { 8, 46 },
+                                          { 9, 47 },
+                                          { -18, -49 },
+                                          { -17, -48 },
+                                          { 3002, 4097 } }) {
+            QVERIFY(selection.selectCell(target));
+            motion.finish();
+            selection.setLift(0);
+            verify();
+        }
+        const auto before = previous;
+        const auto shift = selection.rebase();
+        QVERIFY(shift.lane != 0 && shift.row != 0);
+        verify();
+        QCOMPARE(previous, before);
+    }
     void pickingUsesPublishedTransforms()
     {
         MotionController motion;

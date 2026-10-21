@@ -193,7 +193,7 @@ auto bindIntegrationWindow(IntegrationReviewState &state)
     state.item->setTelemetryEnabled(true);
     QObject::connect(state.item, &rhi::SceneItem::frameSubmitted, state.window,
                      [&, epoch](QJsonObject sample) {
-                         return observeIntegrationFrame(epoch, state, sample);
+                         return observeIntegrationFrame(epoch, state, std::move(sample));
                      });
     QObject::connect(state.item, &rhi::RhiItem::renderFailed, state.window,
                      [&](const QString &message) {
@@ -207,7 +207,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
 {
     const int index = state.replayIndex++;
     if (index < sizes.size()) {
-        state.stage = "resize"_L1;
+        state.stage = u"resize"_s;
         const QSize size = sizes[index];
         const auto after = yalahoo::review::nowNs();
         state.awaiting = [size, after](const QJsonObject &sample) {
@@ -222,7 +222,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
                                           { u"width"_s, size.width() },
                                           { u"height"_s, size.height() } });
     } else if (index < sizes.size() + effectStrengths.size()) {
-        state.stage = "quality"_L1;
+        state.stage = u"quality"_s;
         const int strength = effectStrengths[index - sizes.size()];
         const auto after = yalahoo::review::nowNs();
         state.awaiting = [&, strength, after](const QJsonObject &sample) {
@@ -247,7 +247,7 @@ auto advanceIntegrationReview(IntegrationReviewState &state, auto &sizes, auto &
                                           { u"atNs"_s, after } });
     } else if (index
                < sizes.size() + effectStrengths.size() + yalahoo::review::LifecycleRebuildCount) {
-        state.stage = "rebuild"_L1;
+        state.stage = u"rebuild"_s;
         const auto after = yalahoo::review::nowNs();
         state.awaiting = [&, after](const QJsonObject &sample) {
             const bool match = sample[u"submittedNs"_s].toInteger() >= after

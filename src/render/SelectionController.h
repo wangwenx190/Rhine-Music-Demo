@@ -29,7 +29,7 @@ class SelectionController final : public QObject
     Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY selectionChanged FINAL)
 public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
-    void setColumns(QList<LibraryColumn> columns, Snapshot snapshot = { });
+    void setColumns(QList<LibraryColumn> columns, const Snapshot &snapshot = { });
     QPair<QString, QString> coverSource(const QString &id) const;
     QString albumTitle(const QString &id) const;
     QString albumId() const;
@@ -151,7 +151,14 @@ private:
     QHash<QString, CoverSource> m_coverSources;
     ArchiveCell m_cell, m_origin;
     QVector<ArchiveInstance> m_instances;
-    QHash<QPair<qint64, qint64>, quint64> m_poolObjects;
+    struct PoolObject final
+    {
+        QPair<qint64, qint64> physical;
+        quint64 objectId = 0;
+    };
+    // Each complete 9x48 frontier visits every physical residue exactly once.
+    // Store its previous identity directly, including across logical coordinate rebases.
+    std::array<PoolObject, ArchivePool::capacity> m_poolObjects;
     ReturningCasePool m_returning;
     DetailMotion m_detailMotion;
     CaseClarity m_clarity;

@@ -6,6 +6,7 @@
 #include "MotionController.h"
 #include "SelectionController.h"
 #include <limits>
+#include <stdexcept>
 #include "CoverCache.h"
 #include "AtlasAllocator.h"
 #include "SceneItem.h"
@@ -103,6 +104,35 @@ private Q_SLOTS:
         QVERIFY(atlas.publish(lease, cover));
         atlas.release(lease);
         QCOMPARE(atlas.retainedBytes(), 0);
+    }
+    void atlasReplayTracksStrideReleaseAndReplacement()
+    {
+        AtlasAllocator atlas(512, 4, 2);
+        const auto first = atlas.acquire(u"first"_s);
+        const auto second = atlas.acquire(u"second"_s);
+        const auto third = atlas.acquire(u"third"_s);
+        QVERIFY(atlas.publish(third, pixels(u"third"_s)));
+        const auto original = atlas.replay(0, 4);
+        QCOMPARE(original.size(), 1);
+        QCOMPARE(original.first().slot, 4);
+        QCOMPARE(atlas.replay(0).first().slot, 2);
+        QCOMPARE(atlas.replay(0, 4).first().slot, 4);
+        QVERIFY_THROWS_EXCEPTION(std::invalid_argument,
+                                 atlas.replay(0, std::numeric_limits<int>::max()));
+        atlas.release(third);
+        QVERIFY(atlas.replay(0, 4).isEmpty());
+        const auto replacement = atlas.acquire(u"replacement"_s);
+        QVERIFY(replacement.lease != third.lease);
+        QVERIFY(atlas.publish(replacement, pixels(u"replacement"_s)));
+        const auto updated = atlas.replay(0, 4);
+        QCOMPARE(updated.first().lease, replacement.lease);
+        QCOMPARE(original.first().lease, third.lease);
+        QVERIFY(updated.first().pixels.cacheKey() != original.first().pixels.cacheKey());
+        atlas.reset();
+        QVERIFY(atlas.replay(0, 4).isEmpty());
+        QCOMPARE(original.first().pixels.pixelColor(0, 0), QColor(Qt::red));
+        Q_UNUSED(first);
+        Q_UNUSED(second);
     }
     void malformedAtlasLeaseCannotOverflowSlotIndex()
     {
