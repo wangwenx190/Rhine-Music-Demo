@@ -496,7 +496,7 @@ private:
     std::array<Uniform, UniformBaseCount> uniformBases;
     QVector<QVector4D> entityLight0, entityLight1;
     QVector<QMatrix4x4> lightEntities;
-    QByteArray uniformScratch;
+    QByteArray uniformScratch, instanceScratch;
     QImage detachedCover;
     QVector4D cachedRowSettings, cachedPrintSettings;
     QVector3D cachedRowColumn, cachedLightColumn;
@@ -595,6 +595,7 @@ void Renderer::reset()
     vertices.reset();
     indices.reset();
     instanceBuffer.reset();
+    instanceScratch.clear();
     cover.reset();
     environment.reset();
     dfg.reset();
@@ -1049,6 +1050,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
                                renderData::MaximumCaseEntities * renderData::InstanceBytes));
         require(instanceBuffer->create(), "RHI instance buffer failed");
+        instanceScratch = QByteArray(instanceBuffer->size(), Qt::Uninitialized);
         outputUniform.reset(api->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
                                            renderData::OutputUniformBytes));
         require(outputUniform->create(), "Output uniform buffer failed");
@@ -1896,7 +1898,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     const auto batchGeometryOffset = append({ }, 1);
     const int visibleCount = int(std::count(visible.begin(), visible.end(), true));
     if (batched) {
-        QByteArray instances(entities.size() * renderData::InstanceBytes, '\0');
+        // Every field in the active prefix is overwritten before QRhi copies the upload.
+        auto &instances = instanceScratch;
         int instanceCursor = 0;
         auto instance = [&](int i) {
             return writeInstanceData(instances, instanceCursor, entities, i);
@@ -1907,7 +1910,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         for (int i : opaqueOrder)
             if (!visible[i])
                 instance(i);
-        updates->updateDynamicBuffer(instanceBuffer.get(), 0, instances.size(),
+        updates->updateDynamicBuffer(instanceBuffer.get(), 0,
+                                     instanceCursor * renderData::InstanceBytes,
                                      instances.constData());
     }
     updates->updateDynamicBuffer(uniforms.get(), 0, cursor, bytes.constData());
