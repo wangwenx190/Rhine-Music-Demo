@@ -232,25 +232,26 @@ private:
         }
         if (kind == MetadataKind::Introduction) {
             pages(false);
-        } else {
-            const auto id = preferredRelease(job.query);
-            if (!id.isEmpty()) {
-                if (!validMbid(id)) {
-                    fail(tr("Invalid MusicBrainz release identifier."));
-                    return;
-                }
-                release(id);
-            } else {
-                job.stage = Stage::ReleaseSearch;
-                get(endpoint(u"https://musicbrainz.org/ws/2/release/"_s,
-                             { { u"fmt"_s, u"json"_s },
-                               { u"limit"_s, u"10"_s },
-                               { u"query"_s,
-                                 u"release:\""_s + escapeSearch(album.title) + u"\" AND artist:\""_s
-                                         + escapeSearch(album.artist) + '"'_L1 } }));
-            }
+            return;
         }
+        const auto id = preferredRelease(job.query);
+        if (!id.isEmpty() && !validMbid(id)) {
+            fail(tr("Invalid MusicBrainz release identifier."));
+            return;
+        }
+        if (!id.isEmpty()) {
+            release(id);
+            return;
+        }
+        job.stage = Stage::ReleaseSearch;
+        get(endpoint(u"https://musicbrainz.org/ws/2/release/"_s,
+                     { { u"fmt"_s, u"json"_s },
+                       { u"limit"_s, u"10"_s },
+                       { u"query"_s,
+                         u"release:\""_s + escapeSearch(album.title) + u"\" AND artist:\""_s
+                                 + escapeSearch(album.artist) + '\"'_L1 } }));
     }
+
     void get(const QUrl &url)
     {
         const auto &query = m_active->query;
@@ -351,134 +352,154 @@ private:
             return;
         }
         const auto &data = response.data;
-        if (job.stage == Stage::ReleaseSearch) {
-            if (!data.value(u"releases"_s).isArray() || !data.value(u"count"_s).isDouble()
-                || data.value(u"count"_s).toInteger(-1) < 0) {
-                fail(tr("MusicBrainz returned an unexpected search response."));
-                return;
-            }
-            const auto id = musicBrainzRelease(job.query.album, data);
-            if (!validMbid(id)) {
-                job.result.status = data.value(u"releases"_s).toArray().isEmpty()
-                        ? ProviderStatus::NotFound
-                        : ProviderStatus::Uncertain;
-                const auto field =
-                        job.result.kind == MetadataKind::Credits ? u"creditsLookup"_s : u"online"_s;
-                job.result.payload.insert(
-                        field,
-                        QJsonObject{ { u"candidates"_s,
-                                       musicBrainzCandidates(job.query.album, data) } });
+        static constexpr void (MetadataWorker::*handlers[])(const QJsonObject &) = {
+            &MetadataWorker::receiveSearch,   &MetadataWorker::receiveRelease,
+            &MetadataWorker::receiveGroup,    &MetadataWorker::receivePages,
+            &MetadataWorker::receiveEntities, &MetadataWorker::receiveEntities
+        };
+        (this->*handlers[std::to_underlying(job.stage)])(data);
+    }
+    void receiveSearch(const QJsonObject &data)
+    {
+        auto &job = *m_active;
+        if (!data.value(u"releases"_s).isArray() || !data.value(u"count"_s).isDouble()
+            || data.value(u"count"_s).toInteger(-1) < 0) {
+            fail(tr("MusicBrainz returned an unexpected search response."));
+            return;
+        }
+        const auto id = musicBrainzRelease(job.query.album, data);
+        if (!validMbid(id)) {
+            job.result.status = data.value(u"releases"_s).toArray().isEmpty()
+                    ? ProviderStatus::NotFound
+                    : ProviderStatus::Uncertain;
+            const auto field =
+                    job.result.kind == MetadataKind::Credits ? u"creditsLookup"_s : u"online"_s;
+            job.result.payload.insert(
+                    field,
+                    QJsonObject{
+                            { u"candidates"_s, musicBrainzCandidates(job.query.album, data) } });
 
-                finish();
-                return;
-            }
-            release(id);
-        } else if (job.stage == Stage::Release) {
-            if (!data.value(u"media"_s).isArray()
-                || data.value(u"id"_s).toString() != job.releaseId) {
-                fail(tr("MusicBrainz returned an unexpected release response."));
-                return;
-            }
-            const auto match = musicBrainzMetadata(job.query.album, job.result.kind, data);
-            if (match.status == ProviderStatus::Uncertain) {
-                job.result = match;
-                finish();
-                return;
-            }
-            job.release = data;
-            const auto group = data.value(u"release-group"_s).toObject().value(u"id"_s).toString();
-            if (job.result.kind == MetadataKind::Enrichment && validMbid(group)) {
-                job.stage = Stage::Group;
-                job.groupId = group;
-                get(endpoint(u"https://musicbrainz.org/ws/2/release-group/"_s + group,
-                             { { u"fmt"_s, u"json"_s }, { u"inc"_s, u"genres"_s } }));
-            } else {
-                job.result = match;
-                finish();
-            }
-        } else if (job.stage == Stage::Group) {
-            if (data.value(u"id"_s).toString() != job.groupId) {
-                fail(tr("MusicBrainz returned an unexpected release group response."));
-                return;
-            }
-            job.release.insert(u"release-group"_s, data);
-            job.result = musicBrainzMetadata(job.query.album, job.result.kind, job.release);
             finish();
-        } else if (job.stage == Stage::Pages) {
-            const auto query = data.value(u"query"_s).toObject();
-            const bool emptySearch = data.contains(u"batchcomplete"_s)
-                    && (query.isEmpty()
-                        || query.value(u"searchinfo"_s).toObject().value(u"totalhits"_s).toInt(-1)
-                                == 0);
-            if (!query.value(u"pages"_s).isArray() && !emptySearch) {
-                job.failures.append(tr("Wikipedia returned an unexpected page response."));
-                assess();
-                return;
+            return;
+        }
+        release(id);
+    }
+    void receiveRelease(const QJsonObject &data)
+    {
+        auto &job = *m_active;
+        if (!data.value(u"media"_s).isArray() || data.value(u"id"_s).toString() != job.releaseId) {
+            fail(tr("MusicBrainz returned an unexpected release response."));
+            return;
+        }
+        const auto match = musicBrainzMetadata(job.query.album, job.result.kind, data);
+        if (match.status == ProviderStatus::Uncertain) {
+            job.result = match;
+            finish();
+            return;
+        }
+        job.release = data;
+        const auto group = data.value(u"release-group"_s).toObject().value(u"id"_s).toString();
+        if (job.result.kind == MetadataKind::Enrichment && validMbid(group)) {
+            job.stage = Stage::Group;
+            job.groupId = group;
+            get(endpoint(u"https://musicbrainz.org/ws/2/release-group/"_s + group,
+                         { { u"fmt"_s, u"json"_s }, { u"inc"_s, u"genres"_s } }));
+        } else {
+            job.result = match;
+            finish();
+        }
+    }
+    void receiveGroup(const QJsonObject &data)
+    {
+        auto &job = *m_active;
+        if (data.value(u"id"_s).toString() != job.groupId) {
+            fail(tr("MusicBrainz returned an unexpected release group response."));
+            return;
+        }
+        job.release.insert(u"release-group"_s, data);
+        job.result = musicBrainzMetadata(job.query.album, job.result.kind, job.release);
+        finish();
+    }
+    void receivePages(const QJsonObject &data)
+    {
+        auto &job = *m_active;
+        const auto query = data.value(u"query"_s).toObject();
+        const bool emptySearch = data.contains(u"batchcomplete"_s)
+                && (query.isEmpty()
+                    || query.value(u"searchinfo"_s).toObject().value(u"totalhits"_s).toInt(-1)
+                            == 0);
+        if (!query.value(u"pages"_s).isArray() && !emptySearch) {
+            job.failures.append(tr("Wikipedia returned an unexpected page response."));
+            assess();
+            return;
+        }
+        const auto incoming = query.value(u"pages"_s).toArray();
+        QSet<qint64> seen;
+        for (const auto &page : std::as_const(job.pages))
+            seen.insert(page.toObject().value(u"pageid"_s).toInteger());
+        for (const auto &page : incoming) {
+            const auto object = page.toObject();
+            if (object.contains(u"missing"_s) || object.value(u"pageid"_s).toInteger() <= 0)
+                continue;
+            if (!seen.contains(object.value(u"pageid"_s).toInteger())
+                && job.pages.size() < MaximumCandidatePages) {
+                seen.insert(object.value(u"pageid"_s).toInteger());
+                job.pages.append(page);
             }
-            const auto incoming = query.value(u"pages"_s).toArray();
-            QSet<qint64> seen;
-            for (const auto &page : std::as_const(job.pages))
-                seen.insert(page.toObject().value(u"pageid"_s).toInteger());
-            for (const auto &page : incoming) {
-                const auto object = page.toObject();
-                if (object.contains(u"missing"_s) || object.value(u"pageid"_s).toInteger() <= 0)
-                    continue;
-                if (!seen.contains(object.value(u"pageid"_s).toInteger())
-                    && job.pages.size() < MaximumCandidatePages) {
-                    seen.insert(object.value(u"pageid"_s).toInteger());
-                    job.pages.append(page);
-                }
-            }
-            QStringList ids;
-            static const QRegularExpression qid(u"^Q[1-9][0-9]*$"_s);
+        }
+        QStringList ids;
+        static const QRegularExpression qid(u"^Q[1-9][0-9]*$"_s);
+        for (const auto &page : std::as_const(job.pages)) {
+            const auto id = page.toObject()
+                                    .value(u"pageprops"_s)
+                                    .toObject()
+                                    .value(u"wikibase_item"_s)
+                                    .toString();
+            if (qid.match(id).hasMatch() && !job.entities.contains(id))
+                ids.append(id);
+        }
+        ids.removeDuplicates();
+        if (ids.isEmpty())
+            assess();
+        else
+            entities(ids, Stage::Entities);
+    }
+    void receiveEntities(const QJsonObject &data)
+    {
+        auto &job = *m_active;
+        if (!data.value(u"entities"_s).isObject()) {
+            job.failures.append(tr("Wikidata returned an unexpected entity response."));
+            assess();
+            return;
+        }
+        const auto incoming = data.value(u"entities"_s).toObject();
+        for (auto it = incoming.begin(); it != incoming.end(); ++it)
+            job.entities.insert(it.key(), it.value());
+        QStringList performers;
+        if (job.stage == Stage::Entities) {
             for (const auto &page : std::as_const(job.pages)) {
                 const auto id = page.toObject()
                                         .value(u"pageprops"_s)
                                         .toObject()
                                         .value(u"wikibase_item"_s)
                                         .toString();
-                if (qid.match(id).hasMatch() && !job.entities.contains(id))
-                    ids.append(id);
+                for (const auto &performer :
+                     wikidataClaims(job.entities.value(id).toObject(), u"P175"_s))
+                    if (!job.entities.contains(performer))
+                        performers.append(performer);
             }
-            ids.removeDuplicates();
-            if (ids.isEmpty())
-                assess();
-            else
-                entities(ids, Stage::Entities);
+            performers.removeDuplicates();
+        }
+        if (performers.size() > MaximumPerformers) {
+            job.uncertain = true;
+            assess();
+        } else if (performers.isEmpty()) {
+            assess();
         } else {
-            if (!data.value(u"entities"_s).isObject()) {
-                job.failures.append(tr("Wikidata returned an unexpected entity response."));
-                assess();
-                return;
-            }
-            const auto incoming = data.value(u"entities"_s).toObject();
-            for (auto it = incoming.begin(); it != incoming.end(); ++it)
-                job.entities.insert(it.key(), it.value());
-            QStringList performers;
-            if (job.stage == Stage::Entities) {
-                for (const auto &page : std::as_const(job.pages)) {
-                    const auto id = page.toObject()
-                                            .value(u"pageprops"_s)
-                                            .toObject()
-                                            .value(u"wikibase_item"_s)
-                                            .toString();
-                    for (const auto &performer :
-                         wikidataClaims(job.entities.value(id).toObject(), u"P175"_s))
-                        if (!job.entities.contains(performer))
-                            performers.append(performer);
-                }
-                performers.removeDuplicates();
-            }
-            if (performers.size() > MaximumPerformers) {
-                job.uncertain = true;
-                assess();
-            } else if (performers.isEmpty()) {
-                assess();
-            } else {
-                entities(performers, Stage::Performers);
-            }
+            entities(performers, Stage::Performers);
         }
     }
+
     void fail(const QString &message)
     {
         m_active->result.status = ProviderStatus::Error;

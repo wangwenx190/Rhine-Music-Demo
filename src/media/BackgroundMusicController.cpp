@@ -44,16 +44,19 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
                 Q_EMIT silenceReached();
                 Q_EMIT stateChanged();
             });
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {
-        if (m_refreshPending)
-            return;
-        m_refreshPending = true;
-        QTimer::singleShot(0, this, [this] {
-            m_refreshPending = false;
-            refreshOutput();
-        });
-    });
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
+            &BackgroundMusicController::scheduleOutputRefresh);
     refreshOutput();
+}
+void BackgroundMusicController::scheduleOutputRefresh()
+{
+    if (m_refreshPending)
+        return;
+    m_refreshPending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_refreshPending = false;
+        refreshOutput();
+    });
 }
 BackgroundMusicController::~BackgroundMusicController()
 {

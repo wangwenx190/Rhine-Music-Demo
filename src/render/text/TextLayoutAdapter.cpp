@@ -224,6 +224,47 @@ QPair<QString, QString> TextLayoutAdapter::titleParts(const QString &text)
 {
     return albumTitleParts(text);
 }
+namespace {
+void fitTransportText(TitleLayout &result, const QFont &main, double size, double width)
+{
+    if (result.naturalWidth <= width)
+        return;
+
+    auto dots = shape(u"\u2026"_s, main, size, width, 0, 0, false, true, false);
+    QString fitted;
+    for (const auto &glyph : result.glyphs) {
+        if (glyph.x + glyph.width + dots.naturalWidth > width)
+            break;
+        fitted += glyph.text;
+    }
+    result.fitted = dots.naturalWidth <= width ? fitted + u"\u2026"_s : QString();
+    result.glyphs = shape(result.fitted, main, size, width, 0, 0, false, true, false).glyphs;
+}
+TitleLayout fitTitle(const auto &candidate, double size, double minimum, double budget)
+{
+    auto result = candidate(size, false);
+    if (result.mainLines <= 2 && result.height <= budget + 1)
+        return result;
+    int fit = -1;
+    for (int i = 1; i <= CoarseSearchSteps; ++i) {
+        result = candidate(size - (size - minimum) * i / CoarseSearchSteps, false);
+        if (result.mainLines <= 2 && result.height <= budget + 1) {
+            fit = i;
+            break;
+        }
+    }
+    if (fit < 0)
+        return candidate(minimum, true);
+    const double high = size - (size - minimum) * (fit - 1) / CoarseSearchSteps;
+    const double low = size - (size - minimum) * fit / CoarseSearchSteps;
+    for (int i = 1; i <= FineSearchSteps; ++i) {
+        result = candidate(high - (high - low) * i / FineSearchSteps, false);
+        if (result.mainLines <= 2 && result.height <= budget + 1)
+            break;
+    }
+    return result;
+}
+}
 TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                                        const QFont &subtitle, double size, double width,
                                        double budget, bool narrow, double dpr, bool transport)
@@ -270,44 +311,13 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     if (transport) {
         result = candidate(size, false, true);
         result.fitted = text;
-        if (result.naturalWidth > width) {
-            auto dots = shape(u"\u2026"_s, main, size, width, 0, 0, false, true, false);
-            QString fitted;
-            for (const auto &glyph : result.glyphs) {
-                if (glyph.x + glyph.width + dots.naturalWidth > width)
-                    break;
-                fitted += glyph.text;
-            }
-            result.fitted = dots.naturalWidth <= width ? fitted + u"\u2026"_s : QString();
-            result.glyphs =
-                    shape(result.fitted, main, size, width, 0, 0, false, true, false).glyphs;
-        }
+        fitTransportText(result, main, size, width);
+
         result.height = TransportLineHeightPixels;
     } else {
-        result = candidate(size, false);
-        if (result.mainLines > 2 || result.height > budget + 1) {
-            const double minimum =
-                    std::min(size, narrow ? NarrowMinimumFontPixels : MinimumFontPixels);
-            int fit = -1;
-            for (int i = 1; i <= CoarseSearchSteps; ++i) {
-                result = candidate(size - (size - minimum) * i / CoarseSearchSteps, false);
-                if (result.mainLines <= 2 && result.height <= budget + 1) {
-                    fit = i;
-                    break;
-                }
-            }
-            if (fit < 0)
-                result = candidate(minimum, true);
-            else {
-                const double high = size - (size - minimum) * (fit - 1) / CoarseSearchSteps;
-                const double low = size - (size - minimum) * fit / CoarseSearchSteps;
-                for (int i = 1; i <= FineSearchSteps; ++i) {
-                    result = candidate(high - (high - low) * i / FineSearchSteps, false);
-                    if (result.mainLines <= 2 && result.height <= budget + 1)
-                        break;
-                }
-            }
-        }
+        result = fitTitle(candidate, size,
+                          std::min(size, narrow ? NarrowMinimumFontPixels : MinimumFontPixels),
+                          budget);
         result = candidate(result.size, result.overflow, true);
         result.height = std::min(result.height, budget);
     }

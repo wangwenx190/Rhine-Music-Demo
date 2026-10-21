@@ -107,6 +107,260 @@ public:
     }
 };
 }
+
+namespace {
+
+auto collectSettingsSample(const qint64 &previous, const quint64 &inputRevision,
+                           const QSize &expected, bool &ready, QEventLoop &loop,
+                           const QJsonObject &sample)
+{
+    if (sample[u"submission"_s].toInteger() > previous
+        && sample[u"inputRevision"_s].toInteger() == qint64(inputRevision)
+        && sample[u"targetWidth"_s].toInt() == expected.width()
+        && sample[u"targetHeight"_s].toInt() == expected.height()) {
+        ready = true;
+        loop.quit();
+    }
+}
+
+auto renderSettingsFrame(yalahoo::rhi::SceneItem *&settingsScene, SceneAdapter &scene,
+                         QJsonObject &lastSettingsSample, auto &render, OffscreenSurface &surface)
+{
+    if (!settingsScene)
+        return false;
+    const auto expected = scene.quality()->targetSize();
+    const auto previous = lastSettingsSample[u"submission"_s].toInteger();
+    // One explicit Review action receipt, so a static scene submits this observation.
+    scene.recordInput();
+    const auto inputRevision = scene.frame().inputRevision;
+    QEventLoop loop;
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, &loop, &QEventLoop::quit);
+    bool ready = false;
+    const auto connection = QObject::connect(
+            settingsScene, &rhi::SceneItem::frameSubmitted, &loop, [&](const QJsonObject &sample) {
+                return collectSettingsSample(previous, inputRevision, expected, ready, loop,
+                                             sample);
+            });
+    const bool rendered = render();
+    if (!ready) {
+        watchdog.start(5000);
+        surface.requestFrame();
+        loop.exec();
+    }
+    QObject::disconnect(connection);
+    return rendered && ready;
+}
+}
+
+namespace {
+auto reviewLibraryObserveFrame(const std::shared_ptr<std::atomic<bool>> &deviceCaptured,
+                               QQuickRenderControl &control, QQuickWindow &window)
+{
+    if (deviceCaptured->exchange(true))
+        return;
+    auto *api = OffscreenSurface::Enabled
+            ? control.rhi()
+            : static_cast<QRhi *>(window.rendererInterface()->getResource(
+                      &window, QSGRendererInterface::RhiResource));
+    const QVariantMap info{
+        { u"backend"_s, api ? QString::fromUtf8(api->backendName()) : QString() },
+        { u"gpu"_s, api ? QString::fromUtf8(api->driverInfo().deviceName) : QString() }
+    };
+    QMetaObject::invokeMethod(
+            &window,
+            [&window, info] {
+                window.setProperty("libraryAuditDevice", info);
+            },
+            Qt::QueuedConnection);
+}
+}
+
+namespace {
+struct NativeFrames final
+{
+    std::atomic<quint64> synchronized{ 0 };
+    std::atomic<quint64> presented{ 0 };
+};
+auto reviewLibraryRender(const std::shared_ptr<NativeFrames> &nativeFrames,
+                         OffscreenSurface &surface, QSignalSpy &rendered)
+{
+    if (!OffscreenSurface::Enabled) {
+        // A swap from an already synchronized frame cannot acknowledge a new GUI change.
+        const auto before = nativeFrames->synchronized.load();
+        surface.requestFrame();
+        return QTest::qWaitFor(
+                [&] {
+                    return nativeFrames->presented.load() > before;
+                },
+                5000);
+    }
+    const int before = rendered.size();
+    surface.requestFrame();
+    QElapsedTimer wait;
+    wait.start();
+    while (rendered.size() == before && wait.elapsed() < FrameDeadlineMilliseconds)
+        QTest::qWait(EventPollMilliseconds);
+    return rendered.size() > before;
+}
+}
+
+namespace {
+auto verifySettingsInputs(auto &check, auto &renderSettingsTarget, QJsonObject &lastSettingsSample,
+                          yalahoo::rhi::SceneItem *&settingsScene,
+                          QJsonArray &settingsResourceSamples, QQuickWindow &window,
+                          QQuickItem *&scroll, auto &render, SettingsController &settings,
+                          MotionController &motion, SceneAdapter &scene, OffscreenSurface &surface,
+                          const QString &output, SampleProvider &injected, LibrarySession &library,
+                          QQuickItem *&query, LibrarySnapshot &snapshot)
+{
+    check(u"settings-resource-sample"_s, renderSettingsTarget() && !lastSettingsSample.isEmpty());
+    const auto baselineResources = lastSettingsSample;
+    const auto atlasGeneration = settingsScene ? settingsScene->input().atlasGeneration : 0;
+    settingsResourceSamples.append(baselineResources);
+    const auto focusSetting = [&](const QString &name) {
+        auto *control = yalahoo::review::findVisual(window.contentItem(), name);
+        if (control && scroll) {
+            const double y = control->mapToItem(scroll, QPointF()).y();
+            scroll->setProperty("contentY",
+                                std::clamp(scroll->property("contentY").toDouble() + y - 20, 0.,
+                                           std::max(0.,
+                                                    scroll->property("contentHeight").toDouble()
+                                                            - scroll->height())));
+            control->forceActiveFocus();
+            render();
+        }
+        return control;
+    };
+    auto *single = focusSetting(u"settingsSingleInstance"_s);
+    check(u"single-instance-control-present"_s, single != nullptr);
+    if (single)
+        QTest::keyClick(&window, Qt::Key_Space);
+    check(u"single-instance-qt-input"_s, !settings.values()[u"singleInstance"_s].toBool());
+    settings.update(u"singleInstance"_s, true);
+    auto *speed = focusSetting(u"settingsSpeedControl"_s);
+    check(u"speed-control-present"_s, speed != nullptr);
+    if (speed)
+        QTest::keyClick(&window, Qt::Key_Right);
+    check(u"speed-qt-input"_s, std::abs(motion.clock()->speed() - 1.05) < 1e-9);
+    check(u"speed-control-range"_s,
+          speed && speed->property("from").toDouble() == .25
+                  && speed->property("to").toDouble() == 3.0);
+    check(u"speed-resource-render"_s, renderSettingsTarget());
+    check(u"speed-keeps-resources"_s,
+          lastSettingsSample[u"resourceGeneration"_s] == baselineResources[u"resourceGeneration"_s]
+                  && lastSettingsSample[u"postprocessRevision"_s]
+                          == baselineResources[u"postprocessRevision"_s]);
+    settings.update(u"motionSpeed"_s, 1.0);
+    if (scroll)
+        scroll->setProperty("contentY", 0);
+    render();
+    auto *theme = yalahoo::review::findVisual(window.contentItem(), u"settingsNightTheme"_s);
+    check(u"theme-control-present"_s, theme != nullptr);
+    if (theme) {
+        theme->forceActiveFocus();
+        QTest::keyClick(&window, Qt::Key_Space);
+        renderSettingsTarget();
+        check(u"theme-qt-input"_s, scene.lighting()->night());
+        settings.update(u"theme"_s, u"day"_s);
+        renderSettingsTarget();
+    }
+    check(u"theme-keeps-resources"_s,
+          lastSettingsSample[u"resourceGeneration"_s] == baselineResources[u"resourceGeneration"_s]
+                  && lastSettingsSample[u"postprocessRevision"_s]
+                          == baselineResources[u"postprocessRevision"_s]);
+    auto *qualitySlider = focusSetting(u"settingsdepthOfFieldControl"_s);
+    check(u"quality-control-present"_s, qualitySlider != nullptr);
+    if (qualitySlider)
+        QTest::keyClick(&window, Qt::Key_Right);
+    check(u"quality-qt-input"_s, scene.quality()->values()[u"depthOfField"_s].toInt() == 105);
+    check(u"quality-resource-render"_s, renderSettingsTarget());
+    check(u"effect-keeps-native-target"_s,
+          lastSettingsSample[u"resourceGeneration"_s].toInteger()
+                          == baselineResources[u"resourceGeneration"_s].toInteger()
+                  && settingsScene && settingsScene->input().atlasGeneration == atlasGeneration);
+    settingsResourceSamples.append(lastSettingsSample);
+    check(u"quality-own-image"_s, surface.grab().save(output + "/settings-quality.png"_L1));
+    if (qualitySlider)
+        QTest::keyClick(&window, Qt::Key_Left);
+    check(u"quality-resource-restore"_s, renderSettingsTarget());
+    settingsResourceSamples.append(lastSettingsSample);
+    check(u"quality-resource-return"_s,
+          lastSettingsSample[u"resources"_s].toObject()[u"estimatedCurrentBytes"_s]
+                  == baselineResources[u"resources"_s].toObject()[u"estimatedCurrentBytes"_s]);
+    if (scroll)
+        scroll->setProperty("contentY", 0);
+    render();
+    for (auto status :
+         { ProviderStatus::Matched, ProviderStatus::Uncertain, ProviderStatus::Error }) {
+        injected.status = status;
+        library.requestMetadata(library.navigationAlbumId(), u"introduction"_s);
+        QElapsedTimer timer;
+        timer.start();
+        while (library.metadataFor(library.navigationAlbumId(), u"introduction"_s)[u"status"_s]
+                               .toString()
+                       != statusName(status)
+               && timer.elapsed() < InputDeadlineMilliseconds)
+            QTest::qWait(EventPollMilliseconds);
+        check(u"injected-status-render"_s, render());
+        auto *state =
+                yalahoo::review::findVisual(window.contentItem(), u"introductionMetadataState"_s);
+        check(u"injected-status-ui"_s,
+              state
+                      && state->property("text").toString().contains(
+                              metadataStatusText(statusName(status))));
+        auto *content =
+                yalahoo::review::findVisual(window.contentItem(), u"introductionMetadataContent"_s);
+        check(u"injected-content-ui"_s,
+              content && content->property("text").toString().contains(u"Injected introduction"_s));
+    }
+    injected.setEnabled(true);
+    check(u"future-capability-render"_s, render());
+    check(u"future-capability-enables-query"_s, query && query->isEnabled());
+    const int previousRequests = injected.introductionRequests;
+    injected.status = ProviderStatus::Matched;
+    if (query) {
+        query->forceActiveFocus();
+        QTest::keyClick(&window, Qt::Key_Space);
+    }
+    QElapsedTimer queryTimer;
+    queryTimer.start();
+    while (library.metadataBusy() && queryTimer.elapsed() < ModelDeadlineMilliseconds)
+        QTest::qWait(EventPollMilliseconds);
+    check(u"current-query-qt-input"_s,
+          injected.lastQueryEnabled && injected.introductionRequests == previousRequests + 1
+                  && library.metadataFor(library.navigationAlbumId(),
+                                         u"introduction"_s)[u"status"_s]
+                                  .toString()
+                          == "Matched"_L1);
+    auto *batchQuery =
+            yalahoo::review::findVisual(window.contentItem(), u"introductionMetadataBatch"_s);
+    check(u"batch-query-enabled"_s, render() && batchQuery && batchQuery->isEnabled());
+    if (batchQuery) {
+        batchQuery->forceActiveFocus();
+        QTest::keyClick(&window, Qt::Key_Space);
+    }
+    queryTimer.restart();
+    while (library.metadataProgress()[u"active"_s].toBool()
+           && queryTimer.elapsed() < ModelDeadlineMilliseconds)
+        QTest::qWait(EventPollMilliseconds);
+    check(u"batch-query-qt-input"_s,
+          library.metadataProgress()[u"kind"_s].toString() == "introduction"_L1
+                  && library.metadataProgress()[u"completed"_s].toInt() == snapshot.albums.size());
+    injected.setEnabled(false);
+    check(u"offline-capability-restored"_s, render() && query && !query->isEnabled());
+    check(u"batch-start"_s, library.requestMetadataBatch(u"credits"_s));
+    QElapsedTimer timer;
+    timer.start();
+    while (library.metadataProgress()[u"active"_s].toBool()
+           && timer.elapsed() < ModelDeadlineMilliseconds)
+        QTest::qWait(EventPollMilliseconds);
+    check(u"batch-progress"_s,
+          !library.metadataProgress()[u"active"_s].toBool()
+                  && library.metadataProgress()[u"completed"_s].toInt() == snapshot.albums.size());
+}
+}
 int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerification,
                   bool settingsVerification, bool representative)
 {
@@ -234,31 +488,12 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     QObject::connect(
             &window, &QQuickWindow::afterRendering, &window,
             [&window, &control, deviceCaptured] {
-                if (deviceCaptured->exchange(true))
-                    return;
-                auto *api = OffscreenSurface::Enabled
-                        ? control.rhi()
-                        : static_cast<QRhi *>(window.rendererInterface()->getResource(
-                                  &window, QSGRendererInterface::RhiResource));
-                const QVariantMap info{
-                    { u"backend"_s, api ? QString::fromUtf8(api->backendName()) : QString() },
-                    { u"gpu"_s, api ? QString::fromUtf8(api->driverInfo().deviceName) : QString() }
-                };
-                QMetaObject::invokeMethod(
-                        &window,
-                        [&window, info] {
-                            window.setProperty("libraryAuditDevice", info);
-                        },
-                        Qt::QueuedConnection);
+                return reviewLibraryObserveFrame(deviceCaptured, control, window);
             },
             Qt::DirectConnection);
     input.attach(&window);
     QSignalSpy rendered(&surface, &OffscreenSurface::frameRendered);
-    struct NativeFrames final
-    {
-        std::atomic<quint64> synchronized{ 0 };
-        std::atomic<quint64> presented{ 0 };
-    };
+
     const auto nativeFrames = std::make_shared<NativeFrames>();
     QObject::connect(
             &window, &QQuickWindow::afterSynchronizing, &window,
@@ -274,56 +509,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             Qt::DirectConnection);
     QSignalSpy playback(&library, &LibrarySession::playbackChanged);
     const auto render = [&] {
-        if (!OffscreenSurface::Enabled) {
-            // A swap from an already synchronized frame cannot acknowledge a new GUI change.
-            const auto before = nativeFrames->synchronized.load();
-            surface.requestFrame();
-            return QTest::qWaitFor(
-                    [&] {
-                        return nativeFrames->presented.load() > before;
-                    },
-                    5000);
-        }
-        const int before = rendered.size();
-        surface.requestFrame();
-        QElapsedTimer wait;
-        wait.start();
-        while (rendered.size() == before && wait.elapsed() < FrameDeadlineMilliseconds)
-            QTest::qWait(EventPollMilliseconds);
-        return rendered.size() > before;
+        return reviewLibraryRender(nativeFrames, surface, rendered);
     };
     const auto renderSettingsTarget = [&] {
-        if (!settingsScene)
-            return false;
-        const auto expected = scene.quality()->targetSize();
-        const auto previous = lastSettingsSample[u"submission"_s].toInteger();
-        // One explicit Review action receipt, so a static scene submits this observation.
-        scene.recordInput();
-        const auto inputRevision = scene.frame().inputRevision;
-        QEventLoop loop;
-        QTimer watchdog;
-        watchdog.setSingleShot(true);
-        QObject::connect(&watchdog, &QTimer::timeout, &loop, &QEventLoop::quit);
-        bool ready = false;
-        const auto connection = QObject::connect(
-                settingsScene, &rhi::SceneItem::frameSubmitted, &loop,
-                [&](const QJsonObject &sample) {
-                    if (sample[u"submission"_s].toInteger() > previous
-                        && sample[u"inputRevision"_s].toInteger() == qint64(inputRevision)
-                        && sample[u"targetWidth"_s].toInt() == expected.width()
-                        && sample[u"targetHeight"_s].toInt() == expected.height()) {
-                        ready = true;
-                        loop.quit();
-                    }
-                });
-        const bool rendered = render();
-        if (!ready) {
-            watchdog.start(5000);
-            surface.requestFrame();
-            loop.exec();
-        }
-        QObject::disconnect(connection);
-        return rendered && ready;
+        return renderSettingsFrame(settingsScene, scene, lastSettingsSample, render, surface);
     };
     surface.show();
     motion.clock()->setActive(true);
@@ -460,168 +649,10 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                       output
                                       + u"/settings-top-%1-%2.png"_s.arg(size.width()).arg(night)));
                     if (dpr == 1 && size == QSize(1280, 720) && !night) {
-                        check(u"settings-resource-sample"_s,
-                              renderSettingsTarget() && !lastSettingsSample.isEmpty());
-                        const auto baselineResources = lastSettingsSample;
-                        const auto atlasGeneration =
-                                settingsScene ? settingsScene->input().atlasGeneration : 0;
-                        settingsResourceSamples.append(baselineResources);
-                        const auto focusSetting = [&](const QString &name) {
-                            auto *control = yalahoo::review::findVisual(window.contentItem(), name);
-                            if (control && scroll) {
-                                const double y = control->mapToItem(scroll, QPointF()).y();
-                                scroll->setProperty(
-                                        "contentY",
-                                        std::clamp(
-                                                scroll->property("contentY").toDouble() + y - 20,
-                                                0.,
-                                                std::max(
-                                                        0.,
-                                                        scroll->property("contentHeight").toDouble()
-                                                                - scroll->height())));
-                                control->forceActiveFocus();
-                                render();
-                            }
-                            return control;
-                        };
-                        auto *speed = focusSetting(u"settingsSpeedControl"_s);
-                        check(u"speed-control-present"_s, speed != nullptr);
-                        if (speed)
-                            QTest::keyClick(&window, Qt::Key_Right);
-                        check(u"speed-qt-input"_s, std::abs(motion.clock()->speed() - 1.05) < 1e-9);
-                        check(u"speed-control-range"_s,
-                              speed && speed->property("from").toDouble() == .25
-                                      && speed->property("to").toDouble() == 3.0);
-                        check(u"speed-resource-render"_s, renderSettingsTarget());
-                        check(u"speed-keeps-resources"_s,
-                              lastSettingsSample[u"resourceGeneration"_s]
-                                              == baselineResources[u"resourceGeneration"_s]
-                                      && lastSettingsSample[u"postprocessRevision"_s]
-                                              == baselineResources[u"postprocessRevision"_s]);
-                        settings.update(u"motionSpeed"_s, 1.0);
-                        if (scroll)
-                            scroll->setProperty("contentY", 0);
-                        render();
-                        auto *theme = yalahoo::review::findVisual(window.contentItem(),
-                                                                  u"settingsNightTheme"_s);
-                        check(u"theme-control-present"_s, theme != nullptr);
-                        if (theme) {
-                            theme->forceActiveFocus();
-                            QTest::keyClick(&window, Qt::Key_Space);
-                            renderSettingsTarget();
-                            check(u"theme-qt-input"_s, scene.lighting()->night());
-                            settings.update(u"theme"_s, u"day"_s);
-                            renderSettingsTarget();
-                        }
-                        check(u"theme-keeps-resources"_s,
-                              lastSettingsSample[u"resourceGeneration"_s]
-                                              == baselineResources[u"resourceGeneration"_s]
-                                      && lastSettingsSample[u"postprocessRevision"_s]
-                                              == baselineResources[u"postprocessRevision"_s]);
-                        auto *qualitySlider = focusSetting(u"settingsdepthOfFieldControl"_s);
-                        check(u"quality-control-present"_s, qualitySlider != nullptr);
-                        if (qualitySlider)
-                            QTest::keyClick(&window, Qt::Key_Right);
-                        check(u"quality-qt-input"_s,
-                              scene.quality()->values()[u"depthOfField"_s].toInt() == 105);
-                        check(u"quality-resource-render"_s, renderSettingsTarget());
-                        check(u"effect-keeps-native-target"_s,
-                              lastSettingsSample[u"resourceGeneration"_s].toInteger()
-                                              == baselineResources[u"resourceGeneration"_s]
-                                                         .toInteger()
-                                      && settingsScene
-                                      && settingsScene->input().atlasGeneration == atlasGeneration);
-                        settingsResourceSamples.append(lastSettingsSample);
-                        check(u"quality-own-image"_s,
-                              surface.grab().save(output + "/settings-quality.png"_L1));
-                        if (qualitySlider)
-                            QTest::keyClick(&window, Qt::Key_Left);
-                        check(u"quality-resource-restore"_s, renderSettingsTarget());
-                        settingsResourceSamples.append(lastSettingsSample);
-                        check(u"quality-resource-return"_s,
-                              lastSettingsSample[u"resources"_s]
-                                              .toObject()[u"estimatedCurrentBytes"_s]
-                                      == baselineResources[u"resources"_s]
-                                                 .toObject()[u"estimatedCurrentBytes"_s]);
-                        if (scroll)
-                            scroll->setProperty("contentY", 0);
-                        render();
-                        for (auto status : { ProviderStatus::Matched, ProviderStatus::Uncertain,
-                                             ProviderStatus::Error }) {
-                            injected.status = status;
-                            library.requestMetadata(library.navigationAlbumId(), u"introduction"_s);
-                            QElapsedTimer timer;
-                            timer.start();
-                            while (library.metadataFor(library.navigationAlbumId(),
-                                                       u"introduction"_s)[u"status"_s]
-                                                   .toString()
-                                           != statusName(status)
-                                   && timer.elapsed() < InputDeadlineMilliseconds)
-                                QTest::qWait(EventPollMilliseconds);
-                            check(u"injected-status-render"_s, render());
-                            auto *state = yalahoo::review::findVisual(
-                                    window.contentItem(), u"introductionMetadataState"_s);
-                            check(u"injected-status-ui"_s,
-                                  state
-                                          && state->property("text").toString().contains(
-                                                  metadataStatusText(statusName(status))));
-                            auto *content = yalahoo::review::findVisual(
-                                    window.contentItem(), u"introductionMetadataContent"_s);
-                            check(u"injected-content-ui"_s,
-                                  content
-                                          && content->property("text").toString().contains(
-                                                  u"Injected introduction"_s));
-                        }
-                        injected.setEnabled(true);
-                        check(u"future-capability-render"_s, render());
-                        check(u"future-capability-enables-query"_s, query && query->isEnabled());
-                        const int previousRequests = injected.introductionRequests;
-                        injected.status = ProviderStatus::Matched;
-                        if (query) {
-                            query->forceActiveFocus();
-                            QTest::keyClick(&window, Qt::Key_Space);
-                        }
-                        QElapsedTimer queryTimer;
-                        queryTimer.start();
-                        while (library.metadataBusy()
-                               && queryTimer.elapsed() < ModelDeadlineMilliseconds)
-                            QTest::qWait(EventPollMilliseconds);
-                        check(u"current-query-qt-input"_s,
-                              injected.lastQueryEnabled
-                                      && injected.introductionRequests == previousRequests + 1
-                                      && library.metadataFor(library.navigationAlbumId(),
-                                                             u"introduction"_s)[u"status"_s]
-                                                      .toString()
-                                              == "Matched"_L1);
-                        auto *batchQuery = yalahoo::review::findVisual(
-                                window.contentItem(), u"introductionMetadataBatch"_s);
-                        check(u"batch-query-enabled"_s,
-                              render() && batchQuery && batchQuery->isEnabled());
-                        if (batchQuery) {
-                            batchQuery->forceActiveFocus();
-                            QTest::keyClick(&window, Qt::Key_Space);
-                        }
-                        queryTimer.restart();
-                        while (library.metadataProgress()[u"active"_s].toBool()
-                               && queryTimer.elapsed() < ModelDeadlineMilliseconds)
-                            QTest::qWait(EventPollMilliseconds);
-                        check(u"batch-query-qt-input"_s,
-                              library.metadataProgress()[u"kind"_s].toString() == "introduction"_L1
-                                      && library.metadataProgress()[u"completed"_s].toInt()
-                                              == snapshot.albums.size());
-                        injected.setEnabled(false);
-                        check(u"offline-capability-restored"_s,
-                              render() && query && !query->isEnabled());
-                        check(u"batch-start"_s, library.requestMetadataBatch(u"credits"_s));
-                        QElapsedTimer timer;
-                        timer.start();
-                        while (library.metadataProgress()[u"active"_s].toBool()
-                               && timer.elapsed() < ModelDeadlineMilliseconds)
-                            QTest::qWait(EventPollMilliseconds);
-                        check(u"batch-progress"_s,
-                              !library.metadataProgress()[u"active"_s].toBool()
-                                      && library.metadataProgress()[u"completed"_s].toInt()
-                                              == snapshot.albums.size());
+                        verifySettingsInputs(check, renderSettingsTarget, lastSettingsSample,
+                                             settingsScene, settingsResourceSamples, window, scroll,
+                                             render, settings, motion, scene, surface, output,
+                                             injected, library, query, snapshot);
                     }
                     QPointer<QQuickItem> oldPanel = settingsPanel;
                     QTest::keyClick(&window, Qt::Key_Escape);
@@ -654,7 +685,9 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                         yalahoo::review::findVisual(window.contentItem(), u"nativeScene"_s));
                 check(u"scene-error-free"_s, sceneItem && sceneItem->errorText().isEmpty());
                 check(u"panel-descriptor"_s,
-                      sceneItem && sceneItem->input().panelLayerSize == size);
+                      sceneItem && sceneItem->panelLayerSize() == size
+                              && sceneItem->input().panelLayerSize
+                                      == size * window.effectiveDevicePixelRatio());
                 if (dpr == 1 && size == QSize(1280, 720) && !night) {
                     QPointer<QQuickItem> first = yalahoo::review::findVisual(
                             window.contentItem(), u"librarySearchResult-0"_s);

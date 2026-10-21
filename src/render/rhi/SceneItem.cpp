@@ -41,6 +41,27 @@ constexpr auto PercentScale = 100;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo::rhi {
+struct SceneItem::DiagnosticMailbox final
+{
+    Q_DISABLE_COPY_MOVE(DiagnosticMailbox)
+    DiagnosticMailbox() = default;
+    QMutex mutex;
+    DiagnosticSamples samples;
+    DiagnosticSeries presented;
+    std::optional<double> previousPresentation;
+    std::optional<DiagnosticBatch> latest;
+    DiagnosticSeries latestPresented;
+    bool queued = false;
+};
+struct SceneItem::TelemetryMailbox final
+{
+    Q_DISABLE_COPY_MOVE(TelemetryMailbox)
+    TelemetryMailbox() = default;
+    QMutex mutex;
+    QVector<QJsonObject> samples;
+    bool queued = false;
+    quint64 coalesced = 0;
+};
 QString SceneItem::diagnosticText() const
 {
     if (!m_diagnosticsEnabled)
@@ -143,6 +164,117 @@ void SceneItem::refreshTextResources()
     ++m_textRevision;
     schedule();
 }
+void SceneItem::handleVisibility(bool visible)
+{
+    configureDiagnostics();
+    if (!visible)
+        mouseUngrabEvent();
+    schedule();
+    if (visible && !m_restorePending) {
+        m_restorePending = true;
+        // A native surface can be replaced while the basic loop retains
+        // its scene graph. Submit the current immutable frame on restore,
+        // even when reduced motion leaves all scene values unchanged.
+        QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    m_restorePending = false;
+                    if (this->window() && this->window()->isVisible()) {
+                        ensurePolished();
+                        update();
+                    }
+                },
+                Qt::QueuedConnection);
+    }
+}
+void SceneItem::queuePrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
+                              bool uploaded)
+{
+    if (!guard)
+        return;
+    QMetaObject::invokeMethod(
+            guard,
+            [guard, token, submission, uploaded] {
+                publishPrepared(guard, token, submission, uploaded);
+            },
+            Qt::QueuedConnection);
+}
+void SceneItem::publishPrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
+                                bool uploaded)
+{
+    if (!guard || !guard->m_renderingActive || !guard->m_preparing
+        || token != guard->m_preparationToken || submission != guard->submission() || !uploaded)
+        return;
+    const auto covers = guard->coverStatistics();
+    if (covers.value(u"ready"_s).toInt() != covers.value(u"identities"_s).toInt()
+        || (covers.value(u"owned"_s).toInt() > 0 && !covers.value(u"selectedDetailed"_s).toBool()))
+        return;
+    Q_EMIT guard->scenePrepared();
+}
+void SceneItem::bindWindow(QQuickWindow *window)
+{
+    disconnect(m_windowStateConnection);
+    disconnect(m_visibilityConnection);
+    disconnect(m_activeConnection);
+    disconnect(m_dprConnection);
+    disconnect(m_screenConnection);
+    mouseUngrabEvent();
+    if (window) {
+        m_screenConnection = connect(window, &QWindow::screenChanged, this, &SceneItem::schedule);
+        m_dprConnection =
+                connect(window, &QQuickWindow::devicePixelRatioChanged, this, &SceneItem::schedule);
+        m_visibilityConnection =
+                connect(window, &QWindow::visibleChanged, this, [this](bool visible) {
+                    handleVisibility(visible);
+                });
+        m_windowStateConnection = connect(window, &QWindow::visibilityChanged, this,
+                                          &SceneItem::configureDiagnostics);
+        m_activeConnection = connect(window, &QWindow::activeChanged, this, [this, window] {
+            if (!window->isActive())
+                mouseUngrabEvent();
+        });
+    }
+    configureDiagnostics();
+    schedule();
+}
+void SceneItem::handlePoolCoverReady(const CoverSnapshot &pixels)
+{
+    if (!m_adapter)
+        return;
+    if (m_poolSelection && !pixels->error.isEmpty()
+        && pixels->fallbackTitle != m_poolSelection->coverSource(pixels->identity).second) {
+        schedule();
+        return;
+    }
+    const auto &instances = m_adapter->frame().instances;
+    const auto activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
+    if (pixels->resolution == renderData::CoverTilePixels) {
+        const auto lease = m_poolLeases.constFind(pixels->identity);
+        if (lease != m_poolLeases.cend() && m_atlas.publish(*lease, pixels))
+            m_readyCovers.insert(pixels->identity, pixels->error.isEmpty());
+    }
+    for (auto &owned : m_ownedCovers)
+        if (owned.objectId == activeObject && owned.pixels
+            && owned.pixels->identity == pixels->identity) {
+            if (pixels->resolution >= m_detailResolution)
+                owned.highResolutionFailed = !pixels->error.isEmpty();
+            m_coverPool.upgrade(owned.pixels, pixels);
+        }
+    ++m_coverRevision;
+    schedule();
+    return;
+}
+void SceneItem::handleCoverReady(CoverSnapshot pixels)
+{
+    if (m_poolMode) {
+        handlePoolCoverReady(pixels);
+        return;
+    }
+    if (m_coverPool.upgrade(m_selectedCover, pixels)) {
+        m_cover = pixels->image;
+        schedule();
+    }
+}
 SceneItem::SceneItem(QQuickItem *parent)
     : RhiItem(parent),
       m_cover(renderData::CoverTilePixels, renderData::CoverTilePixels,
@@ -158,36 +290,7 @@ SceneItem::SceneItem(QQuickItem *parent)
     m_cover.fill(Qt::transparent);
     m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
     connect(&m_covers, &CoverCache::ready, this, [this](CoverSnapshot pixels) {
-        if (m_poolMode) {
-            if (!m_adapter)
-                return;
-            if (m_poolSelection && !pixels->error.isEmpty()
-                && pixels->fallbackTitle != m_poolSelection->coverSource(pixels->identity).second) {
-                schedule();
-                return;
-            }
-            const auto &instances = m_adapter->frame().instances;
-            const auto activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
-            if (pixels->resolution == renderData::CoverTilePixels) {
-                const auto lease = m_poolLeases.constFind(pixels->identity);
-                if (lease != m_poolLeases.cend() && m_atlas.publish(*lease, pixels))
-                    m_readyCovers.insert(pixels->identity, pixels->error.isEmpty());
-            }
-            for (auto &owned : m_ownedCovers)
-                if (owned.objectId == activeObject && owned.pixels
-                    && owned.pixels->identity == pixels->identity) {
-                    if (pixels->resolution >= m_detailResolution)
-                        owned.highResolutionFailed = !pixels->error.isEmpty();
-                    m_coverPool.upgrade(owned.pixels, pixels);
-                }
-            ++m_coverRevision;
-            schedule();
-            return;
-        }
-        if (m_coverPool.upgrade(m_selectedCover, pixels)) {
-            m_cover = pixels->image;
-            schedule();
-        }
+        return handleCoverReady(pixels);
     });
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
     connect(this, &RhiItem::hdrHeadroomChanged, this, &SceneItem::schedule);
@@ -199,49 +302,7 @@ SceneItem::SceneItem(QQuickItem *parent)
         Q_EMIT errorTextChanged();
     });
     connect(this, &QQuickItem::windowChanged, this, [this](QQuickWindow *window) {
-        disconnect(m_windowStateConnection);
-        disconnect(m_visibilityConnection);
-        disconnect(m_activeConnection);
-        disconnect(m_dprConnection);
-        disconnect(m_screenConnection);
-        mouseUngrabEvent();
-        if (window) {
-            m_screenConnection =
-                    connect(window, &QWindow::screenChanged, this, &SceneItem::schedule);
-            m_dprConnection = connect(window, &QQuickWindow::devicePixelRatioChanged, this,
-                                      &SceneItem::schedule);
-            m_visibilityConnection =
-                    connect(window, &QWindow::visibleChanged, this, [this](bool visible) {
-                        configureDiagnostics();
-                        if (!visible)
-                            mouseUngrabEvent();
-                        schedule();
-                        if (visible && !m_restorePending) {
-                            m_restorePending = true;
-                            // A native surface can be replaced while the basic loop retains
-                            // its scene graph. Submit the current immutable frame on restore,
-                            // even when reduced motion leaves all scene values unchanged.
-                            QMetaObject::invokeMethod(
-                                    this,
-                                    [this] {
-                                        m_restorePending = false;
-                                        if (this->window() && this->window()->isVisible()) {
-                                            ensurePolished();
-                                            update();
-                                        }
-                                    },
-                                    Qt::QueuedConnection);
-                        }
-                    });
-            m_windowStateConnection = connect(window, &QWindow::visibilityChanged, this,
-                                              &SceneItem::configureDiagnostics);
-            m_activeConnection = connect(window, &QWindow::activeChanged, this, [this, window] {
-                if (!window->isActive())
-                    mouseUngrabEvent();
-            });
-        }
-        configureDiagnostics();
-        schedule();
+        return bindWindow(window);
     });
 }
 void SceneItem::setAdapter(SceneAdapter *adapter)
@@ -318,6 +379,89 @@ void SceneItem::refreshPool()
 }
 // Resolve leases by stable identity and content generation. Detailed tiles share an owned image
 // snapshot, so a GUI publication never borrows pixels from a temporary cache lookup.
+void SceneItem::ensureBaseCover(const QString &id, const QPair<QString, QString> &source,
+                                const AtlasLease &lease)
+{
+    if (m_readyCovers.contains(id))
+        return;
+
+    if (auto pixels =
+                m_covers.lookup(id, source.first, renderData::CoverTilePixels, source.second)) {
+        if (m_atlas.publish(lease, pixels))
+            m_readyCovers.insert(id, pixels->error.isEmpty());
+    } else if (m_covers.hasPendingCapacity())
+        m_covers.request(id, source.first, renderData::CoverTilePixels, source.second);
+}
+std::pair<QRect, quint64> SceneItem::prepareOwnedCover(Input &in, const ArchiveInstance &instance,
+                                                       const QPair<QString, QString> &source,
+                                                       QRect tile, quint64 coverLease)
+{
+    auto *it = acquireOwnedCover(instance, source);
+    if (!it || !it->pixels)
+        return { tile, coverLease };
+    requestDetailedCover(*it, instance.albumId, source);
+    const auto pixels = it->pixels->pixels;
+    if (!pixels || pixels->resolution <= renderData::CoverTilePixels)
+        return { tile, coverLease };
+    const int block = int(it - m_ownedCovers.data());
+    const int top = ((yalahoo::rhi::sceneAtlas::BaseWidthPixels + m_ownedSide - 1) / m_ownedSide)
+            * m_ownedSide;
+    tile = { (block % 2) * m_ownedSide, top + (block / 2) * m_ownedSide, pixels->resolution,
+             pixels->resolution };
+    coverLease = it->lease;
+    if (it->tiledPixels != pixels || it->tiledRegion != tile) {
+        it->uploads.clear();
+        for (const auto &part : pixels->tiles) {
+            const int slot = ((tile.y() + part.origin.y()) / renderData::CoverTilePixels)
+                            * (m_atlasSize.width() / renderData::CoverTilePixels)
+                    + (tile.x() + part.origin.x()) / renderData::CoverTilePixels;
+            it->uploads.append({ m_atlas.generation(), it->lease, ++m_ownedSerial, slot, part.image,
+                                 true, part.mipmaps });
+        }
+        it->tiledPixels = pixels;
+        it->tiledRegion = tile;
+    }
+    in.atlasUploads += it->uploads;
+    return { tile, coverLease };
+}
+SceneItem::OwnedCover *SceneItem::acquireOwnedCover(const ArchiveInstance &instance,
+                                                    const QPair<QString, QString> &source)
+{
+    auto it =
+            std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(), [&](const OwnedCover &cover) {
+                return cover.objectId == instance.objectId;
+            });
+    if (it != m_ownedCovers.end())
+        return &*it;
+    it = std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(), [](const OwnedCover &cover) {
+        return cover.objectId == 0;
+    });
+    if (it == m_ownedCovers.end())
+        return nullptr;
+    it->objectId = instance.objectId;
+    it->lease = ++m_ownedSerial;
+    it->pixels = m_coverPool.acquire(instance.albumId,
+                                     m_covers.lookup(instance.albumId, source.first,
+                                                     renderData::CoverTilePixels, source.second),
+                                     m_covers.generation());
+    return &*it;
+}
+void SceneItem::requestDetailedCover(OwnedCover &owned, const QString &id,
+                                     const QPair<QString, QString> &source)
+{
+    if (owned.objectId != m_activeObject
+        || (owned.highResolutionFailed
+            && (!owned.pixels->pixels || owned.pixels->pixels->error.isEmpty()))
+        || (owned.pixels->pixels && owned.pixels->pixels->resolution >= m_detailResolution))
+        return;
+    if (auto pixels = m_covers.lookup(id, source.first, m_detailResolution, source.second)) {
+        owned.highResolutionFailed = !pixels->error.isEmpty();
+        m_coverPool.upgrade(owned.pixels, pixels);
+        return;
+    }
+    if (m_covers.hasPendingCapacity())
+        m_covers.request(id, source.first, m_detailResolution, source.second);
+}
 void SceneItem::preparePool(Input &in)
 {
     auto *selection = m_adapter->selection();
@@ -381,73 +525,14 @@ void SceneItem::preparePool(Input &in)
         auto coverLease = lease.lease;
         in.fallbackCoverTiles[index] = tile;
         in.fallbackCoverLeases[index] = coverLease;
-        if (!m_readyCovers.contains(id)) {
-            if (auto pixels = m_covers.lookup(id, source.first, renderData::CoverTilePixels,
-                                              source.second)) {
-                if (m_atlas.publish(lease, pixels))
-                    m_readyCovers.insert(id, pixels->error.isEmpty());
-            } else if (m_covers.hasPendingCapacity())
-                m_covers.request(id, source.first, renderData::CoverTilePixels, source.second);
-        }
+        ensureBaseCover(id, source, lease);
+
         if (instance.owned) {
-            auto it = std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(),
-                                   [&](const OwnedCover &c) {
-                                       return c.objectId == instance.objectId;
-                                   });
-            if (it == m_ownedCovers.end()) {
-                it = std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(),
-                                  [](const OwnedCover &c) {
-                                      return c.objectId == 0;
-                                  });
-                if (it != m_ownedCovers.end()) {
-                    it->objectId = instance.objectId;
-                    it->lease = ++m_ownedSerial;
-                    it->pixels = m_coverPool.acquire(id,
-                                                     m_covers.lookup(id, source.first,
-                                                                     renderData::CoverTilePixels,
-                                                                     source.second),
-                                                     m_covers.generation());
-                }
-            }
-            if (it != m_ownedCovers.end() && it->pixels) {
-                if (instance.objectId == m_activeObject
-                    && (!it->highResolutionFailed
-                        || (it->pixels->pixels && !it->pixels->pixels->error.isEmpty()))
-                    && (!it->pixels->pixels
-                        || it->pixels->pixels->resolution < m_detailResolution)) {
-                    if (auto pixels = m_covers.lookup(id, source.first, m_detailResolution,
-                                                      source.second)) {
-                        it->highResolutionFailed = !pixels->error.isEmpty();
-                        m_coverPool.upgrade(it->pixels, pixels);
-                    } else if (m_covers.hasPendingCapacity())
-                        m_covers.request(id, source.first, m_detailResolution, source.second);
-                }
-                const auto pixels = it->pixels->pixels;
-                if (pixels && pixels->resolution > renderData::CoverTilePixels) {
-                    const int block = int(it - m_ownedCovers.begin());
-                    const int top = ((yalahoo::rhi::sceneAtlas::BaseWidthPixels + m_ownedSide - 1)
-                                     / m_ownedSide)
-                            * m_ownedSide;
-                    tile = { (block % 2) * m_ownedSide, top + (block / 2) * m_ownedSide,
-                             pixels->resolution, pixels->resolution };
-                    coverLease = it->lease;
-                    if (it->tiledPixels != pixels || it->tiledRegion != tile) {
-                        it->uploads.clear();
-                        for (const auto &part : pixels->tiles) {
-                            const int slot =
-                                    ((tile.y() + part.origin.y()) / renderData::CoverTilePixels)
-                                            * (m_atlasSize.width() / renderData::CoverTilePixels)
-                                    + (tile.x() + part.origin.x()) / renderData::CoverTilePixels;
-                            it->uploads.append({ m_atlas.generation(), it->lease, ++m_ownedSerial,
-                                                 slot, part.image, true, part.mipmaps });
-                        }
-                        it->tiledPixels = pixels;
-                        it->tiledRegion = tile;
-                    }
-                    in.atlasUploads += it->uploads;
-                }
-            }
+            const auto owned = prepareOwnedCover(in, instance, source, tile, coverLease);
+            tile = owned.first;
+            coverLease = owned.second;
         }
+
         in.entities[index] = instance.transform;
         in.entityIds[index] = instance.objectId;
         in.coverTiles[index] = tile;
@@ -491,6 +576,63 @@ void SceneItem::setDiagnosticsEnabled(bool enabled)
     configureDiagnostics();
     Q_EMIT diagnosticsChanged();
 }
+void SceneItem::publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
+                                   const QPointer<SceneItem> &guard, quint64 epoch)
+{
+    DiagnosticBatch batch;
+    DiagnosticSeries presented;
+    {
+        const QMutexLocker lock(&mailbox->mutex);
+        batch = *mailbox->latest;
+        presented = mailbox->latestPresented;
+        mailbox->latest.reset();
+        mailbox->queued = false;
+    }
+    if (!guard || epoch != guard->m_diagnosticsEpoch)
+        return;
+    const auto cache = guard->m_covers.statistics();
+    guard->m_diagnosticValues = {
+        { u"cpu"_s, batch.cpu.distribution() },
+        { u"sync"_s, batch.sync.distribution() },
+        { u"gpu"_s, batch.gpu.distribution() },
+        { u"submissionIntervals"_s, batch.intervals.distribution() },
+        { u"qtFrameIntervals"_s, presented.distribution() },
+        { u"submissions"_s, batch.submissions },
+        { u"elapsedMs"_s, batch.elapsedMs },
+        { u"submissionRate"_s,
+          batch.intervals.seen() * yalahoo::units::MillisecondsPerSecond / batch.elapsedMs },
+        { u"atlasUploadBytes"_s, batch.atlasBytes },
+        { u"selectedUploadBytes"_s, batch.selectedBytes },
+        { u"uniformUploadBytes"_s, batch.uniformBytes },
+        { u"decodeStarts"_s, cache.value(u"decodeStarts"_s).toVariant() },
+        { u"decodeActive"_s, cache.value(u"active"_s).toVariant() },
+        { u"decodePending"_s, cache.value(u"pending"_s).toVariant() },
+        { u"requestedSwapInterval"_s, guard->window()->requestedFormat().swapInterval() }
+    };
+    Q_EMIT guard->diagnosticValuesChanged();
+}
+void SceneItem::queueDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
+                                 const QPointer<SceneItem> &guard, const quint64 &epoch,
+                                 DiagnosticSample sample)
+{
+    const QMutexLocker lock(&mailbox->mutex);
+    auto batch = mailbox->samples.add(sample);
+    if (!batch)
+        return;
+    mailbox->latest = *batch;
+    mailbox->latestPresented = mailbox->presented;
+    mailbox->presented = { };
+    if (mailbox->queued)
+        return;
+    mailbox->queued = true;
+    if (guard)
+        QMetaObject::invokeMethod(
+                guard,
+                [mailbox, guard, epoch] {
+                    publishDiagnostics(mailbox, guard, epoch);
+                },
+                Qt::QueuedConnection);
+}
 void SceneItem::configureDiagnostics()
 {
     ++m_callbackRevision;
@@ -508,19 +650,8 @@ void SceneItem::configureDiagnostics()
         schedule();
         return;
     }
-    struct Mailbox final
-    {
-        Q_DISABLE_COPY_MOVE(Mailbox)
-        Mailbox() = default;
-        QMutex mutex;
-        DiagnosticSamples samples;
-        DiagnosticSeries presented;
-        std::optional<double> previousPresentation;
-        std::optional<DiagnosticBatch> latest;
-        DiagnosticSeries latestPresented;
-        bool queued = false;
-    };
-    auto mailbox = std::make_shared<Mailbox>();
+
+    auto mailbox = std::make_shared<DiagnosticMailbox>();
     m_presentedConnection = connect(
             window(), &QQuickWindow::frameSwapped, this,
             [mailbox] {
@@ -535,55 +666,7 @@ void SceneItem::configureDiagnostics()
             Qt::DirectConnection);
     QPointer<SceneItem> guard(this);
     diagnosed = [mailbox, guard, epoch](DiagnosticSample sample) {
-        const QMutexLocker lock(&mailbox->mutex);
-        auto batch = mailbox->samples.add(sample);
-        if (!batch)
-            return;
-        mailbox->latest = *batch;
-        mailbox->latestPresented = mailbox->presented;
-        mailbox->presented = { };
-        if (mailbox->queued)
-            return;
-        mailbox->queued = true;
-        if (guard)
-            QMetaObject::invokeMethod(
-                    guard,
-                    [mailbox, guard, epoch] {
-                        DiagnosticBatch batch;
-                        DiagnosticSeries presented;
-                        {
-                            const QMutexLocker lock(&mailbox->mutex);
-                            batch = *mailbox->latest;
-                            presented = mailbox->latestPresented;
-                            mailbox->latest.reset();
-                            mailbox->queued = false;
-                        }
-                        if (!guard || epoch != guard->m_diagnosticsEpoch)
-                            return;
-                        const auto cache = guard->m_covers.statistics();
-                        guard->m_diagnosticValues = {
-                            { u"cpu"_s, batch.cpu.distribution() },
-                            { u"sync"_s, batch.sync.distribution() },
-                            { u"gpu"_s, batch.gpu.distribution() },
-                            { u"submissionIntervals"_s, batch.intervals.distribution() },
-                            { u"qtFrameIntervals"_s, presented.distribution() },
-                            { u"submissions"_s, batch.submissions },
-                            { u"elapsedMs"_s, batch.elapsedMs },
-                            { u"submissionRate"_s,
-                              batch.intervals.seen() * yalahoo::units::MillisecondsPerSecond
-                                      / batch.elapsedMs },
-                            { u"atlasUploadBytes"_s, batch.atlasBytes },
-                            { u"selectedUploadBytes"_s, batch.selectedBytes },
-                            { u"uniformUploadBytes"_s, batch.uniformBytes },
-                            { u"decodeStarts"_s, cache.value(u"decodeStarts"_s).toVariant() },
-                            { u"decodeActive"_s, cache.value(u"active"_s).toVariant() },
-                            { u"decodePending"_s, cache.value(u"pending"_s).toVariant() },
-                            { u"requestedSwapInterval"_s,
-                              guard->window()->requestedFormat().swapInterval() }
-                        };
-                        Q_EMIT guard->diagnosticValuesChanged();
-                    },
-                    Qt::QueuedConnection);
+        return queueDiagnostics(mailbox, guard, epoch, sample);
     };
     schedule();
 }
@@ -596,54 +679,59 @@ void SceneItem::setTelemetryEnabled(bool enabled)
     schedule();
     Q_EMIT telemetryEnabledChanged();
 }
+void SceneItem::publishTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
+                                 const QPointer<SceneItem> &guard, quint64 epoch)
+{
+    QVector<QJsonObject> batch;
+    quint64 dropped = 0;
+    {
+        const QMutexLocker lock(&mailbox->mutex);
+        batch.swap(mailbox->samples);
+        dropped = mailbox->coalesced;
+        mailbox->queued = false;
+    }
+    if (guard && epoch == guard->m_telemetryEpoch && guard->m_renderingActive
+        && guard->telemetryEnabled())
+        for (auto &sample : batch) {
+            if (!guard || epoch != guard->m_telemetryEpoch || !guard->m_renderingActive
+                || !guard->telemetryEnabled())
+                break;
+            sample[u"coalescedSamples"_s] = qint64(dropped);
+            Q_EMIT guard->frameSubmitted(std::move(sample));
+        }
+}
+void SceneItem::queueTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
+                               const QPointer<SceneItem> &guard, const quint64 &epoch,
+                               QJsonObject sample)
+{
+    const QMutexLocker lock(&mailbox->mutex);
+    if (mailbox->samples.size() == MaximumFeedbackSamples) {
+        mailbox->samples.removeFirst();
+        ++mailbox->coalesced;
+    }
+    mailbox->samples.append(std::move(sample));
+    if (mailbox->queued)
+        return;
+    mailbox->queued = true;
+    if (guard)
+        QMetaObject::invokeMethod(
+                guard,
+                [mailbox, guard, epoch] {
+                    publishTelemetry(mailbox, guard, epoch);
+                },
+                Qt::QueuedConnection);
+}
 void SceneItem::configureTelemetry()
 {
     ++m_callbackRevision;
     const auto epoch = ++m_telemetryEpoch;
     profiled = { };
     if (m_telemetryEnabled && m_renderingActive) {
-        struct Mailbox final
-        {
-            QMutex mutex;
-            QVector<QJsonObject> samples;
-            bool queued = false;
-            quint64 coalesced = 0;
-        };
-        auto mailbox = std::make_shared<Mailbox>();
+
+        auto mailbox = std::make_shared<TelemetryMailbox>();
         QPointer<SceneItem> guard(this);
         profiled = [mailbox, guard, epoch](QJsonObject sample) {
-            const QMutexLocker lock(&mailbox->mutex);
-            if (mailbox->samples.size() == MaximumFeedbackSamples) {
-                mailbox->samples.removeFirst();
-                ++mailbox->coalesced;
-            }
-            mailbox->samples.append(std::move(sample));
-            if (mailbox->queued)
-                return;
-            mailbox->queued = true;
-            if (guard)
-                QMetaObject::invokeMethod(
-                        guard,
-                        [mailbox, guard, epoch] {
-                            QVector<QJsonObject> batch;
-                            quint64 dropped = 0;
-                            {
-                                const QMutexLocker lock(&mailbox->mutex);
-                                batch.swap(mailbox->samples);
-                                dropped = mailbox->coalesced;
-                                mailbox->queued = false;
-                            }
-                            if (guard && epoch == guard->m_telemetryEpoch
-                                && guard->m_renderingActive && guard->telemetryEnabled())
-                                for (auto &sample : batch) {
-                                    if (!guard || epoch != guard->m_telemetryEpoch
-                                        || !guard->m_renderingActive || !guard->telemetryEnabled())
-                                        break;
-                                    sample[u"coalescedSamples"_s] = qint64(dropped);
-                                    Q_EMIT guard->frameSubmitted(std::move(sample));
-                                }
-                        },
-                        Qt::QueuedConnection);
+            return queueTelemetry(mailbox, guard, epoch, sample);
         };
     }
 }
@@ -733,24 +821,7 @@ void SceneItem::setPreparing(bool value)
     if (value) {
         QPointer<SceneItem> guard(this);
         prepared = [guard](quint64 token, quint64 submission, bool uploaded) {
-            if (!guard)
-                return;
-            QMetaObject::invokeMethod(
-                    guard,
-                    [guard, token, submission, uploaded] {
-                        if (!guard || !guard->m_renderingActive || !guard->m_preparing
-                            || token != guard->m_preparationToken
-                            || submission != guard->submission() || !uploaded)
-                            return;
-                        const auto covers = guard->coverStatistics();
-                        if (covers.value(u"ready"_s).toInt()
-                                    != covers.value(u"identities"_s).toInt()
-                            || (covers.value(u"owned"_s).toInt() > 0
-                                && !covers.value(u"selectedDetailed"_s).toBool()))
-                            return;
-                        Q_EMIT guard->scenePrepared();
-                    },
-                    Qt::QueuedConnection);
+            queuePrepared(guard, token, submission, uploaded);
         };
     }
     schedule();
@@ -939,23 +1010,64 @@ void SceneItem::touchEvent(QTouchEvent *event)
 }
 // Prepare a coherent scene/cover snapshot on the GUI thread after layout. Hidden or opaque
 // opening states return before pool preparation; only the renderer owns native submission resources.
+void SceneItem::submitOccluded()
+{
+
+    if (!input().sceneOccluded) {
+        auto next = input();
+        next.sceneOccluded = true;
+        next.preparationToken = 0;
+        if (next.cover.isNull())
+            next.cover = m_cover;
+        auto target = QSize(fixedColorBufferWidth(), fixedColorBufferHeight());
+        if (target.isEmpty())
+            target = m_adapter->quality()->targetSize();
+        submit(std::move(next), target.expandedTo(QSize(1, 1)));
+    }
+    return;
+}
+void SceneItem::requestDemoCover()
+{
+    const auto identity = u"demo-square"_s;
+    const auto path = u":/assets/demo-covers/square.png"_s;
+    if (auto pixels = m_covers.lookup(identity, path, m_detailResolution)) {
+        if (m_coverPool.upgrade(m_selectedCover, pixels))
+            m_cover = pixels->image;
+    } else {
+        m_covers.request(identity, path, renderData::CoverTilePixels);
+        m_covers.request(identity, path, m_detailResolution);
+    }
+}
+double SceneItem::projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const
+{
+    double demand = renderData::CoverTilePixels;
+
+    std::array<QPointF, PaperCornerCount> points;
+    int index = 0;
+    for (float y : { yalahoo::rhi::renderData::PaperBottom, yalahoo::rhi::renderData::PaperTop })
+        for (float x : { -yalahoo::rhi::renderData::PaperLeftMagnitude,
+                         yalahoo::rhi::renderData::PaperRight }) {
+            const auto clip = vp * model * QVector4D(x, y, yalahoo::rhi::renderData::PaperFront, 1);
+            if (clip.w() <= 0)
+                return renderData::CoverTilePixels;
+            points[index++] = QPointF(clip.x() / clip.w() * width() * .5,
+                                      clip.y() / clip.w() * height() * .5);
+        }
+    for (const auto edge : { std::pair{ 0, 1 }, { 0, 2 }, { 1, 3 }, { 2, 3 } })
+        demand = std::max(demand,
+                          QLineF(points[edge.first], points[edge.second]).length()
+                                  * window()->effectiveDevicePixelRatio() * PaperTileExtent
+                                  / PaperInteriorExtent);
+
+    return demand;
+}
 void SceneItem::updatePolish()
 try {
     if (!m_renderingActive || !m_adapter || !window() || !isVisible() || width() <= 0
         || height() <= 0)
         return;
     if (m_sceneOccluded) {
-        if (!input().sceneOccluded) {
-            auto next = input();
-            next.sceneOccluded = true;
-            next.preparationToken = 0;
-            if (next.cover.isNull())
-                next.cover = m_cover;
-            auto target = QSize(fixedColorBufferWidth(), fixedColorBufferHeight());
-            if (target.isEmpty())
-                target = m_adapter->quality()->targetSize();
-            submit(std::move(next), target.expandedTo(QSize(1, 1)));
-        }
+        submitOccluded();
         return;
     }
     auto &adapter = *m_adapter;
@@ -977,24 +1089,7 @@ try {
     const auto &frame = adapter.frame();
     const auto vp = frame.projection * frame.view;
     const auto inspect = [&](const QMatrix4x4 &model) {
-        std::array<QPointF, PaperCornerCount> points;
-        int index = 0;
-        for (float y :
-             { yalahoo::rhi::renderData::PaperBottom, yalahoo::rhi::renderData::PaperTop })
-            for (float x : { -yalahoo::rhi::renderData::PaperLeftMagnitude,
-                             yalahoo::rhi::renderData::PaperRight }) {
-                const auto clip =
-                        vp * model * QVector4D(x, y, yalahoo::rhi::renderData::PaperFront, 1);
-                if (clip.w() <= 0)
-                    return;
-                points[index++] = QPointF(clip.x() / clip.w() * width() * .5,
-                                          clip.y() / clip.w() * height() * .5);
-            }
-        for (const auto edge : { std::pair{ 0, 1 }, { 0, 2 }, { 1, 3 }, { 2, 3 } })
-            demand = std::max(demand,
-                              QLineF(points[edge.first], points[edge.second]).length()
-                                      * window()->effectiveDevicePixelRatio() * PaperTileExtent
-                                      / PaperInteriorExtent);
+        demand = std::max(demand, projectedCoverDemand(vp, model));
     };
     if (frame.instances.isEmpty())
         inspect(frame.caseTransform);
@@ -1030,15 +1125,7 @@ try {
     }
     if (!m_poolMode && m_selectedCover
         && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution < m_detailResolution)) {
-        const auto identity = u"demo-square"_s;
-        const auto path = u":/assets/demo-covers/square.png"_s;
-        if (auto pixels = m_covers.lookup(identity, path, m_detailResolution)) {
-            if (m_coverPool.upgrade(m_selectedCover, pixels))
-                m_cover = pixels->image;
-        } else {
-            m_covers.request(identity, path, renderData::CoverTilePixels);
-            m_covers.request(identity, path, m_detailResolution);
-        }
+        requestDemoCover();
     }
     auto &quality = *adapter.quality();
     const double dpr = window()->effectiveDevicePixelRatio();

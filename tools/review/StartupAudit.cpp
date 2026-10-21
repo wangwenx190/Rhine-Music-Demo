@@ -83,9 +83,7 @@ QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
         return values[qMax(0, int(std::ceil(p * values.size())) - 1)];
     };
     const auto over = [&](double limit) {
-        return int(std::count_if(values.begin(), values.end(), [=](double v) {
-            return v > limit;
-        }));
+        return int(values.cend() - std::upper_bound(values.cbegin(), values.cend(), limit));
     };
     return { { u"count"_s, values.size() },
              { u"p50Ms"_s, percentile(.5) },
@@ -305,6 +303,29 @@ public:
         stage = std::move(value);
         qInfo().noquote() << "Startup stage:" << stage;
     }
+    void collectFrameSample(QJsonObject sample)
+    {
+        if (samples.size() >= MaximumFrameSamples) {
+            overflow = true;
+            return;
+        }
+        if (sample[u"coalescedSamples"_s].toInt() != 0)
+            failure = "Telemetry samples lost"_L1;
+        lastResources = sample[u"resources"_s].toObject();
+        sample.remove(u"resources"_s);
+        const auto bytes = lastResources[u"resizeOldPlusNewUpperBoundBytes"_s].toInteger();
+        peakBytes = qMax(peakBytes, bytes);
+        const auto plan = lastResources[u"preallocationPlan"_s].toObject();
+        if (plan != lastPlan) {
+            lastPlan = plan;
+            inventories.append(
+                    QJsonObject{ { u"stage"_s, stage }, { u"resources"_s, lastResources } });
+        }
+        sample[u"stage"_s] = stage;
+        sample[u"covers"_s] = native->coverStatistics();
+        sample[u"clockFrame"_s] = qint64(motion.clock()->frameCount());
+        samples.append(sample);
+    }
     void createRoot()
     {
         QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/pages/MusicStage.qml"_s));
@@ -333,30 +354,10 @@ public:
                 yalahoo::review::findVisual(root.get(), u"nativeScene"_s));
         require(native, "Production scene missing");
         native->setTelemetryEnabled(true);
-        QObject::connect(
-                native, &rhi::SceneItem::frameSubmitted, root.get(), [&](QJsonObject sample) {
-                    if (samples.size() >= MaximumFrameSamples) {
-                        overflow = true;
-                        return;
-                    }
-                    if (sample[u"coalescedSamples"_s].toInt() != 0)
-                        failure = "Telemetry samples lost"_L1;
-                    lastResources = sample[u"resources"_s].toObject();
-                    sample.remove(u"resources"_s);
-                    const auto bytes =
-                            lastResources[u"resizeOldPlusNewUpperBoundBytes"_s].toInteger();
-                    peakBytes = qMax(peakBytes, bytes);
-                    const auto plan = lastResources[u"preallocationPlan"_s].toObject();
-                    if (plan != lastPlan) {
-                        lastPlan = plan;
-                        inventories.append(QJsonObject{ { u"stage"_s, stage },
-                                                        { u"resources"_s, lastResources } });
-                    }
-                    sample[u"stage"_s] = stage;
-                    sample[u"covers"_s] = native->coverStatistics();
-                    sample[u"clockFrame"_s] = qint64(motion.clock()->frameCount());
-                    samples.append(sample);
-                });
+        QObject::connect(native, &rhi::SceneItem::frameSubmitted, root.get(),
+                         [&](QJsonObject sample) {
+                             return collectFrameSample(sample);
+                         });
         router.attach(&window);
     }
     void destroyRoot()
@@ -684,6 +685,55 @@ void verifyNativeWindowLifecycle(Driver &d, const std::function<void(const char 
         }
     }
     d.playback.pause();
+}
+}
+
+namespace {
+auto reviewStartupReplay(QElapsedTimer &sampling, const QStringList &stages,
+                         const QStringList &allStages, int &stageIndex, Driver &d,
+                         QJsonArray &actions, int &eventIndex, double duration)
+{
+    const auto elapsed = sampling.nsecsElapsed() / NanosecondsPerSecond;
+    if (elapsed >= duration)
+        return true;
+    const int index = qMin(stages.size() - 1, qsizetype(elapsed / duration * stages.size()));
+    const int sourceIndex = allStages.indexOf(stages[index]);
+    if (index != stageIndex) {
+        stageIndex = index;
+        d.setStage(stages[index]);
+        d.presentation.back();
+        d.panels.close();
+        d.overview.setActive(false);
+        d.scene.lighting()->setNight(sourceIndex >= 6);
+        if (sourceIndex % 6 == 2 || sourceIndex % 6 == 3)
+            d.presentation.open();
+        if (sourceIndex % 6 == 4)
+            d.overview.setActive(true);
+        if (sourceIndex % 6 == 5)
+            d.panels.open(u"search"_s);
+        actions.append(QJsonObject{ { u"stage"_s, d.stage },
+                                    { u"elapsedSeconds"_s, elapsed },
+                                    { u"atNs"_s, yalahoo::review::nowNs() } });
+    }
+    const int event = int(elapsed * 3);
+    if (event != eventIndex) {
+        eventIndex = event;
+        const int local = sourceIndex % 6;
+        if (local == 1) {
+            QKeyEvent key(QEvent::KeyPress, event % 8 < 4 ? Qt::Key_Down : Qt::Key_Up,
+                          Qt::NoModifier);
+            QCoreApplication::sendEvent(&d.window, &key);
+        } else if (local == 3 && d.presentation.detailEnabled()) {
+            d.scene.recordInput();
+            d.presentation.select(d.library.snapshot()->albums[event % 2 + 1].id, true);
+        } else if (local == 5) {
+            d.scene.recordInput();
+            d.library.search(event % 3 == 0           ? u""_s
+                                     : event % 3 == 1 ? u"\u533f\u540d"_s
+                                                      : u"\u533f\u540d\u4e13\u8f91 2"_s);
+        }
+    }
+    return false;
 }
 }
 int reviewStartup(QGuiApplication &, const QString &output, double seconds,
@@ -1078,49 +1128,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
             int stageIndex = -1, eventIndex = -1;
             sampling.start();
             const auto replay = [&](double duration) {
-                const auto elapsed = sampling.nsecsElapsed() / NanosecondsPerSecond;
-                if (elapsed >= duration)
-                    return true;
-                const int index =
-                        qMin(stages.size() - 1, qsizetype(elapsed / duration * stages.size()));
-                const int sourceIndex = allStages.indexOf(stages[index]);
-                if (index != stageIndex) {
-                    stageIndex = index;
-                    d.setStage(stages[index]);
-                    d.presentation.back();
-                    d.panels.close();
-                    d.overview.setActive(false);
-                    d.scene.lighting()->setNight(sourceIndex >= 6);
-                    if (sourceIndex % 6 == 2 || sourceIndex % 6 == 3)
-                        d.presentation.open();
-                    if (sourceIndex % 6 == 4)
-                        d.overview.setActive(true);
-                    if (sourceIndex % 6 == 5)
-                        d.panels.open(u"search"_s);
-                    actions.append(QJsonObject{ { u"stage"_s, d.stage },
-                                                { u"elapsedSeconds"_s, elapsed },
-                                                { u"atNs"_s, yalahoo::review::nowNs() } });
-                }
-                const int event = int(elapsed * 3);
-                if (event != eventIndex) {
-                    eventIndex = event;
-                    const int local = sourceIndex % 6;
-                    if (local == 1) {
-                        QKeyEvent key(QEvent::KeyPress, event % 8 < 4 ? Qt::Key_Down : Qt::Key_Up,
-                                      Qt::NoModifier);
-                        QCoreApplication::sendEvent(&d.window, &key);
-                    } else if (local == 3 && d.presentation.detailEnabled()) {
-                        d.scene.recordInput();
-                        d.presentation.select(d.library.snapshot()->albums[event % 2 + 1].id, true);
-                    } else if (local == 5) {
-                        d.scene.recordInput();
-                        d.library.search(event % 3 == 0 ? u""_s
-                                                 : event % 3 == 1
-                                                 ? u"\u533f\u540d"_s
-                                                 : u"\u533f\u540d\u4e13\u8f91 2"_s);
-                    }
-                }
-                return false;
+                return reviewStartupReplay(sampling, stages, allStages, stageIndex, d, actions,
+                                           eventIndex, duration);
             };
             if (scenario != "matrix"_L1 && !observeOnly) {
                 d.wait(
@@ -1428,6 +1437,47 @@ int reviewWindowLifecycle(const QString &output)
     return passed ? 0 : 1;
 }
 
+namespace {
+auto reviewGuiCapture(Driver &d, QString &context, auto &check, const QString &output,
+                      QJsonArray &captures, const QString &phase)
+{
+    d.setStage(context + "-"_L1 + phase);
+    d.frames(2);
+    d.native->ensurePolished();
+    check("no-render-error", d.native->errorText().isEmpty());
+    const auto &frame = d.native->input().scene;
+    check("current-production-snapshot",
+          (d.opening.sceneOccluded() ? d.native->input().sceneOccluded
+                                     : frame.revision == d.scene.frame().revision)
+                  && frame.width == d.window.width() && frame.height == d.window.height());
+    bool finite = true;
+    for (float value : std::span(frame.projection.constData(), 16))
+        finite &= std::isfinite(value);
+    for (const auto &instance : frame.instances)
+        for (float value : std::span(instance.transform.constData(), 16))
+            finite &= std::isfinite(value);
+    check("finite-bounded-geometry", finite && frame.instances.size() <= ArchivePool::capacity + 4);
+    check("bounded-owned-covers", d.native->coverStatistics()[u"owned"_s].toInt() <= 4);
+    const auto image = d.surface.grab();
+    const auto file = context + "-"_L1 + phase + ".png"_L1;
+    require(!image.isNull() && image.save(output + "/"_L1 + file), "Cannot capture own GUI output");
+    const auto dpr = d.window.effectiveDevicePixelRatio();
+    check("actual-output-dimensions", image.size() == d.window.size() * dpr);
+    captures.append(QJsonObject{ { u"state"_s, context },
+                                 { u"phase"_s, phase },
+                                 { u"image"_s, file },
+                                 { u"width"_s, d.window.width() },
+                                 { u"height"_s, d.window.height() },
+                                 { u"dpr"_s, dpr },
+                                 { u"night"_s, d.scene.lighting()->night() },
+                                 { u"realistic"_s, d.selection.realistic() },
+                                 { u"selection"_s, d.selection.albumId() },
+                                 { u"instances"_s, frame.instances.size() },
+                                 { u"covers"_s, d.native->coverStatistics() },
+                                 { u"resources"_s, d.lastResources },
+                                 { u"submission"_s, qint64(d.native->submission()) } });
+}
+}
 int reviewGui(const QString &output, bool narrowOnly, bool representative)
 {
     // The same driver and production stage serve cold-start and integrated GUI checks.
@@ -1491,43 +1541,7 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
             QTest::mouseClick(&d.window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
         };
         const auto capture = [&](const QString &phase) {
-            d.setStage(context + "-"_L1 + phase);
-            d.frames(2);
-            d.native->ensurePolished();
-            check("no-render-error", d.native->errorText().isEmpty());
-            const auto &frame = d.native->input().scene;
-            check("current-production-snapshot",
-                  (d.opening.sceneOccluded() ? d.native->input().sceneOccluded
-                                             : frame.revision == d.scene.frame().revision)
-                          && frame.width == d.window.width() && frame.height == d.window.height());
-            bool finite = true;
-            for (float value : std::span(frame.projection.constData(), 16))
-                finite &= std::isfinite(value);
-            for (const auto &instance : frame.instances)
-                for (float value : std::span(instance.transform.constData(), 16))
-                    finite &= std::isfinite(value);
-            check("finite-bounded-geometry",
-                  finite && frame.instances.size() <= ArchivePool::capacity + 4);
-            check("bounded-owned-covers", d.native->coverStatistics()[u"owned"_s].toInt() <= 4);
-            const auto image = d.surface.grab();
-            const auto file = context + "-"_L1 + phase + ".png"_L1;
-            require(!image.isNull() && image.save(output + "/"_L1 + file),
-                    "Cannot capture own GUI output");
-            const auto dpr = d.window.effectiveDevicePixelRatio();
-            check("actual-output-dimensions", image.size() == d.window.size() * dpr);
-            captures.append(QJsonObject{ { u"state"_s, context },
-                                         { u"phase"_s, phase },
-                                         { u"image"_s, file },
-                                         { u"width"_s, d.window.width() },
-                                         { u"height"_s, d.window.height() },
-                                         { u"dpr"_s, dpr },
-                                         { u"night"_s, d.scene.lighting()->night() },
-                                         { u"realistic"_s, d.selection.realistic() },
-                                         { u"selection"_s, d.selection.albumId() },
-                                         { u"instances"_s, frame.instances.size() },
-                                         { u"covers"_s, d.native->coverStatistics() },
-                                         { u"resources"_s, d.lastResources },
-                                         { u"submission"_s, qint64(d.native->submission()) } });
+            return reviewGuiCapture(d, context, check, output, captures, phase);
         };
         const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
                                   { 960, 900 },   { 930, 900 },   { 390, 844 },

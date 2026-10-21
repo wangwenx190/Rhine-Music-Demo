@@ -107,12 +107,11 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                         return sameGlyphInk(oldFace.glyph, face.glyph);
                     });
             FaceNode target;
-            if (found != previous.end()) {
+            const bool reusedFace = found != previous.end();
+            if (reusedFace) {
                 ++reused;
                 target = *found;
                 previous.erase(found);
-                if (node->color != m_color)
-                    recolorReelTextNode(target.text, m_color);
             } else {
                 target.transform = new QSGTransformNode;
                 target.clip = new QSGClipNode;
@@ -123,6 +122,8 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                 target.clip->appendChildNode(target.text);
                 ++rebuilds;
             }
+            if (reusedFace && node->color != m_color)
+                recolorReelTextNode(target.text, m_color);
             target.clip->setClipRect(
                     { -face.glyph.size * yalahoo::sampledReel::GlyphSidePaddingEm
                               / face.glyph.scale,

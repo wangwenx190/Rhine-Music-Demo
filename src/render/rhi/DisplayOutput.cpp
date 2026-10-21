@@ -40,6 +40,53 @@ DisplayOutput::~DisplayOutput()
     if (m_window)
         disconnect(m_window, nullptr, this, nullptr);
 }
+void DisplayOutput::reportSceneGraphError(const quint64 &epoch, const QString &message)
+{
+    if (!m_window || epoch != m_epoch.load())
+        return;
+    if (m_requested) {
+        recoverOutput();
+    } else {
+        qCWarning(yalahoo::logRender, "Scene graph initialization failed: %s", qPrintable(message));
+        QCoreApplication::exit(DisplayConfigurationExitCode);
+    }
+}
+void DisplayOutput::reportSwapChain(QQuickWindow &window)
+{
+    // Render thread: only immutable local facts cross back to the GUI.
+    auto *swap = window.swapChain();
+    const auto format = swap ? swap->format() : QRhiSwapChain::SDR;
+    const auto epoch = m_epoch.load();
+    if (m_reportedEpoch == epoch)
+        return;
+    m_reportedEpoch = epoch;
+    QMetaObject::invokeMethod(
+            this,
+            [this, format, epoch] {
+                if (!m_window || epoch != m_epoch.load())
+                    return;
+                const auto expected = m_requestedHdr10 ? QRhiSwapChain::HDR10
+                                                       : QRhiSwapChain::HDRExtendedSrgbLinear;
+                if (m_requested && format != expected) {
+                    recoverOutput();
+                    return;
+                }
+                m_active = m_requested && format == expected;
+                m_ready = true;
+                Q_EMIT changed();
+            },
+            Qt::QueuedConnection);
+}
+void DisplayOutput::queueSceneGraphError(const QString &message)
+{
+    const auto epoch = m_epoch.load();
+    QMetaObject::invokeMethod(
+            this,
+            [this, epoch, message] {
+                return reportSceneGraphError(epoch, message);
+            },
+            Qt::QueuedConnection);
+}
 void DisplayOutput::attach(QQuickWindow &window)
 {
     Q_ASSERT(!m_window);
@@ -68,51 +115,13 @@ void DisplayOutput::attach(QQuickWindow &window)
     connect(
             &window, &QQuickWindow::beforeSynchronizing, this,
             [this, &window] {
-                // Render thread: only immutable local facts cross back to the GUI.
-                auto *swap = window.swapChain();
-                const auto format = swap ? swap->format() : QRhiSwapChain::SDR;
-                const auto epoch = m_epoch.load();
-                if (m_reportedEpoch == epoch)
-                    return;
-                m_reportedEpoch = epoch;
-                QMetaObject::invokeMethod(
-                        this,
-                        [this, format, epoch] {
-                            if (!m_window || epoch != m_epoch.load())
-                                return;
-                            const auto expected = m_requestedHdr10
-                                    ? QRhiSwapChain::HDR10
-                                    : QRhiSwapChain::HDRExtendedSrgbLinear;
-                            if (m_requested && format != expected) {
-                                recoverOutput();
-                                return;
-                            }
-                            m_active = m_requested && format == expected;
-                            m_ready = true;
-                            Q_EMIT changed();
-                        },
-                        Qt::QueuedConnection);
+                return reportSwapChain(window);
             },
             Qt::DirectConnection);
     connect(
             &window, &QQuickWindow::sceneGraphError, this,
             [this](QQuickWindow::SceneGraphError, const QString &message) {
-                const auto epoch = m_epoch.load();
-                QMetaObject::invokeMethod(
-                        this,
-                        [this, epoch, message] {
-                            if (!m_window || epoch != m_epoch.load())
-                                return;
-                            if (m_requested) {
-                                recoverOutput();
-                            } else {
-                                qCWarning(yalahoo::logRender,
-                                          "Scene graph initialization failed: %s",
-                                          qPrintable(message));
-                                QCoreApplication::exit(DisplayConfigurationExitCode);
-                            }
-                        },
-                        Qt::QueuedConnection);
+                queueSceneGraphError(message);
             },
             Qt::DirectConnection);
     refresh();

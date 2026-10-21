@@ -85,6 +85,43 @@ QString musicBrainzRelease(const Album &album, const QJsonObject &search)
     return candidates.size() == 1 ? candidates.first().toObject().value(u"id"_s).toString()
                                   : QString();
 }
+
+namespace {
+auto collectMusicBrainzCredits(const QSet<QString> &roles, QJsonArray &credits, QSet<QString> &seen,
+                               const QJsonObject &object, const Track *track)
+{
+    for (const auto &value : object.value(u"relations"_s).toArray()) {
+        const auto relation = value.toObject();
+        const auto artist = relation.value(u"artist"_s).toObject();
+        const auto role = relation.value(u"type"_s).toString();
+        const auto creditField = relation.value(u"direction"_s) == "backward"_L1
+                ? u"source-credit"_s
+                : u"target-credit"_s;
+        auto name = relation.value(creditField).toString();
+        if (name.isEmpty())
+            name = artist.value(u"name"_s).toString();
+        if (name.isEmpty() || !roles.contains(role) || credits.size() >= MaximumCredits)
+            continue;
+        const auto attributes = relation.value(u"attributes"_s).toArray();
+        QStringList labels;
+        for (const auto &attribute : attributes)
+            labels.append(attribute.toString());
+        const auto label = labels.isEmpty() ? role : role + u" ("_s + labels.join(u", "_s) + ')'_L1;
+        const auto key = name + '\n'_L1 + label + '\n'_L1 + (track ? track->id : QString());
+        if (seen.contains(key))
+            continue;
+        seen.insert(key);
+        credits.append(QJsonObject{
+                { u"name"_s, name },
+                { u"role"_s, label },
+                { u"source"_s, u"MusicBrainz"_s },
+                { u"trackId"_s, track ? track->id : QString() },
+                { u"trackTitle"_s, track ? track->title : QString() },
+                { u"url"_s,
+                  u"https://musicbrainz.org/artist/"_s + artist.value(u"id"_s).toString() } });
+    }
+}
+}
 ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
                                    const QJsonObject &release)
 {
@@ -200,37 +237,7 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
                                       u"concertmaster"_s,
                                       u"remixer"_s };
     const auto collect = [&](const QJsonObject &object, const Track *track) {
-        for (const auto &value : object.value(u"relations"_s).toArray()) {
-            const auto relation = value.toObject();
-            const auto artist = relation.value(u"artist"_s).toObject();
-            const auto role = relation.value(u"type"_s).toString();
-            const auto creditField = relation.value(u"direction"_s) == "backward"_L1
-                    ? u"source-credit"_s
-                    : u"target-credit"_s;
-            auto name = relation.value(creditField).toString();
-            if (name.isEmpty())
-                name = artist.value(u"name"_s).toString();
-            if (name.isEmpty() || !roles.contains(role) || credits.size() >= MaximumCredits)
-                continue;
-            const auto attributes = relation.value(u"attributes"_s).toArray();
-            QStringList labels;
-            for (const auto &attribute : attributes)
-                labels.append(attribute.toString());
-            const auto label =
-                    labels.isEmpty() ? role : role + u" ("_s + labels.join(u", "_s) + ')'_L1;
-            const auto key = name + '\n'_L1 + label + '\n'_L1 + (track ? track->id : QString());
-            if (seen.contains(key))
-                continue;
-            seen.insert(key);
-            credits.append(QJsonObject{
-                    { u"name"_s, name },
-                    { u"role"_s, label },
-                    { u"source"_s, u"MusicBrainz"_s },
-                    { u"trackId"_s, track ? track->id : QString() },
-                    { u"trackTitle"_s, track ? track->title : QString() },
-                    { u"url"_s,
-                      u"https://musicbrainz.org/artist/"_s + artist.value(u"id"_s).toString() } });
-        }
+        return collectMusicBrainzCredits(roles, credits, seen, object, track);
     };
     collect(release, nullptr);
     collect(release.value(u"release-group"_s).toObject(), nullptr);

@@ -117,6 +117,8 @@ Q_SIGNALS:
     void memoryChanged();
 
 private:
+    double realisticField(double row, double lane, bool reduced) const;
+    void advanceLift(double dt, bool reduced, bool detailNavigation);
     struct Pulse final
     {
         ArchiveCell cell;

@@ -33,6 +33,26 @@ public:
     SettingsTest() = default;
 
 private Q_SLOTS:
+    void singleInstancePreference()
+    {
+        QTemporaryDir directory;
+        {
+            PreferencesStore preferences(directory.path());
+            OfflineMetadataProvider provider;
+            LibrarySession library(&provider);
+            MotionController motion;
+            SceneAdapter scene(motion.clock());
+            SelectionController selection(&motion);
+            SettingsController settings(&preferences, &library, &motion, &scene, &selection);
+            QVERIFY(settings.values().value(u"singleInstance"_s).toBool());
+            QVERIFY(!settings.update(u"singleInstance"_s, u"false"_s));
+            QVERIFY(!preferences.update({ { u"singleInstance"_s, 1 } }));
+            QVERIFY(settings.update(u"singleInstance"_s, false));
+            QVERIFY(!settings.values().value(u"singleInstance"_s).toBool());
+        }
+        PreferencesStore restored(directory.path());
+        QVERIFY(!restored.values().value(u"singleInstance"_s).toBool());
+    }
     void qualityFieldKeepsOtherRuntimeValues()
     {
         QTemporaryDir directory;

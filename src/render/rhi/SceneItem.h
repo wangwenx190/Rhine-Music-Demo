@@ -9,6 +9,8 @@
 #include "AtlasAllocator.h"
 #include "TitleReel.h"
 #include <QPointer>
+#include <QPair>
+#include <utility>
 
 namespace yalahoo::rhi {
 namespace sceneAtlas {
@@ -139,9 +141,43 @@ protected:
     void touchEvent(QTouchEvent *event) override;
 
 private:
+    void submitOccluded();
+    void requestDemoCover();
+    double projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const;
+    void handleVisibility(bool visible);
+    static void queuePrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
+                              bool uploaded);
+    static void publishPrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
+                                bool uploaded);
+    void handlePoolCoverReady(const CoverSnapshot &pixels);
+    struct DiagnosticMailbox;
+    struct TelemetryMailbox;
+    static void publishTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
+                                 const QPointer<SceneItem> &guard, quint64 epoch);
+    static void publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
+                                   const QPointer<SceneItem> &guard, quint64 epoch);
+    void handleCoverReady(CoverSnapshot pixels);
+    void bindWindow(QQuickWindow *window);
+    static void queueDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
+                                 const QPointer<SceneItem> &guard, const quint64 &epoch,
+                                 DiagnosticSample sample);
+    static void queueTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
+                               const QPointer<SceneItem> &guard, const quint64 &epoch,
+                               QJsonObject sample);
+
     void schedule();
     void configureDiagnostics();
     bool selectAt(QPointF point);
+    struct OwnedCover;
+    void ensureBaseCover(const QString &id, const QPair<QString, QString> &source,
+                         const AtlasLease &lease);
+    std::pair<QRect, quint64> prepareOwnedCover(Input &in, const ArchiveInstance &instance,
+                                                const QPair<QString, QString> &source, QRect tile,
+                                                quint64 coverLease);
+    OwnedCover *acquireOwnedCover(const ArchiveInstance &instance,
+                                  const QPair<QString, QString> &source);
+    void requestDetailedCover(OwnedCover &owned, const QString &id,
+                              const QPair<QString, QString> &source);
     void preparePool(Input &input);
     void resetPool();
     void refreshPool();

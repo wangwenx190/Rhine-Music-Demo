@@ -43,6 +43,26 @@ QQuickItem *findVisual(QQuickItem *item, const QString &name)
     return nullptr;
 }
 }
+
+namespace {
+auto renderPresentationFrame(QSignalSpy &frames, QSignalSpy &swaps,
+                             std::atomic<quint64> &requestedFrame, OffscreenSurface &surface,
+                             std::atomic<quint64> &presentedFrame)
+{
+    const int previous = OffscreenSurface::Enabled ? frames.size() : swaps.size();
+    const auto requested = ++requestedFrame;
+    surface.requestFrame();
+    QElapsedTimer timer;
+    timer.start();
+    const auto completed = [&] {
+        return OffscreenSurface::Enabled ? frames.size() > previous
+                                         : presentedFrame.load() >= requested;
+    };
+    while (!completed() && timer.elapsed() < ModelDeadlineMilliseconds)
+        QTest::qWait(EventPollMilliseconds);
+    return completed();
+}
+}
 int reviewPresentation(QGuiApplication &, const QString &output)
 {
     QDir().mkpath(output);
@@ -151,18 +171,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
             },
             Qt::DirectConnection);
     const auto render = [&] {
-        const int previous = OffscreenSurface::Enabled ? frames.size() : swaps.size();
-        const auto requested = ++requestedFrame;
-        surface.requestFrame();
-        QElapsedTimer timer;
-        timer.start();
-        const auto completed = [&] {
-            return OffscreenSurface::Enabled ? frames.size() > previous
-                                             : presentedFrame.load() >= requested;
-        };
-        while (!completed() && timer.elapsed() < ModelDeadlineMilliseconds)
-            QTest::qWait(EventPollMilliseconds);
-        return completed();
+        return renderPresentationFrame(frames, swaps, requestedFrame, surface, presentedFrame);
     };
     bool passed = true;
     QJsonArray captures, lifecycle;

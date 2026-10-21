@@ -71,6 +71,9 @@ private:
     struct Job;
     struct State;
     struct Entry;
+    static void decodeAndDeliver(const Job &job, const std::shared_ptr<State> &state);
+    static QImage readSource(const Job &job, const std::shared_ptr<State> &state,
+                             CoverPixels &pixels);
     static CoverSnapshot decode(const Job &job, const std::shared_ptr<State> &state);
     static QString key(const QString &identity, const QString &path, int resolution,
                        const QString &title);

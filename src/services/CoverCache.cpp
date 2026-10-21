@@ -242,6 +242,20 @@ void CoverCache::setSuspended(bool suspended)
     else
         pump();
 }
+void CoverCache::decodeAndDeliver(const Job &job, const std::shared_ptr<State> &state)
+{
+    const auto pixels = decode(job, state);
+    const QMutexLocker lock(&state->mutex);
+    if (state->receiver) {
+        auto *receiver = state->receiver;
+        QMetaObject::invokeMethod(
+                receiver,
+                [receiver, job, pixels] {
+                    receiver->complete(job, pixels);
+                },
+                Qt::QueuedConnection);
+    }
+}
 void CoverCache::pump()
 {
     if (d->m_suspended)
@@ -250,17 +264,7 @@ void CoverCache::pump()
         const auto job = d->m_pending.first();
         const auto state = d->m_state;
         const bool started = decodePool().tryStart([job, state] {
-            const auto pixels = decode(job, state);
-            const QMutexLocker lock(&state->mutex);
-            if (state->receiver) {
-                auto *receiver = state->receiver;
-                QMetaObject::invokeMethod(
-                        receiver,
-                        [receiver, job, pixels] {
-                            receiver->complete(job, pixels);
-                        },
-                        Qt::QueuedConnection);
-            }
+            decodeAndDeliver(job, state);
         });
         if (!started) {
             d->m_retry.start();
@@ -404,6 +408,33 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
 }
 // Decode into worker-owned pixels, then publish an immutable snapshot.
 // Cancellation/generation checks protect the facade; decoded byte limits protect allocation.
+QImage CoverCache::readSource(const Job &job, const std::shared_ptr<State> &state,
+                              CoverPixels &pixels)
+{
+    if (job.path.isEmpty()) {
+        pixels.error = u"Missing cover"_s;
+        return { };
+    }
+    QImageReader reader(job.path);
+    reader.setAutoTransform(true);
+    pixels.sourceSize = reader.size();
+    pixels.decoderScaling = reader.supportsOption(QImageIOHandler::ScaledSize);
+    const auto size = pixels.sourceSize;
+    if (!size.isValid()) {
+        pixels.error = u"Missing/unknown cover dimensions"_s;
+        return { };
+    }
+    if (job.generation != state->generation.load() || !job.wanted->load())
+        return { };
+    if (qMax(size.width(), size.height()) > job.resolution)
+        reader.setScaledSize(size.scaled(job.resolution, job.resolution, Qt::KeepAspectRatio));
+    auto source = reader.read();
+    pixels.readerReturnedBytes = source.sizeInBytes();
+    if (source.isNull())
+        pixels.error = reader.errorString().isEmpty() ? u"Cover decoder returned no image"_s
+                                                      : reader.errorString();
+    return source;
+}
 CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &state)
 {
     if (job.generation != state->generation.load() || !job.wanted->load())
@@ -414,30 +445,7 @@ CoverSnapshot CoverCache::decode(const Job &job, const std::shared_ptr<State> &s
     pixels->generation = job.generation;
     pixels->resolution = job.resolution;
     QImage source;
-    // A known absent cover goes straight to the authored placeholder, without opening an empty URL.
-    if (job.path.isEmpty()) {
-        pixels->error = u"Missing cover"_s;
-    } else {
-        QImageReader reader(job.path);
-        reader.setAutoTransform(true);
-        pixels->sourceSize = reader.size();
-        pixels->decoderScaling = reader.supportsOption(QImageIOHandler::ScaledSize);
-        const auto size = pixels->sourceSize;
-        if (!size.isValid()) {
-            pixels->error = u"Missing/unknown cover dimensions"_s;
-        } else if (job.generation == state->generation.load() && job.wanted->load()) {
-            if (qMax(size.width(), size.height()) > job.resolution)
-                reader.setScaledSize(
-                        size.scaled(job.resolution, job.resolution, Qt::KeepAspectRatio));
-            source = reader.read();
-            pixels->readerReturnedBytes = source.sizeInBytes();
-            if (source.isNull()) {
-                pixels->error = reader.errorString();
-                if (pixels->error.isEmpty())
-                    pixels->error = u"Cover decoder returned no image"_s;
-            }
-        }
-    }
+    source = readSource(job, state, *pixels);
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };
     if (!source.isNull() && source.colorSpace().isValid())
@@ -493,11 +501,10 @@ void CoverCache::complete(const Job &job, CoverSnapshot pixels)
         d->m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
         if (bytes <= cacheLimit) {
             while (d->m_bytes + bytes > cacheLimit && !d->m_cache.isEmpty()) {
-                auto oldest = d->m_cache.begin();
-                for (auto it = d->m_cache.begin(); it != d->m_cache.end(); ++it) {
-                    if (it->used < oldest->used)
-                        oldest = it;
-                }
+                const auto oldest = std::min_element(d->m_cache.begin(), d->m_cache.end(),
+                                                     [](const Entry &left, const Entry &right) {
+                                                         return left.used < right.used;
+                                                     });
                 d->m_bytes -= oldest->pixels->byteSize();
                 d->m_cache.erase(oldest);
             }

@@ -207,105 +207,109 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
              { u"uniformUploadBytes"_s, post.uniformUploadBytes() } };
 }
 }
+
+namespace {
+auto runSmaaAudit(int &argc, char **&argv)
+{
+    if (argc != 2)
+        return 2;
+    try {
+        const QString output = QString::fromLocal8Bit(argv[1]);
+        require(QDir().mkpath(output), "Cannot create SMAA report directory");
+        preparedAssets();
+        yalahoo::review::OffscreenRhi backend;
+        auto *api = backend.get();
+        QJsonArray rows;
+        int totalSoftened = 0, index = 0;
+        for (const auto size : { QSize(64, 64), QSize(129, 73), QSize(73, 129) }) {
+            std::unique_ptr<QRhiTexture> texture(api->newTexture(QRhiTexture::RGBA16F, size));
+            require(texture->create(), "Cannot create analytic SMAA input");
+            PostSettings settings;
+            settings.size = size;
+            settings.smaa = true;
+            Postprocess post;
+            quint64 revision = 0;
+            // Return to flat after active edges to reject stale reused edge/weight targets.
+            for (int sequence = 0; sequence < 8; ++sequence) {
+                const int pattern = sequence % 7;
+                settings.focus += 1;
+                post.prepare(api, settings, texture.get(), texture.get(), texture.get(),
+                             texture.get());
+                if (!revision)
+                    revision = post.revision();
+                require(post.revision() == revision,
+                        "Input/focus rebuilt unrelated SMAA resources");
+                require(post.passes()
+                                == QJsonArray{ u"smaa-edges"_s, u"smaa-weights"_s,
+                                               u"smaa-blend"_s },
+                        "SMAA graph changed");
+                auto row =
+                        verify(api, post, texture.get(), analytic(size, pattern), output, index++);
+                totalSoftened += row[u"softenedPixels"_s].toInt();
+                rows.append(row);
+            }
+            ResourceInventory inventory;
+            post.inventory(inventory);
+            require(inventory.entries().size() == 8, "SMAA allocated unrelated resources");
+            require(inventory.bytes()
+                            == qint64(size.width()) * size.height() * 24 + (160 * 560 + 66 * 33) * 4
+                                    + 1104 * 3,
+                    "SMAA formats/samples/lookup mip allocation changed");
+            if (size == QSize(73, 129)) {
+                for (int cycle = 0; cycle < 10; ++cycle) {
+                    const auto before = post.revision();
+                    post.reset();
+                    post.prepare(api, settings, texture.get(), texture.get(), texture.get(),
+                                 texture.get());
+                    require(post.revision() > before, "SMAA reset did not rebuild resources");
+                    auto row = verify(api, post, texture.get(), analytic(size, cycle % 6), output,
+                                      index++);
+                    row[u"resourceRebuild"_s] = cycle + 1;
+                    rows.append(row);
+                }
+            }
+            settings.smaa = false;
+            post.prepare(api, settings, texture.get(), texture.get(), texture.get(), texture.get());
+            ResourceInventory disabled;
+            post.inventory(disabled);
+            require(post.output() == texture.get() && post.passes().isEmpty()
+                            && disabled.entries().isEmpty(),
+                    "Disabled SMAA retains targets or lookup textures");
+        }
+        require(totalSoftened > 0, "SMAA did not smooth any analytic edge");
+        for (const auto *window : QGuiApplication::topLevelWindows())
+            require(!window->isVisible(), "SMAA exposed a native window");
+        require(!QGuiApplication::focusWindow(), "SMAA focused a window");
+        QSaveFile report(output + "/runtime.json"_L1);
+        require(report.open(QIODevice::WriteOnly), "Cannot open SMAA report");
+        report.write(
+                QJsonDocument(
+                        QJsonObject{
+                                { u"passed"_s, true },
+                                { u"round"_s, u"R19D4B1"_s },
+                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                { u"backend"_s, int(api->backend()) },
+                                { u"device"_s, QString::fromUtf8(api->driverInfo().deviceName) },
+                                { u"system"_s, QSysInfo::prettyProductName() },
+                                { u"cpu"_s, QSysInfo::currentCpuArchitecture() },
+                                { u"framebufferYUp"_s, api->isYUpInFramebuffer() },
+                                { u"topLevelWindows"_s, QGuiApplication::topLevelWindows().size() },
+                                { u"visibleWindows"_s, 0 },
+                                { u"measurement"_s,
+                                  u"CPU command recording only; no GPU/present/VSYNC timing"_s },
+                                { u"cases"_s, rows } })
+                        .toJson());
+        require(report.commit(), "Cannot save SMAA report");
+        return 0;
+    } catch (const std::exception &error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        return 1;
+    }
+}
+}
 int main(int argc, char **argv)
 {
     return yalahoo::review::runApplication(argc, argv, [&](QGuiApplication &) {
-        if (argc != 2)
-            return 2;
-        try {
-            const QString output = QString::fromLocal8Bit(argv[1]);
-            require(QDir().mkpath(output), "Cannot create SMAA report directory");
-            preparedAssets();
-            yalahoo::review::OffscreenRhi backend;
-            auto *api = backend.get();
-            QJsonArray rows;
-            int totalSoftened = 0, index = 0;
-            for (const auto size : { QSize(64, 64), QSize(129, 73), QSize(73, 129) }) {
-                std::unique_ptr<QRhiTexture> texture(api->newTexture(QRhiTexture::RGBA16F, size));
-                require(texture->create(), "Cannot create analytic SMAA input");
-                PostSettings settings;
-                settings.size = size;
-                settings.smaa = true;
-                Postprocess post;
-                quint64 revision = 0;
-                // Return to flat after active edges to reject stale reused edge/weight targets.
-                for (int sequence = 0; sequence < 8; ++sequence) {
-                    const int pattern = sequence % 7;
-                    settings.focus += 1;
-                    post.prepare(api, settings, texture.get(), texture.get(), texture.get(),
-                                 texture.get());
-                    if (!revision)
-                        revision = post.revision();
-                    require(post.revision() == revision,
-                            "Input/focus rebuilt unrelated SMAA resources");
-                    require(post.passes()
-                                    == QJsonArray{ u"smaa-edges"_s, u"smaa-weights"_s,
-                                                   u"smaa-blend"_s },
-                            "SMAA graph changed");
-                    auto row = verify(api, post, texture.get(), analytic(size, pattern), output,
-                                      index++);
-                    totalSoftened += row[u"softenedPixels"_s].toInt();
-                    rows.append(row);
-                }
-                ResourceInventory inventory;
-                post.inventory(inventory);
-                require(inventory.entries().size() == 8, "SMAA allocated unrelated resources");
-                require(inventory.bytes()
-                                == qint64(size.width()) * size.height() * 24
-                                        + (160 * 560 + 66 * 33) * 4 + 1104 * 3,
-                        "SMAA formats/samples/lookup mip allocation changed");
-                if (size == QSize(73, 129)) {
-                    for (int cycle = 0; cycle < 10; ++cycle) {
-                        const auto before = post.revision();
-                        post.reset();
-                        post.prepare(api, settings, texture.get(), texture.get(), texture.get(),
-                                     texture.get());
-                        require(post.revision() > before, "SMAA reset did not rebuild resources");
-                        auto row = verify(api, post, texture.get(), analytic(size, cycle % 6),
-                                          output, index++);
-                        row[u"resourceRebuild"_s] = cycle + 1;
-                        rows.append(row);
-                    }
-                }
-                settings.smaa = false;
-                post.prepare(api, settings, texture.get(), texture.get(), texture.get(),
-                             texture.get());
-                ResourceInventory disabled;
-                post.inventory(disabled);
-                require(post.output() == texture.get() && post.passes().isEmpty()
-                                && disabled.entries().isEmpty(),
-                        "Disabled SMAA retains targets or lookup textures");
-            }
-            require(totalSoftened > 0, "SMAA did not smooth any analytic edge");
-            for (const auto *window : QGuiApplication::topLevelWindows())
-                require(!window->isVisible(), "SMAA exposed a native window");
-            require(!QGuiApplication::focusWindow(), "SMAA focused a window");
-            QSaveFile report(output + "/runtime.json"_L1);
-            require(report.open(QIODevice::WriteOnly), "Cannot open SMAA report");
-            report.write(
-                    QJsonDocument(
-                            QJsonObject{
-                                    { u"passed"_s, true },
-                                    { u"round"_s, u"R19D4B1"_s },
-                                    { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                    { u"backend"_s, int(api->backend()) },
-                                    { u"device"_s,
-                                      QString::fromUtf8(api->driverInfo().deviceName) },
-                                    { u"system"_s, QSysInfo::prettyProductName() },
-                                    { u"cpu"_s, QSysInfo::currentCpuArchitecture() },
-                                    { u"framebufferYUp"_s, api->isYUpInFramebuffer() },
-                                    { u"topLevelWindows"_s,
-                                      QGuiApplication::topLevelWindows().size() },
-                                    { u"visibleWindows"_s, 0 },
-                                    { u"measurement"_s,
-                                      u"CPU command recording only; no GPU/present/VSYNC timing"_s },
-                                    { u"cases"_s, rows } })
-                            .toJson());
-            require(report.commit(), "Cannot save SMAA report");
-            return 0;
-        } catch (const std::exception &error) {
-            std::fprintf(stderr, "%s\n", error.what());
-            return 1;
-        }
+        return runSmaaAudit(argc, argv);
     });
 }

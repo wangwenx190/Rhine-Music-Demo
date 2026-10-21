@@ -24,17 +24,20 @@ PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
     m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
     m_player.setPlaybackRate(1);
     m_player.setAudioOutput(&m_output);
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {
-        if (m_refreshPending)
-            return;
-        m_refreshPending = true;
-        QTimer::singleShot(0, this, [this] {
-            m_refreshPending = false;
-            refreshDevices();
-        });
-    });
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
+            &PlaybackController::scheduleOutputRefresh);
     connect(&m_output, &QAudioOutput::volumeChanged, this, &PlaybackController::volumeChanged);
     refreshDevices();
+}
+void PlaybackController::scheduleOutputRefresh()
+{
+    if (m_refreshPending)
+        return;
+    m_refreshPending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_refreshPending = false;
+        refreshDevices();
+    });
 }
 PlaybackController::~PlaybackController()
 {
@@ -518,6 +521,23 @@ bool PlaybackController::selectDevice(const QString &id)
     refreshDevices();
     return true;
 }
+void PlaybackController::restoreOutput(const QAudioDevice &selected)
+{
+    const bool recovering = m_unavailable;
+    m_unavailable = false;
+    const bool changed = m_output.device() != selected;
+    if (recovering || changed)
+        m_output.setDevice(selected);
+    if (m_player.audioOutput() != &m_output)
+        m_player.setAudioOutput(&m_output);
+    if (!m_source.isEmpty()) {
+        if (m_player.source() != m_source
+            || (recovering && m_error.isEmpty() && m_player.error() != QMediaPlayer::NoError))
+            load(std::max<qint64>(0, m_restore));
+        else if ((recovering || changed) && m_error.isEmpty())
+            ready();
+    }
+}
 void PlaybackController::refreshDevices()
 {
     applyDevices(QMediaDevices::audioOutputs(), QMediaDevices::defaultAudioOutput());
@@ -553,20 +573,7 @@ void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
             m_player.setAudioOutput(nullptr);
         }
     } else {
-        const bool recovering = m_unavailable;
-        m_unavailable = false;
-        const bool changed = m_output.device() != selected;
-        if (recovering || changed)
-            m_output.setDevice(selected);
-        if (m_player.audioOutput() != &m_output)
-            m_player.setAudioOutput(&m_output);
-        if (!m_source.isEmpty()) {
-            if (m_player.source() != m_source
-                || (recovering && m_error.isEmpty() && m_player.error() != QMediaPlayer::NoError))
-                load(std::max<qint64>(0, m_restore));
-            else if ((recovering || changed) && m_error.isEmpty())
-                ready();
-        }
+        restoreOutput(selected);
     }
     Q_EMIT devicesChanged();
     Q_EMIT stateChanged();

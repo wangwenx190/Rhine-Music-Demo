@@ -140,6 +140,8 @@ Q_SIGNALS:
     void queueFinished();
 
 private:
+    void restoreOutput(const QAudioDevice &selected);
+    void scheduleOutputRefresh();
     friend class PlaybackTest;
     enum class Intent {
         Stopped,

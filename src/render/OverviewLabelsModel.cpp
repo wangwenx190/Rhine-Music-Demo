@@ -2,6 +2,7 @@
 #include "OverviewLabelsModel.h"
 #include <QPointF>
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 
 using namespace Qt::StringLiterals;
@@ -81,39 +82,71 @@ QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
         || index.row() >= capacity)
         return { };
     const auto &s = *m_slots[index.row()];
-    const auto &c = s.column;
-    switch (role) {
-    case Lane:
-        return c.lane;
-    case Name:
-        return c.name;
-    case Count:
-        return c.count;
-    case X:
-        return c.x;
-    case Y:
-        return c.y;
-    case Extent:
-        return c.extent;
-    case Selected:
-        return c.selected;
-    case Interactive:
-        return s.wanted;
-    case Expanded:
-        return c.lane == m_expanded && s.wanted;
-    case Fade:
-        return s.fade.opacity();
-    case Offset:
-        return s.fade.offset();
-    case EntryWidth:
-        return EntryButtonWidthPixels * s.entry;
-    case EntryOpacity:
-        return s.entryOpacity;
-    case EntryOffset:
-        return -EntryHiddenOffsetPixels * (1 - s.entry);
-    default:
-        return { };
-    }
+    struct RoleReader final
+    {
+        int role;
+        QVariant (*read)(const Slot &s, int expanded);
+    };
+    static const RoleReader readers[] = { { Lane,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.lane;
+                                            } },
+                                          { Name,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.name;
+                                            } },
+                                          { Count,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.count;
+                                            } },
+                                          { X,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.x;
+                                            } },
+                                          { Y,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.y;
+                                            } },
+                                          { Extent,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.extent;
+                                            } },
+                                          { Selected,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.column.selected;
+                                            } },
+                                          { Interactive,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.wanted;
+                                            } },
+                                          { Expanded,
+                                            [](const Slot &s, int expanded) -> QVariant {
+                                                return s.column.lane == expanded && s.wanted;
+                                            } },
+                                          { Fade,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.fade.opacity();
+                                            } },
+                                          { Offset,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.fade.offset();
+                                            } },
+                                          { EntryWidth,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return EntryButtonWidthPixels * s.entry;
+                                            } },
+                                          { EntryOpacity,
+                                            [](const Slot &s, int) -> QVariant {
+                                                return s.entryOpacity;
+                                            } },
+                                          { EntryOffset, [](const Slot &s, int) -> QVariant {
+                                               return -EntryHiddenOffsetPixels * (1 - s.entry);
+                                           } } };
+    const auto reader =
+            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
+                return entry.role == role;
+            });
+    return reader == std::end(readers) ? QVariant{ } : reader->read(s, m_expanded);
 }
 // Prioritize expanded/selected labels before collision admission. Retained anchors use looser
 // visibility bounds so small projection changes do not repeatedly destroy and recreate a card.

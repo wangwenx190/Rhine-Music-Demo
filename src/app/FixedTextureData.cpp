@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 #include "RenderData.h"
 #include "Logging.h"
 #include "FixedTextureData.h"
@@ -15,6 +17,34 @@ constexpr auto SourceRgbaFloatBytes = 16;
 
 using namespace Qt::StringLiterals;
 
+namespace {
+QSize fixedTextureSize(const QString &asset)
+{
+    using namespace yalahoo::rhi::renderData;
+    struct Entry final
+    {
+        QLatin1StringView name;
+        QSize size;
+    };
+    const Entry fixed[] = { { "room-pmrem"_L1, { EnvironmentWidth, EnvironmentHeight } },
+                            { "dfg"_L1, { DfgSide, DfgSide } },
+                            { "ltc1"_L1, { LtcSide, LtcSide } },
+                            { "ltc2"_L1, { LtcSide, LtcSide } } };
+    const auto entry =
+            std::find_if(std::begin(fixed), std::end(fixed), [&](const Entry &candidate) {
+                return candidate.name == asset;
+            });
+    if (entry != std::end(fixed))
+        return entry->size;
+    if (!asset.endsWith(u"-16"_s) && !asset.endsWith(u"-32"_s) && !asset.endsWith(u"-64"_s))
+        return { };
+    if (asset.startsWith(u"ssao-kernel-"_s))
+        return { asset.section('-'_L1, -1).toInt(), 1 };
+    if (asset.startsWith(u"ssao-noise-"_s))
+        return { NoiseSide, NoiseSide };
+    return { };
+}
+}
 void FixedTextureData::setAsset(const QString &asset)
 {
     if (asset == m_asset)
@@ -41,21 +71,8 @@ void FixedTextureData::setAsset(const QString &asset)
         Q_EMIT assetChanged();
         return;
     }
-    QSize size;
-    if (asset == "room-pmrem"_L1)
-        size = { yalahoo::rhi::renderData::EnvironmentWidth,
-                 yalahoo::rhi::renderData::EnvironmentHeight };
-    else if (asset == "dfg"_L1)
-        size = { yalahoo::rhi::renderData::DfgSide, yalahoo::rhi::renderData::DfgSide };
-    else if (asset == "ltc1"_L1 || asset == "ltc2"_L1)
-        size = { yalahoo::rhi::renderData::LtcSide, yalahoo::rhi::renderData::LtcSide };
-    else if (asset.startsWith(u"ssao-kernel-"_s)
-             && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
-        size = { asset.section('-'_L1, -1).toInt(), 1 };
-    else if (asset.startsWith(u"ssao-noise-"_s)
-             && (asset.endsWith(u"-16"_s) || asset.endsWith(u"-32"_s) || asset.endsWith(u"-64"_s)))
-        size = { yalahoo::rhi::renderData::NoiseSide, yalahoo::rhi::renderData::NoiseSide };
-    else {
+    const auto size = fixedTextureSize(asset);
+    if (!size.isValid()) {
         qCWarning(yalahoo::logRender, "Unknown fixed material texture");
         return;
     }

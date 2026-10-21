@@ -172,6 +172,46 @@ public:
     QJsonArray samples;
 };
 }
+
+namespace {
+auto observeOpeningFrame(Driver &d, yalahoo::OpeningInk *&ink, QJsonArray &costs,
+                         const QString &output, bool quick)
+{
+    QQmlComponent component(&d.engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/OpeningComparison.qml"_s));
+    std::unique_ptr<QQuickItem> shape;
+    if (quick) {
+        shape.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
+                { { u"source"_s, QVariant::fromValue(ink) } })));
+        require(bool(shape), "Cannot create Quick Shape comparison");
+        shape->setParentItem(ink->parentItem());
+        shape->setPosition(ink->position());
+        ink->setVisible(false);
+    }
+    QElapsedTimer timer;
+    const auto before = openingInkStats().paintNs.load();
+    const auto paints = openingInkStats().paints.load();
+    timer.start();
+    d.frames(32, [&](int i) {
+        ink->setTime(.7 + i * .02);
+        if (shape)
+            shape->setProperty("paths", ink->comparisonPaths());
+    });
+    costs.append(QJsonObject{
+            { u"api"_s, quick ? u"QtQuick.Shape.CurveRenderer"_s : u"C++ Canvas Painter"_s },
+            { u"frames"_s, 32 },
+            { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / NanosecondsPerMillisecond },
+            { u"canvasPaintMs"_s,
+              (openingInkStats().paintNs.load() - before) / NanosecondsPerMillisecond },
+            { u"canvasPaints"_s, qint64(openingInkStats().paints.load() - paints) },
+            { u"gpuCompleteMs"_s, QJsonValue::Null },
+            { u"scope"_s, u"Local serial diagnostic; no FPS or cross-API image score"_s } });
+    const auto image = d.surface.grab();
+    require(image.save(output + (quick ? "/quick-shape.png"_L1 : "/canvas-painter.png"_L1)),
+            "Cannot save drawing comparison");
+    shape.reset();
+    ink->setVisible(true);
+}
+}
 int reviewOpening(QGuiApplication &, const QString &output, bool representative)
 {
     QDir().mkpath(output);
@@ -301,42 +341,7 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
                 yalahoo::review::findVisual(d.root.get(), u"openingBrandInk"_s));
         require(ink, "Missing production brand painter");
         const auto compare = [&](bool quick) {
-            QQmlComponent component(&d.engine,
-                                    QUrl(u"qrc:/qt/qml/Yalahoo/Music/OpeningComparison.qml"_s));
-            std::unique_ptr<QQuickItem> shape;
-            if (quick) {
-                shape.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
-                        { { u"source"_s, QVariant::fromValue(ink) } })));
-                require(bool(shape), "Cannot create Quick Shape comparison");
-                shape->setParentItem(ink->parentItem());
-                shape->setPosition(ink->position());
-                ink->setVisible(false);
-            }
-            QElapsedTimer timer;
-            const auto before = openingInkStats().paintNs.load();
-            const auto paints = openingInkStats().paints.load();
-            timer.start();
-            d.frames(32, [&](int i) {
-                ink->setTime(.7 + i * .02);
-                if (shape)
-                    shape->setProperty("paths", ink->comparisonPaths());
-            });
-            costs.append(QJsonObject{
-                    { u"api"_s,
-                      quick ? u"QtQuick.Shape.CurveRenderer"_s : u"C++ Canvas Painter"_s },
-                    { u"frames"_s, 32 },
-                    { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / NanosecondsPerMillisecond },
-                    { u"canvasPaintMs"_s,
-                      (openingInkStats().paintNs.load() - before) / NanosecondsPerMillisecond },
-                    { u"canvasPaints"_s, qint64(openingInkStats().paints.load() - paints) },
-                    { u"gpuCompleteMs"_s, QJsonValue::Null },
-                    { u"scope"_s,
-                      u"Local serial diagnostic; no FPS or cross-API image score"_s } });
-            const auto image = d.surface.grab();
-            require(image.save(output + (quick ? "/quick-shape.png"_L1 : "/canvas-painter.png"_L1)),
-                    "Cannot save drawing comparison");
-            shape.reset();
-            ink->setVisible(true);
+            return observeOpeningFrame(d, ink, costs, output, quick);
         };
         if (compareDrawing) {
             compare(false);

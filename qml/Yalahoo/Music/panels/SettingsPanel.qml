@@ -36,6 +36,25 @@ ArchiveScrollView {
         }
         SettingsSection {
             tokens: root.tokens
+            ArchiveCheckBox {
+                objectName: "settingsSingleInstance"
+                tokens: root.tokens
+                text: qsTr("Single instance")
+                checked: root.settings.values.singleInstance
+                onToggled: root.settings.update("singleInstance", checked)
+            }
+            ArchiveText {
+                tokens: root.tokens
+                width: parent.width
+                cssPixelSize: 12
+                color: root.tokens.muted
+                wrapMode: Text.Wrap
+                text: qsTr(
+                          "Applies after restarting the application. Opening it again brings the existing window forward.")
+            }
+        }
+        SettingsSection {
+            tokens: root.tokens
 
             ArchiveText {
                 tokens: root.tokens

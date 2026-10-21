@@ -81,13 +81,17 @@ LibraryStore按实体/kind合并已接受结果；批次结束、取消或累计
 
 TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项完成polish；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
 
+`ui-audit --library 输出目录 --representative`使用桌面/窄屏、DPR1/2与双主题的既有代表组合，保留该范围内的实际输入、焦点及资料状态断言；省略选项保持完整库面板检查范围。设置入口同样支持`--representative`。代表检查不冒称其余矩阵或物理设备事实。
+
 ## 设置与偏好
 
 SettingsPanel沿冻结music-app的renderSettingsPanel/music.css：两列主题卡、排列、介绍/制作信息、阵列与列记忆、景深设置、减少动态/速度、全屏/开场重播/界面重载、三路声音和折叠MusicBrainz配置。面板沿用LibraryPanels的几何、模态输入、唯一SurfaceTransition与背景资源；来源布局与当前适配判定见source-fidelity-review.md。歌曲、BGM、音效及设备接口只由playback.md维护，画质字段及归一化只由occlusion.md维护。
 
 SettingsController::updateQuality在C++合并单字段与当前完整画质值，再交RenderQuality归一化；未知字段拒绝，不重置其他选择。SettingsController按字段路由至既有LibrarySession、SelectionController、MotionController/FrameClock、SelectionLighting和RenderQuality。主题只监听目标nightChanged，动画渐变不保存偏好；速度不改变开场或歌曲速度。排列显式更新列模型，theme/speed不重建库/媒体/材质/封面。App的reloadRequested关闭并完成面板退出，销毁/重建MusicStage视觉树；原生控制器、正在播放对象、音源/意图、数据、用户画质和会话列记忆继续存活。重载先取消资料请求generation，QML异步结果不能回写旧视图。
 
-原生preferences.json的schemaVersion为1；无版本对象在显式导入或读取时归入1，其他版本/坏JSON/非法已知字段保留原文件并阻止自动覆盖。theme、sortMode、arrayMode、rememberColumnPosition、reduced、motionSpeed、volume/bgm/bgmVolume/sound/soundVolume和renderQuality保存当前选择；renderQuality仅保存艺术效果参数，原生尺寸与固定生产采样由occlusion.md维护。已知字段校验类型、离散选项及音量/速度范围；画质数值交唯一RenderQuality归一化，不改变其未知扩展。未知根字段与对象扩展在更新/导入/保存中保留。会话各列位置仍只在ColumnMemory，不写偏好JSON。
+原生preferences.json的schemaVersion为1；无版本对象在显式导入或读取时归入1，其他版本/坏JSON/非法已知字段保留原文件并阻止自动覆盖。theme、sortMode、arrayMode、rememberColumnPosition、singleInstance、reduced、motionSpeed、volume/bgm/bgmVolume/sound/soundVolume和renderQuality保存当前选择；renderQuality仅保存艺术效果参数，原生尺寸与固定生产采样由occlusion.md维护。已知字段校验类型、离散选项及音量/速度范围；画质数值交唯一RenderQuality归一化，不改变其未知扩展。未知根字段与对象扩展在更新/导入/保存中保留。会话各列位置仍只在ColumnMemory，不写偏好JSON。
+
+`singleInstance`为布尔值，默认开启，设置面板可修改，重启后生效。普通产品在启动资料Provider、声音、曲库或创建窗口前，以规范化数据目录的QLockFile和仅当前用户可访问的QLocalServer仲裁；相同目录再次启动只请求已有窗口显示/恢复与激活，确认后退出，不转发导入/扫描参数。不同数据目录相互独立；关闭此模式允许多开。持锁进程不会因运行时间过长被驱逐；崩溃锁按Qt的死进程判定恢复，锁/端点/响应失败明确报错，不能降级多开。演示与验证入口不读取用户此项设置、不参与产品实例仲裁。启动阶段的有界IPC等待不进入常规交互路径。`single-instance`使用匿名临时目录和真实子进程验证仲裁/激活/隔离/正常退出/崩溃恢复；设置校验和持久化由`settings`覆盖。
 
 PreferencesStore在事件循环合并变化，只有一个在途worker保存和一个最新意图；JSON序列化与QSaveFile提交在worker，禁止direct-write fallback，文件仅owner读写。显式导入最多1MiB、单个在途，按revision拒绝期间发生设置变化后的旧结果；原文件不写。损坏/未知schema使用内存默认值并暴露错误，写失败保留旧文件、无自动重试循环；析构只完成已接受的最后保存。
 

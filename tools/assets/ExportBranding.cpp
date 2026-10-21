@@ -425,6 +425,62 @@ public:
 };
 }
 
+namespace {
+auto makeBrandPreview(PreviewWindow &window, const QString &media, QJsonObject &result,
+                      bool &grabbed, QGuiApplication &app)
+{
+    try {
+        require(window.isExposed(), u"Qt proof window not exposed"_s);
+        require(yalahoo::verification::windowPolicySatisfied(window),
+                u"Brand proof window violated bottom/no-focus policy"_s);
+        // Bottom windows can be occluded by the user's work. Capture only our own
+        // rendered board; never sample the desktop or raise a proof window.
+        const QImage capture = window.renderedImage();
+        require(!capture.isNull(), u"Native Qt window capture failed"_s);
+        save(capture, media + "windows-window.png"_L1);
+        result[u"nativeWindow"_s] =
+                QJsonObject{ { u"exposed"_s, true },
+                             { u"capture"_s, u"docs/media/branding/windows-window.png"_s },
+                             { u"captureMethod"_s, u"own rendered board; no desktop capture"_s },
+                             { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) },
+                             { u"dpr"_s, window.devicePixelRatio() },
+                             { u"width"_s, capture.width() },
+                             { u"height"_s, capture.height() },
+                             { u"platform"_s, QGuiApplication::platformName() } };
+        grabbed = true;
+    } catch (const std::exception &e) {
+        qCritical("%s", e.what());
+    }
+    app.quit();
+}
+}
+
+namespace {
+auto writeBrandAssets(std::function<void(const QString &)> &visit, QJsonArray &entries,
+                      QString const &tree, const QString &relative)
+{
+    QDir current(repository() + "/"_L1 + relative);
+    for (const auto &file :
+         current.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QString path = relative + "/"_L1 + file.fileName();
+        if (file.isDir())
+            visit(path);
+        else
+            entries.append(QJsonObject{
+                    { u"path"_s, path },
+                    { u"bytes"_s, double(file.size()) },
+                    { u"sha256"_s,
+                      QString::fromUtf8(QCryptographicHash::hash(read(file.absoluteFilePath()),
+                                                                 QCryptographicHash::Sha256)
+                                                .toHex()) },
+                    { u"source"_s,
+                      tree.endsWith(u"branding"_s)
+                              ? u"Original yalahOO!!! geometric path design, R03B"_s
+                              : u"resources/branding/icon.svg or icon-small.svg; "
+                                "QSvgRenderer derivative"_s } });
+    }
+}
+}
 int main(int argc, char **argv)
 {
     yalahoo::verification::prepareApplication();
@@ -733,30 +789,7 @@ int main(int argc, char **argv)
             });
             bool grabbed = false;
             QTimer::singleShot(NativeWindowDeadlineMilliseconds, &app, [&] {
-                try {
-                    require(window.isExposed(), u"Qt proof window not exposed"_s);
-                    require(yalahoo::verification::windowPolicySatisfied(window),
-                            u"Brand proof window violated bottom/no-focus policy"_s);
-                    // Bottom windows can be occluded by the user's work. Capture only our own
-                    // rendered board; never sample the desktop or raise a proof window.
-                    const QImage capture = window.renderedImage();
-                    require(!capture.isNull(), u"Native Qt window capture failed"_s);
-                    save(capture, media + "windows-window.png"_L1);
-                    result[u"nativeWindow"_s] = QJsonObject{
-                        { u"exposed"_s, true },
-                        { u"capture"_s, u"docs/media/branding/windows-window.png"_s },
-                        { u"captureMethod"_s, u"own rendered board; no desktop capture"_s },
-                        { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) },
-                        { u"dpr"_s, window.devicePixelRatio() },
-                        { u"width"_s, capture.width() },
-                        { u"height"_s, capture.height() },
-                        { u"platform"_s, QGuiApplication::platformName() }
-                    };
-                    grabbed = true;
-                } catch (const std::exception &e) {
-                    qCritical("%s", e.what());
-                }
-                app.quit();
+                return makeBrandPreview(window, media, result, grabbed, app);
             });
             app.exec();
             require(grabbed, u"Native Qt window verification failed"_s);
@@ -785,27 +818,7 @@ int main(int argc, char **argv)
             const QStringList trees{ u"resources/branding"_s, u"resources/icons/yalahoo"_s };
             for (const auto &tree : trees) {
                 std::function<void(const QString &)> visit = [&](const QString &relative) {
-                    QDir current(repository() + "/"_L1 + relative);
-                    for (const auto &file : current.entryInfoList(
-                                 QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-                        const QString path = relative + "/"_L1 + file.fileName();
-                        if (file.isDir())
-                            visit(path);
-                        else
-                            entries.append(QJsonObject{
-                                    { u"path"_s, path },
-                                    { u"bytes"_s, double(file.size()) },
-                                    { u"sha256"_s,
-                                      QString::fromUtf8(QCryptographicHash::hash(
-                                                                read(file.absoluteFilePath()),
-                                                                QCryptographicHash::Sha256)
-                                                                .toHex()) },
-                                    { u"source"_s,
-                                      tree.endsWith(u"branding"_s)
-                                              ? u"Original yalahOO!!! geometric path design, R03B"_s
-                                              : u"resources/branding/icon.svg or icon-small.svg; "
-                                                "QSvgRenderer derivative"_s } });
-                    }
+                    return writeBrandAssets(visit, entries, tree, relative);
                 };
                 visit(tree);
             }

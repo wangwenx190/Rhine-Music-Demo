@@ -72,6 +72,35 @@ QString genreKey(QString value)
     static const QRegularExpression separators(u"[\\s\\p{P}\\p{S}]"_s);
     return value.trimmed().normalized(QString::NormalizationForm_KC).toLower().remove(separators);
 }
+QString resolveRawGenre(const Album &album, QHash<QString, QString> &names, QSet<QString> &ids,
+                        LibrarySnapshot &snapshot)
+{
+    QString id;
+    for (const auto &raw : album.rawGenres) {
+        id = names.value(genreKey(raw));
+        if (!id.isEmpty())
+            break;
+    }
+    if (id.isEmpty()) {
+        const auto name = album.rawGenres.first();
+        const auto key = genreKey(name);
+        id = "source-"_L1
+                + QString::fromUtf8(
+                        QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
+                                .toHex()
+                                .first(ArtworkIdHexCharacters));
+        if (!ids.contains(id)) {
+            Genre genre;
+            genre.id = id;
+            genre.name = name;
+            snapshot.genres.append(genre);
+            names.insert(key, id);
+            ids.insert(id);
+        }
+    }
+
+    return id;
+}
 void resolveGenres(LibrarySnapshot &snapshot)
 {
     QHash<QString, QString> names;
@@ -94,30 +123,7 @@ void resolveGenres(LibrarySnapshot &snapshot)
         if (ids.contains(overrideId)) {
             album.genreId = overrideId;
         } else if (!album.rawGenres.isEmpty()) {
-            QString id;
-            for (const auto &raw : album.rawGenres) {
-                id = names.value(genreKey(raw));
-                if (!id.isEmpty())
-                    break;
-            }
-            if (id.isEmpty()) {
-                const auto name = album.rawGenres.first();
-                const auto key = genreKey(name);
-                id = "source-"_L1
-                        + QString::fromUtf8(
-                                QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha256)
-                                        .toHex()
-                                        .first(ArtworkIdHexCharacters));
-                if (!ids.contains(id)) {
-                    Genre genre;
-                    genre.id = id;
-                    genre.name = name;
-                    snapshot.genres.append(genre);
-                    names.insert(key, id);
-                    ids.insert(id);
-                }
-            }
-            album.genreId = id;
+            album.genreId = resolveRawGenre(album, names, ids, snapshot);
         }
         ++counts[album.genreId];
     }
@@ -125,6 +131,34 @@ void resolveGenres(LibrarySnapshot &snapshot)
         genre.albumCount = counts.value(genre.id);
 }
 
+QUrl cachedArtwork(const Album &album, const QString &root)
+{
+    for (const auto &track : album.tracks) {
+        const auto cached =
+                track.fields.value(u"_embeddedCover"_s).toObject().value(u"path"_s).toString();
+        if (cached.isEmpty())
+            continue;
+        const auto embedded = ArtworkStore::copy(cached, root);
+        if (!embedded.isEmpty())
+            return embedded;
+    }
+    return { };
+}
+void persistArtwork(Track &track, const QImage &image, const QString &root)
+{
+    if (image.isNull()) {
+        track.fields.insert(u"_embeddedCover"_s, QJsonValue::Null);
+        return;
+    }
+    QString error;
+    const auto cover = ArtworkStore::save(image, root, &error);
+    if (!cover.isEmpty())
+        track.fields.insert(u"_embeddedCover"_s, QJsonObject{ { u"path"_s, cover.toLocalFile() } });
+    if (!error.isEmpty())
+        track.fields.insert(u"_artworkError"_s, error);
+    else
+        track.fields.remove(u"_artworkError"_s);
+}
 void apply(Track &track, const MediaObservation &value, bool timeout)
 {
     const auto &metadata = value.metadata;
@@ -252,6 +286,20 @@ private:
                 break;
         }
     }
+    void queueCompletion(Slot &slot, quint64 serial)
+    {
+        if (!slot.busy || slot.serial != serial || slot.queued
+            || slot.source->observation().status == MediaObservation::Loading)
+            return;
+        slot.queued = true;
+        QMetaObject::invokeMethod(
+                this,
+                [this, &slot, serial] {
+                    if (slot.busy && slot.serial == serial)
+                        complete(slot, false);
+                },
+                Qt::QueuedConnection);
+    }
     void pump()
     {
         if (!m_running)
@@ -296,17 +344,7 @@ private:
                 const auto serial = ++slot.serial;
                 slot.connection =
                         connect(slot.source, &MetadataSource::changed, this, [this, &slot, serial] {
-                            if (!slot.busy || slot.serial != serial || slot.queued
-                                || slot.source->observation().status == MediaObservation::Loading)
-                                return;
-                            slot.queued = true;
-                            QMetaObject::invokeMethod(
-                                    this,
-                                    [this, &slot, serial] {
-                                        if (slot.busy && slot.serial == serial)
-                                            complete(slot, false);
-                                    },
-                                    Qt::QueuedConnection);
+                            queueCompletion(slot, serial);
                         });
                 slot.timer->start(ProbeTimeoutMilliseconds);
                 slot.source->open(track.sourceUrl);
@@ -329,19 +367,9 @@ private:
             if (album.offline)
                 continue;
             if (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty()) {
-                for (const auto &track : album.tracks) {
-                    const auto cached = track.fields.value(u"_embeddedCover"_s)
-                                                .toObject()
-                                                .value(u"path"_s)
-                                                .toString();
-                    if (!cached.isEmpty()) {
-                        const auto embedded = ArtworkStore::copy(cached, m_root);
-                        if (!embedded.isEmpty()) {
-                            album.coverUrl = embedded;
-                            break;
-                        }
-                    }
-                }
+                const auto embedded = cachedArtwork(album, m_root);
+                if (!embedded.isEmpty())
+                    album.coverUrl = embedded;
             }
             std::stable_sort(
                     album.tracks.begin(), album.tracks.end(), [](const Track &a, const Track &b) {
@@ -393,19 +421,7 @@ private:
         if (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty()) {
             const auto image =
                     observation.metadata.value(QMediaMetaData::CoverArtImage).value<QImage>();
-            if (image.isNull()) {
-                track.fields.insert(u"_embeddedCover"_s, QJsonValue::Null);
-            } else {
-                QString error;
-                const auto cover = ArtworkStore::save(image, m_root, &error);
-                if (!cover.isEmpty())
-                    track.fields.insert(u"_embeddedCover"_s,
-                                        QJsonObject{ { u"path"_s, cover.toLocalFile() } });
-                if (!error.isEmpty())
-                    track.fields.insert(u"_artworkError"_s, error);
-                else
-                    track.fields.remove(u"_artworkError"_s);
-            }
+            persistArtwork(track, image, m_root);
         }
         disconnect(slot.connection);
         slot.timer->stop();

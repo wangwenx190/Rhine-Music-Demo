@@ -24,6 +24,7 @@
 #include "OnlineMetadataProvider.h"
 #include <QNetworkProxyFactory>
 #include "PreferencesStore.h"
+#include "SingleInstance.h"
 #include "SettingsController.h"
 #include "DemoLibrary.h"
 #include "SceneAdapter.h"
@@ -111,6 +112,53 @@ enum ReviewExit {
     AppVerificationFailed = 25
 };
 
+QQuickItem *findVisualItem(QQuickItem *item, const QString &name)
+{
+    if (item->objectName() == name)
+        return item;
+    for (auto *child : item->childItems()) {
+        if (auto *found = findVisualItem(child, name))
+            return found;
+    }
+    return nullptr;
+}
+
+bool initializeLibraryCommands(const QCommandLineParser &parser, yalahoo::LibraryStore &store,
+                               yalahoo::PreferencesStore &preferences)
+{
+    if (parser.isSet(u"import-preferences"_s)
+        && !preferences.importJson(QUrl::fromLocalFile(parser.value(u"import-preferences"_s))))
+        return false;
+    if (parser.isSet(u"import-legacy"_s)
+        && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
+        qCWarning(yalahoo::logApp, "--import-legacy cannot be combined with scan options");
+        return false;
+    }
+    store.load();
+    if (parser.isSet(u"import-legacy"_s)) {
+        if (!store.importLegacy(QUrl::fromLocalFile(parser.value(u"import-legacy"_s))))
+            return false;
+    } else if (parser.isSet(u"music-root"_s)) {
+        QList<QUrl> roots;
+        for (const auto &path : parser.values(u"music-root"_s)) {
+            if (!QDir::isAbsolutePath(path)) {
+                qCWarning(yalahoo::logApp, "--music-root requires absolute paths");
+                return false;
+            }
+            roots.append(QUrl::fromLocalFile(path));
+        }
+        if (!store.setRoots(roots))
+            return false;
+    } else if (parser.isSet(u"rescan-library"_s)) {
+        const auto once = std::make_shared<QMetaObject::Connection>();
+        *once = QObject::connect(&store, &yalahoo::LibraryStore::snapshotReady, &store,
+                                 [store = &store, once](yalahoo::Snapshot) {
+                                     QObject::disconnect(*once);
+                                     store->rescan();
+                                 });
+    }
+    return true;
+}
 // Construct on first access; no namespace-scope runtime initialization is required.
 QMutex &diagnosticsMutex()
 {
@@ -135,6 +183,181 @@ void recordDiagnostic(QtMsgType type, const QMessageLogContext &context, const Q
 }
 }
 
+namespace {
+// Shared references remain valid until this review event loop has stopped.
+struct RuntimeReviewState final
+{
+    const QString &report;
+    std::shared_ptr<bool> &reportWritten;
+    QQuickWindow *&window;
+    yalahoo::PlaybackController &playback;
+    std::atomic<int> &api;
+    QCommandLineParser &parser;
+    QJsonObject &motionEvidence;
+    yalahoo::MotionController &motion;
+    bool &resumeDiscarded;
+    int &resumeSamples;
+    QJsonArray &completionRevisions;
+    yalahoo::SceneAdapter &scene;
+    std::atomic<int> &frames;
+    yalahoo::SelectionController &selection;
+    yalahoo::LibrarySession &library;
+    QGuiApplication &app;
+};
+auto writeRuntimeEvidence(RuntimeReviewState &state)
+{
+    if (std::exchange(*state.reportWritten, true))
+        return;
+    const QImage image = state.window->grabWindow();
+    const QRawFont raw = QRawFont::fromFont(QGuiApplication::font());
+    const QString chinese = u"\u4e00\u5f20\u4e00\u5f20\uff0c\u6162\u6162\u542c"_s;
+    bool chineseSupported = true;
+    for (const QChar character : chinese)
+        chineseSupported = chineseSupported && raw.supportsCharacter(character);
+    const bool shaderAvailable = QFile::exists(u":/assets/shaders/probe.frag.qsb"_s);
+    const bool qmlAvailable = QFile::exists(u":/qt/qml/Yalahoo/Music/App.qml"_s);
+    const int interactions = state.window->property("interactionCount").toInt();
+    const bool mediaAvailable = state.playback.isAvailable();
+    const bool backend = state.api.load() == int(QQuickWindow::graphicsApi());
+    QDir().mkpath(QFileInfo(state.report).absolutePath());
+    const QString screenshot = QFileInfo(state.report).absolutePath()
+            + (state.parser.isSet(u"verify-motion"_s) ? u"/runtime-motion.png"_s
+                                                      : u"/runtime.png"_s);
+    const bool saved = !image.isNull() && image.save(screenshot);
+    const auto *nativeScene = state.window->findChild<QQuickItem *>(u"nativeScene"_s);
+    const bool nativeSceneAvailable = nativeScene != nullptr;
+    const bool qmlMediaAvailable =
+            state.window->findChild<QObject *>(u"qmlMediaProbe"_s) != nullptr;
+    const auto *libraryProbe = state.window->findChild<QObject *>(u"libraryDataProbe"_s);
+    const QString libraryText =
+            libraryProbe ? libraryProbe->property("text").toString() : QString{ };
+    int modelPixels = 0;
+    QRect modelRegion;
+    if (nativeScene && !image.isNull()) {
+        const QRectF sceneRegion = nativeScene->mapRectToScene(
+                QRectF(0, 0, nativeScene->width(), nativeScene->height()));
+        const qreal scaleX = qreal(image.width()) / state.window->width();
+        const qreal scaleY = qreal(image.height()) / state.window->height();
+        modelRegion = QRectF(sceneRegion.x() * scaleX, sceneRegion.y() * scaleY,
+                             sceneRegion.width() * scaleX, sceneRegion.height() * scaleY)
+                              .toAlignedRect()
+                              .intersected(image.rect());
+    }
+    for (int y = modelRegion.top(); !modelRegion.isEmpty() && y <= modelRegion.bottom(); ++y) {
+        for (int x = modelRegion.left(); x <= modelRegion.right(); ++x) {
+            const QColor color = image.pixelColor(x, y);
+            if (state.parser.isSet(u"verify-shading"_s)
+                        ? (color.red() > color.blue() + 20 && color.red() > color.green() + 8)
+                        : (color.green() > color.red() + 8 && color.green() < 165
+                           && color.red() > 40))
+                ++modelPixels;
+        }
+    }
+    QStringList recorded;
+    {
+        const QMutexLocker lock(&diagnosticsMutex());
+        recorded = diagnostics();
+    }
+    state.motionEvidence.insert(u"finalWindowVisibility"_s, int(state.window->visibility()));
+    state.motionEvidence.insert(u"clockActive"_s, state.motion.clock()->active());
+    state.motionEvidence.insert(u"applicationVisible"_s,
+                                state.motion.clock()->applicationVisible());
+    const bool motionPassed = !state.parser.isSet(u"verify-motion"_s)
+            || (state.motionEvidence.value(u"hiddenPaused"_s).toBool()
+                && state.motionEvidence.value(u"minimizedPaused"_s).toBool()
+                && state.resumeDiscarded && state.resumeSamples == 2 && !state.motion.moving()
+                && state.motion.rail() == -.62 && state.motion.column() == -5.2
+                && state.motion.clock()->openingTime() == yalahoo::openingTimeline::DurationSeconds
+                && !state.completionRevisions.isEmpty()
+                && state.completionRevisions.last().toInteger() == qint64(state.motion.revision())
+                && state.scene.reducedMotion() == state.motion.reducedMotion()
+                && state.scene.settled() && state.playback.source().isEmpty());
+    const bool shaderDiagnostics =
+            std::any_of(recorded.cbegin(), recorded.cend(), [](const QString &s) {
+                return s.contains(u"Failed to compile"_s) || s.contains(u"QSpirvCompiler"_s)
+                        || s.contains(u"TypeError"_s);
+            });
+    const bool passed = yalahoo::verification::windowPolicySatisfied(*state.window)
+            && !shaderDiagnostics && motionPassed && state.frames > 0
+            && state.motion.clock()->frameCount() > 1 && state.motion.clock()->visualTime() > 0
+            && backend && interactions == 1 && mediaAvailable && shaderAvailable && qmlAvailable
+            && chineseSupported && saved && nativeSceneAvailable && qmlMediaAvailable
+            && modelPixels > 100 && libraryProbe
+            && (!state.parser.isSet(u"verify-filled"_s)
+                || (state.scene.selection() == &state.selection
+                    && state.scene.frame().instances.size() == 432
+                    && state.library.albums()->rowCount() == 27
+                    && state.library.playbackTrackId().isEmpty()
+                    && state.playback.source().isEmpty()))
+            && (!state.parser.isSet(u"verify-library"_s)
+                || (state.library.albums()->rowCount() == 21
+                    && state.library.searchResults()->rowCount() == 28
+                    && state.library.metadata().size() == 1
+                    && state.library.playbackTrackId().isEmpty()
+                    && state.playback.source().isEmpty()
+                    && libraryText
+                            == u"\u533f\u540d\u5e93\u6a21\u578b \u00b7 21 \u5f20\u4e13\u8f91"_s));
+    const QJsonObject evidence{
+        { u"passed"_s, passed },
+        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+        { u"platformPlugin"_s, QGuiApplication::platformName() },
+        { u"graphicsApi"_s, state.api.load() },
+        { u"renderedFrames"_s, state.frames.load() },
+        { u"windowTitle"_s, state.window->title() },
+        { u"windowPolicy"_s, yalahoo::verification::windowPolicy(*state.window) },
+        { u"devicePixelRatio"_s, state.window->devicePixelRatio() },
+        { u"applicationName"_s, state.app.applicationName() },
+        { u"displayName"_s, state.app.applicationDisplayName() },
+        { u"dataDirectory"_s,
+          QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) },
+        { u"controlRendering"_s, u"project-quick-templates"_s },
+        { u"interactionCount"_s, interactions },
+        { u"chineseGlyphs"_s, chineseSupported },
+        { u"font"_s, raw.familyName() },
+        { u"qmlResource"_s, qmlAvailable },
+        { u"shaderResource"_s, shaderAvailable },
+        { u"nativeSceneObject"_s, nativeSceneAvailable },
+        { u"modelPixels"_s, modelPixels },
+        { u"shadingProbe"_s, state.parser.isSet(u"verify-shading"_s) },
+        { u"qmlMediaObject"_s, qmlMediaAvailable },
+        { u"diagnostics"_s, QJsonArray::fromStringList(recorded) },
+        { u"mediaAvailable"_s, mediaAvailable },
+        { u"audioOutputCount"_s, QMediaDevices::audioOutputs().size() },
+        { u"screenshotSaved"_s, saved },
+        { u"sourceOpened"_s, false }
+    };
+    QJsonObject reportData = evidence;
+    reportData.insert(u"visualFrameCount"_s, qint64(state.motion.clock()->frameCount()));
+    reportData.insert(u"visualTime"_s, state.motion.clock()->visualTime());
+    if (state.parser.isSet(u"verify-motion"_s)) {
+        state.motionEvidence.insert(u"passed"_s, motionPassed);
+        state.motionEvidence.insert(u"resumeDiscarded"_s, state.resumeDiscarded);
+        state.motionEvidence.insert(u"resumeSamples"_s, state.resumeSamples);
+        state.motionEvidence.insert(u"completionRevisions"_s, state.completionRevisions);
+        state.motionEvidence.insert(u"finalRevision"_s, qint64(state.motion.revision()));
+        state.motionEvidence.insert(u"openingTime"_s, state.motion.clock()->openingTime());
+        state.motionEvidence.insert(u"mediaSourceEmpty"_s, state.playback.source().isEmpty());
+        reportData.insert(u"motion"_s, state.motionEvidence);
+    }
+    reportData.insert(u"libraryAlbums"_s, state.library.albums()->rowCount());
+    reportData.insert(u"searchResults"_s, state.library.searchResults()->rowCount());
+    reportData.insert(u"metadataResults"_s, state.library.metadata().size());
+    reportData.insert(u"playbackTrackId"_s, state.library.playbackTrackId());
+    reportData.insert(u"libraryQmlText"_s, libraryText);
+    reportData.insert(u"filledProbe"_s, state.parser.isSet(u"verify-filled"_s));
+    if (state.scene.selection())
+        reportData.insert(u"poolInstances"_s, state.scene.frame().instances.size());
+    QSaveFile output(state.report);
+    if (!output.open(QIODevice::WriteOnly)) {
+        state.app.exit(RuntimeReportOpenFailed);
+        return;
+    }
+    output.write(QJsonDocument(reportData).toJson());
+    const bool committed = output.commit();
+    state.app.exit(passed && committed ? 0 : RuntimeVerificationFailed);
+}
+
+}
 int main(int argc, char **argv)
 {
     bool collectDiagnostics = false;
@@ -321,6 +544,27 @@ int main(int argc, char **argv)
             || parser.isSet(u"verify-integration"_s)
 #endif
             ;
+    // Keep the ownership lock until library and final preference writes have finished.
+    yalahoo::SingleInstance singleInstance;
+    std::unique_ptr<yalahoo::PreferencesStore> preferences;
+    if (!verificationRun && !demonstration) {
+        const QString dataRoot = parser.isSet(u"data-dir"_s)
+                ? parser.value(u"data-dir"_s)
+                : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        if (!QDir::isAbsolutePath(dataRoot)) {
+            qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
+            return InvalidCommandLine;
+        }
+        preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
+        const auto result = singleInstance.start(
+                dataRoot, preferences->values().value(u"singleInstance"_s).toBool());
+        if (result == yalahoo::SingleInstance::Result::Secondary)
+            return 0;
+        if (result == yalahoo::SingleInstance::Result::Error) {
+            qCCritical(yalahoo::logApp) << singleInstance.error();
+            return InvalidCommandLine;
+        }
+    }
     QNetworkProxyFactory::setUseSystemConfiguration(true);
     std::unique_ptr<yalahoo::IMetadataProvider> provider;
     if (verificationRun || demonstration)
@@ -394,7 +638,6 @@ int main(int argc, char **argv)
     bool resumeDiscarded = true;
     int resumeSamples = 0;
     QJsonArray completionRevisions;
-    std::unique_ptr<yalahoo::PreferencesStore> preferences;
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
     if (!verificationRun && !demonstration) {
         const QString dataRoot = parser.isSet(u"data-dir"_s)
@@ -404,7 +647,6 @@ int main(int argc, char **argv)
             qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
             return InvalidCommandLine;
         }
-        preferences = std::make_unique<yalahoo::PreferencesStore>(dataRoot);
         const auto applyAudio = [&] {
             const auto audio = preferences->audio();
             playback.setVolume(
@@ -489,39 +731,8 @@ int main(int argc, char **argv)
                              if (!startup.statistics()[u"initialReady"_s].toBool())
                                  startup.receive(libraryStore->snapshot());
                          });
-        if (parser.isSet(u"import-preferences"_s))
-            if (!preferences->importJson(
-                        QUrl::fromLocalFile(parser.value(u"import-preferences"_s))))
-                return InvalidCommandLine;
-        if (parser.isSet(u"import-legacy"_s)
-            && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
-            qCWarning(yalahoo::logApp, "--import-legacy cannot be combined with scan options");
+        if (!initializeLibraryCommands(parser, *libraryStore, *preferences))
             return InvalidCommandLine;
-        }
-        libraryStore->load();
-        if (parser.isSet(u"import-legacy"_s)) {
-            if (!libraryStore->importLegacy(QUrl::fromLocalFile(parser.value(u"import-legacy"_s))))
-                return InvalidCommandLine;
-        } else if (parser.isSet(u"music-root"_s)) {
-            QList<QUrl> roots;
-            for (const auto &path : parser.values(u"music-root"_s)) {
-                if (!QDir::isAbsolutePath(path)) {
-                    qCWarning(yalahoo::logApp, "--music-root requires absolute paths");
-                    return InvalidCommandLine;
-                }
-                roots.append(QUrl::fromLocalFile(path));
-            }
-            if (!libraryStore->setRoots(roots))
-                return InvalidCommandLine;
-        } else if (parser.isSet(u"rescan-library"_s)) {
-            const auto once = std::make_shared<QMetaObject::Connection>();
-            *once = QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady,
-                                     libraryStore.get(),
-                                     [store = libraryStore.get(), once](yalahoo::Snapshot) {
-                                         QObject::disconnect(*once);
-                                         store->rescan();
-                                     });
-        }
     }
     yalahoo::SettingsController settings(preferences.get(), &library, &motion, &scene, &selection);
     if (!verificationRun || parser.isSet(u"verify-filled"_s) || appVerification) {
@@ -704,6 +915,14 @@ int main(int argc, char **argv)
     if (!verificationRun) {
         displayOutput.attach(*window);
         window->show();
+        QObject::connect(&singleInstance, &yalahoo::SingleInstance::activationRequested, window,
+                         [window] {
+                             if (window->windowState() == Qt::WindowMinimized)
+                                 window->showNormal();
+                             window->show();
+                             window->raise();
+                             window->requestActivate();
+                         });
     }
     if (verificationRun)
         yalahoo::verification::prepareWindow(*window, verificationFrameless);
@@ -738,18 +957,9 @@ int main(int argc, char **argv)
         return InvalidCommandLine;
     if (parser.isSet(u"verify-app"_s)) {
         QTimer::singleShot(0, &engine, [&] {
-            const auto find = [](auto &&self, QQuickItem *item,
-                                 const QString &name) -> QQuickItem * {
-                if (item->objectName() == name)
-                    return item;
-                for (auto *child : item->childItems())
-                    if (auto *found = self(self, child, name))
-                        return found;
-                return nullptr;
-            };
-            auto *surface = find(find, window->contentItem(), u"displaySurface"_s);
-            auto *overlay = find(find, window->contentItem(), u"displayOverlay"_s);
-            auto *sceneItem = find(find, window->contentItem(), u"nativeScene"_s);
+            auto *surface = findVisualItem(window->contentItem(), u"displaySurface"_s);
+            auto *overlay = findVisualItem(window->contentItem(), u"displayOverlay"_s);
+            auto *sceneItem = findVisualItem(window->contentItem(), u"nativeScene"_s);
             const bool passed = deploymentWarnings.isEmpty() && surface && overlay && sceneItem
                     && overlay->parentItem() == surface && surface->isAncestorOf(sceneItem)
                     && surface->size() == window->size() && !window->isVisible()
@@ -872,155 +1082,24 @@ int main(int argc, char **argv)
             QCoreApplication::sendEvent(window, &release);
         });
         auto reportWritten = std::make_shared<bool>(false);
+        RuntimeReviewState state{ report,
+                                  reportWritten,
+                                  window,
+                                  playback,
+                                  api,
+                                  parser,
+                                  motionEvidence,
+                                  motion,
+                                  resumeDiscarded,
+                                  resumeSamples,
+                                  completionRevisions,
+                                  scene,
+                                  frames,
+                                  selection,
+                                  library,
+                                  app };
         auto writeRuntimeReport = [&, report, reportWritten] {
-            if (std::exchange(*reportWritten, true))
-                return;
-            const QImage image = window->grabWindow();
-            const QRawFont raw = QRawFont::fromFont(QGuiApplication::font());
-            const QString chinese = u"\u4e00\u5f20\u4e00\u5f20\uff0c\u6162\u6162\u542c"_s;
-            bool chineseSupported = true;
-            for (const QChar character : chinese)
-                chineseSupported = chineseSupported && raw.supportsCharacter(character);
-            const bool shaderAvailable = QFile::exists(u":/assets/shaders/probe.frag.qsb"_s);
-            const bool qmlAvailable = QFile::exists(u":/qt/qml/Yalahoo/Music/App.qml"_s);
-            const int interactions = window->property("interactionCount").toInt();
-            const bool mediaAvailable = playback.isAvailable();
-            const bool backend = api.load() == int(QQuickWindow::graphicsApi());
-            QDir().mkpath(QFileInfo(report).absolutePath());
-            const QString screenshot = QFileInfo(report).absolutePath()
-                    + (parser.isSet(u"verify-motion"_s) ? u"/runtime-motion.png"_s
-                                                        : u"/runtime.png"_s);
-            const bool saved = !image.isNull() && image.save(screenshot);
-            const auto *nativeScene = window->findChild<QQuickItem *>(u"nativeScene"_s);
-            const bool nativeSceneAvailable = nativeScene != nullptr;
-            const bool qmlMediaAvailable =
-                    window->findChild<QObject *>(u"qmlMediaProbe"_s) != nullptr;
-            const auto *libraryProbe = window->findChild<QObject *>(u"libraryDataProbe"_s);
-            const QString libraryText =
-                    libraryProbe ? libraryProbe->property("text").toString() : QString{ };
-            int modelPixels = 0;
-            QRect modelRegion;
-            if (nativeScene && !image.isNull()) {
-                const QRectF sceneRegion = nativeScene->mapRectToScene(
-                        QRectF(0, 0, nativeScene->width(), nativeScene->height()));
-                const qreal scaleX = qreal(image.width()) / window->width();
-                const qreal scaleY = qreal(image.height()) / window->height();
-                modelRegion = QRectF(sceneRegion.x() * scaleX, sceneRegion.y() * scaleY,
-                                     sceneRegion.width() * scaleX, sceneRegion.height() * scaleY)
-                                      .toAlignedRect()
-                                      .intersected(image.rect());
-            }
-            for (int y = modelRegion.top(); !modelRegion.isEmpty() && y <= modelRegion.bottom();
-                 ++y) {
-                for (int x = modelRegion.left(); x <= modelRegion.right(); ++x) {
-                    const QColor color = image.pixelColor(x, y);
-                    if (parser.isSet(u"verify-shading"_s)
-                                ? (color.red() > color.blue() + 20
-                                   && color.red() > color.green() + 8)
-                                : (color.green() > color.red() + 8 && color.green() < 165
-                                   && color.red() > 40))
-                        ++modelPixels;
-                }
-            }
-            QStringList recorded;
-            {
-                const QMutexLocker lock(&diagnosticsMutex());
-                recorded = diagnostics();
-            }
-            motionEvidence.insert(u"finalWindowVisibility"_s, int(window->visibility()));
-            motionEvidence.insert(u"clockActive"_s, motion.clock()->active());
-            motionEvidence.insert(u"applicationVisible"_s, motion.clock()->applicationVisible());
-            const bool motionPassed = !parser.isSet(u"verify-motion"_s)
-                    || (motionEvidence.value(u"hiddenPaused"_s).toBool()
-                        && motionEvidence.value(u"minimizedPaused"_s).toBool() && resumeDiscarded
-                        && resumeSamples == 2 && !motion.moving() && motion.rail() == -.62
-                        && motion.column() == -5.2
-                        && motion.clock()->openingTime()
-                                == yalahoo::openingTimeline::DurationSeconds
-                        && !completionRevisions.isEmpty()
-                        && completionRevisions.last().toInteger() == qint64(motion.revision())
-                        && scene.reducedMotion() == motion.reducedMotion() && scene.settled()
-                        && playback.source().isEmpty());
-            const bool shaderDiagnostics =
-                    std::any_of(recorded.cbegin(), recorded.cend(), [](const QString &s) {
-                        return s.contains(u"Failed to compile"_s) || s.contains(u"QSpirvCompiler"_s)
-                                || s.contains(u"TypeError"_s);
-                    });
-            const bool passed = yalahoo::verification::windowPolicySatisfied(*window)
-                    && !shaderDiagnostics && motionPassed && frames > 0
-                    && motion.clock()->frameCount() > 1 && motion.clock()->visualTime() > 0
-                    && backend && interactions == 1 && mediaAvailable && shaderAvailable
-                    && qmlAvailable && chineseSupported && saved && nativeSceneAvailable
-                    && qmlMediaAvailable && modelPixels > 100 && libraryProbe
-                    && (!parser.isSet(u"verify-filled"_s)
-                        || (scene.selection() == &selection && scene.frame().instances.size() == 432
-                            && library.albums()->rowCount() == 27
-                            && library.playbackTrackId().isEmpty() && playback.source().isEmpty()))
-                    && (!parser.isSet(u"verify-library"_s)
-                        || (library.albums()->rowCount() == 21
-                            && library.searchResults()->rowCount() == 28
-                            && library.metadata().size() == 1 && library.playbackTrackId().isEmpty()
-                            && playback.source().isEmpty()
-                            && libraryText
-                                    == u"\u533f\u540d\u5e93\u6a21\u578b \u00b7 21 \u5f20\u4e13\u8f91"_s));
-            const QJsonObject evidence{
-                { u"passed"_s, passed },
-                { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                { u"platformPlugin"_s, QGuiApplication::platformName() },
-                { u"graphicsApi"_s, api.load() },
-                { u"renderedFrames"_s, frames.load() },
-                { u"windowTitle"_s, window->title() },
-                { u"windowPolicy"_s, yalahoo::verification::windowPolicy(*window) },
-                { u"devicePixelRatio"_s, window->devicePixelRatio() },
-                { u"applicationName"_s, app.applicationName() },
-                { u"displayName"_s, app.applicationDisplayName() },
-                { u"dataDirectory"_s,
-                  QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) },
-                { u"controlRendering"_s, u"project-quick-templates"_s },
-                { u"interactionCount"_s, interactions },
-                { u"chineseGlyphs"_s, chineseSupported },
-                { u"font"_s, raw.familyName() },
-                { u"qmlResource"_s, qmlAvailable },
-                { u"shaderResource"_s, shaderAvailable },
-                { u"nativeSceneObject"_s, nativeSceneAvailable },
-                { u"modelPixels"_s, modelPixels },
-                { u"shadingProbe"_s, parser.isSet(u"verify-shading"_s) },
-                { u"qmlMediaObject"_s, qmlMediaAvailable },
-                { u"diagnostics"_s, QJsonArray::fromStringList(recorded) },
-                { u"mediaAvailable"_s, mediaAvailable },
-                { u"audioOutputCount"_s, QMediaDevices::audioOutputs().size() },
-                { u"screenshotSaved"_s, saved },
-                { u"sourceOpened"_s, false }
-            };
-            QJsonObject reportData = evidence;
-            reportData.insert(u"visualFrameCount"_s, qint64(motion.clock()->frameCount()));
-            reportData.insert(u"visualTime"_s, motion.clock()->visualTime());
-            if (parser.isSet(u"verify-motion"_s)) {
-                motionEvidence.insert(u"passed"_s, motionPassed);
-                motionEvidence.insert(u"resumeDiscarded"_s, resumeDiscarded);
-                motionEvidence.insert(u"resumeSamples"_s, resumeSamples);
-                motionEvidence.insert(u"completionRevisions"_s, completionRevisions);
-                motionEvidence.insert(u"finalRevision"_s, qint64(motion.revision()));
-                motionEvidence.insert(u"openingTime"_s, motion.clock()->openingTime());
-                motionEvidence.insert(u"mediaSourceEmpty"_s, playback.source().isEmpty());
-                reportData.insert(u"motion"_s, motionEvidence);
-            }
-            reportData.insert(u"libraryAlbums"_s, library.albums()->rowCount());
-            reportData.insert(u"searchResults"_s, library.searchResults()->rowCount());
-            reportData.insert(u"metadataResults"_s, library.metadata().size());
-            reportData.insert(u"playbackTrackId"_s, library.playbackTrackId());
-            reportData.insert(u"libraryQmlText"_s, libraryText);
-            reportData.insert(u"filledProbe"_s, parser.isSet(u"verify-filled"_s));
-            if (scene.selection())
-                reportData.insert(u"poolInstances"_s, scene.frame().instances.size());
-            QSaveFile output(report);
-            if (!output.open(QIODevice::WriteOnly)) {
-                app.exit(RuntimeReportOpenFailed);
-                return;
-            }
-            output.write(QJsonDocument(reportData).toJson());
-            const bool committed = output.commit();
-            app.exit(passed && committed ? 0 : RuntimeVerificationFailed);
+            return writeRuntimeEvidence(state);
         };
         if (parser.isSet(u"verify-motion"_s)) {
             QObject::connect(motion.clock(), &yalahoo::FrameClock::frame, window,

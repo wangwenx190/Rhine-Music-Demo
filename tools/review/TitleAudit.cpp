@@ -64,6 +64,11 @@ double trackError(const QJsonArray &samples)
     }
     return error;
 }
+auto titleSlotKey(const QString &value)
+{
+    return std::tuple(value.startsWith(u"translation"_s), value.section(':'_L1, 1, 1).toInt(),
+                      value.section(':'_L1, 2, 2).toInt());
+}
 QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
 {
     double error = std::max(std::abs(controller.fittedSize() - source[u"size"_s].toDouble()),
@@ -77,12 +82,7 @@ QJsonObject structure(yalahoo::TitleReel &controller, const QJsonObject &source)
         if (controller.slotAt(i)->active)
             ordered.append(controller.slotAt(i));
     std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) {
-        const auto key = [](const QString &value) {
-            return std::tuple(value.startsWith(u"translation"_s),
-                              value.section(':'_L1, 1, 1).toInt(),
-                              value.section(':'_L1, 2, 2).toInt());
-        };
-        return key(a->key) < key(b->key);
+        return titleSlotKey(a->key) < titleSlotKey(b->key);
     });
     for (const auto &entry : glyphs) {
         const auto glyph = entry.toObject();
@@ -199,6 +199,566 @@ double rollingError(const QJsonArray &samples)
                   std::abs(roll.sample().velocity - expectedRoll[u"velocity"_s].toDouble()) });
     }
     return error;
+}
+}
+
+namespace {
+auto advanceTitleAudit(int &step, const int &staticSteps, QJsonArray &cases, QQuickWindow &window,
+                       const QString &output, yalahoo::TitleReel &controller, QQuickItem *&root,
+                       bool &passed, QJsonArray &captures, QJsonArray &costs, qint64 &guiNs,
+                       std::atomic<qint64> &syncNs, qint64 &beginSync,
+                       std::atomic<qint64> &renderNs, qint64 &beginRender,
+                       const int &animationSteps, quint64 &beginReuse, quint64 &beginCanvasPaints,
+                       bool &noFrameShaping, quint64 &beginGeometry, QJsonArray &animatedCosts,
+                       int &animatedFrame, qint64 &tickNs, QJsonArray &frameRecords,
+                       qint64 &beginCanvasSync, qint64 &beginCanvasPaint, const int &headerSteps,
+                       bool &fixedButtons, int &playbackChanges, yalahoo::LibrarySession &session,
+                       QJsonArray &headerChecks, QJsonArray &headerPositions,
+                       quint64 &lifecycleNodeLimit, int &lifecycleRendererLimit,
+                       QJsonArray &lifecycle, QGuiApplication &app, std::function<void()> &next,
+                       QImage image)
+{
+    const int index = step - 1;
+    if (index < staticSteps) {
+        const auto test = cases[index / 3].toObject();
+        const int mode = index % 3;
+        const QSize captureSize(qRound(test[u"width"_s].toDouble() * window.devicePixelRatio()),
+                                qRound(test[u"budget"_s].toDouble() * window.devicePixelRatio()));
+        const auto actual = image.copy(QRect(QPoint(), captureSize));
+        const QString filename = u"native-%1-mode-%2.png"_s.arg(index / 3).arg(mode);
+        const bool valid = !image.isNull() && image.width() >= captureSize.width()
+                && image.height() >= captureSize.height() && actual.save(output + '/'_L1 + filename)
+                && yalahoo::verification::windowPolicySatisfied(window);
+        const auto geometry = structure(controller, test[u"state"_s].toObject());
+        const auto layers = layerStructure(root, controller, mode);
+        const bool structurePassed =
+                valid && geometry[u"passed"_s].toBool() && layers[u"passed"_s].toBool();
+        if (mode == 0)
+            passed &= structurePassed;
+        captures.append(QJsonObject{
+                { u"case"_s, index / 3 },
+                { u"mode"_s, mode },
+                { u"file"_s, filename },
+                { u"valid"_s, valid },
+                { u"structurePassed"_s, structurePassed },
+                { u"geometry"_s, geometry },
+                { u"layers"_s, layers },
+                { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
+        QSaveFile progress(output + "/captures.json"_L1);
+        if (progress.open(QIODevice::WriteOnly)) {
+            progress.write(QJsonDocument(captures).toJson());
+            progress.commit();
+        }
+        costs.append(QJsonObject{ { u"mode"_s, mode },
+                                  { u"guiStateNs"_s, guiNs },
+                                  { u"syncCpuNs"_s, double(syncNs.load() - beginSync) },
+                                  { u"renderSubmitCpuNs"_s, double(renderNs.load() - beginRender) },
+                                  { u"gpuTime"_s, QJsonValue::Null } });
+    } else if (index < staticSteps + animationSteps) {
+        const int mode = (index - staticSteps) % 3;
+        const bool nativeMode = mode == 0;
+        const auto reused = yalahoo::ReelInk::geometryReuses() - beginReuse;
+        const auto canvasPaints = canvasTitleStats().paints.load() - beginCanvasPaints;
+        const bool valid = !image.isNull() && noFrameShaping && (!nativeMode || reused > 0)
+                && (nativeMode || yalahoo::ReelInk::geometryUpdates() == beginGeometry)
+                && (mode == 2 || canvasPaints == 0)
+                && yalahoo::verification::windowPolicySatisfied(window);
+        passed &= valid;
+        animatedCosts.append(QJsonObject{
+                { u"run"_s, (index - staticSteps) / 3 },
+                { u"mode"_s, (index - staticSteps) % 3 },
+                { u"passed"_s, valid },
+                { u"frames"_s, animatedFrame },
+                { u"guiStateNs"_s, double(guiNs) },
+                { u"clockTickCpuNs"_s, double(tickNs) },
+                { u"samples"_s, frameRecords },
+                { u"syncCpuNs"_s, double(syncNs.load() - beginSync) },
+                { u"renderSubmitCpuNs"_s, double(renderNs.load() - beginRender) },
+                { u"gpuTime"_s, QJsonValue::Null },
+                { u"canvasSyncCpuNs"_s,
+                  double(canvasTitleStats().syncNs.load() - beginCanvasSync) },
+                { u"canvasPaintCpuNs"_s,
+                  double(canvasTitleStats().paintNs.load() - beginCanvasPaint) },
+                { u"canvasPaints"_s, double(canvasPaints) },
+                { u"glyphNodesCreated"_s,
+                  double(yalahoo::ReelInk::geometryUpdates() - beginGeometry) },
+                { u"glyphNodesReused"_s, double(reused) },
+                { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
+    } else if (index < staticSteps + animationSteps + headerSteps) {
+        auto *song = root->findChild<QQuickItem *>("playingTitle");
+        auto *play = root->findChild<QQuickItem *>("playButton");
+        auto *stop = root->findChild<QQuickItem *>("stopButton");
+        bool valid = song && play && stop && !image.isNull() && fixedButtons
+                && yalahoo::verification::windowPolicySatisfied(window);
+        const QString full = root->property("song").toString();
+        const int beforePlaybackChanges = playbackChanges;
+        const QString beforeAlbum = session.playbackAlbumId();
+        const QString beforeTrack = session.playbackTrackId();
+        const auto *tooltip = song ? qvariant_cast<QObject *>(song->property("toolTip")) : nullptr;
+        const bool fullNames = tooltip && tooltip->property("text").toString() == full
+                && QQmlProperty::read(song, u"Accessible.name"_s,
+                                      QQmlEngine::contextForObject(song))
+                                .toString()
+                        == u"\u5b9a\u4f4d\u6b4c\u66f2\uff1a"_s + full;
+        valid &= fullNames;
+        if (valid && song->width() > 0) {
+            const QPointF point = song->mapToScene({ song->width() / 2, song->height() / 2 });
+            QMouseEvent press(QEvent::MouseButtonPress, point, window.mapToGlobal(point.toPoint()),
+                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QMouseEvent release(QEvent::MouseButtonRelease, point,
+                                window.mapToGlobal(point.toPoint()), Qt::LeftButton, Qt::NoButton,
+                                Qt::NoModifier);
+            QCoreApplication::sendEvent(&window, &press);
+            QCoreApplication::sendEvent(&window, &release);
+            valid &= root->property("lastAction").toString() == "locate-song"_L1;
+            session.navigate(beforeAlbum, beforeTrack);
+        }
+        const bool playbackUnchanged = beforePlaybackChanges == playbackChanges
+                && beforeAlbum == session.playbackAlbumId()
+                && beforeTrack == session.playbackTrackId();
+        valid &= playbackUnchanged;
+        auto *header = root->findChild<QQuickItem *>("archiveHeader");
+        auto *transportReel = header
+                ? qvariant_cast<yalahoo::TitleReel *>(header->property("transportController"))
+                : nullptr;
+        const bool reducedFinished = transportReel && !transportReel->moving();
+        valid &= reducedFinished;
+        const double songWidth = song ? song->width() : 0;
+        root->setProperty("testReduced", false);
+        root->setProperty("song", u""_s);
+        const bool exitDisabled = song && !song->isEnabled() && song->width() == songWidth
+                && song->property("retainedTitle").toString() == full;
+        valid &= exitDisabled;
+        const auto playPosition = play ? play->mapToScene({ 0, 0 }) : QPointF();
+        const auto stopPosition = stop ? stop->mapToScene({ 0, 0 }) : QPointF();
+        if (play && stop)
+            valid &= playPosition.x() + play->width() <= window.width()
+                    && stopPosition.x() + stop->width() <= window.width();
+        else
+            valid = false;
+        const QString filename = u"header-%1.png"_s.arg(index - staticSteps - animationSteps);
+        valid &= image.save(output + '/'_L1 + filename);
+        passed &= valid;
+        headerChecks.append(QJsonObject{ { u"passed"_s, valid },
+                                         { u"file"_s, filename },
+                                         { u"title"_s, full },
+                                         { u"action"_s, root->property("lastAction").toString() },
+                                         { u"fixedButtons"_s, fixedButtons },
+                                         { u"positions"_s, headerPositions },
+                                         { u"fullNames"_s, fullNames },
+                                         { u"playbackUnchanged"_s, playbackUnchanged },
+                                         { u"reducedFinished"_s, reducedFinished },
+                                         { u"exitDisabled"_s, exitDisabled },
+                                         { u"width"_s, window.width() },
+                                         { u"height"_s, window.height() },
+                                         { u"songWidth"_s, songWidth } });
+    } else {
+        const auto nodes = yalahoo::ReelInk::liveNodes();
+        const auto renderers = canvasTitleStats().renderers.load();
+        // Each mode has a different owner; the bounded ceilings cover all ten restores.
+        lifecycleNodeLimit = std::max(lifecycleNodeLimit, quint64(controller.slotCount()));
+        lifecycleRendererLimit = 1;
+        const bool valid = nodes <= int(lifecycleNodeLimit) && renderers <= lifecycleRendererLimit
+                && controller.diagnostics()[u"cacheBytes"_s].toInt()
+                        <= yalahoo::TextLayoutAdapter::CacheBytes
+                && !image.isNull() && yalahoo::verification::windowPolicySatisfied(window);
+        passed &= valid;
+        lifecycle.append(QJsonObject{
+                { u"cycle"_s, index - staticSteps - animationSteps - headerSteps },
+                { u"passed"_s, valid },
+                { u"liveInkNodes"_s, nodes },
+                { u"liveCanvasRenderers"_s, renderers },
+                { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
+    }
+    QTimer::singleShot(0, &app, [&] {
+        next();
+    });
+}
+}
+
+namespace {
+
+auto bindTitleFramesObserveFrame(QRhiReadbackResult &readback, const bool &flip,
+                                 std::atomic<bool> &inFlight, std::atomic<int> &drain,
+                                 QQuickWindow &window, std::function<void(QImage)> &completed)
+{
+    QImage copy;
+    try {
+        copy = yalahoo::rhi::readbackImage(readback, flip);
+    } catch (const std::runtime_error &error) {
+        qWarning("Title readback failed: %s", error.what());
+    }
+    inFlight = false;
+    drain = 0;
+    QMetaObject::invokeMethod(
+            &window,
+            [&, copy] {
+                completed(copy);
+            },
+            Qt::QueuedConnection);
+}
+
+auto bindTitleFrames(std::atomic<bool> &requested, std::atomic<bool> &inFlight,
+                     OffscreenSurface &surface, std::atomic<int> &drain,
+                     QRhiReadbackResult &readback, QQuickWindow &window,
+                     std::function<void(QImage)> &completed)
+{
+    if (!requested || inFlight)
+        return;
+    auto *rhi = surface.rhi();
+    auto *commandBuffer = surface.commandBuffer();
+    if (!rhi || !commandBuffer)
+        return;
+    requested = false;
+    inFlight = true;
+    drain = rhi->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1;
+    const bool flip = rhi->isYUpInFramebuffer();
+    readback.completed = [&, flip] {
+        return bindTitleFramesObserveFrame(readback, flip, inFlight, drain, window, completed);
+    };
+    auto *batch = rhi->nextResourceUpdateBatch();
+    batch->readBackTexture(surface.readbackDescription(), &readback);
+    commandBuffer->resourceUpdate(batch);
+}
+}
+
+namespace {
+
+auto recordHeaderPositions(QQuickItem *&root, QMutex &positionsMutex,
+                           QPointF &synchronizedPlayPosition, QPointF &synchronizedStopPosition,
+                           int &animatedFrame, QPointF &initialPlayPosition,
+                           QPointF &initialStopPosition, bool &fixedButtons,
+                           QJsonArray &headerPositions)
+{
+    auto *play = root->findChild<QQuickItem *>("playButton");
+    auto *stop = root->findChild<QQuickItem *>("stopButton");
+    if (play && stop) {
+        const QMutexLocker lock(&positionsMutex);
+        const auto playPosition = synchronizedPlayPosition;
+        const auto stopPosition = synchronizedStopPosition;
+        // Establish the prepared layout before the first playback change at 8.
+        if (animatedFrame == 7) {
+            initialPlayPosition = playPosition;
+            initialStopPosition = stopPosition;
+        }
+        if (animatedFrame >= 7)
+            fixedButtons &= QLineF(initialPlayPosition, playPosition).length() < .01
+                    && QLineF(initialStopPosition, stopPosition).length() < .01;
+        headerPositions.append(QJsonObject{ { u"frame"_s, animatedFrame },
+                                            { u"playX"_s, playPosition.x() },
+                                            { u"playY"_s, playPosition.y() },
+                                            { u"stopX"_s, stopPosition.x() },
+                                            { u"stopY"_s, stopPosition.y() } });
+    } else {
+        fixedButtons = false;
+    }
+}
+
+auto advanceTitleFrame(bool &animationRun, int &animatedFrame, yalahoo::LibrarySession &session,
+                       bool &headerRun, QQuickItem *&root, QMutex &positionsMutex,
+                       QPointF &synchronizedPlayPosition, QPointF &synchronizedStopPosition,
+                       QPointF &initialPlayPosition, QPointF &initialStopPosition,
+                       bool &fixedButtons, QJsonArray &headerPositions,
+                       yalahoo::TitleReel &controller, yalahoo::FrameClock &clock, qint64 &tickNs,
+                       QJsonArray &frameRecords, std::atomic<qint64> &syncNs,
+                       std::atomic<qint64> &renderNs, QElapsedTimer &timer, bool &noFrameShaping)
+{
+    if (animationRun && animatedFrame % 40 == 0) {
+        session.navigate(animatedFrame % 80 == 0 ? u"album-0"_s : u"album-1"_s);
+    }
+    if (headerRun) {
+        recordHeaderPositions(root, positionsMutex, synchronizedPlayPosition,
+                              synchronizedStopPosition, animatedFrame, initialPlayPosition,
+                              initialStopPosition, fixedButtons, headerPositions);
+    }
+    const auto before = controller.diagnostics()[u"layoutMisses"_s];
+    if (headerRun && animatedFrame == 7)
+        root->setProperty("testReduced", false);
+    if (headerRun && animatedFrame == 8)
+        session.setPlaybackIds(u"album-1"_s, u"track-1"_s);
+    if (headerRun && animatedFrame == 15)
+        clock.setSpeed(.25);
+    if (headerRun && animatedFrame == 21) {
+        clock.setSpeed(3);
+        session.setPlaybackIds(u"album-2"_s, u"track-2"_s);
+    }
+    if (headerRun && animatedFrame == 25)
+        root->setProperty("testReduced", true);
+    QElapsedTimer tickTimer;
+    tickTimer.start();
+    clock.advance(animationRun ? 1.0 / 120 : 1.0 / 60);
+    const auto tick = tickTimer.nsecsElapsed();
+    tickNs += tick;
+    if (animationRun)
+        frameRecords.append(QJsonObject{
+                { u"frame"_s, animatedFrame },
+                { u"stateForNextSubmissionTickCpuNs"_s, double(tick) },
+                { u"synchronizationCpuCumulativeNs"_s, double(syncNs.load()) },
+                { u"renderSubmitCpuCumulativeNs"_s, double(renderNs.load()) },
+                { OffscreenSurface::Enabled ? u"offscreenFrameCompletedNs"_s : u"presentEventNs"_s,
+                  double(timer.nsecsElapsed()) } });
+    noFrameShaping &= controller.diagnostics()[u"layoutMisses"_s] == before;
+    ++animatedFrame;
+}
+
+auto captureTitleLayouts(int &warmFrames, bool &animationRun, bool &headerRun, int &animatedFrame,
+                         yalahoo::LibrarySession &session, QQuickItem *&root,
+                         QMutex &positionsMutex, QPointF &synchronizedPlayPosition,
+                         QPointF &synchronizedStopPosition, QPointF &initialPlayPosition,
+                         QPointF &initialStopPosition, bool &fixedButtons,
+                         QJsonArray &headerPositions, yalahoo::TitleReel &controller,
+                         yalahoo::FrameClock &clock, qint64 &tickNs, QJsonArray &frameRecords,
+                         std::atomic<qint64> &syncNs, std::atomic<qint64> &renderNs,
+                         QElapsedTimer &timer, bool &noFrameShaping, std::atomic<bool> &requested,
+                         int &marker, OffscreenSurface &surface, std::atomic<bool> &inFlight,
+                         std::atomic<int> &drain)
+{
+    if (warmFrames > 0) {
+        if (animationRun || headerRun) {
+            advanceTitleFrame(animationRun, animatedFrame, session, headerRun, root, positionsMutex,
+                              synchronizedPlayPosition, synchronizedStopPosition,
+                              initialPlayPosition, initialStopPosition, fixedButtons,
+                              headerPositions, controller, clock, tickNs, frameRecords, syncNs,
+                              renderNs, timer, noFrameShaping);
+        }
+        --warmFrames;
+        requested = warmFrames == 0;
+        root->setProperty("marker", ++marker);
+        surface.requestFrame();
+    } else if (inFlight && drain > 0) {
+        --drain;
+        root->setProperty("marker", ++marker);
+        surface.requestFrame();
+    }
+}
+}
+
+namespace {
+auto finalizeTitleAudit(const QString &output, int &step, const int &staticSteps,
+                        const int &animationSteps, const int &headerSteps, int &warmFrames,
+                        std::atomic<bool> &requested, std::atomic<bool> &inFlight,
+                        std::atomic<int> &drain, QQuickWindow &window,
+                        std::atomic<bool> &restorePending, const double &dpr, QGuiApplication &app)
+{
+    QSaveFile file(output + "/timeout.json"_L1);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(QJsonObject{ { u"passed"_s, false },
+                                              { u"step"_s, step },
+                                              { u"staticSteps"_s, staticSteps },
+                                              { u"animationSteps"_s, animationSteps },
+                                              { u"headerSteps"_s, headerSteps },
+                                              { u"warmFrames"_s, warmFrames },
+                                              { u"requested"_s, requested.load() },
+                                              { u"inFlight"_s, inFlight.load() },
+                                              { u"drain"_s, drain.load() },
+                                              { u"visible"_s, window.isVisible() },
+                                              { u"exposed"_s, window.isExposed() },
+                                              { u"restorePending"_s, restorePending.load() },
+                                              { u"dpr"_s, dpr },
+                                              { u"windowPolicy"_s,
+                                                yalahoo::verification::windowPolicy(window) } })
+                           .toJson());
+        file.commit();
+    }
+    app.exit(7);
+}
+}
+
+namespace {
+
+auto finishTitleAudit_observeFrame(bool &passed, const QString &output, QGuiApplication &app,
+                                   const double &motionError, QQuickWindow &window,
+                                   OffscreenSurface &surface, const QString &sourceDirectory,
+                                   QJsonArray &captures, QJsonArray &lifecycle,
+                                   QJsonArray &animatedCosts, QJsonArray &headerChecks,
+                                   QJsonArray &costs)
+{
+    const bool released = yalahoo::ReelInk::liveNodes() == 0 && canvasTitleStats().renderers == 0;
+    passed &= released;
+    QSaveFile file(output + "/report.json"_L1);
+    if (!file.open(QIODevice::WriteOnly)) {
+        app.exit(5);
+        return;
+    }
+    file.write(QJsonDocument(
+                       QJsonObject{
+                               { u"passed"_s, passed },
+                               { u"motionError"_s, motionError },
+                               { u"dpr"_s, window.devicePixelRatio() },
+                               { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                               { u"offscreen"_s, OffscreenSurface::Enabled },
+                               { u"renderProtocol"_s,
+                                 OffscreenSurface::Enabled ? u"render-control-gui-thread"_s
+                                                           : u"native-window"_s },
+                               { u"offscreenResourcePlan"_s, surface.diagnostics() },
+                               { u"backend"_s,
+                                 QString::fromUtf8(yalahoo::graphicsBackendName(
+                                         window.rendererInterface()->graphicsApi())) },
+                               { u"sourceDirectory"_s, sourceDirectory },
+                               { u"captures"_s, captures },
+                               { u"lifecycle"_s, lifecycle },
+                               { u"animatedCosts"_s, animatedCosts },
+                               { u"headerChecks"_s, headerChecks },
+                               { u"costs"_s, costs },
+                               { u"released"_s, released },
+                               { u"canvasSyncCpuNs"_s, double(canvasTitleStats().syncNs.load()) },
+                               { u"canvasPaintCpuNs"_s, double(canvasTitleStats().paintNs.load()) },
+                               { u"canvasPaints"_s, double(canvasTitleStats().paints.load()) },
+                               { u"windowPolicy"_s, yalahoo::verification::windowPolicy(window) } })
+                       .toJson());
+    app.exit(file.commit() && passed ? 0 : 6);
+}
+
+auto finishTitleAudit(int &step, const int &staticSteps, const int &animationSteps,
+                      const int &headerSteps, QQuickItem *&root, std::unique_ptr<QObject> &object,
+                      QQuickWindow &window, OffscreenSurface &surface, QGuiApplication &app,
+                      bool &passed, const QString &output, const double &motionError,
+                      const QString &sourceDirectory, QJsonArray &captures, QJsonArray &lifecycle,
+                      QJsonArray &animatedCosts, QJsonArray &headerChecks, QJsonArray &costs,
+                      qint64 &beginSync, std::atomic<qint64> &syncNs, qint64 &beginRender,
+                      std::atomic<qint64> &renderNs, qint64 &beginCanvasSync,
+                      qint64 &beginCanvasPaint, quint64 &beginCanvasPaints, quint64 &beginGeometry,
+                      quint64 &beginReuse, QJsonArray &cases, yalahoo::TitleReel &controller,
+                      bool &animationRun, bool &headerRun, int &animatedFrame, qint64 &tickNs,
+                      bool &fixedButtons, bool &noFrameShaping, QJsonArray &frameRecords,
+                      QJsonArray &headerPositions, yalahoo::FrameClock &clock,
+                      const QList<QSize> &productSizes, yalahoo::LayoutMetrics &metrics,
+                      yalahoo::LibrarySession &session, yalahoo::LibrarySnapshot &library,
+                      std::atomic<bool> &restorePending, int &marker, qint64 &guiNs,
+                      int &warmFrames)
+{
+    if (step >= staticSteps + animationSteps + headerSteps + 10) {
+        root->setParentItem(nullptr);
+        object.reset();
+        if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic"_ba) {
+            // Run Qt's queued renderer deletions with a current context before hiding.
+            QObject::connect(
+                    &window, &QQuickWindow::frameSwapped, &window,
+                    [&] {
+                        surface.hide();
+                        window.releaseResources();
+                        window.destroy();
+                    },
+                    Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+            surface.requestFrame();
+        } else {
+            surface.hide();
+            window.releaseResources();
+        }
+        QTimer::singleShot(RestoreSettleMilliseconds, &app, [&] {
+            return finishTitleAudit_observeFrame(passed, output, app, motionError, window, surface,
+                                                 sourceDirectory, captures, lifecycle,
+                                                 animatedCosts, headerChecks, costs);
+        });
+        return;
+    }
+    beginSync = syncNs;
+    beginRender = renderNs;
+    beginCanvasSync = canvasTitleStats().syncNs;
+    beginCanvasPaint = canvasTitleStats().paintNs;
+    beginCanvasPaints = canvasTitleStats().paints;
+    beginGeometry = yalahoo::ReelInk::geometryUpdates();
+    beginReuse = yalahoo::ReelInk::geometryReuses();
+    QElapsedTimer guiTimer;
+    guiTimer.start();
+    if (step < staticSteps) {
+        const auto test = cases[step / 3].toObject();
+        root->setProperty("mode", step % 3);
+        root->setProperty("night", test[u"night"_s].toBool());
+        const QSize size(test[u"width"_s].toInt() + 2, test[u"budget"_s].toInt() + 2);
+        window.resize(size);
+        root->setSize(size);
+        controller.setAvailableWidth(test[u"width"_s].toDouble());
+        controller.setBudget(test[u"budget"_s].toDouble());
+        controller.setPixelSize(test[u"size"_s].toDouble());
+        controller.setText(test[u"text"_s].toString());
+        controller.reconcile();
+    } else if (step < staticSteps + animationSteps) {
+        animationRun = true;
+        headerRun = false;
+        animatedFrame = 0;
+        tickNs = 0;
+        fixedButtons = true;
+        noFrameShaping = true;
+        frameRecords = { };
+        root->setProperty("mode", (step - staticSteps) % 3);
+        root->setProperty("night", false);
+        controller.setReducedMotion(false);
+        controller.setAvailableWidth(300);
+        controller.setBudget(150);
+        controller.setPixelSize(28);
+        window.resize(302, 152);
+        root->setSize(window.size());
+        controller.reconcile();
+    } else if (step < staticSteps + animationSteps + headerSteps) {
+        animationRun = false;
+        headerRun = true;
+        controller.setActive(false);
+        animatedFrame = 0;
+        tickNs = 0;
+        fixedButtons = true;
+        headerPositions = { };
+        clock.setSpeed(1);
+        const int index = step - staticSteps - animationSteps;
+        const auto size = productSizes[index / 2];
+        window.resize(size);
+        root->setSize(size);
+        metrics.setViewport(size.width(), size.height());
+        root->setProperty("headerMode", true);
+        root->setProperty("testReduced", true);
+        root->setProperty("night", index % 2 != 0);
+        root->setProperty("lastAction", u""_s);
+        session.setPlaybackIds(u"album-0"_s, u"track-0"_s);
+        root->setProperty("song", library.albums[0].tracks[0].title);
+        root->setProperty("playing", index % 2 != 0);
+    } else {
+        animationRun = false;
+        headerRun = false;
+        controller.setActive(true);
+        root->setProperty("headerMode", false);
+        root->setProperty("testReduced", true);
+        controller.setReducedMotion(true);
+        restorePending = true;
+        surface.hide();
+        window.releaseResources();
+        if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic"_ba) {
+            restorePending = false;
+            window.destroy();
+            QTimer::singleShot(0, &window, [&] {
+                window.create();
+                surface.show();
+                root->setProperty("marker", ++marker);
+                surface.requestFrame();
+            });
+        }
+        controller.setAvailableWidth(300 + (step % 2) * 20);
+        window.resize(int(controller.availableWidth()) + 2, 152);
+        root->setSize(window.size());
+        controller.reconcile();
+        root->setProperty("mode", (step - staticSteps) % 3);
+    }
+    guiNs = guiTimer.nsecsElapsed();
+    ++step;
+    warmFrames = animationRun ? 120 : headerRun ? 60 : 3;
+    root->setProperty("marker", ++marker);
+    surface.requestFrame();
+}
+}
+
+namespace {
+auto reviewTitleObserveFrame(QQuickWindow &window, std::atomic<bool> &restorePending,
+                             OffscreenSurface &surface, QQuickItem *&root, int &marker)
+{
+    QMetaObject::invokeMethod(
+            &window,
+            [&] {
+                if (!restorePending.exchange(false))
+                    return;
+                surface.show();
+                root->setProperty("marker", ++marker);
+                surface.requestFrame();
+            },
+            Qt::QueuedConnection);
 }
 }
 int reviewTitle(QGuiApplication &app, const QString &output, const QString &source)
@@ -355,442 +915,45 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
     QObject::connect(
             &window, &QQuickWindow::sceneGraphInvalidated, &window,
             [&] {
-                QMetaObject::invokeMethod(
-                        &window,
-                        [&] {
-                            if (!restorePending.exchange(false))
-                                return;
-                            surface.show();
-                            root->setProperty("marker", ++marker);
-                            surface.requestFrame();
-                        },
-                        Qt::QueuedConnection);
+                return reviewTitleObserveFrame(window, restorePending, surface, root, marker);
             },
             Qt::DirectConnection);
     QObject::connect(
             &window, &QQuickWindow::afterRendering, &window,
             [&] {
-                if (!requested || inFlight)
-                    return;
-                auto *rhi = surface.rhi();
-                auto *commandBuffer = surface.commandBuffer();
-                if (!rhi || !commandBuffer)
-                    return;
-                requested = false;
-                inFlight = true;
-                drain = rhi->resourceLimit(QRhi::MaxAsyncReadbackFrames) + 1;
-                const bool flip = rhi->isYUpInFramebuffer();
-                readback.completed = [&, flip] {
-                    QImage copy;
-                    try {
-                        copy = yalahoo::rhi::readbackImage(readback, flip);
-                    } catch (const std::runtime_error &error) {
-                        qWarning("Title readback failed: %s", error.what());
-                    }
-                    inFlight = false;
-                    drain = 0;
-                    QMetaObject::invokeMethod(
-                            &window,
-                            [&, copy] {
-                                completed(copy);
-                            },
-                            Qt::QueuedConnection);
-                };
-                auto *batch = rhi->nextResourceUpdateBatch();
-                batch->readBackTexture(surface.readbackDescription(), &readback);
-                commandBuffer->resourceUpdate(batch);
+                return bindTitleFrames(requested, inFlight, surface, drain, readback, window,
+                                       completed);
             },
             Qt::DirectConnection);
     surface.connectFrames(&app, [&] {
-        if (warmFrames > 0) {
-            if (animationRun || headerRun) {
-                if (animationRun && animatedFrame % 40 == 0) {
-                    session.navigate(animatedFrame % 80 == 0 ? u"album-0"_s : u"album-1"_s);
-                }
-                if (headerRun) {
-                    auto *play = root->findChild<QQuickItem *>("playButton");
-                    auto *stop = root->findChild<QQuickItem *>("stopButton");
-                    if (play && stop) {
-                        const QMutexLocker lock(&positionsMutex);
-                        const auto playPosition = synchronizedPlayPosition;
-                        const auto stopPosition = synchronizedStopPosition;
-                        // Establish the prepared layout before the first playback change at 8.
-                        if (animatedFrame == 7) {
-                            initialPlayPosition = playPosition;
-                            initialStopPosition = stopPosition;
-                        }
-                        if (animatedFrame >= 7)
-                            fixedButtons &= QLineF(initialPlayPosition, playPosition).length() < .01
-                                    && QLineF(initialStopPosition, stopPosition).length() < .01;
-                        headerPositions.append(QJsonObject{ { u"frame"_s, animatedFrame },
-                                                            { u"playX"_s, playPosition.x() },
-                                                            { u"playY"_s, playPosition.y() },
-                                                            { u"stopX"_s, stopPosition.x() },
-                                                            { u"stopY"_s, stopPosition.y() } });
-                    } else {
-                        fixedButtons = false;
-                    }
-                }
-                const auto before = controller.diagnostics()[u"layoutMisses"_s];
-                if (headerRun && animatedFrame == 7)
-                    root->setProperty("testReduced", false);
-                if (headerRun && animatedFrame == 8)
-                    session.setPlaybackIds(u"album-1"_s, u"track-1"_s);
-                if (headerRun && animatedFrame == 15)
-                    clock.setSpeed(.25);
-                if (headerRun && animatedFrame == 21) {
-                    clock.setSpeed(3);
-                    session.setPlaybackIds(u"album-2"_s, u"track-2"_s);
-                }
-                if (headerRun && animatedFrame == 25)
-                    root->setProperty("testReduced", true);
-                QElapsedTimer tickTimer;
-                tickTimer.start();
-                clock.advance(animationRun ? 1.0 / 120 : 1.0 / 60);
-                const auto tick = tickTimer.nsecsElapsed();
-                tickNs += tick;
-                if (animationRun)
-                    frameRecords.append(QJsonObject{
-                            { u"frame"_s, animatedFrame },
-                            { u"stateForNextSubmissionTickCpuNs"_s, double(tick) },
-                            { u"synchronizationCpuCumulativeNs"_s, double(syncNs.load()) },
-                            { u"renderSubmitCpuCumulativeNs"_s, double(renderNs.load()) },
-                            { OffscreenSurface::Enabled ? u"offscreenFrameCompletedNs"_s
-                                                        : u"presentEventNs"_s,
-                              double(timer.nsecsElapsed()) } });
-                noFrameShaping &= controller.diagnostics()[u"layoutMisses"_s] == before;
-                ++animatedFrame;
-            }
-            --warmFrames;
-            requested = warmFrames == 0;
-            root->setProperty("marker", ++marker);
-            surface.requestFrame();
-        } else if (inFlight && drain > 0) {
-            --drain;
-            root->setProperty("marker", ++marker);
-            surface.requestFrame();
-        }
+        return captureTitleLayouts(warmFrames, animationRun, headerRun, animatedFrame, session,
+                                   root, positionsMutex, synchronizedPlayPosition,
+                                   synchronizedStopPosition, initialPlayPosition,
+                                   initialStopPosition, fixedButtons, headerPositions, controller,
+                                   clock, tickNs, frameRecords, syncNs, renderNs, timer,
+                                   noFrameShaping, requested, marker, surface, inFlight, drain);
     });
     const int staticSteps = cases.size() * 3;
     const int animationSteps = 3 * costRuns;
     const int headerSteps = productSizes.size() * 2;
     completed = [&](QImage image) {
-        const int index = step - 1;
-        if (index < staticSteps) {
-            const auto test = cases[index / 3].toObject();
-            const int mode = index % 3;
-            const QSize captureSize(
-                    qRound(test[u"width"_s].toDouble() * window.devicePixelRatio()),
-                    qRound(test[u"budget"_s].toDouble() * window.devicePixelRatio()));
-            const auto actual = image.copy(QRect(QPoint(), captureSize));
-            const QString filename = u"native-%1-mode-%2.png"_s.arg(index / 3).arg(mode);
-            const bool valid = !image.isNull() && image.width() >= captureSize.width()
-                    && image.height() >= captureSize.height()
-                    && actual.save(output + '/'_L1 + filename)
-                    && yalahoo::verification::windowPolicySatisfied(window);
-            const auto geometry = structure(controller, test[u"state"_s].toObject());
-            const auto layers = layerStructure(root, controller, mode);
-            const bool structurePassed =
-                    valid && geometry[u"passed"_s].toBool() && layers[u"passed"_s].toBool();
-            if (mode == 0)
-                passed &= structurePassed;
-            captures.append(QJsonObject{
-                    { u"case"_s, index / 3 },
-                    { u"mode"_s, mode },
-                    { u"file"_s, filename },
-                    { u"valid"_s, valid },
-                    { u"structurePassed"_s, structurePassed },
-                    { u"geometry"_s, geometry },
-                    { u"layers"_s, layers },
-                    { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
-            QSaveFile progress(output + "/captures.json"_L1);
-            if (progress.open(QIODevice::WriteOnly)) {
-                progress.write(QJsonDocument(captures).toJson());
-                progress.commit();
-            }
-            costs.append(
-                    QJsonObject{ { u"mode"_s, mode },
-                                 { u"guiStateNs"_s, guiNs },
-                                 { u"syncCpuNs"_s, double(syncNs.load() - beginSync) },
-                                 { u"renderSubmitCpuNs"_s, double(renderNs.load() - beginRender) },
-                                 { u"gpuTime"_s, QJsonValue::Null } });
-        } else if (index < staticSteps + animationSteps) {
-            const int mode = (index - staticSteps) % 3;
-            const bool nativeMode = mode == 0;
-            const auto reused = yalahoo::ReelInk::geometryReuses() - beginReuse;
-            const auto canvasPaints = canvasTitleStats().paints.load() - beginCanvasPaints;
-            const bool valid = !image.isNull() && noFrameShaping && (!nativeMode || reused > 0)
-                    && (nativeMode || yalahoo::ReelInk::geometryUpdates() == beginGeometry)
-                    && (mode == 2 || canvasPaints == 0)
-                    && yalahoo::verification::windowPolicySatisfied(window);
-            passed &= valid;
-            animatedCosts.append(QJsonObject{
-                    { u"run"_s, (index - staticSteps) / 3 },
-                    { u"mode"_s, (index - staticSteps) % 3 },
-                    { u"passed"_s, valid },
-                    { u"frames"_s, animatedFrame },
-                    { u"guiStateNs"_s, double(guiNs) },
-                    { u"clockTickCpuNs"_s, double(tickNs) },
-                    { u"samples"_s, frameRecords },
-                    { u"syncCpuNs"_s, double(syncNs.load() - beginSync) },
-                    { u"renderSubmitCpuNs"_s, double(renderNs.load() - beginRender) },
-                    { u"gpuTime"_s, QJsonValue::Null },
-                    { u"canvasSyncCpuNs"_s,
-                      double(canvasTitleStats().syncNs.load() - beginCanvasSync) },
-                    { u"canvasPaintCpuNs"_s,
-                      double(canvasTitleStats().paintNs.load() - beginCanvasPaint) },
-                    { u"canvasPaints"_s, double(canvasPaints) },
-                    { u"glyphNodesCreated"_s,
-                      double(yalahoo::ReelInk::geometryUpdates() - beginGeometry) },
-                    { u"glyphNodesReused"_s, double(reused) },
-                    { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
-        } else if (index < staticSteps + animationSteps + headerSteps) {
-            auto *song = root->findChild<QQuickItem *>("playingTitle");
-            auto *play = root->findChild<QQuickItem *>("playButton");
-            auto *stop = root->findChild<QQuickItem *>("stopButton");
-            bool valid = song && play && stop && !image.isNull() && fixedButtons
-                    && yalahoo::verification::windowPolicySatisfied(window);
-            const QString full = root->property("song").toString();
-            const int beforePlaybackChanges = playbackChanges;
-            const QString beforeAlbum = session.playbackAlbumId();
-            const QString beforeTrack = session.playbackTrackId();
-            const auto *tooltip =
-                    song ? qvariant_cast<QObject *>(song->property("toolTip")) : nullptr;
-            const bool fullNames = tooltip && tooltip->property("text").toString() == full
-                    && QQmlProperty::read(song, u"Accessible.name"_s,
-                                          QQmlEngine::contextForObject(song))
-                                    .toString()
-                            == u"\u5b9a\u4f4d\u6b4c\u66f2\uff1a"_s + full;
-            valid &= fullNames;
-            if (valid && song->width() > 0) {
-                const QPointF point = song->mapToScene({ song->width() / 2, song->height() / 2 });
-                QMouseEvent press(QEvent::MouseButtonPress, point,
-                                  window.mapToGlobal(point.toPoint()), Qt::LeftButton,
-                                  Qt::LeftButton, Qt::NoModifier);
-                QMouseEvent release(QEvent::MouseButtonRelease, point,
-                                    window.mapToGlobal(point.toPoint()), Qt::LeftButton,
-                                    Qt::NoButton, Qt::NoModifier);
-                QCoreApplication::sendEvent(&window, &press);
-                QCoreApplication::sendEvent(&window, &release);
-                valid &= root->property("lastAction").toString() == "locate-song"_L1;
-                session.navigate(beforeAlbum, beforeTrack);
-            }
-            const bool playbackUnchanged = beforePlaybackChanges == playbackChanges
-                    && beforeAlbum == session.playbackAlbumId()
-                    && beforeTrack == session.playbackTrackId();
-            valid &= playbackUnchanged;
-            auto *header = root->findChild<QQuickItem *>("archiveHeader");
-            auto *transportReel = header
-                    ? qvariant_cast<yalahoo::TitleReel *>(header->property("transportController"))
-                    : nullptr;
-            const bool reducedFinished = transportReel && !transportReel->moving();
-            valid &= reducedFinished;
-            const double songWidth = song ? song->width() : 0;
-            root->setProperty("testReduced", false);
-            root->setProperty("song", u""_s);
-            const bool exitDisabled = song && !song->isEnabled() && song->width() == songWidth
-                    && song->property("retainedTitle").toString() == full;
-            valid &= exitDisabled;
-            const auto playPosition = play ? play->mapToScene({ 0, 0 }) : QPointF();
-            const auto stopPosition = stop ? stop->mapToScene({ 0, 0 }) : QPointF();
-            if (play && stop)
-                valid &= playPosition.x() + play->width() <= window.width()
-                        && stopPosition.x() + stop->width() <= window.width();
-            else
-                valid = false;
-            const QString filename = u"header-%1.png"_s.arg(index - staticSteps - animationSteps);
-            valid &= image.save(output + '/'_L1 + filename);
-            passed &= valid;
-            headerChecks.append(
-                    QJsonObject{ { u"passed"_s, valid },
-                                 { u"file"_s, filename },
-                                 { u"title"_s, full },
-                                 { u"action"_s, root->property("lastAction").toString() },
-                                 { u"fixedButtons"_s, fixedButtons },
-                                 { u"positions"_s, headerPositions },
-                                 { u"fullNames"_s, fullNames },
-                                 { u"playbackUnchanged"_s, playbackUnchanged },
-                                 { u"reducedFinished"_s, reducedFinished },
-                                 { u"exitDisabled"_s, exitDisabled },
-                                 { u"width"_s, window.width() },
-                                 { u"height"_s, window.height() },
-                                 { u"songWidth"_s, songWidth } });
-        } else {
-            const auto nodes = yalahoo::ReelInk::liveNodes();
-            const auto renderers = canvasTitleStats().renderers.load();
-            // Each mode has a different owner; the bounded ceilings cover all ten restores.
-            lifecycleNodeLimit = std::max(lifecycleNodeLimit, quint64(controller.slotCount()));
-            lifecycleRendererLimit = 1;
-            const bool valid = nodes <= int(lifecycleNodeLimit)
-                    && renderers <= lifecycleRendererLimit
-                    && controller.diagnostics()[u"cacheBytes"_s].toInt()
-                            <= yalahoo::TextLayoutAdapter::CacheBytes
-                    && !image.isNull() && yalahoo::verification::windowPolicySatisfied(window);
-            passed &= valid;
-            lifecycle.append(QJsonObject{
-                    { u"cycle"_s, index - staticSteps - animationSteps - headerSteps },
-                    { u"passed"_s, valid },
-                    { u"liveInkNodes"_s, nodes },
-                    { u"liveCanvasRenderers"_s, renderers },
-                    { u"resources"_s, QJsonObject::fromVariantMap(controller.diagnostics()) } });
-        }
-        QTimer::singleShot(0, &app, [&] {
-            next();
-        });
+        return advanceTitleAudit(
+                step, staticSteps, cases, window, output, controller, root, passed, captures, costs,
+                guiNs, syncNs, beginSync, renderNs, beginRender, animationSteps, beginReuse,
+                beginCanvasPaints, noFrameShaping, beginGeometry, animatedCosts, animatedFrame,
+                tickNs, frameRecords, beginCanvasSync, beginCanvasPaint, headerSteps, fixedButtons,
+                playbackChanges, session, headerChecks, headerPositions, lifecycleNodeLimit,
+                lifecycleRendererLimit, lifecycle, app, next, image);
     };
     next = [&] {
-        if (step >= staticSteps + animationSteps + headerSteps + 10) {
-            root->setParentItem(nullptr);
-            object.reset();
-            if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic"_ba) {
-                // Run Qt's queued renderer deletions with a current context before hiding.
-                QObject::connect(
-                        &window, &QQuickWindow::frameSwapped, &window,
-                        [&] {
-                            surface.hide();
-                            window.releaseResources();
-                            window.destroy();
-                        },
-                        Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
-                surface.requestFrame();
-            } else {
-                surface.hide();
-                window.releaseResources();
-            }
-            QTimer::singleShot(RestoreSettleMilliseconds, &app, [&] {
-                const bool released =
-                        yalahoo::ReelInk::liveNodes() == 0 && canvasTitleStats().renderers == 0;
-                passed &= released;
-                QSaveFile file(output + "/report.json"_L1);
-                if (!file.open(QIODevice::WriteOnly)) {
-                    app.exit(5);
-                    return;
-                }
-                file.write(
-                        QJsonDocument(
-                                QJsonObject{
-                                        { u"passed"_s, passed },
-                                        { u"motionError"_s, motionError },
-                                        { u"dpr"_s, window.devicePixelRatio() },
-                                        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                        { u"offscreen"_s, OffscreenSurface::Enabled },
-                                        { u"renderProtocol"_s,
-                                          OffscreenSurface::Enabled ? u"render-control-gui-thread"_s
-                                                                    : u"native-window"_s },
-                                        { u"offscreenResourcePlan"_s, surface.diagnostics() },
-                                        { u"backend"_s,
-                                          QString::fromUtf8(yalahoo::graphicsBackendName(
-                                                  window.rendererInterface()->graphicsApi())) },
-                                        { u"sourceDirectory"_s, sourceDirectory },
-                                        { u"captures"_s, captures },
-                                        { u"lifecycle"_s, lifecycle },
-                                        { u"animatedCosts"_s, animatedCosts },
-                                        { u"headerChecks"_s, headerChecks },
-                                        { u"costs"_s, costs },
-                                        { u"released"_s, released },
-                                        { u"canvasSyncCpuNs"_s,
-                                          double(canvasTitleStats().syncNs.load()) },
-                                        { u"canvasPaintCpuNs"_s,
-                                          double(canvasTitleStats().paintNs.load()) },
-                                        { u"canvasPaints"_s,
-                                          double(canvasTitleStats().paints.load()) },
-                                        { u"windowPolicy"_s,
-                                          yalahoo::verification::windowPolicy(window) } })
-                                .toJson());
-                app.exit(file.commit() && passed ? 0 : 6);
-            });
-            return;
-        }
-        beginSync = syncNs;
-        beginRender = renderNs;
-        beginCanvasSync = canvasTitleStats().syncNs;
-        beginCanvasPaint = canvasTitleStats().paintNs;
-        beginCanvasPaints = canvasTitleStats().paints;
-        beginGeometry = yalahoo::ReelInk::geometryUpdates();
-        beginReuse = yalahoo::ReelInk::geometryReuses();
-        QElapsedTimer guiTimer;
-        guiTimer.start();
-        if (step < staticSteps) {
-            const auto test = cases[step / 3].toObject();
-            root->setProperty("mode", step % 3);
-            root->setProperty("night", test[u"night"_s].toBool());
-            const QSize size(test[u"width"_s].toInt() + 2, test[u"budget"_s].toInt() + 2);
-            window.resize(size);
-            root->setSize(size);
-            controller.setAvailableWidth(test[u"width"_s].toDouble());
-            controller.setBudget(test[u"budget"_s].toDouble());
-            controller.setPixelSize(test[u"size"_s].toDouble());
-            controller.setText(test[u"text"_s].toString());
-            controller.reconcile();
-        } else if (step < staticSteps + animationSteps) {
-            animationRun = true;
-            headerRun = false;
-            animatedFrame = 0;
-            tickNs = 0;
-            fixedButtons = true;
-            noFrameShaping = true;
-            frameRecords = { };
-            root->setProperty("mode", (step - staticSteps) % 3);
-            root->setProperty("night", false);
-            controller.setReducedMotion(false);
-            controller.setAvailableWidth(300);
-            controller.setBudget(150);
-            controller.setPixelSize(28);
-            window.resize(302, 152);
-            root->setSize(window.size());
-            controller.reconcile();
-        } else if (step < staticSteps + animationSteps + headerSteps) {
-            animationRun = false;
-            headerRun = true;
-            controller.setActive(false);
-            animatedFrame = 0;
-            tickNs = 0;
-            fixedButtons = true;
-            headerPositions = { };
-            clock.setSpeed(1);
-            const int index = step - staticSteps - animationSteps;
-            const auto size = productSizes[index / 2];
-            window.resize(size);
-            root->setSize(size);
-            metrics.setViewport(size.width(), size.height());
-            root->setProperty("headerMode", true);
-            root->setProperty("testReduced", true);
-            root->setProperty("night", index % 2 != 0);
-            root->setProperty("lastAction", u""_s);
-            session.setPlaybackIds(u"album-0"_s, u"track-0"_s);
-            root->setProperty("song", library.albums[0].tracks[0].title);
-            root->setProperty("playing", index % 2 != 0);
-        } else {
-            animationRun = false;
-            headerRun = false;
-            controller.setActive(true);
-            root->setProperty("headerMode", false);
-            root->setProperty("testReduced", true);
-            controller.setReducedMotion(true);
-            restorePending = true;
-            surface.hide();
-            window.releaseResources();
-            if (!OffscreenSurface::Enabled && qgetenv("QSG_RENDER_LOOP") == "basic"_ba) {
-                restorePending = false;
-                window.destroy();
-                QTimer::singleShot(0, &window, [&] {
-                    window.create();
-                    surface.show();
-                    root->setProperty("marker", ++marker);
-                    surface.requestFrame();
-                });
-            }
-            controller.setAvailableWidth(300 + (step % 2) * 20);
-            window.resize(int(controller.availableWidth()) + 2, 152);
-            root->setSize(window.size());
-            controller.reconcile();
-            root->setProperty("mode", (step - staticSteps) % 3);
-        }
-        guiNs = guiTimer.nsecsElapsed();
-        ++step;
-        warmFrames = animationRun ? 120 : headerRun ? 60 : 3;
-        root->setProperty("marker", ++marker);
-        surface.requestFrame();
+        return finishTitleAudit(
+                step, staticSteps, animationSteps, headerSteps, root, object, window, surface, app,
+                passed, output, motionError, sourceDirectory, captures, lifecycle, animatedCosts,
+                headerChecks, costs, beginSync, syncNs, beginRender, renderNs, beginCanvasSync,
+                beginCanvasPaint, beginCanvasPaints, beginGeometry, beginReuse, cases, controller,
+                animationRun, headerRun, animatedFrame, tickNs, fixedButtons, noFrameShaping,
+                frameRecords, headerPositions, clock, productSizes, metrics, session, library,
+                restorePending, marker, guiNs, warmFrames);
     };
     surface.show();
     QTimer::singleShot(0, &app, [&] {
@@ -799,27 +962,9 @@ int reviewTitle(QGuiApplication &app, const QString &output, const QString &sour
     const double dpr = window.devicePixelRatio();
     // Bound the complete own-render, animation and lifecycle verification.
     QTimer::singleShot(int(90000 * std::max(1.0, dpr * dpr)), &app, [&] {
-        QSaveFile file(output + "/timeout.json"_L1);
-        if (file.open(QIODevice::WriteOnly)) {
-            file.write(QJsonDocument(QJsonObject{ { u"passed"_s, false },
-                                                  { u"step"_s, step },
-                                                  { u"staticSteps"_s, staticSteps },
-                                                  { u"animationSteps"_s, animationSteps },
-                                                  { u"headerSteps"_s, headerSteps },
-                                                  { u"warmFrames"_s, warmFrames },
-                                                  { u"requested"_s, requested.load() },
-                                                  { u"inFlight"_s, inFlight.load() },
-                                                  { u"drain"_s, drain.load() },
-                                                  { u"visible"_s, window.isVisible() },
-                                                  { u"exposed"_s, window.isExposed() },
-                                                  { u"restorePending"_s, restorePending.load() },
-                                                  { u"dpr"_s, dpr },
-                                                  { u"windowPolicy"_s,
-                                                    yalahoo::verification::windowPolicy(window) } })
-                               .toJson());
-            file.commit();
-        }
-        app.exit(7);
+        return finalizeTitleAudit(output, step, staticSteps, animationSteps, headerSteps,
+                                  warmFrames, requested, inFlight, drain, window, restorePending,
+                                  dpr, app);
     });
     const int result = app.exec();
     QObject::disconnect(&window, nullptr, &window, nullptr);

@@ -40,16 +40,19 @@ InterfaceSoundController::InterfaceSoundController(QObject *parent)
             });
         }
     }
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this, [this] {
-        if (m_refreshPending)
-            return;
-        m_refreshPending = true;
-        QTimer::singleShot(0, this, [this] {
-            m_refreshPending = false;
-            refreshOutput();
-        });
-    });
+    connect(&m_devices, &QMediaDevices::audioOutputsChanged, this,
+            &InterfaceSoundController::scheduleOutputRefresh);
     refreshOutput();
+}
+void InterfaceSoundController::scheduleOutputRefresh()
+{
+    if (m_refreshPending)
+        return;
+    m_refreshPending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_refreshPending = false;
+        refreshOutput();
+    });
 }
 InterfaceSoundController::~InterfaceSoundController()
 {

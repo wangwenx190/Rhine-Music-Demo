@@ -16,7 +16,7 @@
 - **QT-07 所属线程执行对象操作。** GUI和模型在GUI线程，计时器/媒体worker在有事件循环的所属线程；QThread对象仍属于创建线程。moveToThread前核对子对象与parent；跨线程交接值，避免直接访问QObject。[线程与QObject](https://doc.qt.io/qt-6/threads-qobject.html)
 - **QT-08 可重入不等于线程安全。** 不同实例可并行操作不代表同一实例可并发修改；隐式共享副本也不为共享的原对象加锁。第三方回调和渲染线程引用要有独立同步协议。[可重入与线程安全](https://doc.qt.io/qt-6/threads-reentrancy.html)
 - **QT-09 退出协议保证销毁线程。** worker用finished到deleteLater或等价协议，任务依赖销毁前join/结束。核对线程未启动、早退、任务失败与应用退出；不能结束事件循环后才期望普通queued清理执行。[QThread](https://doc.qt.io/qt-6/qthread.html)
-- **QT-10 取消能力按真实实现判断。** Future取消未必停止底层计算；worker主动检查取消，结果带身份/版本。QFutureWatcher在启动前接好完成信号；容量覆盖在途、排队和完成邮箱，不只线程池大小。[QFutureWatcher](https://doc.qt.io/qt-6/qfuturewatcher.html)、[Qt Concurrent](https://doc.qt.io/qt-6/qtconcurrent-index.html)
+- **QT-10 取消能力按真实实现判断。** Future取消未必停止底层计算；worker主动检查取消，结果带身份/版本。QFutureWatcher在启动前接好完成信号；容量覆盖在途、排队和完成邮箱，不只线程池大小。[QFutureWatcher](https://doc.qt.io/qt-6/qfuturewatcher.html)、[Qt Concurrent](https://doc.qt.io/qt-6/qtconcurrent-index.html) 批量worker优先既有QtConcurrent与有界线程池；仅当QtTaskTree可显著消除实际异步编排、且收益完全抵消模块/配方/生命周期维护时引入，不为替换短小明确的完成回调增加新模块。
 - **QT-11 不阻塞常规GUI事件。** 扫描、解码和媒体探测异步；不在交互路径waitForFinished/sleep/手动processEvents。BlockingQueuedConnection只用于经过无环推演的必要协议，接收事件循环必须活动；不得用于常规热路径。[QEventLoop](https://doc.qt.io/qt-6/qeventloop.html)
 - **QT-12 时间与调度分开。** QTimer是唤醒机制，不保证准点；运动/超时依据单调经过时间。隐藏、取消和重建后检查旧timer回调代次；不以补发全部漏掉tick造成突发工作。[QTimer](https://doc.qt.io/qt-6/qtimer.html)、[QElapsedTimer](https://doc.qt.io/qt-6/qelapsedtimer.html)
 

@@ -29,32 +29,38 @@ struct PreferencesStore::Private final
     quint64 m_revision = 0;
     bool m_writable = true, m_dirty = false, m_saving = false, m_scheduled = false;
 };
+void PreferencesStore::load()
+{
+    QFile file(d->m_path);
+    if (!file.exists())
+        return;
+
+    QJsonParseError parse;
+    const bool opened = file.open(QIODevice::ReadOnly);
+    const auto document =
+            opened && file.size() <= yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
+            ? QJsonDocument::fromJson(file.readAll(), &parse)
+            : QJsonDocument();
+    if (!opened || document.isNull() || !document.isObject()) {
+        d->m_writable = false;
+        d->m_error = QCoreApplication::translate(
+                "Yalahoo",
+                "Cannot read preferences, or the file is damaged. The original file was preserved.");
+    } else {
+        d->m_document = document.object();
+        d->m_error = validate(d->m_document);
+        d->m_writable = d->m_error.isEmpty();
+        if (!d->m_writable)
+            d->m_document = { };
+    }
+}
 PreferencesStore::PreferencesStore(QString dataRoot, QObject *parent)
     : QObject(parent), d(std::make_unique<Private>())
 {
     d->m_path = QDir(dataRoot).filePath(u"preferences.json"_s);
     d->m_worker.setMaxThreadCount(1);
-    QFile file(d->m_path);
-    if (file.exists()) {
-        QJsonParseError parse;
-        const bool opened = file.open(QIODevice::ReadOnly);
-        const auto document =
-                opened && file.size() <= yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
-                ? QJsonDocument::fromJson(file.readAll(), &parse)
-                : QJsonDocument();
-        if (!opened || document.isNull() || !document.isObject()) {
-            d->m_writable = false;
-            d->m_error = QCoreApplication::translate(
-                    "Yalahoo",
-                    "Cannot read preferences, or the file is damaged. The original file was preserved.");
-        } else {
-            d->m_document = document.object();
-            d->m_error = validate(d->m_document);
-            d->m_writable = d->m_error.isEmpty();
-            if (!d->m_writable)
-                d->m_document = { };
-        }
-    }
+    load();
+
     if (!d->m_error.isEmpty())
         qCWarning(logSettings) << "Preferences load failed" << "path=" << d->m_path
                                << "error=" << d->m_error;
@@ -108,6 +114,7 @@ QVariantMap PreferencesStore::values() const
                         { u"arrayMode"_s, u"filled"_s },
                         { u"rememberColumnPosition"_s, true },
                         { u"reduced"_s, false },
+                        { u"singleInstance"_s, true },
                         { u"motionSpeed"_s, 1.0 },
                         { u"volume"_s, yalahoo::productDefaults::DefaultSongVolume },
                         { u"bgm"_s, true },
@@ -124,7 +131,8 @@ QString PreferencesStore::validate(const QJsonObject &document)
         return QCoreApplication::translate(
                 "Yalahoo",
                 "Unsupported preferences schemaVersion. The original file was preserved.");
-    for (auto key : { u"rememberColumnPosition"_s, u"reduced"_s, u"bgm"_s, u"sound"_s })
+    for (auto key :
+         { u"rememberColumnPosition"_s, u"reduced"_s, u"singleInstance"_s, u"bgm"_s, u"sound"_s })
         if (document.contains(key) && !document.value(key).isBool())
             return QCoreApplication::translate("Yalahoo", "Invalid preference switch type: ") + key;
     const QList<QPair<QString, QStringList>> choices{
@@ -243,6 +251,31 @@ void PreferencesStore::setNavigation(bool remember, bool realistic)
     update({ { u"rememberColumnPosition"_s, remember },
              { u"arrayMode"_s, realistic ? u"realistic"_s : u"filled"_s } });
 }
+QPair<QJsonObject, QString> PreferencesStore::readPreferenceImport(const QString &path)
+{
+    using Result = QPair<QJsonObject, QString>;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)
+        || file.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
+        return Result{ { },
+                       QCoreApplication::translate(
+                               "Yalahoo", "Cannot read preference JSON, or it exceeds 1 MiB.") };
+    const auto bytes = file.read(yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB + 1);
+    QJsonParseError parse;
+    const auto document = QJsonDocument::fromJson(bytes, &parse);
+    if (bytes.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
+        || file.error() != QFileDevice::NoError || parse.error != QJsonParseError::NoError
+        || !document.isObject())
+        return Result{ { },
+                       QCoreApplication::translate(
+                               "Yalahoo",
+                               "Invalid preference JSON. The original file was preserved.") };
+    auto object = document.object();
+    const auto error = validate(object);
+    if (!error.isEmpty())
+        return Result{ { }, error };
+    return Result{ object, { } };
+}
 bool PreferencesStore::importJson(const QUrl &url)
 {
     if (!d->m_writable || d->m_import.isRunning() || !url.isLocalFile()
@@ -266,31 +299,8 @@ bool PreferencesStore::importJson(const QUrl &url)
                 if (update(result.first.toVariantMap()))
                     Q_EMIT imported();
             });
-    d->m_import.setFuture(QtConcurrent::run(&d->m_worker, [path = url.toLocalFile()] {
-        using Result = QPair<QJsonObject, QString>;
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly)
-            || file.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
-            return Result{ { },
-                           QCoreApplication::translate(
-                                   "Yalahoo",
-                                   "Cannot read preference JSON, or it exceeds 1 MiB.") };
-        const auto bytes = file.read(yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB + 1);
-        QJsonParseError parse;
-        const auto document = QJsonDocument::fromJson(bytes, &parse);
-        if (bytes.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
-            || file.error() != QFileDevice::NoError || parse.error != QJsonParseError::NoError
-            || !document.isObject())
-            return Result{ { },
-                           QCoreApplication::translate(
-                                   "Yalahoo",
-                                   "Invalid preference JSON. The original file was preserved.") };
-        auto object = document.object();
-        const auto error = validate(object);
-        if (!error.isEmpty())
-            return Result{ { }, error };
-        return Result{ object, { } };
-    }));
+    d->m_import.setFuture(QtConcurrent::run(&d->m_worker, &PreferencesStore::readPreferenceImport,
+                                            url.toLocalFile()));
     return true;
 }
 // Write a complete validated candidate with QSaveFile. Failure leaves the previous file intact;

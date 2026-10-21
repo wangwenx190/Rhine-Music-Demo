@@ -98,6 +98,34 @@ QVector3D floorPoint(const Input &input, int x, int y, QSize size)
             + up * (ny / input.scene.projection(1, 1)) - back;
     return (camera + ray * ((-4.63 - camera.y) / ray.y)).qt();
 }
+
+namespace {
+auto floorReferenceDirect(const QVector3D &view, const FloorLookup &dfg, const double &r,
+                          const double &f0, const double &ems, const double &single,
+                          const double &average, double nv, double pi, const Input &input,
+                          QVector3D light, QVector3D energy)
+{
+    const double nl = std::clamp(double(light.y()), 0., 1.);
+    if (nl == 0)
+        return QVector3D();
+    const auto half = (view + light).normalized();
+    const double nh = std::clamp(double(half.y()), 0., 1.);
+    const double vh = std::clamp(double(QVector3D::dotProduct(view, half)), 0., 1.);
+    const double aa = std::pow(r, 4);
+    const double visibility = .5
+            / std::max(nl * std::sqrt(aa + (1 - aa) * nv * nv)
+                               + nv * std::sqrt(aa + (1 - aa) * nl * nl),
+                       1e-6);
+    const double distribution = aa / (pi * std::pow(nh * nh * (aa - 1) + 1, 2));
+    const double fresnel = f0 + (1 - f0) * std::exp2((-5.55473 * vh - 6.98316) * vh);
+    const auto fl = dfg.sample(r, nl);
+    const double sl = f0 * fl.x() + fl.y();
+    const double compensation = ems * (1 - fl.x() - fl.y());
+    const double brdf = fresnel * visibility * distribution
+            + single * sl * average / (1 - compensation * average + 1e-6) * compensation;
+    return energy * float(nl) * (input.floorColor / float(pi) + QVector3D(1, 1, 1) * float(brdf));
+}
+}
 QVector3D floorReference(const Input &input, QVector3D world, double shadow)
 {
     static const FloorLookup dfg(":/rhi/environment/dfg.rgba32f", 16, 16);
@@ -110,26 +138,8 @@ QVector3D floorReference(const Input &input, QVector3D world, double shadow)
     const double multi = single * average / (1 - ems * average) * ems;
     auto outgoing = input.floorColor * input.skyColor * float(input.lightIntensities.y() / pi);
     const auto direct = [&](QVector3D light, QVector3D energy) {
-        const double nl = std::clamp(double(light.y()), 0., 1.);
-        if (nl == 0)
-            return QVector3D();
-        const auto half = (view + light).normalized();
-        const double nh = std::clamp(double(half.y()), 0., 1.);
-        const double vh = std::clamp(double(QVector3D::dotProduct(view, half)), 0., 1.);
-        const double aa = std::pow(r, 4);
-        const double visibility = .5
-                / std::max(nl * std::sqrt(aa + (1 - aa) * nv * nv)
-                                   + nv * std::sqrt(aa + (1 - aa) * nl * nl),
-                           1e-6);
-        const double distribution = aa / (pi * std::pow(nh * nh * (aa - 1) + 1, 2));
-        const double fresnel = f0 + (1 - f0) * std::exp2((-5.55473 * vh - 6.98316) * vh);
-        const auto fl = dfg.sample(r, nl);
-        const double sl = f0 * fl.x() + fl.y();
-        const double compensation = ems * (1 - fl.x() - fl.y());
-        const double brdf = fresnel * visibility * distribution
-                + single * sl * average / (1 - compensation * average + 1e-6) * compensation;
-        return energy * float(nl)
-                * (input.floorColor / float(pi) + QVector3D(1, 1, 1) * float(brdf));
+        return floorReferenceDirect(view, dfg, r, f0, ems, single, average, nv, pi, input, light,
+                                    energy);
     };
     outgoing += direct(QVector3D(-6, 14, -5).normalized(),
                        input.keyColor * float(input.lightIntensities.x() * shadow));

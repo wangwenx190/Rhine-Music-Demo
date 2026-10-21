@@ -205,6 +205,8 @@
 | Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tests/tools/UnixDeploymentTest.py`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、Release IPO及GCC ICF或Clang linker ICF、ELF/ldd/全部暂存ELF strip后保留动态导出/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
 | 后端与日志 | 使用Release `graphics-backend`、`logging`、`logging-terminal`及普通部署包。Windows显式D3D11/12、Windows/Linux的OpenGL与已启用Vulkan、macOS Vulkan核对真实API；Qt特性或设备/格式不支持时明确报错并非零退出。Linux默认Vulkan不可用时警告并回退OpenGL，显式请求不回退。目标成功路径需真实输出，不能只看初始化。日志目录/上界/轮转按logging.md；Windows真实控制台VT颜色/UTF-8及重定向正常。 |
 
+- SINGLE-INSTANCE-P：Windows/Linux尚缺本机QLockFile与QLocalServer（named pipe/Unix socket）的真实进程仲裁及窗口激活事实。源码为SingleInstance、main、PreferencesStore/SettingsController和SettingsPanel；匿名输入由SingleInstanceTest/SettingsTest生成。依赖目标Release包及正常桌面会话，入口为`ctest --preset qt-release -R '^(single-instance|settings)$'`，并在普通产品设置中切换模式、重启、再次启动同一目录及独立临时目录。退出要求为开启时仅原实例处理激活、关闭时可多开、目录隔离、退出/崩溃锁恢复、错误不降级启动；真实前台/最小化恢复需遵守当轮窗口授权，macOS物理激活同归下方产品/输入任务。目标构建仍按本组原门槛，不以主机测试代替。
+
 部署验证失败保留旧包；加载探针仅证明实际报告中的加载事实。产品功能、设备与窗口检查直接共用下方正常产品会话，不在部署后再跑整套组件/性能矩阵。macOS当前Kit未启用Vulkan，缺对应原生Kit/SDK/MoltenVK；未具能力时保留该具体缺口。
 
 ### 联网资料目标运行 · ONLINE-METADATA-P

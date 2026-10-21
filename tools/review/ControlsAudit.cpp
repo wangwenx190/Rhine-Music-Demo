@@ -27,6 +27,25 @@ constexpr int BackendDeadlineMilliseconds = 5000;
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+
+namespace {
+auto renderControlsFrame(OffscreenSurface &surface)
+{
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    bool rendered = false;
+    surface.connectFrames(&loop, [&] {
+        rendered = true;
+        loop.quit();
+    });
+    QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timeout.start(BackendDeadlineMilliseconds);
+    surface.requestFrame();
+    loop.exec();
+    return rendered;
+}
+}
 int reviewControls(const QString &output)
 {
     QDir().mkpath(output);
@@ -47,19 +66,7 @@ int reviewControls(const QString &output)
     OffscreenSurface surface(window, control);
     surface.show();
     const auto render = [&] {
-        QEventLoop loop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        bool rendered = false;
-        surface.connectFrames(&loop, [&] {
-            rendered = true;
-            loop.quit();
-        });
-        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        timeout.start(BackendDeadlineMilliseconds);
-        surface.requestFrame();
-        loop.exec();
-        return rendered;
+        return renderControlsFrame(surface);
     };
     const auto item = [&](const char *name) {
         return root->findChild<QQuickItem *>(name);

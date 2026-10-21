@@ -145,6 +145,22 @@ public:
     }
 
 private:
+    struct State;
+    static void queueCapture(const std::shared_ptr<State> &state,
+                             const QPointer<QQuickWindow> &guard, rhi::Capture capture)
+    {
+        if (guard)
+            QMetaObject::invokeMethod(
+                    guard,
+                    [state, capture = std::move(capture)]() mutable {
+                        if (state->loop && capture.request == state->request) {
+                            state->capture = std::move(capture);
+                            state->loop->quit();
+                        }
+                    },
+                    Qt::QueuedConnection);
+    }
+
     void createWindow()
     {
         window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? &control : nullptr);
@@ -167,16 +183,7 @@ private:
                          });
         const QPointer<QQuickWindow> guard(window.get());
         item->captured = [state = state, guard](rhi::Capture capture) {
-            if (guard)
-                QMetaObject::invokeMethod(
-                        guard,
-                        [state, capture = std::move(capture)]() mutable {
-                            if (state->loop && capture.request == state->request) {
-                                state->capture = std::move(capture);
-                                state->loop->quit();
-                            }
-                        },
-                        Qt::QueuedConnection);
+            queueCapture(state, guard, std::move(capture));
         };
     }
     void destroyWindow()

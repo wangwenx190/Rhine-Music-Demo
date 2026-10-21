@@ -42,6 +42,74 @@ QQuickItem *visualItem(QQuickItem *root, const QString &name)
 }
 }
 
+namespace yalahoo {
+namespace {
+// Shared references remain valid until this review event loop has stopped.
+struct BrowseReviewState final
+{
+    int &index;
+    const QList<QSize> &sizes;
+    QQuickWindow &window;
+    bool &passed;
+    LibrarySession &library;
+    const QString &playback;
+    const QString &output;
+    QGuiApplication &app;
+    QJsonArray &captures;
+    SceneAdapter &scene;
+    QObject &reviewLifetime;
+    std::function<void()> &next;
+};
+auto advanceBrowseCapture(BrowseReviewState &state)
+{
+    if (state.index == state.sizes.size() * 2) {
+        const auto *info = state.window.findChild<QQuickItem *>("browseInfo");
+        state.passed &= info && !state.library.browseInfo().isEmpty()
+                && state.library.playbackTrackId() == state.playback
+                && verification::windowPolicySatisfied(state.window);
+        QSaveFile file(state.output + "/report.json"_L1);
+        if (!file.open(QIODevice::WriteOnly)) {
+            state.app.exit(CaptureFailed);
+            return;
+        }
+        file.write(QJsonDocument(
+                           QJsonObject{
+                                   { u"passed"_s, state.passed },
+                                   { u"captures"_s, state.captures },
+                                   { u"windowPolicy"_s, verification::windowPolicy(state.window) },
+                                   { u"playbackUnchanged"_s,
+                                     state.library.playbackTrackId() == state.playback },
+                                   { u"browseInfo"_s,
+                                     QJsonObject::fromVariantMap(state.library.browseInfo()) },
+                                   { u"qtVersion"_s, QString::fromUtf8(qVersion()) } })
+                           .toJson());
+        state.app.exit(file.commit() && state.passed ? 0 : ReportFailed);
+        return;
+    }
+    state.window.resize(state.sizes[state.index / 2]);
+    state.scene.lighting()->setNight(state.index % 2 != 0);
+    // Both palette and lighting use the source 650ms transition.
+    QTimer::singleShot(CaptureSettleMilliseconds, &state.reviewLifetime, [&] {
+        const auto image = state.window.grabWindow();
+        const QString name =
+                u"product-%1.png"_s.arg(state.index, 2, yalahoo::units::DecimalBase, '0'_L1);
+        const bool valid = !image.isNull() && image.save(state.output + '/'_L1 + name)
+                && state.window.size() == state.sizes[state.index / 2]
+                && verification::windowPolicySatisfied(state.window)
+                && state.window.title() == QGuiApplication::applicationDisplayName();
+        state.captures.append(QJsonObject{ { u"file"_s, name },
+                                           { u"passed"_s, valid },
+                                           { u"width"_s, state.window.width() },
+                                           { u"height"_s, state.window.height() },
+                                           { u"dpr"_s, state.window.devicePixelRatio() } });
+        state.passed &= valid;
+        ++state.index;
+        QTimer::singleShot(0, &state.reviewLifetime, state.next);
+    });
+}
+
+}
+}
 int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                           LibrarySession &library, const QString &output)
 {
@@ -55,53 +123,10 @@ int yalahoo::reviewBrowse(QGuiApplication &app, QQuickWindow &window, SceneAdapt
     int index = 0;
     bool passed = true;
     std::function<void()> next;
+    BrowseReviewState state{ index,  sizes, window,   passed, library,        playback,
+                             output, app,   captures, scene,  reviewLifetime, next };
     next = [&] {
-        if (index == sizes.size() * 2) {
-            const auto *info = window.findChild<QQuickItem *>("browseInfo");
-            passed &= info && !library.browseInfo().isEmpty()
-                    && library.playbackTrackId() == playback
-                    && verification::windowPolicySatisfied(window);
-            QSaveFile file(output + "/report.json"_L1);
-            if (!file.open(QIODevice::WriteOnly)) {
-                app.exit(CaptureFailed);
-                return;
-            }
-            file.write(
-                    QJsonDocument(
-                            QJsonObject{ { u"passed"_s, passed },
-                                         { u"captures"_s, captures },
-                                         { u"windowPolicy"_s, verification::windowPolicy(window) },
-                                         { u"playbackUnchanged"_s,
-                                           library.playbackTrackId() == playback },
-                                         { u"browseInfo"_s,
-                                           QJsonObject::fromVariantMap(library.browseInfo()) },
-                                         { u"qtVersion"_s, QString::fromUtf8(qVersion()) } })
-                            .toJson());
-            app.exit(file.commit() && passed ? 0 : ReportFailed);
-            return;
-        }
-        window.resize(sizes[index / 2]);
-        scene.lighting()->setNight(index % 2 != 0);
-        // Both palette and lighting use the source 650ms transition.
-        QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
-            const auto image = window.grabWindow();
-            const QString name =
-                    u"product-%1.png"_s.arg(index, 2, yalahoo::units::DecimalBase, '0'_L1);
-            const bool valid = !image.isNull() && image.save(output + '/'_L1 + name)
-                    && window.size() == sizes[index / 2]
-                    && verification::windowPolicySatisfied(window)
-                    && window.title() == QGuiApplication::applicationDisplayName();
-            captures.append(QJsonObject{ { u"file"_s, name },
-                                         { u"passed"_s, valid },
-                                         { u"width"_s, window.width() },
-                                         { u"height"_s, window.height() },
-                                         { u"dpr"_s, window.devicePixelRatio() } });
-            passed &= valid;
-            ++index;
-            QTimer::singleShot(0, &reviewLifetime, [&] {
-                next();
-            });
-        });
+        return advanceBrowseCapture(state);
     };
     window.show();
     QTimer::singleShot(ResizeSettleMilliseconds, &reviewLifetime, [&] {

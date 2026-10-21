@@ -181,125 +181,129 @@ QJsonObject verify(const Inputs &input, const PostSettings &settings,
              { u"aperture"_s, settings.aperture } };
 }
 }
+
+namespace {
+auto runBokehAudit(int &argc, char **&argv)
+{
+    if (argc != 2)
+        return 2;
+    try {
+        const QString output = QString::fromLocal8Bit(argv[1]);
+        require(QDir().mkpath(output), "Cannot create Bokeh report directory");
+        QFile source((QString::fromUtf8(FIXTURE_ROOT))
+                     + "/tests/fixtures/postprocess/bokeh-kernel.json"_L1);
+        require(source.open(QIODevice::ReadOnly), "Missing locked Bokeh kernel");
+        const auto taps = QJsonDocument::fromJson(source.readAll()).object()[u"taps"_s].toArray();
+        require(taps.size() == 41, "Wrong source tap count");
+        preparedAssets();
+        yalahoo::review::OffscreenRhi backend;
+        auto *api = backend.get();
+        QJsonArray results;
+        int totalSharp = 0, totalForeground = 0, totalBackground = 0, totalSaturated = 0;
+        for (const auto size : { QSize(129, 73), QSize(257, 193), QSize(193, 257) }) {
+            Inputs input(api, size, 5, 300, 25);
+            Postprocess post;
+            PostSettings settings;
+            settings.size = size;
+            settings.bokeh = true;
+            quint64 stableRevision = 0;
+            for (const float focus : { 25.0f, 20.0f, 30.0f }) {
+                for (const float aperture : { 0.0f, .0003f, .0008f, .0012f }) {
+                    settings.focus = focus;
+                    settings.aperture = aperture;
+                    post.prepare(api, settings, input.color.get(), input.depth.get(),
+                                 input.depth.get(), input.depth.get());
+                    if (!stableRevision)
+                        stableRevision = post.revision();
+                    require(stableRevision == post.revision(),
+                            "Focus/aperture rebuilt Bokeh resources");
+                    require(post.passes() == QJsonArray{ u"bokeh"_s }
+                                    && post.output() != input.color.get(),
+                            "Unexpected Bokeh graph or framebuffer feedback");
+                    const auto readback = capture(api, post, input);
+                    QImage preview;
+                    const auto result = verify(input, settings, readback, taps, preview);
+                    results.append(result);
+                    totalSharp += result[u"sharp"_s].toInt();
+                    totalForeground += result[u"foreground"_s].toInt();
+                    totalBackground += result[u"background"_s].toInt();
+                    totalSaturated += result[u"saturated"_s].toInt();
+                    if (focus == 25 && aperture == .0008f)
+                        require(preview.save(output
+                                             + u"/bokeh-%1x%2.png"_s.arg(size.width())
+                                                       .arg(size.height())),
+                                "Cannot save own Bokeh output");
+                }
+            }
+            if (size == QSize(193, 257)) {
+                for (int cycle = 0; cycle < 10; ++cycle) {
+                    const auto before = post.revision();
+                    post.reset();
+                    settings.nearPlane = .1f;
+                    settings.farPlane = 1000;
+                    settings.focus = 25;
+                    settings.aperture = .0008f;
+                    Inputs restored(api, size, settings.nearPlane, settings.farPlane, 25);
+                    post.prepare(api, settings, restored.color.get(), restored.depth.get(),
+                                 restored.depth.get(), restored.depth.get());
+                    require(post.revision() > before, "Bokeh resource reset did not occur");
+                    QImage preview;
+                    auto row =
+                            verify(restored, settings, capture(api, post, restored), taps, preview);
+                    row[u"resourceRebuild"_s] = cycle + 1;
+                    results.append(row);
+                    // Release bindings while their source textures still exist.
+                    post.reset();
+                }
+                post.prepare(api, settings, input.color.get(), input.depth.get(), input.depth.get(),
+                             input.depth.get());
+            }
+            ResourceInventory inventory;
+            post.inventory(inventory);
+            require(inventory.entries().size() == 2,
+                    "Bokeh allocated unused ping/pong or AO resources");
+            settings.bokeh = false;
+            post.prepare(api, settings, input.color.get(), input.depth.get(), input.depth.get(),
+                         input.depth.get());
+            ResourceInventory disabled;
+            post.inventory(disabled);
+            require(post.output() == input.color.get() && post.passes().isEmpty()
+                            && disabled.entries().isEmpty(),
+                    "Disabled Bokeh retains unused render targets");
+        }
+        require(totalSharp > 0 && totalForeground > 0 && totalBackground > 0 && totalSaturated > 0,
+                "Bokeh source probes did not cover signed, sharp and saturated CoC");
+        int visibleWindows = 0;
+        for (const auto *window : QGuiApplication::topLevelWindows())
+            visibleWindows += window->isVisible();
+        require(visibleWindows == 0 && !QGuiApplication::focusWindow(),
+                "Offscreen Bokeh verification exposed or focused a window");
+        QSaveFile report(output + "/runtime.json"_L1);
+        require(report.open(QIODevice::WriteOnly), "Cannot open Bokeh report");
+        report.write(
+                QJsonDocument(
+                        QJsonObject{
+                                { u"passed"_s, true },
+                                { u"round"_s, u"R19D4A"_s },
+                                { u"backend"_s, int(api->backend()) },
+                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                { u"topLevelWindows"_s, QGuiApplication::topLevelWindows().size() },
+                                { u"visibleWindows"_s, visibleWindows },
+                                { u"measurement"_s,
+                                  u"production Postprocess in real QRhi offscreen frames; no presentation timing"_s },
+                                { u"cases"_s, results } })
+                        .toJson());
+        require(report.commit(), "Cannot save Bokeh report");
+        return 0;
+    } catch (const std::exception &error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        return 1;
+    }
+}
+}
 int main(int argc, char **argv)
 {
     return yalahoo::review::runApplication(argc, argv, [&](QGuiApplication &) {
-        if (argc != 2)
-            return 2;
-        try {
-            const QString output = QString::fromLocal8Bit(argv[1]);
-            require(QDir().mkpath(output), "Cannot create Bokeh report directory");
-            QFile source((QString::fromUtf8(FIXTURE_ROOT))
-                         + "/tests/fixtures/postprocess/bokeh-kernel.json"_L1);
-            require(source.open(QIODevice::ReadOnly), "Missing locked Bokeh kernel");
-            const auto taps =
-                    QJsonDocument::fromJson(source.readAll()).object()[u"taps"_s].toArray();
-            require(taps.size() == 41, "Wrong source tap count");
-            preparedAssets();
-            yalahoo::review::OffscreenRhi backend;
-            auto *api = backend.get();
-            QJsonArray results;
-            int totalSharp = 0, totalForeground = 0, totalBackground = 0, totalSaturated = 0;
-            for (const auto size : { QSize(129, 73), QSize(257, 193), QSize(193, 257) }) {
-                Inputs input(api, size, 5, 300, 25);
-                Postprocess post;
-                PostSettings settings;
-                settings.size = size;
-                settings.bokeh = true;
-                quint64 stableRevision = 0;
-                for (const float focus : { 25.0f, 20.0f, 30.0f }) {
-                    for (const float aperture : { 0.0f, .0003f, .0008f, .0012f }) {
-                        settings.focus = focus;
-                        settings.aperture = aperture;
-                        post.prepare(api, settings, input.color.get(), input.depth.get(),
-                                     input.depth.get(), input.depth.get());
-                        if (!stableRevision)
-                            stableRevision = post.revision();
-                        require(stableRevision == post.revision(),
-                                "Focus/aperture rebuilt Bokeh resources");
-                        require(post.passes() == QJsonArray{ u"bokeh"_s }
-                                        && post.output() != input.color.get(),
-                                "Unexpected Bokeh graph or framebuffer feedback");
-                        const auto readback = capture(api, post, input);
-                        QImage preview;
-                        const auto result = verify(input, settings, readback, taps, preview);
-                        results.append(result);
-                        totalSharp += result[u"sharp"_s].toInt();
-                        totalForeground += result[u"foreground"_s].toInt();
-                        totalBackground += result[u"background"_s].toInt();
-                        totalSaturated += result[u"saturated"_s].toInt();
-                        if (focus == 25 && aperture == .0008f)
-                            require(preview.save(output
-                                                 + u"/bokeh-%1x%2.png"_s.arg(size.width())
-                                                           .arg(size.height())),
-                                    "Cannot save own Bokeh output");
-                    }
-                }
-                if (size == QSize(193, 257)) {
-                    for (int cycle = 0; cycle < 10; ++cycle) {
-                        const auto before = post.revision();
-                        post.reset();
-                        settings.nearPlane = .1f;
-                        settings.farPlane = 1000;
-                        settings.focus = 25;
-                        settings.aperture = .0008f;
-                        Inputs restored(api, size, settings.nearPlane, settings.farPlane, 25);
-                        post.prepare(api, settings, restored.color.get(), restored.depth.get(),
-                                     restored.depth.get(), restored.depth.get());
-                        require(post.revision() > before, "Bokeh resource reset did not occur");
-                        QImage preview;
-                        auto row = verify(restored, settings, capture(api, post, restored), taps,
-                                          preview);
-                        row[u"resourceRebuild"_s] = cycle + 1;
-                        results.append(row);
-                        // Release bindings while their source textures still exist.
-                        post.reset();
-                    }
-                    post.prepare(api, settings, input.color.get(), input.depth.get(),
-                                 input.depth.get(), input.depth.get());
-                }
-                ResourceInventory inventory;
-                post.inventory(inventory);
-                require(inventory.entries().size() == 2,
-                        "Bokeh allocated unused ping/pong or AO resources");
-                settings.bokeh = false;
-                post.prepare(api, settings, input.color.get(), input.depth.get(), input.depth.get(),
-                             input.depth.get());
-                ResourceInventory disabled;
-                post.inventory(disabled);
-                require(post.output() == input.color.get() && post.passes().isEmpty()
-                                && disabled.entries().isEmpty(),
-                        "Disabled Bokeh retains unused render targets");
-            }
-            require(totalSharp > 0 && totalForeground > 0 && totalBackground > 0
-                            && totalSaturated > 0,
-                    "Bokeh source probes did not cover signed, sharp and saturated CoC");
-            int visibleWindows = 0;
-            for (const auto *window : QGuiApplication::topLevelWindows())
-                visibleWindows += window->isVisible();
-            require(visibleWindows == 0 && !QGuiApplication::focusWindow(),
-                    "Offscreen Bokeh verification exposed or focused a window");
-            QSaveFile report(output + "/runtime.json"_L1);
-            require(report.open(QIODevice::WriteOnly), "Cannot open Bokeh report");
-            report.write(
-                    QJsonDocument(
-                            QJsonObject{
-                                    { u"passed"_s, true },
-                                    { u"round"_s, u"R19D4A"_s },
-                                    { u"backend"_s, int(api->backend()) },
-                                    { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                    { u"topLevelWindows"_s,
-                                      QGuiApplication::topLevelWindows().size() },
-                                    { u"visibleWindows"_s, visibleWindows },
-                                    { u"measurement"_s,
-                                      u"production Postprocess in real QRhi offscreen frames; no presentation timing"_s },
-                                    { u"cases"_s, results } })
-                            .toJson());
-            require(report.commit(), "Cannot save Bokeh report");
-            return 0;
-        } catch (const std::exception &error) {
-            std::fprintf(stderr, "%s\n", error.what());
-            return 1;
-        }
+        return runBokehAudit(argc, argv);
     });
 }

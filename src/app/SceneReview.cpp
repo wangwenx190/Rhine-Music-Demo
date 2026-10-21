@@ -44,6 +44,189 @@ enum ReviewExit {
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+
+namespace {
+// Shared references remain valid until this review event loop has stopped.
+struct SceneReviewState final
+{
+    int &index;
+    QJsonArray &cases;
+    SceneAdapter &scene;
+    QQuickWindow &window;
+    int &startFrame;
+    const std::shared_ptr<std::atomic<int>> &frames;
+    yalahoo::rhi::SceneItem *&view;
+    QObject *&layoutLabel;
+    double &maxQt;
+    double &maxWeb;
+    const QString &folder;
+    bool &pass;
+    QJsonArray &results;
+    const QString &report;
+    const QJsonObject &oracle;
+    const QByteArray &fixtureBytes;
+    QGuiApplication &app;
+};
+auto captureSceneReview(SceneReviewState &state)
+{
+    ++state.index;
+    if (state.index >= state.cases.size())
+        return;
+    const auto c = state.cases[state.index].toObject();
+    if (state.index == StaticPoseCount) {
+        state.scene.setReducedMotion(false);
+        state.scene.observe({ { -62.26, 35.98, 43.28 },
+                              { -.5, 1.1, .4 },
+                              2 * SceneVector{ -62.26 + .5, 35.98 - 1.1, 43.28 - .4 }.length()
+                                      * std::tan(6.15 * std::acos(-1.0) / 360) },
+                            0);
+    }
+    state.window.resize(c[u"width"_s].toInt(), c[u"height"_s].toInt());
+    state.scene.layout()->setViewport(state.window.width(), state.window.height());
+    state.scene.setDetail(c[u"detail"_s].toDouble());
+    if (c[u"dynamic"_s].toBool()) {
+        state.scene.setReducedMotion(c[u"reduced"_s].toBool());
+        state.scene.advance(c[u"dt"_s].toDouble());
+    } else
+        state.scene.snapToTarget();
+    state.startFrame = state.frames->load();
+    state.window.update();
+}
+
+auto finishSceneReview(SceneReviewState &state, auto &next, auto &poll)
+{
+    if (state.frames->load() - state.startFrame < 3) {
+        state.window.update();
+        return;
+    }
+    const auto c = state.cases[state.index].toObject();
+    const bool dynamic = c[u"dynamic"_s].toBool();
+    const bool capture = !dynamic || state.index == StaticPoseCount || state.index == 108
+            || state.index == 198 || state.index == 288 || state.index == 408;
+    const QImage image = capture ? state.window.grabWindow() : QImage{ };
+    const bool bindings = state.window.width() == c[u"width"_s].toInt()
+            && state.window.height() == c[u"height"_s].toInt()
+            && state.view->width() == state.window.width()
+            && state.view->height() == state.window.height()
+            && state.layoutLabel->property("text").toString().startsWith(
+                    state.scene.layout()->kind())
+            && (state.view->input().scene.camera.position.qt() - state.scene.cameraPosition())
+                            .length()
+                    < PositionTolerance
+            && std::abs(state.view->input().scene.fieldOfView - state.scene.fieldOfView())
+                    < FovTolerance;
+    bool points = true;
+    QJsonArray projections;
+    for (auto value : c[u"projections"_s].toArray()) {
+        const auto p = value.toObject();
+        const auto a = p[u"world"_s].toArray(), expected = p[u"pixel"_s].toArray();
+        const QVector3D world(float(a[0].toDouble()), float(a[1].toDouble()),
+                              float(a[2].toDouble()));
+        QVector3D qt;
+        const bool invoked = QMetaObject::invokeMethod(
+                state.view, "qtProjection", Q_RETURN_ARG(QVector3D, qt), Q_ARG(QVector3D, world));
+        const auto cpu = state.scene.projectWorldPoint(world);
+        const double qtError = std::hypot(qt.x() - cpu.x(), qt.y() - cpu.y());
+        const double webError =
+                std::hypot(qt.x() - expected[0].toDouble(), qt.y() - expected[1].toDouble());
+        state.maxQt = std::max(state.maxQt, qtError);
+        state.maxWeb = std::max(state.maxWeb, webError);
+        points = points && invoked && qtError <= 2 && webError <= 2;
+        projections.append(QJsonObject{ { u"qtPixel"_s, QJsonArray{ qt.x(), qt.y() } },
+                                        { u"qtCpuError"_s, qtError },
+                                        { u"webError"_s, webError } });
+    }
+    // Actual no-light mesh pixels and client dimensions/DPR, in addition to the submitted RHI snapshot mapping.
+    int pixels = 0;
+    const auto rgb = image.convertToFormat(QImage::Format_RGB32);
+    // Diagnostic labels must not stand in for missing mesh pixels.
+    const int inset = qRound(CaptureInsetPixels * state.window.devicePixelRatio());
+    const auto background = image.isNull() ? QColor() : image.pixelColor(image.width() - 1, 0);
+    for (int y = inset; y < rgb.height() - inset; ++y)
+        for (int x = 0; x < rgb.width(); ++x) {
+            const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
+            // geometryDiagnostic writes a packed unit view normal for every face.
+            // A green-only test loses valid purple/front-facing normals during the dolly.
+            const double nx = 2.0 * qRed(color) / yalahoo::units::MaximumChannelByte - 1;
+            const double ny = 2.0 * qGreen(color) / yalahoo::units::MaximumChannelByte - 1;
+            const double nz = 2.0 * qBlue(color) / yalahoo::units::MaximumChannelByte - 1;
+            const int difference = std::abs(qRed(color) - background.red())
+                    + std::abs(qGreen(color) - background.green())
+                    + std::abs(qBlue(color) - background.blue());
+            constexpr double packedNormalTolerance =
+                    2 * UnitCubeDiagonal / yalahoo::units::MaximumChannelByte
+                    + DepthPackingErrorUnits
+                            / (yalahoo::units::MaximumChannelByte
+                               * yalahoo::units::MaximumChannelByte);
+            if (difference > 9
+                && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
+                ++pixels;
+        }
+    const QString file = u"case-%1-%2x%3-detail-%4.png"_s
+                                 .arg(state.index, 2, yalahoo::units::DecimalBase, '0'_L1)
+                                 .arg(state.window.width())
+                                 .arg(state.window.height())
+                                 .arg(state.scene.detail());
+    const bool saved = !capture || (!image.isNull() && image.save(state.folder + "/"_L1 + file));
+    const bool passed = bindings && points && saved && state.view->errorText().isEmpty()
+            && (!capture || pixels > yalahoo::review::MinimumForegroundPixels);
+    state.pass = state.pass && passed;
+    state.results.append(
+            QJsonObject{ { u"index"_s, state.index },
+                         { u"width"_s, state.window.width() },
+                         { u"height"_s, state.window.height() },
+                         { u"detail"_s, state.scene.detail() },
+                         { u"dynamic"_s, dynamic },
+                         { u"time"_s, c[u"time"_s] },
+                         { u"portrait"_s, state.scene.layout()->portrait() },
+                         { u"kind"_s, state.scene.layout()->kind() },
+                         { u"frameRevision"_s, qint64(state.scene.frameRevision()) },
+                         { u"renderedFrames"_s, state.frames->load() - state.startFrame },
+                         { u"imageWidth"_s, image.width() },
+                         { u"imageHeight"_s, image.height() },
+                         { u"dpr"_s, state.window.devicePixelRatio() },
+                         { u"modelPixels"_s, pixels },
+                         { u"renderTargetWidth"_s, state.view->fixedColorBufferWidth() },
+                         { u"renderTargetHeight"_s, state.view->fixedColorBufferHeight() },
+                         { u"renderError"_s, state.view->errorText() },
+                         { u"bindings"_s, bindings },
+                         { u"passed"_s, passed },
+                         { u"screenshot"_s, capture ? file : QString{ } },
+                         { u"projections"_s, projections } });
+    if (state.index + 1 < state.cases.size()) {
+        next();
+        return;
+    }
+    poll.stop();
+    const auto api = state.window.rendererInterface()->graphicsApi();
+    state.pass = state.pass && QSGRendererInterface::isApiRhiBased(api);
+    state.pass = state.pass && verification::windowPolicySatisfied(state.window);
+    QSaveFile output(state.report);
+    bool committed = output.open(QIODevice::WriteOnly);
+    if (committed) {
+        output.write(
+                QJsonDocument(QJsonObject{ { u"passed"_s, state.pass },
+                                           { u"windowPolicy"_s,
+                                             verification::windowPolicy(state.window) },
+                                           { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+                                           { u"platform"_s, QGuiApplication::platformName() },
+                                           { u"graphicsApi"_s, int(api) },
+                                           { u"baseline"_s, state.oracle[u"baseline"_s] },
+                                           { u"fixtureSha256"_s,
+                                             QString::fromUtf8(QCryptographicHash::hash(
+                                                                       state.fixtureBytes,
+                                                                       QCryptographicHash::Sha256)
+                                                                       .toHex()) },
+                                           { u"maxQtCpuPixels"_s, state.maxQt },
+                                           { u"maxWebPixels"_s, state.maxWeb },
+                                           { u"cases"_s, state.results } })
+                        .toJson());
+        committed = output.commit();
+    }
+    state.app.exit(state.pass && committed ? 0 : ReviewFailed);
+}
+
+}
 int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                 const QString &fixture, const QString &report)
 {
@@ -89,156 +272,15 @@ int reviewScene(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
     int index = -1, startFrame = 0;
     bool pass = true;
     double maxQt = 0, maxWeb = 0;
+    SceneReviewState state{ index,   cases,       scene,  window,       startFrame, frames,
+                            view,    layoutLabel, maxQt,  maxWeb,       folder,     pass,
+                            results, report,      oracle, fixtureBytes, app };
     const auto next = [&] {
-        ++index;
-        if (index >= cases.size())
-            return;
-        const auto c = cases[index].toObject();
-        if (index == StaticPoseCount) {
-            scene.setReducedMotion(false);
-            scene.observe({ { -62.26, 35.98, 43.28 },
-                            { -.5, 1.1, .4 },
-                            2 * SceneVector{ -62.26 + .5, 35.98 - 1.1, 43.28 - .4 }.length()
-                                    * std::tan(6.15 * std::acos(-1.0) / 360) },
-                          0);
-        }
-        window.resize(c[u"width"_s].toInt(), c[u"height"_s].toInt());
-        scene.layout()->setViewport(window.width(), window.height());
-        scene.setDetail(c[u"detail"_s].toDouble());
-        if (c[u"dynamic"_s].toBool()) {
-            scene.setReducedMotion(c[u"reduced"_s].toBool());
-            scene.advance(c[u"dt"_s].toDouble());
-        } else
-            scene.snapToTarget();
-        startFrame = frames->load();
-        window.update();
+        return captureSceneReview(state);
     };
     QTimer poll;
     QObject::connect(&poll, &QTimer::timeout, &window, [&] {
-        if (frames->load() - startFrame < 3) {
-            window.update();
-            return;
-        }
-        const auto c = cases[index].toObject();
-        const bool dynamic = c[u"dynamic"_s].toBool();
-        const bool capture = !dynamic || index == StaticPoseCount || index == 108 || index == 198
-                || index == 288 || index == 408;
-        const QImage image = capture ? window.grabWindow() : QImage{ };
-        const bool bindings = window.width() == c[u"width"_s].toInt()
-                && window.height() == c[u"height"_s].toInt() && view->width() == window.width()
-                && view->height() == window.height()
-                && layoutLabel->property("text").toString().startsWith(scene.layout()->kind())
-                && (view->input().scene.camera.position.qt() - scene.cameraPosition()).length()
-                        < PositionTolerance
-                && std::abs(view->input().scene.fieldOfView - scene.fieldOfView()) < FovTolerance;
-        bool points = true;
-        QJsonArray projections;
-        for (auto value : c[u"projections"_s].toArray()) {
-            const auto p = value.toObject();
-            const auto a = p[u"world"_s].toArray(), expected = p[u"pixel"_s].toArray();
-            const QVector3D world(float(a[0].toDouble()), float(a[1].toDouble()),
-                                  float(a[2].toDouble()));
-            QVector3D qt;
-            const bool invoked = QMetaObject::invokeMethod(
-                    view, "qtProjection", Q_RETURN_ARG(QVector3D, qt), Q_ARG(QVector3D, world));
-            const auto cpu = scene.projectWorldPoint(world);
-            const double qtError = std::hypot(qt.x() - cpu.x(), qt.y() - cpu.y());
-            const double webError =
-                    std::hypot(qt.x() - expected[0].toDouble(), qt.y() - expected[1].toDouble());
-            maxQt = std::max(maxQt, qtError);
-            maxWeb = std::max(maxWeb, webError);
-            points = points && invoked && qtError <= 2 && webError <= 2;
-            projections.append(QJsonObject{ { u"qtPixel"_s, QJsonArray{ qt.x(), qt.y() } },
-                                            { u"qtCpuError"_s, qtError },
-                                            { u"webError"_s, webError } });
-        }
-        // Actual no-light mesh pixels and client dimensions/DPR, in addition to the submitted RHI snapshot mapping.
-        int pixels = 0;
-        const auto rgb = image.convertToFormat(QImage::Format_RGB32);
-        // Diagnostic labels must not stand in for missing mesh pixels.
-        const int inset = qRound(CaptureInsetPixels * window.devicePixelRatio());
-        const auto background = image.isNull() ? QColor() : image.pixelColor(image.width() - 1, 0);
-        for (int y = inset; y < rgb.height() - inset; ++y)
-            for (int x = 0; x < rgb.width(); ++x) {
-                const auto color = reinterpret_cast<const QRgb *>(rgb.constScanLine(y))[x];
-                // geometryDiagnostic writes a packed unit view normal for every face.
-                // A green-only test loses valid purple/front-facing normals during the dolly.
-                const double nx = 2.0 * qRed(color) / yalahoo::units::MaximumChannelByte - 1;
-                const double ny = 2.0 * qGreen(color) / yalahoo::units::MaximumChannelByte - 1;
-                const double nz = 2.0 * qBlue(color) / yalahoo::units::MaximumChannelByte - 1;
-                const int difference = std::abs(qRed(color) - background.red())
-                        + std::abs(qGreen(color) - background.green())
-                        + std::abs(qBlue(color) - background.blue());
-                constexpr double packedNormalTolerance =
-                        2 * UnitCubeDiagonal / yalahoo::units::MaximumChannelByte
-                        + DepthPackingErrorUnits
-                                / (yalahoo::units::MaximumChannelByte
-                                   * yalahoo::units::MaximumChannelByte);
-                if (difference > 9
-                    && std::abs(nx * nx + ny * ny + nz * nz - 1) <= packedNormalTolerance)
-                    ++pixels;
-            }
-        const QString file =
-                u"case-%1-%2x%3-detail-%4.png"_s.arg(index, 2, yalahoo::units::DecimalBase, '0'_L1)
-                        .arg(window.width())
-                        .arg(window.height())
-                        .arg(scene.detail());
-        const bool saved = !capture || (!image.isNull() && image.save(folder + "/"_L1 + file));
-        const bool passed = bindings && points && saved && view->errorText().isEmpty()
-                && (!capture || pixels > yalahoo::review::MinimumForegroundPixels);
-        pass = pass && passed;
-        results.append(QJsonObject{ { u"index"_s, index },
-                                    { u"width"_s, window.width() },
-                                    { u"height"_s, window.height() },
-                                    { u"detail"_s, scene.detail() },
-                                    { u"dynamic"_s, dynamic },
-                                    { u"time"_s, c[u"time"_s] },
-                                    { u"portrait"_s, scene.layout()->portrait() },
-                                    { u"kind"_s, scene.layout()->kind() },
-                                    { u"frameRevision"_s, qint64(scene.frameRevision()) },
-                                    { u"renderedFrames"_s, frames->load() - startFrame },
-                                    { u"imageWidth"_s, image.width() },
-                                    { u"imageHeight"_s, image.height() },
-                                    { u"dpr"_s, window.devicePixelRatio() },
-                                    { u"modelPixels"_s, pixels },
-                                    { u"renderTargetWidth"_s, view->fixedColorBufferWidth() },
-                                    { u"renderTargetHeight"_s, view->fixedColorBufferHeight() },
-                                    { u"renderError"_s, view->errorText() },
-                                    { u"bindings"_s, bindings },
-                                    { u"passed"_s, passed },
-                                    { u"screenshot"_s, capture ? file : QString{ } },
-                                    { u"projections"_s, projections } });
-        if (index + 1 < cases.size()) {
-            next();
-            return;
-        }
-        poll.stop();
-        const auto api = window.rendererInterface()->graphicsApi();
-        pass = pass && QSGRendererInterface::isApiRhiBased(api);
-        pass = pass && verification::windowPolicySatisfied(window);
-        QSaveFile output(report);
-        bool committed = output.open(QIODevice::WriteOnly);
-        if (committed) {
-            output.write(
-                    QJsonDocument(
-                            QJsonObject{ { u"passed"_s, pass },
-                                         { u"windowPolicy"_s, verification::windowPolicy(window) },
-                                         { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                         { u"platform"_s, QGuiApplication::platformName() },
-                                         { u"graphicsApi"_s, int(api) },
-                                         { u"baseline"_s, oracle[u"baseline"_s] },
-                                         { u"fixtureSha256"_s,
-                                           QString::fromUtf8(
-                                                   QCryptographicHash::hash(
-                                                           fixtureBytes, QCryptographicHash::Sha256)
-                                                           .toHex()) },
-                                         { u"maxQtCpuPixels"_s, maxQt },
-                                         { u"maxWebPixels"_s, maxWeb },
-                                         { u"cases"_s, results } })
-                            .toJson());
-            committed = output.commit();
-        }
-        app.exit(pass && committed ? 0 : ReviewFailed);
+        return finishSceneReview(state, next, poll);
     });
     QTimer timeout;
     timeout.setSingleShot(true);

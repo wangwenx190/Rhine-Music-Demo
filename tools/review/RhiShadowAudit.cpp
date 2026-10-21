@@ -209,128 +209,132 @@ QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
              { u"maxError"_s, worst } };
 }
 }
+
+namespace {
+auto runShadowAudit(int &argc, char **&argv)
+{
+    if (argc != 2)
+        return 2;
+    try {
+        const QString output = QString::fromLocal8Bit(argv[1]);
+        check(QDir().mkpath(output), "Cannot create shadow output");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
+        check(file.open(QIODevice::ReadOnly), "Missing anonymous shadow fixture");
+        auto c = QJsonDocument::fromJson(file.readAll())
+                         .object()[u"cases"_s]
+                         .toArray()[0]
+                         .toObject();
+        c[u"position"_s] = QJsonArray{ 6, 4, 6 };
+        c[u"clipNear"_s] = .1;
+        c[u"clipFar"_s] = 100;
+        c[u"layer"_s] = u"paper"_s;
+        RhiCaptureHarness driver;
+        const auto floors = runFloorAudit(driver, c, output);
+        QJsonArray results, lifecycle;
+        Input last;
+        const QSize size(640, 480);
+        c[u"width"_s] = size.width();
+        c[u"height"_s] = size.height();
+        for (bool night : { false, true }) {
+            c[u"day"_s] = !night;
+            for (int count : { 1, 7, 8, 9 }) {
+                if (night && count != 9)
+                    continue;
+                auto input = fixture(c);
+                input.entities.clear();
+                for (int i = 0; i < count; ++i) {
+                    QMatrix4x4 model;
+                    model.translate((i % 3 - 1) * 1.5f, 0, (i / 3 - 1) * .62f);
+                    model.rotate(i * 2.3f, 0, 1, 0);
+                    input.entities.append(model);
+                }
+                input.shadowDiagnostic = true;
+                input.captureShadowDepth = true;
+                input.captureSamples = 1;
+                for (int map : { 1024, 2048, 4096 }) {
+                    if (count != 9 && map != 1024)
+                        continue;
+                    input.shadowSize = map;
+                    input.shadows = true;
+                    const auto capture = driver.capture(input, size);
+                    checkSubmittedShadow(input, capture);
+                    auto math = validateMath(input, capture, size);
+                    math[u"projection"_s] = validateProjection(input, capture);
+                    auto same = driver.capture(input, size);
+                    check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                  && same.metadata[u"shadowState"_s]
+                                                  .toObject()[u"separateCasterUniforms"_s]
+                                                  .toInt()
+                                          == 0,
+                          "Unchanged caster pool redrew or reuploaded shadow uniforms");
+                    math[u"initialUniformUploadBytes"_s] =
+                            capture.metadata[u"uniformUploadBytes"_s];
+                    math[u"cachedUniformUploadBytes"_s] = same.metadata[u"uniformUploadBytes"_s];
+                    const auto generation = same.metadata[u"resourceGeneration"_s];
+                    input.scene.view.rotate(.5f, 0, 1, 0);
+                    input.keyColor *= .9f;
+                    same = driver.capture(input, size);
+                    check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                  && same.metadata[u"resourceGeneration"_s] == generation,
+                          "Receiver camera/light color invalidated shadow resources");
+                    input.entities[0].translate(.1f, 0, 0);
+                    same = driver.capture(input, size);
+                    check(same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
+                                  && same.metadata[u"resourceGeneration"_s] == generation,
+                          "Animated caster failed to update cached shadow");
+                    input.shadows = false;
+                    const auto off = driver.capture(input, size);
+                    checkSubmittedShadow(input, off);
+                    validateMath(input, off, size);
+                    input.shadows = true;
+                    const auto restored = driver.capture(input, size);
+                    checkSubmittedShadow(input, restored);
+                    validateMath(input, restored, size);
+                    math[u"night"_s] = night;
+                    math[u"count"_s] = count;
+                    math[u"metadata"_s] = capture.metadata;
+                    results.append(math);
+                    if (count == 9 && map == 2048)
+                        check(capture.color.save(output
+                                                 + (night ? "/night.png"_L1 : "/day.png"_L1)),
+                              "Cannot save own shadow output");
+                    last = input;
+                }
+            }
+        }
+        last.shadowSize = 1024;
+        for (int cycle = 0; cycle < 10; ++cycle) {
+            driver.rebuild();
+            const auto capture = driver.capture(last, size);
+            check(driver.rebuilt(), "Shadow lifecycle did not invalidate real scene graph");
+            checkSubmittedShadow(last, capture);
+            lifecycle.append(validateMath(last, capture, size));
+        }
+        QSaveFile report(output + "/runtime.json"_L1);
+        check(report.open(QIODevice::WriteOnly), "Cannot open shadow report");
+        report.write(QJsonDocument(QJsonObject{ { u"round"_s, u"R19D3A"_s },
+                                                { u"passed"_s, true },
+                                                { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                                { u"cases"_s, results },
+                                                { u"floors"_s, floors },
+                                                { u"rebuilds"_s, lifecycle },
+                                                { u"offscreen"_s, driver.surface->diagnostics() },
+                                                { u"windowPolicy"_s,
+                                                  verification::windowPolicy(*driver.window) } })
+                             .toJson());
+        check(report.commit(), "Cannot write shadow report");
+        std::printf("Shadow source math/cache passed %lld states and ten rebuilds\n",
+                    results.size());
+        return 0;
+    } catch (const std::exception &error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        return 1;
+    }
+}
+}
 int main(int argc, char **argv)
 {
     return yalahoo::review::runApplication(argc, argv, [&](QGuiApplication &) {
-        if (argc != 2)
-            return 2;
-        try {
-            const QString output = QString::fromLocal8Bit(argv[1]);
-            check(QDir().mkpath(output), "Cannot create shadow output");
-            QFile file((QString::fromUtf8(FIXTURE_ROOT))
-                       + "/tests/fixtures/rhi-shell/visual.json"_L1);
-            check(file.open(QIODevice::ReadOnly), "Missing anonymous shadow fixture");
-            auto c = QJsonDocument::fromJson(file.readAll())
-                             .object()[u"cases"_s]
-                             .toArray()[0]
-                             .toObject();
-            c[u"position"_s] = QJsonArray{ 6, 4, 6 };
-            c[u"clipNear"_s] = .1;
-            c[u"clipFar"_s] = 100;
-            c[u"layer"_s] = u"paper"_s;
-            RhiCaptureHarness driver;
-            const auto floors = runFloorAudit(driver, c, output);
-            QJsonArray results, lifecycle;
-            Input last;
-            const QSize size(640, 480);
-            c[u"width"_s] = size.width();
-            c[u"height"_s] = size.height();
-            for (bool night : { false, true }) {
-                c[u"day"_s] = !night;
-                for (int count : { 1, 7, 8, 9 }) {
-                    if (night && count != 9)
-                        continue;
-                    auto input = fixture(c);
-                    input.entities.clear();
-                    for (int i = 0; i < count; ++i) {
-                        QMatrix4x4 model;
-                        model.translate((i % 3 - 1) * 1.5f, 0, (i / 3 - 1) * .62f);
-                        model.rotate(i * 2.3f, 0, 1, 0);
-                        input.entities.append(model);
-                    }
-                    input.shadowDiagnostic = true;
-                    input.captureShadowDepth = true;
-                    input.captureSamples = 1;
-                    for (int map : { 1024, 2048, 4096 }) {
-                        if (count != 9 && map != 1024)
-                            continue;
-                        input.shadowSize = map;
-                        input.shadows = true;
-                        const auto capture = driver.capture(input, size);
-                        checkSubmittedShadow(input, capture);
-                        auto math = validateMath(input, capture, size);
-                        math[u"projection"_s] = validateProjection(input, capture);
-                        auto same = driver.capture(input, size);
-                        check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                      && same.metadata[u"shadowState"_s]
-                                                      .toObject()[u"separateCasterUniforms"_s]
-                                                      .toInt()
-                                              == 0,
-                              "Unchanged caster pool redrew or reuploaded shadow uniforms");
-                        math[u"initialUniformUploadBytes"_s] =
-                                capture.metadata[u"uniformUploadBytes"_s];
-                        math[u"cachedUniformUploadBytes"_s] =
-                                same.metadata[u"uniformUploadBytes"_s];
-                        const auto generation = same.metadata[u"resourceGeneration"_s];
-                        input.scene.view.rotate(.5f, 0, 1, 0);
-                        input.keyColor *= .9f;
-                        same = driver.capture(input, size);
-                        check(!same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                      && same.metadata[u"resourceGeneration"_s] == generation,
-                              "Receiver camera/light color invalidated shadow resources");
-                        input.entities[0].translate(.1f, 0, 0);
-                        same = driver.capture(input, size);
-                        check(same.metadata[u"shadowState"_s].toObject()[u"rendered"_s].toBool()
-                                      && same.metadata[u"resourceGeneration"_s] == generation,
-                              "Animated caster failed to update cached shadow");
-                        input.shadows = false;
-                        const auto off = driver.capture(input, size);
-                        checkSubmittedShadow(input, off);
-                        validateMath(input, off, size);
-                        input.shadows = true;
-                        const auto restored = driver.capture(input, size);
-                        checkSubmittedShadow(input, restored);
-                        validateMath(input, restored, size);
-                        math[u"night"_s] = night;
-                        math[u"count"_s] = count;
-                        math[u"metadata"_s] = capture.metadata;
-                        results.append(math);
-                        if (count == 9 && map == 2048)
-                            check(capture.color.save(output
-                                                     + (night ? "/night.png"_L1 : "/day.png"_L1)),
-                                  "Cannot save own shadow output");
-                        last = input;
-                    }
-                }
-            }
-            last.shadowSize = 1024;
-            for (int cycle = 0; cycle < 10; ++cycle) {
-                driver.rebuild();
-                const auto capture = driver.capture(last, size);
-                check(driver.rebuilt(), "Shadow lifecycle did not invalidate real scene graph");
-                checkSubmittedShadow(last, capture);
-                lifecycle.append(validateMath(last, capture, size));
-            }
-            QSaveFile report(output + "/runtime.json"_L1);
-            check(report.open(QIODevice::WriteOnly), "Cannot open shadow report");
-            report.write(
-                    QJsonDocument(QJsonObject{ { u"round"_s, u"R19D3A"_s },
-                                               { u"passed"_s, true },
-                                               { u"qt"_s, QString::fromUtf8(qVersion()) },
-                                               { u"cases"_s, results },
-                                               { u"floors"_s, floors },
-                                               { u"rebuilds"_s, lifecycle },
-                                               { u"offscreen"_s, driver.surface->diagnostics() },
-                                               { u"windowPolicy"_s,
-                                                 verification::windowPolicy(*driver.window) } })
-                            .toJson());
-            check(report.commit(), "Cannot write shadow report");
-            std::printf("Shadow source math/cache passed %lld states and ten rebuilds\n",
-                        results.size());
-            return 0;
-        } catch (const std::exception &error) {
-            std::fprintf(stderr, "%s\n", error.what());
-            return 1;
-        }
+        return runShadowAudit(argc, argv);
     });
 }

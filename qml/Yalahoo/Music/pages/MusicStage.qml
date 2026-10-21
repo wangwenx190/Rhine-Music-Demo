@@ -42,6 +42,41 @@ Item {
     property bool experimentsVisible: false
     signal experimentsVisibilityRequested(bool shown)
     onExperimentsVisibilityRequested: shown => experimentsVisible = shown
+    readonly property var headerActions: ({
+                                              "play-pause": function () {
+                                                  if (stage.playbackController)
+                                                      stage.playbackController.toggle();
+                                              },
+                                              "stop": function () {
+                                                  if (stage.playbackController)
+                                                      stage.playbackController.stop();
+                                              },
+                                              "settings": function () {
+                                                  if (stage.panelController)
+                                                      stage.panelController.open(
+                                                                  stage.settingsController
+                                                                  ? "settings" : "playback");
+                                              },
+                                              "search": stage.openLibraryPanel,
+                                              "library": stage.openLibraryPanel,
+                                              "locate-song": function () {
+                                                  if (stage.trackFocusController)
+                                                      stage.trackFocusController.locatePlayback();
+                                              },
+                                              "open": function () {
+                                                  if (stage.presentationController)
+                                                      stage.presentationController.open();
+                                              }
+                                          })
+    function openLibraryPanel(action: string): void {
+        if (stage.panelController)
+            stage.panelController.open(action);
+    }
+    function dispatchHeaderAction(action: string): void {
+        const handler = headerActions[action];
+        if (handler)
+            handler(action);
+    }
     focus: true
     width: 1280
     height: 720
@@ -192,20 +227,7 @@ Item {
             contentEnabled: !stage.presentationController
                             || stage.presentationController.archiveEnabled
             selection: stage.sceneAdapter.selection
-            onActionRequested: action => {
-                if (stage.playbackController && action === "play-pause") {
-                    stage.playbackController.toggle();
-                } else if (stage.playbackController && action === "stop") {
-                    stage.playbackController.stop();
-                } else if (action === "settings" && stage.panelController) {
-                    stage.panelController.open(stage.settingsController ? "settings" : "playback");
-                } else if ((action === "search" || action === "library") && stage.panelController) {
-                    stage.panelController.open(action);
-                } else if (action === "locate-song" && stage.trackFocusController) {
-                    stage.trackFocusController.locatePlayback();
-                } else if (action === "open" && stage.presentationController)
-                    stage.presentationController.open();
-            }
+            onActionRequested: action => stage.dispatchHeaderAction(action)
             onThemeRequested: night => {
                 stage.sceneAdapter.recordInput();
                 stage.sceneAdapter.lighting.night = night;

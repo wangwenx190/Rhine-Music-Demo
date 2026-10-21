@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 #include "ReviewSupport.h"
 #include "SceneGeometry.h"
 #include "ProductDefaults.h"
@@ -87,6 +89,546 @@ enum ReviewStage {
 
 using namespace Qt::StringLiterals;
 
+namespace yalahoo {
+namespace {
+// Shared references remain valid until this review event loop has stopped.
+struct OverviewReviewState final
+{
+    bool &finished;
+    int &stage;
+    int &cycle;
+    const int &requestedCycles;
+    const QString &playback;
+    LibrarySession &library;
+    QStringList &warnings;
+    QQuickWindow &window;
+    yalahoo::rhi::SceneItem *&native;
+    QJsonArray &samples;
+    bool &passed;
+    QJsonArray &checks;
+    QJsonArray &pictures;
+    QJsonArray &states;
+    int &peakLabels;
+    QElapsedTimer &time;
+    MotionController &motion;
+    SceneAdapter &scene;
+    SelectionController *&selection;
+    const QString &output;
+    QGuiApplication &app;
+    int &frames;
+    OverviewController &overview;
+    QMutex &positionsMutex;
+    QPointF &playPosition;
+    QPointF &synchronizedPlay;
+    QPointF &stopPosition;
+    QPointF &synchronizedStop;
+    QString &selected;
+    int &visibleLane;
+    PresentationController &presentation;
+    const QList<QSize> &sizes;
+    int &sizeIndex;
+    const bool &initialNight;
+    double &pausedProgress;
+    quint64 &priorSubmission;
+    QObject &lifetime;
+};
+auto finishOverviewReview(OverviewReviewState &state, auto &check)
+{
+    if (state.finished)
+        return;
+    state.finished = true;
+    check(u"sequence-completed"_s, state.stage == OverviewComplete);
+    check(u"requested-lifecycle-cycles"_s, state.cycle == state.requestedCycles);
+    check(u"playback-isolated"_s, state.playback == state.library.playbackTrackId());
+    check(u"qml-warnings"_s, state.warnings.isEmpty());
+    check(u"window-policy"_s, verification::windowPolicySatisfied(state.window));
+    check(u"renderer-errors"_s, state.native->errorText().isEmpty());
+    QSet<qint64> generations, postprocess;
+    qint64 peakUpload = 0;
+    for (const auto value : state.samples) {
+        const auto sample = value.toObject();
+        if (sample[u"stage"_s].toInt() >= 1 && sample[u"stage"_s].toInt() <= 7) {
+            generations.insert(sample[u"resourceGeneration"_s].toInteger());
+            postprocess.insert(sample[u"postprocessRevision"_s].toInteger());
+        }
+        peakUpload = std::max(peakUpload, sample[u"atlasUploadBytes"_s].toInteger());
+    }
+    check(u"overview-keeps-render-targets"_s, generations.size() == 1 && postprocess.size() == 1);
+    check(u"upload-burst"_s,
+          peakUpload <= 2 * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB);
+    QJsonObject report{
+        { u"passed"_s, state.passed },
+        { u"configuration"_s, u"Release"_s },
+        { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
+        { u"backend"_s, qEnvironmentVariable("QSG_RHI_BACKEND") },
+        { u"dpr"_s, state.window.effectiveDevicePixelRatio() },
+        { u"windowPolicy"_s, verification::windowPolicy(state.window) },
+        { u"checks"_s, state.checks },
+        { u"pictures"_s, state.pictures },
+        { u"qmlWarnings"_s, QJsonArray::fromStringList(state.warnings) },
+        { u"states"_s, state.states },
+        { u"samples"_s, state.samples },
+        { u"cycles"_s, state.cycle },
+        { u"requestedLifecycleCycles"_s, state.requestedCycles },
+        { u"peakLabelSlots"_s, state.peakLabels },
+        { u"overviewUiAttachments"_s,
+          QJsonObject{
+                  { u"scope"_s,
+                    u"Separate Qt Quick crop/horizontal layers; descriptor estimate, not driver allocation"_s },
+                  { u"maximumSlots"_s, MaximumLiveLabels },
+                  { u"texturesPerSlot"_s, 2 },
+                  { u"width"_s, LabelBudgetWidth },
+                  { u"height"_s, LabelBudgetHeight },
+                  { u"rgba8PayloadBytesUpperBound"_s, LabelColorBudgetBytes },
+                  { u"withDepthStencilUpperBoundBytes"_s, LabelAttachmentBudgetBytes },
+                  { u"resizeOverlapUpperBoundBytes"_s, LabelResizeBudgetBytes },
+                  { u"actualDriverAllocationBytes"_s, QJsonValue::Null } } },
+        { u"peakAtlasUploadBytes"_s, peakUpload },
+        { u"durationMs"_s, state.time.elapsed() },
+        { u"clockActive"_s, state.motion.clock()->active() },
+        { u"applicationVisible"_s, state.motion.clock()->applicationVisible() },
+        { u"cameraSettled"_s, state.scene.settled() },
+        { u"archiveReady"_s, state.selection->archiveReady() },
+        { u"measurementScope"_s,
+          u"Qt frame/renderer telemetry and own-window PNG; no input-to-photon or measured VRAM"_s }
+    };
+    QSaveFile file(state.output + "/report.json"_L1);
+    if (!file.open(QIODevice::WriteOnly)) {
+        state.app.exit(CaptureFailed);
+        return;
+    }
+    file.write(QJsonDocument(report).toJson());
+    state.app.exit(file.commit() && state.passed ? 0 : ReportFailed);
+}
+
+template <typename ReadyFunction, typename ButtonFunction, typename CheckFunction,
+          typename FirstLaneFunction, typename CaptureFunction, typename KeyFunction,
+          typename ClickPointFunction, typename FinishFunction>
+struct OverviewStageContext final
+{
+    OverviewReviewState &state;
+    ReadyFunction &ready;
+    ButtonFunction &button;
+    CheckFunction &check;
+    FirstLaneFunction &firstLane;
+    CaptureFunction &capture;
+    KeyFunction &key;
+    ClickPointFunction &clickPoint;
+    FinishFunction &finish;
+};
+void advanceOverviewAwaitInitialFrame(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &button = context.button;
+    auto &check = context.check;
+
+    if (!ready() || state.frames < InitialSettleFrames)
+        return;
+    {
+        QMutexLocker lock(&state.positionsMutex);
+        state.playPosition = state.synchronizedPlay;
+        state.stopPosition = state.synchronizedStop;
+    }
+    state.selected = state.selection->albumId();
+    button(u"overviewToggle"_s);
+    check(u"toggle-enter"_s, state.overview.active());
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitOverview(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &button = context.button;
+    auto &check = context.check;
+    auto &firstLane = context.firstLane;
+
+    if (!ready() || state.overview.progress() < OpenedProgressThreshold)
+        return;
+    {
+        QMutexLocker lock(&state.positionsMutex);
+        check(u"fixed-transport-buttons"_s,
+              QLineF(state.playPosition, state.synchronizedPlay).length()
+                              <= TransportPositionTolerance
+                      && QLineF(state.stopPosition, state.synchronizedStop).length()
+                              <= TransportPositionTolerance);
+    }
+    state.visibleLane = firstLane();
+    check(u"visible-label"_s, state.visibleLane >= 0);
+    check(u"no-one-step-entry"_s, !state.overview.enter(state.visibleLane));
+    button("overviewLabel-"_L1 + QString::number(state.visibleLane));
+    check(u"first-click-only-expands"_s,
+          state.overview.active() && state.overview.labels()->canEnter(state.visibleLane)
+                  && state.selected == state.selection->albumId());
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitExpandedEntry(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &button = context.button;
+    auto &check = context.check;
+    auto &capture = context.capture;
+
+    if (state.frames < ExpandedSettleFrames)
+        return;
+    capture(u"expanded"_s);
+    button("overviewEnter-"_L1 + QString::number(state.visibleLane));
+    check(u"second-click-enters-near"_s,
+          !state.overview.active() && !state.presentation.wantsDetail());
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitBrowseFocus(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &key = context.key;
+
+    if (!ready() || state.overview.progress() > ClosedProgressThreshold
+        || !state.presentation.browseSurface()->shown())
+        return;
+    check(u"return-focus"_s,
+          yalahoo::review::findVisual(state.window.contentItem(), u"overviewToggle"_s)
+                  ->hasActiveFocus());
+    key(Qt::Key_V);
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitReenteredOverview(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &button = context.button;
+    auto &check = context.check;
+
+    if (!ready() || state.overview.progress() < OpenedProgressThreshold)
+        return;
+    button(u"overviewNext"_s);
+    check(u"column-navigation-stays-overview"_s,
+          state.overview.active() && !state.overview.labels()->canEnter(state.visibleLane));
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitColumnNavigation(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &key = context.key;
+
+    if (!ready())
+        return;
+    key(Qt::Key_Escape);
+    check(u"escape-return"_s, !state.overview.active());
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitEscape(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &key = context.key;
+
+    if (!ready() || state.overview.progress() > ClosedProgressThreshold)
+        return;
+    key(Qt::Key_V);
+    ++state.stage;
+    return;
+}
+void advanceOverviewClickArchiveCase(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &clickPoint = context.clickPoint;
+    {
+        if (!ready() || state.overview.progress() < OpenedProgressThreshold)
+            return;
+        bool clicked = false;
+        for (const auto &instance : state.selection->instances()) {
+            const auto point = state.scene.projectWorldPoint(
+                    instance.transform.map({ 0, yalahoo::sceneGeometry::HingeHeight, 0 }));
+            if (point.x() < HorizontalHitInsetPixels
+                || point.x() > state.window.width() - HorizontalHitInsetPixels
+                || point.y() < TopHitInsetPixels
+                || point.y() > state.window.height() - BottomHitInsetPixels)
+                continue;
+            if (!state.scene.hitTest(point.x(), point.y()).isEmpty()) {
+                clickPoint({ point.x(), point.y() });
+                clicked = true;
+                break;
+            }
+        }
+        check(u"album-click-returns"_s, clicked && !state.overview.active());
+        ++state.stage;
+        return;
+    }
+}
+void advanceOverviewAwaitCaseReturn(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+
+    if (!ready() || state.overview.progress() > ClosedProgressThreshold)
+        return;
+    state.overview.setActive(true);
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewReverseOverview(auto &context)
+{
+    OverviewReviewState &state = context.state;
+
+    if (state.frames < ReversalSettleFrames)
+        return;
+    state.overview.setActive(false);
+    state.motion.clock()->setSpeed(yalahoo::productDefaults::MinimumMotionSpeed);
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewReverseAgain(auto &context)
+{
+    OverviewReviewState &state = context.state;
+
+    if (state.frames < ReversalSettleFrames)
+        return;
+    state.overview.setActive(true);
+    state.motion.clock()->setSpeed(yalahoo::productDefaults::MaximumMotionSpeed);
+    ++state.stage;
+    return;
+}
+void advanceOverviewReduceOverviewMotion(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &check = context.check;
+
+    state.motion.setReducedMotion(true);
+    check(u"reduced-finishes-progress"_s, state.overview.progress() == 1);
+    state.selection->setRealistic(true);
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewResizeViewport(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+
+    if (!ready() || state.frames < ViewportSetupFrames)
+        return;
+    state.window.resize(state.sizes[state.sizeIndex]);
+    state.scene.lighting()->setNight(state.sizeIndex % 2 ? !state.initialNight
+                                                         : state.initialNight);
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewCheckViewport(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &capture = context.capture;
+    {
+        if (!ready() || state.frames < ResizeSettleFrames)
+            return;
+        QVector<QRectF> occupied;
+        for (int row = 0; row < state.overview.labels()->rowCount(); ++row) {
+            const auto index = state.overview.labels()->index(row);
+            if (!state.overview.labels()->data(index, OverviewLabelsModel::Interactive).toBool())
+                continue;
+            const int lane =
+                    state.overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
+            auto *label = yalahoo::review::findVisual(state.window.contentItem(),
+                                                      "overviewLabel-"_L1 + QString::number(lane));
+            if (!label) {
+                check(u"label-object"_s, false);
+                continue;
+            }
+            const auto rect = label->mapRectToScene(label->boundingRect());
+            check(u"label-inside-viewport"_s,
+                  rect.left() >= -RetainedLeftSlackPixels
+                          && rect.right() + EntryWidthPixels
+                                  <= state.window.width() - LabelRightInsetPixels);
+            for (const auto &other : occupied)
+                check(u"labels-do-not-overlap"_s, !rect.intersects(other));
+            occupied.append(rect);
+        }
+        capture("size-"_L1 + QString::number(state.sizeIndex));
+        if (++state.sizeIndex < state.sizes.size())
+            state.stage = ResizeViewport;
+        else {
+            state.window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
+            ++state.stage;
+        }
+        return;
+    }
+}
+void advanceOverviewPrepareWindowCycle(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+
+    if (!ready())
+        return;
+    if (!state.requestedCycles) {
+        state.overview.setActive(false);
+        state.stage = AwaitOverviewRelease;
+        return;
+    }
+    state.pausedProgress = state.overview.progress();
+    state.priorSubmission = quint64(state.samples.size());
+    state.window.hide();
+    state.window.releaseResources();
+    state.window.destroy();
+    ++state.stage;
+    QTimer::singleShot(HiddenSettleMilliseconds, &state.lifetime, [&] {
+        check(u"hidden-clock-paused"_s,
+              !state.motion.clock()->active() && state.overview.progress() == state.pausedProgress);
+        state.window.create();
+        state.window.show();
+        state.window.update();
+    });
+    return;
+}
+void advanceOverviewAwaitWindowCycle(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &capture = context.capture;
+
+    if (!ready() || quint64(state.samples.size()) <= state.priorSubmission
+        || !state.window.isExposed())
+        return;
+    if (++state.cycle < state.requestedCycles)
+        state.stage = PrepareWindowCycle;
+    else {
+        capture(u"restored"_s);
+        state.overview.setActive(false);
+        ++state.stage;
+    }
+    return;
+}
+void advanceOverviewAwaitOverviewRelease(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+
+    if (!ready() || state.overview.progress() != 0)
+        return;
+    state.overview.setActive(true);
+    state.frames = 0;
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitShortcutExit(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &key = context.key;
+
+    if (!ready() || state.frames < ShortcutSettleFrames)
+        return;
+    key(Qt::Key_V);
+    check(u"v-return"_s, !state.overview.active());
+    ++state.stage;
+    return;
+}
+void advanceOverviewAwaitLabelRelease(auto &context)
+{
+    OverviewReviewState &state = context.state;
+    auto &ready = context.ready;
+    auto &check = context.check;
+    auto &finish = context.finish;
+
+    if (!ready() || state.overview.labels()->liveCount() != 0)
+        return;
+    check(u"labels-release"_s, state.overview.labels()->liveCount() == 0);
+    check(u"archive-no-detail"_s,
+          state.presentation.archiveEnabled() && !state.presentation.wantsDetail());
+    ++state.stage;
+    finish();
+    return;
+}
+void advanceOverviewDefault(auto &)
+{
+
+    return;
+}
+
+auto advanceOverviewReview(OverviewReviewState &state, auto &check, auto &ready, auto &button,
+                           auto &firstLane, auto &capture, auto &key, auto &clickPoint,
+                           auto &finish)
+{
+    if (state.finished)
+        return;
+    // The finite probe also advances through static reduced-motion states.
+    // Request its next actual Qt frame without adding a product clock or timer.
+    const auto nextFrame = qScopeGuard([&] {
+        if (!state.finished && state.window.isVisible())
+            state.window.update();
+    });
+    ++state.frames;
+    state.states.append(QJsonObject{ { u"stage"_s, state.stage },
+                                     { u"progress"_s, state.overview.progress() },
+                                     { u"album"_s, state.selection->albumId() },
+                                     { u"labels"_s, state.overview.labels()->liveCount() },
+                                     { u"frameRevision"_s, qint64(state.scene.frameRevision()) } });
+    state.peakLabels = std::max(state.peakLabels, state.overview.labels()->liveCount());
+    if (state.overview.labels()->liveCount() > MaximumLiveLabels)
+        check(u"label-capacity"_s, false);
+    {
+        OverviewStageContext context{ state,   ready, button,     check, firstLane,
+                                      capture, key,   clickPoint, finish };
+        using Context = decltype(context);
+        struct Route final
+        {
+            int stage;
+            void (*run)(Context &);
+        };
+        static constexpr Route routes[] = {
+            { AwaitInitialFrame, &advanceOverviewAwaitInitialFrame },
+            { AwaitOverview, &advanceOverviewAwaitOverview },
+            { AwaitExpandedEntry, &advanceOverviewAwaitExpandedEntry },
+            { AwaitBrowseFocus, &advanceOverviewAwaitBrowseFocus },
+            { AwaitReenteredOverview, &advanceOverviewAwaitReenteredOverview },
+            { AwaitColumnNavigation, &advanceOverviewAwaitColumnNavigation },
+            { AwaitEscape, &advanceOverviewAwaitEscape },
+            { ClickArchiveCase, &advanceOverviewClickArchiveCase },
+            { AwaitCaseReturn, &advanceOverviewAwaitCaseReturn },
+            { ReverseOverview, &advanceOverviewReverseOverview },
+            { ReverseAgain, &advanceOverviewReverseAgain },
+            { ReduceOverviewMotion, &advanceOverviewReduceOverviewMotion },
+            { ResizeViewport, &advanceOverviewResizeViewport },
+            { CheckViewport, &advanceOverviewCheckViewport },
+            { PrepareWindowCycle, &advanceOverviewPrepareWindowCycle },
+            { AwaitWindowCycle, &advanceOverviewAwaitWindowCycle },
+            { AwaitOverviewRelease, &advanceOverviewAwaitOverviewRelease },
+            { AwaitShortcutExit, &advanceOverviewAwaitShortcutExit },
+            { AwaitLabelRelease, &advanceOverviewAwaitLabelRelease }
+        };
+        const int stageKey = state.stage;
+        const auto route =
+                std::find_if(std::begin(routes), std::end(routes), [stageKey](const Route &entry) {
+                    return entry.stage == stageKey;
+                });
+        if (route != std::end(routes))
+            route->run(context);
+        else
+            advanceOverviewDefault(context);
+    }
+}
+
+}
+}
 int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                             OverviewController &overview, PresentationController &presentation,
                             LibrarySession &library, MotionController &motion,
@@ -192,73 +734,45 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
         }
         return -1;
     };
+    OverviewReviewState state{ finished,
+                               stage,
+                               cycle,
+                               requestedCycles,
+                               playback,
+                               library,
+                               warnings,
+                               window,
+                               native,
+                               samples,
+                               passed,
+                               checks,
+                               pictures,
+                               states,
+                               peakLabels,
+                               time,
+                               motion,
+                               scene,
+                               selection,
+                               output,
+                               app,
+                               frames,
+                               overview,
+                               positionsMutex,
+                               playPosition,
+                               synchronizedPlay,
+                               stopPosition,
+                               synchronizedStop,
+                               selected,
+                               visibleLane,
+                               presentation,
+                               sizes,
+                               sizeIndex,
+                               initialNight,
+                               pausedProgress,
+                               priorSubmission,
+                               lifetime };
     const auto finish = [&] {
-        if (finished)
-            return;
-        finished = true;
-        check(u"sequence-completed"_s, stage == OverviewComplete);
-        check(u"requested-lifecycle-cycles"_s, cycle == requestedCycles);
-        check(u"playback-isolated"_s, playback == library.playbackTrackId());
-        check(u"qml-warnings"_s, warnings.isEmpty());
-        check(u"window-policy"_s, verification::windowPolicySatisfied(window));
-        check(u"renderer-errors"_s, native->errorText().isEmpty());
-        QSet<qint64> generations, postprocess;
-        qint64 peakUpload = 0;
-        for (const auto value : samples) {
-            const auto sample = value.toObject();
-            if (sample[u"stage"_s].toInt() >= 1 && sample[u"stage"_s].toInt() <= 7) {
-                generations.insert(sample[u"resourceGeneration"_s].toInteger());
-                postprocess.insert(sample[u"postprocessRevision"_s].toInteger());
-            }
-            peakUpload = std::max(peakUpload, sample[u"atlasUploadBytes"_s].toInteger());
-        }
-        check(u"overview-keeps-render-targets"_s,
-              generations.size() == 1 && postprocess.size() == 1);
-        check(u"upload-burst"_s,
-              peakUpload <= 2 * yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB);
-        QJsonObject report{
-            { u"passed"_s, passed },
-            { u"configuration"_s, u"Release"_s },
-            { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-            { u"backend"_s, qEnvironmentVariable("QSG_RHI_BACKEND") },
-            { u"dpr"_s, window.effectiveDevicePixelRatio() },
-            { u"windowPolicy"_s, verification::windowPolicy(window) },
-            { u"checks"_s, checks },
-            { u"pictures"_s, pictures },
-            { u"qmlWarnings"_s, QJsonArray::fromStringList(warnings) },
-            { u"states"_s, states },
-            { u"samples"_s, samples },
-            { u"cycles"_s, cycle },
-            { u"requestedLifecycleCycles"_s, requestedCycles },
-            { u"peakLabelSlots"_s, peakLabels },
-            { u"overviewUiAttachments"_s,
-              QJsonObject{
-                      { u"scope"_s,
-                        u"Separate Qt Quick crop/horizontal layers; descriptor estimate, not driver allocation"_s },
-                      { u"maximumSlots"_s, MaximumLiveLabels },
-                      { u"texturesPerSlot"_s, 2 },
-                      { u"width"_s, LabelBudgetWidth },
-                      { u"height"_s, LabelBudgetHeight },
-                      { u"rgba8PayloadBytesUpperBound"_s, LabelColorBudgetBytes },
-                      { u"withDepthStencilUpperBoundBytes"_s, LabelAttachmentBudgetBytes },
-                      { u"resizeOverlapUpperBoundBytes"_s, LabelResizeBudgetBytes },
-                      { u"actualDriverAllocationBytes"_s, QJsonValue::Null } } },
-            { u"peakAtlasUploadBytes"_s, peakUpload },
-            { u"durationMs"_s, time.elapsed() },
-            { u"clockActive"_s, motion.clock()->active() },
-            { u"applicationVisible"_s, motion.clock()->applicationVisible() },
-            { u"cameraSettled"_s, scene.settled() },
-            { u"archiveReady"_s, selection->archiveReady() },
-            { u"measurementScope"_s,
-              u"Qt frame/renderer telemetry and own-window PNG; no input-to-photon or measured VRAM"_s }
-        };
-        QSaveFile file(output + "/report.json"_L1);
-        if (!file.open(QIODevice::WriteOnly)) {
-            app.exit(CaptureFailed);
-            return;
-        }
-        file.write(QJsonDocument(report).toJson());
-        app.exit(file.commit() && passed ? 0 : ReportFailed);
+        return finishOverviewReview(state, check);
     };
     QObject::connect(qmlEngine(&window), &QQmlEngine::warnings, &lifetime,
                      [&](const QList<QQmlError> &errors) {
@@ -285,253 +799,8 @@ int yalahoo::reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAda
     QObject::connect(
             &window, &QQuickWindow::frameSwapped, &lifetime,
             [&] {
-                if (finished)
-                    return;
-                // The finite probe also advances through static reduced-motion states.
-                // Request its next actual Qt frame without adding a product clock or timer.
-                const auto nextFrame = qScopeGuard([&] {
-                    if (!finished && window.isVisible())
-                        window.update();
-                });
-                ++frames;
-                states.append(QJsonObject{ { u"stage"_s, stage },
-                                           { u"progress"_s, overview.progress() },
-                                           { u"album"_s, selection->albumId() },
-                                           { u"labels"_s, overview.labels()->liveCount() },
-                                           { u"frameRevision"_s, qint64(scene.frameRevision()) } });
-                peakLabels = std::max(peakLabels, overview.labels()->liveCount());
-                if (overview.labels()->liveCount() > MaximumLiveLabels)
-                    check(u"label-capacity"_s, false);
-                switch (stage) {
-                case AwaitInitialFrame:
-                    if (!ready() || frames < InitialSettleFrames)
-                        return;
-                    {
-                        QMutexLocker lock(&positionsMutex);
-                        playPosition = synchronizedPlay;
-                        stopPosition = synchronizedStop;
-                    }
-                    selected = selection->albumId();
-                    button(u"overviewToggle"_s);
-                    check(u"toggle-enter"_s, overview.active());
-                    ++stage;
-                    break;
-                case AwaitOverview:
-                    if (!ready() || overview.progress() < OpenedProgressThreshold)
-                        return;
-                    {
-                        QMutexLocker lock(&positionsMutex);
-                        check(u"fixed-transport-buttons"_s,
-                              QLineF(playPosition, synchronizedPlay).length()
-                                              <= TransportPositionTolerance
-                                      && QLineF(stopPosition, synchronizedStop).length()
-                                              <= TransportPositionTolerance);
-                    }
-                    visibleLane = firstLane();
-                    check(u"visible-label"_s, visibleLane >= 0);
-                    check(u"no-one-step-entry"_s, !overview.enter(visibleLane));
-                    button("overviewLabel-"_L1 + QString::number(visibleLane));
-                    check(u"first-click-only-expands"_s,
-                          overview.active() && overview.labels()->canEnter(visibleLane)
-                                  && selected == selection->albumId());
-                    frames = 0;
-                    ++stage;
-                    break;
-                case AwaitExpandedEntry:
-                    if (frames < ExpandedSettleFrames)
-                        return;
-                    capture(u"expanded"_s);
-                    button("overviewEnter-"_L1 + QString::number(visibleLane));
-                    check(u"second-click-enters-near"_s,
-                          !overview.active() && !presentation.wantsDetail());
-                    ++stage;
-                    break;
-                case AwaitBrowseFocus:
-                    if (!ready() || overview.progress() > ClosedProgressThreshold
-                        || !presentation.browseSurface()->shown())
-                        return;
-                    check(u"return-focus"_s,
-                          yalahoo::review::findVisual(window.contentItem(), u"overviewToggle"_s)
-                                  ->hasActiveFocus());
-                    key(Qt::Key_V);
-                    ++stage;
-                    break;
-                case AwaitReenteredOverview:
-                    if (!ready() || overview.progress() < OpenedProgressThreshold)
-                        return;
-                    button(u"overviewNext"_s);
-                    check(u"column-navigation-stays-overview"_s,
-                          overview.active() && !overview.labels()->canEnter(visibleLane));
-                    ++stage;
-                    break;
-                case AwaitColumnNavigation:
-                    if (!ready())
-                        return;
-                    key(Qt::Key_Escape);
-                    check(u"escape-return"_s, !overview.active());
-                    ++stage;
-                    break;
-                case AwaitEscape:
-                    if (!ready() || overview.progress() > ClosedProgressThreshold)
-                        return;
-                    key(Qt::Key_V);
-                    ++stage;
-                    break;
-                case ClickArchiveCase: {
-                    if (!ready() || overview.progress() < OpenedProgressThreshold)
-                        return;
-                    bool clicked = false;
-                    for (const auto &instance : selection->instances()) {
-                        const auto point = scene.projectWorldPoint(instance.transform.map(
-                                { 0, yalahoo::sceneGeometry::HingeHeight, 0 }));
-                        if (point.x() < HorizontalHitInsetPixels
-                            || point.x() > window.width() - HorizontalHitInsetPixels
-                            || point.y() < TopHitInsetPixels
-                            || point.y() > window.height() - BottomHitInsetPixels)
-                            continue;
-                        if (!scene.hitTest(point.x(), point.y()).isEmpty()) {
-                            clickPoint({ point.x(), point.y() });
-                            clicked = true;
-                            break;
-                        }
-                    }
-                    check(u"album-click-returns"_s, clicked && !overview.active());
-                    ++stage;
-                    break;
-                }
-                case AwaitCaseReturn:
-                    if (!ready() || overview.progress() > ClosedProgressThreshold)
-                        return;
-                    overview.setActive(true);
-                    frames = 0;
-                    ++stage;
-                    break;
-                case ReverseOverview:
-                    if (frames < ReversalSettleFrames)
-                        return;
-                    overview.setActive(false);
-                    motion.clock()->setSpeed(yalahoo::productDefaults::MinimumMotionSpeed);
-                    frames = 0;
-                    ++stage;
-                    break;
-                case ReverseAgain:
-                    if (frames < ReversalSettleFrames)
-                        return;
-                    overview.setActive(true);
-                    motion.clock()->setSpeed(yalahoo::productDefaults::MaximumMotionSpeed);
-                    ++stage;
-                    break;
-                case ReduceOverviewMotion:
-                    motion.setReducedMotion(true);
-                    check(u"reduced-finishes-progress"_s, overview.progress() == 1);
-                    selection->setRealistic(true);
-                    frames = 0;
-                    ++stage;
-                    break;
-                case ResizeViewport:
-                    if (!ready() || frames < ViewportSetupFrames)
-                        return;
-                    window.resize(sizes[sizeIndex]);
-                    scene.lighting()->setNight(sizeIndex % 2 ? !initialNight : initialNight);
-                    frames = 0;
-                    ++stage;
-                    break;
-                case CheckViewport: {
-                    if (!ready() || frames < ResizeSettleFrames)
-                        return;
-                    QVector<QRectF> occupied;
-                    for (int row = 0; row < overview.labels()->rowCount(); ++row) {
-                        const auto index = overview.labels()->index(row);
-                        if (!overview.labels()
-                                     ->data(index, OverviewLabelsModel::Interactive)
-                                     .toBool())
-                            continue;
-                        const int lane =
-                                overview.labels()->data(index, OverviewLabelsModel::Lane).toInt();
-                        auto *label = yalahoo::review::findVisual(
-                                window.contentItem(), "overviewLabel-"_L1 + QString::number(lane));
-                        if (!label) {
-                            check(u"label-object"_s, false);
-                            continue;
-                        }
-                        const auto rect = label->mapRectToScene(label->boundingRect());
-                        check(u"label-inside-viewport"_s,
-                              rect.left() >= -RetainedLeftSlackPixels
-                                      && rect.right() + EntryWidthPixels
-                                              <= window.width() - LabelRightInsetPixels);
-                        for (const auto &other : occupied)
-                            check(u"labels-do-not-overlap"_s, !rect.intersects(other));
-                        occupied.append(rect);
-                    }
-                    capture("size-"_L1 + QString::number(sizeIndex));
-                    if (++sizeIndex < sizes.size())
-                        stage = ResizeViewport;
-                    else {
-                        window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
-                        ++stage;
-                    }
-                    break;
-                }
-                case PrepareWindowCycle:
-                    if (!ready())
-                        return;
-                    if (!requestedCycles) {
-                        overview.setActive(false);
-                        stage = AwaitOverviewRelease;
-                        break;
-                    }
-                    pausedProgress = overview.progress();
-                    priorSubmission = quint64(samples.size());
-                    window.hide();
-                    window.releaseResources();
-                    window.destroy();
-                    ++stage;
-                    QTimer::singleShot(HiddenSettleMilliseconds, &lifetime, [&] {
-                        check(u"hidden-clock-paused"_s,
-                              !motion.clock()->active() && overview.progress() == pausedProgress);
-                        window.create();
-                        window.show();
-                        window.update();
-                    });
-                    break;
-                case AwaitWindowCycle:
-                    if (!ready() || quint64(samples.size()) <= priorSubmission
-                        || !window.isExposed())
-                        return;
-                    if (++cycle < requestedCycles)
-                        stage = PrepareWindowCycle;
-                    else {
-                        capture(u"restored"_s);
-                        overview.setActive(false);
-                        ++stage;
-                    }
-                    break;
-                case AwaitOverviewRelease:
-                    if (!ready() || overview.progress() != 0)
-                        return;
-                    overview.setActive(true);
-                    frames = 0;
-                    ++stage;
-                    break;
-                case AwaitShortcutExit:
-                    if (!ready() || frames < ShortcutSettleFrames)
-                        return;
-                    key(Qt::Key_V);
-                    check(u"v-return"_s, !overview.active());
-                    ++stage;
-                    break;
-                case AwaitLabelRelease:
-                    if (!ready() || overview.labels()->liveCount() != 0)
-                        return;
-                    check(u"labels-release"_s, overview.labels()->liveCount() == 0);
-                    check(u"archive-no-detail"_s,
-                          presentation.archiveEnabled() && !presentation.wantsDetail());
-                    ++stage;
-                    finish();
-                    break;
-                default:
-                    break;
-                }
+                return advanceOverviewReview(state, check, ready, button, firstLane, capture, key,
+                                             clickPoint, finish);
             },
             Qt::QueuedConnection);
     QTimer::singleShot(ReviewDeadlineMilliseconds, &lifetime, finish);

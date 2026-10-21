@@ -37,7 +37,9 @@ inline bool useReviewGlMultisampleBuffers(QRhi *api)
     if (!api)
         qCFatal(logReviewGl, "Review capability check requires the initialized RHI");
 #if defined(Q_OS_MACOS)
-    if (api && api->backend() == QRhi::OpenGLES2) {
+    if (api->backend() != QRhi::OpenGLES2)
+        return false;
+    {
         auto *context = QOpenGLContext::currentContext();
         if (!context)
             qCFatal(logReviewGl, "Review OpenGL capability check requires the current RHI context");
@@ -63,26 +65,23 @@ inline bool useReviewGlMultisampleBuffers(QRhi *api)
 inline QJsonObject quick3DTarget(QQuickWindow &window)
 {
     QJsonObject result;
-    if (auto *attachment = QQuick3DSceneManager::getOrSetWindowAttachment(window)) {
-        if (attachment->rci()) {
-            const auto &context = attachment->rci()->rhiContext();
-            result.insert(u"samples"_s, context->mainPassSampleCount());
-            if (auto *target = context->renderTarget();
-                target && target->resourceType() == QRhiResource::TextureRenderTarget) {
-                const auto description =
-                        static_cast<QRhiTextureRenderTarget *>(target)->description();
-                if (description.colorAttachmentCount() > 0) {
-                    const auto *color = description.colorAttachmentAt(0);
-                    result.insert(u"renderbuffer"_s, color->renderBuffer() != nullptr);
-                    result.insert(u"resolved"_s, color->resolveTexture() != nullptr);
-                    if (color->renderBuffer() && color->resolveTexture())
-                        result.insert(u"formatPreserved"_s,
-                                      color->renderBuffer()->backingFormat()
-                                              == color->resolveTexture()->format());
-                }
-            }
-        }
-    }
+    auto *attachment = QQuick3DSceneManager::getOrSetWindowAttachment(window);
+    if (!attachment || !attachment->rci())
+        return result;
+    const auto &context = attachment->rci()->rhiContext();
+    result.insert(u"samples"_s, context->mainPassSampleCount());
+    auto *target = context->renderTarget();
+    if (!target || target->resourceType() != QRhiResource::TextureRenderTarget)
+        return result;
+    const auto description = static_cast<QRhiTextureRenderTarget *>(target)->description();
+    if (description.colorAttachmentCount() == 0)
+        return result;
+    const auto *color = description.colorAttachmentAt(0);
+    result.insert(u"renderbuffer"_s, color->renderBuffer() != nullptr);
+    result.insert(u"resolved"_s, color->resolveTexture() != nullptr);
+    if (color->renderBuffer() && color->resolveTexture())
+        result.insert(u"formatPreserved"_s,
+                      color->renderBuffer()->backingFormat() == color->resolveTexture()->format());
     return result;
 }
 

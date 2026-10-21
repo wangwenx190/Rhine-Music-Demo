@@ -501,6 +501,10 @@ yalahoo_add_assets(AudioAmbienceTest)
 add_test(NAME audio-ambience COMMAND AudioAmbienceTest)
 set_tests_properties(audio-ambience PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
 
+yalahoo_unit_test(SingleInstanceTest single-instance
+    LIBRARIES YalahooCore
+    TIMEOUT 30)
+
 yalahoo_unit_test(SettingsTest settings
     LIBRARIES YalahooScene
     TIMEOUT 60)

@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 #include "MetadataMerge.h"
 #include <utility>
 #include <QCryptographicHash>
@@ -35,16 +37,19 @@ ProviderResult cachedMetadata(const Album &album, MetadataKind kind, RequestToke
     if (kind != MetadataKind::Introduction && !state.value(u"sourceDetails"_s).toObject().isEmpty())
         result.source = state.value(u"sourceDetails"_s).toObject();
     const auto status = state.value(u"status"_s).toString().toLower();
-    if (status == "matched"_L1)
-        result.status = ProviderStatus::Matched;
-    else if (status == "partial"_L1)
-        result.status = ProviderStatus::Partial;
-    else if (status == "not-found"_L1)
-        result.status = ProviderStatus::NotFound;
-    else if (status == "uncertain"_L1)
-        result.status = ProviderStatus::Uncertain;
-    else if (status == "error"_L1)
-        result.status = ProviderStatus::Error;
+    static const std::pair<QLatin1StringView, ProviderStatus> statuses[] = {
+        { "matched"_L1, ProviderStatus::Matched },
+        { "partial"_L1, ProviderStatus::Partial },
+        { "not-found"_L1, ProviderStatus::NotFound },
+        { "uncertain"_L1, ProviderStatus::Uncertain },
+        { "error"_L1, ProviderStatus::Error }
+    };
+    const auto found =
+            std::find_if(std::begin(statuses), std::end(statuses), [&](const auto &entry) {
+                return entry.first == status;
+            });
+    if (found != std::end(statuses))
+        result.status = found->second;
     else if (kind == MetadataKind::Introduction && !album.description.isEmpty())
         result.status = ProviderStatus::Matched;
     else if (kind == MetadataKind::Credits && !album.producers.isEmpty())
@@ -66,6 +71,49 @@ QString metadataKey(const Album &album, MetadataKind kind)
                                .toJson(QJsonDocument::Compact);
     return QString::fromUtf8(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
 }
+namespace {
+void mergeIntroduction(Album &album, const ProviderResult &result, const QJsonObject &state)
+{
+    album.introduction = state;
+    const auto text = result.payload.value(u"description"_s).toString();
+    // A failed refresh must not remove an existing introduction.
+    if (!text.isEmpty() && result.status == ProviderStatus::Matched) {
+        album.description = text;
+        album.descriptionSource = result.source;
+    }
+}
+void mergeCredits(Album &album, const ProviderResult &result, const QJsonObject &state)
+{
+    album.creditsLookup = state;
+    if (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial) {
+        QList<Producer> producers;
+        for (const auto &person : std::as_const(album.producers))
+            if (person.source != "MusicBrainz"_L1)
+                producers.append(person);
+        for (const auto &value : result.payload.value(u"producers"_s).toArray()) {
+            const auto object = value.toObject();
+            if (object.value(u"source"_s).toString() != "MusicBrainz"_L1)
+                continue;
+            Producer person;
+            person.name = object.value(u"name"_s).toString();
+            person.role = object.value(u"role"_s).toString();
+            person.source = u"MusicBrainz"_s;
+            person.trackId = object.value(u"trackId"_s).toString();
+            person.trackTitle = object.value(u"trackTitle"_s).toString();
+            person.url = object.value(u"url"_s).toString();
+            if (!person.name.isEmpty() && !person.role.isEmpty())
+                producers.append(std::move(person));
+        }
+        album.producers = std::move(producers);
+    }
+}
+void mergeEnrichment(Album &album, const ProviderResult &result, const QJsonObject &state)
+{
+    album.online = state;
+    if (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial)
+        album.fields.insert(u"_onlineGenres"_s, result.payload.value(u"genres"_s).toArray());
+}
+}
 bool mergeMetadata(Album &album, const ProviderResult &result)
 {
     if (album.id != result.albumId || result.status == ProviderStatus::Deferred
@@ -77,42 +125,21 @@ bool mergeMetadata(Album &album, const ProviderResult &result)
     const auto state = result.payload.value(stateKey).toObject();
     if (state.isEmpty())
         return false;
-    if (result.kind == MetadataKind::Introduction) {
-        album.introduction = state;
-        const auto text = result.payload.value(u"description"_s).toString();
-        // A failed refresh must not remove an existing introduction.
-        if (!text.isEmpty() && result.status == ProviderStatus::Matched) {
-            album.description = text;
-            album.descriptionSource = result.source;
-        }
-    } else if (result.kind == MetadataKind::Credits) {
-        album.creditsLookup = state;
-        if (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial) {
-            QList<Producer> producers;
-            for (const auto &person : std::as_const(album.producers))
-                if (person.source != "MusicBrainz"_L1)
-                    producers.append(person);
-            for (const auto &value : result.payload.value(u"producers"_s).toArray()) {
-                const auto object = value.toObject();
-                if (object.value(u"source"_s).toString() != "MusicBrainz"_L1)
-                    continue;
-                Producer person;
-                person.name = object.value(u"name"_s).toString();
-                person.role = object.value(u"role"_s).toString();
-                person.source = u"MusicBrainz"_s;
-                person.trackId = object.value(u"trackId"_s).toString();
-                person.trackTitle = object.value(u"trackTitle"_s).toString();
-                person.url = object.value(u"url"_s).toString();
-                if (!person.name.isEmpty() && !person.role.isEmpty())
-                    producers.append(std::move(person));
-            }
-            album.producers = std::move(producers);
-        }
-    } else {
-        album.online = state;
-        if (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial)
-            album.fields.insert(u"_onlineGenres"_s, result.payload.value(u"genres"_s).toArray());
-    }
+    struct Merge final
+    {
+        MetadataKind kind;
+        void (*apply)(Album &, const ProviderResult &, const QJsonObject &);
+    };
+    static constexpr Merge handlers[] = { { MetadataKind::Introduction, &mergeIntroduction },
+                                          { MetadataKind::Credits, &mergeCredits },
+                                          { MetadataKind::Enrichment, &mergeEnrichment } };
+    const auto handler =
+            std::find_if(std::begin(handlers), std::end(handlers), [&](const Merge &entry) {
+                return entry.kind == result.kind;
+            });
+    if (handler == std::end(handlers))
+        return false;
+    handler->apply(album, result, state);
     return true;
 }
 }

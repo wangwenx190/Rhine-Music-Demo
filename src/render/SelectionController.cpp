@@ -579,6 +579,23 @@ void SelectionController::cancelDrag()
 {
     m_drag.cancel();
 }
+double SelectionController::realisticField(double row, double lane, bool reduced) const
+{
+    const double activity = m_realColumns.activity(int(lane));
+    double height = reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
+    if (!reduced && activity > 0) {
+        double ripple = 0;
+        for (const auto &pulse : m_pulses)
+            if (pulse.cell.lane == lane)
+                ripple += musicSelectionWave(std::abs(row - pulse.cell.row), m_time - pulse.time);
+        height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
+                * m_pulseGain * activity;
+    }
+    return height
+            + settlingWave(row - m_realColumns.row(int(lane), overviewProgress()),
+                           sceneGeometry::SettledSceneSeconds)
+            * activity;
+}
 double SelectionController::field(double row, double lane) const
 {
     if (!m_motion)
@@ -598,24 +615,8 @@ double SelectionController::field(double row, double lane) const
                         * columnStrength(lane, m_cell.lane);
         return opening * (1 - intro) + resting * intro;
     }
-    if (m_realistic) {
-        const double activity = m_realColumns.activity(int(lane));
-        double height =
-                reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
-        if (!reduced && activity > 0) {
-            double ripple = 0;
-            for (const auto &pulse : m_pulses)
-                if (pulse.cell.lane == lane)
-                    ripple +=
-                            musicSelectionWave(std::abs(row - pulse.cell.row), m_time - pulse.time);
-            height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
-                    * m_pulseGain * activity;
-        }
-        return height
-                + settlingWave(row - m_realColumns.row(int(lane), overviewProgress()),
-                               sceneGeometry::SettledSceneSeconds)
-                * activity;
-    }
+    if (m_realistic)
+        return realisticField(row, lane, reduced);
     double height = 0;
     if (m_scanBlend != 0)
         height += archiveWave(row + m_origin.row, lane + m_origin.lane, m_scanTime) * m_scanBlend;
@@ -781,6 +782,35 @@ void SelectionController::setOpeningTime(std::optional<double> time)
     }
     publish();
 }
+void SelectionController::advanceLift(double dt, bool reduced, bool detailNavigation)
+{
+    m_returnY.reset();
+    const bool aligningNeighbor =
+            std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
+                return copy.returnY && copy.cell.lane == m_cell.lane
+                        && std::abs(copy.cell.row - m_cell.row) < NeighborRadiusRows;
+            });
+    if (m_managedDetail && m_navigationLift) {
+        m_liftTarget = m_detailMotion.placed()
+                ? (!reduced && aligningNeighbor ? 0 : sceneGeometry::InspectionLift)
+                : sceneGeometry::PreviewLift;
+        if (reduced)
+            m_lift.finish(m_liftTarget);
+        else
+            m_lift.update(m_liftTarget, detailNavigation ? DetailLiftRate : LiftFollowRate, dt);
+    } else if (m_managedDetail
+               && (m_detail > 0 || !m_detailMotion.settled() || m_detailMotion.holdsDetail())) {
+        m_lift.value = sceneGeometry::PreviewLift
+                + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift) * m_detail;
+        m_lift.velocity = m_detailMotion.state().value == m_detail
+                ? (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift)
+                        * m_detailMotion.state().velocity
+                : 0;
+    } else if (reduced)
+        m_lift.finish(m_liftTarget);
+    else
+        m_lift.update(m_liftTarget, LiftFollowRate, dt);
+}
 void SelectionController::advance(double dt)
 {
     if (m_openingTime)
@@ -848,32 +878,7 @@ void SelectionController::advance(double dt)
     if (m_returnY && m_rotation != 0)
         m_lift.finish(*m_returnY - base);
     else {
-        m_returnY.reset();
-        const bool aligningNeighbor =
-                std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
-                    return copy.returnY && copy.cell.lane == m_cell.lane
-                            && std::abs(copy.cell.row - m_cell.row) < NeighborRadiusRows;
-                });
-        if (m_managedDetail && m_navigationLift) {
-            m_liftTarget = m_detailMotion.placed()
-                    ? (!reduced && aligningNeighbor ? 0 : sceneGeometry::InspectionLift)
-                    : sceneGeometry::PreviewLift;
-            if (reduced)
-                m_lift.finish(m_liftTarget);
-            else
-                m_lift.update(m_liftTarget, detailNavigation ? DetailLiftRate : LiftFollowRate, dt);
-        } else if (m_managedDetail
-                   && (m_detail > 0 || !m_detailMotion.settled() || m_detailMotion.holdsDetail())) {
-            m_lift.value = sceneGeometry::PreviewLift
-                    + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift) * m_detail;
-            m_lift.velocity = m_detailMotion.state().value == m_detail
-                    ? (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift)
-                            * m_detailMotion.state().velocity
-                    : 0;
-        } else if (reduced)
-            m_lift.finish(m_liftTarget);
-        else
-            m_lift.update(m_liftTarget, LiftFollowRate, dt);
+        advanceLift(dt, reduced, detailNavigation);
     }
     if (m_managedDetail)
         m_clarity.advance(dt, m_detail > ClarityReadyProgress && m_lift.value > ClarityReadyLift,

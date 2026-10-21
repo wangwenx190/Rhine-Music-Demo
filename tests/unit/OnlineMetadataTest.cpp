@@ -342,34 +342,40 @@ private Q_SLOTS:
             QVERIFY(request.rawHeader("User-Agent"_ba).contains("yalahoo"_ba));
         }
     }
+
+private:
+    static auto releaseFixtureResponse(const QNetworkRequest &request)
+    {
+        if (request.url().path().endsWith(u"/release/"_s)) {
+            auto first = sampleRelease();
+            first.insert(u"score"_s, 100);
+            first.insert(u"track-count"_s, 1);
+            auto second = first;
+            second.insert(u"id"_s, groupId());
+            return Response{ json({ { u"count"_s, 2 },
+                                    { u"releases"_s, QJsonArray{ first, second } } }),
+                             200,
+                             0,
+                             { } };
+        }
+        if (request.url().path().contains(u"release-group"_s))
+            return Response{
+                json({ { u"id"_s, groupId() },
+                       { u"genres"_s, QJsonArray{ QJsonObject{ { u"name"_s, u"rock"_s } } } } }),
+                200,
+                0,
+                { }
+            };
+        auto release = sampleRelease();
+        release.insert(u"id"_s, groupId());
+        return Response{ json(release), 200, 0, { } };
+    }
+private Q_SLOTS:
     void releaseChoiceAndGenreEnrichment()
     {
         const auto server = std::make_shared<Server>();
         server->respond = [](const QNetworkRequest &request) {
-            if (request.url().path().endsWith(u"/release/"_s)) {
-                auto first = sampleRelease();
-                first.insert(u"score"_s, 100);
-                first.insert(u"track-count"_s, 1);
-                auto second = first;
-                second.insert(u"id"_s, groupId());
-                return Response{ json({ { u"count"_s, 2 },
-                                        { u"releases"_s, QJsonArray{ first, second } } }),
-                                 200,
-                                 0,
-                                 { } };
-            }
-            if (request.url().path().contains(u"release-group"_s))
-                return Response{
-                    json({ { u"id"_s, groupId() },
-                           { u"genres"_s,
-                             QJsonArray{ QJsonObject{ { u"name"_s, u"rock"_s } } } } }),
-                    200,
-                    0,
-                    { }
-                };
-            auto release = sampleRelease();
-            release.insert(u"id"_s, groupId());
-            return Response{ json(release), 200, 0, { } };
+            return releaseFixtureResponse(request);
         };
         OnlineMetadataProvider provider(nullptr, [server] {
             return new Network(server);

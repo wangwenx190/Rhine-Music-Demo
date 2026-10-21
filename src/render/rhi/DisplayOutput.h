@@ -47,6 +47,10 @@ Q_SIGNALS:
     void changed();
 
 private:
+    void queueSceneGraphError(const QString &message);
+    void reportSwapChain(QQuickWindow &window);
+    void reportSceneGraphError(const quint64 &epoch, const QString &message);
+
     void refresh();
     void configure(bool hdr);
     void recoverOutput();

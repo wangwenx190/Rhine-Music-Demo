@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QTextLayout>
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 
 using namespace Qt::StringLiterals;
@@ -18,6 +19,77 @@ constexpr auto SecondsPerMinute = 60;
 constexpr auto FormatSignificantDigits = 8;
 constexpr auto MetricPrefixScale = 1000;
 
+QString verifiedStatus(const QJsonObject &lookup, bool credits, bool, int trackCount)
+{
+    return credits ? QCoreApplication::translate("Yalahoo", "Track credits verified: %1 / %2.")
+                             .arg(lookup.value(u"matchedTracks"_s).toInt())
+                             .arg(lookup.value(u"totalTracks"_s).toInt(trackCount))
+                   : QCoreApplication::translate("Yalahoo", "The introduction is saved locally.");
+}
+QString statusMessage(const QJsonObject &lookup, const QString &status, bool retained, bool credits,
+                      int trackCount)
+{
+    struct Message final
+    {
+        QLatin1StringView status;
+        QString (*text)(const QJsonObject &, bool, bool, int);
+    };
+    static constexpr Message messages[] = {
+        { "error"_L1,
+          [](const QJsonObject &state, bool, bool, int) {
+              return QCoreApplication::translate("Yalahoo", "Query failed: ")
+                      + state.value(u"error"_s)
+                                .toString(QCoreApplication::translate(
+                                        "Yalahoo",
+                                        "The metadata source is temporarily unavailable."));
+          } },
+        { "uncertain"_L1,
+          [](const QJsonObject &, bool, bool, int) {
+              return QCoreApplication::translate(
+                      "Yalahoo",
+                      "The album or track could not be identified reliably. Uncertain metadata was not applied.");
+          } },
+        { "not-found"_L1,
+          [](const QJsonObject &, bool, bool, int) {
+              return QCoreApplication::translate("Yalahoo", "No verifiable metadata was found.");
+          } },
+        { "matched"_L1, &verifiedStatus },
+        { "partial"_L1, &verifiedStatus },
+        { "unqueried"_L1,
+          [](const QJsonObject &, bool, bool retained, int) {
+              return retained
+                      ? QCoreApplication::translate("Yalahoo", "Metadata is saved locally.")
+                      : QCoreApplication::translate("Yalahoo", "Metadata has not been queried.");
+          } }
+    };
+    const auto message =
+            std::find_if(std::begin(messages), std::end(messages), [&](const Message &entry) {
+                return entry.status == status;
+            });
+    return message == std::end(messages)
+            ? QCoreApplication::translate("Yalahoo", "Metadata status: %1.").arg(status)
+            : message->text(lookup, credits, retained, trackCount);
+}
+QString formatMetadataNumber(int value, double scale, const QString &unit)
+{
+    double scaled = value / scale;
+    if (unit == "kbps"_L1)
+        scaled = std::round(scaled);
+    else if (unit == "kHz"_L1)
+        scaled = std::round(scaled * yalahoo::units::DecimalBase) / yalahoo::units::DecimalBase;
+    return QString::number(scaled, 'g', FormatSignificantDigits);
+}
+QString displayMetadataRange(std::optional<int> low, std::optional<int> high, double scale,
+                             const QString &unit)
+{
+    if (!low)
+        return QCoreApplication::translate("Yalahoo", "Not provided");
+    const auto number = [scale, &unit](int value) {
+        return formatMetadataNumber(value, scale, unit);
+    };
+    return number(*low) + " "_L1 + unit
+            + (*low == *high ? QString() : u"\u2013"_s + number(*high) + " "_L1 + unit);
+}
 QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int trackCount = 0)
 {
     const QString status = lookup.value(u"status"_s).toString(u"unqueried"_s);
@@ -25,30 +97,7 @@ QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int
             ? QCoreApplication::translate("Yalahoo",
                                           " Existing metadata is retained for offline reading.")
             : QString();
-    QString result;
-    if (status == "error"_L1)
-        result = QCoreApplication::translate("Yalahoo", "Query failed: ")
-                + lookup.value(u"error"_s)
-                          .toString(QCoreApplication::translate(
-                                  "Yalahoo", "The metadata source is temporarily unavailable."));
-    else if (status == "uncertain"_L1)
-        result = QCoreApplication::translate(
-                "Yalahoo",
-                "The album or track could not be identified reliably. Uncertain metadata was not applied.");
-    else if (status == "not-found"_L1)
-        result = QCoreApplication::translate("Yalahoo", "No verifiable metadata was found.");
-    else if (status == "partial"_L1 || status == "matched"_L1)
-        result = credits
-                ? QCoreApplication::translate("Yalahoo", "Track credits verified: %1 / %2.")
-                          .arg(lookup.value(u"matchedTracks"_s).toInt())
-                          .arg(lookup.value(u"totalTracks"_s).toInt(trackCount))
-                : QCoreApplication::translate("Yalahoo", "The introduction is saved locally.");
-    else if (status == "unqueried"_L1)
-        result = retained
-                ? QCoreApplication::translate("Yalahoo", "Metadata is saved locally.")
-                : QCoreApplication::translate("Yalahoo", "Metadata has not been queried.");
-    else
-        result = QCoreApplication::translate("Yalahoo", "Metadata status: %1.").arg(status);
+    QString result = statusMessage(lookup, status, retained, credits, trackCount);
     if (status != "error"_L1 && !lookup.value(u"error"_s).toString().isEmpty())
         result += " "_L1 + lookup.value(u"error"_s).toString();
     if (!lookup.value(u"retryAt"_s).toString().isEmpty())
@@ -93,30 +142,54 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
         || index.row() >= rowCount())
         return { };
     const auto &track = m_album->tracks[index.row()];
-    switch (role) {
-    case TrackId:
-        return track.id;
-    case Number:
-        return u"%1"_s.arg(track.trackNumber.value_or(index.row() + 1), 2,
-                           yalahoo::units::DecimalBase, '0'_L1);
-    case Title:
-        return track.title;
-    case Artist:
-        return artistDisplayName(track.artist);
-    case Format:
-        return track.format;
-    case Duration:
-        return time(track.duration);
-    case Disc:
-        return track.discNumber.value_or(1);
-    case DiscHeading:
-        return m_info.value(u"discs"_s).toInt() > 1
-                && (index.row() == 0
-                    || m_album->tracks[index.row() - 1].discNumber.value_or(1)
-                            != track.discNumber.value_or(1));
-    default:
-        return { };
-    }
+    struct RoleReader final
+    {
+        int role;
+        QVariant (*read)(const DetailModel &self, const Track &track, int row);
+    };
+    static const RoleReader readers[] = {
+        { TrackId,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return track.id;
+          } },
+        { Number,
+          [](const DetailModel &, const Track &track, int row) -> QVariant {
+              return u"%1"_s.arg(track.trackNumber.value_or(row + 1), 2,
+                                 yalahoo::units::DecimalBase, '0'_L1);
+          } },
+        { Title,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return track.title;
+          } },
+        { Artist,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return artistDisplayName(track.artist);
+          } },
+        { Format,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return track.format;
+          } },
+        { Duration,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return time(track.duration);
+          } },
+        { Disc,
+          [](const DetailModel &, const Track &track, int) -> QVariant {
+              return track.discNumber.value_or(1);
+          } },
+        { DiscHeading,
+          [](const DetailModel &self, const Track &track, int row) -> QVariant {
+              return self.m_info.value(u"discs"_s).toInt() > 1
+                      && (row == 0
+                          || self.m_album->tracks[row - 1].discNumber.value_or(1)
+                                  != track.discNumber.value_or(1));
+          } }
+    };
+    const auto reader =
+            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
+                return entry.role == role;
+            });
+    return reader == std::end(readers) ? QVariant{ } : reader->read(*this, track, index.row());
 }
 QHash<int, QByteArray> DetailModel::roleNames() const
 {
@@ -187,22 +260,7 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
             range(track.sampleRate, minRate, maxRate);
             range(track.bitrate, minBitrate, maxBitrate);
         }
-        const auto display = [](std::optional<int> low, std::optional<int> high, double scale,
-                                const QString &unit) {
-            if (!low)
-                return QCoreApplication::translate("Yalahoo", "Not provided");
-            const auto number = [scale, &unit](int value) {
-                double scaled = value / scale;
-                if (unit == "kbps"_L1)
-                    scaled = std::round(scaled);
-                else if (unit == "kHz"_L1)
-                    scaled = std::round(scaled * yalahoo::units::DecimalBase)
-                            / yalahoo::units::DecimalBase;
-                return QString::number(scaled, 'g', FormatSignificantDigits);
-            };
-            return number(*low) + " "_L1 + unit
-                    + (*low == *high ? QString() : u"\u2013"_s + number(*high) + " "_L1 + unit);
-        };
+
         fact(QCoreApplication::translate("Yalahoo", "RELEASE / Year"),
              a.year ? QString::number(*a.year)
                     : QCoreApplication::translate("Yalahoo", "Not provided"));
@@ -217,10 +275,11 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                                : formats.join(u" \u00b7 "_s));
         fact(QCoreApplication::translate("Yalahoo", "RESOLUTION / Bit depth and sample rate"),
              (lossy ? QCoreApplication::translate("Yalahoo", "Lossy encoding")
-                    : display(minBits, maxBits, 1, u"bit"_s))
-                     + " / "_L1 + display(minRate, maxRate, MetricPrefixScale, u"kHz"_s));
+                    : displayMetadataRange(minBits, maxBits, 1, u"bit"_s))
+                     + " / "_L1
+                     + displayMetadataRange(minRate, maxRate, MetricPrefixScale, u"kHz"_s));
         fact(QCoreApplication::translate("Yalahoo", "BITRATE"),
-             display(minBitrate, maxBitrate, MetricPrefixScale, u"kbps"_s));
+             displayMetadataRange(minBitrate, maxBitrate, MetricPrefixScale, u"kbps"_s));
         fact(QCoreApplication::translate("Yalahoo", "DURATION / Total time"), time(duration));
         for (const auto &producer : a.producers) {
             producers.append(QVariantMap{
@@ -269,18 +328,18 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
             appendUnique(group.sources, group.sourceKeys,
                          source + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
             const auto trackTitle = producer[u"trackTitle"_s].toString();
-            if (!trackTitle.isEmpty()) {
-                const auto trackKey = producer[u"trackId"_s].toString() + QChar(0) + trackTitle
-                        + QChar(0) + producer[u"role"_s].toString() + QChar(0) + url;
-                if (!group.trackKeys.contains(trackKey)) {
-                    group.trackKeys.insert(trackKey);
-                    group.tracks.append(trackTitle + u" \u00b7 "_s + producer[u"role"_s].toString()
-                                        + QCoreApplication::translate("Yalahoo", "\nSource: ")
-                                        + source
-                                        + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
-                }
-            } else
+            if (trackTitle.isEmpty()) {
                 appendUnique(group.unscoped, group.unscopedKeys, producer[u"role"_s].toString());
+                continue;
+            }
+            const auto trackKey = producer[u"trackId"_s].toString() + QChar(0) + trackTitle
+                    + QChar(0) + producer[u"role"_s].toString() + QChar(0) + url;
+            if (group.trackKeys.contains(trackKey))
+                continue;
+            group.trackKeys.insert(trackKey);
+            group.tracks.append(trackTitle + u" \u00b7 "_s + producer[u"role"_s].toString()
+                                + QCoreApplication::translate("Yalahoo", "\nSource: ") + source
+                                + (url.isEmpty() ? QString() : u" \u00b7 "_s + url));
         }
         QVariantList groups;
         for (const auto &group : grouped)

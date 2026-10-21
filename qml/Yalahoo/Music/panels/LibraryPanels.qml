@@ -45,14 +45,17 @@ T.Popup {
     background: Item {}
     onOpened: Qt.callLater(focusContent)
     function focusContent(): void {
-        if (controller.panel === "search")
-            search.focusSearch();
-        else if (controller.panel === "library")
-            library.focusEditor();
-        else if (settingsLoader.item)
-            (settingsLoader.item as SettingsPanel).focusControl();
-        else if (playbackLoader.item)
-            (playbackLoader.item as PlaybackPanel).focusControl();
+        const targets = {
+            "search": search.focusSearch,
+            "library": library.focusEditor,
+            "settings": settingsLoader.item ? (settingsLoader.item as SettingsPanel).focusControl :
+                                              null,
+            "playback": playbackLoader.item ? (playbackLoader.item as PlaybackPanel).focusControl :
+                                              null
+        };
+        const focusTarget = targets[controller.panel];
+        if (focusTarget)
+            focusTarget();
     }
     function dismiss(): void {
         pendingAlbum = "";

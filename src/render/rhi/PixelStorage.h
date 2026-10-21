@@ -3,6 +3,9 @@
 
 #pragma once
 #include "RhiApi.h"
+#include <algorithm>
+#include <iterator>
+#include <utility>
 
 namespace yalahoo::rhi {
 namespace pixelStorage {
@@ -15,30 +18,29 @@ inline constexpr auto HalfScalarBytes = 2;
 
 inline int bytesPerPixel(QRhiTexture::Format format)
 {
-    switch (format) {
-    case QRhiTexture::UnknownFormat:
-        // QRhiRenderBuffer may not expose its backend depth format. D32FS8 is the
-        // conservative supported depth/stencil upper bound; report format=0 explicitly.
-        return pixelStorage::HalfRgbaOrDepthStencilBytes;
-    case QRhiTexture::RGBA16F:
-    case QRhiTexture::D32FS8:
-        return pixelStorage::HalfRgbaOrDepthStencilBytes;
-    case QRhiTexture::RGBA32F:
-        return pixelStorage::FloatRgbaBytes;
-    case QRhiTexture::D16:
-    case QRhiTexture::R16F:
-        return pixelStorage::HalfScalarBytes;
-    case QRhiTexture::RGBA8:
-    case QRhiTexture::BGRA8:
-    case QRhiTexture::R32F:
-    case QRhiTexture::D32F:
-    case QRhiTexture::D24S8:
-    case QRhiTexture::D24:
-        return pixelStorage::RgbaOrFloatScalarBytes;
-    default:
-        require(false, "Cannot estimate selected attachment format");
-        return 0;
-    }
+    // UnknownFormat is QRhiRenderBuffer's undisclosed backend depth format; D32FS8
+    // remains its conservative bound. Other unlisted formats are rejected.
+    using Entry = std::pair<QRhiTexture::Format, int>;
+    static constexpr Entry formats[] = {
+        { QRhiTexture::UnknownFormat, pixelStorage::HalfRgbaOrDepthStencilBytes },
+        { QRhiTexture::RGBA16F, pixelStorage::HalfRgbaOrDepthStencilBytes },
+        { QRhiTexture::D32FS8, pixelStorage::HalfRgbaOrDepthStencilBytes },
+        { QRhiTexture::RGBA32F, pixelStorage::FloatRgbaBytes },
+        { QRhiTexture::D16, pixelStorage::HalfScalarBytes },
+        { QRhiTexture::R16F, pixelStorage::HalfScalarBytes },
+        { QRhiTexture::RGBA8, pixelStorage::RgbaOrFloatScalarBytes },
+        { QRhiTexture::BGRA8, pixelStorage::RgbaOrFloatScalarBytes },
+        { QRhiTexture::R32F, pixelStorage::RgbaOrFloatScalarBytes },
+        { QRhiTexture::D32F, pixelStorage::RgbaOrFloatScalarBytes },
+        { QRhiTexture::D24S8, pixelStorage::RgbaOrFloatScalarBytes },
+        { QRhiTexture::D24, pixelStorage::RgbaOrFloatScalarBytes }
+    };
+    const auto entry =
+            std::find_if(std::begin(formats), std::end(formats), [format](const Entry &candidate) {
+                return candidate.first == format;
+            });
+    require(entry != std::end(formats), "Cannot estimate selected attachment format");
+    return entry->second;
 }
 
 struct TextureExtent final

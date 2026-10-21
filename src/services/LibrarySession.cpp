@@ -35,6 +35,14 @@ QVariantMap LibrarySession::metadata() const
         result.insert(it.key(), metadataValue(it.value()));
     return result;
 }
+namespace {
+void retainIntroduction(QVariantMap &value, QVariantMap &payload, const Album &resolved)
+{
+    payload.insert(u"description"_s, resolved.description);
+    if (!resolved.descriptionSource.isEmpty())
+        value.insert(u"source"_s, resolved.descriptionSource.toVariantMap());
+}
+}
 LibrarySession::LibrarySession(IMetadataProvider *provider, QObject *parent)
     : QObject(parent),
       m_provider(provider),
@@ -463,9 +471,7 @@ QVariantMap LibrarySession::metadataFor(const QString &albumId, const QString &k
         const auto resolved = resolvedAlbum(albumId);
         if (kind == "introduction"_L1 && payload.value(u"description"_s).toString().isEmpty()
             && !resolved.description.isEmpty()) {
-            payload.insert(u"description"_s, resolved.description);
-            if (!resolved.descriptionSource.isEmpty())
-                value.insert(u"source"_s, resolved.descriptionSource.toVariantMap());
+            retainIntroduction(value, payload, resolved);
         } else if (kind == "credits"_L1 && payload.value(u"producers"_s).toList().isEmpty()
                    && !resolved.producers.isEmpty()) {
             payload.insert(u"producers"_s, producerData(resolved.producers).toVariantList());

@@ -8,6 +8,9 @@
 #include "SceneAdapter.h"
 #include "SettingsController.h"
 #include <cmath>
+#include <array>
+#include <algorithm>
+#include <iterator>
 
 using namespace Qt::StringLiterals;
 
@@ -50,7 +53,8 @@ SettingsController::SettingsController(PreferencesStore *preferences, LibrarySes
 }
 QVariantMap SettingsController::values() const
 {
-    return { { u"theme"_s, m_scene->lighting()->night() ? u"night"_s : u"day"_s },
+    return { { u"singleInstance"_s, m_singleInstance },
+             { u"theme"_s, m_scene->lighting()->night() ? u"night"_s : u"day"_s },
              { u"sortMode"_s, m_sortMode },
              { u"arrayMode"_s, m_selection->realistic() ? u"realistic"_s : u"filled"_s },
              { u"rememberColumnPosition"_s, m_selection->rememberColumnPosition() },
@@ -69,6 +73,7 @@ void SettingsController::persist(const QString &field, const QVariant &value)
 void SettingsController::apply()
 {
     m_applying = true;
+    m_singleInstance = m_preferences->values().value(u"singleInstance"_s).toBool();
     const auto values = m_preferences->values();
     m_scene->lighting()->setNight(values.value(u"theme"_s).toString() == "night"_L1);
     // Unknown nested extensions stay in PreferencesStore, outside the runtime parameter set.
@@ -96,28 +101,82 @@ void SettingsController::apply()
 }
 bool SettingsController::update(const QString &field, const QVariant &value)
 {
-    if (field == "theme"_L1 && (value == u"day"_s || value == u"night"_s))
-        m_scene->lighting()->setNight(value == u"night"_s);
-    else if (field == "reduced"_L1 && value.metaType().id() == QMetaType::Bool)
-        m_motion->setReducedMotion(value.toBool());
-    else if (field == "motionSpeed"_L1 && value.metaType().id() != QMetaType::QString
-             && value.metaType().id() != QMetaType::Bool && value.canConvert<double>()
-             && std::isfinite(value.toDouble()))
-        m_motion->clock()->setSpeed(value.toDouble());
-    else if (field == "sortMode"_L1
-             && (value == u"genre"_s || value == u"artist"_s || value == u"album"_s)) {
-        m_sortMode = value.toString();
-        m_library->sort(m_sortMode);
-        persist(field, value);
-    } else if (field == "arrayMode"_L1 && (value == u"filled"_s || value == u"realistic"_s))
-        m_selection->setRealistic(value == u"realistic"_s);
-    else if (field == "rememberColumnPosition"_L1 && value.metaType().id() == QMetaType::Bool)
-        m_selection->setRememberColumnPosition(value.toBool());
-    else if (field == "renderQuality"_L1 && value.canConvert<QVariantMap>())
-        m_scene->quality()->configure(value.toMap());
-    else
-        return false;
-    return true;
+    struct Route final
+    {
+        QLatin1StringView field;
+        bool (*apply)(SettingsController &, const QVariant &);
+    };
+    static constexpr Route routes[] = {
+        { "theme"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input != u"day"_s && input != u"night"_s)
+                  return false;
+              self.m_scene->lighting()->setNight(input == u"night"_s);
+              return true;
+          } },
+        { "reduced"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input.metaType().id() != QMetaType::Bool)
+                  return false;
+              self.m_motion->setReducedMotion(input.toBool());
+              return true;
+          } },
+        { "motionSpeed"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input.metaType().id() == QMetaType::QString
+                  || input.metaType().id() == QMetaType::Bool || !input.canConvert<double>()
+                  || !std::isfinite(input.toDouble()))
+                  return false;
+              self.m_motion->clock()->setSpeed(input.toDouble());
+              return true;
+          } },
+        { "sortMode"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input != u"genre"_s && input != u"artist"_s && input != u"album"_s)
+                  return false;
+              self.m_sortMode = input.toString();
+              self.m_library->sort(self.m_sortMode);
+              self.persist(u"sortMode"_s, input);
+              return true;
+          } },
+        { "arrayMode"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input != u"filled"_s && input != u"realistic"_s)
+                  return false;
+              self.m_selection->setRealistic(input == u"realistic"_s);
+              return true;
+          } },
+        { "rememberColumnPosition"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input.metaType().id() != QMetaType::Bool)
+                  return false;
+              self.m_selection->setRememberColumnPosition(input.toBool());
+              return true;
+          } },
+        { "renderQuality"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (!input.canConvert<QVariantMap>())
+                  return false;
+              self.m_scene->quality()->configure(input.toMap());
+              return true;
+          } },
+        { "singleInstance"_L1,
+          [](SettingsController &self, const QVariant &input) {
+              if (input.metaType().id() != QMetaType::Bool)
+                  return false;
+              if (self.m_preferences
+                  && !self.m_preferences->update({ { u"singleInstance"_s, input } }))
+                  return false;
+              self.m_singleInstance = input.toBool();
+              Q_EMIT self.changed();
+              return true;
+          } }
+    };
+    const auto route =
+            std::find_if(std::begin(routes), std::end(routes), [&](const Route &candidate) {
+                return candidate.field == field;
+            });
+    return route != std::end(routes) && route->apply(*this, value);
 }
 bool SettingsController::updateQuality(const QString &field, const QVariant &value)
 {

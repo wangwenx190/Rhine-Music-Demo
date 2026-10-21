@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 #include "ReviewSupport.h"
 #include <QWheelEvent>
 #include "NavigationReview.h"
@@ -51,6 +53,262 @@ enum ReviewStage {
 
 using namespace Qt::StringLiterals;
 
+namespace yalahoo {
+namespace {
+// Shared references remain valid until this review event loop has stopped.
+struct NavigationReviewState final
+{
+    bool &waiting;
+    bool &queued;
+    int &step;
+    QQuickWindow &window;
+    QJsonArray &samples;
+    RulerController &ruler;
+    qint64 &restoreStartedNs;
+    QTimer &deadline;
+    QObject &scope;
+    std::function<void()> &next;
+    SelectionController *&selection;
+    QGuiApplication &app;
+    InputRouter &input;
+    SceneAdapter &scene;
+    const QString &output;
+    qint64 (*const &now)();
+    LibrarySession &library;
+    const QString &playback;
+    QJsonArray &inputs;
+    std::function<void()> &advanceWhenReady;
+};
+auto finishNavigationReview(NavigationReviewState &state, auto &hasSubmission)
+{
+    if (!state.waiting || state.queued)
+        return;
+    const bool ready = state.step == AwaitInitialFrame
+            ? state.window.isExposed() && !state.samples.isEmpty()
+            : state.step == CheckHidden ? !state.window.isVisible() && !state.ruler.active()
+            : state.step == CheckRestored
+            ? state.window.isExposed() && state.ruler.active() && !state.samples.isEmpty()
+                    && state.samples.last().toObject()[u"submittedNs"_s].toInteger()
+                            >= state.restoreStartedNs
+            : hasSubmission()
+                    && (state.step != CheckWheelCap || !state.ruler.state()[u"moving"_s].toBool());
+    if (!ready)
+        return;
+    state.waiting = false;
+    state.queued = true;
+    state.deadline.stop();
+    QMetaObject::invokeMethod(
+            &state.scope,
+            [&] {
+                state.queued = false;
+                state.next();
+            },
+            Qt::QueuedConnection);
+}
+
+template <typename WheelFunction, typename CheckFunction, typename CheckSubmissionFunction,
+          typename KeyFunction, typename FinishFunction>
+struct NavigationStageContext final
+{
+    NavigationReviewState &state;
+    WheelFunction &wheel;
+    CheckFunction &check;
+    CheckSubmissionFunction &checkSubmission;
+    KeyFunction &key;
+    FinishFunction &finish;
+};
+void advanceNavigationAwaitInitialFrame(auto &context)
+{
+    auto &wheel = context.wheel;
+
+    for (int i = 0; i < 4; ++i)
+        wheel(-12, -120);
+    return;
+}
+void advanceNavigationCheckWheelBurst(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+    auto &key = context.key;
+
+    check(u"pixelDelta-priority-48px"_s, state.selection->albumId() == "a0-1"_L1);
+    checkSubmission(u"pixelDelta-corresponding-submission"_s);
+    for (int i = 0; i < 8; ++i)
+        key(Qt::Key_Down);
+    for (int i = 0; i < 5; ++i)
+        key(Qt::Key_Up);
+    return;
+}
+void advanceNavigationCheckOpposedWheel(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+    auto &key = context.key;
+
+    check(u"rapid-reversal-latest-target"_s, state.selection->albumId() == "a0-4"_L1);
+    checkSubmission(u"reversal-corresponding-submission"_s);
+    key(Qt::Key_Right);
+    return;
+}
+void advanceNavigationCheckFiniteColumn(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &wheel = context.wheel;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+    auto &key = context.key;
+    {
+        check(u"keyboard-column"_s, state.selection->cell().lane == 1);
+        checkSubmission(u"column-corresponding-submission"_s);
+        const auto before = state.selection->albumId();
+        QQmlEngine engine;
+        QQmlComponent component(&engine);
+        component.setData("import QtQuick\nTextInput {width: 100; height: 40; text: 'x'}"_ba,
+                          QUrl());
+        std::unique_ptr<QObject> object(component.create());
+        auto *text = qobject_cast<QQuickItem *>(object.get());
+        if (!text) {
+            state.app.exit(RulerObjectMissing);
+            return;
+        }
+        text->setParentItem(state.window.contentItem());
+        text->forceActiveFocus();
+        key(Qt::Key_Down);
+        check(u"input-focus-owned"_s, state.selection->albumId() == before);
+        object.reset();
+        state.selection->setRealistic(true);
+        state.selection->navigateRow(12);
+        wheel(0, -1200);
+        return;
+    }
+}
+void advanceNavigationCheckWheelCap(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+    {
+        check(u"wheel-event-cap-and-finite-end"_s, state.selection->cell().row == 15);
+        checkSubmission(u"finite-end-corresponding-submission"_s);
+        int first = -1;
+        const auto states = state.ruler.slotStates();
+        for (int i = 0; i < 16; ++i)
+            if (states[i].toMap()[u"enabled"_s].toBool()
+                && states[i].toMap()[u"ordinal"_s].toInt() == 0)
+                first = i;
+        auto *button = yalahoo::review::findVisual(state.window.contentItem(),
+                                                   u"rulerSlot%1"_s.arg(first));
+        if (!button) {
+            state.app.exit(RulerSlotsMissing);
+            return;
+        }
+        const auto point = button->mapToScene({ button->width() / 2, button->height() / 2 });
+        QMouseEvent press(QEvent::MouseButtonPress, point, state.window.mapToGlobal(point),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, point, state.window.mapToGlobal(point),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&state.window, &press);
+        QCoreApplication::sendEvent(&state.window, &release);
+        return;
+    }
+}
+void advanceNavigationCheckRulerClick(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+
+    check(u"production-ruler-click"_s, state.selection->cell().row == 12);
+    checkSubmission(u"ruler-click-corresponding-submission"_s);
+    state.input.swipe({ 0, -36 }, SwipeDeadlineMilliseconds);
+    state.window.resize(390, 844);
+    state.scene.lighting()->setNight(true);
+    return;
+}
+void advanceNavigationCheckSwipe(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &checkSubmission = context.checkSubmission;
+
+    check(u"touch-common-boundary"_s, state.selection->cell().row == 13);
+    checkSubmission(u"touch-corresponding-submission"_s);
+    check(u"portrait-narrow"_s, state.ruler.narrow() && state.scene.layout()->portrait());
+    state.window.grabWindow().save(state.output + "/portrait-night.png"_L1);
+    state.window.hide();
+    return;
+}
+void advanceNavigationCheckHidden(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+
+    check(u"hidden-ruler-no-input"_s, !state.ruler.active());
+    state.window.releaseResources();
+    state.restoreStartedNs = state.now();
+    state.window.show();
+    return;
+}
+void advanceNavigationCheckRestored(auto &context)
+{
+    NavigationReviewState &state = context.state;
+    auto &check = context.check;
+    auto &finish = context.finish;
+    {
+        check(u"restore-production-ruler"_s, state.ruler.active() && state.ruler.narrow());
+        check(u"navigation-playback-independent"_s,
+              state.library.playbackTrackId() == state.playback);
+        check(u"window-policy"_s, verification::windowPolicySatisfied(state.window));
+        check(u"real-input-frame-submissions"_s,
+              !state.samples.isEmpty() && !state.inputs.isEmpty());
+        const auto image = state.window.grabWindow();
+        check(u"own-render-capture"_s,
+              !image.isNull() && image.save(state.output + "/restored.png"_L1));
+        finish();
+        return;
+    }
+}
+
+auto advanceNavigationReview(NavigationReviewState &state, auto &wheel, auto &check,
+                             auto &checkSubmission, auto &key, auto &finish)
+{
+    {
+        NavigationStageContext context{ state, wheel, check, checkSubmission, key, finish };
+        using Context = decltype(context);
+        struct Route final
+        {
+            int stage;
+            void (*run)(Context &);
+        };
+        static constexpr Route routes[] = {
+            { AwaitInitialFrame, &advanceNavigationAwaitInitialFrame },
+            { CheckWheelBurst, &advanceNavigationCheckWheelBurst },
+            { CheckOpposedWheel, &advanceNavigationCheckOpposedWheel },
+            { CheckFiniteColumn, &advanceNavigationCheckFiniteColumn },
+            { CheckWheelCap, &advanceNavigationCheckWheelCap },
+            { CheckRulerClick, &advanceNavigationCheckRulerClick },
+            { CheckSwipe, &advanceNavigationCheckSwipe },
+            { CheckHidden, &advanceNavigationCheckHidden },
+            { CheckRestored, &advanceNavigationCheckRestored }
+        };
+        const int stageKey = state.step++;
+        const auto route =
+                std::find_if(std::begin(routes), std::end(routes), [stageKey](const Route &entry) {
+                    return entry.stage == stageKey;
+                });
+        if (route != std::end(routes))
+            route->run(context);
+    }
+    state.waiting = true;
+    state.deadline.start(StageDeadlineMilliseconds);
+    state.window.update();
+    state.advanceWhenReady();
+}
+
+}
+}
 int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &scene,
                               LibrarySession &library, InputRouter &input, RulerController &ruler,
                               const QString &output)
@@ -150,28 +408,13 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
                         .toJson());
         app.exit(file.commit() && passed ? 0 : ReportFailed);
     };
+    NavigationReviewState state{
+        waiting,  queued, step,    window,    samples, ruler,           restoreStartedNs,
+        deadline, scope,  next,    selection, app,     input,           scene,
+        output,   now,    library, playback,  inputs,  advanceWhenReady
+    };
     advanceWhenReady = [&] {
-        if (!waiting || queued)
-            return;
-        const bool ready = step == AwaitInitialFrame ? window.isExposed() && !samples.isEmpty()
-                : step == CheckHidden                ? !window.isVisible() && !ruler.active()
-                : step == CheckRestored ? window.isExposed() && ruler.active() && !samples.isEmpty()
-                        && samples.last().toObject()[u"submittedNs"_s].toInteger()
-                                >= restoreStartedNs
-                                        : hasSubmission()
-                        && (step != CheckWheelCap || !ruler.state()[u"moving"_s].toBool());
-        if (!ready)
-            return;
-        waiting = false;
-        queued = true;
-        deadline.stop();
-        QMetaObject::invokeMethod(
-                &scope,
-                [&] {
-                    queued = false;
-                    next();
-                },
-                Qt::QueuedConnection);
+        return finishNavigationReview(state, hasSubmission);
     };
     QObject::connect(&window, &QQuickWindow::frameSwapped, &scope, advanceWhenReady);
     QObject::connect(&window, &QWindow::visibleChanged, &scope, advanceWhenReady);
@@ -189,108 +432,7 @@ int yalahoo::reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneA
         QCoreApplication::sendEvent(&window, &event);
     };
     next = [&] {
-        switch (step++) {
-        case AwaitInitialFrame:
-            for (int i = 0; i < 4; ++i)
-                wheel(-12, -120);
-            break;
-        case CheckWheelBurst:
-            check(u"pixelDelta-priority-48px"_s, selection->albumId() == "a0-1"_L1);
-            checkSubmission(u"pixelDelta-corresponding-submission"_s);
-            for (int i = 0; i < 8; ++i)
-                key(Qt::Key_Down);
-            for (int i = 0; i < 5; ++i)
-                key(Qt::Key_Up);
-            break;
-        case CheckOpposedWheel:
-            check(u"rapid-reversal-latest-target"_s, selection->albumId() == "a0-4"_L1);
-            checkSubmission(u"reversal-corresponding-submission"_s);
-            key(Qt::Key_Right);
-            break;
-        case CheckFiniteColumn: {
-            check(u"keyboard-column"_s, selection->cell().lane == 1);
-            checkSubmission(u"column-corresponding-submission"_s);
-            const auto before = selection->albumId();
-            QQmlEngine engine;
-            QQmlComponent component(&engine);
-            component.setData("import QtQuick\nTextInput {width: 100; height: 40; text: 'x'}"_ba,
-                              QUrl());
-            std::unique_ptr<QObject> object(component.create());
-            auto *text = qobject_cast<QQuickItem *>(object.get());
-            if (!text) {
-                app.exit(RulerObjectMissing);
-                return;
-            }
-            text->setParentItem(window.contentItem());
-            text->forceActiveFocus();
-            key(Qt::Key_Down);
-            check(u"input-focus-owned"_s, selection->albumId() == before);
-            object.reset();
-            selection->setRealistic(true);
-            selection->navigateRow(12);
-            wheel(0, -1200);
-            break;
-        }
-        case CheckWheelCap: {
-            check(u"wheel-event-cap-and-finite-end"_s, selection->cell().row == 15);
-            checkSubmission(u"finite-end-corresponding-submission"_s);
-            int first = -1;
-            const auto states = ruler.slotStates();
-            for (int i = 0; i < 16; ++i)
-                if (states[i].toMap()[u"enabled"_s].toBool()
-                    && states[i].toMap()[u"ordinal"_s].toInt() == 0)
-                    first = i;
-            auto *button =
-                    yalahoo::review::findVisual(window.contentItem(), u"rulerSlot%1"_s.arg(first));
-            if (!button) {
-                app.exit(RulerSlotsMissing);
-                return;
-            }
-            const auto point = button->mapToScene({ button->width() / 2, button->height() / 2 });
-            QMouseEvent press(QEvent::MouseButtonPress, point, window.mapToGlobal(point),
-                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-            QMouseEvent release(QEvent::MouseButtonRelease, point, window.mapToGlobal(point),
-                                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
-            QCoreApplication::sendEvent(&window, &press);
-            QCoreApplication::sendEvent(&window, &release);
-            break;
-        }
-        case CheckRulerClick:
-            check(u"production-ruler-click"_s, selection->cell().row == 12);
-            checkSubmission(u"ruler-click-corresponding-submission"_s);
-            input.swipe({ 0, -36 }, SwipeDeadlineMilliseconds);
-            window.resize(390, 844);
-            scene.lighting()->setNight(true);
-            break;
-        case CheckSwipe:
-            check(u"touch-common-boundary"_s, selection->cell().row == 13);
-            checkSubmission(u"touch-corresponding-submission"_s);
-            check(u"portrait-narrow"_s, ruler.narrow() && scene.layout()->portrait());
-            window.grabWindow().save(output + "/portrait-night.png"_L1);
-            window.hide();
-            break;
-        case CheckHidden:
-            check(u"hidden-ruler-no-input"_s, !ruler.active());
-            window.releaseResources();
-            restoreStartedNs = now();
-            window.show();
-            break;
-        case CheckRestored: {
-            check(u"restore-production-ruler"_s, ruler.active() && ruler.narrow());
-            check(u"navigation-playback-independent"_s, library.playbackTrackId() == playback);
-            check(u"window-policy"_s, verification::windowPolicySatisfied(window));
-            check(u"real-input-frame-submissions"_s, !samples.isEmpty() && !inputs.isEmpty());
-            const auto image = window.grabWindow();
-            check(u"own-render-capture"_s,
-                  !image.isNull() && image.save(output + "/restored.png"_L1));
-            finish();
-            return;
-        }
-        }
-        waiting = true;
-        deadline.start(StageDeadlineMilliseconds);
-        window.update();
-        advanceWhenReady();
+        return advanceNavigationReview(state, wheel, check, checkSubmission, key, finish);
     };
     waiting = true;
     deadline.start(StageDeadlineMilliseconds);

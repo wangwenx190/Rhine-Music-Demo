@@ -127,6 +127,16 @@ Q_SIGNALS:
     void focusRequested(bool detail);
 
 private:
+    void selectPending(const QString &albumId, const QString &trackId, bool &archiveRoute,
+                       bool &openAfter);
+
+    void commitPendingMenu();
+    void browseHidden(quint64 revision);
+    void detailHidden(quint64 revision);
+    void switchHidden(quint64 revision);
+    void advanceFrame(double dt);
+    void updatePresentation();
+
     void advanceTab(double dt);
     bool navigationEnabled(int direction) const;
     void transact(const std::function<void()> &operation);

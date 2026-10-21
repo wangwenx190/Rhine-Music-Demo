@@ -110,6 +110,38 @@ void saveFile(const QString &path, const QByteArray &bytes)
 }
 // Validate each accessor against both its buffer view and the binary payload before reading.
 // The accepted layout is deliberately narrow: unsupported transforms or sparse data require explicit adaptation.
+
+namespace {
+auto readGeometryAccessor(const QJsonArray &accessors, const QJsonArray &views,
+                          const QByteArray &bin, int index, int components, int componentType)
+{
+    require(index >= 0 && index < accessors.size(), "Invalid accessor index");
+    const auto a = accessors[index].toObject();
+    const int viewId = a[u"bufferView"_s].toInt(-1);
+    require(viewId >= 0 && viewId < views.size() && !a.contains(u"sparse"_s)
+                    && !a[u"normalized"_s].toBool(),
+            "Unsupported accessor");
+    const auto view = views[viewId].toObject();
+    require(a[u"componentType"_s].toInt() == componentType && view[u"buffer"_s].toInt() == 0,
+            "Unsupported accessor component");
+    require(a[u"type"_s].toString()
+                    == (components == 1           ? "SCALAR"_L1
+                                : components == 2 ? "VEC2"_L1
+                                                  : "VEC3"_L1),
+            "Invalid accessor dimensions");
+    const int size = componentType == GlbUnsignedShort ? 2 : 4;
+    const int stride = view[u"byteStride"_s].toInt(components * size),
+              count = a[u"count"_s].toInt();
+    const int viewStart = view[u"byteOffset"_s].toInt(), localStart = a[u"byteOffset"_s].toInt();
+    require(count > 0 && stride >= components * size && viewStart >= 0 && localStart >= 0,
+            "Invalid accessor range");
+    const qint64 required = qint64(count - 1) * stride + components * size;
+    require(required <= qint64(view[u"byteLength"_s].toInt()) - localStart
+                    && qint64(viewStart) + localStart + required <= bin.size(),
+            "Accessor exceeds buffer");
+    return std::array<qsizetype, 3>{ qsizetype(viewStart) + localStart, stride, count };
+}
+}
 QVector<Batch> readGlb(const QByteArray &bytes)
 {
     Reader r{ bytes };
@@ -134,32 +166,7 @@ QVector<Batch> readGlb(const QByteArray &bytes)
     }
     const auto accessors = root[u"accessors"_s].toArray(), views = root[u"bufferViews"_s].toArray();
     auto accessor = [&](int index, int components, int componentType) {
-        require(index >= 0 && index < accessors.size(), "Invalid accessor index");
-        const auto a = accessors[index].toObject();
-        const int viewId = a[u"bufferView"_s].toInt(-1);
-        require(viewId >= 0 && viewId < views.size() && !a.contains(u"sparse"_s)
-                        && !a[u"normalized"_s].toBool(),
-                "Unsupported accessor");
-        const auto view = views[viewId].toObject();
-        require(a[u"componentType"_s].toInt() == componentType && view[u"buffer"_s].toInt() == 0,
-                "Unsupported accessor component");
-        require(a[u"type"_s].toString()
-                        == (components == 1           ? "SCALAR"_L1
-                                    : components == 2 ? "VEC2"_L1
-                                                      : "VEC3"_L1),
-                "Invalid accessor dimensions");
-        const int size = componentType == GlbUnsignedShort ? 2 : 4;
-        const int stride = view[u"byteStride"_s].toInt(components * size),
-                  count = a[u"count"_s].toInt();
-        const int viewStart = view[u"byteOffset"_s].toInt(),
-                  localStart = a[u"byteOffset"_s].toInt();
-        require(count > 0 && stride >= components * size && viewStart >= 0 && localStart >= 0,
-                "Invalid accessor range");
-        const qint64 required = qint64(count - 1) * stride + components * size;
-        require(required <= qint64(view[u"byteLength"_s].toInt()) - localStart
-                        && qint64(viewStart) + localStart + required <= bin.size(),
-                "Accessor exceeds buffer");
-        return std::array<qsizetype, 3>{ qsizetype(viewStart) + localStart, stride, count };
+        return readGeometryAccessor(accessors, views, bin, index, components, componentType);
     };
     QVector<Batch> batches;
     for (const auto &meshValue : root[u"meshes"_s].toArray()) {

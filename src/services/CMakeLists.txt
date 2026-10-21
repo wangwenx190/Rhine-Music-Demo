@@ -22,6 +22,8 @@ target_sources(
     MetadataPresentation.cpp
     CoverCache.h
     CoverCache.cpp
+    SingleInstance.cpp
+    SingleInstance.h
     PreferencesStore.cpp
     PreferencesStore.h
 )

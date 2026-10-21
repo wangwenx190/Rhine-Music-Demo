@@ -230,6 +230,19 @@ private Q_SLOTS:
             previous = encoded;
         }
     }
+
+private:
+    static auto awaitPresentedFrame(QQuickWindow *&window, DisplayOutput &output, QSignalSpy &swaps,
+                                    qsizetype before)
+    {
+        window->update();
+        return QTest::qWaitFor(
+                [&] {
+                    return output.ready() && swaps.size() > before && window->isExposed();
+                },
+                5000);
+    }
+private Q_SLOTS:
     void nativeOutput()
     {
         QVERIFY(qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1);
@@ -269,12 +282,7 @@ private Q_SLOTS:
                 5000));
         const bool actualHdr = output.hdrActive();
         const auto presented = [&](qsizetype before) {
-            window->update();
-            return QTest::qWaitFor(
-                    [&] {
-                        return output.ready() && swaps.size() > before && window->isExposed();
-                    },
-                    5000);
+            return awaitPresentedFrame(window, output, swaps, before);
         };
         if (actualHdr) {
             const auto resources = invalidations.size();

@@ -60,6 +60,7 @@ Q_SIGNALS:
     void silenceReached();
 
 private:
+    void scheduleOutputRefresh();
     friend class AudioAmbienceTest;
     void reconcile();
     void advanceFade();

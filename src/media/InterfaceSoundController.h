@@ -48,6 +48,7 @@ Q_SIGNALS:
     void settingsChanged();
 
 private:
+    void scheduleOutputRefresh();
     friend class AudioAmbienceTest;
     void refreshOutput();
     QMediaDevices m_devices;

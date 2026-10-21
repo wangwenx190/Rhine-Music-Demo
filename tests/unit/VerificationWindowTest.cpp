@@ -35,6 +35,28 @@ private Q_SLOTS:
         QVERIFY(!foregroundOwnershipSafe(0, 11, 42, false, false));
         QVERIFY(!foregroundOwnershipSafe(10, 0, 42, false, false));
     }
+
+private:
+    static auto showVerifiedWindow(QSignalSpy &swaps, QQuickWindow &window, auto &record,
+                                   const QString &name)
+    {
+        const auto before = swaps.size();
+        window.show();
+        window.update();
+        const bool visible = QTest::qWaitFor(
+                [&] {
+                    bool presented = swaps.size() > before && window.isExposed();
+#if defined(Q_OS_MACOS)
+                    presented = presented
+                            && yalahoo::verification::nativeWindowPolicy(window)[u"onScreen"_s]
+                                       .toBool();
+#endif
+                    return presented;
+                },
+                5000);
+        record(name, visible);
+    }
+private Q_SLOTS:
     void visibleNativeWindow()
     {
         if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") != 1)
@@ -58,21 +80,7 @@ private Q_SLOTS:
             passed = passed && valid;
         };
         const auto show = [&](const QString &name) {
-            const auto before = swaps.size();
-            window.show();
-            window.update();
-            const bool visible = QTest::qWaitFor(
-                    [&] {
-                        bool presented = swaps.size() > before && window.isExposed();
-#if defined(Q_OS_MACOS)
-                        presented = presented
-                                && yalahoo::verification::nativeWindowPolicy(window)[u"onScreen"_s]
-                                           .toBool();
-#endif
-                        return presented;
-                    },
-                    5000);
-            record(name, visible);
+            return showVerifiedWindow(swaps, window, record, name);
         };
         record(u"before-show"_s);
         show(u"first-show"_s);

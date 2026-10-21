@@ -34,6 +34,7 @@ Q_SIGNALS:
     void completed(const yalahoo::MetadataResponse &response);
 
 private:
+    void parseResponse(MetadataResponse &response);
     void start();
     void finish();
     void read();

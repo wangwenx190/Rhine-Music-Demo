@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "MetadataConfiguration.h"
 #include "Units.h"
 #include "IMetadataProvider.h"
@@ -371,6 +372,67 @@ LibraryStore::JobResult LibraryStore::write(const QString &path, Snapshot snapsh
 }
 // One worker owns all filesystem transactions. Prefer the latest scan intent and coalesce saves,
 // so canceled work cannot create an unbounded queue or overwrite a newer accepted snapshot.
+void LibraryStore::startMetadata()
+{
+    d->m_metadataCommit = false;
+    d->m_active = Kind::Metadata;
+    auto pending = std::exchange(d->m_metadataPending, { });
+    d->m_metadataBytes = 0;
+    d->m_job.setFuture(QtConcurrent::run(
+            &d->m_worker, [snapshot = d->m_snapshot, pending = std::move(pending)] {
+                auto updated = *snapshot;
+                for (auto &album : updated.albums)
+                    for (const auto kind : { MetadataKind::Introduction, MetadataKind::Credits,
+                                             MetadataKind::Enrichment }) {
+                        const auto it = pending.constFind(album.id + '/'_L1 + kindName(kind));
+                        if (it != pending.cend() && it->inputKey == metadataKey(album, kind))
+                            mergeMetadata(album, *it);
+                    }
+                return JobResult{
+                    std::make_shared<const LibrarySnapshot>(std::move(updated)), { }, 0, false
+                };
+            }));
+}
+
+void LibraryStore::startSave()
+{
+    d->m_active = Kind::Save;
+    d->m_job.setFuture(QtConcurrent::run(&d->m_worker, &LibraryStore::write, d->m_path,
+                                         std::exchange(d->m_savePending, { })));
+}
+
+void LibraryStore::startLoad()
+{
+    d->m_loadPending = false;
+    d->m_active = Kind::Load;
+    d->m_job.setFuture(QtConcurrent::run(&d->m_worker, &LibraryStore::read, d->m_path));
+}
+
+void LibraryStore::startImport()
+{
+    d->m_active = Kind::Import;
+    d->m_cancel = std::make_shared<std::atomic_bool>(false);
+    d->m_job.setFuture(QtConcurrent::run(&d->m_worker,
+                                         [source = std::exchange(d->m_importPending, { }),
+                                          root = d->m_dataRoot, cancel = d->m_cancel] {
+                                             const auto imported =
+                                                     LegacyImporter::read(source, root, cancel);
+                                             return JobResult{ imported.snapshot, imported.error, 0,
+                                                               imported.cancelled };
+                                         }));
+}
+
+void LibraryStore::startScan()
+{
+    d->m_scanPending = false;
+    d->m_active = Kind::Scan;
+    d->m_cancel = std::make_shared<std::atomic_bool>(false);
+    d->m_job.setFuture(QtConcurrent::run(
+            &d->m_worker, [roots = d->m_roots, previous = d->m_snapshot, cancel = d->m_cancel] {
+                const auto scan = DirectoryScanner::scan(roots, previous, cancel);
+                return JobResult{ scan.snapshot, scan.error, scan.filesVisited, scan.cancelled };
+            }));
+}
 void LibraryStore::schedule()
 {
     if (d->m_active != Kind::None) {
@@ -384,58 +446,47 @@ void LibraryStore::schedule()
                            << "cache=" << d->m_path << "roots=" << d->m_roots
                            << "save=" << bool(d->m_savePending) << "scan=" << d->m_scanPending
                            << "import=" << d->m_importPending;
-    if (d->m_metadataCommit && d->m_initialized && !d->m_loadPending) {
-        d->m_metadataCommit = false;
-        d->m_active = Kind::Metadata;
-        auto pending = std::exchange(d->m_metadataPending, { });
-        d->m_metadataBytes = 0;
-        d->m_job.setFuture(QtConcurrent::run(
-                &d->m_worker, [snapshot = d->m_snapshot, pending = std::move(pending)] {
-                    auto updated = *snapshot;
-                    for (auto &album : updated.albums)
-                        for (const auto kind : { MetadataKind::Introduction, MetadataKind::Credits,
-                                                 MetadataKind::Enrichment }) {
-                            const auto it = pending.constFind(album.id + '/'_L1 + kindName(kind));
-                            if (it != pending.cend() && it->inputKey == metadataKey(album, kind))
-                                mergeMetadata(album, *it);
-                        }
-                    return JobResult{
-                        std::make_shared<const LibrarySnapshot>(std::move(updated)), { }, 0, false
-                    };
-                }));
-    } else if (d->m_savePending) {
-        d->m_active = Kind::Save;
-        d->m_job.setFuture(QtConcurrent::run(&d->m_worker, &LibraryStore::write, d->m_path,
-                                             std::exchange(d->m_savePending, { })));
-    } else if (d->m_loadPending || !d->m_initialized) {
-        d->m_loadPending = false;
-        d->m_active = Kind::Load;
-        d->m_job.setFuture(QtConcurrent::run(&d->m_worker, &LibraryStore::read, d->m_path));
-    } else if (!d->m_importPending.isEmpty()) {
-        d->m_active = Kind::Import;
-        d->m_cancel = std::make_shared<std::atomic_bool>(false);
-        d->m_job.setFuture(QtConcurrent::run(
-                &d->m_worker,
-                [source = std::exchange(d->m_importPending, { }), root = d->m_dataRoot,
-                 cancel = d->m_cancel] {
-                    const auto imported = LegacyImporter::read(source, root, cancel);
-                    return JobResult{ imported.snapshot, imported.error, 0, imported.cancelled };
-                }));
-    } else if (d->m_scanPending) {
-        d->m_scanPending = false;
-        d->m_active = Kind::Scan;
-        d->m_cancel = std::make_shared<std::atomic_bool>(false);
-        d->m_job.setFuture(QtConcurrent::run(
-                &d->m_worker, [roots = d->m_roots, previous = d->m_snapshot, cancel = d->m_cancel] {
-                    const auto scan = DirectoryScanner::scan(roots, previous, cancel);
-                    return JobResult{ scan.snapshot, scan.error, scan.filesVisited,
-                                      scan.cancelled };
-                }));
-    }
+    struct Route final
+    {
+        bool ready;
+        void (LibraryStore::*start)();
+    };
+    const Route routes[] = { { d->m_metadataCommit && d->m_initialized && !d->m_loadPending,
+                               &LibraryStore::startMetadata },
+                             { bool(d->m_savePending), &LibraryStore::startSave },
+                             { d->m_loadPending || !d->m_initialized, &LibraryStore::startLoad },
+                             { !d->m_importPending.isEmpty(), &LibraryStore::startImport },
+                             { d->m_scanPending, &LibraryStore::startScan } };
+    const auto route =
+            std::find_if(std::begin(routes), std::end(routes), [](const Route &candidate) {
+                return candidate.ready;
+            });
+    if (route != std::end(routes))
+        (this->*route->start)();
     Q_EMIT statusChanged();
 }
 // Completion is a publication boundary: accept only the job generation still owned by this store.
 // Scheduling the next coalesced intent happens after the candidate has been reconciled.
+void LibraryStore::completeLoad(const JobResult &result, quint64 generation)
+{
+    d->m_initialized = true;
+    // A root change during loading invalidates display intent, not the cache's
+    // safety check or the baseline needed to preserve metadata/offline roots.
+    if (!result.error.isEmpty()) {
+        d->m_writable = false;
+        report(result.error);
+    } else if (result.snapshot) {
+        d->m_writable = true;
+        d->m_error.clear();
+        d->m_snapshot = result.snapshot;
+        if (generation == d->m_generation && !d->m_scanPending && d->m_importPending.isEmpty()) {
+            d->m_roots.clear();
+            for (const auto &root : d->m_snapshot->roots)
+                d->m_roots.append(root.path);
+            Q_EMIT snapshotReady(d->m_snapshot);
+        }
+    }
+}
 void LibraryStore::complete()
 {
     const auto kind = std::exchange(d->m_active, Kind::None);
@@ -464,24 +515,7 @@ void LibraryStore::complete()
         else
             report(result.error);
     } else if (kind == Kind::Load) {
-        d->m_initialized = true;
-        // A root change during loading invalidates display intent, not the cache's
-        // safety check or the baseline needed to preserve metadata/offline roots.
-        if (!result.error.isEmpty()) {
-            d->m_writable = false;
-            report(result.error);
-        } else if (result.snapshot) {
-            d->m_writable = true;
-            d->m_error.clear();
-            d->m_snapshot = result.snapshot;
-            if (generation == d->m_generation && !d->m_scanPending
-                && d->m_importPending.isEmpty()) {
-                d->m_roots.clear();
-                for (const auto &root : d->m_snapshot->roots)
-                    d->m_roots.append(root.path);
-                Q_EMIT snapshotReady(d->m_snapshot);
-            }
-        }
+        completeLoad(result, generation);
     } else {
         accept(result, kind, generation);
     }

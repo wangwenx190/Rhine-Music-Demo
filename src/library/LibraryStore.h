@@ -71,7 +71,14 @@ private:
     static JobResult read(const QString &path);
     static JobResult write(const QString &path, Snapshot snapshot);
     void schedule();
+    void startMetadata();
+    void startSave();
+    void startLoad();
+    void startImport();
+    void startScan();
+
     void complete();
+    void completeLoad(const JobResult &result, quint64 generation);
     void accept(JobResult result, Kind kind, quint64 generation);
     void report(const QString &error);
     struct Private;

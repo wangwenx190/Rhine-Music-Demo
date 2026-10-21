@@ -70,6 +70,19 @@ const QSet<QString> &audioExtensions()
     return value;
 }
 
+void resetTrackMetadata(Track &track, const QFileInfo &info)
+{
+    track.title = info.completeBaseName();
+    track.artist.clear();
+    static const QRegularExpression disc(u"^(\\d{1,2})[-_](\\d{1,3})(?:[\\s._-]|$)"_s);
+    const auto match = disc.match(info.fileName());
+    if (match.hasMatch()) {
+        if (match.captured(1).toInt() > 0)
+            track.discNumber = match.captured(1).toInt();
+        if (match.captured(2).toInt() > 0)
+            track.trackNumber = match.captured(2).toInt();
+    }
+}
 struct Walker final
 {
     LibrarySnapshot &next;
@@ -146,18 +159,8 @@ struct Walker final
             track.relativePath = QDir(root).relativeFilePath(file);
             track.format = info.suffix().toUpper();
             track.fields.insert(u"_fingerprint"_s, stamp);
-            if (!unchanged) {
-                track.title = info.completeBaseName();
-                track.artist.clear();
-                static const QRegularExpression disc(u"^(\\d{1,2})[-_](\\d{1,3})(?:[\\s._-]|$)"_s);
-                const auto match = disc.match(info.fileName());
-                if (match.hasMatch()) {
-                    if (match.captured(1).toInt() > 0)
-                        track.discNumber = match.captured(1).toInt();
-                    if (match.captured(2).toInt() > 0)
-                        track.trackNumber = match.captured(2).toInt();
-                }
-            }
+            if (!unchanged)
+                resetTrackMetadata(track, info);
             album.tracks.append(std::move(track));
         }
         std::sort(album.tracks.begin(), album.tracks.end(), [this](const Track &a, const Track &b) {
@@ -301,33 +304,34 @@ QString DirectoryScanner::fingerprint(const QString &absolutePath, QString *erro
     std::error_code ec;
     const auto path = nativePath(absolutePath);
     const auto size = fs::file_size(path, ec);
-    if (!ec) {
-        const auto time = fs::last_write_time(path, ec);
-        if (!ec) {
-#ifdef _MSC_VER
-            // MSVC file_clock provides to_utc, while libc++/libstdc++ provide to_sys.
-            const auto epoch =
-                    std::chrono::clock_cast<std::chrono::system_clock>(time).time_since_epoch();
-#else
-            const auto epoch = fs::file_time_type::clock::to_sys(time).time_since_epoch();
-#endif
-            const auto seconds = std::chrono::floor<std::chrono::seconds>(epoch);
-            const auto nanoseconds =
-                    std::chrono::duration_cast<std::chrono::nanoseconds>(epoch - seconds).count();
-            // Match Node's seconds*1000 + nanoseconds/1e6 without narrowing the epoch to ns.
-            const double ms =
-                    static_cast<double>(seconds.count()) * yalahoo::units::MillisecondsPerSecond
-                    + static_cast<double>(nanoseconds) / yalahoo::units::NanosecondsPerMillisecond;
-            auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
-            encoded = encoded.mid(1, encoded.size() - 2);
-            if (error)
-                error->clear();
-            return QString::number(size) + ':'_L1 + QString::fromUtf8(encoded);
-        }
+    if (ec) {
+        if (error)
+            *error = fileError(absolutePath, ec);
+        return { };
     }
+    const auto time = fs::last_write_time(path, ec);
+    if (ec) {
+        if (error)
+            *error = fileError(absolutePath, ec);
+        return { };
+    }
+#ifdef _MSC_VER
+    // MSVC file_clock provides to_utc, while libc++/libstdc++ provide to_sys.
+    const auto epoch = std::chrono::clock_cast<std::chrono::system_clock>(time).time_since_epoch();
+#else
+    const auto epoch = fs::file_time_type::clock::to_sys(time).time_since_epoch();
+#endif
+    const auto seconds = std::chrono::floor<std::chrono::seconds>(epoch);
+    const auto nanoseconds =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(epoch - seconds).count();
+    // Match Node's seconds*1000 + nanoseconds/1e6 without narrowing the epoch to ns.
+    const double ms = static_cast<double>(seconds.count()) * yalahoo::units::MillisecondsPerSecond
+            + static_cast<double>(nanoseconds) / yalahoo::units::NanosecondsPerMillisecond;
+    auto encoded = QJsonDocument(QJsonArray{ ms }).toJson(QJsonDocument::Compact);
+    encoded = encoded.mid(1, encoded.size() - 2);
     if (error)
-        *error = fileError(absolutePath, ec);
-    return { };
+        error->clear();
+    return QString::number(size) + ':'_L1 + QString::fromUtf8(encoded);
 }
 // Build a candidate snapshot off-thread and roll back an unreadable root as a whole.
 // Cancellation publishes no partial library; the owner validates the generation before acceptance.
@@ -373,12 +377,14 @@ ScanResult DirectoryScanner::scan(const QList<QUrl> &roots, Snapshot previous,
         if (!ok) {
             // A partially unreadable root is transactional: no apparent deletions.
             next.albums.resize(start);
-            if (previous)
-                for (auto album : previous->albums)
-                    if (within(album.folder.toLocalFile(), root)) {
-                        album.offline = true;
-                        next.albums.append(std::move(album));
-                    }
+        }
+        if (!ok && previous) {
+            for (auto album : previous->albums) {
+                if (!within(album.folder.toLocalFile(), root))
+                    continue;
+                album.offline = true;
+                next.albums.append(std::move(album));
+            }
         }
         next.roots.append(std::move(entry));
     }

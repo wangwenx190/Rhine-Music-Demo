@@ -5,6 +5,7 @@
 #include <QLocale>
 #include <QSet>
 #include <algorithm>
+#include <iterator>
 #include <numeric>
 
 namespace {
@@ -28,6 +29,20 @@ QString artistDisplayName(const QString &artist)
 QString normalizedKey(const QString &value)
 {
     return value.normalized(QString::NormalizationForm_KC).simplified().toLower();
+}
+void appendGenreColumns(LibraryOrder &result, const LibrarySnapshot &snapshot)
+{
+    QSet<QString> used;
+    for (const auto &album : snapshot.albums)
+        used.insert(album.genreId);
+
+    for (const auto &genre : snapshot.genres) {
+        if (used.remove(genre.id))
+            result.columns.append({ genre.id, genreDisplayName(genre), { } });
+    }
+    for (const auto &album : snapshot.albums)
+        if (used.remove(album.genreId))
+            result.columns.append({ album.genreId, album.genreId, { } });
 }
 LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
 {
@@ -75,18 +90,8 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
             result.columns.append(column);
         }
     } else {
-        QSet<QString> used;
-        for (const auto &album : snapshot.albums)
-            used.insert(album.genreId);
-        if (mode == SortMode::Genre) {
-            for (const auto &genre : snapshot.genres) {
-                if (used.remove(genre.id))
-                    result.columns.append({ genre.id, genreDisplayName(genre), { } });
-            }
-            for (const auto &album : snapshot.albums)
-                if (used.remove(album.genreId))
-                    result.columns.append({ album.genreId, album.genreId, { } });
-        }
+        if (mode == SortMode::Genre)
+            appendGenreColumns(result, snapshot);
         QHash<QString, qsizetype> columnByKey;
         columnByKey.reserve(result.columns.size());
         for (qsizetype i = 0; i < result.columns.size(); ++i)
@@ -172,51 +177,92 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
         || index.row() >= rowCount())
         return { };
     const auto &album = m_snapshot->albums[m_order.indices[index.row()]];
-    switch (role) {
-    case AlbumId:
-        return album.id;
-    case Title:
-        return album.title;
-    case Artist:
-        return artistDisplayName(album.artist);
-    case Year:
-        return album.year ? QVariant(*album.year) : QVariant{ };
-    case GenreId:
-        return album.genreId;
-    case CoverUrl:
-        return album.coverUrl;
-    case Folder:
-        return album.folder;
-    case Tracks: {
-        QVariantList tracks;
-        for (const auto &track : album.tracks) {
-            auto map = toJson(track).toVariantMap();
-            map.insert(u"sourceUrl"_s, track.sourceUrl);
-            tracks.append(map);
-        }
-        return tracks;
-    }
-    case Producers:
-        return producerData(album.producers).toVariantList();
-    case Description:
-        return album.description;
-    case DescriptionSource:
-        return album.descriptionSource.toVariantMap();
-    case Introduction:
-        return album.introduction.toVariantMap();
-    case CreditsLookup:
-        return album.creditsLookup.toVariantMap();
-    case Online:
-        return album.online.toVariantMap();
-    case LocalNote:
-        return album.localNote;
-    case Offline:
-        return album.offline;
-    case AlbumData:
-        return toJson(album).toVariantMap();
-    default:
-        return { };
-    }
+    struct RoleReader final
+    {
+        int role;
+        QVariant (*read)(const Album &album);
+    };
+    static const RoleReader readers[] = {
+        { AlbumId,
+          [](const Album &album) -> QVariant {
+              return album.id;
+          } },
+        { Title,
+          [](const Album &album) -> QVariant {
+              return album.title;
+          } },
+        { Artist,
+          [](const Album &album) -> QVariant {
+              return artistDisplayName(album.artist);
+          } },
+        { Year,
+          [](const Album &album) -> QVariant {
+              return album.year ? QVariant(*album.year) : QVariant{ };
+          } },
+        { GenreId,
+          [](const Album &album) -> QVariant {
+              return album.genreId;
+          } },
+        { CoverUrl,
+          [](const Album &album) -> QVariant {
+              return album.coverUrl;
+          } },
+        { Folder,
+          [](const Album &album) -> QVariant {
+              return album.folder;
+          } },
+        { Tracks,
+          [](const Album &album) -> QVariant {
+              QVariantList tracks;
+              for (const auto &track : album.tracks) {
+                  auto map = toJson(track).toVariantMap();
+                  map.insert(u"sourceUrl"_s, track.sourceUrl);
+                  tracks.append(map);
+              }
+              return tracks;
+          } },
+        { Producers,
+          [](const Album &album) -> QVariant {
+              return producerData(album.producers).toVariantList();
+          } },
+        { Description,
+          [](const Album &album) -> QVariant {
+              return album.description;
+          } },
+        { DescriptionSource,
+          [](const Album &album) -> QVariant {
+              return album.descriptionSource.toVariantMap();
+          } },
+        { Introduction,
+          [](const Album &album) -> QVariant {
+              return album.introduction.toVariantMap();
+          } },
+        { CreditsLookup,
+          [](const Album &album) -> QVariant {
+              return album.creditsLookup.toVariantMap();
+          } },
+        { Online,
+          [](const Album &album) -> QVariant {
+              return album.online.toVariantMap();
+          } },
+        { LocalNote,
+          [](const Album &album) -> QVariant {
+              return album.localNote;
+          } },
+        { Offline,
+          [](const Album &album) -> QVariant {
+              return album.offline;
+          } },
+        { AlbumData,
+          [](const Album &album) -> QVariant {
+              return toJson(album).toVariantMap();
+          } }
+    };
+    const auto reader =
+            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
+                return entry.role == role;
+            });
+    return reader == std::end(readers) ? QVariant{ } : reader->read(album);
 }
 void AlbumListModel::setSnapshot(Snapshot snapshot)
 {

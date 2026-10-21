@@ -32,6 +32,46 @@ constexpr int FrameDeadlineMilliseconds = 5000;
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+
+namespace {
+auto renderExperimentFrame(QJsonObject &lastSample, yalahoo::rhi::SceneItem *&native,
+                           OffscreenSurface &surface, QQuickWindow &window,
+                           MotionController &motion, SceneAdapter &scene)
+{
+    QEventLoop loop;
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    bool rendered = false;
+    qint64 expectedInput = -1;
+    const auto ready = [&] {
+        return rendered && lastSample[u"inputRevision"_s].toInteger() == expectedInput;
+    };
+    QObject::connect(native, &rhi::SceneItem::frameSubmitted, &loop, [&] {
+        if (ready())
+            loop.quit();
+    });
+    const auto done = [&] {
+        rendered = true;
+        if (ready())
+            loop.quit();
+    };
+    QMetaObject::Connection connection;
+    if (OffscreenSurface::Enabled)
+        connection = QObject::connect(&surface, &OffscreenSurface::frameRendered, &loop, done);
+    else
+        connection = QObject::connect(&window, &QQuickWindow::frameSwapped, &loop, done,
+                                      Qt::QueuedConnection);
+    QObject::connect(&watchdog, &QTimer::timeout, &loop, &QEventLoop::quit);
+    motion.clock()->advance(1.0 / 60);
+    scene.recordInput();
+    expectedInput = qint64(scene.frame().inputRevision);
+    surface.requestFrame();
+    watchdog.start(5000);
+    loop.exec();
+    QObject::disconnect(connection);
+    return ready();
+}
+}
 int reviewExperiments(const QString &output)
 {
     QDir().mkpath(output);
@@ -84,38 +124,7 @@ int reviewExperiments(const QString &output)
     motion.clock()->setActive(true);
     motion.clock()->advance(0);
     const auto render = [&] {
-        QEventLoop loop;
-        QTimer watchdog;
-        watchdog.setSingleShot(true);
-        bool rendered = false;
-        qint64 expectedInput = -1;
-        const auto ready = [&] {
-            return rendered && lastSample[u"inputRevision"_s].toInteger() == expectedInput;
-        };
-        QObject::connect(native, &rhi::SceneItem::frameSubmitted, &loop, [&] {
-            if (ready())
-                loop.quit();
-        });
-        const auto done = [&] {
-            rendered = true;
-            if (ready())
-                loop.quit();
-        };
-        QMetaObject::Connection connection;
-        if (OffscreenSurface::Enabled)
-            connection = QObject::connect(&surface, &OffscreenSurface::frameRendered, &loop, done);
-        else
-            connection = QObject::connect(&window, &QQuickWindow::frameSwapped, &loop, done,
-                                          Qt::QueuedConnection);
-        QObject::connect(&watchdog, &QTimer::timeout, &loop, &QEventLoop::quit);
-        motion.clock()->advance(1.0 / 60);
-        scene.recordInput();
-        expectedInput = qint64(scene.frame().inputRevision);
-        surface.requestFrame();
-        watchdog.start(5000);
-        loop.exec();
-        QObject::disconnect(connection);
-        return ready();
+        return renderExperimentFrame(lastSample, native, surface, window, motion, scene);
     };
     QJsonArray checks;
     QJsonObject context;

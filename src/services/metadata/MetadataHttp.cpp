@@ -156,6 +156,24 @@ void MetadataHttp::read()
         m_reply->abort();
     }
 }
+void MetadataHttp::parseResponse(MetadataResponse &response)
+{
+    QJsonParseError error;
+    const auto document = QJsonDocument::fromJson(m_bytes, &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject()) {
+        response.error = tr("The metadata service returned invalid JSON.");
+        return;
+    }
+    response.data = document.object();
+    if (!response.data.contains(u"error"_s))
+        return;
+    response.error = tr("The metadata service reported an API error.");
+    if (response.data.value(u"error"_s).toObject().value(u"code"_s) == "maxlag"_L1) {
+        const auto retry = QDateTime::currentDateTimeUtc().addSecs(FallbackRetrySeconds);
+        m_cooldown.insert(service(m_url), retry);
+        response.retryAt = retry.toString(Qt::ISODateWithMs);
+    }
+}
 void MetadataHttp::finish()
 {
     if (!m_reply)
@@ -190,24 +208,8 @@ void MetadataHttp::finish()
         m_cooldown.insert(service(m_url), retry);
         response.retryAt = retry.toString(Qt::ISODateWithMs);
     }
-    if (response.error.isEmpty()) {
-        QJsonParseError error;
-        const auto document = QJsonDocument::fromJson(m_bytes, &error);
-        if (error.error != QJsonParseError::NoError || !document.isObject()) {
-            response.error = tr("The metadata service returned invalid JSON.");
-        } else {
-            response.data = document.object();
-            if (response.data.contains(u"error"_s)) {
-                response.error = tr("The metadata service reported an API error.");
-                if (response.data.value(u"error"_s).toObject().value(u"code"_s) == "maxlag"_L1) {
-                    const auto retry =
-                            QDateTime::currentDateTimeUtc().addSecs(FallbackRetrySeconds);
-                    m_cooldown.insert(service(m_url), retry);
-                    response.retryAt = retry.toString(Qt::ISODateWithMs);
-                }
-            }
-        }
-    }
+    if (response.error.isEmpty())
+        parseResponse(response);
     m_reply.clear();
     reply->deleteLater();
     m_bytes.clear();

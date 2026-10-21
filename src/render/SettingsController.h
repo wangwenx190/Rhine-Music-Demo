@@ -40,6 +40,7 @@ private:
     SceneAdapter *m_scene;
     SelectionController *m_selection;
     QString m_sortMode = u"genre"_s;
+    bool m_singleInstance = true;
     bool m_applying = false;
 };
 }
