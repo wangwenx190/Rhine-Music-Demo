@@ -17,6 +17,11 @@
 
 namespace yalahoo {
 
+struct CoverSource final
+{
+    QString path, placeholderTitle;
+    bool operator==(const CoverSource &) const = default;
+};
 class OverviewController;
 class SelectionController final : public QObject
 {
@@ -30,7 +35,7 @@ class SelectionController final : public QObject
 public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
     void setColumns(QList<LibraryColumn> columns, const Snapshot &snapshot = { });
-    QPair<QString, QString> coverSource(const QString &id) const;
+    CoverSource coverSource(const QString &id) const;
     QString albumTitle(const QString &id) const;
     QString albumId() const;
     ArchiveCell cell() const;
@@ -131,6 +136,14 @@ private:
     std::array<double, 2> displayOffset() const;
     QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0,
                          bool folded = true) const;
+    struct TransformInputs final
+    {
+        std::array<double, 2> offset;
+        double entryZ = 0, overview = 0;
+    };
+    TransformInputs transformInputs() const;
+    QMatrix4x4 transform(ArchiveCell cell, double lift, double rotation, bool folded,
+                         const TransformInputs &inputs, double height, double slope) const;
     struct ExtentCache final
     {
         double lane = std::numeric_limits<double>::infinity();
@@ -144,16 +157,22 @@ private:
     RealColumns m_realColumns;
     ColumnMemory m_memory;
     bool m_realistic = false;
-    struct CoverSource final
+    struct AlbumCoverSource final
     {
-        QString path, placeholderTitle, title;
+        CoverSource cover;
+        QString title;
     };
-    QHash<QString, CoverSource> m_coverSources;
+    QHash<QString, AlbumCoverSource> m_coverSources;
     ArchiveCell m_cell, m_origin;
-    QVector<ArchiveInstance> m_instances;
+    QVector<ArchiveInstance> m_instances, m_instanceScratch;
     struct PoolObject final
     {
-        QPair<qint64, qint64> physical;
+        struct PhysicalCell final
+        {
+            qint64 lane = 0, row = 0;
+            bool operator==(const PhysicalCell &) const = default;
+        };
+        PhysicalCell physical;
         quint64 objectId = 0;
     };
     // Each complete 9x48 frontier visits every physical residue exactly once.

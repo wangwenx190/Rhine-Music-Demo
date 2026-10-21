@@ -42,12 +42,12 @@ private Q_SLOTS:
         QCOMPARE(text.mid(boundaries[3], boundaries[4] - boundaries[3]), u"e\u0301"_s);
         auto parts = yalahoo::TextLayoutAdapter::titleParts(
                 u"\u97f3\u4e50\u6536\u85cf\uff08Archive gyp\uff09"_s);
-        QCOMPARE(parts.first, u"\u97f3\u4e50\u6536\u85cf"_s);
-        QCOMPARE(parts.second, u"Archive gyp"_s);
-        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(u"Music (Live)"_s).second, QString());
+        QCOMPARE(parts.main, u"\u97f3\u4e50\u6536\u85cf"_s);
+        QCOMPARE(parts.translation, u"Archive gyp"_s);
+        QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(u"Music (Live)"_s).translation, QString());
         QCOMPARE(yalahoo::TextLayoutAdapter::titleParts(
                          u"\u97f3\u4e50\uff08\u73b0\u573a\u7248\uff09"_s)
-                         .second,
+                         .translation,
                  QString());
     }
     void layoutAndCache()

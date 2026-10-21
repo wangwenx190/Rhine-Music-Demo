@@ -56,6 +56,15 @@ constexpr int ModelDeadlineMilliseconds = 3000;
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int EventPollMilliseconds = 5;
 
+bool waitForSearch(SearchListModel &model)
+{
+    return QTest::qWaitFor(
+            [&model] {
+                return !model.searching();
+            },
+            ModelDeadlineMilliseconds);
+}
+
 // Test-only injection. No networking objects or production registration.
 class SampleProvider final : public IMetadataProvider
 {
@@ -692,6 +701,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, press);
                     check(u"search-row-pressed"_s, first && first->property("pressed").toBool());
                     query->setProperty("text", u"Song"_s);
+                    check(u"search-query-ready"_s, waitForSearch(*library.searchResults()));
                     render();
                     check(u"search-row-reused"_s,
                           first
@@ -723,13 +733,19 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                 check(u"search-focus-and-modal"_s, query->hasActiveFocus() && !input.enabled());
                 for (const auto character : "Song 199"_ba)
                     QTest::keyClick(&window, character);
-                check(u"continuous-input"_s, library.searchResults()->rowCount() == 20);
+                check(u"continuous-input"_s,
+                      waitForSearch(*library.searchResults())
+                              && library.searchResults()->rowCount() == 20);
                 if (song)
                     check(u"search-space-keeps-intent"_s, song->requested());
                 query->setProperty("text", u"unmatched"_s);
-                check(u"empty-results"_s, library.searchResults()->rowCount() == 0);
+                check(u"empty-results"_s,
+                      waitForSearch(*library.searchResults())
+                              && library.searchResults()->rowCount() == 0);
                 query->setProperty("text", u""_s);
-                check(u"empty-query-albums"_s, library.searchResults()->rowCount() == 20);
+                check(u"empty-query-albums"_s,
+                      waitForSearch(*library.searchResults())
+                              && library.searchResults()->rowCount() == 20);
                 int delegates = 0;
                 for (auto *item : results->childItems())
                     delegates += item->childItems().size();

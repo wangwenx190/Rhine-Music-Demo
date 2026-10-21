@@ -72,9 +72,7 @@ QVariantList LibrarySession::genres() const
 }
 bool LibrarySession::hasGenre(const QString &id) const
 {
-    return std::any_of(m_genres.cbegin(), m_genres.cend(), [&id](const QVariant &value) {
-        return value.toMap().value(u"id"_s).toString() == id;
-    });
+    return m_visibleGenres.contains(id);
 }
 QVariantMap LibrarySession::summary() const
 {
@@ -130,15 +128,19 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     invalidate();
     m_snapshot = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
     m_genres.clear();
+    m_visibleGenres.clear();
+    m_visibleGenres.reserve(m_snapshot->genres.size());
     m_genres.reserve(m_snapshot->genres.size());
     QSet<QString> usedGenres;
     usedGenres.reserve(m_snapshot->genres.size());
     for (const auto &entry : m_snapshot->albums)
         usedGenres.insert(entry.genreId);
     for (const auto &genre : m_snapshot->genres)
-        if (usedGenres.contains(genre.id))
+        if (usedGenres.contains(genre.id)) {
+            m_visibleGenres.insert(genre.id);
             m_genres.append(
                     QVariantMap{ { u"id"_s, genre.id }, { u"name"_s, genreDisplayName(genre) } });
+        }
     rebuildSummary();
     m_albumIndices.clear();
     m_genreNames.clear();
@@ -182,7 +184,7 @@ void LibrarySession::search(const QString &query, const QString &genreId)
 {
     m_query = query;
     m_genre = genreId;
-    m_search.update(m_snapshot, query, genreId);
+    m_search.request(query, genreId);
 }
 void LibrarySession::sort(const QString &mode)
 {

@@ -164,12 +164,12 @@ void SelectionLighting::setSettings(RowLightingSettings s)
     s.fill = valid(s.fill, m_settings.fill, 0, 1);
     s.transitionDuration = valid(s.transitionDuration, m_settings.transitionDuration,
                                  MinimumRibbonSeconds, MaximumRibbonSeconds);
-    const auto before = settings();
+    const auto before = m_settings;
     m_settings = s;
     ribbon.settings = s;
     if (m_comparing)
         ribbon.settings.mode = RowLightingMode::Baseline;
-    if (settings() != before) {
+    if (m_settings != before) {
         Q_EMIT settingsChanged();
         Q_EMIT changed();
     }

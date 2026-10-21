@@ -56,7 +56,7 @@ private Q_SLOTS:
                              std::make_shared<const LibrarySnapshot>(library));
         RulerController ruler(&motion, &selection);
         QCOMPARE(selection.albumTitle(album.id), album.title);
-        QVERIFY(selection.coverSource(album.id).second.size() <= 256);
+        QVERIFY(selection.coverSource(album.id).placeholderTitle.size() <= 256);
         bool found = false;
         for (const auto &value : ruler.slotStates()) {
             const auto state = value.toMap();

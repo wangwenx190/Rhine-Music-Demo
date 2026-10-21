@@ -26,6 +26,7 @@ struct RowLightingSettings final
     double strength = rowLightDefaults::Strength, width = rowLightDefaults::WidthRows,
            offset = rowLightDefaults::OffsetRows, fill = 1,
            transitionDuration = rowLightDefaults::TransitionSeconds;
+    bool operator==(const RowLightingSettings &) const = default;
 };
 struct RowLightingInput final
 {

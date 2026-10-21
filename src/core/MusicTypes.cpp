@@ -30,7 +30,7 @@ QString graphemePrefix(const QString &text, qsizetype maxCodeUnits)
         boundary.toPreviousBoundary();
     return text.left(qMax(qsizetype(0), boundary.position()));
 }
-QPair<QString, QString> albumTitleParts(const QString &text)
+AlbumTitleParts albumTitleParts(const QString &text)
 {
     static const QRegularExpression pattern(u"^(.+?)[\uff08(]([^\uff08\uff09()]+)[\uff09)]\\s*$"_s);
     static const QRegularExpression han(u"\\p{Han}"_s);

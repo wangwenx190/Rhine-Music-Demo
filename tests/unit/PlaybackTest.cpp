@@ -118,6 +118,28 @@ private Q_SLOTS:
         QVERIFY(!f.player.playing());
         QCOMPARE(f.player.m_player.playbackRate(), 1.);
     }
+    void queueReuseAndSnapshotInvalidation()
+    {
+        Fixture f;
+        f.player.applyDevices({ }, { });
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
+        const auto *storage = std::as_const(f.player.m_queue).constData();
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
+        QCOMPARE(std::as_const(f.player.m_queue).constData(), storage);
+        QVERIFY(!f.player.playTrack(u"album"_s, u"missing"_s));
+        QCOMPARE(f.player.trackId(), u"track-1"_s);
+        auto replacement = *f.library.snapshot();
+        replacement.albums[0].tracks[1].title = u"Replacement title"_s;
+        const auto old = f.player.m_queueSnapshot;
+        f.library.setSnapshot(std::move(replacement));
+        QVERIFY(old.expired());
+        QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
+        QCOMPARE(f.player.title(), u"Replacement title"_s);
+        f.library.setSnapshot({ });
+        QVERIFY(f.player.m_queueSnapshot.expired());
+        f.player.next();
+        QCOMPARE(f.player.trackId(), u"track-2"_s);
+    }
     void lateLoadEndAndQueueOwnership()
     {
         Fixture f;

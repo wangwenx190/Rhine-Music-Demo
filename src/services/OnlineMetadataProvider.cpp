@@ -28,12 +28,16 @@ constexpr auto MaximumCandidatePages = 12;
 constexpr auto MaximumPerformers = 50;
 constexpr auto RetryDelaySeconds = 60;
 
-QUrl endpoint(const QString &base, const QList<QPair<QString, QString>> &parameters)
+struct QueryParameter final
+{
+    QString name, value;
+};
+QUrl endpoint(const QString &base, const QList<QueryParameter> &parameters)
 {
     QUrl url(base);
     QUrlQuery query;
     for (const auto &parameter : parameters)
-        query.addQueryItem(parameter.first, parameter.second);
+        query.addQueryItem(parameter.name, parameter.value);
     url.setQuery(query);
     return url;
 }
@@ -272,17 +276,17 @@ private:
         auto &job = *m_active;
         job.stage = Stage::Pages;
         job.searched = search;
-        QList<QPair<QString, QString>> parameters{ { u"action"_s, u"query"_s },
-                                                   { u"format"_s, u"json"_s },
-                                                   { u"formatversion"_s, u"2"_s },
-                                                   { u"maxlag"_s, u"5"_s },
-                                                   { u"prop"_s, u"extracts|pageprops|revisions"_s },
-                                                   { u"exintro"_s, u"1"_s },
-                                                   { u"explaintext"_s, u"1"_s },
-                                                   { u"exchars"_s, u"1200"_s },
-                                                   { u"rvprop"_s, u"ids"_s },
-                                                   { u"redirects"_s, u"1"_s },
-                                                   { u"converttitles"_s, u"1"_s } };
+        QList<QueryParameter> parameters{ { u"action"_s, u"query"_s },
+                                          { u"format"_s, u"json"_s },
+                                          { u"formatversion"_s, u"2"_s },
+                                          { u"maxlag"_s, u"5"_s },
+                                          { u"prop"_s, u"extracts|pageprops|revisions"_s },
+                                          { u"exintro"_s, u"1"_s },
+                                          { u"explaintext"_s, u"1"_s },
+                                          { u"exchars"_s, u"1200"_s },
+                                          { u"rvprop"_s, u"ids"_s },
+                                          { u"redirects"_s, u"1"_s },
+                                          { u"converttitles"_s, u"1"_s } };
         if (search) {
             parameters.append({ u"generator"_s, u"search"_s });
             auto title = job.query.album.title;

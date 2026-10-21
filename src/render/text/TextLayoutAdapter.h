@@ -2,6 +2,7 @@
 // retains fallback-font identity, baselines and color-glyph descriptors.
 
 #pragma once
+#include "MusicTypes.h"
 #include <QFont>
 #include <QGlyphRun>
 #include <QCache>
@@ -50,7 +51,7 @@ public:
                         double width, double budget, bool narrow, double dpr,
                         bool transport = false);
     static QList<int> boundaries(const QString &text);
-    static QPair<QString, QString> titleParts(const QString &text);
+    static AlbumTitleParts titleParts(const QString &text);
     quint64 misses() const;
     int cacheBytes() const;
     int cacheEntries() const;

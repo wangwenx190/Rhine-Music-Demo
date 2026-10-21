@@ -5,7 +5,6 @@
 #include "RhiApi.h"
 #include <algorithm>
 #include <iterator>
-#include <utility>
 
 namespace yalahoo::rhi {
 namespace pixelStorage {
@@ -20,7 +19,11 @@ inline int bytesPerPixel(QRhiTexture::Format format)
 {
     // UnknownFormat is QRhiRenderBuffer's undisclosed backend depth format; D32FS8
     // remains its conservative bound. Other unlisted formats are rejected.
-    using Entry = std::pair<QRhiTexture::Format, int>;
+    struct Entry final
+    {
+        QRhiTexture::Format format;
+        int bytes;
+    };
     static constexpr Entry formats[] = {
         { QRhiTexture::UnknownFormat, pixelStorage::HalfRgbaOrDepthStencilBytes },
         { QRhiTexture::RGBA16F, pixelStorage::HalfRgbaOrDepthStencilBytes },
@@ -37,10 +40,10 @@ inline int bytesPerPixel(QRhiTexture::Format format)
     };
     const auto entry =
             std::find_if(std::begin(formats), std::end(formats), [format](const Entry &candidate) {
-                return candidate.first == format;
+                return candidate.format == format;
             });
     require(entry != std::end(formats), "Cannot estimate selected attachment format");
-    return entry->second;
+    return entry->bytes;
 }
 
 struct TextureExtent final

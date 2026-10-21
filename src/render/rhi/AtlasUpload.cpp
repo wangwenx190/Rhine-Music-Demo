@@ -27,6 +27,12 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
             ++m_rejected;
             continue;
         }
+        if (u.serial <= m_serials.value(u.slot))
+            continue;
+        if (u.lease < m_leases.value(u.slot)) {
+            ++m_rejected;
+            continue;
+        }
         const QPoint destination((u.slot % (m_size.width() / renderData::CoverTilePixels))
                                          * renderData::CoverTilePixels,
                                  (u.slot / (m_size.width() / renderData::CoverTilePixels))
@@ -48,12 +54,6 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
                                        mip.size()));
         }
         if (!valid) {
-            ++m_rejected;
-            continue;
-        }
-        if (u.serial <= m_serials.value(u.slot))
-            continue;
-        if (u.lease < m_leases.value(u.slot)) {
             ++m_rejected;
             continue;
         }

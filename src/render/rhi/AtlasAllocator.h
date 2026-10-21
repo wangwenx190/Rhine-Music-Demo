@@ -6,6 +6,7 @@
 #include "CoverCache.h"
 #include <QHash>
 #include <memory>
+#include <vector>
 
 namespace yalahoo::rhi {
 namespace atlasDefaults {
@@ -63,6 +64,7 @@ private:
     QSize m_size;
     int m_slotsPerPage = 0;
     QVector<Slot> m_slots;
+    std::vector<int> m_freeSlots;
     QHash<QString, int> m_identities;
     mutable QVector<Replay> m_replays;
     quint64 m_generation = 0, m_lease = 0, m_serial = 0;

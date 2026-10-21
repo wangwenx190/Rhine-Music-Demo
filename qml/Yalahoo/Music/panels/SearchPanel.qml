@@ -154,6 +154,8 @@ Item {
         currentIndex: -1
         header: SearchHeader {}
         function activate(index: int): void {
+            if (root.librarySession.searchResults.searching)
+                return;
             const item = root.librarySession.searchResults.resultAt(index);
             if (item.albumId)
                 root.resultRequested(item.albumId, item.trackId);
@@ -169,6 +171,7 @@ Item {
         delegate: T.Button {
             id: result
             objectName: "librarySearchResult-" + index
+            enabled: !root.librarySession.searchResults.searching
             focusPolicy: Qt.StrongFocus
             hoverEnabled: true
             required property int index

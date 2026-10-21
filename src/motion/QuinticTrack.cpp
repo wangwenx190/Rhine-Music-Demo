@@ -66,11 +66,10 @@ void QuinticTrack::update(double dt, bool reduced)
     }
     const auto [a, b, c, d, e, f] = m_coefficients;
     const double t = m_elapsed;
-    m_state.value = a + b * t + c * std::pow(t, 2) + d * std::pow(t, 3) + e * std::pow(t, 4)
-            + f * std::pow(t, 5);
-    m_state.velocity = b + 2 * c * t + 3 * d * std::pow(t, 2) + 4 * e * std::pow(t, 3)
-            + 5 * f * std::pow(t, 4);
-    m_state.acceleration = 2 * c + 6 * d * t + 12 * e * std::pow(t, 2) + 20 * f * std::pow(t, 3);
+    // Horner evaluation shares each power implicitly and avoids general-purpose pow calls.
+    m_state.value = a + t * (b + t * (c + t * (d + t * (e + t * f))));
+    m_state.velocity = b + t * (2 * c + t * (3 * d + t * (4 * e + t * 5 * f)));
+    m_state.acceleration = 2 * c + t * (6 * d + t * (12 * e + t * 20 * f));
 }
 void QuinticTrack::translate(double offset)
 {

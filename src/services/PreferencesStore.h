@@ -6,7 +6,6 @@
 #include <QObject>
 #include <QUrl>
 #include <QJsonObject>
-#include <QPair>
 #include <QVariantMap>
 
 namespace yalahoo {
@@ -37,7 +36,12 @@ Q_SIGNALS:
 
 private:
     void load();
-    static QPair<QJsonObject, QString> readPreferenceImport(const QString &path);
+    struct ImportResult final
+    {
+        QJsonObject document;
+        QString error;
+    };
+    static ImportResult readPreferenceImport(const QString &path);
 
     static QString validate(const QJsonObject &document);
     static QString write(const QString &path, const QJsonObject &document);

@@ -19,7 +19,6 @@
 #include <QJsonArray>
 #include <QThread>
 #include <QCoreApplication>
-#include <QSet>
 #include <QtEndian>
 #include <QFloat16>
 #include <QElapsedTimer>
@@ -1822,7 +1821,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             || (input.shadows && shadowEntities != entities);
     const bool batched = entities.size() >= MinimumBatchedEntities;
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
-    canonicalLightVP = lightProjection() * lightView();
+    canonicalLightVP = lightViewProjection();
     nativeLightVP = api->clipSpaceCorrMatrix() * canonicalLightVP;
     if (input.shells || !batched) {
         lightModels.resize(entities.size());
@@ -2123,8 +2122,13 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         };
 #ifdef YALAHOO_RHI_AUDIT
         QJsonArray resolveGraph;
+        struct NamedTarget final
+        {
+            const char *name;
+            Target *target;
+        };
         for (const auto &[name, target] :
-             { std::pair{ "opaque", &opaque }, std::pair{ "composite", &composite } }) {
+             { NamedTarget{ "opaque", &opaque }, NamedTarget{ "composite", &composite } }) {
             if (!target->rt)
                 continue;
             QJsonArray attachments;
@@ -2684,13 +2688,10 @@ void RhiItem::submit(Input input, QSize target)
                 "Shell instances require stable IDs");
         require(input.entityIds.isEmpty() || input.entityIds.size() == input.entities.size(),
                 "Mismatched shell IDs");
-        QSet<quint64> ids;
-        ids.reserve(input.entityIds.size());
-        for (auto id : input.entityIds) {
-            const auto previous = ids.size();
-            ids.insert(id);
-            require(ids.size() != previous, "Duplicate shell instance ID");
-        }
+        std::array<quint64, renderData::MaximumCaseEntities> ids;
+        const auto end = std::copy(input.entityIds.cbegin(), input.entityIds.cend(), ids.begin());
+        std::sort(ids.begin(), end);
+        require(std::adjacent_find(ids.begin(), end) == end, "Duplicate shell instance ID");
     }
     ++m_submission;
     m_input = std::move(input);

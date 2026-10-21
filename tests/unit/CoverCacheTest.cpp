@@ -134,6 +134,30 @@ private Q_SLOTS:
         Q_UNUSED(first);
         Q_UNUSED(second);
     }
+    void recycledSlotPreservesRelocatedIdentity()
+    {
+        AtlasAllocator atlas(512, 3, 2);
+        const auto first = atlas.acquire(u"first"_s);
+        const auto second = atlas.acquire(u"second"_s);
+        atlas.release(first);
+        atlas.release(second);
+        const auto relocated = atlas.acquire(u"second"_s);
+        QCOMPARE(relocated.slot, first.slot);
+        const auto replacement = atlas.acquire(u"replacement"_s);
+        QCOMPARE(replacement.slot, second.slot);
+        const auto retained = atlas.acquire(u"second"_s);
+        QCOMPARE(retained.slot, relocated.slot);
+        QCOMPARE(retained.lease, relocated.lease);
+        QVERIFY(atlas.publish(retained, pixels(u"second"_s)));
+        atlas.release(relocated);
+        QVERIFY(atlas.publish(retained, pixels(u"second"_s)));
+        atlas.release(retained);
+        QVERIFY(!atlas.publish(retained, pixels(u"second"_s)));
+        const auto reused = atlas.acquire(u"third"_s);
+        QCOMPARE(reused.slot, first.slot);
+        atlas.reset();
+        QCOMPARE(atlas.acquire(u"reset"_s).slot, 0);
+    }
     void malformedAtlasLeaseCannotOverflowSlotIndex()
     {
         AtlasAllocator atlas(2048, 1);

@@ -6,6 +6,7 @@
 #include <QAbstractListModel>
 #include <QHash>
 #include <QVariantList>
+#include <atomic>
 
 namespace yalahoo {
 namespace libraryColumns {
@@ -115,25 +116,37 @@ public:
     };
     Q_ENUM(Role)
     explicit SearchListModel(QObject *parent = nullptr);
+    ~SearchListModel() override;
+    Q_PROPERTY(bool searching READ searching NOTIFY searchingChanged FINAL)
+    bool searching() const;
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE QVariantMap resultAt(int row) const;
     void update(Snapshot snapshot, const QString &query, const QString &genreId);
+    void request(const QString &query, const QString &genreId);
     void updateMetadataSnapshot(Snapshot snapshot)
     {
         m_snapshot = std::move(snapshot);
     }
 Q_SIGNALS:
     void countChanged();
+    void searchingChanged();
 
 private:
     struct SearchEntry final
     {
         SearchResult result;
         QString genreId, text;
-        bool album = false;
+        qsizetype nextAlbum = 0;
     };
+    struct PendingSearch;
+    void startSearch();
+    void replaceResults(QList<SearchResult> results);
+    static QList<SearchResult> filter(const QList<SearchEntry> &entries, const QString &needle,
+                                      const QString &genreId,
+                                      const std::atomic<quint64> &generation, quint64 ticket);
+    std::unique_ptr<PendingSearch> m_search;
     Snapshot m_snapshot;
     QList<SearchEntry> m_entries;
     QHash<QString, QString> m_genreNames;

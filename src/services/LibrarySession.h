@@ -5,6 +5,7 @@
 #include "LibraryModels.h"
 #include "IMetadataProvider.h"
 #include <QPointer>
+#include <QSet>
 
 namespace yalahoo {
 // GUI-thread boundary; providers are injected, IDs never derive from view positions.
@@ -141,6 +142,7 @@ private:
     QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,
             m_playbackTrackId;
     QVariantList m_genres;
+    QSet<QString> m_visibleGenres;
     QHash<QString, ProviderResult> m_metadata;
     QVariantMap m_summary;
     QStringList m_batchAlbums;

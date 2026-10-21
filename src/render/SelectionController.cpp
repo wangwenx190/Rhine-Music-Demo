@@ -94,8 +94,8 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
                 continue;
             const auto path = album.coverUrl.scheme() == "qrc"_L1 ? u":"_s + album.coverUrl.path()
                                                                   : album.coverUrl.toLocalFile();
-            *entry.iterator = { path,
-                                graphemePrefix(album.title, MaximumPlaceholderTitleCharacters),
+            *entry.iterator = { { path,
+                                  graphemePrefix(album.title, MaximumPlaceholderTitleCharacters) },
                                 album.title };
         }
     m_returning.clear();
@@ -130,11 +130,10 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
     publish();
     Q_EMIT selectionChanged();
 }
-QPair<QString, QString> SelectionController::coverSource(const QString &id) const
+CoverSource SelectionController::coverSource(const QString &id) const
 {
     const auto source = m_coverSources.constFind(id);
-    return source == m_coverSources.cend() ? QPair<QString, QString>{ }
-                                           : qMakePair(source->path, source->placeholderTitle);
+    return source == m_coverSources.cend() ? CoverSource{ } : source->cover;
 }
 QString SelectionController::albumTitle(const QString &id) const
 {
@@ -648,8 +647,11 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     QMatrix4x4 matrix;
     if (!m_motion)
         return matrix;
-    const double slope = field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane);
-    const auto offset = displayOffset();
+    return transform(cell, lift, rotation, folded, transformInputs(), field(cell.row, cell.lane),
+                     field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane));
+}
+SelectionController::TransformInputs SelectionController::transformInputs() const
+{
     const double entryZ = m_openingTime ? -OpeningEntryDepth
                     * std::pow(1
                                        - std::clamp((*m_openingTime
@@ -658,14 +660,23 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
                                                     0.0, 1.0),
                                2)
                                         : 0;
-    matrix.translate(
-            float((cell.lane - m_cell.lane) * sceneGeometry::ColumnSpacing - offset[1]),
-            float(-sceneGeometry::FloorDepth + field(cell.row, cell.lane) + lift),
-            float(m_realistic ? (cell.row - m_realColumns.row(int(cell.lane), overviewProgress()))
-                                          * sceneGeometry::RowSpacing
-                                  - sceneGeometry::ArchiveDepth + entryZ
-                              : (cell.row - m_cell.row) * sceneGeometry::RowSpacing
-                                  - sceneGeometry::ArchiveDepth + offset[0] + entryZ));
+    return { displayOffset(), entryZ, overviewProgress() };
+}
+QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
+                                          bool folded, const TransformInputs &inputs, double height,
+                                          double slope) const
+{
+    QMatrix4x4 matrix;
+    const auto &offset = inputs.offset;
+    const double entryZ = inputs.entryZ;
+    matrix.translate(float((cell.lane - m_cell.lane) * sceneGeometry::ColumnSpacing - offset[1]),
+                     float(-sceneGeometry::FloorDepth + height + lift),
+                     float(m_realistic
+                                   ? (cell.row - m_realColumns.row(int(cell.lane), inputs.overview))
+                                                   * sceneGeometry::RowSpacing
+                                           - sceneGeometry::ArchiveDepth + entryZ
+                                   : (cell.row - m_cell.row) * sceneGeometry::RowSpacing
+                                           - sceneGeometry::ArchiveDepth + offset[0] + entryZ));
     const double quality = smooth(lift / LiftPitchFadeDistance);
     const double pitch = slope * SlopePitchGain * (1 - m_detail) * (1 - quality);
     // Evaluate Three's XYZ rotation in double, then round each matrix element once.
@@ -924,16 +935,23 @@ void SelectionController::publish()
                     int(ArchivePool::visibleCell(index * ArchivePool::rows, center).lane),
                     overviewProgress());
     m_pool.update(center, m_realistic ? &rows : nullptr);
-    QVector<ArchiveInstance> next;
+    auto &next = m_instanceScratch;
+    next.clear();
     next.reserve(ArchivePool::capacity + AdditionalCaseCapacity);
+    const auto inputs = transformInputs();
+    struct PreviousField final
+    {
+        ArchiveCell cell;
+        double upper;
+    };
+    std::optional<PreviousField> previousField;
     for (auto instance : m_pool.instances()) {
         // Optical depth ties use the physical identity, which survives logical rebase.
-        const auto physical = qMakePair(qint64(instance.cell.lane + m_origin.lane),
-                                        qint64(instance.cell.row + m_origin.row));
+        const PoolObject::PhysicalCell physical{ qint64(instance.cell.lane + m_origin.lane),
+                                                 qint64(instance.cell.row + m_origin.row) };
         const auto lane =
-                (physical.first % ArchivePool::lanes + ArchivePool::lanes) % ArchivePool::lanes;
-        const auto row =
-                (physical.second % ArchivePool::rows + ArchivePool::rows) % ArchivePool::rows;
+                (physical.lane % ArchivePool::lanes + ArchivePool::lanes) % ArchivePool::lanes;
+        const auto row = (physical.row % ArchivePool::rows + ArchivePool::rows) % ArchivePool::rows;
         auto &object = m_poolObjects[lane * ArchivePool::rows + row];
         if (!object.objectId || object.physical != physical)
             object = { physical, ++m_objectSerial };
@@ -944,7 +962,18 @@ void SelectionController::publish()
                             });
         if (hidden || instance.albumId.isEmpty())
             continue;
-        instance.transform = transform(instance.cell);
+        // Consecutive rows share the same half-row sample in the slope difference.
+        // Reuse the exact value only within this publication, so every state change
+        // naturally invalidates it without a persistent field-cache key.
+        const auto cell = instance.cell;
+        const double lower = previousField && previousField->cell.lane == cell.lane
+                        && previousField->cell.row + 1 == cell.row
+                ? previousField->upper
+                : field(cell.row - .5, cell.lane);
+        const double upper = field(cell.row + .5, cell.lane);
+        previousField = PreviousField{ cell, upper };
+        instance.transform =
+                transform(cell, 0, 0, true, inputs, field(cell.row, cell.lane), upper - lower);
         next.append(std::move(instance));
     }
     for (const auto &copy : m_returning)
@@ -955,7 +984,7 @@ void SelectionController::publish()
                       transform(m_cell, m_lift.value, m_rotation), true, m_clarity.value() });
     if (next == m_instances)
         return;
-    m_instances = std::move(next);
+    m_instances.swap(next);
     ++m_revision;
     Q_EMIT frameChanged();
 }

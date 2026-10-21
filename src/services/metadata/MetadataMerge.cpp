@@ -37,19 +37,22 @@ ProviderResult cachedMetadata(const Album &album, MetadataKind kind, const Reque
     if (kind != MetadataKind::Introduction && !state.value(u"sourceDetails"_s).toObject().isEmpty())
         result.source = state.value(u"sourceDetails"_s).toObject();
     const auto status = state.value(u"status"_s).toString().toLower();
-    static constexpr std::pair<QLatin1StringView, ProviderStatus> statuses[] = {
-        { "matched"_L1, ProviderStatus::Matched },
-        { "partial"_L1, ProviderStatus::Partial },
-        { "not-found"_L1, ProviderStatus::NotFound },
-        { "uncertain"_L1, ProviderStatus::Uncertain },
-        { "error"_L1, ProviderStatus::Error }
+    struct StatusEntry final
+    {
+        QLatin1StringView name;
+        ProviderStatus status;
     };
+    static constexpr StatusEntry statuses[] = { { "matched"_L1, ProviderStatus::Matched },
+                                                { "partial"_L1, ProviderStatus::Partial },
+                                                { "not-found"_L1, ProviderStatus::NotFound },
+                                                { "uncertain"_L1, ProviderStatus::Uncertain },
+                                                { "error"_L1, ProviderStatus::Error } };
     const auto found =
             std::find_if(std::begin(statuses), std::end(statuses), [&](const auto &entry) {
-                return entry.first == status;
+                return entry.name == status;
             });
     if (found != std::end(statuses))
-        result.status = found->second;
+        result.status = found->status;
     else if (kind == MetadataKind::Introduction && !album.description.isEmpty())
         result.status = ProviderStatus::Matched;
     else if (kind == MetadataKind::Credits && !album.producers.isEmpty())

@@ -212,8 +212,10 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
         track.fields.insert(u"_probeError"_s, value.error);
     else
         track.fields.remove(u"_probeError"_s);
-    if (!timeout)
-        track.fields.insert(u"_qtProbeVersion"_s, QString::fromUtf8(qVersion()));
+    if (!timeout) {
+        static const auto version = QString::fromUtf8(qVersion());
+        track.fields.insert(u"_qtProbeVersion"_s, version);
+    }
 }
 }
 class ProbeWorker final : public QObject
@@ -306,6 +308,7 @@ private:
     }
     void pump()
     {
+        static const auto version = QString::fromUtf8(qVersion());
         if (!m_running)
             return;
         if (stopped()) {
@@ -335,9 +338,7 @@ private:
                 const bool needsCover =
                         (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty())
                         && !coverKnown;
-                if (!needsCover
-                    && track.fields.value(u"_qtProbeVersion"_s).toString()
-                            == QString::fromUtf8(qVersion()))
+                if (!needsCover && track.fields.value(u"_qtProbeVersion"_s).toString() == version)
                     continue;
                 if (!track.sourceUrl.isLocalFile())
                     continue;
@@ -375,16 +376,15 @@ private:
                 if (!embedded.isEmpty())
                     album.coverUrl = embedded;
             }
-            std::stable_sort(
-                    album.tracks.begin(), album.tracks.end(), [](const Track &a, const Track &b) {
-                        return std::pair(a.discNumber.value_or(1),
-                                         a.trackNumber.value_or(
-                                                 yalahoo::libraryDefaults::UnnumberedTrackSortKey))
-                                < std::pair(
-                                        b.discNumber.value_or(1),
-                                        b.trackNumber.value_or(
-                                                yalahoo::libraryDefaults::UnnumberedTrackSortKey));
-                    });
+            std::stable_sort(album.tracks.begin(), album.tracks.end(),
+                             [](const Track &a, const Track &b) {
+                                 if (a.discNumber.value_or(1) != b.discNumber.value_or(1))
+                                     return a.discNumber.value_or(1) < b.discNumber.value_or(1);
+                                 return a.trackNumber.value_or(
+                                                yalahoo::libraryDefaults::UnnumberedTrackSortKey)
+                                         < b.trackNumber.value_or(
+                                                 yalahoo::libraryDefaults::UnnumberedTrackSortKey);
+                             });
             if (!album.tracks.isEmpty()) {
                 const auto &first = album.tracks.first();
                 const auto common = first.fields.value(u"_common"_s).toObject();

@@ -257,14 +257,19 @@ void Postprocess::render(QRhiCommandBuffer *cb)
             std::memcpy(p.kernelValues.data(), bytes.constData(), bytes.size());
             floats(p.noise.get(), "ssao-noise-"_L1 + QString::number(s.samples));
         }
-        for (const auto &entry : { std::pair{ p.area.get(), u"smaa-area"_s },
-                                   std::pair{ p.search.get(), u"smaa-search"_s } }) {
-            if (!entry.first)
+        struct LookupTexture final
+        {
+            QRhiTexture *texture;
+            QLatin1StringView name;
+        };
+        for (const auto &entry : { LookupTexture{ p.area.get(), "smaa-area"_L1 },
+                                   LookupTexture{ p.search.get(), "smaa-search"_L1 } }) {
+            if (!entry.texture)
                 continue;
-            const auto image = preparedAssets().images.value(":/rhi/postprocess/"_L1 + entry.second
-                                                             + ".png"_L1);
-            require(image.size() == entry.first->pixelSize(), "Invalid SMAA lookup size");
-            updates->uploadTexture(entry.first, image.convertToFormat(QImage::Format_RGBA8888));
+            const auto image =
+                    preparedAssets().images.value(":/rhi/postprocess/"_L1 + entry.name + ".png"_L1);
+            require(image.size() == entry.texture->pixelSize(), "Invalid SMAA lookup size");
+            updates->uploadTexture(entry.texture, image.convertToFormat(QImage::Format_RGBA8888));
         }
         p.upload = false;
     }

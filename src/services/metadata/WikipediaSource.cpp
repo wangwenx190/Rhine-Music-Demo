@@ -161,10 +161,6 @@ ProviderResult wikipediaMetadata(const Album &album, const QJsonArray &pages,
         if (matched.size() > 1) {
             result.status = ProviderStatus::Uncertain;
             result.payload = { };
-            const auto revisions = page.value(u"revisions"_s).toArray();
-            const auto revision = revisions.isEmpty()
-                    ? QJsonValue()
-                    : revisions.first().toObject().value(u"revid"_s);
             result.source = { };
             return result;
         }

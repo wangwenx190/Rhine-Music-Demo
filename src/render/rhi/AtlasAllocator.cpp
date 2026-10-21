@@ -2,6 +2,9 @@
 #include "AtlasAllocator.h"
 #include <stdexcept>
 #include <limits>
+#include <algorithm>
+#include <functional>
+#include <numeric>
 
 namespace yalahoo::rhi {
 namespace {
@@ -31,16 +34,12 @@ AtlasLease AtlasAllocator::acquire(const QString &identity, quint64 coverGenerat
     if (index >= 0 && m_slots[index].coverGeneration != coverGeneration)
         return { };
     if (index < 0) {
-        for (int i = 0; i < m_slots.size(); ++i) {
-            if (!m_slots[i].references) {
-                index = i;
-                break;
-            }
-        }
-        if (index < 0)
+        if (m_freeSlots.empty())
             return { };
+        std::pop_heap(m_freeSlots.begin(), m_freeSlots.end(), std::greater<>());
+        index = m_freeSlots.back();
+        m_freeSlots.pop_back();
         auto &slot = m_slots[index];
-        m_identities.remove(slot.identity);
         slot = { };
         slot.identity = identity;
         slot.lease = ++m_lease;
@@ -72,6 +71,8 @@ void AtlasAllocator::release(const AtlasLease &lease)
     if (auto *slot = find(lease)) {
         if (--slot->references == 0) {
             m_identities.remove(slot->identity);
+            m_freeSlots.push_back(lease.page * m_slotsPerPage + lease.slot);
+            std::push_heap(m_freeSlots.begin(), m_freeSlots.end(), std::greater<>());
             slot->pixels.reset();
             slot->dirty = false;
             invalidateReplay(lease.page * m_slotsPerPage + lease.slot);
@@ -180,6 +181,9 @@ void AtlasAllocator::reset()
     m_identities.reserve(m_slots.size());
     m_replays.clear();
     m_replays.resize(pages());
+    m_freeSlots.resize(m_slots.size());
+    std::iota(m_freeSlots.begin(), m_freeSlots.end(), 0);
+    std::make_heap(m_freeSlots.begin(), m_freeSlots.end(), std::greater<>());
     for (auto &slot : m_slots)
         slot = { };
 }

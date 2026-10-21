@@ -512,6 +512,46 @@ private Q_SLOTS:
         QCOMPARE(reset.size(), 0);
         QCOMPARE(model.rowCount(), 1024);
     }
+    void asynchronousSearchKeepsLatestQuery()
+    {
+        LibrarySnapshot snapshot;
+        Album album;
+        album.id = u"first"_s;
+        album.title = u"Collection"_s;
+        for (int i = 0; i < 1024; ++i) {
+            Track track;
+            track.id = u"track-%1"_s.arg(i);
+            track.albumId = album.id;
+            track.title = u"Song %1"_s.arg(i);
+            album.tracks.append(track);
+        }
+        snapshot.albums.append(album);
+        SearchListModel model;
+        QAbstractItemModelTester tester(&model,
+                                        QAbstractItemModelTester::FailureReportingMode::QtTest);
+        auto data = std::make_shared<const LibrarySnapshot>(snapshot);
+        model.update(data, { }, { });
+        QSignalSpy reset(&model, &QAbstractItemModel::modelReset);
+        model.request(u"song"_s, { });
+        QVERIFY(model.searching());
+        model.request(u"missing"_s, { });
+        model.request(u"song 1023"_s, { });
+        QTRY_VERIFY(!model.searching());
+        QCOMPARE(model.rowCount(), 1);
+        QCOMPARE(model.resultAt(0).value(u"trackId"_s).toString(), u"track-1023"_s);
+        QCOMPARE(reset.size(), 0);
+        model.request(u"song"_s, { });
+        model.update({ }, { }, { });
+        QVERIFY(!model.searching());
+        QCOMPARE(model.rowCount(), 0);
+        snapshot.albums[0].id = u"replacement"_s;
+        snapshot.albums[0].tracks.clear();
+        model.update(std::make_shared<const LibrarySnapshot>(snapshot), { }, { });
+        model.request(u"collection"_s, { });
+        QTRY_VERIFY(!model.searching());
+        QCOMPARE(model.rowCount(), 1);
+        QCOMPARE(model.resultAt(0).value(u"albumId"_s).toString(), u"replacement"_s);
+    }
     void frozenSearch()
     {
         QFile file(
@@ -698,7 +738,7 @@ private Q_SLOTS:
         playback.clear();
         session.sort(u"artist"_s);
         session.search(u"Typography"_s);
-        QCOMPARE(session.searchResults()->rowCount(), 28);
+        QTRY_COMPARE(session.searchResults()->rowCount(), 28);
         QVERIFY(session.navigate(session.snapshot()->albums[1].id));
         session.requestMetadata(albumId, u"introduction"_s);
         QTRY_COMPARE(session.metadata().size(), 1);

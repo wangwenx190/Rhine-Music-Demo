@@ -127,10 +127,11 @@ struct LoggingSession::State final
         const auto now = QDateTime::currentDateTimeUtc();
         nextCleanup = now.addSecs(CleanupIntervalSeconds);
         const auto cutoff = now.addDays(-options.retentionDays);
-        const QRegularExpression owned(
+        static const QRegularExpression owned(
                 u"^(yalahoo-\\d{8}T\\d{9}Z-\\d+-[0-9a-f-]{36})\\.\\d+\\.log$"_s);
         const QDir directory(options.directory);
-        for (const auto &entry : directory.entryInfoList({ u"yalahoo-*.log"_s }, QDir::Files)) {
+        for (const auto &entry :
+             directory.entryInfoList({ u"yalahoo-*.log"_s }, QDir::Files, QDir::NoSort)) {
             const auto match = owned.match(entry.fileName());
             if (!match.hasMatch() || entry.isSymLink() || entry.lastModified() >= cutoff
                 || match.captured(1) == stem)

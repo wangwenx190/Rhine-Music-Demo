@@ -4,6 +4,9 @@
 #include "DetailModel.h"
 #include <QSet>
 #include <QTextLayout>
+#include <QGuiApplication>
+#include <QDataStream>
+#include <QIODevice>
 #include <algorithm>
 #include <iterator>
 #include <cmath>
@@ -107,9 +110,18 @@ QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int
             + QCoreApplication::translate("Yalahoo", " Online queries are not enabled yet.");
 }
 }
+DetailModel::DetailModel(QObject *parent) : QAbstractListModel(parent)
+{
+    if (auto *application = qobject_cast<QGuiApplication *>(QCoreApplication::instance()))
+        connect(application, &QGuiApplication::fontDatabaseChanged, this, [this] {
+            m_lineHeights.clear();
+        });
+}
 double DetailModel::normalLineHeight(const QString &text, const QFont &font)
 {
-    const QString key = font.toString() + QChar(0) + text;
+    QByteArray key;
+    QDataStream stream(&key, QIODevice::WriteOnly);
+    stream << font << text;
     if (const auto *cached = m_lineHeights.object(key))
         return *cached;
     QTextLayout layout(text, font);
@@ -119,7 +131,7 @@ double DetailModel::normalLineHeight(const QString &text, const QFont &font)
     // CSS normal line boxes round the resolved ascent/descent independently.
     const double height =
             line.isValid() ? std::round(line.ascent()) + std::round(line.descent()) : 0;
-    const qsizetype cost = key.size() * 2 + LineCacheEntryOverheadBytes;
+    const qsizetype cost = key.size() + LineCacheEntryOverheadBytes;
     if (cost <= m_lineHeights.maxCost())
         m_lineHeights.insert(key, new double(height), int(cost));
     return height;
@@ -360,8 +372,8 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
         descriptionSource.removeAll(QString());
         m_info = { { u"id"_s, a.id },
                    { u"title"_s, a.title },
-                   { u"mainTitle"_s, title.first },
-                   { u"translation"_s, title.second },
+                   { u"mainTitle"_s, title.main },
+                   { u"translation"_s, title.translation },
                    { u"artist"_s, artistDisplayName(a.artist) },
                    { u"offline"_s, a.offline },
                    { u"description"_s, a.description },

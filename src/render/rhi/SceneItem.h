@@ -5,12 +5,11 @@
 #include "RenderData.h"
 #include "RhiItem.h"
 #include "SceneAdapter.h"
+#include "SelectionController.h"
 #include "InputRouter.h"
 #include "AtlasAllocator.h"
 #include "TitleReel.h"
 #include <QPointer>
-#include <QPair>
-#include <utility>
 
 namespace yalahoo::rhi {
 namespace sceneAtlas {
@@ -169,15 +168,16 @@ private:
     void configureDiagnostics();
     bool selectAt(QPointF point);
     struct OwnedCover;
-    void ensureBaseCover(const QString &id, const QPair<QString, QString> &source,
-                         const AtlasLease &lease);
-    std::pair<QRect, quint64> prepareOwnedCover(Input &in, const ArchiveInstance &instance,
-                                                const QPair<QString, QString> &source, QRect tile,
-                                                quint64 coverLease);
-    OwnedCover *acquireOwnedCover(const ArchiveInstance &instance,
-                                  const QPair<QString, QString> &source);
-    void requestDetailedCover(OwnedCover &owned, const QString &id,
-                              const QPair<QString, QString> &source);
+    void ensureBaseCover(const QString &id, const CoverSource &source, const AtlasLease &lease);
+    struct CoverRegion final
+    {
+        QRect tile;
+        quint64 lease;
+    };
+    CoverRegion prepareOwnedCover(Input &in, const ArchiveInstance &instance,
+                                  const CoverSource &source, QRect tile, quint64 coverLease);
+    OwnedCover *acquireOwnedCover(const ArchiveInstance &instance, const CoverSource &source);
+    void requestDetailedCover(OwnedCover &owned, const QString &id, const CoverSource &source);
     void preparePool(Input &input);
     void resetPool();
     void refreshPool();
@@ -199,8 +199,13 @@ private:
     AtlasAllocator m_atlas{ sceneAtlas::MaximumAtlasSide,
                             yalahoo::rhi::renderData::MaximumCaseEntities,
                             sceneAtlas::BaseColumns };
-    QHash<QString, AtlasLease> m_poolLeases;
-    QHash<QString, QPair<QString, QString>> m_poolSources;
+    struct PoolCover final
+    {
+        AtlasLease lease;
+        CoverSource source;
+        bool wanted = false;
+    };
+    QHash<QString, PoolCover> m_poolLeases;
     // Ready identities map to whether the tile contains real artwork rather than a placeholder.
     QHash<QString, bool> m_readyCovers;
     std::array<OwnedCover, sceneAtlas::OwnedCoverCount> m_ownedCovers;

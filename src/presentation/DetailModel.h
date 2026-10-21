@@ -8,6 +8,7 @@
 #include <QAbstractListModel>
 #include <QCache>
 #include <QFont>
+#include <QByteArray>
 
 namespace yalahoo {
 namespace detailText {
@@ -34,9 +35,7 @@ public:
         Disc,
         DiscHeading
     };
-    explicit DetailModel(QObject *parent = nullptr) : QAbstractListModel(parent)
-    {
-    }
+    explicit DetailModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
@@ -51,8 +50,8 @@ Q_SIGNALS:
     void albumChanged();
 
 private:
-    QCache<QString, double> m_lineHeights{ detailText::HeightCacheKiB
-                                           * yalahoo::units::BytesPerKiB };
+    QCache<QByteArray, double> m_lineHeights{ detailText::HeightCacheKiB
+                                              * yalahoo::units::BytesPerKiB };
     Snapshot m_snapshot;
     const Album *m_album = nullptr;
     Album m_resolved;

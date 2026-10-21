@@ -5,6 +5,8 @@
 #include "MusicTypes.h"
 #include "BackgroundMusicController.h"
 #include <QPointer>
+#include <QHash>
+#include <memory>
 #include <QAudioDevice>
 #include <QAudioOutput>
 #include <QMediaDevices>
@@ -167,6 +169,8 @@ private:
     QMediaPlayer m_player;
     QList<QMetaObject::Connection> m_connections;
     QList<Track> m_queue;
+    QHash<QString, int> m_queueIndices;
+    std::weak_ptr<const LibrarySnapshot> m_queueSnapshot;
     QList<QAudioDevice> m_outputs;
     QUrl m_source;
     QByteArray m_preferred;

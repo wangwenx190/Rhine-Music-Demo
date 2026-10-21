@@ -7,7 +7,7 @@
 - `startOpening()` 重置独立开场时间，从相同 dt 积累至 11.6 秒；不受 speed 影响。`finishOpening()` 在运行时到达终点并发出一次完成通知。开场UI与交接由[opening.md](opening.md)的OpeningController消费。
 - 窗口隐藏、最小化，或应用进入 Hidden/Suspended 时停止唯一帧源并停用时钟。恢复后丢弃首个帧间隔，避免后台时间消耗轨迹；不保留积压，不改变媒体对象。
 - `ScalarSpring::update(target, rate, dt)` 原样计算临界阻尼解析解及精确加速度。`observe()` 计算从弹簧交接到五次轨迹的加速度。rate=3.7/9/6.5 分别供普通真实列/详情/总览使用。
-- `QuinticTrack` 保存位置、速度、加速度、目标、系数及累计时间；`observe()` 仅在未运行时接收状态，`retarget()` 从当前 x/v/a 接续到静止终点，同目标返回 false 且不重启。`translate()` 只改变位置、目标和常数项；`finish()` 到达精确目标并归零 v/a；`reset()` 结束轨迹并解除目标记忆，保留当前状态。
+- `QuinticTrack` 保存位置、速度、加速度、目标、系数及累计时间，位置及两阶导数用Horner形式求值；`observe()` 仅在未运行时接收状态，`retarget()` 从当前 x/v/a 接续到静止终点，同目标返回 false 且不重启。`translate()` 只改变位置、目标和常数项；`finish()` 到达精确目标并归零 v/a；`reset()` 结束轨迹并解除目标记忆，保留当前状态。
 - `ArchiveMotion` 按 rail/column/shoulder/lane 顺序保存四条轨迹，时长统一为 `1.4+clamp((hypot(lanes,rows/8)-1)/7,0,1)`。observe 接收显示弹簧及其目标/rate，retarget 接收显示 x/v 并保留上次精确 a。一项目标变化时四条轨迹共用新时长，同组目标不重启。单独使用内核时 translate 后需同步平移显示弹簧；`MotionController::translate()` 已同时处理二者。
 - `ColumnScalar` 逐式移植冻结 `MusicRealColumnScalar` 的弹簧/五次切换、settled 阈值及 finish。实际列成员/选择/居中布局归real-columns.md。
 - `MotionController` 从唯一帧信号更新已缩放时间。observe始终保留精确加速度交接，仅在显示弹簧的值或导数变化时发送stateChanged；静止观察不重新唤醒帧源。新目标递增 revision；只为已完成的请求发送 `completed(revision)`，替换掉的目标不完成，重复 finish 不重发。减少动态立即完成当前请求和运行中的开场时钟，回调可用于后续焦点/状态交接。与媒体状态没有连接。

@@ -1,7 +1,6 @@
 #include "EasingCurve.h"
 #include "FrameClock.h"
 #include "PresentationController.h"
-#include <tuple>
 #include <cmath>
 #include <QPointF>
 
@@ -90,11 +89,18 @@ void PresentationController::advanceTab(double dt)
 }
 void PresentationController::transact(const std::function<void()> &operation)
 {
-    const auto before = std::tuple(m_phase, m_wantsDetail, m_pending);
+    struct PresentationState final
+    {
+        QString phase;
+        bool wantsDetail;
+        std::optional<PresentationSelection> pending;
+        bool operator==(const PresentationState &) const = default;
+    };
+    const PresentationState before{ m_phase, m_wantsDetail, m_pending };
     ++m_depth;
     operation();
     --m_depth;
-    if (!m_depth && before != std::tuple(m_phase, m_wantsDetail, m_pending))
+    if (!m_depth && before != PresentationState{ m_phase, m_wantsDetail, m_pending })
         Q_EMIT changed();
 }
 void PresentationController::open()

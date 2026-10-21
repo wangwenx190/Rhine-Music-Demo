@@ -142,7 +142,11 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         QList<bool> colorRuns;
         resolvedRuns.reserve(runs.size());
         colorRuns.reserve(runs.size());
-        QMap<int, QList<QPair<int, int>>> groups;
+        struct GlyphPosition final
+        {
+            int run, glyph;
+        };
+        QMap<int, QList<GlyphPosition>> groups;
         for (int runIndex = 0; runIndex < runs.size(); ++runIndex) {
             const auto &run = runs[runIndex];
             const auto raw = run.rawFont();
@@ -193,7 +197,7 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             bool colored = false;
             QMap<int, QList<int>> runGroups;
             for (const auto &value : group.value())
-                runGroups[value.first].append(value.second);
+                runGroups[value.run].append(value.glyph);
             for (auto runGroup = runGroups.cbegin(); runGroup != runGroups.cend(); ++runGroup) {
                 const auto &source = resolvedRuns[runGroup.key()];
                 ResolvedGlyphRun run{ source.font, source.fontHead, { }, { }, source.flags };
@@ -289,7 +293,7 @@ QList<int> TextLayoutAdapter::boundaries(const QString &text)
         result.append(position);
     return result;
 }
-QPair<QString, QString> TextLayoutAdapter::titleParts(const QString &text)
+AlbumTitleParts TextLayoutAdapter::titleParts(const QString &text)
 {
     return albumTitleParts(text);
 }
@@ -308,28 +312,28 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     }
     ++m_misses;
     TitleLayout result;
-    auto parts = transport ? qMakePair(text, QString()) : titleParts(text);
+    auto parts = transport ? AlbumTitleParts{ text, { } } : titleParts(text);
     if (!transport) {
         static const QRegularExpression whitespace(u"[\\t\\n\\r\\f ]+"_s);
         static const QRegularExpression ends(u"^ +| +$"_s);
-        parts.first.replace(whitespace, u" "_s).remove(ends);
-        parts.second.replace(whitespace, u" "_s).remove(ends);
+        parts.main.replace(whitespace, u" "_s).remove(ends);
+        parts.translation.replace(whitespace, u" "_s).remove(ends);
     }
-    const auto firstAnalysis = analyzeText(parts.first);
-    const auto secondAnalysis = analyzeText(parts.second);
+    const auto firstAnalysis = analyzeText(parts.main);
+    const auto secondAnalysis = analyzeText(parts.translation);
     const auto candidate = [&](double candidateSize, bool clamp, bool collect = false) {
         TitleLayout value;
         value.size = candidateSize;
         auto first =
-                shape(parts.first, main, candidateSize, width, transport ? 0 : MainLineHeightRatio,
+                shape(parts.main, main, candidateSize, width, transport ? 0 : MainLineHeightRatio,
                       transport ? 0 : -MainLetterSpacingPixels, false, transport, clamp, collect,
                       budget, &firstAnalysis);
-        auto second = shape(parts.second, subtitle, candidateSize * SubtitleSizeRatio, width,
+        auto second = shape(parts.translation, subtitle, candidateSize * SubtitleSizeRatio, width,
                             SubtitleLineHeightRatio,
                             candidateSize * SubtitleSizeRatio * SubtitleLetterSpacingEm, true,
                             false, clamp, collect, budget, &secondAnalysis);
         const double gap =
-                parts.second.isEmpty() ? 0 : candidateSize * SubtitleSizeRatio * SubtitleGapEm;
+                parts.translation.isEmpty() ? 0 : candidateSize * SubtitleSizeRatio * SubtitleGapEm;
         for (auto &glyph : second.glyphs)
             glyph.y += first.height + gap;
         value.glyphs = std::move(first.glyphs);

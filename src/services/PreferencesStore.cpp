@@ -13,6 +13,7 @@
 #include <QSaveFile>
 #include <QTimer>
 #include <cmath>
+#include <optional>
 
 using namespace Qt::StringLiterals;
 
@@ -23,9 +24,10 @@ struct PreferencesStore::Private final
     Private() = default;
     QString m_path, m_error;
     QJsonObject m_document;
+    mutable std::optional<QVariantMap> m_values;
     QThreadPool m_worker;
     QFutureWatcher<QString> m_save;
-    QFutureWatcher<QPair<QJsonObject, QString>> m_import;
+    QFutureWatcher<ImportResult> m_import;
     quint64 m_revision = 0;
     bool m_writable = true, m_dirty = false, m_saving = false, m_scheduled = false;
 };
@@ -109,21 +111,27 @@ QJsonObject PreferencesStore::audio() const
 }
 QVariantMap PreferencesStore::values() const
 {
-    QJsonObject values{ { u"theme"_s, u"day"_s },
-                        { u"sortMode"_s, u"genre"_s },
-                        { u"arrayMode"_s, u"filled"_s },
-                        { u"rememberColumnPosition"_s, true },
-                        { u"reduced"_s, false },
-                        { u"singleInstance"_s, true },
-                        { u"motionSpeed"_s, 1.0 },
-                        { u"volume"_s, yalahoo::productDefaults::DefaultSongVolume },
-                        { u"bgm"_s, true },
-                        { u"bgmVolume"_s, yalahoo::productDefaults::DefaultBackgroundVolume },
-                        { u"sound"_s, true },
-                        { u"soundVolume"_s, yalahoo::productDefaults::DefaultFeedbackVolume } };
-    for (auto it = d->m_document.begin(); it != d->m_document.end(); ++it)
+    if (d->m_values)
+        return *d->m_values;
+    static const QJsonObject defaults{
+        { u"theme"_s, u"day"_s },
+        { u"sortMode"_s, u"genre"_s },
+        { u"arrayMode"_s, u"filled"_s },
+        { u"rememberColumnPosition"_s, true },
+        { u"reduced"_s, false },
+        { u"singleInstance"_s, true },
+        { u"motionSpeed"_s, 1.0 },
+        { u"volume"_s, yalahoo::productDefaults::DefaultSongVolume },
+        { u"bgm"_s, true },
+        { u"bgmVolume"_s, yalahoo::productDefaults::DefaultBackgroundVolume },
+        { u"sound"_s, true },
+        { u"soundVolume"_s, yalahoo::productDefaults::DefaultFeedbackVolume }
+    };
+    auto values = defaults;
+    for (auto it = d->m_document.constBegin(); it != d->m_document.constEnd(); ++it)
         values.insert(it.key(), it.value());
-    return values.toVariantMap();
+    d->m_values = values.toVariantMap();
+    return *d->m_values;
 }
 QString PreferencesStore::validate(const QJsonObject &document)
 {
@@ -135,17 +143,22 @@ QString PreferencesStore::validate(const QJsonObject &document)
          { u"rememberColumnPosition"_s, u"reduced"_s, u"singleInstance"_s, u"bgm"_s, u"sound"_s })
         if (document.contains(key) && !document.value(key).isBool())
             return QCoreApplication::translate("Yalahoo", "Invalid preference switch type: ") + key;
-    static const QList<QPair<QString, QStringList>> choices{
+    struct PreferenceChoice final
+    {
+        QString key;
+        QStringList options;
+    };
+    static const QList<PreferenceChoice> choices{
         { u"theme"_s, { u"day"_s, u"night"_s } },
         { u"sortMode"_s, { u"genre"_s, u"artist"_s, u"album"_s } },
         { u"arrayMode"_s, { u"filled"_s, u"realistic"_s } }
     };
     for (const auto &choice : choices)
-        if (document.contains(choice.first)
-            && (!document.value(choice.first).isString()
-                || !choice.second.contains(document.value(choice.first).toString())))
+        if (document.contains(choice.key)
+            && (!document.value(choice.key).isString()
+                || !choice.options.contains(document.value(choice.key).toString())))
             return QCoreApplication::translate("Yalahoo", "Invalid preference option: ")
-                    + choice.first;
+                    + choice.key;
     for (const auto &key : { u"volume"_s, u"bgmVolume"_s, u"soundVolume"_s, u"motionSpeed"_s }) {
         const auto value = document.value(key);
         if (!value.isUndefined()
@@ -228,6 +241,7 @@ bool PreferencesStore::update(const QVariantMap &patch)
     if (!modified)
         return true;
     ++d->m_revision;
+    d->m_values.reset();
     d->m_dirty = true;
     reportError({ });
     Q_EMIT changed();
@@ -251,30 +265,30 @@ void PreferencesStore::setNavigation(bool remember, bool realistic)
     update({ { u"rememberColumnPosition"_s, remember },
              { u"arrayMode"_s, realistic ? u"realistic"_s : u"filled"_s } });
 }
-QPair<QJsonObject, QString> PreferencesStore::readPreferenceImport(const QString &path)
+PreferencesStore::ImportResult PreferencesStore::readPreferenceImport(const QString &path)
 {
-    using Result = QPair<QJsonObject, QString>;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)
         || file.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB)
-        return Result{ { },
-                       QCoreApplication::translate(
-                               "Yalahoo", "Cannot read preference JSON, or it exceeds 1 MiB.") };
+        return ImportResult{ { },
+                             QCoreApplication::translate(
+                                     "Yalahoo",
+                                     "Cannot read preference JSON, or it exceeds 1 MiB.") };
     const auto bytes = file.read(yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB + 1);
     QJsonParseError parse;
     const auto document = QJsonDocument::fromJson(bytes, &parse);
     if (bytes.size() > yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
         || file.error() != QFileDevice::NoError || parse.error != QJsonParseError::NoError
         || !document.isObject())
-        return Result{ { },
-                       QCoreApplication::translate(
-                               "Yalahoo",
-                               "Invalid preference JSON. The original file was preserved.") };
+        return ImportResult{ { },
+                             QCoreApplication::translate(
+                                     "Yalahoo",
+                                     "Invalid preference JSON. The original file was preserved.") };
     auto object = document.object();
     const auto error = validate(object);
     if (!error.isEmpty())
-        return Result{ { }, error };
-    return Result{ object, { } };
+        return ImportResult{ { }, error };
+    return ImportResult{ object, { } };
 }
 bool PreferencesStore::importJson(const QUrl &url)
 {
@@ -287,18 +301,17 @@ bool PreferencesStore::importJson(const QUrl &url)
     }
     const auto revision = ++d->m_revision;
     disconnect(&d->m_import, nullptr, this, nullptr);
-    connect(&d->m_import, &QFutureWatcher<QPair<QJsonObject, QString>>::finished, this,
-            [this, revision] {
-                if (revision != d->m_revision)
-                    return;
-                const auto result = d->m_import.result();
-                if (!result.second.isEmpty()) {
-                    reportError(result.second);
-                    return;
-                }
-                if (update(result.first.toVariantMap()))
-                    Q_EMIT imported();
-            });
+    connect(&d->m_import, &QFutureWatcher<ImportResult>::finished, this, [this, revision] {
+        if (revision != d->m_revision)
+            return;
+        const auto result = d->m_import.result();
+        if (!result.error.isEmpty()) {
+            reportError(result.error);
+            return;
+        }
+        if (update(result.document.toVariantMap()))
+            Q_EMIT imported();
+    });
     d->m_import.setFuture(QtConcurrent::run(&d->m_worker, &PreferencesStore::readPreferenceImport,
                                             url.toLocalFile()));
     return true;

@@ -34,19 +34,30 @@ struct ResourceUpdateDeleter final
 };
 using ResourceUpdates = std::unique_ptr<QRhiResourceUpdateBatch, ResourceUpdateDeleter>;
 QShader shader(const QString &path);
-inline QMatrix4x4 lightView()
+inline const QMatrix4x4 &lightView()
 {
-    QMatrix4x4 m;
-    m.lookAt({ -shadowCamera::PositionXMagnitude, shadowCamera::PositionY,
-               -shadowCamera::PositionZMagnitude },
-             { 0, 0, 0 }, { 0, 1, 0 });
-    return m;
+    static const auto view = [] {
+        QMatrix4x4 m;
+        m.lookAt({ -shadowCamera::PositionXMagnitude, shadowCamera::PositionY,
+                   -shadowCamera::PositionZMagnitude },
+                 { 0, 0, 0 }, { 0, 1, 0 });
+        return m;
+    }();
+    return view;
 }
-inline QMatrix4x4 lightProjection()
+inline const QMatrix4x4 &lightProjection()
 {
-    QMatrix4x4 m;
-    m.ortho(-shadowCamera::HalfWidth, shadowCamera::HalfWidth, -shadowCamera::HalfHeight,
-            shadowCamera::HalfHeight, shadowCamera::NearPlane, shadowCamera::FarPlane);
-    return m;
+    static const auto projection = [] {
+        QMatrix4x4 m;
+        m.ortho(-shadowCamera::HalfWidth, shadowCamera::HalfWidth, -shadowCamera::HalfHeight,
+                shadowCamera::HalfHeight, shadowCamera::NearPlane, shadowCamera::FarPlane);
+        return m;
+    }();
+    return projection;
+}
+inline const QMatrix4x4 &lightViewProjection()
+{
+    static const auto matrix = lightProjection() * lightView();
+    return matrix;
 }
 }

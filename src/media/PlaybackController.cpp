@@ -125,34 +125,39 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
                 "Yalahoo", "The album directory is unavailable. Rescan or choose another track."));
         return false;
     }
-    int target = -1;
+    const auto snapshot = m_library->snapshot();
+    const bool reuse = m_queueSnapshot.lock() == snapshot && !m_queue.isEmpty()
+            && std::as_const(m_queue).first().albumId == albumId;
     QList<Track> queue;
-    QSet<QString> ids;
-    queue.reserve(album->tracks.size());
-    ids.reserve(album->tracks.size());
-    for (const auto &entry : album->tracks) {
-        const auto count = ids.size();
-        ids.insert(entry.id);
-        if (ids.size() == count)
-            continue;
-        if (entry.id == trackId)
-            target = int(queue.size());
-        queue.append(entry);
+    QHash<QString, int> indices;
+    if (!reuse) {
+        queue.reserve(album->tracks.size());
+        indices.reserve(album->tracks.size());
+        for (const auto &entry : album->tracks) {
+            if (indices.tryEmplace(entry.id, int(queue.size())).inserted)
+                queue.append(entry);
+        }
     }
+    const int target = (reuse ? m_queueIndices : indices).value(trackId, -1);
     if (target < 0) {
         Q_EMIT rejected(QCoreApplication::translate(
                 "Yalahoo",
                 "The track is no longer in the library. Choose another track or rescan."));
         return false;
     }
-    const auto &url = queue[target].sourceUrl;
+    const auto &tracks = reuse ? std::as_const(m_queue) : std::as_const(queue);
+    const auto &url = tracks[target].sourceUrl;
     if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery()
         || url.hasFragment() || url.toLocalFile().contains(QChar::Null)) {
         Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
                                                     "Tracks require a local absolute file path."));
         return false;
     }
-    m_queue = std::move(queue);
+    if (!reuse) {
+        m_queue = std::move(queue);
+        m_queueIndices = std::move(indices);
+        m_queueSnapshot = snapshot;
+    }
     start(target);
     return true;
 }
