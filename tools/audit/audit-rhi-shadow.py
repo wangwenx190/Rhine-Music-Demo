@@ -57,10 +57,12 @@ CHECKS = [
      "Receiver and actual paper/shell uploaded bytes are inspected only during explicit capture."),
     ("PERF-04", "src/render/rhi/RhiItem.cpp", "makeTarget(shadow,",
      "Graph remains caster->single-sample R32F+D32F->opaque/paper->resolve/mips->shell. "
-     "Targets/pipelines rebuild only on existing compatibility keys; camera/color/numeric "
+     "Shadow targets/pipelines use their own dimension key; screen resize/MSAA keep the cached map. "
+     "Shadow-only replacement updates sampled bindings without rebuilding screen/postprocess targets; camera/color/numeric "
      "light changes do not invalidate fixed-light caster depth. Actual inventory includes both."),
     ("PERF-05", "src/render/rhi/RhiItem.cpp", "cachedShadows != input.shadows",
-     "Caster matrix change, shadow size/renderer generation or enabled toggle invalidates map. "
+     "Enabled caster matrix change, shadow size/renderer generation or enabled toggle invalidates map. "
+     "Disabled caster movement reuses the cleared map without another pass. "
      "Unchanged pool reuses depth and skips separate nonbatched caster uniforms; enabling after "
      "disabled clear rerenders. Public light camera "
      "is fixed, so no missing movable-light key. New varyings move repeated projection to vertices."),

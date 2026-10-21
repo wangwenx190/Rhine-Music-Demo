@@ -4,6 +4,7 @@
 #include "MotionController.h"
 #include "SelectionController.h"
 #include "CoverCache.h"
+#include "CoverSamplingChecks.h"
 #include <QScopeGuard>
 #include "RhiCaptureHarness.h"
 #include "RhiProductionFixture.h"
@@ -335,17 +336,20 @@ auto runScaleAudit(int &argc, char **&argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         check(QDir().mkpath(output), "Cannot create scale output directory");
+        check(argc == 2 || QByteArray(argv[2]) == "--representative"
+                      || QByteArray(argv[2]) == "--filtering-only",
+              "Unsupported native-size audit option");
+        const auto coverSampling = checkLinearCoverSampling();
         checkCoverFiltering();
-        const auto transitions = dprTransitions();
+        const bool filteringOnly = argc == 3 && QByteArray(argv[2]) == "--filtering-only";
+        const auto transitions = filteringOnly ? QJsonArray() : dprTransitions();
         QJsonArray states;
         const QList<double> dprs =
                 OffscreenSurface::Enabled ? QList<double>{ 1, 1.5, 2 } : QList<double>{ 0 };
-        check(argc == 2 || QByteArray(argv[2]) == "--representative",
-              "Unsupported native-size audit option");
         const bool representative = argc == 3;
         const auto sizes =
                 representative ? QList<QSize>{ { 321, 241 }, { 640, 480 } } : sourceSizes();
-        for (auto size : sizes) {
+        for (auto size : filteringOnly ? QList<QSize>() : sizes) {
             QJsonArray sourceThemes;
             for (double dpr : dprs) {
                 const auto state = captureState(size, dpr, output, states.size());
@@ -368,6 +372,8 @@ auto runScaleAudit(int &argc, char **&argv)
                                 { u"passed"_s, true },
                                 { u"states"_s, states },
                                 { u"dprTransitions"_s, transitions },
+                                { u"linearCoverSampling"_s, coverSampling },
+                                { u"filteringOnly"_s, filteringOnly },
                                 { u"nativeDprMatrixPending"_s, !OffscreenSurface::Enabled },
                                 { u"scope"_s,
                                   u"Own RenderControl/native output, actual attachments and source math; no physical display/VSYNC or measured VRAM claim"_s } })

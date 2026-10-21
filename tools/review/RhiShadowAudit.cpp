@@ -210,9 +210,129 @@ QJsonObject validateMath(const Input &input, const Capture &capture, QSize size)
              { u"maxError"_s, worst } };
 }
 
+struct ShadowTransition final
+{
+    const char *label;
+    bool redraw, replaceShadow, replaceMain;
+};
+Capture checkShadowTransition(RhiCaptureHarness &driver, const Input &input, QSize size,
+                              const Capture &previous, ShadowTransition transition)
+{
+    const auto current = driver.capture(input, size);
+    checkSubmittedShadow(input, current);
+    const auto state = current.metadata[u"shadowState"_s].toObject();
+    const auto oldState = previous.metadata[u"shadowState"_s].toObject();
+    if (state[u"rendered"_s].toBool() != transition.redraw || !state[u"bindingMatches"_s].toBool())
+        std::fprintf(stderr, "Shadow transition %s expected redraw=%d actual=%s\n",
+                     transition.label, transition.redraw,
+                     QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
+    check(state[u"rendered"_s].toBool() == transition.redraw && state[u"bindingMatches"_s].toBool(),
+          "Shadow dirty state or sampled attachment is incorrect");
+    check((state[u"resourceRevision"_s] != oldState[u"resourceRevision"_s])
+                  == transition.replaceShadow,
+          "Shadow resource replacement escaped its compatibility key");
+    check((current.metadata[u"resourceGeneration"_s] != previous.metadata[u"resourceGeneration"_s])
+                  == transition.replaceMain,
+          "Screen target replacement escaped its compatibility key");
+    if (!transition.replaceMain)
+        check(current.metadata[u"postprocessRevision"_s]
+                      == previous.metadata[u"postprocessRevision"_s],
+              "A shadow-only change rebuilt the postprocess graph");
+    if (!transition.redraw) {
+        check(state[u"separateCasterUniforms"_s].toInt() == 0,
+              "A clean shadow uploaded separate caster uniforms");
+        check(!current.shadowDepth.isEmpty() && current.shadowDepth == previous.shadowDepth,
+              "A clean shadow lost its retained depth contents");
+    }
+    if (!input.shadows && transition.redraw)
+        for (qsizetype offset = 0; offset < current.shadowDepth.size(); offset += sizeof(float)) {
+            float depth;
+            std::memcpy(&depth, current.shadowDepth.constData() + offset, sizeof(depth));
+            check(depth == 1, "A disabled shadow target retained caster depth");
+        }
+    if (QByteArray(transition.label) == "caster")
+        check(current.shadowDepth != previous.shadowDepth,
+              "A moving caster did not change actual shadow depth");
+    return current;
+}
+QJsonArray checkShadowInvalidation(RhiCaptureHarness &driver, const QJsonObject &source,
+                                   const QString &output)
+{
+    QJsonArray states;
+    for (int count : { 1, 8 }) {
+        auto input = fixture(source);
+        input.entities.clear();
+        input.entityIds.clear();
+        for (int index = 0; index < count; ++index) {
+            QMatrix4x4 model;
+            model.translate(index * .4f, 0, 0);
+            input.entities.append(model);
+            input.entityIds.append(index + 1);
+        }
+        input.shells = true;
+        input.postprocess = true;
+        input.aoSamples = 64;
+        input.bokeh = true;
+        input.smaa = true;
+        input.shadows = true;
+        input.captureShadowDepth = true;
+        input.shadowSize = 256;
+        input.captureSamples = 1;
+        QSize size(193, 129);
+        auto previous = driver.capture(input, size);
+        // Establish the current caster state before comparing later transitions.
+        check(previous.metadata[u"shadowState"_s].toObject()[u"bindingMatches"_s].toBool(),
+              "Initial shadow attachment is not bound to the scene");
+        const auto capture = [&](ShadowTransition transition) {
+            previous = checkShadowTransition(driver, input, size, previous, transition);
+            states.append(QJsonObject{
+                    { u"transition"_s, QString::fromUtf8(transition.label) },
+                    { u"entities"_s, count },
+                    { u"resourceGeneration"_s, previous.metadata[u"resourceGeneration"_s] },
+                    { u"postprocessRevision"_s, previous.metadata[u"postprocessRevision"_s] },
+                    { u"shadow"_s, previous.metadata[u"shadowState"_s] },
+                    { u"resources"_s, previous.metadata[u"resources"_s] } });
+        };
+        capture({ "unchanged", false, false, false });
+        size = { 257, 193 };
+        capture({ "resize", false, false, true });
+        input.shells = false;
+        capture({ "opaque-layout", false, false, true });
+        input.shells = true;
+        capture({ "shell-layout", false, false, true });
+        input.captureSamples = 4;
+        capture({ "msaa", false, false, true });
+        input.scene.view.rotate(.5f, 0, 1, 0);
+        input.keyColor *= .9f;
+        input.focus += 1;
+        capture({ "camera-light-focus", false, false, false });
+        input.cover.fill(Qt::blue);
+        capture({ "cover", false, false, false });
+        input.shadowSize = 512;
+        capture({ "shadow-size", true, true, false });
+        capture({ "shadow-size-stable", false, false, false });
+        input.entities[0].translate(.1f, 0, 0);
+        capture({ "caster", true, false, false });
+        input.shadows = false;
+        capture({ "disable", true, false, false });
+        input.entities[0].translate(.1f, 0, 0);
+        capture({ "disabled-caster", false, false, false });
+        input.shadowSize = 256;
+        capture({ "disabled-shadow-size", true, true, false });
+        capture({ "disabled-shadow-size-stable", false, false, false });
+        size = { 193, 129 };
+        capture({ "disabled-resize", false, false, true });
+        input.shadows = true;
+        capture({ "enable", true, false, false });
+        capture({ "enabled-stable", false, false, false });
+        check(previous.color.save(output + u"/casters-%1.png"_s.arg(count)),
+              "Cannot save own shadow invalidation output");
+    }
+    return states;
+}
 auto runShadowAudit(int &argc, char **&argv)
 {
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
         return 2;
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
@@ -227,7 +347,23 @@ auto runShadowAudit(int &argc, char **&argv)
         c[u"clipNear"_s] = .1;
         c[u"clipFar"_s] = 100;
         c[u"layer"_s] = u"paper"_s;
+        check(argc == 2 || QByteArray(argv[2]) == "--invalidation-only",
+              "Unsupported shadow audit option");
         RhiCaptureHarness driver;
+        const auto invalidation = checkShadowInvalidation(driver, c, output);
+        if (argc == 3) {
+            QSaveFile report(output + "/runtime.json"_L1);
+            check(report.open(QIODevice::WriteOnly), "Cannot open shadow invalidation report");
+            report.write(
+                    QJsonDocument(QJsonObject{ { u"passed"_s, true },
+                                               { u"states"_s, invalidation },
+                                               { u"offscreen"_s, driver.surface->diagnostics() },
+                                               { u"windowPolicy"_s,
+                                                 verification::windowPolicy(*driver.window) } })
+                            .toJson());
+            check(report.commit(), "Cannot write shadow invalidation report");
+            return 0;
+        }
         const auto floors = runFloorAudit(driver, c, output);
         QJsonArray results, lifecycle;
         Input last;
@@ -316,6 +452,7 @@ auto runShadowAudit(int &argc, char **&argv)
                                                 { u"qt"_s, QString::fromUtf8(qVersion()) },
                                                 { u"cases"_s, results },
                                                 { u"floors"_s, floors },
+                                                { u"invalidation"_s, invalidation },
                                                 { u"rebuilds"_s, lifecycle },
                                                 { u"offscreen"_s, driver.surface->diagnostics() },
                                                 { u"windowPolicy"_s,

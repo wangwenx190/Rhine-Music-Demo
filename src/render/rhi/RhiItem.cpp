@@ -377,6 +377,8 @@ public:
 
 private:
     void prepareCoverTexture(QSize coverSize);
+    void replaceTextureBinding(int binding, QRhiTexture *texture, QRhiSampler *sampler);
+    void prepareShadowResources();
     void prepareShellPipelines();
     void drawShellPass(QRhiCommandBuffer *cb, const QVector<ShellDraw> &shells,
                        const QVector<bool> &visible, bool batched, quint32 batchGeometryOffset,
@@ -423,7 +425,7 @@ private:
     bool failedRenderer = false;
     qint64 previousResourceBytes = 0;
     quint64 inventoryGeneration = 0, inventoryPostRevision = 0, inventoryCoverRevision = 0;
-    quint64 coverResourceRevision = 0;
+    quint64 coverResourceRevision = 0, shadowResourceRevision = 0;
     QJsonObject cachedInventory, allocationPlan;
     struct AllocationKey final
     {
@@ -775,6 +777,50 @@ void Renderer::prepareCoverTexture(QSize coverSize)
         enqueueAtlas();
     }
 }
+// Preserve PSOs when only a sampled image changes; the SRB layout remains compatible.
+void Renderer::replaceTextureBinding(int binding, QRhiTexture *texture, QRhiSampler *sampler)
+{
+    for (auto *bindings : { geometryBindings.get(), shellBindings.get() }) {
+        if (!bindings)
+            continue;
+        QVector<QRhiShaderResourceBinding> values(bindings->cbeginBindings(),
+                                                  bindings->cendBindings());
+        // Both scene SRBs declare the contiguous Frame/Cover/Environment/Shadow prefix.
+        require((binding == CoverBinding || binding == ShadowBinding) && values.size() > binding,
+                "Missing scene texture binding");
+        QRhiShaderResourceBinding::StageFlags stages = QRhiShaderResourceBinding::FragmentStage;
+        if (binding == CoverBinding)
+            stages |= QRhiShaderResourceBinding::VertexStage;
+        values[binding] =
+                QRhiShaderResourceBinding::sampledTexture(binding, stages, texture, sampler);
+        bindings->setBindings(values.cbegin(), values.cend());
+        require(bindings->create(), "Sampled texture binding replacement failed");
+    }
+}
+void Renderer::prepareShadowResources()
+{
+    const int requested = std::max(1, input.shadowSize);
+    if (shadow.rt && shadowSize == requested)
+        return;
+    shadowPipeline.reset();
+    shadowInstances.reset();
+    shadowSize = requested;
+    makeTarget(shadow, { shadowSize, shadowSize }, false, 1, false, QRhiTexture::R32F);
+    if (!shadowBindings) {
+        shadowBindings.reset(api->newShaderResourceBindings());
+        const auto stages =
+                QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage;
+        shadowBindings->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
+                FrameUniformBinding, stages, uniforms.get(), sizeof(Uniform)) });
+        require(shadowBindings->create(), "Shadow bindings failed");
+    }
+    shadowPipeline = pipeline(shadow, shadowBindings.get(), true);
+    shadowInstances = pipeline(shadow, shadowBindings.get(), true, false, true);
+    replaceTextureBinding(ShadowBinding, shadow.hardwareDepth.get(), shadowCompare.get());
+    ++shadowResourceRevision;
+    cachedInventory = { };
+    shadowDirty = true;
+}
 void Renderer::prepareShellPipelines()
 {
     const auto stages =
@@ -1032,14 +1078,14 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             require((*t)->create(), "Shell lookup texture failed");
         }
     }
+    prepareShadowResources();
     const auto coverSize = input.atlasGeneration ? input.atlasSize : input.cover.size();
     const bool replaceCover = !cover || cover->pixelSize() != coverSize
             || atlasGeneration != input.atlasGeneration
             || cover->flags().testFlag(QRhiTexture::MipMapped) != input.filterCovers;
     const bool replaceTargets = targetSize != renderTarget()->pixelSize()
-            || shadowSize != std::max(1, input.shadowSize) || captureSamples != input.captureSamples
-            || targetsHaveShells != input.shells || diagnosticTargets != bool(deliver)
-            || !opaque.rt;
+            || captureSamples != input.captureSamples || targetsHaveShells != input.shells
+            || diagnosticTargets != bool(deliver) || !opaque.rt;
     if (replaceCover && !replaceTargets) {
         require(std::max(coverSize.width(), coverSize.height())
                         <= api->resourceLimit(QRhi::TextureSizeMax),
@@ -1050,19 +1096,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                 QRhiTexture::UsedAsTransferSource
                         | (input.filterCovers ? QRhiTexture::MipMapped : QRhiTexture::Flags())));
         require(cover->create(), "Cover texture replacement failed");
-        for (auto *bindings : { geometryBindings.get(), shellBindings.get() }) {
-            if (!bindings)
-                continue;
-            QVector<QRhiShaderResourceBinding> values(bindings->cbeginBindings(),
-                                                      bindings->cendBindings());
-            values[1] = QRhiShaderResourceBinding::sampledTexture(
-                    CoverBinding,
-                    QRhiShaderResourceBinding::VertexStage
-                            | QRhiShaderResourceBinding::FragmentStage,
-                    cover.get(), input.filterCovers ? mipLinear.get() : linear.get());
-            bindings->setBindings(values.cbegin(), values.cend());
-            require(bindings->create(), "Cover binding replacement failed");
-        }
+        replaceTextureBinding(CoverBinding, cover.get(),
+                              input.filterCovers ? mipLinear.get() : linear.get());
         ++coverResourceRevision;
         coverDirty = true;
         atlasGeneration = input.atlasGeneration;
@@ -1075,7 +1110,6 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         post.reset();
         prepassPipeline.reset();
         opaqueInstances.reset();
-        shadowInstances.reset();
         prepassInstances.reset();
         coverageInstances.reset();
         prepassBackgroundPipeline.reset();
@@ -1089,19 +1123,15 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         outputPipeline.reset();
         backgroundPipeline.reset();
         opaquePipeline.reset();
-        shadowPipeline.reset();
         outputBindings.reset();
         geometryBindings.reset();
-        shadowBindings.reset();
         targetSize = renderTarget()->pixelSize();
-        shadowSize = std::max(1, input.shadowSize);
         captureSamples = input.captureSamples;
         targetsHaveShells = input.shells;
         diagnosticTargets = bool(deliver);
         require(api->supportedSampleCounts().contains(captureSamples),
                 "Requested capture MSAA is unsupported");
         ++generation;
-        shadowDirty = true;
         require(std::max(targetSize.width(), targetSize.height())
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "RHI target exceeds GPU dimensions");
@@ -1113,7 +1143,6 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                        QRhiTexture::RGBA16F, opaque.z);
         else
             composite.reset();
-        makeTarget(shadow, { shadowSize, shadowSize }, false, 1, false, QRhiTexture::R32F);
         require(std::max(coverSize.width(), coverSize.height())
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "Atlas exceeds GPU dimensions");
@@ -1144,14 +1173,8 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                           LtcSecondBinding, QRhiShaderResourceBinding::FragmentStage, ltc2.get(),
                           linear.get()) });
         require(geometryBindings->create(), "Geometry bindings failed");
-        shadowBindings.reset(api->newShaderResourceBindings());
-        shadowBindings->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-                0, stages, uniforms.get(), sizeof(Uniform)) });
-        require(shadowBindings->create(), "Shadow bindings failed");
         opaquePipeline = pipeline(opaque, geometryBindings.get(), false);
-        shadowPipeline = pipeline(shadow, shadowBindings.get(), true);
         opaqueInstances = pipeline(opaque, geometryBindings.get(), false, false, true);
-        shadowInstances = pipeline(shadow, shadowBindings.get(), true, false, true);
         backgroundPipeline = pipeline(opaque, geometryBindings.get(), false);
         backgroundPipeline->setDepthTest(false);
         backgroundPipeline->setDepthWrite(false);
@@ -1741,7 +1764,9 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     const auto visible = visibleEntities(input, entities);
     require(entities.size() <= renderData::MaximumCaseEntities,
             "RHI visible pool capacity exceeded");
-    shadowDirty = shadowDirty || shadowEntities != entities || cachedShadows != input.shadows;
+    // Disabled shadows need one clear after toggling/reallocation, not on every caster movement.
+    shadowDirty = shadowDirty || cachedShadows != input.shadows
+            || (input.shadows && shadowEntities != entities);
     const bool batched = entities.size() >= MinimumBatchedEntities;
     nativeVP = api->clipSpaceCorrMatrix() * input.scene.projection * input.scene.view;
     canonicalLightVP = lightProjection() * lightView();
@@ -1990,6 +2015,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             { u"qt"_s, QString::fromUtf8(qVersion()) },
             { u"generation"_s, qint64(generation) },
             { u"resourceGeneration"_s, qint64(generation) },
+            { u"postprocessRevision"_s, qint64(post.revision()) },
             { u"width"_s, targetSize.width() },
             { u"height"_s, targetSize.height() },
             { u"shadowSize"_s, shadowSize },
@@ -2226,6 +2252,21 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             lightMatrix.append(value);
         p->capture.metadata[u"shadowState"_s] = QJsonObject{
             { u"rendered"_s, shadowRendered },
+            { u"resourceRevision"_s, qint64(shadowResourceRevision) },
+            { u"bindingMatches"_s,
+              std::find(geometryBindings->cbeginBindings(), geometryBindings->cendBindings(),
+                        QRhiShaderResourceBinding::sampledTexture(
+                                ShadowBinding, QRhiShaderResourceBinding::FragmentStage,
+                                shadow.hardwareDepth.get(), shadowCompare.get()))
+                              != geometryBindings->cendBindings()
+                      && (!shellBindings
+                          || std::find(shellBindings->cbeginBindings(),
+                                       shellBindings->cendBindings(),
+                                       QRhiShaderResourceBinding::sampledTexture(
+                                               ShadowBinding,
+                                               QRhiShaderResourceBinding::FragmentStage,
+                                               shadow.hardwareDepth.get(), shadowCompare.get()))
+                                  != shellBindings->cendBindings()) },
             { u"separateCasterUniforms"_s, shadowOffsets.size() },
             { u"casters"_s, input.shadows ? entities.size() : 0 },
             { u"batched"_s, batched },

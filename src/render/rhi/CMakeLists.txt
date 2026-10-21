@@ -159,5 +159,6 @@ if(YALAHOO_REVIEW)
         GLSL "330,300 es" HLSL 50 MSL 12 FILES "${optics_generated}")
     qt_add_shaders(YalahooRhi review_visibility PREFIX /rhi
         BASE "${PROJECT_SOURCE_DIR}/tools/review" GLSL "330,300 es" HLSL 50 MSL 12
-        FILES "${PROJECT_SOURCE_DIR}/tools/review/VisibilityProbe.frag")
+        FILES "${PROJECT_SOURCE_DIR}/tools/review/VisibilityProbe.frag"
+              "${PROJECT_SOURCE_DIR}/tools/review/CoverSamplingProbe.frag")
 endif()

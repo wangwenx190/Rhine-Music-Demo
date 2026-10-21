@@ -28,7 +28,7 @@ RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue
 
 SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三个 returning 的预算。fork 共享当前不可变像素，却取得独立 lease；selected 升级清晰层不改变 returning 的图像。身份/source generation 不匹配及降清晰度升级拒绝；reset 后旧 lease 不能再更新，且仍占容量直到主人释放。对应独立 RhiItem cover texture 由 render 线程持有，每次只上传最新 revision；R18 使用这些租约时不得覆盖旧 returning 封面。
 
-worker以线性光、预乘alpha对每张封面独立做面积归约，生成完整mip链；不对合并图集整体生成mip。各层随对应dirty分块增量上传，字节全部计入原上传预算，静止不重算/重传。opaque.frag根据UV导数的椭圆足迹选择mip和自适应长轴采样；最多32个重叠积分点，极端斜角相应扩大mip足迹，控制工作量并避免欠采样。每级以实际textureSize换算整数原点与范围并钳制半像素边界，不跨封面串色；透射捕获保留独立mip链。alpha测试门槛仍为.025，颜色还原的分母以同门槛为下界，使透明helper片元也保持有限，不改变存活片元的颜色。
+worker以线性光、预乘alpha对每张封面独立做面积归约，生成完整mip链；不对合并图集整体生成mip。各层仍以sRGB编码的预乘RGBA8随对应dirty分块增量上传，字节全部计入原上传预算，静止不重算/重传。生产cover-sampling.glsl以texelFetch读取每个原始texel，先除alpha、解码sRGB并在线性光下重新预乘，再做双线性、跨mip与足迹积分；最终alphaTest后仅还原线性颜色，不重复解码。不能先对编码值插值再解码。每个积分点最多读取两层各四个texel，32点上界为256次texel读取；整数LOD只读取一层，1×1层只读取一个texel。GPU纹理格式、CPU不可变快照与上传预算不变。opaque.frag根据UV导数的椭圆足迹选择mip和自适应长轴采样；最多32个重叠积分点，极端斜角相应扩大mip足迹，控制工作量并避免欠采样。每级以实际textureSize换算整数原点与范围并钳制半像素边界，不跨封面串色；透射捕获保留独立mip链。alpha测试门槛仍为.025，颜色还原的分母以同门槛为下界，使透明helper片元也保持有限，不改变存活片元的颜色。
 
 清晰封面缓存层由实际纸面四角投影边长×窗口DPR×留边系数向上取整至二次幂决定，不设固定清晰图尺寸上限。普通阵列使用256²缩略图，独立selected/returning按自身快照尺寸占用清晰区；归位仍固定接管快照，晚到结果仅升级当前selected。普通阵列缩略图是来源设计的资源取舍，不是安全边界；是否需升级须结合最终可见区域、源壳体透射采样与景深判断，不能仅凭投影边长宣称可见画质缺陷或等价。QImageReader分配能力与实际GPU尺寸不足时显式报告错误，不更改屏幕空间目标。
 
@@ -45,6 +45,8 @@ worker以线性光、预乘alpha对每张封面独立做面积归约，生成完
 - AtlasUploadQueue尚有待上传tile时沿真实渲染续帧排空，每批仍遵守初始化/稳态原预算；静止/减少动态不依赖下一次用户输入完成封面。
 
 ## 检查入口
+
+`rhi-scale-audit 新目录 --filtering-only`仅执行共享生产采样helper的12组解析UV/颜色/alpha/跨mip/长轴/边界检查，以及生产纸面图集隔离与稳定零上传检查；不附带DPR、整场或压力矩阵。解析期望从本次输入texel独立按double计算线性预乘插值，实际输出为RGBA16F。
 
 `CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图、PNG/JPEG/WebP单图分配准入及JPEG解码缩放、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。定向准入检查可用 `CoverCacheTest imageAllocationPolicy`，改变环境上限须启动独立进程。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立完整mip上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 

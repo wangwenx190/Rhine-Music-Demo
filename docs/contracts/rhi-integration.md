@@ -10,7 +10,7 @@
 - 相机/布局/实体实际变化才更新几何revision，输入revision独立。polish合并同帧相机/灯光/画质/封面；相同submission不重复复制。封面owned immutable像素共享，外部Review输入隔离一次，cacheKey变化才交接。
 - SceneItem在实际可绘制的polish中按已确定的pool/单盒模式请求对应封面。
 - PreparedAssets在首个RhiItem的GUI构造/show前一次预载固定qrc GLB/qsb/PMREM half/lookup，进程内有界不可变；render/同步不读盘或解码。
-- 目标兼容键含尺寸/阴影/MSAA/布局，封面有独立revision；后处理键含AO尺寸/核/DOF/SMAA/实际附件身份。相机、焦点、主题数值和实体数量不得重建无关目标/PSO/SRB。buffer容量/上传边界只在rhi-postprocess.md维护。
+- 屏幕目标兼容键含尺寸/MSAA/布局；阴影按自身尺寸独立兼容与标脏，封面有独立revision；后处理键含AO尺寸/核/DOF/SMAA/实际附件身份。相机、焦点、主题数值和实体数量不得重建无关目标/PSO/SRB。buffer容量/上传边界只在rhi-postprocess.md维护。
 - MusicStage.visualActive统一门控帧源、启动快照、SceneItem.renderingActive及封面队列；隐藏停止新解码准入/polish/提交，有限在途结果只入有界CPU缓存/租约。恢复合并ensurePolished/update并提交最新快照。GPU资源由render释放，错误跨renderer虚函数前捕获并显示errorText；已录命令引用的资源等待正常SG释放，不在错误回调提前销毁。QObject销毁取消回调，旧窗口结果核对epoch。
 
 ## 资源统计接线
