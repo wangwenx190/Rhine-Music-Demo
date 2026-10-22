@@ -25,6 +25,7 @@
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <cstring>
+#include <utility>
 #include <algorithm>
 #include <cstdio>
 
@@ -542,7 +543,7 @@ void Renderer::enqueueAtlas()
         || expectedFallbackTiles != input.fallbackCoverTiles
         || expectedFallbackLeases != input.fallbackCoverLeases) {
         for (int i = 0; i < input.coverLeases.size(); ++i) {
-            const auto tile = input.coverTiles[i];
+            const auto tile = std::as_const(input.coverTiles)[i];
             for (int y = tile.y(); y < tile.y() + tile.height(); y += renderData::CoverTilePixels)
                 for (int x = tile.x(); x < tile.x() + tile.width();
                      x += renderData::CoverTilePixels)
@@ -550,16 +551,16 @@ void Renderer::enqueueAtlas()
                                                       * (input.atlasSize.width()
                                                          / renderData::CoverTilePixels)
                                               + x / renderData::CoverTilePixels,
-                                      input.coverLeases[i]);
+                                      std::as_const(input.coverLeases)[i]);
         }
         expectedAtlasGeneration = atlasGeneration;
         for (int i = 0; i < input.fallbackCoverTiles.size(); ++i) {
-            const auto tile = input.fallbackCoverTiles[i];
+            const auto tile = std::as_const(input.fallbackCoverTiles)[i];
             atlasQueue.expect(
                     (tile.y() / renderData::CoverTilePixels)
                                     * (input.atlasSize.width() / renderData::CoverTilePixels)
                             + tile.x() / renderData::CoverTilePixels,
-                    input.fallbackCoverLeases[i]);
+                    std::as_const(input.fallbackCoverLeases)[i]);
         }
         expectedCoverLeases = input.coverLeases;
         expectedCoverTiles = input.coverTiles;
@@ -1779,7 +1780,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             require(input.coverMipmaps.size() == api->mipLevelsForSize(image.size()) - 1,
                     "Cover filtering requires a complete independently generated mip chain");
             for (int level = 1; level <= input.coverMipmaps.size(); ++level) {
-                const auto &mip = input.coverMipmaps[level - 1];
+                const auto &mip = std::as_const(input.coverMipmaps)[level - 1];
                 updates->uploadTexture(
                         cover.get(),
                         { { 0, level, QRhiTextureSubresourceUploadDescription(mip) } });
@@ -1795,8 +1796,8 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     for (int i = 0; i < input.fallbackCoverTiles.size(); ++i)
         if (!atlasQueue.ready(std::as_const(effectiveCoverTiles)[i],
                               std::as_const(effectiveCoverLeases)[i])) {
-            effectiveCoverTiles[i] = input.fallbackCoverTiles[i];
-            effectiveCoverLeases[i] = input.fallbackCoverLeases[i];
+            effectiveCoverTiles[i] = std::as_const(input.fallbackCoverTiles)[i];
+            effectiveCoverLeases[i] = std::as_const(input.fallbackCoverLeases)[i];
         }
     const bool standalone = input.entities.isEmpty() && !input.poolFrame;
     if (standalone) {
@@ -1923,8 +1924,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             const float db = depths[b];
             if (da != db)
                 return da < db;
-            const auto ia = input.entityIds.isEmpty() ? quint64(a) : input.entityIds[a];
-            const auto ib = input.entityIds.isEmpty() ? quint64(b) : input.entityIds[b];
+            const auto ia =
+                    input.entityIds.isEmpty() ? quint64(a) : std::as_const(input.entityIds)[a];
+            const auto ib =
+                    input.entityIds.isEmpty() ? quint64(b) : std::as_const(input.entityIds)[b];
             return ia < ib;
         });
     }
@@ -1945,7 +1948,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         const std::array<Mesh, yalahoo::rhi::renderData::CaseSurfaceCount> meshes{ lid, spine,
                                                                                    tray };
         for (int i : std::as_const(opaqueOrder)) {
-            const auto id = input.entityIds.isEmpty() ? 0 : input.entityIds[i];
+            const auto id = input.entityIds.isEmpty() ? 0 : std::as_const(input.entityIds)[i];
             for (int surface = 0; surface < yalahoo::rhi::renderData::CaseSurfaceCount; ++surface) {
                 const auto mesh = meshes[surface];
                 const auto center = viewModels[i] * QVector4D(mesh.center, 1);
@@ -2649,7 +2652,7 @@ void RhiItem::submit(Input input, QSize target)
                         && input.fallbackCoverLeases.size() == input.entities.size()
                         && input.coverLeases.size() == input.entities.size()),
             "Atlas fallback/entity mismatch");
-    for (const auto &tile : input.fallbackCoverTiles)
+    for (const auto &tile : std::as_const(input.fallbackCoverTiles))
         require(QRect(QPoint(), input.atlasSize).contains(tile)
                         && tile.size()
                                 == QSize(renderData::CoverTilePixels, renderData::CoverTilePixels)
@@ -2674,7 +2677,7 @@ void RhiItem::submit(Input input, QSize target)
                         && input.atlasSize.width() % renderData::CoverTilePixels == 0
                         && input.atlasSize.height() % renderData::CoverTilePixels == 0,
                 "Atlas size must use whole tiles");
-        for (const auto &tile : input.coverTiles)
+        for (const auto &tile : std::as_const(input.coverTiles))
             require(QRect(QPoint(), input.atlasSize).contains(tile) && tile.width() == tile.height()
                             && tile.width() >= renderData::CoverTilePixels
                             && (tile.width() & (tile.width() - 1)) == 0

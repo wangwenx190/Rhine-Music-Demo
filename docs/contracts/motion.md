@@ -12,7 +12,7 @@
 - `ColumnScalar` 逐式移植冻结 `MusicRealColumnScalar` 的弹簧/五次切换、settled 阈值及 finish。实际列成员/选择/居中布局归real-columns.md。
 - `MotionController` 从唯一帧信号更新已缩放时间。observe始终保留精确加速度交接，仅在显示弹簧的值或导数变化时发送stateChanged；静止观察不重新唤醒帧源。新目标递增 revision；只为已完成的请求发送 `completed(revision)`，替换掉的目标不完成，重复 finish 不重发。减少动态立即完成当前请求和运行中的开场时钟，回调可用于后续焦点/状态交接。与媒体状态没有连接。
 
-`MotionFunctions` 保留冻结 motion.ts 的平滑、波浪、抽取、空闲、列强度、合成场与归位函数及 InspectionLift/AlignmentEpsilon。精确零权重的时间窗跳过对应packet/场计算；settling传播尚未到达时直接返回零，不截断非零衰减尾部。场景消费者与开场分别见scene.md及opening.md。唯一主动行为差异是按长期契约给 archive 请求增加同目标不重启保护；冻结真实列已有相同保护。
+`MotionFunctions` 保留冻结 motion.ts 的平滑、波浪、抽取、空闲、列强度、合成场与归位函数及 InspectionLift/AlignmentEpsilon。选中波纹将age决定的包络增益与传播距离预计算为SelectionWave；SelectionController只在脉冲时间推进时刷新一次，空间采样复用该值，新增脉冲从零包络开始，换库清空，坐标重基不改时间状态。精确零权重的时间窗跳过对应packet/场计算；settling传播尚未到达时直接返回零，不截断非零衰减尾部。场景消费者与开场分别见scene.md及opening.md。唯一主动行为差异是按长期契约给 archive 请求增加同目标不重启保护；冻结真实列已有相同保护。
 
 ## 数学输入与检查
 

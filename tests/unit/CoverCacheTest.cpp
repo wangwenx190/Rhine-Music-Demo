@@ -63,6 +63,24 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void readOnlySubmissionPreservesSharedDescriptors()
+    {
+        RhiItem item;
+        Input input;
+        input.atlasGeneration = 1;
+        input.atlasSize = { 512, 256 };
+        input.entities.resize(2);
+        input.entityIds = { 1, 2 };
+        input.coverTiles = { QRect(0, 0, 256, 256), QRect(256, 0, 256, 256) };
+        input.fallbackCoverTiles = input.coverTiles;
+        input.coverLeases = { 1, 2 };
+        input.fallbackCoverLeases = input.coverLeases;
+        input.shells = true;
+        item.submit(input, { 16, 16 });
+        QVERIFY(item.input().coverTiles.isSharedWith(input.coverTiles));
+        QVERIFY(item.input().fallbackCoverTiles.isSharedWith(input.fallbackCoverTiles));
+        QVERIFY(item.input().entityIds.isSharedWith(input.entityIds));
+    }
     void shellIdentityValidationFollowsAcceptedInputs()
     {
         RhiItem item;
@@ -413,6 +431,42 @@ private Q_SLOTS:
         QVERIFY(cache.request(u"95"_s, directory.filePath(u"95.jpg"_s), 256));
         QCOMPARE(cache.statistics()[u"decodeStarts"_s], stats[u"decodeStarts"_s]);
     }
+    void lruHitsAndTargetedInvalidationPreserveOrder()
+    {
+        QTemporaryDir directory;
+        QImage image(8, 8, QImage::Format_RGB32);
+        image.fill(Qt::blue);
+        const auto path = directory.filePath(u"cover.png"_s);
+        QVERIFY(image.save(path));
+        CoverCache cache;
+        QSignalSpy ready(&cache, &CoverCache::ready);
+        QVERIFY(cache.request(u"0"_s, path, 512));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
+        const auto retained = qvariant_cast<CoverSnapshot>(ready.first().first());
+        const auto bytes = retained->byteSize();
+        const int capacity = int(CoverCache::cacheLimit / bytes);
+        QVERIFY(capacity >= 3 && capacity <= 12);
+        for (int i = 1; i < capacity; ++i) {
+            QVERIFY(cache.request(QString::number(i), path, 512));
+            QTRY_COMPARE_WITH_TIMEOUT(ready.size(), i + 1, AsyncDeadlineMilliseconds);
+        }
+        QCOMPARE(cache.lookup(u"0"_s, path, 512), retained);
+        cache.invalidate(u"2"_s);
+        QVERIFY(!cache.lookup(u"2"_s, path, 512));
+        QCOMPARE(cache.statistics()[u"completedLruBytes"_s].toInteger(), (capacity - 1) * bytes);
+        // Fill the freed entry and overflow once: the untouched oldest entry is 1, not 0.
+        for (int i = capacity; i <= capacity + 1; ++i) {
+            QVERIFY(cache.request(QString::number(i), path, 512));
+            QTRY_COMPARE_WITH_TIMEOUT(ready.size(), i + 1, AsyncDeadlineMilliseconds);
+        }
+        QVERIFY(!cache.lookup(u"1"_s, path, 512));
+        QCOMPARE(cache.lookup(u"0"_s, path, 512), retained);
+        QCOMPARE(cache.statistics()[u"completedLruBytes"_s].toInteger(), capacity * bytes);
+        cache.reset();
+        QCOMPARE(cache.statistics()[u"completedLruBytes"_s].toInteger(), 0);
+        QVERIFY(!cache.lookup(u"0"_s, path, 512));
+        QCOMPARE(retained->image.pixelColor(256, 256), QColor(Qt::blue));
+    }
     void cancellationAndClose()
     {
         QTemporaryDir directory;
@@ -733,9 +787,25 @@ private Q_SLOTS:
         item.prepared(token, submission, true);
         QTRY_COMPARE(prepared.size(), 1);
         item.setPreparing(false);
+        item.publishNow();
         const auto before = item.input();
         const auto decodes =
                 item.coverStatistics().value(u"cache"_s).toObject().value(u"decodeStarts"_s);
+        adapter.recordInput();
+        item.publishNow();
+        QVERIFY(item.input().entities.isSharedWith(before.entities));
+        QVERIFY(item.input().entityIds.isSharedWith(before.entityIds));
+        QVERIFY(item.input().coverTiles.isSharedWith(before.coverTiles));
+        QVERIFY(item.input().coverLeases.isSharedWith(before.coverLeases));
+        QVERIFY(item.input().atlasUploads.isSharedWith(before.atlasUploads));
+        selection.setLift(.41);
+        item.publishNow();
+        QVERIFY(item.input().entities.last() != before.entities.last());
+        QVERIFY(item.input().entityIds.isSharedWith(before.entityIds));
+        QVERIFY(item.input().coverTiles.isSharedWith(before.coverTiles));
+        QVERIFY(item.input().coverLeases.isSharedWith(before.coverLeases));
+        QVERIFY(item.input().fallbackCoverTiles.isSharedWith(before.fallbackCoverTiles));
+        QVERIFY(item.input().fallbackCoverLeases.isSharedWith(before.fallbackCoverLeases));
         // A different song in the same album does not alter cover identity or pixels.
         library.albums[0].tracks.append(Track{ });
         selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
@@ -771,6 +841,26 @@ private Q_SLOTS:
                 if (next.slot == upload.slot && next.lease == upload.lease)
                     QCOMPARE(next.serial, upload.serial);
         }
+        QTRY_VERIFY_WITH_TIMEOUT(
+                (item.publishNow(), item.coverStatistics()[u"selectedDetailed"_s].toBool()),
+                AsyncDeadlineMilliseconds);
+        const auto resolution = item.coverStatistics()[u"owners"_s]
+                                        .toArray()
+                                        .first()
+                                        .toObject()[u"resolution"_s]
+                                        .toInt();
+        item.setSize({ 1920, 1280 });
+        item.publishNow();
+        QTRY_VERIFY_WITH_TIMEOUT(
+                (item.publishNow(), item.coverStatistics()[u"selectedDetailed"_s].toBool()),
+                AsyncDeadlineMilliseconds);
+        QVERIFY(item.coverStatistics()[u"owners"_s]
+                        .toArray()
+                        .first()
+                        .toObject()[u"resolution"_s]
+                        .toInt()
+                > resolution);
+        QVERIFY(item.input().atlasGeneration != after.atlasGeneration);
     }
     void selectedAndReturning()
     {

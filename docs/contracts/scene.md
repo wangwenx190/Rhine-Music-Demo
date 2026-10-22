@@ -22,7 +22,7 @@
 
 `advance(motionDt)` 消费已经乘速度的唯一 FrameClock 输出，不再乘倍率或另设产品计时器。position/aim 每轴和 span 按 rate=9 的解析临界阻尼推进；FOV=2 atan(max(.1,span)/(2 max(1,distance)))。`observe` 从当前 position/aim/span 差分保留 authored pose 的速度，为R20接入开场时间线提供接口。`setDetail`/resize 重定向保留相机状态；resize 同步发布新 aspect 和 portrait，同时等待现有速度连续追随新目标。减少动态直接落到新目标。`setNavigation` 保留 rate=6 小轨道，realColumns 屏蔽 row orbit；`setPointer` 只在普通浏览且非减少动态时提供原 .12 偏移。
 
-相机位置、aim、span和viewport不变时，SceneAdapter保留view/projection、相机旋转与view-projection乘积；实体波浪仍独立更新快照revision。
+固定静止锚点的基础高度在CameraFraming函数级静态值中求解一次，portrait、详情与独立selected slot共用同一源公式。相机位置、aim、span和viewport不变时，SceneAdapter保留view/projection、相机旋转与view-projection乘积；实体波浪仍独立更新快照revision。
 
 ## 源状态与投影检查
 

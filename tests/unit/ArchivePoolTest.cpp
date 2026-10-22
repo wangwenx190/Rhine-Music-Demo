@@ -163,6 +163,34 @@ private Q_SLOTS:
             QVERIFY(std::abs(returnStep(.8, t) - v[u"returnAngle"_s].toDouble()) < 1e-10);
         }
     }
+    void pulseEnvelopeRefreshesWithSceneTime()
+    {
+        for (const bool realistic : { false, true }) {
+            MotionController motion;
+            SelectionController selection(&motion);
+            selection.setColumns(columns({ 5 }));
+            selection.setRealistic(realistic);
+            QVERIFY(selection.selectCell({ 0, 13 }));
+            double age = 0;
+            for (const double dt : { 0., .05, .2, .46, .3 }) {
+                age += dt;
+                selection.advance(dt);
+                const double center = realistic ? selection.realColumns().row(0)
+                                                : motion.springs()[ShoulderAxis].value;
+                const double strength =
+                        realistic ? 1 : columnStrength(0, motion.springs()[LaneAxis].value);
+                for (const double row : { 12., 13., 13.5, 16. }) {
+                    const double expected = settlingWave(row - center, 26.56) * strength
+                            + musicSelectionWave(std::abs(row - 13), age);
+                    QVERIFY(std::abs(selection.field(row, 0) - expected) < 1e-10);
+                }
+            }
+            selection.setColumns(columns({ 5 }));
+            const double center = realistic ? selection.realColumns().row(0)
+                                            : motion.springs()[ShoulderAxis].value;
+            QCOMPARE(selection.field(13, 0), settlingWave(13 - center, 26.56));
+        }
+    }
     void frozenProductionTransforms()
     {
         MotionController motion;

@@ -28,17 +28,14 @@ struct SelectionWaveParameters final
 {
     double amplitude, fadeInSeconds, decayPerSecond, rowsPerSecond;
 };
-double travellingSelectionWave(double distance, double age, SelectionWaveParameters parameters)
+SelectionWave prepareSelectionWave(double age, SelectionWaveParameters parameters)
 {
     constexpr auto LifetimeSeconds = 3.2;
-    constexpr auto RadiansPerRow = .58;
-    constexpr auto WidthRows = 3.4;
     if (age < 0 || age > LifetimeSeconds)
-        return 0;
-    const double phase = distance - age * parameters.rowsPerSecond;
-    return parameters.amplitude * smooth(age / parameters.fadeInSeconds)
-            * std::exp(-age * parameters.decayPerSecond) * std::cos(phase * RadiansPerRow)
-            * bell(phase, WidthRows);
+        return { };
+    return { parameters.amplitude * smooth(age / parameters.fadeInSeconds)
+                     * std::exp(-age * parameters.decayPerSecond),
+             age * parameters.rowsPerSecond };
 }
 
 }
@@ -125,11 +122,24 @@ double settlingWave(double distance, double time)
 }
 double baselineSelectionWave(double distance, double age)
 {
-    return travellingSelectionWave(distance, age, { .8, .2, 1.15, 8 });
+    return prepareSelectionWave(age, { .8, .2, 1.15, 8 }).sample(distance);
+}
+double SelectionWave::sample(double distance) const
+{
+    constexpr auto RadiansPerRow = .58;
+    constexpr auto WidthRows = 3.4;
+    if (gain == 0)
+        return 0;
+    const double phase = distance - travel;
+    return gain * std::cos(phase * RadiansPerRow) * bell(phase, WidthRows);
+}
+SelectionWave prepareMusicSelectionWave(double age)
+{
+    return prepareSelectionWave(age, { .32, .46, 1.35, 5.5 });
 }
 double musicSelectionWave(double distance, double age)
 {
-    return travellingSelectionWave(distance, age, { .32, .46, 1.35, 5.5 });
+    return prepareMusicSelectionWave(age).sample(distance);
 }
 double selectionWave(double distance, double age)
 {

@@ -8,7 +8,7 @@ R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量
 
 ## 请求、像素与失效
 
-CoverCache 仅在 GUI 线程调用。请求键为稳定identity、完整本地/qrc path、resolution和标题；已解码的有效图片按无标题别名复用，缺图及解码失败占位保留完整标题依赖，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须`invalidate(identity)`并重新获取对应租约；完整场景更换才reset generation。原生扫描封面使用内容寻址URL携带revision，SceneItem在libraryChanged时只比较有界可见池的来源和占位标题（有效图片单独改名保留租约），释放变化身份的图集/选中租约，保留其余槽位和serial；不能仅用相同路径复用旧revision。完成占位携带fallbackTitle，过期标题不得发布到新来源；有效缩略图不被高清解码失败的占位覆盖。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
+CoverCache 仅在 GUI 线程调用。完成缓存以哈希索引与双向LRU链维护，命中移动节点和单项淘汰均为平均O(1)，按身份失效只遍历一次缓存并保留其余访问顺序；外部不可变快照不因淘汰而失效。请求键为稳定identity、完整本地/qrc path、resolution和标题；已解码的有效图片按无标题别名复用，缺图及解码失败占位保留完整标题依赖，路径使用长度前缀，允许 Unicode、空格和分隔符。调用者的源内容或缺图标题变化必须`invalidate(identity)`并重新获取对应租约；完整场景更换才reset generation。原生扫描封面使用内容寻址URL携带revision，SceneItem在libraryChanged时只比较有界可见池的来源和占位标题（有效图片单独改名保留租约），释放变化身份的图集/选中租约，保留其余槽位和serial；不能仅用相同路径复用旧revision。完成占位携带fallbackTitle，过期标题不得发布到新来源；有效缩略图不被高清解码失败的占位覆盖。SceneItem按有序实体ID、封面revision、图集generation和投影清晰层复用已就绪的租约/区域/replay描述符；仅相机变化还共享原实体矩阵，几何变化只重建矩阵数组。未就绪基础图或选中清晰图继续执行准入重试，内容/身份/需求变化立即回到完整准备。GUI准备、提交校验与render读取使用const访问，不能因非const遍历或下标读取而分离不可变快照。命中先 lookup，再 request 清晰度；request 命中不重复发 ready。容量满时返回 false，调用者按当前可见需求稍后重试，不在另一层无限排队。cancel(identity) 移除未开始需求并标记在途工作，保留已完成缓存；reset 取消全部旧 generation，清理 LRU，但保留在途容量记账直到完成。
 
 QImageReader 在 worker 中读取尺寸、缩放能力和错误，设置 autoTransform，仅在原图超过请求缓存层最长边时设置 scaledSize，小图直接绘制到目标画布，避免先放大再缩小。插件不支持解码缩放时由 Qt 完整解码后缩放；带有效 ICC 配置的图像先在 worker 转换到 sRGB，与 shader 的颜色空间一致。未知尺寸或解码失败返回 error 与缺图画面。
 
@@ -24,7 +24,7 @@ AtlasAllocator 最多 432 个槽位，页面每边最多 2048、按设备上限�
 
 acquire 引用计数固定身份槽，release 后可复用；重用分配单调 lease，publish 核对 allocator generation、identity、lease 和 decode generation。每槽 serial 单调，重复快照不重新标脏。uploads每页提供有界增量；replay缓存该页已就绪的不可变描述符，按实际目标列跨度映射slot，供合并提交及scene graph重建共享。身份准入/最后释放、像素发布、generation或目标跨度变化使缓存失效；释放与换代立即清除缓存持有的旧快照，已提交值保持独立有效期。不能把完整CPU页面合成后上传。
 
-RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次。重建重新播放当前 retained tile，旧结果不能污染新资源。旧 Review 未提供 coverLeases 的原始 fixture 保持历史语义。
+RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。每个物理槽的serial、预期lease与已上传lease集中在一条哈希记录中，ready只查找一次；待上传项仍按slot有序合并和排出。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次。重建重新播放当前 retained tile，旧结果不能污染新资源。旧 Review 未提供 coverLeases 的原始 fixture 保持历史语义。
 
 SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三个 returning 的预算。fork 共享当前不可变像素，却取得独立 lease；selected 升级清晰层不改变 returning 的图像。身份/source generation 不匹配及降清晰度升级拒绝；reset 后旧 lease 不能再更新，且仍占容量直到主人释放。对应独立 RhiItem cover texture 由 render 线程持有，每次只上传最新 revision；R18 使用这些租约时不得覆盖旧 returning 封面。
 

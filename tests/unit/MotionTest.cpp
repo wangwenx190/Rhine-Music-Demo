@@ -61,6 +61,23 @@ private:
             compareState(state[i], expected.value(keys[i]).toObject());
     }
 private Q_SLOTS:
+    void preparedSelectionWaveKeepsSourceEnvelope()
+    {
+        for (const double age : { -.01, 0., .01, .23, .46, 1.7, 3.2, 3.21 }) {
+            const auto wave = prepareMusicSelectionWave(age);
+            for (const double distance : { -8., 0., .5, 3., 19. }) {
+                const double t = std::clamp(age / .46, 0., 1.);
+                const double envelope = t * t * t * (10 + t * (-15 + 6 * t));
+                const double phase = distance - age * 5.5;
+                const double expected = age < 0 || age > 3.2
+                        ? 0
+                        : .32 * envelope * std::exp(-age * 1.35) * std::cos(phase * .58)
+                                * std::exp(-.5 * std::pow(phase / 3.4, 2));
+                QVERIFY(std::abs(wave.sample(distance) - expected) < 1e-14);
+                QVERIFY(std::abs(musicSelectionWave(distance, age) - expected) < 1e-14);
+            }
+        }
+    }
     void frozenNonzeroAndVariableFrames()
     {
         const auto oracle = readJson(

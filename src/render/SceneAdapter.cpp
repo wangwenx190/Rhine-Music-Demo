@@ -178,13 +178,12 @@ CameraPose SceneAdapter::target() const
     const auto &direction = basis.direction, &right = basis.right, &up = basis.up;
     SceneVector aim{ -BrowseAimX, -BrowseAimY, BrowseAimZ };
     aim = cameraFraming::browseAim(aim, basis, span, aspect, m_layout.portrait());
-    SceneVector detailAim{
-        0,
-        -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                + (sceneGeometry::CaseHeight + yalahoo::sceneGeometry::InspectionLiftPadding)
-                + sceneGeometry::HingeHeight,
-        -sceneGeometry::ArchiveDepth
-    };
+    SceneVector detailAim{ 0,
+                           cameraFraming::settledCaseBase()
+                                   + (sceneGeometry::CaseHeight
+                                      + yalahoo::sceneGeometry::InspectionLiftPadding)
+                                   + sceneGeometry::HingeHeight,
+                           -sceneGeometry::ArchiveDepth };
     const double detailX = m_layout.portrait() ? .5 : LandscapeDetailX;
     const double detailY = m_layout.portrait() ? PortraitDetailY + PortraitDetailTopPixels / h
             : m_layout.compact()
@@ -369,13 +368,11 @@ void SceneAdapter::publish()
             renderedDistance + BrowseFogFarOffset * (1 - m_detail) + DetailFogFarOffset * m_detail;
     const SceneVector caseOrigin = m_selection
             ? m_selection->selectedPosition()
-            : SceneVector{
-                  0,
-                  -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                          + sceneGeometry::PreviewLift
-                          + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift) * m_detail,
-                  -sceneGeometry::ArchiveDepth
-              };
+            : SceneVector{ 0,
+                           cameraFraming::settledCaseBase() + sceneGeometry::PreviewLift
+                                   + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift)
+                                           * m_detail,
+                           -sceneGeometry::ArchiveDepth };
     const bool cameraChanged = !m_frame.revision || m_frame.width != m_layout.width()
             || m_frame.height != m_layout.height() || m_frame.camera.position != position
             || m_frame.camera.aim != aim || m_frame.camera.span != m_span.value;

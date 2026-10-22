@@ -177,6 +177,7 @@ private:
                                   const CoverSource &source, QRect tile, quint64 coverLease);
     OwnedCover *acquireOwnedCover(const ArchiveInstance &instance, const CoverSource &source);
     void requestDetailedCover(OwnedCover &owned, const QString &id, const CoverSource &source);
+    bool reusePool(Input &input) const;
     void preparePool(Input &input);
     void resetPool();
     void refreshPool();
@@ -212,6 +213,7 @@ private:
     std::array<OwnedCover, sceneAtlas::OwnedCoverCount> m_ownedCovers;
     quint64 m_ownedSerial = 0;
     int m_detailResolution = yalahoo::rhi::renderData::CoverTilePixels;
+    int m_publishedDetailResolution = 0;
     int m_ownedSide = yalahoo::rhi::renderData::CoverTilePixels;
     QSize m_atlasSize{ sceneAtlas::BaseWidthPixels, sceneAtlas::InitialHeightPixels };
     quint64 m_activeObject = 0;

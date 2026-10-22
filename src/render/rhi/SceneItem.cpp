@@ -21,6 +21,7 @@
 #include <QTouchEvent>
 #include <QHoverEvent>
 #include <memory>
+#include <utility>
 #include <limits>
 #include <cmath>
 
@@ -468,15 +469,61 @@ void SceneItem::requestDetailedCover(OwnedCover &owned, const QString &id,
     if (m_covers.hasPendingCapacity())
         m_covers.request(id, source.path, m_detailResolution, source.placeholderTitle);
 }
+bool SceneItem::reusePool(Input &in) const
+{
+    const auto &previous = input();
+    const auto &instances = std::as_const(in.scene.instances);
+    if (!previous.poolFrame || previous.atlasGeneration != m_atlas.generation()
+        || m_coverRevision != m_publishedCoverRevision
+        || m_detailResolution != m_publishedDetailResolution
+        || m_readyCovers.size() != m_poolLeases.size()
+        || !std::equal(instances.cbegin(), instances.cend(), previous.entityIds.cbegin(),
+                       previous.entityIds.cend(), [](const ArchiveInstance &instance, quint64 id) {
+                           return instance.objectId == id;
+                       }))
+        return false;
+    // Unready work must keep visiting admission until it has a usable selected snapshot.
+    if (!instances.isEmpty() && instances.last().owned) {
+        const auto selected = std::find_if(m_ownedCovers.cbegin(), m_ownedCovers.cend(),
+                                           [this](const OwnedCover &cover) {
+                                               return cover.objectId == m_activeObject;
+                                           });
+        if (selected == m_ownedCovers.cend() || !selected->pixels || !selected->pixels->pixels
+            || selected->pixels->pixels->resolution < m_detailResolution)
+            return false;
+    }
+    if (instances.isSharedWith(previous.scene.instances)) {
+        in.entities = previous.entities;
+    } else {
+        in.entities.resize(instances.size());
+        for (qsizetype i = 0; i < in.entities.size(); ++i)
+            in.entities[i] = instances[i].transform;
+    }
+    // Geometry/camera animation changes no cover ownership. Retain the immutable descriptor
+    // storage until identity order, content, atlas layout or projected demand changes.
+    in.entityIds = previous.entityIds;
+    in.coverTiles = previous.coverTiles;
+    in.coverLeases = previous.coverLeases;
+    in.fallbackCoverTiles = previous.fallbackCoverTiles;
+    in.fallbackCoverLeases = previous.fallbackCoverLeases;
+    in.atlasUploads = previous.atlasUploads;
+    in.atlasSize = previous.atlasSize;
+    in.atlasGeneration = previous.atlasGeneration;
+    in.poolFrame = true;
+    return true;
+}
 void SceneItem::preparePool(Input &in)
 {
     auto *selection = m_adapter->selection();
-    m_activeObject = in.scene.instances.isEmpty() ? 0 : in.scene.instances.last().objectId;
+    const auto &instances = std::as_const(in.scene.instances);
+    m_activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
+    if (reusePool(in))
+        return;
     in.entities.clear();
     in.entityIds.clear();
     std::array<quint64, SelectedCoverPool::capacity> ownedIds;
     qsizetype ownedCount = 0;
-    const int count = int(in.scene.instances.size());
+    const int count = int(instances.size());
     for (auto &cover : m_poolLeases)
         cover.wanted = false;
     in.entities.resize(count);
@@ -485,7 +532,7 @@ void SceneItem::preparePool(Input &in)
     in.coverLeases.resize(count);
     in.fallbackCoverTiles.resize(count);
     in.fallbackCoverLeases.resize(count);
-    for (const auto &instance : in.scene.instances) {
+    for (const auto &instance : instances) {
         if (auto cover = m_poolLeases.find(instance.albumId); cover != m_poolLeases.end())
             cover->wanted = true;
         if (instance.owned) {
@@ -508,11 +555,11 @@ void SceneItem::preparePool(Input &in)
             || std::find(ownedIds.begin(), ownedIds.begin() + ownedCount, owned.objectId)
                     != ownedIds.begin() + ownedCount)
             continue;
-        if (in.scene.instances.isEmpty()) {
+        if (instances.isEmpty()) {
             owned = { };
             continue;
         }
-        const auto &active = in.scene.instances.last();
+        const auto &active = instances.last();
         if (active.owned && owned.pixels && owned.pixels->identity == active.albumId
             && std::none_of(m_ownedCovers.begin(), m_ownedCovers.end(),
                             [&](const OwnedCover &other) {
@@ -526,7 +573,7 @@ void SceneItem::preparePool(Input &in)
     for (int offset = 0; offset < count; ++offset) {
         // Admit the selected cover first, without changing the instance/sort ordering.
         const int index = offset == 0 ? count - 1 : offset - 1;
-        const auto &instance = in.scene.instances[index];
+        const auto &instance = instances[index];
         const auto &id = instance.albumId;
         const auto entry = m_poolLeases.tryEmplace(id);
         if (entry.inserted) {
@@ -1225,14 +1272,15 @@ try {
             && in.exposure == old.exposure;
     if (unchanged)
         return;
-    m_publishedCallbackRevision = m_callbackRevision;
-    m_publishedCoverRevision = m_coverRevision;
     if (m_poolMode)
         preparePool(in);
     else {
         in.entities = { in.scene.caseTransform };
         in.entityIds = { 1 };
     }
+    m_publishedCallbackRevision = m_callbackRevision;
+    m_publishedCoverRevision = m_coverRevision;
+    m_publishedDetailResolution = m_detailResolution;
     submit(std::move(in), target);
 } catch (const std::runtime_error &error) {
     m_errorText = QString::fromUtf8(error.what());

@@ -10,6 +10,7 @@
 #include <QVariantMap>
 #include <QAbstractListModel>
 #include <array>
+#include <optional>
 
 namespace yalahoo {
 namespace reelMotion {
@@ -93,6 +94,8 @@ Q_SIGNALS:
 
 private:
     QVariantList m_values;
+    std::optional<double> m_contentPixelSize;
+    bool m_contentTranslation = false;
     int m_faceCapacity = reelMotion::InitialFaceCapacity;
 };
 class TitleReel : public QAbstractListModel, public QQmlParserStatus

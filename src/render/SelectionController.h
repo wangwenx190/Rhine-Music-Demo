@@ -5,6 +5,7 @@
 #include "SceneGeometry.h"
 #include "ArchivePool.h"
 #include "MotionController.h"
+#include "MotionFunctions.h"
 #include "SceneFrame.h"
 #include "RealColumns.h"
 #include "ColumnMemory.h"
@@ -135,6 +136,7 @@ private:
     {
         ArchiveCell cell;
         double time = 0;
+        SelectionWave wave;
     };
     void publish();
     bool tracksSettled() const;

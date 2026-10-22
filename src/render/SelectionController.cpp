@@ -437,7 +437,7 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
     else if (guided || distant || m_motion->moving())
         m_motion->retarget(targets);
     if (!detailNavigation)
-        m_pulses.append({ cell, m_time });
+        m_pulses.append({ cell, m_time, { } });
     if (m_pulses.size() > MaximumSelectionPulses)
         m_pulses.removeFirst();
     publish();
@@ -612,7 +612,7 @@ double SelectionController::realisticField(double row, const FieldColumn &column
         double ripple = 0;
         for (const auto &pulse : m_pulses)
             if (pulse.cell.lane == lane)
-                ripple += musicSelectionWave(std::abs(row - pulse.cell.row), m_time - pulse.time);
+                ripple += pulse.wave.sample(std::abs(row - pulse.cell.row));
         height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
                 * m_pulseGain * activity;
     }
@@ -648,10 +648,8 @@ double SelectionController::field(double row, const FieldColumn &column) const
     if (!column.reduced && m_pulseGain != 0) {
         double ripple = 0;
         for (const auto &pulse : m_pulses)
-            ripple += musicSelectionWave(
-                    std::hypot(row - pulse.cell.row,
-                               (lane - pulse.cell.lane) * RippleLaneDistanceScale),
-                    m_time - pulse.time);
+            ripple += pulse.wave.sample(std::hypot(
+                    row - pulse.cell.row, (lane - pulse.cell.lane) * RippleLaneDistanceScale));
         height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
                 * m_pulseGain;
     }
@@ -892,6 +890,8 @@ void SelectionController::advance(double dt)
     m_pulses.removeIf([&](const Pulse &p) {
         return m_time - p.time >= PulseLifetimeSeconds;
     });
+    for (auto &pulse : m_pulses)
+        pulse.wave = prepareMusicSelectionWave(m_time - pulse.time);
     const bool aligning =
             std::any_of(m_returning.cbegin(), m_returning.cend(), [](const Copy &copy) {
                 return copy.returnY.has_value();

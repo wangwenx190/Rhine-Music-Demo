@@ -21,6 +21,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <list>
 
 using namespace Qt::StringLiterals;
 
@@ -157,8 +158,8 @@ struct CoverCache::Job final
 };
 struct CoverCache::Entry final
 {
+    QString key;
     CoverSnapshot pixels;
-    quint64 used = 0;
     qint64 bytes = 0;
 };
 struct CoverCache::State final
@@ -178,11 +179,13 @@ struct CoverCache::Private final
     QList<Job> m_pending;
     QSet<QString> m_pendingKeys;
     QHash<QString, Job> m_running;
-    QHash<QString, Entry> m_cache;
+    // Hash iterators may move on rehash; list iterators survive admission and LRU splicing.
+    std::list<Entry> m_lru;
+    QHash<QString, std::list<Entry>::iterator> m_cache;
     qint64 m_bytes = 0, m_workingSetBytes = 0, m_peakWorkingSetBytes = 0;
     bool m_suspended = false;
     int m_active = 0, m_peakActive = 0, m_peakPending = 0;
-    quint64 m_clock = 0, m_decodes = 0, m_rejected = 0, m_stale = 0;
+    quint64 m_decodes = 0, m_rejected = 0, m_stale = 0;
     qint64 m_peakReaderBytes = 0;
     int m_decoderScaledResults = 0;
 };
@@ -230,11 +233,14 @@ CoverSnapshot CoverCache::lookup(const QString &identity, const QString &path, i
 }
 CoverSnapshot CoverCache::lookupCached(const QString &cacheKey, bool requireArtwork)
 {
-    auto it = d->m_cache.find(cacheKey);
-    if (it == d->m_cache.end() || (requireArtwork && !it->pixels->error.isEmpty()))
+    const auto it = d->m_cache.constFind(cacheKey);
+    if (it == d->m_cache.cend())
         return { };
-    it->used = ++d->m_clock;
-    return it->pixels;
+    const auto entry = *it;
+    if (requireArtwork && !entry->pixels->error.isEmpty())
+        return { };
+    d->m_lru.splice(d->m_lru.begin(), d->m_lru, entry);
+    return entry->pixels;
 }
 bool CoverCache::request(QString identity, QString path, int resolution, QString title)
 {
@@ -276,6 +282,7 @@ void CoverCache::reset()
     d->m_pending.clear();
     d->m_pendingKeys.clear();
     d->m_cache.clear();
+    d->m_lru.clear();
     d->m_bytes = 0;
     // Running jobs retain their reservations until their completion is consumed.
     d->m_retry.stop();
@@ -295,10 +302,11 @@ void CoverCache::cancel(const QString &identity)
 void CoverCache::invalidate(const QString &identity)
 {
     cancel(identity);
-    for (auto it = d->m_cache.begin(); it != d->m_cache.end();) {
+    for (auto it = d->m_lru.begin(); it != d->m_lru.end();) {
         if (it->pixels->identity == identity) {
             d->m_bytes -= it->bytes;
-            it = d->m_cache.erase(it);
+            d->m_cache.remove(it->key);
+            it = d->m_lru.erase(it);
         } else {
             ++it;
         }
@@ -552,21 +560,21 @@ void CoverCache::complete(const Job &job, const CoverSnapshot &pixels)
                 ? key(job.identity, job.path, job.resolution, { })
                 : job.key;
         if (const auto previous = d->m_cache.find(completedKey); previous != d->m_cache.end()) {
-            d->m_bytes -= previous->bytes;
+            d->m_bytes -= (*previous)->bytes;
+            d->m_lru.erase(*previous);
             d->m_cache.erase(previous);
         }
         d->m_peakReaderBytes = qMax(d->m_peakReaderBytes, pixels->readerReturnedBytes);
         d->m_decoderScaledResults += pixels->decoderScaling && pixels->error.isEmpty();
         if (bytes <= cacheLimit) {
             while (d->m_bytes + bytes > cacheLimit && !d->m_cache.isEmpty()) {
-                const auto oldest = std::min_element(d->m_cache.begin(), d->m_cache.end(),
-                                                     [](const Entry &left, const Entry &right) {
-                                                         return left.used < right.used;
-                                                     });
-                d->m_bytes -= oldest->bytes;
-                d->m_cache.erase(oldest);
+                const auto &oldest = d->m_lru.back();
+                d->m_bytes -= oldest.bytes;
+                d->m_cache.remove(oldest.key);
+                d->m_lru.pop_back();
             }
-            d->m_cache.insert(completedKey, { pixels, ++d->m_clock, bytes });
+            d->m_lru.push_front({ completedKey, pixels, bytes });
+            d->m_cache.insert(completedKey, d->m_lru.begin());
             d->m_bytes += bytes;
         }
         const QPointer<CoverCache> guard(this);

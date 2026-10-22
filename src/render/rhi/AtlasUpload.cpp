@@ -12,9 +12,7 @@ void AtlasUploadQueue::reset(QSize size, quint64 generation)
             "Invalid atlas dimensions/generation");
     m_size = size;
     m_generation = generation;
-    m_serials.clear();
-    m_leases.clear();
-    m_uploadedLeases.clear();
+    m_slots.clear();
     m_pending.clear();
 }
 void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
@@ -27,9 +25,10 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
             ++m_rejected;
             continue;
         }
-        if (u.serial <= m_serials.value(u.slot))
+        const auto state = m_slots.value(u.slot);
+        if (u.serial <= state.serial)
             continue;
-        if (u.lease < m_leases.value(u.slot)) {
+        if (u.lease < state.lease) {
             ++m_rejected;
             continue;
         }
@@ -57,8 +56,7 @@ void AtlasUploadQueue::enqueue(const QVector<AtlasUpload> &uploads)
             ++m_rejected;
             continue;
         }
-        m_serials[u.slot] = u.serial;
-        m_leases[u.slot] = u.lease;
+        m_slots[u.slot] = { u.serial, u.lease, state.uploadedLease };
         auto detached = u;
         detached.pixels = u.pixels.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
         if (!u.immutableOwned) {
@@ -83,7 +81,7 @@ QVector<AtlasUpload> AtlasUploadQueue::take(bool initializing)
         if (bytes + cost > maximum)
             break;
         bytes += cost;
-        m_uploadedLeases[entry.key()] = entry->lease;
+        m_slots[entry.key()].uploadedLease = entry->lease;
         batch.append(std::move(entry.value()));
         m_pending.erase(entry);
     }
@@ -111,15 +109,18 @@ void AtlasUploadQueue::expect(int slot, quint64 lease)
                                     * (m_size.height() / renderData::CoverTilePixels)
                     && lease > 0,
             "Invalid expected atlas lease");
-    if (lease > m_leases.value(slot)) {
-        m_leases[slot] = lease;
-        m_serials.remove(slot);
+    auto &state = m_slots[slot];
+    if (lease > state.lease) {
+        state.lease = lease;
+        state.serial = 0;
         m_pending.remove(slot);
     }
 }
 bool AtlasUploadQueue::ready(int slot, quint64 lease) const
 {
-    return lease > 0 && m_uploadedLeases.value(slot) == lease && m_leases.value(slot) == lease;
+    const auto state = m_slots.constFind(slot);
+    return lease > 0 && state != m_slots.cend() && state->uploadedLease == lease
+            && state->lease == lease;
 }
 bool AtlasUploadQueue::ready(QRect tile, quint64 lease) const
 {

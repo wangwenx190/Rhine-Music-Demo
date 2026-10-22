@@ -13,6 +13,13 @@ double smooth(double t);
 double archiveWave(double row, double lane, double time);
 double extraction(double time);
 double settlingWave(double distance, double time);
+// A pulse's time envelope is shared by all spatial samples in one scene state.
+struct SelectionWave final
+{
+    double gain = 0, travel = 0;
+    double sample(double distance) const;
+};
+SelectionWave prepareMusicSelectionWave(double age);
 double baselineSelectionWave(double distance, double age);
 double musicSelectionWave(double distance, double age);
 double selectionWave(double distance, double age);

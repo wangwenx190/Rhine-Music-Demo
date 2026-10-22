@@ -143,11 +143,17 @@ QVariant OverviewLabelsModel::data(const QModelIndex &index, int role) const
                                               { EntryOffset, [](const Slot &s, int) -> QVariant {
                                                    return -EntryHiddenOffsetPixels * (1 - s.entry);
                                                } } };
-    const auto reader =
-            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
-                return entry.role == role;
-            });
-    return reader == std::end(readers) ? QVariant{ } : reader->read(s, m_expanded);
+    static_assert([] {
+        int next = Lane;
+        for (const auto &reader : readers) {
+            if (reader.role != next++)
+                return false;
+        }
+        return next == EntryOffset + 1;
+    }());
+    if (role < Lane || role > EntryOffset)
+        return { };
+    return readers[role - Lane].read(s, m_expanded);
 }
 // Prioritize expanded/selected labels before collision admission. Retained anchors use looser
 // visibility bounds so small projection changes do not repeatedly destroy and recreate a card.

@@ -27,6 +27,7 @@ struct TitleGlyph final
     QList<ResolvedGlyphRun> renderRuns;
     double baseline = 0;
     bool colorGlyph = false;
+    bool operator==(const TitleGlyph &) const = default;
 };
 struct TitleLayout final
 {

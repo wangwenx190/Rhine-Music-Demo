@@ -197,11 +197,17 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
                                   != track.discNumber.value_or(1));
           } }
     };
-    const auto reader =
-            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
-                return entry.role == role;
-            });
-    return reader == std::end(readers) ? QVariant{ } : reader->read(*this, track, index.row());
+    static_assert([] {
+        int next = TrackId;
+        for (const auto &reader : readers) {
+            if (reader.role != next++)
+                return false;
+        }
+        return next == DiscHeading + 1;
+    }());
+    if (role < TrackId || role > DiscHeading)
+        return { };
+    return readers[role - TrackId].read(*this, track, index.row());
 }
 QHash<int, QByteArray> DetailModel::roleNames() const
 {

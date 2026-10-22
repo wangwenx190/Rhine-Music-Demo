@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include "ArtworkStore.h"
 #include <QBuffer>
+#include <QCache>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -15,6 +16,7 @@ namespace yalahoo {
 namespace {
 // Compare decoded storage against the Qt allocation limit, not compressed image size.
 constexpr auto DecodedRgbaBytesPerPixel = 4;
+constexpr auto ValidatedArtworkEntries = 128;
 
 bool withinImageAllocationLimit(const QImage &image)
 {
@@ -27,9 +29,9 @@ bool withinImageAllocationLimit(const QImage &image)
     return image.sizeInBytes() <= bytes
             && qint64(image.width()) * image.height() <= bytes / DecodedRgbaBytesPerPixel;
 }
-QUrl persist(const QByteArray &bytes, const QByteArray &format, const QString &root, QString *error)
+QUrl persist(const QByteArray &bytes, const QByteArray &hash, const QByteArray &format,
+             const QString &root, QString *error)
 {
-    const auto hash = QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
     const auto directory = QDir(root).filePath(u"artwork"_s);
     const auto path = QDir(directory).filePath(QString::fromUtf8(hash + '.' + format));
     if (QFileInfo(directory).isSymLink() || QFileInfo(path).isSymLink()) {
@@ -87,15 +89,22 @@ QUrl ArtworkStore::copy(const QString &source, const QString &dataRoot, QString 
             *error = QCoreApplication::translate("Yalahoo", "Invalid cover format or dimensions.");
         return { };
     }
-    // Decode once here to reject corrupt images before selecting their priority.
+    const auto hash = QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
+    // Rescans and embedded-cover reuse still read/hash the actual bytes. A bounded per-thread
+    // digest cache avoids decoding unchanged content again, without sharing mutable Qt objects.
+    // Include the effective allocation policy so a previous success cannot bypass a stricter one.
+    thread_local QCache<QByteArray, bool> validated(ValidatedArtworkEntries);
+    const auto validationKey = hash + ':' + QByteArray::number(QImageReader::allocationLimit());
     reader.setAutoTransform(true);
-    if (reader.read().isNull()) {
+    if (!validated.object(validationKey) && reader.read().isNull()) {
         if (error)
             *error = QCoreApplication::translate("Yalahoo", "Cannot decode the cover: ")
                     + reader.errorString();
         return { };
     }
-    return persist(bytes, format, dataRoot, error);
+    if (!validated.contains(validationKey))
+        validated.insert(validationKey, new bool(true));
+    return persist(bytes, hash, format, dataRoot, error);
 }
 QUrl ArtworkStore::save(const QImage &image, const QString &dataRoot, QString *error)
 {
@@ -117,6 +126,7 @@ QUrl ArtworkStore::save(const QImage &image, const QString &dataRoot, QString *e
                     "Yalahoo", "Cannot encode the embedded cover, or it exceeds 30 MiB.");
         return { };
     }
-    return persist(bytes, "png"_ba, dataRoot, error);
+    const auto hash = QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
+    return persist(bytes, hash, "png"_ba, dataRoot, error);
 }
 }

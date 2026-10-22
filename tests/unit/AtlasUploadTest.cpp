@@ -9,6 +9,33 @@ public:
     AtlasUploadTest() = default;
 
 private Q_SLOTS:
+    void leaseInvalidationRetainsIndependentSlotHistory()
+    {
+        AtlasUploadQueue queue;
+        queue.reset({ 512, 256 }, 9);
+        QImage pixels(256, 256, QImage::Format_RGBA8888_Premultiplied);
+        pixels.fill(Qt::red);
+        queue.enqueue({ { 9, 2, 10, 0, pixels, true }, { 9, 5, 20, 1, pixels, true } });
+        QCOMPARE(queue.take(false).size(), 2);
+        QVERIFY(queue.ready(0, 2));
+        QVERIFY(queue.ready(1, 5));
+        queue.expect(0, 3);
+        QVERIFY(!queue.ready(0, 2));
+        QVERIFY(!queue.ready(0, 3));
+        QVERIFY(queue.ready(1, 5));
+        // A stale completion must not overwrite the new expectation, even with a later serial.
+        queue.enqueue({ { 9, 2, 11, 0, pixels, true } });
+        QCOMPARE(queue.pending(), 0);
+        // A new lease may start its own serial after expect() reset the previous one.
+        queue.enqueue({ { 9, 3, 1, 0, pixels, true } });
+        queue.expect(0, 2);
+        QCOMPARE(queue.take(false).size(), 1);
+        QVERIFY(queue.ready(0, 3));
+        QVERIFY(queue.ready(1, 5));
+        queue.reset({ 512, 256 }, 10);
+        QVERIFY(!queue.ready(0, 3));
+        QVERIFY(!queue.ready(1, 5));
+    }
     void highResolutionRegionReadiness()
     {
         AtlasUploadQueue queue;

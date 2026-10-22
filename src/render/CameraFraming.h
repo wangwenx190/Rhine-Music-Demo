@@ -27,6 +27,13 @@ struct Basis final
 {
     SceneVector direction, right, up;
 };
+inline double settledCaseBase()
+{
+    // The authored resting anchor is independent of camera, viewport and motion state.
+    static const double height =
+            -sceneGeometry::FloorDepth + settlingWave(0, sceneGeometry::SettledSceneSeconds);
+    return height;
+}
 inline Basis basis(double yaw, double elevation)
 {
     const SceneVector direction{ -std::sin(yaw) * std::cos(elevation), std::sin(elevation),
@@ -38,10 +45,7 @@ inline SceneVector browseAim(SceneVector base, const Basis &basis, double span, 
                              bool portrait)
 {
     if (portrait)
-        return SceneVector{ 0,
-                            -sceneGeometry::FloorDepth
-                                    + settlingWave(0, sceneGeometry::SettledSceneSeconds)
-                                    + PortraitPreviewLift + sceneGeometry::HingeHeight,
+        return SceneVector{ 0, settledCaseBase() + PortraitPreviewLift + sceneGeometry::HingeHeight,
                             -sceneGeometry::ArchiveDepth }
         + basis.up * ((PortraitPreviewY - .5) * span);
     const double wide = smooth(

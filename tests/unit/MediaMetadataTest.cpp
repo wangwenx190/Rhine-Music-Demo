@@ -23,6 +23,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
@@ -166,6 +167,8 @@ private Q_SLOTS:
     void timeout();
     void cancellationAndReuse();
     void artworkGuards();
+    void artworkValidationUsesContentRatherThanPaths();
+    void artworkValidationRespectsAllocationPolicy();
     void embeddedAllocationAccounting();
     void artworkSymlink();
     void legacy_data();
@@ -398,6 +401,57 @@ void MediaMetadataTest::artworkGuards()
     QVERIFY(test::writeFile(temp.filePath(u"read-only-parent"_s), "file"_ba));
     QVERIFY(ArtworkStore::save(small, temp.filePath(u"read-only-parent/native"_s), &error)
                     .isEmpty());
+}
+void MediaMetadataTest::artworkValidationUsesContentRatherThanPaths()
+{
+    QTemporaryDir directory;
+    const auto source = directory.filePath(u"source.png"_s);
+    const auto firstRoot = directory.filePath(u"first"_s);
+    const auto secondRoot = directory.filePath(u"second"_s);
+    QImage image(32, 16, QImage::Format_RGBA8888);
+    image.fill(Qt::red);
+    QVERIFY(image.save(source));
+    QString error;
+    const auto first = ArtworkStore::copy(source, firstRoot, &error);
+    QVERIFY2(!first.isEmpty(), qPrintable(error));
+    QCOMPARE(ArtworkStore::copy(source, firstRoot, &error), first);
+    const auto second = ArtworkStore::copy(source, secondRoot, &error);
+    QVERIFY(!second.isEmpty());
+    QCOMPARE(QImage(second.toLocalFile()).pixelColor(0, 0), QColor(Qt::red));
+    image.fill(Qt::blue);
+    QVERIFY(image.save(source));
+    const auto changed = ArtworkStore::copy(source, firstRoot, &error);
+    QVERIFY(!changed.isEmpty() && changed != first);
+    QCOMPARE(QImage(changed.toLocalFile()).pixelColor(0, 0), QColor(Qt::blue));
+    QCOMPARE(QImage(first.toLocalFile()).pixelColor(0, 0), QColor(Qt::red));
+    // Keep a recognizable PNG header but corrupt its image payload after a successful copy.
+    auto truncated = test::readFile(source).first(33);
+    QVERIFY(test::writeFile(source, truncated));
+    QVERIFY(ArtworkStore::copy(source, firstRoot, &error).isEmpty());
+    QVERIFY(!error.isEmpty());
+}
+void MediaMetadataTest::artworkValidationRespectsAllocationPolicy()
+{
+    // This synchronous test has no image workers; restore the process policy before returning.
+    const auto previous = QImageReader::allocationLimit();
+    const auto restore = qScopeGuard([previous] {
+        QImageReader::setAllocationLimit(previous);
+    });
+    QTemporaryDir directory;
+    const auto source = directory.filePath(u"source.png"_s);
+    const auto native = directory.filePath(u"native"_s);
+    QImage image(1024, 512, QImage::Format_RGBA8888);
+    image.fill(Qt::green);
+    QVERIFY(image.save(source));
+    QImageReader::setAllocationLimit(0);
+    QVERIFY(!ArtworkStore::copy(source, native).isEmpty());
+    QImageReader::setAllocationLimit(1);
+    QString error;
+    QVERIFY(ArtworkStore::copy(source, native, &error).isEmpty());
+    QVERIFY(!error.isEmpty());
+    QImageReader::setAllocationLimit(0);
+    QVERIFY(!ArtworkStore::copy(source, native, &error).isEmpty());
+    QVERIFY(error.isEmpty());
 }
 void MediaMetadataTest::embeddedAllocationAccounting()
 {

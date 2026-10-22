@@ -53,9 +53,11 @@ public:
 private:
     QSize m_size;
     quint64 m_generation = 0, m_rejected = 0;
-    QHash<int, quint64> m_serials;
-    QHash<int, quint64> m_leases;
-    QHash<int, quint64> m_uploadedLeases;
+    struct SlotState final
+    {
+        quint64 serial = 0, lease = 0, uploadedLease = 0;
+    };
+    QHash<int, SlotState> m_slots;
     QMap<int, AtlasUpload> m_pending;
 };
 }

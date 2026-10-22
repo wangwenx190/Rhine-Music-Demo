@@ -34,10 +34,18 @@ inline Sample analytic(double start, double target, double velocity, double dura
 }
 inline void fill(Points &points, double start, double target, double velocity, double duration)
 {
-    for (int i = 0; i < SampleCount; ++i)
-        points[i] = i == Intervals
-                ? target
-                : analytic(start, target, velocity, duration, double(i) / Intervals).value;
+    // Every retarget uses the same normalized grid, regardless of glyph, speed or duration.
+    static const auto decays = [] {
+        std::array<double, Intervals> values;
+        for (int i = 0; i < Intervals; ++i)
+            values[i] = std::exp(-Decay * (double(i) / Intervals));
+        return values;
+    }();
+    const double delta = start - target;
+    const double advance = velocity * duration + Decay * delta;
+    for (int i = 0; i < Intervals; ++i)
+        points[i] = target + (delta + advance * (double(i) / Intervals)) * decays[i];
+    points[Intervals] = target;
 }
 inline Sample interpolate(const Points &points, double position, double duration)
 {

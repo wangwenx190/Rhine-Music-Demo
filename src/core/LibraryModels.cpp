@@ -275,11 +275,17 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
               return toJson(album).toVariantMap();
           } }
     };
-    const auto reader =
-            std::find_if(std::begin(readers), std::end(readers), [role](const RoleReader &entry) {
-                return entry.role == role;
-            });
-    return reader == std::end(readers) ? QVariant{ } : reader->read(album);
+    static_assert([] {
+        int next = AlbumId;
+        for (const auto &reader : readers) {
+            if (reader.role != next++)
+                return false;
+        }
+        return next == AlbumData + 1;
+    }());
+    if (role < AlbumId || role > AlbumData)
+        return { };
+    return readers[role - AlbumId].read(album);
 }
 void AlbumListModel::setSnapshot(Snapshot snapshot)
 {

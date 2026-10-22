@@ -7,6 +7,7 @@
 #include <QGuiApplication>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace {
 // Reel curves preserve the source sampled trajectory, velocity clamp and blur response.
@@ -139,6 +140,23 @@ int ReelSlot::faceCapacity() const
 }
 void ReelSlot::writeFaces(const QList<TitleGlyph> &values)
 {
+    // Finishing or reconciling an already-settled slot must not rebuild identical QML
+    // descriptors and invalidate native glyph nodes. Compare the normalized full descriptor.
+    const bool unchanged = m_contentPixelSize == glyph.size
+            && m_contentTranslation == glyph.translation
+            && std::equal(faces.cbegin(), faces.cend(), values.cbegin(), values.cend(),
+                          [this](const Face &face, TitleGlyph value) {
+                              if (value.height == 0)
+                                  value.height = glyph.height;
+                              return face.glyph == value
+                                      && capacityWidth >= value.width + glyph.size * GlyphPaddingEm
+                                              + SlotPaddingPixels
+                                      && capacityHeight >= value.height;
+                          });
+    if (unchanged)
+        return;
+    m_contentPixelSize = glyph.size;
+    m_contentTranslation = glyph.translation;
     faces.clear();
     m_values.clear();
     faces.reserve(values.size());
@@ -529,7 +547,7 @@ void TitleReel::reconcile()
     QSet<QString> keys;
     keys.reserve(m_target.glyphs.size());
     bool added = false;
-    for (const auto &glyph : m_target.glyphs) {
+    for (const auto &glyph : std::as_const(m_target.glyphs)) {
         keys.insert(glyph.key);
         auto *slot = m_index.value(glyph.key);
         if (!slot) {

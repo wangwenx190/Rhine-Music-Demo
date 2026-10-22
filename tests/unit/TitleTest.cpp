@@ -265,6 +265,61 @@ private Q_SLOTS:
             QCOMPARE(track.sample().velocity, 0.0);
         }
     }
+    void sampledRetargetsPreserveTheAnalyticGrid()
+    {
+        // Different glyphs and durations reuse the grid, never another track's state.
+        for (const double duration : { .299, .460, .7 }) {
+            for (const double velocity : { -180., 0., 73. }) {
+                yalahoo::sampledReel::Points points;
+                yalahoo::sampledReel::fill(points, -12, 31, velocity, duration);
+                for (int i = 0; i < 48; ++i) {
+                    const double t = double(i) / 48;
+                    const double expected =
+                            31 + (-43 + (velocity * duration - 430) * t) * std::exp(-10 * t);
+                    QVERIFY(std::abs(points[i] - expected) < 1e-12);
+                }
+                QCOMPARE(points[48], 31.);
+            }
+        }
+    }
+    void identicalFacesDoNotRepublishContent()
+    {
+        yalahoo::ReelSlot slot;
+        yalahoo::TitleGlyph glyph;
+        glyph.text = u"A"_s;
+        glyph.font = yalahoo::assetFont(400);
+        glyph.size = 24;
+        glyph.width = 18;
+        glyph.height = 32;
+        slot.glyph = glyph;
+        QSignalSpy contents(&slot, &yalahoo::ReelSlot::contentChanged);
+        slot.writeFaces({ glyph });
+        QCOMPARE(contents.count(), 1);
+        const auto revision = slot.revision;
+        const auto values = slot.faceValues();
+        slot.writeFaces({ glyph });
+        slot.rollTo(glyph, true);
+        QCOMPARE(contents.count(), 1);
+        QCOMPARE(slot.revision, revision);
+        QCOMPARE(slot.faceValues(), values);
+        // Full descriptor changes must still invalidate cached descriptors and native ink.
+        glyph.baseline += .5;
+        slot.writeFaces({ glyph });
+        QCOMPARE(contents.count(), 2);
+        QCOMPARE(slot.faces.first().glyph.baseline, .5);
+        yalahoo::TitleGlyph empty;
+        slot.writeFaces({ empty });
+        QCOMPARE(slot.faces.first().glyph.height, 32.);
+        const auto blankRevision = slot.revision;
+        slot.writeFaces({ empty });
+        QCOMPARE(slot.revision, blankRevision);
+        slot.glyph.size = 12;
+        slot.glyph.translation = true;
+        slot.writeFaces({ empty });
+        QCOMPARE(slot.revision, blankRevision + 1);
+        QVERIFY(slot.translation());
+        QCOMPARE(slot.pixelSize(), 12.);
+    }
     void naturalWidthDoesNotRetargetDuringVisibilityChanges()
     {
         yalahoo::TitleReel reel;
