@@ -81,7 +81,7 @@ struct Inputs final
         return yalahoo::review::sampleBilinear(colors, size, u * size.width(), v * size.height());
     }
 };
-QRhiReadbackResult capture(QRhi *api, Postprocess &post, Inputs &input)
+QRhiReadbackResult capture(QRhi *api, Postprocess &post, Inputs &input, qint64 expectedUpload = 80)
 {
     QRhiCommandBuffer *cb = nullptr;
     require(api->beginOffscreenFrame(&cb) == QRhi::FrameOpSuccess,
@@ -90,7 +90,7 @@ QRhiReadbackResult capture(QRhi *api, Postprocess &post, Inputs &input)
     input.upload(updates);
     cb->resourceUpdate(updates);
     post.render(cb);
-    require(post.uniformUploadBytes() == 80, "Bokeh uploaded unused uniform capacity");
+    require(post.uniformUploadBytes() == expectedUpload, "Unexpected Bokeh uniform upload");
     const auto uploaded = post.submittedBokeh();
     require(uploaded[u"width"_s].toInt() == input.size.width()
                     && uploaded[u"height"_s].toInt() == input.size.height()
@@ -208,6 +208,11 @@ auto runBokehChecks(int &argc, char **&argv)
                                     && post.output() != input.color.get(),
                             "Unexpected Bokeh graph or framebuffer feedback");
                     const auto readback = capture(api, post, input);
+                    if (size == QSize(129, 73) && focus == 25 && aperture == 0) {
+                        const auto stable = capture(api, post, input, 0);
+                        require(stable.data == readback.data,
+                                "Cached Bokeh uniforms changed the rendered result");
+                    }
                     QImage preview;
                     const auto result = verify(input, settings, readback, taps, preview);
                     results.append(result);

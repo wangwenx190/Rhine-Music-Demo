@@ -97,6 +97,19 @@ LightingPalette LightingPalette::theme(bool night)
 SelectionLighting::SelectionLighting(QObject *parent)
     : QObject(parent), m_palette(LightingPalette::theme(false)), m_from(m_palette), m_to(m_palette)
 {
+    notifyChanged();
+}
+void SelectionLighting::notifyChanged()
+{
+    const PublishedLighting next{ m_palette,      ribbon.settings, rowColumn(),    lightColumn(),
+                                  spotPosition(), spotTarget(),    areaPosition(), areaTarget(),
+                                  m_detail,       m_visible };
+    if (m_published && *m_published == next)
+        return;
+    // Commit before synchronous observers run. Velocities and other internal state
+    // continue advancing even when their published positions have not changed.
+    m_published = next;
+    Q_EMIT changed();
 }
 // Invert the authored cubic Bezier x coordinate with bounded Newton iterations.
 // The polynomial and derivative coefficients come from the source control points.
@@ -130,7 +143,7 @@ void SelectionLighting::setNight(bool night)
         m_elapsed = ThemeTransitionSeconds;
     }
     Q_EMIT nightChanged();
-    Q_EMIT changed();
+    notifyChanged();
 }
 void SelectionLighting::setReducedMotion(bool reduced)
 {
@@ -138,7 +151,7 @@ void SelectionLighting::setReducedMotion(bool reduced)
     if (reduced) {
         m_palette = m_to;
         m_elapsed = ThemeTransitionSeconds;
-        Q_EMIT changed();
+        notifyChanged();
     }
 }
 QVariantMap SelectionLighting::settings() const
@@ -171,7 +184,7 @@ void SelectionLighting::setSettings(RowLightingSettings s)
         ribbon.settings.mode = RowLightingMode::Baseline;
     if (m_settings != before) {
         Q_EMIT settingsChanged();
-        Q_EMIT changed();
+        notifyChanged();
     }
 }
 bool SelectionLighting::configure(const QVariantMap &patch)
@@ -216,7 +229,7 @@ void SelectionLighting::setComparing(bool value)
     if (value)
         ribbon.settings.mode = RowLightingMode::Baseline;
     Q_EMIT comparingChanged();
-    Q_EMIT changed();
+    notifyChanged();
 }
 void SelectionLighting::advanceTheme(double dt)
 {
@@ -258,7 +271,7 @@ void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, Scene
     if (!i.visible) {
         m_initialized = false;
         ribbon.reset();
-        Q_EMIT changed();
+        notifyChanged();
         return;
     }
     if (!m_initialized || i.reduced || i.cinematic) {
@@ -272,7 +285,7 @@ void SelectionLighting::update(const RowLightingInput &i, SceneVector aim, Scene
     m_offset = offset;
     m_initialized = true;
     ribbon.update(i, dt);
-    Q_EMIT changed();
+    notifyChanged();
 }
 double SelectionLighting::areaIntensity() const
 {

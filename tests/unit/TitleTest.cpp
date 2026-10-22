@@ -90,11 +90,18 @@ private Q_SLOTS:
         QVERIFY(song.fitted.endsWith(u"\u2026"_s));
         QVERIFY(!song.fitted.contains(QChar::ReplacementCharacter));
     }
+    void wholeLineGlyphAssociation_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("ligatures") << u"AV office affinity e\u0301 gyp"_s;
+        QTest::newRow("mixed-runs") << u"AV \u6536\u85cf office e\u0301 gyp"_s;
+        QTest::newRow("bidirectional") << u"AV \u05e9\u05dc\u05d5\u05dd office"_s;
+    }
     void wholeLineGlyphAssociation()
     {
+        QFETCH(QString, text);
         yalahoo::TextLayoutAdapter adapter;
         auto font = yalahoo::assetFont(700);
-        const QString text = u"AV office affinity e\u0301 gyp"_s;
         const auto actual = adapter.measure(text, font, font, 28, 600, 150, false, 1);
         font.setPixelSize(int(actual.size));
         font.setHintingPreference(QFont::PreferNoHinting);

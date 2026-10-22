@@ -7,6 +7,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
+#include <cstddef>
 
 using namespace Qt::StringLiterals;
 
@@ -67,6 +68,7 @@ struct Pass final
     Owned<QRhiBuffer> uniform;
     Owned<QRhiShaderResourceBindings> bindings;
     Owned<QRhiGraphicsPipeline> pipeline;
+    std::array<std::byte, PostPrefixBytes> uploadedPrefix{ };
 };
 struct alignas(UniformAlignmentBytes) PostPrefix final
 {
@@ -273,7 +275,7 @@ void Postprocess::render(QRhiCommandBuffer *cb)
         }
         p.upload = false;
     }
-    for (const auto &pass : p.passes) {
+    for (auto &pass : p.passes) {
         const auto size = pass.target->texture->pixelSize();
         PostPrefix u{ { float(size.width()), float(size.height()), s.projectionX, s.projectionY },
                       { s.nearPlane, s.farPlane, p.api->isYUpInFramebuffer() ? 1.0f : -1.0f, 0 },
@@ -292,8 +294,11 @@ void Postprocess::render(QRhiCommandBuffer *cb)
         if (pass.name == "bokeh"_L1)
             p.submittedBokeh = u;
 #endif
-        updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u);
-        p.uniformUploadBytes += sizeof(u);
+        if (firstUpload || std::memcmp(pass.uploadedPrefix.data(), &u, sizeof(u)) != 0) {
+            updates->updateDynamicBuffer(pass.uniform.get(), 0, sizeof(u), &u);
+            std::memcpy(pass.uploadedPrefix.data(), &u, sizeof(u));
+            p.uniformUploadBytes += sizeof(u);
+        }
     }
     cb->resourceUpdate(updates.release());
     for (const auto &pass : p.passes) {

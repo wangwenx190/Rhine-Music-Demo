@@ -10,7 +10,7 @@
 
 音乐入口覆盖后的暖昼/深夜：environment .25/.16，key .45/.30，hemisphere .32/.21，fill .045，spot 180×64/130×64，area 34/24，scatter 1/.72，printAmbient .5/.12，曝光1.05/1.08；灯色和背景色见 LightingPalette::theme。key/fill 方向取 (-6,14,-5)/(7,8,-10)，保留 RoomEnvironment 的方向/颜色和原半球上下色。
 
-主题在650ms内按 cubic-bezier(.4,0,.2,1) 解横坐标并在线性RGB空间插值。反向请求以当前已显示 palette 为起点，相同目标不重启；减少动态直接完成。warmth 驱动既有材质数值与线性 tint 插值；背景和未来阅读层共用同一个 palette/backgroundColor。QML 不另用 Behavior/ColorAnimation 重算主题时间。
+主题在650ms内按 cubic-bezier(.4,0,.2,1) 解横坐标并在线性RGB空间插值。反向请求以当前已显示 palette 为起点，相同目标不重启；减少动态直接完成。warmth 驱动既有材质数值与线性 tint 插值；背景和未来阅读层共用同一个 palette/backgroundColor。QML 不另用 Behavior/ColorAnimation 重算主题时间。`changed`只在实际发布的palette、设置、位置、详情比例或可见状态变化时发出；内部速度与跟随初始化照常更新，通知前提交发布快照，避免重复绑定计算及同步重入。
 
 灯光通过公有 CustomMaterial uniform 在 GLSL 中计算，保留源 Lambert、GGX/Smith 多次散射、LTC 面光与固定 PMREM；没有使用 Qt 内置灯的不同 brightness 单位，因此无需以不相同的单位抄数或搜索换算因子。灯/面积光计算因子均为1，暖昼与深夜相同，未按主题调参。材质参数不乘图像标定系数；所有材质/灯光参数直接按源公式，不使用图像标定系数。LTC 两张64×64原始表经已有锁定依赖导出为 qrc RGBA32F；原 MIT 许可与来源保留。
 

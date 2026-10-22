@@ -20,6 +20,46 @@ public:
     LightingTest() = default;
 
 private Q_SLOTS:
+    void unchangedPublishedLightingDoesNotNotify()
+    {
+        SelectionLighting light;
+        QSignalSpy changes(&light, &SelectionLighting::changed);
+        RowLightingInput input;
+        input.origin = { 1, 2, 3 };
+        input.reduced = true;
+        const SceneVector aim{ 4, 5, 6 }, offset{ 7, 8, 9 };
+        light.update(input, aim, offset, 0, 0);
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        for (int i = 0; i < 8; ++i)
+            light.update(input, aim, offset, 0, 1.0 / 60);
+        QCOMPARE(changes.size(), 0);
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        input.visible = false;
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 0);
+        input.visible = true;
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        light.setReducedMotion(true);
+        light.setNight(true);
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        light.setReducedMotion(true);
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 0);
+        QVERIFY(light.configure({ { u"strength"_s, .9 } }));
+        QCOMPARE(changes.size(), 1);
+        changes.clear();
+        light.update(input, aim, offset, .5, 0);
+        QCOMPARE(changes.size(), 0);
+    }
     void floorThemeUsesLinearAuthoredColorsAndInterruptedTransition()
     {
         const auto decode = [](int value) {

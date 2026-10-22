@@ -384,10 +384,13 @@ QList<SearchResult> SearchListModel::filter(const QList<SearchEntry> &entries,
         if (generation.load(std::memory_order_relaxed) != ticket)
             return { };
         const auto &entry = entries[i];
-        // Album headers link to the next album, so clearing a query never visits every track.
-        i = albumsOnly ? entry.nextAlbum : i + 1;
-        if (!genreId.isEmpty() && entry.genreId != genreId)
+        // Album headers skip all tracks when either the query or genre excludes them.
+        // Track entries are reached only inside an admitted album.
+        if (!genreId.isEmpty() && entry.genreId != genreId) {
+            i = entry.nextAlbum;
             continue;
+        }
+        i = albumsOnly ? entry.nextAlbum : i + 1;
         if (albumsOnly || entry.text.contains(needle))
             results.append(entry.result);
     }

@@ -198,9 +198,20 @@ void SceneItem::publishPrepared(const QPointer<SceneItem> &guard, quint64 token,
     if (!guard || !guard->m_renderingActive || !guard->m_preparing
         || token != guard->m_preparationToken || submission != guard->submission() || !uploaded)
         return;
-    const auto covers = guard->coverStatistics();
-    if (covers.value(u"ready"_s).toInt() != covers.value(u"identities"_s).toInt()
-        || (covers.value(u"owned"_s).toInt() > 0 && !covers.value(u"selectedDetailed"_s).toBool()))
+    if (guard->m_readyCovers.size() != guard->m_poolLeases.size())
+        return;
+    const bool hasOwned = std::any_of(guard->m_ownedCovers.cbegin(), guard->m_ownedCovers.cend(),
+                                      [](const OwnedCover &cover) {
+                                          return bool(cover.pixels);
+                                      });
+    const bool selectedDetailed = std::any_of(
+            guard->m_ownedCovers.cbegin(), guard->m_ownedCovers.cend(),
+            [guard](const OwnedCover &cover) {
+                return cover.objectId == guard->m_activeObject && cover.pixels
+                        && cover.pixels->pixels
+                        && cover.pixels->pixels->resolution >= guard->m_detailResolution;
+            });
+    if (hasOwned && !selectedDetailed)
         return;
     Q_EMIT guard->scenePrepared();
 }

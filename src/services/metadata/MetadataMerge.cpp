@@ -147,4 +147,35 @@ bool mergeMetadata(Album &album, const ProviderResult &result)
     handler->apply(album, result, state);
     return true;
 }
+Snapshot mergeMetadataBatch(Snapshot snapshot, const QHash<QString, ProviderResult> &pending)
+{
+    if (!snapshot || pending.isEmpty())
+        return snapshot;
+    QMultiHash<QString, const ProviderResult *> byAlbum;
+    byAlbum.reserve(pending.size());
+    for (const auto &result : pending)
+        byAlbum.insert(result.albumId, &result);
+    std::shared_ptr<LibrarySnapshot> updated;
+    for (qsizetype i = 0; i < snapshot->albums.size(); ++i) {
+        const auto &album = snapshot->albums[i];
+        const auto [first, last] = std::as_const(byAlbum).equal_range(album.id);
+        if (first == last)
+            continue;
+        Album candidate = album;
+        bool accepted = false;
+        for (auto it = first; it != last; ++it) {
+            const auto &result = **it;
+            if (result.inputKey == metadataKey(album, result.kind))
+                accepted = mergeMetadata(candidate, result) || accepted;
+        }
+        if (!accepted)
+            continue;
+        // No writable iteration of the full snapshot until a valid update exists.
+        // Rejected batches retain the original immutable storage and identity.
+        if (!updated)
+            updated = std::make_shared<LibrarySnapshot>(*snapshot);
+        updated->albums[i] = std::move(candidate);
+    }
+    return updated ? Snapshot(std::move(updated)) : snapshot;
+}
 }

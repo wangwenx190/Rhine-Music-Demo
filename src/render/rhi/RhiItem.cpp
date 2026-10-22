@@ -1737,6 +1737,7 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     frameUploadBytes = 0;
     selectedUploadBytes = 0;
     uploadRegions = { };
+    const bool recordCapture = deliver && input.request != capturedRequest && pending.size() < 2;
     if (atlasGeneration) {
         for (const auto &u : atlasQueue.take(input.initializingAtlas)) {
             const QPoint destination(
@@ -1757,14 +1758,15 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
                 }
             }
             frameUploadBytes += AtlasUploadQueue::payloadBytes(u);
-            uploadRegions.append(QJsonObject{ { u"slot"_s, u.slot },
-                                              { u"x"_s, destination.x() },
-                                              { u"y"_s, destination.y() },
-                                              { u"width"_s, renderData::CoverTilePixels },
-                                              { u"height"_s, renderData::CoverTilePixels },
-                                              { u"bytes"_s, AtlasUploadQueue::tileBytes },
-                                              { u"lease"_s, qint64(u.lease) },
-                                              { u"serial"_s, qint64(u.serial) } });
+            if (recordCapture)
+                uploadRegions.append(QJsonObject{ { u"slot"_s, u.slot },
+                                                  { u"x"_s, destination.x() },
+                                                  { u"y"_s, destination.y() },
+                                                  { u"width"_s, renderData::CoverTilePixels },
+                                                  { u"height"_s, renderData::CoverTilePixels },
+                                                  { u"bytes"_s, AtlasUploadQueue::tileBytes },
+                                                  { u"lease"_s, qint64(u.lease) },
+                                                  { u"serial"_s, qint64(u.serial) } });
         }
     } else if (coverDirty) {
         // Filter premultiplied texels, then unpremultiply in the paper shader. Straight
@@ -2010,7 +2012,6 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     } else {
         cb->resourceUpdate(updates.release());
     }
-    const bool recordCapture = deliver && input.request != capturedRequest && pending.size() < 2;
     QJsonArray captureKinds, opticalEvents, fogUniforms;
     const auto recordFog = [&](const Uniform &submitted) {
         fogUniforms.append(QJsonObject{

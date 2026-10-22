@@ -469,6 +469,38 @@ private Q_SLOTS:
         QCOMPARE(model.rowCount(), 0);
         QVERIFY(!model.data(model.index(0), SearchListModel::Title).isValid());
     }
+    void genreSearchSkipsExcludedAlbumTracks()
+    {
+        LibrarySnapshot snapshot;
+        for (int i = 0; i < 4; ++i) {
+            Album album;
+            album.id = u"album-%1"_s.arg(i);
+            album.title = u"Match"_s;
+            album.genreId = i % 2 ? u"included"_s : u"excluded"_s;
+            for (int j = 0; j < 64; ++j) {
+                Track track;
+                track.id = u"track-%1-%2"_s.arg(i).arg(j);
+                track.albumId = album.id;
+                track.title = u"Match"_s;
+                album.tracks.append(track);
+            }
+            snapshot.albums.append(album);
+        }
+        SearchListModel model;
+        const auto owner = std::make_shared<const LibrarySnapshot>(snapshot);
+        for (const auto &query : { u"match"_s, QString() }) {
+            model.update(owner, query, u"included"_s);
+            const auto expected = searchLibrary(snapshot, query, u"included"_s);
+            QCOMPARE(model.rowCount(), expected.size());
+            for (int row = 0; row < expected.size(); ++row) {
+                QCOMPARE(model.resultAt(row).value(u"albumId"_s).toString(), expected[row].albumId);
+                QCOMPARE(model.resultAt(row).value(u"trackId"_s).toString(), expected[row].trackId);
+            }
+        }
+        model.request(u"match"_s, u"missing"_s);
+        QTRY_VERIFY(!model.searching());
+        QCOMPARE(model.rowCount(), 0);
+    }
     void incrementalSearchNotifications()
     {
         LibrarySnapshot snapshot;

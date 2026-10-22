@@ -133,6 +133,31 @@ QJsonObject checkProductionAttachments(Input input, QSize size)
     require(verification::windowPolicySatisfied(*driver.window), "Production window policy failed");
     return resources;
 }
+void checkUniformReuse(RhiCaptureHarness &driver, Input input, QSize size, const Capture &initial)
+{
+    const auto stable = driver.capture(input, size);
+    require(stable.metadata[u"postUniformUploadBytes"_s].toInteger() == 0
+                    && stable.postprocessed == initial.postprocessed,
+            "Unchanged combined postprocess uniforms were uploaded or changed output");
+    const auto original = input;
+    input.focus += 5;
+    input.aperture *= 2;
+    input.scene.projection.scale(1.1f, .9f);
+    const auto changed = driver.capture(input, size);
+    const auto passes =
+            changed.metadata[u"postprocessGraph"_s].toObject()[u"passes"_s].toArray().size();
+    require(changed.metadata[u"postUniformUploadBytes"_s].toInteger() == passes * 80
+                    && changed.metadata[u"postprocessRevision"_s]
+                            == stable.metadata[u"postprocessRevision"_s],
+            "Changed postprocess parameters were not uploaded without rebuilding");
+    RhiCaptureHarness fresh;
+    const auto rebuilt = fresh.capture(input, size);
+    require(changed.postprocessed == rebuilt.postprocessed,
+            "Updated cached uniforms differ from fresh postprocess resources");
+    const auto restored = driver.capture(original, size);
+    require(restored.postprocessed == initial.postprocessed,
+            "Reverting postprocess parameters retained stale uniforms");
+}
 QJsonObject checkAttachments(const QJsonArray &sourceCases)
 {
     RhiCaptureHarness driver;
@@ -153,6 +178,8 @@ QJsonObject checkAttachments(const QJsonArray &sourceCases)
             checkPostprocessGraph(input, capture);
             checkTransientInventory(capture.metadata[u"resources"_s].toObject(), size, samples,
                                     true);
+            if (size == QSize(321, 241) && samples == 1)
+                checkUniformReuse(driver, input, size, capture);
             states.append(QJsonObject{
                     { u"diagnostic"_s, capture.metadata },
                     { u"productionResources"_s, checkProductionAttachments(input, size) } });
@@ -228,13 +255,8 @@ auto runPostprocessChecks(int &argc, char **&argv)
                                             == stable.metadata[u"postprocessGraph"_s]
                                     && first.postprocessed == stable.postprocessed,
                             "Stable resolve/postprocess changed or rebuilt");
-                    const int passCount = stable.metadata[u"postprocessGraph"_s]
-                                                  .toObject()[u"passes"_s]
-                                                  .toArray()
-                                                  .size();
-                    require(stable.metadata[u"postUniformUploadBytes"_s].toInteger()
-                                    == passCount * 80,
-                            "Steady postprocess uploaded beyond dynamic prefixes");
+                    require(stable.metadata[u"postUniformUploadBytes"_s].toInteger() == 0,
+                            "Steady postprocess repeated unchanged uniforms");
                     if (size == QSize(640, 480) && samples == 4)
                         require(stable.postprocessed.save(output + u"/combined-%1.png"_s.arg(mode)),
                                 "Cannot save actual combined output");

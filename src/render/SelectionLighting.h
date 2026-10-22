@@ -8,6 +8,7 @@
 #include <QStringView>
 #include <QVector4D>
 #include <QVariantMap>
+#include <optional>
 namespace yalahoo {
 namespace lightingDefaults {
 // Default day palette uses source light units; theme interpolation takes seconds.
@@ -34,6 +35,7 @@ struct LightingPalette final
     SceneVector floor;
     static SceneVector floorColor(QStringView theme);
     static LightingPalette theme(bool night);
+    bool operator==(const LightingPalette &) const = default;
 };
 class SelectionLighting : public QObject
 {
@@ -189,6 +191,17 @@ Q_SIGNALS:
     void comparingChanged();
 
 private:
+    struct PublishedLighting final
+    {
+        LightingPalette palette;
+        RowLightingSettings settings;
+        QVector3D rowColumn, lightColumn, spotPosition, spotTarget, areaPosition, areaTarget;
+        double detail = 0;
+        bool visible = true;
+        bool operator==(const PublishedLighting &) const = default;
+    };
+    void notifyChanged();
+    std::optional<PublishedLighting> m_published;
     RowLightingSettings m_settings;
     bool m_comparing = false;
     LightingPalette m_palette, m_from, m_to;

@@ -51,6 +51,8 @@ constexpr auto FallbackCaptionY = .87;
 constexpr auto ByteChannelScale = 255.0;
 constexpr auto FloatByteChannelScale = 255.0f;
 constexpr auto TileMipLevels = 8;
+// Halving an extent visits at most three source rows, plus floating endpoint slack.
+constexpr auto MaximumReductionRows = 4;
 
 QThreadPool &decodePool()
 {
@@ -62,6 +64,67 @@ QThreadPool &decodePool()
     Q_UNUSED(configured);
     return pool;
 }
+template <class ReadRow, class ReadPixel>
+void reduceMip(QSize currentSize, QImage &next, QImage &encoded, const ReadRow &readRow,
+               const ReadPixel &read)
+{
+    const auto size = next.size();
+    const double sx = double(currentSize.width()) / size.width();
+    const double sy = double(currentSize.height()) / size.height();
+    const int columns = currentSize.width() > 1 ? 2 : 1;
+    const int rows = currentSize.height() > 1 ? 2 : 1;
+    const bool integralFootprint = currentSize.width() == size.width() * columns
+            && currentSize.height() == size.height() * rows;
+    for (int y = 0; y < size.height(); ++y) {
+        auto *output = reinterpret_cast<float *>(next.scanLine(y));
+        auto *bytes = encoded.scanLine(y);
+        const double y0 = y * sy, y1 = std::min(double(currentSize.height()), (y + 1) * sy);
+        const int endY = int(std::ceil(y1));
+        const int firstY = int(y0);
+        std::array<decltype(readRow(0)), MaximumReductionRows> sourceRows;
+        for (int iy = firstY; iy < endY; ++iy)
+            sourceRows[iy - firstY] = readRow(iy);
+        for (int x = 0; x < size.width(); ++x) {
+            std::array<double, 4> sum{ };
+            const double x0 = x * sx, x1 = std::min(double(currentSize.width()), (x + 1) * sx);
+            const int endX = int(std::ceil(x1));
+            if (integralFootprint) {
+                // Power-of-two cover layers have unit source weights. Preserve the same
+                // double accumulation order while avoiding per-sample overlap arithmetic.
+                for (int iy = 0; iy < rows; ++iy) {
+                    for (int ix = 0; ix < columns; ++ix) {
+                        const auto sample = read(sourceRows[iy], x * columns + ix);
+                        for (int c = 0; c < 4; ++c)
+                            sum[c] += sample[c];
+                    }
+                }
+            } else {
+                for (int iy = int(y0); iy < endY; ++iy) {
+                    const double weightY = std::min(y1, iy + 1.0) - std::max(y0, double(iy));
+                    for (int ix = int(x0); ix < endX; ++ix) {
+                        const double weight =
+                                (std::min(x1, ix + 1.0) - std::max(x0, double(ix))) * weightY;
+                        const auto sample = read(sourceRows[iy - firstY], ix);
+                        for (int c = 0; c < 4; ++c)
+                            sum[c] += sample[c] * weight;
+                    }
+                }
+            }
+            for (int c = 0; c < 4; ++c)
+                output[4 * x + c] = float(sum[c] / (sx * sy));
+            const double alpha = output[4 * x + 3];
+            for (int c = 0; c < 3; ++c)
+                bytes[4 * x + c] = uchar(std::clamp(
+                        qRound(alpha > 0 ? colorTransfer::encode(output[4 * x + c] / alpha) * alpha
+                                               * yalahoo::units::MaximumChannelByte
+                                         : 0),
+                        0, yalahoo::units::MaximumChannelByte));
+            bytes[4 * x + 3] = uchar(std::clamp(qRound(alpha * yalahoo::units::MaximumChannelByte),
+                                                0, yalahoo::units::MaximumChannelByte));
+        }
+    }
+}
+
 }
 qint64 CoverPixels::byteSize() const
 {
@@ -352,86 +415,45 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
     // Decode sRGB before area reduction; alpha remains premultiplied in linear light.
     // Independent chains never incorporate pixels belonging to another atlas slot.
     const auto source = image.convertToFormat(QImage::Format_RGBA8888);
-    const auto encode = [](double v) {
-        return colorTransfer::encode(v);
-    };
     static const auto decoded = [] {
         std::array<float, ByteChannelValues> values;
         for (int i = 0; i < ByteChannelValues; ++i)
             values[i] = float(colorTransfer::decode(i / ByteChannelScale));
         return values;
     }();
-    QImage linear(source.size(), QImage::Format_RGBA32FPx4_Premultiplied);
-    for (int y = 0; y < source.height(); ++y) {
-        const auto *input = source.constScanLine(y);
-        auto *row = reinterpret_cast<float *>(linear.scanLine(y));
-        for (int x = 0; x < source.width(); ++x) {
-            const float alpha = input[4 * x + 3] / FloatByteChannelScale;
-            for (int c = 0; c < 3; ++c)
-                row[4 * x + c] = decoded[input[4 * x + c]] * alpha;
-            row[4 * x + 3] = alpha;
-        }
-    }
+    QImage linear;
     QList<QImage> levels;
     levels.reserve(std::bit_width(unsigned(qMax(source.width(), source.height()))));
-    while (linear.width() > 1 || linear.height() > 1) {
-        const QSize size(qMax(1, linear.width() / 2), qMax(1, linear.height() / 2));
-        QImage next(size, linear.format());
+    QSize currentSize = source.size();
+    while (currentSize.width() > 1 || currentSize.height() > 1) {
+        const QSize size(qMax(1, currentSize.width() / 2), qMax(1, currentSize.height() / 2));
+        QImage next(size, QImage::Format_RGBA32FPx4_Premultiplied);
         QImage encoded(size, QImage::Format_RGBA8888_Premultiplied);
         encoded.setColorSpace(QColorSpace::SRgb);
-        const double sx = double(linear.width()) / size.width();
-        const double sy = double(linear.height()) / size.height();
-        const int columns = linear.width() > 1 ? 2 : 1;
-        const int rows = linear.height() > 1 ? 2 : 1;
-        const bool integralFootprint =
-                linear.width() == size.width() * columns && linear.height() == size.height() * rows;
-        for (int y = 0; y < size.height(); ++y) {
-            auto *output = reinterpret_cast<float *>(next.scanLine(y));
-            auto *bytes = encoded.scanLine(y);
-            const double y0 = y * sy, y1 = (y + 1) * sy;
-            const int endY = int(std::ceil(y1));
-            for (int x = 0; x < size.width(); ++x) {
-                std::array<double, 4> sum{ };
-                const double x0 = x * sx, x1 = (x + 1) * sx;
-                const int endX = int(std::ceil(x1));
-                if (integralFootprint) {
-                    // Power-of-two cover layers have unit source weights. Preserve the same
-                    // double accumulation order while avoiding per-sample overlap arithmetic.
-                    for (int iy = 0; iy < rows; ++iy) {
-                        const auto *row =
-                                reinterpret_cast<const float *>(linear.constScanLine(y * rows + iy))
-                                + 4 * x * columns;
-                        for (int ix = 0; ix < columns; ++ix)
-                            for (int c = 0; c < 4; ++c)
-                                sum[c] += row[4 * ix + c];
-                    }
-                } else {
-                    for (int iy = int(y0); iy < endY; ++iy) {
-                        const auto *row = reinterpret_cast<const float *>(linear.constScanLine(iy));
-                        const double weightY = std::min(y1, iy + 1.0) - std::max(y0, double(iy));
-                        for (int ix = int(x0); ix < endX; ++ix) {
-                            const double weight =
-                                    (std::min(x1, ix + 1.0) - std::max(x0, double(ix))) * weightY;
-                            for (int c = 0; c < 4; ++c)
-                                sum[c] += row[4 * ix + c] * weight;
-                        }
-                    }
-                }
-                for (int c = 0; c < 4; ++c)
-                    output[4 * x + c] = float(sum[c] / (sx * sy));
-                const double alpha = output[4 * x + 3];
-                for (int c = 0; c < 3; ++c)
-                    bytes[4 * x + c] = uchar(
-                            std::clamp(qRound(alpha > 0 ? encode(output[4 * x + c] / alpha) * alpha
-                                                              * yalahoo::units::MaximumChannelByte
-                                                        : 0),
-                                       0, yalahoo::units::MaximumChannelByte));
-                bytes[4 * x + 3] =
-                        uchar(std::clamp(qRound(alpha * yalahoo::units::MaximumChannelByte), 0,
-                                         yalahoo::units::MaximumChannelByte));
-            }
+        if (linear.isNull()) {
+            // Fuse the full-resolution decode with the first reduction. Preserve the
+            // original float premultiplication before double accumulation; no full-size
+            // 16-byte/pixel linear intermediate needs to be stored or read back.
+            const auto readRow = [&source](int y) {
+                return source.constScanLine(y);
+            };
+            reduceMip(currentSize, next, encoded, readRow, [](const uchar *row, int x) {
+                const auto *input = row + 4 * x;
+                const float alpha = input[3] / FloatByteChannelScale;
+                return std::array<float, 4>{ decoded[input[0]] * alpha, decoded[input[1]] * alpha,
+                                             decoded[input[2]] * alpha, alpha };
+            });
+        } else {
+            const auto readRow = [&linear](int y) {
+                return reinterpret_cast<const float *>(linear.constScanLine(y));
+            };
+            reduceMip(currentSize, next, encoded, readRow, [](const float *row, int x) {
+                const auto *input = row + 4 * x;
+                return std::array<float, 4>{ input[0], input[1], input[2], input[3] };
+            });
         }
         levels.append(std::move(encoded));
+        currentSize = size;
         linear = std::move(next);
     }
     return levels;

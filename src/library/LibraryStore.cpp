@@ -80,20 +80,15 @@ LibraryStore::~LibraryStore()
     d->m_worker.waitForDone();
     if (d->m_active == Kind::Metadata) {
         const auto result = d->m_job.result();
-        if (result.snapshot)
+        if (result.snapshot && result.snapshot != d->m_snapshot) {
             d->m_snapshot = result.snapshot;
-        d->m_savePending = d->m_snapshot;
+            d->m_savePending = d->m_snapshot;
+        }
     }
     if (!d->m_metadataPending.isEmpty() && d->m_writable) {
-        auto snapshot = *d->m_snapshot;
-        for (auto &album : snapshot.albums)
-            for (const auto kind :
-                 { MetadataKind::Introduction, MetadataKind::Credits, MetadataKind::Enrichment }) {
-                const auto it = d->m_metadataPending.constFind(album.id + '/'_L1 + kindName(kind));
-                if (it != d->m_metadataPending.cend() && it->inputKey == metadataKey(album, kind))
-                    mergeMetadata(album, *it);
-            }
-        d->m_savePending = std::make_shared<const LibrarySnapshot>(std::move(snapshot));
+        const auto updated = mergeMetadataBatch(d->m_snapshot, d->m_metadataPending);
+        if (updated != d->m_snapshot)
+            d->m_savePending = updated;
     }
     if (d->m_savePending && d->m_writable) {
         const auto result = write(d->m_path, d->m_savePending);
@@ -383,17 +378,7 @@ void LibraryStore::startMetadata()
     d->m_metadataBytes = 0;
     d->m_job.setFuture(QtConcurrent::run(
             &d->m_worker, [snapshot = d->m_snapshot, pending = std::move(pending)] {
-                auto updated = *snapshot;
-                for (auto &album : updated.albums)
-                    for (const auto kind : { MetadataKind::Introduction, MetadataKind::Credits,
-                                             MetadataKind::Enrichment }) {
-                        const auto it = pending.constFind(album.id + '/'_L1 + kindName(kind));
-                        if (it != pending.cend() && it->inputKey == metadataKey(album, kind))
-                            mergeMetadata(album, *it);
-                    }
-                return JobResult{
-                    std::make_shared<const LibrarySnapshot>(std::move(updated)), { }, 0, false
-                };
+                return JobResult{ mergeMetadataBatch(snapshot, pending), { }, 0, false };
             }));
 }
 
@@ -509,9 +494,11 @@ void LibraryStore::complete()
     }
     d->m_cancel.reset();
     if (kind == Kind::Metadata && result.snapshot) {
-        d->m_snapshot = result.snapshot;
-        d->m_savePending = d->m_snapshot;
-        Q_EMIT metadataCommitted(d->m_snapshot);
+        if (result.snapshot != d->m_snapshot) {
+            d->m_snapshot = result.snapshot;
+            d->m_savePending = d->m_snapshot;
+            Q_EMIT metadataCommitted(d->m_snapshot);
+        }
     } else if (kind == Kind::Save) {
         if (result.error.isEmpty())
             Q_EMIT saved();

@@ -6,9 +6,9 @@
 #include <QRegularExpression>
 #include <QDataStream>
 #include <QIODevice>
-#include <QMap>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 
@@ -144,9 +144,13 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
         colorRuns.reserve(runs.size());
         struct GlyphPosition final
         {
-            int run, glyph;
+            int start, run, glyph;
         };
-        QMap<int, QList<GlyphPosition>> groups;
+        QList<GlyphPosition> groups;
+        qsizetype glyphCount = 0;
+        for (const auto &run : runs)
+            glyphCount += run.glyphIndexes().size();
+        groups.reserve(glyphCount);
         for (int runIndex = 0; runIndex < runs.size(); ++runIndex) {
             const auto &run = runs[runIndex];
             const auto raw = run.rawFont();
@@ -166,14 +170,24 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
                 const int start = boundary == graphemes.begin()
                         ? lineStart
                         : std::max(lineStart, *(boundary - 1));
-                groups[start].append({ runIndex, i });
+                groups.append({ start, runIndex, i });
             }
         }
+        // One contiguous index replaces a tree and separate lists for every grapheme/run.
+        // String index orders the visual cells; run/glyph order preserves shaping within a cell.
+        std::sort(groups.begin(), groups.end(), [](const GlyphPosition &a, const GlyphPosition &b) {
+            if (a.start != b.start)
+                return a.start < b.start;
+            return a.run != b.run ? a.run < b.run : a.glyph < b.glyph;
+        });
         int column = 0;
-        for (auto group = groups.cbegin(); group != groups.cend(); ++group) {
-            const int start = group.key();
-            const auto following = std::next(group);
-            const int next = following == groups.cend() ? end : following.key();
+        for (qsizetype first = 0; first < groups.size();) {
+            const int start = groups[first].start;
+            qsizetype following = first + 1;
+            while (following < groups.size() && groups[following].start == start)
+                ++following;
+            const int next = following == groups.size() ? end : groups[following].start;
+            const auto groupStart = std::exchange(first, following);
             // Cluster starts from the entire shaped line merge ligatures without re-querying
             // every character range or changing contextual glyph forms.
             TitleGlyph glyph;
@@ -195,21 +209,24 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
             glyph.font = font;
             glyph.baseline = line.ascent() + line.y() - glyph.y / scale;
             bool colored = false;
-            QMap<int, QList<int>> runGroups;
-            for (const auto &value : group.value())
-                runGroups[value.run].append(value.glyph);
-            for (auto runGroup = runGroups.cbegin(); runGroup != runGroups.cend(); ++runGroup) {
-                const auto &source = resolvedRuns[runGroup.key()];
+            for (auto runStart = groupStart; runStart < following;) {
+                const auto runIndex = groups[runStart].run;
+                auto runEnd = runStart + 1;
+                while (runEnd < following && groups[runEnd].run == runIndex)
+                    ++runEnd;
+                const auto &source = resolvedRuns[runIndex];
                 ResolvedGlyphRun run{ source.font, source.fontHead, { }, { }, source.flags };
-                run.indexes.reserve(runGroup->size());
-                run.positions.reserve(runGroup->size());
-                for (const int i : runGroup.value()) {
+                run.indexes.reserve(runEnd - runStart);
+                run.positions.reserve(runEnd - runStart);
+                for (auto position = runStart; position < runEnd; ++position) {
+                    const int i = groups[position].glyph;
                     run.indexes.append(source.indexes[i]);
                     run.positions.append(source.positions[i]
                                          - QPointF(glyph.x / scale, glyph.y / scale));
                 }
                 glyph.renderRuns.append(std::move(run));
-                colored |= colorRuns[runGroup.key()];
+                colored |= colorRuns[runIndex];
+                runStart = runEnd;
             }
             if (colored) {
                 glyph.colorGlyph = true;

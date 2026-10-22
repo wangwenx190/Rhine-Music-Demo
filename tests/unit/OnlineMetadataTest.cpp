@@ -235,6 +235,84 @@ public:
     OnlineMetadataTest() = default;
 
 private Q_SLOTS:
+    void rejectedMetadataBatchDoesNotSaveOrNotify()
+    {
+        QTemporaryDir directory;
+        LibrarySnapshot library;
+        library.fields.insert(u"nativeSchemaVersion"_s, 1);
+        library.albums.append(sampleAlbum());
+        QFile cache(directory.filePath(u"library-index.json"_s));
+        QVERIFY(cache.open(QIODevice::WriteOnly));
+        const auto bytes = QJsonDocument(toJson(library)).toJson();
+        QCOMPARE(cache.write(bytes), bytes.size());
+        cache.close();
+        LibraryStore store(directory.path());
+        QSignalSpy loaded(&store, &LibraryStore::snapshotReady);
+        store.load();
+        QTRY_COMPARE(loaded.size(), 1);
+        const auto original = store.snapshot();
+        QSignalSpy committed(&store, &LibraryStore::metadataCommitted);
+        QSignalSpy saved(&store, &LibraryStore::saved);
+        ProviderResult result;
+        result.albumId = library.albums.first().id;
+        result.kind = MetadataKind::Introduction;
+        result.status = ProviderStatus::Matched;
+        result.checkedAt = u"2026-10-22T00:00:00Z"_s;
+        result.inputKey = u"stale"_s;
+        result.payload = { { u"introduction"_s, QJsonObject{ { u"status"_s, u"matched"_s } } } };
+        store.stageMetadata(result);
+        store.commitMetadata();
+        QTRY_VERIFY(!store.busy());
+        QCOMPARE(store.snapshot(), original);
+        QCOMPARE(committed.size(), 0);
+        QCOMPARE(saved.size(), 0);
+        QVERIFY(cache.open(QIODevice::ReadOnly));
+        QCOMPARE(cache.readAll(), bytes);
+    }
+    void metadataBatchRejectsStaleValuesWithoutCopyingSnapshot()
+    {
+        LibrarySnapshot library;
+        library.albums.append(sampleAlbum());
+        auto other = sampleAlbum();
+        other.id = u"album-other"_s;
+        other.fields.insert(u"extension"_s, 7);
+        library.albums.append(other);
+        const auto original = std::make_shared<const LibrarySnapshot>(library);
+        ProviderResult introduction;
+        introduction.albumId = library.albums.first().id;
+        introduction.kind = MetadataKind::Introduction;
+        introduction.status = ProviderStatus::Matched;
+        introduction.inputKey = u"stale-key"_s;
+        introduction.payload = { { u"introduction"_s,
+                                   QJsonObject{ { u"status"_s, u"matched"_s } } },
+                                 { u"description"_s, u"Accepted text"_s } };
+        QHash<QString, ProviderResult> pending{ { u"introduction"_s, introduction } };
+        QCOMPARE(mergeMetadataBatch(original, pending), original);
+        introduction.inputKey = metadataKey(library.albums.first(), MetadataKind::Introduction);
+        pending[u"introduction"_s] = introduction;
+        auto credits = introduction;
+        credits.kind = MetadataKind::Credits;
+        credits.inputKey = metadataKey(library.albums.first(), MetadataKind::Credits);
+        credits.payload = { { u"creditsLookup"_s, QJsonObject{ { u"status"_s, u"partial"_s } } } };
+        credits.status = ProviderStatus::Partial;
+        pending.insert(u"credits"_s, credits);
+        auto missing = introduction;
+        missing.albumId = u"missing"_s;
+        pending.insert(u"missing"_s, missing);
+        const auto updated = mergeMetadataBatch(original, pending);
+        QVERIFY(updated != original);
+        QCOMPARE(updated->albums.first().description, u"Accepted text"_s);
+        QCOMPARE(updated->albums.first().creditsLookup.value(u"status"_s), u"partial"_s);
+        QCOMPARE(updated->albums.first().producers.size(), 1);
+        QCOMPARE(toJson(updated->albums.last()), toJson(other));
+        QVERIFY(original->albums.first().description.isEmpty());
+        QVERIFY(original->albums.first().creditsLookup.isEmpty());
+        introduction.status = ProviderStatus::Cancelled;
+        QCOMPARE(mergeMetadataBatch(original, { { u"cancelled"_s, introduction } }), original);
+        introduction.status = ProviderStatus::Matched;
+        introduction.payload = { };
+        QCOMPARE(mergeMetadataBatch(original, { { u"empty"_s, introduction } }), original);
+    }
     void repeatedTrackTitlesStillRequireUniqueMatches()
     {
         auto album = sampleAlbum();

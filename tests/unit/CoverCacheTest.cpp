@@ -128,6 +128,34 @@ private Q_SLOTS:
         levels = CoverCache::makeMipmaps(odd);
         QCOMPARE(levels.size(), 1);
         QVERIFY(std::abs(levels.first().pixelColor(0, 0).red() - 156) <= 1);
+        QImage oddAlpha(3, 3, QImage::Format_RGBA8888_Premultiplied);
+        for (int y = 0; y < 3; ++y) {
+            oddAlpha.setPixelColor(0, y, Qt::white);
+            oddAlpha.setPixelColor(1, y, Qt::black);
+            oddAlpha.setPixelColor(2, y, QColor(255, 0, 0, 128));
+        }
+        const auto mixed = CoverCache::makeMipmaps(oddAlpha);
+        QCOMPARE(mixed.size(), 1);
+        // Linear premultiplied mean: alpha=(1+1+128/255)/3,
+        // red=(1+128/255)/3, green=blue=1/3, then encode and premultiply.
+        const auto *rgba = mixed.first().constBits();
+        const std::array<int, 4> expected{ 170, 142, 142, 213 };
+        for (int c = 0; c < 4; ++c)
+            QVERIFY(std::abs(int(rgba[c]) - expected[c]) <= 1);
+        QVERIFY(CoverCache::makeMipmaps(QImage()).isEmpty());
+        QVERIFY(CoverCache::makeMipmaps(QImage(1, 1, QImage::Format_RGBA8888)).isEmpty());
+        // The final 27 -> 13 footprint can round just beyond its source extent.
+        for (const auto size : { QSize(27, 1), QSize(1, 27), QSize(27, 27), QSize(55, 27) }) {
+            QImage uniform(size, QImage::Format_RGBA8888);
+            uniform.fill(QColor(127, 63, 31, 128));
+            for (const auto &mip : CoverCache::makeMipmaps(uniform)) {
+                const auto edge = mip.pixelColor(mip.width() - 1, mip.height() - 1);
+                QVERIFY(std::abs(edge.red() - 127) <= 1);
+                QVERIFY(std::abs(edge.green() - 63) <= 1);
+                QVERIFY(std::abs(edge.blue() - 31) <= 1);
+                QCOMPARE(edge.alpha(), 128);
+            }
+        }
     }
     void atlasExpansionRetainsPixelsAndLeaseIdentity()
     {
@@ -719,6 +747,19 @@ private Q_SLOTS:
                  item.coverStatistics()[u"ready"_s].toInt() == 2
                          && item.coverStatistics()[u"selectedDetailed"_s].toBool()),
                 AsyncDeadlineMilliseconds);
+        item.setPreparing(true);
+        item.publishNow();
+        QSignalSpy prepared(&item, &SceneItem::scenePrepared);
+        const auto token = item.input().preparationToken;
+        const auto submission = item.submission();
+        item.prepared(token - 1, submission, true);
+        item.prepared(token, submission - 1, true);
+        item.prepared(token, submission, false);
+        QCoreApplication::sendPostedEvents();
+        QCOMPARE(prepared.size(), 0);
+        item.prepared(token, submission, true);
+        QTRY_COMPARE(prepared.size(), 1);
+        item.setPreparing(false);
         const auto before = item.input();
         const auto decodes =
                 item.coverStatistics().value(u"cache"_s).toObject().value(u"decodeStarts"_s);
