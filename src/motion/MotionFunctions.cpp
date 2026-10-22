@@ -66,12 +66,21 @@ double archiveWave(double row, double lane, double time)
     constexpr auto ReturnFadeDurationSeconds = .85;
 
     const double t = time - SceneStartSeconds, phase = row + (lane - 2) * LanePhaseRows;
-    return smooth(t / ArrivalFadeSeconds)
-            * (packet(phase - (LeadingStartRow + t * LeadingRowsPerSecond))
-                       * (1 - smooth((t - LeadingFadeStartSeconds) / LeadingFadeSeconds))
-               + packet(phase - (ReturnStartRow - (t - ReturnStartSeconds) * ReturnRowsPerSecond))
-                       * smooth((t - ReturnFadeStartSeconds) / ArrivalFadeSeconds)
-                       * (1 - smooth((t - ReturnFadeOutSeconds) / ReturnFadeDurationSeconds)));
+    const double arrival = smooth(t / ArrivalFadeSeconds);
+    if (arrival == 0)
+        return 0;
+    const double leadingGain = 1 - smooth((t - LeadingFadeStartSeconds) / LeadingFadeSeconds);
+    const double returnIn = smooth((t - ReturnFadeStartSeconds) / ArrivalFadeSeconds);
+    const double returnOut = 1 - smooth((t - ReturnFadeOutSeconds) / ReturnFadeDurationSeconds);
+    // The authored envelopes have exact zero tails. Do not evaluate their discarded packets.
+    const double leading = leadingGain == 0
+            ? 0
+            : packet(phase - (LeadingStartRow + t * LeadingRowsPerSecond)) * leadingGain;
+    const double returning = returnIn == 0 || returnOut == 0
+            ? 0
+            : packet(phase - (ReturnStartRow - (t - ReturnStartSeconds) * ReturnRowsPerSecond))
+                    * returnIn * returnOut;
+    return arrival * (leading + returning);
 }
 double extraction(double time)
 {
@@ -102,6 +111,8 @@ double settlingWave(double distance, double time)
     constexpr auto RingFadeSeconds = .16;
 
     const double age = time - SettleStartSeconds - std::abs(distance) * DelaySecondsPerRow;
+    if (age <= 0)
+        return 0;
     const double envelope =
             std::max(-MinimumEnvelopeMagnitude,
                      CenterEnvelope - EnvelopeFalloff * (std::sqrt(distance * distance + 1) - 1));
@@ -175,7 +186,8 @@ double cinematicField(double row, double lane, double time, double center, doubl
 
     const double handoff = smooth((time - HandoffStartSeconds) / HandoffDurationSeconds),
                  selection = smooth((time - SelectionStartSeconds) / SelectionDurationSeconds);
-    return archiveWave(row, lane, time) * (1 - handoff)
+    const double archive = handoff == 1 ? 0 : archiveWave(row, lane, time) * (1 - handoff);
+    return archive
             + settlingWave(row - center,
                            time + SettleTimeAdvanceSeconds * handoff * (1 - selection))
             * columnStrength(lane, focus,

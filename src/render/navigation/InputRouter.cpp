@@ -24,30 +24,37 @@ constexpr auto MinimumSwipePixels = 36;
 constexpr auto SwipeAxisDominance = 1.3;
 constexpr auto MaximumSwipeMilliseconds = 1400;
 
+bool inputOwner(QQuickItem *item, bool wheel)
+{
+    return item->property("navigationInputOwner").toBool() || item->inherits("QQuickTextInput")
+            || item->inherits("QQuickTextEdit") || item->inherits("QQuickSlider")
+            || item->inherits("QQuickSpinBox") || item->inherits("QQuickComboBox")
+            || item->inherits("QQuickPopupItem")
+            || (wheel
+                && (item->inherits("QQuickFlickable") || item->inherits("QQuickAbstractButton")));
+}
 bool ownsInput(QQuickItem *item, bool wheel)
 {
     for (auto *node = item; node; node = node->parentItem()) {
-        if (node->property("navigationInputOwner").toBool() || node->inherits("QQuickTextInput")
-            || node->inherits("QQuickTextEdit") || node->inherits("QQuickSlider")
-            || node->inherits("QQuickSpinBox") || node->inherits("QQuickComboBox")
-            || node->inherits("QQuickPopupItem")
-            || (wheel
-                && (node->inherits("QQuickFlickable") || node->inherits("QQuickAbstractButton"))))
+        if (inputOwner(node, wheel))
             return true;
     }
     return false;
 }
-bool pointerOwner(QQuickItem *item, QPointF scenePoint)
+bool pointerOwner(QQuickItem *item, QPointF scenePoint, bool inheritedOwner = false)
 {
     if (!item->isVisible() || !item->isEnabled() || item->opacity() <= 0)
         return false;
     const bool contains = item->contains(item->mapFromScene(scenePoint));
     if (item->clip() && !contains)
         return false;
-    if (contains && ownsInput(item, true))
+    // Carry ancestor ownership down this event's traversal instead of walking the same
+    // parent chain again for every overlapping item. No state survives the input event.
+    const bool owned = inheritedOwner || inputOwner(item, true);
+    if (contains && owned)
         return true;
     for (auto *child : item->childItems())
-        if (pointerOwner(child, scenePoint))
+        if (pointerOwner(child, scenePoint, owned))
             return true;
     return false;
 }

@@ -16,6 +16,11 @@ struct TransportTrack final
     double value() const;
     void move(double to, double seconds, bool instant);
     void advance(double dt);
+
+private:
+    double progress() const;
+    mutable double m_cachedElapsed = -1, m_cachedDuration = -1, m_cachedProgress = 0;
+    mutable bool m_cachedEase = false;
 };
 class TransportMotion : public QObject, public QQmlParserStatus
 {

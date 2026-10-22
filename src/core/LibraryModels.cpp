@@ -54,32 +54,37 @@ LibraryOrder orderLibrary(const LibrarySnapshot &snapshot, SortMode mode)
     LibraryOrder result;
     result.indices.resize(snapshot.albums.size());
     std::iota(result.indices.begin(), result.indices.end(), 0);
-    QCollator collator(QLocale(u"zh_CN"_s));
-    collator.setNumericMode(true);
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
-    const auto compare = [&](const QString &a, const QString &b) {
-        const int locale = collator.compare(a, b);
-        return locale ? locale : QString::compare(a, b, Qt::CaseSensitive);
-    };
     QStringList titles, artists;
     if (mode != SortMode::Genre) {
+        QCollator collator(QLocale(u"zh_CN"_s));
+        collator.setNumericMode(true);
+        collator.setCaseSensitivity(Qt::CaseInsensitive);
+        QList<QCollatorSortKey> titleKeys, artistKeys;
+        titleKeys.reserve(snapshot.albums.size());
+        if (mode == SortMode::Artist)
+            artistKeys.reserve(snapshot.albums.size());
         titles.reserve(snapshot.albums.size());
         if (mode == SortMode::Artist)
             artists.reserve(snapshot.albums.size());
         for (const auto &album : snapshot.albums) {
             titles.append(normalizedKey(album.title));
-            if (mode == SortMode::Artist)
+            titleKeys.append(collator.sortKey(titles.last()));
+            if (mode == SortMode::Artist) {
                 artists.append(normalizedKey(album.artist));
+                artistKeys.append(collator.sortKey(artists.last()));
+            }
         }
         std::stable_sort(result.indices.begin(), result.indices.end(), [&](int a, int b) {
             const auto &left = snapshot.albums[a];
             const auto &right = snapshot.albums[b];
             if (mode == SortMode::Artist) {
-                const int artist = compare(artists[a], artists[b]);
+                const int locale = artistKeys[a].compare(artistKeys[b]);
+                const int artist = locale ? locale : QString::compare(artists[a], artists[b]);
                 if (artist)
                     return artist < 0;
             }
-            const int title = compare(titles[a], titles[b]);
+            const int locale = titleKeys[a].compare(titleKeys[b]);
+            const int title = locale ? locale : QString::compare(titles[a], titles[b]);
             return title ? title < 0 : left.id < right.id;
         });
     }

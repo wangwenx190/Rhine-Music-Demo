@@ -2683,10 +2683,16 @@ void RhiItem::submit(Input input, QSize target)
                 "Shell instances require stable IDs");
         require(input.entityIds.isEmpty() || input.entityIds.size() == input.entities.size(),
                 "Mismatched shell IDs");
-        std::array<quint64, renderData::MaximumCaseEntities> ids;
-        const auto end = std::copy(input.entityIds.cbegin(), input.entityIds.cend(), ids.begin());
-        std::sort(ids.begin(), end);
-        require(std::adjacent_find(ids.begin(), end) == end, "Duplicate shell instance ID");
+        // Ordinary animation changes transforms while identities stay fixed. The previous
+        // accepted shell snapshot proves uniqueness until the ID sequence changes. Inputs
+        // without shell entities did not establish that invariant and cannot seed this cache.
+        if (!m_input.shells || m_input.entities.isEmpty() || input.entityIds != m_input.entityIds) {
+            std::array<quint64, renderData::MaximumCaseEntities> ids;
+            const auto end =
+                    std::copy(input.entityIds.cbegin(), input.entityIds.cend(), ids.begin());
+            std::sort(ids.begin(), end);
+            require(std::adjacent_find(ids.begin(), end) == end, "Duplicate shell instance ID");
+        }
     }
     ++m_submission;
     m_input = std::move(input);

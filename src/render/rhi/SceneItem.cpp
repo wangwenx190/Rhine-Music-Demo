@@ -1257,10 +1257,12 @@ try {
         return;
     m_publishedCallbackRevision = m_callbackRevision;
     m_publishedCoverRevision = m_coverRevision;
-    in.entities = { in.scene.caseTransform };
-    in.entityIds = { 1 };
     if (m_poolMode)
         preparePool(in);
+    else {
+        in.entities = { in.scene.caseTransform };
+        in.entityIds = { 1 };
+    }
     submit(std::move(in), target);
 } catch (const std::runtime_error &error) {
     m_errorText = QString::fromUtf8(error.what());

@@ -17,6 +17,7 @@
 #include <chrono>
 #include <filesystem>
 #include <array>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 
@@ -122,10 +123,38 @@ struct Walker final
             }
         }
     }
-    bool less(const QString &a, const QString &b) const
+    void sortPaths(QStringList &paths, bool covers = false) const
     {
-        const int order = collator.compare(a, b);
-        return order == 0 ? a < b : order < 0;
+        if (paths.size() < 2)
+            return;
+        struct PathKey final
+        {
+            QString path;
+            QCollatorSortKey key;
+            int rank;
+        };
+        static constexpr std::array preferred{ "cover"_L1, "folder"_L1, "front"_L1 };
+        QList<PathKey> keys;
+        keys.reserve(paths.size());
+        // Locale transformation and file-name parsing happen once per path, outside comparisons.
+        for (const auto &path : std::as_const(paths)) {
+            int rank = UnpreferredCoverRank;
+            if (covers) {
+                const auto stem = QFileInfo(path).completeBaseName().toLower();
+                const auto found = std::find(preferred.cbegin(), preferred.cend(), stem);
+                rank = int(found - preferred.cbegin());
+            }
+            keys.append({ path, collator.sortKey(path), rank });
+        }
+        std::sort(keys.begin(), keys.end(), [](const PathKey &a, const PathKey &b) {
+            if (a.rank != b.rank)
+                return a.rank < b.rank;
+            const int order = a.key.compare(b.key);
+            return order ? order < 0 : a.path < b.path;
+        });
+        paths.clear();
+        for (auto &entry : keys)
+            paths.append(std::move(entry.path));
     }
     bool appendAlbum(const QString &root, const QString &folder, const QStringList &files,
                      bool single, const QStringList &images, QString &error)
@@ -176,15 +205,15 @@ struct Walker final
                 resetTrackMetadata(track, info);
             album.tracks.append(std::move(track));
         }
-        std::sort(album.tracks.begin(), album.tracks.end(), [this](const Track &a, const Track &b) {
-            if (a.discNumber.value_or(1) != b.discNumber.value_or(1))
-                return a.discNumber.value_or(1) < b.discNumber.value_or(1);
-            if (a.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey)
-                != b.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey))
-                return a.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey)
-                        < b.trackNumber.value_or(yalahoo::libraryDefaults::UnnumberedTrackSortKey);
-            return less(a.relativePath, b.relativePath);
-        });
+        // Files already have natural path order. A stable numeric sort preserves that tie-break
+        // without transforming the same relative path at every comparison.
+        std::stable_sort(
+                album.tracks.begin(), album.tracks.end(), [](const Track &a, const Track &b) {
+                    if (a.discNumber.value_or(1) != b.discNumber.value_or(1))
+                        return a.discNumber.value_or(1) < b.discNumber.value_or(1);
+                    return a.trackNumber.value_or(libraryDefaults::UnnumberedTrackSortKey)
+                            < b.trackNumber.value_or(libraryDefaults::UnnumberedTrackSortKey);
+                });
         if (!old) {
             album.title = single ? album.tracks.first().title : QFileInfo(folder).fileName();
             album.artist.clear();
@@ -232,28 +261,9 @@ struct Walker final
             error = fileError(folder, ec);
             return false;
         }
-        std::sort(files.begin(), files.end(), [this](const QString &a, const QString &b) {
-            return less(a, b);
-        });
-        std::sort(directories.begin(), directories.end(),
-                  [this](const QString &a, const QString &b) {
-                      return less(a, b);
-                  });
-        static constexpr std::array preferred{ "cover"_L1, "folder"_L1, "front"_L1 };
-        QHash<QString, int> imageRanks;
-        imageRanks.reserve(images.size());
-        for (const auto &image : images) {
-            const auto stem = QFileInfo(image).completeBaseName().toLower();
-            const auto rank = std::find(preferred.cbegin(), preferred.cend(), stem);
-            imageRanks.insert(image,
-                              rank == preferred.cend() ? UnpreferredCoverRank
-                                                       : int(rank - preferred.cbegin()));
-        }
-        std::sort(images.begin(), images.end(),
-                  [this, &imageRanks](const QString &a, const QString &b) {
-                      const int first = imageRanks.value(a), second = imageRanks.value(b);
-                      return first == second ? less(a, b) : first < second;
-                  });
+        sortPaths(files);
+        sortPaths(directories);
+        sortPaths(images, true);
         if (folder == root) {
             QHash<QString, QStringList> singleImages;
             singleImages.reserve(images.size());

@@ -367,11 +367,11 @@ void SceneAdapter::publish()
                           + (sceneGeometry::InspectionLift - sceneGeometry::PreviewLift) * m_detail,
                   -sceneGeometry::ArchiveDepth
               };
-    if (m_frame.revision && m_frame.width == m_layout.width() && m_frame.height == m_layout.height()
-        && m_frame.hasArchivePool == bool(m_selection) && m_frame.camera.position == position
-        && m_frame.camera.aim == aim && m_frame.camera.span == m_span.value
-        && m_frame.fogNear == fogNear && m_frame.fogFar == fogFar
-        && m_frame.casePosition == caseOrigin
+    const bool cameraChanged = !m_frame.revision || m_frame.width != m_layout.width()
+            || m_frame.height != m_layout.height() || m_frame.camera.position != position
+            || m_frame.camera.aim != aim || m_frame.camera.span != m_span.value;
+    if (!cameraChanged && m_frame.hasArchivePool == bool(m_selection) && m_frame.fogNear == fogNear
+        && m_frame.fogFar == fogFar && m_frame.casePosition == caseOrigin
         && m_frame.individualMaterials == (m_managedDetail && bool(m_selection))
         && m_selectionRevision == (m_selection ? m_selection->revision() : 0))
         return;
@@ -383,18 +383,22 @@ void SceneAdapter::publish()
     m_frame.camera = { position, aim, m_span.value };
     m_frame.fogNear = fogNear;
     m_frame.fogFar = fogFar;
-    const double distance = std::max(1.0, renderedDistance);
-    m_frame.fieldOfView =
-            2 * std::atan(std::max(MinimumFovSpan, m_span.value) / (2 * distance)) / radians;
-    m_frame.view.setToIdentity();
-    m_frame.view.lookAt(cameraPosition(), cameraAim(), { 0, 1, 0 });
-    m_frame.cameraRotation =
-            QQuaternion::fromRotationMatrix(m_frame.view.inverted().normalMatrix());
-    m_frame.projection.setToIdentity();
-    m_frame.projection.perspective(float(m_frame.fieldOfView),
-                                   float(m_frame.width / m_frame.height), float(clipNear()),
-                                   float(clipFar()));
-    m_viewProjection = m_frame.projection * m_frame.view;
+    // Entity waves and cover changes do not alter camera matrices. Keep their exact values
+    // until one of the camera/layout inputs changes instead of rebuilding/inverting per frame.
+    if (cameraChanged) {
+        const double distance = std::max(1.0, renderedDistance);
+        m_frame.fieldOfView =
+                2 * std::atan(std::max(MinimumFovSpan, m_span.value) / (2 * distance)) / radians;
+        m_frame.view.setToIdentity();
+        m_frame.view.lookAt(cameraPosition(), cameraAim(), { 0, 1, 0 });
+        m_frame.cameraRotation =
+                QQuaternion::fromRotationMatrix(m_frame.view.inverted().normalMatrix());
+        m_frame.projection.setToIdentity();
+        m_frame.projection.perspective(float(m_frame.fieldOfView),
+                                       float(m_frame.width / m_frame.height), float(clipNear()),
+                                       float(clipFar()));
+        m_viewProjection = m_frame.projection * m_frame.view;
+    }
     m_frame.casePosition = caseOrigin;
     m_frame.caseTransform.setToIdentity();
     m_frame.caseTransform.translate(casePosition());

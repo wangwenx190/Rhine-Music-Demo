@@ -50,7 +50,8 @@ bool validMbid(const QString &id)
 QString escapeSearch(const QString &value)
 {
     QString result;
-    const auto reserved = u"+-&|!(){}[]^\"~*?:\\/"_s;
+    result.reserve(value.size() * 2);
+    static constexpr auto reserved = "+-&|!(){}[]^\"~*?:\\/"_L1;
     for (const auto character : value) {
         if (reserved.contains(character))
             result += '\\'_L1;
@@ -170,7 +171,7 @@ private:
         QStringList failures;
         bool uncertain = false, searched = false;
         QString language = u"zh"_s;
-        QString releaseId, groupId;
+        QString releaseId, groupId, inputKey;
     };
     void start()
     {
@@ -180,7 +181,8 @@ private:
         auto &job = *m_active;
         const auto &album = job.query.album;
         const auto kind = job.result.kind;
-        const auto key = metadataKey(album, kind);
+        // The job owns an immutable album query throughout all HTTP stages.
+        job.inputKey = metadataKey(album, kind);
         const auto cached = cachedMetadata(album, kind, job.token);
         const auto state = kind == MetadataKind::Introduction ? album.introduction
                 : kind == MetadataKind::Credits               ? album.creditsLookup
@@ -190,8 +192,8 @@ private:
         const auto retry = QDateTime::fromString(cached.retryAt, Qt::ISODateWithMs);
         const auto desiredRelease =
                 kind == MetadataKind::Introduction ? QString() : preferredRelease(job.query);
-        const bool same =
-                (!state.contains(u"inputKey"_s) || state.value(u"inputKey"_s).toString() == key)
+        const bool same = (!state.contains(u"inputKey"_s)
+                           || state.value(u"inputKey"_s).toString() == job.inputKey)
                 && (desiredRelease.isEmpty()
                     || state.value(u"releaseId"_s).toString() == desiredRelease);
         const auto checked = QDateTime::fromString(cached.checkedAt, Qt::ISODateWithMs);
@@ -518,7 +520,7 @@ private:
         result.requestId = job.token.requestId;
         result.generation = job.token.generation;
         result.albumId = job.token.albumId;
-        result.inputKey = metadataKey(job.query.album, result.kind);
+        result.inputKey = std::move(job.inputKey);
         if (checked) {
             const auto now = QDateTime::currentDateTimeUtc();
             result.checkedAt = now.toString(Qt::ISODateWithMs);

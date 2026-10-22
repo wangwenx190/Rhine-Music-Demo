@@ -122,7 +122,15 @@ Q_SIGNALS:
     void memoryChanged();
 
 private:
-    double realisticField(double row, double lane, bool reduced) const;
+    // Lane-only values are sampled once for a publication, never retained across state changes.
+    struct FieldColumn final
+    {
+        double lane = 0, center = 0, strength = 1, activity = 0, intro = 0;
+        bool reduced = false;
+    };
+    FieldColumn fieldColumn(double lane) const;
+    double field(double row, const FieldColumn &column) const;
+    double realisticField(double row, const FieldColumn &column) const;
     void advanceLift(double dt, bool reduced, bool detailNavigation);
     struct Pulse final
     {

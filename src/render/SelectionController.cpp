@@ -583,11 +583,31 @@ void SelectionController::cancelDrag()
 {
     m_drag.cancel();
 }
-double SelectionController::realisticField(double row, double lane, bool reduced) const
+SelectionController::FieldColumn SelectionController::fieldColumn(double lane) const
 {
-    const double activity = m_realColumns.activity(int(lane));
-    double height = reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
-    if (!reduced && activity > 0) {
+    FieldColumn column;
+    column.lane = lane;
+    column.reduced = m_motion->reducedMotion();
+    if (m_realistic) {
+        column.activity = m_realColumns.activity(int(lane));
+        column.center = m_realColumns.row(int(lane), m_openingTime ? 0 : overviewProgress());
+    } else {
+        const auto &springs = m_motion->springs();
+        column.center = m_openingTime ? m_cell.row : springs[ShoulderAxis].value;
+        column.strength =
+                columnStrength(lane, m_openingTime ? m_cell.lane : springs[LaneAxis].value);
+    }
+    if (m_openingTime)
+        column.intro = smooth((*m_openingTime - openingTimeline::PreviewStartSeconds)
+                              / openingTimeline::PreviewDurationSeconds);
+    return column;
+}
+double SelectionController::realisticField(double row, const FieldColumn &column) const
+{
+    const double lane = column.lane, activity = column.activity;
+    double height =
+            column.reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
+    if (!column.reduced && activity > 0 && m_pulseGain != 0) {
         double ripple = 0;
         for (const auto &pulse : m_pulses)
             if (pulse.cell.lane == lane)
@@ -596,37 +616,35 @@ double SelectionController::realisticField(double row, double lane, bool reduced
                 * m_pulseGain * activity;
     }
     return height
-            + settlingWave(row - m_realColumns.row(int(lane), overviewProgress()),
-                           sceneGeometry::SettledSceneSeconds)
-            * activity;
+            + settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds) * activity;
 }
 double SelectionController::field(double row, double lane) const
 {
-    if (!m_motion)
-        return 0;
-    const bool reduced = m_motion->reducedMotion();
+    return m_motion ? field(row, fieldColumn(lane)) : 0;
+}
+double SelectionController::field(double row, const FieldColumn &column) const
+{
+    const double lane = column.lane;
     if (m_openingTime) {
-        const double intro = smooth((*m_openingTime - yalahoo::openingTimeline::PreviewStartSeconds)
-                                    / yalahoo::openingTimeline::PreviewDurationSeconds);
-        const double opening =
-                cinematicField(row - m_cell.row + yalahoo::sceneGeometry::FirstAlbumRow,
-                               lane - m_cell.lane + 2, *m_openingTime);
-        const double resting = m_realistic
-                ? settlingWave(row - m_realColumns.row(int(lane)),
-                               sceneGeometry::SettledSceneSeconds)
-                        * m_realColumns.activity(int(lane))
-                : settlingWave(row - m_cell.row, sceneGeometry::SettledSceneSeconds)
-                        * columnStrength(lane, m_cell.lane);
+        const double intro = column.intro;
+        const double opening = intro == 1
+                ? 0
+                : cinematicField(row - m_cell.row + sceneGeometry::FirstAlbumRow,
+                                 lane - m_cell.lane + 2, *m_openingTime);
+        if (intro == 0)
+            return opening;
+        const double resting = settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds)
+                * (m_realistic ? column.activity : column.strength);
         return opening * (1 - intro) + resting * intro;
     }
     if (m_realistic)
-        return realisticField(row, lane, reduced);
+        return realisticField(row, column);
     double height = 0;
     if (m_scanBlend != 0)
         height += archiveWave(row + m_origin.row, lane + m_origin.lane, m_scanTime) * m_scanBlend;
     if (m_idleGain != 0)
         height += idleWave(row + m_origin.row, lane + m_origin.lane, m_time) * m_idleGain;
-    if (!reduced && m_pulseGain != 0) {
+    if (!column.reduced && m_pulseGain != 0) {
         double ripple = 0;
         for (const auto &pulse : m_pulses)
             ripple += musicSelectionWave(
@@ -636,10 +654,9 @@ double SelectionController::field(double row, double lane) const
         height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
                 * m_pulseGain;
     }
-    const auto &springs = m_motion->springs();
     return height
-            + settlingWave(row - springs[ShoulderAxis].value, sceneGeometry::SettledSceneSeconds)
-            * columnStrength(lane, springs[LaneAxis].value);
+            + settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds)
+            * column.strength;
 }
 QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
                                           bool folded) const
@@ -945,6 +962,7 @@ void SelectionController::publish()
         double upper;
     };
     std::optional<PreviousField> previousField;
+    std::optional<FieldColumn> column;
     for (auto instance : m_pool.instances()) {
         // Optical depth ties use the physical identity, which survives logical rebase.
         const PoolObject::PhysicalCell physical{ qint64(instance.cell.lane + m_origin.lane),
@@ -966,14 +984,16 @@ void SelectionController::publish()
         // Reuse the exact value only within this publication, so every state change
         // naturally invalidates it without a persistent field-cache key.
         const auto cell = instance.cell;
+        if (!column || column->lane != cell.lane)
+            column = fieldColumn(cell.lane);
         const double lower = previousField && previousField->cell.lane == cell.lane
                         && previousField->cell.row + 1 == cell.row
                 ? previousField->upper
-                : field(cell.row - .5, cell.lane);
-        const double upper = field(cell.row + .5, cell.lane);
+                : field(cell.row - .5, *column);
+        const double upper = field(cell.row + .5, *column);
         previousField = PreviousField{ cell, upper };
         instance.transform =
-                transform(cell, 0, 0, true, inputs, field(cell.row, cell.lane), upper - lower);
+                transform(cell, 0, 0, true, inputs, field(cell.row, *column), upper - lower);
         next.append(std::move(instance));
     }
     for (const auto &copy : m_returning)

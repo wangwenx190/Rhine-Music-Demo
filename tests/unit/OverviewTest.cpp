@@ -84,6 +84,39 @@ public:
     OverviewTest() = default;
 
 private Q_SLOTS:
+    void labelNotificationsFollowChangedRoles()
+    {
+        OverviewLabelsModel model;
+        QVector<OverviewColumn> input{ { 0, u"Column"_s, 12, 960, 350, 1, true } };
+        model.update(input, 1920, 1080, true, 0, true);
+        QSignalSpy changes(&model, &QAbstractItemModel::dataChanged);
+        model.update(input, 1920, 1080, true, .05, true);
+        QVERIFY(changes.isEmpty());
+        input[0].x += 1;
+        model.update(input, 1920, 1080, true, .05, true);
+        QCOMPARE(changes.size(), 1);
+        QCOMPARE(qvariant_cast<QList<int>>(changes.takeFirst()[2]),
+                 QList<int>{ OverviewLabelsModel::X });
+        QVERIFY(model.expand(0));
+        model.update(input, 1920, 1080, true, .05, true);
+        QCOMPARE(changes.size(), 1);
+        const auto expanded = qvariant_cast<QList<int>>(changes.takeFirst()[2]);
+        QVERIFY(expanded.contains(OverviewLabelsModel::Expanded));
+        QVERIFY(expanded.contains(OverviewLabelsModel::EntryWidth));
+        QVERIFY(!expanded.contains(OverviewLabelsModel::Name));
+        model.update(input, 1920, 1080, true, .05, true);
+        QVERIFY(changes.isEmpty());
+        model.collapse();
+        model.update(input, 1920, 1080, true, .05, true);
+        QCOMPARE(changes.size(), 1);
+        QVERIFY(qvariant_cast<QList<int>>(changes.takeFirst()[2])
+                        .contains(OverviewLabelsModel::Expanded));
+        model.clear();
+        QVERIFY(!changes.isEmpty());
+        changes.clear();
+        model.clear();
+        QVERIFY(changes.isEmpty());
+    }
     void dependencyTeardownClearsOverviewAndRejectsNewCommands()
     {
         for (int removed = 0; removed < 4; ++removed) {

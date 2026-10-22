@@ -219,9 +219,6 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(const QVector<Overvie
 void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double width,
                                  double height, bool ready, double dt, bool reduced)
 {
-    std::array<bool, capacity> previouslyLive;
-    for (int row = 0; row < capacity; ++row)
-        previouslyLive[row] = m_slots[row]->column.lane >= 0;
     std::array<int, capacity> retained;
     qsizetype retainedCount = 0;
     for (const auto &s : m_slots)
@@ -294,9 +291,41 @@ void OverviewLabelsModel::update(const QVector<OverviewColumn> &columns, double 
                                  : s.opacityFrom
                         + (target - s.opacityFrom)
                                 * opacityCurve().valueForProgress(s.opacityTime / EntryFadeSeconds);
-        if (previouslyLive[row] || s.column.lane >= 0 || s.fade.running())
-            Q_EMIT dataChanged(index(row), index(row));
+        notifySlot(row);
     }
+}
+void OverviewLabelsModel::notifySlot(int row)
+{
+    auto &slot = *m_slots[row];
+    const PublishedSlot next{
+        slot.column,         slot.wanted,        slot.column.lane == m_expanded && slot.wanted,
+        slot.fade.opacity(), slot.fade.offset(), slot.entry,
+        slot.entryOpacity
+    };
+    const auto &before = slot.published;
+    QList<int> roles;
+    const auto changed = [&roles](const auto &oldValue, const auto &newValue, int role) {
+        if (oldValue != newValue)
+            roles.append(role);
+    };
+    changed(before.column.lane, next.column.lane, Lane);
+    changed(before.column.name, next.column.name, Name);
+    changed(before.column.count, next.column.count, Count);
+    changed(before.column.x, next.column.x, X);
+    changed(before.column.y, next.column.y, Y);
+    changed(before.column.extent, next.column.extent, Extent);
+    changed(before.column.selected, next.column.selected, Selected);
+    changed(before.wanted, next.wanted, Interactive);
+    changed(before.expanded, next.expanded, Expanded);
+    changed(before.fade, next.fade, Fade);
+    changed(before.offset, next.offset, Offset);
+    changed(before.entry, next.entry, EntryWidth);
+    changed(before.entry, next.entry, EntryOffset);
+    changed(before.entryOpacity, next.entryOpacity, EntryOpacity);
+    // Commit before notifying: synchronous readers may expand, clear or replace labels.
+    slot.published = next;
+    if (!roles.isEmpty())
+        Q_EMIT dataChanged(index(row), index(row), roles);
 }
 bool OverviewLabelsModel::expand(int lane)
 {
@@ -331,7 +360,8 @@ void OverviewLabelsModel::clear()
         s->column = { };
         s->entry = s->entryOpacity = s->entryTarget = s->entryFrom = s->opacityFrom = 0;
     }
-    Q_EMIT dataChanged(index(0), index(capacity - 1));
+    for (int row = 0; row < capacity; ++row)
+        notifySlot(row);
 }
 int OverviewLabelsModel::liveCount() const
 {

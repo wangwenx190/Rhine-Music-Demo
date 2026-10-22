@@ -64,6 +64,13 @@ public:
     bool running() const;
 
 private:
+    void notifySlot(int row);
+    struct PublishedSlot final
+    {
+        OverviewColumn column;
+        bool wanted = false, expanded = false;
+        double fade = 0, offset = 0, entry = 0, entryOpacity = 0;
+    };
     struct Slot final
     {
         OverviewColumn column;
@@ -73,6 +80,7 @@ private:
         double entryTime = 0, entryFrom = 0, entry = 0;
         double opacityTime = 0, opacityFrom = 0, entryOpacity = 0;
         double entryTarget = 0;
+        PublishedSlot published;
     };
     std::array<std::unique_ptr<Slot>, capacity> m_slots;
     int m_expanded = -1;

@@ -381,6 +381,10 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
         encoded.setColorSpace(QColorSpace::SRgb);
         const double sx = double(linear.width()) / size.width();
         const double sy = double(linear.height()) / size.height();
+        const int columns = linear.width() > 1 ? 2 : 1;
+        const int rows = linear.height() > 1 ? 2 : 1;
+        const bool integralFootprint =
+                linear.width() == size.width() * columns && linear.height() == size.height() * rows;
         for (int y = 0; y < size.height(); ++y) {
             auto *output = reinterpret_cast<float *>(next.scanLine(y));
             auto *bytes = encoded.scanLine(y);
@@ -390,14 +394,27 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
                 std::array<double, 4> sum{ };
                 const double x0 = x * sx, x1 = (x + 1) * sx;
                 const int endX = int(std::ceil(x1));
-                for (int iy = int(y0); iy < endY; ++iy) {
-                    const auto *row = reinterpret_cast<const float *>(linear.constScanLine(iy));
-                    const double weightY = std::min(y1, iy + 1.0) - std::max(y0, double(iy));
-                    for (int ix = int(x0); ix < endX; ++ix) {
-                        const double weight =
-                                (std::min(x1, ix + 1.0) - std::max(x0, double(ix))) * weightY;
-                        for (int c = 0; c < 4; ++c)
-                            sum[c] += row[4 * ix + c] * weight;
+                if (integralFootprint) {
+                    // Power-of-two cover layers have unit source weights. Preserve the same
+                    // double accumulation order while avoiding per-sample overlap arithmetic.
+                    for (int iy = 0; iy < rows; ++iy) {
+                        const auto *row =
+                                reinterpret_cast<const float *>(linear.constScanLine(y * rows + iy))
+                                + 4 * x * columns;
+                        for (int ix = 0; ix < columns; ++ix)
+                            for (int c = 0; c < 4; ++c)
+                                sum[c] += row[4 * ix + c];
+                    }
+                } else {
+                    for (int iy = int(y0); iy < endY; ++iy) {
+                        const auto *row = reinterpret_cast<const float *>(linear.constScanLine(iy));
+                        const double weightY = std::min(y1, iy + 1.0) - std::max(y0, double(iy));
+                        for (int ix = int(x0); ix < endX; ++ix) {
+                            const double weight =
+                                    (std::min(x1, ix + 1.0) - std::max(x0, double(ix))) * weightY;
+                            for (int c = 0; c < 4; ++c)
+                                sum[c] += row[4 * ix + c] * weight;
+                        }
                     }
                 }
                 for (int c = 0; c < 4; ++c)

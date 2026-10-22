@@ -24,11 +24,23 @@ double bezier(double x, bool ease)
     return sampleCubicBezier(x, { x1, y1 }, { x2, 1 }, BezierSearchSteps);
 }
 }
+double TransportTrack::progress() const
+{
+    if (elapsed != m_cachedElapsed || duration != m_cachedDuration || ease != m_cachedEase) {
+        // QML can read one track several times after a notification. Reuse the exact bounded
+        // Bezier inversion until one of its inputs changes, including during reversal.
+        m_cachedProgress = bezier(std::clamp(elapsed / duration, 0.0, 1.0), ease);
+        m_cachedElapsed = elapsed;
+        m_cachedDuration = duration;
+        m_cachedEase = ease;
+    }
+    return m_cachedProgress;
+}
 double TransportTrack::value() const
 {
     if (elapsed >= duration)
         return target;
-    return start + (target - start) * bezier(std::clamp(elapsed / duration, 0.0, 1.0), ease);
+    return start + (target - start) * progress();
 }
 void TransportTrack::move(double to, double seconds, bool instant)
 {
@@ -37,8 +49,7 @@ void TransportTrack::move(double to, double seconds, bool instant)
     const double current = value();
     const double previousTarget = target;
     if (!instant && elapsed < duration && to == reversingStart) {
-        const double progress = bezier(std::clamp(elapsed / duration, 0.0, 1.0), ease);
-        shortening = std::clamp(std::abs(progress * shortening + 1 - shortening), 0.0, 1.0);
+        shortening = std::clamp(std::abs(progress() * shortening + 1 - shortening), 0.0, 1.0);
         reversingStart = previousTarget;
     } else {
         shortening = 1;

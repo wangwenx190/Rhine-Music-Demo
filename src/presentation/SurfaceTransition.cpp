@@ -19,6 +19,22 @@ constexpr auto BrowseBezierSecondX = .25;
 constexpr auto EnterBezierFirstX = .22;
 constexpr auto EnterBezierSecondX = .36;
 constexpr auto CompletionEpsilonSeconds = 1e-10;
+
+const QEasingCurve &exitCurve()
+{
+    static const auto curve = yalahoo::cubicBezier(ExitBezierFirstX, 0, 1, 1);
+    return curve;
+}
+const QEasingCurve &enterCurve(bool browse)
+{
+    if (browse) {
+        static const auto curve =
+                yalahoo::cubicBezier(BrowseBezierFirstX, 0, BrowseBezierSecondX, 1);
+        return curve;
+    }
+    static const auto curve = yalahoo::cubicBezier(EnterBezierFirstX, 1, EnterBezierSecondX, 1);
+    return curve;
+}
 }
 
 namespace yalahoo {
@@ -52,13 +68,11 @@ void SurfaceTransition::run(bool show, bool reduced, std::function<void()> finis
                          : base)
             / yalahoo::units::MillisecondsPerSecond;
     if (!show) {
-        m_ease = cubicBezier(ExitBezierFirstX, 0, 1, 1);
+        m_ease = exitCurve();
     } else if (m_enterCurve) {
         m_ease = *m_enterCurve;
-    } else if (m_browse) {
-        m_ease = cubicBezier(BrowseBezierFirstX, 0, BrowseBezierSecondX, 1);
     } else {
-        m_ease = cubicBezier(EnterBezierFirstX, 1, EnterBezierSecondX, 1);
+        m_ease = enterCurve(m_browse);
     }
     m_elapsed = 0;
     m_opacity = m_fromOpacity;

@@ -66,6 +66,34 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void shellIdentityValidationFollowsAcceptedInputs()
+    {
+        RhiItem item;
+        Input input;
+        input.cover = QImage(1, 1, QImage::Format_RGBA8888_Premultiplied);
+        input.cover.fill(Qt::white);
+        input.entities.resize(2);
+        input.entityIds = { 1, 2 };
+        input.shells = true;
+        item.submit(input, { 16, 16 });
+        input.entities[0].translate(1, 0, 0);
+        item.submit(input, { 16, 16 });
+        const auto accepted = item.submission();
+        input.entityIds = { 1, 1 };
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, item.submit(input, { 16, 16 }));
+        QCOMPARE(item.submission(), accepted);
+        // Non-shell and empty-entity submissions do not prove uniqueness for a later shell frame.
+        input.shells = false;
+        item.submit(input, { 16, 16 });
+        input.shells = true;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, item.submit(input, { 16, 16 }));
+        input.entities.clear();
+        item.submit(input, { 16, 16 });
+        input.entities.resize(2);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, item.submit(input, { 16, 16 }));
+        input.entityIds = { 2, 1 };
+        item.submit(input, { 16, 16 });
+    }
     void mipmapsPreserveLinearLightAndAlpha()
     {
         QImage checker(2, 2, QImage::Format_RGBA8888_Premultiplied);
@@ -84,6 +112,22 @@ private Q_SLOTS:
         const auto edge = levels.first().pixelColor(0, 0);
         QVERIFY(edge.red() >= 253);
         QVERIFY(std::abs(edge.alpha() - 64) <= 1);
+        // Single-axis chains still integrate every source texel; odd widths use area weights.
+        for (const auto size : { QSize(4, 1), QSize(1, 4) }) {
+            QImage strip(size, QImage::Format_RGBA8888_Premultiplied);
+            strip.fill(Qt::black);
+            strip.setPixelColor(0, 0, Qt::white);
+            strip.setPixelColor(size.width() - 1, size.height() - 1, Qt::white);
+            const auto chain = CoverCache::makeMipmaps(strip);
+            QCOMPARE(chain.size(), 2);
+            QVERIFY(std::abs(chain.last().pixelColor(0, 0).red() - 188) <= 1);
+        }
+        QImage odd(3, 1, QImage::Format_RGBA8888_Premultiplied);
+        odd.fill(Qt::black);
+        odd.setPixelColor(2, 0, Qt::white);
+        levels = CoverCache::makeMipmaps(odd);
+        QCOMPARE(levels.size(), 1);
+        QVERIFY(std::abs(levels.first().pixelColor(0, 0).red() - 156) <= 1);
     }
     void atlasExpansionRetainsPixelsAndLeaseIdentity()
     {
