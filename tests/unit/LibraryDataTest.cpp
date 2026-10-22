@@ -79,6 +79,66 @@ private:
         return result;
     }
 private Q_SLOTS:
+    void typedPayloadsDoNotRetainObsoleteJsonCopies()
+    {
+        LibrarySnapshot source;
+        const QJsonObject extension{ { u"future"_s,
+                                       QJsonObject{ { u"keep"_s, QJsonValue::Null } } } };
+        source.fields = extension;
+        source.scan = { { u"status"_s, u"done"_s } };
+        source.enrich = source.introductions = source.credits = source.scan;
+        Genre genre;
+        genre.id = u"genre"_s;
+        genre.name = u"Genre"_s;
+        genre.aliases = { u"Alias"_s };
+        genre.fields = extension;
+        source.genres.append(genre);
+        Album album;
+        album.id = u"album"_s;
+        album.genreId = genre.id;
+        album.title = u"Collection"_s;
+        album.description = QString(65536, u'x');
+        album.localNote = u"Local note"_s;
+        album.descriptionSource = album.introduction = album.creditsLookup = album.online =
+                QJsonObject{ { u"payload"_s, QString(8192, u'y') } };
+        album.rawGenres = { u"Raw genre"_s };
+        album.fields = extension;
+        Track track;
+        track.id = u"track"_s;
+        track.albumId = album.id;
+        track.title = u"Song"_s;
+        track.fields = extension;
+        album.tracks.append(track);
+        Producer producer;
+        producer.name = u"Person"_s;
+        producer.role = u"Writer"_s;
+        producer.fields = extension;
+        album.producers.append(producer);
+        source.albums.append(album);
+        const auto encoded = toJson(source);
+        LibrarySnapshot parsed;
+        QVERIFY(readLibrary(encoded, parsed));
+        QCOMPARE(toJson(parsed), encoded);
+        QCOMPARE(parsed.fields, extension);
+        QCOMPARE(parsed.genres.first().fields, extension);
+        QCOMPARE(parsed.albums.first().fields, extension);
+        QCOMPARE(parsed.albums.first().tracks.first().fields, extension);
+        QCOMPARE(parsed.albums.first().producers.first().fields, extension);
+        auto &updated = parsed.albums.first();
+        updated.description = u"Refreshed"_s;
+        updated.introduction = { { u"status"_s, u"matched"_s } };
+        const auto refreshed = toJson(parsed).value(u"albums"_s).toArray().first().toObject();
+        QCOMPARE(refreshed.value(u"description"_s).toString(), u"Refreshed"_s);
+        QCOMPARE(refreshed.value(u"introduction"_s).toObject(), updated.introduction);
+        QCOMPARE(refreshed.value(u"future"_s), extension.value(u"future"_s));
+        QCOMPARE(encoded.value(u"albums"_s)
+                         .toArray()
+                         .first()
+                         .toObject()
+                         .value(u"description"_s)
+                         .toString(),
+                 album.description);
+    }
     void boundedPrefixesKeepCompleteGraphemes()
     {
         const QString prefix(255, u'a');

@@ -556,18 +556,19 @@ void SearchListModel::replaceResults(QList<SearchResult> results)
 {
     const auto ticket = m_search->generation.load(std::memory_order_relaxed);
     int prefix = 0;
-    while (prefix < m_results.size() && prefix < results.size()
-           && m_results[prefix] == results[prefix])
+    const auto &before = std::as_const(m_results);
+    const auto &after = std::as_const(results);
+    while (prefix < before.size() && prefix < after.size() && before[prefix] == after[prefix])
         ++prefix;
     int suffix = 0;
-    while (suffix < m_results.size() - prefix && suffix < results.size() - prefix
-           && m_results[m_results.size() - 1 - suffix] == results[results.size() - 1 - suffix])
+    while (suffix < before.size() - prefix && suffix < after.size() - prefix
+           && before[before.size() - 1 - suffix] == after[after.size() - 1 - suffix])
         ++suffix;
     const int removed = int(m_results.size()) - prefix - suffix;
     const int inserted = int(results.size()) - prefix - suffix;
     const int reused = std::min(removed, inserted);
     for (int i = 0; i < reused; ++i)
-        m_results[prefix + i] = results[prefix + i];
+        m_results[prefix + i] = after[prefix + i];
     // Synchronous observers can replace the snapshot or request another query.
     // Already-notified edits are valid, but no stale edit may follow that callback.
     if (reused)

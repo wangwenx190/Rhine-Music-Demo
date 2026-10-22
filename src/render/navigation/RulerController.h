@@ -70,6 +70,13 @@ private:
         double revealAt = 0, rippleAt = -rulerGeometry::InactiveRippleTime;
         bool pointer = false, focused = false;
     };
+    struct PublishedSlot final
+    {
+        RulerMark mark;
+        double ordinal = 0;
+        QString title;
+        bool enabled = false;
+    };
     void synchronize(bool groupChanged = false);
     void regroup(bool instant);
     void recycle();
@@ -84,6 +91,8 @@ private:
     std::array<Slot, rulerGeometry::PhysicalTickCount> m_slots;
     RulerDrawing m_drawing;
     QVariantList m_slotStates;
+    std::array<PublishedSlot, rulerGeometry::PhysicalTickCount> m_publishedSlots;
+    bool m_titlesDirty = true;
     ScalarSpring m_scroll, m_width;
     int m_count = 0, m_lane = -1;
     double m_selected = 0, m_target = 0, m_time = 0;

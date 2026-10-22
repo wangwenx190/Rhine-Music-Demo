@@ -5,6 +5,11 @@
 #include "FrameClock.h"
 #include "TextLayoutAdapter.h"
 #include "TitleReel.h"
+#include "ReelInk.h"
+#include <QQuickRenderControl>
+#include <QQuickWindow>
+#include <QSGNode>
+#include <QScopeGuard>
 #include "TransportMotion.h"
 #include "AssetCatalog.h"
 #include <QTest>
@@ -425,6 +430,99 @@ private Q_SLOTS:
         QVERIFY(QMetaObject::invokeMethod(qGuiApp, "fontDatabaseChanged"));
         reel.reconcile();
         QVERIFY(reel.diagnostics()[u"layoutMisses"_s].toULongLong() > beforeInvalidation);
+    }
+    void longRetiredSuffixUsesOneModelTransaction()
+    {
+        yalahoo::TitleReel reel;
+        QAbstractItemModelTester tester(&reel,
+                                        QAbstractItemModelTester::FailureReportingMode::QtTest);
+        reel.setTransport(true);
+        reel.setReducedMotion(true);
+        reel.setFont(yalahoo::assetFont(700));
+        reel.setAvailableWidth(10000);
+        reel.setText(QString(256, u'W'));
+        reel.componentComplete();
+        QCOMPARE(reel.slotCount(), 256);
+        auto *first = reel.slotAt(0);
+        QSignalSpy removed(&reel, &QAbstractItemModel::rowsRemoved);
+        QSignalSpy reset(&reel, &QAbstractItemModel::modelReset);
+        reel.setText(u"W"_s);
+        reel.reconcile();
+        QCOMPARE(reel.slotAt(0), first);
+        QCOMPARE(reel.diagnostics().value(u"activeSlots"_s).toInt(), 1);
+        QCOMPARE(reel.slotCount(), 65);
+        QCOMPARE(removed.size(), 1);
+        QCOMPARE(reset.size(), 0);
+        reel.setText(QString(256, u'W'));
+        reel.reconcile();
+        QCOMPARE(reel.slotAt(0), first);
+        QCOMPARE(reel.slotCount(), 256);
+        for (int i = 0; i < reel.slotCount(); ++i) {
+            QVERIFY(reel.slotAt(i)->active);
+            QCOMPARE(reel.slotAt(i)->glyph.text, u"W"_s);
+        }
+    }
+    void reboundSlotsWithEqualRevisionsRefreshInk()
+    {
+        // A hidden null-RHI scene graph exercises the production node cache without
+        // requiring a native surface or a GPU submission.
+        const auto api = QQuickWindow::graphicsApi();
+        const auto restoreApi = qScopeGuard([api] {
+            QQuickWindow::setGraphicsApi(api);
+        });
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Null);
+        QQuickRenderControl control;
+        QQuickWindow window(&control);
+        QVERIFY(control.initialize());
+        struct InkHarness final : yalahoo::ReelInk
+        {
+            QSGNode *synchronize(QSGNode *previous)
+            {
+                return updatePaintNode(previous, nullptr);
+            }
+        } ink;
+        ink.setParentItem(window.contentItem());
+        yalahoo::TextLayoutAdapter layout;
+        const auto font = yalahoo::assetFont(700);
+        const auto a = layout.measure(u"A"_s, font, font, 28, 100, 100, false, 1).glyphs.first();
+        const auto b = layout.measure(u"B"_s, font, font, 28, 100, 100, false, 1).glyphs.first();
+        yalahoo::ReelSlot first;
+        first.active = true;
+        first.glyph = a;
+        first.writeFaces({ a });
+        auto second = std::make_unique<yalahoo::ReelSlot>();
+        second->active = true;
+        second->glyph = b;
+        second->writeFaces({ b });
+        QCOMPARE(first.revision, second->revision);
+        ink.setSlot(&first);
+        auto node = std::unique_ptr<QSGNode>(ink.synchronize(nullptr));
+        QVERIFY(node);
+        QCOMPARE(node->childCount(), 1);
+        const auto updates = yalahoo::ReelInk::geometryUpdates();
+        ink.setSlot(second.get());
+        node.reset(ink.synchronize(node.release()));
+        QCOMPARE(yalahoo::ReelInk::geometryUpdates(), updates + 1);
+        QCOMPARE(node->childCount(), 1);
+        const auto reused = yalahoo::ReelInk::geometryReuses();
+        yalahoo::ReelSlot identical;
+        identical.active = true;
+        identical.glyph = b;
+        identical.writeFaces({ b });
+        ink.setSlot(&identical);
+        node.reset(ink.synchronize(node.release()));
+        QCOMPARE(yalahoo::ReelInk::geometryUpdates(), updates + 1);
+        QCOMPARE(yalahoo::ReelInk::geometryReuses(), reused + 1);
+        ink.setSlot(second.get());
+        node.reset(ink.synchronize(node.release()));
+        QSignalSpy changed(&ink, &yalahoo::ReelInk::slotChanged);
+        second.reset();
+        QCOMPARE(changed.size(), 1);
+        QVERIFY(!ink.slot());
+        node.reset(ink.synchronize(node.release()));
+        QVERIFY(!node);
+        ink.setParentItem(nullptr);
+        control.invalidate();
     }
     void transportTiming()
     {

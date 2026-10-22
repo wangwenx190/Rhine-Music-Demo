@@ -6,6 +6,7 @@
 #include <QRegularExpression>
 #include <QCoreApplication>
 #include <QTextBoundaryFinder>
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
@@ -43,6 +44,17 @@ AlbumTitleParts albumTitleParts(const QString &text)
 }
 
 namespace {
+QJsonObject extensionFields(const QJsonObject &object,
+                            std::initializer_list<QLatin1StringView> known)
+{
+    // Build only the extension object. Removing keys from a copy can retain the CBOR
+    // backing storage of large, now-obsolete typed metadata after a later refresh.
+    QJsonObject result;
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it)
+        if (std::find(known.begin(), known.end(), it.keyView()) == known.end())
+            result.insert(it.key(), it.value());
+    return result;
+}
 bool validFields(const QJsonObject &json, QJsonValue::Type type,
                  std::initializer_list<QLatin1StringView> keys)
 {
@@ -162,9 +174,9 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         || !validFields(json, QJsonValue::Bool, { "onlineEnabled"_L1 }))
         return fail(u"Invalid library metadata types"_s);
     LibrarySnapshot library;
-    library.fields = json;
-    for (const auto &key : { u"albums"_s, u"genres"_s, u"roots"_s })
-        library.fields.remove(key);
+    library.fields = extensionFields(json,
+                                     { "albums"_L1, "genres"_L1, "roots"_L1, "scan"_L1, "enrich"_L1,
+                                       "introductions"_L1, "credits"_L1, "onlineEnabled"_L1 });
     library.scan = json.value(u"scan"_s).toObject();
     library.enrich = json.value(u"enrich"_s).toObject();
     library.introductions = json.value(u"introductions"_s).toObject();
@@ -190,9 +202,11 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             return fail(u"Invalid genre metadata types"_s);
         if (!validIntegers(object, { "albumCount"_L1 }))
             return fail(QCoreApplication::translate("Yalahoo", "Invalid genre integer metadata"));
-        Genre genre{ object.value(u"id"_s).toString(), object.value(u"name"_s).toString(),
-                     strings(object.value(u"aliases"_s).toArray()),
-                     integer(object, "albumCount"_L1), object };
+        Genre genre{
+            object.value(u"id"_s).toString(), object.value(u"name"_s).toString(),
+            strings(object.value(u"aliases"_s).toArray()), integer(object, "albumCount"_L1),
+            extensionFields(object, { "id"_L1, "name"_L1, "aliases"_L1, "albumCount"_L1 })
+        };
         const auto count = genreIds.size();
         genreIds.insert(genre.id);
         if (genre.id.isEmpty() || genreIds.size() == count)
@@ -215,9 +229,12 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         if (!object.value(u"tracks"_s).isArray()
             || (object.contains(u"producers"_s) && !object.value(u"producers"_s).isArray()))
             return fail(u"Album tracks/producers must be arrays"_s);
-        album.fields = object;
-        album.fields.remove(u"tracks"_s);
-        album.fields.remove(u"producers"_s);
+        album.fields = extensionFields(
+                object,
+                { "id"_L1, "title"_L1, "artist"_L1, "genreId"_L1, "description"_L1, "localNote"_L1,
+                  "folder"_L1, "folderUrl"_L1, "coverUrl"_L1, "year"_L1, "discCount"_L1,
+                  "rawGenres"_L1, "descriptionSource"_L1, "introduction"_L1, "creditsLookup"_L1,
+                  "online"_L1, "offline"_L1, "tracks"_L1, "producers"_L1 });
         album.id = object.value(u"id"_s).toString();
         const auto count = albumIds.size();
         albumIds.insert(album.id);
@@ -254,7 +271,12 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                                   "mediaSupport"_L1 })
                 || !validFields(trackObject, QJsonValue::Bool, { "lossless"_L1 }))
                 return fail(u"Invalid track metadata types"_s);
-            track.fields = trackObject;
+            track.fields = extensionFields(trackObject,
+                                           { "id"_L1, "albumId"_L1, "title"_L1, "artist"_L1,
+                                             "format"_L1, "codec"_L1, "relativePath"_L1,
+                                             "duration"_L1, "sourceUrl"_L1, "mediaSupport"_L1,
+                                             "trackNumber"_L1, "discNumber"_L1, "bitsPerSample"_L1,
+                                             "sampleRate"_L1, "bitrate"_L1, "lossless"_L1 });
             track.id = trackObject.value(u"id"_s).toString();
             track.albumId = trackObject.value(u"albumId"_s).toString(album.id);
             const auto count = trackIds.size();
@@ -304,7 +326,10 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             album.producers.append(
                     { p.value(u"name"_s).toString(), p.value(u"role"_s).toString(),
                       p.value(u"source"_s).toString(), p.value(u"trackId"_s).toString(),
-                      p.value(u"trackTitle"_s).toString(), p.value(u"url"_s).toString(), p });
+                      p.value(u"trackTitle"_s).toString(), p.value(u"url"_s).toString(),
+                      extensionFields(p,
+                                      { "name"_L1, "role"_L1, "source"_L1, "trackId"_L1,
+                                        "trackTitle"_L1, "url"_L1 }) });
         }
         library.albums.append(std::move(album));
     }

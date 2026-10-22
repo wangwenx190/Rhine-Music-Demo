@@ -609,17 +609,25 @@ void TitleReel::prune()
         idle += !slot->active;
     bool removed = false;
     for (int i = 0; i < m_slots.size() && idle > MaximumIdleSlots;) {
-        auto *slot = m_slots[i];
-        if (slot->active) {
+        if (m_slots[i]->active) {
             ++i;
             continue;
         }
-        m_index.remove(slot->key);
-        beginRemoveRows({ }, i, i);
-        m_slots.removeAt(i);
+        int end = i;
+        const int maximum = idle - MaximumIdleSlots;
+        while (end < m_slots.size() && end - i < maximum && !m_slots[end]->active)
+            ++end;
+        // A long title can retire a whole suffix. Remove each contiguous run once,
+        // avoiding a shift of the remaining pointer array for every retired slot.
+        beginRemoveRows({ }, i, end - 1);
+        for (int row = i; row < end; ++row) {
+            auto *slot = m_slots[row];
+            m_index.remove(slot->key);
+            slot->deleteLater();
+        }
+        m_slots.remove(i, end - i);
         endRemoveRows();
-        slot->deleteLater();
-        --idle;
+        idle -= end - i;
         removed = true;
     }
     if (removed)

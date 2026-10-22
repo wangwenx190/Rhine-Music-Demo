@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 
@@ -112,6 +113,7 @@ void RulerController::configure(int count, int row, double physicalRow, bool loo
 {
     if (count < 0 || !std::isfinite(physicalRow))
         return;
+    m_titlesDirty = true;
     const bool first = !m_populated;
     groupChanged |= count != m_count || loop != m_loop;
     m_count = count;
@@ -351,20 +353,38 @@ QVariantList RulerController::slotStates() const
 }
 void RulerController::publish()
 {
-    QVariantList result;
-    result.reserve(yalahoo::rulerGeometry::PhysicalTickCount);
+    // Preserve descriptor storage for unchanged physical slots. Only content/group
+    // changes or recycled ordinals need a title lookup; visual ticks reuse the title.
+    const bool initial = m_slotStates.isEmpty();
+    if (initial)
+        m_slotStates.resize(yalahoo::rulerGeometry::PhysicalTickCount);
     for (int i = 0; i < yalahoo::rulerGeometry::PhysicalTickCount; ++i) {
+        auto &before = m_publishedSlots[i];
         const auto &mark = m_drawing.marks[i];
-        result.append(QVariantMap{ { u"x"_s, mark.x },
-                                   { u"enabled"_s, m_active && mark.visible },
-                                   { u"active"_s, mark.active },
-                                   { u"title"_s, title(m_slots[i].ordinal) },
-                                   { u"ordinal"_s, m_slots[i].ordinal },
-                                   { u"height"_s, mark.height },
-                                   { u"alpha"_s, mark.alpha },
-                                   { u"hovering"_s, mark.hovering } });
+        const double ordinal = m_slots[i].ordinal;
+        const auto label = initial || m_titlesDirty || before.ordinal != ordinal ? title(ordinal)
+                                                                                 : before.title;
+        const bool enabled = m_active && mark.visible;
+        if (!initial && before.mark == mark && before.ordinal == ordinal && before.title == label
+            && before.enabled == enabled)
+            continue;
+        auto value = std::as_const(m_slotStates)[i].toMap();
+        const auto update = [&](const auto &oldValue, const auto &newValue, const QString &key) {
+            if (initial || oldValue != newValue)
+                value.insert(key, newValue);
+        };
+        update(before.mark.x, mark.x, u"x"_s);
+        update(before.enabled, enabled, u"enabled"_s);
+        update(before.mark.active, mark.active, u"active"_s);
+        update(before.title, label, u"title"_s);
+        update(before.ordinal, ordinal, u"ordinal"_s);
+        update(before.mark.height, mark.height, u"height"_s);
+        update(before.mark.alpha, mark.alpha, u"alpha"_s);
+        update(before.mark.hovering, mark.hovering, u"hovering"_s);
+        m_slotStates[i] = std::move(value);
+        before = { mark, ordinal, label, enabled };
     }
-    m_slotStates = std::move(result);
+    m_titlesDirty = false;
     Q_EMIT changed();
 }
 bool RulerController::click(int slot)

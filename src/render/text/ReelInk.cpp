@@ -35,6 +35,7 @@ public:
         --nodes;
     }
     quint64 revision = std::numeric_limits<quint64>::max();
+    quint64 slotGeneration = 0;
     QColor color;
     QList<FaceNode> faces;
 };
@@ -54,9 +55,15 @@ void ReelInk::setSlot(ReelSlot *slot)
     if (m_slot)
         disconnect(m_slot, nullptr, this, nullptr);
     m_slot = slot;
+    ++m_slotGeneration;
     if (slot) {
         connect(slot, &ReelSlot::contentChanged, this, &ReelInk::update);
         connect(slot, &ReelSlot::frameChanged, this, &ReelInk::update);
+        connect(slot, &QObject::destroyed, this, [this] {
+            ++m_slotGeneration;
+            Q_EMIT slotChanged();
+            update();
+        });
     }
     Q_EMIT slotChanged();
     update();
@@ -94,7 +101,9 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
     }
     if (!node)
         node = new InkNode;
-    if (node->revision != m_slot->revision) {
+    // Revisions are local to a slot. A different slot can carry the same revision
+    // while requiring different glyphs; keep exact-ink reuse inside reconciliation.
+    if (node->slotGeneration != m_slotGeneration || node->revision != m_slot->revision) {
         auto previous = std::move(node->faces);
         for (const auto &face : previous)
             node->removeChildNode(face.transform);
@@ -136,6 +145,7 @@ QSGNode *ReelInk::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         }
         for (const auto &face : previous)
             delete face.transform;
+        node->slotGeneration = m_slotGeneration;
         node->revision = m_slot->revision;
         node->color = m_color;
     }

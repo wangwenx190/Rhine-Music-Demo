@@ -2,7 +2,7 @@
 
 冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts`、`data.ts:setMusicAlbums`及`scripts/music-library.mjs`。本文管理值模型、身份/排序/搜索、本地扫描/存储序列化与Provider协议；媒体与UI消费者按各自专项契约接入。
 
-`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。各级 `fields` 保留未知扩展与当前元数据，写回时覆盖已知字段。已由值模型持有的子数组不再重复存入扩展对象。`readLibrary` 使用临时值解析，重复/错配 ID、非法集合或已知字段类型、非整数或超int范围的可选整数、非数值/负数/非有限时长返回错误，原快照不变；缺失/null可选参数保持未知。本地file URL须有效、绝对且没有query/fragment/NUL，非法来源保持空URL，不猜测为可播放文件。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
+`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。LibrarySnapshot、Album、Track、Producer和Genre的`fields`只保留未由类型化成员持有的扩展字段，序列化由当前成员写出已知字段；未知扩展中的嵌套对象和null原样保留。解析直接构造扩展对象，不从完整JSON副本删除已知键，避免旧正文、查询状态及曲目载荷在资料刷新后继续占用扩展对象的底层存储。LibraryRoot保留原始路径字段供无效本地路径的只读往返，运行使用已验证的QUrl。`readLibrary` 使用临时值解析，重复/错配 ID、非法集合或已知字段类型、非整数或超int范围的可选整数、非数值/负数/非有限时长返回错误，原快照不变；缺失/null可选参数保持未知。本地file URL须有效、绝对且没有query/fragment/NUL，非法来源保持空URL，不猜测为可播放文件。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
 
 歌曲 `sourceUrl`、目录 `folder` 和 roots.path 使用本地 QUrl；绝对 Unicode 原生路径用 `QUrl::fromLocalFile`，不从当前目录猜相对音乐路径。歌曲 URL 只接受本地文件；封面额外允许 qrc。来源/候选链接保留文本。显式目录导入见下节。`MediaSupport` 为 Unknown/Supported/Unsupported，只有实际媒体状态才能更新；无声标签加载不证明可解码播放，不按扩展名猜测。
 
@@ -12,7 +12,7 @@
 
 LibrarySession在快照替换时缓存已使用流派列表。搜索筛选由GenreRowsModel在C++测量和分行，字体/字体库变化才重新测量，宽度变化只重新分行；行通过QAbstractListModel供QML ListView虚拟化，显示顺序与22px内距/7px间距保持原规则。模型内容与测量/分行均为O(流派数量)，不随视觉帧运行。全部选项和空库仍保留“全部”。
 
-SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→索引及搜索字符串/流派名缓存；同一快照改变query只归一化查询，复用全部条目。交互查询由单个worker筛选隐式共享的只读条目，最多一个在途任务与一个最新查询；新输入/换库按generation取消旧扫描，GUI仅接纳当前结果，筛选中禁止激活旧查询结果，退出先取消再等待worker。重复的归一化查询复用当前结果。查询结果保留相同前后缀，中间重叠行以单批dataChanged复用，仅数量差触发一次区间删除或插入，不按键重置模型；每次数据/行通知后核对generation，观察者同步换库或发起新查询时停止旧结果余下的修改，count按实际已发布值去重通知；新查询清除旧键盘选择行号；委托按下时保存专辑/曲目身份，释放时身份已变化则取消定位；快照更换/清空时事务重置并重建/清空索引。role与resultAt按稳定ID索引读取，曲目定位仍在所属专辑内，不假设跨专辑曲目ID全局唯一。内存为O(专辑+曲目+搜索文本)，非空查询为O(总搜索文本+结果)，空查询通过专辑边界索引跳过曲目，成本为O(专辑数量)；流派过滤同样整段跳过被排除专辑的曲目，非空筛选仅访问专辑头及被接纳流派的搜索文本，不改变匹配和返回顺序。
+SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→索引及搜索字符串/流派名缓存；同一快照改变query只归一化查询，复用全部条目。交互查询由单个worker筛选隐式共享的只读条目，最多一个在途任务与一个最新查询；新输入/换库按generation取消旧扫描，GUI仅接纳当前结果，筛选中禁止激活旧查询结果，退出先取消再等待worker。重复的归一化查询复用当前结果。查询结果用const容器比较相同前后缀，避免只读比较使worker完成值或已发布结果隐式detach；中间重叠行以单批dataChanged复用，仅数量差触发一次区间删除或插入，不按键重置模型；每次数据/行通知后核对generation，观察者同步换库或发起新查询时停止旧结果余下的修改，count按实际已发布值去重通知；新查询清除旧键盘选择行号；委托按下时保存专辑/曲目身份，释放时身份已变化则取消定位；快照更换/清空时事务重置并重建/清空索引。role与resultAt按稳定ID索引读取，曲目定位仍在所属专辑内，不假设跨专辑曲目ID全局唯一。内存为O(专辑+曲目+搜索文本)，非空查询为O(总搜索文本+结果)，空查询通过专辑边界索引跳过曲目，成本为O(专辑数量)；流派过滤同样整段跳过被排除专辑的曲目，非空筛选仅访问专辑头及被接纳流派的搜索文本，不改变匹配和返回顺序。
 
 搜索逐式保留 `music-search.ts`：仅 trim 和 lowercase，匹配专辑标题/歌手/流派显示名（缺失则“未分类”）与曲目标题/歌手；匹配专辑后仍逐曲匹配，空查询只返回专辑，流派过滤按 ID。不匹配备注、制作信息或原始流派数组，也不加入排序的 NFKC/空白归并。`tools/migration/export-search-golden.mjs` 从 Git 冻结源码去掉类型声明后执行原函数，生成 216 个用例与源码/fixture hash；Node 仅用于可选的 Web 验证数据导出，原生运行、CMake 和 CTest 不依赖它。
 

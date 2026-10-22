@@ -69,6 +69,55 @@ private Q_SLOTS:
         ruler.configure(37, 5, 5, true, true);
         QVERIFY(!ruler.slotStates().isEmpty());
     }
+    void rulerReusesUnchangedSlotsAndRefreshesTitles()
+    {
+        MotionController motion;
+        motion.setReducedMotion(true);
+        SelectionController selection(&motion);
+        LibrarySnapshot library;
+        LibraryColumn column{ u"genre"_s, u"Genre"_s, { } };
+        for (int i = 0; i < 3; ++i) {
+            Album album;
+            album.id = QString::number(i);
+            album.title = u"Title %1"_s.arg(i);
+            library.albums.append(album);
+            column.albumIds.append(album.id);
+        }
+        selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
+        RulerController ruler(&motion, &selection);
+        const auto before = ruler.slotStates();
+        int hovered = -1;
+        for (int i = 0; i < before.size(); ++i)
+            if (before[i].toMap().value(u"enabled"_s).toBool()
+                && !before[i].toMap().value(u"active"_s).toBool()) {
+                hovered = i;
+                break;
+            }
+        QVERIFY(hovered >= 0);
+        ruler.hover(hovered, true, false);
+        const auto after = ruler.slotStates();
+        for (int i = 0; i < before.size(); ++i) {
+            const auto old = before[i].toMap();
+            const auto next = after[i].toMap();
+            if (i != hovered) {
+                QCOMPARE(next, old);
+                QVERIFY(next.isSharedWith(old));
+            }
+        }
+        QVERIFY(after[hovered].toMap().value(u"hovering"_s).toBool());
+        QVERIFY(!before[hovered].toMap().value(u"hovering"_s).toBool());
+        library.albums[0].title = u"Updated title"_s;
+        selection.setColumns({ column }, std::make_shared<const LibrarySnapshot>(library));
+        bool found = false;
+        for (const auto &value : ruler.slotStates()) {
+            const auto slot = value.toMap();
+            if (slot.value(u"active"_s).toBool()) {
+                QCOMPARE(slot.value(u"title"_s).toString(), u"Updated title"_s);
+                found = true;
+            }
+        }
+        QVERIFY(found);
+    }
     void wheelRemainder()
     {
         InputRouter input(nullptr);
