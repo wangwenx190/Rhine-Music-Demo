@@ -85,6 +85,16 @@ private Q_SLOTS:
         }
         QCOMPARE(openingFrame(std::numeric_limits<double>::quiet_NaN()).values(),
                  openingFrame(0).values());
+        Fixture fixture;
+        const auto selected = fixture.selection.selectedPosition();
+        for (double invalid :
+             { std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+               -std::numeric_limits<double>::infinity() }) {
+            QCOMPARE(openingReveal(invalid, 0), 0.0);
+            QCOMPARE(openingReveal(1, invalid), 0.0);
+            fixture.selection.setOpeningTime(invalid);
+            QCOMPARE(fixture.selection.selectedPosition(), selected);
+        }
     }
     void ratesReadinessAndHandoff()
     {

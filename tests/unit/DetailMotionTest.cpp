@@ -392,7 +392,8 @@ private Q_SLOTS:
             const auto transform = f.selection.instances().last().transform;
             const auto world = transform.map(QVector3D(0, 1.85, 0));
             const auto projected = f.scene.projectWorldPoint(world);
-            const auto hit = f.scene.hitTest(projected.x(), projected.y());
+            QVERIFY(projected);
+            const auto hit = f.scene.hitTest(projected->x(), projected->y());
             QCOMPARE(hit[u"albumId"_s].toString(), f.selection.albumId());
             QCOMPARE(hit[u"objectId"_s].toULongLong(), f.selection.instances().last().objectId);
             QVERIFY(std::abs(transform(0, 2) - std::sin(f.selection.rotation())) < 1e-6);

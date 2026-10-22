@@ -1,38 +1,22 @@
-import {transpile} from './frozen-source.mjs';
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
+import {FrozenSource, repositoryRoot as root, transpile} from './frozen-source.mjs';
+import {baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
-import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(import.meta.url);
-const ts = require(path.join(root, 'legacy-web/node_modules/typescript'));
 const THREE = require(path.join(root, 'legacy-web/node_modules/three'));
 const revision = baselineRevision;
 const sources = [];
-const frozen = (name) => {
-    const text =
-        execFrozenGit(['show', `${revision}:src/${name}.ts`], {cwd: root, encoding: 'utf8'});
-    sources.push({path: `src/${name}.ts`, sha256: createHash('sha256').update(text).digest('hex')});
-    return text;
-};
+const frozenSource = new FrozenSource(sources);
 const modules = {
     'three': THREE,
     './brand': {bootMarkContour: ''},
     './archive-loop.ts': {COLUMN_SPACING: 5.2, ROW_SPACING: 0.62}
 };
 const load = (name) => {
-    const text = frozen(name);
-    const js = transpile(text);
-    const exports = {};
-    new Function('exports', 'require', js)(exports, (id) => {
-        const result = modules[id] ?? modules[id.replace(/\.ts$/, '')];
-        if (!result)
-            throw new Error(`Unexpected source dependency ${id}`);
-        return result;
-    });
+    const exports = frozenSource.load(name, modules);
     modules[`./${name}`] = exports;
+    modules[`./${name}.ts`] = exports;
     return exports;
 };
 const timing = load('music-boot-timing');
@@ -40,15 +24,13 @@ const opening = load('music-opening');
 const motion = load('motion');
 const viewport = load('viewport-layout');
 const camera = load('music-camera');
-const scene = frozen('scene');
+const scene = frozenSource.read('scene');
 const cameraStart = scene.indexOf('    const orbit = ease((shot - 22.6) / 1.6);');
 const cameraEnd =
     scene.indexOf('    if (!cinematic && !this.reduced && (!musicLibrary', cameraStart);
 if (cameraStart < 0 || cameraEnd < 0)
     throw new Error('Frozen production camera boundary changed');
-const body = ts.transpileModule(scene.slice(cameraStart, cameraEnd), {
-                   compilerOptions: {target: ts.ScriptTarget.ES2022}
-               }).outputText;
+const body = transpile(scene.slice(cameraStart, cameraEnd));
 const cameraFn = new Function(
     'THREE', 'ease', 'settlingWave', 'archiveFraming', 'musicArchiveOffset', 'musicCinematicPose',
     'musicExtractionAnchor', 'overviewFraming', 'MUSIC_MODEL', 'MUSIC_DETAIL_ELEVATION',

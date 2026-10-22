@@ -2,6 +2,7 @@
 // isolated from Qt projection and native backend conventions.
 
 #pragma once
+#include <optional>
 #include "FrameClock.h"
 #include "LayoutMetrics.h"
 #include "SceneFrame.h"
@@ -109,7 +110,7 @@ public:
     void snapToTarget();
     void setLightingInput(RowLightingInput input, QQuaternion caseRotation = { });
     void updateLighting(double motionDt);
-    Q_INVOKABLE QVector3D projectWorldPoint(QVector3D world) const;
+    std::optional<QVector3D> projectWorldPoint(QVector3D world) const;
     Q_INVOKABLE double focalDepth(QVector3D origin) const;
     Q_INVOKABLE QVariantMap hitTest(double x, double y) const;
     Q_INVOKABLE void recordInput();

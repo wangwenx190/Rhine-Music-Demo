@@ -24,6 +24,12 @@ ArchiveScrollView {
     signal fullscreenRequested
     contentWidth: availableWidth
 
+    component VolumeRange: SettingRange {
+        suffix: "%"
+        decimals: 0
+        displayFactor: 100
+    }
+
     function focusControl(): void {
         themeChoice.forceActiveFocus();
     }
@@ -43,12 +49,9 @@ ArchiveScrollView {
                 checked: root.settings.values.singleInstance
                 onToggled: root.settings.update("singleInstance", checked)
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
                 cssPixelSize: 12
-                color: root.tokens.muted
-                wrapMode: Text.Wrap
                 text: qsTr(
                           "Applies after restarting the application. Opening it again brings the existing window forward.")
             }
@@ -114,12 +117,9 @@ ArchiveScrollView {
                 selected: root.settings.values.sortMode
                 onChosen: value => root.settings.update("sortMode", value)
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
                 cssPixelSize: 12
-                color: root.tokens.muted
-                wrapMode: Text.Wrap
                 text: qsTr(
                           "Artist sorting puts each artist in one column. Album title sorting puts 12 albums in each column.")
             }
@@ -189,12 +189,8 @@ ArchiveScrollView {
                 text: qsTr("RENDER QUALITY")
                 cssPixelSize: 12
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
-                cssPixelSize: 11
-                color: root.tokens.muted
-                wrapMode: Text.Wrap
                 text: qsTr(
                           "Renders at the display's native pixel density. Antialiasing and full-resolution effects remain enabled.")
             }
@@ -267,12 +263,9 @@ ArchiveScrollView {
                 text: qsTr("Sound")
                 cssPixelSize: 12
             }
-            SettingRange {
+            VolumeRange {
                 tokens: root.tokens
                 label: qsTr("Track volume")
-                suffix: "%"
-                decimals: 0
-                displayFactor: 100
                 visible: root.playback !== null
                 value: root.playback ? root.playback.volume : 0
                 onMoved: value => {
@@ -290,12 +283,9 @@ ArchiveScrollView {
                         root.interfaceSound.enabled = checked;
                 }
             }
-            SettingRange {
+            VolumeRange {
                 tokens: root.tokens
                 label: qsTr("Sound effect volume")
-                suffix: "%"
-                decimals: 0
-                displayFactor: 100
                 visible: root.interfaceSound !== null
                 value: root.interfaceSound ? root.interfaceSound.volume : 0
                 onMoved: value => {
@@ -313,12 +303,9 @@ ArchiveScrollView {
                         root.backgroundMusic.enabled = checked;
                 }
             }
-            SettingRange {
+            VolumeRange {
                 tokens: root.tokens
                 label: qsTr("BGM volume")
-                suffix: "%"
-                decimals: 0
-                displayFactor: 100
                 visible: root.backgroundMusic !== null
                 value: root.backgroundMusic ? root.backgroundMusic.volume : 0
                 onMoved: value => {
@@ -344,12 +331,8 @@ ArchiveScrollView {
                         root.playback.selectDevice(value);
                 }
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
-                cssPixelSize: 11
-                color: root.tokens.muted
-                wrapMode: Text.Wrap
                 text: qsTr(
                           "BGM and interface effects use the system default output. All three volumes are independent. Events without a dedicated short sound remain silent.")
             }
@@ -386,12 +369,8 @@ ArchiveScrollView {
                                                                        networkEnabled: checked
                                                                    })
                 }
-                ArchiveText {
+                PanelDescription {
                     tokens: root.tokens
-                    width: parent.width
-                    cssPixelSize: 11
-                    color: root.tokens.muted
-                    wrapMode: Text.Wrap
                     text: qsTr(
                               "Queries send album titles, artist names, and public identifiers to MusicBrainz, Wikipedia, or Wikidata. Music files and local paths stay on this device. Automatic queries are controlled separately.")
                 }
@@ -468,12 +447,8 @@ ArchiveScrollView {
                                                                        proxyUrl: proxy.text
                                                                    })
                 }
-                ArchiveText {
+                PanelDescription {
                     tokens: root.tokens
-                    width: parent.width
-                    cssPixelSize: 11
-                    color: root.tokens.muted
-                    wrapMode: Text.Wrap
                     text: root.store ? root.store.error : qsTr(
                                            "Metadata configuration is saved through explicit import or the native music library.")
                 }

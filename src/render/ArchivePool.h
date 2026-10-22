@@ -5,6 +5,7 @@
 #include "LibraryModels.h"
 #include <QMatrix4x4>
 #include <array>
+#include <optional>
 
 namespace yalahoo {
 struct ArchiveCell final
@@ -28,7 +29,6 @@ class ArchivePool final
 public:
     ArchivePool() = default;
     static constexpr int lanes = 9, rows = 48, capacity = lanes * rows;
-    static constexpr double columnSpacing = 5.2, rowSpacing = .62;
     static int wrap(double value, int count);
     static double nearestOccurrence(double value, double center, double period);
     static ArchiveCell poolCell(int index);
@@ -38,7 +38,7 @@ public:
     std::optional<ArchiveCell> location(const QString &albumId) const;
     int columnCount() const;
     int rowCount(double lane) const;
-    double rowPeriod() const;
+    std::optional<int> rowPeriod() const;
     const QList<LibraryColumn> &columns() const;
     QString realAlbumAt(ArchiveCell cell) const;
     void update(ArchiveCell center, const std::array<double, lanes> *columnRows = nullptr);
@@ -48,6 +48,6 @@ private:
     QList<LibraryColumn> m_columns;
     QHash<QString, ArchiveCell> m_locations;
     std::array<ArchiveInstance, capacity> m_instances;
-    double m_rowPeriod = 1;
+    std::optional<int> m_rowPeriod = 1;
 };
 }

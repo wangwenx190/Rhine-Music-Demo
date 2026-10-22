@@ -19,13 +19,6 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
-namespace {
-bool put(const QString &path, const QByteArray &bytes)
-{
-    QFile file(path);
-    return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
-}
-}
 class SettingsTest final : public QObject
 {
     Q_OBJECT
@@ -34,6 +27,22 @@ public:
     SettingsTest() = default;
 
 private Q_SLOTS:
+    void invalidSpeedConversionKeepsRuntimeAndPreferences()
+    {
+        QTemporaryDir directory;
+        test::SettingsFixture fixture(directory.path());
+        QVERIFY(fixture.settings.update(u"motionSpeed"_s, 2.0));
+        const auto before = fixture.preferences.values();
+        QSignalSpy changes(&fixture.settings, &SettingsController::changed);
+        for (const auto &invalid :
+             { QVariant("invalid"_ba), QVariant(std::numeric_limits<double>::infinity()),
+               QVariant(-std::numeric_limits<double>::infinity()),
+               QVariant(std::numeric_limits<double>::quiet_NaN()) })
+            QVERIFY(!fixture.settings.update(u"motionSpeed"_s, invalid));
+        QCOMPARE(fixture.motion.clock()->speed(), 2.0);
+        QCOMPARE(fixture.preferences.values(), before);
+        QVERIFY(changes.isEmpty());
+    }
     void singleInstancePreference()
     {
         QTemporaryDir directory;
@@ -58,6 +67,11 @@ private Q_SLOTS:
         expected.insert(u"depthOfField"_s, 75.);
         QCOMPARE(fixture.scene.quality()->values(), expected);
         QVERIFY(!fixture.settings.updateQuality(u"unknown"_s, 1));
+        for (const auto &invalid :
+             { QVariant("invalid"_ba), QVariant(std::numeric_limits<double>::infinity()),
+               QVariant(-std::numeric_limits<double>::infinity()),
+               QVariant(std::numeric_limits<double>::quiet_NaN()) })
+            QVERIFY(!fixture.settings.updateQuality(u"depthOfField"_s, invalid));
         QCOMPARE(fixture.scene.quality()->values(), expected);
     }
 
@@ -69,7 +83,7 @@ private Q_SLOTS:
         const auto source = directory.filePath(u"\u663e\u5f0f \u5bfc\u51fa.json"_s);
         const QByteArray bytes = R"({"theme":"night","sortMode":"artist","motionSpeed":2.5,
             "reduced":true,"renderQuality":{"depthOfField":125,"futureQuality":7},"future":{"x":8}})"_ba;
-        QVERIFY(put(source, bytes));
+        QVERIFY(test::writeFile(source, bytes));
         {
             PreferencesStore preferences(directory.path());
             QSignalSpy imported(&preferences, &PreferencesStore::imported);
@@ -104,7 +118,7 @@ private Q_SLOTS:
         for (const auto &invalid :
              { "{"_ba, "[]"_ba, "{\"schemaVersion\":2,\"theme\":\"night\"}"_ba,
                "{\"reduced\":5}"_ba }) {
-            QVERIFY(put(path, invalid));
+            QVERIFY(test::writeFile(path, invalid));
             PreferencesStore damaged(directory.path());
             QVERIFY(!damaged.error().isEmpty());
             QVERIFY(!damaged.update({ { u"theme"_s, u"day"_s } }));

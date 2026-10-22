@@ -1,4 +1,5 @@
 #include "RenderQuality.h"
+#include "NumericValue.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -15,20 +16,19 @@ namespace yalahoo {
 RenderQuality::RenderQuality(QObject *parent) : QObject(parent)
 {
 }
-void RenderQuality::configure(const QVariantMap &input)
+bool RenderQuality::configure(const QVariantMap &input)
 {
     const auto value =
             input.value(u"depthOfField"_s, yalahoo::renderQuality::DefaultDepthOfFieldPercent);
-    bool valid = false;
-    const double amount = value.toDouble(&valid);
-    if (!valid || value.metaType().id() == QMetaType::QString
-        || value.metaType().id() == QMetaType::Bool || !std::isfinite(amount))
-        return;
-    const double next = std::max(0.0, amount);
+    const auto amount = finiteNumber(value);
+    if (!amount)
+        return false;
+    const double next = std::max(0.0, *amount);
     if (next == m_depthOfField)
-        return;
+        return true;
     m_depthOfField = next;
     Q_EMIT changed();
+    return true;
 }
 void RenderQuality::resize(double width, double height, double dpr)
 {

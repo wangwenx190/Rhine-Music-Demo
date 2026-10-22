@@ -330,9 +330,9 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
                         + (sceneGeometry::CaseHeight + LabelTopPadding) * extent),
                   float((anchorRow - row) * sceneGeometry::RowSpacing
                         - sceneGeometry::ArchiveDepth) });
-        if (!std::isfinite(point.x()) || point.z() < -1 || point.z() > 1)
+        if (!point || point->z() < -1 || point->z() > 1)
             continue;
-        result.append({ lane, column.label, pool.rowCount(lane), point.x(), point.y(), extent,
+        result.append({ lane, column.label, pool.rowCount(lane), point->x(), point->y(), extent,
                         lane == ArchivePool::wrap(m_selection->cell().lane, count) });
     }
     std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) {

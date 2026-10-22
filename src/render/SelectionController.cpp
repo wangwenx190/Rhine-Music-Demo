@@ -548,18 +548,18 @@ bool SelectionController::canInspect() const
     if (!m_managedDetail || m_detailMotion.phase() != DetailMotion::Phase::Presented
         || m_detail <= DetailOcclusionProgress || m_pulseGain >= ActivityThreshold)
         return false;
-    double neighborTop = -std::numeric_limits<double>::infinity();
-    for (int row = -NeighborRadiusRows; row <= NeighborRadiusRows; ++row)
+    const auto top = [this](ArchiveCell cell, double lift = 0) {
+        return -sceneGeometry::FloorDepth + field(cell.row, cell.lane) + lift
+                + sceneGeometry::CaseTop;
+    };
+    double neighborTop = top({ m_cell.lane, m_cell.row - NeighborRadiusRows });
+    for (int row = -NeighborRadiusRows + 1; row <= NeighborRadiusRows; ++row)
         if (row != 0)
-            neighborTop = std::max(neighborTop,
-                                   -sceneGeometry::FloorDepth + field(m_cell.row + row, m_cell.lane)
-                                           + sceneGeometry::CaseTop);
+            neighborTop = std::max(neighborTop, top({ m_cell.lane, m_cell.row + row }));
     for (const auto &copy : m_returning)
         if (copy.cell.lane == m_cell.lane
             && std::abs(copy.cell.row - m_cell.row) <= NeighborRadiusRows)
-            neighborTop = std::max(neighborTop,
-                                   -sceneGeometry::FloorDepth + field(copy.cell.row, copy.cell.lane)
-                                           + copy.lift.value + sceneGeometry::CaseTop);
+            neighborTop = std::max(neighborTop, top(copy.cell, copy.lift.value));
     return selectedPosition().y + sceneGeometry::CaseBottom - neighborTop > NeighborClearance;
 }
 bool SelectionController::beginDrag(QPointF point, int pointerId)
@@ -760,13 +760,13 @@ ArchiveCell SelectionController::rebase()
     ArchiveCell shift{ 0, 0 };
     if (!m_motion || m_realistic)
         return shift;
-    const double period = m_pool.rowPeriod();
+    const auto period = m_pool.rowPeriod();
     const int lanes = qMax(1, m_pool.columnCount());
     if (std::abs(m_cell.lane) > RebaseCoordinateMagnitude)
         shift.lane = std::floor((m_cell.lane - 2) / lanes + .5) * lanes;
-    if (std::abs(m_cell.row) > std::max(RebaseRowMagnitude, period * 2))
-        shift.row =
-                std::floor((m_cell.row - yalahoo::sceneGeometry::FirstAlbumRow) / period) * period;
+    if (period && std::abs(m_cell.row) > std::max(RebaseRowMagnitude, double(*period) * 2))
+        shift.row = std::floor((m_cell.row - yalahoo::sceneGeometry::FirstAlbumRow) / *period)
+                * *period;
     if (shift == ArchiveCell{ 0, 0 })
         return shift;
     m_cell.lane -= shift.lane;
@@ -789,6 +789,8 @@ ArchiveCell SelectionController::rebase()
 }
 void SelectionController::setOpeningTime(std::optional<double> time)
 {
+    if (time && !std::isfinite(*time))
+        return;
     const bool entering = time && !m_openingTime;
     m_openingTime = time;
     m_scanBlend = m_idleGain = 0;

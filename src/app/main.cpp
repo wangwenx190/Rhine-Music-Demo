@@ -242,11 +242,13 @@ int main(int argc, char **argv)
             || parser.isSet(u"verify-materials"_s)
 #endif
             ;
+    const bool persistentSession = !verificationRun && !demonstration;
     // Keep the ownership lock until library and final preference writes have finished.
     yalahoo::SingleInstance singleInstance;
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
-    if (!verificationRun && !demonstration) {
-        const QString dataRoot = parser.isSet(u"data-dir"_s)
+    QString dataRoot;
+    if (persistentSession) {
+        dataRoot = parser.isSet(u"data-dir"_s)
                 ? parser.value(u"data-dir"_s)
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir::isAbsolutePath(dataRoot)) {
@@ -265,7 +267,7 @@ int main(int argc, char **argv)
     }
     QNetworkProxyFactory::setUseSystemConfiguration(true);
     std::unique_ptr<yalahoo::IMetadataProvider> provider;
-    if (verificationRun || demonstration)
+    if (!persistentSession)
         provider = std::make_unique<yalahoo::OfflineMetadataProvider>();
     else
         provider = std::make_unique<yalahoo::OnlineMetadataProvider>();
@@ -284,8 +286,7 @@ int main(int argc, char **argv)
     yalahoo::SelectionController selection(&motion);
     yalahoo::SceneAdapter scene(motion.clock());
     yalahoo::OpeningController opening(&motion, &scene, &selection);
-    yalahoo::StartupCoordinator startup(&library, &opening, motion.clock(),
-                                        !verificationRun && !demonstration);
+    yalahoo::StartupCoordinator startup(&library, &opening, motion.clock(), persistentSession);
     yalahoo::InputRouter inputRouter(&selection);
     yalahoo::RulerController rulerController(&motion, &selection);
     rulerController.setInputRouter(&inputRouter);
@@ -310,14 +311,7 @@ int main(int argc, char **argv)
     QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion,
                      updateApplicationVisibility);
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
-    if (!verificationRun && !demonstration) {
-        const QString dataRoot = parser.isSet(u"data-dir"_s)
-                ? parser.value(u"data-dir"_s)
-                : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-        if (!QDir::isAbsolutePath(dataRoot)) {
-            qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
-            return InvalidCommandLine;
-        }
+    if (persistentSession) {
         const auto applyAudio = [&] {
             const auto audio = preferences->audio();
             playback.setVolume(
@@ -489,7 +483,7 @@ int main(int argc, char **argv)
         presentation.reset();
         updateOpeningInput();
     });
-    if (!verificationRun && !demonstration) {
+    if (persistentSession) {
         auto soundCell = std::make_shared<yalahoo::ArchiveCell>(selection.cell());
         QObject::connect(&selection, &yalahoo::SelectionController::selectionChanged, &sounds,
                          [&, soundCell] {

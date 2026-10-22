@@ -6,6 +6,7 @@ qt_add_library(
     Require.h
     MonotonicTime.h
     JsonFile.h
+    NumericValue.h
     Units.h
     ColorTransfer.h
     CoverPixels.h

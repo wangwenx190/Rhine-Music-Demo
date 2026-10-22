@@ -11,6 +11,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <numbers>
+#include <limits>
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
@@ -57,12 +58,29 @@ private Q_SLOTS:
         QVERIFY(!caseRayEntry({ 0, 1, 1 }, { 0, 0, -.5 }));
         QVERIFY(!caseRayEntry({ 0, 1, 1 }, { 0, 0, 2 }));
         QMatrix4x4 identity;
-        QCOMPARE(projectToViewport(identity, { 0, 0, .5 }, { 800, 600 }), QVector3D(400, 300, .5));
-        QCOMPARE(projectToViewport(identity, { -1, 1, 0 }, { 800, 600 }), QVector3D(0, 0, 0));
+        QCOMPARE(projectToViewport(identity, { 0, 0, .5 }, { 800, 600 }),
+                 std::optional(QVector3D(400, 300, .5)));
+        QCOMPARE(projectToViewport(identity, { -1, 1, 0 }, { 800, 600 }),
+                 std::optional(QVector3D(0, 0, 0)));
         identity(3, 3) = -1;
         const auto behind = projectToViewport(identity, { 0, 0, 0 }, { 800, 600 });
-        QVERIFY(std::isnan(behind.x()) && std::isnan(behind.y()));
-        QCOMPARE(behind.z(), -1);
+        QVERIFY(!behind);
+    }
+    void nonfiniteGeometryIsRejected()
+    {
+        SceneAdapter scene;
+        const auto revision = scene.frameRevision();
+        for (const float invalid :
+             { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(),
+               -std::numeric_limits<float>::infinity() }) {
+            QVERIFY(!caseRayEntry({ invalid, 1, 1 }, { 0, 0, -2 }));
+            QVERIFY(!caseRayEntry({ 0, 1, 1 }, { invalid, 0, -2 }));
+            QVERIFY(!projectToViewport(QMatrix4x4(), { invalid, 0, 0 }, { 800, 600 }));
+            QVERIFY(!projectToViewport(QMatrix4x4(), { 0, 0, 0 }, { invalid, 600 }));
+            scene.observe({ { invalid, 1, 2 }, { 0, 1, 0 }, 7 }, 0);
+            scene.setOpeningTime(invalid);
+            QCOMPARE(scene.frameRevision(), revision);
+        }
     }
     void fogTracksRenderedCameraAndDetail()
     {
@@ -113,15 +131,17 @@ private Q_SLOTS:
             for (auto point : c[u"projections"_s].toArray()) {
                 const auto q = point.toObject();
                 const auto actual = scene.projectWorldPoint(vector(q[u"world"_s]).qt());
+                QVERIFY(actual);
                 const auto expected = q[u"pixel"_s].toArray();
-                const double error = std::hypot(actual.x() - expected[0].toDouble(),
-                                                actual.y() - expected[1].toDouble());
+                const double error = std::hypot(actual->x() - expected[0].toDouble(),
+                                                actual->y() - expected[1].toDouble());
                 maxProjection = std::max(maxProjection, error);
                 QVERIFY2(error <= 2, qPrintable(QString::number(error)));
             }
             const auto center =
                     scene.projectWorldPoint((f.casePosition + SceneVector{ 0, 1.85, 0 }).qt());
-            QVERIFY(!scene.hitTest(center.x(), center.y()).isEmpty());
+            QVERIFY(center);
+            QVERIFY(!scene.hitTest(center->x(), center->y()).isEmpty());
             QVERIFY(scene.hitTest(-1, -1).isEmpty());
         }
     }
@@ -225,7 +245,8 @@ private Q_SLOTS:
         scene.setDetail(1);
         const auto point = scene.projectWorldPoint(
                 (scene.frame().casePosition + SceneVector{ .17, 1.85, .07 }).qt());
-        const auto hit = scene.hitTest(point.x(), point.y());
+        QVERIFY(point);
+        const auto hit = scene.hitTest(point->x(), point->y());
         QCOMPARE(hit[u"objectId"_s].toString(), u"inspection-case"_s);
         QCOMPARE(hit[u"frameRevision"_s].toULongLong(), scene.frameRevision());
         QVERIFY(scene.hitTest(0, 0).isEmpty());

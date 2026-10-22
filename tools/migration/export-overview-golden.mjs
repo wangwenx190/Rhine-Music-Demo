@@ -1,28 +1,23 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {FrozenSource, loadSource} from './frozen-source.mjs';
+import {FrozenSource, repositoryRoot as root, typescript as ts, transpile} from './frozen-source.mjs';
 // Mathematical test input: execute frozen overview classes and actual production scene methods.
 import {baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
 const frozenSource = new FrozenSource(sources);
-const frozen = name => frozenSource.read(name);
-const load = loadSource;
-const motion = load(frozen('motion'), {});
+const motion = frozenSource.load('motion', {});
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const THREE = createRequire(import.meta.url)(path.join(root, 'legacy-web/node_modules/three'));
-const overview = load(frozen('music-overview'), {three: THREE, './motion.ts': motion});
-const edge = load(frozen('music-overview-edge'), {});
-const archive =
-    load(frozen('music-archive-motion'),
-         {'./motion.ts': motion, './archive-loop.ts': {COLUMN_SPACING: 5.2, ROW_SPACING: .62}});
-const real = load(frozen('music-real-columns'),
-                  {'./motion.ts': motion, './music-archive-motion.ts': archive});
-const sceneText = frozen('scene');
+const overview = frozenSource.load('music-overview', {three: THREE, './motion.ts': motion});
+const edge = frozenSource.load('music-overview-edge', {});
+const archive = frozenSource.load(
+    'music-archive-motion',
+    {'./motion.ts': motion, './archive-loop.ts': {COLUMN_SPACING: 5.2, ROW_SPACING: .62}});
+const real = frozenSource.load('music-real-columns',
+                               {'./motion.ts': motion, './music-archive-motion.ts': archive});
+const sceneText = frozenSource.read('scene');
 const ast =
     ts.createSourceFile('scene.ts', sceneText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const names = ['getOverviewColumns', 'musicColumnRowOffset', 'musicColumnExtent'];
@@ -36,10 +31,7 @@ function visit(node) {
 visit(ast);
 if (methods.length !== names.length)
     throw new Error('Frozen overview projection methods missing');
-const compiledMethods =
-    ts.transpileModule(`return {${methods.join(',')}}`, {
-          compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
-      }).outputText;
+const compiledMethods = transpile(`return {${methods.join(',')}}`);
 const cases = [];
 for (const fps of [20, 30, 60, 120]) {
     const transition = new overview.MusicOverviewMotion();

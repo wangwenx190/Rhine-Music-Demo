@@ -345,13 +345,15 @@ void advanceOverviewClickArchiveCase(auto &context)
         for (const auto &instance : state.selection->instances()) {
             const auto point = state.scene.projectWorldPoint(
                     instance.transform.map({ 0, yalahoo::sceneGeometry::HingeHeight, 0 }));
-            if (point.x() < HorizontalHitInsetPixels
-                || point.x() > state.window.width() - HorizontalHitInsetPixels
-                || point.y() < TopHitInsetPixels
-                || point.y() > state.window.height() - BottomHitInsetPixels)
+            if (!point)
                 continue;
-            if (!state.scene.hitTest(point.x(), point.y()).isEmpty()) {
-                clickPoint({ point.x(), point.y() });
+            if (point->x() < HorizontalHitInsetPixels
+                || point->x() > state.window.width() - HorizontalHitInsetPixels
+                || point->y() < TopHitInsetPixels
+                || point->y() > state.window.height() - BottomHitInsetPixels)
+                continue;
+            if (!state.scene.hitTest(point->x(), point->y()).isEmpty()) {
+                clickPoint({ point->x(), point->y() });
                 clicked = true;
                 break;
             }

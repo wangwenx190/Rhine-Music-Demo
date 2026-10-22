@@ -1,7 +1,6 @@
 #include "SceneGeometry.h"
 #include "ArchivePool.h"
 #include <cmath>
-#include <limits>
 #include <numeric>
 #include <utility>
 
@@ -60,12 +59,11 @@ void ArchivePool::setColumns(QList<LibraryColumn> columns)
             ++row;
             return false;
         });
-        if (std::isfinite(m_rowPeriod)) {
+        if (m_rowPeriod) {
             const auto count = qMax(1, int(column.albumIds.size()));
             const auto next =
-                    qint64(m_rowPeriod) / std::gcd(qint64(m_rowPeriod), qint64(count)) * count;
-            m_rowPeriod = next > MaximumExactRowPeriod ? std::numeric_limits<double>::infinity()
-                                                       : double(next);
+                    qint64(*m_rowPeriod) / std::gcd(qint64(*m_rowPeriod), qint64(count)) * count;
+            m_rowPeriod = next > MaximumExactRowPeriod ? std::nullopt : std::optional(int(next));
         }
     }
 }
@@ -92,7 +90,7 @@ int ArchivePool::rowCount(double lane) const
     return m_columns.isEmpty() ? 0
                                : int(m_columns[wrap(lane, int(m_columns.size()))].albumIds.size());
 }
-double ArchivePool::rowPeriod() const
+std::optional<int> ArchivePool::rowPeriod() const
 {
     return m_rowPeriod;
 }

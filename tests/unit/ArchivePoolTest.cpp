@@ -370,7 +370,8 @@ private Q_SLOTS:
         QVERIFY(compared);
         const auto pixel = scene.projectWorldPoint(
                 (selection.selectedPosition() + SceneVector{ 0, 1.85, 0 }).qt());
-        const auto hit = scene.hitTest(pixel.x(), pixel.y());
+        QVERIFY(pixel);
+        const auto hit = scene.hitTest(pixel->x(), pixel->y());
         QCOMPARE(hit[u"albumId"_s].toString(), selection.albumId());
         QCOMPARE(hit[u"lane"_s].toDouble(), selection.cell().lane);
         QCOMPARE(hit[u"row"_s].toDouble(), selection.cell().row);
@@ -388,7 +389,7 @@ private Q_SLOTS:
         QCOMPARE(selection.instances().size(), 432);
         QVERIFY(selection.select(u"8:9999"_s));
         selection.setColumns(columns({ 97, 101, 103 }));
-        QVERIFY(!std::isfinite(selection.pool().rowPeriod()));
+        QVERIFY(!selection.pool().rowPeriod());
         QVERIFY(selection.selectCell({ 0, 9999999 }));
         const auto shift = selection.rebase();
         QCOMPARE(shift.row, 0);

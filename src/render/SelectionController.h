@@ -13,7 +13,6 @@
 #include "ReturningCasePool.h"
 #include "PointerDragController.h"
 #include <QPointer>
-#include <limits>
 
 namespace yalahoo {
 
@@ -154,7 +153,7 @@ private:
                          const TransformInputs &inputs, double height, double slope) const;
     struct ExtentCache final
     {
-        double lane = std::numeric_limits<double>::infinity();
+        std::optional<double> lane;
         double extent = 1;
     };
     mutable std::array<ExtentCache, ArchivePool::lanes> m_extentCache;

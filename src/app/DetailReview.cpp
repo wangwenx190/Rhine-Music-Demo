@@ -279,7 +279,10 @@ void advanceDetailAwaitOpen(auto &context)
     {
         const auto center = state.scene.projectWorldPoint(state.scene.frame().caseTransform.map(
                 QVector3D(0, yalahoo::sceneGeometry::HingeHeight, 0)));
-        state.dragStart = { center.x(), center.y() };
+        check(u"selected-projection"_s, center.has_value());
+        if (!center)
+            return;
+        state.dragStart = { center->x(), center->y() };
         recordAction();
         mouse(QEvent::MouseButtonPress, state.dragStart, Qt::LeftButton);
         mouse(QEvent::MouseMove, state.dragStart + QPointF(DragDeltaX, DragDeltaY), Qt::LeftButton);

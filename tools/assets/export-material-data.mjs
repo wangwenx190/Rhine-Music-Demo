@@ -19,10 +19,9 @@ if (lut.width !== 16 || lut.height !== 16 || lut.data.length !== 512)
     throw Error('Unexpected source DFG layout');
 const half = (h) => {
     const sign = h & 32768 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023;
-    return (sign
-            * (e === 0    ? (2 ** -14 * m) / 1024
-               : e === 31 ? NaN
-                          : 2 ** (e - 15) * (1 + m / 1024)));
+    if (e === 31)
+        throw Error('Nonfinite DFG input');
+    return sign * (e === 0 ? (2 ** -14 * m) / 1024 : 2 ** (e - 15) * (1 + m / 1024));
 };
 const data = Buffer.alloc(4096);
 for (let i = 0; i < 256; ++i)

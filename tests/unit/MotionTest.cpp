@@ -245,6 +245,32 @@ private Q_SLOTS:
         QCOMPARE(done.size(), 1);
         QVERIFY(frames.size() > 300);
     }
+    void nonfiniteControllerInputKeepsTheCurrentTrajectory()
+    {
+        MotionController controller;
+        controller.clock()->setActive(true);
+        controller.clock()->advance(0);
+        controller.travel(4, 5, 6, 7);
+        controller.clock()->advance(.01);
+        const auto state = controller.springs();
+        const auto revision = controller.revision();
+        QSignalSpy changes(&controller, &MotionController::stateChanged);
+        for (const double invalid :
+             { std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+               -std::numeric_limits<double>::infinity() }) {
+            QVERIFY(!controller.retarget({ invalid, 1, 2, 3 }));
+            controller.translate({ 1, invalid, 2, 3 });
+            auto corrupt = state;
+            corrupt[0].value = invalid;
+            controller.observe(corrupt, { 1, 2, 3, 4 }, { 1, 1, 1, 1 });
+            QCOMPARE(controller.revision(), revision);
+            for (size_t axis = 0; axis < state.size(); ++axis) {
+                QCOMPARE(controller.springs()[axis].value, state[axis].value);
+                QCOMPARE(controller.springs()[axis].velocity, state[axis].velocity);
+            }
+        }
+        QVERIFY(changes.isEmpty());
+    }
     void controllerCompletionAndRevisions()
     {
         MotionController controller;

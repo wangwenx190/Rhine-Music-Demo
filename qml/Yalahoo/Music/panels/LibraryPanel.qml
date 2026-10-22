@@ -32,15 +32,12 @@ ArchiveScrollView {
             width: parent.width
             sourceComponent: root.heading
         }
-        ArchiveText {
-            width: parent.width
+        PanelDescription {
             tokens: root.tokens
             text: qsTr(
                       "Each track in a root directory gets its own card, preferring embedded artwork. Subfolders appear as albums, preferring folder artwork.")
             cssPixelSize: 12
             cssLineHeight: 22.2
-            wrapMode: Text.Wrap
-            color: root.tokens.muted
         }
         ArchiveText {
             tokens: root.tokens
@@ -171,15 +168,11 @@ ArchiveScrollView {
             text: qsTr("Cover display")
             cssPixelSize: 12
         }
-        ArchiveText {
-            width: parent.width
+        PanelDescription {
             tokens: root.tokens
             text: qsTr(
                       "Square, portrait, and landscape covers keep their original proportions and fit fully on the card. Missing artwork uses an album title placeholder, never another album's image.")
-            cssPixelSize: 11
             cssLineHeight: 20.9
-            color: root.tokens.muted
-            wrapMode: Text.Wrap
         }
     }
     Component.onCompleted: loadRoots()

@@ -31,10 +31,7 @@ constexpr int EventPollMilliseconds = 10;
 
 bool put(const QString &path, const QByteArray &bytes = "anonymous audio fixture"_ba)
 {
-    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
-        return false;
-    QFile file(path);
-    return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+    return test::writeFile(path, bytes);
 }
 Snapshot scan(const QString &root, Snapshot previous = { })
 {

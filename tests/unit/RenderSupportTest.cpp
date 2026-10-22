@@ -4,6 +4,8 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QSignalSpy>
+#include <QQuickItem>
+#include <QVector2D>
 #include <QtTest>
 
 using namespace Qt::StringLiterals;
@@ -153,6 +155,17 @@ private Q_SLOTS:
         QCOMPARE(intermediate->property("textureSize").toSize(), target);
         QCOMPARE(intermediate->property("sourceItem").value<QObject *>(),
                  root->property("horizontalPass").value<QObject *>());
+        auto *horizontal = root->property("horizontalPass").value<QQuickItem *>();
+        QVERIFY(horizontal);
+        QCOMPARE(horizontal->size(), QSizeF(target));
+        QCOMPARE(horizontal->property("sampleStep").value<QVector2D>(),
+                 QVector2D(1.0f / target.width(), 0));
+        QObject *overlay = nullptr;
+        if (componentName == "DetailTabsBackdrop"_L1) {
+            overlay = horizontal->property("overlay").value<QObject *>();
+            QVERIFY(overlay);
+            QCOMPARE(overlay->property("textureSize").toSize(), target);
+        }
         QVERIFY(root->setProperty("sceneX", 110.0));
         QCOMPARE(crop->property("sourceRect").toRectF().x(), 110 - radius);
         if (componentName == "OverviewBackdrop"_L1) {
@@ -162,6 +175,9 @@ private Q_SLOTS:
             root->setProperty("width", 210.0);
             QCOMPARE(crop->property("textureSize").toSize(),
                      QSize(target.width() + 10, target.height()));
+            if (overlay)
+                QCOMPARE(overlay->property("textureSize").toSize(),
+                         QSize(target.width() + 10, target.height()));
         }
         QVERIFY(warnings.isEmpty());
     }

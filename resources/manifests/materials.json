@@ -22,44 +22,44 @@
     },
     {
       "path": "licenses/materials-NOTICE.md",
-      "bytes": 848,
-      "sha256": "6e191e83f585e2bfce550dbf44ddaa58e835f345a4b61f8fe7f925d2e6f87387",
+      "bytes": 851,
+      "sha256": "c04d9c29c0a46845bf058ebca7cdcf9ff5490706a00ee8070fca63570cc77b3f",
       "qrc": ":/assets/licenses/materials-NOTICE.md"
     },
     {
       "path": "shaders/case-glass.vert",
-      "bytes": 362,
-      "sha256": "7b7b6f3c068c4df03b67541e8698302ada86ed968236fff534c4ff97d6e5ce76",
+      "bytes": 385,
+      "sha256": "204f70e11fdfae32ac3899366186417b98fcf02724a3430e82d2cd29a45a988c",
       "qrc": ":/assets/shaders/case-glass.vert"
     },
     {
       "path": "shaders/case-glass.frag",
-      "bytes": 19308,
-      "sha256": "f78d39f6ae5764a9d4c867dd5f5b4abb57743a330f1d67a6fa2912c16bbaae1d",
+      "bytes": 22155,
+      "sha256": "ed48e80c0c8cabb0399701a83dcdaf66710326721dfb5e4c4c93e33faa95105f",
       "qrc": ":/assets/shaders/case-glass.frag"
     },
     {
       "path": "shaders/album-paper.vert",
-      "bytes": 366,
-      "sha256": "7aa68dd2b2a92b93a00e63e2a492a23a330821f986328d10b280463aca751ada",
+      "bytes": 393,
+      "sha256": "c56cfc7a6901265b879ac016a1f9890f52f0b3fbfc5b9ae5c25d661b225c4d7e",
       "qrc": ":/assets/shaders/album-paper.vert"
     },
     {
       "path": "shaders/album-paper.frag",
-      "bytes": 8740,
-      "sha256": "3d027b8d650c70ccfbebe063b99534b5f9cf66d5f81d4581d6ef6f894bf9a25c",
+      "bytes": 9981,
+      "sha256": "1619de8d0926f82e99c985b5e35b4d581c1bd59fad4310e2579e1c2cd3dbf344",
       "qrc": ":/assets/shaders/album-paper.frag"
     },
     {
       "path": "shaders/material-background.frag",
-      "bytes": 191,
-      "sha256": "7d8af721ccc0beb62d2faa2a1d0f371b3e428eedc0ffbe3cfff11d71a426dbef",
+      "bytes": 212,
+      "sha256": "b331ad90357b840a7d038dc4d08861ca207ce145f31804b6158ab4d97c415f78",
       "qrc": ":/assets/shaders/material-background.frag"
     },
     {
       "path": "shaders/material-output.frag",
-      "bytes": 224,
-      "sha256": "f239373fb638b35e18ba8e19dac0faeb494002df720f4bcc3ca98d4ff126ba03",
+      "bytes": 488,
+      "sha256": "0da422fc5406ef19aee6bc0763328657fc49db7efad7678df7fb0c556a0e8b1b",
       "qrc": ":/assets/shaders/material-output.frag"
     }
   ]

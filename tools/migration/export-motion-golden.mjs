@@ -1,10 +1,8 @@
-import {FrozenSource} from './frozen-source.mjs';
+import {FrozenSource, repositoryRoot as root} from './frozen-source.mjs';
 import {baselineRevision} from './frozen-git.mjs';
 // Verification-only: execute immutable Git blobs using the already frozen TS dependency.
 import {writeFileSync, mkdirSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
 const frozenSource = new FrozenSource(sources);

@@ -3,6 +3,7 @@
 #include "RowLightController.h"
 #include "SelectionLighting.h"
 #include "ProductDefaults.h"
+#include "NumericValue.h"
 #include <QVector4D>
 #include <algorithm>
 #include <array>
@@ -205,12 +206,10 @@ bool SelectionLighting::configure(const QVariantMap &patch)
                 : it.key() == "fill"_L1               ? &next.fill
                 : it.key() == "transitionDuration"_L1 ? &next.transitionDuration
                                                       : nullptr;
-        const auto &value = it.value();
-        if (!target || value.metaType().id() == QMetaType::QString
-            || value.metaType().id() == QMetaType::Bool || !value.canConvert<double>()
-            || !std::isfinite(value.toDouble()))
+        const auto number = finiteNumber(it.value());
+        if (!target || !number)
             return false;
-        *target = value.toDouble();
+        *target = *number;
     }
     setSettings(next);
     return true;

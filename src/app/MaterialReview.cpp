@@ -268,8 +268,13 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
     for (const auto point : { QVector3D(-2.225f, .175f, .07f), QVector3D(2.225f, 3.525f, .07f) }) {
         const auto origin = view->property("reviewCasePosition").template value<QVector3D>();
         const auto world = point + origin;
-        const auto qt = project(view, world), cpu = state.scene.projectWorldPoint(world);
-        const double error = std::hypot(qt.x() - cpu.x(), qt.y() - cpu.y());
+        const auto qt = project(view, world);
+        const auto cpu = state.scene.projectWorldPoint(world);
+        if (!cpu) {
+            valid = false;
+            continue;
+        }
+        const double error = std::hypot(qt.x() - cpu->x(), qt.y() - cpu->y());
         maxProjection = std::max(maxProjection, error);
         valid = valid && std::isfinite(error) && error <= 2;
     }

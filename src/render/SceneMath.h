@@ -11,20 +11,23 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <optional>
 
 namespace yalahoo {
-inline QVector3D projectToViewport(const QMatrix4x4 &viewProjection, QVector3D world,
-                                   QSizeF viewport)
+inline std::optional<QVector3D> projectToViewport(const QMatrix4x4 &viewProjection, QVector3D world,
+                                                  QSizeF viewport)
 {
     const auto clip = viewProjection * QVector4D(world, 1);
-    if (clip.w() <= 0)
-        return { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
-                 -1 };
+    if (!std::isfinite(clip.x()) || !std::isfinite(clip.y()) || !std::isfinite(clip.z())
+        || !std::isfinite(clip.w()) || clip.w() <= 0 || !std::isfinite(viewport.width())
+        || !std::isfinite(viewport.height()) || viewport.width() <= 0 || viewport.height() <= 0)
+        return std::nullopt;
     const auto ndc = clip.toVector3DAffine();
-    return { float((ndc.x() + 1) * .5 * viewport.width()),
-             float((1 - ndc.y()) * .5 * viewport.height()), ndc.z() };
+    const QVector3D point(float((ndc.x() + 1) * .5 * viewport.width()),
+                          float((1 - ndc.y()) * .5 * viewport.height()), ndc.z());
+    if (!std::isfinite(point.x()) || !std::isfinite(point.y()) || !std::isfinite(point.z()))
+        return std::nullopt;
+    return point;
 }
 inline std::optional<double> caseRayEntry(QVector3D start, QVector3D delta)
 {
@@ -36,6 +39,8 @@ inline std::optional<double> caseRayEntry(QVector3D start, QVector3D delta)
                                                           sceneGeometry::CaseHalfDepth };
     double enter = 0, exit = 1;
     for (int axis = 0; axis < units::VectorAxes; ++axis) {
+        if (!std::isfinite(start[axis]) || !std::isfinite(delta[axis]))
+            return std::nullopt;
         if (std::abs(delta[axis]) < sceneGeometry::ParallelRayTolerance) {
             if (start[axis] < low[axis] || start[axis] > high[axis])
                 return std::nullopt;

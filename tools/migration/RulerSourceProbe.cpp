@@ -37,6 +37,24 @@ constexpr int LayoutSettleMilliseconds = 120;
 constexpr int RestoreSettleMilliseconds = 200;
 constexpr int CleanupDeadlineMilliseconds = 1000;
 
+QQuickItem *createRulerRoot(QQmlEngine &engine, QQuickWindow &window,
+                            std::unique_ptr<QObject> &object, yalahoo::RulerController *controller,
+                            yalahoo::FrameClock &clock, bool night)
+{
+    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/RulerReview.qml"_s));
+    object.reset(component.createWithInitialProperties(
+            { { u"controller"_s, QVariant::fromValue(controller) },
+              { u"clock"_s, QVariant::fromValue(&clock) },
+              { u"night"_s, night },
+              { u"offscreenRendering"_s, OffscreenSurface::Enabled } }));
+    auto *root = qobject_cast<QQuickItem *>(object.get());
+    if (root)
+        root->setParentItem(window.contentItem());
+    else
+        qWarning() << component.errors();
+    return root;
+}
+
 double stateError(const QVariantMap &actual, const QJsonObject &expected)
 {
     double error = 0;
@@ -105,19 +123,11 @@ auto advanceRulerProbeRestoreWindow(std::unique_ptr<OffscreenSurface> &surface,
     renderControl.reset();
     surface = makeWindow();
     bindWindow();
-    QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/RulerReview.qml"_s));
-    object.reset(component.createWithInitialProperties(
-            { { u"controller"_s, QVariant::fromValue(controller.get()) },
-              { u"clock"_s, QVariant::fromValue(&clock) },
-              { u"night"_s, night },
-              { u"offscreenRendering"_s, OffscreenSurface::Enabled } }));
-    root = qobject_cast<QQuickItem *>(object.get());
+    root = createRulerRoot(engine, *window, object, controller.get(), clock, night);
     if (!root) {
-        qWarning() << component.errors();
         app.exit(4);
         return;
     }
-    root->setParentItem(window->contentItem());
     QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
         const auto hidden = controller->state();
         controller->advance(.05);
@@ -475,19 +485,12 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
             object.reset();
             controller = std::make_unique<yalahoo::RulerController>(nullptr, nullptr);
             controller->setNarrow(test[u"narrow"_s].toBool());
-            QQmlComponent component(&engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/RulerReview.qml"_s));
-            object.reset(component.createWithInitialProperties(
-                    { { u"controller"_s, QVariant::fromValue(controller.get()) },
-                      { u"clock"_s, QVariant::fromValue(&clock) },
-                      { u"night"_s, test[u"night"_s].toBool() },
-                      { u"offscreenRendering"_s, OffscreenSurface::Enabled } }));
-            root = qobject_cast<QQuickItem *>(object.get());
+            root = createRulerRoot(engine, *window, object, controller.get(), clock,
+                                   test[u"night"_s].toBool());
             if (!root) {
-                qWarning() << component.errors();
                 app.exit(4);
                 return;
             }
-            root->setParentItem(window->contentItem());
         }
         const auto states = test[u"states"_s].toArray();
         if (stateIndex == states.size()) {

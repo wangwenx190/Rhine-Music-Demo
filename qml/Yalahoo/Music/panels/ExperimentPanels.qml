@@ -60,14 +60,11 @@ Rectangle {
                 checked: root.diagnostics
                 onToggled: root.diagnostics = checked
             }
-            ArchiveText {
+            PanelDescription {
                 id: diagnosticText
                 objectName: "experimentDiagnostics"
                 tokens: root.tokens
-                width: parent.width
                 cssPixelSize: 10
-                color: root.tokens.muted
-                wrapMode: Text.Wrap
                 text: root.sceneSource.diagnosticText
             }
         }

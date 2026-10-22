@@ -1,32 +1,18 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {transpile} from './frozen-source.mjs';
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
+import {FrozenSource, repositoryRoot as root} from './frozen-source.mjs';
+import {baselineRevision} from './frozen-git.mjs';
 // Frozen source oracle; development only, no product Node dependency.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
 import * as THREE from '../../legacy-web/node_modules/three/build/three.module.js';
 import {RectAreaLightUniformsLib} from '../../legacy-web/node_modules/three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-const root = path.resolve(import.meta.dirname, '../..'), baseline = baselineRevision;
+const baseline = baselineRevision;
 const sources = {}, modules = {
     three: THREE,
     'three/addons/lights/RectAreaLightUniformsLib.js': {RectAreaLightUniformsLib},
 };
-for (const name of ['music-model', 'theme-transition', 'music-row-lighting', 'music-lighting']) {
-    const src = execFrozenGit(['show', baseline + ':src/' + name + '.ts'], {
-        cwd: root,
-        encoding: 'utf8',
-    });
-    sources['src/' + name + '.ts'] = createHash('sha256').update(src).digest('hex');
-    const js = transpile(src);
-    const exports = {};
-    new Function('exports', 'require', js)(exports, (id) => {
-        if (!(id in modules))
-            throw Error(id);
-        return modules[id];
-    });
-    modules['./' + name + '.ts'] = exports;
-}
+const frozenSource = new FrozenSource(sources);
+for (const name of ['music-model', 'theme-transition', 'music-row-lighting', 'music-lighting'])
+    modules['./' + name + '.ts'] = frozenSource.load(name, modules);
 const {MusicSelectionLighting} = modules['./music-lighting.ts'],
       {ThemeTransition} = modules['./theme-transition.ts'];
 const row = modules['./music-row-lighting.ts'];

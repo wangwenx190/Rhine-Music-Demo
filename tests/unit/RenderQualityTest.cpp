@@ -50,9 +50,11 @@ private Q_SLOTS:
             QCOMPARE(scene.cameraPosition(), position);
         }
         const auto values = scene.quality()->values();
-        scene.quality()->configure({ { u"depthOfField"_s, u"100"_s } });
-        scene.quality()->configure(
-                { { u"depthOfField"_s, std::numeric_limits<double>::infinity() } });
+        for (const auto &invalid : { QVariant(u"100"_s), QVariant(true), QVariant("invalid"_ba),
+                                     QVariant(std::numeric_limits<double>::infinity()),
+                                     QVariant(-std::numeric_limits<double>::infinity()),
+                                     QVariant(std::numeric_limits<double>::quiet_NaN()) })
+            scene.quality()->configure({ { u"depthOfField"_s, invalid } });
         QCOMPARE(scene.quality()->values(), values);
         scene.quality()->resize(-1, 10, 2);
         QCOMPARE(scene.quality()->targetSize(), QSize(3840, 2160));

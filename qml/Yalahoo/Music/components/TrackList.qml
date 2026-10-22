@@ -129,7 +129,7 @@ Item {
             trackFocus.refineListReveal(currentView.originY, row.y + row.trackTop, row.trackHeight,
                                         height, layoutHeader ? layoutHeader.tabsHeight : 0, last
                                         ? last.y + last.height - height - currentView.originY :
-                                          Number.NaN);
+                                          null);
         }
         currentView.contentY = trackFocus.listScrollY(currentView.originY);
     }

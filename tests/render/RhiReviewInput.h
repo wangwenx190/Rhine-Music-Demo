@@ -2,6 +2,7 @@
 // describe real backend capabilities rather than fabricated output.
 
 #pragma once
+#include "Require.h"
 #include <QString>
 using Qt::StringLiterals::operator""_s;
 using Qt::StringLiterals::operator""_L1;
@@ -9,9 +10,19 @@ using Qt::StringLiterals::operator""_L1;
 #include "SceneAdapter.h"
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QCryptographicHash>
+#include <QFile>
 namespace yalahoo::review {
 using namespace yalahoo::rhi;
+inline QJsonObject readFixture(const QString &path)
+{
+    QFile file(path);
+    require(file.open(QIODevice::ReadOnly), "Missing source review JSON");
+    const auto document = QJsonDocument::fromJson(file.readAll());
+    require(document.isObject(), "Invalid source review JSON");
+    return document.object();
+}
 inline QVector3D vector(const QJsonArray &v)
 {
     return { float(v[0].toDouble()), float(v[1].toDouble()), float(v[2].toDouble()) };

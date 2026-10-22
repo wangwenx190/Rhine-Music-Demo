@@ -91,14 +91,10 @@ ArchiveScrollView {
                 onToggled: if (root.backgroundMusic)
                                root.backgroundMusic.enabled = checked
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
                 text: qsTr(
                           "Fades out before a track starts. Pausing stays quiet; stopping or reaching the end of the queue restores it.")
-                cssPixelSize: 11
-                wrapMode: Text.Wrap
-                color: root.tokens.muted
             }
             ArchiveSlider {
                 tokens: root.tokens
@@ -151,14 +147,10 @@ ArchiveScrollView {
                          && root.interfaceSound.available
                 onClicked: root.interfaceSound.preview()
             }
-            ArchiveText {
+            PanelDescription {
                 tokens: root.tokens
-                width: parent.width
                 text: qsTr(
                           "Events without a dedicated short sound remain silent. BGM and effects use the system default output with separate volume controls.")
-                cssPixelSize: 11
-                wrapMode: Text.Wrap
-                color: root.tokens.muted
             }
         }
         ArchiveText {
@@ -212,14 +204,10 @@ ArchiveScrollView {
                 onClicked: root.playback.next()
             }
         }
-        ArchiveText {
+        PanelDescription {
             tokens: root.tokens
-            width: parent.width
             text: qsTr(
                       "Plays local files through the system audio output. Choose another track or retry if the format is unavailable.")
-            cssPixelSize: 11
-            wrapMode: Text.Wrap
-            color: root.tokens.muted
         }
     }
 }

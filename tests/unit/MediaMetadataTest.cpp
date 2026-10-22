@@ -1,3 +1,4 @@
+#include "../support/FileFixture.h"
 // Uses controllable anonymous backends to test timeout, cancellation and late metadata
 // publication. Explicit fixture literals are independent inputs or expected results; timing
 // bounds have named constants.
@@ -37,12 +38,6 @@ constexpr int AsyncDeadlineMilliseconds = 10000;
 constexpr int EnrichmentDeadlineMilliseconds = 15000;
 constexpr int ProbeTimeoutDeadlineMilliseconds = 11000;
 
-bool put(const QString &path, const QByteArray &bytes)
-{
-    QDir().mkpath(QFileInfo(path).absolutePath());
-    QFile file(path);
-    return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
-}
 QByteArray chunk(const char *name, QByteArray bytes)
 {
     QByteArray result(name, 4);
@@ -183,9 +178,9 @@ void MediaMetadataTest::publicMetadataAndPriority()
 {
     QTemporaryDir temp;
     const auto root = temp.filePath(u"\u97f3\u4e50 # %"_s);
-    QVERIFY(put(root + u"/\u4e13\u8f91/2.wav"_s, wave()));
-    QVERIFY(put(root + u"/\u4e13\u8f91/1.wav"_s, wave()));
-    QVERIFY(put(root + u"/\u5355\u66f2.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/2.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/1.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/\u5355\u66f2.wav"_s, wave()));
     QImage red(24, 16, QImage::Format_ARGB32);
     red.fill(Qt::red);
     QDir().mkpath(root + u"/\u4e13\u8f91"_s);
@@ -243,7 +238,7 @@ void MediaMetadataTest::publicMetadataAndPriority()
     QCOMPARE(stats->opens, opens);
     QCOMPARE(stats->created, 2);
     QCOMPARE(resultOf(done, 1)->albums[0].coverUrl, result->albums[0].coverUrl);
-    QVERIFY(put(root + u"/\u4e13\u8f91/cover.png"_s, "corrupt preferred image"_ba));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/cover.png"_s, "corrupt preferred image"_ba));
     const auto changed =
             DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, result, { }).snapshot;
     probe.start(changed, temp.filePath(u"native"_s), { }, 3);
@@ -269,8 +264,8 @@ void MediaMetadataTest::realSilentAndInvalid()
     QTemporaryDir temp;
     const auto root = temp.filePath(u"\u66f2\u5e93 Unicode"_s);
     const auto wav = root + u"/\u4e13\u8f91/valid.wav"_s;
-    QVERIFY(put(wav, wave()));
-    QVERIFY(put(root + u"/\u4e13\u8f91/broken.wav"_s, "broken"_ba));
+    QVERIFY(test::writeFile(wav, wave()));
+    QVERIFY(test::writeFile(root + u"/\u4e13\u8f91/broken.wav"_s, "broken"_ba));
     const auto original = yalahoo::test::readFile(wav);
     MediaMetadataProbe probe;
     QSignalSpy done(&probe, &MediaMetadataProbe::finished);
@@ -307,9 +302,9 @@ void MediaMetadataTest::realEmbeddedPriority()
     embedded.fill(Qt::blue);
     QImage directory(12, 20, QImage::Format_ARGB32);
     directory.fill(Qt::red);
-    QVERIFY(put(root + u"/single.wav"_s, wave(embedded)));
-    QVERIFY(put(root + u"/album/song.wav"_s, wave(embedded)));
-    QVERIFY(put(root + u"/fallback.wav"_s, wave()));
+    QVERIFY(test::writeFile(root + u"/single.wav"_s, wave(embedded)));
+    QVERIFY(test::writeFile(root + u"/album/song.wav"_s, wave(embedded)));
+    QVERIFY(test::writeFile(root + u"/fallback.wav"_s, wave()));
     QVERIFY(directory.save(root + u"/fallback.png"_s));
     QVERIFY(directory.save(root + u"/single.png"_s));
     QVERIFY(directory.save(root + u"/album/cover.png"_s));
@@ -328,7 +323,7 @@ void MediaMetadataTest::realEmbeddedPriority()
 void MediaMetadataTest::timeout()
 {
     QTemporaryDir temp;
-    QVERIFY(put(temp.filePath(u"root/hang.wav"_s), wave()));
+    QVERIFY(test::writeFile(temp.filePath(u"root/hang.wav"_s), wave()));
     auto stats = std::make_shared<FakeStats>();
     MediaMetadataProbe probe(nullptr, factory(stats, { }, -1));
     QSignalSpy done(&probe, &MediaMetadataProbe::finished);
@@ -345,7 +340,8 @@ void MediaMetadataTest::cancellationAndReuse()
 {
     QTemporaryDir temp;
     for (int i = 0; i < 80; ++i)
-        QVERIFY(put(temp.filePath(u"root/album/"_s) + QString::number(i) + u".wav"_s, wave()));
+        QVERIFY(test::writeFile(temp.filePath(u"root/album/"_s) + QString::number(i) + u".wav"_s,
+                                wave()));
     auto stats = std::make_shared<FakeStats>();
     MediaObservation loaded;
     loaded.status = MediaObservation::Loaded;
@@ -382,7 +378,7 @@ void MediaMetadataTest::artworkGuards()
     const bool allowed = limit == 0 || large.sizeInBytes() <= qint64(limit) * 1024 * 1024;
     QCOMPARE(!ArtworkStore::copy(path, native, &error).isEmpty(), allowed);
     QCOMPARE(!ArtworkStore::save(large, native, &error).isEmpty(), allowed);
-    QVERIFY(put(temp.filePath(u"broken.png"_s), "not an image"_ba));
+    QVERIFY(test::writeFile(temp.filePath(u"broken.png"_s), "not an image"_ba));
     QVERIFY(ArtworkStore::copy(temp.filePath(u"broken.png"_s), native, &error).isEmpty());
     QFile oversized(temp.filePath(u"oversized.png"_s));
     QVERIFY(oversized.open(QIODevice::WriteOnly));
@@ -399,7 +395,7 @@ void MediaMetadataTest::artworkGuards()
     small.fill(Qt::blue);
     QVERIFY(ArtworkStore::save(small, native) != a);
     QVERIFY(!ArtworkStore::save(small, temp.filePath(u"blocked/file"_s), &error).isEmpty());
-    QVERIFY(put(temp.filePath(u"read-only-parent"_s), "file"_ba));
+    QVERIFY(test::writeFile(temp.filePath(u"read-only-parent"_s), "file"_ba));
     QVERIFY(ArtworkStore::save(small, temp.filePath(u"read-only-parent/native"_s), &error)
                     .isEmpty());
 }
@@ -457,7 +453,7 @@ void MediaMetadataTest::legacy()
     const auto music = temp.filePath(u"\u97f3\u4e50 # %"_s);
     const auto source = temp.filePath(u"music-data-v3"_s);
     const auto native = temp.filePath(u"native"_s);
-    QVERIFY(put(music + u"/\u4e13\u8f91/song.wav"_s, wave()));
+    QVERIFY(test::writeFile(music + u"/\u4e13\u8f91/song.wav"_s, wave()));
     QImage image(32, 16, QImage::Format_ARGB32);
     image.fill(Qt::blue);
     QDir().mkpath(source + "/artwork"_L1);
@@ -496,9 +492,9 @@ void MediaMetadataTest::legacy()
     json.insert(u"albums"_s, inputAlbums);
     json.insert(u"version"_s, 1);
     json.insert(u"futureIndex"_s, 42);
-    QVERIFY(put(source + u"/library-index.json"_s, QJsonDocument(json).toJson()));
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, QJsonDocument(json).toJson()));
     const auto before = yalahoo::test::readFile(source + "/library-index.json"_L1);
-    QVERIFY(put(
+    QVERIFY(test::writeFile(
             source + u"/genre-rules.json"_s,
             QJsonDocument(QJsonObject{ { u"genres"_s,
                                          QJsonArray{ QJsonObject{ { u"id"_s, u"manual"_s },
@@ -506,7 +502,7 @@ void MediaMetadataTest::legacy()
                                        { u"albumOverrides"_s,
                                          QJsonObject{ { album.id, u"manual"_s } } } })
                     .toJson()));
-    QVERIFY(put(
+    QVERIFY(test::writeFile(
             source + u"/config.json"_s,
             QJsonDocument(QJsonObject{ { u"version"_s, 1 },
                                        { u"roots"_s, QJsonArray{ music } },
@@ -514,7 +510,7 @@ void MediaMetadataTest::legacy()
                                        { u"futureConfig"_s, 8 },
                                        { u"musicBrainzContact"_s, u"project@example.invalid"_s } })
                     .toJson()));
-    QVERIFY(put(source + u"/pcm-cache/private"_s, "DO NOT COPY"_ba));
+    QVERIFY(test::writeFile(source + u"/pcm-cache/private"_s, "DO NOT COPY"_ba));
     const auto imported = LegacyImporter::read(source, native, { });
     QVERIFY2(imported.snapshot, qPrintable(imported.error));
     const auto &actual = imported.snapshot->albums.first();
@@ -547,11 +543,12 @@ void MediaMetadataTest::legacyErrorsAndCancellation()
     QTemporaryDir temp;
     const auto source = temp.filePath(u"legacy"_s);
     const auto native = temp.filePath(u"native"_s);
-    QVERIFY(put(source + u"/library-index.json"_s, "broken"_ba));
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, "broken"_ba));
     QVERIFY(!LegacyImporter::read(source, native, { }).error.isEmpty());
-    QVERIFY(put(source + u"/library-index.json"_s, "{\"version\":99,\"albums\":[]}"_ba));
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s,
+                            "{\"version\":99,\"albums\":[]}"_ba));
     QVERIFY(!LegacyImporter::read(source, native, { }).error.isEmpty());
-    QVERIFY(put(source + u"/library-index.json"_s, "{\"version\":1,\"albums\":[]}"_ba));
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, "{\"version\":1,\"albums\":[]}"_ba));
     QVERIFY(!LegacyImporter::read(source, source, { }).snapshot);
     QVERIFY(!LegacyImporter::read(source, source + u"/nested"_s, { }).snapshot);
     auto cancel = std::make_shared<std::atomic_bool>(true);
@@ -566,8 +563,8 @@ void MediaMetadataTest::storeImportAndPreferences()
     QTemporaryDir temp;
     const auto source = temp.filePath(u"legacy"_s);
     const auto native = temp.filePath(u"native"_s);
-    QVERIFY(put(source + u"/library-index.json"_s,
-                "{\"version\":1,\"albums\":[],\"future\":42}"_ba));
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s,
+                            "{\"version\":1,\"albums\":[],\"future\":42}"_ba));
     LibraryStore store(native);
     OfflineMetadataProvider provider;
     LibrarySession session(&provider);
@@ -589,7 +586,7 @@ void MediaMetadataTest::storeImportAndPreferences()
     QSignalSpy imported(&preferences, &PreferencesStore::imported);
     QSignalSpy saved(&preferences, &PreferencesStore::saved);
     const auto exported = temp.filePath(u"browser-export.json"_s);
-    QVERIFY(put(
+    QVERIFY(test::writeFile(
             exported,
             "{\"arrayMode\":\"realistic\",\"rememberColumnPosition\":false,\"future\":{\"x\":7}}"_ba));
     const auto original = yalahoo::test::readFile(exported);
@@ -607,11 +604,11 @@ void MediaMetadataTest::storeImportAndPreferences()
              7);
     QCOMPARE(yalahoo::test::readFile(exported), original);
     QSignalSpy errors(&preferences, &PreferencesStore::saveError);
-    QVERIFY(put(exported, "[]"_ba));
+    QVERIFY(test::writeFile(exported, "[]"_ba));
     QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
     QTRY_COMPARE(errors.size(), 1);
     QCOMPARE(imported.size(), 1);
-    QVERIFY(put(exported, "{\"arrayMode\":\"realistic\"}"_ba));
+    QVERIFY(test::writeFile(exported, "{\"arrayMode\":\"realistic\"}"_ba));
     const auto saves = saved.size();
     QVERIFY(preferences.importJson(QUrl::fromLocalFile(exported)));
     preferences.setNavigation(true, false);
@@ -625,8 +622,8 @@ void MediaMetadataTest::storeProbeReplacement()
     const auto rootA = temp.filePath(u"first"_s);
     const auto rootB = temp.filePath(u"last"_s);
     for (int i = 0; i < 30; ++i)
-        QVERIFY(put(rootA + u"/album/"_s + QString::number(i) + u".wav"_s, wave()));
-    QVERIFY(put(rootB + u"/single.wav"_s, wave()));
+        QVERIFY(test::writeFile(rootA + u"/album/"_s + QString::number(i) + u".wav"_s, wave()));
+    QVERIFY(test::writeFile(rootB + u"/single.wav"_s, wave()));
     LibraryStore store(temp.filePath(u"native"_s));
     QSignalSpy ready(&store, &LibraryStore::snapshotReady);
     bool replaced = false;

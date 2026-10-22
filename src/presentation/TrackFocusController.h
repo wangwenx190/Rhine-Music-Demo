@@ -3,6 +3,7 @@
 
 #pragma once
 #include <QObject>
+#include <QVariant>
 #include <QString>
 
 namespace yalahoo {
@@ -32,7 +33,8 @@ public:
                                      double low, double high, double rowTop, double rowHeight,
                                      double viewportHeight, double headerHeight);
     Q_INVOKABLE void refineListReveal(double origin, double rowTop, double rowHeight,
-                                      double viewportHeight, double headerHeight, double high);
+                                      double viewportHeight, double headerHeight,
+                                      const QVariant &high);
     Q_INVOKABLE double listScrollY(double origin) const;
     void setReducedMotion(bool reduced);
     void advance(double dt);

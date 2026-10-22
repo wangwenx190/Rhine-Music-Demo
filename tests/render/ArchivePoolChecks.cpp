@@ -415,15 +415,16 @@ auto runArchivePoolChecks(int &argc, char **&argv, QGuiApplication &app)
         waitPrepared();
         const auto pixel = adapter.projectWorldPoint(
                 (selection.selectedPosition() + SceneVector{ 0, 1.85, 0 }).qt());
-        const auto hit = adapter.hitTest(pixel.x(), pixel.y());
+        require(pixel.has_value(), "Selected case projection is invalid");
+        const auto hit = adapter.hitTest(pixel->x(), pixel->y());
         require(hit[u"albumId"_s].toString() == selection.albumId(),
                 "Pool selection hit differs from rendered coordinates");
-        QMouseEvent press(QEvent::MouseButtonPress, QPointF(pixel.x(), pixel.y()),
-                          QPointF(pixel.x(), pixel.y()), Qt::LeftButton, Qt::LeftButton,
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(pixel->x(), pixel->y()),
+                          QPointF(pixel->x(), pixel->y()), Qt::LeftButton, Qt::LeftButton,
                           Qt::NoModifier);
         QCoreApplication::sendEvent(item, &press);
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(pixel.x(), pixel.y()),
-                            QPointF(pixel.x(), pixel.y()), Qt::LeftButton, Qt::NoButton,
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(pixel->x(), pixel->y()),
+                            QPointF(pixel->x(), pixel->y()), Qt::LeftButton, Qt::NoButton,
                             Qt::NoModifier);
         QCoreApplication::sendEvent(item, &release);
         require(press.isAccepted() && release.isAccepted(),

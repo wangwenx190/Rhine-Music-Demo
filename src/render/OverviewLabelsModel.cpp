@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <iterator>
 #include <cmath>
-#include <limits>
 
 using namespace Qt::StringLiterals;
 
@@ -159,7 +158,7 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(const QVector<Overvie
 {
     // The inclusive physical interval has ten candidates at a half-lane boundary.
     // Cull its zero-extent endpoints after priority sorting; never truncate a selected ID.
-    const auto count = std::min(columns.size(), qsizetype(CandidateCountWithBoundary));
+    qsizetype count = 0;
     struct Candidate final
     {
         qsizetype index;
@@ -167,11 +166,12 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(const QVector<Overvie
         double centerDistance;
     };
     std::array<Candidate, CandidateCountWithBoundary> candidates;
-    for (qsizetype i = 0; i < count; ++i) {
+    const auto limit = std::min(columns.size(), qsizetype(CandidateCountWithBoundary));
+    for (qsizetype i = 0; i < limit; ++i) {
         const auto &column = columns[i];
-        candidates[i] = { i, column.lane == expanded,
-                          std::isfinite(column.x) ? std::abs(column.x - width / 2)
-                                                  : std::numeric_limits<double>::infinity() };
+        if (!std::isfinite(column.x) || !std::isfinite(column.y) || !std::isfinite(column.extent))
+            continue;
+        candidates[count++] = { i, column.lane == expanded, std::abs(column.x - width / 2) };
     }
     const auto end = candidates.begin() + count;
     std::sort(candidates.begin(), end, [&columns](const auto &a, const auto &b) {
@@ -190,8 +190,7 @@ QVector<OverviewColumn> OverviewLabelsModel::visibleLabels(const QVector<Overvie
     for (auto it = candidates.begin(); it != end; ++it) {
         const auto &c = columns[it->index];
         const bool keep = std::find(retained.begin(), retained.end(), c.lane) != retained.end();
-        if (!std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.extent)
-            || c.extent <= (keep ? RetainedExtentThreshold : NewExtentThreshold))
+        if (c.extent <= (keep ? RetainedExtentThreshold : NewExtentThreshold))
             continue;
         if (c.x < labelWidth / 2 + (keep ? -RetainedLeftSlackPixels : AdmissionInsetPixels)
             || c.x > width - labelWidth / 2 - EntryButtonWidthPixels

@@ -1,24 +1,19 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {FrozenSource, loadSource} from './frozen-source.mjs';
+import {FrozenSource, repositoryRoot as root} from './frozen-source.mjs';
 // Verification input: execute the frozen placement/gate and production drag expressions.
 import {baselineRevision} from './frozen-git.mjs';
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
 const frozenSource = new FrozenSource(sources);
-const frozen = name => frozenSource.read(name);
-const load = loadSource;
-const motion = load(frozen('motion'), {});
+const motion = frozenSource.load('motion', {});
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
-const camera = load(frozen('music-camera'), {
+const camera = frozenSource.load('music-camera', {
     three: {MathUtils: {clamp}},
     './motion.ts': motion,
     './viewport-layout.ts': {},
 });
-const scene = frozen('scene');
+const scene = frozenSource.read('scene');
 const rotationExpression = scene.match(
     /this\.rotation = this\.reduced\s*\? inspecting[\s\S]*?returnStep\(this\.rotation, dt, this\.reduced\);/)[0];
 const advanceRotation = new Function('rotation', 'targetRotation', 'dt', 'inspecting',
@@ -93,7 +88,7 @@ for (const reduced of [false, true]) {
             rotations.push({frame, reduced, rotation});
     }
 }
-const decryption = load(frozen('decryption'), {});
+const decryption = frozenSource.load('decryption', {});
 const clarity = new decryption.DecryptionController();
 const claritySamples = [];
 for (let frame = 0; frame < 1200; ++frame) {

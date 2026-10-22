@@ -118,12 +118,9 @@ Column {
                 }
             }
         }
-        ArchiveText {
+        PanelDescription {
             tokens: root.tokens
-            width: parent.width
             cssPixelSize: 10
-            color: root.tokens.muted
-            wrapMode: Text.Wrap
             text: root.mode === "baseline" ? qsTr(
                                                  "Retain the original ambient and cover lighting as a brightness reference.") :
                                              root.mode === "area" ? qsTr(
@@ -199,12 +196,9 @@ Column {
                 }
             }
         }
-        ArchiveText {
+        PanelDescription {
             tokens: root.tokens
-            width: parent.width
             cssPixelSize: 10
-            color: root.tokens.muted
-            wrapMode: Text.Wrap
             text: qsTr(
                       "Duration is measured at 1x and follows the overall animation speed. Album details retain the original selection light.")
         }

@@ -1,13 +1,11 @@
-import {FrozenSource} from './frozen-source.mjs';
+import {FrozenSource, repositoryRoot as root, transpile} from './frozen-source.mjs';
 import {baselineRevision} from './frozen-git.mjs';
 // Verification-only execution of immutable Git source, using existing Web dev dependencies.
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const req = createRequire(path.join(root, 'legacy-web/package.json'));
-const ts = req('typescript'), THREE = req('three');
+const THREE = req('three');
 const baseline = baselineRevision, sources = [];
 const frozenSource = new FrozenSource(sources);
 const frozen = name => frozenSource.read(name);
@@ -23,14 +21,10 @@ const spacing = frozen('archive-loop');
 const columnSpacing = Number(spacing.match(/export const COLUMN_SPACING = ([\d.]+)/)[1]);
 const rowSpacing = Number(spacing.match(/export const ROW_SPACING = ([\d.]+)/)[1]);
 // Execute the actual production target block, with cinematic/overview disabled for R06.
-const block = ts.transpileModule(
-                    scene.slice(
-                        scene.indexOf('    const orbit = ease((shot - 22.6)'),
-                        scene.indexOf('    if (!cinematic && !this.reduced && (!musicLibrary'),
-                        ),
-                    {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}},
-                    )
-                  .outputText;
+const block = transpile(scene.slice(
+    scene.indexOf('    const orbit = ease((shot - 22.6)'),
+    scene.indexOf('    if (!cinematic && !this.reduced && (!musicLibrary'),
+    ));
 if (!block.includes('const cameraPosition = cameraAim'))
     throw Error('Frozen camera target extraction failed');
 const target = new Function(

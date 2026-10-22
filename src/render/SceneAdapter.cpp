@@ -303,6 +303,8 @@ void SceneAdapter::advance(double dt)
 }
 void SceneAdapter::setOpeningTime(std::optional<double> time, double dt)
 {
+    if ((time && !std::isfinite(*time)) || !std::isfinite(dt))
+        return;
     m_openingTime = time;
     m_managedDetail = false;
     m_detail = 0;
@@ -321,6 +323,12 @@ void SceneAdapter::observe(CameraPose pose, double dt)
 {
     // Observe authored poses in the existing browse springs; the final hold clears velocity.
     const auto p = components(pose.position), a = components(pose.aim);
+    const auto finite = [](double value) {
+        return std::isfinite(value);
+    };
+    if (!std::ranges::all_of(p, finite) || !std::ranges::all_of(a, finite)
+        || !std::isfinite(pose.span) || !std::isfinite(dt))
+        return;
     for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
         m_position[i].velocity = dt > 0 ? (p[i] - m_position[i].value) / dt : 0;
         m_aim[i].velocity = dt > 0 ? (a[i] - m_aim[i].value) / dt : 0;
@@ -445,7 +453,7 @@ double SceneAdapter::focalDepth(QVector3D origin) const
     // Frozen scene.ts: (model.position + (0,2,0)) in camera view space.
     return -(m_frame.view * QVector4D(origin + QVector3D(0, 2, 0), 1)).z();
 }
-QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
+std::optional<QVector3D> SceneAdapter::projectWorldPoint(QVector3D world) const
 {
     return projectToViewport(m_viewProjection, world, { m_frame.width, m_frame.height });
 }

@@ -417,10 +417,12 @@ private Q_SLOTS:
                     continue;
                 const auto point =
                         f.scene.projectWorldPoint(instance.transform.map({ 0, 1.85f, 0 }));
-                QVERIFY(point.x() >= 0 && point.x() < 1280 && point.y() >= 0 && point.y() < 720);
+                QVERIFY(point);
+                QVERIFY(point->x() >= 0 && point->x() < 1280 && point->y() >= 0
+                        && point->y() < 720);
                 auto isolated = f.scene.frame();
                 isolated.instances = { instance };
-                QVERIFY(f.selection.hitTest(isolated, point.x(), point.y()).isEmpty());
+                QVERIFY(f.selection.hitTest(isolated, point->x(), point->y()).isEmpty());
                 checked = true;
                 break;
             }

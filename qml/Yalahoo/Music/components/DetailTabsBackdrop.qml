@@ -17,26 +17,18 @@ BackdropBlur {
         width: root.targetWidth
         height: root.targetHeight
     }
-    ShaderEffect {
+    BackdropBlurPass {
         id: horizontal
-        width: root.targetWidth
-        height: root.targetHeight
-        visible: false
-        property var source: root.sceneTexture
+        backdrop: root
+        horizontal: true
         property var overlay: content
-        property vector2d sampleStep: Qt.vector2d(1 / width, 0)
         property real composite: 1
         fragmentShader: "qrc:/assets/shaders/detail-tabs-blur.frag.qsb"
     }
 
-    ShaderEffect {
-        x: -root.blurRadius
-        y: -root.blurRadius
-        width: root.targetWidth
-        height: root.targetHeight
-        property var source: root.horizontalTexture
+    BackdropBlurPass {
+        backdrop: root
         property var overlay: content
-        property vector2d sampleStep: Qt.vector2d(0, 1 / height)
         property real composite: 0
         fragmentShader: "qrc:/assets/shaders/detail-tabs-blur.frag.qsb"
     }

@@ -33,12 +33,9 @@ Column {
             value: root.settings.values.motionSpeed
             onMoved: value => root.settings.update("motionSpeed", value)
         }
-        ArchiveText {
+        PanelDescription {
             tokens: root.tokens
-            width: parent.width
             cssPixelSize: 10
-            color: root.tokens.muted
-            wrapMode: Text.Wrap
             text: qsTr(
                       "Albums, camera, text, and light transitions change speed together. Actual light duration = panel duration / this multiplier. Track playback and the opening sequence are unchanged.")
         }

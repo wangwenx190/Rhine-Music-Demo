@@ -1,11 +1,8 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {FrozenSource, loadSource} from './frozen-source.mjs';
+import {FrozenSource, loadSource, repositoryRoot as root, transpile} from './frozen-source.mjs';
 import {baselineRevision} from './frozen-git.mjs';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
 const frozenSource = new FrozenSource(sources);
@@ -68,9 +65,7 @@ const end = scene.indexOf('  private visibleMusicCell(', start);
 if (start < 0 || end < 0)
     throw new Error('Missing frozen finite-column production field');
 const fieldSource = scene.slice(start, end).replace('  private ', '');
-const fieldClass = ts.transpileModule(`class Field { ${fieldSource} }`, {
-                         compilerOptions: {target: ts.ScriptTarget.ES2022},
-                     }).outputText;
+const fieldClass = transpile(`class Field { ${fieldSource} }`);
 const Field = new Function('motion', 'THREE', `
     const { idleWave, musicSelectionWave, rippleEnvelope, settlingWave } = motion;
     ${fieldClass}

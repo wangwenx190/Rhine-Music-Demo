@@ -25,13 +25,10 @@ Column {
         text: root.title
         cssPixelSize: 12
     }
-    ArchiveText {
+    PanelDescription {
         tokens: root.tokens
-        width: parent.width
         text: root.explanation
         cssPixelSize: 12
-        color: root.tokens.muted
-        wrapMode: Text.Wrap
     }
     ArchiveText {
         objectName: root.kind + "MetadataState"
@@ -79,14 +76,10 @@ Column {
         Accessible.description: root.queryEnabled ? "" : qsTr(
                                                         "Enable online metadata in advanced settings")
     }
-    ArchiveText {
+    PanelDescription {
         tokens: root.tokens
         text: qsTr("Online queries are disabled. Existing metadata remains available offline.")
-        width: parent.width
-        wrapMode: Text.Wrap
         visible: !root.queryEnabled
-        cssPixelSize: 11
-        color: root.tokens.muted
     }
     ArchiveButton {
         objectName: root.kind + "MetadataBatch"

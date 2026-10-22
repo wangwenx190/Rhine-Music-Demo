@@ -1,4 +1,3 @@
-#include "SceneMath.h"
 #include "Units.h"
 #include "RenderData.h"
 #include "SelectionLighting.h"
@@ -742,11 +741,6 @@ void SceneItem::configureTelemetry()
             return queueTelemetry(mailbox, guard, epoch, std::move(sample));
         };
     }
-}
-QVector3D SceneItem::qtProjection(QVector3D world) const
-{
-    const auto &scene = input().scene;
-    return projectToViewport(scene.projection * scene.view, world, { scene.width, scene.height });
 }
 QJsonObject SceneItem::coverStatistics() const
 {

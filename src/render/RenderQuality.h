@@ -32,7 +32,7 @@ public:
         using namespace Qt::StringLiterals;
         return { { u"depthOfField"_s, m_depthOfField } };
     }
-    Q_INVOKABLE void configure(const QVariantMap &values);
+    Q_INVOKABLE bool configure(const QVariantMap &values);
     Q_INVOKABLE void resize(double width, double height, double dpr);
     int shadows() const;
     int aoSamples() const

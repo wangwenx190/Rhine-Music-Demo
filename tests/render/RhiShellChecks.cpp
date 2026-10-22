@@ -20,14 +20,6 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-QJsonObject read(const QString &path)
-{
-    QFile file(path);
-    require(file.open(QIODevice::ReadOnly), "Missing source review JSON");
-    const auto document = QJsonDocument::fromJson(file.readAll());
-    require(document.isObject(), "Invalid source review JSON");
-    return document.object();
-}
 double depthAt(const QImage &image, QPoint point)
 {
     const auto pixel = image.pixelColor(point);
@@ -147,7 +139,7 @@ auto runShellChecks(int &argc, char **&argv)
     try {
         const QString fixturePath = QString::fromLocal8Bit(argv[1]);
         const QString output = QString::fromLocal8Bit(argv[2]);
-        const auto source = read(fixturePath);
+        const auto source = readFixture(fixturePath);
         const auto cases = source[u"cases"_s].toArray();
         require(cases.size() == 61, "Incomplete source shell states");
         QDir().mkpath(output);
@@ -201,9 +193,10 @@ auto runShellChecks(int &argc, char **&argv)
             results.append(QJsonObject{ { u"sourceIndex"_s, sourceIndex },
                                         { u"metadata"_s, gpu.metadata } });
         }
-        const auto original = read((QString::fromUtf8(FIXTURE_ROOT))
-                                   + "/tests/fixtures/render-backend/visual.json"_L1)[u"cases"_s]
-                                      .toArray();
+        const auto original =
+                readFixture((QString::fromUtf8(FIXTURE_ROOT))
+                            + "/tests/fixtures/render-backend/visual.json"_L1)[u"cases"_s]
+                        .toArray();
         for (int index : { 58, 59 }) {
             auto input = fixture(original[index].toObject());
             input.geometryDiagnostic = true;

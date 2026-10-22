@@ -105,7 +105,6 @@ public:
     {
         return m_errorText;
     }
-    Q_INVOKABLE QVector3D qtProjection(QVector3D world) const;
     QJsonObject coverStatistics() const;
     TitleReel *titleReel() const;
     void setTitleReel(TitleReel *reel);

@@ -4,6 +4,7 @@
 #include "LibrarySession.h"
 #include <QCoreApplication>
 #include "TrackFocusController.h"
+#include "NumericValue.h"
 #include <algorithm>
 #include <QPointF>
 #include <cmath>
@@ -140,13 +141,17 @@ void TrackFocusController::beginListReveal(quint64 revision, double startRelativ
     beginReveal(revision, startRelative + origin, m_listTarget + origin);
 }
 void TrackFocusController::refineListReveal(double origin, double rowTop, double rowHeight,
-                                            double viewportHeight, double headerHeight, double high)
+                                            double viewportHeight, double headerHeight,
+                                            const QVariant &highValue)
 {
     if (!active() || !std::isfinite(origin) || !std::isfinite(rowTop) || !std::isfinite(rowHeight)
         || !std::isfinite(viewportHeight) || !std::isfinite(headerHeight))
         return;
-    if (!std::isfinite(high))
-        high = m_listHigh;
+    const auto highNumber =
+            highValue.isNull() ? std::optional(m_listHigh) : finiteNumber(highValue);
+    if (!highNumber)
+        return;
+    double high = *highNumber;
     high = std::max(m_listLow, high);
     m_listOffset = centeredListTarget(origin, rowTop, rowHeight, viewportHeight, headerHeight,
                                       m_listLow, high)

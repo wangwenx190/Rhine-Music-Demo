@@ -11,23 +11,15 @@ BackdropBlur {
     horizontalPass: horizontal
     cropName: "overviewCrop"
     intermediateName: "overviewHorizontalTexture"
-    ShaderEffect {
+    BackdropBlurPass {
         id: horizontal
-        width: root.targetWidth
-        height: root.targetHeight
-        visible: false
-        property var source: root.sceneTexture
-        property vector2d sampleStep: Qt.vector2d(1 / root.targetWidth, 0)
+        backdrop: root
+        horizontal: true
         fragmentShader: "qrc:/assets/shaders/overview-blur.frag.qsb"
     }
 
-    ShaderEffect {
-        x: -root.blurRadius
-        y: -root.blurRadius
-        width: root.targetWidth
-        height: root.targetHeight
-        property var source: root.horizontalTexture
-        property vector2d sampleStep: Qt.vector2d(0, 1 / root.targetHeight)
+    BackdropBlurPass {
+        backdrop: root
         fragmentShader: "qrc:/assets/shaders/overview-blur.frag.qsb"
     }
 }

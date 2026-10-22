@@ -29,13 +29,18 @@ export class FrozenSource {
         this.sources = sources;
     }
     read(name) {
-        const sourcePath = `src/${name}.ts`;
+        return this.readPath(`src/${name}.ts`);
+    }
+    readPath(sourcePath) {
         const source = execFrozenGit(['show', `${baselineRevision}:${sourcePath}`], {
             cwd: repositoryRoot,
             encoding: 'utf8',
         });
-        this.sources.push(
-            {path: sourcePath, sha256: createHash('sha256').update(source).digest('hex')});
+        const sha256 = createHash('sha256').update(source).digest('hex');
+        if (Array.isArray(this.sources))
+            this.sources.push({path: sourcePath, sha256});
+        else
+            this.sources[sourcePath] = sha256;
         return source;
     }
     load(name, dependencies = {}) {
@@ -44,12 +49,6 @@ export class FrozenSource {
 }
 
 export function frozenReader(sources) {
-    return name => {
-        const text = execFrozenGit(['show', baselineRevision + ':' + name], {
-            cwd: repositoryRoot,
-            encoding: 'utf8',
-        });
-        sources[name] = createHash('sha256').update(text).digest('hex');
-        return text;
-    };
+    const source = new FrozenSource(sources);
+    return name => source.readPath(name);
 }

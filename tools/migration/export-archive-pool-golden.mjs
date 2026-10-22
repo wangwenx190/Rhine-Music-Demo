@@ -1,12 +1,9 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {FrozenSource} from './frozen-source.mjs';
+import {FrozenSource, repositoryRoot as root, transpile} from './frozen-source.mjs';
 import {baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
 const counts = [1, 2, 3, 7, 64, 97, 101, 113, 127];
@@ -31,11 +28,7 @@ function extract(start, end) {
     const first = sceneSource.indexOf(start), last = sceneSource.indexOf(end, first);
     if (first < 0 || last < first)
         throw new Error('Frozen production pool block changed');
-    return ts
-        .transpileModule(sceneSource.slice(first, last), {
-            compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
-        })
-        .outputText;
+    return transpile(sceneSource.slice(first, last));
 }
 const cells =
     Array.from({length: 432}, (_, index) => loop.visibleCell(index, {lane: 0, row: 12}, 48));

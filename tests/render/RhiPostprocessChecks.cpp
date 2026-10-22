@@ -23,14 +23,6 @@ using namespace yalahoo::rhi;
 using namespace yalahoo::review;
 
 namespace {
-QJsonObject read(const QString &path)
-{
-    QFile file(path);
-    require(file.open(QIODevice::ReadOnly), "Missing source mathematical input");
-    const auto doc = QJsonDocument::fromJson(file.readAll());
-    require(doc.isObject(), "Invalid source mathematical input");
-    return doc.object();
-}
 void checkResolve(const Capture &capture, int samples, bool shells)
 {
     const auto graph = capture.metadata[u"resolveGraph"_s].toArray();
@@ -217,8 +209,8 @@ auto runPostprocessChecks(int &argc, char **&argv)
     try {
         const QString output = QString::fromLocal8Bit(argv[1]);
         require(QDir().mkpath(output), "Cannot create diagnostic output");
-        const auto original = read((QString::fromUtf8(FIXTURE_ROOT))
-                                   + "/tests/fixtures/render-backend/visual.json"_L1);
+        const auto original = readFixture((QString::fromUtf8(FIXTURE_ROOT))
+                                          + "/tests/fixtures/render-backend/visual.json"_L1);
         const auto sourceCases = original[u"cases"_s].toArray();
         if (attachmentsOnly) {
             const auto report = checkAttachments(sourceCases);

@@ -12,6 +12,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <cmath>
+#include <limits>
 
 using namespace Qt::StringLiterals;
 
@@ -89,6 +90,15 @@ private Q_SLOTS:
         QCOMPARE(f.focus.listScrollY(150), scroll + 50);
         f.focus.refineListReveal(150, 470, 40, 200, 20, 500);
         QCOMPARE(f.focus.listScrollY(150), scroll + 70);
+        // An unavailable final delegate is distinct from invalid numeric geometry.
+        f.focus.refineListReveal(150, 470, 40, 200, 20, QVariant());
+        QCOMPARE(f.focus.listScrollY(150), scroll + 70);
+        for (double invalid :
+             { std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+               -std::numeric_limits<double>::infinity() }) {
+            f.focus.refineListReveal(150, 999, 40, 200, 20, invalid);
+            QCOMPARE(f.focus.listScrollY(150), scroll + 70);
+        }
         f.focus.advance(1);
         QCOMPARE(f.focus.listScrollY(150), 380.);
         f.focus.cancel();

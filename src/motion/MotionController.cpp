@@ -1,8 +1,25 @@
 #include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
+#include <algorithm>
+#include <cmath>
 
 namespace yalahoo {
+namespace {
+bool finiteValues(const ArchiveValues &values)
+{
+    return std::ranges::all_of(values, [](double value) {
+        return std::isfinite(value);
+    });
+}
+bool finiteSprings(const ArchiveSprings &springs)
+{
+    return std::ranges::all_of(springs, [](const auto &spring) {
+        return std::isfinite(spring.value) && std::isfinite(spring.velocity)
+                && std::isfinite(spring.acceleration);
+    });
+}
+}
 std::array<Kinematics, ArchiveAxisCount> ArchiveMotion::state() const
 {
     std::array<Kinematics, ArchiveAxisCount> result;
@@ -78,7 +95,7 @@ MotionController::MotionController(QObject *parent) : QObject(parent)
 void MotionController::observe(const ArchiveSprings &springs, const ArchiveValues &targets,
                                const ArchiveValues &rates)
 {
-    if (moving())
+    if (moving() || !finiteSprings(springs) || !finiteValues(targets) || !finiteValues(rates))
         return;
     bool changed = false;
     for (size_t i = 0; i < springs.size(); ++i) {
@@ -93,7 +110,7 @@ void MotionController::observe(const ArchiveSprings &springs, const ArchiveValue
 }
 bool MotionController::retarget(const ArchiveValues &targets)
 {
-    if (!m_archive.retarget(m_springs, targets))
+    if (!finiteValues(targets) || !m_archive.retarget(m_springs, targets))
         return false;
     ++m_revision;
     Q_EMIT stateChanged();
@@ -107,6 +124,8 @@ void MotionController::travel(double rail, double column, double shoulder, doubl
 }
 void MotionController::translate(const ArchiveValues &offset)
 {
+    if (!finiteValues(offset))
+        return;
     m_archive.translate(offset);
     for (size_t i = 0; i < m_springs.size(); ++i)
         m_springs[i].translate(offset[i]);

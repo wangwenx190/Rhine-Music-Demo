@@ -7,7 +7,7 @@
 #include "PreferencesStore.h"
 #include "SceneAdapter.h"
 #include "SettingsController.h"
-#include <cmath>
+#include "NumericValue.h"
 #include <array>
 #include <algorithm>
 #include <iterator>
@@ -123,11 +123,10 @@ bool SettingsController::update(const QString &field, const QVariant &value)
           } },
         { "motionSpeed"_L1,
           [](SettingsController &self, const QVariant &input) {
-              if (input.metaType().id() == QMetaType::QString
-                  || input.metaType().id() == QMetaType::Bool || !input.canConvert<double>()
-                  || !std::isfinite(input.toDouble()))
+              const auto number = finiteNumber(input);
+              if (!number)
                   return false;
-              self.m_motion->clock()->setSpeed(input.toDouble());
+              self.m_motion->clock()->setSpeed(*number);
               return true;
           } },
         { "sortMode"_L1,
@@ -157,8 +156,7 @@ bool SettingsController::update(const QString &field, const QVariant &value)
           [](SettingsController &self, const QVariant &input) {
               if (!input.canConvert<QVariantMap>())
                   return false;
-              self.m_scene->quality()->configure(input.toMap());
-              return true;
+              return self.m_scene->quality()->configure(input.toMap());
           } },
         { "singleInstance"_L1,
           [](SettingsController &self, const QVariant &input) {

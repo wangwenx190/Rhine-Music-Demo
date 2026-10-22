@@ -220,6 +220,8 @@ CameraPose openingCamera(double sceneTime, double width, double height, SceneVec
 }
 double openingReveal(double elapsed, double delay)
 {
+    if (!std::isfinite(elapsed) || !std::isfinite(delay))
+        return 0;
     // Invert the authored Bezier x coordinate by bounded bisection, then evaluate cubic y.
     constexpr auto RevealEndSeconds = .72;
     constexpr auto BezierSearchSteps = 40;
