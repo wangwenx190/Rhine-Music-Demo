@@ -1,6 +1,6 @@
 # 项目自绘交互控件
 
-本契约维护产品、探针和Review共用控件的视觉、输入与验证边界。冻结来源经历史映射解析，逐项判定见[source-fidelity-review.md](source-fidelity-review.md)；字体/主题常量由DesignTokens与assets/materials契约维护，不在这里复制色值。
+本契约维护产品、探针和Review共用控件的视觉、输入与验证边界。冻结来源经历史映射解析，逐项判定见[source-fidelity-review.md](source-fidelity-review.md)；字体由assets.md维护，界面主题由DesignTokens与lighting.md维护，不在这里复制色值。
 
 ## 长期强制规则
 

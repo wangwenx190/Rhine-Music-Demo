@@ -1,6 +1,6 @@
 # 封面解码、图集与租约契约
 
-R12 的生产填充池采用单张合并 atlas 与分块高清区域；其容量、准备中低清晰度回退、归位快照固定、资源峰值与窗口重建调度见 [archive-pool.md](archive-pool.md)。下述 2048² 分页/独立 selected texture 数值仍描述 R11 的通用 allocator 和独立 Review，不替代生产池汇总。
+生产填充池采用单张合并 atlas 与分块高清区域；其容量、准备中低清晰度回退、归位快照固定、资源峰值与窗口重建调度见 [archive-pool.md](archive-pool.md)。下述2048²分页/独立selected texture数值描述通用allocator和独立Review，不替代生产池汇总。
 
 冻结来源为原始提交 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/cover-atlas.ts` 和 `src/viewer-album-cover.ts`，当前工作树位于 `legacy-web/src/`；历史 Git 读取继续使用既有清理映射。contain、1/64 留边、透明背景、选中/归位独立所有权和 tile 像素中心钳制按源码执行。
 
@@ -24,9 +24,9 @@ AtlasAllocator 最多 432 个槽位，页面每边最多 2048、按设备上限�
 
 acquire 引用计数固定身份槽，release 后可复用；重用分配单调 lease，publish 核对 allocator generation、identity、lease 和 decode generation。每槽 serial 单调，重复快照不重新标脏。uploads每页提供有界增量；replay缓存该页已就绪的不可变描述符，按实际目标列跨度映射slot，供合并提交及scene graph重建共享。身份准入/最后释放、像素发布、generation或目标跨度变化使缓存失效；释放与换代立即清除缓存持有的旧快照，已提交值保持独立有效期。不能把完整CPU页面合成后上传。
 
-RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。每个物理槽的serial、预期lease与已上传lease集中在一条哈希记录中，ready只查找一次；待上传项仍按slot有序合并和排出。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次；有效区域与租约写入renderer独占的复用缓冲，同一帧就绪判定直接生成UV，不因临时回退分离输入数组或重复检查同一区域。重建重新播放当前 retained tile，旧结果不能污染新资源。旧 Review 未提供 coverLeases 的原始 fixture 保持历史语义。
+RhiItem 的 coverTiles/coverLeases 配对传入，render 独占 AtlasUploadQueue。每个物理槽的serial、预期lease与已上传lease集中在一条哈希记录中，ready只查找一次；待上传项仍按slot有序合并和排出。预期租约变更使旧像素立即不再可采样，只有该租约 tile 的上传和绘制命令在同一 QRhi command buffer 提交时，uniform/实例 UV 才有效；未就绪使用零 UV extent 并 discard。队列先拒绝旧 generation/lease/serial，再转换/复制像素，按槽合并。enqueueAtlas 只在同步或资源重建时接收新快照，预期租约/布局未变化时复用共享值；renderFrame 仅排出实际上传批次，不反复提交旧批次；有效区域与租约写入renderer独占的复用缓冲，同一帧就绪判定直接生成UV，不因临时回退分离输入数组或重复检查同一区域。重建重新播放当前 retained tile，旧结果不能污染新资源。独立Review不提供coverLeases时按其直接纹理输入处理；生产池必须提供租约。
 
-SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三个 returning 的预算。fork 共享当前不可变像素，却取得独立 lease；selected 升级清晰层不改变 returning 的图像。身份/source generation 不匹配及降清晰度升级拒绝；reset 后旧 lease 不能再更新，且仍占容量直到主人释放。对应独立 RhiItem cover texture 由 render 线程持有，每次只上传最新 revision；R18 使用这些租约时不得覆盖旧 returning 封面。
+SelectedCoverPool 同时最多四个独立 lease，提供 selected 与最多三个 returning 的预算。fork 共享当前不可变像素，却取得独立 lease；selected 升级清晰层不改变 returning 的图像。身份/source generation 不匹配及降清晰度升级拒绝；reset 后旧 lease 不能再更新，且仍占容量直到主人释放。对应独立 RhiItem cover texture 由 render 线程持有，每次只上传最新 revision；详情消费者不得覆盖returning已持有的封面。
 
 worker以线性光、预乘alpha对每张封面独立做面积归约，生成完整mip链；首级缩小直接从RGBA8按原float精度解码并预乘，再以double累加，不分配完整原尺寸RGBA32F工作图；后续层保留浮点中间值。二次幂层使用单位权重的整数足迹，保持double累加顺序与编码，奇数尺寸保留通用面积权重；不对合并图集整体生成mip。各层仍以sRGB编码的预乘RGBA8随对应dirty分块增量上传，字节全部计入原上传预算，静止不重算/重传。生产cover-sampling.glsl以texelFetch读取每个原始texel，先除alpha、解码sRGB并在线性光下重新预乘，再做双线性、跨mip与足迹积分；最终alphaTest后仅还原线性颜色，不重复解码。不能先对编码值插值再解码。每个积分点最多读取两层各四个texel，32点上界为256次texel读取；整数LOD只读取一层，1×1层只读取一个texel。GPU纹理格式、CPU不可变快照与上传预算不变。opaque.frag根据UV导数的椭圆足迹选择mip和自适应长轴采样；最多32个重叠积分点，极端斜角相应扩大mip足迹，控制工作量并避免欠采样。每级以实际textureSize换算整数原点与范围并钳制半像素边界，不跨封面串色；透射捕获保留独立mip链。alpha测试门槛仍为.025，颜色还原的分母以同门槛为下界，使透明helper片元也保持有限，不改变存活片元的颜色。
 
@@ -50,6 +50,6 @@ worker以线性光、预乘alpha对每张封面独立做面积归约，生成完
 
 `CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图、PNG/JPEG/WebP单图分配准入及JPEG解码缩放、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。定向准入检查可用 `CoverCacheTest imageAllocationPolicy`，改变环境上限须启动独立进程。`cover-gpu`按源UV公式独立核对contain/留边、实际GPU纹理尺寸/上传载荷和自身正常输出；覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立完整mip上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。`cover-cache`以96张2048²合成JPEG核对解码缩放、重复请求合并、三worker准入、完成缓存上限及命中复用；有界事件循环等待真实ready，不将定时器唤醒次数作为门禁。
 
-目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码自动安全检查使用`tools/audit/audit-best-practices.py`，架构与生命周期仍需逐路径审查。R19A的缺图绘制修正固定为首行CSS500、脚注恢复Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R36。
+目标入口`cover-cache`及Review `cover-gpu`，按[test-gates.md](test-gates.md)选择实际隐藏/窗口组；源码自动安全检查使用`tools/audit/audit-best-practices.py`，架构与生命周期仍需逐路径审查。缺图绘制使用首行CSS500、脚注Normal400，其余画布/基线/contain不变。资产来源归assets.md，生产合并atlas布局归archive-pool.md，目标欠验归计划R36。
 
 `archive-pool-gpu`额外沿生产SceneItem→AtlasUploadQueue→QRhi提交验证快照中的同专辑换曲零解码/上传，以及单封面revision恰好一个256²阵列tile加16个高清tile的实际上传；兼容render/cover资源generation不变，收敛后零上传。选中/归位旧像素隔离另由上述租约单元检查证明，不用源图评分替代资源事实。

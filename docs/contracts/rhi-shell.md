@@ -7,7 +7,7 @@
 - 不透明捕获含背景/纸面/结构/生产地面，不含透射壳体。采样已resolve的线性颜色mip链，endPass→resolve→generateMips完成后才提交壳体；独立合成颜色目标禁止反馈/递归玻璃捕获。
 - 合成先复制已resolve的不透明颜色并保留/共享兼容硬件深度，再绘制壳体；不靠量化颜色猜深度。captureSamples是实际样本数，设备不支持显式失败，不能静默降级。
 - 壳体FrontSide（Back cull/CCW）、depthTest/write、LessOrEqual、blend=false、alpha=1。visibility先写front-surface depth，颜色用Equal/read-only depth；两个顶点变体共同执行world=`model*vertex`后`nativeVP*world`并声明invariant，仅二者qsb MSL2.1，其余shader保持既有目标。
-- 纸面顶点按contain/1⁄64 inset裁可见矩形并反向映射UV，centroid插值保留几何MSAA部分覆盖；alphaTest=.025。上传预乘RGBA8，滤波后恢复未预乘颜色再sRGB解码，透明黑不形成边；几何normal/DOF覆盖仍为完整原平面。
+- 纸面顶点按contain/1⁄64 inset裁可见矩形并反向映射UV，centroid插值保留几何MSAA部分覆盖；alphaTest=.025。上传预乘RGBA8；各原始texel先恢复编码色、解码到线性光并重新预乘，再按covers.md过滤与积分，最终仅恢复线性颜色，透明黑不形成边；几何normal/DOF覆盖仍为完整原平面。
 
 ## 材质适配与排序
 

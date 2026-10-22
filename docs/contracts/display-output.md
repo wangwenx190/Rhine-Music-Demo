@@ -29,7 +29,7 @@ ApplicationWindow的只读contentItem保持Qt所有权；DisplaySurface作为其
 
 ## 默认质量
 
-全平台在QML创建前设置QQuickWindow::CurveTextRendering；全局字体及四个嵌入字体面使用PreferAntialias | PreferQuality与PreferNoHinting。自绘文本/编辑器显式关闭hinting，普通文字与字轮保持curve路径；彩色字形继续Qt fallback。QML Rectangle/Shape/Text显式启用可用AA，Shape保持CurveRenderer；CanvasPainter保留几何AA，生产三维保持4×MSAA。二维curve/几何AA已覆盖轮廓，不额外为整窗及模糊层叠加MSAA；它会增加整层存储/resolve带宽，缺少明确额外收益。三维采样与原生目标尺寸执行occlusion.md。
+全平台在QML创建前设置QQuickWindow::CurveTextRendering；全局字体及四个嵌入字体面使用PreferAntialias | PreferQuality与PreferNoHinting。自绘文本/编辑器显式关闭hinting，普通文字与字轮保持curve路径；彩色字形继续Qt fallback。QML Rectangle/Shape/Text显式启用可用AA，Shape保持CurveRenderer；CanvasPainter保留几何AA，生产三维采样唯一见[occlusion.md](occlusion.md#画质边界)。二维curve/几何AA已覆盖轮廓，不额外为整窗及模糊层叠加MSAA；它会增加整层存储/resolve带宽，缺少明确额外收益。三维采样与原生目标尺寸执行occlusion.md。
 
 QML Image与ShaderEffectSource默认smooth/mipmap均为true。生产SVG使用QtQuick.VectorImage的CurveRenderer与PreserveAspectFit；移除源SVG的DPR栅格尺寸绑定，仍保留原viewBox、布局与路径。深度、法线、SMAA lookup等数据纹理及带tile隔离的封面图集继续执行专项采样语义，不把图像显示默认值施加给数据通道或制造跨tile串色。
 

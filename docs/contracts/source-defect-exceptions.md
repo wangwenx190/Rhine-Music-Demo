@@ -1,6 +1,6 @@
 # 原项目缺陷与复刻例外
 
-处理原则以[迁移计划](../../QT_QUICK_MIGRATION_PLAN.md#优先级与源码基准)为准。本文仅记录冻结原项目自身的问题；原生迁移遗漏、API适配和迁移实现bug归[source-fidelity-review.md](source-fidelity-review.md)及组件契约，不混为原项目缺陷。
+处理原则以[迁移计划](../../QT_QUICK_MIGRATION_PLAN.md#优先级与源码基准)为准。本文仅记录冻结原项目自身的问题；原生实现规范/缺陷回归归组件契约，来源适配理由归[source-fidelity-review.md](source-fidelity-review.md)，未决项归迁移计划，不混为原项目缺陷。
 
 每项须列出冻结来源/实际生产符号、可复现触发条件、为何属于缺陷或不合理行为、可确定的正常预期及依据、实现或跳过决定、受影响边界。无法推断预期时明确记录跳过的特性，不用猜测值或截图补偿代替。
 

@@ -22,7 +22,7 @@ QQuickWindow 使用自身 grabWindow / GPU texture readback 获取完整渲染�
 
 Release CTest 的 `verification-window-policy` 创建隐藏的真实原生 QWindow，验证初次创建、flags 变化和 surface 重建保持隐藏；Windows 同时核对系统 WS_EX_NOACTIVATE、非 topmost 和前台 HWND 不等于测试窗口。macOS 隐藏检查核对原生低层级、拒绝 key、关闭启动激活、忽略原生鼠标事件及验证进程从未占据前台/获得激活或焦点；不为检查标志而显示窗口。实际运行/运动/资料及两个 RHI Review 的 windowPolicy 检查覆盖必须显示的窗口和恢复行为；图形对照继续使用原 DPR/fixture/目标尺寸，不因置底而降低画质或改用假渲染。
 
-授权可见复现使用进程环境开关，不写进公共 preset。`ui-tests` 另设 `YALAHOO_VERIFY_VISIBLE=1` 选择 native window；`node tools/migration/verify-title.mjs --visible --backend <目标后端> --dpr 1|1.5|2 --source 同机参照 --output 新目录` 保留有效结构/运动/缓存/释放检查；该入口已按R19F拆除旧图像门禁。macOS OpenGL 按当前 AppKit 要求使用 basic，Metal 使用 threaded；原生 frameSwapped 的驱动回调排队到 GUI，basic 的 surface 重建与最终 renderer 清理帧单列，不能称为 render-thread 隔离。当前 CTest 中 `verification-window-visible` 核对首次曝光、实际帧、原生 onScreen、最小化及无边框/带边框两种 flags/surface 重建；`verification-window-policy` 强制 `YALAHOO_VERIFY_FOREGROUND=0`，独立证明默认隐藏策略。
+授权可见复现使用进程环境开关，不写进公共 preset。`ui-tests` 另设 `YALAHOO_VERIFY_VISIBLE=1` 选择 native window；`node tools/migration/verify-title.mjs --visible --backend <目标后端> --dpr 1|1.5|2 --source 同机参照 --output 新目录` 保留有效结构/运动/缓存/释放检查；其来源/运动/资源断言归title-reels.md。macOS OpenGL 按当前 AppKit 要求使用 basic，Metal 使用 threaded；原生 frameSwapped 的驱动回调排队到 GUI，basic 的 surface 重建与最终 renderer 清理帧单列，不能称为 render-thread 隔离。当前 CTest 中 `verification-window-visible` 核对首次曝光、实际帧、原生 onScreen、最小化及无边框/带边框两种 flags/surface 重建；`verification-window-policy` 强制 `YALAHOO_VERIFY_FOREGROUND=0`，独立证明默认隐藏策略。
 
 ## 授权可见入口
 
@@ -30,7 +30,8 @@ Release CTest 的 `verification-window-policy` 创建隐藏的真实原生 QWind
 cmake --preset qt-release -DYALAHOO_MACOS_VISIBLE_TESTS=ON
 YALAHOO_VERIFY_FOREGROUND=1 ctest --preset qt-release-visible -R '^runtime-overview$'
 cmake --preset qt-release -DYALAHOO_MACOS_VISIBLE_TESTS=OFF
-ctest --preset qt-release -R verification-window-policy
 ```
 
-可见开关只选择入口，不自行授予前台权限；授权来自用户指定轮次。UI独立native入口另需YALAHOO_VERIFY_VISIBLE=1。工具仅发送自身Qt事件，不全局模拟用户键鼠。
+结束时恢复OFF；策略或实际恢复行为改变才定向运行verification-window-policy，否则复用有效结果。可见开关只选择入口，不自行授予前台权限；授权来自用户指定轮次。UI独立native入口另需YALAHOO_VERIFY_VISIBLE=1。工具仅发送自身Qt事件，不全局模拟用户键鼠。
+
+实际Review/原生可见分类、Review OFF的注册范围和测试选择统一见[test-gates.md](test-gates.md#当前review入口分类)，本文件不另维护入口清单。

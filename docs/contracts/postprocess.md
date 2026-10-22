@@ -13,7 +13,7 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 - 使用实际渲染相机距离与detail：near=`distance+lerp(5,-1,detail)`，far=`distance+lerp(25,12,detail)`；仅detail变化也须更新。viewDepth=-viewZ，以`smoothstep(near,far,viewDepth)`混合线性主题fogColor。
 - 纸面/不透明地面在各自源着色后、capture/resolve/mips前加雾；壳体在BRDF、透射/Beer及光场完成后加自身表面雾，不能对同一表面重复处理。背景、normal、depth不加雾。
 - 雾先于SSAO/Bokeh/SMAA及一次ACES/sRGB；生产始终启用，rawOutput仅供Review。
-- `rhi-fog-gpu`覆盖84源helper状态、RGBA16F误差<.001及一次SG重建；生产1200帧核对真正上传的uniform，单独雾/主题更新不得重建无关资源。静态入口
+- `rhi-fog-gpu`覆盖84源helper状态、RGBA16F误差<.001及一次SG重建；生产1200帧核对真正上传的uniform，单独雾/主题更新不得重建无关资源。
 
 ## Bokeh
 
@@ -34,6 +34,6 @@ HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR
 
 生产始终启用几何MSAA和SMAA；屏幕空间尺寸执行occlusion.md。实际样本数/resolve/部分覆盖由几何与壳体检查证明，SSAA仅Review诊断，不是产品预设或绕过目标上限的方法。
 
-Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。
+Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。来源适配理由见[source-fidelity-review.md](source-fidelity-review.md#r19d-算法与资源图)。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。
 
 `resources/shaders/gaussian-blur.glsl`统一执行各二维背景的有序高斯累加，各调用shader保留自己的来源sigma与成对权重表；审计从指定表读取核，不把其他vec2常量算作采样。RHI后处理入口通过`post-input.glsl`共享std140输入，并直接包含共享源算法核；SSAO的16/32/64入口以编译期宏选择`ssao-body.glsl`的完整有序样本。

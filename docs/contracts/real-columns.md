@@ -2,17 +2,17 @@
 
 `RealColumns`、`ColumnMemory`、`NavigationAvailability` 与 `SelectionController` 位于 `src/render/`。来源为冻结提交 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `music-real-columns.ts`、`music-app.ts`、`scene.ts` 和 `viewport-layout.ts` 的音乐生产路径，读取经 `frozen-git.mjs` 的历史映射解析。
 
-真实模式的合法行是 12…11+count，中点为 12+(count−1)/2。未选列独立居中；当前列单独移动。离开列的深度和活动权重按 1.4–2.4 秒五次轨迹归中，返回时从当前位置、速度和加速度重定向。相邻行使用 3.7 临界阻尼，详情内部行移动使用 9；程序化定位、切列及进行中的五次轨迹保留原时长规则。唯一 FrameClock 已缩放的 dt 只应用一次，减少动态完成轨迹；overview 插值入口由后续总览集成使用。
+真实模式的合法行是 12…11+count，中点为 12+(count−1)/2。未选列独立居中；当前列单独移动。离开列的深度和活动权重按 1.4–2.4 秒五次轨迹归中，返回时从当前位置、速度和加速度重定向。相邻行使用 3.7 临界阻尼，详情内部行移动使用 9；程序化定位、切列及进行中的五次轨迹保留原时长规则。唯一 FrameClock 已缩放的 dt 只应用一次，减少动态完成轨迹；overview插值由[总览控制器](overview.md)消费。
 
 真实模式中每个稳定专辑 ID 只保留一个合法物理格。9×48 池按每列实际显示深度虚拟化，长列不受 48 限制；越界列和行不产生实例、封面租约或拾取对象。实例、选中/归位副本、SceneFrame、GPU 阴影及 hitTest 共享变换。纵向位置为 `(row−columnDepth)×0.62−2.17`；全局 rail 的抵消不让别列随当前列上下移动。默认 idleWave 使用绝对时间，其他列操作不重启它；选择波纹只作用于本列，活动权重控制闲置/settling 混合。
 
-SelectionController 统一提供 `navigationAvailability()`、`moveRow()`、`navigateRow()`、`moveLane()`、`enterColumn()` 与稳定 ID `select()`。首尾请求在改状态前拒绝，不生成脉冲、归位副本或新选择 revision。真实模式上下有限、左右循环；填充模式保留物理循环，包括单张填充列。SceneItem 的键盘、滚轮、触摸共用这些入口，滑尺/详情后续通过同一控制器接入。触摸遵循冻结 swipeDirection：主要距离≥36逻辑像素，≥次要距离×1.3，时长≤1400ms。测试直接向自身 Qt 对象投递事件，不激活窗口。
+SelectionController 统一提供 `navigationAvailability()`、`moveRow()`、`navigateRow()`、`moveLane()`、`enterColumn()` 与稳定 ID `select()`。首尾请求在改状态前拒绝，不生成脉冲、归位副本或新选择 revision。真实模式上下有限、左右循环；填充模式保留物理循环，包括单张填充列。SceneItem 的键盘、滚轮、触摸共用这些入口，滑尺/详情共用该控制器；原生输入单位、触摸边界与事件路由唯一见[navigation.md](navigation.md)。
 
 列记忆默认开，按列 key 存稳定 albumId。快照或排序换代时重建索引并重置为每列首张；切开关不修改当前选择、实例或播放。关闭时不读写记忆；跨列选择从目标列实际显示深度取最近合法行，归中途中快速折返也如此。填充模式使用实际 rail 深度并保留正负周期。重新打开记录当前列，其他列原记忆保留；程序化 enterColumn 在填充模式取相机附近物理列。
 
 模式切换保留稳定 albumId，规范化物理格并平移既有运动轨道；真实列从当时实际 rail 深度开始归中。清除旧归位副本和脉冲，重置光带跟随。真实列的光带输入启用 independentColumns，复用 RowLightController 的世界坐标原点换算。搜索、列选择、模式/记忆开关不调用播放接口。
 
-`PreferencesStore` 在 `--data-dir` 或 QStandardPaths::AppLocalDataLocation 下保存 `preferences.json`，只写 arrayMode 和 rememberColumnPosition，保留未知 JSON 字段，不写会话行位。启动读取限制为 1MiB；损坏/不可读文件保留原件并显示错误。QSaveFile 原子保存由专用单线程池处理，一项在途任务加一个最新待保存文档，快速切换合并；工作线程不访问控制器/QML。保存失败通知 GUI，退出时仅等待本服务并提交最后一个待保存值。
+排列与记忆开关由PreferencesStore保存，完整schema、读取/写入上限、原子提交及并发规则见[settings.md](settings.md)。ColumnMemory只保留会话位置，不写偏好文件。
 
 ## 性能与生命周期
 

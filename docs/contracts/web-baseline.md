@@ -17,3 +17,5 @@
 `frozen-source.mjs`统一TypeScript配置、显式依赖与来源hash。`browser-source.mjs`为确需DOM/字体框的组件重建同一生产markup/CSS与字体，校验锁定rolling-number，使用已有无界面Chrome/Edge/Chromium；浏览器路径可由`REVIEW_BROWSER`提供，不下载浏览器。会话只访问回环服务，隔离storage/profile、拦截外部请求并禁音；正常和失败路径均关闭连接、进程、服务与临时profile。独立结构、数值轨迹和自身原生输出质量分别验收。
 
 需要锁定Web依赖时，在`legacy-web/`执行`npm ci --ignore-scripts --no-audit --no-fund --allow-remote=all`；该参数适用于npm 12的现有lockfile镜像地址，不更改依赖或锁文件。Node、TypeScript和浏览器仅为显式来源审计依赖，原生产品与长期测试不依赖它们。
+
+headless采集的页面Runtime请求在受限环境无法返回时，使用独立页面CDP连接并在具备原生服务权限的环境运行同一导出入口；保持headless、回环隔离及外部请求拦截，不改生产算法。

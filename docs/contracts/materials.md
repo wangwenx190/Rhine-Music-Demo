@@ -4,7 +4,7 @@
 
 ## 材质与空间
 
-Quick3D Review的`scene/CaseMaterials.qml`持有三个共享壳体材质、一个漫反射纸面及共享 RoomEnvironment/DFG 纹理；`GlassMaterial.qml` 以 surface=0/1/2 区分主盖/侧脊/后托。导入的三批次 mesh 没有改动。纸面是 3.06×3.06、中心 (0.17,1.85,0.027) 的独立平面，随同一个盒体位移，后托前面 -0.032、盖背面 .052、盖前面 .070 不共面。
+Quick3D Review的`scene/CaseMaterials.qml`持有三个共享壳体材质、一个漫反射纸面及共享 RoomEnvironment/DFG 纹理；`GlassMaterial.qml` 以 surface=0/1/2 区分主盖/侧脊/后托。导入的三批次 mesh 没有改动。纸面为随盒体位移的独立平面，几何尺寸/位置及三壳体间隙唯一见[assets.md](assets.md#三批次模型)。
 
 | 表面 | 基础→暖昼透射 | 粗糙度 | 厚度 | 衰减距离 | clearcoat / 粗糙度 |
 |---|---|---|---|---|---|
@@ -12,7 +12,7 @@ Quick3D Review的`scene/CaseMaterials.qml`持有三个共享壳体材质、一�
 | 侧脊 | .88→.84 | .25→.30 | .06→.08 | 4.5→3.2 | .16 / .20 |
 | 后托 | .80→.70 | .38→.46 | .038→.05 | 4.5→2 | .08 / .38 |
 
-IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独立计算密度与高光。详情只使主盖粗糙度趋向基础 .27 / 暖昼 .34，侧脊和后托不跟随。数值 warmth/clarity 都是连续输入，实际主题动画按 [灯光契约](lighting.md) 接入同一个 FrameClock。参数唯一由`src/render/OpticalParameters.h`的连续模板计算维护；`SourceOptics`缓存double结果供三个Quick3D材质读取，生产RHI以float实例化同一公式并上传uniform。R19C1 移除了 R07 的 ROI 搜索系数（环境/粗糙度 1.01、厚度 .91809、衰减距离 1.0201）；它们没有单位或算法依据，不再参与实现。IOR、颜色、封面与几何仍按冻结源码。
+IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独立计算密度与高光。详情只使主盖粗糙度趋向基础 .27 / 暖昼 .34，侧脊和后托不跟随。数值 warmth/clarity 都是连续输入，实际主题动画按 [灯光契约](lighting.md) 接入同一个 FrameClock。参数唯一由`src/render/OpticalParameters.h`的连续模板计算维护；`SourceOptics`缓存double结果供三个Quick3D材质读取，生产RHI以float实例化同一公式并上传uniform。源公式直接进入实际uniform，不叠加标定系数。IOR、颜色、封面与几何仍按冻结源码。
 
 暖昼表面色为 #fffdf8 / #e7e1d8 / #ece6dc；夜间为 #f6fbff / #f6fbff / #c6d6e5。暖昼衰减色 #f3e9db，夜间主盖/侧脊 #dceafd；后托保留原衰减色。生产RHI按原float精度一次解码固定颜色端点，跨帧复用；连续颜色插值保留原计算顺序。QML color 作为线性 shader uniform，颜色插值发生在线性 shader 中。隔离材质Review的环境强度暖昼.48/深夜.68来自场景environmentIntensity覆盖，不再乘configure的.65；生产音乐环境强度由lighting.md定义。
 
@@ -22,9 +22,9 @@ IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独�
 
 隔离Quick3D Review玻璃使用公开CustomMaterial.Unshaded，显式移植 Three 的 cubeUV/DFG、多次散射能量补偿、折射投影、Beer 衰减、clearcoat 与 ACES；不使用 Qt 私有渲染类。shader 片段保留 MIT 来源，许可证为 `resources/licenses/three-LICENSE`。固定 RoomEnvironment 从冻结源码和已锁定 Three 的实际 PMREM 路径生成；RGBA32F 为 768×1024 的原 cubeUV 排列。DFG 为原 16×16 半精度积分表转成 float，`node tools/assets/export-material-data.mjs` 从既有锁定依赖确定性导出并刷新材料 manifest；`FixedTextureData` 使用公开 TextureData API 读固定 qrc 字节并处理端序，两张纹理各只持有一份。
 
-纸面走 Shaded/POST_PROCESS，线性采样后以入射漫反射 `paperIrradiance` 乘原图颜色，再限制到原图颜色；不加 emission/specular，不对纸面执行 ACES。R07 的固定白色半球测试输入为 (1,1,1)，R08 接入实际世界光场时替换这一入射量。过强照明不能洗白图像，无光必须输出黑色印刷区域。三种封面共用 contain、1/64 透明留白、alphaTest=.025 与半 texel clamp。正式异步封面与图集见covers.md。
+纸面走 Shaded/POST_PROCESS，线性采样后以入射漫反射 `paperIrradiance` 乘原图颜色，再限制到原图颜色；不加 emission/specular，不对纸面执行 ACES。隔离固定白色半球测试输入为(1,1,1)，实际场景消费lighting.md的世界光场。过强照明不能洗白图像，无光必须输出黑色印刷区域。三种封面共用 contain、1/64 透明留白、alphaTest=.025 与半 texel clamp。正式异步封面与图集见covers.md。
 
-不透明背景平面写入精确线性的双主题背景，保证同一捕获中背景/纸面都处于线性空间；它是当前单盒固定环境的背景输入，后续场景集成需要保留同一颜色空间约束。磨砂壳体从公开 SCREEN_MIP_TEXTURE 采样，捕获不含这些玻璃，不能递归透过第二层玻璃。SceneEnvironment 的 TonemapNone 禁止重复映射；最后 `material-output.frag` 只做精确分段 sRGB 编码。玻璃先做一次源 ACES，纸面保留 toneMapped=false；不把 Unshaded 输出误认为 Qt 会自动编码 sRGB。
+不透明背景平面写入精确线性的双主题背景，保证同一捕获中背景/纸面都处于线性空间；它是当前单盒固定环境的背景输入，生产场景同样保持线性捕获约束。磨砂壳体从公开 SCREEN_MIP_TEXTURE 采样，捕获不含这些玻璃，不能递归透过第二层玻璃。SceneEnvironment 的 TonemapNone 禁止重复映射；最后 `material-output.frag` 只做精确分段 sRGB 编码。玻璃先做一次源 ACES，纸面保留 toneMapped=false；不把 Unshaded 输出误认为 Qt 会自动编码 sRGB。
 生产RHI输出与隔离Review的颜色路径分开：生产统一后处理/ACES/sRGB归postprocess.md；RHI捕获/壳体适配归rhi-shell.md。本节直接材质ACES不进入生产逐物体输出。
 
 ## 参数与独立Review检查

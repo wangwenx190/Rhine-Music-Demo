@@ -41,4 +41,4 @@
 
 源地面为200×200平面，rotation.x=-PI/2、y=-4.63、向上法向、FrontSide、receiveShadow=true/castShadow=false。源色为暖昼#d8c9b9、深夜#0b1828；dusk的#a6b8c0仅作来源测试输入。生产SceneItem正常路径始终productFloor=true；geometryOnly与独立Review默认关闭。线性 floorColor 属于 SelectionLighting palette，原源色及.65秒主题曲线随现有 FrameClock 更新。地面kind=6复用opaque管线，使用Standard dielectric（metalness=0、f0=.04、roughness=.95，无clearcoat/transmission/emission），不使用纸面限亮和壳体光场调制；它接收既有key阴影、参与capture/resolve/mips、AO和完整Bokeh depth，但不进入caster池。着色后线性fog先于后处理与统一输出。
 
-地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。历史来源及适配判定见source-fidelity-review.md的R19D3B。验证入口为rhi-shadow-gpu的地面数学/附件/一次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。
+地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。历史来源及适配判定见[来源判定的算法与资源图](source-fidelity-review.md#r19d-算法与资源图)。验证入口为rhi-shadow-gpu的地面数学/附件/一次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。

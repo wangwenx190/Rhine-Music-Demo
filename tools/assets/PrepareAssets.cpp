@@ -357,7 +357,7 @@ int main(int argc, char **argv)
             }
         }
         for (const auto &stem : { u"atmosphere.ogg"_s, u"motif.ogg"_s, u"pulse.ogg"_s,
-                                  u"observatory-preview.mp3"_s, u"score.json"_s, u"README.md"_s })
+                                  u"observatory-preview.mp3"_s, u"score.json"_s })
             copy("legacy-web/public/audio/"_L1 + stem, "audio/"_L1 + stem);
         const QString audioSource = u"legacy-web/src/audio.ts"_s;
         const auto audio = QString::fromUtf8(readFile(root.filePath(audioSource)));
@@ -381,11 +381,19 @@ int main(int argc, char **argv)
                     .toJson(),
             audioSource,
             u"retain event names; no synthesis, PCM extraction or preview-per-key playback"_s);
-        for (const auto &cover :
-             { u"square.png"_s, u"portrait.png"_s, u"landscape.png"_s, u"README.md"_s })
+        for (const auto &cover : { u"square.png"_s, u"portrait.png"_s, u"landscape.png"_s })
             copy("legacy-web/public/demo-covers/"_L1 + cover, "demo-covers/"_L1 + cover);
         copy(u"legacy-web/LICENSE"_s, u"licenses/project-LICENSE"_s);
-        copy(u"legacy-web/NOTICE.md"_s, u"licenses/NOTICE.md"_s);
+        // Native attribution documents are maintained in place; frozen notices only establish
+        // their provenance. Reimporting assets must not restore obsolete Web runtime claims.
+        for (const auto &document :
+             { u"audio/README.md"_s, u"demo-covers/README.md"_s, u"licenses/NOTICE.md"_s }) {
+            const auto source = document.startsWith(u"licenses/"_s)
+                    ? u"legacy-web/NOTICE.md"_s
+                    : "legacy-web/public/"_L1 + document;
+            add(document, readFile(root.filePath("resources/"_L1 + document)), source,
+                u"Native attribution maintained in place; frozen source provenance retained"_s);
+        }
         const QJsonObject manifest{
             { u"schemaVersion"_s, 1 },
             { u"baselineCommit"_s, u"57f4f845c20cce646a15dbf4008c2a162aaaf4e2"_s },

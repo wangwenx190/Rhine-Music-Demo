@@ -8,11 +8,6 @@
 
 ```sh
 sh tools/build/linux.sh
-cmake --build --preset qt-release --target format
-cmake --build --preset qt-release --target check-format
-ctest --preset qt-release -R '^(kit-selection|identity|module-link-and-plugins|source-format|directory-scanner|library-data|media-metadata|settings|playback|audio-ambience|verification-window-policy)$' --output-on-failure
-ctest --preset qt-release-media -R '^(playback-device|audio-ambience-device)$' --output-on-failure
-python3 tests/tools/LinuxDeploymentTest.py
 ```
 
 构建脚本不隐式执行测试；按[test-gates.md](../contracts/test-gates.md)选择实际受影响项。Kit升级后移除过期覆盖，并传`sh tools/build/linux.sh --fresh`。普通启动`./yalahoo.sh`，匿名演示`./tools/launchers/demo.sh`，实验入口`./tools/launchers/lighting-lab.sh`；均保留原样参数，优先部署包，开发回退核对Release产物与cache中选中的Kit。
@@ -56,18 +51,12 @@ QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 
 默认Vulkan；未显式选择时初始化能力不足会提示回退OpenGL。显式Vulkan请求遇到Qt特性、开发头、运行时/设备或格式不足时非零退出并输出原因，后续验证必须记录实际后端，回退不等于Vulkan通过。实际surface/swapchain及全部效果兼容性仍需目标验证，不能由初始化探测代替。
 
-## 目标操作清单
+## 目标验证操作
 
-下列可见检查由用户在对应会话主动运行。代理自动验证遵守[test-window-policy.md](../contracts/test-window-policy.md)，默认隐藏，不能为采集激活窗口。具体数值门槛与退出条件只在迁移计划及所属组件契约维护。
+验收对象、尺寸/DPR选择、复用与停止条件唯一见[test-gates.md](../contracts/test-gates.md)，具体未验目标/设备和入口由迁移计划R36维护。不要将本文的会话示例展开成全组件或全尺寸矩阵。
 
-| 检查 | 操作与预期 |
-| --- | --- |
-| 包/路径/权限/XDG | 包外启动、中文/空格音乐目录和数据根；显式`--data-dir /绝对/隔离目录 --music-root /匿名音乐目录`。区分大小写的目录/文件身份不合并；只读数据根/不可读音乐目录给出明确错误，歌曲与标签不被修改。未指定数据根时遵循XDG并保持yalahoo身份。 |
-| 离线/导入 | 空库和匿名库的扫描、搜索/取消、重启缓存、只读旧JSON导入；无网络请求、无伪造资料，浏览定位不改变播放。 |
-| 浏览/详情/总览 | 九尺寸、双主题与DPR1/1.5/2分别记录真实值；鼠标、键盘、触控板pixelDelta、首尾/反向/切列、抽取/连选/归位、详情拖动、总览折叠定位和焦点均正常；输入法和系统目录对话框另验。 |
-| Canvas/文字/片头 | 生产C++滑尺、二维序章、glyph/Quick Text标题及彩色emoji的轮廓/透明合成/裁切/淡隐正常；片头输入锁/跳过/重播/三维交接、改速/减少动态沿唯一帧源。不能只用模块导入成功代替绘制质量。 |
-| 声音 | 默认/显式设备、播放/暂停/停止/seek/上下曲/自然结束、未知格式/权限错误恢复；BGM/音效独立。最小化歌曲继续；设备切换/消失/恢复及实际听感分别确认，关闭停止三路。 |
-| 生命周期/资源 | 同一窗口hide/minimize/restore、跨屏DPR及resize/画质/主题变化后输出有效；资源/寿命先静态审计，重复SG/视觉重建仅按test-gates.md补具体未决行为。 |
-| 呈现/性能 | xcb/Wayland各自核对实际上下文/swapchain、附件/格式/MSAA/resolve与正常呈现，共用无会话依赖结果。性能先按performance.md静态审计，具体未决问题才最小实测，不默认追加吞吐/计时；未知显示/GPU完成/driver显存保留null。 |
+在上述真实xcb/Wayland会话中分别启动普通产品，使用`--data-dir /绝对/隔离目录 --music-root /匿名音乐目录`。系统特有操作包括大小写/权限/XDG错误、触控板pixelDelta、系统输入法/目录对话框、同窗口最小化恢复和实际跨屏；功能/声音预期按对应契约。物理DPR记录真实值，不要求精确三档屏幕。
 
-需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL与实际启用Vulkan的剩余图形/窗口入口归R36，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tests/runners/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。
+仅目标组件确需Review时配置`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`。CTest按准确名称定向选择，例如`ctest --preset qt-release -R '^directory-scanner$'`；真实媒体用qt-release-media，native窗口用qt-release-visible并遵守窗口契约。已有组件证据未覆盖产品联动时才选择`python3 tests/runners/verify-gui.py --backend opengl --output verification/全新目录`，或将后端参数改为目标实际支持的vulkan。
+
+工具错误路径检查为`python3 tests/tools/LinuxDeploymentTest.py`，strip/重定位检查为`python3 tests/tools/UnixDeploymentTest.py`；运行成功路径仍须目标ELF与真实系统。性能是否测量及入口范围唯一见performance.md。

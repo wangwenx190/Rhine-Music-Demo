@@ -364,15 +364,6 @@
             "source": "legacy-web/public/audio/score.json"
         },
         {
-            "bytes": 949,
-            "inputSha256": "21842877cb3b71649ec5b4def829dc52b216cf47bc66b9df9478a4b6608675cd",
-            "operation": "unchanged copy",
-            "path": "audio/README.md",
-            "qrc": ":/assets/audio/README.md",
-            "sha256": "21842877cb3b71649ec5b4def829dc52b216cf47bc66b9df9478a4b6608675cd",
-            "source": "legacy-web/public/audio/README.md"
-        },
-        {
             "bytes": 4347,
             "inputSha256": "75931d7194ec6cb8e7d09f85f4269e76c83b2c70b0e2bcd7a6652998a37fa3c8",
             "operation": "retain event names; no synthesis, PCM extraction or preview-per-key playback",
@@ -409,15 +400,6 @@
             "source": "legacy-web/public/demo-covers/landscape.png"
         },
         {
-            "bytes": 797,
-            "inputSha256": "58c1aadad09f8fbd52664fe97d91ab28883f87f1677e47d216a8ba22591c1f58",
-            "operation": "unchanged copy",
-            "path": "demo-covers/README.md",
-            "qrc": ":/assets/demo-covers/README.md",
-            "sha256": "58c1aadad09f8fbd52664fe97d91ab28883f87f1677e47d216a8ba22591c1f58",
-            "source": "legacy-web/public/demo-covers/README.md"
-        },
-        {
             "bytes": 1141,
             "inputSha256": "b940fbfa02c0020c6169a02b633448603bcba38a08ed370aeef0c78042c0f16c",
             "operation": "unchanged copy",
@@ -427,12 +409,30 @@
             "source": "legacy-web/LICENSE"
         },
         {
-            "bytes": 6910,
+            "bytes": 771,
+            "inputSha256": "21842877cb3b71649ec5b4def829dc52b216cf47bc66b9df9478a4b6608675cd",
+            "operation": "Native attribution maintained in place; frozen source provenance retained",
+            "path": "audio/README.md",
+            "qrc": ":/assets/audio/README.md",
+            "sha256": "fadfef0a9b4536085ae9ba97d2ab8dd155833823d11f2bc34f65d6c3433ea091",
+            "source": "legacy-web/public/audio/README.md"
+        },
+        {
+            "bytes": 563,
+            "inputSha256": "58c1aadad09f8fbd52664fe97d91ab28883f87f1677e47d216a8ba22591c1f58",
+            "operation": "Native attribution maintained in place; frozen source provenance retained",
+            "path": "demo-covers/README.md",
+            "qrc": ":/assets/demo-covers/README.md",
+            "sha256": "791a6bb23d414fd899ceab11f12632d6eac93fe289f4b3a6e4a703556cde664f",
+            "source": "legacy-web/public/demo-covers/README.md"
+        },
+        {
+            "bytes": 3199,
             "inputSha256": "1bf1945211d2f4f17f00edb372d7c316529de617469ffb2acefca13f1c24faef",
-            "operation": "unchanged copy",
+            "operation": "Native attribution maintained in place; frozen source provenance retained",
             "path": "licenses/NOTICE.md",
             "qrc": ":/assets/licenses/NOTICE.md",
-            "sha256": "1bf1945211d2f4f17f00edb372d7c316529de617469ffb2acefca13f1c24faef",
+            "sha256": "b3bb983ccbe7b03bf35b0c642e2715b32d3d7608f4f17f7ef797c8c76e68abe5",
             "source": "legacy-web/NOTICE.md"
         }
     ],

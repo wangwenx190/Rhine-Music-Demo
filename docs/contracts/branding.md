@@ -1,8 +1,8 @@
 # yalahOO!!! · 原创品牌契约
 
-本文件固定 R03B 的矢量资产与后续接入边界。原创几何由本项目绘制，无旧品牌轮廓、位图描摹、字体字形或外部资源。作者及历史素材署名仍在 `legacy-web/LICENSE`、`legacy-web/NOTICE.md` 保留。来源和 SHA-256 在 `resources/manifests/branding.json`。
+本文件维护当前矢量资产与接入边界。原创几何由本项目绘制，无旧品牌轮廓、位图描摹、字体字形或外部资源。作者及历史素材署名仍在 `legacy-web/LICENSE`、`legacy-web/NOTICE.md` 保留。来源和 SHA-256 在 `resources/manifests/branding.json`。
 
-生产采用开口刻纹、标准字距的B稿；未选设计只作历史素材，不进入产品或设置。本文只管矢量/衍生资产和揭示路径；平台操作分别归docs/platforms中的对应文档，尚未执行的目标检查归迁移计划。
+生产采用开口刻纹、标准字距的主稿。本文只管矢量/衍生资产和揭示路径；平台操作分别归docs/platforms中的对应文档，尚未执行的目标检查归迁移计划。
 
 ## 几何、颜色与安全区
 

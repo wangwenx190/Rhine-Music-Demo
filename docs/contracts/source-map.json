@@ -12,8 +12,8 @@
       "sha256": "8ad730b12e7b71f61c8ca055728f09b9b6133511431efa554580db319ed359fb",
       "musicReachable": true,
       "role": "migrate",
-      "target": "qml/Yalahoo/Music/components/ + qml/Yalahoo/Music/pages/",
-      "responsibility": "Responsive layout, explicit controls and typography",
+      "target": "src/render/OpticalParameters.h + src/render/SourceOptics.h",
+      "responsibility": "Continuous source material parameters and Review optics",
       "imports": [
         "src/glass-reveal.ts",
         "src/internal-optics.ts",
@@ -190,8 +190,8 @@
       "sha256": "db618e47e44f9e3a4197e26d297345b3693ce5ff7067608f9966be3bc5b75910",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/services/CoverCache.cpp + src/render/rhi/AtlasUpload.cpp",
-      "responsibility": "Bounded asynchronous covers and incremental atlas uploads",
+      "target": "src/services/CoverCache.cpp + src/render/rhi/AtlasAllocator.cpp + src/render/rhi/AtlasUpload.cpp",
+      "responsibility": "Artwork decode, bounded leases and incremental atlas upload",
       "imports": [
         "src/music-lighting.ts",
         "src/data.ts",
@@ -411,8 +411,8 @@
       "sha256": "db114c34c6da3bba3389d72ef7d4f949c5a47902e7ee09d020bbd109d4b0f91b",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/DetailMotion.cpp + src/render/ReturningCasePool.cpp + src/render/PointerDragController.cpp",
-      "responsibility": "Extraction, returning cases and detail drag",
+      "target": "src/motion/MotionController.cpp + src/motion/QuinticTrack.cpp",
+      "responsibility": "Source archive quintic travel and C2 retargeting",
       "imports": [
         "src/motion.ts",
         "src/archive-loop.ts"
@@ -424,8 +424,8 @@
       "sha256": "772d89e5ec58fb90c62c625005739385948593f0ee1a8ce12a223c31f2e8f4fb",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/LayoutMetrics.cpp",
-      "responsibility": "Responsive logical viewport and source camera geometry",
+      "target": "src/render/ArchivePool.cpp + src/render/RealColumns.cpp",
+      "responsibility": "Real cell admission and column overview offsets",
       "imports": []
     },
     {
@@ -480,8 +480,8 @@
       "sha256": "b53b26014bdc362d16c87d3e9709e1c0be4dc4217edff289e9db315fcba19faf",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/SceneAdapter.cpp",
-      "responsibility": "Scene frame and analytical camera transitions",
+      "target": "src/render/CameraFraming.h + src/render/SceneAdapter.cpp + src/render/DetailMotion.cpp",
+      "responsibility": "Source camera framing and placement motion",
       "imports": [
         "src/motion.ts",
         "src/viewport-layout.ts"
@@ -493,8 +493,8 @@
       "sha256": "eb072d8c9843a24aaf62f2ef0b09bd25a730314e501035b0b2c4492672054b56",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
-      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "target": "resources/models/music-case-v040.glb + src/render/rhi/PreparedAssets.cpp",
+      "responsibility": "Frozen model resource and native geometry loading",
       "imports": []
     },
     {
@@ -537,8 +537,8 @@
       "sha256": "5a8d6110900ce1e1b6c7872db56e2a6030513d8565d5a1f67d4266a2704f276b",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
-      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "target": "src/render/SelectionLighting.cpp + resources/shaders/lighting-field.glsl",
+      "responsibility": "Source world lighting and theme palette",
       "imports": [
         "src/music-model.ts",
         "src/theme-transition.ts",
@@ -553,8 +553,8 @@
       "sha256": "8531d1f1f5f40a7cc619d8b79eb9270b8afb92c154b1c47d2e5e5af5802c571a",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/rhi/ + src/render/SceneAdapter.cpp + src/render/RenderQuality.cpp",
-      "responsibility": "Production RHI geometry, material, light field and postprocessing",
+      "target": "src/core/SceneGeometry.h + src/render/OpticalParameters.h + src/render/rhi/ShellMaterial.cpp",
+      "responsibility": "Model geometry and continuous source optical parameters",
       "imports": [
         "src/theme-transition.ts"
       ]
@@ -754,7 +754,7 @@
       "musicReachable": true,
       "role": "migrate",
       "target": "src/core/LibraryModels.cpp",
-      "responsibility": "Cached ordering, grouping and search models",
+      "responsibility": "Indexed asynchronous search and stable result models",
       "imports": [
         "src/music-types.ts"
       ]
@@ -847,8 +847,8 @@
       "sha256": "9b40987d496c0717e9e9efcabc20226ec42add9a04b183a6e818c8ba34dd91e9",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/presentation/ + qml/Yalahoo/Music/pages/Detail.qml + qml/Yalahoo/Music/components/TrackList.qml",
-      "responsibility": "Detail content, navigation and virtualized track focus",
+      "target": "src/presentation/TrackFocusController.cpp + qml/Yalahoo/Music/components/TrackList.qml",
+      "responsibility": "Stable track reveal, scrolling and focus",
       "imports": []
     },
     {
@@ -1021,8 +1021,8 @@
       "sha256": "7b59fdda7586195d9e1d26eb38073ecfe645279b197b127bdd61bfa2e0d52344",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/SettingsController.cpp + src/services/PreferencesStore.cpp + qml/Yalahoo/Music/panels/",
-      "responsibility": "Persistent settings and native self-drawn panels",
+      "target": "src/render/SelectionLighting.cpp",
+      "responsibility": "Continuous source theme interpolation",
       "imports": []
     },
     {
@@ -1065,8 +1065,8 @@
       "sha256": "1a23430185d665bea455540b90b286197a732bc41d10cb642c522c27a5b3f265",
       "musicReachable": true,
       "role": "migrate",
-      "target": "qml/Yalahoo/Music/components/ + qml/Yalahoo/Music/pages/",
-      "responsibility": "Responsive layout, explicit controls and typography",
+      "target": "src/services/CoverCache.cpp + resources/shaders/rhi/cover-sampling.glsl",
+      "responsibility": "Contain artwork and isolated linear-light filtering",
       "imports": [
         "src/cover-atlas.ts",
         "src/music-types.ts",
@@ -1089,8 +1089,8 @@
       "sha256": "caca1f5acb9c7f9f08a3e1038f67958b645ba498bcc0b458c909c7e9dd639a55",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/SceneAdapter.cpp",
-      "responsibility": "Scene theme interpolation and source material colors",
+      "target": "src/render/SelectionLighting.cpp + src/render/OpticalParameters.h",
+      "responsibility": "Source palette and material colors",
       "imports": []
     },
     {
@@ -1117,8 +1117,8 @@
   "services": [
     {
       "sourcePath": "legacy-web/scripts/album-introductions.mjs",
-      "target": "src/services/IMetadataProvider.h + src/services/OfflineMetadataProvider.cpp",
-      "policy": "Asynchronous offline cache only; network execution deferred"
+      "target": "src/services/OnlineMetadataProvider.cpp + src/services/metadata/WikipediaSource.cpp",
+      "policy": "Explicitly authorized Wikipedia/Wikidata queries with attributed offline cache"
     },
     {
       "sourcePath": "legacy-web/scripts/archive-content.mjs",
@@ -1132,8 +1132,8 @@
     },
     {
       "sourcePath": "legacy-web/scripts/local-music-credits.mjs",
-      "target": "src/services/IMetadataProvider.h + src/services/OfflineMetadataProvider.cpp",
-      "policy": "Asynchronous offline cache only; network execution deferred"
+      "target": "src/services/IMetadataProvider.h + src/services/metadata/MetadataMerge.cpp",
+      "policy": "Preserve imported local credits and their sources; no native QQ network provider"
     },
     {
       "sourcePath": "legacy-web/scripts/music-audio.mjs",
@@ -1142,8 +1142,8 @@
     },
     {
       "sourcePath": "legacy-web/scripts/music-library.mjs",
-      "target": "src/library/ + src/media/MediaMetadataProbe.cpp",
-      "policy": "Read-only local scan/import, metadata and artwork cache"
+      "target": "src/library/ + src/media/MediaMetadataProbe.cpp + src/services/metadata/MusicBrainzSource.cpp",
+      "policy": "Read-only scan/import, native metadata/artwork cache and authorized MusicBrainz matching"
     },
     {
       "sourcePath": "legacy-web/scripts/music-server.mjs",
@@ -1157,8 +1157,8 @@
     },
     {
       "sourcePath": "legacy-web/scripts/qq-credits.mjs",
-      "target": "src/services/IMetadataProvider.h + src/services/OfflineMetadataProvider.cpp",
-      "policy": "Asynchronous offline cache only; network execution deferred"
+      "target": "src/services/IMetadataProvider.h + src/services/metadata/MetadataMerge.cpp",
+      "policy": "Preserve imported local credits and their sources; no native QQ network provider"
     }
   ]
 }

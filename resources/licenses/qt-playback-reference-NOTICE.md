@@ -1,4 +1,4 @@
-# Qt 播放设备恢复参考
+# Qt 原生实现参考
 
 来源：[MikeQu223/Rhine-Music-Database](https://github.com/MikeQu223/Rhine-Music-Database)。仅适配 `AudioPlayer::followDefaultOutput` / `restorePlaybackPosition` 的公开 Qt API 局部状态隔离思路及 PlatformRegression 的事件序列；本项目自行实现离线队列、source revision 与显式设备策略。没有复制私有设备补丁、在线规则或整套播放器架构。
 
@@ -31,3 +31,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 异步结果隔离另参考同项目 `Qt/src/Host.cpp::acceptCookies` 与 `cover` 完成回调中的 epoch/订阅者检查思路；本项目沿既有 requestId/generation 自行实现测试与批量调度，没有复制 Host、账号、网络或封面队列代码。实际读取 `Qt/src/Host.cpp` SHA256：`b9bb74b1595e640531722d741f84f5730c5deaf5bbfcff0e458e4a890599a71f`。作者与 MIT 许可同上。
+
+同项目`Qt/tests/UiChecks.cpp`的缓存命中/同封面换曲/仅更新采样绑定断言及静止、绘制后失效、隐藏恢复、缓存回选、重建保留歌曲等场景，仅用于本项目独立测试的意图参考；没有复制实现、测试代码或素材，也未采用其资源预算/架构。实际读取文件SHA256：`b7a3878617aab8125dd43b0978d9c3bc0b29ad2501c445b5b21092a3538e56af`。同项目`ItemRenderer::render`的遮挡早退思路用于序章提交门控，未复制其代码、时间阈值或调度器。作者与MIT许可同上。

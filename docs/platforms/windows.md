@@ -9,7 +9,7 @@
 ```powershell
 pwsh -NoProfile -File ./tools/build/build.ps1 -Preset qt-release -Action Configure
 pwsh -NoProfile -File ./tools/build/build.ps1 -Preset qt-release -Action Build
-ctest --preset qt-release -R 'identity|kit|source-format' --output-on-failure
+ctest --preset qt-release -R '^(identity|kit-selection|source-format)$' --output-on-failure
 pwsh -NoProfile -File ./yalahoo.ps1 --demo
 ```
 
@@ -29,7 +29,7 @@ pwsh -NoProfile -File ./tools/deploy/windows.ps1
 
 生成先写独占 staging；工具失败、运行库/插件缺失或混入研究组件时拒绝替换既有包。完成后才替换 `out/windows/`；替换失败恢复旧包。包和本机清单保留本地，不提交 Git。
 
-Windows PE 嵌入 R03B 原创多尺寸 ICO，窗口图标使用同源各尺寸 PNG（16/24/32 使用小稿），设置的“开发与资源”区使用同源 SVG。标识为 `yalahoo` / `yalahoo.music`，显示名为 `yalahOO!!!`；许可与来源由[品牌契约](../contracts/branding.md)维护。
+Windows PE嵌入branding.md定义的原创多尺寸ICO，窗口图标使用同源各尺寸 PNG（16/24/32 使用小稿），设置的“开发与资源”区使用同源 SVG。标识为 `yalahoo` / `yalahoo.music`，显示名为 `yalahOO!!!`；许可与来源由[品牌契约](../contracts/branding.md)维护。
 
 最终逐个用 MSVC dumpbin 检查实际 EXE/DLL 的 import 与 delay import，依赖只允许解析到包内、Windows System32/API set 或随包提供的官方 VC Redistributable；Qt/媒体依赖不能由系统目录掩盖。解析失败或未收集的依赖使部署失败，解析边写入本地 `build/windows-release/deployment-dependencies.json`。这不能替代目标系统的动态插件加载和干净机器运行。
 
@@ -50,9 +50,7 @@ pwsh -NoProfile -File ./out/windows/verify-windows.ps1 -Scenario normal `
 
 自动验证只发送自身 Qt 事件，检查本次 Process.ExitCode 和本次 `product/report.json`；失败、超时或缺报告均失败，stdout/stderr 与环境说明保留本地。`normal` 自动指定临时数据根，音乐输入须使用匿名副本。演示与普通模式由用户检查后关闭；退出码为零本身不表示视觉/听感验收通过。验证窗口策略遵守[窗口契约](../contracts/test-window-policy.md)，未授权时不提升前台。普通用户主动启动产品保持正常窗口行为。
 
-在无 Qt、Node、外部 FFmpeg/开发工具的 Windows 干净机器上重复以上入口，排除开发机已安装运行库及硬编码 Kit 搜索路径掩盖缺失依赖。检查无缺模块/插件/shader/字体错误，MiSans 中文与长标题正确，滑尺和序章轮廓、透明合成/裁切及恢复正常；在 Explorer、窗口/任务栏检查大小图标。正常产品检查空库、演示、Unicode 音乐目录、扫描/错误提示、设备列表、支持的匿名格式、播放/暂停/seek/切歌、设备切换及后台继续播放。格式能力由实际 QtMultimedia 后端决定，缺样本/无设备不得记为通过。
-
-代表尺寸/DPR、浏览/详情/总览/序章及hide/restore/resize沿迁移计划的共用产品会话检查，复用已有有效组件结果。性能按[performance.md](../contracts/performance.md)严格静态审计，只有具体未决问题才选择最小目标实测；不默认采正常VSYNC、未限速或资源峰值。Review工具与产品包分开，实际报告记录目标环境与范围，未知GPU完成/显示/driver显存保持null。
+将完整包复制到无开发Qt的兼容Windows及中文/空格路径，从包外执行上述验证器。普通产品的Explorer/任务栏品牌、中文/空格音乐路径、系统输入法/目录对话框与辅助技术、设备/听感及跨屏/窗口操作共用迁移计划R36的目标产品会话。验收范围和结果解释唯一见[test-gates.md](../contracts/test-gates.md)及对应组件契约；不要重复整套GPU/媒体矩阵，物理缩放记录真实值。
 
 ## 源码审计
 
@@ -60,6 +58,6 @@ pwsh -NoProfile -File ./out/windows/verify-windows.ps1 -Scenario normal `
 pwsh -NoProfile -File ./tools/format/FormatTools.ps1 -Check
 ```
 
-审计输出在 `verification/{windows,macos,linux}-static/windows-deployment/`，覆盖 COMMON/WIN/PERF 的实际调用链、平台分支和源 hash。它证明源码接线与可追溯性，不证明目标 PE、windeployqt 或 GPU 已执行；实际 Windows 构建与干净包/设备/呈现欠验按 R30-P 执行。
+该命令仅检查PowerShell格式，不生成部署/源码审计报告。平台源码审查按[test-gates.md](../contracts/test-gates.md#源码审查边界)，Windows构建、包加载和设备事实仍需对应目标。
 
 开发或普通启动可在当前PowerShell设置`$env:QSG_RHI_BACKEND='d3d12'`或`'vulkan'`后运行`./yalahoo.ps1`；`'opengl'`同样可选，移除该环境变量恢复默认。对应Qt编译特性及驱动必须可用；D3D12需要Windows 10 1703或更新版本和支持的设备，Vulkan需要匹配架构的loader/ICD及开发Kit头。选择、能力与失败语义见[后端契约](../contracts/render-backend.md)。

@@ -16,7 +16,7 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 
 运动只发布变换和必要光场，不重建材质、图集或不变附件。四个清晰封面CPU租约、分块与mip按实际投影需求尺寸记账；GPU清晰区包含于生产图集，布局与所有权分别由archive-pool.md/covers.md维护。它们不等于完整封面系统内存。
 
-产品回放分别记录请求交付到场景及 CPU 封面 ready、实际 Qt submission、atlasUploadBytes、resourceGeneration/postprocessRevision、CPU 租约/分块暂存、ResourceInventory 附件与保守重建重叠。motion 状态不能触发目标重建，普通上传批次上界 2MiB。GPU time 是 QRhi 已完成帧的可用观测，可能对应先前帧；不可用为 null。descriptor 字节是估算，不包含驱动 padding/PSO/SRB 和窗口/compositor，不冒充实测显存。局部回放不替代 R28 的 120 秒正常 VSYNC/产品预算，也不提供 input-to-photon。
+产品回放分别记录请求交付到场景及 CPU 封面 ready、实际 Qt submission、atlasUploadBytes、resourceGeneration/postprocessRevision、CPU 租约/分块暂存、ResourceInventory 附件与保守重建重叠。motion 状态不能触发目标重建，普通上传批次上界 2MiB。GPU time 是 QRhi 已完成帧的可用观测，可能对应先前帧；不可用为 null。descriptor 字节是估算，不包含驱动 padding/PSO/SRB 和窗口/compositor，不冒充实测显存。局部回放不提供屏幕显示延迟；性能是否采样及协议唯一见performance.md。
 ## 检查入口
 
 - `node tools/migration/export-detail-golden.mjs`生成冻结数学；`detail-motion`比较598轨迹帧、50旋转点、1200材质帧，x/v/a≤1e-6。覆盖20/30/60/120fps、1/120秒打断、三次换片/反向回收、满池最后目标、返回/搜索替换、拖动取消、隐藏/换库/九尺寸拾取和真实列边界。
@@ -24,4 +24,4 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 - `--window-lifecycle`仅补生产App同窗口的一次hide与一次minimize/restore，核对隐藏无视觉工作、原窗口/SceneItem与实际提交/自身输出恢复；不增加换片压力或QML根重建。
 - 普通功能保持lifecycleStressRequested=false。性能/资源寿命先按performance.md严格静态审查，仅实际未决项才选择最小生命周期观测；以下次数是工具的完整压力能力，不是默认验收要求。`--lifecycle`另执行三十次换片、十次surface及十次完整App/QML根窗口重建，重绑输入并检查重建后换片；basic允许surface复用context，记录实际context初始化数。
 - ready核对同revision实体身份/CPU封面租约集合，最终owner回落且active/pending为0、运动不改target/postprocess代次、单批≤2MiB。旧窗口回调核对epoch；清理帧在有效context交付后再hide/destroy。
-- macOS已完成两后端有效三DPR产品回放；尚欠目标系统、物理设备、系统焦点和R23/R24真实播放集成按计划R36分工归R18-P。
+- 目标系统、物理设备与实际焦点/播放集成的剩余事实唯一由迁移计划R36维护。

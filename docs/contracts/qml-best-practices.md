@@ -47,7 +47,7 @@
 - **QML-27 可见字符串可翻译。** 使用ASCII英文`qsTr`源句与占位符，其他语言在TS资源；emoji写Unicode转义。列表label翻译而value/ID不翻译，歌曲元数据保留数据原文。数字/时间展示按语义选择locale，协议序列化不随界面语言变化。构建与加载唯一见[Qt翻译规则](qt-best-practices.md#翻译和构建闸门)。[QML国际化](https://doc.qt.io/qt-6/qtquick-internationalization.html)
 - **QML-28 文本输入不逐键执行重工作。** 编辑状态保留Qt输入法语义；搜索等业务按控制器背压/取消执行，不能在onTextChanged同步扫描/排序/解析全库。防抖不等于无限排队工作已被取消。
 - **QML-29 官方工具与运行诊断并用。** 类型/导入变化执行CMake官方qmllint target；运行时检查undefined、binding loop、required属性、创建/销毁和警告。qmllint通过不能证明复杂逻辑适合QML，或目标GPU效果正确。[qmllint](https://doc.qt.io/qt-6/qtqml-tooling-qmllint.html)
-- **QML-30 用profile验证成本推断。** 检查绑定求值、delegate创建、JavaScript、动画与SG成本；复现场景、数据规模和窗口状态保持明确。不能凭“C++更快”迁移本应QML实现的视觉，也不能用平均帧率掩盖卡顿。[QML Profiler](https://doc.qt.io/qtcreator/creator-qml-performance-monitor.html)
+- **QML-30 有具体成本问题时定向profile。** 按performance.md先静态审查；仅未决项需要时检查绑定求值、delegate创建、JavaScript、动画与SG成本；复现场景、数据规模和窗口状态保持明确。不能凭“C++更快”迁移本应QML实现的视觉，也不能用平均帧率掩盖卡顿。[QML Profiler](https://doc.qt.io/qtcreator/creator-qml-performance-monitor.html)
 
 ## 本项目职责判定示例
 

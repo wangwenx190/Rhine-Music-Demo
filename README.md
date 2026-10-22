@@ -37,9 +37,9 @@ Windows 使用 `./yalahoo.ps1`，macOS 也可使用 `./yalahoo.command` 传递�
     --import-preferences "/绝对路径/浏览器导出.json"
 ```
 
-曲库导入读取旧索引、配置、人工流派与引用的封面；偏好导入只读取明确导出的 JSON，不读取浏览器数据库。扫描与导入分别执行；跨系统路径需要在目标系统重新配置。身份、数据格式、缓存保护和导入细则以[数据契约](docs/contracts/library-data.md)为准。
+曲库导入读取旧索引、配置、人工流派与引用的封面；偏好导入规则见[设置契约](docs/contracts/settings.md#显式偏好导入)。扫描与导入分别执行；跨系统路径需要在目标系统重新配置。身份、数据格式、缓存保护和导入细则以[数据契约](docs/contracts/library-data.md)为准。
 
-## 离线功能与边界
+## 功能导览
 
 | 功能 | 当前行为 |
 | --- | --- |
@@ -51,12 +51,12 @@ Windows 使用 `./yalahoo.ps1`，macOS 也可使用 `./yalahoo.command` 传递�
 
 可播放格式取决于当前 QtMultimedia 后端、平台和文件本身；被扫描或读到标签不代表可解码播放。实际格式错误会显示 Qt 原因。普通播放与设备行为见[播放契约](docs/contracts/playback.md)。
 
-原生场景使用 RHI，保留源景深、磨砂、玻璃、阴影和后处理。当前仍需完成的目标系统、物理输入/音频、跨屏、实际呈现和性能检查，以及具体失败或能力缺口，仅在[迁移计划](QT_QUICK_MIGRATION_PLAN.md)维护。离屏输出、Qt 呈现事件与屏幕显示是不同测量范围；不能据组件结果承诺所有设备的完整体验。冻结源码自身的外观例外见[来源例外契约](docs/contracts/source-defect-exceptions.md)。
+原生场景使用 RHI，保留源景深、磨砂、玻璃、阴影和后处理。当前仍需完成的目标系统、物理输入/音频、跨屏、实际呈现检查，以及具体失败或能力缺口，仅在[迁移计划](QT_QUICK_MIGRATION_PLAN.md)维护。离屏输出、Qt 呈现事件与屏幕显示是不同测量范围；不能据组件结果承诺所有设备的完整体验。冻结源码自身的外观例外见[来源例外契约](docs/contracts/source-defect-exceptions.md)。
 
 ## 开发与来源
 
-C++ 在 `src/`，QML 在 `qml/Yalahoo/Music/`，产品资产在 `resources/`，测试在 `tests/`，工具在 `tools/`。冻结 Web 源码、基线和研究资料隔离于 [legacy-web](legacy-web/README.md)；其开发命令在该目录运行。模块来源与原生归属见[源码映射](docs/contracts/source-map.json)，专项技术职责由迁移计划索引确定，[AGENTS.md](AGENTS.md)提供代理入口。
+C++ 在 `src/`，QML 在 `qml/Yalahoo/Music/`，产品资产在 `resources/`，测试在 `tests/`，工具在 `tools/`。冻结 Web 源码、基线和研究资料隔离于 [legacy-web](legacy-web/README.md)；其开发命令在该目录运行。模块来源与原生归属见[源码映射](docs/contracts/source-map.json)，产品范围由[product.md](docs/contracts/product.md)维护，专项技术职责由迁移计划索引确定，[AGENTS.md](AGENTS.md)提供代理入口。
 
 构建、部署、本地验证输出及个人数据不入 Git，边界见[验证产物契约](docs/contracts/verification-artifacts.md)。
 
-音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原 [LICENSE](legacy-web/LICENSE)、[NOTICE](legacy-web/NOTICE.md)及[资源署名](resources/licenses/)保留。
+音乐适配与维护：RonaldDeng；基于 LBEILC / RhineLabUI。原生[MIT许可](resources/licenses/project-LICENSE)及[资源署名](resources/licenses/NOTICE.md)随包保留；冻结Web历史权利说明见[legacy-web/NOTICE.md](legacy-web/NOTICE.md)。

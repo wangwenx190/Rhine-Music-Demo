@@ -30,7 +30,7 @@ REFDB-04只采用公开API的无输出/意图/恢复位置隔离思路和事件�
 
 ## 界面与检查
 
-Header沿用原播放/停止/当前歌名容器，歌名定位复用TrackFocusController。播放与输出面板集中提供上一/下一、进度/时间、系统默认/实际Qt设备、歌曲音量及Qt错误/重试，保留详情静态排版。Space复用InputRouter的输入所有权判定，编辑器/滑块/Popup及修饰快捷键保留自身输入；进入库/搜索或定位不调用媒体命令。音频面板提供本契约的三路独立声音控制；完整非音频设置归library-data.md。
+Header沿用原播放/停止/当前歌名容器，歌名定位复用TrackFocusController。播放与输出面板集中提供上一/下一、进度/时间、系统默认/实际Qt设备、歌曲音量及Qt错误/重试，保留详情静态排版。Space复用InputRouter的输入所有权判定，编辑器/滑块/Popup及修饰快捷键保留自身输入；进入库/搜索或定位不调用媒体命令。音频面板提供本契约的三路独立声音控制；完整非音频设置归[settings.md](settings.md)。
 
 `playback`使用空设备列表和可控状态通知核对队列/快照所有权、无输出待播及重复/晚到事件；`playback-device`使用现场生成的匿名RIFF/WAV和损坏样本，真实执行Qt播放/暂停/seek/停止、自然结束/换曲与错误，再用真实Qt设备对象或空列表核对暂停/停止重连、最后有效位置及显式选择回退。通知注入仅验证状态分支，不作为物理拔插证据，禁止伪造QAudioDevice私有句柄。
 
@@ -48,6 +48,6 @@ BGM格式错误显示Qt原因、静音并放行歌曲；重新开关可重试。
 
 `InterfaceSoundController`启动只读取一次既有嵌入事件映射。只有enabled且真实存在的qrc短资产才进入哈希；没有可用资源时不创建音效实例。有资源时固定最多四个QSoundEffect，复用source，满池/加载中不排队、不扩容。trigger(event)保留17个事件名的入口；当前全部缺独立短资产，所有事件与试听静音，试听按钮禁用。已接入选片tick/column、面板page-open/page-close与详情open/back事件；其他事件保留给对应产品入口，不恢复合成器或旧typing PCM。
 
-音频设置沿用PreferencesStore的单worker、一次在途及最新值合并、QSaveFile原子保存，保留未知字段。仅消费volume/bgm/bgmVolume/sound/soundVolume。设置与GUI重建不重建媒体对象。
+音频设置使用[settings.md](settings.md)定义的PreferencesStore协议，仅消费volume/bgm/bgmVolume/sound/soundVolume。设置与GUI重建不重建媒体对象。
 
 `audio-ambience`核对缺资源静音、参数与独立持久化；`audio-ambience-device`真实执行Ogg循环配置/播放与匿名WAV的歌曲静音门、暂停/停止/队列结束/快速反向、独立音量、隐藏无视觉时钟进度及缺资源静音；测试专用短WAV验证四槽QSoundEffect与满池丢弃。`playback-qml`沿原九尺寸/双主题/DPR检查实际生产音频控件与导航隔离，正常输出只作质量检查。Qt进度和隐藏输出不代替听感、物理设备或原生最小化，欠验只在计划R25-P维护；执行范围沿test-gates.md。

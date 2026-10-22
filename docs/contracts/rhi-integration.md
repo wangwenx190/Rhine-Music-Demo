@@ -41,7 +41,7 @@
 
 `ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`RhiScaleChecks.cpp`中计划规定的九尺寸和与连续阵列入口共用的匿名9×64库，原生质量与双主题、64核全分辨率AO及SMAA。CTest使用`rhi-scale-test 新目录 --representative`选择321×241与640×480，核对封面过滤及同窗口DPR转换，供尺寸规则改动后的定向检查。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
 
-九尺寸布局、主题和DPR边界按test-gates.md分开选择；必要入口调整按test-gates.md，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、半AO/full DOF/CoC等真实耦合边界仍须独立覆盖。
+九尺寸布局、主题和DPR边界按test-gates.md分开选择；必要入口调整按test-gates.md，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、全分辨率AO/DOF/CoC等真实耦合边界仍须独立覆盖。
 
 独立源尺寸公式核对SceneItem/fixed buffer、所有几何/resolve/MSAA/Qt item附件、AO/full DOF及最终输出图尺寸，记录全部资源清单与相等的最终物理尺寸。核对实际独立封面mip/足迹过滤、独立透射mip、后处理color线性/depth nearest及真正上传的focus/aperture/aspect/.011 UV CoC；缩略图与满足当前投影需求的独立租约须就绪。同一640×480窗口DPR 1→2→1.5→1时无resize，重新polish并更新实际目标，图集扩容时更新generation并重传已有不可变像素，尺寸不变时保留generation；就绪后维持零上传。普通产品不增加读回或诊断遍历。
 
@@ -53,6 +53,6 @@
 
 源状态集合为九尺寸×双主题×填充/真实列共36状态、180份自身输出；隐藏目标按尺寸轮换代表DPR1/1.5/2，native只记录实际屏幕DPR。执行矩阵按test-gates.md选择；必要的范围选择及几何/完整交互分离按test-gates.md在当前任务内处理。关键输出覆盖浏览/总览/详情/搜索，填充模式另含二维/三维片头；代表状态以自身Qt键鼠事件核对正反导航、总览进退、详情打开/返回、连选最后意图、搜索模态及浏览播放隔离。详情须等入场透明度达到1，完全遮挡期检查clear提交语义，不能要求重新上传被遮挡的三维快照。运动数值、CSS结构、连续渲染质量分别验收。
 
-报告保留实际viewport/DPR、有限矩阵、实体/清晰封面容量、renderer代次、资源描述符与旧新重叠估算、独立GUI/同步/提交成本和最终释放；显式读回发生在帧完成后的检查点，不计入帧成本。manifest保存源码/资产/二进制/图像hash和失败退出状态，不覆盖已有目录。此入口没有原生呈现、物理输入或显存实测，不产生performance.md之外的性能任务。
+报告保留实际viewport/DPR、有限矩阵、实体/清晰封面容量、renderer代次、资源描述符与旧新重叠估算、独立GUI/同步/提交成本和最终释放；显式读回发生在帧完成后的检查点，不计入帧成本。manifest保存源码/资产/二进制/图像hash和失败退出状态，不覆盖已有目录。隐藏RenderControl入口没有原生呈现；native模式的frameSwapped只证明Qt呈现事件。所有模式均不证明物理输入或显存实测，不产生performance.md之外的性能任务。
 
 `--representative`选择1280×720、930×900和390×844，保留双主题/两阵列及全部联动，输出60个检查点，用于组件布局结果仍有效时补后端产品接线。`--narrow`只重放≤700逻辑px的尺寸，另核对长列名界限与单专辑恢复单行，用于小屏布局改动后的定向回归；两种选择互斥，原完整矩阵中的未受影响状态按test-gates.md复用。正常输出由实际查看检查清晰度、轮廓、裁切和合成，不生成图像评分；源码数学和结构仍使用各组件既有导出/比较入口。

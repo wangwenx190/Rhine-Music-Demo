@@ -1,12 +1,5 @@
-# Observatory / 观测室
+# Observatory / 观测室 · 音频来源
 
-三个 Ogg 文件为本项目原创程序编配的同步循环声部，MP3 是带首尾淡变的独立试听版。配乐无原片采样、无外部录音、无人声。
+`atmosphere.ogg`、`motif.ogg`、`pulse.ogg`为LBEILC在上游RhineLabUI中原创程序编配的同步循环声部；`observatory-preview.mp3`为带首尾淡变的独立试听版，`score.json`为谱面。没有原片采样、外部录音或人声。源谱及合成源码保存在`legacy-web/scripts/render-audio.mjs`，上述路径为源码仓库相对路径，部署包不包含开发脚本。
 
-源谱及合成：`scripts/render-audio.mjs`；音效合成：`src/audio.ts`。
-生成数据：`score.json`。随项目采用仓库 LICENSE。
-
-## 逐字输入短音
-
-`typing-preview.wav` 及 `src/typing-samples.ts` 使用用户提供的《明日方舟》特别映像 [莱茵生命：访问] 中约 6.864–6.986 秒的三个短音，各 38ms。`typing-source.json` 保留精确时间、源文件校验与处理参数。原音及其衍生片段的权利归原作者，不纳入上文原创配乐的 MIT 授权声明。
-
-提取脚本：`scripts/extract-typing-audio.mjs`。原片短音仅去直流、做边缘淡变和统一增益，没有变调、变速或合成替换。`reference/typing-original.wav` 为本地对照片段，不属于生产配乐。
+这些配乐沿用项目MIT许可；代码作者及第三方资产权利边界以随包`project/NOTICE.md`及`project/project-LICENSE`为准（源码仓库位于`resources/licenses/`）。本说明唯一维护这些音频的作者与来源，当前播放路由和界面音效可用性见源码仓库`docs/contracts/playback.md`。

@@ -5,6 +5,7 @@ Explicit developer check: needs Node and the locked Web dependencies; ordinary C
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,6 +16,44 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class AssetExportTest(unittest.TestCase):
+    def test_native_reimport_preserves_maintained_notices(self):
+        # Run the real importer in an isolated tree. The maintained native notices must
+        # survive an asset refresh even when they differ from their frozen Web sources.
+        build = ROOT / "build/release"
+        tool = build / "tools" / ("prepare-assets.exe" if os.name == "nt" else "prepare-assets")
+        kit = Path(json.loads((build / "toolchain.json").read_text())["qtKit"])
+        self.assertTrue(tool.is_file(), "Build the Release prepare-assets target first")
+        documents = ("audio/README.md", "demo-covers/README.md", "licenses/NOTICE.md")
+        with tempfile.TemporaryDirectory(prefix="yalahoo attribution space-") as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "resources", root / "resources")
+            (root / "docs/contracts").mkdir(parents=True)
+            shutil.copyfile(ROOT / "docs/contracts/history-rewrite.json",
+                            root / "docs/contracts/history-rewrite.json")
+            (root / "legacy-web").symlink_to(ROOT / "legacy-web", target_is_directory=True)
+            (root / ".git").symlink_to(ROOT / ".git", target_is_directory=True)
+            expected = {}
+            for name in documents:
+                path = root / "resources" / name
+                path.write_bytes(path.read_bytes() + b"\nNative attribution retained by reimport.\n")
+                expected[name] = path.read_bytes()
+            environment = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+                               QT_PLUGIN_PATH=str(kit / "plugins"))
+            environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
+            result = subprocess.run([str(tool), str(root), str(kit)], env=environment,
+                                    capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            entries = {entry["path"]: entry for entry in json.loads(
+                (root / "resources/manifests/assets.json").read_text())["entries"]}
+            for name, content in expected.items():
+                with self.subTest(document=name):
+                    self.assertEqual((root / "resources" / name).read_bytes(), content)
+                    self.assertEqual(entries[name]["sha256"], hashlib.sha256(content).hexdigest())
+                    self.assertEqual(entries[name]["bytes"], len(content))
+                    source = root / entries[name]["source"]
+                    self.assertEqual(entries[name]["inputSha256"],
+                                     hashlib.sha256(source.read_bytes()).hexdigest())
+
     def test_source_commands_preserve_incomplete_output_directories(self):
         for name, options in (("export-title.mjs", []), ("verify-title.mjs", []),
                               ("export-browse-ui.mjs", ["--overview"]),

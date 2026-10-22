@@ -36,25 +36,11 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 原生strip/重定位最小检查：`python3 tests/tools/UnixDeploymentTest.py`；动态导出、去除开发路径和包外执行须在对应原生平台通过。
 
-## 用户实机清单
+## 实机操作入口
 
-使用匿名或用户明确选定的本地歌曲；隔离数据根示例：
+使用匿名或用户明确选择的歌曲，普通启动可传`--data-dir /绝对/隔离目录 --music-root /绝对/匿名音乐目录`。目标待办与退出事实唯一见迁移计划R36；矩阵、质量与物理DPR选择见[test-gates.md](../contracts/test-gates.md)。
 
-```sh
-./yalahoo.command --data-dir "$PWD/verification/macos-manual/data" \
-    --music-root "/绝对路径/匿名音乐"
-```
-
-| 操作 | 预期与入口 |
-| --- | --- |
-| 配置/构建/静态 | 上述构建与部署成功；格式/官方qmllint按code-style执行 |
-| 脱离Kit | 从包外目录运行验证器，当前进程退出0且新report.json passed；Qt/QML/媒体映像不来自安装Kit；Finder图标/名称正确 |
-| 浏览/详情/总览 | 双主题、真实列/填充、搜索与播放定位互不干扰；检查源景深/磨砂、玻璃排序、透明轮廓、裁切与清晰度。隐藏组件入口用`qt-release-render`选择controls/opening/settings及相应RHI测试 |
-| 片头/Canvas/文字 | Logo圆环、滑尺数字与标题/emoji正常合成；重播/跳过交接有效；实际DPR/resize后无漏画；资源所有权先静态审计，重复重建按test-gates.md按需选择。数学/状态和自身正常输出分别验收 |
-| 原生菜单/输入 | 物理键盘逐项使用上述Command快捷键；编辑焦点/输入法/只读/片头锁正确，设置视觉重载后仍可用；⌘W/⌘Q退出不残留音频进程 |
-| Retina/屏幕 | 在实际DPR1/1.5/2设备与跨屏切换中记录真实值，逻辑尺寸和清晰度正确；显式离屏target DPR不替代物理屏幕 |
-| 播放与设备 | 本地播放、暂停/继续、seek、上下曲、停止、错误、默认/显式设备切换与断开恢复；检查三路独立音量、实际听感、后台继续与退出停止 |
-| 生命周期/性能 | 实际hide/minimize/restore和同窗口surface恢复有效；性能按performance.md先静态审计，仅具体未决问题最小实测 |
+macOS特有操作为Finder图标/名称、上述物理Command菜单、输入法/系统目录对话框、Retina/跨屏通知及EDR亮度/电源变化；媒体设备/听感与同窗口恢复按所属契约在同一产品会话检查。记录实际屏幕DPR，不要求精确DPR1/1.5/2三套物理设备。包外隐藏加载、Qt事件输入和受控target均不能替代这些事实。
 
 ## 图形与验证差异
 
@@ -62,4 +48,4 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 普通验证遵守[test-window-policy.md](../contracts/test-window-policy.md)，macOS可见测试默认OFF，RenderControl真正隐藏。原生工具需有WindowServer/系统服务访问；受限进程中的无屏幕或不可用系统服务不算运行通过。前台授权不跨轮次；不能为遮挡/节流提升窗口。
 
-实际DPR从窗口/组件报告核对；CoreText与彩色字体适配见assets/title-reels。CanvasPainter在产品使用C++ API，各组件现有Metal/OpenGL隐藏及授权可见运行事实见source-fidelity-review.md；欠验只由迁移计划管理。
+实际DPR从窗口/组件报告核对；CoreText与彩色字体适配见assets/title-reels。CanvasPainter在产品使用C++ API，运行报告按verification-artifacts.md保留本地；欠验只由迁移计划管理。

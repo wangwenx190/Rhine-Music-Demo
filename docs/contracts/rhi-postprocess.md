@@ -33,5 +33,5 @@ TransferAudit在适用D3D11目标命令列表按原生纹理筛UpdateSubresource
 - 稳态图像/代次复用且零uniform上传、参数变化时每pass80-byte前缀、focus/aperture/exposure更新不重建，关闭释放AO/DOF/后处理；真实SG失效后组合资源及输出恢复。实际alpha几何部分覆盖、透明洞/黑边的解析门槛归rhi-shell.md，不用截图边缘分数。
 - `rhi-transient-attachments-gpu`或`rhi-postprocess-test 新目录 --attachments-only`只检查321×241/241×321、1×/4×的普通生产与Review附件。实际GPU资源ID证明MSAA共享且resolve独立，描述符清单与分配前计划一致，生产最终背景核对独立ACES/sRGB公式；同一入口同时验证组合uniform稳定零上传、参数更新与还原、缓存输出和新建资源一致；不附带图集矩阵、成本采样或重复重建。
 - 保留可控64tile初始化、432实例、全可见池和1/7/8/31/32/33/64/432容量、单tile替换/还原/逆序、resize不重传、generation拒绝及第九tile背压；自身atlas整页读回验证区域更新，D3D11额外核对native命令。缺primary租约的合法采集metadata为null；fallback要求完整两组租约。
-- `rhi-flicker-gpu`实际SceneItem以original/high两画质覆盖源启用条件和组合图，完整工具序列含双主题/小大场景/静止/波浪/浏览/总览/详情1200帧；按实际缺失断言选状态，不默认全部运行。目标尺度与BLUR修正的独立集成入口见rhi-integration.md；SG失效不冒充同原生窗口恢复或VSYNC。
+- `rhi-flicker-gpu`实际SceneItem使用当前固定生产质量核对组合图，完整工具序列含双主题/小大场景/静止/波浪/浏览/总览/详情1200帧；按实际缺失断言选状态，不默认全部运行。目标尺度与BLUR修正的独立集成入口见rhi-integration.md；SG失效不冒充同原生窗口恢复或VSYNC。
 - 不执行图像分数/120秒产品门槛。Qt呈现、GPU完成/driver显存、显示延迟及完整产品指标依performance.md。

@@ -1,9 +1,5 @@
-# Empty-library demonstration artwork
+# 匿名演示封面来源
 
-Three original abstract images were created with the built-in ImageGen tool on 2026-09-09, before the user added their real music library. They are only used by the explicitly selected empty-library demonstration. Actual albums always use their own local covers.
+三张抽象图像由本项目于2026-09-09使用ImageGen生成：`square.png`为暖沙色落日几何景观，`portrait.png`为深蓝海面与新月，`landscape.png`为冷色雾山。它们作为匿名演示和测试输入，当前生产入口不会在真实空库中自动伪造专辑，也不会替换真实专辑封面。
 
-- `square.png`: warm sand, a low orange sun, quiet minimal geometric landscape; square artwork.
-- `portrait.png`: deep midnight blue, a small crescent moon above a still sea; portrait artwork.
-- `landscape.png`: cool mist and layered mountains; wide artwork.
-
-The source images are copied without cropping or stretching. `containCover` preserves their original aspect ratio on every 3D card and in the independent viewer. No album names or artist identities were invented for the real library.
+原始宽高比保留；当前解码、contain和图集采样规范唯一见[封面契约](../../docs/contracts/covers.md)。本文件只维护三张图像的来源和身份，不作为渲染接口说明。
