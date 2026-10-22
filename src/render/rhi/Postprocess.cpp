@@ -1,5 +1,6 @@
-#include "RenderData.h"
 #include "Postprocess.h"
+#include <vector>
+#include "RenderData.h"
 #include "PreparedAssets.h"
 #include "ResourceInventory.h"
 #include <QImage>
@@ -84,7 +85,16 @@ static_assert(sizeof(PostPrefix) == PostPrefixBytes);
 static_assert(sizeof(PostUniform) == renderData::PostUniformBytes
               && offsetof(PostUniform, kernel) == PostPrefixBytes);
 }
-struct Postprocess::State final
+struct Postprocess::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private();
+    ~Private();
+    struct State;
+    std::unique_ptr<State> state;
+    quint64 revision = 0;
+};
+struct Postprocess::Private::State final
 {
     Q_DISABLE_COPY_MOVE(State)
     State() = default;
@@ -147,26 +157,31 @@ struct Postprocess::State final
         output = target.texture.get();
     }
 };
-Postprocess::Postprocess() = default;
+Postprocess::Private::Private() = default;
+Postprocess::Private::~Private() = default;
+Postprocess::Postprocess() : d(std::make_unique<Private>())
+{
+}
 Postprocess::~Postprocess() = default;
 void Postprocess::reset()
 {
-    m_state.reset();
-    ++m_revision;
+    d->state.reset();
+    ++d->revision;
 }
 void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, QRhiTexture *normal,
                           QRhiTexture *aoDepth, QRhiTexture *dofDepth)
 {
-    if (m_state && m_state->api == api && m_state->settings.size == s.size
-        && m_state->settings.samples == s.samples && m_state->settings.bokeh == s.bokeh
-        && m_state->settings.smaa == s.smaa && m_state->source == color && m_state->normal == normal
-        && m_state->aoDepth == aoDepth && m_state->dofDepth == dofDepth) {
-        m_state->settings = s;
+    if (d->state && d->state->api == api && d->state->settings.size == s.size
+        && d->state->settings.samples == s.samples && d->state->settings.bokeh == s.bokeh
+        && d->state->settings.smaa == s.smaa && d->state->source == color
+        && d->state->normal == normal && d->state->aoDepth == aoDepth
+        && d->state->dofDepth == dofDepth) {
+        d->state->settings = s;
         return;
     }
     reset();
-    m_state = std::make_unique<State>();
-    auto &p = *m_state;
+    d->state = std::make_unique<Private::State>();
+    auto &p = *d->state;
     p.api = api;
     p.settings = s;
     p.source = color;
@@ -234,7 +249,7 @@ void Postprocess::prepare(QRhi *api, const PostSettings &s, QRhiTexture *color, 
 }
 void Postprocess::render(QRhiCommandBuffer *cb)
 {
-    auto &p = *m_state;
+    auto &p = *d->state;
     const auto &s = p.settings;
     ResourceUpdates updates(p.api->nextResourceUpdateBatch());
     const bool firstUpload = p.upload;
@@ -313,20 +328,20 @@ void Postprocess::render(QRhiCommandBuffer *cb)
 }
 QRhiTexture *Postprocess::output() const
 {
-    return m_state ? m_state->output : nullptr;
+    return d->state ? d->state->output : nullptr;
 }
 QRhiTexture *Postprocess::rawAo() const
 {
-    return m_state->rawAo.texture.get();
+    return d->state->rawAo.texture.get();
 }
 QRhiTexture *Postprocess::blurredAo() const
 {
-    return m_state->blur.texture.get();
+    return d->state->blur.texture.get();
 }
 QRhiTexture *Postprocess::smaaEdges() const
 {
 #ifdef YALAHOO_RHI_AUDIT
-    return m_state ? m_state->edges.texture.get() : nullptr;
+    return d->state ? d->state->edges.texture.get() : nullptr;
 #else
     return nullptr;
 #endif
@@ -334,7 +349,7 @@ QRhiTexture *Postprocess::smaaEdges() const
 QRhiTexture *Postprocess::smaaWeights() const
 {
 #ifdef YALAHOO_RHI_AUDIT
-    return m_state ? m_state->weights.texture.get() : nullptr;
+    return d->state ? d->state->weights.texture.get() : nullptr;
 #else
     return nullptr;
 #endif
@@ -342,16 +357,16 @@ QRhiTexture *Postprocess::smaaWeights() const
 QJsonArray Postprocess::passes() const
 {
     QJsonArray result;
-    if (m_state)
-        for (const auto &pass : m_state->passes)
+    if (d->state)
+        for (const auto &pass : d->state->passes)
             result.append(pass.name);
     return result;
 }
 QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
 {
 #ifdef YALAHOO_RHI_AUDIT
-    if (m_state) {
-        const auto &p = *m_state;
+    if (d->state) {
+        const auto &p = *d->state;
         QJsonArray passes;
         auto *currentColor = p.source;
         for (const auto &pass : p.passes) {
@@ -415,7 +430,7 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
                            && p.nearest->addressU() == QRhiSampler::ClampToEdge
                            && p.nearest->addressV() == QRhiSampler::ClampToEdge },
                  { u"sourceMatches"_s, p.source == expectedSource },
-                 { u"revision"_s, qint64(m_revision) },
+                 { u"revision"_s, qint64(d->revision) },
                  { u"sourceSamples"_s, p.source->sampleCount() },
                  { u"sourceFormat"_s, int(p.source->format()) },
                  { u"outputSamples"_s, p.output->sampleCount() },
@@ -429,8 +444,8 @@ QJsonObject Postprocess::graph(QRhiTexture *expectedSource) const
 QJsonObject Postprocess::submittedBokeh() const
 {
 #ifdef YALAHOO_RHI_AUDIT
-    if (m_state && m_state->settings.bokeh) {
-        const auto &p = *m_state;
+    if (d->state && d->state->settings.bokeh) {
+        const auto &p = *d->state;
         const auto &u = p.submittedBokeh;
         return { { u"focus"_s, u.dof[0] },
                  { u"aperture"_s, u.dof[1] },
@@ -448,17 +463,17 @@ QJsonObject Postprocess::submittedBokeh() const
 }
 qint64 Postprocess::uniformUploadBytes() const
 {
-    return m_state ? m_state->uniformUploadBytes : 0;
+    return d->state ? d->state->uniformUploadBytes : 0;
 }
 quint64 Postprocess::revision() const
 {
-    return m_revision;
+    return d->revision;
 }
 void Postprocess::inventory(ResourceInventory &inventory) const
 {
-    if (!m_state)
+    if (!d->state)
         return;
-    const auto &p = *m_state;
+    const auto &p = *d->state;
     for (int i = 0; i < 2; ++i)
         inventory.texture(u"post-ping-%1"_s.arg(i), p.ping[i].texture.get());
     inventory.texture(u"post-ao-raw"_s, p.rawAo.texture.get());

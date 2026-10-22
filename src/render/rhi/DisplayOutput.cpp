@@ -1,6 +1,12 @@
+#include "DisplayOutput.h"
+#include <memory>
+#include "DisplayState.h"
+#include <QPointer>
+#include <QTimer>
+#include <atomic>
+#include <utility>
 #include <QQuickWindow>
 #include "Logging.h"
-#include "DisplayOutput.h"
 #include <QColorSpace>
 #include <QGuiApplication>
 #include <rhi/qrhi.h>
@@ -16,31 +22,63 @@ constexpr auto DisplayConfigurationExitCode = 23;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-DisplayOutput::DisplayOutput(QObject *parent) : DisplayOutput(makeDisplayMonitor(), parent)
+struct DisplayOutput::Private final
 {
-}
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(DisplayOutput *owner, std::unique_ptr<DisplayMonitor> monitor)
+        : q(owner), m_monitor(std::move(monitor))
+    {
+    }
+    DisplayOutput *const q;
+
+    void queueSceneGraphError(const QString &message);
+    void reportSwapChain(QQuickWindow &window);
+    void reportSceneGraphError(const quint64 &epoch, const QString &message);
+
+    void refresh();
+    void configure(bool hdr);
+    void recoverOutput();
+    QPointer<QQuickWindow> m_window;
+    std::unique_ptr<DisplayMonitor> m_monitor;
+    QTimer m_poll;
+    DisplayState m_state;
+    bool m_requested = false;
+    bool m_requestedHdr10 = false;
+    bool m_active = false;
+    bool m_ready = true;
+    bool m_reconfiguring = false;
+    bool m_rejected = false;
+    bool m_useLinearFallback = false;
+    std::atomic<quint64> m_epoch = 0;
+    quint64 m_reportedEpoch = quint64(-1); // Render-thread state only.
+};
 DisplayOutput::DisplayOutput(std::unique_ptr<DisplayMonitor> monitor, QObject *parent)
-    : QObject(parent), m_monitor(std::move(monitor))
+    : QObject(parent), d(std::make_unique<Private>(this, std::move(monitor)))
 {
-    m_monitor->changed = [this] {
-        refresh();
+    d->m_monitor->changed = [this] {
+        d->refresh();
     };
     // Native events cover topology/mode changes; current headroom/white level may
     // have no notification. One coarse query per second also covers that case.
-    m_poll.setInterval(DisplayPollMilliseconds);
-    m_poll.setTimerType(Qt::CoarseTimer);
-    connect(&m_poll, &QTimer::timeout, this, &DisplayOutput::refresh);
-    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this] {
-        refresh();
+    d->m_poll.setInterval(DisplayPollMilliseconds);
+    d->m_poll.setTimerType(Qt::CoarseTimer);
+    connect(&d->m_poll, &QTimer::timeout, this, [this] {
+        d->refresh();
     });
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this] {
+        d->refresh();
+    });
+}
+DisplayOutput::DisplayOutput(QObject *parent) : DisplayOutput(makeDisplayMonitor(), parent)
+{
 }
 DisplayOutput::~DisplayOutput()
 {
-    m_monitor->changed = { };
-    if (m_window)
-        disconnect(m_window, nullptr, this, nullptr);
+    d->m_monitor->changed = { };
+    if (d->m_window)
+        disconnect(d->m_window, nullptr, this, nullptr);
 }
-void DisplayOutput::reportSceneGraphError(const quint64 &epoch, const QString &message)
+void DisplayOutput::Private::reportSceneGraphError(const quint64 &epoch, const QString &message)
 {
     if (!m_window || epoch != m_epoch.load())
         return;
@@ -51,7 +89,7 @@ void DisplayOutput::reportSceneGraphError(const quint64 &epoch, const QString &m
         QCoreApplication::exit(DisplayConfigurationExitCode);
     }
 }
-void DisplayOutput::reportSwapChain(QQuickWindow &window)
+void DisplayOutput::Private::reportSwapChain(QQuickWindow &window)
 {
     // Render thread: only immutable local facts cross back to the GUI.
     auto *swap = window.swapChain();
@@ -61,7 +99,7 @@ void DisplayOutput::reportSwapChain(QQuickWindow &window)
         return;
     m_reportedEpoch = epoch;
     QMetaObject::invokeMethod(
-            this,
+            q,
             [this, format, epoch] {
                 if (!m_window || epoch != m_epoch.load())
                     return;
@@ -73,15 +111,15 @@ void DisplayOutput::reportSwapChain(QQuickWindow &window)
                 }
                 m_active = m_requested && format == expected;
                 m_ready = true;
-                Q_EMIT changed();
+                Q_EMIT q->changed();
             },
             Qt::QueuedConnection);
 }
-void DisplayOutput::queueSceneGraphError(const QString &message)
+void DisplayOutput::Private::queueSceneGraphError(const QString &message)
 {
     const auto epoch = m_epoch.load();
     QMetaObject::invokeMethod(
-            this,
+            q,
             [this, epoch, message] {
                 return reportSceneGraphError(epoch, message);
             },
@@ -89,44 +127,44 @@ void DisplayOutput::queueSceneGraphError(const QString &message)
 }
 void DisplayOutput::attach(QQuickWindow &window)
 {
-    Q_ASSERT(!m_window);
-    m_window = &window;
+    Q_ASSERT(!d->m_window);
+    d->m_window = &window;
     connect(&window, &QWindow::screenChanged, this, [this] {
-        m_rejected = false;
-        m_useLinearFallback = false;
-        refresh();
+        d->m_rejected = false;
+        d->m_useLinearFallback = false;
+        d->refresh();
     });
     connect(&window, &QWindow::visibleChanged, this, [this](bool visible) {
         if (visible) {
-            m_poll.start();
-            refresh();
+            d->m_poll.start();
+            d->refresh();
         } else {
-            m_poll.stop();
+            d->m_poll.stop();
         }
     });
     connect(&window, &QWindow::visibilityChanged, this, [this](QWindow::Visibility visibility) {
         if (visibility == QWindow::Hidden || visibility == QWindow::Minimized) {
-            m_poll.stop();
+            d->m_poll.stop();
         } else {
-            m_poll.start();
-            refresh();
+            d->m_poll.start();
+            d->refresh();
         }
     });
     connect(
             &window, &QQuickWindow::beforeSynchronizing, this,
             [this, &window] {
-                return reportSwapChain(window);
+                return d->reportSwapChain(window);
             },
             Qt::DirectConnection);
     connect(
             &window, &QQuickWindow::sceneGraphError, this,
             [this](QQuickWindow::SceneGraphError, const QString &message) {
-                queueSceneGraphError(message);
+                d->queueSceneGraphError(message);
             },
             Qt::DirectConnection);
-    refresh();
+    d->refresh();
 }
-void DisplayOutput::refresh()
+void DisplayOutput::Private::refresh()
 {
     if (!m_window || m_reconfiguring)
         return;
@@ -150,9 +188,9 @@ void DisplayOutput::refresh()
     if (request != m_requested || (request && hdr10 != m_requestedHdr10))
         configure(request);
     else if (changedState)
-        Q_EMIT changed();
+        Q_EMIT q->changed();
 }
-void DisplayOutput::recoverOutput()
+void DisplayOutput::Private::recoverOutput()
 {
     if (m_requestedHdr10 && m_state.allowLinearFallback) {
         m_useLinearFallback = true;
@@ -162,7 +200,7 @@ void DisplayOutput::recoverOutput()
         configure(false);
     }
 }
-void DisplayOutput::configure(bool hdr)
+void DisplayOutput::Private::configure(bool hdr)
 {
     if (!m_window)
         return;
@@ -197,9 +235,30 @@ void DisplayOutput::configure(bool hdr)
     m_window->setFormat(format);
     m_window->setPersistentGraphics(persistentGraphics);
     m_window->setPersistentSceneGraph(persistentSceneGraph);
-    Q_EMIT changed();
+    Q_EMIT q->changed();
     if (visibility != QWindow::Hidden)
         m_window->setVisibility(visibility);
     m_reconfiguring = false;
 }
+bool DisplayOutput::hdrActive() const
+{
+    return d->m_active;
+}
+bool DisplayOutput::ready() const
+{
+    return d->m_ready;
+}
+float DisplayOutput::whiteScale() const
+{
+    return d->m_active && !d->m_useLinearFallback ? d->m_state.whiteScale : 1;
+}
+float DisplayOutput::headroom() const
+{
+    return d->m_active ? d->m_state.headroom : 1;
+}
+bool DisplayOutput::hdr10() const
+{
+    return d->m_active && d->m_requestedHdr10;
+}
+
 }

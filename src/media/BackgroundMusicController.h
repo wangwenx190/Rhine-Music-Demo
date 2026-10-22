@@ -2,13 +2,9 @@
 // control its intent without changing song playback.
 
 #pragma once
-#include "ProductDefaults.h"
-#include <QAudioOutput>
-#include <QAudioDevice>
-#include <QMediaPlayer>
-#include <QMediaDevices>
-#include <QElapsedTimer>
-#include <QTimer>
+#include <QObject>
+#include <QString>
+#include <memory>
 
 namespace yalahoo {
 
@@ -29,26 +25,11 @@ public:
     };
     explicit BackgroundMusicController(QObject *parent = nullptr);
     ~BackgroundMusicController() override;
-    bool enabled() const
-    {
-        return m_enabled;
-    }
-    double volume() const
-    {
-        return m_volume;
-    }
-    bool playing() const
-    {
-        return m_player.isPlaying();
-    }
-    QString error() const
-    {
-        return m_error;
-    }
-    bool silent() const
-    {
-        return m_output.volume() == 0;
-    }
+    bool enabled() const;
+    double volume() const;
+    bool playing() const;
+    QString error() const;
+    bool silent() const;
     void setEnabled(bool enabled);
     void setVolume(double volume);
     void setSongActivity(SongActivity activity);
@@ -61,19 +42,7 @@ Q_SIGNALS:
 
 private:
     friend class AudioAmbienceTest;
-    void reconcile();
-    void advanceFade();
-    void refreshOutput();
-    QMediaDevices m_devices;
-    QTimer m_outputRefresh;
-    QAudioOutput m_output;
-    QMediaPlayer m_player;
-    QTimer m_fade;
-    QElapsedTimer m_elapsed;
-    QString m_error;
-    SongActivity m_song = SongActivity::Stopped;
-    double m_volume = yalahoo::productDefaults::DefaultBackgroundVolume, m_from = 0, m_target = 0;
-    int m_duration = 0;
-    bool m_enabled = true, m_active = false, m_available = false;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

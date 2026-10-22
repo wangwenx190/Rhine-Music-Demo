@@ -1,5 +1,9 @@
-#include <QCoreApplication>
 #include "GenreRowsModel.h"
+#include <memory>
+#include <QAbstractListModel>
+#include <QFont>
+#include <QVariantList>
+#include <QCoreApplication>
 #include <QFontMetricsF>
 #include <QGuiApplication>
 #include <cmath>
@@ -16,54 +20,78 @@ constexpr auto ChipGapPixels = 7;
 
 constexpr int entriesRole = Qt::UserRole + 1;
 }
-GenreRowsModel::GenreRowsModel(QObject *parent) : QAbstractListModel(parent)
+struct GenreRowsModel::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(GenreRowsModel *owner) : q(owner)
+    {
+    }
+    GenreRowsModel *const q;
+
+    void measure();
+    void rewrap();
+    struct Label final
+    {
+        QString id, name;
+        double width = 0;
+    };
+    QVariantList m_genres;
+    QFont m_font;
+    double m_width = 0;
+    QList<Label> m_labels;
+    QList<QVariantList> m_rows;
+};
+GenreRowsModel::GenreRowsModel(QObject *parent)
+    : QAbstractListModel(parent), d(std::make_unique<Private>(this))
 {
     if (qGuiApp)
-        connect(qGuiApp, &QGuiApplication::fontDatabaseChanged, this, &GenreRowsModel::measure);
-    measure();
+        connect(qGuiApp, &QGuiApplication::fontDatabaseChanged, this, [this] {
+            d->measure();
+        });
+    d->measure();
 }
 QVariantList GenreRowsModel::genres() const
 {
-    return m_genres;
+    return d->m_genres;
 }
 void GenreRowsModel::setGenres(const QVariantList &genres)
 {
-    if (m_genres == genres)
+    if (d->m_genres == genres)
         return;
-    m_genres = genres;
-    measure();
+    d->m_genres = genres;
+    d->measure();
     Q_EMIT genresChanged();
 }
 QFont GenreRowsModel::font() const
 {
-    return m_font;
+    return d->m_font;
 }
 void GenreRowsModel::setFont(const QFont &font)
 {
-    if (m_font == font)
+    if (d->m_font == font)
         return;
-    m_font = font;
-    measure();
+    d->m_font = font;
+    d->measure();
     Q_EMIT fontChanged();
 }
 double GenreRowsModel::width() const
 {
-    return m_width;
+    return d->m_width;
 }
 void GenreRowsModel::setWidth(double width)
 {
     if (!std::isfinite(width))
         return;
     width = std::max(0., width);
-    if (m_width == width)
+    if (d->m_width == width)
         return;
-    m_width = width;
-    rewrap();
+    d->m_width = width;
+    d->rewrap();
     Q_EMIT widthChanged();
 }
 // Measure once per content/font revision, including source chip padding. Rewrap reuses these
 // widths, so resizing does not repeatedly shape the same label for every candidate row.
-void GenreRowsModel::measure()
+void GenreRowsModel::Private::measure()
 {
     const QFontMetricsF metrics(m_font);
     m_labels.clear();
@@ -80,7 +108,7 @@ void GenreRowsModel::measure()
     }
     rewrap();
 }
-void GenreRowsModel::rewrap()
+void GenreRowsModel::Private::rewrap()
 {
     QList<QVariantList> rows;
     QVariantList row;
@@ -100,24 +128,26 @@ void GenreRowsModel::rewrap()
         rows.append(row);
     if (rows == m_rows)
         return;
-    beginResetModel();
+    q->beginResetModel();
     m_rows = std::move(rows);
-    endResetModel();
+    q->endResetModel();
 }
 int GenreRowsModel::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : int(m_rows.size());
+    return parent.isValid() ? 0 : int(d->m_rows.size());
 }
 QVariant GenreRowsModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
         || index.row() >= rowCount() || role != entriesRole)
         return { };
-    return m_rows[index.row()];
+    return d->m_rows[index.row()];
 }
 QHash<int, QByteArray> GenreRowsModel::roleNames() const
 {
     static const QHash<int, QByteArray> roles = { { entriesRole, "entries"_ba } };
     return roles;
 }
+GenreRowsModel::~GenreRowsModel() = default;
+
 }

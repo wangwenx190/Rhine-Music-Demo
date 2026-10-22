@@ -1,10 +1,12 @@
+#include "ExperimentChecks.h"
+#include "InputRouter.h"
+#include "SelectionLighting.h"
 #include "ReviewSupport.h"
 #include "RowLightController.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
 #include <QQuickWindow>
-#include "ExperimentChecks.h"
 #include "OffscreenSurface.h"
 #include "DemoLibrary.h"
 #include "OfflineMetadataProvider.h"

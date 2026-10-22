@@ -2,14 +2,17 @@
 // publishes coherent revisions without render-thread access to live models.
 
 #pragma once
-#include "RenderData.h"
 #include "RhiItem.h"
-#include "SceneAdapter.h"
-#include "SelectionController.h"
-#include "InputRouter.h"
-#include "SceneCovers.h"
-#include "TitleReel.h"
-#include <QPointer>
+#include <memory>
+
+namespace yalahoo {
+class SceneAdapter;
+class InputRouter;
+class TitleReel;
+}
+Q_MOC_INCLUDE("SceneAdapter.h")
+Q_MOC_INCLUDE("InputRouter.h")
+Q_MOC_INCLUDE("TitleReel.h")
 
 namespace yalahoo::rhi {
 class SceneItem : public RhiItem
@@ -34,68 +37,33 @@ class SceneItem : public RhiItem
     Q_PROPERTY(yalahoo::TitleReel *transportReel READ transportReel WRITE setTransportReel NOTIFY textReelsChanged FINAL)
 public:
     explicit SceneItem(QQuickItem *parent = nullptr);
-    bool renderingActive() const
-    {
-        return m_renderingActive;
-    }
+    ~SceneItem() override;
+    bool renderingActive() const;
     void setRenderingActive(bool active);
-    bool sceneOccluded() const
-    {
-        return m_sceneOccluded;
-    }
+    bool sceneOccluded() const;
     void setSceneOccluded(bool value);
-    bool preparing() const
-    {
-        return m_preparing;
-    }
+    bool preparing() const;
     void setPreparing(bool value);
     Q_INVOKABLE void restartPreparation();
-    QSize panelLayerSize() const
-    {
-        return m_panelLayerSize;
-    }
+    QSize panelLayerSize() const;
     void setPanelLayerSize(QSize value);
-    QSize openingLayerSize() const
-    {
-        return m_openingLayerSize;
-    }
+    QSize openingLayerSize() const;
     void setOpeningLayerSize(QSize value);
-    SceneAdapter *adapter() const
-    {
-        return m_adapter;
-    }
+    SceneAdapter *adapter() const;
     void setAdapter(SceneAdapter *adapter);
     InputRouter *inputRouter() const;
     void setInputRouter(InputRouter *router);
-    bool inspectionEnabled() const
-    {
-        return m_inspectionEnabled;
-    }
+    bool inspectionEnabled() const;
     void setInspectionEnabled(bool enabled);
-    bool geometryOnly() const
-    {
-        return m_geometryOnly;
-    }
+    bool geometryOnly() const;
     void setGeometryOnly(bool enabled);
-    bool telemetryEnabled() const
-    {
-        return m_telemetryEnabled;
-    }
+    bool telemetryEnabled() const;
     void setTelemetryEnabled(bool enabled);
-    bool diagnosticsEnabled() const
-    {
-        return m_diagnosticsEnabled;
-    }
+    bool diagnosticsEnabled() const;
     void setDiagnosticsEnabled(bool enabled);
-    QVariantMap diagnosticValues() const
-    {
-        return m_diagnosticValues;
-    }
+    QVariantMap diagnosticValues() const;
     QString diagnosticText() const;
-    QString errorText() const
-    {
-        return m_errorText;
-    }
+    QString errorText() const;
     QJsonObject coverStatistics() const;
     TitleReel *titleReel() const;
     void setTitleReel(TitleReel *reel);
@@ -130,60 +98,7 @@ protected:
     void touchEvent(QTouchEvent *event) override;
 
 private:
-    void submitOccluded();
-    double projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const;
-    void handleVisibility(bool visible);
-    static void queuePrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
-                              bool uploaded);
-    static void publishPrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
-                                bool uploaded);
-    struct DiagnosticMailbox;
-    struct TelemetryMailbox;
-    static void publishTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
-                                 const QPointer<SceneItem> &guard, quint64 epoch);
-    static void publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
-                                   const QPointer<SceneItem> &guard, quint64 epoch);
-    void bindWindow(QQuickWindow *window);
-    static void queueDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
-                                 const QPointer<SceneItem> &guard, const quint64 &epoch,
-                                 DiagnosticSample sample);
-    static void queueTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
-                               const QPointer<SceneItem> &guard, const quint64 &epoch,
-                               QJsonObject sample);
-
-    void schedule();
-    void configureDiagnostics();
-    bool selectAt(QPointF point);
-    void refreshTextResources();
-    void bindTextReel(QPointer<TitleReel> &current, QMetaObject::Connection &changed,
-                      QMetaObject::Connection &destroyed, TitleReel *reel);
-    QPointer<TitleReel> m_titleReel, m_transportReel;
-    QMetaObject::Connection m_titleConnection, m_transportConnection;
-    QMetaObject::Connection m_titleDestroyedConnection, m_transportDestroyedConnection;
-    QList<QSize> m_textSizes;
-    quint64 m_textRevision = 0;
-    SceneCovers m_sceneCovers;
-    QMetaObject::Connection m_visibilityConnection, m_activeConnection;
-    QMetaObject::Connection m_dprConnection, m_screenConnection;
-    bool m_renderingActive = true;
-    bool m_sceneOccluded = false, m_preparing = false;
-    quint64 m_preparationToken = 0;
-    QSize m_openingLayerSize, m_panelLayerSize;
-    quint64 m_publishedCoverRevision = 0;
-    QPointer<SceneAdapter> m_adapter;
-    QPointer<InputRouter> m_inputRouter;
-    QString m_errorText;
-    bool m_geometryOnly = false, m_inspectionEnabled = true;
-    bool m_telemetryEnabled = false, m_diagnosticsEnabled = false;
-    void configureTelemetry();
-    quint64 m_diagnosticsEpoch = 0, m_telemetryEpoch = 0;
-    quint64 m_callbackRevision = 0, m_publishedCallbackRevision = 0;
-    QVariantMap m_diagnosticValues;
-    QMetaObject::Connection m_presentedConnection, m_windowStateConnection;
-    std::optional<QPointF> m_mouseStart;
-    bool m_mouseMoved = false, m_restorePending = false;
-    std::optional<QPointF> m_touchStart;
-    bool m_touchInspecting = false;
-    quint64 m_touchTimestamp = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

@@ -26,8 +26,6 @@ Q_SIGNALS:
     void activationRequested();
 
 private:
-    void accept();
-    void receive(QLocalSocket &socket);
     struct Private;
     std::unique_ptr<Private> d;
 };

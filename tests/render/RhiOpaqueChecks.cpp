@@ -1,3 +1,5 @@
+#include "SelectionLighting.h"
+#include "LayoutMetrics.h"
 #include "Require.h"
 #include "ReviewApplication.h"
 #include "RhiCaptureHarness.h"

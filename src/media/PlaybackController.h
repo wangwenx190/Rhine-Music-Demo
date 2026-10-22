@@ -2,14 +2,14 @@
 // are reconciled with the latest requested track and pause/stop intent.
 
 #pragma once
-#include <QTimer>
-#include "PlaybackQueue.h"
-#include "BackgroundMusicController.h"
-#include <QPointer>
-#include <QAudioDevice>
-#include <QAudioOutput>
-#include <QMediaDevices>
-#include <QMediaPlayer>
+#include "MusicTypes.h"
+#include <QObject>
+#include <QVariantList>
+#include <memory>
+
+namespace yalahoo {
+class BackgroundMusicController;
+}
 
 namespace yalahoo {
 class LibrarySession;
@@ -64,70 +64,25 @@ public:
     bool playing() const;
     bool loading() const;
     bool requested() const;
-    QString error() const
-    {
-        return m_error;
-    }
-    QString notice() const
-    {
-        return m_notice;
-    }
+    QString error() const;
+    QString notice() const;
     qint64 position() const;
-    qint64 duration() const
-    {
-        return m_duration;
-    }
-    bool seekable() const
-    {
-        return m_seekable && !m_source.isEmpty();
-    }
-    bool dragging() const
-    {
-        return m_dragging;
-    }
-    double volume() const
-    {
-        return m_output.volume();
-    }
+    qint64 duration() const;
+    bool seekable() const;
+    bool dragging() const;
+    double volume() const;
     void setVolume(double value);
     QVariantList devices() const;
     QVariantList deviceChoices() const;
-    QString selectedDevice() const
-    {
-        return QString::fromUtf8(m_preferred.toBase64());
-    }
-    bool outputAvailable() const
-    {
-        return !m_unavailable;
-    }
-    bool canNext() const
-    {
-        return m_queue.hasNext();
-    }
-    bool canPrevious() const
-    {
-        return m_queue.current() != nullptr;
-    }
-    QString outputName() const
-    {
-        return m_output.device().description();
-    }
-    QUrl source() const
-    {
-        return m_player.source();
-    }
-    bool isAvailable() const
-    {
-        return m_player.isAvailable();
-    }
-    quint64 sourceRevision() const
-    {
-        return m_revision;
-    }
-    MediaSupport mediaSupport() const
-    {
-        return m_support;
-    }
+    QString selectedDevice() const;
+    bool outputAvailable() const;
+    bool canNext() const;
+    bool canPrevious() const;
+    QString outputName() const;
+    QUrl source() const;
+    bool isAvailable() const;
+    quint64 sourceRevision() const;
+    MediaSupport mediaSupport() const;
 Q_SIGNALS:
     void rejected(const QString &message);
     void currentChanged();
@@ -141,41 +96,8 @@ Q_SIGNALS:
     void queueFinished();
 
 private:
-    void restoreOutput(const QAudioDevice &selected);
     friend class PlaybackTest;
-    enum class Intent {
-        Stopped,
-        Paused,
-        Playing
-    };
-    void setIntent(Intent intent);
-    void clearConnections();
-    void load(qint64 restore = 0);
-    void ready();
-    bool current(quint64 revision, const QUrl &source) const;
-    void status(QMediaPlayer::MediaStatus status, quint64 revision);
-    void refreshDevices();
-    void applyDevices(const QList<QAudioDevice> &devices, const QAudioDevice &systemDefault);
-    void start(int index);
-    void setSupport(MediaSupport support);
-    const Track *track() const;
-    QPointer<BackgroundMusicController> m_background;
-    QMetaObject::Connection m_silenceConnection;
-    LibrarySession *m_library;
-    QMediaDevices m_devices;
-    QTimer m_outputRefresh;
-    QAudioOutput m_output;
-    QMediaPlayer m_player;
-    QList<QMetaObject::Connection> m_connections;
-    PlaybackQueue m_queue;
-    QList<QAudioDevice> m_outputs;
-    QUrl m_source;
-    QByteArray m_preferred;
-    QString m_error, m_notice;
-    Intent m_intent = Intent::Stopped;
-    MediaSupport m_support = MediaSupport::Unknown;
-    quint64 m_revision = 0, m_endedRevision = 0;
-    qint64 m_position = 0, m_lastPosition = 0, m_duration = 0, m_restore = -1, m_preview = 0;
-    bool m_seekable = false, m_dragging = false, m_unavailable = true;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

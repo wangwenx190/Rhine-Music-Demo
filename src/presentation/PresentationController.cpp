@@ -1,6 +1,7 @@
+#include "PresentationController.h"
+#include <utility>
 #include "EasingCurve.h"
 #include "FrameClock.h"
-#include "PresentationController.h"
 #include <cmath>
 #include <QPointF>
 
@@ -13,23 +14,69 @@ constexpr auto TabBezierSecondX = .36;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-void PresentationController::advanceFrame(double dt)
+struct PresentationController::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(PresentationController *owner, PresentationPorts ports)
+        : q(owner), m_ports(std::move(ports))
+    {
+    }
+    PresentationController *const q;
+
+    void selectPending(const QString &albumId, const QString &trackId, bool &archiveRoute,
+                       bool &openAfter);
+
+    void commitPendingMenu();
+    void browseHidden(quint64 revision);
+    void detailHidden(quint64 revision);
+    void switchHidden(quint64 revision);
+    void advanceFrame(double dt);
+    void updatePresentation();
+
+    void advanceTab(double dt);
+    bool navigationEnabled(int direction) const;
+    void transact(const std::function<void()> &operation);
+    void beginOpen();
+    void beginExit();
+    void beginDetailSwitch();
+    void returnToArchive();
+    bool commitSelection(bool detail);
+    void prepareMenu();
+    void showMenu();
+    PresentationPorts m_ports;
+    SurfaceTransition m_browse{ presentationMotion::BrowseEnterMilliseconds,
+                                presentationMotion::BrowseExitMilliseconds, false, true, q };
+    SurfaceTransition m_detail{ presentationMotion::DetailEnterMilliseconds,
+                                presentationMotion::DetailExitMilliseconds, true, false, q };
+    QString m_phase = u"archive"_s;
+    std::optional<PresentationSelection> m_pending;
+    quint64 m_revision = 0, m_layoutRevision = 0;
+    bool m_wantsDetail = false, m_browseHidden = false, m_cameraEntered = false;
+    bool m_layoutReady = false, m_reduced = false;
+    double m_tabX = 0, m_tabWidth = 0, m_tabFromX = 0, m_tabFromWidth = 0;
+    double m_tabTargetX = 0, m_tabTargetWidth = 0,
+           m_tabElapsed = presentationMotion::TabSlideSeconds;
+    double m_tabOpacity = 1, m_tabFadeFrom = presentationMotion::TabInitialOpacity,
+           m_tabFadeElapsed = presentationMotion::TabFadeSeconds;
+    int m_depth = 0;
+};
+void PresentationController::Private::advanceFrame(double dt)
 {
     transact([&] {
         m_browse.advance(dt);
         m_detail.advance(dt);
         advanceTab(dt);
-        update();
+        q->update();
     });
 }
 PresentationController::PresentationController(FrameClock *clock, PresentationPorts ports,
                                                QObject *parent)
-    : QObject(parent), m_ports(std::move(ports))
+    : QObject(parent), d(std::make_unique<Private>(this, std::move(ports)))
 {
-    m_browse.reset(true);
+    d->m_browse.reset(true);
     if (clock) {
         connect(clock, &FrameClock::frame, this, [this](double, double dt) {
-            return advanceFrame(dt);
+            return d->advanceFrame(dt);
         });
     }
 }
@@ -37,26 +84,26 @@ void PresentationController::setTabIndicator(double x, double width, bool animat
 {
     if (!std::isfinite(x) || !std::isfinite(width) || width < 0)
         return;
-    m_tabFromX = m_tabX;
-    m_tabFromWidth = m_tabWidth;
-    m_tabTargetX = x;
-    m_tabTargetWidth = width;
-    m_tabElapsed = 0;
-    if (!animate || m_reduced)
-        advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
+    d->m_tabFromX = d->m_tabX;
+    d->m_tabFromWidth = d->m_tabWidth;
+    d->m_tabTargetX = x;
+    d->m_tabTargetWidth = width;
+    d->m_tabElapsed = 0;
+    if (!animate || d->m_reduced)
+        d->advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
 }
 void PresentationController::revealTabContent()
 {
-    m_tabFadeFrom = m_tabFadeElapsed < yalahoo::presentationMotion::TabFadeSeconds
-            ? m_tabOpacity
+    d->m_tabFadeFrom = d->m_tabFadeElapsed < yalahoo::presentationMotion::TabFadeSeconds
+            ? d->m_tabOpacity
             : yalahoo::presentationMotion::TabInitialOpacity;
-    m_tabFadeElapsed = 0;
-    m_tabOpacity = m_reduced ? 1 : m_tabFadeFrom;
-    if (m_reduced)
-        m_tabFadeElapsed = yalahoo::presentationMotion::TabFadeSeconds;
+    d->m_tabFadeElapsed = 0;
+    d->m_tabOpacity = d->m_reduced ? 1 : d->m_tabFadeFrom;
+    if (d->m_reduced)
+        d->m_tabFadeElapsed = yalahoo::presentationMotion::TabFadeSeconds;
     Q_EMIT tabIndicatorChanged();
 }
-void PresentationController::advanceTab(double dt)
+void PresentationController::Private::advanceTab(double dt)
 {
     if (!std::isfinite(dt) || dt <= 0)
         return;
@@ -85,9 +132,9 @@ void PresentationController::advanceTab(double dt)
         changed = true;
     }
     if (changed)
-        Q_EMIT tabIndicatorChanged();
+        Q_EMIT q->tabIndicatorChanged();
 }
-void PresentationController::transact(const std::function<void()> &operation)
+void PresentationController::Private::transact(const std::function<void()> &operation)
 {
     struct PresentationState final
     {
@@ -101,33 +148,33 @@ void PresentationController::transact(const std::function<void()> &operation)
     operation();
     --m_depth;
     if (!m_depth && before != PresentationState{ m_phase, m_wantsDetail, m_pending })
-        Q_EMIT changed();
+        Q_EMIT q->changed();
 }
 void PresentationController::open()
 {
-    transact([&] {
-        m_wantsDetail = true;
-        if (m_phase == "archive"_L1) {
-            if (m_ports.archiveReady()) {
-                beginOpen();
+    d->transact([&] {
+        d->m_wantsDetail = true;
+        if (d->m_phase == "archive"_L1) {
+            if (d->m_ports.archiveReady()) {
+                d->beginOpen();
             } else {
-                m_phase = u"selecting"_s;
-                m_browse.hide(m_reduced);
+                d->m_phase = u"selecting"_s;
+                d->m_browse.hide(d->m_reduced);
             }
         }
     });
 }
 void PresentationController::back()
 {
-    transact([&] {
-        m_wantsDetail = false;
-        m_pending.reset();
-        if (m_phase != "archive"_L1 && m_phase != "selecting"_L1)
-            beginExit();
+    d->transact([&] {
+        d->m_wantsDetail = false;
+        d->m_pending.reset();
+        if (d->m_phase != "archive"_L1 && d->m_phase != "selecting"_L1)
+            d->beginExit();
     });
 }
-void PresentationController::selectPending(const QString &albumId, const QString &trackId,
-                                           bool &archiveRoute, bool &openAfter)
+void PresentationController::Private::selectPending(const QString &albumId, const QString &trackId,
+                                                    bool &archiveRoute, bool &openAfter)
 {
     m_pending = PresentationSelection{ albumId, trackId, archiveRoute };
     m_wantsDetail = openAfter;
@@ -156,39 +203,41 @@ void PresentationController::select(const QString &albumId, bool openAfter, bool
 {
     if (albumId.isEmpty())
         return;
-    transact([&] {
-        return selectPending(albumId, trackId, archiveRoute, openAfter);
+    d->transact([&] {
+        return d->selectPending(albumId, trackId, archiveRoute, openAfter);
     });
 }
-bool PresentationController::navigationEnabled(int direction) const
+bool PresentationController::Private::navigationEnabled(int direction) const
 {
     return m_ports.navigationEnabled
             ? m_ports.navigationEnabled(m_pending ? m_pending->albumId : QString(), direction)
-            : canStepAlbum(direction);
+            : q->canStepAlbum(direction);
 }
 bool PresentationController::canStepAlbum(int direction) const
 {
-    return (direction == 1 || direction == -1) && m_ports.adjacentAlbum
-            && !m_ports.adjacentAlbum(m_pending ? m_pending->albumId : QString(), direction)
+    return (direction == 1 || direction == -1) && d->m_ports.adjacentAlbum
+            && !d->m_ports
+                        .adjacentAlbum(d->m_pending ? d->m_pending->albumId : QString(), direction)
                         .isEmpty();
 }
 void PresentationController::stepAlbum(int direction)
 {
     if (!canStepAlbum(direction))
         return;
-    select(m_ports.adjacentAlbum(m_pending ? m_pending->albumId : QString(), direction), true);
+    select(d->m_ports.adjacentAlbum(d->m_pending ? d->m_pending->albumId : QString(), direction),
+           true);
 }
 void PresentationController::layoutReady(quint64 revision)
 {
-    if (revision == m_layoutRevision)
-        m_layoutReady = true;
+    if (revision == d->m_layoutRevision)
+        d->m_layoutReady = true;
 }
-void PresentationController::commitPendingMenu()
+void PresentationController::Private::commitPendingMenu()
 {
     if (commitSelection(true))
         prepareMenu();
 }
-void PresentationController::updatePresentation()
+void PresentationController::Private::updatePresentation()
 {
     if (m_phase == "switching"_L1) {
         if (m_pending) {
@@ -212,7 +261,7 @@ void PresentationController::updatePresentation()
             return;
         m_phase = u"archive"_s;
         m_browse.show(m_reduced);
-        Q_EMIT focusRequested(false);
+        Q_EMIT q->focusRequested(false);
         return;
     }
     if (!m_ports.archiveReady())
@@ -227,16 +276,16 @@ void PresentationController::updatePresentation()
     } else {
         m_phase = u"archive"_s;
         m_browse.show(m_reduced);
-        Q_EMIT focusRequested(false);
+        Q_EMIT q->focusRequested(false);
     }
 }
 void PresentationController::update()
 {
-    transact([&] {
-        return updatePresentation();
+    d->transact([&] {
+        return d->updatePresentation();
     });
 }
-void PresentationController::browseHidden(quint64 revision)
+void PresentationController::Private::browseHidden(quint64 revision)
 {
     transact([&] {
         if (revision != m_revision)
@@ -251,14 +300,14 @@ void PresentationController::browseHidden(quint64 revision)
         m_ports.enterCamera();
     });
 }
-void PresentationController::detailHidden(quint64 revision)
+void PresentationController::Private::detailHidden(quint64 revision)
 {
     transact([&] {
         if (revision == m_revision)
             returnToArchive();
     });
 }
-void PresentationController::switchHidden(quint64 revision)
+void PresentationController::Private::switchHidden(quint64 revision)
 {
     transact([&] {
         if (revision != m_revision)
@@ -272,7 +321,7 @@ void PresentationController::switchHidden(quint64 revision)
             prepareMenu();
     });
 }
-void PresentationController::beginOpen()
+void PresentationController::Private::beginOpen()
 {
     const auto revision = ++m_revision;
     m_phase = u"opening"_s;
@@ -282,7 +331,7 @@ void PresentationController::beginOpen()
         browseHidden(revision);
     });
 }
-void PresentationController::beginExit()
+void PresentationController::Private::beginExit()
 {
     if (m_phase == "hiding"_L1 || m_phase == "returning"_L1 || m_phase == "switch-hiding"_L1)
         return;
@@ -292,7 +341,7 @@ void PresentationController::beginExit()
         detailHidden(revision);
     });
 }
-void PresentationController::beginDetailSwitch()
+void PresentationController::Private::beginDetailSwitch()
 {
     const auto revision = ++m_revision;
     m_phase = u"switch-hiding"_s;
@@ -306,7 +355,7 @@ void PresentationController::beginDetailSwitch()
         switchHidden(revision);
     });
 }
-bool PresentationController::commitSelection(bool detail)
+bool PresentationController::Private::commitSelection(bool detail)
 {
     if (m_ports.canSelect && !m_ports.canSelect(*m_pending))
         return false;
@@ -318,51 +367,105 @@ bool PresentationController::commitSelection(bool detail)
         m_ports.select(request);
     return true;
 }
-void PresentationController::returnToArchive()
+void PresentationController::Private::returnToArchive()
 {
     m_phase = u"returning"_s;
     m_ports.returnCamera();
 }
-void PresentationController::prepareMenu()
+void PresentationController::Private::prepareMenu()
 {
     m_detail.reset(false);
     m_tabOpacity = 1;
     m_tabFadeElapsed = yalahoo::presentationMotion::TabFadeSeconds;
-    Q_EMIT tabIndicatorChanged();
+    Q_EMIT q->tabIndicatorChanged();
     m_layoutReady = false;
     ++m_layoutRevision;
-    Q_EMIT prepared();
+    Q_EMIT q->prepared();
 }
-void PresentationController::showMenu()
+void PresentationController::Private::showMenu()
 {
     m_phase = u"detail"_s;
     m_detail.show(m_reduced);
-    Q_EMIT focusRequested(true);
+    Q_EMIT q->focusRequested(true);
 }
 void PresentationController::reset()
 {
-    transact([&] {
-        ++m_revision;
-        ++m_layoutRevision;
-        m_pending.reset();
-        m_wantsDetail = m_browseHidden = m_cameraEntered = m_layoutReady = false;
-        m_phase = u"archive"_s;
-        m_detail.reset(false);
-        m_browse.reset(true);
+    d->transact([&] {
+        ++d->m_revision;
+        ++d->m_layoutRevision;
+        d->m_pending.reset();
+        d->m_wantsDetail = d->m_browseHidden = d->m_cameraEntered = d->m_layoutReady = false;
+        d->m_phase = u"archive"_s;
+        d->m_detail.reset(false);
+        d->m_browse.reset(true);
         Q_EMIT prepared();
     });
 }
 void PresentationController::setReducedMotion(bool reduced)
 {
-    if (m_reduced == reduced)
+    if (d->m_reduced == reduced)
         return;
-    transact([&] {
-        m_reduced = reduced;
+    d->transact([&] {
+        d->m_reduced = reduced;
         if (reduced) {
-            m_browse.finish();
-            m_detail.finish();
-            advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
+            d->m_browse.finish();
+            d->m_detail.finish();
+            d->advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
         }
     });
 }
+QString PresentationController::phase() const
+{
+    return d->m_phase;
+}
+bool PresentationController::wantsDetail() const
+{
+    return d->m_wantsDetail;
+}
+bool PresentationController::archiveEnabled() const
+{
+    return d->m_phase == "archive"_L1;
+}
+bool PresentationController::detailEnabled() const
+{
+    return d->m_phase == "detail"_L1;
+}
+quint64 PresentationController::layoutRevision() const
+{
+    return d->m_layoutRevision;
+}
+SurfaceTransition *PresentationController::browseSurface()
+{
+    return &d->m_browse;
+}
+SurfaceTransition *PresentationController::detailSurface()
+{
+    return &d->m_detail;
+}
+std::optional<PresentationSelection> PresentationController::pendingSelection() const
+{
+    return d->m_pending;
+}
+bool PresentationController::canMovePrevious() const
+{
+    return d->navigationEnabled(-1);
+}
+bool PresentationController::canMoveNext() const
+{
+    return d->navigationEnabled(1);
+}
+double PresentationController::tabOpacity() const
+{
+    return d->m_tabOpacity;
+}
+double PresentationController::tabX() const
+{
+    return d->m_tabX;
+}
+double PresentationController::tabWidth() const
+{
+    return d->m_tabWidth;
+}
+PresentationController::~PresentationController() = default;
+
 }

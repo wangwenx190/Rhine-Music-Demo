@@ -1,8 +1,10 @@
+#include "OverviewController.h"
+#include "LayoutMetrics.h"
+#include <utility>
 #include "EasingCurve.h"
 #include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
-#include "OverviewController.h"
 #include "SceneAdapter.h"
 #include "SelectionController.h"
 #include "PresentationController.h"
@@ -48,24 +50,52 @@ const QEasingCurve &fadeCurve()
 }
 }
 
-OverviewController::OverviewController(MotionController *motion, QObject *parent)
-    : QObject(parent), m_motion(motion), m_clock(motion ? motion->clock() : nullptr)
+struct OverviewController::Private final
 {
-    m_chrome.setEnterCurve(transformCurve());
-    if (m_clock) {
-        connect(m_clock, &FrameClock::frame, this, [this](double, double dt) {
-            advance(dt, m_motion->reducedMotion());
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(OverviewController *owner, MotionController *motion)
+        : q(owner), m_motion(motion), m_clock(motion ? motion->clock() : nullptr)
+    {
+    }
+    OverviewController *const q;
+
+    void notify();
+    std::array<double, overviewMotion::NotificationFields> m_notified{ -1, -1, -1, -1, -1 };
+    QPointer<MotionController> m_motion;
+    QPointer<FrameClock> m_clock;
+    QPointer<SceneAdapter> m_scene;
+    QPointer<SelectionController> m_selection;
+    QPointer<PresentationController> m_presentation;
+    OverviewLabelsModel m_labels;
+    SurfaceTransition m_chrome{ overviewMotion::ChromeEnterMilliseconds,
+                                overviewMotion::ChromeExitMilliseconds, false, false };
+    ScalarSpring m_progress;
+    bool m_active = false, m_chromeShown = false, m_revealPending = false;
+    quint64 m_sceneRevision = 0;
+    bool m_labelsDirty = true;
+    double m_navigationTime = overviewMotion::NavigationSlideSeconds, m_navFrom = 1,
+           m_navOpacity = 1;
+    double m_navOffsetFrom = 0, m_navOffset = 0;
+};
+OverviewController::OverviewController(MotionController *motion, QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>(this, motion))
+{
+    d->m_chrome.setEnterCurve(transformCurve());
+    if (d->m_clock) {
+        connect(d->m_clock, &FrameClock::frame, this, [this](double, double dt) {
+            advance(dt, d->m_motion->reducedMotion());
         });
         connect(motion, &QObject::destroyed, this, &OverviewController::reset);
     }
 }
+
 void OverviewController::bind(SceneAdapter *scene, SelectionController *selection,
                               PresentationController *presentation)
 {
-    Q_ASSERT(!m_scene && !m_selection && !m_presentation);
-    m_scene = scene;
-    m_selection = selection;
-    m_presentation = presentation;
+    Q_ASSERT(!d->m_scene && !d->m_selection && !d->m_presentation);
+    d->m_scene = scene;
+    d->m_selection = selection;
+    d->m_presentation = presentation;
     selection->setOverview(this);
     connect(scene, &QObject::destroyed, this, &OverviewController::reset);
     connect(selection, &QObject::destroyed, this, &OverviewController::reset);
@@ -74,113 +104,113 @@ void OverviewController::bind(SceneAdapter *scene, SelectionController *selectio
     connect(selection, &SelectionController::selectionChanged, this, &OverviewController::collapse);
     connect(selection, &SelectionController::arrayModeChanged, this, &OverviewController::collapse);
     connect(presentation, &PresentationController::changed, this, [this] {
-        if (!m_presentation->archiveEnabled())
+        if (!d->m_presentation->archiveEnabled())
             setActive(false);
     });
-    if (m_clock) {
-        connect(m_clock, &FrameClock::frame, this, [this](double, double dt) {
-            synchronize(dt, m_motion->reducedMotion());
+    if (d->m_clock) {
+        connect(d->m_clock, &FrameClock::frame, this, [this](double, double dt) {
+            synchronize(dt, d->m_motion->reducedMotion());
         });
-        connect(m_motion, &MotionController::reducedMotionChanged, this, [this] {
-            advance(0, m_motion->reducedMotion());
-            if (m_motion->reducedMotion()) {
-                if (m_scene)
-                    m_scene->setReducedMotion(true);
-                if (m_selection)
-                    m_selection->advance(0);
-                if (m_scene)
-                    m_scene->advance(0);
+        connect(d->m_motion, &MotionController::reducedMotionChanged, this, [this] {
+            advance(0, d->m_motion->reducedMotion());
+            if (d->m_motion->reducedMotion()) {
+                if (d->m_scene)
+                    d->m_scene->setReducedMotion(true);
+                if (d->m_selection)
+                    d->m_selection->advance(0);
+                if (d->m_scene)
+                    d->m_scene->advance(0);
             }
-            synchronize(0, m_motion->reducedMotion());
+            synchronize(0, d->m_motion->reducedMotion());
         });
     }
 }
 bool OverviewController::active() const
 {
-    return m_active;
+    return d->m_active;
 }
 bool OverviewController::ready() const
 {
-    return m_active && progress() > InteractionReadyProgress;
+    return d->m_active && progress() > InteractionReadyProgress;
 }
 double OverviewController::progress() const
 {
-    return std::clamp(m_progress.value, 0.0, 1.0);
+    return std::clamp(d->m_progress.value, 0.0, 1.0);
 }
 const Kinematics &OverviewController::state() const
 {
-    return m_progress;
+    return d->m_progress;
 }
 OverviewLabelsModel *OverviewController::labels()
 {
-    return &m_labels;
+    return &d->m_labels;
 }
 SurfaceTransition *OverviewController::chrome()
 {
-    return &m_chrome;
+    return &d->m_chrome;
 }
 double OverviewController::navigationOpacity() const
 {
-    return m_navOpacity;
+    return d->m_navOpacity;
 }
 double OverviewController::navigationOffset() const
 {
-    return m_navOffset;
+    return d->m_navOffset;
 }
 void OverviewController::setActive(bool active)
 {
-    if (active == m_active)
+    if (active == d->m_active)
         return;
     if (active
-        && (!m_motion || !m_scene || !m_selection || m_selection->albumId().isEmpty()
-            || !m_presentation || !m_presentation->archiveEnabled()))
+        && (!d->m_motion || !d->m_scene || !d->m_selection || d->m_selection->albumId().isEmpty()
+            || !d->m_presentation || !d->m_presentation->archiveEnabled()))
         return;
-    m_active = active;
-    m_revealPending = !active;
-    m_labels.collapse();
-    m_labelsDirty = true;
-    m_navFrom = m_navOpacity;
-    m_navOffsetFrom = m_navOffset;
-    m_navigationTime = 0;
-    if (m_scene)
-        m_scene->setPointer(0, 0);
-    const bool reduced = m_clock && m_motion->reducedMotion();
+    d->m_active = active;
+    d->m_revealPending = !active;
+    d->m_labels.collapse();
+    d->m_labelsDirty = true;
+    d->m_navFrom = d->m_navOpacity;
+    d->m_navOffsetFrom = d->m_navOffset;
+    d->m_navigationTime = 0;
+    if (d->m_scene)
+        d->m_scene->setPointer(0, 0);
+    const bool reduced = d->m_clock && d->m_motion->reducedMotion();
     if (active) {
-        m_presentation->browseSurface()->hide(reduced);
+        d->m_presentation->browseSurface()->hide(reduced);
     } else {
-        m_chromeShown = false;
-        m_chrome.hide(reduced);
+        d->m_chromeShown = false;
+        d->m_chrome.hide(reduced);
         Q_EMIT focusRequested(false);
     }
     if (reduced) {
         advance(0, true);
-        if (m_selection)
-            m_selection->advance(0);
-        if (m_scene)
-            m_scene->advance(0);
+        if (d->m_selection)
+            d->m_selection->advance(0);
+        if (d->m_scene)
+            d->m_scene->advance(0);
     }
     synchronize(0, reduced);
 }
 void OverviewController::toggle()
 {
-    setActive(!m_active);
+    setActive(!d->m_active);
 }
 void OverviewController::collapse()
 {
-    m_labels.collapse();
-    m_labelsDirty = true;
+    d->m_labels.collapse();
+    d->m_labelsDirty = true;
 }
 void OverviewController::expand(int lane)
 {
-    if (ready() && m_labels.expand(lane)) {
-        m_labelsDirty = true;
-        synchronize(0, m_clock && m_motion->reducedMotion());
+    if (ready() && d->m_labels.expand(lane)) {
+        d->m_labelsDirty = true;
+        synchronize(0, d->m_clock && d->m_motion->reducedMotion());
     }
 }
 bool OverviewController::enter(int lane)
 {
-    if (!ready() || !m_selection || !m_labels.canEnter(lane)
-        || !m_selection->enterColumn(lane, true))
+    if (!ready() || !d->m_selection || !d->m_labels.canEnter(lane)
+        || !d->m_selection->enterColumn(lane, true))
         return false;
     setActive(false);
     return true;
@@ -197,69 +227,70 @@ void OverviewController::advance(double dt, bool reduced)
     if (!std::isfinite(dt) || dt < 0)
         return;
     if (reduced)
-        m_progress.finish(m_active ? 1 : 0);
-    else if (m_active || m_progress.value != 0 || m_progress.velocity != 0)
-        m_progress.update(m_active ? 1 : 0, OverviewSpringRate, dt);
-    m_navigationTime = reduced
+        d->m_progress.finish(d->m_active ? 1 : 0);
+    else if (d->m_active || d->m_progress.value != 0 || d->m_progress.velocity != 0)
+        d->m_progress.update(d->m_active ? 1 : 0, OverviewSpringRate, dt);
+    d->m_navigationTime = reduced
             ? yalahoo::overviewMotion::NavigationSlideSeconds
-            : std::min(yalahoo::overviewMotion::NavigationSlideSeconds, m_navigationTime + dt);
+            : std::min(yalahoo::overviewMotion::NavigationSlideSeconds, d->m_navigationTime + dt);
 
-    m_navOpacity = m_navFrom
-            + ((m_active ? 0 : 1) - m_navFrom)
+    d->m_navOpacity = d->m_navFrom
+            + ((d->m_active ? 0 : 1) - d->m_navFrom)
                     * fadeCurve().valueForProgress(
-                            std::min(1.0, m_navigationTime / NavigationFadeSeconds));
-    m_navOffset = m_navOffsetFrom
-            + ((m_active ? -NavigationHiddenOffsetPixels : 0) - m_navOffsetFrom)
+                            std::min(1.0, d->m_navigationTime / NavigationFadeSeconds));
+    d->m_navOffset = d->m_navOffsetFrom
+            + ((d->m_active ? -NavigationHiddenOffsetPixels : 0) - d->m_navOffsetFrom)
                     * transformCurve().valueForProgress(
-                            m_navigationTime / yalahoo::overviewMotion::NavigationSlideSeconds);
+                            d->m_navigationTime / yalahoo::overviewMotion::NavigationSlideSeconds);
 }
 void OverviewController::synchronize(double dt, bool reduced)
 {
-    if (m_active && progress() > ChromeRevealProgress && !m_chromeShown) {
-        m_chromeShown = true;
-        m_chrome.show(reduced);
+    if (d->m_active && progress() > ChromeRevealProgress && !d->m_chromeShown) {
+        d->m_chromeShown = true;
+        d->m_chrome.show(reduced);
         Q_EMIT focusRequested(true);
     }
-    m_chrome.advance(dt);
+    d->m_chrome.advance(dt);
     if (reduced)
-        m_chrome.finish();
-    if (m_scene && (m_active || m_labels.liveCount())
-        && (m_labelsDirty || m_sceneRevision != m_scene->frameRevision() || m_labels.running())) {
-        m_sceneRevision = m_scene->frameRevision();
-        m_labelsDirty = false;
-        m_labels.update(projectColumns(), m_scene->layout()->width(), m_scene->layout()->height(),
-                        ready(), dt, reduced);
+        d->m_chrome.finish();
+    if (d->m_scene && (d->m_active || d->m_labels.liveCount())
+        && (d->m_labelsDirty || d->m_sceneRevision != d->m_scene->frameRevision()
+            || d->m_labels.running())) {
+        d->m_sceneRevision = d->m_scene->frameRevision();
+        d->m_labelsDirty = false;
+        d->m_labels.update(projectColumns(), d->m_scene->layout()->width(),
+                           d->m_scene->layout()->height(), ready(), dt, reduced);
     }
-    if (m_revealPending && !m_active && m_scene && m_selection && m_presentation
-        && m_presentation->archiveEnabled() && progress() < BrowseRevealProgress
-        && m_selection->archiveReady() && m_scene->settled()) {
-        m_revealPending = false;
-        m_presentation->browseSurface()->show(reduced);
+    if (d->m_revealPending && !d->m_active && d->m_scene && d->m_selection && d->m_presentation
+        && d->m_presentation->archiveEnabled() && progress() < BrowseRevealProgress
+        && d->m_selection->archiveReady() && d->m_scene->settled()) {
+        d->m_revealPending = false;
+        d->m_presentation->browseSurface()->show(reduced);
         Q_EMIT focusRequested(false);
     }
-    notify();
+    d->notify();
 }
 void OverviewController::reset()
 {
-    m_active = m_chromeShown = m_revealPending = false;
-    m_progress.finish(0);
-    m_sceneRevision = 0;
-    m_labelsDirty = true;
-    m_chrome.reset(false);
-    m_labels.clear();
-    m_navigationTime = yalahoo::overviewMotion::NavigationSlideSeconds;
-    m_navFrom = m_navOpacity = 1;
-    m_navOffsetFrom = m_navOffset = 0;
-    notify();
+    d->m_active = d->m_chromeShown = d->m_revealPending = false;
+    d->m_progress.finish(0);
+    d->m_sceneRevision = 0;
+    d->m_labelsDirty = true;
+    d->m_chrome.reset(false);
+    d->m_labels.clear();
+    d->m_navigationTime = yalahoo::overviewMotion::NavigationSlideSeconds;
+    d->m_navFrom = d->m_navOpacity = 1;
+    d->m_navOffsetFrom = d->m_navOffset = 0;
+    d->notify();
 }
-void OverviewController::notify()
+void OverviewController::Private::notify()
 {
-    const std::array<double, 5> state{ double(m_active), progress(), double(ready()), m_navOpacity,
-                                       m_navOffset };
+    const std::array<double, 5> state{ double(m_active), q->progress(), double(q->ready()),
+                                       m_navOpacity, m_navOffset };
     if (state == m_notified)
         return;
     m_notified = state;
-    Q_EMIT changed();
+    Q_EMIT q->changed();
 }
 double OverviewController::columnExtent(double lane, double centerLane, double progress)
 {
@@ -296,21 +327,21 @@ CameraPose OverviewController::framing(CameraPose base, double width, double hei
 QVector<OverviewColumn> OverviewController::projectColumns() const
 {
     QVector<OverviewColumn> result;
-    if (!m_scene || !m_selection)
+    if (!d->m_scene || !d->m_selection)
         return result;
-    const auto &pool = m_selection->pool();
+    const auto &pool = d->m_selection->pool();
     const int count = pool.columnCount();
     if (!count)
         return result;
     result.reserve(std::min(count, int(2 * VisibleHalfLanes) + 1));
-    const double center = m_selection->centerLane();
+    const double center = d->m_selection->centerLane();
     // Enumerate physical candidates, then map to canonical IDs. Never scan C library columns.
     for (double physical = std::ceil(center - VisibleHalfLanes);
          physical <= center + VisibleHalfLanes; physical += 1) {
-        if (m_selection->realistic() && (physical < 0 || physical >= count))
+        if (d->m_selection->realistic() && (physical < 0 || physical >= count))
             continue;
         const int lane = ArchivePool::wrap(physical, count);
-        const double nearest = m_selection->realistic()
+        const double nearest = d->m_selection->realistic()
                 ? lane
                 : std::floor((center - lane) / count + .5) * count + lane;
         // One nearest physical occurrence exists per canonical lane, so this test
@@ -318,13 +349,13 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
         if (physical != nearest || !pool.rowCount(lane))
             continue;
         const auto &column = pool.columns()[lane];
-        const double extent = m_selection->columnExtent(physical);
-        const double row = m_selection->browseRow(lane);
-        const double anchorRow = m_selection->realistic()
+        const double extent = d->m_selection->columnExtent(physical);
+        const double row = d->m_selection->browseRow(lane);
+        const double anchorRow = d->m_selection->realistic()
                 ? std::clamp(row, double(yalahoo::sceneGeometry::FirstAlbumRow),
                              double(ArchiveLastRowOffset + pool.rowCount(lane)))
                 : row;
-        const auto point = m_scene->projectWorldPoint(
+        const auto point = d->m_scene->projectWorldPoint(
                 { float((physical - center) * sceneGeometry::ColumnSpacing),
                   float(-sceneGeometry::FloorDepth + sceneGeometry::CaseBottom
                         + (sceneGeometry::CaseHeight + LabelTopPadding) * extent),
@@ -333,11 +364,13 @@ QVector<OverviewColumn> OverviewController::projectColumns() const
         if (!point || point->z() < -1 || point->z() > 1)
             continue;
         result.append({ lane, column.label, pool.rowCount(lane), point->x(), point->y(), extent,
-                        lane == ArchivePool::wrap(m_selection->cell().lane, count) });
+                        lane == ArchivePool::wrap(d->m_selection->cell().lane, count) });
     }
     std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) {
         return a.lane < b.lane;
     });
     return result;
 }
+OverviewController::~OverviewController() = default;
+
 }

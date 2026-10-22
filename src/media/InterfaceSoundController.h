@@ -2,13 +2,8 @@
 // synthesizing delayed sounds for events that occurred while muted.
 
 #pragma once
-#include <QTimer>
-#include "ProductDefaults.h"
-#include <QMediaDevices>
-#include <QAudioDevice>
-#include <QSoundEffect>
-#include <QHash>
-#include <array>
+#include <QObject>
+#include <QString>
 #include <memory>
 
 namespace yalahoo {
@@ -28,18 +23,9 @@ class InterfaceSoundController : public QObject
 public:
     explicit InterfaceSoundController(QObject *parent = nullptr);
     ~InterfaceSoundController() override;
-    bool enabled() const
-    {
-        return m_enabled;
-    }
-    double volume() const
-    {
-        return m_volume;
-    }
-    bool available() const
-    {
-        return !m_sources.isEmpty();
-    }
+    bool enabled() const;
+    double volume() const;
+    bool available() const;
     void setEnabled(bool enabled);
     void setVolume(double volume);
     Q_INVOKABLE bool trigger(const QString &event);
@@ -50,12 +36,7 @@ Q_SIGNALS:
 
 private:
     friend class AudioAmbienceTest;
-    void refreshOutput();
-    QMediaDevices m_devices;
-    QTimer m_outputRefresh;
-    QHash<QString, QUrl> m_sources;
-    std::array<std::unique_ptr<QSoundEffect>, feedbackAudio::VoiceCount> m_pool;
-    double m_volume = yalahoo::productDefaults::DefaultFeedbackVolume;
-    bool m_enabled = true;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

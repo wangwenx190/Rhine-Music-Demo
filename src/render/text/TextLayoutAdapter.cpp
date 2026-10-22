@@ -1,4 +1,9 @@
 #include "TextLayoutAdapter.h"
+#include <memory>
+#include <QFont>
+#include <QGlyphRun>
+#include <QCache>
+#include <QByteArray>
 #include "MusicTypes.h"
 #include <QTextLayout>
 #include <QTextBoundaryFinder>
@@ -51,6 +56,7 @@ TextAnalysis analyzeText(const QString &text)
     TextAnalysis result;
     if (text.isEmpty())
         return result;
+
     result.graphemes = TextLayoutAdapter::boundaries(text);
     const auto &graphemes = result.graphemes;
     for (int i = 0; i + 1 < graphemes.size(); ++i) {
@@ -299,7 +305,18 @@ TitleLayout fitTitle(const auto &candidate, double size, double minimum, double 
     return result;
 }
 }
-TextLayoutAdapter::TextLayoutAdapter() : m_cache(CacheBytes)
+struct TextLayoutAdapter::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() : m_cache(CacheBytes)
+    {
+    }
+
+    QCache<QByteArray, TitleLayout> m_cache;
+    QList<QByteArray> m_keys;
+    quint64 m_misses = 0;
+};
+TextLayoutAdapter::TextLayoutAdapter() : d(std::make_unique<Private>())
 {
 }
 QList<int> TextLayoutAdapter::boundaries(const QString &text)
@@ -322,12 +339,12 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
     QByteArray key;
     QDataStream stream(&key, QIODevice::WriteOnly);
     stream << text << main << subtitle << size << width << budget << narrow << dpr << transport;
-    if (auto *cached = m_cache.object(key)) {
-        m_keys.removeAll(key);
-        m_keys.append(key);
+    if (auto *cached = d->m_cache.object(key)) {
+        d->m_keys.removeAll(key);
+        d->m_keys.append(key);
         return *cached;
     }
-    ++m_misses;
+    ++d->m_misses;
     TitleLayout result;
     auto parts = transport ? AlbumTitleParts{ text, { } } : titleParts(text);
     if (!transport) {
@@ -382,33 +399,35 @@ TitleLayout TextLayoutAdapter::measure(const QString &text, const QFont &main,
                     + run.indexes.size() * (sizeof(quint32) + sizeof(QPointF));
     }
     // Byte-cost eviction can remove entries independently of the entry-count LRU.
-    m_keys.removeIf([this, &key](const QByteArray &cached) {
-        return cached == key || !m_cache.contains(cached);
+    d->m_keys.removeIf([this, &key](const QByteArray &cached) {
+        return cached == key || !d->m_cache.contains(cached);
     });
     // Entry and byte LRU bounds complement each other; oversized inputs are never cached.
-    if (m_keys.size() >= MaximumLayoutEntries)
-        m_cache.remove(m_keys.takeFirst());
+    if (d->m_keys.size() >= MaximumLayoutEntries)
+        d->m_cache.remove(d->m_keys.takeFirst());
     if (bytes <= CacheBytes) {
-        m_cache.insert(key, new TitleLayout(result), int(bytes));
-        m_keys.append(key);
+        d->m_cache.insert(key, new TitleLayout(result), int(bytes));
+        d->m_keys.append(key);
     }
     return result;
 }
 quint64 TextLayoutAdapter::misses() const
 {
-    return m_misses;
+    return d->m_misses;
 }
 int TextLayoutAdapter::cacheBytes() const
 {
-    return m_cache.totalCost();
+    return d->m_cache.totalCost();
 }
 int TextLayoutAdapter::cacheEntries() const
 {
-    return m_cache.size();
+    return d->m_cache.size();
 }
 void TextLayoutAdapter::clear()
 {
-    m_cache.clear();
-    m_keys.clear();
+    d->m_cache.clear();
+    d->m_keys.clear();
 }
+TextLayoutAdapter::~TextLayoutAdapter() = default;
+
 }

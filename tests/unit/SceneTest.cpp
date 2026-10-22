@@ -1,3 +1,4 @@
+#include "LayoutMetrics.h"
 #include "NumericChecks.h"
 #include "FrameClock.h"
 #include "MotionController.h"

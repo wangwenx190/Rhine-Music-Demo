@@ -2,6 +2,8 @@
 // follows scene revisions and navigation remains independent of playback.
 
 #pragma once
+#include "SurfaceTransition.h"
+#include <memory>
 #include "OverviewLabelsModel.h"
 #include "ScalarSpring.h"
 #include "SceneFrame.h"
@@ -33,6 +35,7 @@ class OverviewController final : public QObject
     Q_PROPERTY(double navigationOffset READ navigationOffset NOTIFY changed FINAL)
 public:
     explicit OverviewController(MotionController *motion, QObject *parent = nullptr);
+    ~OverviewController() override;
     void bind(SceneAdapter *scene, SelectionController *selection,
               PresentationController *presentation);
     bool active() const;
@@ -60,22 +63,7 @@ Q_SIGNALS:
     void focusRequested(bool overview);
 
 private:
-    void notify();
-    std::array<double, overviewMotion::NotificationFields> m_notified{ -1, -1, -1, -1, -1 };
-    QPointer<MotionController> m_motion;
-    QPointer<FrameClock> m_clock;
-    QPointer<SceneAdapter> m_scene;
-    QPointer<SelectionController> m_selection;
-    QPointer<PresentationController> m_presentation;
-    OverviewLabelsModel m_labels;
-    SurfaceTransition m_chrome{ overviewMotion::ChromeEnterMilliseconds,
-                                overviewMotion::ChromeExitMilliseconds, false, false };
-    ScalarSpring m_progress;
-    bool m_active = false, m_chromeShown = false, m_revealPending = false;
-    quint64 m_sceneRevision = 0;
-    bool m_labelsDirty = true;
-    double m_navigationTime = overviewMotion::NavigationSlideSeconds, m_navFrom = 1,
-           m_navOpacity = 1;
-    double m_navOffsetFrom = 0, m_navOffset = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

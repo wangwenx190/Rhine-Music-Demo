@@ -2,6 +2,7 @@
 // revision-aware cached state preserve glyph identity through interruption.
 
 #pragma once
+#include <memory>
 #include "SampledReelCurve.h"
 #include "TextLayoutAdapter.h"
 #include "FrameClock.h"
@@ -123,6 +124,7 @@ class TitleReel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(bool moving READ moving NOTIFY changed FINAL)
 public:
     explicit TitleReel(QObject *parent = nullptr);
+    ~TitleReel() override;
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
@@ -173,25 +175,7 @@ Q_SIGNALS:
     void resourcesChanged();
 
 private:
-    void schedule(bool instant);
-    void prune();
-    void publishResources();
-    TextLayoutAdapter m_layout;
-    TitleLayout m_target;
-    QList<ReelSlot *> m_slots;
-    QList<ReelSlot *> m_animatedSlots;
-    QHash<QString, ReelSlot *> m_index;
-    QPointer<FrameClock> m_clock;
-    QMetaObject::Connection m_connection;
-    QString m_text, m_displayed;
-    QFont m_font, m_subtitle;
-    double m_size = reelMotion::DefaultFontPixels, m_width = reelMotion::DefaultLayoutBudgetPixels,
-           m_budget = reelMotion::DefaultLayoutBudgetPixels, m_dpr = 1;
-    bool m_narrow = false, m_transport = false, m_reduced = false, m_active = true;
-    bool m_complete = false, m_scheduled = false, m_instant = true;
-    bool m_finishPending = false;
-    bool m_dirty = true;
-    ReelTrack m_height;
-    QList<QSize> m_resourceSizes;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

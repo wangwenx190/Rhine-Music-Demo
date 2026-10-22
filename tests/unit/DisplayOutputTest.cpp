@@ -1,3 +1,4 @@
+#include "DisplayState.h"
 #include <QQuickWindow>
 #include "DisplayOutput.h"
 #include "GraphicsBackend.h"

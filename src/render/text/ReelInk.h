@@ -2,6 +2,7 @@
 // revisions invalidate independently; synchronization isolates GUI and render lifetimes.
 
 #pragma once
+#include <QPointer>
 #include "TitleReel.h"
 #include <QQuickItem>
 #include <QColor>

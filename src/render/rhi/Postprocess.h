@@ -8,7 +8,6 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <memory>
-#include <vector>
 
 namespace yalahoo::rhi {
 
@@ -48,8 +47,7 @@ public:
     void inventory(ResourceInventory &inventory) const;
 
 private:
-    struct State;
-    std::unique_ptr<State> m_state;
-    quint64 m_revision = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

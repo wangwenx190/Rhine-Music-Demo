@@ -15,10 +15,17 @@ constexpr auto MaximumActivationBytes = 16;
 constexpr auto EndpointDigestHexCharacters = 32;
 }
 namespace yalahoo {
+
 struct SingleInstance::Private final
 {
     Q_DISABLE_COPY_MOVE(Private)
-    Private() = default;
+    explicit Private(SingleInstance *owner) : q(owner)
+    {
+    }
+    SingleInstance *const q;
+
+    void accept();
+    void receive(QLocalSocket &socket);
     // Destroy the endpoint before releasing its ownership lock.
     std::unique_ptr<QLockFile> lock;
     QLocalServer server;
@@ -26,9 +33,12 @@ struct SingleInstance::Private final
     QPointer<QLocalSocket> activePeer;
     bool started = false;
 };
-SingleInstance::SingleInstance(QObject *parent) : QObject(parent), d(std::make_unique<Private>())
+SingleInstance::SingleInstance(QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>(this))
 {
-    connect(&d->server, &QLocalServer::newConnection, this, &SingleInstance::accept);
+    connect(&d->server, &QLocalServer::newConnection, this, [this] {
+        d->accept();
+    });
 }
 SingleInstance::~SingleInstance() = default;
 QString SingleInstance::error() const
@@ -83,27 +93,27 @@ SingleInstance::Result SingleInstance::start(const QString &dataRoot, bool enabl
     d->error = tr("The existing application instance did not accept activation. Please try again.");
     return Result::Error;
 }
-void SingleInstance::accept()
+void SingleInstance::Private::accept()
 {
     // Keep at most one incomplete activation; do not accumulate sockets/timers from repeated launches.
-    while (auto *peer = d->server.nextPendingConnection()) {
-        if (d->activePeer) {
+    while (auto *peer = server.nextPendingConnection()) {
+        if (activePeer) {
             peer->abort();
             peer->deleteLater();
             continue;
         }
-        d->activePeer = peer;
-        peer->setParent(this);
+        activePeer = peer;
+        peer->setParent(q);
         peer->setReadBufferSize(MaximumActivationBytes);
-        connect(peer, &QLocalSocket::readyRead, this, [this, peer] {
+        QObject::connect(peer, &QLocalSocket::readyRead, q, [this, peer] {
             receive(*peer);
         });
-        connect(peer, &QLocalSocket::disconnected, peer, &QObject::deleteLater);
+        QObject::connect(peer, &QLocalSocket::disconnected, peer, &QObject::deleteLater);
         QTimer::singleShot(ActivationTimeoutMilliseconds, peer, &QObject::deleteLater);
         receive(*peer);
     }
 }
-void SingleInstance::receive(QLocalSocket &socket)
+void SingleInstance::Private::receive(QLocalSocket &socket)
 {
     auto *peer = &socket;
     if (!peer->canReadLine())
@@ -114,6 +124,6 @@ void SingleInstance::receive(QLocalSocket &socket)
     }
     peer->write("ok\n"_ba);
     peer->disconnectFromServer();
-    Q_EMIT activationRequested();
+    Q_EMIT q->activationRequested();
 }
 }

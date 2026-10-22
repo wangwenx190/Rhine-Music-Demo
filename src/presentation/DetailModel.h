@@ -2,13 +2,10 @@
 // ownership keep asynchronous updates separate from navigation.
 
 #pragma once
-#include "Units.h"
-#include <QObject>
-#include "MusicTypes.h"
 #include <QAbstractListModel>
-#include <QCache>
 #include <QFont>
-#include <QByteArray>
+#include <QVariantMap>
+#include <memory>
 
 namespace yalahoo {
 namespace detailText {
@@ -36,13 +33,11 @@ public:
         DiscHeading
     };
     explicit DetailModel(QObject *parent = nullptr);
+    ~DetailModel() override;
     int rowCount(const QModelIndex &parent = { }) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
-    QVariantMap album() const
-    {
-        return m_info;
-    }
+    QVariantMap album() const;
     void prepare(const LibrarySession &library, bool metadataOnly = false);
     Q_INVOKABLE double normalLineHeight(const QString &text, const QFont &font);
     static QString time(double seconds);
@@ -50,11 +45,7 @@ Q_SIGNALS:
     void albumChanged();
 
 private:
-    QCache<QByteArray, double> m_lineHeights{ detailText::HeightCacheKiB
-                                              * yalahoo::units::BytesPerKiB };
-    Snapshot m_snapshot;
-    const Album *m_album = nullptr;
-    Album m_resolved;
-    QVariantMap m_info;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

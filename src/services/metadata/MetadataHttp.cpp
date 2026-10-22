@@ -1,6 +1,15 @@
+#include "MetadataHttp.h"
+#include <memory>
+#include <QElapsedTimer>
+#include <QUrl>
+#include <QByteArray>
+#include <QHash>
+#include <QJsonObject>
+#include <QPointer>
+#include <QTimer>
+#include <utility>
 #include "MetadataConfiguration.h"
 #include <QNetworkAccessManager>
-#include "MetadataHttp.h"
 #include <algorithm>
 #include <QDateTime>
 #include <QJsonDocument>
@@ -32,21 +41,47 @@ QString service(const QUrl &url)
     return url.host() == "musicbrainz.org"_L1 ? u"musicbrainz.org"_s : u"wikimedia"_s;
 }
 }
-MetadataHttp::MetadataHttp(QObject *parent, QNetworkAccessManager *network)
-    : QObject(parent),
-      m_network(network ? network : new QNetworkAccessManager(this)),
-      m_delay(this),
-      m_deadline(this)
+struct MetadataHttp::Private final
 {
-    m_network->setParent(this);
-    m_clock.start();
-    m_delay.setSingleShot(true);
-    m_deadline.setSingleShot(true);
-    connect(&m_delay, &QTimer::timeout, this, &MetadataHttp::start);
-    connect(&m_deadline, &QTimer::timeout, this, [this] {
-        m_error = tr("Metadata request timed out.");
-        if (m_reply)
-            m_reply->abort();
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(MetadataHttp *owner, QNetworkAccessManager *network)
+        : q(owner),
+          m_network(network ? network : new QNetworkAccessManager(owner)),
+          m_delay(owner),
+          m_deadline(owner)
+    {
+    }
+    MetadataHttp *const q;
+
+    void parseResponse(MetadataResponse &response);
+    void start();
+    void finish();
+    void read();
+    QNetworkAccessManager *m_network;
+    QPointer<QNetworkReply> m_reply;
+    QTimer m_delay, m_deadline;
+    QElapsedTimer m_clock;
+    QHash<QString, qint64> m_next;
+    QHash<QString, QDateTime> m_cooldown;
+    QUrl m_url;
+    QString m_contact, m_error;
+    QJsonObject m_configuration;
+    QByteArray m_bytes;
+};
+MetadataHttp::MetadataHttp(QObject *parent, QNetworkAccessManager *network)
+    : QObject(parent), d(std::make_unique<Private>(this, network))
+{
+    d->m_network->setParent(this);
+    d->m_clock.start();
+    d->m_delay.setSingleShot(true);
+    d->m_deadline.setSingleShot(true);
+    connect(&d->m_delay, &QTimer::timeout, this, [this] {
+        d->start();
+    });
+    connect(&d->m_deadline, &QTimer::timeout, this, [this] {
+        d->m_error = tr("Metadata request timed out.");
+        if (d->m_reply)
+            d->m_reply->abort();
     });
 }
 MetadataHttp::~MetadataHttp()
@@ -55,42 +90,43 @@ MetadataHttp::~MetadataHttp()
 }
 void MetadataHttp::cancel()
 {
-    m_delay.stop();
-    m_deadline.stop();
-    if (auto *reply = m_reply.data()) {
-        m_reply.clear();
+    d->m_delay.stop();
+    d->m_deadline.stop();
+    if (auto *reply = d->m_reply.data()) {
+        d->m_reply.clear();
         disconnect(reply, nullptr, this, nullptr);
         reply->abort();
         reply->deleteLater();
     }
-    m_bytes.clear();
+    d->m_bytes.clear();
 }
 void MetadataHttp::get(const QUrl &url, const QString &contact, const QJsonObject &configuration)
 {
     cancel();
-    m_url = url;
-    m_contact = contact;
-    m_configuration = configuration;
-    m_error.clear();
-    m_delay.start(0);
+    d->m_url = url;
+    d->m_contact = contact;
+    d->m_configuration = configuration;
+    d->m_error.clear();
+    d->m_delay.start(0);
 }
 // Pace requests by service host and configure the selected proxy before creating the reply.
 // The independent deadline also bounds stalls that never produce another network progress event.
-void MetadataHttp::start()
+void MetadataHttp::Private::start()
 {
     static const QSet<QString> hosts{ u"musicbrainz.org"_s, u"zh.wikipedia.org"_s,
                                       u"en.wikipedia.org"_s, u"www.wikidata.org"_s };
     if (m_url.scheme() != "https"_L1 || !hosts.contains(m_url.host()) || !m_url.userInfo().isEmpty()
         || m_url.port(-1) != -1 || m_url.hasFragment()) {
-        Q_EMIT completed({ { }, tr("Unsupported metadata address."), { } });
+        Q_EMIT q->completed({ { }, MetadataHttp::tr("Unsupported metadata address."), { } });
         return;
     }
     const auto key = service(m_url);
     const auto retry = m_cooldown.value(key);
     if (retry > QDateTime::currentDateTimeUtc()) {
-        Q_EMIT completed({ { },
-                           tr("The metadata service is cooling down. Try again later."),
-                           retry.toString(Qt::ISODateWithMs) });
+        Q_EMIT q->completed(
+                { { },
+                  MetadataHttp::tr("The metadata service is cooling down. Try again later."),
+                  retry.toString(Qt::ISODateWithMs) });
         return;
     }
     const auto wait = m_next.value(key, 0) - m_clock.elapsed();
@@ -103,7 +139,7 @@ void MetadataHttp::start()
     if ((m_configuration.contains(u"proxyEnabled"_s)
          && !m_configuration.value(u"proxyEnabled"_s).isBool())
         || (mode != "system"_L1 && mode != "manual"_L1)) {
-        Q_EMIT completed({ { }, tr("Invalid HTTP proxy address."), { } });
+        Q_EMIT q->completed({ { }, MetadataHttp::tr("Invalid HTTP proxy address."), { } });
         return;
     }
     if (!m_configuration.value(u"proxyEnabled"_s).toBool(true)) {
@@ -113,7 +149,7 @@ void MetadataHttp::start()
     } else {
         const QUrl proxy(m_configuration.value(u"proxyUrl"_s).toString());
         if (!metadataConfiguration::validProxy(proxy)) {
-            Q_EMIT completed({ { }, tr("Invalid HTTP proxy address."), { } });
+            Q_EMIT q->completed({ { }, MetadataHttp::tr("Invalid HTTP proxy address."), { } });
             return;
         }
         m_network->setProxy(QNetworkProxy(
@@ -142,39 +178,43 @@ void MetadataHttp::start()
     request.setDecompressedSafetyCheckThreshold(maximumResponseBytes);
     m_reply = m_network->get(request);
     m_reply->setReadBufferSize(maximumResponseBytes + 1);
-    connect(m_reply, &QNetworkReply::readyRead, this, &MetadataHttp::read);
-    connect(m_reply, &QNetworkReply::finished, this, &MetadataHttp::finish);
+    QObject::connect(m_reply, &QNetworkReply::readyRead, q, [this] {
+        read();
+    });
+    QObject::connect(m_reply, &QNetworkReply::finished, q, [this] {
+        finish();
+    });
     m_deadline.start(RequestDeadlineMilliseconds);
 }
-void MetadataHttp::read()
+void MetadataHttp::Private::read()
 {
     if (!m_reply || m_bytes.size() > maximumResponseBytes)
         return;
     m_bytes += m_reply->read(maximumResponseBytes + 1 - m_bytes.size());
     if (m_bytes.size() > maximumResponseBytes) {
-        m_error = tr("Metadata response exceeds 2 MiB.");
+        m_error = MetadataHttp::tr("Metadata response exceeds 2 MiB.");
         m_reply->abort();
     }
 }
-void MetadataHttp::parseResponse(MetadataResponse &response)
+void MetadataHttp::Private::parseResponse(MetadataResponse &response)
 {
     QJsonParseError error;
     const auto document = QJsonDocument::fromJson(m_bytes, &error);
     if (error.error != QJsonParseError::NoError || !document.isObject()) {
-        response.error = tr("The metadata service returned invalid JSON.");
+        response.error = MetadataHttp::tr("The metadata service returned invalid JSON.");
         return;
     }
     response.data = document.object();
     if (!response.data.contains(u"error"_s))
         return;
-    response.error = tr("The metadata service reported an API error.");
+    response.error = MetadataHttp::tr("The metadata service reported an API error.");
     if (response.data.value(u"error"_s).toObject().value(u"code"_s) == "maxlag"_L1) {
         const auto retry = QDateTime::currentDateTimeUtc().addSecs(FallbackRetrySeconds);
         m_cooldown.insert(service(m_url), retry);
         response.retryAt = retry.toString(Qt::ISODateWithMs);
     }
 }
-void MetadataHttp::finish()
+void MetadataHttp::Private::finish()
 {
     if (!m_reply)
         return;
@@ -187,11 +227,13 @@ void MetadataHttp::finish()
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     response.error = m_error;
     if (response.error.isEmpty() && status == 0 && reply->error() != QNetworkReply::NoError)
-        response.error = tr("Cannot connect to %1: %2").arg(m_url.host(), reply->errorString());
+        response.error = MetadataHttp::tr("Cannot connect to %1: %2")
+                                 .arg(m_url.host(), reply->errorString());
     if (response.error.isEmpty() && (status < HttpSuccessBegin || status >= HttpSuccessEnd))
-        response.error = tr("%1 returned HTTP %2.").arg(m_url.host()).arg(status);
+        response.error = MetadataHttp::tr("%1 returned HTTP %2.").arg(m_url.host()).arg(status);
     if (response.error.isEmpty() && reply->error() != QNetworkReply::NoError)
-        response.error = tr("Cannot connect to %1: %2").arg(m_url.host(), reply->errorString());
+        response.error = MetadataHttp::tr("Cannot connect to %1: %2")
+                                 .arg(m_url.host(), reply->errorString());
     const auto retryHeader = QString::fromUtf8(reply->rawHeader("Retry-After"_ba));
     if (status == HttpTooManyRequests || status == HttpUnavailable || !retryHeader.isEmpty()) {
         bool numeric = false;
@@ -213,6 +255,7 @@ void MetadataHttp::finish()
     m_reply.clear();
     reply->deleteLater();
     m_bytes.clear();
-    Q_EMIT completed(response);
+    Q_EMIT q->completed(response);
 }
+
 }

@@ -2,6 +2,8 @@
 // Explicit fixture literals are independent inputs or expected results; timing bounds have named
 // constants.
 
+#include "BackgroundMusicController_p.h"
+#include "InterfaceSoundController_p.h"
 #include "LibrarySession.h"
 #include "BackgroundMusicController.h"
 #include "InterfaceSoundController.h"
@@ -62,15 +64,15 @@ private Q_SLOTS:
         QVERIFY(song.outputAvailable());
         background.start();
         QTRY_VERIFY_WITH_TIMEOUT(background.playing(), AsyncDeadlineMilliseconds);
-        QTRY_VERIFY(!background.m_fade.isActive());
+        QTRY_VERIFY(!background.d->m_fade.isActive());
         QVERIFY(background.error().isEmpty());
-        QCOMPARE(background.m_player.loops(), QMediaPlayer::Infinite);
-        QCOMPARE(background.m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
-        QCOMPARE(background.m_output.volume(), .01f);
-        const auto duration = background.m_player.duration();
+        QCOMPARE(background.d->m_player.loops(), QMediaPlayer::Infinite);
+        QCOMPARE(background.d->m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
+        QCOMPARE(background.d->m_output.volume(), .01f);
+        const auto duration = background.d->m_player.duration();
         QVERIFY(duration > 1000);
-        background.m_player.setPosition(duration - 50);
-        QTRY_VERIFY_WITH_TIMEOUT(background.m_player.position() < duration / 2,
+        background.d->m_player.setPosition(duration - 50);
+        QTRY_VERIFY_WITH_TIMEOUT(background.d->m_player.position() < duration / 2,
                                  BackendDeadlineMilliseconds);
         QVERIFY(background.playing());
         bool overlap = false;
@@ -82,15 +84,15 @@ private Q_SLOTS:
         song.toggle();
         QVERIFY(song.requested());
         QVERIFY(!song.playing());
-        QVERIFY(background.m_fade.isActive());
+        QVERIFY(background.d->m_fade.isActive());
         QVERIFY(!background.silent());
         QTRY_VERIFY_WITH_TIMEOUT(song.playing(), AsyncDeadlineMilliseconds);
         QVERIFY(!silenced.isEmpty());
         QVERIFY(background.silent());
         QVERIFY(!overlap);
-        QVERIFY(!background.m_fade.isActive());
+        QVERIFY(!background.d->m_fade.isActive());
         song.pause();
-        QTRY_VERIFY(!background.m_fade.isActive());
+        QTRY_VERIFY(!background.d->m_fade.isActive());
         QVERIFY(background.silent());
         QVERIFY(!background.playing());
         // No window or visual clock exists: ordinary media progress continues while hidden.
@@ -103,28 +105,28 @@ private Q_SLOTS:
         QCOMPARE(song.trackId(), track.id);
         QSignalSpy ended(&song, &PlaybackController::queueFinished);
         QTRY_COMPARE_WITH_TIMEOUT(ended.size(), 1, AsyncDeadlineMilliseconds);
-        QTRY_VERIFY(!background.m_fade.isActive());
+        QTRY_VERIFY(!background.d->m_fade.isActive());
         QTRY_VERIFY(background.playing());
-        QCOMPARE(background.m_output.volume(), .01f);
+        QCOMPARE(background.d->m_output.volume(), .01f);
         song.toggle();
         song.pause();
-        QTRY_VERIFY(!background.m_fade.isActive());
+        QTRY_VERIFY(!background.d->m_fade.isActive());
         QVERIFY(background.silent());
         QVERIFY(!song.playing());
         song.stop();
-        QVERIFY(background.m_fade.isActive());
+        QVERIFY(background.d->m_fade.isActive());
         song.toggle();
         song.stop();
         background.setEnabled(false);
-        QTRY_VERIFY(!background.m_fade.isActive());
+        QTRY_VERIFY(!background.d->m_fade.isActive());
         QVERIFY(background.silent());
         background.setVolume(.02);
         QCOMPARE(song.volume(), double(.01f));
         background.setEnabled(true);
-        QTRY_VERIFY(!background.m_fade.isActive());
-        QCOMPARE(background.m_output.volume(), .02f);
+        QTRY_VERIFY(!background.d->m_fade.isActive());
+        QCOMPARE(background.d->m_output.volume(), .02f);
         background.stop();
-        QVERIFY(!background.m_fade.isActive());
+        QVERIFY(!background.d->m_fade.isActive());
         QVERIFY(background.silent());
         QVERIFY(!background.playing());
     }
@@ -136,10 +138,10 @@ private Q_SLOTS:
         background.start();
         QTRY_VERIFY_WITH_TIMEOUT(background.playing(), AsyncDeadlineMilliseconds);
         QTemporaryDir root;
-        background.m_player.setSource(QUrl::fromLocalFile(root.filePath(u"missing.ogg"_s)));
+        background.d->m_player.setSource(QUrl::fromLocalFile(root.filePath(u"missing.ogg"_s)));
         QTRY_VERIFY_WITH_TIMEOUT(!background.error().isEmpty(), AsyncDeadlineMilliseconds);
         QVERIFY(background.silent());
-        QVERIFY(!background.m_fade.isActive());
+        QVERIFY(!background.d->m_fade.isActive());
         background.setSongActivity(BackgroundMusicController::SongActivity::Playing);
         background.setSongActivity(BackgroundMusicController::SongActivity::Stopped);
         QVERIFY(!background.playing());
@@ -147,7 +149,7 @@ private Q_SLOTS:
         background.setEnabled(true);
         QTRY_VERIFY_WITH_TIMEOUT(background.playing(), AsyncDeadlineMilliseconds);
         QVERIFY(background.error().isEmpty());
-        QCOMPARE(background.m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
+        QCOMPARE(background.d->m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
         background.stop();
     }
     void missingEventsAreSilent()
@@ -163,7 +165,7 @@ private Q_SLOTS:
         for (const auto &event : events)
             QVERIFY(!sounds.trigger(event.toObject()[u"event"_s].toString()));
         QVERIFY(!sounds.trigger(u"unknown-event"_s));
-        for (const auto &effect : sounds.m_pool)
+        for (const auto &effect : sounds.d->m_pool)
             QVERIFY(!effect);
         const auto original = sounds.volume();
         sounds.setVolume(std::numeric_limits<double>::quiet_NaN());
@@ -186,22 +188,22 @@ private Q_SLOTS:
         QVERIFY(file.write(test::wave(1000)) > 0);
         file.close();
         const auto url = QUrl::fromLocalFile(file.fileName());
-        sounds.m_sources.insert(u"confirm"_s, url);
+        sounds.d->m_sources.insert(u"confirm"_s, url);
         sounds.setVolume(.01);
-        for (auto &effect : sounds.m_pool) {
+        for (auto &effect : sounds.d->m_pool) {
             effect = std::make_unique<QSoundEffect>();
             effect->setAudioDevice(QMediaDevices::defaultAudioOutput());
             effect->setVolume(.01f);
             effect->setSource(url);
         }
-        for (const auto &effect : sounds.m_pool)
+        for (const auto &effect : sounds.d->m_pool)
             QTRY_COMPARE_WITH_TIMEOUT(effect->status(), QSoundEffect::Ready,
                                       AsyncDeadlineMilliseconds);
         for (int i = 0; i < 4; ++i)
             QVERIFY(sounds.trigger(u"confirm"_s));
         QVERIFY(!sounds.trigger(u"confirm"_s));
         sounds.setEnabled(false);
-        for (const auto &effect : sounds.m_pool)
+        for (const auto &effect : sounds.d->m_pool)
             QVERIFY(!effect->isPlaying());
     }
     void audioPreferencesPersistIndependently()

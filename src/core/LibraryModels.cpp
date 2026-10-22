@@ -1,6 +1,7 @@
+#include "LibraryModels.h"
+#include <atomic>
 #include "Units.h"
 #include <QCoreApplication>
-#include "LibraryModels.h"
 #include <QCollator>
 #include <QLocale>
 #include <QSet>
@@ -341,48 +342,78 @@ QVariantList AlbumListModel::columns() const
                                    { u"lane"_s, lane++ } });
     return result;
 }
-struct SearchListModel::PendingSearch final
+struct SearchListModel::Private final
 {
-    Q_DISABLE_COPY_MOVE(PendingSearch)
-    PendingSearch() = default;
-    QThreadPool worker;
-    QFutureWatcher<QList<SearchResult>> completion;
-    std::atomic<quint64> generation{ 0 };
-    quint64 activeTicket = 0;
-    QString needle, genreId;
-    bool pending = false, running = false;
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(SearchListModel *owner)
+        : q(owner), m_snapshot(std::make_shared<const LibrarySnapshot>())
+    {
+    }
+    SearchListModel *const q;
+
+    struct SearchEntry final
+    {
+        SearchResult result;
+        QString genreId, text;
+        qsizetype nextAlbum = 0;
+    };
+    struct PendingSearch final
+    {
+        Q_DISABLE_COPY_MOVE(PendingSearch)
+        PendingSearch() = default;
+        QThreadPool worker;
+        QFutureWatcher<QList<SearchResult>> completion;
+        std::atomic<quint64> generation{ 0 };
+        quint64 activeTicket = 0;
+        QString needle, genreId;
+        bool pending = false, running = false;
+    };
+    void startSearch();
+    void replaceResults(QList<SearchResult> results);
+    void notifyCount();
+    static QList<SearchResult> filter(const QList<SearchEntry> &entries, const QString &needle,
+                                      const QString &genreId,
+                                      const std::atomic<quint64> &generation, quint64 ticket);
+    PendingSearch m_search;
+    Snapshot m_snapshot;
+    QList<SearchEntry> m_entries;
+    QHash<QString, QString> m_genreNames;
+    QList<SearchResult> m_results;
+    int m_notifiedCount = 0;
+    QHash<QString, qsizetype> m_albumIndices;
+    QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
 };
 SearchListModel::SearchListModel(QObject *parent)
-    : QAbstractListModel(parent),
-      m_search(std::make_unique<PendingSearch>()),
-      m_snapshot(std::make_shared<const LibrarySnapshot>())
+    : QAbstractListModel(parent), d(std::make_unique<Private>(this))
 {
-    m_search->worker.setMaxThreadCount(1);
-    connect(&m_search->completion, &QFutureWatcher<QList<SearchResult>>::finished, this, [this] {
+    d->m_search.worker.setMaxThreadCount(1);
+    connect(&d->m_search.completion, &QFutureWatcher<QList<SearchResult>>::finished, this, [this] {
         const bool wasSearching = searching();
-        m_search->running = false;
-        if (m_search->activeTicket == m_search->generation.load(std::memory_order_relaxed))
-            replaceResults(m_search->completion.result());
-        startSearch();
+        d->m_search.running = false;
+        if (d->m_search.activeTicket == d->m_search.generation.load(std::memory_order_relaxed))
+            d->replaceResults(d->m_search.completion.result());
+        d->startSearch();
         if (wasSearching != searching())
             Q_EMIT searchingChanged();
     });
 }
 bool SearchListModel::searching() const
 {
-    return m_search->pending
-            || (m_search->running
-                && m_search->activeTicket == m_search->generation.load(std::memory_order_relaxed));
+    return d->m_search.pending
+            || (d->m_search.running
+                && d->m_search.activeTicket
+                        == d->m_search.generation.load(std::memory_order_relaxed));
 }
 SearchListModel::~SearchListModel()
 {
     // Teardown cancels the scan before joining; workers never call the GUI or borrow its entries.
-    ++m_search->generation;
-    m_search->worker.waitForDone();
+    ++d->m_search.generation;
+    d->m_search.worker.waitForDone();
 }
-QList<SearchResult> SearchListModel::filter(const QList<SearchEntry> &entries,
-                                            const QString &needle, const QString &genreId,
-                                            const std::atomic<quint64> &generation, quint64 ticket)
+QList<SearchResult> SearchListModel::Private::filter(const QList<Private::SearchEntry> &entries,
+                                                     const QString &needle, const QString &genreId,
+                                                     const std::atomic<quint64> &generation,
+                                                     quint64 ticket)
 {
     QList<SearchResult> results;
     const bool albumsOnly = needle.isEmpty();
@@ -405,37 +436,37 @@ QList<SearchResult> SearchListModel::filter(const QList<SearchEntry> &entries,
 void SearchListModel::request(const QString &query, const QString &genreId)
 {
     const auto needle = query.trimmed().toLower();
-    if (needle == m_search->needle && genreId == m_search->genreId)
+    if (needle == d->m_search.needle && genreId == d->m_search.genreId)
         return;
     const bool wasSearching = searching();
-    m_search->needle = needle;
-    m_search->genreId = genreId;
-    ++m_search->generation;
-    m_search->pending = true;
-    startSearch();
+    d->m_search.needle = needle;
+    d->m_search.genreId = genreId;
+    ++d->m_search.generation;
+    d->m_search.pending = true;
+    d->startSearch();
     if (wasSearching != searching())
         Q_EMIT searchingChanged();
 }
-void SearchListModel::startSearch()
+void SearchListModel::Private::startSearch()
 {
-    if (!m_search->pending || m_search->running)
+    if (!m_search.pending || m_search.running)
         return;
-    m_search->pending = false;
-    m_search->running = true;
-    const auto ticket = m_search->generation.load(std::memory_order_relaxed);
-    m_search->activeTicket = ticket;
+    m_search.pending = false;
+    m_search.running = true;
+    const auto ticket = m_search.generation.load(std::memory_order_relaxed);
+    m_search.activeTicket = ticket;
     // Qt containers share immutable storage. A replacement detaches on the GUI;
     // one running scan and one latest query bound both work and completion delivery.
-    m_search->completion.setFuture(QtConcurrent::run(
-            &m_search->worker,
-            [entries = m_entries, needle = m_search->needle, genreId = m_search->genreId,
-             generation = &m_search->generation, ticket] {
+    m_search.completion.setFuture(QtConcurrent::run(
+            &m_search.worker,
+            [entries = m_entries, needle = m_search.needle, genreId = m_search.genreId,
+             generation = &m_search.generation, ticket] {
                 return filter(entries, needle, genreId, *generation, ticket);
             }));
 }
 int SearchListModel::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : int(m_results.size());
+    return parent.isValid() ? 0 : int(d->m_results.size());
 }
 QHash<int, QByteArray> SearchListModel::roleNames() const
 {
@@ -451,14 +482,14 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
         || index.row() >= rowCount())
         return { };
-    const auto &result = m_results[index.row()];
-    const auto albumIndex = m_albumIndices.constFind(result.albumId);
-    if (albumIndex == m_albumIndices.cend())
+    const auto &result = d->m_results[index.row()];
+    const auto albumIndex = d->m_albumIndices.constFind(result.albumId);
+    if (albumIndex == d->m_albumIndices.cend())
         return { };
-    const auto &album = m_snapshot->albums[albumIndex.value()];
-    const auto tracks = m_trackIndices.constFind(result.albumId);
+    const auto &album = d->m_snapshot->albums[albumIndex.value()];
+    const auto tracks = d->m_trackIndices.constFind(result.albumId);
     const auto trackIndex =
-            tracks == m_trackIndices.cend() ? -1 : tracks->value(result.trackId, -1);
+            tracks == d->m_trackIndices.cend() ? -1 : tracks->value(result.trackId, -1);
     const auto *track = trackIndex < 0 ? nullptr : &album.tracks[trackIndex];
     switch (role) {
     case Kind:
@@ -476,8 +507,8 @@ QVariant SearchListModel::data(const QModelIndex &index, int role) const
     case Subtitle:
         if (track)
             return album.title;
-        return m_genreNames.value(album.genreId,
-                                  QCoreApplication::translate("Yalahoo", "Unclassified"));
+        return d->m_genreNames.value(album.genreId,
+                                     QCoreApplication::translate("Yalahoo", "Unclassified"));
     default:
         return { };
     }
@@ -486,75 +517,76 @@ QVariantMap SearchListModel::resultAt(int row) const
 {
     if (row < 0 || row >= rowCount())
         return { };
-    return { { u"albumId"_s, m_results[row].albumId }, { u"trackId"_s, m_results[row].trackId } };
+    return { { u"albumId"_s, d->m_results[row].albumId },
+             { u"trackId"_s, d->m_results[row].trackId } };
 }
 void SearchListModel::update(Snapshot snapshot, const QString &query, const QString &genreId)
 {
     if (!snapshot)
         snapshot = std::make_shared<const LibrarySnapshot>();
-    const bool replaced = m_snapshot != snapshot;
+    const bool replaced = d->m_snapshot != snapshot;
     const bool wasSearching = searching();
-    ++m_search->generation;
-    m_search->pending = false;
-    m_search->needle = query.trimmed().toLower();
-    m_search->genreId = genreId;
+    ++d->m_search.generation;
+    d->m_search.pending = false;
+    d->m_search.needle = query.trimmed().toLower();
+    d->m_search.genreId = genreId;
     if (replaced) {
         beginResetModel();
-        m_snapshot = std::move(snapshot);
-        m_albumIndices.clear();
-        m_trackIndices.clear();
-        m_entries.clear();
-        m_genreNames.clear();
-        m_genreNames.reserve(m_snapshot->genres.size());
-        qsizetype entryCount = m_snapshot->albums.size();
-        for (const auto &album : m_snapshot->albums)
+        d->m_snapshot = std::move(snapshot);
+        d->m_albumIndices.clear();
+        d->m_trackIndices.clear();
+        d->m_entries.clear();
+        d->m_genreNames.clear();
+        d->m_genreNames.reserve(d->m_snapshot->genres.size());
+        qsizetype entryCount = d->m_snapshot->albums.size();
+        for (const auto &album : d->m_snapshot->albums)
             entryCount += album.tracks.size();
-        m_entries.reserve(entryCount);
-        for (const auto &genre : m_snapshot->genres)
-            m_genreNames.insert(genre.id, genreDisplayName(genre));
-        m_albumIndices.reserve(m_snapshot->albums.size());
-        m_trackIndices.reserve(m_snapshot->albums.size());
-        for (qsizetype i = 0; i < m_snapshot->albums.size(); ++i) {
-            const auto &album = m_snapshot->albums[i];
-            if (!m_albumIndices.tryEmplace(album.id, i).inserted)
+        d->m_entries.reserve(entryCount);
+        for (const auto &genre : d->m_snapshot->genres)
+            d->m_genreNames.insert(genre.id, genreDisplayName(genre));
+        d->m_albumIndices.reserve(d->m_snapshot->albums.size());
+        d->m_trackIndices.reserve(d->m_snapshot->albums.size());
+        for (qsizetype i = 0; i < d->m_snapshot->albums.size(); ++i) {
+            const auto &album = d->m_snapshot->albums[i];
+            if (!d->m_albumIndices.tryEmplace(album.id, i).inserted)
                 continue;
-            const QString genre = m_genreNames.value(
+            const QString genre = d->m_genreNames.value(
                     album.genreId, QCoreApplication::translate("Yalahoo", "Unclassified"));
-            const auto albumEntry = m_entries.size();
-            m_entries.append({ { album.id, { } },
-                               album.genreId,
-                               (album.title + ' '_L1 + album.artist + ' '_L1 + genre).toLower(),
-                               0 });
+            const auto albumEntry = d->m_entries.size();
+            d->m_entries.append({ { album.id, { } },
+                                  album.genreId,
+                                  (album.title + ' '_L1 + album.artist + ' '_L1 + genre).toLower(),
+                                  0 });
             for (const auto &track : album.tracks)
-                m_entries.append({ { album.id, track.id },
-                                   album.genreId,
-                                   (track.title + ' '_L1 + track.artist).toLower(),
-                                   0 });
-            m_entries[albumEntry].nextAlbum = m_entries.size();
+                d->m_entries.append({ { album.id, track.id },
+                                      album.genreId,
+                                      (track.title + ' '_L1 + track.artist).toLower(),
+                                      0 });
+            d->m_entries[albumEntry].nextAlbum = d->m_entries.size();
             QHash<QString, qsizetype> tracks;
             tracks.reserve(album.tracks.size());
             for (qsizetype j = 0; j < album.tracks.size(); ++j)
                 tracks.tryEmplace(album.tracks[j].id, j);
-            m_trackIndices.insert(album.id, std::move(tracks));
+            d->m_trackIndices.insert(album.id, std::move(tracks));
         }
     }
-    auto results = filter(m_entries, m_search->needle, genreId, m_search->generation,
-                          m_search->generation.load(std::memory_order_relaxed));
+    auto results = d->filter(d->m_entries, d->m_search.needle, genreId, d->m_search.generation,
+                             d->m_search.generation.load(std::memory_order_relaxed));
     if (replaced) {
-        m_results = std::move(results);
+        d->m_results = std::move(results);
         endResetModel();
-        notifyCount();
+        d->notifyCount();
         if (wasSearching != searching())
             Q_EMIT searchingChanged();
         return;
     }
-    replaceResults(std::move(results));
+    d->replaceResults(std::move(results));
     if (wasSearching != searching())
         Q_EMIT searchingChanged();
 }
-void SearchListModel::replaceResults(QList<SearchResult> results)
+void SearchListModel::Private::replaceResults(QList<SearchResult> results)
 {
-    const auto ticket = m_search->generation.load(std::memory_order_relaxed);
+    const auto ticket = m_search.generation.load(std::memory_order_relaxed);
     int prefix = 0;
     const auto &before = std::as_const(m_results);
     const auto &after = std::as_const(results);
@@ -572,37 +604,42 @@ void SearchListModel::replaceResults(QList<SearchResult> results)
     // Synchronous observers can replace the snapshot or request another query.
     // Already-notified edits are valid, but no stale edit may follow that callback.
     if (reused)
-        Q_EMIT dataChanged(index(prefix), index(prefix + reused - 1));
-    if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+        Q_EMIT q->dataChanged(q->index(prefix), q->index(prefix + reused - 1));
+    if (ticket != m_search.generation.load(std::memory_order_relaxed)) {
         notifyCount();
         return;
     }
     if (removed > reused) {
-        beginRemoveRows({ }, prefix + reused, prefix + removed - 1);
+        q->beginRemoveRows({ }, prefix + reused, prefix + removed - 1);
         m_results.remove(prefix + reused, removed - reused);
-        endRemoveRows();
-        if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+        q->endRemoveRows();
+        if (ticket != m_search.generation.load(std::memory_order_relaxed)) {
             notifyCount();
             return;
         }
     }
     if (inserted > reused) {
-        beginInsertRows({ }, prefix + reused, prefix + inserted - 1);
+        q->beginInsertRows({ }, prefix + reused, prefix + inserted - 1);
         m_results = std::move(results);
-        endInsertRows();
-        if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+        q->endInsertRows();
+        if (ticket != m_search.generation.load(std::memory_order_relaxed)) {
             notifyCount();
             return;
         }
     }
     notifyCount();
 }
-void SearchListModel::notifyCount()
+void SearchListModel::Private::notifyCount()
 {
-    const int count = rowCount();
+    const int count = q->rowCount();
     if (count != m_notifiedCount) {
         m_notifiedCount = count;
-        Q_EMIT countChanged();
+        Q_EMIT q->countChanged();
     }
 }
+void SearchListModel::updateMetadataSnapshot(Snapshot snapshot)
+{
+    d->m_snapshot = std::move(snapshot);
+}
+
 }

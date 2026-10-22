@@ -1,3 +1,6 @@
+#include "RenderQuality.h"
+#include "SelectionLighting.h"
+#include "LayoutMetrics.h"
 #include "Require.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"

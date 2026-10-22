@@ -2,6 +2,7 @@
 // published to the painter rather than recomputed in QML.
 
 #pragma once
+#include <QPointer>
 #include "ScalarSpring.h"
 #include "SelectionController.h"
 #include <QVariantList>

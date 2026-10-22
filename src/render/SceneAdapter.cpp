@@ -1,3 +1,13 @@
+#include "SceneAdapter.h"
+#include <memory>
+#include <optional>
+#include "LayoutMetrics.h"
+#include "ScalarSpring.h"
+#include "SelectionLighting.h"
+#include "RenderQuality.h"
+#include "RenderBackend.h"
+#include <QVariantMap>
+#include <utility>
 #include "SceneMath.h"
 #include "CameraFraming.h"
 #include "Units.h"
@@ -6,7 +16,6 @@
 #include "RowLightController.h"
 #include "FrameClock.h"
 #include "SelectionController.h"
-#include "SceneAdapter.h"
 #include "OverviewController.h"
 #include "opening/OpeningFrame.h"
 #include "MotionFunctions.h"
@@ -73,75 +82,103 @@ SceneVector velocities(const std::array<ScalarSpring, yalahoo::units::VectorAxes
     return { s[0].velocity, s[1].velocity, s[2].velocity };
 }
 }
+struct SceneAdapter::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(SceneAdapter *owner) : q(owner)
+    {
+    }
+    SceneAdapter *const q;
+
+    void publish();
+    QPointer<SelectionController> m_selection;
+    quint64 m_selectionRevision = 0;
+    LayoutMetrics m_layout;
+    SelectionLighting m_lighting;
+    RenderQuality m_quality;
+    RowLightingInput m_lightingInput;
+    QQuaternion m_caseRotation;
+    bool m_explicitLightingInput = false;
+    SceneFrame m_frame;
+    QMatrix4x4 m_viewProjection;
+    std::array<ScalarSpring, 3> m_position, m_aim;
+    ScalarSpring m_span, m_yaw, m_elevation;
+    double m_detail = 0, m_laneSpeed = 0, m_rowSpeed = 0, m_pointerX = 0, m_pointerY = 0;
+    bool m_reduced = false, m_managedDetail = false;
+    std::optional<double> m_openingTime;
+};
 SelectionController *SceneAdapter::selection() const
 {
-    return m_selection;
+    return d->m_selection;
 }
 void SceneAdapter::setSelection(SelectionController *selection)
 {
-    if (m_selection == selection)
+    if (d->m_selection == selection)
         return;
-    if (m_selection)
-        disconnect(m_selection, nullptr, this, nullptr);
-    m_selection = selection;
+    if (d->m_selection)
+        disconnect(d->m_selection, nullptr, this, nullptr);
+    d->m_selection = selection;
     if (!selection)
-        m_explicitLightingInput = false;
-    m_selectionRevision = 0;
+        d->m_explicitLightingInput = false;
+    d->m_selectionRevision = 0;
     if (selection) {
-        connect(selection, &SelectionController::frameChanged, this, &SceneAdapter::publish);
+        connect(selection, &SelectionController::frameChanged, this, [this] {
+            d->publish();
+        });
         connect(selection, &SelectionController::libraryChanged, this, [this] {
-            m_managedDetail = false;
-            m_detail = 0;
+            d->m_managedDetail = false;
+            d->m_detail = 0;
             snapToTarget();
             Q_EMIT detailChanged();
         });
         connect(selection, &SelectionController::arrayModeChanged, this, [this] {
-            m_lighting.ribbon.reset();
+            d->m_lighting.ribbon.reset();
         });
         connect(selection, &SelectionController::coordinatesRebased, this,
                 [this](double lane, double row) {
-                    m_lighting.ribbon.row.translate(-row);
-                    m_lighting.ribbon.lane.translate(-lane);
+                    d->m_lighting.ribbon.row.translate(-row);
+                    d->m_lighting.ribbon.lane.translate(-lane);
                 });
         connect(selection, &QObject::destroyed, this, [this] {
-            m_explicitLightingInput = false;
-            m_selectionRevision = 0;
-            publish();
+            d->m_explicitLightingInput = false;
+            d->m_selectionRevision = 0;
+            d->publish();
             Q_EMIT selectionControllerChanged();
         });
     }
-    publish();
+    d->publish();
     Q_EMIT selectionControllerChanged();
 }
 void SceneAdapter::recordInput()
 {
-    ++m_frame.inputRevision;
-    m_frame.inputReceivedNs = yalahoo::monotonicNanoseconds();
+    ++d->m_frame.inputRevision;
+    d->m_frame.inputReceivedNs = yalahoo::monotonicNanoseconds();
     Q_EMIT frameChanged();
 }
 void SceneAdapter::recordNavigationCommit(quint64 revision)
 {
-    m_frame.navigationRevision = revision;
-    m_frame.navigationInputRevision = m_frame.inputRevision;
-    m_frame.navigationCommittedNs = yalahoo::monotonicNanoseconds();
+    d->m_frame.navigationRevision = revision;
+    d->m_frame.navigationInputRevision = d->m_frame.inputRevision;
+    d->m_frame.navigationCommittedNs = yalahoo::monotonicNanoseconds();
     Q_EMIT frameChanged();
 }
-SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
+SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>(this))
 {
     // The first responsive frame starts at its target. Opening can observe its authored pose.
     snapToTarget();
     updateLighting(0);
-    connect(&m_layout, &LayoutMetrics::changed, this, [this] {
-        if (m_openingTime)
-            setOpeningTime(m_openingTime);
-        else if (m_reduced)
+    connect(&d->m_layout, &LayoutMetrics::changed, this, [this] {
+        if (d->m_openingTime)
+            setOpeningTime(d->m_openingTime);
+        else if (d->m_reduced)
             snapToTarget();
         else
-            publish();
+            d->publish();
     });
     if (clock)
         connect(clock, &FrameClock::frame, this, [this](double, double motionDt) {
-            if (!m_openingTime) {
+            if (!d->m_openingTime) {
                 advance(motionDt);
                 updateLighting(motionDt);
             }
@@ -151,67 +188,69 @@ SceneAdapter::SceneAdapter(FrameClock *clock, QObject *parent) : QObject(parent)
 // Portrait layout changes framing, while the render viewport remains the actual content size.
 CameraPose SceneAdapter::target() const
 {
-    const double w = m_layout.width(), h = m_layout.height(), aspect = w / h, d = m_detail;
+    const double w = d->m_layout.width(), h = d->m_layout.height(), aspect = w / h,
+                 detailProgress = d->m_detail;
     const double baseSpan = yalahoo::sceneDefaults::BrowseSpan
-            + (DetailSpan - yalahoo::sceneDefaults::BrowseSpan) * d;
+            + (DetailSpan - yalahoo::sceneDefaults::BrowseSpan) * detailProgress;
     const double portraitDetailSpan = std::max(
             PortraitMinimumDetailSpan / aspect,
             PortraitCaseSpan * h
                     / std::max(MinimumPortraitContentHeight,
                                PortraitDetailHeightRatio * h - PortraitDetailChromePixels));
-    const double span = m_layout.portrait()
+    const double span = d->m_layout.portrait()
             ? std::max(baseSpan,
                        yalahoo::cameraFraming::PortraitPreviewSpan / aspect
                                + (portraitDetailSpan
                                   - yalahoo::cameraFraming::PortraitPreviewSpan / aspect)
-                                       * d)
+                                       * detailProgress)
             : std::max(baseSpan,
                        baseSpan
                                * (yalahoo::cameraFraming::StandardAspectWidth
                                   / yalahoo::cameraFraming::AspectHeightUnits)
                                / aspect);
-    const double yaw =
-            (BrowseYawDegrees * radians + m_yaw.value) * (1 - d) + DetailYawDegrees * radians * d;
-    const double elevation = (BrowseElevationDegrees * radians + m_elevation.value) * (1 - d)
-            + DetailElevationDegrees * radians * d;
+    const double yaw = (BrowseYawDegrees * radians + d->m_yaw.value) * (1 - detailProgress)
+            + DetailYawDegrees * radians * detailProgress;
+    const double elevation =
+            (BrowseElevationDegrees * radians + d->m_elevation.value) * (1 - detailProgress)
+            + DetailElevationDegrees * radians * detailProgress;
     const auto basis = cameraFraming::basis(yaw, elevation);
     const auto &direction = basis.direction, &right = basis.right, &up = basis.up;
     SceneVector aim{ -BrowseAimX, -BrowseAimY, BrowseAimZ };
-    aim = cameraFraming::browseAim(aim, basis, span, aspect, m_layout.portrait());
+    aim = cameraFraming::browseAim(aim, basis, span, aspect, d->m_layout.portrait());
     SceneVector detailAim{ 0,
                            cameraFraming::settledCaseBase()
                                    + (sceneGeometry::CaseHeight
                                       + yalahoo::sceneGeometry::InspectionLiftPadding)
                                    + sceneGeometry::HingeHeight,
                            -sceneGeometry::ArchiveDepth };
-    const double detailX = m_layout.portrait() ? .5 : LandscapeDetailX;
-    const double detailY = m_layout.portrait() ? PortraitDetailY + PortraitDetailTopPixels / h
-            : m_layout.compact()
+    const double detailX = d->m_layout.portrait() ? .5 : LandscapeDetailX;
+    const double detailY = d->m_layout.portrait() ? PortraitDetailY + PortraitDetailTopPixels / h
+            : d->m_layout.compact()
             ? CompactDetailY
             : DesktopDetailYPixels / yalahoo::cameraFraming::ReferenceHeightPixels;
     detailAim = detailAim + right * ((.5 - detailX) * w * span / h) + up * ((detailY - .5) * span);
-    aim = aim * (1 - d) + detailAim * d;
+    aim = aim * (1 - detailProgress) + detailAim * detailProgress;
     auto pose = OverviewController::framing(
             { aim
                       + direction
                               * (BrowseCameraDistance
-                                 + (DetailCameraDistance - BrowseCameraDistance) * d),
+                                 + (DetailCameraDistance - BrowseCameraDistance) * detailProgress),
               aim, span },
-            w, h, m_selection ? m_selection->overviewProgress() : 0);
+            w, h, d->m_selection ? d->m_selection->overviewProgress() : 0);
     auto position = pose.position;
-    if (!m_reduced && d == 0) {
-        position.x += m_pointerX * PointerParallaxDistance;
-        position.y -= m_pointerY * PointerParallaxDistance;
+    if (!d->m_reduced && detailProgress == 0) {
+        position.x += d->m_pointerX * PointerParallaxDistance;
+        position.y -= d->m_pointerY * PointerParallaxDistance;
     }
     return { position, pose.aim, pose.span };
 }
 void SceneAdapter::requestDetail(bool detail)
 {
-    if (!m_selection)
+    if (!d->m_selection)
         return;
-    m_managedDetail = true;
-    m_selection->requestDetail(detail);
-    if (m_reduced)
+    d->m_managedDetail = true;
+    d->m_selection->requestDetail(detail);
+    if (d->m_reduced)
         advance(0);
 }
 void SceneAdapter::setDetail(double detail)
@@ -219,28 +258,28 @@ void SceneAdapter::setDetail(double detail)
     if (!std::isfinite(detail))
         return;
     detail = std::clamp(detail, 0.0, 1.0);
-    if (detail == m_detail)
+    if (detail == d->m_detail)
         return;
-    m_managedDetail = false;
-    m_detail = detail;
-    if (m_selection)
-        m_selection->setDetail(detail);
-    if (m_reduced)
+    d->m_managedDetail = false;
+    d->m_detail = detail;
+    if (d->m_selection)
+        d->m_selection->setDetail(detail);
+    if (d->m_reduced)
         snapToTarget();
     else
-        publish();
+        d->publish();
     Q_EMIT detailChanged();
 }
 void SceneAdapter::setReducedMotion(bool reduced)
 {
-    if (reduced == m_reduced)
+    if (reduced == d->m_reduced)
         return;
-    m_reduced = reduced;
-    m_lighting.setReducedMotion(reduced);
+    d->m_reduced = reduced;
+    d->m_lighting.setReducedMotion(reduced);
     if (reduced) {
-        m_yaw.finish(0);
-        m_elevation.finish(0);
-        if (m_managedDetail && m_selection)
+        d->m_yaw.finish(0);
+        d->m_elevation.finish(0);
+        if (d->m_managedDetail && d->m_selection)
             advance(0);
         else
             snapToTarget();
@@ -252,69 +291,69 @@ void SceneAdapter::setNavigation(double laneSpeed, double rowSpeed, bool realCol
 {
     if (!std::isfinite(laneSpeed) || !std::isfinite(rowSpeed))
         return;
-    m_laneSpeed = laneSpeed;
-    m_rowSpeed = realColumns ? 0 : rowSpeed;
+    d->m_laneSpeed = laneSpeed;
+    d->m_rowSpeed = realColumns ? 0 : rowSpeed;
 }
 void SceneAdapter::setPointer(double x, double y)
 {
     if (!std::isfinite(x) || !std::isfinite(y))
         return;
-    m_pointerX = std::clamp(x, -1.0, 1.0);
-    m_pointerY = std::clamp(y, -1.0, 1.0);
+    d->m_pointerX = std::clamp(x, -1.0, 1.0);
+    d->m_pointerY = std::clamp(y, -1.0, 1.0);
 }
 void SceneAdapter::advance(double dt)
 {
-    if (m_openingTime || !std::isfinite(dt) || dt < 0)
+    if (d->m_openingTime || !std::isfinite(dt) || dt < 0)
         return;
-    if (m_selection) {
-        const auto speeds = m_selection->navigationSpeeds();
-        setNavigation(speeds[0], speeds[1], m_selection->realistic());
+    if (d->m_selection) {
+        const auto speeds = d->m_selection->navigationSpeeds();
+        setNavigation(speeds[0], speeds[1], d->m_selection->realistic());
     }
-    if (m_managedDetail && m_selection) {
-        const double detail = m_selection->detailMotion().value();
-        if (m_detail != detail) {
-            m_detail = detail;
+    if (d->m_managedDetail && d->m_selection) {
+        const double detail = d->m_selection->detailMotion().value();
+        if (d->m_detail != detail) {
+            d->m_detail = detail;
             Q_EMIT detailChanged();
         }
     }
-    if (m_reduced) {
+    if (d->m_reduced) {
         snapToTarget();
-        if (m_managedDetail && m_selection)
-            m_selection->updateDetailReadiness(dt, true);
+        if (d->m_managedDetail && d->m_selection)
+            d->m_selection->updateDetailReadiness(dt, true);
         return;
     }
-    m_yaw.update(std::clamp(m_laneSpeed / LaneOrbitSpeedScale, -1.0, 1.0) * LaneOrbitAmplitude
-                         * (1 - m_detail),
-                 OrbitFollowRate, dt);
-    m_elevation.update(std::clamp(m_rowSpeed / RowOrbitSpeedScale, -1.0, 1.0) * RowOrbitAmplitude
-                               * (1 - m_detail),
-                       OrbitFollowRate, dt);
+    d->m_yaw.update(std::clamp(d->m_laneSpeed / LaneOrbitSpeedScale, -1.0, 1.0) * LaneOrbitAmplitude
+                            * (1 - d->m_detail),
+                    OrbitFollowRate, dt);
+    d->m_elevation.update(std::clamp(d->m_rowSpeed / RowOrbitSpeedScale, -1.0, 1.0)
+                                  * RowOrbitAmplitude * (1 - d->m_detail),
+                          OrbitFollowRate, dt);
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
     for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
-        m_position[i].update(p[i], CameraFollowRate, dt);
-        m_aim[i].update(a[i], CameraFollowRate, dt);
+        d->m_position[i].update(p[i], CameraFollowRate, dt);
+        d->m_aim[i].update(a[i], CameraFollowRate, dt);
     }
-    m_span.update(goal.span, CameraFollowRate, dt);
-    publish();
-    if (m_managedDetail && m_selection)
-        m_selection->updateDetailReadiness(dt, settled());
+    d->m_span.update(goal.span, CameraFollowRate, dt);
+    d->publish();
+    if (d->m_managedDetail && d->m_selection)
+        d->m_selection->updateDetailReadiness(dt, settled());
 }
 void SceneAdapter::setOpeningTime(std::optional<double> time, double dt)
 {
     if ((time && !std::isfinite(*time)) || !std::isfinite(dt))
         return;
-    m_openingTime = time;
-    m_managedDetail = false;
-    m_detail = 0;
-    m_yaw.finish(0);
-    m_elevation.finish(0);
+    d->m_openingTime = time;
+    d->m_managedDetail = false;
+    d->m_detail = 0;
+    d->m_yaw.finish(0);
+    d->m_elevation.finish(0);
     if (time) {
-        observe(openingCamera(*time, m_layout.width(), m_layout.height(),
-                              m_selection ? m_selection->selectedPosition() : SceneVector{ }),
+        observe(openingCamera(*time, d->m_layout.width(), d->m_layout.height(),
+                              d->m_selection ? d->m_selection->selectedPosition() : SceneVector{ }),
                 dt);
     } else {
-        observe(m_frame.camera, 0);
+        observe(d->m_frame.camera, 0);
     }
     updateLighting(dt);
 }
@@ -329,37 +368,37 @@ void SceneAdapter::observe(CameraPose pose, double dt)
         || !std::isfinite(pose.span) || !std::isfinite(dt))
         return;
     for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
-        m_position[i].velocity = dt > 0 ? (p[i] - m_position[i].value) / dt : 0;
-        m_aim[i].velocity = dt > 0 ? (a[i] - m_aim[i].value) / dt : 0;
-        m_position[i].value = p[i];
-        m_aim[i].value = a[i];
+        d->m_position[i].velocity = dt > 0 ? (p[i] - d->m_position[i].value) / dt : 0;
+        d->m_aim[i].velocity = dt > 0 ? (a[i] - d->m_aim[i].value) / dt : 0;
+        d->m_position[i].value = p[i];
+        d->m_aim[i].value = a[i];
     }
-    m_span.velocity = dt > 0 ? (pose.span - m_span.value) / dt : 0;
-    m_span.value = pose.span;
-    publish();
+    d->m_span.velocity = dt > 0 ? (pose.span - d->m_span.value) / dt : 0;
+    d->m_span.value = pose.span;
+    d->publish();
 }
 void SceneAdapter::snapToTarget()
 {
     const auto goal = target();
     const auto p = components(goal.position), a = components(goal.aim);
     for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
-        m_position[i].finish(p[i]);
-        m_aim[i].finish(a[i]);
+        d->m_position[i].finish(p[i]);
+        d->m_aim[i].finish(a[i]);
     }
-    m_span.finish(goal.span);
-    publish();
+    d->m_span.finish(goal.span);
+    d->publish();
 }
 bool SceneAdapter::settled() const
 {
     const auto goal = target();
-    return (values(m_position) - goal.position).length() < PositionSettledTolerance
-            && (values(m_aim) - goal.aim).length() < AimSettledTolerance
-            && std::abs(m_span.value - goal.span) < SpanSettledTolerance
-            && velocities(m_position).length() < PositionVelocityTolerance
-            && velocities(m_aim).length() < AimVelocityTolerance
-            && std::abs(m_span.velocity) < SpanVelocityTolerance;
+    return (values(d->m_position) - goal.position).length() < PositionSettledTolerance
+            && (values(d->m_aim) - goal.aim).length() < AimSettledTolerance
+            && std::abs(d->m_span.value - goal.span) < SpanSettledTolerance
+            && velocities(d->m_position).length() < PositionVelocityTolerance
+            && velocities(d->m_aim).length() < AimVelocityTolerance
+            && std::abs(d->m_span.velocity) < SpanVelocityTolerance;
 }
-void SceneAdapter::publish()
+void SceneAdapter::Private::publish()
 {
     const SceneVector position = values(m_position), aim = values(m_aim);
     const double renderedDistance = (position - aim).length();
@@ -396,77 +435,78 @@ void SceneAdapter::publish()
         m_frame.fieldOfView =
                 2 * std::atan(std::max(MinimumFovSpan, m_span.value) / (2 * distance)) / radians;
         m_frame.view.setToIdentity();
-        m_frame.view.lookAt(cameraPosition(), cameraAim(), { 0, 1, 0 });
+        m_frame.view.lookAt(q->cameraPosition(), q->cameraAim(), { 0, 1, 0 });
         m_frame.cameraRotation =
                 QQuaternion::fromRotationMatrix(m_frame.view.inverted().normalMatrix());
         m_frame.projection.setToIdentity();
         m_frame.projection.perspective(float(m_frame.fieldOfView),
-                                       float(m_frame.width / m_frame.height), float(clipNear()),
-                                       float(clipFar()));
+                                       float(m_frame.width / m_frame.height), float(q->clipNear()),
+                                       float(q->clipFar()));
         m_viewProjection = m_frame.projection * m_frame.view;
     }
     m_frame.casePosition = caseOrigin;
     m_frame.caseTransform.setToIdentity();
-    m_frame.caseTransform.translate(casePosition());
+    m_frame.caseTransform.translate(q->casePosition());
     m_frame.hasArchivePool = bool(m_selection);
     m_frame.individualMaterials = m_managedDetail && bool(m_selection);
     m_frame.instances = m_selection ? m_selection->instances() : QVector<ArchiveInstance>{ };
     if (m_selection) {
         m_frame.caseTransform.rotate(m_selection->selectedRotation());
         const auto cell = m_selection->cell();
-        setLightingInput({ caseOrigin, cell.row, cell.lane, m_selection->realistic() },
-                         m_selection->selectedRotation());
+        q->setLightingInput({ caseOrigin, cell.row, cell.lane, m_selection->realistic() },
+                            m_selection->selectedRotation());
     }
-    Q_EMIT frameChanged();
+    Q_EMIT q->frameChanged();
 }
 void SceneAdapter::setLightingInput(RowLightingInput input, QQuaternion rotation)
 {
-    m_explicitLightingInput = true;
-    m_lightingInput = input;
-    m_caseRotation = rotation;
+    d->m_explicitLightingInput = true;
+    d->m_lightingInput = input;
+    d->m_caseRotation = rotation;
 }
 void SceneAdapter::updateLighting(double dt)
 {
-    auto input = m_lightingInput;
-    if (!m_explicitLightingInput) {
-        input.origin = m_frame.casePosition;
+    auto input = d->m_lightingInput;
+    if (!d->m_explicitLightingInput) {
+        input.origin = d->m_frame.casePosition;
         input.row = input.origin.z / sceneGeometry::RowSpacing;
         input.lane = input.origin.x / sceneGeometry::ColumnSpacing;
     }
-    input.reduced = m_reduced || input.reduced;
-    input.cinematic = m_openingTime.has_value();
-    input.introTime = m_openingTime;
+    input.reduced = d->m_reduced || input.reduced;
+    input.cinematic = d->m_openingTime.has_value();
+    input.introTime = d->m_openingTime;
     const auto localAim =
-            m_caseRotation.rotatedVector({ -float(yalahoo::cameraFraming::LocalLightAimX),
-                                           float(yalahoo::cameraFraming::LocalLightAimY), 0 });
+            d->m_caseRotation.rotatedVector({ -float(yalahoo::cameraFraming::LocalLightAimX),
+                                              float(yalahoo::cameraFraming::LocalLightAimY), 0 });
     const auto offset = cameraRotation().rotatedVector({ -yalahoo::cameraFraming::LightOffsetX,
                                                          -yalahoo::cameraFraming::LightOffsetY,
                                                          yalahoo::cameraFraming::LightOffsetZ });
-    m_lighting.update(input, input.origin + SceneVector{ localAim.x(), localAim.y(), localAim.z() },
-                      { offset.x(), offset.y(), offset.z() }, m_detail, dt);
+    d->m_lighting.update(input,
+                         input.origin + SceneVector{ localAim.x(), localAim.y(), localAim.z() },
+                         { offset.x(), offset.y(), offset.z() }, d->m_detail, dt);
 }
 double SceneAdapter::focalDepth(QVector3D origin) const
 {
     // Frozen scene.ts: (model.position + (0,2,0)) in camera view space.
-    return -(m_frame.view * QVector4D(origin + QVector3D(0, 2, 0), 1)).z();
+    return -(d->m_frame.view * QVector4D(origin + QVector3D(0, 2, 0), 1)).z();
 }
 std::optional<QVector3D> SceneAdapter::projectWorldPoint(QVector3D world) const
 {
-    return projectToViewport(m_viewProjection, world, { m_frame.width, m_frame.height });
+    return projectToViewport(d->m_viewProjection, world, { d->m_frame.width, d->m_frame.height });
 }
 QVariantMap SceneAdapter::hitTest(double x, double y) const
 {
-    if (m_selection)
-        return m_selection->hitTest(m_frame, x, y);
-    if (!std::isfinite(x) || !std::isfinite(y) || x < 0 || y < 0 || x >= m_frame.width
-        || y >= m_frame.height)
+    if (d->m_selection)
+        return d->m_selection->hitTest(d->m_frame, x, y);
+    if (!std::isfinite(x) || !std::isfinite(y) || x < 0 || y < 0 || x >= d->m_frame.width
+        || y >= d->m_frame.height)
         return { };
     bool invertible = false;
-    const auto inverse =
-            (m_frame.projection * m_frame.view * m_frame.caseTransform).inverted(&invertible);
+    const auto inverse = (d->m_frame.projection * d->m_frame.view * d->m_frame.caseTransform)
+                                 .inverted(&invertible);
     if (!invertible)
         return { };
-    const double nx = 2 * x / m_frame.width - 1, ny = 1 - 2 * y / m_frame.height;
+    const double nx = 2 * x / d->m_frame.width - 1, ny = 1 - 2 * y / d->m_frame.height;
     const auto start = (inverse * QVector4D(float(nx), float(ny), -1, 1)).toVector3DAffine();
     const auto end = (inverse * QVector4D(float(nx), float(ny), 1, 1)).toVector3DAffine();
     const auto delta = end - start;
@@ -476,7 +516,69 @@ QVariantMap SceneAdapter::hitTest(double x, double y) const
     const auto local = start + delta * float(*enter);
     return { { u"objectId"_s, u"inspection-case"_s },
              { u"localPoint"_s, QVariant::fromValue(local) },
-             { u"worldPoint"_s, QVariant::fromValue(m_frame.caseTransform.map(local)) },
+             { u"worldPoint"_s, QVariant::fromValue(d->m_frame.caseTransform.map(local)) },
              { u"frameRevision"_s, QVariant::fromValue(frameRevision()) } };
 }
+SelectionLighting *SceneAdapter::lighting()
+{
+    return &d->m_lighting;
+}
+RenderQuality *SceneAdapter::quality()
+{
+    return &d->m_quality;
+}
+QVariantMap SceneAdapter::renderBackendContract() const
+{
+    return RenderBackendContract::fields();
+}
+LayoutMetrics *SceneAdapter::layout()
+{
+    return &d->m_layout;
+}
+const SceneFrame &SceneAdapter::frame() const
+{
+    return d->m_frame;
+}
+QVector3D SceneAdapter::cameraPosition() const
+{
+    return d->m_frame.camera.position.qt();
+}
+QVector3D SceneAdapter::cameraAim() const
+{
+    return d->m_frame.camera.aim.qt();
+}
+QQuaternion SceneAdapter::cameraRotation() const
+{
+    return d->m_frame.cameraRotation;
+}
+QVector3D SceneAdapter::casePosition() const
+{
+    return d->m_frame.casePosition.qt();
+}
+double SceneAdapter::fieldOfView() const
+{
+    return d->m_frame.fieldOfView;
+}
+double SceneAdapter::clipNear() const
+{
+    return d->m_frame.nearPlane;
+}
+double SceneAdapter::clipFar() const
+{
+    return d->m_frame.farPlane;
+}
+quint64 SceneAdapter::frameRevision() const
+{
+    return d->m_frame.revision;
+}
+double SceneAdapter::detail() const
+{
+    return d->m_detail;
+}
+bool SceneAdapter::reducedMotion() const
+{
+    return d->m_reduced;
+}
+SceneAdapter::~SceneAdapter() = default;
+
 }

@@ -2,6 +2,7 @@
 // Explicit fixture literals are independent inputs or expected results; timing bounds have named
 // constants.
 
+#include "SceneCovers.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -11,6 +12,7 @@
 #include "AtlasAllocator.h"
 #include "SceneItem.h"
 #include <QQuickWindow>
+#include <QPointer>
 #include <QFile>
 #include <QColorSpace>
 #include <QImageReader>
@@ -63,6 +65,18 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void hiddenSceneItemDestructionDetachesWindow()
+    {
+        QQuickWindow window;
+        QPointer<SceneItem> observed;
+        {
+            SceneItem item(window.contentItem());
+            observed = &item;
+            QCOMPARE(item.window(), &window);
+        }
+        QVERIFY(observed.isNull());
+        QVERIFY(!window.isVisible());
+    }
     void projectedDemandRejectsInvalidValues()
     {
         SceneCovers covers;

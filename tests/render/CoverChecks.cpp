@@ -1,3 +1,4 @@
+#include "LayoutMetrics.h"
 #include "Require.h"
 #include "CaptureMailbox.h"
 #include "ReviewSupport.h"

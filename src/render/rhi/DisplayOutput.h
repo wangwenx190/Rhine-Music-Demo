@@ -2,11 +2,13 @@
 // state while surface changes follow explicit epochs.
 
 #pragma once
-#include "DisplayState.h"
-#include <QPointer>
-#include <QTimer>
-#include <QQuickWindow>
-#include <atomic>
+#include <QObject>
+#include <memory>
+
+class QQuickWindow;
+namespace yalahoo {
+class DisplayMonitor;
+}
 
 namespace yalahoo {
 class DisplayOutput : public QObject
@@ -23,49 +25,16 @@ public:
     explicit DisplayOutput(std::unique_ptr<DisplayMonitor> monitor, QObject *parent = nullptr);
     ~DisplayOutput() override;
     void attach(QQuickWindow &window);
-    bool hdrActive() const
-    {
-        return m_active;
-    }
-    bool ready() const
-    {
-        return m_ready;
-    }
-    float whiteScale() const
-    {
-        return m_active && !m_useLinearFallback ? m_state.whiteScale : 1;
-    }
-    float headroom() const
-    {
-        return m_active ? m_state.headroom : 1;
-    }
-    bool hdr10() const
-    {
-        return m_active && m_requestedHdr10;
-    }
+    bool hdrActive() const;
+    bool ready() const;
+    float whiteScale() const;
+    float headroom() const;
+    bool hdr10() const;
 Q_SIGNALS:
     void changed();
 
 private:
-    void queueSceneGraphError(const QString &message);
-    void reportSwapChain(QQuickWindow &window);
-    void reportSceneGraphError(const quint64 &epoch, const QString &message);
-
-    void refresh();
-    void configure(bool hdr);
-    void recoverOutput();
-    QPointer<QQuickWindow> m_window;
-    std::unique_ptr<DisplayMonitor> m_monitor;
-    QTimer m_poll;
-    DisplayState m_state;
-    bool m_requested = false;
-    bool m_requestedHdr10 = false;
-    bool m_active = false;
-    bool m_ready = true;
-    bool m_reconfiguring = false;
-    bool m_rejected = false;
-    bool m_useLinearFallback = false;
-    std::atomic<quint64> m_epoch = 0;
-    quint64 m_reportedEpoch = quint64(-1); // Render-thread state only.
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

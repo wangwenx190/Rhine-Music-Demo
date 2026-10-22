@@ -43,20 +43,6 @@ Q_SIGNALS:
     void changed();
 
 private:
-    void requestDemoCover();
-    void handlePoolCoverReady(const std::shared_ptr<const CoverPixels> &pixels);
-    void handleCoverReady(const std::shared_ptr<const CoverPixels> &pixels);
-    struct OwnedCover;
-    void ensureBaseCover(const QString &id, const CoverSource &source, const AtlasLease &lease);
-    struct CoverRegion;
-    CoverRegion prepareOwnedCover(Input &in, const ArchiveInstance &instance,
-                                  const CoverSource &source, QRect tile, quint64 coverLease);
-    OwnedCover *acquireOwnedCover(const ArchiveInstance &instance, const CoverSource &source);
-    void requestDetailedCover(OwnedCover &owned, const QString &id, const CoverSource &source);
-    bool reusePool(Input &input, const Input &previous) const;
-    void preparePool(Input &input, const Input &previous);
-    void resetPool();
-    void refreshPool();
     struct Private;
     std::unique_ptr<Private> d;
 };

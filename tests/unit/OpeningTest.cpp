@@ -1,3 +1,4 @@
+#include "LayoutMetrics.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"

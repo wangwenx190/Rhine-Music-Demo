@@ -22,8 +22,10 @@ public:
     ProviderCapabilities capabilities() const override;
     void cancel(RequestToken token) override;
 
-private:
+protected:
     bool request(AlbumQuery query, RequestToken token, MetadataKind kind) override;
+
+private:
     struct Private;
     std::unique_ptr<Private> d;
 };

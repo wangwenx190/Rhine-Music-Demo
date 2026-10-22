@@ -1,3 +1,7 @@
+#include "InputRouter.h"
+#include "DetailReview.h"
+#include "SelectionController.h"
+#include "SelectionLighting.h"
 #include <algorithm>
 #include <iterator>
 #include "ReviewSupport.h"
@@ -5,7 +9,6 @@
 #include "ProductDefaults.h"
 #include "Units.h"
 #include "MotionController.h"
-#include "DetailReview.h"
 #include "BackendCapabilities.h"
 #include "SceneAdapter.h"
 #include "SceneItem.h"

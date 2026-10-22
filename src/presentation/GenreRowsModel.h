@@ -5,6 +5,7 @@
 #include <QAbstractListModel>
 #include <QFont>
 #include <QVariantList>
+#include <memory>
 
 namespace yalahoo {
 // Width changes rewrap measured labels; only visible rows cross the QML boundary.
@@ -17,6 +18,7 @@ class GenreRowsModel : public QAbstractListModel
     Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged FINAL)
 public:
     explicit GenreRowsModel(QObject *parent = nullptr);
+    ~GenreRowsModel() override;
     QVariantList genres() const;
     void setGenres(const QVariantList &genres);
     QFont font() const;
@@ -32,17 +34,7 @@ Q_SIGNALS:
     void widthChanged();
 
 private:
-    void measure();
-    void rewrap();
-    struct Label final
-    {
-        QString id, name;
-        double width = 0;
-    };
-    QVariantList m_genres;
-    QFont m_font;
-    double m_width = 0;
-    QList<Label> m_labels;
-    QList<QVariantList> m_rows;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

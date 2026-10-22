@@ -1,5 +1,5 @@
-#include "Units.h"
 #include "Logging.h"
+#include "Units.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -103,11 +103,11 @@ void consoleWrite(QtMsgType type, const QByteArray &bytes, bool color)
 }
 }
 
-struct LoggingSession::State final
+struct LoggingSession::Private final
 {
-    Q_DISABLE_COPY_MOVE(State)
-    State() = default;
-    static State *active;
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+    static Private *active;
     Options options;
     QString stem;
     QFile file;
@@ -240,13 +240,13 @@ struct LoggingSession::State final
             active->write(bytes);
     }
 };
-LoggingSession::State *LoggingSession::State::active = nullptr;
+LoggingSession::Private *LoggingSession::Private::active = nullptr;
 
 LoggingSession::LoggingSession() : LoggingSession(Options{ })
 {
 }
 
-LoggingSession::LoggingSession(Options options) : m_state(std::make_unique<State>())
+LoggingSession::LoggingSession(Options options) : d(std::make_unique<Private>())
 {
     if (options.directory.isEmpty())
         options.directory =
@@ -255,54 +255,52 @@ LoggingSession::LoggingSession(Options options) : m_state(std::make_unique<State
     options.segmentBytes = std::max<qint64>(MinimumLogSegmentBytes, options.segmentBytes);
     options.archiveCount = std::clamp(options.archiveCount, 1, MaximumLogArchives);
     options.retentionDays = std::max(1, options.retentionDays);
-    m_state->options = std::move(options);
-    m_state->color = prepareConsole();
+    d->options = std::move(options);
+    d->color = prepareConsole();
     qSetMessagePattern(u"%{time yyyy-MM-ddTHH:mm:ss.zzz t} [%{type}] [%{category}] "
                        u"[pid=%{pid} tid=%{threadid}] %{message} "
                        u"(%{file}:%{line} %{function})"_s);
-    m_state->stem =
-            u"yalahoo-%1-%2-%3"_s
-                    .arg(QDateTime::currentDateTimeUtc().toString(u"yyyyMMdd'T'HHmmsszzz'Z'"_s))
-                    .arg(QCoreApplication::applicationPid())
-                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-    const auto &directory = m_state->options.directory;
+    d->stem = u"yalahoo-%1-%2-%3"_s
+                      .arg(QDateTime::currentDateTimeUtc().toString(u"yyyyMMdd'T'HHmmsszzz'Z'"_s))
+                      .arg(QCoreApplication::applicationPid())
+                      .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const auto &directory = d->options.directory;
     if (QFileInfo(directory).isSymLink() || !QDir().mkpath(directory)) {
-        m_state->fileFailed = true;
-        m_state->emergency(u"Cannot create log directory: "_s + directory);
+        d->fileFailed = true;
+        d->emergency(u"Cannot create log directory: "_s + directory);
     } else {
-        m_state->cleanup();
-        m_state->runLock =
-                std::make_unique<QLockFile>(QDir(directory).filePath(m_state->stem + u".lock"_s));
-        m_state->runLock->setStaleLockTime(0);
-        if (!m_state->runLock->tryLock()) {
-            m_state->fileFailed = true;
-            m_state->emergency(u"Cannot lock log session: "_s + directory);
+        d->cleanup();
+        d->runLock = std::make_unique<QLockFile>(QDir(directory).filePath(d->stem + u".lock"_s));
+        d->runLock->setStaleLockTime(0);
+        if (!d->runLock->tryLock()) {
+            d->fileFailed = true;
+            d->emergency(u"Cannot lock log session: "_s + directory);
         } else {
-            m_state->open();
+            d->open();
         }
     }
     {
         const QMutexLocker lock(&sinkMutex());
-        Q_ASSERT(!State::active);
-        State::active = m_state.get();
-        m_state->previous = qInstallMessageHandler(State::message);
+        Q_ASSERT(!Private::active);
+        Private::active = d.get();
+        d->previous = qInstallMessageHandler(Private::message);
     }
     qCInfo(logApp) << "Logging started" << "file=" << filePath()
-                   << "segmentBytes=" << m_state->options.segmentBytes
-                   << "archives=" << m_state->options.archiveCount
-                   << "retentionDays=" << m_state->options.retentionDays;
+                   << "segmentBytes=" << d->options.segmentBytes
+                   << "archives=" << d->options.archiveCount
+                   << "retentionDays=" << d->options.retentionDays;
 }
 
 LoggingSession::~LoggingSession()
 {
     qCInfo(logApp) << "Logging stopped";
     const QMutexLocker lock(&sinkMutex());
-    qInstallMessageHandler(m_state->previous);
-    State::active = nullptr;
+    qInstallMessageHandler(d->previous);
+    Private::active = nullptr;
 }
 
 QString LoggingSession::filePath() const
 {
-    return m_state->segment(0);
+    return d->segment(0);
 }
 }

@@ -1,3 +1,7 @@
+#include "TitleReel.h"
+#include "StartupChecks.h"
+#include "SelectionLighting.h"
+#include "LayoutMetrics.h"
 #include "MonotonicTime.h"
 #include "Require.h"
 #include "ReviewSupport.h"
@@ -9,7 +13,6 @@
 #include "SelectionController.h"
 #include <QQuickWindow>
 #include "PresentationController.h"
-#include "StartupChecks.h"
 #include "OffscreenSurface.h"
 #include "StartupCoordinator.h"
 #include "OverviewController.h"

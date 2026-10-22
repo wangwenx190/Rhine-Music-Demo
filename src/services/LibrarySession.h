@@ -2,10 +2,9 @@
 // request tokens separate navigation from persistence and playback.
 
 #pragma once
+#include <memory>
 #include "LibraryModels.h"
 #include "IMetadataProvider.h"
-#include <QPointer>
-#include <QSet>
 
 namespace yalahoo {
 // GUI-thread boundary; providers are injected, IDs never derive from view positions.
@@ -31,23 +30,11 @@ class LibrarySession final : public QObject
 public:
     explicit LibrarySession(IMetadataProvider *provider, QObject *parent = nullptr);
     ~LibrarySession() override;
-    AlbumListModel *albums()
-    {
-        return &m_albums;
-    }
-    SearchListModel *searchResults()
-    {
-        return &m_search;
-    }
+    AlbumListModel *albums();
+    SearchListModel *searchResults();
     void setSnapshot(LibrarySnapshot snapshot);
-    Snapshot snapshot() const
-    {
-        return m_snapshot;
-    }
-    const Album *navigationAlbum() const
-    {
-        return album(m_navigationAlbumId);
-    }
+    Snapshot snapshot() const;
+    const Album *navigationAlbum() const;
     QVariantList genres() const;
     Q_INVOKABLE bool hasGenre(const QString &id) const;
     QVariantMap summary() const;
@@ -61,10 +48,7 @@ public:
     Album resolvedAlbum(const QString &albumId) const;
     void adoptMetadataSnapshot(Snapshot snapshot);
     void adoptMetadataConfiguration(const Snapshot &snapshot);
-    bool metadataBusy() const
-    {
-        return !m_pending.isEmpty();
-    }
+    bool metadataBusy() const;
     Q_INVOKABLE quint64 requestMetadata(const QString &albumId, const QString &kind,
                                         bool force = false, const QString &releaseId = { });
     Q_INVOKABLE void cancelMetadata(quint64 requestId);
@@ -74,26 +58,11 @@ public:
                                         quint64 revision = 0) const;
     QVariantMap metadataConfiguration() const;
     QVariantMap metadataProgress() const;
-    QString navigationAlbumId() const
-    {
-        return m_navigationAlbumId;
-    }
-    QString navigationTrackId() const
-    {
-        return m_navigationTrackId;
-    }
-    QString playbackAlbumId() const
-    {
-        return m_playbackAlbumId;
-    }
-    QString playbackTrackId() const
-    {
-        return m_playbackTrackId;
-    }
-    quint64 metadataRevision() const
-    {
-        return m_metadataRevision;
-    }
+    QString navigationAlbumId() const;
+    QString navigationTrackId() const;
+    QString playbackAlbumId() const;
+    QString playbackTrackId() const;
+    quint64 metadataRevision() const;
     QVariantMap metadata() const;
     QVariantMap providerCapabilities() const;
     QVariantMap browseInfo() const;
@@ -111,44 +80,7 @@ Q_SIGNALS:
 
 private:
     friend class PlaybackController;
-    void adoptPlaybackIds(const QString &albumId, const QString &trackId);
-    struct Pending final
-    {
-        RequestToken token;
-        MetadataKind kind;
-    };
-    void invalidate();
-    void rebuildSummary();
-    void rebuildBrowsePositions();
-    void advanceBatch();
-    void receive(const ProviderResult &result);
-    const Album *album(const QString &id) const;
-    const Track *track(const QString &albumId, const QString &trackId) const;
-    QPointer<IMetadataProvider> m_provider;
-    AlbumListModel m_albums;
-    SearchListModel m_search;
-    Snapshot m_snapshot;
-    QHash<QString, qsizetype> m_albumIndices;
-    QHash<QString, QString> m_genreNames;
-    struct BrowsePosition final
-    {
-        int code = 0, number = 0, total = 0, lane = 0;
-        QString label;
-    };
-    QHash<QString, BrowsePosition> m_browsePositions;
-    QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
-    QHash<quint64, Pending> m_pending;
-    quint64 m_generation = 0, m_requestId = 0, m_metadataRevision = 0;
-    QString m_query, m_genre, m_navigationAlbumId, m_navigationTrackId, m_playbackAlbumId,
-            m_playbackTrackId;
-    QVariantList m_genres;
-    QSet<QString> m_visibleGenres;
-    QHash<QString, ProviderResult> m_metadata;
-    QVariantMap m_summary;
-    QStringList m_batchAlbums;
-    QString m_batchKind, m_batchStatus;
-    quint64 m_batchRequest = 0;
-    int m_batchNext = 0, m_batchCompleted = 0, m_batchErrors = 0;
-    bool m_batchActive = false;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

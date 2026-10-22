@@ -2,6 +2,7 @@
 // prevent interrupted readiness work from revealing stale content.
 
 #pragma once
+#include <memory>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
 using Qt::StringLiterals::operator""_L1;
@@ -55,68 +56,30 @@ class PresentationController final : public QObject
 public:
     explicit PresentationController(FrameClock *clock, PresentationPorts ports,
                                     QObject *parent = nullptr);
-    QString phase() const
-    {
-        return m_phase;
-    }
-    bool wantsDetail() const
-    {
-        return m_wantsDetail;
-    }
-    bool archiveEnabled() const
-    {
-        return m_phase == "archive"_L1;
-    }
-    bool detailEnabled() const
-    {
-        return m_phase == "detail"_L1;
-    }
-    quint64 layoutRevision() const
-    {
-        return m_layoutRevision;
-    }
-    SurfaceTransition *browseSurface()
-    {
-        return &m_browse;
-    }
-    SurfaceTransition *detailSurface()
-    {
-        return &m_detail;
-    }
-    std::optional<PresentationSelection> pendingSelection() const
-    {
-        return m_pending;
-    }
+    ~PresentationController() override;
+    QString phase() const;
+    bool wantsDetail() const;
+    bool archiveEnabled() const;
+    bool detailEnabled() const;
+    quint64 layoutRevision() const;
+    SurfaceTransition *browseSurface();
+    SurfaceTransition *detailSurface();
+    std::optional<PresentationSelection> pendingSelection() const;
     Q_INVOKABLE void open();
     Q_INVOKABLE void back();
     Q_INVOKABLE void select(const QString &albumId, bool openAfter, bool archiveRoute = false,
                             const QString &trackId = { });
-    bool canMovePrevious() const
-    {
-        return navigationEnabled(-1);
-    }
-    bool canMoveNext() const
-    {
-        return navigationEnabled(1);
-    }
+    bool canMovePrevious() const;
+    bool canMoveNext() const;
     Q_INVOKABLE void stepAlbum(int direction);
     Q_INVOKABLE bool canStepAlbum(int direction) const;
     Q_INVOKABLE void layoutReady(quint64 revision);
     Q_INVOKABLE void reset();
     void update();
-    double tabOpacity() const
-    {
-        return m_tabOpacity;
-    }
+    double tabOpacity() const;
     Q_INVOKABLE void revealTabContent();
-    double tabX() const
-    {
-        return m_tabX;
-    }
-    double tabWidth() const
-    {
-        return m_tabWidth;
-    }
+    double tabX() const;
+    double tabWidth() const;
     Q_INVOKABLE void setTabIndicator(double x, double width, bool animate);
 
     void setReducedMotion(bool reduced);
@@ -127,41 +90,7 @@ Q_SIGNALS:
     void focusRequested(bool detail);
 
 private:
-    void selectPending(const QString &albumId, const QString &trackId, bool &archiveRoute,
-                       bool &openAfter);
-
-    void commitPendingMenu();
-    void browseHidden(quint64 revision);
-    void detailHidden(quint64 revision);
-    void switchHidden(quint64 revision);
-    void advanceFrame(double dt);
-    void updatePresentation();
-
-    void advanceTab(double dt);
-    bool navigationEnabled(int direction) const;
-    void transact(const std::function<void()> &operation);
-    void beginOpen();
-    void beginExit();
-    void beginDetailSwitch();
-    void returnToArchive();
-    bool commitSelection(bool detail);
-    void prepareMenu();
-    void showMenu();
-    PresentationPorts m_ports;
-    SurfaceTransition m_browse{ presentationMotion::BrowseEnterMilliseconds,
-                                presentationMotion::BrowseExitMilliseconds, false, true, this };
-    SurfaceTransition m_detail{ presentationMotion::DetailEnterMilliseconds,
-                                presentationMotion::DetailExitMilliseconds, true, false, this };
-    QString m_phase = u"archive"_s;
-    std::optional<PresentationSelection> m_pending;
-    quint64 m_revision = 0, m_layoutRevision = 0;
-    bool m_wantsDetail = false, m_browseHidden = false, m_cameraEntered = false;
-    bool m_layoutReady = false, m_reduced = false;
-    double m_tabX = 0, m_tabWidth = 0, m_tabFromX = 0, m_tabFromWidth = 0;
-    double m_tabTargetX = 0, m_tabTargetWidth = 0,
-           m_tabElapsed = presentationMotion::TabSlideSeconds;
-    double m_tabOpacity = 1, m_tabFadeFrom = presentationMotion::TabInitialOpacity,
-           m_tabFadeElapsed = presentationMotion::TabFadeSeconds;
-    int m_depth = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

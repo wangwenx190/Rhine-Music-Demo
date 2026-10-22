@@ -35,18 +35,6 @@ Q_SIGNALS:
     void imported();
 
 private:
-    void load();
-    struct ImportResult final
-    {
-        QJsonObject document;
-        QString error;
-    };
-    static ImportResult readPreferenceImport(const QString &path);
-
-    static QString validate(const QJsonObject &document);
-    static QString write(const QString &path, const QJsonObject &document);
-    void schedule();
-    void reportError(const QString &error);
     struct Private;
     std::unique_ptr<Private> d;
 };

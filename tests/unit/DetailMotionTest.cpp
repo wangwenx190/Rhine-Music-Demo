@@ -2,6 +2,9 @@
 // images. Explicit fixture literals are independent inputs or expected results; timing bounds
 // have named constants.
 
+#include "PointerDragController.h"
+#include "CaseClarity.h"
+#include "LayoutMetrics.h"
 #include "NumericChecks.h"
 #include "PresentationController.h"
 #include "MotionController.h"

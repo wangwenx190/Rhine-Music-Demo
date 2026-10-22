@@ -1,10 +1,15 @@
+#include "SelectionController.h"
+#include <QPointer>
+#include "PointerDragController.h"
+#include "CaseClarity.h"
+#include "ArchiveField.h"
+#include <utility>
 #include "SceneMath.h"
 #include "Units.h"
 #include "OpeningTimeline.h"
 #include "SceneGeometry.h"
 #include "FrameClock.h"
 #include "MotionController.h"
-#include "SelectionController.h"
 #include "OverviewController.h"
 #include "MotionFunctions.h"
 #include "MusicTypes.h"
@@ -53,10 +58,85 @@ constexpr auto ReturnLiftRate = 4.5;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-SelectionController::SelectionController(MotionController *motion, QObject *parent)
-    : QObject(parent), m_motion(motion)
+struct SelectionController::Private final
 {
-    m_instances.reserve(ArchivePool::capacity + AdditionalCaseCapacity);
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(SelectionController *owner, MotionController *motion)
+        : q(owner), m_motion(motion)
+    {
+    }
+    SelectionController *const q;
+
+    ArchiveField::Column fieldColumn(double lane) const;
+    double field(double row, const ArchiveField::Column &column) const;
+    void advanceLift(double dt, bool reduced, bool detailNavigation);
+    void publish();
+    bool tracksSettled() const;
+    std::optional<ArchiveCell> selectionCell(const QString &id) const;
+    double field(double row, double lane) const;
+    std::array<double, 2> displayOffset() const;
+    QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0,
+                         bool folded = true) const;
+    struct TransformInputs final
+    {
+        std::array<double, 2> offset;
+        double entryZ = 0, overview = 0;
+    };
+    TransformInputs transformInputs() const;
+    QMatrix4x4 transform(ArchiveCell cell, double lift, double rotation, bool folded,
+                         const TransformInputs &inputs, double height, double slope) const;
+    struct ExtentCache final
+    {
+        std::optional<double> lane;
+        double extent = 1;
+    };
+    mutable std::array<ExtentCache, ArchivePool::lanes> m_extentCache;
+    mutable double m_extentCenter = 0, m_extentProgress = -1;
+    QPointer<OverviewController> m_overview;
+    QPointer<MotionController> m_motion;
+    ArchivePool m_pool;
+    RealColumns m_realColumns;
+    ColumnMemory m_memory;
+    bool m_realistic = false;
+    struct AlbumCoverSource final
+    {
+        CoverSource cover;
+        QString title;
+    };
+    QHash<QString, AlbumCoverSource> m_coverSources;
+    ArchiveCell m_cell, m_origin;
+    QVector<ArchiveInstance> m_instances, m_instanceScratch;
+    struct PoolObject final
+    {
+        struct PhysicalCell final
+        {
+            qint64 lane = 0, row = 0;
+            bool operator==(const PhysicalCell &) const = default;
+        };
+        PhysicalCell physical;
+        quint64 objectId = 0;
+    };
+    // Each complete 9x48 frontier visits every physical residue exactly once.
+    // Store its previous identity directly, including across logical coordinate rebases.
+    std::array<PoolObject, ArchivePool::capacity> m_poolObjects;
+    ReturningCasePool m_returning;
+    DetailMotion m_detailMotion;
+    CaseClarity m_clarity;
+    PointerDragController m_drag;
+    bool m_managedDetail = false, m_navigationLift = false;
+    ArchiveField m_field;
+    ScalarSpring m_lift;
+    double m_rotation = 0;
+    double m_liftTarget = yalahoo::sceneGeometry::PreviewLift, m_detail = 0;
+    std::optional<double> m_openingTime;
+    std::optional<double> m_returnY;
+    quint64 m_revision = 0, m_objectSerial = ArchivePool::capacity;
+    quint64 m_selectedObject = ++m_objectSerial;
+};
+SelectionController::SelectionController(MotionController *motion, QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>(this, motion))
+{
+    d->m_instances.reserve(ArchivePool::capacity + AdditionalCaseCapacity);
     if (motion) {
         connect(motion->clock(), &FrameClock::frame, this, [this](double, double dt) {
             advance(dt);
@@ -66,6 +146,7 @@ SelectionController::SelectionController(MotionController *motion, QObject *pare
         });
     }
 }
+
 void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapshot &snapshot)
 {
     const auto oldId = albumId();
@@ -75,13 +156,13 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
             firstId = column.albumIds.first();
             break;
         }
-    m_pool.setColumns(std::move(columns));
-    m_coverSources.clear();
+    d->m_pool.setColumns(std::move(columns));
+    d->m_coverSources.clear();
     if (snapshot)
-        m_coverSources.reserve(snapshot->albums.size());
+        d->m_coverSources.reserve(snapshot->albums.size());
     if (snapshot)
         for (const auto &album : snapshot->albums) {
-            const auto entry = m_coverSources.tryEmplace(album.id);
+            const auto entry = d->m_coverSources.tryEmplace(album.id);
             if (!entry.inserted)
                 continue;
             const auto path = album.coverUrl.scheme() == "qrc"_L1 ? u":"_s + album.coverUrl.path()
@@ -90,75 +171,76 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
                                   graphemePrefix(album.title, MaximumPlaceholderTitleCharacters) },
                                 album.title };
         }
-    m_returning.clear();
-    m_drag.reset();
-    m_detailMotion.reset();
-    m_clarity.select();
-    m_managedDetail = m_navigationLift = false;
-    m_detail = 0;
-    m_liftTarget = sceneGeometry::PreviewLift;
-    m_poolObjects.fill({ });
-    m_field.clearPulses();
-    m_origin = { 0, 0 };
-    m_cell = m_pool.location(oldId).value_or(m_pool.location(firstId).value_or(
+    d->m_returning.clear();
+    d->m_drag.reset();
+    d->m_detailMotion.reset();
+    d->m_clarity.select();
+    d->m_managedDetail = d->m_navigationLift = false;
+    d->m_detail = 0;
+    d->m_liftTarget = sceneGeometry::PreviewLift;
+    d->m_poolObjects.fill({ });
+    d->m_field.clearPulses();
+    d->m_origin = { 0, 0 };
+    d->m_cell = d->m_pool.location(oldId).value_or(d->m_pool.location(firstId).value_or(
             ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow }));
-    m_realColumns.reset(m_pool.rowCounts(), m_cell);
-    m_memory.reset(m_pool.columns());
-    m_lift.finish(m_liftTarget);
-    m_rotation = 0;
-    m_returnY.reset();
-    m_selectedObject = ++m_objectSerial;
-    if (m_motion) {
-        m_motion->travel(-sceneGeometry::ArchiveDepth
-                                 - (m_cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
-                         (m_cell.lane - 2) * sceneGeometry::ColumnSpacing, m_cell.row, m_cell.lane);
-        m_motion->finish();
+    d->m_realColumns.reset(d->m_pool.rowCounts(), d->m_cell);
+    d->m_memory.reset(d->m_pool.columns());
+    d->m_lift.finish(d->m_liftTarget);
+    d->m_rotation = 0;
+    d->m_returnY.reset();
+    d->m_selectedObject = ++d->m_objectSerial;
+    if (d->m_motion) {
+        d->m_motion->travel(-sceneGeometry::ArchiveDepth
+                                    - (d->m_cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
+                            (d->m_cell.lane - 2) * sceneGeometry::ColumnSpacing, d->m_cell.row,
+                            d->m_cell.lane);
+        d->m_motion->finish();
     }
     Q_EMIT libraryChanged();
-    publish();
+    d->publish();
     Q_EMIT selectionChanged();
 }
 CoverSource SelectionController::coverSource(const QString &id) const
 {
-    const auto source = m_coverSources.constFind(id);
-    return source == m_coverSources.cend() ? CoverSource{ } : source->cover;
+    const auto source = d->m_coverSources.constFind(id);
+    return source == d->m_coverSources.cend() ? CoverSource{ } : source->cover;
 }
 QString SelectionController::albumTitle(const QString &id) const
 {
-    const auto source = m_coverSources.constFind(id);
-    return source == m_coverSources.cend() ? QString{ } : source->title;
+    const auto source = d->m_coverSources.constFind(id);
+    return source == d->m_coverSources.cend() ? QString{ } : source->title;
 }
 QString SelectionController::albumId() const
 {
-    return m_realistic ? m_pool.realAlbumAt(m_cell) : m_pool.albumAt(m_cell);
+    return d->m_realistic ? d->m_pool.realAlbumAt(d->m_cell) : d->m_pool.albumAt(d->m_cell);
 }
 bool SelectionController::realistic() const
 {
-    return m_realistic;
+    return d->m_realistic;
 }
 const RealColumns &SelectionController::realColumns() const
 {
-    return m_realColumns;
+    return d->m_realColumns;
 }
 double SelectionController::browseRow(int lane) const
 {
-    return m_realistic ? m_realColumns.row(lane, overviewProgress())
-            : m_motion
-            ? (-m_motion->rail() - sceneGeometry::ArchiveDepth) / sceneGeometry::RowSpacing
+    return d->m_realistic ? d->m_realColumns.row(lane, overviewProgress())
+            : d->m_motion
+            ? (-d->m_motion->rail() - sceneGeometry::ArchiveDepth) / sceneGeometry::RowSpacing
                     + RailOriginRow
-            : m_cell.row;
+            : d->m_cell.row;
 }
 void SelectionController::setOverview(OverviewController *overview)
 {
-    m_overview = overview;
+    d->m_overview = overview;
 }
 double SelectionController::overviewProgress() const
 {
-    return m_overview ? m_overview->progress() : 0;
+    return d->m_overview ? d->m_overview->progress() : 0;
 }
 double SelectionController::centerLane() const
 {
-    return m_motion ? m_motion->column() / sceneGeometry::ColumnSpacing + 2 : m_cell.lane;
+    return d->m_motion ? d->m_motion->column() / sceneGeometry::ColumnSpacing + 2 : d->m_cell.lane;
 }
 double SelectionController::columnExtent(double lane) const
 {
@@ -166,12 +248,12 @@ double SelectionController::columnExtent(double lane) const
     if (progress == 0)
         return 1;
     const double center = centerLane();
-    if (center != m_extentCenter || progress != m_extentProgress) {
-        m_extentCenter = center;
-        m_extentProgress = progress;
-        m_extentCache.fill({ });
+    if (center != d->m_extentCenter || progress != d->m_extentProgress) {
+        d->m_extentCenter = center;
+        d->m_extentProgress = progress;
+        d->m_extentCache.fill({ });
     }
-    auto &entry = m_extentCache[ArchivePool::wrap(lane, ArchivePool::lanes)];
+    auto &entry = d->m_extentCache[ArchivePool::wrap(lane, ArchivePool::lanes)];
     if (entry.lane != lane) {
         entry.lane = lane;
         entry.extent = OverviewController::columnExtent(lane, center, progress);
@@ -180,31 +262,31 @@ double SelectionController::columnExtent(double lane) const
 }
 void SelectionController::overviewAlbumClicked()
 {
-    if (m_overview)
-        m_overview->albumClicked();
+    if (d->m_overview)
+        d->m_overview->albumClicked();
 }
 bool SelectionController::rememberColumnPosition() const
 {
-    return m_memory.enabled;
+    return d->m_memory.enabled;
 }
 void SelectionController::setRememberColumnPosition(bool enabled)
 {
-    if (enabled == m_memory.enabled)
+    if (enabled == d->m_memory.enabled)
         return;
-    m_memory.enabled = enabled;
-    if (enabled && m_pool.columnCount())
-        m_memory.remember(
-                m_pool.columns()[ArchivePool::wrap(m_cell.lane, m_pool.columnCount())].key,
+    d->m_memory.enabled = enabled;
+    if (enabled && d->m_pool.columnCount())
+        d->m_memory.remember(
+                d->m_pool.columns()[ArchivePool::wrap(d->m_cell.lane, d->m_pool.columnCount())].key,
                 albumId());
     Q_EMIT memoryChanged();
 }
 NavigationAvailability SelectionController::navigationAvailability() const
 {
-    const auto location = m_pool.location(albumId());
+    const auto location = d->m_pool.location(albumId());
     return location
-            ? NavigationAvailability::at(m_pool.rowCount(location->lane),
+            ? NavigationAvailability::at(d->m_pool.rowCount(location->lane),
                                          int(location->row - yalahoo::sceneGeometry::FirstAlbumRow),
-                                         m_pool.columnCount(), m_realistic)
+                                         d->m_pool.columnCount(), d->m_realistic)
             : NavigationAvailability{ };
 }
 bool SelectionController::canMovePrevious() const
@@ -217,48 +299,48 @@ bool SelectionController::canMoveNext() const
 }
 void SelectionController::setRealistic(bool realistic)
 {
-    if (m_realistic == realistic || !m_motion)
+    if (d->m_realistic == realistic || !d->m_motion)
         return;
-    const auto canonical = m_pool.location(albumId());
-    const auto old = m_cell;
+    const auto canonical = d->m_pool.location(albumId());
+    const auto old = d->m_cell;
     const double displayed =
-            (-m_motion->rail() - sceneGeometry::ArchiveDepth) / sceneGeometry::RowSpacing
+            (-d->m_motion->rail() - sceneGeometry::ArchiveDepth) / sceneGeometry::RowSpacing
             + RailOriginRow;
-    m_realistic = realistic;
-    m_cell = canonical.value_or(ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow });
-    const ArchiveCell shift{ old.lane - m_cell.lane, old.row - m_cell.row };
-    m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
-                          -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
-    m_realColumns.reset(m_pool.rowCounts(), m_cell, displayed - shift.row);
-    m_origin = { 0, 0 };
-    m_returning.clear();
-    m_poolObjects.fill({ });
-    m_field.clearPulses();
+    d->m_realistic = realistic;
+    d->m_cell = canonical.value_or(ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow });
+    const ArchiveCell shift{ old.lane - d->m_cell.lane, old.row - d->m_cell.row };
+    d->m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
+                             -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
+    d->m_realColumns.reset(d->m_pool.rowCounts(), d->m_cell, displayed - shift.row);
+    d->m_origin = { 0, 0 };
+    d->m_returning.clear();
+    d->m_poolObjects.fill({ });
+    d->m_field.clearPulses();
     Q_EMIT arrayModeChanged();
-    publish();
+    d->publish();
     Q_EMIT selectionChanged();
 }
 ArchiveCell SelectionController::cell() const
 {
-    return m_cell;
+    return d->m_cell;
 }
 ArchiveCell SelectionController::coordinateOrigin() const
 {
-    return m_origin;
+    return d->m_origin;
 }
 const ArchivePool &SelectionController::pool() const
 {
-    return m_pool;
+    return d->m_pool;
 }
 const QVector<ArchiveInstance> &SelectionController::instances() const
 {
-    return m_instances;
+    return d->m_instances;
 }
 quint64 SelectionController::revision() const
 {
-    return m_revision;
+    return d->m_revision;
 }
-std::optional<ArchiveCell> SelectionController::selectionCell(const QString &id) const
+std::optional<ArchiveCell> SelectionController::Private::selectionCell(const QString &id) const
 {
     const auto canonical = m_pool.location(id);
     if (!canonical || m_realistic)
@@ -270,46 +352,46 @@ std::optional<ArchiveCell> SelectionController::selectionCell(const QString &id)
 }
 bool SelectionController::albumNavigationEnabled(const QString &id, int direction) const
 {
-    const auto cell = m_pool.location(id.isEmpty() ? albumId() : id);
+    const auto cell = d->m_pool.location(id.isEmpty() ? albumId() : id);
     return cell
-            && NavigationAvailability::at(m_pool.rowCount(cell->lane),
+            && NavigationAvailability::at(d->m_pool.rowCount(cell->lane),
                                           int(cell->row - yalahoo::sceneGeometry::FirstAlbumRow),
-                                          m_pool.columnCount(), m_realistic)
+                                          d->m_pool.columnCount(), d->m_realistic)
                        .allowsRow(direction);
 }
 QString SelectionController::adjacentAlbum(const QString &id, int direction) const
 {
     if (direction != 1 && direction != -1)
         return { };
-    const auto cell = m_pool.location(id.isEmpty() ? albumId() : id);
-    if (!cell || m_pool.rowCount(cell->lane) < 2)
+    const auto cell = d->m_pool.location(id.isEmpty() ? albumId() : id);
+    if (!cell || d->m_pool.rowCount(cell->lane) < 2)
         return { };
     const ArchiveCell target{ cell->lane, cell->row + direction };
-    return m_realistic ? m_pool.realAlbumAt(target) : m_pool.albumAt(target);
+    return d->m_realistic ? d->m_pool.realAlbumAt(target) : d->m_pool.albumAt(target);
 }
 bool SelectionController::canSelect(const QString &id) const
 {
-    const auto cell = selectionCell(id);
+    const auto cell = d->selectionCell(id);
     return cell
-            && (*cell == m_cell
-                || m_returning.canExchange(*cell, m_lift.value > InvisibleCaseThreshold));
+            && (*cell == d->m_cell
+                || d->m_returning.canExchange(*cell, d->m_lift.value > InvisibleCaseThreshold));
 }
 // Resolve the canonical cell and reserve return-copy capacity before changing identity.
 // An interrupted selection retains the outgoing displayed pose instead of snapping it back.
 bool SelectionController::select(const QString &id)
 {
-    const auto cell = selectionCell(id);
+    const auto cell = d->selectionCell(id);
     return cell && selectCell(*cell, true);
 }
 bool SelectionController::switchDetail(const QString &id)
 {
     if (!canSelect(id))
         return false;
-    m_navigationLift = m_detailMotion.placed();
+    d->m_navigationLift = d->m_detailMotion.placed();
     const bool result = select(id);
     if (result) {
-        m_drag.reset();
-        m_clarity.enter(m_clarity.value() > AlreadyClearThreshold);
+        d->m_drag.reset();
+        d->m_clarity.enter(d->m_clarity.value() > AlreadyClearThreshold);
     }
     return result;
 }
@@ -317,7 +399,7 @@ bool SelectionController::moveRow(int direction)
 {
     if (!navigationAvailability().allowsRow(direction))
         return false;
-    return selectCell({ m_cell.lane, m_cell.row + direction });
+    return selectCell({ d->m_cell.lane, d->m_cell.row + direction });
 }
 bool SelectionController::moveLane(int direction)
 {
@@ -325,7 +407,7 @@ bool SelectionController::moveLane(int direction)
         return false;
     // Public selection accepts large periodic coordinates; narrow only after rebase.
     rebase();
-    const double lane = m_cell.lane + direction;
+    const double lane = d->m_cell.lane + direction;
     return enterColumn(int(lane), false);
 }
 bool SelectionController::enterColumn(int lane, bool guided)
@@ -335,28 +417,28 @@ bool SelectionController::enterColumn(int lane, bool guided)
 }
 std::optional<ArchiveCell> SelectionController::columnTarget(int lane, bool guided) const
 {
-    if (!m_motion || !m_pool.columnCount())
+    if (!d->m_motion || !d->m_pool.columnCount())
         return std::nullopt;
-    const int canonicalLane = ArchivePool::wrap(lane, m_pool.columnCount());
-    const auto &column = m_pool.columns()[canonicalLane];
+    const int canonicalLane = ArchivePool::wrap(lane, d->m_pool.columnCount());
+    const auto &column = d->m_pool.columns()[canonicalLane];
     if (column.albumIds.isEmpty())
         return std::nullopt;
-    const auto remembered = m_pool.location(m_memory.recalled(column.key));
+    const auto remembered = d->m_pool.location(d->m_memory.recalled(column.key));
     double row;
     if (remembered && remembered->lane == canonicalLane)
-        row = m_realistic ? remembered->row
-                          : ArchivePool::nearestOccurrence(remembered->row, m_cell.row,
-                                                           m_pool.rowCount(canonicalLane));
+        row = d->m_realistic ? remembered->row
+                             : ArchivePool::nearestOccurrence(remembered->row, d->m_cell.row,
+                                                              d->m_pool.rowCount(canonicalLane));
     else
         row = std::floor(browseRow(canonicalLane) + .5);
-    if (m_realistic)
+    if (d->m_realistic)
         row = std::clamp(row, double(yalahoo::sceneGeometry::FirstAlbumRow),
                          double(LastAlbumRowOffset + column.albumIds.size()));
-    const double physicalLane = m_realistic ? double(canonicalLane)
+    const double physicalLane = d->m_realistic ? double(canonicalLane)
             : guided
-            ? ArchivePool::nearestOccurrence(canonicalLane,
-                                             m_motion->column() / sceneGeometry::ColumnSpacing + 2,
-                                             m_pool.columnCount())
+            ? ArchivePool::nearestOccurrence(
+                      canonicalLane, d->m_motion->column() / sceneGeometry::ColumnSpacing + 2,
+                      d->m_pool.columnCount())
             : double(lane);
     return ArchiveCell{ physicalLane, row };
 }
@@ -365,63 +447,65 @@ bool SelectionController::navigateRow(double row)
     if (!std::isfinite(row))
         return false;
     // Slider/touch/detail callers share the same finite boundary as directional input.
-    if (m_realistic
+    if (d->m_realistic
         && (row < yalahoo::sceneGeometry::FirstAlbumRow
-            || row >= yalahoo::sceneGeometry::FirstAlbumRow + m_pool.rowCount(m_cell.lane)))
+            || row >= yalahoo::sceneGeometry::FirstAlbumRow + d->m_pool.rowCount(d->m_cell.lane)))
         return false;
-    return selectCell({ m_cell.lane, row });
+    return selectCell({ d->m_cell.lane, row });
 }
 bool SelectionController::selectCell(ArchiveCell cell, bool guided)
 {
-    if (!m_motion || !std::isfinite(cell.lane) || !std::isfinite(cell.row)
+    if (!d->m_motion || !std::isfinite(cell.lane) || !std::isfinite(cell.row)
         || std::abs(cell.lane) > MaximumCoordinateMagnitude
         || std::abs(cell.row) > MaximumCoordinateMagnitude || std::floor(cell.lane) != cell.lane
         || std::floor(cell.row) != cell.row
-        || (m_realistic ? m_pool.realAlbumAt(cell) : m_pool.albumAt(cell)).isEmpty())
+        || (d->m_realistic ? d->m_pool.realAlbumAt(cell) : d->m_pool.albumAt(cell)).isEmpty())
         return false;
-    if (cell == m_cell)
+    if (cell == d->m_cell)
         return true;
-    if (!m_returning.canExchange(cell, m_lift.value > InvisibleCaseThreshold))
+    if (!d->m_returning.canExchange(cell, d->m_lift.value > InvisibleCaseThreshold))
         return false;
-    auto previous = m_returning.take(cell);
-    if (m_lift.value > InvisibleCaseThreshold)
-        m_returning.append(
-                { m_cell, albumId(), m_lift, m_rotation,
-                  m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt,
-                  m_selectedObject, m_clarity.value() });
-    const auto old = m_cell;
-    if (m_managedDetail) {
-        if (!m_detailMotion.placed())
-            m_navigationLift = false;
-        m_detailMotion.selectionChanged();
+    auto previous = d->m_returning.take(cell);
+    if (d->m_lift.value > InvisibleCaseThreshold)
+        d->m_returning.append(
+                { d->m_cell, albumId(), d->m_lift, d->m_rotation,
+                  d->m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt,
+                  d->m_selectedObject, d->m_clarity.value() });
+    const auto old = d->m_cell;
+    if (d->m_managedDetail) {
+        if (!d->m_detailMotion.placed())
+            d->m_navigationLift = false;
+        d->m_detailMotion.selectionChanged();
     }
-    m_drag.reset();
-    m_cell = cell;
-    m_memory.remember(m_pool.columns()[ArchivePool::wrap(cell.lane, m_pool.columnCount())].key,
-                      albumId());
-    if (m_realistic)
-        m_realColumns.select(cell, guided,
-                             m_managedDetail ? m_detailMotion.placed()
-                                             : m_detail > DetailPlacementThreshold);
-    m_field.interact();
-    m_lift = previous ? previous->lift : ScalarSpring{ };
-    m_rotation = previous ? previous->rotation : 0;
-    m_returnY = previous ? previous->returnY : std::nullopt;
-    m_selectedObject = previous ? previous->objectId : ++m_objectSerial;
-    m_clarity.select(previous ? previous->clarity : 0);
+    d->m_drag.reset();
+    d->m_cell = cell;
+    d->m_memory.remember(
+            d->m_pool.columns()[ArchivePool::wrap(cell.lane, d->m_pool.columnCount())].key,
+            albumId());
+    if (d->m_realistic)
+        d->m_realColumns.select(cell, guided,
+                                d->m_managedDetail ? d->m_detailMotion.placed()
+                                                   : d->m_detail > DetailPlacementThreshold);
+    d->m_field.interact();
+    d->m_lift = previous ? previous->lift : ScalarSpring{ };
+    d->m_rotation = previous ? previous->rotation : 0;
+    d->m_returnY = previous ? previous->returnY : std::nullopt;
+    d->m_selectedObject = previous ? previous->objectId : ++d->m_objectSerial;
+    d->m_clarity.select(previous ? previous->clarity : 0);
     const ArchiveValues targets{ -sceneGeometry::ArchiveDepth
                                          - (cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
                                  (cell.lane - 2) * sceneGeometry::ColumnSpacing, cell.row,
                                  cell.lane };
     const bool distant = cell.lane != old.lane && std::abs(cell.row - old.row) > 1;
-    const bool detailNavigation = m_managedDetail && m_navigationLift && m_detailMotion.placed();
+    const bool detailNavigation =
+            d->m_managedDetail && d->m_navigationLift && d->m_detailMotion.placed();
     if (detailNavigation)
-        m_motion->cancelTravel();
-    else if (guided || distant || m_motion->moving())
-        m_motion->retarget(targets);
+        d->m_motion->cancelTravel();
+    else if (guided || distant || d->m_motion->moving())
+        d->m_motion->retarget(targets);
     if (!detailNavigation)
-        m_field.pulse(cell);
-    publish();
+        d->m_field.pulse(cell);
+    d->publish();
     Q_EMIT selectionChanged();
     return true;
 }
@@ -429,59 +513,59 @@ void SelectionController::setLift(double lift)
 {
     if (!std::isfinite(lift) || lift < 0 || lift > InspectionLift)
         return;
-    m_liftTarget = lift;
-    m_lift.finish(lift);
-    publish();
+    d->m_liftTarget = lift;
+    d->m_lift.finish(lift);
+    d->publish();
 }
 void SelectionController::setRotation(double radians)
 {
     if (!std::isfinite(radians))
         return;
-    m_rotation = radians;
-    publish();
+    d->m_rotation = radians;
+    d->publish();
 }
 void SelectionController::setDetail(double detail)
 {
     if (!std::isfinite(detail))
         return;
-    m_detail = std::clamp(detail, 0.0, 1.0);
+    d->m_detail = std::clamp(detail, 0.0, 1.0);
     // Frozen music scene: MUSIC_MODEL.height + 0.12 clears the shelf.
     setLift(sceneGeometry::PreviewLift
             + (sceneGeometry::CaseHeight + yalahoo::sceneGeometry::InspectionLiftPadding
                - sceneGeometry::PreviewLift)
-                    * m_detail);
+                    * d->m_detail);
 }
 void SelectionController::returnSelected()
 {
-    m_returnY = m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt;
-    m_liftTarget = 0;
+    d->m_returnY = d->m_rotation != 0 ? std::optional<double>(selectedPosition().y) : std::nullopt;
+    d->m_liftTarget = 0;
 }
 void SelectionController::requestDetail(bool detail)
 {
-    m_field.interact();
-    m_managedDetail = true;
-    m_detailMotion.request(detail);
-    m_drag.cancel();
+    d->m_field.interact();
+    d->m_managedDetail = true;
+    d->m_detailMotion.request(detail);
+    d->m_drag.cancel();
     if (detail) {
-        m_clarity.enter();
-        m_returnY.reset();
+        d->m_clarity.enter();
+        d->m_returnY.reset();
     } else {
-        m_clarity.leave();
-        if (m_rotation != 0)
-            m_returnY = selectedPosition().y;
+        d->m_clarity.leave();
+        if (d->m_rotation != 0)
+            d->m_returnY = selectedPosition().y;
     }
-    if (m_motion && m_motion->reducedMotion())
+    if (d->m_motion && d->m_motion->reducedMotion())
         advance(0);
 }
 std::array<double, 2> SelectionController::navigationSpeeds() const
 {
-    return m_motion ? std::array<double, 2>{ m_motion->springs()[ColumnAxis].velocity
-                                                     / sceneGeometry::ColumnSpacing,
-                                             m_motion->springs()[RailAxis].velocity
-                                                     / sceneGeometry::RowSpacing }
-                    : std::array<double, 2>{ 0, 0 };
+    return d->m_motion ? std::array<double, 2>{ d->m_motion->springs()[ColumnAxis].velocity
+                                                        / sceneGeometry::ColumnSpacing,
+                                                d->m_motion->springs()[RailAxis].velocity
+                                                        / sceneGeometry::RowSpacing }
+                       : std::array<double, 2>{ 0, 0 };
 }
-bool SelectionController::tracksSettled() const
+bool SelectionController::Private::tracksSettled() const
 {
     if (!m_motion || m_motion->moving())
         return false;
@@ -497,49 +581,49 @@ bool SelectionController::tracksSettled() const
 }
 void SelectionController::updateDetailReadiness(double dt, bool cameraSettled)
 {
-    if (!m_managedDetail)
+    if (!d->m_managedDetail)
         return;
-    const auto &d = m_detailMotion;
-    const double target = d.holdsDetail() ? 1 : 0;
-    const bool liftSettled = d.settled() && tracksSettled()
-            && std::abs(m_detail - target) < AlignmentTolerance
-            && std::abs(m_lift.value
+    const auto &detail = d->m_detailMotion;
+    const double target = detail.holdsDetail() ? 1 : 0;
+    const bool liftSettled = detail.settled() && d->tracksSettled()
+            && std::abs(d->m_detail - target) < AlignmentTolerance
+            && std::abs(d->m_lift.value
                         - (target ? sceneGeometry::InspectionLift : sceneGeometry::PreviewLift))
                     < TrackPositionTolerance
-            && std::abs(m_rotation) < AlignmentTolerance
-            && std::abs(m_lift.velocity) < TrackVelocityTolerance;
-    m_detailMotion.updateReadiness(dt, cameraSettled, liftSettled, m_motion->reducedMotion());
-    if (m_detailMotion.phase() == DetailMotion::Phase::Archive)
-        m_navigationLift = false;
+            && std::abs(d->m_rotation) < AlignmentTolerance
+            && std::abs(d->m_lift.velocity) < TrackVelocityTolerance;
+    d->m_detailMotion.updateReadiness(dt, cameraSettled, liftSettled, d->m_motion->reducedMotion());
+    if (d->m_detailMotion.phase() == DetailMotion::Phase::Archive)
+        d->m_navigationLift = false;
 }
 bool SelectionController::archiveReady() const
 {
-    return tracksSettled()
-            && (!m_managedDetail || m_detailMotion.phase() == DetailMotion::Phase::Archive);
+    return d->tracksSettled()
+            && (!d->m_managedDetail || d->m_detailMotion.phase() == DetailMotion::Phase::Archive);
 }
 bool SelectionController::archiveInteractive() const
 {
     return archiveReady()
-            || (m_detailMotion.phase() == DetailMotion::Phase::ReturningArray
-                && m_detailMotion.settled() && m_detail < AlignmentTolerance
-                && std::abs(m_rotation) < AlignmentTolerance);
+            || (d->m_detailMotion.phase() == DetailMotion::Phase::ReturningArray
+                && d->m_detailMotion.settled() && d->m_detail < AlignmentTolerance
+                && std::abs(d->m_rotation) < AlignmentTolerance);
 }
 bool SelectionController::canInspect() const
 {
-    if (!m_managedDetail || m_detailMotion.phase() != DetailMotion::Phase::Presented
-        || m_detail <= DetailOcclusionProgress || m_field.pulseGain() >= ActivityThreshold)
+    if (!d->m_managedDetail || d->m_detailMotion.phase() != DetailMotion::Phase::Presented
+        || d->m_detail <= DetailOcclusionProgress || d->m_field.pulseGain() >= ActivityThreshold)
         return false;
     const auto top = [this](ArchiveCell cell, double lift = 0) {
-        return -sceneGeometry::FloorDepth + field(cell.row, cell.lane) + lift
+        return -sceneGeometry::FloorDepth + d->field(cell.row, cell.lane) + lift
                 + sceneGeometry::CaseTop;
     };
-    double neighborTop = top({ m_cell.lane, m_cell.row - NeighborRadiusRows });
+    double neighborTop = top({ d->m_cell.lane, d->m_cell.row - NeighborRadiusRows });
     for (int row = -NeighborRadiusRows + 1; row <= NeighborRadiusRows; ++row)
         if (row != 0)
-            neighborTop = std::max(neighborTop, top({ m_cell.lane, m_cell.row + row }));
-    for (const auto &copy : m_returning)
-        if (copy.cell.lane == m_cell.lane
-            && std::abs(copy.cell.row - m_cell.row) <= NeighborRadiusRows)
+            neighborTop = std::max(neighborTop, top({ d->m_cell.lane, d->m_cell.row + row }));
+    for (const auto &copy : d->m_returning)
+        if (copy.cell.lane == d->m_cell.lane
+            && std::abs(copy.cell.row - d->m_cell.row) <= NeighborRadiusRows)
             neighborTop = std::max(neighborTop, top(copy.cell, copy.lift.value));
     return selectedPosition().y + sceneGeometry::CaseBottom - neighborTop > NeighborClearance;
 }
@@ -547,32 +631,32 @@ bool SelectionController::beginDrag(QPointF point, int pointerId)
 {
     if (!canInspect())
         return false;
-    return m_drag.press(point, pointerId);
+    return d->m_drag.press(point, pointerId);
 }
 bool SelectionController::moveDrag(QPointF point, int pointerId)
 {
     if (!canInspect()) {
-        m_drag.cancel();
+        d->m_drag.cancel();
         return false;
     }
-    return m_drag.move(point, pointerId);
+    return d->m_drag.move(point, pointerId);
 }
 void SelectionController::endDrag(QPointF point, int pointerId)
 {
-    m_drag.release(point, pointerId);
+    d->m_drag.release(point, pointerId);
 }
 void SelectionController::cancelDrag()
 {
-    m_drag.cancel();
+    d->m_drag.cancel();
 }
-ArchiveField::Column SelectionController::fieldColumn(double lane) const
+ArchiveField::Column SelectionController::Private::fieldColumn(double lane) const
 {
     ArchiveField::Column column;
     column.lane = lane;
     column.reduced = m_motion->reducedMotion();
     if (m_realistic) {
         column.activity = m_realColumns.activity(int(lane));
-        column.center = m_realColumns.row(int(lane), m_openingTime ? 0 : overviewProgress());
+        column.center = m_realColumns.row(int(lane), m_openingTime ? 0 : q->overviewProgress());
     } else {
         const auto &springs = m_motion->springs();
         column.center = m_openingTime ? m_cell.row : springs[ShoulderAxis].value;
@@ -586,14 +670,18 @@ ArchiveField::Column SelectionController::fieldColumn(double lane) const
 }
 double SelectionController::field(double row, double lane) const
 {
+    return d->field(row, lane);
+}
+double SelectionController::Private::field(double row, double lane) const
+{
     return m_motion ? field(row, fieldColumn(lane)) : 0;
 }
-double SelectionController::field(double row, const ArchiveField::Column &column) const
+double SelectionController::Private::field(double row, const ArchiveField::Column &column) const
 {
     return m_field.sample(row, column, { m_realistic, m_openingTime, m_cell, m_origin });
 }
-QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
-                                          bool folded) const
+QMatrix4x4 SelectionController::Private::transform(ArchiveCell cell, double lift, double rotation,
+                                                   bool folded) const
 {
     QMatrix4x4 matrix;
     if (!m_motion)
@@ -601,7 +689,7 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     return transform(cell, lift, rotation, folded, transformInputs(), field(cell.row, cell.lane),
                      field(cell.row + .5, cell.lane) - field(cell.row - .5, cell.lane));
 }
-SelectionController::TransformInputs SelectionController::transformInputs() const
+SelectionController::Private::TransformInputs SelectionController::Private::transformInputs() const
 {
     const double entryZ = m_openingTime ? -OpeningEntryDepth
                     * std::pow(1
@@ -611,11 +699,12 @@ SelectionController::TransformInputs SelectionController::transformInputs() cons
                                                     0.0, 1.0),
                                2)
                                         : 0;
-    return { displayOffset(), entryZ, overviewProgress() };
+    return { displayOffset(), entryZ, q->overviewProgress() };
 }
-QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
-                                          bool folded, const TransformInputs &inputs, double height,
-                                          double slope) const
+QMatrix4x4 SelectionController::Private::transform(ArchiveCell cell, double lift, double rotation,
+                                                   bool folded,
+                                                   const Private::TransformInputs &inputs,
+                                                   double height, double slope) const
 {
     QMatrix4x4 matrix;
     const auto &offset = inputs.offset;
@@ -645,7 +734,7 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     orientation(2, 1) = float(sx);
     orientation(2, 2) = float(cx * cy);
     matrix *= orientation;
-    const double extent = folded ? columnExtent(cell.lane) : 1;
+    const double extent = folded ? q->columnExtent(cell.lane) : 1;
     if (extent <= 0) {
         matrix.scale(0);
     } else if (extent != 1) {
@@ -654,7 +743,7 @@ QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double 
     }
     return matrix;
 }
-std::array<double, 2> SelectionController::displayOffset() const
+std::array<double, 2> SelectionController::Private::displayOffset() const
 {
     const auto &s = m_motion->springs();
     const std::array<double, 2> target{
@@ -678,79 +767,81 @@ std::array<double, 2> SelectionController::displayOffset() const
 }
 SceneVector SelectionController::selectedPosition() const
 {
-    const auto p = transform(m_cell, m_lift.value, m_rotation).column(TranslationColumn);
+    const auto p =
+            d->transform(d->m_cell, d->m_lift.value, d->m_rotation).column(TranslationColumn);
     return { p.x(), p.y(), p.z() };
 }
 QQuaternion SelectionController::selectedRotation() const
 {
     return QQuaternion::fromRotationMatrix(
-            transform(m_cell, m_lift.value, m_rotation, false).normalMatrix());
+            d->transform(d->m_cell, d->m_lift.value, d->m_rotation, false).normalMatrix());
 }
 // Translate displayed tracks and remembered origins by the same whole-period offset.
 // This bounds floating-point coordinates without changing the visible pose or canonical album ID.
 ArchiveCell SelectionController::rebase()
 {
     ArchiveCell shift{ 0, 0 };
-    if (!m_motion || m_realistic)
+    if (!d->m_motion || d->m_realistic)
         return shift;
-    const auto period = m_pool.rowPeriod();
-    const int lanes = qMax(1, m_pool.columnCount());
-    if (std::abs(m_cell.lane) > RebaseCoordinateMagnitude)
-        shift.lane = std::floor((m_cell.lane - 2) / lanes + .5) * lanes;
-    if (period && std::abs(m_cell.row) > std::max(RebaseRowMagnitude, double(*period) * 2))
-        shift.row = std::floor((m_cell.row - yalahoo::sceneGeometry::FirstAlbumRow) / *period)
+    const auto period = d->m_pool.rowPeriod();
+    const int lanes = qMax(1, d->m_pool.columnCount());
+    if (std::abs(d->m_cell.lane) > RebaseCoordinateMagnitude)
+        shift.lane = std::floor((d->m_cell.lane - 2) / lanes + .5) * lanes;
+    if (period && std::abs(d->m_cell.row) > std::max(RebaseRowMagnitude, double(*period) * 2))
+        shift.row = std::floor((d->m_cell.row - yalahoo::sceneGeometry::FirstAlbumRow) / *period)
                 * *period;
     if (shift == ArchiveCell{ 0, 0 })
         return shift;
-    m_cell.lane -= shift.lane;
-    m_cell.row -= shift.row;
-    m_origin.lane += shift.lane;
-    m_origin.row += shift.row;
-    for (auto &copy : m_returning) {
+    d->m_cell.lane -= shift.lane;
+    d->m_cell.row -= shift.row;
+    d->m_origin.lane += shift.lane;
+    d->m_origin.row += shift.row;
+    for (auto &copy : d->m_returning) {
         copy.cell.lane -= shift.lane;
         copy.cell.row -= shift.row;
     }
-    m_field.rebase(shift);
-    m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
-                          -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
+    d->m_field.rebase(shift);
+    d->m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
+                             -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
     Q_EMIT coordinatesRebased(shift.lane, shift.row);
-    publish();
+    d->publish();
     return shift;
 }
 void SelectionController::setOpeningTime(std::optional<double> time)
 {
     if (time && !std::isfinite(*time))
         return;
-    const bool entering = time && !m_openingTime;
-    m_openingTime = time;
-    m_field.beginOpening();
+    const bool entering = time && !d->m_openingTime;
+    d->m_openingTime = time;
+    d->m_field.beginOpening();
     if (time) {
-        m_returning.clear();
-        m_rotation = m_detail = 0;
-        m_returnY.reset();
-        m_managedDetail = m_navigationLift = false;
-        m_detailMotion.reset();
-        m_clarity.select();
+        d->m_returning.clear();
+        d->m_rotation = d->m_detail = 0;
+        d->m_returnY.reset();
+        d->m_managedDetail = d->m_navigationLift = false;
+        d->m_detailMotion.reset();
+        d->m_clarity.select();
         const double intro = smooth((*time - yalahoo::openingTimeline::PreviewStartSeconds)
                                     / yalahoo::openingTimeline::PreviewDurationSeconds);
-        m_lift.finish(extraction(*time) * (1 - intro) + sceneGeometry::PreviewLift * intro);
-        m_liftTarget = sceneGeometry::PreviewLift;
-        if (entering && m_motion) {
-            m_motion->travel(-sceneGeometry::ArchiveDepth
-                                     - (m_cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
-                             (m_cell.lane - 2) * sceneGeometry::ColumnSpacing, m_cell.row,
-                             m_cell.lane);
-            m_motion->finish();
+        d->m_lift.finish(extraction(*time) * (1 - intro) + sceneGeometry::PreviewLift * intro);
+        d->m_liftTarget = sceneGeometry::PreviewLift;
+        if (entering && d->m_motion) {
+            d->m_motion->travel(-sceneGeometry::ArchiveDepth
+                                        - (d->m_cell.row - RailOriginRow)
+                                                * sceneGeometry::RowSpacing,
+                                (d->m_cell.lane - 2) * sceneGeometry::ColumnSpacing, d->m_cell.row,
+                                d->m_cell.lane);
+            d->m_motion->finish();
         }
-        m_realColumns.update(0, true);
+        d->m_realColumns.update(0, true);
     }
-    publish();
+    d->publish();
 }
-void SelectionController::advanceLift(double dt, bool reduced, bool detailNavigation)
+void SelectionController::Private::advanceLift(double dt, bool reduced, bool detailNavigation)
 {
     m_returnY.reset();
     const bool aligningNeighbor =
-            std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
+            std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const ReturningCase &copy) {
                 return copy.returnY && copy.cell.lane == m_cell.lane
                         && std::abs(copy.cell.row - m_cell.row) < NeighborRadiusRows;
             });
@@ -777,17 +868,18 @@ void SelectionController::advanceLift(double dt, bool reduced, bool detailNaviga
 }
 void SelectionController::advance(double dt)
 {
-    if (m_openingTime)
+    if (d->m_openingTime)
         return;
-    if (!m_motion || m_pool.columnCount() == 0 || !std::isfinite(dt) || dt < 0)
+    if (!d->m_motion || d->m_pool.columnCount() == 0 || !std::isfinite(dt) || dt < 0)
         return;
     rebase();
-    const bool reduced = m_motion->reducedMotion();
-    const ArchiveValues targets{ -sceneGeometry::ArchiveDepth
-                                         - (m_cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
-                                 (m_cell.lane - 2) * sceneGeometry::ColumnSpacing, m_cell.row,
-                                 m_cell.lane };
-    const bool detailNavigation = m_managedDetail && m_navigationLift && m_detailMotion.placed();
+    const bool reduced = d->m_motion->reducedMotion();
+    const ArchiveValues targets{
+        -sceneGeometry::ArchiveDepth - (d->m_cell.row - RailOriginRow) * sceneGeometry::RowSpacing,
+        (d->m_cell.lane - 2) * sceneGeometry::ColumnSpacing, d->m_cell.row, d->m_cell.lane
+    };
+    const bool detailNavigation =
+            d->m_managedDetail && d->m_navigationLift && d->m_detailMotion.placed();
     const ArchiveValues rates{ reduced ? ReducedFollowRate
                                        : detailNavigation
                                        ? yalahoo::sceneGeometry::DetailFollowRate
@@ -802,46 +894,47 @@ void SelectionController::advance(double dt)
                                reduced ? ReducedFollowRate
                                        : detailNavigation ? yalahoo::sceneGeometry::DetailFollowRate
                                                           : LaneFollowRate };
-    if (!m_motion->moving()) {
-        auto springs = m_motion->springs();
+    if (!d->m_motion->moving()) {
+        auto springs = d->m_motion->springs();
         for (int i = 0; i < ArchiveAxisCount; ++i) {
             if (reduced)
                 springs[i].finish(targets[i]);
             else
                 springs[i].update(targets[i], rates[i], dt);
         }
-        m_motion->observe(springs, targets, rates);
+        d->m_motion->observe(springs, targets, rates);
     }
-    if (m_realistic)
-        m_realColumns.update(dt, reduced);
-    const bool aligning =
-            std::any_of(m_returning.cbegin(), m_returning.cend(), [](const Copy &copy) {
-                return copy.returnY.has_value();
-            });
+    if (d->m_realistic)
+        d->m_realColumns.update(dt, reduced);
+    const bool aligning = std::any_of(d->m_returning.cbegin(), d->m_returning.cend(),
+                                      [](const ReturningCase &copy) {
+                                          return copy.returnY.has_value();
+                                      });
     const bool idleEligible =
-            m_liftTarget > 0 && m_detail < ActivityThreshold && !m_returnY && !aligning;
-    m_field.advance(dt, reduced, idleEligible, m_detail > 0 || m_returnY || aligning);
-    const bool inspecting = m_managedDetail && m_detailMotion.placed() && !m_returnY;
-    m_rotation = m_drag.advance(m_rotation, dt, inspecting, reduced);
-    if (m_managedDetail) {
-        m_detailMotion.advance(dt, reduced, m_rotation == 0);
-        m_detail = m_detailMotion.value();
+            d->m_liftTarget > 0 && d->m_detail < ActivityThreshold && !d->m_returnY && !aligning;
+    d->m_field.advance(dt, reduced, idleEligible, d->m_detail > 0 || d->m_returnY || aligning);
+    const bool inspecting = d->m_managedDetail && d->m_detailMotion.placed() && !d->m_returnY;
+    d->m_rotation = d->m_drag.advance(d->m_rotation, dt, inspecting, reduced);
+    if (d->m_managedDetail) {
+        d->m_detailMotion.advance(dt, reduced, d->m_rotation == 0);
+        d->m_detail = d->m_detailMotion.value();
     }
-    const double base = -sceneGeometry::FloorDepth + field(m_cell.row, m_cell.lane);
-    if (m_returnY && m_rotation != 0)
-        m_lift.finish(*m_returnY - base);
+    const double base = -sceneGeometry::FloorDepth + d->field(d->m_cell.row, d->m_cell.lane);
+    if (d->m_returnY && d->m_rotation != 0)
+        d->m_lift.finish(*d->m_returnY - base);
     else {
-        advanceLift(dt, reduced, detailNavigation);
+        d->advanceLift(dt, reduced, detailNavigation);
     }
-    if (m_managedDetail)
-        m_clarity.advance(dt, m_detail > ClarityReadyProgress && m_lift.value > ClarityReadyLift,
-                          reduced);
-    for (auto &copy : m_returning) {
+    if (d->m_managedDetail)
+        d->m_clarity.advance(
+                dt, d->m_detail > ClarityReadyProgress && d->m_lift.value > ClarityReadyLift,
+                reduced);
+    for (auto &copy : d->m_returning) {
         copy.clarity = reduced ? 0 : copy.clarity * std::exp(-dt * ReturnClarityDecayRate);
         copy.rotation = reduced ? 0 : returnStep(copy.rotation, dt, false);
         if (copy.returnY && !reduced) {
             copy.lift.finish(*copy.returnY + sceneGeometry::FloorDepth
-                             - field(copy.cell.row, copy.cell.lane));
+                             - d->field(copy.cell.row, copy.cell.lane));
             if (copy.rotation == 0)
                 copy.returnY.reset();
         } else {
@@ -852,13 +945,13 @@ void SelectionController::advance(double dt)
                 copy.lift.update(0, detailNavigation ? DetailLiftRate : ReturnLiftRate, dt);
         }
     }
-    m_returning.removeIf([](const Copy &copy) {
+    d->m_returning.removeIf([](const ReturningCase &copy) {
         return copy.lift.value < InvisibleCaseThreshold
                 && std::abs(copy.rotation) < InvisibleCaseThreshold;
     });
-    publish();
+    d->publish();
 }
-void SelectionController::publish()
+void SelectionController::Private::publish()
 {
     if (!m_motion)
         return;
@@ -870,7 +963,7 @@ void SelectionController::publish()
         for (int index = 0; index < ArchivePool::lanes; ++index)
             rows[index] = m_realColumns.row(
                     int(ArchivePool::visibleCell(index * ArchivePool::rows, center).lane),
-                    overviewProgress());
+                    q->overviewProgress());
     m_pool.update(center, m_realistic ? &rows : nullptr);
     auto &next = m_instanceScratch;
     next.clear();
@@ -895,9 +988,10 @@ void SelectionController::publish()
             object = { physical, ++m_objectSerial };
         instance.objectId = object.objectId;
         const bool hidden = instance.cell == m_cell
-                || std::any_of(m_returning.cbegin(), m_returning.cend(), [&](const Copy &copy) {
-                                return copy.cell == instance.cell;
-                            });
+                || std::any_of(m_returning.cbegin(), m_returning.cend(),
+                               [&](const ReturningCase &copy) {
+                                   return copy.cell == instance.cell;
+                               });
         if (hidden || instance.albumId.isEmpty())
             continue;
         // Consecutive rows share the same half-row sample in the slope difference.
@@ -919,14 +1013,14 @@ void SelectionController::publish()
     for (const auto &copy : m_returning)
         next.append({ copy.cell, copy.albumId, copy.objectId,
                       transform(copy.cell, copy.lift.value, copy.rotation), true, copy.clarity });
-    if (!albumId().isEmpty())
-        next.append({ m_cell, albumId(), m_selectedObject,
+    if (!q->albumId().isEmpty())
+        next.append({ m_cell, q->albumId(), m_selectedObject,
                       transform(m_cell, m_lift.value, m_rotation), true, m_clarity.value() });
     if (next == m_instances)
         return;
     m_instances.swap(next);
     ++m_revision;
-    Q_EMIT frameChanged();
+    Q_EMIT q->frameChanged();
 }
 QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, double y) const
 {
@@ -969,4 +1063,30 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
              { u"worldPoint"_s, QVariant::fromValue(hit.transform.map(nearestLocal)) },
              { u"frameRevision"_s, QVariant::fromValue(frame.revision) } };
 }
+double SelectionController::selectedClarity() const
+{
+    return d->m_clarity.value();
+}
+const DetailMotion &SelectionController::detailMotion() const
+{
+    return d->m_detailMotion;
+}
+bool SelectionController::dragging() const
+{
+    return d->m_drag.dragging();
+}
+double SelectionController::rotation() const
+{
+    return d->m_rotation;
+}
+Kinematics SelectionController::liftState() const
+{
+    return d->m_lift;
+}
+const ReturningCasePool &SelectionController::returningCases() const
+{
+    return d->m_returning;
+}
+SelectionController::~SelectionController() = default;
+
 }

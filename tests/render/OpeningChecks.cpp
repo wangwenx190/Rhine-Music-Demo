@@ -1,10 +1,11 @@
+#include "OpeningChecks.h"
+#include "SelectionLighting.h"
 #include "Require.h"
 #include "ReviewSupport.h"
 #include "SceneAdapter.h"
 #include "MotionController.h"
 #include "SelectionController.h"
 #include <QQuickWindow>
-#include "OpeningChecks.h"
 #include "OffscreenSurface.h"
 #include "OpeningController.h"
 #include "OpeningInk.h"

@@ -5,8 +5,8 @@
 #include "MusicTypes.h"
 #include <QFont>
 #include <QGlyphRun>
-#include <QCache>
 #include <QByteArray>
+#include <memory>
 
 namespace yalahoo {
 struct ResolvedGlyphRun final
@@ -48,6 +48,7 @@ class TextLayoutAdapter final
 public:
     static constexpr int CacheBytes = 8 * 1024 * 1024;
     TextLayoutAdapter();
+    ~TextLayoutAdapter();
     TitleLayout measure(const QString &text, const QFont &main, const QFont &subtitle, double size,
                         double width, double budget, bool narrow, double dpr,
                         bool transport = false);
@@ -59,8 +60,7 @@ public:
     void clear();
 
 private:
-    QCache<QByteArray, TitleLayout> m_cache;
-    QList<QByteArray> m_keys;
-    quint64 m_misses = 0;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

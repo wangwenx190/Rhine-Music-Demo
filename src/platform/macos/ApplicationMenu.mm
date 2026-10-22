@@ -1,5 +1,5 @@
-#include <QCoreApplication>
 #include "ApplicationMenu.h"
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QMetaObject>
 #include <QPointer>
@@ -192,14 +192,14 @@ NSMenuItem *addItem(NSMenu *menu, NSString *title, NSString *key, SEL action, id
 @end
 
 namespace yalahoo {
-struct ApplicationMenu::State final
+struct ApplicationMenu::Private final
 {
-    Q_DISABLE_COPY_MOVE(State)
-    State() = default;
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
     NSMenu *previous = nil;
     NSMenu *bar = nil;
     YalahooMenuTarget *target = nil;
-    ~State()
+    ~Private()
     {
         if (NSApp.mainMenu == bar)
             NSApp.mainMenu = previous;
@@ -210,17 +210,17 @@ struct ApplicationMenu::State final
 };
 ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> settings,
                                  std::function<bool()> settingsEnabled)
-    : m_state(std::make_unique<State>())
+    : d(std::make_unique<Private>())
 {
-    m_state->previous = [NSApp.mainMenu retain];
-    m_state->target = [[YalahooMenuTarget alloc] init];
-    m_state->target->window = &window;
-    m_state->target->settings = std::move(settings);
-    m_state->target->settingsEnabled = std::move(settingsEnabled);
-    m_state->bar = [[NSMenu alloc] initWithTitle:@"yalahOO!!!"];
-    auto *application = addMenu(m_state->bar, @"yalahOO!!!");
+    d->previous = [NSApp.mainMenu retain];
+    d->target = [[YalahooMenuTarget alloc] init];
+    d->target->window = &window;
+    d->target->settings = std::move(settings);
+    d->target->settingsEnabled = std::move(settingsEnabled);
+    d->bar = [[NSMenu alloc] initWithTitle:@"yalahOO!!!"];
+    auto *application = addMenu(d->bar, @"yalahOO!!!");
     addItem(application, QCoreApplication::translate("Yalahoo", "Settings...").toNSString(), @",",
-            @selector(openSettings:), m_state->target);
+            @selector(openSettings:), d->target);
     [application addItem:[NSMenuItem separatorItem]];
     addItem(application, QCoreApplication::translate("Yalahoo", "Hide yalahOO!!!").toNSString(),
             @"h", @selector(hide:), NSApp);
@@ -232,11 +232,11 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
             @selector(unhideAllApplications:), NSApp);
     [application addItem:[NSMenuItem separatorItem]];
     addItem(application, QCoreApplication::translate("Yalahoo", "Quit yalahOO!!!").toNSString(),
-            @"q", @selector(quit:), m_state->target);
-    auto *file = addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "File").toNSString());
+            @"q", @selector(quit:), d->target);
+    auto *file = addMenu(d->bar, QCoreApplication::translate("Yalahoo", "File").toNSString());
     addItem(file, QCoreApplication::translate("Yalahoo", "Close").toNSString(), @"w",
-            @selector(closeWindow:), m_state->target);
-    auto *edit = addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "Edit").toNSString());
+            @selector(closeWindow:), d->target);
+    auto *edit = addMenu(d->bar, QCoreApplication::translate("Yalahoo", "Edit").toNSString());
     const NSArray<NSString *> *titles = @[
         QCoreApplication::translate("Yalahoo", "Undo").toNSString(),
         QCoreApplication::translate("Yalahoo", "Redo").toNSString(),
@@ -247,7 +247,7 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
     ];
     const NSArray<NSString *> *keys = @[ @"z", @"z", @"x", @"c", @"v", @"a" ];
     for (NSInteger index = 0; index < EditCommandCount; ++index) {
-        auto *item = addItem(edit, titles[index], keys[index], @selector(edit:), m_state->target);
+        auto *item = addItem(edit, titles[index], keys[index], @selector(edit:), d->target);
         item.tag = index + 1;
         if (index + 1 == RedoCommand)
             item.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
@@ -255,12 +255,12 @@ ApplicationMenu::ApplicationMenu(QQuickWindow &window, std::function<void()> set
             [edit addItem:[NSMenuItem separatorItem]];
     }
     auto *windowMenu =
-            addMenu(m_state->bar, QCoreApplication::translate("Yalahoo", "Window").toNSString());
+            addMenu(d->bar, QCoreApplication::translate("Yalahoo", "Window").toNSString());
     addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Minimize").toNSString(), @"m",
-            @selector(minimizeWindow:), m_state->target);
+            @selector(minimizeWindow:), d->target);
     addItem(windowMenu, QCoreApplication::translate("Yalahoo", "Zoom").toNSString(), @"",
-            @selector(zoomWindow:), m_state->target);
-    NSApp.mainMenu = m_state->bar;
+            @selector(zoomWindow:), d->target);
+    NSApp.mainMenu = d->bar;
 }
 ApplicationMenu::~ApplicationMenu() = default;
 }

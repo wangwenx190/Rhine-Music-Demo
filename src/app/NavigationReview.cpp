@@ -1,9 +1,12 @@
+#include "NavigationReview.h"
+#include "SelectionController.h"
+#include "SelectionLighting.h"
+#include "LayoutMetrics.h"
 #include "MonotonicTime.h"
 #include <algorithm>
 #include <iterator>
 #include "ReviewSupport.h"
 #include <QWheelEvent>
-#include "NavigationReview.h"
 #include "InputRouter.h"
 #include "RulerController.h"
 #include "SceneAdapter.h"

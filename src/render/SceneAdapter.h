@@ -2,16 +2,24 @@
 // isolated from Qt projection and native backend conventions.
 
 #pragma once
-#include <optional>
-#include "FrameClock.h"
-#include "LayoutMetrics.h"
 #include "SceneFrame.h"
-#include "ScalarSpring.h"
-#include "SelectionLighting.h"
-#include "RenderQuality.h"
-#include "RenderBackend.h"
-#include "SelectionController.h"
+#include "RowLightController.h"
+#include <QObject>
 #include <QVariantMap>
+#include <memory>
+#include <optional>
+namespace yalahoo {
+class FrameClock;
+class LayoutMetrics;
+class SelectionLighting;
+class RenderQuality;
+class SelectionController;
+}
+Q_MOC_INCLUDE("LayoutMetrics.h")
+Q_MOC_INCLUDE("SelectionLighting.h")
+Q_MOC_INCLUDE("RenderQuality.h")
+Q_MOC_INCLUDE("SelectionController.h")
+
 namespace yalahoo {
 class SceneAdapter : public QObject
 {
@@ -34,68 +42,24 @@ class SceneAdapter : public QObject
     Q_PROPERTY(yalahoo::SelectionController* selection READ selection NOTIFY selectionControllerChanged FINAL)
 public:
     explicit SceneAdapter(FrameClock *clock = nullptr, QObject *parent = nullptr);
+    ~SceneAdapter() override;
     void setSelection(SelectionController *selection);
     SelectionController *selection() const;
-    SelectionLighting *lighting()
-    {
-        return &m_lighting;
-    }
-    RenderQuality *quality()
-    {
-        return &m_quality;
-    }
-    QVariantMap renderBackendContract() const
-    {
-        return RenderBackendContract::fields();
-    }
-    LayoutMetrics *layout()
-    {
-        return &m_layout;
-    }
-    const SceneFrame &frame() const
-    {
-        return m_frame;
-    }
-    QVector3D cameraPosition() const
-    {
-        return m_frame.camera.position.qt();
-    }
-    QVector3D cameraAim() const
-    {
-        return m_frame.camera.aim.qt();
-    }
-    QQuaternion cameraRotation() const
-    {
-        return m_frame.cameraRotation;
-    }
-    QVector3D casePosition() const
-    {
-        return m_frame.casePosition.qt();
-    }
-    double fieldOfView() const
-    {
-        return m_frame.fieldOfView;
-    }
-    double clipNear() const
-    {
-        return m_frame.nearPlane;
-    }
-    double clipFar() const
-    {
-        return m_frame.farPlane;
-    }
-    quint64 frameRevision() const
-    {
-        return m_frame.revision;
-    }
-    double detail() const
-    {
-        return m_detail;
-    }
-    bool reducedMotion() const
-    {
-        return m_reduced;
-    }
+    SelectionLighting *lighting();
+    RenderQuality *quality();
+    QVariantMap renderBackendContract() const;
+    LayoutMetrics *layout();
+    const SceneFrame &frame() const;
+    QVector3D cameraPosition() const;
+    QVector3D cameraAim() const;
+    QQuaternion cameraRotation() const;
+    QVector3D casePosition() const;
+    double fieldOfView() const;
+    double clipNear() const;
+    double clipFar() const;
+    quint64 frameRevision() const;
+    double detail() const;
+    bool reducedMotion() const;
     void setDetail(double detail);
     void requestDetail(bool detail);
     void setReducedMotion(bool reduced);
@@ -122,21 +86,7 @@ Q_SIGNALS:
     void selectionControllerChanged();
 
 private:
-    void publish();
-    QPointer<SelectionController> m_selection;
-    quint64 m_selectionRevision = 0;
-    LayoutMetrics m_layout;
-    SelectionLighting m_lighting;
-    RenderQuality m_quality;
-    RowLightingInput m_lightingInput;
-    QQuaternion m_caseRotation;
-    bool m_explicitLightingInput = false;
-    SceneFrame m_frame;
-    QMatrix4x4 m_viewProjection;
-    std::array<ScalarSpring, 3> m_position, m_aim;
-    ScalarSpring m_span, m_yaw, m_elevation;
-    double m_detail = 0, m_laneSpeed = 0, m_rowSpeed = 0, m_pointerX = 0, m_pointerY = 0;
-    bool m_reduced = false, m_managedDetail = false;
-    std::optional<double> m_openingTime;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

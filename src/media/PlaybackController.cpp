@@ -1,7 +1,17 @@
+#include "PlaybackController.h"
+#include <memory>
+#include "PlaybackQueue.h"
+#include "BackgroundMusicController.h"
+#include <QPointer>
+#include <QAudioDevice>
+#include <QAudioOutput>
+#include <QMediaDevices>
+#include <QMediaPlayer>
+#include "LibrarySession_p.h"
+#include "PlaybackController_p.h"
 #include "ProductDefaults.h"
 #include "LibrarySession.h"
 #include <QCoreApplication>
-#include "PlaybackController.h"
 #include "Logging.h"
 #include <QTimer>
 #include <algorithm>
@@ -16,48 +26,48 @@ constexpr auto RestartPreviousThresholdMilliseconds = 3000;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+
 PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
-    : QObject(parent),
-      m_library(library),
-      m_devices(this),
-      m_outputRefresh(this),
-      m_output(this),
-      m_player(this)
+    : QObject(parent), d(std::make_unique<Private>(this, library))
 {
-    m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
-    m_player.setPlaybackRate(1);
-    m_player.setAudioOutput(&m_output);
-    m_outputRefresh.setSingleShot(true);
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, &m_outputRefresh,
+    d->m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
+    d->m_player.setPlaybackRate(1);
+    d->m_player.setAudioOutput(&d->m_output);
+    d->m_outputRefresh.setSingleShot(true);
+    connect(&d->m_devices, &QMediaDevices::audioOutputsChanged, &d->m_outputRefresh,
             qOverload<>(&QTimer::start));
-    connect(&m_outputRefresh, &QTimer::timeout, this, &PlaybackController::refreshDevices);
-    connect(&m_output, &QAudioOutput::volumeChanged, this, &PlaybackController::volumeChanged);
-    refreshDevices();
+    connect(&d->m_outputRefresh, &QTimer::timeout, this, [this] {
+        d->refreshDevices();
+    });
+    connect(&d->m_output, &QAudioOutput::volumeChanged, this, &PlaybackController::volumeChanged);
+    d->refreshDevices();
 }
 
 PlaybackController::~PlaybackController()
 {
-    ++m_revision;
-    clearConnections();
-    m_player.stop();
-    m_player.setSource({ });
-    m_player.setAudioOutput(nullptr);
+    ++d->m_revision;
+    d->clearConnections();
+    d->m_player.stop();
+    d->m_player.setSource({ });
+    d->m_player.setAudioOutput(nullptr);
 }
 void PlaybackController::setBackgroundMusic(BackgroundMusicController *background)
 {
-    disconnect(m_silenceConnection);
-    m_background = background;
+    disconnect(d->m_silenceConnection);
+    d->m_background = background;
     if (background)
-        m_silenceConnection = connect(background, &BackgroundMusicController::silenceReached, this,
-                                      &PlaybackController::ready);
-    setIntent(m_intent);
+        d->m_silenceConnection =
+                connect(background, &BackgroundMusicController::silenceReached, this, [this] {
+                    d->ready();
+                });
+    d->setIntent(d->m_intent);
 }
-void PlaybackController::setIntent(Intent intent)
+void PlaybackController::Private::setIntent(Private::Intent intent)
 {
     if (m_intent != intent)
         qCInfo(logMedia) << "Playback intent changed" << "intent=" << int(intent)
-                         << "albumId=" << albumId() << "trackId=" << trackId()
-                         << "positionMs=" << position();
+                         << "albumId=" << q->albumId() << "trackId=" << q->trackId()
+                         << "positionMs=" << q->position();
     m_intent = intent;
     if (m_background) {
         using Activity = BackgroundMusicController::SongActivity;
@@ -66,62 +76,62 @@ void PlaybackController::setIntent(Intent intent)
                                                                          : Activity::Stopped);
     }
 }
-const Track *PlaybackController::track() const
+const Track *PlaybackController::Private::track() const
 {
     return m_queue.current();
 }
 QString PlaybackController::title() const
 {
-    return track() ? track()->title : QString();
+    return d->track() ? d->track()->title : QString();
 }
 QString PlaybackController::albumId() const
 {
-    return track() ? track()->albumId : QString();
+    return d->track() ? d->track()->albumId : QString();
 }
 QString PlaybackController::trackId() const
 {
-    return track() ? track()->id : QString();
+    return d->track() ? d->track()->id : QString();
 }
 bool PlaybackController::requested() const
 {
-    return m_intent == Intent::Playing;
+    return d->m_intent == Private::Intent::Playing;
 }
 bool PlaybackController::playing() const
 {
-    return requested() && !m_unavailable && m_player.isPlaying();
+    return requested() && !d->m_unavailable && d->m_player.isPlaying();
 }
 bool PlaybackController::loading() const
 {
-    return requested() && !m_unavailable
-            && (m_player.mediaStatus() == QMediaPlayer::LoadingMedia
-                || m_player.mediaStatus() == QMediaPlayer::BufferingMedia
-                || m_player.source().isEmpty());
+    return requested() && !d->m_unavailable
+            && (d->m_player.mediaStatus() == QMediaPlayer::LoadingMedia
+                || d->m_player.mediaStatus() == QMediaPlayer::BufferingMedia
+                || d->m_player.source().isEmpty());
 }
 QString PlaybackController::state() const
 {
-    if (!m_error.isEmpty())
+    if (!d->m_error.isEmpty())
         return u"error"_s;
-    if (requested() && m_unavailable)
+    if (requested() && d->m_unavailable)
         return u"waiting-output"_s;
     if (loading())
         return u"loading"_s;
     if (playing())
         return u"playing"_s;
-    return m_intent == Intent::Paused ? u"paused"_s : u"stopped"_s;
+    return d->m_intent == Private::Intent::Paused ? u"paused"_s : u"stopped"_s;
 }
 qint64 PlaybackController::position() const
 {
-    return m_dragging ? m_preview : m_restore >= 0 ? m_restore : m_position;
+    return d->m_dragging ? d->m_preview : d->m_restore >= 0 ? d->m_restore : d->m_position;
 }
 bool PlaybackController::playTrack(const QString &albumId, const QString &trackId)
 {
-    const auto *album = m_library->album(albumId);
+    const auto *album = d->m_library->d->album(albumId);
     if (!album || album->offline) {
         Q_EMIT rejected(QCoreApplication::translate(
                 "Yalahoo", "The album directory is unavailable. Rescan or choose another track."));
         return false;
     }
-    const auto result = m_queue.select(m_library->snapshot(), *album, trackId);
+    const auto result = d->m_queue.select(d->m_library->snapshot(), *album, trackId);
     if (result != PlaybackQueue::Selection::Accepted) {
         Q_EMIT rejected(
                 result == PlaybackQueue::Selection::MissingTrack
@@ -132,19 +142,19 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
                                   "Yalahoo", "Tracks require a local absolute file path."));
         return false;
     }
-    start(m_queue.index());
+    d->start(d->m_queue.index());
     return true;
 }
 bool PlaybackController::playAlbum(const QString &albumId)
 {
-    const auto *album = m_library->album(albumId);
+    const auto *album = d->m_library->d->album(albumId);
     return album && !album->tracks.isEmpty() && playTrack(albumId, album->tracks.first().id);
 }
-void PlaybackController::start(int index)
+void PlaybackController::Private::start(int index)
 {
     if (!m_queue.selectIndex(index)) {
-        Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
-                                                    "Tracks require a local absolute file path."));
+        Q_EMIT q->rejected(QCoreApplication::translate(
+                "Yalahoo", "Tracks require a local absolute file path."));
         return;
     }
     m_source = track()->sourceUrl;
@@ -152,117 +162,117 @@ void PlaybackController::start(int index)
     m_error.clear();
     m_duration = m_position = m_lastPosition = 0;
     m_dragging = false;
-    m_library->adoptPlaybackIds(albumId(), trackId());
+    m_library->d->adoptPlaybackIds(q->albumId(), q->trackId());
     load();
-    Q_EMIT currentChanged();
-    Q_EMIT durationChanged();
-    Q_EMIT positionChanged();
-    Q_EMIT seekableChanged();
-    Q_EMIT stateChanged();
+    Q_EMIT q->currentChanged();
+    Q_EMIT q->durationChanged();
+    Q_EMIT q->positionChanged();
+    Q_EMIT q->seekableChanged();
+    Q_EMIT q->stateChanged();
 }
-void PlaybackController::clearConnections()
+void PlaybackController::Private::clearConnections()
 {
     for (const auto &connection : std::exchange(m_connections, { }))
-        disconnect(connection);
+        QObject::disconnect(connection);
 }
-bool PlaybackController::current(quint64 revision, const QUrl &source) const
+bool PlaybackController::Private::current(quint64 revision, const QUrl &source) const
 {
     return revision == m_revision && !m_source.isEmpty() && source == m_source
             && m_player.source() == source;
 }
-void PlaybackController::load(qint64 restore)
+void PlaybackController::Private::load(qint64 restore)
 {
     const auto revision = ++m_revision;
-    qCInfo(logMedia) << "Loading track" << "revision=" << revision << "albumId=" << albumId()
-                     << "trackId=" << trackId() << "source=" << m_source << "restoreMs=" << restore;
+    qCInfo(logMedia) << "Loading track" << "revision=" << revision << "albumId=" << q->albumId()
+                     << "trackId=" << q->trackId() << "source=" << m_source
+                     << "restoreMs=" << restore;
     setSupport(MediaSupport::Unknown);
     clearConnections();
     m_player.stop();
     m_player.setSource({ });
     m_seekable = m_dragging = false;
-    Q_EMIT seekableChanged();
+    Q_EMIT q->seekableChanged();
     m_restore = std::max<qint64>(0, restore);
     m_position = m_restore;
-    Q_EMIT positionChanged();
+    Q_EMIT q->positionChanged();
     if (m_unavailable || m_source.isEmpty())
         return;
     if (!m_player.isAvailable()) {
         m_error = QCoreApplication::translate("Yalahoo",
                                               "The Qt media playback service is unavailable.");
         setIntent(Intent::Paused);
-        Q_EMIT stateChanged();
+        Q_EMIT q->stateChanged();
         return;
     }
     const auto source = m_source;
-    m_connections.append(connect(&m_player, &QMediaPlayer::mediaStatusChanged, this,
-                                 [this, revision, source](auto value) {
-                                     if (current(revision, source)
-                                         && value == m_player.mediaStatus())
-                                         status(value, revision);
-                                 }));
-    m_connections.append(connect(
-            &m_player, &QMediaPlayer::seekableChanged, this, [this, revision, source](bool value) {
+    m_connections.append(QObject::connect(
+            &m_player, &QMediaPlayer::mediaStatusChanged, q, [this, revision, source](auto value) {
+                if (current(revision, source) && value == m_player.mediaStatus())
+                    status(value, revision);
+            }));
+    m_connections.append(QObject::connect(
+            &m_player, &QMediaPlayer::seekableChanged, q, [this, revision, source](bool value) {
                 if (!current(revision, source) || value != m_player.isSeekable())
                     return;
                 m_seekable = value;
-                Q_EMIT seekableChanged();
+                Q_EMIT q->seekableChanged();
                 ready();
             }));
-    m_connections.append(connect(&m_player, &QMediaPlayer::durationChanged, this,
-                                 [this, revision, source](qint64 value) {
-                                     if (!current(revision, source) || value != m_player.duration())
-                                         return;
-                                     m_duration = std::max<qint64>(0, value);
-                                     Q_EMIT durationChanged();
-                                 }));
-    m_connections.append(connect(
-            &m_player, &QMediaPlayer::positionChanged, this, [this, revision, source](qint64) {
+    m_connections.append(QObject::connect(
+            &m_player, &QMediaPlayer::durationChanged, q, [this, revision, source](qint64 value) {
+                if (!current(revision, source) || value != m_player.duration())
+                    return;
+                m_duration = std::max<qint64>(0, value);
+                Q_EMIT q->durationChanged();
+            }));
+    m_connections.append(QObject::connect(
+            &m_player, &QMediaPlayer::positionChanged, q, [this, revision, source](qint64) {
                 if (!current(revision, source) || m_unavailable || m_restore >= 0)
                     return;
                 const auto value = m_player.position();
                 m_position = std::max<qint64>(0, value);
                 if (value > 0) {
                     m_lastPosition = value;
-                    if (playing() && m_player.hasAudio())
+                    if (q->playing() && m_player.hasAudio())
                         setSupport(MediaSupport::Supported);
                 }
                 if (!m_dragging)
-                    Q_EMIT positionChanged();
+                    Q_EMIT q->positionChanged();
             }));
-    m_connections.append(connect(&m_player, &QMediaPlayer::playbackStateChanged, this,
-                                 [this, revision, source](auto value) {
-                                     if (!current(revision, source)
-                                         || value != m_player.playbackState())
-                                         return;
-                                     if (value == QMediaPlayer::PlayingState) {
-                                         if (!requested() || m_unavailable)
-                                             m_player.pause();
-                                     }
-                                     Q_EMIT stateChanged();
-                                 }));
-    m_connections.append(
-            connect(&m_player, &QMediaPlayer::errorOccurred, this,
-                    [this, revision, source](auto error, const QString &reason) {
-                        if (!current(revision, source) || error != m_player.error() || m_unavailable
-                            || error == QMediaPlayer::NoError)
-                            return;
-                        qCWarning(logMedia) << "Playback error" << "revision=" << revision
-                                            << "source=" << source << "code=" << int(error)
-                                            << "reason=" << reason
-                                            << "device=" << m_output.device().description();
-                        m_error = reason.isEmpty()
-                                ? QCoreApplication::translate("Yalahoo", "Qt media error: %1")
-                                          .arg(int(error))
-                                : reason;
-                        setIntent(Intent::Paused);
-                        if (error == QMediaPlayer::FormatError)
-                            setSupport(MediaSupport::Unsupported);
-                        Q_EMIT stateChanged();
-                    }));
+    m_connections.append(QObject::connect(&m_player, &QMediaPlayer::playbackStateChanged, q,
+                                          [this, revision, source](auto value) {
+                                              if (!current(revision, source)
+                                                  || value != m_player.playbackState())
+                                                  return;
+                                              if (value == QMediaPlayer::PlayingState) {
+                                                  if (!q->requested() || m_unavailable)
+                                                      m_player.pause();
+                                              }
+                                              Q_EMIT q->stateChanged();
+                                          }));
+    m_connections.append(QObject::connect(
+            &m_player, &QMediaPlayer::errorOccurred, q,
+            [this, revision, source](auto error, const QString &reason) {
+                if (!current(revision, source) || error != m_player.error() || m_unavailable
+                    || error == QMediaPlayer::NoError)
+                    return;
+                qCWarning(logMedia)
+                        << "Playback error" << "revision=" << revision << "source=" << source
+                        << "code=" << int(error) << "reason=" << reason
+                        << "device=" << m_output.device().description();
+                m_error = reason.isEmpty()
+                        ? QCoreApplication::translate("Yalahoo", "Qt media error: %1")
+                                  .arg(int(error))
+                        : reason;
+                setIntent(Intent::Paused);
+                if (error == QMediaPlayer::FormatError)
+                    setSupport(MediaSupport::Unsupported);
+                Q_EMIT q->stateChanged();
+            }));
     m_player.setPlaybackRate(1);
     m_player.setSource(source);
 }
-void PlaybackController::ready()
+void PlaybackController::Private::ready()
 {
     const auto value = m_player.mediaStatus();
     if (m_unavailable || m_source.isEmpty() || m_player.source() != m_source
@@ -273,7 +283,7 @@ void PlaybackController::ready()
         setIntent(Intent::Paused);
         m_player.pause();
         setSupport(MediaSupport::Unsupported);
-        Q_EMIT stateChanged();
+        Q_EMIT q->stateChanged();
         return;
     }
     m_duration = std::max<qint64>(0, m_player.duration());
@@ -287,35 +297,35 @@ void PlaybackController::ready()
         m_position = m_lastPosition = target;
         if (m_seekable)
             m_player.setPosition(target);
-        Q_EMIT positionChanged();
+        Q_EMIT q->positionChanged();
     }
-    if (requested() && m_background && !m_background->silent())
+    if (q->requested() && m_background && !m_background->silent())
         return;
-    if (requested() && !m_player.isPlaying())
+    if (q->requested() && !m_player.isPlaying())
         m_player.play();
     else if (m_intent == Intent::Paused)
         m_player.pause();
-    Q_EMIT durationChanged();
-    Q_EMIT seekableChanged();
-    Q_EMIT stateChanged();
+    Q_EMIT q->durationChanged();
+    Q_EMIT q->seekableChanged();
+    Q_EMIT q->stateChanged();
 }
-void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revision)
+void PlaybackController::Private::status(QMediaPlayer::MediaStatus value, quint64 revision)
 {
     if (revision != m_revision)
         return;
     qCInfo(logMedia) << "Media status changed" << "revision=" << revision << "source=" << m_source
                      << "status=" << int(value) << "error=" << m_player.errorString();
-    if (value == QMediaPlayer::EndOfMedia && requested() && m_endedRevision != revision) {
+    if (value == QMediaPlayer::EndOfMedia && q->requested() && m_endedRevision != revision) {
         m_endedRevision = revision;
         // Never replace a source inside the backend's signal stack.
-        QTimer::singleShot(0, this, [this, revision] {
-            if (revision != m_revision || !requested())
+        QTimer::singleShot(0, q, [this, revision] {
+            if (revision != m_revision || !q->requested())
                 return;
-            if (canNext())
-                next();
+            if (q->canNext())
+                q->next();
             else {
-                stop();
-                Q_EMIT queueFinished();
+                q->stop();
+                Q_EMIT q->queueFinished();
             }
         });
     } else if (value == QMediaPlayer::InvalidMedia) {
@@ -327,14 +337,14 @@ void PlaybackController::status(QMediaPlayer::MediaStatus value, quint64 revisio
     } else if (value == QMediaPlayer::LoadedMedia || value == QMediaPlayer::BufferedMedia) {
         ready();
     }
-    Q_EMIT stateChanged();
+    Q_EMIT q->stateChanged();
 }
-void PlaybackController::setSupport(MediaSupport support)
+void PlaybackController::Private::setSupport(MediaSupport support)
 {
     if (m_support == support)
         return;
     m_support = support;
-    Q_EMIT supportChanged(support);
+    Q_EMIT q->supportChanged(support);
 }
 void PlaybackController::toggle()
 {
@@ -342,42 +352,42 @@ void PlaybackController::toggle()
         pause();
         return;
     }
-    if (!track()) {
-        playAlbum(m_library->navigationAlbumId());
+    if (!d->track()) {
+        playAlbum(d->m_library->navigationAlbumId());
         return;
     }
-    setIntent(Intent::Playing);
-    m_error.clear();
-    if (m_source.isEmpty()) {
-        m_source = track()->sourceUrl;
-        load();
-    } else if (m_player.mediaStatus() == QMediaPlayer::EndOfMedia)
-        load();
-    else if (m_player.error() != QMediaPlayer::NoError)
-        load(position());
+    d->setIntent(Private::Intent::Playing);
+    d->m_error.clear();
+    if (d->m_source.isEmpty()) {
+        d->m_source = d->track()->sourceUrl;
+        d->load();
+    } else if (d->m_player.mediaStatus() == QMediaPlayer::EndOfMedia)
+        d->load();
+    else if (d->m_player.error() != QMediaPlayer::NoError)
+        d->load(position());
     else
-        ready();
+        d->ready();
     Q_EMIT stateChanged();
 }
 void PlaybackController::pause()
 {
-    setIntent(Intent::Paused);
-    m_player.pause();
+    d->setIntent(Private::Intent::Paused);
+    d->m_player.pause();
     Q_EMIT stateChanged();
 }
 void PlaybackController::stop()
 {
-    ++m_revision;
-    clearConnections();
-    m_player.stop();
-    m_player.setSource({ });
-    m_source.clear();
-    setIntent(Intent::Stopped);
-    setSupport(MediaSupport::Unknown);
-    m_error.clear();
-    m_position = m_lastPosition = m_preview = 0;
-    m_restore = -1;
-    m_dragging = m_seekable = false;
+    ++d->m_revision;
+    d->clearConnections();
+    d->m_player.stop();
+    d->m_player.setSource({ });
+    d->m_source.clear();
+    d->setIntent(Private::Intent::Stopped);
+    d->setSupport(MediaSupport::Unknown);
+    d->m_error.clear();
+    d->m_position = d->m_lastPosition = d->m_preview = 0;
+    d->m_restore = -1;
+    d->m_dragging = d->m_seekable = false;
     Q_EMIT positionChanged();
     Q_EMIT seekableChanged();
     Q_EMIT stateChanged();
@@ -385,90 +395,91 @@ void PlaybackController::stop()
 void PlaybackController::next()
 {
     if (canNext())
-        start(m_queue.index() + 1);
+        d->start(d->m_queue.index() + 1);
     else
         stop();
 }
 void PlaybackController::previous()
 {
-    if (!track())
+    if (!d->track())
         return;
     if (position() > RestartPreviousThresholdMilliseconds) {
         seek(0);
         return;
     }
-    if (m_queue.index() == 0) {
+    if (d->m_queue.index() == 0) {
         if (seekable())
             seek(0);
         if (!requested())
             toggle();
     } else
-        start(m_queue.index() - 1);
+        d->start(d->m_queue.index() - 1);
 }
 void PlaybackController::retry()
 {
-    if (!track())
+    if (!d->track())
         return;
-    m_source = track()->sourceUrl;
-    setIntent(Intent::Playing);
-    m_error.clear();
-    load(position());
+    d->m_source = d->track()->sourceUrl;
+    d->setIntent(Private::Intent::Playing);
+    d->m_error.clear();
+    d->load(position());
     Q_EMIT stateChanged();
 }
 void PlaybackController::seek(qint64 value)
 {
     if (!seekable())
         return;
-    m_position = m_lastPosition =
-            m_duration > 0 ? std::clamp(value, qint64(0), m_duration) : std::max<qint64>(0, value);
-    m_restore = m_unavailable ? m_position : -1;
-    m_player.setPosition(m_position);
+    d->m_position = d->m_lastPosition = d->m_duration > 0
+            ? std::clamp(value, qint64(0), d->m_duration)
+            : std::max<qint64>(0, value);
+    d->m_restore = d->m_unavailable ? d->m_position : -1;
+    d->m_player.setPosition(d->m_position);
     Q_EMIT positionChanged();
 }
 void PlaybackController::beginSeek()
 {
     if (!seekable())
         return;
-    m_preview = position();
-    m_dragging = true;
+    d->m_preview = position();
+    d->m_dragging = true;
     Q_EMIT positionChanged();
 }
 void PlaybackController::previewSeek(qint64 value)
 {
-    if (!m_dragging)
+    if (!d->m_dragging)
         return;
-    m_preview = std::clamp(value, qint64(0), m_duration);
+    d->m_preview = std::clamp(value, qint64(0), d->m_duration);
     Q_EMIT positionChanged();
 }
 void PlaybackController::commitSeek()
 {
-    if (!m_dragging)
+    if (!d->m_dragging)
         return;
-    const auto target = m_preview;
-    m_dragging = false;
+    const auto target = d->m_preview;
+    d->m_dragging = false;
     seek(target);
     Q_EMIT positionChanged();
 }
 void PlaybackController::cancelSeek()
 {
-    if (!m_dragging)
+    if (!d->m_dragging)
         return;
-    m_dragging = false;
+    d->m_dragging = false;
     Q_EMIT positionChanged();
 }
 void PlaybackController::setVolume(double value)
 {
     if (std::isfinite(value))
-        m_output.setVolume(float(std::clamp(value, 0., 1.)));
+        d->m_output.setVolume(float(std::clamp(value, 0., 1.)));
 }
 QVariantList PlaybackController::deviceChoices() const
 {
     QVariantList choices;
-    choices.reserve(m_outputs.size() + 1);
+    choices.reserve(d->m_outputs.size() + 1);
     choices.append(
             QVariantMap{ { u"label"_s, QCoreApplication::translate("Yalahoo", "System default") },
                          { u"value"_s, QString() } });
-    for (const auto &device : m_outputs)
+    for (const auto &device : d->m_outputs)
         choices.append(QVariantMap{ { u"label"_s, device.description() },
                                     { u"value"_s, QString::fromUtf8(device.id().toBase64()) } });
     return choices;
@@ -478,7 +489,7 @@ QVariantList PlaybackController::devices() const
     QVariantList result{ { QVariantMap{
             { u"id"_s, u""_s },
             { u"name"_s, QCoreApplication::translate("Yalahoo", "System default") } } } };
-    for (const auto &device : m_outputs)
+    for (const auto &device : d->m_outputs)
         result.append(QVariantMap{ { u"id"_s, QString::fromUtf8(device.id().toBase64()) },
                                    { u"name"_s, device.description() } });
     return result;
@@ -490,16 +501,16 @@ bool PlaybackController::selectDevice(const QString &id)
     if (!id.isEmpty() && decoded.toBase64() != encoded)
         return false;
     if (!id.isEmpty()
-        && std::none_of(m_outputs.cbegin(), m_outputs.cend(), [&](const auto &device) {
+        && std::none_of(d->m_outputs.cbegin(), d->m_outputs.cend(), [&](const auto &device) {
                return device.id() == decoded;
            }))
         return false;
-    m_preferred = decoded;
-    m_notice.clear();
-    refreshDevices();
+    d->m_preferred = decoded;
+    d->m_notice.clear();
+    d->refreshDevices();
     return true;
 }
-void PlaybackController::restoreOutput(const QAudioDevice &selected)
+void PlaybackController::Private::restoreOutput(const QAudioDevice &selected)
 {
     const bool recovering = m_unavailable;
     m_unavailable = false;
@@ -516,14 +527,14 @@ void PlaybackController::restoreOutput(const QAudioDevice &selected)
             ready();
     }
 }
-void PlaybackController::refreshDevices()
+void PlaybackController::Private::refreshDevices()
 {
     applyDevices(QMediaDevices::audioOutputs(), QMediaDevices::defaultAudioOutput());
 }
 // Choose a surviving explicit device first, then the system default. A route change preserves
 // source identity, valid position and the newest pause/stop intent across backend reloads.
-void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
-                                      const QAudioDevice &systemDefault)
+void PlaybackController::Private::applyDevices(const QList<QAudioDevice> &devices,
+                                               const QAudioDevice &systemDefault)
 {
     qCInfo(logMedia) << "Audio outputs refreshed" << "count=" << devices.size()
                      << "default=" << systemDefault.description()
@@ -553,7 +564,68 @@ void PlaybackController::applyDevices(const QList<QAudioDevice> &devices,
     } else {
         restoreOutput(selected);
     }
-    Q_EMIT devicesChanged();
-    Q_EMIT stateChanged();
+    Q_EMIT q->devicesChanged();
+    Q_EMIT q->stateChanged();
 }
+QString PlaybackController::error() const
+{
+    return d->m_error;
+}
+QString PlaybackController::notice() const
+{
+    return d->m_notice;
+}
+qint64 PlaybackController::duration() const
+{
+    return d->m_duration;
+}
+bool PlaybackController::seekable() const
+{
+    return d->m_seekable && !d->m_source.isEmpty();
+}
+bool PlaybackController::dragging() const
+{
+    return d->m_dragging;
+}
+double PlaybackController::volume() const
+{
+    return d->m_output.volume();
+}
+QString PlaybackController::selectedDevice() const
+{
+    return QString::fromUtf8(d->m_preferred.toBase64());
+}
+bool PlaybackController::outputAvailable() const
+{
+    return !d->m_unavailable;
+}
+bool PlaybackController::canNext() const
+{
+    return d->m_queue.hasNext();
+}
+bool PlaybackController::canPrevious() const
+{
+    return d->m_queue.current() != nullptr;
+}
+QString PlaybackController::outputName() const
+{
+    return d->m_output.device().description();
+}
+QUrl PlaybackController::source() const
+{
+    return d->m_player.source();
+}
+bool PlaybackController::isAvailable() const
+{
+    return d->m_player.isAvailable();
+}
+quint64 PlaybackController::sourceRevision() const
+{
+    return d->m_revision;
+}
+MediaSupport PlaybackController::mediaSupport() const
+{
+    return d->m_support;
+}
+
 }

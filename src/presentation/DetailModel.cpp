@@ -1,7 +1,15 @@
+#include "DetailModel.h"
+#include <memory>
+#include <QObject>
+#include "MusicTypes.h"
+#include <QAbstractListModel>
+#include <QCache>
+#include <QFont>
+#include <QByteArray>
+#include <utility>
 #include "Units.h"
 #include "LibrarySession.h"
 #include <QCoreApplication>
-#include "DetailModel.h"
 #include <QSet>
 #include <QTextLayout>
 #include <QGuiApplication>
@@ -110,11 +118,24 @@ QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int
             + QCoreApplication::translate("Yalahoo", " Online queries are not enabled yet.");
 }
 }
-DetailModel::DetailModel(QObject *parent) : QAbstractListModel(parent)
+struct DetailModel::Private final
+{
+    Q_DISABLE_COPY_MOVE(Private)
+    Private() = default;
+
+    QCache<QByteArray, double> m_lineHeights{ detailText::HeightCacheKiB
+                                              * yalahoo::units::BytesPerKiB };
+    Snapshot m_snapshot;
+    const Album *m_album = nullptr;
+    Album m_resolved;
+    QVariantMap m_info;
+};
+DetailModel::DetailModel(QObject *parent)
+    : QAbstractListModel(parent), d(std::make_unique<Private>())
 {
     if (auto *application = qobject_cast<QGuiApplication *>(QCoreApplication::instance()))
         connect(application, &QGuiApplication::fontDatabaseChanged, this, [this] {
-            m_lineHeights.clear();
+            d->m_lineHeights.clear();
         });
 }
 double DetailModel::normalLineHeight(const QString &text, const QFont &font)
@@ -122,7 +143,7 @@ double DetailModel::normalLineHeight(const QString &text, const QFont &font)
     QByteArray key;
     QDataStream stream(&key, QIODevice::WriteOnly);
     stream << font << text;
-    if (const auto *cached = m_lineHeights.object(key))
+    if (const auto *cached = d->m_lineHeights.object(key))
         return *cached;
     QTextLayout layout(text, font);
     layout.beginLayout();
@@ -132,8 +153,8 @@ double DetailModel::normalLineHeight(const QString &text, const QFont &font)
     const double height =
             line.isValid() ? std::round(line.ascent()) + std::round(line.descent()) : 0;
     const qsizetype cost = key.size() + LineCacheEntryOverheadBytes;
-    if (cost <= m_lineHeights.maxCost())
-        m_lineHeights.insert(key, new double(height), int(cost));
+    if (cost <= d->m_lineHeights.maxCost())
+        d->m_lineHeights.insert(key, new double(height), int(cost));
     return height;
 }
 QString DetailModel::time(double seconds)
@@ -146,14 +167,14 @@ QString DetailModel::time(double seconds)
 }
 int DetailModel::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid() || !m_album ? 0 : m_album->tracks.size();
+    return parent.isValid() || !d->m_album ? 0 : d->m_album->tracks.size();
 }
 QVariant DetailModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.model() != this || index.column() != 0 || index.row() < 0
         || index.row() >= rowCount())
         return { };
-    const auto &track = m_album->tracks[index.row()];
+    const auto &track = d->m_album->tracks[index.row()];
     struct RoleReader final
     {
         int role;
@@ -191,9 +212,9 @@ QVariant DetailModel::data(const QModelIndex &index, int role) const
           } },
         { DiscHeading,
           [](const DetailModel &self, const Track &track, int row) -> QVariant {
-              return self.m_info.value(u"discs"_s).toInt() > 1
+              return self.d->m_info.value(u"discs"_s).toInt() > 1
                       && (row == 0
-                          || self.m_album->tracks[row - 1].discNumber.value_or(1)
+                          || self.d->m_album->tracks[row - 1].discNumber.value_or(1)
                                   != track.discNumber.value_or(1));
           } }
     };
@@ -222,16 +243,16 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
 {
     const auto snapshot = library.snapshot();
     const auto *album = library.navigationAlbum();
-    if (!metadataOnly && snapshot == m_snapshot && album && album->id == m_resolved.id
-        && m_info.value(u"code"_s) == library.browseInfo().value(u"code"_s))
+    if (!metadataOnly && snapshot == d->m_snapshot && album && album->id == d->m_resolved.id
+        && d->m_info.value(u"code"_s) == library.browseInfo().value(u"code"_s))
         return;
     if (!metadataOnly)
         beginResetModel();
-    m_snapshot = snapshot;
-    m_resolved = album ? library.resolvedAlbum(album->id) : Album();
-    m_album = album ? &m_resolved : nullptr;
-    album = m_album;
-    m_info.clear();
+    d->m_snapshot = snapshot;
+    d->m_resolved = album ? library.resolvedAlbum(album->id) : Album();
+    d->m_album = album ? &d->m_resolved : nullptr;
+    album = d->m_album;
+    d->m_info.clear();
     if (album) {
         const auto &a = *album;
         QVariantList facts, producers;
@@ -376,32 +397,39 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                                        a.descriptionSource.value(u"url"_s).toString(),
                                        a.descriptionSource.value(u"license"_s).toString() };
         descriptionSource.removeAll(QString());
-        m_info = { { u"id"_s, a.id },
-                   { u"title"_s, a.title },
-                   { u"mainTitle"_s, title.main },
-                   { u"translation"_s, title.translation },
-                   { u"artist"_s, artistDisplayName(a.artist) },
-                   { u"offline"_s, a.offline },
-                   { u"description"_s, a.description },
-                   { u"localNote"_s, a.localNote },
-                   { u"descriptionSource"_s, a.descriptionSource.toVariantMap() },
-                   { u"descriptionSourceText"_s, descriptionSource.join(u" \u00b7 "_s) },
-                   { u"introduction"_s, a.introduction.toVariantMap() },
-                   { u"creditsLookup"_s, a.creditsLookup.toVariantMap() },
-                   { u"producers"_s, producers },
-                   { u"producerGroups"_s, groups },
-                   { u"introductionStatus"_s,
-                     lookupStatus(a.introduction, !a.description.isEmpty(), false) },
-                   { u"creditsStatus"_s,
-                     lookupStatus(a.creditsLookup, !a.producers.isEmpty(), true, a.tracks.size()) },
-                   { u"folder"_s, a.folder.toDisplayString() },
-                   { u"rawGenres"_s, a.rawGenres },
-                   { u"facts"_s, facts },
-                   { u"discs"_s, discs },
-                   { u"code"_s, library.browseInfo().value(u"code"_s) } };
+        d->m_info = { { u"id"_s, a.id },
+                      { u"title"_s, a.title },
+                      { u"mainTitle"_s, title.main },
+                      { u"translation"_s, title.translation },
+                      { u"artist"_s, artistDisplayName(a.artist) },
+                      { u"offline"_s, a.offline },
+                      { u"description"_s, a.description },
+                      { u"localNote"_s, a.localNote },
+                      { u"descriptionSource"_s, a.descriptionSource.toVariantMap() },
+                      { u"descriptionSourceText"_s, descriptionSource.join(u" \u00b7 "_s) },
+                      { u"introduction"_s, a.introduction.toVariantMap() },
+                      { u"creditsLookup"_s, a.creditsLookup.toVariantMap() },
+                      { u"producers"_s, producers },
+                      { u"producerGroups"_s, groups },
+                      { u"introductionStatus"_s,
+                        lookupStatus(a.introduction, !a.description.isEmpty(), false) },
+                      { u"creditsStatus"_s,
+                        lookupStatus(a.creditsLookup, !a.producers.isEmpty(), true,
+                                     a.tracks.size()) },
+                      { u"folder"_s, a.folder.toDisplayString() },
+                      { u"rawGenres"_s, a.rawGenres },
+                      { u"facts"_s, facts },
+                      { u"discs"_s, discs },
+                      { u"code"_s, library.browseInfo().value(u"code"_s) } };
     }
     if (!metadataOnly)
         endResetModel();
     Q_EMIT albumChanged();
 }
+QVariantMap DetailModel::album() const
+{
+    return d->m_info;
+}
+DetailModel::~DetailModel() = default;
+
 }

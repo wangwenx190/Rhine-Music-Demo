@@ -1,50 +1,75 @@
+#include "OfflineMetadataProvider.h"
+#include <QList>
+#include <QHash>
 #include "metadata/MetadataMerge.h"
 #include <QCoreApplication>
-#include "OfflineMetadataProvider.h"
 #include <QTimer>
 #include <utility>
 
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-OfflineMetadataProvider::OfflineMetadataProvider(QObject *parent)
-    : IMetadataProvider(parent),
-      m_cache(std::make_shared<const LibrarySnapshot>()),
-      m_dispatch(this)
+struct OfflineMetadataProvider::Private final
 {
-    m_dispatch.setSingleShot(true);
-    connect(&m_dispatch, &QTimer::timeout, this, &OfflineMetadataProvider::dispatch);
+    Q_DISABLE_COPY_MOVE(Private)
+    explicit Private(OfflineMetadataProvider *owner)
+        : q(owner), m_cache(std::make_shared<const LibrarySnapshot>()), m_dispatch(owner)
+    {
+    }
+    OfflineMetadataProvider *const q;
+
+    struct Pending final
+    {
+        AlbumQuery query;
+        RequestToken token;
+        MetadataKind kind;
+        Snapshot cache;
+        qsizetype albumIndex = -1;
+    };
+    void dispatch();
+    Snapshot m_cache;
+    QHash<QString, qsizetype> m_albumIndices;
+    QList<Pending> m_pending;
+    QTimer m_dispatch;
+};
+OfflineMetadataProvider::OfflineMetadataProvider(QObject *parent)
+    : IMetadataProvider(parent), d(std::make_unique<Private>(this))
+{
+    d->m_dispatch.setSingleShot(true);
+    connect(&d->m_dispatch, &QTimer::timeout, this, [this] {
+        d->dispatch();
+    });
 }
 void OfflineMetadataProvider::setCache(Snapshot cache)
 {
-    m_cache = cache ? std::move(cache) : std::make_shared<const LibrarySnapshot>();
-    m_albumIndices.clear();
-    m_albumIndices.reserve(m_cache->albums.size());
-    for (qsizetype index = 0; index < m_cache->albums.size(); ++index)
-        m_albumIndices.tryEmplace(m_cache->albums[index].id, index);
+    d->m_cache = cache ? std::move(cache) : std::make_shared<const LibrarySnapshot>();
+    d->m_albumIndices.clear();
+    d->m_albumIndices.reserve(d->m_cache->albums.size());
+    for (qsizetype index = 0; index < d->m_cache->albums.size(); ++index)
+        d->m_albumIndices.tryEmplace(d->m_cache->albums[index].id, index);
 }
 void OfflineMetadataProvider::cancel(RequestToken token)
 {
-    m_pending.removeIf([&token](const Pending &pending) {
+    d->m_pending.removeIf([&token](const Private::Pending &pending) {
         return pending.token == token;
     });
-    if (m_pending.isEmpty())
-        m_dispatch.stop();
+    if (d->m_pending.isEmpty())
+        d->m_dispatch.stop();
 }
 bool OfflineMetadataProvider::request(AlbumQuery query, RequestToken token, MetadataKind kind)
 {
-    for (const auto &pending : std::as_const(m_pending))
+    for (const auto &pending : std::as_const(d->m_pending))
         if (pending.token == token)
             return true;
-    if (m_pending.size() >= yalahoo::metadataLimits::MaximumPendingRequests)
+    if (d->m_pending.size() >= yalahoo::metadataLimits::MaximumPendingRequests)
         return false;
-    const auto albumIndex = m_albumIndices.value(token.albumId, -1);
-    m_pending.append({ std::move(query), std::move(token), kind, m_cache, albumIndex });
-    if (!m_dispatch.isActive())
-        m_dispatch.start(0);
+    const auto albumIndex = d->m_albumIndices.value(token.albumId, -1);
+    d->m_pending.append({ std::move(query), std::move(token), kind, d->m_cache, albumIndex });
+    if (!d->m_dispatch.isActive())
+        d->m_dispatch.start(0);
     return true;
 }
-void OfflineMetadataProvider::dispatch()
+void OfflineMetadataProvider::Private::dispatch()
 {
     if (m_pending.isEmpty())
         return;
@@ -64,7 +89,7 @@ void OfflineMetadataProvider::dispatch()
     if (query.albumId != token.albumId) {
         result.status = ProviderStatus::Error;
         result.error = u"Album query/token mismatch"_s;
-        Q_EMIT resultReady(result);
+        Q_EMIT q->resultReady(result);
         return;
     }
     if (albumIndex >= 0)
@@ -76,6 +101,12 @@ void OfflineMetadataProvider::dispatch()
         result.retryAt.clear();
         result.error = QCoreApplication::translate("Yalahoo", "Online metadata is not enabled yet");
     }
-    Q_EMIT resultReady(result);
+    Q_EMIT q->resultReady(result);
 }
+ProviderCapabilities OfflineMetadataProvider::capabilities() const
+{
+    return { };
+}
+OfflineMetadataProvider::~OfflineMetadataProvider() = default;
+
 }

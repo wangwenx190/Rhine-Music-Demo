@@ -2,6 +2,7 @@
 // values; rendering never queries live controller state.
 
 #pragma once
+#include <QPointer>
 #include "RulerController.h"
 #include "CanvasSupport.h"
 

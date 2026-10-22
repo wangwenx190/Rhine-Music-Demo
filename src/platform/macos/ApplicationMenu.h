@@ -19,7 +19,7 @@ public:
     ~ApplicationMenu();
 
 private:
-    struct State;
-    std::unique_ptr<State> m_state;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

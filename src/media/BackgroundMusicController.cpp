@@ -1,5 +1,15 @@
-#include <QCoreApplication>
 #include "BackgroundMusicController.h"
+#include <memory>
+#include "ProductDefaults.h"
+#include <QAudioOutput>
+#include <QAudioDevice>
+#include <QMediaPlayer>
+#include <QMediaDevices>
+#include <QElapsedTimer>
+#include <QTimer>
+#include "BackgroundMusicController_p.h"
+#include <utility>
+#include <QCoreApplication>
 #include "Logging.h"
 #include <algorithm>
 #include <cmath>
@@ -14,78 +24,78 @@ constexpr auto FadeOutMilliseconds = 220;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+
 BackgroundMusicController::BackgroundMusicController(QObject *parent)
-    : QObject(parent),
-      m_devices(this),
-      m_outputRefresh(this),
-      m_output(this),
-      m_player(this),
-      m_fade(this)
+    : QObject(parent), d(std::make_unique<Private>(this))
 {
-    m_output.setVolume(0);
-    m_player.setAudioOutput(&m_output);
-    m_player.setLoops(QMediaPlayer::Infinite);
-    m_player.setPlaybackRate(1);
-    m_fade.setInterval(FadeTickMilliseconds);
-    m_fade.setTimerType(Qt::PreciseTimer);
-    connect(&m_fade, &QTimer::timeout, this, &BackgroundMusicController::advanceFade);
-    connect(&m_player, &QMediaPlayer::playbackStateChanged, this, [this] {
+    d->m_output.setVolume(0);
+    d->m_player.setAudioOutput(&d->m_output);
+    d->m_player.setLoops(QMediaPlayer::Infinite);
+    d->m_player.setPlaybackRate(1);
+    d->m_fade.setInterval(FadeTickMilliseconds);
+    d->m_fade.setTimerType(Qt::PreciseTimer);
+    connect(&d->m_fade, &QTimer::timeout, this, [this] {
+        d->advanceFade();
+    });
+    connect(&d->m_player, &QMediaPlayer::playbackStateChanged, this, [this] {
         Q_EMIT stateChanged();
     });
-    connect(&m_player, &QMediaPlayer::errorOccurred, this,
+    connect(&d->m_player, &QMediaPlayer::errorOccurred, this,
             [this](auto error, const QString &reason) {
-                if (error == QMediaPlayer::NoError || error != m_player.error())
+                if (error == QMediaPlayer::NoError || error != d->m_player.error())
                     return;
-                qCWarning(logMedia) << "Background music error" << "source=" << m_player.source()
+                qCWarning(logMedia) << "Background music error" << "source=" << d->m_player.source()
                                     << "code=" << int(error) << "reason=" << reason;
-                m_error = reason.isEmpty()
+                d->m_error = reason.isEmpty()
                         ? QCoreApplication::translate("Yalahoo",
                                                       "Qt cannot play the background music.")
                         : reason;
-                m_fade.stop();
-                m_target = 0;
-                m_output.setVolume(0);
-                m_player.pause();
+                d->m_fade.stop();
+                d->m_target = 0;
+                d->m_output.setVolume(0);
+                d->m_player.pause();
                 Q_EMIT silenceReached();
                 Q_EMIT stateChanged();
             });
-    m_outputRefresh.setSingleShot(true);
-    connect(&m_devices, &QMediaDevices::audioOutputsChanged, &m_outputRefresh,
+    d->m_outputRefresh.setSingleShot(true);
+    connect(&d->m_devices, &QMediaDevices::audioOutputsChanged, &d->m_outputRefresh,
             qOverload<>(&QTimer::start));
-    connect(&m_outputRefresh, &QTimer::timeout, this, &BackgroundMusicController::refreshOutput);
-    refreshOutput();
+    connect(&d->m_outputRefresh, &QTimer::timeout, this, [this] {
+        d->refreshOutput();
+    });
+    d->refreshOutput();
 }
 
 BackgroundMusicController::~BackgroundMusicController()
 {
     stop();
-    m_player.setSource({ });
-    m_player.setAudioOutput(nullptr);
+    d->m_player.setSource({ });
+    d->m_player.setAudioOutput(nullptr);
 }
 void BackgroundMusicController::start()
 {
-    if (m_active)
+    if (d->m_active)
         return;
-    m_active = true;
-    reconcile();
+    d->m_active = true;
+    d->reconcile();
 }
 void BackgroundMusicController::stop()
 {
-    m_active = false;
-    m_fade.stop();
-    m_target = 0;
-    m_output.setVolume(0);
-    m_player.stop();
+    d->m_active = false;
+    d->m_fade.stop();
+    d->m_target = 0;
+    d->m_output.setVolume(0);
+    d->m_player.stop();
     Q_EMIT silenceReached();
 }
 void BackgroundMusicController::setEnabled(bool enabled)
 {
-    if (m_enabled == enabled)
+    if (d->m_enabled == enabled)
         return;
-    m_enabled = enabled;
+    d->m_enabled = enabled;
     if (enabled)
-        m_error.clear();
-    reconcile();
+        d->m_error.clear();
+    d->reconcile();
     Q_EMIT settingsChanged();
     Q_EMIT stateChanged();
 }
@@ -94,20 +104,20 @@ void BackgroundMusicController::setVolume(double volume)
     if (!std::isfinite(volume))
         return;
     volume = std::clamp(volume, 0., 1.);
-    if (m_volume == volume)
+    if (d->m_volume == volume)
         return;
-    m_volume = volume;
-    reconcile();
+    d->m_volume = volume;
+    d->reconcile();
     Q_EMIT settingsChanged();
 }
 void BackgroundMusicController::setSongActivity(SongActivity activity)
 {
-    if (m_song == activity)
+    if (d->m_song == activity)
         return;
-    m_song = activity;
-    reconcile();
+    d->m_song = activity;
+    d->reconcile();
 }
-void BackgroundMusicController::refreshOutput()
+void BackgroundMusicController::Private::refreshOutput()
 {
     const auto device = QMediaDevices::defaultAudioOutput();
     m_available = !device.isNull();
@@ -118,11 +128,11 @@ void BackgroundMusicController::refreshOutput()
         m_target = 0;
         m_output.setVolume(0);
         m_player.pause();
-        Q_EMIT silenceReached();
+        Q_EMIT q->silenceReached();
     }
     reconcile();
 }
-void BackgroundMusicController::reconcile()
+void BackgroundMusicController::Private::reconcile()
 {
     const double target = m_active && m_enabled && m_available && m_error.isEmpty()
                     && m_song == SongActivity::Stopped
@@ -148,7 +158,7 @@ void BackgroundMusicController::reconcile()
     }
     m_fade.start();
 }
-void BackgroundMusicController::advanceFade()
+void BackgroundMusicController::Private::advanceFade()
 {
     const double progress = std::min(1., double(m_elapsed.elapsed()) / m_duration);
     m_output.setVolume(float(m_from + (m_target - m_from) * progress));
@@ -158,7 +168,28 @@ void BackgroundMusicController::advanceFade()
     m_output.setVolume(float(m_target));
     if (m_target == 0) {
         m_player.pause();
-        Q_EMIT silenceReached();
+        Q_EMIT q->silenceReached();
     }
 }
+bool BackgroundMusicController::enabled() const
+{
+    return d->m_enabled;
+}
+double BackgroundMusicController::volume() const
+{
+    return d->m_volume;
+}
+bool BackgroundMusicController::playing() const
+{
+    return d->m_player.isPlaying();
+}
+QString BackgroundMusicController::error() const
+{
+    return d->m_error;
+}
+bool BackgroundMusicController::silent() const
+{
+    return d->m_output.volume() == 0;
+}
+
 }

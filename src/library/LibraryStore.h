@@ -52,35 +52,6 @@ Q_SIGNALS:
     void scanFinished(quint64 generation, quint64 filesVisited);
 
 private:
-    enum class Kind {
-        None,
-        Load,
-        Scan,
-        Probe,
-        Import,
-        Save,
-        Metadata
-    };
-    struct JobResult final
-    {
-        Snapshot snapshot;
-        QString error;
-        quint64 filesVisited = 0;
-        bool cancelled = false;
-    };
-    static JobResult read(const QString &path);
-    static JobResult write(const QString &path, const Snapshot &snapshot);
-    void schedule();
-    void startMetadata();
-    void startSave();
-    void startLoad();
-    void startImport();
-    void startScan();
-
-    void complete();
-    void completeLoad(const JobResult &result, quint64 generation);
-    void accept(const JobResult &result, Kind kind, quint64 generation);
-    void report(const QString &error);
     struct Private;
     std::unique_ptr<Private> d;
 };

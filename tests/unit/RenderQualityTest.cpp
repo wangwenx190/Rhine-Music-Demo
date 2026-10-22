@@ -1,3 +1,4 @@
+#include "LayoutMetrics.h"
 #include "RenderQuality.h"
 #include "SceneAdapter.h"
 #include <QtTest>

@@ -2,19 +2,15 @@
 // navigation and scene invalidation without changing playback intent.
 
 #pragma once
+#include <memory>
 #include "SceneGeometry.h"
-#include "ArchiveField.h"
 #include "ArchivePool.h"
 #include "MotionController.h"
-#include "MotionFunctions.h"
 #include "SceneFrame.h"
 #include "RealColumns.h"
 #include "ColumnMemory.h"
 #include "DetailMotion.h"
-#include "CaseClarity.h"
 #include "ReturningCasePool.h"
-#include "PointerDragController.h"
-#include <QPointer>
 
 namespace yalahoo {
 
@@ -35,6 +31,7 @@ class SelectionController final : public QObject
     Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY selectionChanged FINAL)
 public:
     explicit SelectionController(MotionController *motion, QObject *parent = nullptr);
+    ~SelectionController() override;
     void setColumns(QList<LibraryColumn> columns, const Snapshot &snapshot = { });
     CoverSource coverSource(const QString &id) const;
     QString albumTitle(const QString &id) const;
@@ -73,14 +70,8 @@ public:
     QString adjacentAlbum(const QString &id, int direction) const;
     bool albumNavigationEnabled(const QString &id, int direction) const;
     bool switchDetail(const QString &id);
-    double selectedClarity() const
-    {
-        return m_clarity.value();
-    }
-    const DetailMotion &detailMotion() const
-    {
-        return m_detailMotion;
-    }
+    double selectedClarity() const;
+    const DetailMotion &detailMotion() const;
     void updateDetailReadiness(double dt, bool cameraSettled);
     bool archiveReady() const;
     bool archiveInteractive() const;
@@ -89,23 +80,11 @@ public:
     bool moveDrag(QPointF point, int pointerId = 0);
     void endDrag(QPointF point, int pointerId = 0);
     void cancelDrag();
-    bool dragging() const
-    {
-        return m_drag.dragging();
-    }
+    bool dragging() const;
     std::array<double, 2> navigationSpeeds() const;
-    double rotation() const
-    {
-        return m_rotation;
-    }
-    Kinematics liftState() const
-    {
-        return m_lift;
-    }
-    const ReturningCasePool &returningCases() const
-    {
-        return m_returning;
-    }
+    double rotation() const;
+    Kinematics liftState() const;
+    const ReturningCasePool &returningCases() const;
     void advance(double dt);
     void setOpeningTime(std::optional<double> time);
     ArchiveCell rebase();
@@ -123,70 +102,7 @@ Q_SIGNALS:
     void memoryChanged();
 
 private:
-    ArchiveField::Column fieldColumn(double lane) const;
-    double field(double row, const ArchiveField::Column &column) const;
-    void advanceLift(double dt, bool reduced, bool detailNavigation);
-    void publish();
-    bool tracksSettled() const;
-    std::optional<ArchiveCell> selectionCell(const QString &id) const;
-    using Copy = ReturningCase;
-    std::array<double, 2> displayOffset() const;
-    QMatrix4x4 transform(ArchiveCell cell, double lift = 0, double rotation = 0,
-                         bool folded = true) const;
-    struct TransformInputs final
-    {
-        std::array<double, 2> offset;
-        double entryZ = 0, overview = 0;
-    };
-    TransformInputs transformInputs() const;
-    QMatrix4x4 transform(ArchiveCell cell, double lift, double rotation, bool folded,
-                         const TransformInputs &inputs, double height, double slope) const;
-    struct ExtentCache final
-    {
-        std::optional<double> lane;
-        double extent = 1;
-    };
-    mutable std::array<ExtentCache, ArchivePool::lanes> m_extentCache;
-    mutable double m_extentCenter = 0, m_extentProgress = -1;
-    QPointer<OverviewController> m_overview;
-    QPointer<MotionController> m_motion;
-    ArchivePool m_pool;
-    RealColumns m_realColumns;
-    ColumnMemory m_memory;
-    bool m_realistic = false;
-    struct AlbumCoverSource final
-    {
-        CoverSource cover;
-        QString title;
-    };
-    QHash<QString, AlbumCoverSource> m_coverSources;
-    ArchiveCell m_cell, m_origin;
-    QVector<ArchiveInstance> m_instances, m_instanceScratch;
-    struct PoolObject final
-    {
-        struct PhysicalCell final
-        {
-            qint64 lane = 0, row = 0;
-            bool operator==(const PhysicalCell &) const = default;
-        };
-        PhysicalCell physical;
-        quint64 objectId = 0;
-    };
-    // Each complete 9x48 frontier visits every physical residue exactly once.
-    // Store its previous identity directly, including across logical coordinate rebases.
-    std::array<PoolObject, ArchivePool::capacity> m_poolObjects;
-    ReturningCasePool m_returning;
-    DetailMotion m_detailMotion;
-    CaseClarity m_clarity;
-    PointerDragController m_drag;
-    bool m_managedDetail = false, m_navigationLift = false;
-    ArchiveField m_field;
-    ScalarSpring m_lift;
-    double m_rotation = 0;
-    double m_liftTarget = yalahoo::sceneGeometry::PreviewLift, m_detail = 0;
-    std::optional<double> m_openingTime;
-    std::optional<double> m_returnY;
-    quint64 m_revision = 0, m_objectSerial = ArchivePool::capacity;
-    quint64 m_selectedObject = ++m_objectSerial;
+    struct Private;
+    std::unique_ptr<Private> d;
 };
 }

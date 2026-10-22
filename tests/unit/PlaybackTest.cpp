@@ -2,6 +2,7 @@
 // input. Explicit fixture literals are independent inputs or expected results; timing bounds
 // have named constants.
 
+#include "PlaybackController_p.h"
 #include "LibrarySession.h"
 #include "PlaybackController.h"
 #include "AudioFixture.h"
@@ -129,11 +130,11 @@ private Q_SLOTS:
         f.player.previewSeek(2000);
         QCOMPARE(f.player.position(), 2000);
         // A live backend update cannot overwrite the thumb while dragging.
-        QCOMPARE(f.player.m_player.position(), 1000);
-        f.player.m_player.setPosition(1200);
+        QCOMPARE(f.player.d->m_player.position(), 1000);
+        f.player.d->m_player.setPosition(1200);
         QCOMPARE(f.player.position(), 2000);
         f.player.commitSeek();
-        QTRY_VERIFY(std::abs(f.player.m_player.position() - 2000) < 100);
+        QTRY_VERIFY(std::abs(f.player.d->m_player.position() - 2000) < 100);
         f.player.toggle();
         QTRY_VERIFY(f.player.playing());
         f.player.previous();
@@ -150,21 +151,21 @@ private Q_SLOTS:
         QVERIFY(!f.player.requested());
         f.player.toggle();
         f.player.pause();
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.m_player.mediaStatus() == QMediaPlayer::LoadedMedia
-                                         || f.player.m_player.mediaStatus()
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.d->m_player.mediaStatus() == QMediaPlayer::LoadedMedia
+                                         || f.player.d->m_player.mediaStatus()
                                                  == QMediaPlayer::BufferedMedia,
                                  AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
-        QCOMPARE(f.player.m_player.playbackRate(), 1.);
+        QCOMPARE(f.player.d->m_player.playbackRate(), 1.);
     }
     void queueReuseAndSnapshotInvalidation()
     {
         Fixture f;
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
-        const auto *storage = f.player.m_queue.tracks().constData();
+        const auto *storage = f.player.d->m_queue.tracks().constData();
         QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
-        QCOMPARE(f.player.m_queue.tracks().constData(), storage);
+        QCOMPARE(f.player.d->m_queue.tracks().constData(), storage);
         QVERIFY(!f.player.playTrack(u"album"_s, u"missing"_s));
         QCOMPARE(f.player.trackId(), u"track-1"_s);
         auto replacement = *f.library.snapshot();
@@ -182,20 +183,20 @@ private Q_SLOTS:
     void lateLoadEndAndQueueOwnership()
     {
         Fixture f;
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         const auto old = f.player.sourceRevision();
         f.player.next();
         const auto current = f.player.sourceRevision();
         QVERIFY(current > old);
         QCOMPARE(f.player.trackId(), u"track-1"_s);
-        f.player.status(QMediaPlayer::EndOfMedia, old);
+        f.player.d->status(QMediaPlayer::EndOfMedia, old);
         QCOMPARE(f.player.trackId(), u"track-1"_s);
         f.player.pause();
-        f.player.status(QMediaPlayer::LoadedMedia, current);
+        f.player.d->status(QMediaPlayer::LoadedMedia, current);
         QVERIFY(!f.player.requested());
         f.player.stop();
-        f.player.status(QMediaPlayer::LoadedMedia, current);
+        f.player.d->status(QMediaPlayer::LoadedMedia, current);
         QVERIFY(f.player.source().isEmpty());
         QVERIFY(!f.player.requested());
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
@@ -205,12 +206,12 @@ private Q_SLOTS:
         QCOMPARE(f.player.trackId(), u"track-1"_s);
         QCOMPARE(f.library.playbackTrackId(), u"track-1"_s);
         // Exactly one end commit for the current source, despite duplicate notifications.
-        f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
-        f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
+        f.player.d->status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
+        f.player.d->status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         QTRY_COMPARE(f.player.trackId(), u"track-2"_s);
-        f.player.status(QMediaPlayer::InvalidMedia, old);
+        f.player.d->status(QMediaPlayer::InvalidMedia, old);
         QVERIFY(f.player.error().isEmpty());
-        f.player.status(QMediaPlayer::InvalidMedia, f.player.sourceRevision());
+        f.player.d->status(QMediaPlayer::InvalidMedia, f.player.sourceRevision());
         QVERIFY(!f.player.error().isEmpty());
         QVERIFY(!f.player.playing());
         f.player.stop();
@@ -223,15 +224,15 @@ private Q_SLOTS:
         const auto systemDefault = QMediaDevices::defaultAudioOutput();
         QVERIFY(!real.isEmpty());
         QVERIFY(!systemDefault.isNull());
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(!f.player.outputAvailable());
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         QVERIFY(f.player.requested());
         QVERIFY(f.player.source().isEmpty());
         f.player.pause();
-        f.player.applyDevices(real, systemDefault);
-        QTRY_VERIFY_WITH_TIMEOUT(f.player.m_player.mediaStatus() == QMediaPlayer::LoadedMedia
-                                         || f.player.m_player.mediaStatus()
+        f.player.d->applyDevices(real, systemDefault);
+        QTRY_VERIFY_WITH_TIMEOUT(f.player.d->m_player.mediaStatus() == QMediaPlayer::LoadedMedia
+                                         || f.player.d->m_player.mediaStatus()
                                                  == QMediaPlayer::BufferedMedia,
                                  AsyncDeadlineMilliseconds);
         QVERIFY(!f.player.playing());
@@ -242,33 +243,33 @@ private Q_SLOTS:
         f.player.seek(1500);
         f.player.pause();
         // Model a backend's spurious zero before the output-loss notification.
-        f.player.m_player.setPosition(0);
-        f.player.applyDevices({ }, { });
-        f.player.applyDevices(real, systemDefault);
+        f.player.d->m_player.setPosition(0);
+        f.player.d->applyDevices({ }, { });
+        f.player.d->applyDevices(real, systemDefault);
         QTRY_VERIFY(std::abs(f.player.position() - 1500) < 100);
         QVERIFY(!f.player.playing());
         QCOMPARE(f.player.volume(), double(.01f));
         f.player.toggle();
         QTRY_VERIFY(f.player.playing());
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(f.player.requested());
-        f.player.applyDevices(real, systemDefault);
+        f.player.d->applyDevices(real, systemDefault);
         QTRY_VERIFY_WITH_TIMEOUT(f.player.playing(), AsyncDeadlineMilliseconds);
         f.player.pause();
         const auto id = QString::fromUtf8(real.first().id().toBase64());
         QVERIFY(f.player.selectDevice(id));
         QCOMPARE(f.player.selectedDevice(), id);
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(f.player.selectedDevice().isEmpty());
         QVERIFY(!f.player.notice().isEmpty());
         f.player.stop();
-        f.player.applyDevices(real, systemDefault);
+        f.player.d->applyDevices(real, systemDefault);
         QVERIFY(!f.player.playing());
         QVERIFY(f.player.source().isEmpty());
-        f.player.applyDevices({ }, { });
+        f.player.d->applyDevices({ }, { });
         QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
         f.player.stop();
-        f.player.applyDevices(real, systemDefault);
+        f.player.d->applyDevices(real, systemDefault);
         QVERIFY(f.player.source().isEmpty());
         QVERIFY(!f.player.requested());
         QVERIFY(!f.player.selectDevice(u"not-a-device"_s));
@@ -291,7 +292,7 @@ private Q_SLOTS:
         f.player.seek(2000);
         QCOMPARE(f.player.position(), 0);
         QVERIFY(!f.player.playTrack(u"missing"_s, u"track-0"_s));
-        QCOMPARE(f.player.m_player.playbackRate(), 1.);
+        QCOMPARE(f.player.d->m_player.playbackRate(), 1.);
     }
 };
 }

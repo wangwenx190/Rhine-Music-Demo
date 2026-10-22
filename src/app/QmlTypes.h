@@ -2,6 +2,9 @@
 // narrow typed interfaces without giving QML ownership of services.
 
 #pragma once
+#include "LayoutMetrics.h"
+#include "SelectionLighting.h"
+#include "RenderQuality.h"
 #include "OptionMetrics.h"
 #include "SourceOptics.h"
 #include "GenreRowsModel.h"
