@@ -332,7 +332,7 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
     QObject scope;
     QTimer deadline;
     deadline.setSingleShot(true);
-    bool waiting = false, queued = false;
+    bool waiting = true, queued = false;
     qint64 restoreStartedNs = 0;
     std::function<void()> next;
     std::function<void()> advanceWhenReady;
@@ -415,7 +415,6 @@ int reviewNavigation(QGuiApplication &app, QQuickWindow &window, SceneAdapter &s
     next = [&] {
         return advanceNavigationReview(state, wheel, check, checkSubmission, key, finish);
     };
-    waiting = true;
     deadline.start(StageDeadlineMilliseconds);
     window.show();
     window.update();

@@ -183,9 +183,7 @@ private:
         // The job owns an immutable album query throughout all HTTP stages.
         job.inputKey = metadataKey(album, kind);
         const auto cached = cachedMetadata(album, kind, job.token);
-        const auto state = kind == MetadataKind::Introduction ? album.introduction
-                : kind == MetadataKind::Credits               ? album.creditsLookup
-                                                              : album.online;
+        const auto state = metadataState(album, kind);
         const auto expires =
                 QDateTime::fromString(state.value(u"expiresAt"_s).toString(), Qt::ISODateWithMs);
         const auto retry = QDateTime::fromString(cached.retryAt, Qt::ISODateWithMs);
@@ -377,8 +375,7 @@ private:
             job.result.status = data.value(u"releases"_s).toArray().isEmpty()
                     ? ProviderStatus::NotFound
                     : ProviderStatus::Uncertain;
-            const auto field =
-                    job.result.kind == MetadataKind::Credits ? u"creditsLookup"_s : u"online"_s;
+            const auto field = metadataStateKey(job.result.kind);
             job.result.payload.insert(
                     field,
                     QJsonObject{
@@ -525,12 +522,8 @@ private:
             result.checkedAt = now.toString(Qt::ISODateWithMs);
             if (result.status == ProviderStatus::Error && result.retryAt.isEmpty())
                 result.retryAt = now.addSecs(RetryDelaySeconds).toString(Qt::ISODateWithMs);
-            const auto field = result.kind == MetadataKind::Introduction ? u"introduction"_s
-                    : result.kind == MetadataKind::Credits               ? u"creditsLookup"_s
-                                                                         : u"online"_s;
-            auto state = result.kind == MetadataKind::Introduction ? job.query.album.introduction
-                    : result.kind == MetadataKind::Credits         ? job.query.album.creditsLookup
-                                                                   : job.query.album.online;
+            const auto field = metadataStateKey(result.kind);
+            auto state = metadataState(job.query.album, result.kind);
             const auto patch = result.payload.value(field).toObject();
             for (auto it = patch.begin(); it != patch.end(); ++it)
                 state.insert(it.key(), it.value());

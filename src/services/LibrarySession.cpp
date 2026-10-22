@@ -283,20 +283,10 @@ quint64 LibrarySession::requestMetadata(const QString &albumId, const QString &n
     const auto *album = this->album(albumId);
     if (!album || !m_provider)
         return 0;
-    const auto capabilities = m_provider->capabilities();
-    if ((name == "introduction"_L1 && !capabilities.introductions)
-        || (name == "credits"_L1 && !capabilities.credits)
-        || (name == "enrichment"_L1 && !capabilities.enrichment))
+    const auto parsedKind = metadataKind(name);
+    if (!parsedKind || !supportsMetadata(m_provider->capabilities(), *parsedKind))
         return 0;
-    MetadataKind kind;
-    if (name == "introduction"_L1)
-        kind = MetadataKind::Introduction;
-    else if (name == "credits"_L1)
-        kind = MetadataKind::Credits;
-    else if (name == "enrichment"_L1)
-        kind = MetadataKind::Enrichment;
-    else
-        return 0;
+    const auto kind = *parsedKind;
     const auto requests = m_pending;
     for (const auto &request : requests)
         if (request.token.albumId == albumId && request.kind == kind)
@@ -412,20 +402,13 @@ void LibrarySession::cancelAllMetadata()
 }
 bool LibrarySession::requestMetadataBatch(const QString &kind, bool missingOnly)
 {
-    if (!m_provider
-        || (kind != "introduction"_L1 && kind != "credits"_L1 && kind != "enrichment"_L1))
-        return false;
-    const auto capabilities = m_provider->capabilities();
-    if ((kind == "introduction"_L1 && !capabilities.introductions)
-        || (kind == "credits"_L1 && !capabilities.credits)
-        || (kind == "enrichment"_L1 && !capabilities.enrichment))
+    const auto parsedKind = metadataKind(kind);
+    if (!m_provider || !parsedKind || !supportsMetadata(m_provider->capabilities(), *parsedKind))
         return false;
     invalidate();
     m_batchAlbums.clear();
     for (const auto &entry : m_snapshot->albums) {
-        const auto state = kind == "introduction"_L1 ? entry.introduction
-                : kind == "credits"_L1               ? entry.creditsLookup
-                                                     : entry.online;
+        const auto state = metadataState(entry, *parsedKind);
         if (!missingOnly || state.isEmpty())
             m_batchAlbums.append(entry.id);
     }
@@ -484,34 +467,11 @@ QVariantMap LibrarySession::metadataFor(const QString &albumId, const QString &k
         value.insert(u"payload"_s, payload);
         return present(std::move(value));
     }
-    QJsonObject state, payload, source;
-    if (kind == "introduction"_L1) {
-        state = entry->introduction;
-        payload = { { u"description"_s, entry->description }, { u"introduction"_s, state } };
-        source = entry->descriptionSource;
-    } else if (kind == "credits"_L1) {
-        state = entry->creditsLookup;
-        payload = { { u"producers"_s, producerData(entry->producers) },
-                    { u"creditsLookup"_s, state } };
-        source = { { u"name"_s, state.value(u"source"_s) } };
-    } else if (kind == "enrichment"_L1) {
-        state = entry->online;
-        payload = { { u"online"_s, state },
-                    { u"genres"_s, entry->fields.value(u"_onlineGenres"_s) } };
-        source = { { u"name"_s, u"MusicBrainz"_s }, { u"url"_s, state.value(u"sourceUrl"_s) } };
-    } else {
+    const auto parsedKind = metadataKind(kind);
+    if (!parsedKind)
         return { };
-    }
-    if (kind != "introduction"_L1 && !state.value(u"sourceDetails"_s).toObject().isEmpty())
-        source = state.value(u"sourceDetails"_s).toObject();
-    return present({ { u"albumId"_s, albumId },
-                     { u"kind"_s, kind },
-                     { u"status"_s, state.value(u"status"_s).toString(u"Deferred"_s) },
-                     { u"payload"_s, payload.toVariantMap() },
-                     { u"source"_s, source.toVariantMap() },
-                     { u"checkedAt"_s, state.value(u"checkedAt"_s).toString() },
-                     { u"retryAt"_s, state.value(u"retryAt"_s).toString() },
-                     { u"error"_s, state.value(u"error"_s).toString() } });
+    return present(
+            metadataValue(cachedMetadata(*entry, *parsedKind, { 0, m_generation, albumId })));
 }
 Album LibrarySession::resolvedAlbum(const QString &albumId) const
 {
@@ -558,13 +518,8 @@ void LibrarySession::adoptMetadataSnapshot(Snapshot snapshot)
     for (auto it = m_metadata.begin(); it != m_metadata.end();) {
         const auto &result = it.value();
         const auto *entry = album(result.albumId);
-        const auto field = result.kind == MetadataKind::Introduction ? u"introduction"_s
-                : result.kind == MetadataKind::Credits               ? u"creditsLookup"_s
-                                                                     : u"online"_s;
-        const auto state = !entry                           ? QJsonObject()
-                : result.kind == MetadataKind::Introduction ? entry->introduction
-                : result.kind == MetadataKind::Credits      ? entry->creditsLookup
-                                                            : entry->online;
+        const auto field = metadataStateKey(result.kind);
+        const auto state = entry ? metadataState(*entry, result.kind) : QJsonObject();
         if (!state.isEmpty() && state == result.payload.value(field).toObject())
             it = m_metadata.erase(it);
         else

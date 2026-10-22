@@ -227,6 +227,22 @@ class TerminalCaptureTest(unittest.TestCase):
 
 
 class ShaderSourceTest(unittest.TestCase):
+    def test_shell_generator_rejects_missing_origin_function(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('tools/assets/prepare-rhi-shell.py', 'tools/shader_source.py',
+                         'resources/shaders/case-glass.frag'):
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, target)
+            (root / 'resources/shaders/rhi').mkdir()
+            source = root / 'resources/shaders/case-glass.frag'
+            source.write_text(source.read_text().replace('float musicRowField(', 'float missingRowField('))
+            result = subprocess.run([sys.executable, str(root / 'tools/assets/prepare-rhi-shell.py')],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Expected exactly one shared origin function: musicRowField', result.stderr)
+
     def test_relative_include_and_cycle(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -5,6 +5,9 @@ Shadow reception uses the R10A source filter; transmission always reads opaque c
 """
 from pathlib import Path
 import re
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shader_source import LIGHTING_UNIFORMS, hoist_origin_lighting, replace_identifiers
 
 root = Path(__file__).resolve().parents[2]
 directory = root / 'resources/shaders/rhi'
@@ -28,20 +31,7 @@ source = source.replace('    FRAGCOLOR = vec4(compositorOutput ? outgoing : ACES
                         '    normalOut = vec4(normalize(viewNormal) * .5 + .5, 1);\n'
                         '    depthOut = vec4(packDepth((viewDepth - f.clip.x) / (f.clip.y - f.clip.x)), 1);')
 mapping = {
-    'rowColumn': 'f.rowColumn.xyz',
-    'rowSettings': 'f.rowSettings',
-    'lightColumn': 'f.lightColumn.xyz',
-    'printAmbient': 'f.settings.x',
-    'rowFill': 'f.settings.z',
-    'rowDetail': 'f.settings.y',
-    'spotPosition': 'f.spotPosition.xyz',
-    'spotTarget': 'f.spotTarget.xyz',
-    'spotColor': 'f.spotColor.xyz',
-    'spotIntensity': 'f.optics.x',
-    'groundColor': 'f.groundColor.xyz',
-    'skyColor': 'f.skyColor.xyz',
-    'lightIntensities': 'f.lightIntensities.xyz',
-    'keyColor': 'f.keyColor.xyz',
+    **LIGHTING_UNIFORMS,
     'scatterColor': 'f.scatter.xyz',
     'scatterStrength': 'f.scatter.w',
     'areaPosition': 'f.areaPosition.xyz',
@@ -64,8 +54,6 @@ mapping = {
     'environmentIntensity': 'f.coat.w',
     'exposure': 'f.camera.w',
     'lightingEnabled': '(f.areaTarget.w > .5)',
-    'mix(nightTint.rgb, dayTint.rgb, warmth)': 'f.tint.rgb',
-    'mix(nightAttenuation.rgb, dayAttenuation.rgb, warmth)': 'f.attenuation.rgb',
 }
 source = source.replace('mix(nightTint.rgb, dayTint.rgb, warmth)', 'f.tint.rgb')
 source = source.replace('mix(nightAttenuation.rgb, dayAttenuation.rgb, warmth)', 'f.attenuation.rgb')
@@ -77,17 +65,9 @@ source = source.replace('float roughness)', 'float pmremRoughness)')
 a = source.index('float roughnessToMip(')
 b = source.index('float w0(', a)
 source = source[:a] + re.sub(r'\broughness\b', 'pmremRoughness', source[a:b]) + source[b:]
-for name, replacement in mapping.items():
-    if '(' not in name:
-        source = re.sub(r'\b' + re.escape(name) + r'\b', replacement, source)
-# These source expressions depend only on the immutable entity origin and frame settings.
-# RhiItem evaluates them once per entity; local geometry/normal/view terms stay in the shader.
-source = re.sub(r'float musicRowField\(vec3 origin\)\s*\{.*?\n\}',
-                'float musicRowField(vec3 origin)\n{\n    return f.originLight0.x;\n}',
-                source, flags=re.S)
-source = re.sub(r'float musicPrintExposure\(vec3 origin\)\s*\{.*?\n\}',
-                'float musicPrintExposure(vec3 origin)\n{\n    return f.originLight0.y;\n}',
-                source, flags=re.S)
+source = replace_identifiers(source, mapping)
+# RhiItem evaluates immutable entity-origin terms once; local geometry terms stay in GLSL.
+source = hoist_origin_lighting(source, 'f.originLight0')
 a = source.index('    float laneDistance =')
 b = source.index('    float edgeTransport =', a)
 source = source[:a] + ('    float laneLight = f.originLight0.z;\n'

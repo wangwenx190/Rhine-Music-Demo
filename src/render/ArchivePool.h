@@ -38,6 +38,7 @@ public:
     std::optional<ArchiveCell> location(const QString &albumId) const;
     int columnCount() const;
     int rowCount(double lane) const;
+    QList<int> rowCounts() const;
     std::optional<int> rowPeriod() const;
     const QList<LibraryColumn> &columns() const;
     QString realAlbumAt(ArchiveCell cell) const;

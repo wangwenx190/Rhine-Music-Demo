@@ -1,6 +1,6 @@
 function(yalahoo_platform target)
     if(WIN32)
-        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /Zc:__cplusplus)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
         target_compile_definitions(${target} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     elseif(UNIX)
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)

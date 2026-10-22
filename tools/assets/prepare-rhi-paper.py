@@ -3,8 +3,8 @@ import argparse
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from shader_source import read_shader, tokens
-import re
+from shader_source import (LIGHTING_UNIFORMS, hoist_origin_lighting, read_shader,
+                           replace_identifiers, tokens)
 
 ROOT = Path(__file__).resolve().parents[2]
 source = read_shader(ROOT / "resources/shaders/album-paper.frag")
@@ -13,24 +13,9 @@ a = source.index("vec3 musicShell(")
 b = source.index("#define CUBEUV_MAX_MIP", a)
 source = source[:a] + source[b:]
 source = source.replace("Shared field, diffuse and shell transport", "Shared field and diffuse transport")
-for name, replacement in {
-    "rowColumn": "f.rowColumn.xyz", "rowSettings": "f.rowSettings",
-    "lightColumn": "f.lightColumn.xyz", "printAmbient": "f.settings.x",
-    "rowFill": "f.settings.z", "rowDetail": "f.settings.y",
-    "spotPosition": "f.spotPosition.xyz", "spotTarget": "f.spotTarget.xyz",
-    "spotColor": "f.spotColor.xyz", "spotIntensity": "f.optics.x",
-    "groundColor": "f.groundColor.xyz", "skyColor": "f.skyColor.xyz",
-    "lightIntensities": "f.lightIntensities.xyz", "keyColor": "f.keyColor.xyz",
-}.items():
-    source = re.sub(r"\b" + name + r"\b", replacement, source)
+source = replace_identifiers(source, LIGHTING_UNIFORMS)
 # Only immutable origin/frame terms are hoisted; local normal/view terms stay in GLSL.
-for name, value in [("musicRowField", "entityLight0.x"),
-                    ("musicPrintExposure", "entityLight0.y")]:
-    source, count = re.subn(r"float " + name + r"\(vec3 origin\)\s*\{.*?\n\}",
-                            "float " + name + "(vec3 origin)\n{\n    return " + value + ";\n}",
-                            source, flags=re.S)
-    if count != 1:
-        raise SystemExit("Unexpected shared paper function: " + name)
+source = hoist_origin_lighting(source, "entityLight0")
 source = source.rstrip() + "\n"
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--check", action="store_true")

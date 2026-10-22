@@ -1,19 +1,13 @@
 """Normalize deployment paths/metadata and inspect a self-contained macOS bundle."""
-import json
 from pathlib import Path
 import plistlib
 import re
 import shutil
-import subprocess
-from package_support import package_inventory
+from package_support import package_inventory, run, verify_package_inventory
 
 
 MACHO = {bytes.fromhex(value) for value in
          ('feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf')}
-
-
-def run(*arguments):
-    return subprocess.check_output([str(value) for value in arguments], text=True).strip()
 
 
 def inventory(root):
@@ -173,10 +167,5 @@ def inspect_bundle(bundle):
 
 
 def verify_inventory(package):
-    metadata = json.loads((package / 'package.json').read_text())
     # package.json describes every other file, including the verifier and symlinks.
-    actual = inventory(package)
-    if (metadata['files'] != actual or metadata.get('review') is not False
-            or metadata.get('configuration') != 'Release'):
-        raise RuntimeError('Production package inventory or configuration changed')
-    return metadata
+    return verify_package_inventory(package, inventory(package))

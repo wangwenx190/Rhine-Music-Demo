@@ -226,16 +226,10 @@ ArchiveScrollView {
                 checked: root.settings.values.reduced
                 onToggled: root.settings.update("reduced", checked)
             }
-            SettingRange {
+            MotionSpeedRange {
                 objectName: "settingsSpeed"
                 tokens: root.tokens
-                label: qsTr("Animation speed")
-                suffix: "\u00d7"
-                minimum: .25
-                maximum: 3
-                step: .05
-                value: root.settings.values.motionSpeed
-                onMoved: value => root.settings.update("motionSpeed", value)
+                settings: root.settings
             }
             ArchiveButton {
                 tokens: root.tokens
@@ -313,12 +307,9 @@ ArchiveScrollView {
                         root.backgroundMusic.volume = value;
                 }
             }
-            ArchiveButton {
+            InterfaceSoundPreview {
                 tokens: root.tokens
-                text: qsTr("Preview interface sound \u2197")
-                enabled: root.interfaceSound !== null && root.interfaceSound.enabled
-                         && root.interfaceSound.available
-                onClicked: root.interfaceSound.preview()
+                interfaceSound: root.interfaceSound
             }
             SettingChoice {
                 tokens: root.tokens

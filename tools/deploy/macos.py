@@ -2,7 +2,6 @@
 """Build and atomically package the selected native Qt macOS Release product."""
 import argparse
 import json
-import os
 from pathlib import Path
 import platform
 import shutil
@@ -10,7 +9,7 @@ import subprocess
 import tempfile
 from macos_bundle import inspect_bundle, inventory, normalize_bundle, run, strip_bundle
 from qml_closure import production_qml
-from package_support import copy_licenses, digest, install_package
+from package_support import copy_licenses, digest, install_package, isolated_environment
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,8 +33,7 @@ def main():
         raise RuntimeError('Deployment tools must belong to the selected Qt Kit')
     qml = [str(path.relative_to(ROOT / 'qml'))
            for path in production_qml(ROOT, build, metadata)]
-    environment = {key: value for key, value in os.environ.items()
-                   if not key.startswith(('QT_', 'QML', 'QSG_', 'DYLD_', 'YALAHOO_'))}
+    environment = isolated_environment('DYLD_')
     environment['PATH'] = str(kit / 'bin') + ':/usr/bin:/bin:/usr/sbin:/sbin'
     (ROOT / 'out').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='macos-staging-', dir=ROOT / 'out') as temporary:

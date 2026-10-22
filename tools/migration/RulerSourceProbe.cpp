@@ -37,6 +37,17 @@ constexpr int LayoutSettleMilliseconds = 120;
 constexpr int RestoreSettleMilliseconds = 200;
 constexpr int CleanupDeadlineMilliseconds = 1000;
 
+// The review owns these references until queued captures finish or its context is destroyed.
+void requestRulerCapture(QObject &lifetime, std::atomic<bool> &requested, QQuickItem *&root,
+                         std::unique_ptr<OffscreenSurface> &surface)
+{
+    QTimer::singleShot(CaptureSettleMilliseconds, &lifetime, [&requested, &root, &surface] {
+        requested = true;
+        root->setProperty("marker", root->property("marker").toInt() + 1);
+        surface->requestFrame();
+    });
+}
+
 QQuickItem *createRulerRoot(QQmlEngine &engine, QQuickWindow &window,
                             std::unique_ptr<QObject> &object, yalahoo::RulerController *controller,
                             yalahoo::FrameClock &clock, bool night)
@@ -245,11 +256,7 @@ auto advanceRulerProbe(QMutex &imageMutex, QImage &image, bool &stationaryPendin
     }
     if (stationaryPending) {
         if (stationaryWarmup-- > 0) {
-            QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
-                requested = true;
-                root->setProperty("marker", root->property("marker").toInt() + 1);
-                surface->requestFrame();
-            });
+            requestRulerCapture(reviewLifetime, requested, root, surface);
             return;
         }
         stationaryPending = false;
@@ -525,11 +532,7 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
             continue;
         modeSyncStart = syncNs;
         modeRenderStart = renderNs;
-        QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
-            requested = true;
-            root->setProperty("marker", root->property("marker").toInt() + 1);
-            surface->requestFrame();
-        });
+        requestRulerCapture(reviewLifetime, requested, root, surface);
         return;
     }
     // Measure a visible, settled ruler after resource initialization submissions.
@@ -537,11 +540,7 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
     for (int frame = 0; frame < 240; ++frame)
         controller->advance(1.0 / 120);
     stationaryPending = true;
-    QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
-        requested = true;
-        root->setProperty("marker", root->property("marker").toInt() + 1);
-        surface->requestFrame();
-    });
+    requestRulerCapture(reviewLifetime, requested, root, surface);
 }
 
 auto probeRulerSourceObserveFrame(QQuickItem *&root, QObject &reviewLifetime,
@@ -549,11 +548,7 @@ auto probeRulerSourceObserveFrame(QQuickItem *&root, QObject &reviewLifetime,
                                   std::unique_ptr<OffscreenSurface> &surface)
 {
     root->setProperty("ordinal", 907);
-    QTimer::singleShot(CaptureSettleMilliseconds, &reviewLifetime, [&] {
-        requested = true;
-        root->setProperty("marker", root->property("marker").toInt() + 1);
-        surface->requestFrame();
-    });
+    requestRulerCapture(reviewLifetime, requested, root, surface);
 }
 }
 

@@ -33,28 +33,13 @@ struct PreferencesStore::Private final
 };
 void PreferencesStore::load()
 {
-    QFile file(d->m_path);
-    if (!file.exists())
+    if (!QFileInfo::exists(d->m_path))
         return;
-
-    QJsonParseError parse;
-    const bool opened = file.open(QIODevice::ReadOnly);
-    const auto document =
-            opened && file.size() <= yalahoo::units::BytesPerKiB * yalahoo::units::BytesPerKiB
-            ? QJsonDocument::fromJson(file.readAll(), &parse)
-            : QJsonDocument();
-    if (!opened || document.isNull() || !document.isObject()) {
-        d->m_writable = false;
-        d->m_error = QCoreApplication::translate(
-                "Yalahoo",
-                "Cannot read preferences, or the file is damaged. The original file was preserved.");
-    } else {
-        d->m_document = document.object();
-        d->m_error = validate(d->m_document);
-        d->m_writable = d->m_error.isEmpty();
-        if (!d->m_writable)
-            d->m_document = { };
-    }
+    const auto result = readPreferenceImport(d->m_path);
+    d->m_error = result.error;
+    d->m_writable = d->m_error.isEmpty();
+    if (d->m_writable)
+        d->m_document = result.document;
 }
 PreferencesStore::PreferencesStore(const QString &dataRoot, QObject *parent)
     : QObject(parent), d(std::make_unique<Private>())

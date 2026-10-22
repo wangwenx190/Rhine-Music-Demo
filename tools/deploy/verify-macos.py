@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Verify an immutable deployed bundle from a fresh unrelated directory."""
 import argparse
-import os
 from pathlib import Path
 import platform
 import sys
@@ -10,7 +9,7 @@ import sys
 sys.dont_write_bytecode = True
 from macos_bundle import inspect_bundle, verify_inventory
 
-from package_support import finish_verification, run_probe, verification_output
+from package_support import finish_verification, isolated_environment, run_probe, verification_output
 
 
 def main():
@@ -27,8 +26,7 @@ def main():
     bundle = package / 'yalahoo.app'
     closure = inspect_bundle(bundle)
     output = verification_output(package, args.output, 'yalahoo-deployment-')
-    environment = {key: value for key, value in os.environ.items() if not key.startswith(
-        ('QT_', 'QML', 'QSG_', 'DYLD_', 'YALAHOO_', 'QCPAINTER_'))}
+    environment = isolated_environment('DYLD_')
     environment.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin', QSG_RHI_BACKEND='metal',
                        QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM='1',
                        YALAHOO_VERIFY_FOREGROUND='0', QCPAINTER_DEBUG_COLLECT='0')

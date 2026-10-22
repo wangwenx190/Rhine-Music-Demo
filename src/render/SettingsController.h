@@ -2,6 +2,7 @@
 // updates preserve unrelated settings and notify only changed values.
 
 #pragma once
+#include "ProductDefaults.h"
 #include <QObject>
 #include <QVariantMap>
 #include <QString>
@@ -19,11 +20,26 @@ class SettingsController final : public QObject
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(SettingsController)
     Q_PROPERTY(QVariantMap values READ values NOTIFY changed FINAL)
+    Q_PROPERTY(double minimumMotionSpeed READ minimumMotionSpeed CONSTANT FINAL)
+    Q_PROPERTY(double maximumMotionSpeed READ maximumMotionSpeed CONSTANT FINAL)
+    Q_PROPERTY(double motionSpeedStep READ motionSpeedStep CONSTANT FINAL)
 public:
     SettingsController(PreferencesStore *preferences, LibrarySession *library,
                        MotionController *motion, SceneAdapter *scene,
                        SelectionController *selection, QObject *parent = nullptr);
     QVariantMap values() const;
+    double minimumMotionSpeed() const
+    {
+        return productDefaults::MinimumMotionSpeed;
+    }
+    double maximumMotionSpeed() const
+    {
+        return productDefaults::MaximumMotionSpeed;
+    }
+    double motionSpeedStep() const
+    {
+        return productDefaults::MotionSpeedStep;
+    }
     Q_INVOKABLE bool update(const QString &field, const QVariant &value);
     Q_INVOKABLE bool updateQuality(const QString &field, const QVariant &value);
     Q_INVOKABLE void reload();

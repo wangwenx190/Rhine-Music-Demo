@@ -55,10 +55,11 @@ private Q_SLOTS:
         QCOMPARE(fixture.preferences.values()[u"lighting"_s].toMap(), authored);
         lighting->setComparing(false);
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Hybrid);
-        for (const auto &invalid : { QVariant(u"1"_s), QVariant(true), QVariant("invalid"_ba),
-                                     QVariant(std::numeric_limits<double>::infinity()),
-                                     QVariant(-std::numeric_limits<double>::infinity()),
-                                     QVariant(std::numeric_limits<double>::quiet_NaN()) }) {
+        for (const auto &invalid :
+             { QVariant(u"1"_s), QVariant(true), QVariant("1"_ba), QVariant("invalid"_ba),
+               QVariant(std::numeric_limits<double>::infinity()),
+               QVariant(-std::numeric_limits<double>::infinity()),
+               QVariant(std::numeric_limits<double>::quiet_NaN()) }) {
             QVERIFY(!lighting->configure({ { u"strength"_s, invalid }, { u"width"_s, 1.0 } }));
             QCOMPARE(lighting->settings(), authored);
         }

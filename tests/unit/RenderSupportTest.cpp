@@ -74,10 +74,13 @@ private Q_SLOTS:
         auto mailbox = std::make_shared<CaptureMailbox>();
         QEventLoop loop;
         mailbox->loop = &loop;
-        auto receiver = std::make_unique<QObject>();
-        QPointer<QObject> guard(receiver.get());
-        queueCapture(mailbox, guard, { });
-        receiver.reset();
+        QPointer<QObject> guard;
+        {
+            QObject receiver;
+            guard = &receiver;
+            queueCapture(mailbox, guard, { });
+        }
+        QVERIFY(guard.isNull());
         QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
         QVERIFY(!mailbox->capture);
         queueCapture(mailbox, guard, { });

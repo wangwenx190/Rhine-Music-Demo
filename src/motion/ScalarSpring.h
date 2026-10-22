@@ -2,8 +2,26 @@
 // analytically, avoiding frame-rate-dependent Euler integration.
 
 #pragma once
+#include <algorithm>
+#include <cmath>
 
 namespace yalahoo {
+template <typename T>
+struct CriticalSpringState final
+{
+    T value, velocity;
+};
+// Scalar and vector consumers share the exact solution; caller-specific limits stay outside it.
+template <typename T>
+CriticalSpringState<T> criticalSpringStep(T value, T velocity, T target, double rate, double dt)
+{
+    dt = std::max(0.0, dt);
+    const auto delta = value - target;
+    const auto impulse = velocity + delta * rate;
+    const double decay = std::exp(-rate * dt);
+    return { target + (delta + impulse * dt) * decay, (velocity - impulse * (rate * dt)) * decay };
+}
+
 struct Kinematics
 {
     double value = 0;

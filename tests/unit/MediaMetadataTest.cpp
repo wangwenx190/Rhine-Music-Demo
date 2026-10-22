@@ -1,4 +1,3 @@
-#include "../support/FileFixture.h"
 // Uses controllable anonymous backends to test timeout, cancellation and late metadata
 // publication. Explicit fixture literals are independent inputs or expected results; timing
 // bounds have named constants.

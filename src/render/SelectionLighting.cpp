@@ -78,10 +78,9 @@ LightingPalette makePalette(bool night)
 }
 void followVector(SceneVector &value, SceneVector &velocity, SceneVector target, double dt)
 {
-    const double decay = std::exp(-AnchorFollowRate * dt);
-    const auto delta = value - target, impulse = velocity + delta * AnchorFollowRate;
-    value = target + (delta + impulse * dt) * decay;
-    velocity = (velocity - impulse * (AnchorFollowRate * dt)) * decay;
+    const auto next = criticalSpringStep(value, velocity, target, AnchorFollowRate, dt);
+    value = next.value;
+    velocity = next.velocity;
 }
 }
 SceneVector LightingPalette::floorColor(QStringView theme)

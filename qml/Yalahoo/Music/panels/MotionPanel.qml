@@ -20,18 +20,12 @@ Column {
         width: parent.width
         spacing: 10
         visible: root.expanded
-        SettingRange {
+        MotionSpeedRange {
             stacked: true
             captionSize: 10
             objectName: "motionSpeed"
             tokens: root.tokens
-            label: qsTr("Animation speed")
-            minimum: .25
-            maximum: 3
-            step: .05
-            suffix: "\u00d7"
-            value: root.settings.values.motionSpeed
-            onMoved: value => root.settings.update("motionSpeed", value)
+            settings: root.settings
         }
         PanelDescription {
             tokens: root.tokens

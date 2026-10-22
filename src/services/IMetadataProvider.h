@@ -4,6 +4,8 @@
 #pragma once
 #include "MusicTypes.h"
 #include <QObject>
+#include <QStringView>
+#include <optional>
 #include <utility>
 
 namespace yalahoo {
@@ -58,6 +60,11 @@ struct ProviderResult final
     bool fromCache = false;
     qsizetype payloadBytes = 0;
 };
+// A single descriptor maps public names, album cache fields and provider capabilities.
+std::optional<MetadataKind> metadataKind(QStringView name);
+QString metadataStateKey(MetadataKind kind);
+QJsonObject metadataState(const Album &album, MetadataKind kind);
+bool supportsMetadata(const ProviderCapabilities &capabilities, MetadataKind kind);
 class IMetadataProvider : public QObject
 {
     Q_OBJECT

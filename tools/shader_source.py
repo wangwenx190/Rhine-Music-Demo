@@ -3,6 +3,31 @@ from pathlib import Path
 import re
 
 TOKEN_PATTERN = r"[A-Za-z_][A-Za-z_0-9]*|(?:\d*\.\d+|\d+\.?\d*)(?:[eE][+-]?\d+)?|\S"
+LIGHTING_UNIFORMS = {
+    'rowColumn': 'f.rowColumn.xyz', 'rowSettings': 'f.rowSettings',
+    'lightColumn': 'f.lightColumn.xyz', 'printAmbient': 'f.settings.x',
+    'rowFill': 'f.settings.z', 'rowDetail': 'f.settings.y',
+    'spotPosition': 'f.spotPosition.xyz', 'spotTarget': 'f.spotTarget.xyz',
+    'spotColor': 'f.spotColor.xyz', 'spotIntensity': 'f.optics.x',
+    'groundColor': 'f.groundColor.xyz', 'skyColor': 'f.skyColor.xyz',
+    'lightIntensities': 'f.lightIntensities.xyz', 'keyColor': 'f.keyColor.xyz',
+}
+
+
+def replace_identifiers(source, mapping):
+    for name, replacement in mapping.items():
+        source = re.sub(r'\b' + re.escape(name) + r'\b', replacement, source)
+    return source
+
+
+def hoist_origin_lighting(source, field):
+    for name, channel in (('musicRowField', 'x'), ('musicPrintExposure', 'y')):
+        source, count = re.subn(r'float ' + name + r'\(vec3 origin\)\s*\{.*?\n\}',
+                                'float ' + name + '(vec3 origin)\n{\n    return '
+                                + field + '.' + channel + ';\n}', source, flags=re.S)
+        if count != 1:
+            raise ValueError('Expected exactly one shared origin function: ' + name)
+    return source
 
 
 def tokens(text):

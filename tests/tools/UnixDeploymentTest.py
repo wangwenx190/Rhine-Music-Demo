@@ -26,6 +26,41 @@ def run(*arguments, **kwargs):
 
 
 class PackageSupportTest(unittest.TestCase):
+    def test_environment_isolation_is_shared_without_mutating_the_parent(self):
+        polluted = dict(QT_PLUGIN_PATH='foreign', QML_IMPORT_PATH='foreign', QSG_RHI_BACKEND='foreign',
+                        YALAHOO_VERIFY_FOREGROUND='1', QCPAINTER_DEBUG_COLLECT='1',
+                        LD_PRELOAD='foreign', DYLD_INSERT_LIBRARIES='foreign', KEEP='original')
+        with patch.dict(os.environ, polluted, clear=True):
+            for prefix in ('LD_', 'DYLD_'):
+                environment = package_support.isolated_environment(prefix)
+                self.assertEqual(environment['KEEP'], 'original')
+                self.assertFalse(any(key.startswith(('QT_', 'QML', 'QSG_', 'YALAHOO_',
+                                                     'QCPAINTER_', prefix)) for key in environment))
+            self.assertEqual(dict(os.environ), polluted)
+
+    def test_inventory_requires_a_boolean_production_marker_on_both_platforms(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'player').write_bytes(b'anonymous product')
+            for module in (linux_package, macos_bundle):
+                for marker in (None, 0, '', [], 'false', True):
+                    with self.subTest(module=module.__name__, marker=marker):
+                        metadata = dict(configuration='Release', system='Linux', review=marker,
+                                        files=module.inventory(root))
+                        (root / 'package.json').write_text(json.dumps(metadata))
+                        with self.assertRaises(RuntimeError):
+                            module.verify_inventory(root)
+
+    def test_probe_records_launch_failure_without_losing_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            probe = package_support.run_probe([output / 'missing-player'], output, os.environ)
+            self.assertFalse(probe.passed)
+            self.assertFalse(probe.timed_out)
+            self.assertNotEqual(probe.exit_code, 0)
+            self.assertEqual(probe.report, {})
+            self.assertIn('missing-player', (output / 'stderr.txt').read_text())
+
     def test_inventory_rejects_nonrelocatable_and_dangling_links_on_both_platforms(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()

@@ -1,6 +1,4 @@
 #include "ScalarSpring.h"
-#include <algorithm>
-#include <cmath>
 
 namespace yalahoo {
 void ScalarSpring::observe(double target, double rate)
@@ -11,12 +9,9 @@ void ScalarSpring::observe(double target, double rate)
 // Advance position and velocity from the same initial state, then recompute acceleration.
 void ScalarSpring::update(double target, double rate, double dt)
 {
-    dt = std::max(0.0, dt);
-    const double delta = value - target;
-    const double impulse = velocity + rate * delta;
-    const double decay = std::exp(-rate * dt);
-    value = target + (delta + impulse * dt) * decay;
-    velocity = (velocity - rate * impulse * dt) * decay;
+    const auto next = criticalSpringStep(value, velocity, target, rate, dt);
+    value = next.value;
+    velocity = next.velocity;
     observe(target, rate);
 }
 }

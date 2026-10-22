@@ -16,19 +16,16 @@ ProviderResult cachedMetadata(const Album &album, MetadataKind kind, const Reque
     result.generation = token.generation;
     result.albumId = token.albumId;
     result.kind = kind;
-    QJsonObject state;
+    const auto state = metadataState(album, kind);
     if (kind == MetadataKind::Introduction) {
-        state = album.introduction;
         result.payload = { { u"description"_s, album.description }, { u"introduction"_s, state } };
         result.source = album.descriptionSource;
     } else if (kind == MetadataKind::Credits) {
-        state = album.creditsLookup;
         result.payload = { { u"producers"_s, producerData(album.producers) },
                            { u"creditsLookup"_s, state } };
         result.source = { { u"name"_s, state.value(u"source"_s) },
                           { u"url"_s, state.value(u"sourceUrl"_s) } };
     } else {
-        state = album.online;
         result.payload = { { u"online"_s, state },
                            { u"genres"_s, album.fields.value(u"_onlineGenres"_s) } };
         result.source = { { u"name"_s, u"MusicBrainz"_s },
@@ -124,9 +121,7 @@ bool mergeMetadata(Album &album, const ProviderResult &result)
     if (album.id != result.albumId || result.status == ProviderStatus::Deferred
         || result.status == ProviderStatus::Cancelled)
         return false;
-    const QString stateKey = result.kind == MetadataKind::Introduction ? u"introduction"_s
-            : result.kind == MetadataKind::Credits                     ? u"creditsLookup"_s
-                                                                       : u"online"_s;
+    const auto stateKey = metadataStateKey(result.kind);
     const auto state = result.payload.value(stateKey).toObject();
     if (state.isEmpty())
         return false;

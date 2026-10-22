@@ -619,10 +619,6 @@
         <translation>专辑、镜头、文字与光带同步变速。光带实际时长 = 光效面板时长 ÷ 此倍率。歌曲播放和开场片头不变。</translation>
     </message>
     <message>
-        <source>Animation speed</source>
-        <translation>动画速度</translation>
-    </message>
-    <message>
         <source>Restore 1x</source>
         <translation>恢复 1×</translation>
     </message>
@@ -997,10 +993,6 @@ MIT licensed code. Asset and font licenses are included with the application.</s
         <translation>MusicBrainz 联系邮箱或项目网址</translation>
     </message>
     <message>
-        <source>Preview interface sound ↗</source>
-        <translation>试听界面音效 ↗</translation>
-    </message>
-    <message>
         <source>Public encyclopedia introductions and their sources are saved locally.</source>
         <translation>公开百科介绍与资料来源保存在本机。</translation>
     </message>
@@ -1304,10 +1296,6 @@ Source: </source>
     <message>
         <source>Cannot read preference JSON, or it exceeds 1 MiB.</source>
         <translation>偏好 JSON 无法读取或超过 1MiB。</translation>
-    </message>
-    <message>
-        <source>Cannot read preferences, or the file is damaged. The original file was preserved.</source>
-        <translation>偏好文件无法读取或已损坏，保留原文件。</translation>
     </message>
     <message>
         <source>Cannot read the cover, or it exceeds 30 MiB.</source>

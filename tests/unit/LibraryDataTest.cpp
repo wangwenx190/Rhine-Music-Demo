@@ -788,6 +788,25 @@ private Q_SLOTS:
                          ->data(session.albums()->index(0), AlbumListModel::Title)
                          .isValid());
     }
+    void persistedMetadataHasTheSameStatusAndSourceAsProviderCache()
+    {
+        OfflineMetadataProvider provider;
+        auto snapshot = library(u"single"_s);
+        auto &album = snapshot.albums[0];
+        album.introduction = { { u"status"_s, u"matched"_s } };
+        album.creditsLookup = { { u"status"_s, u"not-found"_s },
+                                { u"source"_s, u"MusicBrainz"_s },
+                                { u"sourceUrl"_s, u"https://musicbrainz.org/release/fixture"_s } };
+        LibrarySession session(&provider);
+        session.setSnapshot(snapshot);
+        QCOMPARE(session.metadataFor(album.id, u"introduction"_s).value(u"status"_s).toString(),
+                 u"Matched"_s);
+        const auto credits = session.metadataFor(album.id, u"credits"_s);
+        QCOMPARE(credits.value(u"status"_s).toString(), u"NotFound"_s);
+        QCOMPARE(credits.value(u"source"_s).toMap().value(u"url"_s).toString(),
+                 u"https://musicbrainz.org/release/fixture"_s);
+        QVERIFY(session.metadataFor(album.id, u"invalid"_s).isEmpty());
+    }
     void offlineCacheAndCancellation()
     {
         OfflineMetadataProvider provider;

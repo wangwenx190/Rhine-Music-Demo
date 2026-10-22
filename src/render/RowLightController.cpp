@@ -30,13 +30,9 @@ double RowLightController::follow(ScalarSpring &s, double target, double dt, dou
     const double rate = CriticalDampingDurationFactor / duration, direction = distance > 0 ? 1 : -1;
     const double velocity =
             std::min(std::max(0.0, s.velocity * direction), rate * std::abs(distance)) * direction;
-    const double elapsed = std::max(0.0, dt), impulse = velocity - rate * distance,
-                 decay = std::exp(-rate * elapsed);
-    const double next = target + (-distance + impulse * elapsed) * decay;
-    s.value = std::clamp(next, std::min(previous, target), std::max(previous, target));
-    s.velocity = s.value == target || s.value != next
-            ? 0
-            : (velocity - rate * impulse * elapsed) * decay;
+    const auto next = criticalSpringStep(previous, velocity, target, rate, dt);
+    s.value = std::clamp(next.value, std::min(previous, target), std::max(previous, target));
+    s.velocity = s.value == target || s.value != next.value ? 0 : next.velocity;
     return s.value;
 }
 double RowLightController::introOffset(double t)

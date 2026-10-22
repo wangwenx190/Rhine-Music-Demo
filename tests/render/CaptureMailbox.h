@@ -20,10 +20,11 @@ struct CaptureMailbox final
 inline void queueCapture(const std::shared_ptr<CaptureMailbox> &state,
                          const QPointer<QObject> &guard, rhi::Capture capture)
 {
-    if (!guard)
+    auto *receiver = guard.data();
+    if (!receiver)
         return;
     QMetaObject::invokeMethod(
-            guard,
+            receiver,
             [state, capture = std::move(capture)]() mutable {
                 if (state->loop && capture.request == state->request) {
                     state->capture = std::move(capture);

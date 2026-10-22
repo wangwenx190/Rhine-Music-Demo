@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 """Inspect a relocatable Linux product; system ABI/driver libraries remain external."""
-import json
-import os
 from pathlib import Path
 import re
-import subprocess
-from package_support import package_inventory
-
-
-def run(*args, env=None):
-    return subprocess.run([str(value) for value in args], env=env, check=True,
-                          capture_output=True, text=True).stdout.strip()
+from package_support import isolated_environment, package_inventory, run, verify_package_inventory
 
 
 def inventory(root):
@@ -18,12 +10,7 @@ def inventory(root):
 
 
 def verify_inventory(root):
-    metadata = json.loads((root / 'package.json').read_text())
-    if metadata['files'] != inventory(root):
-        raise RuntimeError('Package inventory, permissions or symlinks changed')
-    if metadata['system'] != 'Linux' or metadata['configuration'] != 'Release' or metadata['review']:
-        raise RuntimeError('Expected native production Linux Release package')
-    return metadata
+    return verify_package_inventory(root, inventory(root), system='Linux')
 
 
 def elf_files(root):
@@ -35,8 +22,7 @@ def elf_files(root):
 
 
 def clean_environment(root):
-    environment = {key: value for key, value in os.environ.items() if not key.startswith(
-        ('QT_', 'QML', 'QSG_', 'LD_', 'YALAHOO_', 'QCPAINTER_'))}
+    environment = isolated_environment('LD_')
     environment.update(PATH='/usr/bin:/bin', LD_LIBRARY_PATH=str(root / 'lib'))
     return environment
 

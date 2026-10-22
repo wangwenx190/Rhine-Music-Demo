@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -10,6 +11,25 @@ import tempfile
 
 PROBE_TIMEOUT_SECONDS = 60
 HASH_BLOCK_BYTES = 1024 * 1024
+
+
+def run(*arguments, env=None):
+    return subprocess.run([str(value) for value in arguments], env=env, check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def isolated_environment(loader_prefix):
+    prefixes = ('QT_', 'QML', 'QSG_', 'YALAHOO_', 'QCPAINTER_', loader_prefix)
+    return {key: value for key, value in os.environ.items() if not key.startswith(prefixes)}
+
+
+def verify_package_inventory(root, actual, *, system=None):
+    metadata = json.loads((root / 'package.json').read_text())
+    if (metadata.get('files') != actual or metadata.get('review') is not False
+            or metadata.get('configuration') != 'Release'
+            or (system is not None and metadata.get('system') != system)):
+        raise RuntimeError('Production package inventory or configuration changed')
+    return metadata
 
 
 def digest(path):
@@ -81,8 +101,12 @@ def run_probe(command, output, environment, *, timeout=PROBE_TIMEOUT_SECONDS):
     timed_out = False
     with (output / 'stdout.txt').open('w', encoding='utf-8') as stdout, \
             (output / 'stderr.txt').open('w', encoding='utf-8') as stderr:
-        process = subprocess.Popen([*map(str, command), '--verify-deployment', str(report_path)],
-                                   cwd=output, env=environment, stdout=stdout, stderr=stderr)
+        try:
+            process = subprocess.Popen([*map(str, command), '--verify-deployment', str(report_path)],
+                                       cwd=output, env=environment, stdout=stdout, stderr=stderr)
+        except OSError as error:
+            stderr.write(f'Cannot launch deployment probe: {error}\n')
+            return ProbeResult(-1, False, {})
         try:
             code = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:

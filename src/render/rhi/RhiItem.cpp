@@ -120,7 +120,9 @@ constexpr int InstanceUvOffsetBytes = 64;
 constexpr int InstanceLightOffsetBytes = 80;
 constexpr int InstanceSecondaryLightOffsetBytes = 96;
 constexpr int MaximumOpticalProbe = 13;
+#ifdef YALAHOO_RHI_AUDIT
 constexpr int VisibilityProbe = 10;
+#endif
 constexpr int MinimumBatchedEntities = 8;
 constexpr int ExtraGeometryVertices = 15;
 constexpr int ExtraGeometryIndices = 21;
@@ -795,7 +797,6 @@ Owned<QRhiGraphicsPipeline> Renderer::pipeline(Target &target, QRhiShaderResourc
 }
 void Renderer::prepareCoverTexture(QSize coverSize)
 {
-
     ++coverResourceRevision;
     cover.reset(api->newTexture(
             QRhiTexture::RGBA8, coverSize, 1,
@@ -1153,20 +1154,9 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                         <= api->resourceLimit(QRhi::TextureSizeMax),
                 "Cover exceeds GPU dimensions");
         auto previous = std::move(cover);
-        cover.reset(api->newTexture(
-                QRhiTexture::RGBA8, coverSize, 1,
-                QRhiTexture::UsedAsTransferSource
-                        | (input.filterCovers ? QRhiTexture::MipMapped : QRhiTexture::Flags())));
-        require(cover->create(), "Cover texture replacement failed");
+        prepareCoverTexture(coverSize);
         replaceTextureBinding(CoverBinding, cover.get(),
                               input.filterCovers ? mipLinear.get() : linear.get());
-        ++coverResourceRevision;
-        coverDirty = true;
-        atlasGeneration = input.atlasGeneration;
-        if (atlasGeneration) {
-            atlasQueue.reset(coverSize, atlasGeneration);
-            enqueueAtlas();
-        }
     }
     if (replaceTargets) {
         resetTargetPipelines();

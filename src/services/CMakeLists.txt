@@ -4,6 +4,7 @@ target_sources(
     DemoLibrary.h
     DemoLibrary.cpp
     IMetadataProvider.h
+    IMetadataProvider.cpp
     OnlineMetadataProvider.h
     OnlineMetadataProvider.cpp
     metadata/MetadataHttp.h

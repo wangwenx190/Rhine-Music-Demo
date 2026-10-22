@@ -341,19 +341,15 @@ int main(int argc, char **argv)
         QObject::connect(&sounds, &yalahoo::InterfaceSoundController::settingsChanged,
                          preferences.get(), saveAudio);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
+        const auto configureMetadata = [online = static_cast<yalahoo::OnlineMetadataProvider *>(
+                                                provider.get())](
+                                               const yalahoo::Snapshot &snapshot) {
+            online->configure(snapshot->fields.value(u"metadataConfiguration"_s).toObject());
+        };
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, provider.get(),
-                         [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
-                                 const yalahoo::Snapshot &snapshot) {
-                             online->configure(
-                                     snapshot->fields.value(u"metadataConfiguration"_s).toObject());
-                         });
+                         configureMetadata);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
-                         provider.get(),
-                         [online = static_cast<yalahoo::OnlineMetadataProvider *>(provider.get())](
-                                 const yalahoo::Snapshot &snapshot) {
-                             online->configure(
-                                     snapshot->fields.value(u"metadataConfiguration"_s).toObject());
-                         });
+                         provider.get(), configureMetadata);
         QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
                          &library, &yalahoo::LibrarySession::adoptMetadataConfiguration);
         QObject::connect(&library, &yalahoo::LibrarySession::metadataDelivered, libraryStore.get(),

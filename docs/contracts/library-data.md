@@ -22,7 +22,7 @@ LibrarySession 的 navigationAlbumId/navigationTrackId 与 playbackAlbumId/playb
 
 ## 联网资料与离线缓存
 
-IMetadataProvider构造注入，提供Introduction/Credits/Enrichment/cancel异步接口。AlbumQuery携带专辑值、本地曲目用于匹配、enabled/force/configuration；本地路径与曲目文件不发送。请求bool表示是否接纳，拒绝时不建立订阅。ProviderResult携带requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error及输入摘要；状态为Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。LibrarySession在结果进入缓存前检查请求、代次、实体和kind；取消、换库、扫描、视觉重载及销毁淘汰过期结果。导航与播放始终独立。
+IMetadataProvider构造注入，提供Introduction/Credits/Enrichment/cancel异步接口。三类资料的公开名称、缓存字段和Provider能力由同一描述表映射；设置页和Provider复用`cachedMetadata`解析已存状态、内容及来源，状态统一为ProviderStatus的展示名。AlbumQuery携带专辑值、本地曲目用于匹配、enabled/force/configuration；本地路径与曲目文件不发送。请求bool表示是否接纳，拒绝时不建立订阅。ProviderResult携带requestId/generation/albumId/kind/status/payload/source/checkedAt/retryAt/error及输入摘要；状态为Deferred/Matched/Partial/NotFound/Uncertain/Error/Cancelled。LibrarySession在结果进入缓存前检查请求、代次、实体和kind；取消、换库、扫描、视觉重载及销毁淘汰过期结果。导航与播放始终独立。
 
 普通产品注入OnlineMetadataProvider，演示和验证入口使用OfflineMetadataProvider。`metadataConfiguration.networkEnabled`默认false；用户在“高级 · 联网资料”显式开启后才能发送查询。`onlineEnabled`独立控制扫描后对尚无MusicBrainz查询状态的专辑自动补充结构化资料，初次加载缓存不自动查询。手动当前专辑按钮刷新该类资料；全库按钮串行补缺或刷新过期项，不强制重查有效缓存。原MusicBrainz联系字段可选，空值使用项目公开网址标识User-Agent；`proxyEnabled`默认true，关闭时明确直连；`proxyMode`默认system，区分系统默认代理与manual手动代理，手填地址在`proxyUrl`独立保存。手动代理必须为不含认证信息的有效HTTP地址；空或无效手填地址不能静默回退系统代理。配置修改仅更新配置并取消在途请求，保留已接受资料、曲目模型、导航与播放，不作为换库。所有配置通过LibraryStore保存，验证字段类型、联系方式长度/换行及代理结构，保留未知扩展。忙碌/损坏库拒绝配置写入。
 

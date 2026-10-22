@@ -140,12 +140,9 @@ ArchiveScrollView {
                              root.interfaceSound.volume = value
                 Accessible.name: qsTr("Interface sound volume")
             }
-            ArchiveButton {
+            InterfaceSoundPreview {
                 tokens: root.tokens
-                text: qsTr("Preview interface sound \u2197")
-                enabled: root.interfaceSound !== null && root.interfaceSound.enabled
-                         && root.interfaceSound.available
-                onClicked: root.interfaceSound.preview()
+                interfaceSound: root.interfaceSound
             }
             PanelDescription {
                 tokens: root.tokens

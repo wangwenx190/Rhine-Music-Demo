@@ -111,11 +111,7 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
     m_origin = { 0, 0 };
     m_cell = m_pool.location(oldId).value_or(m_pool.location(firstId).value_or(
             ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow }));
-    QList<int> counts;
-    counts.reserve(m_pool.columns().size());
-    for (const auto &column : m_pool.columns())
-        counts.append(int(column.albumIds.size()));
-    m_realColumns.reset(counts, m_cell);
+    m_realColumns.reset(m_pool.rowCounts(), m_cell);
     m_memory.reset(m_pool.columns());
     m_lift.finish(m_liftTarget);
     m_rotation = 0;
@@ -242,11 +238,7 @@ void SelectionController::setRealistic(bool realistic)
     const ArchiveCell shift{ old.lane - m_cell.lane, old.row - m_cell.row };
     m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
                           -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
-    QList<int> counts;
-    counts.reserve(m_pool.columns().size());
-    for (const auto &column : m_pool.columns())
-        counts.append(int(column.albumIds.size()));
-    m_realColumns.reset(counts, m_cell, displayed - shift.row);
+    m_realColumns.reset(m_pool.rowCounts(), m_cell, displayed - shift.row);
     m_origin = { 0, 0 };
     m_returning.clear();
     m_poolObjects.fill({ });

@@ -7,36 +7,6 @@
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
-QString kindName(MetadataKind kind)
-{
-    switch (kind) {
-    case MetadataKind::Credits:
-        return u"credits"_s;
-    case MetadataKind::Enrichment:
-        return u"enrichment"_s;
-    default:
-        return u"introduction"_s;
-    }
-}
-QString statusName(ProviderStatus status)
-{
-    switch (status) {
-    case ProviderStatus::Matched:
-        return u"Matched"_s;
-    case ProviderStatus::Partial:
-        return u"Partial"_s;
-    case ProviderStatus::NotFound:
-        return u"NotFound"_s;
-    case ProviderStatus::Uncertain:
-        return u"Uncertain"_s;
-    case ProviderStatus::Error:
-        return u"Error"_s;
-    case ProviderStatus::Cancelled:
-        return u"Cancelled"_s;
-    default:
-        return u"Deferred"_s;
-    }
-}
 OfflineMetadataProvider::OfflineMetadataProvider(QObject *parent)
     : IMetadataProvider(parent),
       m_cache(std::make_shared<const LibrarySnapshot>()),

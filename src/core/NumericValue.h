@@ -3,13 +3,22 @@
 
 #pragma once
 #include <QVariant>
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 
 namespace yalahoo {
 inline std::optional<double> finiteNumber(const QVariant &value)
 {
-    if (value.metaType().id() == QMetaType::QString || value.metaType().id() == QMetaType::Bool)
+    // QVariant also converts byte strings and custom types; only arithmetic storage is input.
+    static constexpr std::array numericTypes{
+        QMetaType::Char,   QMetaType::SChar,    QMetaType::UChar,     QMetaType::Short,
+        QMetaType::UShort, QMetaType::Int,      QMetaType::UInt,      QMetaType::Long,
+        QMetaType::ULong,  QMetaType::LongLong, QMetaType::ULongLong, QMetaType::Float,
+        QMetaType::Double
+    };
+    if (std::ranges::find(numericTypes, value.metaType().id()) == numericTypes.end())
         return std::nullopt;
     bool converted = false;
     const double number = value.toDouble(&converted);

@@ -9,6 +9,7 @@
 #include "SettingsController.h"
 #include "OfflineMetadataProvider.h"
 #include "LibraryStore.h"
+#include "NumericValue.h"
 #include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -27,6 +28,19 @@ public:
     SettingsTest() = default;
 
 private Q_SLOTS:
+    void numericStorageIsAcceptedWithoutTextConversions()
+    {
+        for (const auto &value :
+             { QVariant::fromValue(char(2)), QVariant::fromValue(short(2)), QVariant::fromValue(2u),
+               QVariant::fromValue(2L), QVariant::fromValue(2LL), QVariant::fromValue(2ULL),
+               QVariant::fromValue(2.f), QVariant(2.) }) {
+            const auto number = finiteNumber(value);
+            QVERIFY(number.has_value());
+            QCOMPARE(*number, 2.);
+        }
+        for (const auto &value : { QVariant(), QVariant(true), QVariant(u"2"_s), QVariant("2"_ba) })
+            QVERIFY(!finiteNumber(value));
+    }
     void invalidSpeedConversionKeepsRuntimeAndPreferences()
     {
         QTemporaryDir directory;
@@ -34,10 +48,10 @@ private Q_SLOTS:
         QVERIFY(fixture.settings.update(u"motionSpeed"_s, 2.0));
         const auto before = fixture.preferences.values();
         QSignalSpy changes(&fixture.settings, &SettingsController::changed);
-        for (const auto &invalid :
-             { QVariant("invalid"_ba), QVariant(std::numeric_limits<double>::infinity()),
-               QVariant(-std::numeric_limits<double>::infinity()),
-               QVariant(std::numeric_limits<double>::quiet_NaN()) })
+        for (const auto &invalid : { QVariant("2"_ba), QVariant("invalid"_ba),
+                                     QVariant(std::numeric_limits<double>::infinity()),
+                                     QVariant(-std::numeric_limits<double>::infinity()),
+                                     QVariant(std::numeric_limits<double>::quiet_NaN()) })
             QVERIFY(!fixture.settings.update(u"motionSpeed"_s, invalid));
         QCOMPARE(fixture.motion.clock()->speed(), 2.0);
         QCOMPARE(fixture.preferences.values(), before);
@@ -67,10 +81,10 @@ private Q_SLOTS:
         expected.insert(u"depthOfField"_s, 75.);
         QCOMPARE(fixture.scene.quality()->values(), expected);
         QVERIFY(!fixture.settings.updateQuality(u"unknown"_s, 1));
-        for (const auto &invalid :
-             { QVariant("invalid"_ba), QVariant(std::numeric_limits<double>::infinity()),
-               QVariant(-std::numeric_limits<double>::infinity()),
-               QVariant(std::numeric_limits<double>::quiet_NaN()) })
+        for (const auto &invalid : { QVariant("75"_ba), QVariant("invalid"_ba),
+                                     QVariant(std::numeric_limits<double>::infinity()),
+                                     QVariant(-std::numeric_limits<double>::infinity()),
+                                     QVariant(std::numeric_limits<double>::quiet_NaN()) })
             QVERIFY(!fixture.settings.updateQuality(u"depthOfField"_s, invalid));
         QCOMPARE(fixture.scene.quality()->values(), expected);
     }

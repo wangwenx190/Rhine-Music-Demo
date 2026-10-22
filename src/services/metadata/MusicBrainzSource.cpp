@@ -227,18 +227,17 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
     };
     collectGenres(release);
     collectGenres(release.value(u"release-group"_s).toObject());
+    result.payload = { { u"online"_s,
+                         QJsonObject{
+                                 { u"releaseId"_s, releaseId },
+                                 { u"releaseGroupId"_s,
+                                   release.value(u"release-group"_s).toObject().value(u"id"_s) },
+                                 { u"sourceUrl"_s, result.source.value(u"url"_s) },
+                                 { u"title"_s, release.value(u"title"_s) },
+                                 { u"artist"_s, artistName(release) } } },
+                       { u"genres"_s, genres } };
     if (kind == MetadataKind::Enrichment) {
         result.status = genres.isEmpty() ? ProviderStatus::Partial : ProviderStatus::Matched;
-        result.payload = {
-            { u"online"_s,
-              QJsonObject{ { u"releaseId"_s, releaseId },
-                           { u"releaseGroupId"_s,
-                             release.value(u"release-group"_s).toObject().value(u"id"_s) },
-                           { u"sourceUrl"_s, result.source.value(u"url"_s) },
-                           { u"title"_s, release.value(u"title"_s) },
-                           { u"artist"_s, artistName(release) } } },
-            { u"genres"_s, genres }
-        };
         return result;
     }
     QJsonArray credits;
@@ -288,25 +287,14 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
         if (credits.size() > before)
             ++tracksWithCredits;
     }
-    result.status = kind == MetadataKind::Credits
-            ? (credits.isEmpty() ? ProviderStatus::NotFound : ProviderStatus::Partial)
-            : (genres.isEmpty() ? ProviderStatus::Partial : ProviderStatus::Matched);
     // Even populated credits cannot prove that every role on the release was documented.
-    result.payload = { { u"online"_s,
-                         QJsonObject{
-                                 { u"releaseId"_s, releaseId },
-                                 { u"releaseGroupId"_s,
-                                   release.value(u"release-group"_s).toObject().value(u"id"_s) },
-                                 { u"sourceUrl"_s, result.source.value(u"url"_s) },
-                                 { u"title"_s, release.value(u"title"_s) },
-                                 { u"artist"_s, artistName(release) } } },
-                       { u"producers"_s, credits },
-                       { u"genres"_s, genres },
-                       { u"creditsLookup"_s,
-                         QJsonObject{ { u"source"_s, u"MusicBrainz"_s },
-                                      { u"matchedTracks"_s, tracksWithCredits },
-                                      { u"totalTracks"_s, album.tracks.size() },
-                                      { u"releaseId"_s, releaseId } } } };
+    result.status = credits.isEmpty() ? ProviderStatus::NotFound : ProviderStatus::Partial;
+    result.payload.insert(u"producers"_s, credits);
+    result.payload.insert(u"creditsLookup"_s,
+                          QJsonObject{ { u"source"_s, u"MusicBrainz"_s },
+                                       { u"matchedTracks"_s, tracksWithCredits },
+                                       { u"totalTracks"_s, album.tracks.size() },
+                                       { u"releaseId"_s, releaseId } });
     return result;
 }
 }

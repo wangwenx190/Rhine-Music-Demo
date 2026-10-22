@@ -85,6 +85,14 @@ int ArchivePool::columnCount() const
 {
     return int(m_columns.size());
 }
+QList<int> ArchivePool::rowCounts() const
+{
+    QList<int> counts;
+    counts.reserve(m_columns.size());
+    for (const auto &column : m_columns)
+        counts.append(int(column.albumIds.size()));
+    return counts;
+}
 int ArchivePool::rowCount(double lane) const
 {
     return m_columns.isEmpty() ? 0
