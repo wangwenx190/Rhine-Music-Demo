@@ -1,12 +1,11 @@
 """Check locked SMAA source adaptation, lookup provenance and local platform matrices."""
-from audit_support import source_check
+from audit_support import read_shader, source_rows, write_source_report
 import base64
 import hashlib
 import json
 import re
 import subprocess
 from pathlib import Path
-from audit_support import read_shader
 
 ROOT = Path(__file__).resolve().parents[2]
 manifest = json.loads((ROOT / "resources/manifests/postprocess.json").read_text())
@@ -114,12 +113,9 @@ checks = [
 ]
 for platform, symbol in [("windows", "QRhiD3D11InitParams"), ("macos", "QRhiMetalInitParams"),
                           ("linux", "QRhiGles2InitParams")]:
-    rows = []
-    for identity, path, symbol, evidence in checks + [
+    rows = source_rows(ROOT, checks + [
             (platform.upper() + "-01", "tools/review/OffscreenRhi.h", symbol,
-             "Real native QRhi selected; GL fallback outlives QRhi, no visible windows/swapchain. Target actual execution recorded separately; qsb is only static translation.")]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, evidence=evidence, platform=platform, result='static-audit-passed', limitations='Backend execution separate; no MSAA/resolve/BLUR-01/VSYNC closure.'))
-    output = ROOT / "verification" / f"{platform}-static" / "rhi-smaa"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")
+             "Real native QRhi selected; GL fallback outlives QRhi, no visible windows/swapchain. Target actual execution recorded separately; qsb is only static translation.")],
+                       platform=platform, result='static-audit-passed', limitations='Backend execution separate; no MSAA/resolve/BLUR-01/VSYNC closure.')
+    write_source_report(ROOT, platform, 'rhi-smaa', dict(checks=rows, history=history))
 print("Locked SMAA helpers/lookup, history and COMMON/PERF/platform matrices verified")

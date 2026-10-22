@@ -1,7 +1,5 @@
 """R19E source provenance and call-path audit; runtime results are separate."""
-from audit_support import BASELINE
-from audit_support import source_check
-from audit_support import historical as historical
+from audit_support import BASELINE, historical, source_rows, write_source_report
 import json
 from pathlib import Path
 
@@ -52,10 +50,7 @@ CHECKS = [
     ('PERF-07', 'tools/review/RulerAudit.cpp', 'surface->hide()', 'One asynchronous readback with backend-bounded drain; actual full-window/graph invalidation, resize/restore and renderer release; an owned epoch rejects old callbacks and a basic-loop cleanup frame retires queued renderer deletions. No production readback or timer added.'),
 ]
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
-    rows = []
-    for identity, path, symbol, reason in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Platform native compiler/backend branch preserved; host generation does not prove target execution.')]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=reason, platform=platform, evidence=reason, result='static-audit-passed', limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R36 retains missing targets.'))
-    output = ROOT / 'verification' / f'{platform}-static' / 'browse-navigation'
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, checks=rows), indent=2) + '\n')
+    rows = source_rows(ROOT, CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Platform native compiler/backend branch preserved; host generation does not prove target execution.')],
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Actual target GPU, native input/window, physical DPR/VSYNC and deployment require runtime evidence; R36 retains missing targets.')
+    write_source_report(ROOT, platform, 'browse-navigation', dict(frozen=frozen, history=history, checks=rows))
 print('R19E frozen/history/call-path COMMON/PERF/platform audit passed')

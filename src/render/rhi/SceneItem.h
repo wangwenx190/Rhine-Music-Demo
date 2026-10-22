@@ -182,6 +182,8 @@ private:
     void resetPool();
     void refreshPool();
     void refreshTextResources();
+    void bindTextReel(QPointer<TitleReel> &current, QMetaObject::Connection &changed,
+                      QMetaObject::Connection &destroyed, TitleReel *reel);
     QPointer<TitleReel> m_titleReel, m_transportReel;
     QMetaObject::Connection m_titleConnection, m_transportConnection;
     QMetaObject::Connection m_titleDestroyedConnection, m_transportDestroyedConnection;

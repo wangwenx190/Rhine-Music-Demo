@@ -1,6 +1,5 @@
 """Hash-bound manual SSAO/readback review; output is local, not release evidence."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,12 +52,9 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
-    for check_id, path, symbol, conclusion in CHECKS + [(check_id, "cmake/Platform.cmake", marker,
+    rows = source_rows(ROOT, CHECKS + [(check_id, "cmake/Platform.cmake", marker,
             "Native Kit/compiler/API branches remain. Real target Windows/D3D11 and Linux/GL "
-            "environments are absent on this host; exact target matrix is retained for R36.")]:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Source/algorithm scope only; actual GPU runs are separate. No screenshot comparison, VRAM or normal VSYNC claim.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-ao"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+            "environments are absent on this host; exact target matrix is retained for R36.")],
+                       result='static-audit-passed', platform=host, limitations='Source/algorithm scope only; actual GPU runs are separate. No screenshot comparison, VRAM or normal VSYNC claim.')
+    write_source_report(ROOT, host, 'rhi-ao', rows)
 print("Source SSAO/readback/platform matrices generated")

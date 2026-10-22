@@ -274,13 +274,7 @@ auto advanceNavigationReview(NavigationReviewState &state, auto &wheel, auto &ch
 {
     {
         NavigationStageContext context{ state, wheel, check, checkSubmission, key, finish };
-        using Context = decltype(context);
-        struct Route final
-        {
-            int stage;
-            void (*run)(Context &);
-        };
-        static constexpr Route routes[] = {
+        static constexpr review::StageRoute<decltype(context)> routes[] = {
             { AwaitInitialFrame, &advanceNavigationAwaitInitialFrame },
             { CheckWheelBurst, &advanceNavigationCheckWheelBurst },
             { CheckOpposedWheel, &advanceNavigationCheckOpposedWheel },
@@ -292,12 +286,7 @@ auto advanceNavigationReview(NavigationReviewState &state, auto &wheel, auto &ch
             { CheckRestored, &advanceNavigationCheckRestored }
         };
         const int stageKey = state.step++;
-        const auto route =
-                std::find_if(std::begin(routes), std::end(routes), [stageKey](const Route &entry) {
-                    return entry.stage == stageKey;
-                });
-        if (route != std::end(routes))
-            route->run(context);
+        review::dispatchStage(routes, stageKey, context);
     }
     state.waiting = true;
     state.deadline.start(StageDeadlineMilliseconds);

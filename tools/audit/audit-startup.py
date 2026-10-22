@@ -1,6 +1,6 @@
 """R28 call-chain audit. Descriptors and source review never substitute for target runtime."""
+from audit_support import source_rows, write_source_report
 import hashlib
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,16 +49,9 @@ if reference.is_file():
     reference_evidence["sourceSha256"] = hashlib.sha256(reference.read_bytes()).hexdigest()
 source_hashes = {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sorted(DEPENDENCIES)}
 for platform, target in [("windows", "D3D11"), ("macos", "Metal"), ("linux", "OpenGL/Vulkan")]:
-    checks = []
-    for check_id, path, symbol, evidence in CHECKS:
-        if " ".join(symbol.split()) not in " ".join((ROOT / path).read_text().split()):
-            raise SystemExit(f"Startup source binding changed: {path}::{symbol}")
-        checks.append(dict(checkId=check_id, requirement=evidence, platform=platform,
-                           sourcePath=path, lineOrSymbol=symbol, evidence=evidence,
-                           sourceSha256=source_hashes[path], result="source-reviewed",
-                           limitations=f"Target {target} runtime independent. Remaining native/physical/VSYNC and target OpenGL gaps retain the R28-P/R36 gates."))
-    output = ROOT / "verification" / f"{platform}-static" / "startup"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, sourceSha256=source_hashes,
-                                                             reference=reference_evidence), indent=2) + "\n")
+    checks = source_rows(ROOT, CHECKS, platform=platform, requirement=True,
+                         result="source-reviewed",
+                         limitations=f"Target {target} runtime independent. Remaining native/physical/VSYNC and target OpenGL gaps retain the R28-P/R36 gates.")
+    write_source_report(ROOT, platform, 'startup', dict(checks=checks, sourceSha256=source_hashes,
+                                                             reference=reference_evidence))
 print("R28 COMMON/PERF source review bindings verified; target runtime conclusions remain separate")

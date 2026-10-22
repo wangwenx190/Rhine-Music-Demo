@@ -1,6 +1,5 @@
 """Source-hash guards for the manually reviewed opaque RHI boundary; outputs stay local."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,14 +50,11 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Actual native build/backend/window branches remain separate. This host "
                         "runs macOS Metal RenderControl; Windows/D3D11 and Linux/OpenGL runtime "
                         "remain R36 when their compiler/device/window-manager environment is absent.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Opaque driver/paper scope only; full optical source and continuous flicker remain R19C2B2/C/D. Runtime is separate.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-opaque"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', platform=host, limitations='Opaque driver/paper scope only; full optical source and continuous flicker remain R19C2B2/C/D. Runtime is separate.')
+    write_source_report(ROOT, host, 'rhi-opaque', rows)
 print("Opaque RHI source-hash matrices generated")

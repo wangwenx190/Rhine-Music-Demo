@@ -1,13 +1,10 @@
-"""Bind the macOS deployment call-chain review and actual product-QML closure."""
 #!/usr/bin/env python3
+"""Bind the macOS deployment call-chain review and actual product-QML closure."""
+from audit_support import production_qml, scan_production_qml, write_source_report
 import argparse
 import hashlib
 import json
 from pathlib import Path
-import shutil
-import subprocess
-import tempfile
-import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 # Bindings make the manually reviewed chains traceable; matching a symbol is not runtime proof.
@@ -106,31 +103,10 @@ def main():
     metadata = json.loads((build / 'deployment.json').read_text())
     if metadata['system'] != 'Darwin' or metadata['review'] or metadata['configuration'] != 'Release':
         raise SystemExit('Audit the real macOS production Release build')
-    qml = [(ROOT / 'qml' / value).resolve() for value in metadata['qmlFiles']]
-    if not qml or len(qml) != len(set(qml)) or any(
-            not path.is_file() or not path.is_relative_to(ROOT / 'qml') for path in qml):
-        raise SystemExit('Invalid production QML paths')
-    compiled = {Path(node.text).resolve() for node in ET.parse(
-        build / 'src/app/.qt/rcc/Yalahoo_raw_qml_0.qrc').iter('file') if node.text.endswith('.qml')}
-    if set(qml) != compiled:
-        raise SystemExit('Production metadata diverges from compiled QML resources')
+    qml = production_qml(ROOT, build, metadata)
     kit = Path(metadata['qtKit'])
-    scanner = next((kit / folder / 'qmlimportscanner' for folder in ('libexec', 'bin')
-                    if (kit / folder / 'qmlimportscanner').is_file()), None)
-    if scanner is None:
-        raise SystemExit('Selected Kit import scanner is missing')
-    with tempfile.TemporaryDirectory(prefix='yalahoo-macos-scan-') as directory:
-        for source in qml:
-            destination = Path(directory) / source.relative_to(ROOT / 'qml')
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, destination)
-        scan = subprocess.run([str(scanner), '-rootPath', directory, '-importPath', str(kit / 'qml')],
-                              text=True, capture_output=True, check=True)
-        imports = json.loads(scan.stdout)
-    modules = sorted({entry['name'] for entry in imports if entry.get('type') == 'module'})
-    if not {'QtQuick', 'QtQuick.Templates', 'QtQuick.Dialogs', 'QtMultimedia'} <= set(modules) or any(
-            name.startswith(('QtQuick3D', 'QtCanvas2D')) for name in modules):
-        raise SystemExit('Unexpected production QML module closure')
+    scan = scan_production_qml(ROOT, qml, kit)
+    scanner, modules = scan.scanner, scan.modules
     sources = {ROOT / path for _, path, _, _ in CHECKS} | set(qml)
     for folder in ('src', 'cmake', 'tools/deploy', 'tools/launchers'):
         sources.update(path for path in (ROOT / folder).rglob('*') if path.is_file()
@@ -156,11 +132,9 @@ def main():
                                             'macOS bundle/menu branch is N/A on this platform; '
                                             'shared metadata/probe/launcher source impact reviewed. '
                                             'Target execution remains R30-P/R32-P and R36.')))
-        output = ROOT / 'verification' / f'{platform}-static' / 'macos-deployment'
-        output.mkdir(parents=True, exist_ok=True)
-        (output / 'source-matrix.json').write_text(json.dumps(dict(checks=checks, sourceSha256=hashes,
+        write_source_report(ROOT, platform, 'macos-deployment', dict(checks=checks, sourceSha256=hashes,
             productionQml=dict(qtVersion=metadata['qtVersion'], modules=modules, stderr=scan.stderr,
-                               scannerSha256=hashlib.sha256(scanner.read_bytes()).hexdigest())), indent=2) + '\n')
+                               scannerSha256=hashlib.sha256(scanner.read_bytes()).hexdigest())))
     print('R31 source bindings, compiled product QML and same-Kit imports verified; runtime evidence is separate')
 
 

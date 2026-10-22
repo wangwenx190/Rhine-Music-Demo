@@ -1,6 +1,5 @@
 """Bind manually reviewed source optics and capture edges to hashes; reports stay local."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,14 +54,11 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Native Kit/API branches remain separate; five qsb target languages only "
                         "prove static translation. Current actual GPU is macOS Metal; unavailable "
                         "D3D11 runtime stays R36; Linux GL runtime stays R36. No version or install path is pinned.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Static source/graph scope; runtime listed separately. No source screenshot comparison or claim that array flicker/blur, fog, postprocessing or presentation is closed.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-optics"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', platform=host, limitations='Static source/graph scope; runtime listed separately. No source screenshot comparison or claim that array flicker/blur, fog, postprocessing or presentation is closed.')
+    write_source_report(ROOT, host, 'rhi-optics', rows)
 print("Source optics/capture matrices generated")

@@ -15,6 +15,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/deploy'))
 import linux as linux_deploy
+import linux_package
 import macos_bundle
 import package_support
 
@@ -47,6 +48,61 @@ class PackageSupportTest(unittest.TestCase):
             package_support.install_package(staging, output)
             self.assertEqual(set(output.iterdir()), {output / "new"})
             self.assertEqual(set(base.iterdir()), {output})
+
+    def test_linux_package_requires_native_media_without_an_unused_qml_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            files = ["bin/yalahoo", "yalahoo.sh", "plugins/platforms/libqxcb.so",
+                     "plugins/platforms/libqwayland-generic.so", "plugins/platforms/libqoffscreen.so",
+                     "plugins/multimedia/libffmpegmediaplugin.so", "lib/libQt6CanvasPainter.so.6",
+                     "qml/QtQuick/qmldir", "qml/QtQuick/Templates/qmldir", "qml/QtQuick/Dialogs/qmldir",
+                     "share/applications/yalahoo.desktop", "share/icons/hicolor/scalable/apps/yalahoo.svg"]
+            for name in files:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fixture component")
+            (root / "licenses").mkdir()
+            (root / "bin/qt.conf").write_text(
+                "[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\nQmlImports=qml\n")
+            with patch.object(linux_package, "elf_files", return_value=[root / "bin/yalahoo"]), \
+                    patch.object(linux_package, "dependencies", return_value=[]), \
+                    patch.object(linux_package, "run", side_effect=lambda *a: "Machine: AArch64" if "-h" in a else ""):
+                report = linux_package.inspect_package(root)
+                self.assertEqual(report["architectures"], ["AArch64"])
+                self.assertFalse((root / "qml/QtMultimedia").exists())
+                (root / "plugins/multimedia/libffmpegmediaplugin.so").unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing product component"):
+                    linux_package.inspect_package(root)
+
+    def test_macos_package_requires_native_media_without_an_unused_qml_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory).resolve() / "yalahoo.app"
+            contents = bundle / "Contents"
+            files = ["MacOS/yalahoo", "Resources/yalahoo.icns", "PlugIns/platforms/libqcocoa.dylib",
+                     "PlugIns/imageformats/libqsvg.dylib", "PlugIns/iconengines/libqsvgicon.dylib",
+                     "PlugIns/multimedia/libffmpegmediaplugin.dylib", "Resources/qml/QtQuick/qmldir",
+                     "Resources/qml/QtQuick/Templates/qmldir", "Resources/qml/QtQuick/Dialogs/qmldir"]
+            files += [f"Frameworks/Qt{name}.framework/Qt{name}"
+                      for name in ("Core", "Gui", "Qml", "Quick", "Multimedia", "CanvasPainter")]
+            for name in files:
+                path = contents / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fixture component")
+            identity = dict(CFBundleExecutable="yalahoo", CFBundleIdentifier="yalahoo.music",
+                            CFBundleDisplayName="yalahOO!!!", CFBundleName="yalahOO!!!",
+                            CFBundlePackageType="APPL", CFBundleIconFile="yalahoo.icns",
+                            NSHighResolutionCapable=True, LSMinimumSystemVersion="13.0")
+            (contents / "Info.plist").write_bytes(plistlib.dumps(identity))
+            with patch.object(macos_bundle, "macho", side_effect=lambda p: p == contents / "MacOS/yalahoo"), \
+                    patch.object(macos_bundle, "load_commands", return_value=[
+                        dict(minimumMacOS="13.0", rpaths=[], dependencies=[])]), \
+                    patch.object(macos_bundle, "run", return_value="arm64"):
+                report = macos_bundle.inspect_bundle(bundle)
+                self.assertEqual(report["architectures"], ["arm64"])
+                self.assertFalse((contents / "Resources/qml/QtMultimedia").exists())
+                (contents / "Frameworks/QtMultimedia.framework/QtMultimedia").unlink()
+                with self.assertRaisesRegex(RuntimeError, "Missing deployed component"):
+                    macos_bundle.inspect_bundle(bundle)
 
     def test_probe_records_process_failure_timeout_and_invalid_report(self):
         with tempfile.TemporaryDirectory(prefix="yalahoo probe space-") as temporary:

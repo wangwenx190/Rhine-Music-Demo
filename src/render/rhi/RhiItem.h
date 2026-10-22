@@ -84,6 +84,7 @@ struct Input final
     bool fogEnabled = false; // Independent Review fixtures opt in; production always enables fog.
     bool shadows = true, geometryDiagnostic = false, shadowDiagnostic = false;
     quint64 request = 0;
+    void setLighting(const SelectionLighting &lighting);
 };
 struct Capture final
 {

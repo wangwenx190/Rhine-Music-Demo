@@ -1,6 +1,6 @@
 """Bind the R19C1 call-chain audit to current sources; outputs stay local."""
+from audit_support import write_source_report
 import hashlib
-import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -70,9 +70,7 @@ for platform, platform_check in platforms.items():
             "limitations": "Manual parameter/call-chain scope only; actual runs are listed separately "
                            "in source-fidelity-review.md. Target runtime remains R36/R19C2/D.",
         })
-    output = root / f"verification/{platform}-static/material-parameters"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    output = write_source_report(root, platform, 'material-parameters', rows, 'audit-matrix.json')
     (output / "audit-report.md").write_text(
         f"# R19C1 {platform} static parameter audit\n\n"
         + "\n\n".join(f"{row['checkId']} `{row['sourcePath']}::{row['lineOrSymbol']}`: "

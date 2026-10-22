@@ -1,13 +1,10 @@
-"""Bind the R30 deployment source review; native Windows execution remains independent."""
 #!/usr/bin/env python3
+"""Bind the R30 deployment source review; native Windows execution remains independent."""
+from audit_support import production_qml, scan_production_qml, write_source_report
 import argparse
 import hashlib
 import json
 from pathlib import Path
-import shutil
-import subprocess
-import tempfile
-import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 # Each row binds a manually reviewed call chain, rather than treating a token as proof.
@@ -68,18 +65,7 @@ def main():
     parser.add_argument("--scan-qml", action="store_true", help="run this build's actual Kit import scanner")
     args = parser.parse_args()
     metadata = json.loads((args.build_directory / "deployment.json").read_text(encoding="utf-8"))
-    qml_files = [ROOT / "qml" / path for path in metadata["qmlFiles"]]
-    if any(not path.is_file() or not path.is_relative_to(ROOT / "qml") for path in qml_files):
-        raise SystemExit("Production QML contains an invalid path")
-    if len(set(qml_files)) != len(qml_files) or not qml_files:
-        raise SystemExit("Invalid application QML closure")
-    # Check generated metadata against the actual compiled resource list.
-    qrc = args.build_directory / "src/app/.qt/rcc/Yalahoo_raw_qml_0.qrc"
-    compiled = {Path(node.text).resolve() for node in ET.parse(qrc).iter("file")
-                if node.text.endswith(".qml")}
-    expected = set(qml_files)
-    if not expected <= compiled or (not metadata["review"] and expected != compiled):
-        raise SystemExit("Deployment QML diverges from actual compiled application resources")
+    qml_files = production_qml(ROOT, args.build_directory.resolve(), metadata)
     source_paths = DEPENDENCIES | {str(path.relative_to(ROOT)) for path in qml_files}
     source_paths |= {str(path.relative_to(ROOT)) for path in
                      (ROOT / "resources/icons/yalahoo/png").glob("*.png")}
@@ -87,25 +73,8 @@ def main():
     scan_evidence = None
     if args.scan_qml:
         kit = Path(metadata["qtKit"])
-        scanner = next((path for folder in ("libexec", "bin") for name in
-                        ("qmlimportscanner", "qmlimportscanner.exe")
-                        if (path := kit / folder / name).is_file()), None)
-        if scanner is None:
-            raise SystemExit("Selected Kit import scanner is missing")
-        with tempfile.TemporaryDirectory(prefix="yalahoo-production-qml-") as directory:
-            for source in qml_files:
-                destination = Path(directory) / source.relative_to(ROOT / "qml")
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, destination)
-            scan = subprocess.run([str(scanner), "-rootPath", directory,
-                                   "-importPath", str(kit / "qml")],
-                                  text=True, encoding="utf-8", capture_output=True, check=True)
-            imports = json.loads(scan.stdout)
-        modules = sorted({entry["name"] for entry in imports if entry.get("type") == "module"})
-        if any(name.startswith(("QtQuick3D", "QtCanvas2D")) for name in modules):
-            raise SystemExit("Research-only QML entered the production deployment closure")
-        if not {"QtQuick", "QtQuick.Templates", "QtQuick.Dialogs", "QtMultimedia"} <= set(modules):
-            raise SystemExit("Production scanner did not discover the required imports")
+        scan = scan_production_qml(ROOT, qml_files, kit)
+        scanner, modules = scan.scanner, scan.modules
         scan_evidence = dict(qtVersion=metadata["qtVersion"], system=metadata["system"],
                              modules=modules, scannerSha256=hashlib.sha256(scanner.read_bytes()).hexdigest(),
                              stderr=scan.stderr, scope="host Kit production-QML scan; no target GPU or PE claim")
@@ -122,10 +91,8 @@ def main():
                                limitations="Windows PE/build/deploy/device/presentation: R30-P (R36); OpenGL: R36. "
                                + ("This platform is outside the Windows packaging branch; shared resource/startup impact only."
                                   if platform != "windows" else "No native Windows execution on this host inferred.")))
-        output = ROOT / "verification" / f"{platform}-static" / "windows-deployment"
-        output.mkdir(parents=True, exist_ok=True)
-        (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, sourceSha256=hashes,
-                                                                 qmlScan=scan_evidence), indent=2) + "\n", encoding="utf-8")
+        write_source_report(ROOT, platform, 'windows-deployment', dict(checks=checks, sourceSha256=hashes,
+                                                                 qmlScan=scan_evidence))
     print("R30 source bindings and compiled production QML closure verified; Windows execution is independent")
 
 

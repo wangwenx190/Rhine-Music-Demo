@@ -1,9 +1,6 @@
 """R24 public Qt playback source review; generated evidence remains local."""
-from audit_support import BASELINE
-from audit_support import source_check
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,21 +47,15 @@ paths = sorted({path for _, path, _, _ in CHECKS} | {
     "tools/review/CMakeLists.txt", "tests/unit/CMakeLists.txt", "tests/integration/CMakeLists.txt",
     "tests/support/AudioFixture.h", "resources/licenses/qt-playback-reference-NOTICE.md",
 })
-dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths]
+dependencies = file_dependencies(ROOT, paths)
 revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
-frozen = []
-for path in ["src/music-player.ts", "src/music-app.ts"]:
-    data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
-    frozen.append(dict(sourcePath=path, revision=revision, sourceSha256=hashlib.sha256(data).hexdigest()))
+frozen = [historical(revision, path) for path in ["src/music-player.ts", "src/music-app.ts"]]
 for platform, identity, target in [
     ("macos", "MAC-01", "Actual public Qt backend and Metal hidden results remain local reports; physical unplug, output listening and native input/window/DPR remain R24-P/R36."),
     ("windows", "WIN-01", "Public Qt APIs use real native devices with no old private layout patch. Target compiler/plugins/audio backend/physical output and D3D11 remain R24-P/R36; OpenGL graphics remain R36."),
     ("linux", "LNX-01", "Local URLs and Qt Multimedia use native backend/device support. Native compiler/audio plugin/PipeWire or PulseAudio/ALSA availability and output remain R24-P/R36; GL GUI/input/lifecycle remain R36."),
 ]:
-    rows = []
-    for check_id, path, symbol, requirement in CHECKS + [(identity, "src/media/PlaybackController.cpp", "void PlaybackController::applyDevices", target)]:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=requirement, platform=platform, evidence=requirement, result='source-reviewed', limitations='Source review binding only; execution, output-list injection, physical devices and listening are distinct facts. Missing targets retain original R24-P gates.'))
-    output = ROOT / "verification" / f"{platform}-static" / "playback"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, dependencies=dependencies, frozen=frozen), indent=2) + "\n")
+    rows = source_rows(ROOT, CHECKS + [(identity, "src/media/PlaybackController.cpp", "void PlaybackController::applyDevices", target)],
+                       platform=platform, requirement=True, result='source-reviewed', limitations='Source review binding only; execution, output-list injection, physical devices and listening are distinct facts. Missing targets retain original R24-P gates.')
+    write_source_report(ROOT, platform, 'playback', dict(checks=rows, dependencies=dependencies, frozen=frozen))
 print("R24 public Qt playback COMMON/PERF/platform source bindings verified; target runtime is separate")

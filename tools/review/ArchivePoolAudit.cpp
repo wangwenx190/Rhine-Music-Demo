@@ -1,4 +1,5 @@
 #include "Require.h"
+#include "CaptureMailbox.h"
 #include "JsonFile.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
@@ -57,13 +58,8 @@ Snapshot library(int count)
     return std::make_shared<const LibrarySnapshot>(std::move(result));
 }
 
-struct Wait final
-{
-    quint64 request = 0;
-    QPointer<QEventLoop> loop;
-    std::optional<Capture> capture;
-};
-auto runArchivePoolAuditCapture(SceneItem *&item, std::shared_ptr<Wait> &state,
+auto runArchivePoolAuditCapture(SceneItem *&item,
+                                std::shared_ptr<yalahoo::review::CaptureMailbox> &state,
                                 OffscreenSurface &surface, QQuickWindow &window,
                                 const QString &output, QString name, std::optional<Input> supplied)
 {
@@ -126,21 +122,6 @@ auto runArchivePoolAuditCapture(SceneItem *&item, std::shared_ptr<Wait> &state,
     require(result.postprocessed.save(output + '/'_L1 + name + ".png"_L1),
             "Cannot save own-render pool image");
     return result;
-}
-
-auto runArchivePoolAuditObserveFrame(const QPointer<QQuickWindow> &guard,
-                                     const std::shared_ptr<Wait> &state, Capture capture)
-{
-    if (guard)
-        QMetaObject::invokeMethod(
-                guard,
-                [state, capture = std::move(capture)]() mutable {
-                    if (state->loop && capture.request == state->request) {
-                        state->capture = std::move(capture);
-                        state->loop->quit();
-                    }
-                },
-                Qt::QueuedConnection);
 }
 
 auto runArchivePoolAuditWaitPrepared(SceneItem *&item, SceneAdapter &adapter,
@@ -246,10 +227,10 @@ auto runArchivePoolAudit(int &argc, char **&argv, QGuiApplication &app)
             submissionSamples.append(sample);
         });
 
-        auto state = std::make_shared<Wait>();
+        auto state = std::make_shared<yalahoo::review::CaptureMailbox>();
         QPointer<QQuickWindow> guard(&window);
         item->captured = [state, guard](Capture capture) {
-            return runArchivePoolAuditObserveFrame(guard, state, capture);
+            yalahoo::review::queueCapture(state, guard, std::move(capture));
         };
         auto waitPrepared = [&] {
             return runArchivePoolAuditWaitPrepared(item, adapter, surface);

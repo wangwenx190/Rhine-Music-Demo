@@ -1,6 +1,5 @@
 """Source/ownership audit for the product ground; runtime evidence remains separate."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -43,13 +42,10 @@ if tokens(shared) != tokens(adapted):
 for host, platform_id, symbol in [("windows", "WIN-01", "WIN32"),
                                    ("macos", "MAC-01", "YalahooVerification"),
                                    ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
-    for check_id, path, marker, evidence in CHECKS + [(platform_id, "cmake/Platform.cmake", symbol,
-             "Same selected Kit, native helper and platform build closure retained; target runtime not inferred from macOS.")]:
-        rows.append(source_check(ROOT, path, marker, checkId=check_id, platform=host, requirement=evidence, evidence=evidence, result='static-audit-passed', limitations='Static source/ownership only; target GPU/window/runtime results are separate.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-floor"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, CHECKS + [(platform_id, "cmake/Platform.cmake", symbol,
+             "Same selected Kit, native helper and platform build closure retained; target runtime not inferred from macOS.")],
+                       platform=host, requirement=True, result='static-audit-passed', limitations='Static source/ownership only; target GPU/window/runtime results are separate.')
+    output = write_source_report(ROOT, host, 'rhi-floor', rows, 'audit-matrix.json')
     (output / "audit-report.md").write_text("# R19D3B source audit\n\nStatic audit passed; runtime remains separate.\n\n"
         + "\n".join(f"- {x['checkId']}: {x['sourcePath']}::{x['lineOrSymbol']} — {x['evidence']}" for x in rows) + "\n")
     (output / "runtime-checklist.md").write_text(

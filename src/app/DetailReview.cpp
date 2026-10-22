@@ -716,13 +716,7 @@ auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &ch
     {
         DetailStageContext context{ state, covers, recordAction, ready, capture,
                                     mouse, check,  button,       phase, finish };
-        using Context = decltype(context);
-        struct Route final
-        {
-            int stage;
-            void (*run)(Context &);
-        };
-        static constexpr Route routes[] = {
+        static constexpr review::StageRoute<decltype(context)> routes[] = {
             { AwaitCover, &advanceDetailAwaitCover },
             { AwaitOpen, &advanceDetailAwaitOpen },
             { AwaitDrag, &advanceDetailAwaitDrag },
@@ -743,13 +737,7 @@ auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &ch
             { AwaitRebuiltInput, &advanceDetailAwaitRebuiltInput }
         };
         const int stageKey = state.stage;
-        const auto route =
-                std::find_if(std::begin(routes), std::end(routes), [stageKey](const Route &entry) {
-                    return entry.stage == stageKey;
-                });
-        if (route != std::end(routes))
-            route->run(context);
-        else
+        if (!review::dispatchStage(routes, stageKey, context))
             advanceDetailDefault(context);
     }
 }

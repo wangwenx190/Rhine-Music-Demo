@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick3D
 import Yalahoo.Music
@@ -49,42 +50,26 @@ Node {
         tilingModeHorizontal: Texture.ClampToEdge
         tilingModeVertical: Texture.ClampToEdge
     }
-    readonly property GlassMaterial lid: GlassMaterial {
+    component CaseGlass: GlassMaterial {
         lighting: materials.lighting
         lightingEnabled: materials.lightingEnabled
+        roomTexture: materials.room
+        integrationTexture: materials.integration
+        ltc1Texture: materials.ltc1
+        ltc2Texture: materials.ltc2
+        warmth: materials.warmth
+        compositorOutput: materials.compositorOutput
+        paperIrradiance: materials.paperIrradiance
+    }
+    readonly property GlassMaterial lid: CaseGlass {
         surface: 0
-        roomTexture: materials.room
-        integrationTexture: materials.integration
-        ltc1Texture: materials.ltc1
-        ltc2Texture: materials.ltc2
-        warmth: materials.warmth
         clarity: Math.max(0, Math.min(1, materials.clarity))
-        compositorOutput: materials.compositorOutput
-        paperIrradiance: materials.paperIrradiance
     }
-    readonly property GlassMaterial spine: GlassMaterial {
-        lighting: materials.lighting
-        lightingEnabled: materials.lightingEnabled
+    readonly property GlassMaterial spine: CaseGlass {
         surface: 1
-        compositorOutput: materials.compositorOutput
-        roomTexture: materials.room
-        integrationTexture: materials.integration
-        ltc1Texture: materials.ltc1
-        ltc2Texture: materials.ltc2
-        warmth: materials.warmth
-        paperIrradiance: materials.paperIrradiance
     }
-    readonly property GlassMaterial tray: GlassMaterial {
-        lighting: materials.lighting
-        lightingEnabled: materials.lightingEnabled
+    readonly property GlassMaterial tray: CaseGlass {
         surface: 2
-        compositorOutput: materials.compositorOutput
-        roomTexture: materials.room
-        integrationTexture: materials.integration
-        ltc1Texture: materials.ltc1
-        ltc2Texture: materials.ltc2
-        warmth: materials.warmth
-        paperIrradiance: materials.paperIrradiance
     }
     readonly property LightingMaterial paper: LightingMaterial {
         property real environmentIntensity: lighting.environmentIntensity

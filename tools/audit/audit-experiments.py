@@ -1,9 +1,6 @@
 """Bind R27 source contracts to callable product paths; target runs remain independent."""
-from audit_support import BASELINE
-from audit_support import source_check
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,22 +45,15 @@ DEPENDENCIES = {
 DEPENDENCIES |= {str(path.relative_to(ROOT)) for path in (ROOT / "tools/launchers").glob("*")}
 DEPENDENCIES |= {"yalahoo.sh", "yalahoo.command", "yalahoo.ps1"}
 revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
-frozen = []
-for path in ["src/music-lighting-lab.ts", "src/music-motion-lab.ts", "src/music-lighting-lab.css",
-             "src/music-motion-settings.ts", "src/music-row-lighting.ts", "src/music-app.ts"]:
-    data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
-    frozen.append(dict(sourcePath=path, revision=revision, sourceSha256=hashlib.sha256(data).hexdigest()))
-dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
-                for path in sorted(DEPENDENCIES)]
+frozen = [historical(revision, path) for path in ["src/music-lighting-lab.ts", "src/music-motion-lab.ts", "src/music-lighting-lab.css",
+             "src/music-motion-settings.ts", "src/music-row-lighting.ts", "src/music-app.ts"]]
+dependencies = file_dependencies(ROOT, sorted(DEPENDENCIES))
 for platform, platform_id, launcher in [("macos", "MAC-01", "yalahoo.command"),
                                          ("windows", "WIN-01", "tools/launchers/run-native.ps1"),
                                          ("linux", "LNX-01", "yalahoo.sh")]:
     platform_check = (platform_id, launcher, "yalahoo.sh" if platform == "macos" else "run-native" if platform == "linux" else "$process.ExitCode",
                       "Native launcher selects its platform executable and configured Kit; Windows GUI uses Process.WaitForExit and ExitCode. Actual target compiler, PowerShell parser/FormatTools, plugins, GPU, physical input and normal presentation require that environment; source review does not waive R27-P.")
-    checks = []
-    for check_id, path, symbol, evidence in CHECKS + [platform_check]:
-        checks.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Runtime evidence is separate; missing target/physical/VSYNC checks remain R27-P without relaxed gates.'))
-    output = ROOT / "verification" / f"{platform}-static" / "experiments"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=checks, dependencies=dependencies, frozen=frozen), indent=2) + "\n")
+    checks = source_rows(ROOT, CHECKS + [platform_check],
+                       platform=platform, requirement=True, result='source-reviewed', limitations='Runtime evidence is separate; missing target/physical/VSYNC checks remain R27-P without relaxed gates.')
+    write_source_report(ROOT, platform, 'experiments', dict(checks=checks, dependencies=dependencies, frozen=frozen))
 print("R27 COMMON/PERF/platform source bindings verified; runtime remains separate")

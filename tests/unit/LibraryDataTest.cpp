@@ -411,7 +411,7 @@ private Q_SLOTS:
             album.genreId = u"genre-%1"_s.arg(i % 128);
             snapshot.albums.append(album);
         }
-        snapshot.genres.append({ u"genre-7"_s, u"Known genre"_s });
+        snapshot.genres.append({ u"genre-7"_s, u"Known genre"_s, { }, { }, { } });
         for (const auto mode : { SortMode::Artist, SortMode::Album, SortMode::Genre }) {
             const auto order = orderLibrary(snapshot, mode);
             QCOMPARE(order.indices.size(), snapshot.albums.size());
@@ -804,9 +804,38 @@ private Q_SLOTS:
         connect(temporary, &IMetadataProvider::resultReady, this, [] {
             QFAIL("Provider emitted after destruction");
         });
-        temporary->requestIntroduction(query, { 1, 0, query.albumId });
+        QVERIFY(temporary->requestIntroduction(query, { 1, 0, query.albumId }));
         delete temporary;
         QCoreApplication::processEvents();
+    }
+    void offlineCacheRetainsProvenanceAndEnrichment()
+    {
+        OfflineMetadataProvider provider;
+        auto snapshot = library(u"single"_s);
+        auto &album = snapshot.albums[0];
+        const QJsonObject provenance{ { u"name"_s, u"MusicBrainz"_s },
+                                      { u"url"_s, u"https://musicbrainz.org/release/fixture"_s },
+                                      { u"license"_s, u"CC0"_s } };
+        album.creditsLookup = { { u"status"_s, u"Partial"_s }, { u"sourceDetails"_s, provenance } };
+        album.online = { { u"status"_s, u"matched"_s }, { u"sourceDetails"_s, provenance } };
+        const QJsonArray genres{ u"Jazz"_s, u"Ambient"_s };
+        album.fields.insert(u"_onlineGenres"_s, genres);
+        provider.setCache(std::make_shared<const LibrarySnapshot>(snapshot));
+        QSignalSpy results(&provider, &IMetadataProvider::resultReady);
+        AlbumQuery query;
+        query.albumId = album.id;
+        QVERIFY(provider.requestCredits(query, { 1, 7, album.id }));
+        QVERIFY(provider.requestEnrichment(query, { 2, 7, album.id }));
+        QTRY_COMPARE(results.size(), 2);
+        const auto credits = qvariant_cast<ProviderResult>(results[0][0]);
+        QCOMPARE(credits.status, ProviderStatus::Partial);
+        QCOMPARE(credits.source, provenance);
+        QCOMPARE(credits.generation, quint64(7));
+        const auto enrichment = qvariant_cast<ProviderResult>(results[1][0]);
+        QCOMPARE(enrichment.status, ProviderStatus::Matched);
+        QCOMPARE(enrichment.source, provenance);
+        QCOMPARE(enrichment.payload.value(u"genres"_s).toArray(), genres);
+        QCOMPARE(enrichment.albumId, album.id);
     }
     void offlineAdmissionIsBoundedAndCancelledWorkDoesNotAccumulate()
     {

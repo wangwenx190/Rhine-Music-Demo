@@ -196,7 +196,7 @@
 ### 目标构建、部署与后端/日志
 
 - 归属：BP-P、R30-P、R31-P、R32-P及后端/日志目标检查。输入为根CMake/生产QML清单、`cmake/Deployment.cmake`、qrc资产、GraphicsBackend/BackendCapabilities、LoggingSession、平台启动/部署工具与匿名库；PowerShell共用命令日志、Kit准备及环境恢复由`tools/build/ReviewSupport.ps1`提供。静态展开COMMON-01–05、语言/Qt/QML实践及适用平台分支；已确定的跨平台算法与性能结论共用，不新建逐组件审计工程。
-- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，并以匿名console命令核对`ReviewSupport.ps1`的成功/非零退出日志、含空格路径、临时环境恢复和`verify-r14/r15`的实际接线；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。GUI核对本次Process.ExitCode和当前report，缺报告/错误必须失败；不为每个历史包装入口重复构建。
+- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，并执行`ctest --preset qt-release -R '^review-powershell$'`（或直接运行`pwsh -NoProfile -File tests/tools/ReviewSupportTest.ps1`）核对共用日志、非零退出、工具链返回值、含空格路径与环境恢复；另核对`verify-r14/r15`在目标环境的实际接线；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。GUI核对本次Process.ExitCode和当前report，缺报告/错误必须失败；不为每个历史包装入口重复构建。
 
 | 目标/归属 | 准确入口与独立退出事实 |
 | --- | --- |

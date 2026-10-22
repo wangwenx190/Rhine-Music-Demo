@@ -581,13 +581,7 @@ auto advanceOverviewReview(OverviewReviewState &state, auto &check, auto &ready,
     {
         OverviewStageContext context{ state,   ready, button,     check, firstLane,
                                       capture, key,   clickPoint, finish };
-        using Context = decltype(context);
-        struct Route final
-        {
-            int stage;
-            void (*run)(Context &);
-        };
-        static constexpr Route routes[] = {
+        static constexpr review::StageRoute<decltype(context)> routes[] = {
             { AwaitInitialFrame, &advanceOverviewAwaitInitialFrame },
             { AwaitOverview, &advanceOverviewAwaitOverview },
             { AwaitExpandedEntry, &advanceOverviewAwaitExpandedEntry },
@@ -609,13 +603,7 @@ auto advanceOverviewReview(OverviewReviewState &state, auto &check, auto &ready,
             { AwaitLabelRelease, &advanceOverviewAwaitLabelRelease }
         };
         const int stageKey = state.stage;
-        const auto route =
-                std::find_if(std::begin(routes), std::end(routes), [stageKey](const Route &entry) {
-                    return entry.stage == stageKey;
-                });
-        if (route != std::end(routes))
-            route->run(context);
-        else
+        if (!review::dispatchStage(routes, stageKey, context))
             advanceOverviewDefault(context);
     }
 }

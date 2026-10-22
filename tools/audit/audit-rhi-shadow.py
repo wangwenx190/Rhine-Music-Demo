@@ -1,6 +1,5 @@
 """Record source shadow graph, cache and API audit; generated matrices remain local."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,16 +82,13 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Dynamic latest Kit, native platform helpers and five qsb targets. "
                         "D3D11/Linux hardware not inferred from macOS Metal/OpenGL. "
                         "Existing GL renderbuffer capability adaptation is retained.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=conclusion, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Static graph/API evidence only; runtime reported separately. Product ground remains R19D3B; DOF/AA/BLUR-01 remain D4.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-shadow"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', requirement=True, platform=host, limitations='Static graph/API evidence only; runtime reported separately. Product ground remains R19D3B; DOF/AA/BLUR-01 remain D4.')
+    output = write_source_report(ROOT, host, 'rhi-shadow', rows, 'audit-matrix.json')
     (output / "audit-report.md").write_text(
         f"# R19D3A {host} source audit\n\n"
         "Static audit passed; target runtime is separate and cannot be inferred from this file.\n\n"

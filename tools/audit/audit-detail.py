@@ -1,7 +1,7 @@
-"""R18 reviewed call-chain deductions, frozen-source guards and local run evidence."""
 #!/usr/bin/env python3
+"""R18 reviewed call-chain deductions, frozen-source guards and local run evidence."""
+from audit_support import source_rows, write_source_report
 import argparse
-from audit_support import source_check
 import hashlib
 import json
 from pathlib import Path
@@ -131,14 +131,9 @@ platforms = {
               "recreation need their own native Kit/compositor; macOS GL does not prove them."),
 }
 for platform_name, platform_check in platforms.items():
-    rows = []
-    for check_id, path, symbol, evidence in checks + [platform_check]:
-        rows.append(source_check(root, path, symbol, checkId=check_id, requirement=evidence,
-                                 platform=platform_name, evidence=evidence, result="static-audit-passed",
-                                 limitations="Target native checks remain R36 except the explicitly listed macOS runtime reports"))
-    output = root / f"verification/{platform_name}-static/detail"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+    rows = source_rows(root, checks + [platform_check],
+                       platform=platform_name, requirement=True, result='static-audit-passed', limitations='Target native checks remain R36 except the explicitly listed macOS runtime reports')
+    output = write_source_report(root, platform_name, 'detail', rows, 'audit-matrix.json')
     (output / "runtime-evidence.json").write_text(json.dumps(reports, ensure_ascii=False, indent=2) + "\n")
     (output / "audit-report.md").write_text("\n\n".join(
         f"{row['checkId']} {row['sourcePath']}::{row['lineOrSymbol']}\n\n{row['evidence']}" for row in rows) + "\n")

@@ -10,7 +10,7 @@ endfunction()
 
 function(yalahoo_browse_qml output)
     set(files)
-    yalahoo_qml_group(group components SceneGraphVisual ArchiveVectorImage DisplaySurface DesignTokens ArchiveText ArchiveButton ArchiveSlider ArchiveProgressBar ArchiveCheckBox ArchiveComboBox ArchiveScrollBar ArchiveScrollView ArchiveTextField ArchiveTextArea ArchiveEditorSurface BackdropTexture ArchiveEditMenu ArchiveToolTip ThemeSwitch Header BrowseInfo Footer ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop)
+    yalahoo_qml_group(group components SceneGraphVisual ArchiveVectorImage DisplaySurface DesignTokens ArchiveText ArchiveButton ArchiveSlider ArchiveProgressBar ArchiveCheckBox ArchiveComboBox ArchiveScrollBar ArchiveScrollView ArchiveTextField ArchiveTextArea ArchiveEditorSurface BackdropTexture BackdropBlur ArchiveEditMenu ArchiveToolTip ThemeSwitch Header BrowseInfo Footer ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop)
     list(APPEND files ${group})
     yalahoo_qml_group(group pages Browse Detail Overview Opening MusicStage)
     list(APPEND files ${group})

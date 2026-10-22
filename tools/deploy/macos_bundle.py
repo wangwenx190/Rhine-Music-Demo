@@ -121,7 +121,7 @@ def inspect_bundle(bundle):
     required = ['Resources/yalahoo.icns', 'PlugIns/platforms/libqcocoa.dylib',
                 'PlugIns/imageformats/libqsvg.dylib', 'PlugIns/iconengines/libqsvgicon.dylib',
                 'Resources/qml/QtQuick/qmldir', 'Resources/qml/QtQuick/Templates/qmldir',
-                'Resources/qml/QtQuick/Dialogs/qmldir', 'Resources/qml/QtMultimedia/qmldir']
+                'Resources/qml/QtQuick/Dialogs/qmldir']
     for name in ('Core', 'Gui', 'Qml', 'Quick', 'Multimedia', 'CanvasPainter'):
         required.append(f'Frameworks/Qt{name}.framework/Qt{name}')
     for relative in required:

@@ -1,18 +1,11 @@
 """Trace viewport units, cover/DOF filtering and D1-D4 history without source-image scores."""
-from audit_support import BASELINE
-from audit_support import source_check
-import hashlib
+from audit_support import BASELINE, historical, source_rows, write_source_report
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAPPING = json.loads((ROOT / 'docs/contracts/history-rewrite.json').read_text())['revisions']
 BASELINE = MAPPING[BASELINE]
-
-def historical(revision, path):
-    data = subprocess.check_output(['git', 'show', f'{revision}:{path}'], cwd=ROOT)
-    return data, dict(revision=revision, sourcePath=path, sourceSha256=hashlib.sha256(data).hexdigest())
 
 sources = []
 for path, symbol in [
@@ -24,11 +17,7 @@ for path, symbol in [
     ('src/scene.ts', 'resizeQuality('),
     ('src/cover-atlas.ts', 'generateMipmaps'),
 ]:
-    data, row = historical(BASELINE, path)
-    if symbol not in data.decode():
-        raise SystemExit(f'Frozen viewport/cover source drift: {path}::{symbol}')
-    row['lineOrSymbol'] = symbol
-    sources.append(row)
+    sources.append(historical(BASELINE, path, symbol=symbol))
 history = []
 for revision, path, conclusion in [
     ('3fc6a39', 'src/render/RenderQuality.cpp', 'R09: retain dimension normalization, pixel guard and AO scale; caller must supply displayed units once.'),
@@ -46,9 +35,7 @@ for revision, path, conclusion in [
     ('5e333ec', 'src/render/rhi/Postprocess.cpp', 'R19D4B1: keep source SMAA at actual target size and original lookup.'),
     ('4e86136', 'src/render/rhi/RhiItem.cpp', 'R19D4B2: actual MSAA/resolve and combination resource graph.'),
 ]:
-    _, row = historical(revision, path)
-    row['evidence'] = conclusion
-    history.append(row)
+    history.append(historical(revision, path, conclusion))
 
 CHECKS = [
     ('COMMON-01', 'tools/review/CMakeLists.txt', 'RhiScaleAudit.cpp', 'Review-only executable links actual YalahooRhi; ordinary app uses the same production SceneItem, no alternative rendering algorithm.'),
@@ -65,10 +52,7 @@ CHECKS = [
     ('PERF-07', 'tools/review/OffscreenSurface.h', 'QCoreApplication::sendEvent(&m_window, &change)', 'External RenderControl DPR changes explicitly deliver the standard Qt window event before polish; actual target DPR and same source state are independently checked. Serial real resources with current/old-plus-new descriptor estimates and null driver VRAM. Shared full regression retains ten SG rebuilds/continuous motion. Native screen changes/VSYNC and missing target devices remain R36.'),
 ]
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
-    rows = []
-    for identity, path, symbol, evidence in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native backend/compiler branch preserved. Same-Kit target build and actual target GPU/window/DPR execution required; host qsb is translation only.')]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Runtime/actual visual inspection separate; physical display, native DPR transitions, VSYNC and full product performance are not proved by offscreen output.'))
-    output = ROOT / 'verification' / f'{platform}-static' / 'rhi-scale'
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'source-matrix.json').write_text(json.dumps(dict(checks=rows, frozen=sources, history=history), indent=2) + '\n')
+    rows = source_rows(ROOT, CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native backend/compiler branch preserved. Same-Kit target build and actual target GPU/window/DPR execution required; host qsb is translation only.')],
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Runtime/actual visual inspection separate; physical display, native DPR transitions, VSYNC and full product performance are not proved by offscreen output.')
+    write_source_report(ROOT, platform, 'rhi-scale', dict(checks=rows, frozen=sources, history=history))
 print('Viewport units, cover/DOF sampling, D1-D4 history and COMMON/PERF/platform source audit passed')

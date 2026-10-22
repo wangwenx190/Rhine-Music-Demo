@@ -3,6 +3,7 @@
 
 #pragma once
 #include "Require.h"
+#include "CaptureMailbox.h"
 #include <QtClassHelperMacros>
 #include <QString>
 using Qt::StringLiterals::operator""_s;
@@ -141,22 +142,6 @@ public:
     }
 
 private:
-    struct State;
-    static void queueCapture(const std::shared_ptr<State> &state,
-                             const QPointer<QQuickWindow> &guard, rhi::Capture capture)
-    {
-        if (guard)
-            QMetaObject::invokeMethod(
-                    guard,
-                    [state, capture = std::move(capture)]() mutable {
-                        if (state->loop && capture.request == state->request) {
-                            state->capture = std::move(capture);
-                            state->loop->quit();
-                        }
-                    },
-                    Qt::QueuedConnection);
-    }
-
     void createWindow()
     {
         window = std::make_unique<QQuickWindow>(OffscreenSurface::Enabled ? &control : nullptr);
@@ -194,13 +179,6 @@ private:
         oldSurface.reset();
         item = nullptr;
     }
-    struct State final
-    {
-        quint64 request = 0;
-        QPointer<QEventLoop> loop;
-        std::optional<rhi::Capture> capture;
-        QString error;
-    };
     void setInput(rhi::Input input, QSize size)
     {
         if (manageGeometry) {
@@ -211,7 +189,7 @@ private:
         surface->show();
         surface->requestFrame();
     }
-    std::shared_ptr<State> state = std::make_shared<State>();
+    std::shared_ptr<CaptureMailbox> state = std::make_shared<CaptureMailbox>();
     std::atomic<int> invalidations = 0;
     int previousInvalidations = 0;
     const std::function<rhi::RhiItem *(QQuickItem *)> m_create;

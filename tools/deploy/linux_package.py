@@ -84,7 +84,7 @@ def inspect_package(root):
     required = ['bin/yalahoo', 'bin/qt.conf', 'yalahoo.sh', 'plugins/platforms/libqxcb.so',
                 'plugins/multimedia/libffmpegmediaplugin.so', 'plugins/platforms/libqoffscreen.so',
                 'qml/QtQuick/qmldir', 'qml/QtQuick/Templates/qmldir',
-                'qml/QtQuick/Dialogs/qmldir', 'qml/QtMultimedia/qmldir',
+                'qml/QtQuick/Dialogs/qmldir',
                 'share/applications/yalahoo.desktop',
                 'share/icons/hicolor/scalable/apps/yalahoo.svg', 'licenses']
     if any(not (root / value).exists() for value in required):

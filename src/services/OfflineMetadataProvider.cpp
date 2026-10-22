@@ -1,4 +1,4 @@
-#include "IMetadataProvider.h"
+#include "metadata/MetadataMerge.h"
 #include <QCoreApplication>
 #include "OfflineMetadataProvider.h"
 #include <QTimer>
@@ -36,23 +36,6 @@ QString statusName(ProviderStatus status)
     default:
         return u"Deferred"_s;
     }
-}
-namespace {
-ProviderStatus cachedStatus(const QJsonObject &object)
-{
-    const QString status = object.value(u"status"_s).toString();
-    if (status == "matched"_L1)
-        return ProviderStatus::Matched;
-    if (status == "partial"_L1)
-        return ProviderStatus::Partial;
-    if (status == "not-found"_L1)
-        return ProviderStatus::NotFound;
-    if (status == "uncertain"_L1)
-        return ProviderStatus::Uncertain;
-    if (status == "error"_L1)
-        return ProviderStatus::Error;
-    return ProviderStatus::Deferred;
-}
 }
 OfflineMetadataProvider::OfflineMetadataProvider(QObject *parent)
     : IMetadataProvider(parent),
@@ -114,43 +97,8 @@ void OfflineMetadataProvider::dispatch()
         Q_EMIT resultReady(result);
         return;
     }
-    if (albumIndex >= 0) {
-        const auto *album = &cache->albums[albumIndex];
-        QJsonObject state;
-        switch (kind) {
-        case MetadataKind::Introduction:
-            state = album->introduction;
-            result.payload = { { u"description"_s, album->description },
-                               { u"introduction"_s, state } };
-            result.source = album->descriptionSource;
-            result.status = cachedStatus(state);
-            if (result.status == ProviderStatus::Deferred && !album->description.isEmpty())
-                result.status = ProviderStatus::Matched;
-            break;
-        case MetadataKind::Credits:
-            state = album->creditsLookup;
-            result.payload = { { u"producers"_s, producerData(album->producers) },
-                               { u"creditsLookup"_s, state } };
-            result.source = { { u"name"_s, state.value(u"source"_s) } };
-            result.status = cachedStatus(state);
-            if (result.status == ProviderStatus::Deferred && !album->producers.isEmpty())
-                result.status = ProviderStatus::Partial;
-            break;
-        case MetadataKind::Enrichment:
-            state = album->online;
-            result.payload = { { u"online"_s, state } };
-            result.source = { { u"name"_s, u"MusicBrainz"_s },
-                              { u"url"_s, state.value(u"sourceUrl"_s) } };
-            result.status = cachedStatus(state);
-            break;
-        }
-        if (result.status != ProviderStatus::Deferred) {
-            result.checkedAt = state.value(u"checkedAt"_s)
-                                       .toString(result.source.value(u"checkedAt"_s).toString());
-            result.retryAt = state.value(u"retryAt"_s).toString();
-            result.error = state.value(u"error"_s).toString();
-        }
-    }
+    if (albumIndex >= 0)
+        result = cachedMetadata(cache->albums[albumIndex], kind, token);
     if (result.status == ProviderStatus::Deferred) {
         result.payload = { };
         result.source = { };

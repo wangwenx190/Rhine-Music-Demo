@@ -1,7 +1,6 @@
-"""R29 production GUI source closure. Runtime and output quality are independent facts."""
-from audit_support import BASELINE
-from audit_support import source_check
 #!/usr/bin/env python3
+"""R29 production GUI source closure. Runtime and output quality are independent facts."""
+from audit_support import BASELINE, source_rows, write_source_report
 import argparse
 import hashlib
 import json
@@ -80,19 +79,16 @@ checks.append(('COMMON-05', 'qml/Yalahoo/Music/pages/Browse.qml', 'visible: root
 checks.append(('COMMON-05', 'tools/review/compare-presentation-structure.py', "'back': ['x', 'y', 'fontSize']",
                'The independent frozen DOM comparison includes final back-button position and SDE-01 responsive font intent. The full stage additionally checks that the portrait back button starts below the actual header navigation.'))
 for target, marker in (('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')):
-    rows = []
-    for identity, path, symbol, evidence in checks + [
+    rows = source_rows(ROOT, checks + [
             (dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[target],
              'cmake/Platform.cmake', marker,
-             'The actual native platform backend/build branch is retained; deployment is owned by R30/R31/R32. This host source audit cannot prove another target system, compiler, GPU or display session.')]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=target, evidence=evidence, result='static-audit-passed', limitations='Current runtime scope is recorded separately; R29-P retains missing target/physical/presentation requirements.'))
-    output = ROOT / f'verification/{target}-static/gui'
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'source-matrix.json').write_text(json.dumps(dict(
+             'The actual native platform backend/build branch is retained; deployment is owned by R30/R31/R32. This host source audit cannot prove another target system, compiler, GPU or display session.')],
+                       platform=target, requirement=True, result='static-audit-passed', limitations='Current runtime scope is recorded separately; R29-P retains missing target/physical/presentation requirements.')
+    write_source_report(ROOT, target, 'gui', dict(
         componentAudits=list(components), checks=rows,
         frozenVisibility=dict(revision=baseline, sourcePath=source_path,
                               sourceSha256=hashlib.sha256(frozen).hexdigest()),
         runtimeReports=[dict(path=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
                         for path in args.report], verifiedCheckpoints=len(merged),
-        runtimeBackend=report['backend'], visualQualityAutomaticallyScored=False), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        runtimeBackend=report['backend'], visualQualityAutomaticallyScored=False))
 print('R29 integrated GUI COMMON/PERF/platform source closure passed')

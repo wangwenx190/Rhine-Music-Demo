@@ -1,4 +1,5 @@
 #include "Require.h"
+#include "CaptureMailbox.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
 #include "CoverCache.h"
@@ -35,27 +36,6 @@ CoverSnapshot pixels(const QString &id, QColor color)
     return p;
 }
 
-struct Wait final
-{
-    quint64 request = 0;
-    std::optional<Capture> capture;
-    QPointer<QEventLoop> loop;
-};
-auto runCoverAuditObserveFrame(const QPointer<QQuickWindow> &guard,
-                               const std::shared_ptr<Wait> &state, Capture capture)
-{
-    if (guard)
-        QMetaObject::invokeMethod(
-                guard,
-                [state, capture = std::move(capture)]() mutable {
-                    if (capture.request == state->request && state->loop) {
-                        state->capture = std::move(capture);
-                        state->loop->quit();
-                    }
-                },
-                Qt::QueuedConnection);
-}
-
 auto runCoverAudit(int &argc, char **&argv)
 {
     const auto coverShutdown = qScopeGuard([] {
@@ -74,10 +54,10 @@ auto runCoverAudit(int &argc, char **&argv)
         auto *item = new RhiItem(window.contentItem());
         item->setSize({ 960, 720 });
 
-        auto state = std::make_shared<Wait>();
+        auto state = std::make_shared<yalahoo::review::CaptureMailbox>();
         QPointer<QQuickWindow> guard(&window);
         item->captured = [state, guard](Capture capture) {
-            return runCoverAuditObserveFrame(guard, state, capture);
+            yalahoo::review::queueCapture(state, guard, std::move(capture));
         };
         auto capture = [&](Input input) {
             QEventLoop loop;

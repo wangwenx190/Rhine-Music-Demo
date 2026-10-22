@@ -1,5 +1,5 @@
 """Audit the production opening's source, state, bounded drawing and RHI handoff."""
-from audit_support import source_check
+from audit_support import occluded_polish_guarded, source_rows, write_source_report
 import argparse
 import hashlib
 import json
@@ -38,12 +38,7 @@ if stage.count('FrameAnimation {') != 1 or 'FrameAnimation {' in app:
 if 'MusicStage {' not in app or 'MusicStage.qml' not in (ROOT / 'tools/review/OpeningAudit.cpp').read_text():
     raise SystemExit('Review must instantiate the actual production stage')
 scene_item = (ROOT / 'src/render/rhi/SceneItem.cpp').read_text()
-polish = scene_item[scene_item.index('void SceneItem::updatePolish()'):]
-occluded = polish.index('if (m_sceneOccluded)')
-resumed = polish.index('auto &adapter = *m_adapter;')
-opaque = polish[occluded:resumed]
-if (polish.index('!m_renderingActive') >= occluded or 'return;' not in opaque
-        or 'next.sceneOccluded = true;' not in opaque or 'preparePool(' in opaque):
+if not occluded_polish_guarded(scene_item):
     raise SystemExit('Hidden/opaque polish must return before pool preparation with a clear-only input')
 renderer = (ROOT / 'src/render/rhi/RhiItem.cpp').read_text()
 start = renderer.index('    void render(QRhiCommandBuffer *cb) override')
@@ -70,11 +65,8 @@ for path in ('Qt/src/RhiScene.cpp', 'LICENSE', 'NOTICE'):
         reference_info[path] = hashlib.sha256(file.read_bytes()).hexdigest()
 reference_info['symbol'] = 'ItemRenderer::render, opaque early return before renderer->render'
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
-    rows = []
     entries = CHECKS + [(dict(windows='WIN-01', macos='MAC-01', linux='LNX-01')[platform], 'cmake/Platform.cmake', marker, 'Same native shared implementation and platform branch; target compiler/deployment/runtime remain separate. Remaining target/backend runtime gates are assigned to R36; this audit creates no contexts.')]
-    for identity, path, symbol, evidence in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing target/backend evidence remains R20-P/R36.'))
-    output = ROOT / 'verification' / f'{platform}-static' / 'opening'
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'source-matrix.json').write_text(json.dumps(dict(checks=rows, frozen=golden['sources'], reference=reference_info), indent=2) + '\n')
+    rows = source_rows(ROOT, entries,
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Dynamic output/physical display/normal VSYNC/performance are separate; missing target/backend evidence remains R20-P/R36.')
+    write_source_report(ROOT, platform, 'opening', dict(checks=rows, frozen=golden['sources'], reference=reference_info))
 print('Opening COMMON/PERF/platform source audit passed; target runtime is recorded separately')

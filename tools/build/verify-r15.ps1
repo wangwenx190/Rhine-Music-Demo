@@ -10,7 +10,7 @@ $names = @('PATH', 'QT_PLUGIN_PATH', 'QSG_RHI_BACKEND', 'QSG_RENDER_LOOP', 'QSG_
 $saved = Save-ProcessEnvironment -Names $names
 Push-Location -LiteralPath $repository
 try {
-    Initialize-ReviewBuild -OutputDirectory $evidence
+    $chain = Initialize-ReviewBuild -OutputDirectory $evidence
     $nativeDpr = [double](& ./build/release/tools/ui-audit.exe --native-dpr)
     if ($LASTEXITCODE -ne 0 -or $nativeDpr -le 0) {
         throw 'Native DPR query failed'

@@ -1,8 +1,5 @@
 """R19F provenance and call-path review; runtime and visual quality remain separate."""
-from audit_support import BASELINE
-from audit_support import source_check
-from audit_support import historical as record
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
 from pathlib import Path
 
@@ -13,7 +10,7 @@ BASELINE = MAPPING[BASELINE]
 
 
 
-frozen = [record(BASELINE, 'src/' + name, reason) for name, reason in [
+frozen = [historical(BASELINE, 'src/' + name, reason) for name, reason in [
     ('music-app.ts', 'Production title/transport callers and stylesheet order.'),
     ('style.css', 'MiSans CSS weight mapping and font-synthesis:none.'),
     ('music.css', 'Final title 1.4/translation .45 and 1.45 line boxes, mask/padding/fit sizes.'),
@@ -22,8 +19,8 @@ frozen = [record(BASELINE, 'src/' + name, reason) for name, reason in [
     ('music-transport-title.css', 'Song width/offset/opacity, 29px line and rolling-number blur/hold.'),
     ('music-transport-title.ts', 'Song updates retain locate-only action; playing state independent of browsing.'),
 ]]
-frozen.append(record(BASELINE, 'package-lock.json', 'Locked rolling-number dependency and integrity; export-title validates actual package and hashes its sampled implementation.'))
-history = [record(rev, path, reason) for rev, path, reason in [
+frozen.append(historical(BASELINE, 'package-lock.json', 'Locked rolling-number dependency and integrity; export-title validates actual package and hashes its sampled implementation.'))
+history = [historical(rev, path, reason) for rev, path, reason in [
     ('2abb4f6', 'src/render/text/TextLayoutAdapter.cpp', 'R16: preserve whole-line QTextLayout/string-index association, grapheme grouping, fractional local scale and original font mapping. Contextual forms cannot use per-face fillText as production.'),
     ('2abb4f6', 'qml/Yalahoo/Music/components/TitleReel.qml', 'R16: remove twice-DPR slot allocation: no source caller or API necessity. Keep source local edge fade/transport blur and Qt linear layer filter at actual DPR; CurveRendering retains vector semantics.'),
     ('6636ddb', 'src/render/text/ReelInk.cpp', 'R16B1: retain bounded descriptor matching/reuse and render ownership, independent of image acceptance.'),
@@ -66,13 +63,10 @@ current_paths = {row[1] for row in CHECKS} | {
     'tools/review/CanvasTitleProbe.cpp', 'tools/review/OffscreenSurface.h',
     'tools/review/title-harness.js',
 }
-current = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
-           for path in sorted(current_paths)]
+current = file_dependencies(ROOT, sorted(current_paths))
 for platform, marker in [('windows', 'WIN32'), ('macos', 'YalahooVerification'), ('linux', 'UNIX AND NOT APPLE')]:
-    rows = []
-    for identity, path, symbol, reason in CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native platform compiler/backend/resources preserved; cross-target shader generation is not target runtime.')]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=reason, platform=platform, evidence=reason, result='static-audit-passed', limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R36.'))
-    directory = ROOT / 'verification' / f'{platform}-static' / 'title-reels' / 'r19f'
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / 'source-matrix.json').write_text(json.dumps(dict(frozen=frozen, history=history, current=current, checks=rows), indent=2) + '\n')
+    rows = source_rows(ROOT, CHECKS + [(platform.upper() + '-01', 'cmake/Platform.cmake', marker, 'Native platform compiler/backend/resources preserved; cross-target shader generation is not target runtime.')],
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Runtime, own-output quality, physical DPR/input/VSYNC and deployment require separate evidence; missing target environment remains R36.')
+    write_source_report(ROOT, platform, "title-reels/r19f",
+                        dict(frozen=frozen, history=history, current=current, checks=rows))
 print('R19F history, COMMON/PERF and three-platform call-path audit passed')

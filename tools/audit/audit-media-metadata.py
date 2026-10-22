@@ -1,6 +1,5 @@
 """R22 source review bindings. Runtime results remain in CTest's local reports."""
-from audit_support import BASELINE
-from audit_support import source_check
+from audit_support import BASELINE, file_dependencies, source_rows, write_source_report
 import hashlib
 import json
 import re
@@ -61,21 +60,18 @@ reference_info = dict(available=reference.exists(), sourcePath="Qt/tests/UiCheck
 if reference.exists():
     reference_info["sourceSha256"] = hashlib.sha256(reference.read_bytes()).hexdigest()
 for platform, (check_id, explanation) in PLATFORMS.items():
-    rows = []
     checks = CHECKS + [(check_id, "src/media/MediaMetadataProbe.cpp", "class QtMetadataSource final", explanation)]
-    for identity, path, symbol, evidence in checks:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='source-reviewed', limitations='Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R36 gates.'))
+    rows = source_rows(ROOT, checks,
+                       platform=platform, requirement=True, result='source-reviewed', limitations='Manual source review binding; actual build/test outcomes remain separate. Missing targets retain R22-P/R36 gates.')
     paths = ["src/media/CMakeLists.txt", "src/media/MediaMetadataProbe.h", "src/library/CMakeLists.txt",
              "src/library/DirectoryScanner.cpp", "src/library/LibraryStore.h", "src/library/LegacyImporter.h",
              "src/services/PreferencesStore.h", "src/app/main.cpp", "src/core/LibraryModels.cpp", "src/core/MusicTypes.cpp",
              "tools/review/ArchivePoolAudit.cpp",
              "src/render/rhi/SceneItem.h", "src/render/rhi/AtlasAllocator.cpp",
              "tests/unit/MediaMetadataTest.cpp", "tests/unit/CoverCacheTest.cpp", "tests/unit/CMakeLists.txt"]
-    dependencies = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in paths]
-    output = ROOT / "verification" / f"{platform}-static" / "media-metadata"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, dependencies=dependencies,
+    dependencies = file_dependencies(ROOT, paths)
+    write_source_report(ROOT, platform, 'media-metadata', dict(checks=rows, dependencies=dependencies,
         frozen=dict(revision=baseline, sourcePath="scripts/music-library.mjs",
                     lineOrSymbol="readAlbum/walkAlbums/resolveGenre/init/METADATA_VERSION/COMPATIBLE_METADATA_VERSIONS",
-                    sourceSha256=hashlib.sha256(frozen).hexdigest()), reference=reference_info), indent=2) + "\n")
+                    sourceSha256=hashlib.sha256(frozen).hexdigest()), reference=reference_info))
 print("R22 public metadata mapping and COMMON/PERF/platform source bindings verified; target execution is separate")

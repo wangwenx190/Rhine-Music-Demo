@@ -61,7 +61,7 @@ if(WIN32)
     target_link_libraries(VerificationWindowTest PRIVATE user32)
 endif()
 yalahoo_unit_test(RhiMaterialTest rhi-material-parameters
-    LIBRARIES YalahooRhi  Qt6::GuiPrivate
+    LIBRARIES YalahooRhi  Qt6::GuiPrivate Qt6::Quick3D
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 if(YALAHOO_REVIEW)
     add_test(NAME real-columns-gpu COMMAND archive-pool-audit
@@ -460,3 +460,32 @@ yalahoo_unit_test(OnlineMetadataTest online-metadata
     TIMEOUT 60)
 
 yalahoo_unit_test(JsonFileTest json-file LIBRARIES YalahooCore)
+
+add_executable(NativeToolTest NativeToolTest.cpp)
+set_target_properties(NativeToolTest PROPERTIES AUTOMOC FALSE AUTOUIC FALSE)
+yalahoo_tool(NativeToolTest)
+add_test(NAME native-tool COMMAND NativeToolTest)
+set_tests_properties(native-tool PROPERTIES TIMEOUT 10)
+
+yalahoo_unit_test(ReviewSupportTest review-support
+    TIMEOUT 30
+    LIBRARIES YalahooRhi
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tools/review"
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_QPA_PLATFORM=offscreen")
+
+find_program(YALAHOO_POWERSHELL NAMES pwsh)
+if(YALAHOO_POWERSHELL)
+    add_test(NAME review-powershell COMMAND "${YALAHOO_POWERSHELL}" -NoProfile -File
+        "${PROJECT_SOURCE_DIR}/tests/tools/ReviewSupportTest.ps1")
+    set_tests_properties(review-powershell PROPERTIES TIMEOUT 30)
+else()
+    message(STATUS "review-powershell requires pwsh; its target execution remains R36")
+endif()
+
+find_program(YALAHOO_NODE NAMES node)
+if(YALAHOO_NODE AND EXISTS "${PROJECT_SOURCE_DIR}/legacy-web/node_modules/typescript")
+    add_test(NAME source-tools COMMAND "${YALAHOO_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/SourceToolsTest.mjs")
+    set_tests_properties(source-tools PROPERTIES TIMEOUT 30)
+endif()

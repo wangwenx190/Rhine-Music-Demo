@@ -1,6 +1,5 @@
 """Bind the manually reviewed MaterialReview call chain to source hashes; output is local."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,15 +51,12 @@ for host, platform_guard in {
     "macos": ("MAC-01", "cmake/Platform.cmake", "YalahooVerification"),
     "linux": ("LNX-01", "cmake/Platform.cmake", "UNIX AND NOT APPLE"),
 }.items():
-    rows = []
     check_id, path, symbol = platform_guard
     entries = CHECKS + [(check_id, path, symbol,
                         "Native platform build/window/GPU branches remain real implementations; "
                         "macOS uses the true hidden Metal/OpenGL helper; missing Cocoa multisample-texture storage selects the stock same-format 4x buffer/resolve path. Windows/D3D11 and "
                         "Linux/OpenGL target execution remains R36, not proved by macOS.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Review driver only; actual runs documented separately. No VSYNC, production optical or target-device conclusion.'))
-    output = ROOT / "verification" / f"{host}-static" / "material-review"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', platform=host, limitations='Review driver only; actual runs documented separately. No VSYNC, production optical or target-device conclusion.')
+    write_source_report(ROOT, host, 'material-review', rows, 'audit-matrix.json')
 print("Material Review source-hash matrices generated for Windows, macOS and Linux")

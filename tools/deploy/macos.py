@@ -8,8 +8,8 @@ import platform
 import shutil
 import subprocess
 import tempfile
-import xml.etree.ElementTree as ET
 from macos_bundle import inspect_bundle, inventory, normalize_bundle, run, strip_bundle
+from qml_closure import production_qml
 from package_support import digest, install_package
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,11 +32,8 @@ def main():
     deploy = kit / 'bin/macdeployqt'
     if run(qtpaths, '--query', 'QT_VERSION') != metadata['qtVersion'] or not deploy.is_file():
         raise RuntimeError('Deployment tools must belong to the selected Qt Kit')
-    qml = metadata['qmlFiles']
-    compiled = {str(Path(node.text).resolve().relative_to(ROOT / 'qml')) for node in ET.parse(
-        build / 'src/app/.qt/rcc/Yalahoo_raw_qml_0.qrc').iter('file') if node.text.endswith('.qml')}
-    if not qml or len(qml) != len(set(qml)) or compiled != set(qml):
-        raise RuntimeError('Deployment QML does not match compiled production resources')
+    qml = [str(path.relative_to(ROOT / 'qml'))
+           for path in production_qml(ROOT, build, metadata)]
     environment = {key: value for key, value in os.environ.items()
                    if not key.startswith(('QT_', 'QML', 'QSG_', 'DYLD_', 'YALAHOO_'))}
     environment['PATH'] = str(kit / 'bin') + ':/usr/bin:/bin:/usr/sbin:/sbin'
@@ -49,8 +46,6 @@ def main():
         with tempfile.TemporaryDirectory(prefix='deploy-qml-', dir=build) as scan:
             for relative in qml:
                 path = Path(relative)
-                if path.is_absolute() or '..' in path.parts:
-                    raise RuntimeError(f'Invalid production QML path: {path}')
                 destination = Path(scan) / path
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / 'qml' / path, destination)

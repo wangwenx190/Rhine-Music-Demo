@@ -4,9 +4,7 @@ qt_add_executable(ui-audit UiAudit.cpp StartupAudit.cpp StartupAudit.h ControlsA
 target_include_directories(ui-audit PRIVATE "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/support")
 target_link_libraries(ui-audit PRIVATE YalahooScene YalahooNavigation YalahooText YalahooOpening YalahooRhi YalahooVisuals
     Qt6::CanvasPainter Qt6::QuickTemplates2 Qt6::QuickVectorImage Qt6::Svg Qt6::Test Qt6::GuiPrivate)
-set_target_properties(ui-audit PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
-    WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-yalahoo_platform(ui-audit)
+yalahoo_tool(ui-audit)
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(ui-audit)
 qt_add_resources(ui-audit ui_branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
@@ -34,9 +32,7 @@ function(yalahoo_rhi_review target)
     qt_add_executable(${target} ${ARGN})
     target_link_libraries(${target} PRIVATE YalahooRhi)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
-    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-        "${CMAKE_BINARY_DIR}/tools" WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-    yalahoo_platform(${target})
+    yalahoo_tool(${target})
 endfunction()
 
 if(YALAHOO_REVIEW)
@@ -76,7 +72,4 @@ endif()
 
 qt_add_executable(metadata-network-probe MetadataNetworkProbe.cpp)
 target_link_libraries(metadata-network-probe PRIVATE YalahooCore Qt6::Network)
-set_target_properties(metadata-network-probe PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools"
-    WIN32_EXECUTABLE FALSE MACOSX_BUNDLE FALSE)
-yalahoo_platform(metadata-network-probe)
+yalahoo_tool(metadata-network-probe)

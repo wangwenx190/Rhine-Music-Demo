@@ -1,5 +1,5 @@
 import {typescript as ts} from './frozen-source.mjs';
-import {FrozenSource, transpile} from './frozen-source.mjs';
+import {FrozenSource, loadSource} from './frozen-source.mjs';
 import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -11,21 +11,16 @@ const platform = process.platform === 'win32'    ? 'windows'
                  : process.platform === 'darwin' ? 'macos'
                                                  : 'linux';
 const sources = [];
-const modules = new Map();
 const frozenSource = new FrozenSource(sources);
-function load(name) {
-    if (modules.has(name))
-        return modules.get(name);
-    const exports = {};
-    modules.set(name, exports);
-    new Function('exports', 'require', transpile(frozenSource.read(name)))(exports, id => {
-        return id === './data.ts' ? {} : load(id.replace('./', '').replace('.ts', ''));
-    });
-    return exports;
-}
-
-const {MusicRealColumns} = load('music-real-columns');
-const motion = load('motion');
+const columnsSource = frozenSource.read('music-real-columns');
+const archiveSource = frozenSource.read('music-archive-motion');
+const loop = frozenSource.load('archive-loop', {'./data.ts': {}});
+const motion = frozenSource.load('motion');
+const archive = loadSource(archiveSource, {'./archive-loop.ts': loop});
+const {MusicRealColumns} = loadSource(columnsSource, {
+    './music-archive-motion.ts': archive,
+    './motion.ts': motion,
+});
 const counts = [0, 1, 2, 3, 49, 106];
 const cases = [];
 const fullCases = [];

@@ -1,14 +1,12 @@
-"""Trace Linux deployment and shared source chains; native target evidence stays separate."""
 #!/usr/bin/env python3
+"""Trace Linux deployment and shared source chains; native target evidence stays separate."""
+from audit_support import production_qml, scan_production_qml, write_source_report
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import re
-import shutil
 import subprocess
-import tempfile
-import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKS = [
@@ -114,31 +112,10 @@ def main():
     metadata = json.loads((build / 'deployment.json').read_text())
     if metadata['review'] or metadata['configuration'] != 'Release':
         raise SystemExit('A real production Review OFF Release build is required')
-    qml = [(ROOT / 'qml' / value).resolve() for value in metadata['qmlFiles']]
-    if not qml or len(qml) != len(set(qml)) or any(
-            not path.is_file() or not path.is_relative_to(ROOT / 'qml') for path in qml):
-        raise SystemExit('Invalid production QML paths')
-    compiled = {Path(node.text).resolve() for node in ET.parse(
-        build / 'src/app/.qt/rcc/Yalahoo_raw_qml_0.qrc').iter('file') if node.text.endswith('.qml')}
-    if set(qml) != compiled:
-        raise SystemExit('Production metadata differs from compiled QML')
+    qml = production_qml(ROOT, build, metadata)
     kit = Path(metadata['qtKit'])
-    scanner = next((kit / part / 'qmlimportscanner' for part in ('libexec', 'bin')
-                    if (kit / part / 'qmlimportscanner').is_file()), None)
-    if scanner is None:
-        raise SystemExit('Selected Kit QML scanner is missing')
-    with tempfile.TemporaryDirectory(prefix='yalahoo-linux-scan-') as scan_root:
-        for source in qml:
-            destination = Path(scan_root) / source.relative_to(ROOT / 'qml')
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, destination)
-        scan = subprocess.run([str(scanner), '-rootPath', scan_root, '-importPath', str(kit / 'qml')],
-                              text=True, capture_output=True, check=True)
-        modules = sorted({entry['name'] for entry in json.loads(scan.stdout)
-                          if entry.get('type') == 'module'})
-    if not {'QtQuick', 'QtQuick.Templates', 'QtQuick.Dialogs', 'QtMultimedia'} <= set(modules) or any(
-            name.startswith(('QtQuick3D', 'QtCanvas2D')) for name in modules):
-        raise SystemExit('Unexpected product QML import closure')
+    scan = scan_production_qml(ROOT, qml, kit)
+    scanner, modules = scan.scanner, scan.modules
     qsb = next((kit / part / 'qsb' for part in ('bin', 'libexec')
                 if (kit / part / 'qsb').is_file()), None)
     if qsb is None:
@@ -193,13 +170,11 @@ def main():
                                             'Linux-only ELF/install/probe branches N/A; shared startup/launcher '
                                             'and import closure reviewed. Actual host results recorded separately; '
                                             'target GPU/physical facts not established.')))
-        output = ROOT / 'verification' / f'{platform}-static' / 'linux-deployment'
-        output.mkdir(parents=True, exist_ok=True)
-        (output / 'source-matrix.json').write_text(json.dumps(dict(checks=checks,
+        write_source_report(ROOT, platform, 'linux-deployment', dict(checks=checks,
             sourceSha256=hashes, preprocessorScope=branches, bakedShaderVariants=shaders, productionQml=dict(
                 buildSystem=metadata['system'], qtVersion=metadata['qtVersion'], modules=modules,
                 scannerSha256=hashlib.sha256(scanner.read_bytes()).hexdigest(), stderr=scan.stderr),
-            targetExecution='Not established by this source audit'), indent=2) + '\n')
+            targetExecution='Not established by this source audit'))
     print('R32 source bindings and compiled production imports reviewed; native target evidence is separate')
 
 

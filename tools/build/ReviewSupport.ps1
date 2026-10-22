@@ -7,7 +7,7 @@ function Invoke-ReviewCommand {
     if ($code -ne 0) {
         throw "$Name failed; output retained"
     }
-    Write-Output "$Name passed"
+    Write-Host "$Name passed"
 }
 
 function Save-ProcessEnvironment {
@@ -40,4 +40,5 @@ function Initialize-ReviewBuild {
     $env:QSG_RENDER_LOOP = 'threaded'
     Remove-Item Env:QSG_NO_VSYNC -ErrorAction SilentlyContinue
     $env:QT_SCALE_FACTOR = '1'
+    return $chain
 }

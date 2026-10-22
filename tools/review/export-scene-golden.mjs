@@ -1,8 +1,7 @@
-import {transpile} from './frozen-source.mjs';
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
+import {FrozenSource} from './frozen-source.mjs';
+import {baselineRevision} from './frozen-git.mjs';
 // Verification-only execution of immutable Git source, using existing Web dev dependencies.
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -10,30 +9,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const req = createRequire(path.join(root, 'legacy-web/package.json'));
 const ts = req('typescript'), THREE = req('three');
 const baseline = baselineRevision, sources = [];
-function frozen(name) {
-    const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
-        cwd: root,
-        encoding: 'utf8',
-    });
-    sources.push({
-        path: `src/${name}.ts`,
-        sha256: createHash('sha256').update(source).digest('hex'),
-    });
-    return source;
-}
+const frozenSource = new FrozenSource(sources);
+const frozen = name => frozenSource.read(name);
 const modules = {
     three: THREE
 };
-for (const name of ['motion', 'viewport-layout', 'music-camera']) {
-    const exports = {};
-    const source = transpile(frozen(name));
-    new Function('exports', 'require', source)(exports, (id) => {
-        if (!modules[id])
-            throw Error(`Unknown frozen dependency: ${id}`);
-        return modules[id];
-    });
-    modules[`./${name}.ts`] = exports;
-}
+for (const name of ['motion', 'viewport-layout', 'music-camera'])
+    modules[`./${name}.ts`] = frozenSource.load(name, modules);
 const motion = modules['./motion.ts'], layout = modules['./viewport-layout.ts'],
       music = modules['./music-camera.ts'];
 const scene = frozen('scene'), model = frozen('music-model');

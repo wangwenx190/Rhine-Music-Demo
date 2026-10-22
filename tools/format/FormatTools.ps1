@@ -31,8 +31,12 @@ if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
 $settings = Join-Path $PSScriptRoot 'PowerShellStyle.psd1'
 $encoding = [Text.UTF8Encoding]::new($false)
 $failures = @()
-$sources = Get-ChildItem -LiteralPath (Join-Path $repository 'tools') -Recurse -File |
-    Where-Object { $_.Extension -in @('.ps1', '.psd1') }
+$sources = @(
+    Get-ChildItem -LiteralPath $repository -File
+    foreach ($directory in @('tools', 'tests')) {
+        Get-ChildItem -LiteralPath (Join-Path $repository $directory) -Recurse -File
+    }
+) | Where-Object { $_.Extension -in @('.ps1', '.psd1') }
 foreach ($source in $sources) {
     $original = [IO.File]::ReadAllText($source.FullName)
     $tokens = $null

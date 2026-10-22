@@ -1,7 +1,6 @@
 import {typescript as ts} from './frozen-source.mjs';
 import {FrozenSource} from './frozen-source.mjs';
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
-import {createHash} from 'node:crypto';
+import {baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -28,10 +27,7 @@ function load(name) {
 }
 
 const THREE = createRequire(path.join(root, 'legacy-web/package.json'))('three');
-const sceneSource =
-    execFrozenGit(['show', `${baseline}:src/scene.ts`], {cwd: root, encoding: 'utf8'});
-sources.push(
-    {path: 'src/scene.ts', sha256: createHash('sha256').update(sceneSource).digest('hex')});
+const sceneSource = frozenSource.read('scene');
 const loop = load('archive-loop');
 const motion = load('motion');
 function extract(start, end) {

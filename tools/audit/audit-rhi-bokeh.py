@@ -1,5 +1,5 @@
 """Audit Bokeh source, resource and platform edges; write only local matrices."""
-from audit_support import source_check
+from audit_support import source_rows, write_source_report
 import hashlib
 import json
 import re
@@ -62,12 +62,9 @@ for revision, path in [("522a3f3", "resources/shaders/bokeh.frag"),
 for host, check_id, marker in [("windows", "WIN-01", "QRhiD3D11InitParams"),
                                ("macos", "MAC-01", "QRhiMetalInitParams"),
                                ("linux", "LNX-01", "QRhiGles2InitParams")]:
-    rows = []
-    for identity, path, symbol, evidence in CHECKS + [
+    rows = source_rows(ROOT, CHECKS + [
             (check_id, "tools/review/OffscreenRhi.h", marker,
-             "Native backend selected without a window/swapchain. GL fallback surface lifetime exceeds QRhi. Shared bindings, output Y handling and RGBA16F tested per actual backend; cross-target qsb is only static translation.")]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, evidence=evidence, platform=host, result='static-audit-passed', limitations='Actual backend execution reported separately. No SMAA/scale/BLUR-01/window/VSYNC/performance closure.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-bokeh"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, history=history), indent=2) + "\n")
+             "Native backend selected without a window/swapchain. GL fallback surface lifetime exceeds QRhi. Shared bindings, output Y handling and RGBA16F tested per actual backend; cross-target qsb is only static translation.")],
+                       platform=host, result='static-audit-passed', limitations='Actual backend execution reported separately. No SMAA/scale/BLUR-01/window/VSYNC/performance closure.')
+    write_source_report(ROOT, host, 'rhi-bokeh', dict(checks=rows, history=history))
 print("Bokeh historical and COMMON/PERF/platform source matrices generated")

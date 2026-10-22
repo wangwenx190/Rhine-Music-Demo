@@ -1,8 +1,5 @@
 """R19G1 historical provenance and reviewed production call paths, separate from runtime."""
-from audit_support import BASELINE
-from audit_support import source_check
-from audit_support import historical as record
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
 from pathlib import Path
 
@@ -13,7 +10,7 @@ BASELINE = MAPPING[BASELINE]
 
 
 
-frozen = [record(BASELINE, "src/" + name, reason) for name, reason in [
+frozen = [historical(BASELINE, "src/" + name, reason) for name, reason in [
     ("music-app.ts", "Actual detail ports, overview toggle/exit/input, stylesheet order and label host."),
     ("scene.ts", "Placement/lift, rate-nine detail navigation, returning world height/rotation/clarity, camera blend, transformed folding/picking and actual readiness."),
     ("music-camera.ts", "MusicPlacementMotion and MusicPresentation phases, quintic duration and 80ms readiness hold."),
@@ -26,7 +23,7 @@ frozen = [record(BASELINE, "src/" + name, reason) for name, reason in [
     ("music-real-columns.ts", "Per-column displayed depth and shared overview-progress centering."),
     ("style.css", "MiSans source faces, no synthetic 500 weight and border-box inheritance."),
 ]]
-history = [record(revision, path, reason) for revision, path, reason in [
+history = [historical(revision, path, reason) for revision, path, reason in [
     ("33e8260", "src/presentation/PresentationController.cpp", "R17 ports/readiness/revisions are consumed by R18/R19. Detail text/layout/virtualization remains explicitly R19G2; no R17 completion inferred here."),
     ("e98c798", "src/render/SceneAdapter.cpp", "macOS followup: logical viewport and detail target/pointer/quality behavior. Target-resolution correction already has R19D4C provenance, not a new camera offset."),
     ("ed5aaef", "src/render/DetailMotion.cpp", "R18 authored 1.45/1.05 C2 placement and placing/presented/returning phases retained."),
@@ -54,7 +51,7 @@ CHECKS = [
     ("PERF-03", "src/render/ReturningCasePool.cpp", "m_cases.erase(it)", "Reversal reclaims actual identity/lift/yaw/clarity and its cover lease. Full pool blocks admission rather than evicting unfinished copies. SceneFrame implicit sharing and change-aware uniforms avoid pixel/model/material recreation."),
     ("PERF-04", "qml/Yalahoo/Music/components/OverviewBackdrop.qml", "targetWidth: labelWidth + 76 + 72", "Two fixed RGBA8 padded crop/horizontal layers per live slot; vertical composition is direct. Source sigma12 blur uses logical grid, while text remains native DPR. Motion changes no 3D target compatibility keys. Descriptor and driver allocation remain distinct."),
     ("PERF-05", "src/render/CaseClarity.cpp", "constexpr auto derivatives", "One cached Hermite derivative table, actual reveal mapping and per-copy exp(-9dt). Column extent caches center/progress; published VP reused for label projection. No source-less image compensation found in these retained algorithms."),
-    ("PERF-06", "src/render/OverviewLabelsModel.cpp", "if (previouslyLive[row]", "Signals affect only current/retiring bounded slots; projected anchors have no follow animation. Exit immediately disables entry. Shared clock stops while hidden and static scene/labels skip update. Detail text/scroll work is R19G2."),
+    ("PERF-06", "src/render/OverviewLabelsModel.cpp", "if (!roles.isEmpty())", "Signals affect only current/retiring bounded slots; projected anchors have no follow animation. Exit immediately disables entry. Shared clock stops while hidden and static scene/labels skip update. Detail text/scroll work is R19G2."),
     ("PERF-07", "tools/review/OverviewAudit.cpp", "cycle < requestedCycles", "Ten explicit root/RenderControl invalidations restore live labels, then retirement removes their blur Loaders. Default window policy must pass. Native same-window restore, physical input and VSYNC require separate target evidence."),
 ]
 current_paths = {r[1] for r in CHECKS} | {
@@ -66,18 +63,14 @@ current_paths = {r[1] for r in CHECKS} | {
     "tools/review/export-browse-ui.mjs", "tools/review/overview-ui-harness.js",
     "tools/review/compare-overview-structure.py", "tools/audit/audit-detail.py",
 }
-current = [dict(sourcePath=p, sourceSha256=hashlib.sha256((ROOT / p).read_bytes()).hexdigest())
-           for p in sorted(current_paths)]
+current = file_dependencies(ROOT, sorted(current_paths))
 for platform, marker in [("windows", "WIN32"), ("macos", "YalahooVerification"),
                          ("linux", "UNIX AND NOT APPLE")]:
-    rows = []
-    for identity, path, symbol, reason in CHECKS + [
+    rows = source_rows(ROOT, CHECKS + [
         (platform.upper() + "-01", "cmake/Platform.cmake", marker,
          "Shared Qt implementations and native compiler/backend/resource branches remain. Host qsb target translation does not establish target GPU/runtime.")
-    ]:
-        rows.append(source_check(ROOT, path, symbol, checkId=identity, requirement=reason, platform=platform, evidence=reason, result='static-audit-passed', limitations='Runtime/quality checked separately. Missing target systems, native visibility/input/VSYNC remain R36; R17 presentation review remains R19G2.'))
-    output = ROOT / "verification" / f"{platform}-static" / "detail-overview" / "r19g1"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(
-        frozen=frozen, history=history, current=current, checks=rows), indent=2) + "\n")
+    ],
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Runtime/quality checked separately. Missing target systems, native visibility/input/VSYNC remain R36; R17 presentation review remains R19G2.')
+    write_source_report(ROOT, platform, 'r19g1', dict(
+        frozen=frozen, history=history, current=current, checks=rows))
 print("R19G1 motion/overview history and COMMON/PERF/platform audit passed; R17 remains R19G2")

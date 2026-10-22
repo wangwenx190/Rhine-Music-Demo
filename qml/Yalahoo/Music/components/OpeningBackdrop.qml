@@ -1,37 +1,22 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 
-Item {
+BackdropBlur {
     id: root
-    readonly property real outputDpr: Window.window ? Window.window.devicePixelRatio : 1
-    property bool hdrActive: false
-    required property Item sceneSource
-    required property real sceneX
-    required property real sceneY
     required property size viewport
     required property color pageColor
     required property color surfaceColor
     required property real paperAlpha
-    readonly property real targetWidth: width + 60
-    readonly property real targetHeight: height + 60
-    clip: true
-    BackdropTexture {
-        id: crop
-        hdrActive: root.hdrActive
-        outputDpr: root.outputDpr
-        sourceItem: root.sceneSource
-        sourceRect: Qt.rect(root.sceneX - 30, root.sceneY - 30, root.targetWidth, root.targetHeight)
-        width: root.targetWidth
-        height: root.targetHeight
-    }
+    blurRadius: 30
+    horizontalPass: horizontal
     ShaderEffect {
         id: horizontal
         width: root.targetWidth
         height: root.targetHeight
         visible: false
-        property var source: crop
+        property var source: root.sceneTexture
         property vector2d sampleStep: Qt.vector2d(1 / width, 0)
-        property vector4d region: Qt.vector4d(root.sceneX - 30, root.sceneY - 30,
+        property vector4d region: Qt.vector4d(root.sceneX - root.blurRadius, root.sceneY - root.blurRadius,
                                               root.viewport.width, root.viewport.height)
         property vector2d targetSize: Qt.vector2d(width, height)
         property color pageColor: root.pageColor
@@ -39,21 +24,13 @@ Item {
         property real paperAlpha: root.paperAlpha
         fragmentShader: "qrc:/assets/shaders/opening-blur.frag.qsb"
     }
-    BackdropTexture {
-        id: horizontalTexture
-        hdrActive: root.hdrActive
-        outputDpr: root.outputDpr
-        sourceItem: horizontal
-        width: root.targetWidth
-        height: root.targetHeight
-        hideSource: true
-    }
+
     ShaderEffect {
-        x: -30
-        y: -30
+        x: -root.blurRadius
+        y: -root.blurRadius
         width: root.targetWidth
         height: root.targetHeight
-        property var source: horizontalTexture
+        property var source: root.horizontalTexture
         property vector2d sampleStep: Qt.vector2d(0, 1 / height)
         property vector4d region: Qt.vector4d(0, 0, 1, 1)
         property vector2d targetSize: Qt.vector2d(width, height)

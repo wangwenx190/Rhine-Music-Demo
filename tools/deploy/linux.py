@@ -10,8 +10,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 sys.dont_write_bytecode = True
+from qml_closure import production_qml
 from package_support import install_package
 from linux_package import (clean_environment, dependencies, elf_files, inspect_package,
                            inventory, is_system, requires_bundle, run)
@@ -93,11 +93,8 @@ def main():
     kit = Path(metadata['qtKit']).resolve()
     if run(kit / 'bin/qmake', '-query', 'QT_VERSION') != metadata['qtVersion']:
         raise RuntimeError('Deployment must use the selected Qt Kit')
-    qml = metadata['qmlFiles']
-    compiled = {str(Path(node.text).resolve().relative_to(ROOT / 'qml')) for node in ET.parse(
-        build / 'src/app/.qt/rcc/Yalahoo_raw_qml_0.qrc').iter('file') if node.text.endswith('.qml')}
-    if not qml or len(qml) != len(set(qml)) or set(qml) != compiled:
-        raise RuntimeError('Deployment QML differs from compiled production resources')
+    qml = [str(path.relative_to(ROOT / 'qml'))
+           for path in production_qml(ROOT, build, metadata)]
     (ROOT / 'out').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='linux-staging-', dir=ROOT / 'out') as temporary:
         staging = Path(temporary)

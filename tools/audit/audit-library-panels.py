@@ -1,9 +1,6 @@
 """R23 source review bindings; runtime reports and generated matrices stay local."""
-from audit_support import BASELINE
-from audit_support import source_check
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,10 +36,7 @@ CHECKS = [
 ]
 mapping = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"]
 revision = mapping[BASELINE]
-frozen = []
-for name in ["src/music-search.ts", "src/music-track-focus.ts", "src/music-app.ts", "src/music.css", "src/ui-transitions.ts"]:
-    data = subprocess.check_output(["git", "show", f"{revision}:{name}"], cwd=ROOT)
-    frozen.append(dict(sourcePath=name, revision=revision, sourceSha256=hashlib.sha256(data).hexdigest()))
+frozen = [historical(revision, name) for name in ["src/music-search.ts", "src/music-track-focus.ts", "src/music-app.ts", "src/music.css", "src/ui-transitions.ts"]]
 focus = (ROOT / "src/presentation/TrackFocusController.cpp").read_text()
 for forbidden in ["QMediaPlayer", "QAudioOutput", "setSource(", "->play(", "->pause("]:
     if forbidden in focus:
@@ -69,12 +63,10 @@ dependencies = sorted({path for _, path, _, _ in CHECKS} | {
     "tests/unit/DirectoryScannerTest.cpp", "tests/unit/CoverCacheTest.cpp",
     "tests/integration/CMakeLists.txt",
 })
-dependency_hashes = [dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()) for path in dependencies]
+dependency_hashes = file_dependencies(ROOT, dependencies)
 for platform, (identity, evidence) in platforms.items():
-    rows = []
-    for check_id, path, symbol, requirement in CHECKS + [(identity, "src/app/main.cpp", "yalahoo::TrackFocusController trackFocus", evidence)]:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, requirement=requirement, platform=platform, evidence=requirement, result='source-reviewed', limitations='Source reasoning binding only; native builds/tests/physical display claims require their actual reports and R23-P gates.'))
-    target = ROOT / "verification" / f"{platform}-static" / "library-panels"
-    target.mkdir(parents=True, exist_ok=True)
-    (target / "source-matrix.json").write_text(json.dumps(dict(checks=rows, frozen=frozen, dependencies=dependency_hashes), indent=2) + "\n")
+    rows = source_rows(ROOT, CHECKS + [(identity, "src/app/main.cpp", "yalahoo::TrackFocusController trackFocus", evidence)],
+                       platform=platform, requirement=True, result='source-reviewed', limitations='Source reasoning binding only; native builds/tests/physical display claims require their actual reports and R23-P gates.')
+    write_source_report(ROOT, platform, "library-panels",
+                        dict(checks=rows, frozen=frozen, dependencies=dependency_hashes))
 print("R23 COMMON/PERF/platform review bindings verified; actual runtime remains separate")

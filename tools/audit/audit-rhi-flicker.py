@@ -1,6 +1,5 @@
 """Record manually traced invariance/continuous rendering contracts, without GPU image oracles."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,13 +46,10 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Native backend/compiler/window integration remains intact. Runtime is "
                         "macOS Metal/OpenGL hidden; D3D11 target execution remains R36; Linux OpenGL remains R36.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Finite continuous hidden scope; no old image comparison, normal presentation/VSYNC or untested target claim.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-flicker"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', platform=host, limitations='Finite continuous hidden scope; no old image comparison, normal presentation/VSYNC or untested target claim.')
+    write_source_report(ROOT, host, 'rhi-flicker', rows)
 print("Continuous optical invariance matrices generated")

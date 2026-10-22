@@ -10,6 +10,7 @@
 #include "SelectionLighting.h"
 #include <QtTest>
 #include <QQmlComponent>
+#include <QQuick3DTextureData>
 #include <QQmlEngine>
 #include <QFile>
 #include <QJsonDocument>
@@ -18,6 +19,18 @@
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo::rhi;
+// Material wiring needs texture objects, not a rendered scene or actual lookup decoding.
+class MaterialTextureFixture : public QQuick3DTextureData
+{
+    Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MaterialTextureFixture)
+    Q_PROPERTY(QString asset MEMBER asset)
+public:
+    explicit MaterialTextureFixture(QQuick3DObject *parent = nullptr) : QQuick3DTextureData(parent)
+    {
+    }
+    QString asset;
+};
 class RhiMaterialTest final : public QObject
 {
     Q_OBJECT
@@ -26,6 +39,56 @@ public:
     RhiMaterialTest() = default;
 
 private Q_SLOTS:
+    void initTestCase()
+    {
+        qmlRegisterUncreatableType<yalahoo::SelectionLighting>("Yalahoo.Music", 1, 0,
+                                                               "SelectionLighting", u"Injected"_s);
+        qmlRegisterType<yalahoo::SourceOptics>("Yalahoo.Music", 1, 0, "SourceOptics");
+        qmlRegisterType<MaterialTextureFixture>("Yalahoo.Music", 1, 0, "FixedTextureData");
+    }
+    void sharedCaseMaterialsKeepDistinctSurfacesAndLiveBindings()
+    {
+        yalahoo::SelectionLighting lighting;
+        lighting.setReducedMotion(true);
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(
+                &engine,
+                QUrl::fromLocalFile(QString::fromUtf8(FIXTURE_ROOT)
+                                    + u"/qml/Yalahoo/Music/scene/CaseMaterials.qml"_s));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        std::unique_ptr<QObject> materials(component.createWithInitialProperties(
+                { { u"lighting"_s, QVariant::fromValue(&lighting) }, { u"clarity"_s, .6 } }));
+        QVERIFY2(materials, qPrintable(component.errorString()));
+        auto *lid = materials->property("lid").value<QObject *>();
+        auto *spine = materials->property("spine").value<QObject *>();
+        auto *tray = materials->property("tray").value<QObject *>();
+        QVERIFY(lid && spine && tray);
+        QCOMPARE(lid->property("surface").toInt(), 0);
+        QCOMPARE(spine->property("surface").toInt(), 1);
+        QCOMPARE(tray->property("surface").toInt(), 2);
+        QCOMPARE(lid->property("clarity").toDouble(), .6);
+        materials->setProperty("clarity", .8);
+        QCOMPARE(lid->property("clarity").toDouble(), .8);
+        QCOMPARE(spine->property("clarity").toDouble(), 0.0);
+        QCOMPARE(tray->property("clarity").toDouble(), 0.0);
+        lighting.setNight(true);
+        materials->setProperty("compositorOutput", true);
+        for (auto *surface : { lid, spine, tray }) {
+            QCOMPARE(surface->property("roomTexture").value<QObject *>(),
+                     materials->property("room").value<QObject *>());
+            QCOMPARE(surface->property("integrationTexture").value<QObject *>(),
+                     materials->property("integration").value<QObject *>());
+            QCOMPARE(surface->property("ltc1Texture").value<QObject *>(),
+                     materials->property("ltc1").value<QObject *>());
+            QCOMPARE(surface->property("ltc2Texture").value<QObject *>(),
+                     materials->property("ltc2").value<QObject *>());
+            QCOMPARE(surface->property("warmth").toDouble(), 0.0);
+            QCOMPARE(surface->property("exposure").toDouble(), 1.08);
+            QVERIFY(surface->property("compositorOutput").toBool());
+        }
+        QVERIFY(warnings.isEmpty());
+    }
     void readbackValidationAndHdrSaturation()
     {
         QRhiReadbackResult result;
@@ -71,9 +134,6 @@ private Q_SLOTS:
     }
     void continuousSourceAndQmlParameters()
     {
-        qmlRegisterUncreatableType<yalahoo::SelectionLighting>("Yalahoo.Music", 1, 0,
-                                                               "SelectionLighting", u"Injected"_s);
-        qmlRegisterType<yalahoo::SourceOptics>("Yalahoo.Music", 1, 0, "SourceOptics");
         yalahoo::SelectionLighting lighting;
         QQmlEngine engine;
         QSignalSpy warnings(&engine, &QQmlEngine::warnings);

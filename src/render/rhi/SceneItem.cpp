@@ -120,19 +120,7 @@ TitleReel *SceneItem::titleReel() const
 }
 void SceneItem::setTitleReel(TitleReel *reel)
 {
-    if (m_titleReel == reel)
-        return;
-    disconnect(m_titleConnection);
-    disconnect(m_titleDestroyedConnection);
-    m_titleReel = reel;
-    if (reel) {
-        m_titleConnection =
-                connect(reel, &TitleReel::resourcesChanged, this, &SceneItem::refreshTextResources);
-        m_titleDestroyedConnection =
-                connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
-    }
-    refreshTextResources();
-    Q_EMIT textReelsChanged();
+    bindTextReel(m_titleReel, m_titleConnection, m_titleDestroyedConnection, reel);
 }
 TitleReel *SceneItem::transportReel() const
 {
@@ -140,16 +128,20 @@ TitleReel *SceneItem::transportReel() const
 }
 void SceneItem::setTransportReel(TitleReel *reel)
 {
-    if (m_transportReel == reel)
+    bindTextReel(m_transportReel, m_transportConnection, m_transportDestroyedConnection, reel);
+}
+void SceneItem::bindTextReel(QPointer<TitleReel> &current, QMetaObject::Connection &changed,
+                             QMetaObject::Connection &destroyed, TitleReel *reel)
+{
+    if (current == reel)
         return;
-    disconnect(m_transportConnection);
-    disconnect(m_transportDestroyedConnection);
-    m_transportReel = reel;
+    disconnect(changed);
+    disconnect(destroyed);
+    current = reel;
     if (reel) {
-        m_transportConnection =
+        changed =
                 connect(reel, &TitleReel::resourcesChanged, this, &SceneItem::refreshTextResources);
-        m_transportDestroyedConnection =
-                connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
+        destroyed = connect(reel, &QObject::destroyed, this, &SceneItem::refreshTextResources);
     }
     refreshTextResources();
     Q_EMIT textReelsChanged();
@@ -1194,29 +1186,7 @@ try {
     in.aperture = float((BrowseAperture + DetailApertureGain * adapter.detail()) * depthOfField
                         / PercentScale);
     in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
-    in.background = l.backgroundLinear();
-    in.keyColor = l.keyColor();
-    in.skyColor = l.skyColor();
-    in.groundColor = l.groundColor();
-    in.lightIntensities = l.lightIntensities();
-    in.spotPosition = l.spotPosition();
-    in.spotTarget = l.spotTarget();
-    in.spotColor = l.spotColor();
-    in.spotIntensity = float(l.spotIntensity());
-    in.environmentIntensity = float(l.environmentIntensity());
-    in.rowSettings = l.rowSettings();
-    in.rowColumn = l.rowColumn();
-    in.rowDetail = float(l.rowDetail());
-    in.rowFill = float(l.rowFill());
-    in.lightColumn = l.lightColumn();
-    in.printAmbient = float(l.printAmbient());
-    in.scatterColor = l.scatterColor();
-    in.scatterStrength = float(l.scatterStrength());
-    in.areaPosition = l.areaPosition();
-    in.areaTarget = l.areaTarget();
-    in.areaIntensity = float(l.areaIntensity());
-    in.warmth = float(l.warmth());
-    in.exposure = float(l.exposure());
+    in.setLighting(l);
     const auto target = quality.targetSize();
     const auto &old = input();
     const bool unchanged = m_callbackRevision == m_publishedCallbackRevision && !old.sceneOccluded

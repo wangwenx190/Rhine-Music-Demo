@@ -1,9 +1,6 @@
 """Review shared control ownership/cost paths; target runtime evidence is independent."""
-from audit_support import BASELINE
-from audit_support import source_check
-import hashlib
+from audit_support import BASELINE, file_dependencies, historical, source_rows, write_source_report
 import json
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,23 +37,13 @@ paths |= {"src/app/CMakeLists.txt", "src/app/QmlTypes.h", "src/app/main.cpp",
           "src/render/text/TextAreaFormat.h", "src/render/text/CMakeLists.txt",
           "tools/review/CMakeLists.txt", "tests/integration/CMakeLists.txt",
           "cmake/TestPolicy.cmake", "docs/contracts/controls.md"}
-dependencies = [dict(sourcePath=path,
-                     sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
-                for path in sorted(paths)]
+dependencies = file_dependencies(ROOT, sorted(paths))
 revision = json.loads((ROOT / "docs/contracts/history-rewrite.json").read_text())["revisions"][BASELINE]
-frozen = []
-for path in ("src/style.css", "src/music.css", "src/music-lighting-lab.css"):
-    data = subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
-    frozen.append(dict(sourcePath=path, revision=revision,
-                       sourceSha256=hashlib.sha256(data).hexdigest()))
+frozen = [historical(revision, path) for path in ("src/style.css", "src/music.css", "src/music-lighting-lab.css")]
 for platform, rule in (("windows", "WIN-01"), ("macos", "MAC-01"), ("linux", "LNX-01")):
-    checks = []
     platform_check = (rule, "cmake/Platform.cmake", "APPLE" if platform == "macos" else "WIN32" if platform == "windows" else "UNIX",
                       "Platform bootstrap selects its native window/backend and module closure. Shared control input/visual code has no target omissions; actual compiler/plugins/physical input/IME/accessibility and window/DPR behavior require UI-CONTROLS-P on that system.")
-    for check_id, path, symbol, evidence in CHECKS + [platform_check]:
-        checks.append(source_check(ROOT, path, symbol, checkId=check_id, platform=platform, evidence=evidence, result='source-reviewed', limitations='Target runtime/physical evidence remains separate under UI-CONTROLS-P.'))
-    output = ROOT / "verification" / f"{platform}-static" / "controls"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(
-        dict(checks=checks, dependencies=dependencies, frozen=frozen), indent=2) + "\n")
+    checks = source_rows(ROOT, CHECKS + [platform_check],
+                       platform=platform, result='source-reviewed', limitations='Target runtime/physical evidence remains separate under UI-CONTROLS-P.')
+    write_source_report(ROOT, platform, 'controls', dict(checks=checks, dependencies=dependencies, frozen=frozen))
 print("Control COMMON/PERF/platform source bindings verified; runtime remains separate")

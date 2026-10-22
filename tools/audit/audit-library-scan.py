@@ -1,6 +1,5 @@
 """Bind the R21 source review to symbols/hashes; target execution remains separate."""
-from audit_support import BASELINE
-from audit_support import source_check
+from audit_support import BASELINE, source_rows, write_source_report
 import hashlib
 import json
 import re
@@ -56,19 +55,16 @@ platform_checks = {
 }
 for platform, platform_check in platform_checks.items():
     check_id, marker, evidence = platform_check
-    rows = []
-    for identity, source_path, symbol, explanation in CHECKS + [(check_id, "src/library/DirectoryScanner.cpp", marker, evidence)]:
-        rows.append(source_check(ROOT, source_path, symbol, checkId=identity, requirement=explanation, platform=platform, evidence=explanation, result='source-reviewed', limitations='Markers bind the manual source review; actual test/build execution is separate. R21-P retains missing target checks.'))
+    rows = source_rows(ROOT, CHECKS + [(check_id, "src/library/DirectoryScanner.cpp", marker, evidence)],
+                       platform=platform, requirement=True, result='source-reviewed', limitations='Markers bind the manual source review; actual test/build execution is separate. R21-P retains missing target checks.')
     dependencies = []
     for path in ["src/library/CMakeLists.txt", "src/library/LibraryStore.h", "src/library/DirectoryScanner.h",
                  "src/services/LibrarySession.cpp", "src/app/main.cpp", "src/render/StartupCoordinator.h",
                  "tests/unit/DirectoryScannerTest.cpp",
                  "tests/unit/CMakeLists.txt", "tools/review/verify-scan-fingerprint.mjs"]:
         dependencies.append(dict(sourcePath=path, sourceSha256=hashlib.sha256((ROOT / path).read_bytes()).hexdigest()))
-    output = ROOT / "verification" / f"{platform}-static" / "library-scan"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(dict(checks=rows, dependencies=dependencies,
+    write_source_report(ROOT, platform, 'library-scan', dict(checks=rows, dependencies=dependencies,
         frozen=dict(revision=baseline, sourcePath="scripts/music-library.mjs",
                     lineOrSymbol="safeRootList/walkAlbums/albumEntryId/readAlbum/writeJsonAtomic/scan",
-                    sourceSha256=hashlib.sha256(frozen).hexdigest())), indent=2) + "\n")
+                    sourceSha256=hashlib.sha256(frozen).hexdigest())))
 print("R21 frozen extension set and COMMON/PERF/platform source bindings verified; target runtime remains separate")

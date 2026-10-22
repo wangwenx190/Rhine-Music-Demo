@@ -1,5 +1,5 @@
 """Recover the reviewed Git/plan closure; keep provenance separate from runtime acceptance."""
-from audit_support import source_check
+from audit_support import source_rows
 import hashlib
 import json
 import re
@@ -119,9 +119,8 @@ for platform, platform_id, path, symbol, reason in [
     ("macos", "MAC-01", "src/app/GraphicsBackend.h", "QSurfaceFormat::CoreProfile", "Metal/threaded and OpenGL4.1/basic select before application creation. Current native/hidden runtime is validated separately; no screen/VSYNC claim from texture readback."),
     ("linux", "LNX-01", "cmake/Platform.cmake", "UNIX AND NOT APPLE", "Shared Qt/XDG/OpenGL path has no empty implementation; xcb/Wayland/GPU and deployment require the target environment."),
 ]:
-    rows = []
-    for identity, source, marker, evidence in CHECKS + [(platform_id, path, symbol, reason)]:
-        rows.append(source_check(ROOT, source, marker, checkId=identity, requirement=evidence, platform=platform, evidence=evidence, result='static-audit-passed', limitations='Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R36.'))
+    rows = source_rows(ROOT, CHECKS + [(platform_id, path, symbol, reason)],
+                       platform=platform, requirement=True, result='static-audit-passed', limitations='Runtime, quality and native/physical inputs are separate; missing target facts remain in the migration plan R36.')
     matrices[platform] = rows
 OUTPUT.mkdir(parents=True, exist_ok=True)
 (OUTPUT / "source-matrix.json").write_text(json.dumps(dict(

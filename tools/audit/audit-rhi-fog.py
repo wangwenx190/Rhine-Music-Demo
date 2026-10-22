@@ -1,6 +1,5 @@
 """Record reviewed source fog/color edges by symbol and hash; output remains local."""
-from audit_support import source_check
-import json
+from audit_support import source_rows, write_source_report
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,14 +47,11 @@ CHECKS = [
 for host, check_id, marker in [("windows", "WIN-01", "WIN32"),
                                ("macos", "MAC-01", "YalahooVerification"),
                                ("linux", "LNX-01", "UNIX AND NOT APPLE")]:
-    rows = []
     entries = CHECKS + [(check_id, "cmake/Platform.cmake", marker,
                         "Qt Kit is selected dynamically. Shared std140/qsb API adapters preserve "
                         "color semantics; five shader target translations are static evidence only. "
                         "D3D11/Linux hardware execution and normal presentation stay R36.")]
-    for check_id, path, symbol, conclusion in entries:
-        rows.append(source_check(ROOT, path, symbol, checkId=check_id, evidence=conclusion, result='static-audit-passed', platform=host, limitations='Source/graph audit only; actual runtime reported separately. No image fitting, no BLUR-01/DOF/AA/shadow/presentation closure.'))
-    output = ROOT / "verification" / f"{host}-static" / "rhi-fog"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "source-matrix.json").write_text(json.dumps(rows, indent=2) + "\n")
+    rows = source_rows(ROOT, entries,
+                       result='static-audit-passed', platform=host, limitations='Source/graph audit only; actual runtime reported separately. No image fitting, no BLUR-01/DOF/AA/shadow/presentation closure.')
+    write_source_report(ROOT, host, 'rhi-fog', rows)
 print("Source fog/color matrices generated")

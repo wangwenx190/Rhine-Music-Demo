@@ -2551,6 +2551,32 @@ SceneSubmissionStats &sceneSubmissionStats()
 {
     return submissionStats;
 }
+void Input::setLighting(const SelectionLighting &l)
+{
+    background = l.backgroundLinear();
+    keyColor = l.keyColor();
+    skyColor = l.skyColor();
+    groundColor = l.groundColor();
+    lightIntensities = l.lightIntensities();
+    spotPosition = l.spotPosition();
+    spotTarget = l.spotTarget();
+    spotColor = l.spotColor();
+    spotIntensity = float(l.spotIntensity());
+    environmentIntensity = float(l.environmentIntensity());
+    rowSettings = l.rowSettings();
+    rowColumn = l.rowColumn();
+    rowDetail = float(l.rowDetail());
+    rowFill = float(l.rowFill());
+    lightColumn = l.lightColumn();
+    printAmbient = float(l.printAmbient());
+    scatterColor = l.scatterColor();
+    scatterStrength = float(l.scatterStrength());
+    areaPosition = l.areaPosition();
+    areaTarget = l.areaTarget();
+    areaIntensity = float(l.areaIntensity());
+    warmth = float(l.warmth());
+    exposure = float(l.exposure());
+}
 RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {
     try {

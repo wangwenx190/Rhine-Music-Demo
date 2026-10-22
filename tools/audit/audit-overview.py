@@ -1,7 +1,7 @@
-"""R19 source/call-chain audit with exact hashes and separately scoped runtime evidence."""
 #!/usr/bin/env python3
+"""R19 source/call-chain audit with exact hashes and separately scoped runtime evidence."""
+from audit_support import source_rows, write_source_report
 import argparse
-from audit_support import source_check
 import hashlib
 import json
 from pathlib import Path
@@ -130,14 +130,9 @@ platforms = {
               "DPR/focus/input/capture/restore and GL output quality requires native compositor/Kit (R36)."),
 }
 for name, platform_check in platforms.items():
-    rows = []
-    for check_id, path, symbol, evidence in checks + [platform_check]:
-        rows.append(source_check(root, path, symbol, checkId=check_id, requirement=evidence,
-                                 platform=name, evidence=evidence, result="static-audit-passed",
-                                 limitations="Native scope only as listed in runtime-evidence; other required target checks remain R36"))
-    output = root / f"verification/{name}-static/overview"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "audit-matrix.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+    rows = source_rows(root, checks + [platform_check],
+                       platform=name, requirement=True, result='static-audit-passed', limitations='Native scope only as listed in runtime-evidence; other required target checks remain R36')
+    output = write_source_report(root, name, 'overview', rows, 'audit-matrix.json')
     (output / "runtime-evidence.json").write_text(json.dumps(runtime, ensure_ascii=False, indent=2) + "\n")
     (output / "audit-report.md").write_text("\n\n".join(
         f"{r['checkId']} {r['sourcePath']}::{r['lineOrSymbol']}\n\n{r['evidence']}" for r in rows) + "\n")
