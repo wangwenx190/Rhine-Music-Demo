@@ -64,32 +64,32 @@ yalahoo_unit_test(RhiMaterialTest rhi-material-parameters
     LIBRARIES YalahooRhi  Qt6::GuiPrivate Qt6::Quick3D
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
 if(YALAHOO_REVIEW)
-    add_test(NAME real-columns-gpu COMMAND archive-pool-audit
+    add_test(NAME real-columns-gpu COMMAND archive-pool-test
         "${CMAKE_BINARY_DIR}/verification/real-columns" --real-columns)
-    add_test(NAME archive-pool-gpu COMMAND archive-pool-audit
+    add_test(NAME archive-pool-gpu COMMAND archive-pool-test
         "${CMAKE_BINARY_DIR}/verification/archive-pool")
-    add_test(NAME cover-gpu COMMAND cover-audit "${CMAKE_BINARY_DIR}/verification/covers")
-    add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-audit
+    add_test(NAME cover-gpu COMMAND cover-test "${CMAKE_BINARY_DIR}/verification/covers")
+    add_test(NAME rhi-postprocess-gpu COMMAND rhi-postprocess-test
         "${CMAKE_BINARY_DIR}/verification/rhi-postprocess")
-    add_test(NAME rhi-transient-attachments-gpu COMMAND rhi-postprocess-audit
+    add_test(NAME rhi-transient-attachments-gpu COMMAND rhi-postprocess-test
         "${CMAKE_BINARY_DIR}/verification/rhi-transient-attachments" --attachments-only)
-    add_test(NAME rhi-bokeh-gpu COMMAND rhi-bokeh-audit "${CMAKE_BINARY_DIR}/verification/rhi-bokeh")
-    add_test(NAME rhi-smaa-gpu COMMAND rhi-smaa-audit "${CMAKE_BINARY_DIR}/verification/rhi-smaa")
-    add_test(NAME rhi-ao-gpu COMMAND rhi-ao-audit "${CMAKE_BINARY_DIR}/verification/rhi-ao")
-    add_test(NAME rhi-fog-gpu COMMAND rhi-fog-audit "${CMAKE_BINARY_DIR}/verification/rhi-fog")
-    add_test(NAME rhi-shadow-gpu COMMAND rhi-shadow-audit "${CMAKE_BINARY_DIR}/verification/rhi-shadow")
-    add_test(NAME rhi-shadow-attachments-gpu COMMAND rhi-shadow-audit
+    add_test(NAME rhi-bokeh-gpu COMMAND rhi-bokeh-test "${CMAKE_BINARY_DIR}/verification/rhi-bokeh")
+    add_test(NAME rhi-smaa-gpu COMMAND rhi-smaa-test "${CMAKE_BINARY_DIR}/verification/rhi-smaa")
+    add_test(NAME rhi-ao-gpu COMMAND rhi-ao-test "${CMAKE_BINARY_DIR}/verification/rhi-ao")
+    add_test(NAME rhi-fog-gpu COMMAND rhi-fog-test "${CMAKE_BINARY_DIR}/verification/rhi-fog")
+    add_test(NAME rhi-shadow-gpu COMMAND rhi-shadow-test "${CMAKE_BINARY_DIR}/verification/rhi-shadow")
+    add_test(NAME rhi-shadow-attachments-gpu COMMAND rhi-shadow-test
         "${CMAKE_BINARY_DIR}/verification/rhi-shadow-attachments" --attachments-only)
-    add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-audit
+    add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-test
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
-    add_test(NAME rhi-shell-submission-gpu COMMAND rhi-flicker-audit
+    add_test(NAME rhi-shell-submission-gpu COMMAND rhi-flicker-test
         "${CMAKE_BINARY_DIR}/verification/rhi-shell-submission" --isolated-only)
-    add_test(NAME rhi-scale-gpu COMMAND rhi-scale-audit
+    add_test(NAME rhi-scale-gpu COMMAND rhi-scale-test
         "${CMAKE_BINARY_DIR}/verification/rhi-scale" --representative)
-    add_test(NAME rhi-shell-gpu COMMAND rhi-shell-audit
+    add_test(NAME rhi-shell-gpu COMMAND rhi-shell-test
         "${PROJECT_SOURCE_DIR}/tests/fixtures/rhi-shell/visual.json"
         "${CMAKE_BINARY_DIR}/verification/rhi-shell")
-    add_test(NAME rhi-opaque-gpu COMMAND rhi-audit "${CMAKE_BINARY_DIR}/verification/rhi")
+    add_test(NAME rhi-opaque-gpu COMMAND rhi-opaque-test "${CMAKE_BINARY_DIR}/verification/rhi")
 
     set_tests_properties(real-columns-gpu archive-pool-gpu rhi-shell-gpu PROPERTIES TIMEOUT "240")
 
@@ -279,15 +279,9 @@ yalahoo_unit_test(ModuleProbe module-link-and-plugins
 add_test(NAME production-app-root COMMAND Yalahoo --verify-app)
 set_tests_properties(production-app-root PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
-add_test(
-    NAME
-    shader-tools
-    COMMAND
-    "${YALAHOO_qsb}"
-    --dump
-    "${CMAKE_BINARY_DIR}/src/app/.qsb/probe.frag.qsb"
-)
-set_tests_properties(shader-tools PROPERTIES PASS_REGULAR_EXPRESSION "MSL.*Standard")
+add_test(NAME shader-tools COMMAND "${CMAKE_COMMAND}"
+    "-DQSB=${YALAHOO_qsb}" "-DBUILD_DIRECTORY=${CMAKE_BINARY_DIR}"
+    -P "${PROJECT_SOURCE_DIR}/tests/tools/ShaderVariantsTest.cmake")
 add_test(
     NAME
     kit-selection
@@ -463,29 +457,19 @@ yalahoo_unit_test(JsonFileTest json-file LIBRARIES YalahooCore)
 
 add_executable(NativeToolTest NativeToolTest.cpp)
 set_target_properties(NativeToolTest PROPERTIES AUTOMOC FALSE AUTOUIC FALSE)
-yalahoo_tool(NativeToolTest)
+yalahoo_test_tool(NativeToolTest)
 add_test(NAME native-tool COMMAND NativeToolTest)
 set_tests_properties(native-tool PROPERTIES TIMEOUT 10)
 
-yalahoo_unit_test(ReviewSupportTest review-support
+yalahoo_unit_test(RenderSupportTest render-support
     TIMEOUT 30
     LIBRARIES YalahooRhi
-    INCLUDES "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tools/review"
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/render"
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_QPA_PLATFORM=offscreen")
 
-find_program(YALAHOO_POWERSHELL NAMES pwsh)
-if(YALAHOO_POWERSHELL)
-    add_test(NAME review-powershell COMMAND "${YALAHOO_POWERSHELL}" -NoProfile -File
-        "${PROJECT_SOURCE_DIR}/tests/tools/ReviewSupportTest.ps1")
-    set_tests_properties(review-powershell PROPERTIES TIMEOUT 30)
-else()
-    message(STATUS "review-powershell requires pwsh; its target execution remains R36")
-endif()
-
-find_program(YALAHOO_NODE NAMES node)
-if(YALAHOO_NODE AND EXISTS "${PROJECT_SOURCE_DIR}/legacy-web/node_modules/typescript")
-    add_test(NAME source-tools COMMAND "${YALAHOO_NODE}"
-        "${PROJECT_SOURCE_DIR}/tests/tools/SourceToolsTest.mjs")
-    set_tests_properties(source-tools PROPERTIES TIMEOUT 30)
+if(UNIX)
+    add_test(NAME launchers COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/LauncherTest.py")
+    set_tests_properties(launchers PROPERTIES TIMEOUT 90)
 endif()

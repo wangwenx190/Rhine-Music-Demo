@@ -16,10 +16,9 @@
 
 `lighting-field.glsl` 是纸面和壳体唯一的光场源码，开发工具展开成两个独立 Qt shader，`expand-lighting-shaders.py --check` 校验一致性。row field 以实体 world origin 的x/z计算，排除纸面局部位置、y高度和相机；源 CoverAtlas 的纸面偏移烘焙在几何中，Qt 的独立 Rectangle 反向消去本地偏移得到同一实体原点。主盖/侧脊接入边缘输运与角度 glint，后托只接入源曝光规则；纸面只乘已有漫反射和 fieldExposure，原图上限限制先于光场乘法，不加白/自发光。纸面环境漫反射按原 Lambert PMREM 参与，Lambert 不接收 area 的合成照明。面积光沿用原 LTC 面积积分，不能再额外除π。
 
-当前光场数值复建入口为 `node tools/review/export-lighting-golden.mjs`，直接执行冻结MusicSelectionLighting/ThemeTransition/music-row-lighting并生成20/30/60/120fps轨迹、主题反向/减少动态/隐藏/rebase和392组光场采样。`ctest --preset qt-release -R '^lighting$' --output-on-failure` 检查其数值，不需要原图。sampleRowLighting的核本身不依赖mode/fill，测试仍显式传入两者；灯光shader的模式合成另由R19C2复查，不能用核测试代替。
+当前光场数值复建入口为 `node tools/migration/export-lighting-golden.mjs`，直接执行冻结MusicSelectionLighting/ThemeTransition/music-row-lighting并生成20/30/60/120fps轨迹、主题反向/减少动态/隐藏/rebase和392组光场采样。`ctest --preset qt-release -R '^lighting$' --output-on-failure` 检查其数值，不需要原图。sampleRowLighting的核本身不依赖mode/fill，测试仍显式传入两者；灯光shader的模式合成另由R19C2复查，不能用核测试代替。
 
-
-`runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。`python3 tools/audit/audit-material-parameters.py`与`audit-material-review.py`分别检查实际参数链与Review生命周期，目标欠验归计划R36。
+`runtime-lighting`保留48源状态/灯光参数/投影/有效输出与root重建检查，共用Review执行机制见materials.md；公共分组见test-gates.md。
 
 ## 实验控制
 
@@ -27,4 +26,4 @@
 
 `comparing`仅临时将实际模式设为baseline；按键/指针释放、失焦、窗口隐藏、折叠或销毁面板均恢复最新已确认参数，不写偏好。重置关闭临时对照并恢复本契约的guided固定预设。面板从设置入口开启，关闭保留效果；`--lighting-lab`的匿名启动语义归native-bootstrap.md。
 
-`experiments`检查参数原子性、持久化边界、跟随连续性、默认复位与改速轨迹；`ui-audit --experiments 输出目录`/`experiments-qml`检查实际uniform、资源generation稳定、滚动/键盘隔离、双主题九尺寸和显式DPR1/1.5/2、诊断开关与释放。当前macOS入口使用真正隐藏Metal，物理输入/原生呈现与其他后端按计划R27-P补验。诊断统计语义归performance.md。
+`experiments`检查参数原子性、持久化边界、跟随连续性、默认复位与改速轨迹；`ui-tests --experiments 输出目录`/`experiments-qml`检查实际uniform、资源generation稳定、滚动/键盘隔离、双主题九尺寸和显式DPR1/1.5/2、诊断开关与释放。当前macOS入口使用真正隐藏Metal，物理输入/原生呈现与其他后端按计划R27-P补验。诊断统计语义归performance.md。

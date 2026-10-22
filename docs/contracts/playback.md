@@ -34,9 +34,9 @@ Header沿用原播放/停止/当前歌名容器，歌名定位复用TrackFocusCo
 
 `playback`使用现场生成的匿名RIFF/WAV和损坏样本，真实执行Qt播放/暂停/seek/停止、自然结束/换曲与错误；另用真实Qt设备对象或空列表通知覆盖无输出待播、加载替换、暂停/停止重连、最后有效位置、显式选择回退及重复/晚到事件。通知注入仅验证状态分支，不作为物理拔插证据，禁止伪造QAudioDevice私有句柄。
 
-`playback-qml` / `ui-audit --playback 输出目录`通过实际MusicStage播放按钮启动低音量匿名样本，回放九尺寸、双主题、DPR1/1.5/2、输出面板与播放进度、搜索/库替换/定位播放隔离及默认隐藏策略；记录实际GPU/Qt/系统/音频设备和输入/二进制hash。测试输入生成器只在tests/support，产品没有PCM路径。自身输出只用于实际质量检查，不做图像评分，不代替正常VSYNC、物理输入/设备拔插、格式全集或听感。
+`playback-qml` / `ui-tests --playback 输出目录`通过实际MusicStage播放按钮启动低音量匿名样本，回放九尺寸、双主题、DPR1/1.5/2、输出面板与播放进度、搜索/库替换/定位播放隔离及默认隐藏策略；记录实际GPU/Qt/系统/音频设备和输入/二进制hash。测试输入生成器只在tests/support，产品没有PCM路径。自身输出只用于实际质量检查，不做图像评分，不代替正常VSYNC、物理输入/设备拔插、格式全集或听感。
 
-`python3 tools/audit/audit-playback.py`绑定COMMON-01–05/PERF-01–07、三平台源码/hash和冻结/REFDB来源；目标欠验与原门槛只在迁移计划R24-P维护。共享测试选择与复用见test-gates.md，窗口与产物边界沿公共契约。
+共享测试选择与复用见test-gates.md，窗口与产物边界沿公共契约。
 
 ## 氛围音乐与界面音效
 
@@ -50,4 +50,4 @@ BGM格式错误显示Qt原因、静音并放行歌曲；重新开关可重试。
 
 音频设置沿用PreferencesStore的单worker、一次在途及最新值合并、QSaveFile原子保存，保留未知字段。仅消费volume/bgm/bgmVolume/sound/soundVolume。设置与GUI重建不重建媒体对象。
 
-`audio-ambience`真实执行Ogg循环配置/播放与匿名WAV的歌曲静音门、暂停/停止/队列结束/快速反向、独立音量、隐藏无视觉时钟进度及缺资源静音；测试专用短WAV验证四槽QSoundEffect与满池丢弃。`playback-qml`沿原九尺寸/双主题/DPR检查实际生产音频控件与导航隔离，正常输出只作质量检查。`python3 tools/audit/audit-audio-ambience.py`绑定COMMON/PERF/平台源码与hash。Qt进度和隐藏输出不代替听感、物理设备或原生最小化，欠验只在计划R25-P维护；执行范围沿test-gates.md。
+`audio-ambience`真实执行Ogg循环配置/播放与匿名WAV的歌曲静音门、暂停/停止/队列结束/快速反向、独立音量、隐藏无视觉时钟进度及缺资源静音；测试专用短WAV验证四槽QSoundEffect与满池丢弃。`playback-qml`沿原九尺寸/双主题/DPR检查实际生产音频控件与导航隔离，正常输出只作质量检查。Qt进度和隐藏输出不代替听感、物理设备或原生最小化，欠验只在计划R25-P维护；执行范围沿test-gates.md。

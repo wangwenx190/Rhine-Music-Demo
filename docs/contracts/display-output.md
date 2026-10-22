@@ -36,5 +36,3 @@ QML Image与ShaderEffectSource默认smooth/mipmap均为true。生产SVG使用QtQ
 ## 定向检查
 
 Release `display-transfer-gpu`仅用5×1浮点输入核对scRGB、白电平与HDR10转换；`display-output-visible`使用480×160窗口检查实际系统检测/输出格式、参数更新不失效、一次SDR↔HDR重建或不支持时的SDR回退，以及curve文字/VectorImage加载无warning。前者真正离屏，后者按窗口契约显式授权运行。二者不加载音乐库/大型阵列，不构成完整产品质量或性能结论。目标缺环境事项只在迁移计划HDR-OUTPUT-P维护。
-
-`python3 tools/audit/audit-display-output.py`绑定COMMON-01–05/PERF-01–07及平台调用链符号/hash，并检查同Kit的最终输出qsb跨目标变体；仅生成本地源码审计矩阵，不替代原生目标运行。

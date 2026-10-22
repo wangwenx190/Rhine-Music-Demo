@@ -1,6 +1,6 @@
 # 几何、相机与布局契约
 
-冻结输入为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/viewport-layout.ts`、`music-camera.ts`、`scene.ts`、`motion.ts`、`music-model.ts`、`archive-loop.ts`。`tools/review/export-scene-golden.mjs` 执行 Git 中的函数与实际音乐相机目标代码块，记录输入 hash；仅使用 `legacy-web/` 已有 TypeScript/Three 开发依赖。产品不运行这些依赖，也不读取私人曲库。
+冻结输入为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 的 `src/viewport-layout.ts`、`music-camera.ts`、`scene.ts`、`motion.ts`、`music-model.ts`、`archive-loop.ts`。`tools/migration/export-scene-golden.mjs` 执行 Git 中的函数与实际音乐相机目标代码块，记录输入 hash；仅使用 `legacy-web/` 已有 TypeScript/Three 开发依赖。产品不运行这些依赖，也不读取私人曲库。
 
 ## 共用对象与坐标
 
@@ -26,7 +26,7 @@
 
 ## 源状态与投影检查
 
-`node tools/review/export-scene-golden.mjs`生成`tests/fixtures/scene/`；`scene`检查48布局/相机目标、528顶点/锚点、694帧20/30/60/120fps的非零初态、反向/改速/长帧/resize/减少动态，double≤1e-6。
+`node tools/migration/export-scene-golden.mjs`生成`tests/fixtures/scene/`；`scene`检查48布局/相机目标、528顶点/锚点、694帧20/30/60/120fps的非零初态、反向/改速/长帧/resize/减少动态，double≤1e-6。
 
 Review真实投影≤2逻辑px；QML浮点属性适配允许position1e-3/FOV1e-4，不能放宽最终投影。窗口记录实际QWindow DPR和目标像素；验证进程缩放环境变量不能替代真实DPR。`--verify-scene`/`--scene-report`仅Review，几何输出须renderError为空并排除错误提示区域，超大目标共用RenderQuality保护并检查恢复。
 

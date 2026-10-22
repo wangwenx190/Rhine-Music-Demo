@@ -16,7 +16,7 @@
 
 当前生产普通文字由 `ReelInk → ReelTextNode` 提交整行 shaping 后的 glyph ID/位置。GUI 只缓存字体描述、字体 head 身份与字形值；render thread 独立取得 QRawFont，并核对身份，GUI 的 QRawFont/QTextLayout 不跨线程。私有 Qt Quick glyph 接口隔离在 `src/render/rhi/`，配置时探测最新 Kit 的实际接口，不锁版本或回退旧 Qt。彩色 grapheme 使用 Qt Quick Text 的系统字体/彩色缓存；普通字形的隐藏 Text 不创建。整行上下文变化即使文本相同也失效。
 
-Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/clock。Canvas `fillText` 按字面重新 shaping，不能直接提交当前完整 glyph run，因此不适合作为存在上下文联结文字的最终生产路径；普通字形节点加彩色Text为生产路径，R36只补目标平台的具体呈现/兼容缺口；是否需要候选比较按test-gates.md，不保留默认最终选型任务。
+普通字形节点加彩色Text为生产路径，R36只补目标平台的具体呈现/兼容缺口。
 
 测量缓存键包含文本、两种字体/字重、字号、宽度、预算、窄屏/DPR/歌名模式；96项 LRU与8MiB描述符计费上限并存，超限结果不缓存。8MiB是缓存计费而非完整进程内存。字体数据库变更清空缓存；同帧输入合并成一个 queued reconcile。布局为输入长度 n 的一次整行 shaping，拟合最多25次候选行框测量，字形提取只在选中候选执行；按 string index 分组为 O(n log n)。动画只访问活动槽，不逐帧创建 QTextLayout 或替换面板；静止入口 O(1)。当前生产字号/视口下，内容 revision 只匹配本槽至多八个字面，以 sameGlyphInk 核对字体身份、glyph ID/位置、缩放和行框，保留仍可见的 QSGTextNode/transform/clip，只创建新增字面并删除离开视口的节点；局部匹配最坏 O(f²)，f≤8，不随曲库增长。clip 容量、颜色和滚动变换独立更新，隐藏的 ReelInk 不创建几何。geometryUpdates 计新增字形节点，geometryReuses 计内容 revision 中的节点复用，均为累计诊断计数，不是逐帧 GPU 成本。
 
@@ -28,13 +28,12 @@ Qt Quick Text 与 Canvas Painter 的工具候选使用同一 controller/layout/c
 - 普通glyph只传描述符/head身份/ID/位置；彩色grapheme用Quick Text。macOS在QML创建前指定Apple Color Emoji，主字体半行距floor按逻辑CSS px，混合行按实际QTextLine.ascent补偿普通基线；彩色回退基线独立保留。Windows/Linux不套用macOS定位规则。
 - 字面范围和宽度终点均截到inkEnd，普通glyph保留整行上下文。源测量probe若computed字号陈旧，替换相同CSS/children的测量根，不改拟合算法。
 - naturalWidth仅实际变化通知；caption由存在标题或退出动画状态决定，退出保留完整字面/宽度曲线并禁点击。hide立即停advance，合并一个对象所属queued finish，restore取消陈旧完成。
-- 生产ReelInk和比较Canvas均在GUI与render侧核对item/window有效可见性；隐藏不排版/建字形/绘字，窗口替换断旧连接，恢复重发状态。
+- 生产ReelInk在GUI与render侧核对item/window有效可见性；隐藏不排版/建字形/绘字，窗口替换断旧连接，恢复重发状态。
 
 ## 检查与范围
 
 - `ctest --preset qt-release -R '^title-reels$'`覆盖grapheme/连字/组合字、长文省略、缓存容量、20/30/60/120fps/打断/反转/速度/减少动态/复用、宽度通知、hide合并与恢复取消。
-- 生产组件检查覆盖20项双主题文字、18项九尺寸页眉及隐藏/恢复和节点/renderer释放。成本、缓存工作量和寿命先按performance.md静态审计，真实运行未决项才作最小观测；工具的120帧/十次压力不是默认验收次数。主题/DPR/布局矩阵与压力范围按test-gates.md选择，候选路径仅用于具体问题或明确选型，实际所需成本观测按performance.md选择，不因存在`--cost-runs 3`而固定三次；必要入口调整仅在当前检查被阻塞时按test-gates.md处理。轨迹≤1e-6、结构≤1逻辑px。实际播放与定位由[playback.md](playback.md)和[library-data.md](library-data.md)验证，匿名歌名事件不能替代。
-- 工具候选Text/fillText重新按字面shaping，不能因共用控制器布局就认定整行语义等价；当前生产为glyph+彩色Text/CurveRendering/实际DPR槽层。候选语义/实际质量与成本分开判断，目标补验按后端分工在R36，不因更换目标平台重启选型。
-- 源数据导出`node tools/review/export-title.mjs --dpr 数值 --output 新目录`；原生驱动`node tools/build/verify-title.mjs --backend <目标后端> --dpr 数值 --source 源目录 --output 新目录`。导出器只生成`source-structure-font-metrics-motion-v1`结构、DOM字体框和数值轨迹，不生成浏览器PNG或放大轮廓；当前检查确需源输入且没有有效同协议结果时才导出。原生入口不读取参考图，保留自身输出供质量检查，自动passed只表示结构/运动/资源等非图像门槛。
-- 静态来源/调用链入口`python3 tools/audit/audit-title-source.py`；每个原生输出目录再执行`node tools/audit/audit-title.mjs 输出目录`，独立核对源DOM字体框、主字体基线与彩色字体身份、同Kit qsb变体。Windows薄入口`verify-r16.ps1`/`audit-r16.ps1`转交相同检查，不得使用诊断放行与像素成绩；详细参数以脚本为准。实际DPR读取窗口报告；`--visible`遵守公共窗口策略。
+- 来源探针检查20项双主题文字、18项九尺寸页眉、生产glyph复用、一次隐藏/恢复和节点释放。轨迹≤1e-6、结构≤1逻辑px。实际播放与定位由[playback.md](playback.md)和[library-data.md](library-data.md)验证，匿名歌名事件不能替代。
+- 源数据导出`node tools/migration/export-title.mjs --dpr 数值 --output 新目录`；原生驱动`node tools/migration/verify-title.mjs --backend <目标后端> --dpr 数值 --source 源目录 --output 新目录`。导出器只生成`source-structure-font-metrics-motion-v1`结构、DOM字体框和数值轨迹，不生成浏览器PNG或放大轮廓；当前检查确需源输入且没有有效同协议结果时才导出。原生入口不读取参考图，保留自身输出供质量检查，自动passed只表示结构/运动/资源等非图像门槛。
+- 字体物理身份、同机DOM字体框/主字体基线和彩色字体身份直接由`verify-title.mjs`独立核对；实际DPR读取窗口报告，`--visible`遵守公共窗口策略。来源探针构建开关和测试边界见test-gates.md。
 - macOS Metal/OpenGL已覆盖有效DPR1/1.5/2的隐藏及授权可见组件；有效缩放不等于换用其他物理显示器。原Windows高DPR、共享通知和目标呈现欠验归R36的对应后端任务，历史像素失败不重新设为补修门槛。当前样本不证明完整产品120秒性能/GPU/屏幕延迟。

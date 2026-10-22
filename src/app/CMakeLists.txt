@@ -37,17 +37,17 @@ if(YALAHOO_REVIEW)
         PREFIX
         /review
         BASE
-        "${PROJECT_SOURCE_DIR}/tools/review"
+        "${PROJECT_SOURCE_DIR}/tests/render"
         FILES
-        "${PROJECT_SOURCE_DIR}/tools/review/InstanceProbe.qml"
-        "${PROJECT_SOURCE_DIR}/tools/review/probe-atlas.vert"
-        "${PROJECT_SOURCE_DIR}/tools/review/probe-atlas.frag"
-        "${PROJECT_SOURCE_DIR}/tools/review/instanced-glass.vert"
-        "${PROJECT_SOURCE_DIR}/tools/review/instanced-paper.vert"
+        "${PROJECT_SOURCE_DIR}/tests/render/InstanceProbe.qml"
+        "${PROJECT_SOURCE_DIR}/tests/render/probe-atlas.vert"
+        "${PROJECT_SOURCE_DIR}/tests/render/probe-atlas.frag"
+        "${PROJECT_SOURCE_DIR}/tests/render/instanced-glass.vert"
+        "${PROJECT_SOURCE_DIR}/tests/render/instanced-paper.vert"
     )
-    target_include_directories(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tools/review")
+    target_include_directories(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
     target_link_libraries(Yalahoo PRIVATE Qt6::GuiPrivate)
-    target_sources(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tools/review/OffscreenSurface.h")
+    target_sources(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tests/support/OffscreenSurface.h")
     qt_add_resources(Yalahoo material_probe PREFIX /review
         BASE "${PROJECT_SOURCE_DIR}/tests/fixtures/materials"
         FILES "${PROJECT_SOURCE_DIR}/tests/fixtures/materials/paper-probe.png")

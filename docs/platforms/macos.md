@@ -47,9 +47,9 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 | 操作 | 预期与入口 |
 | --- | --- |
-| 配置/构建/静态 | 上述构建与部署成功；`python3 tools/audit/audit-macos-deployment.py`展开COMMON/MAC/PERF与编译QML闭包。格式/官方qmllint按code-style执行 |
+| 配置/构建/静态 | 上述构建与部署成功；格式/官方qmllint按code-style执行 |
 | 脱离Kit | 从包外目录运行验证器，当前进程退出0且新report.json passed；Qt/QML/媒体映像不来自安装Kit；Finder图标/名称正确 |
-| 浏览/详情/总览 | 双主题、真实列/填充、搜索与播放定位互不干扰；检查源景深/磨砂、玻璃排序、透明轮廓、裁切与清晰度。隐藏组件入口用`qt-release-render`选择ui/ruler/opening/settings及相应RHI测试 |
+| 浏览/详情/总览 | 双主题、真实列/填充、搜索与播放定位互不干扰；检查源景深/磨砂、玻璃排序、透明轮廓、裁切与清晰度。隐藏组件入口用`qt-release-render`选择controls/opening/settings及相应RHI测试 |
 | 片头/Canvas/文字 | Logo圆环、滑尺数字与标题/emoji正常合成；重播/跳过交接有效；实际DPR/resize后无漏画；资源所有权先静态审计，重复重建按test-gates.md按需选择。数学/状态和自身正常输出分别验收 |
 | 原生菜单/输入 | 物理键盘逐项使用上述Command快捷键；编辑焦点/输入法/只读/片头锁正确，设置视觉重载后仍可用；⌘W/⌘Q退出不残留音频进程 |
 | Retina/屏幕 | 在实际DPR1/1.5/2设备与跨屏切换中记录真实值，逻辑尺寸和清晰度正确；显式离屏target DPR不替代物理屏幕 |
@@ -62,4 +62,4 @@ python3 tools/deploy/verify-macos.py --output "$PWD/verification/macos-clean"
 
 普通验证遵守[test-window-policy.md](../contracts/test-window-policy.md)，macOS可见测试默认OFF，RenderControl真正隐藏。原生工具需有WindowServer/系统服务访问；受限进程中的无屏幕或不可用系统服务不算运行通过。前台授权不跨轮次；不能为遮挡/节流提升窗口。
 
-实际DPR从窗口/组件报告核对；CoreText与彩色字体适配见assets/title-reels。CanvasPainter在产品使用C++ API，QtCanvas2D仅在比较工具中；生产打包不因比较工具引入该模块。各组件现有Metal/OpenGL隐藏及授权可见运行事实见source-fidelity-review.md；欠验只由迁移计划管理。
+实际DPR从窗口/组件报告核对；CoreText与彩色字体适配见assets/title-reels。CanvasPainter在产品使用C++ API，各组件现有Metal/OpenGL隐藏及授权可见运行事实见source-fidelity-review.md；欠验只由迁移计划管理。

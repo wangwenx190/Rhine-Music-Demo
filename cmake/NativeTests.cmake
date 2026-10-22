@@ -40,7 +40,7 @@ function(yalahoo_ui_test name option directory timeout)
     if(ui_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "Unknown UI test arguments: ${ui_UNPARSED_ARGUMENTS}")
     endif()
-    add_test(NAME ${name} COMMAND ui-audit ${option}
+    add_test(NAME ${name} COMMAND ui-tests ${option}
         "${CMAKE_BINARY_DIR}/verification/${directory}" ${ui_ARGUMENTS})
     set_tests_properties(${name} PROPERTIES TIMEOUT ${timeout}
         ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
@@ -48,4 +48,10 @@ function(yalahoo_ui_test name option directory timeout)
     if(ui_THREADED)
         set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "QSG_RENDER_LOOP=threaded")
     endif()
+endfunction()
+
+# Regression executables are distinct from asset generators and audit programs.
+function(yalahoo_test_tool target)
+    yalahoo_tool(${target})
+    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 endfunction()

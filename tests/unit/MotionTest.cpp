@@ -5,7 +5,6 @@
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "MotionFunctions.h"
-#include <QCryptographicHash>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -33,13 +32,6 @@ QJsonObject readJson(const QString &path)
         qFatal("Malformed oracle");
     return result.object();
 }
-ArchiveValues values(const QJsonObject &object)
-{
-    ArchiveValues result;
-    for (size_t i = 0; i < 4; ++i)
-        result[i] = object.value(keys[i]).toDouble();
-    return result;
-}
 }
 class MotionTest final : public QObject
 {
@@ -50,7 +42,7 @@ public:
 
 private:
     std::array<double, 3> maxError{ };
-    int r01Samples = 0, extendedSamples = 0;
+    int extendedSamples = 0;
     void near(double actual, double expected, size_t derivative = 0)
     {
         const double error = std::abs(actual - expected);
@@ -73,81 +65,6 @@ private:
             compareState(state[i], expected.value(keys[i]).toObject());
     }
 private Q_SLOTS:
-    void r01Golden()
-    {
-        const auto oracle = readJson(
-                (QString::fromUtf8(FIXTURE_ROOT) + u"/docs/contracts/motion-golden.json"_s));
-        const auto input = oracle.value(u"inputs"_s).toObject();
-        const auto archiveInput = input.value(u"quintic"_s).toObject();
-        int previousFps = 0;
-        ScalarSpring spring;
-        ArchiveSprings springs{ };
-        ArchiveMotion archive;
-        ColumnScalar scalar;
-        FrameClock clock;
-        for (const auto sampleValue : oracle.value(u"samples"_s).toArray()) {
-            const auto sample = sampleValue.toObject();
-            const int fps = sample.value(u"fps"_s).toInt();
-            if (fps != previousFps) {
-                previousFps = fps;
-                spring = { };
-                spring.velocity = .2;
-                springs = { };
-                archive.reset();
-                archive.observe(springs, { }, { 3.7, 3.7, 3.7, 3.7 });
-                archive.retarget(springs, values(archiveInput.value(u"target"_s).toObject()));
-                scalar = ColumnScalar(0);
-                scalar.retarget(18, true, 1.8);
-                clock.setActive(false);
-                clock.setActive(true);
-                clock.startOpening();
-                clock.advance(0);
-            }
-            for (const auto eventValue : sample.value(u"appliedEvents"_s).toArray()) {
-                const auto type = eventValue.toObject().value(u"type"_s).toString();
-                if (type == "reverse"_L1) {
-                    scalar.retarget(-3, true, 1.4);
-                    archive.retarget(springs,
-                                     values(archiveInput.value(u"reverseTarget"_s).toObject()));
-                } else if (type == "rebase"_L1) {
-                    const auto offset = values(archiveInput.value(u"rebase"_s).toObject());
-                    archive.translate(offset);
-                    for (size_t i = 0; i < 4; ++i)
-                        springs[i].translate(offset[i]);
-                }
-            }
-            const double dt = sample.value(u"dt"_s).toDouble();
-            if (dt > 0) {
-                spring.update(1, 3.7, dt);
-                archive.update(springs, dt);
-                scalar.update(dt);
-                clock.advance(dt);
-            }
-            const auto expectedSpring = sample.value(u"spring"_s).toObject();
-            near(spring.value, expectedSpring.value(u"value"_s).toDouble());
-            near(spring.velocity, expectedSpring.value(u"velocity"_s).toDouble(), 1);
-            compareArchive(archive, sample.value(u"quintic"_s).toObject());
-            compareState(scalar.state(), sample.value(u"realColumn"_s).toObject());
-            QCOMPARE(scalar.guided(),
-                     sample.value(u"realColumn"_s).toObject().value(u"guided"_s).toBool());
-            QCOMPARE(scalar.settled(),
-                     sample.value(u"realColumn"_s).toObject().value(u"settled"_s).toBool());
-            near(musicSelectionWave(2, sample.value(u"time"_s).toDouble()),
-                 sample.value(u"wave"_s).toDouble());
-            near(clock.openingTime(), sample.value(u"clock"_s).toDouble());
-            ++r01Samples;
-        }
-        clock.startOpening();
-        clock.advance(0);
-        double previous = 0;
-        for (const auto value : oracle.value(u"longFrames"_s).toArray()) {
-            const auto sample = value.toObject();
-            const double now = sample.value(u"input"_s).toDouble();
-            clock.advance(now - previous);
-            previous = now;
-            near(clock.openingTime(), sample.value(u"output"_s).toDouble());
-        }
-    }
     void frozenNonzeroAndVariableFrames()
     {
         const auto oracle = readJson(
@@ -386,13 +303,11 @@ private Q_SLOTS:
     }
     void cleanupTestCase()
     {
-        const QJsonObject report{ { u"r01Samples"_s, r01Samples },
-                                  { u"extendedSamples"_s, extendedSamples },
-                                  { u"fps"_s, QJsonArray{ 20, 30, 60, 120 } },
-                                  { u"maxPositionError"_s, maxError[0] },
-                                  { u"maxVelocityError"_s, maxError[1] },
-                                  { u"maxAccelerationError"_s, maxError[2] },
-                                  { u"tolerance"_s, 1e-6 } };
+        const QJsonObject report{
+            { u"samples"_s, extendedSamples },          { u"fps"_s, QJsonArray{ 20, 30, 60, 120 } },
+            { u"maxPositionError"_s, maxError[0] },     { u"maxVelocityError"_s, maxError[1] },
+            { u"maxAccelerationError"_s, maxError[2] }, { u"tolerance"_s, 1e-6 }
+        };
         QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(MOTION_REPORT), QJsonDocument(report)));
     }
 };

@@ -112,10 +112,8 @@ private Q_SLOTS:
     }
     void frozenTrajectories()
     {
-        const QString full = qEnvironmentVariable("YALAHOO_REAL_COLUMN_GOLDEN");
-        QFile input(full.isEmpty() ? (QString::fromUtf8(FIXTURE_ROOT)
-                                      + u"/tests/fixtures/real-columns/trajectories.json"_s)
-                                   : full);
+        QFile input(QString::fromUtf8(FIXTURE_ROOT)
+                    + u"/tests/fixtures/real-columns/trajectories.json"_s);
         QVERIFY(input.open(QIODevice::ReadOnly));
         const auto golden = QJsonDocument::fromJson(input.readAll()).object();
         QList<int> counts;

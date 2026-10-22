@@ -46,7 +46,7 @@ worker以线性光、预乘alpha对每张封面独立做面积归约，生成完
 
 ## 检查入口
 
-`rhi-scale-audit 新目录 --filtering-only`仅执行共享生产采样helper的12组解析UV/颜色/alpha/跨mip/长轴/边界检查，以及生产纸面图集隔离与稳定零上传检查；不附带DPR、整场或压力矩阵。解析期望从本次输入texel独立按double计算线性预乘插值，实际输出为RGBA16F。
+`rhi-scale-test 新目录 --filtering-only`仅执行共享生产采样helper的12组解析UV/颜色/alpha/跨mip/长轴/边界检查，以及生产纸面图集隔离与稳定零上传检查；不附带DPR、整场或压力矩阵。解析期望从本次输入texel独立按double计算线性预乘插值，实际输出为RGBA16F。
 
 `CoverCacheTest`另核对重复命中/同专辑换曲、库快照替换不重解码/重传图集、单身份内容变化不改其他槽位，以及选中更新后归位像素仍固定。它覆盖横竖方/alpha/缺图、PNG/JPEG/WebP单图分配准入及JPEG解码缩放、Unicode路径、重复/拒绝/LRU、取消/reset、在途关闭及发布时销毁。定向准入检查可用 `CoverCacheTest imageAllocationPolicy`，改变环境上限须启动独立进程。`CoverAudit`不再评分raw/painted图像；contain/留边使用源UV公式与`CoverCacheTest`解析输入，实际GPU纹理尺寸/上传载荷和自身正常输出独立核对。它覆盖八tile/跨帧预算、旧槽隐藏/晚到拒绝、selected独立完整mip上传、稳定零复制/上传、封面尺寸不重建无关目标及真实SG释放恢复。96张2048²合成JPEG的准备时间、事件响应及各阶段峰值分开记录；不据其推导产品帧率。
 

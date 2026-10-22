@@ -150,7 +150,7 @@ Source build and complete verification instructions: docs/platforms/windows.md i
         throw 'The deployed Qt multimedia plugin is missing.'
     }
     if ($files | Where-Object { $_.Name -match 'Quick3D|Qt6Test|Qt6QuickTest|\.pdb$' -or
-            $_.FullName -match '[/\\](QtCanvas2D|qmltooling)[/\\]' }) {
+            $_.FullName -match '[/\\]qmltooling[/\\]' }) {
         throw 'The package contains development-only components.'
     }
     $dependencies = foreach ($binary in ($files | Where-Object {

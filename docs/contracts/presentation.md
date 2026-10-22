@@ -24,6 +24,6 @@ TrackList准备期保持header位于可视顶部；header高度/polish变化只�
 
 ## 检查入口
 
-`presentation`覆盖双ready门禁、退字连选/四种archiveRoute/取消重开/reset/速度/减少动态与10,000曲目。`presentation-qml`/`ui-audit --presentation 输出目录`使用生产Detail/TrackList；九尺寸、双主题、DPR1/1.5/2按test-gates.md的独立边界选择，不将全部54组合固定为每次门禁，必要入口调整按test-gates.md。跳第8000曲目、真实Qt tab点击/滚动距离钳制、介绍切换/快速重开和退出禁用在代表条件执行；恢复/释放先审所有权与取消路径，仅运行未决行为才按test-gates.md补必要转换。委托门槛0<数量<100，不把某次31个当固定值。结构≤1逻辑px，时序≤一个60Hz帧，warnings为空。
+`presentation`覆盖双ready门禁、退字连选/四种archiveRoute/取消重开/reset/速度/减少动态与10,000曲目。`presentation-qml`/`ui-tests --presentation 输出目录`使用生产Detail/TrackList；九尺寸、双主题、DPR1/1.5/2按test-gates.md的独立边界选择，不将全部54组合固定为每次门禁，必要入口调整按test-gates.md。跳第8000曲目、真实Qt tab点击/滚动距离钳制、介绍切换/快速重开和退出禁用在代表条件执行；恢复/释放先审所有权与取消路径，仅运行未决行为才按test-gates.md补必要转换。委托门槛0<数量<100，不把某次31个当固定值。结构≤1逻辑px，时序≤一个60Hz帧，warnings为空。
 
-`node tools/review/export-browse-ui.mjs --presentation`从冻结生产renderDetail/trackList/albumAbout及最终CSS导出独立结构；只读取DOM/字体框，外部请求被拦截。`python3 tools/review/compare-presentation-structure.py 原生report.json 冻结report.json 输出.json`核对content/caption/返回按钮/标题/facts/tabs/曲目锚点与字号至≤1逻辑px。CSS采集先交付viewport及布局属性变更，再读取新DOM，不用上一次样式状态。源码审计`python3 tools/audit/audit-presentation.py [原生report.json [冻结report.json]]`要求这些实际结果并输出冻结/逐历史符号hash及COMMON-01–05/PERF-01–07三平台矩阵；门禁分组/窗口授权见公共契约。运动ports与播放隔离消费边界分别见detail-motion.md及计划R23/R24；目标系统/物理输入/焦点/窗口欠验只在R36/R17-P维护。
+`node tools/migration/export-browse-ui.mjs --presentation`从冻结生产renderDetail/trackList/albumAbout及最终CSS导出独立结构；只读取DOM/字体框，外部请求被拦截。`python3 tools/migration/compare-presentation-structure.py 原生report.json 冻结report.json 输出.json`核对content/caption/返回按钮/标题/facts/tabs/曲目锚点与字号至≤1逻辑px。CSS采集先交付viewport及布局属性变更，再读取新DOM，不用上一次样式状态。运动ports与播放隔离消费边界分别见detail-motion.md及计划R23/R24；目标系统/物理输入/焦点/窗口欠验只在R36/R17-P维护。

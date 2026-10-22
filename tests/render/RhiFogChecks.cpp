@@ -1,0 +1,149 @@
+#include "Require.h"
+#include "ReviewApplication.h"
+#include "SelectionLighting.h"
+#include "RhiFogChecks.h"
+#include "OutputReference.h"
+#include "RhiReviewInput.h"
+#include "GraphicsBackend.h"
+#include <QGuiApplication>
+#include <QFile>
+#include <QJsonDocument>
+#include "JsonFile.h"
+#include <QDir>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+
+using namespace Qt::StringLiterals;
+
+using namespace yalahoo;
+using namespace yalahoo::rhi;
+using namespace yalahoo::review;
+
+namespace {
+double viewDepth(const Input &input, const Capture &capture)
+{
+    const auto &image = capture.compositeDepth;
+    const auto color = image.pixelColor(image.width() / 2, image.height() / 2);
+    yalahoo::require(color != QColor(Qt::white), "Fog math sample missed shell geometry");
+    const double depth = (color.red() * 65536. + color.green() * 256. + color.blue()) / 16777215.;
+    return input.scene.nearPlane + depth * (input.scene.farPlane - input.scene.nearPlane);
+}
+
+auto runFogChecks(int &argc, char **&argv)
+{
+    if (argc != 2)
+        return 2;
+    try {
+        const QString output = QString::fromLocal8Bit(argv[1]);
+        yalahoo::require(QDir().mkpath(output), "Cannot create fog output");
+        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/rhi-shell/visual.json"_L1);
+        yalahoo::require(file.open(QIODevice::ReadOnly), "Missing fog input");
+        const auto cases = QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray();
+        RhiCaptureHarness driver;
+        QJsonArray results, rebuilds;
+        Input last;
+        qint64 generation = -1;
+        double maxError = 0;
+        for (bool night : { false, true }) {
+            auto input = fixture(cases[0].toObject());
+            SelectionLighting lighting;
+            lighting.setReducedMotion(true);
+            lighting.setNight(night);
+            input.background = lighting.backgroundLinear();
+            input.exposure = float(lighting.exposure());
+            input.shadows = false;
+            input.rawOutput = false;
+            input.captureSamples = 1;
+            const auto initial = driver.capture(input, { 960, 720 });
+            const double depth = viewDepth(input, initial);
+            // Each range encloses the same actual geometry at 0, 1/4, 1/2, 3/4 or full fog.
+            // Includes both endpoints and the explicitly disabled independent Review path.
+            for (double fraction : { -.25, 0., .25, .5, .75, 1., 1.25 }) {
+                input.scene.fogNear = depth - fraction * 20;
+                input.scene.fogFar = input.scene.fogNear + 20;
+                for (bool enabled : { false, true }) {
+                    input.fogEnabled = enabled;
+                    const double t = std::clamp(fraction, 0., 1.);
+                    const double factor = enabled ? t * t * (3 - 2 * t) : 0;
+                    const QVector3D fogged = QVector3D(.18f, .42f, .73f) * float(1 - factor)
+                            + input.background * float(factor);
+                    for (int probe : { 11, 12, 13 }) {
+                        input.opticalProbe = probe;
+                        const auto capture = driver.capture(input, { 960, 720 });
+                        checkSubmittedFog(input, capture);
+                        const auto actual = capture.metadata[u"opticalProbeSample"_s].toArray();
+                        auto expected =
+                                probe == 11 ? fogged : outputReference(fogged, input.exposure);
+                        if (probe == 13)
+                            for (int i = 0; i < 3; ++i)
+                                expected[i] = expected[i] <= .0031308f
+                                        ? expected[i] * 12.92f
+                                        : float(1.055 * std::pow(expected[i], 1 / 2.4) - .055);
+                        yalahoo::require(actual.size() == 3, "Missing float fog sample");
+                        double error = 0;
+                        for (int i = 0; i < 3; ++i)
+                            error = std::max(error, std::abs(actual[i].toDouble() - expected[i]));
+                        // RGBA16F rounding plus RGB24 depth reconstruction; no image reference.
+                        yalahoo::require(error < .001, "Fog/color order differs from source math");
+                        maxError = std::max(maxError, error);
+                        const auto current = capture.metadata[u"resourceGeneration"_s].toInteger();
+                        if (generation >= 0)
+                            yalahoo::require(current == generation, "Fog rebuilt render targets");
+                        generation = current;
+                        results.append(QJsonObject{ { u"night"_s, night },
+                                                    { u"fraction"_s, fraction },
+                                                    { u"enabled"_s, enabled },
+                                                    { u"probe"_s, probe },
+                                                    { u"error"_s, error },
+                                                    { u"metadata"_s, capture.metadata } });
+                    }
+                }
+            }
+            input.scene.fogNear = depth - 5;
+            input.scene.fogFar = depth + 15;
+            input.opticalProbe = 0;
+            input.fogEnabled = true;
+            auto ordinary = driver.capture(input, { 960, 720 });
+            checkSubmittedFog(input, ordinary);
+            yalahoo::require(
+                    driver.surface->grab().save(output + (night ? "/night.png"_L1 : "/day.png"_L1)),
+                    "Cannot save own fog output");
+            last = input;
+        }
+        {
+            driver.rebuild();
+            const auto capture = driver.capture(last, { 960, 720 });
+            yalahoo::require(driver.rebuilt(), "Fog lifecycle did not invalidate real scene graph");
+            checkSubmittedFog(last, capture);
+            yalahoo::require(viewDepth(last, capture) < last.scene.farPlane,
+                             "Fog lifecycle lost geometry");
+            rebuilds.append(capture.metadata);
+        }
+        yalahoo::require(
+                yalahoo::writeJsonFile(output + "/runtime.json"_L1,
+                                       QJsonDocument(QJsonObject{
+                                               { u"passed"_s, true },
+                                               { u"qt"_s, QString::fromUtf8(qVersion()) },
+                                               { u"rebuilds"_s, rebuilds },
+                                               { u"maxError"_s, maxError },
+                                               { u"cases"_s, results },
+                                               { u"offscreen"_s, driver.surface->diagnostics() },
+                                               { u"windowPolicy"_s,
+                                                 verification::windowPolicy(*driver.window) } })),
+                "Cannot write fog report");
+        std::printf("Fog/color source math passed %lld states, max error %.9f\n", results.size(),
+                    maxError);
+        return 0;
+    } catch (const std::exception &error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        return 1;
+    }
+}
+}
+int main(int argc, char **argv)
+{
+    return yalahoo::review::runApplication(argc, argv, [&](QGuiApplication &) {
+        return runFogChecks(argc, argv);
+    });
+}

@@ -11,7 +11,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
-MODULE_PATH = Path(__file__).resolve().parents[2] / "tools/build/verify-startup.py"
+MODULE_PATH = Path(__file__).resolve().parents[2] / "tests/runners/verify-startup.py"
 sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("startup_verification", MODULE_PATH)
 VERIFY = importlib.util.module_from_spec(SPEC)
@@ -135,13 +135,13 @@ class StartupVerificationTest(unittest.TestCase):
                 self.check_formal_runs(runs)
 
     def check_formal_runs(self, runs):
-        script = self.root / "tools/build/verify-startup.py"
+        script = self.root / "tests/runners/verify-startup.py"
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("# fixture\n", encoding="utf-8")
         cache = self.root / "build/release/CMakeCache.txt"
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(f"YALAHOO_SELECTED_QT:PATH={self.root}\nCMAKE_BUILD_TYPE:STRING=Release\n", encoding="utf-8")
-        executable = cache.parent / "tools/ui-audit"
+        executable = cache.parent / "tests/ui-tests"
         executable.parent.mkdir(exist_ok=True)
         executable.write_text("fixture", encoding="utf-8")
         options = ["--backend", "metal", "--formal", "--mode", "vsync", "--scenario", "night-wave",

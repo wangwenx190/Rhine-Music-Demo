@@ -105,7 +105,7 @@
     "geometryInstanceBytes": 112,
     "aoSampleExecution": "Fixed 16/32/64 indices retain all seed=417 samples and accumulation order; radius is loop-invariant",
     "nativeAtlasProof": "Actual D3D11 UpdateSubresource destination boxes/row pitch plus completed whole-page GPU reads; physical bus traffic not measured",
-    "performanceScope": "Historical Windows R10C renderer-only 120s throughput evidence; not current source acceptance. Local CPU diagnostics use rhi-postprocess-audit --profile; full product/VSYNC remains R28/R36.",
+    "performanceScope": "Historical Windows R10C renderer-only 120s throughput evidence; not current source acceptance. Local CPU diagnostics use rhi-postprocess-test --profile; full product/VSYNC remains R28/R36.",
     "evidence": "verification/windows/rhi-postprocess/release-runtime.json",
     "regressions": [
       "verification/windows/rhi-postprocess/release-prestage.json",
@@ -122,7 +122,7 @@
     "contract": "docs/contracts/rhi-integration.md",
     "implementation": "App.qml -> SceneItem -> SceneAdapter/SelectionLighting/RenderQuality -> RhiItem",
     "evidence": "verification/windows/rhi-integration/",
-    "rebuild": "tools/build/verify-r10d.ps1",
+    "rebuild": "yalahoo --verify-integration 输出目录",
     "research": "Review-only ResearchApp/Quick3D capability studies; not linked or packaged in production. Historical image oracles are retired."
   }
 }

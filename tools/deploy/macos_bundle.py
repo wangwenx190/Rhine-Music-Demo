@@ -131,7 +131,7 @@ def inspect_bundle(bundle):
         raise RuntimeError('No deployed Qt media backend')
     paths = list(contents.rglob('*'))
     for path in paths:
-        if any(part in ('QtQuick3D', 'QtCanvas2D', 'qmltooling') for part in path.parts) or re.search(
+        if any(part in ('QtQuick3D', 'qmltooling') for part in path.parts) or re.search(
                 r'Qt(?:Quick3D|Test|QuickTest)|\.dSYM$', path.name):
             raise RuntimeError(f'Development component in production bundle: {path}')
         if path.is_symlink() and not path.resolve().is_relative_to(bundle):

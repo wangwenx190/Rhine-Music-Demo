@@ -3,7 +3,7 @@
 ## 优先级与源码基准
 
 - 优先级：用户最新明确要求 → 本计划 → `AGENTS.md`及各专项契约 → 历史资料。下表专项契约提供对应实施细则；发现不一致时直接修正文档并同步引用。历史任务、授权和验收方法不自动沿用。
-- 冻结基线为 V0.4.1、`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，通过`docs/contracts/history-rewrite.json`及`frozen-git.mjs`/`ResolveFrozenRevision.ps1`解析清理后的等价源码。旧路径在当前树对应`legacy-web/`，旧模块名从该目录解析；根`.git/`保留。Web工具在`legacy-web/`运行并显式使用隔离`MUSIC_DATA_DIR`，不得写回冻结文件或用户旧数据。
+- 冻结基线为 V0.4.1、`57f4f845c20cce646a15dbf4008c2a162aaaf4e2`，通过`docs/contracts/history-rewrite.json`及`tools/migration/frozen-git.mjs`解析清理后的等价源码。旧路径在当前树对应`legacy-web/`，旧模块名从该目录解析；根`.git/`保留。Web工具在`legacy-web/`运行并显式使用隔离`MUSIC_DATA_DIR`，不得写回冻结文件或用户旧数据。
 - **所有外观、几何、相机、字体、材质、光照、特效、动画与合成，均以冻结源码的实际生产调用、最终override和理论效果为基准。** 新品牌及用户指定差异优先；布局/数学/状态可严格核对，原实机图只作大致参考。
 - **禁止用截图逐像素比较、SSIM/RGB/ROI/边缘带分数或浏览器GPU字节相等驱动实现、调参、选型、诊断或验收。** 遗留耦合工具只保留必要的非像素检查；旧分数不重跑、不改写为通过、不再作为待修门禁。
 - **冻结原项目中明显的缺陷、bug或不合理行为不得强行复刻。** 能从生产调用、状态与上下文推断正常预期时，实现该预期行为/表现；无法可靠推断时跳过该特性。两种判定均在[原项目缺陷与复刻例外](docs/contracts/source-defect-exceptions.md)记录来源、问题、预期依据、处理及影响边界；本原则同样约束历史复查与本轮修正。
@@ -63,7 +63,7 @@
 | [motion.md](docs/contracts/motion.md) / [scene.md](docs/contracts/scene.md) | 唯一帧源/运动数学；布局/相机/坐标/拾取 |
 | [opening.md](docs/contracts/opening.md) | 二维序章/三维开场、事件就绪、遮挡提交与交互交接 |
 | [materials.md](docs/contracts/materials.md) / [lighting.md](docs/contracts/lighting.md) | 源材质/纸面语义；世界光场/主题/源单位 |
-| [canvas-painter.md](docs/contracts/canvas-painter.md) / [browse-ui.md](docs/contracts/browse-ui.md) | 两种绘制API共用能力与选型；浏览静态布局/遮罩/图标合成 |
+| [canvas-painter.md](docs/contracts/canvas-painter.md) / [browse-ui.md](docs/contracts/browse-ui.md) | Canvas Painter API、生命周期与资源语义；浏览静态布局/遮罩/图标合成 |
 | [controls.md](docs/contracts/controls.md) | 项目自绘控件、来源尺寸、输入行为与控件检查入口 |
 | [navigation.md](docs/contracts/navigation.md) / [title-reels.md](docs/contracts/title-reels.md) | 滑尺/数字/输入；标题字轮/字体/文字缓存 |
 | [presentation.md](docs/contracts/presentation.md) / [detail-motion.md](docs/contracts/detail-motion.md) / [overview.md](docs/contracts/overview.md) | 详情展示；抽取/换片/拖动；总览取景/折叠/标签 |
@@ -83,10 +83,10 @@
 ### 工具链与目录
 
 - 最新原生Kit发现、ABI/模块闭包、同Kit工具、私有API编译探测和C++23能力均执行[native-bootstrap.md](docs/contracts/native-bootstrap.md)，不得固定Qt版本/安装目录或降级。
-- Canvas Painter共用API、生命周期和选型执行[canvas-painter.md](docs/contracts/canvas-painter.md)；按实际等价性、质量、成本和维护性选择，缺能力明确定位，不因许可类别/技术预览标签放弃合适实现。
-- 根CMake/presets；C++在`src/{app,core,motion,render,media,library,services,platform}`，QML在`qml/Yalahoo/Music/{components,pages,panels,scene}`，资产`resources/`，测试`tests/`，工具`tools/{build,assets,review,deploy,audit,launchers}`。普通启动器在根，演示/研究启动器在`tools/launchers/`；不提前创建未来轮次的空实现。
+- Canvas Painter API与生命周期执行[canvas-painter.md](docs/contracts/canvas-painter.md)。
+- 根CMake/presets；C++在`src/{app,core,motion,render,media,library,services,platform}`，QML在`qml/Yalahoo/Music/{components,pages,panels,scene}`，资产`resources/`，测试`tests/`，回归宿主和驱动在`tests/{render,runners}`，构建/资产/部署工具在`tools/{build,assets,deploy,launchers}`，静态审计在`tools/audit/`，冻结来源和剩余目标审计在`tools/migration/`。普通启动器在根，演示/研究启动器在`tools/launchers/`；不提前创建未来轮次的空实现。
 - `src/`子目录维护源清单；共用代码优先Qt，平台目录只放真实差异。QML用模块相对别名和`loadFromModule("Yalahoo.Music","App")`，非QML资源qrc `/assets/`，shader用qt_add_shaders/qsb；不依赖工作目录。构建`build/{release,debug}`、部署`out/{windows,macos,linux}`；本机配置/路径不提交。
-- 源码按需执行`format`；提交前`check-format`、Release `source-format`及适用检查须有仍有效的通过结果，按test-gates.md复用，不把命令串当作每轮必跑流程；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-audit_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
+- 源码按需执行`format`；提交前`check-format`、Release `source-format`及适用检查须有仍有效的通过结果，按test-gates.md复用，不把命令串当作每轮必跑流程；QML诊断只能用CMake官方`Yalahoo_qmllint`/`ui-tests_qmllint` targets。四空格、展开语句和冻结/第三方排除范围由code-style契约定义。
 
 ### 架构与产品接线
 
@@ -107,7 +107,7 @@
 
 ### 严格静态审计
 
-工具置`tools/audit/`，输出只留本地。复用仍有效的源码结论，只审查本轮实际缺口及受影响调用链，不以缺新报告触发完整重审。需要更新的平台矩阵含checkId/requirement/platform/sourcePath/lineOrSymbol/evidence/result/limitations和内容hash；自动检查后必须推演架构边界、算法最坏复杂度/工作量及真实调用链/分支/错误路径，字符串命中、helper或文件清单不足以证明实现。性能结论按performance.md区分静态已确定、缺陷与具体未决项；静态可确定者不再实测，不能因缺硬件耗时数字生成泛化补验。源码可确定缺陷须修复，静态与真实运行事实分开。
+自动安全分析用`tools/audit/audit-best-practices.py`，冻结来源核对用`tools/migration/`；语义审查直接沿当前生产调用链进行，输出只留本地。复用仍有效的源码结论，只审查本轮实际缺口及受影响调用链，不以缺新报告触发完整重审。需要更新的平台矩阵含checkId/requirement/platform/sourcePath/lineOrSymbol/evidence/result/limitations和内容hash；自动检查后必须推演架构边界、算法最坏复杂度/工作量及真实调用链/分支/错误路径，字符串命中、helper或文件清单不足以证明实现。性能结论按performance.md区分静态已确定、缺陷与具体未决项；静态可确定者不再实测，不能因缺硬件耗时数字生成泛化补验。源码可确定缺陷须修复，静态与真实运行事实分开。
 
 | ID | 审计职责 |
 | --- | --- |
@@ -195,14 +195,14 @@
 
 ### 目标构建、部署与后端/日志
 
-- 归属：BP-P、R30-P、R31-P、R32-P及后端/日志目标检查。输入为根CMake/生产QML清单、`cmake/Deployment.cmake`、qrc资产、GraphicsBackend/BackendCapabilities、LoggingSession、平台启动/部署工具与匿名库；PowerShell共用命令日志、Kit准备及环境恢复由`tools/build/ReviewSupport.ps1`提供。静态展开COMMON-01–05、语言/Qt/QML实践及适用平台分支；已确定的跨平台算法与性能结论共用，不新建逐组件审计工程。
-- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，并执行`ctest --preset qt-release -R '^review-powershell$'`（或直接运行`pwsh -NoProfile -File tests/tools/ReviewSupportTest.ps1`）核对共用日志、非零退出、工具链返回值、含空格路径与环境恢复；另核对`verify-r14/r15`在目标环境的实际接线；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。GUI核对本次Process.ExitCode和当前report，缺报告/错误必须失败；不为每个历史包装入口重复构建。
+- 归属：BP-P、R30-P、R31-P、R32-P及后端/日志目标检查。输入为根CMake/生产QML清单、`cmake/Deployment.cmake`、qrc资产、GraphicsBackend/BackendCapabilities、LoggingSession、平台启动/部署工具与匿名库。静态展开COMMON-01–05、语言/Qt/QML实践及适用平台分支；已确定的跨平台算法与性能结论共用，不新建逐组件审计工程。
+- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，目标启动/部署工具核对当前Process.ExitCode、参数、含空格路径与子进程环境；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。GUI缺报告/错误必须失败。
 
 | 目标/归属 | 准确入口与独立退出事实 |
 | --- | --- |
-| Windows · R30-P/BP-P | 操作按[windows.md](docs/platforms/windows.md)；`pwsh -NoProfile -File tools/deploy/windows.ps1`，`python tools/audit/audit-windows-deployment.py --scan-qml --build-directory build/windows-release`及包内`verify-windows.ps1`。真实MSVC/最新Kit/C++23、Release IPO及`/Gy /Gw /OPT:REF /OPT:ICF`编译/链接、PE/图标、同Kit windeployqt/官方VC运行库、插件/媒体/字体/shader/许可与相对路径完整；包复制到无开发Qt的干净系统及中文/空格路径，从包外加载，不借开发PATH。 |
+| Windows · R30-P/BP-P | 操作按[windows.md](docs/platforms/windows.md)；`pwsh -NoProfile -File tools/deploy/windows.ps1`及包内`verify-windows.ps1`。真实MSVC/最新Kit/C++23、Release IPO及`/Gy /Gw /OPT:REF /OPT:ICF`编译/链接、PE/图标、同Kit windeployqt/官方VC运行库、插件/媒体/字体/shader/许可与相对路径完整；包复制到无开发Qt的干净系统及中文/空格路径，从包外加载，不借开发PATH。 |
 | macOS · R31-P | 输入为`out/macos/`完整生产包，操作按[macos.md](docs/platforms/macos.md)。整包在另一台兼容目标设备的中文/空格路径从包外运行`python3 verify-macos.py --output 绝对新目录`，核对实际映像/架构/相对资源/签名；实机核对Finder品牌、物理AppKit菜单/Command、系统目录选择与输入法。 |
-| Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tests/tools/UnixDeploymentTest.py`、`python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、Release IPO及GCC ICF或Clang linker ICF、ELF/ldd/全部暂存ELF strip后保留动态导出/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
+| Linux · R32-P/BP-P | 操作按[linux.md](docs/platforms/linux.md)；`sh tools/build/linux.sh`、`sh tools/deploy/linux.sh`、`python3 tests/tools/UnixDeploymentTest.py`、`python3 tools/deploy/verify-linux.py --output 绝对新目录`。原生C++23/最新Kit、Release IPO及GCC ICF或Clang linker ICF、ELF/ldd/全部暂存ELF strip后保留动态导出/相对RPATH/qt.conf、xcb/Wayland/媒体/CanvasPainter及许可/权限完整；整包在无开发Qt的兼容CPU/系统ABI及中文/空格路径从包外加载。 |
 | 后端与日志 | 使用Release `graphics-backend`、`logging`、`logging-terminal`及普通部署包。Windows显式D3D11/12、Windows/Linux的OpenGL与已启用Vulkan、macOS Vulkan核对真实API；Qt特性或设备/格式不支持时明确报错并非零退出。Linux默认Vulkan不可用时警告并回退OpenGL，显式请求不回退。目标成功路径需真实输出，不能只看初始化。日志目录/上界/轮转按logging.md；Windows真实控制台VT颜色/UTF-8及重定向正常。 |
 
 - SINGLE-INSTANCE-P：Windows/Linux尚缺本机QLockFile与QLocalServer（named pipe/Unix socket）的真实进程仲裁及窗口激活事实。源码为SingleInstance、main、PreferencesStore/SettingsController和SettingsPanel；匿名输入由SingleInstanceTest/SettingsTest生成。依赖目标Release包及正常桌面会话，入口为`ctest --preset qt-release -R '^(single-instance|settings)$'`，并在普通产品设置中切换模式、重启、再次启动同一目录及独立临时目录。退出要求为开启时仅原实例处理激活、关闭时可多开、目录隔离、退出/崩溃锁恢复、错误不降级启动；真实前台/最小化恢复需遵守当轮窗口授权，macOS物理激活同归下方产品/输入任务。目标构建仍按本组原门槛，不以主机测试代替。
@@ -212,7 +212,7 @@
 ### 联网资料目标运行 · ONLINE-METADATA-P
 
 - 缺口：Windows/Linux原生Qt Network/TLS、系统代理发现、直连与手动HTTP代理的实际运行；macOS其他系统代理/PAC配置仍需对应系统设置环境。共用匹配、取消、缓存、持久化与代理选择算法由`online-metadata`验证，不能外推目标系统的连接事实。
-- 源码与输入：`OnlineMetadataProvider`、`metadata/MetadataHttp`、`LibraryStore`、SettingsPanel/MetadataSection及`tools/review/MetadataNetworkProbe.cpp`；仅用公开专辑名与公开MusicBrainz发行ID/曲目数组，不读用户库。依赖最新目标Kit的Network模块和随包TLS后端、对应系统代理环境。
+- 源码与输入：`OnlineMetadataProvider`、`metadata/MetadataHttp`、`LibraryStore`、SettingsPanel/MetadataSection及`tools/migration/MetadataNetworkProbe.cpp`；仅用公开专辑名与公开MusicBrainz发行ID/曲目数组，不读用户库。依赖最新目标Kit的Network模块和随包TLS后端、对应系统代理环境。
 - 入口与门槛：按library-data.md运行`online-metadata`及`metadata-network-probe`的介绍/制作/流派三类公开查询；测试页核对代理开关默认开启、来源默认system、关闭时直连、manual仅使用已保存地址。实际成功需有Matched介绍及修订号/许可、Partial制作署名与Matched/Partial发行/流派；系统或网络不可达保留原因，不能写成NotFound或成功。部署后复用目标包验证Qt Network/TLS闭包；GUI/默认隐藏策略按test-window-policy.md，相关设置检查按test-gates.md选择。
 
 ### 文件系统、媒体与数据
@@ -221,9 +221,9 @@
 
 | 对象与权威契约 | 最小入口及退出条件 |
 | --- | --- |
-| DirectoryScanner/LibraryStore · R21-P · library-data.md | `directory-scanner`/`library-data`/`library-qml`中尚缺的目标分支；`tools/audit/audit-library-scan.py`，指纹语义需要核对时用`tools/review/verify-scan-fingerprint.mjs`。核对原生UTF-8路径/ID、去重/重扫/取消/原子缓存；Windows实际UNC/junction/ACL，Linux大小写/权限/只读缓存及循环链接。无能力项保留具体缺口。 |
-| MediaMetadataProbe/ArtworkStore/LegacyImporter/PreferencesStore · R22-P · library-data.md | `media-metadata`及受影响缓存/导入测试，`tools/audit/audit-media-metadata.py`。真实无输出/无play探测的取消/晚到/超时/退出，封面优先级及解码保护、内容寻址/符号链接拒写、显式只读旧JSON与未知字段/坏文件/原子保存错误符合契约；Loaded不代表可播放。 |
-| PlaybackController及三路声音 · R24-P/R25-P · playback.md | `playback`/`audio-ambience`、`tools/audit/audit-playback.py`/`audit-audio-ambience.py`；GUI共用一次`playback-qml`或`ui-audit --playback 新目录`。普通Qt公开API、队列/自然结束/暂停/seek/错误与导航隔离正常，歌曲/BGM/音效独立；静音事件不补合成音源。 |
+| DirectoryScanner/LibraryStore · R21-P · library-data.md | `directory-scanner`/`library-data`/`library-qml`中尚缺的目标分支；指纹语义需要核对时用`tools/migration/verify-scan-fingerprint.mjs`。核对原生UTF-8路径/ID、去重/重扫/取消/原子缓存；Windows实际UNC/junction/ACL，Linux大小写/权限/只读缓存及循环链接。无能力项保留具体缺口。 |
+| MediaMetadataProbe/ArtworkStore/LegacyImporter/PreferencesStore · R22-P · library-data.md | `media-metadata`及受影响缓存/导入测试。真实无输出/无play探测的取消/晚到/超时/退出，封面优先级及解码保护、内容寻址/符号链接拒写、显式只读旧JSON与未知字段/坏文件/原子保存错误符合契约；Loaded不代表可播放。 |
+| PlaybackController及三路声音 · R24-P/R25-P · playback.md | `playback`/`audio-ambience`；GUI共用一次`playback-qml`或`ui-tests --playback 新目录`。普通Qt公开API、队列/自然结束/暂停/seek/错误与导航隔离正常，歌曲/BGM/音效独立；静音事件不补合成音源。 |
 
 物理声音检查在每个系统的一次正常产品会话中合并：真实支持样本的播放/暂停/seek/换曲/自然结束及损坏/不支持原因；默认改选、显式设备保持、消失回退/无输出/重连及加载中换曲换设备，保持暂停/停止意图与有效位置/音量；BGM/音效走各自规定路由，最小化继续、关闭停止，听感无意外重叠/突变。既有有效状态测试复用，不能以无声加载、程序进度或模拟设备替代尚缺的实物事实。
 
@@ -235,11 +235,11 @@
 
 | 共同检查及归属 | 修复对象、输入与入口 | 独立退出条件 |
 | --- | --- | --- |
-| 面板/控件 · UI-CONTROLS-P、R23-P/R26-P/R27-P | Library/Search/Settings/ExperimentPanels、TrackFocusController、PreferencesStore/OnlineMetadataProvider；LibraryAudit/Settings/Experiment匿名输入。选择`controls-qml`、`library-panels-qml`、`settings-qml`、`experiments-qml`中实际缺项，或对应`ui-audit --library/--settings/--experiments`入口；审计分别为audit-controls/library-panels/settings/experiments.py。 | 模态/滚动/焦点、搜索取消与最终定位、资料来源/离线状态、设置保存/未知字段与当前媒体连续、四实验模式/改速/临时对照恢复符合controls/library-data/lighting/motion契约；相同控件断言在各宿主复用，宿主特有路由独立保留。 |
-| 文字/页眉/滑尺 · R16B2W/R16B3/R16M3-S/R19E-P | TitleReel/TransportTitle/Header、Ruler/Ordinal/InputRouter；`tests/fixtures/text/titles.json`及144组滑尺源轨迹。`export-title.mjs`→`verify-title.mjs --backend 目标 --dpr 实际值 --source 源目录 --output 新目录`、`title-reels`、`ui-audit --ruler`/普通ui-audit及export-ruler/export-browse-ui/compare-browse-structure；源码入口audit-title-source/audit-browse-navigation.py。 | 字体身份、连字/组合字/emoji、字形/断行/省略/裁切、页眉结构与播放隔离、自然宽度通知/隐藏完成与恢复取消、刻线/clip/淡隐/背压符合title-reels/navigation/browse-ui；所有权/缓存/隐藏工作量先静态确定，未决运行行为才最小观察。 |
-| 详情/总览 · R17-P/R18-P/R19-P | Presentation/DetailMotion/ReturningCasePool/PointerDragController、Overview与SceneItem；presentation/detail-golden/overview/source-golden匿名输入。`ui-audit --presentation`、`verify-detail.py --backend 目标 --runs 1 --output 新目录`、`verify-overview.py --visual --backend 目标 --runs 1 --output 新目录`按缺项选择；audit-presentation/detail/overview/detail-overview-source及对应结构导出/比较入口。 | ready/revision/四种archiveRoute、连选最后意图/反向/拖动取消、sticky tabs/行高/委托虚拟化、总览两步点击/跨列收拢与反转/碰撞准入（标签240ms退场与420ms入口收拢的衔接、计数block宽度）、焦点恢复/定位不改播放，遵守presentation/detail-motion/overview；产品回放与组件报告共用。 |
-| 序章与产品联动 · R20-P/R29-P | OpeningController/OpeningInk、MusicStage/SceneItem；opening/source-golden.json与qrc封面/匿名库。`opening`、`ui-audit --opening`及audit-opening/export-opening-golden；仅组件证据未覆盖的跨组件联动才选`verify-gui.py --backend 目标 --output 新目录`/audit-gui.py。 | 输入锁/跳过/重播/减少动态/一次交接、遮挡零三维submit和恢复正确，产品浏览→详情→总览→搜索/片头的真实接线、透明合成与资源容量符合opening/rhi-integration；不为汇总已有组件结果另跑完整GUI矩阵。 |
-| macOS默认置底无激活显示 · MAC-VISIBLE-3D | VerificationWindowMac::NativeWindowGuard/prepareNativeApplication、App.qml；`python3 tools/build/verify-detail.py --backend opengl --runs 1 --output 新目录`的匿名库。已知失败输入为`verification/r35-detail-native/run-1/report.json`（原生应用hidden、窗口不在屏幕且无曝光/帧）与`verification/r35-detail-accessory/run-1/report.json`（进程激活）。依赖可靠观察自身窗口且不干扰工作区的macOS会话，修复对象仅为默认验证启动/显示策略。 | 默认策略下实际OpenGL窗口show/提交、置底、拒key/鼠标、前台PID与完整激活/焦点历史同时合规，恢复后仍遵守该策略。保持普通产品行为；无可靠条件或发生激活时不得宣告通过、提高层级或放宽门槛。 |
+| 面板/控件 · UI-CONTROLS-P、R23-P/R26-P/R27-P | Library/Search/Settings/ExperimentPanels、TrackFocusController、PreferencesStore/OnlineMetadataProvider；LibraryChecks/Settings/Experiment匿名输入。选择`controls-qml`、`library-panels-qml`、`settings-qml`、`experiments-qml`中实际缺项，或对应`ui-tests --library/--settings/--experiments`入口。 | 模态/滚动/焦点、搜索取消与最终定位、资料来源/离线状态、设置保存/未知字段与当前媒体连续、四实验模式/改速/临时对照恢复符合controls/library-data/lighting/motion契约；相同控件断言在各宿主复用，宿主特有路由独立保留。 |
+| 文字/页眉/滑尺 · R16B2W/R16B3/R16M3-S/R19E-P | TitleReel/TransportTitle/Header、Ruler/Ordinal/InputRouter；`tests/fixtures/text/titles.json`及144组滑尺源轨迹。`export-title.mjs`→`verify-title.mjs --backend 目标 --dpr 实际值 --source 源目录 --output 新目录`、`title-reels`、`source-ui-probe --ruler 输出目录 源report.json`及export-ruler/export-browse-ui/compare-browse-structure。 | 字体身份、连字/组合字/emoji、字形/断行/省略/裁切、页眉结构与播放隔离、自然宽度通知/隐藏完成与恢复取消、刻线/clip/淡隐/背压符合title-reels/navigation/browse-ui；所有权/缓存/隐藏工作量先静态确定，未决运行行为才最小观察。 |
+| 详情/总览 · R17-P/R18-P/R19-P | Presentation/DetailMotion/ReturningCasePool/PointerDragController、Overview与SceneItem；presentation/detail-golden/overview/source-golden匿名输入。`ui-tests --presentation`、`verify-detail.py --backend 目标 --runs 1 --output 新目录`、`verify-overview.py --visual --backend 目标 --runs 1 --output 新目录`按缺项选择及对应结构导出/比较入口。 | ready/revision/四种archiveRoute、连选最后意图/反向/拖动取消、sticky tabs/行高/委托虚拟化、总览两步点击/跨列收拢与反转/碰撞准入（标签240ms退场与420ms入口收拢的衔接、计数block宽度）、焦点恢复/定位不改播放，遵守presentation/detail-motion/overview；产品回放与组件报告共用。 |
+| 序章与产品联动 · R20-P/R29-P | OpeningController/OpeningInk、MusicStage/SceneItem；opening/source-golden.json与qrc封面/匿名库。`opening`、`ui-tests --opening`及export-opening-golden；仅组件证据未覆盖的跨组件联动才选`verify-gui.py --backend 目标 --output 新目录`。 | 输入锁/跳过/重播/减少动态/一次交接、遮挡零三维submit和恢复正确，产品浏览→详情→总览→搜索/片头的真实接线、透明合成与资源容量符合opening/rhi-integration；不为汇总已有组件结果另跑完整GUI矩阵。 |
+| macOS默认置底无激活显示 · MAC-VISIBLE-3D | VerificationWindowMac::NativeWindowGuard/prepareNativeApplication、App.qml；`python3 tests/runners/verify-detail.py --backend opengl --runs 1 --output 新目录`的匿名库。已知失败输入为`verification/r35-detail-native/run-1/report.json`（原生应用hidden、窗口不在屏幕且无曝光/帧）与`verification/r35-detail-accessory/run-1/report.json`（进程激活）。依赖可靠观察自身窗口且不干扰工作区的macOS会话，修复对象仅为默认验证启动/显示策略。 | 默认策略下实际OpenGL窗口show/提交、置底、拒key/鼠标、前台PID与完整激活/焦点历史同时合规，恢复后仍遵守该策略。保持普通产品行为；无可靠条件或发生激活时不得宣告通过、提高层级或放宽门槛。 |
 
 物理检查与部署、媒体共用同一目标产品会话：键鼠/触控板pixelDelta/快捷键、系统中英文与emoji组合输入、剪贴板/撤销、目录选择、辅助技术角色/名称、焦点/模态隔离；Windows/Linux另核对首次show、同对象hide/minimize/restore、实际surface变化与退出；真实跨屏DPR后的SceneItem/Canvas/文字尺寸/清晰度和缓存恢复。不同系统/会话的事实分别保留，隐藏target DPR及注入Qt事件不能冒充物理设备。
 
@@ -253,15 +253,15 @@
 
 | 原ID | 源码/输入与权威契约 | 定向入口及尚需目标事实 |
 | --- | --- | --- |
-| R19A-P | PrepareAssets、字体物理表/QImageReader、封面租约；assets/branding/covers | `prepare-assets --verify-inputs`，assets/branding/cover-cache及audit相关源检查；真实平台字体/ICC/缺图/alpha与插件。源保护负向检查只在隔离副本进行。 |
+| R19A-P | PrepareAssets、字体物理表/QImageReader、封面租约；assets/branding/covers | `prepare-assets --verify-inputs`，assets/branding/cover-cache及资产来源核对；真实平台字体/ICC/缺图/alpha与插件。源保护负向检查只在隔离副本进行。 |
 | R19B-P | FrameClock/SceneAdapter、ArchivePool/RealColumns、motion/scene/archive-pool/real-columns fixture与契约 | 同名数学测试/导出器、`archive-pool-gpu`/`real-columns-gpu`中尚缺的目标分支；真实投影、稳定身份/两阵列/记忆/库替换、封面区域与容量。 |
-| R19C1-P/R19C2A-P | ShellMaterial/SelectionLighting/RowLightController及MaterialReview；materials/parameters、lighting/golden、single-case/visual输入；materials/lighting | audit-material-parameters/material-review、`rhi-material-parameters`/`lighting`及必要的runtime-materials/runtime-lighting；真实参数上传与材质/纸面/光场。Quick3D仅Review，不成为生产RHI的重复验收。 |
-| R19C2B1-P/R19C2B2-P | RhiItem/OpticsProbe、原GLB/Room/DFG/LTC、rhi-shell/visual；rhi-opaque/rhi-shell | audit-rhi-opaque/optics，`rhi-opaque-gpu`/`rhi-shell-gpu`；实际深度/法线/投影、排序/捕获隔离、MSAA部分覆盖/透明洞/alpha黑边与光学解析。 |
-| R19D1-P/R19D2-P | SSAO/Fog生产helper与uniform、occlusion/visual/kernel和rhi-shell/visual；occlusion/postprocess | audit-rhi-ao/fog，`rhi-ao-gpu`/`rhi-fog-gpu`；R16F及奇数宽stride/GL pack、标量/颜色读回、真实camera/detail/线性fog上传与捕获→最终输出次序。 |
-| R19D3A-P/R19D3B-P | Shadow及productFloor、源shadow/Standard/GLB/地面主题参数；rhi-opaque | audit-rhi-shadow/floor、共用`rhi-shadow-gpu`及`rhi-shadow-audit 新目录 --attachments-only/--invalidation-only`；生产D32F-only、显式采集R32F生命周期/预算及同尺寸深度身份保留、normalBias/PCF、地面实际occluded>0、PBR/fog/完整AO与DOF depth。地面不另跑整套阴影。 |
-| R19D4A-P/R19D4B1-P | Postprocess/Bokeh/SMAA、postprocess/bokeh-kernel与锁定lookup；postprocess | audit-rhi-bokeh/smaa、export-bokeh-kernel --check及真正离屏`rhi-bokeh-gpu`/`rhi-smaa-gpu`；真实生产pass解析颜色、HDR/alpha/过滤/边界。 |
-| R19D4B2-P/R19D4C-P | Postprocess/AtlasUploadQueue、SceneItem有效DPR→RenderQuality、render-backend/visual与postprocess/visual；rhi-postprocess/rhi-integration | audit-rhi-resolve/scale、`rhi-postprocess-gpu`/`rhi-scale-gpu`；实际MSAA/resolve/无反馈资源图、附件尺度/保护/CoC/租约与tile上传。Windows原生UpdateSubresource boxes/bytes仅该目标可证明；其他后端不伪造。 |
-| R19C2C-P及上述pass生产接线 | SceneItem→RhiItem实际生产阵列/几何与光学；rhi-shell/rhi-integration | audit-rhi-flicker及必要的`rhi-flicker-gpu`所选状态，或已有产品输出/上传报告；共同证明跨批量边界、运动/进退中的实际uniform与连续透明覆盖，missing/nonfinite精确0、shade>100，保持源实体数量/效果，不默认完整1200帧。 |
+| R19C1-P/R19C2A-P | ShellMaterial/SelectionLighting/RowLightController及MaterialReview；materials/parameters、lighting/golden、single-case/visual输入；materials/lighting | `rhi-material-parameters`/`lighting`及必要的runtime-materials/runtime-lighting；真实参数上传与材质/纸面/光场。Quick3D仅Review，不成为生产RHI的重复验收。 |
+| R19C2B1-P/R19C2B2-P | RhiItem/OpticsProbe、原GLB/Room/DFG/LTC、rhi-shell/visual；rhi-opaque/rhi-shell | `rhi-opaque-gpu`/`rhi-shell-gpu`；实际深度/法线/投影、排序/捕获隔离、MSAA部分覆盖/透明洞/alpha黑边与光学解析。 |
+| R19D1-P/R19D2-P | SSAO/Fog生产helper与uniform、occlusion/visual/kernel和rhi-shell/visual；occlusion/postprocess | `rhi-ao-gpu`/`rhi-fog-gpu`；R16F及奇数宽stride/GL pack、标量/颜色读回、真实camera/detail/线性fog上传与捕获→最终输出次序。 |
+| R19D3A-P/R19D3B-P | Shadow及productFloor、源shadow/Standard/GLB/地面主题参数；rhi-opaque | 共用`rhi-shadow-gpu`及`rhi-shadow-test 新目录 --attachments-only/--invalidation-only`；生产D32F-only、显式采集R32F生命周期/预算及同尺寸深度身份保留、normalBias/PCF、地面实际occluded>0、PBR/fog/完整AO与DOF depth。地面不另跑整套阴影。 |
+| R19D4A-P/R19D4B1-P | Postprocess/Bokeh/SMAA、postprocess/bokeh-kernel与锁定lookup；postprocess | export-bokeh-kernel --check及真正离屏`rhi-bokeh-gpu`/`rhi-smaa-gpu`；真实生产pass解析颜色、HDR/alpha/过滤/边界。 |
+| R19D4B2-P/R19D4C-P | Postprocess/AtlasUploadQueue、SceneItem有效DPR→RenderQuality、render-backend/visual与postprocess/visual；rhi-postprocess/rhi-integration | `rhi-postprocess-gpu`/`rhi-scale-gpu`；实际MSAA/resolve/无反馈资源图、附件尺度/保护/CoC/租约与tile上传。Windows原生UpdateSubresource boxes/bytes仅该目标可证明；其他后端不伪造。 |
+| R19C2C-P及上述pass生产接线 | SceneItem→RhiItem实际生产阵列/几何与光学；rhi-shell/rhi-integration | `rhi-flicker-gpu`所选状态，或已有产品输出/上传报告；共同证明跨批量边界、运动/进退中的实际uniform与连续透明覆盖，missing/nonfinite精确0、shade>100，保持源实体数量/效果，不默认完整1200帧。 |
 
 退出：相关实际输出满足所属契约的原公式、格式、采样、颜色/几何容差及容量/上传边界；静态结论与GPU实际事实分开。无未决项不补性能/缓存成本/重复释放压力；已有实际失败仍须修复并最小复验，未执行目标不记通过。
 

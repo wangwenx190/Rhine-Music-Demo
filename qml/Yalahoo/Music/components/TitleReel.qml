@@ -17,7 +17,6 @@ Item {
     property bool transport: false
     property real bottomPadding: 0
     property TitleReelMotion sharedController: null
-    property bool quickTextCandidate: false
     readonly property TitleReelMotion controller: sharedController || motion
     readonly property real naturalWidth: controller.naturalWidth
     implicitHeight: controller.layoutHeight + bottomPadding
@@ -99,7 +98,7 @@ Item {
             ReelInk {
                 anchors.fill: parent
                 slot: cell.slot
-                visible: !root.quickTextCandidate && Boolean(cell.slot) && cell.slot.nativeInk
+                visible: Boolean(cell.slot) && cell.slot.nativeInk
                 color: cell.slot && cell.slot.translation ? root.tokens.muted : root.tokens.ink
             }
             Repeater {
@@ -114,7 +113,7 @@ Item {
                     width: cell.width
                     height: faceData ? faceData.height : 0
                     clip: true
-                    visible: Boolean(faceData) && (root.quickTextCandidate || faceData.colored)
+                    visible: Boolean(faceData) && faceData.colored
                     Loader {
                         active: face.visible
                         sourceComponent: Text {

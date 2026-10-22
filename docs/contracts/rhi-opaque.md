@@ -15,11 +15,11 @@
 
 36个双主题×前/低视角×三封面×三通道状态保留独立数学检查：已知前平面线性RGB24深度误差<2e-6，view normal按8位编码精度（1/255），源几何四角投影≤2物理px（本入口实际DPR1）。四角只对数学投影与自身合成几何位置，不读取参考图。16个均匀墨色/入射探针直接按sRGBDecode与源Lambert diffuse clamp推导；半球同色并取`intensity=irradiance*PI`隔离已知入射，关闭环境/spot/key/fill并令print exposure=1，覆盖关闭灯光及0/.25/2入射，不据结果拟合参数。
 
-实际附件inventory来自QRhi对象：不透明RGBA16F、法线/线性RGB24深度RGBA8、1×/无mips及真实尺寸；driver分配仍为null。显式采集按实际纹理指针去重，12个语义字段对应4张真实纹理时只读回和转换4次，别名字段共享QImage存储；captured回调仍最多2批，只有显式采集有这项工作，不改产品pass/格式/采样。十次重建由真实sceneGraphInvalidated确认，不靠renderer局部generation递增证明。
+实际附件inventory来自QRhi对象：不透明RGBA16F、法线/线性RGB24深度RGBA8、1×/无mips及真实尺寸；driver分配仍为null。显式采集按实际纹理指针去重，12个语义字段对应4张真实纹理时只读回和转换4次，别名字段共享QImage存储；captured回调仍最多2批，只有显式采集有这项工作，不改产品pass/格式/采样。一次重建由真实sceneGraphInvalidated确认，不靠renderer局部generation递增证明。
 
 保留12个有序尺寸（九种布局尺寸及恢复旧尺寸）、30个真实帧驱动的resize、同capture request的红/蓝封面revision更新、六个双主题/1024/2048/4096阴影状态和十次同item图形重建。阴影只检查已知receiver的源strength=.32产生最低约.68、关闭时为1；完整bias/PCF/深度语义归R19D，不以该结果代替shader全等价。窗口策略逐capture验证；所有输出是自己的诊断目标，线性color PNG不是最终sRGB产品画面。
 
-`rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`和`audit-rhi-opaque.py`为现行入口。未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
+`rhi-opaque-gpu`、`prepare-rhi-paper.py --check`、`expand-lighting-shaders.py --check`为现行入口。未知driver字节为null，资源统计语义由rhi-integration.md统一维护。
 
 ## 阴影
 
@@ -31,9 +31,9 @@
 
 采集开关只重建阴影目标布局及其管线，尺寸不变时保留实际 D32F 资源及采样绑定；开启采集补画一次诊断颜色，关闭采集继续复用深度。资源预算按实际采集状态计入 R32F，实际清单用 QRhi 全局资源 ID 核对 D32F 身份。
 
-`ctest --preset qt-release-render -R '^rhi-shadow-attachments-gpu$'`或`rhi-shadow-audit 新目录 --attachments-only`在1/8实体两种提交路径检查普通生产→采集→普通生产、caster运动、阴影开关及尺寸变化；核对实际附件/预算、D32F身份和缓存，并以当次canonical深度与独立源几何/PCF数学验证真正无颜色附件时的Qt输出，不做图像相似度比较。
+`ctest --preset qt-release-render -R '^rhi-shadow-attachments-gpu$'`或`rhi-shadow-test 新目录 --attachments-only`在1/8实体两种提交路径检查普通生产→采集→普通生产、caster运动、阴影开关及尺寸变化；核对实际附件/预算、D32F身份和缓存，并以当次canonical深度与独立源几何/PCF数学验证真正无颜色附件时的Qt输出，不做图像相似度比较。
 
-`rhi-shadow-audit 新目录 --invalidation-only`在1/8实体两种提交路径定向检查resize、MSAA、不透明/壳体布局、相机/光色/焦点、封面、阴影尺寸、caster运动和开关的独立失效；核对实际采样绑定、资源revision、后处理复用、零独立caster uniform及关闭后的零重复clear，不附带完整光学/重建压力矩阵。
+`rhi-shadow-test 新目录 --invalidation-only`在1/8实体两种提交路径定向检查resize、MSAA、不透明/壳体布局、相机/光色/焦点、封面、阴影尺寸、caster运动和开关的独立失效；核对实际采样绑定、资源revision、后处理复用、零独立caster uniform及关闭后的零重复clear，不附带完整光学/重建压力矩阵。
 
 诊断receiver独立保留为12×12、y=-.05的白色乘数平面。
 
@@ -41,4 +41,4 @@
 
 源地面为200×200平面，rotation.x=-PI/2、y=-4.63、向上法向、FrontSide、receiveShadow=true/castShadow=false。源色为暖昼#d8c9b9、深夜#0b1828；dusk的#a6b8c0仅作来源测试输入。生产SceneItem正常路径始终productFloor=true；geometryOnly与独立Review默认关闭。线性 floorColor 属于 SelectionLighting palette，原源色及.65秒主题曲线随现有 FrameClock 更新。地面kind=6复用opaque管线，使用Standard dielectric（metalness=0、f0=.04、roughness=.95，无clearcoat/transmission/emission），不使用纸面限亮和壳体光场调制；它接收既有key阴影、参与capture/resolve/mips、AO和完整Bokeh depth，但不进入caster池。着色后线性fog先于后处理与统一输出。
 
-地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。历史来源及适配判定见source-fidelity-review.md的R19D3B。验证入口为rhi-shadow-gpu的地面数学/附件/十次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。
+地面几何一次写入共享buffer（152 bytes）；现有receiver槽位复用，没有新增生产目标/纹理/PSO。显式Review的captureFloorDepth扩展到最多14语义字段/2在途批；按纹理身份去重，完整DOF与AO depth同资源时仅一次读回，生产默认false。历史来源及适配判定见source-fidelity-review.md的R19D3B。验证入口为rhi-shadow-gpu的地面数学/附件/一次重建，以及rhi-flicker-gpu的真实生产连续回放；不使用来源截图配对。

@@ -1,6 +1,6 @@
 # 详情抽取、换片与拖动契约
 
-源码依据为冻结 `music-camera.ts` 的 MusicPlacementMotion/MusicPresentation、`scene.ts` 的 setMode/switchMusicAlbum/select/bindPointer/update，以及 music-app.ts 的实际 presentation ports。冻结身份与清理后的 Git 读取规则按 web-baseline.md；测试 oracle 由 `tools/review/export-detail-golden.mjs` 直接执行冻结类及生产旋转表达式生成，不修改 Web 基线。
+源码依据为冻结 `music-camera.ts` 的 MusicPlacementMotion/MusicPresentation、`scene.ts` 的 setMode/switchMusicAlbum/select/bindPointer/update，以及 music-app.ts 的实际 presentation ports。冻结身份与清理后的 Git 读取规则按 web-baseline.md；测试 oracle 由 `tools/migration/export-detail-golden.mjs` 直接执行冻结类及生产旋转表达式生成，不修改 Web 基线。
 
 `DetailMotion` 管理 archive/placing/presented/returning-center/returning-array。唯一 FrameClock 按 MotionController → SelectionController → SceneAdapter → PresentationController 顺序交付已经缩放的 motionDt。1.45/1.05 秒的五次轨迹保留 x/v/a 连续性，同目标不重启；其钳制进度同时驱动 .9→3.47 的抽取、相机 yaw/elevation、取景跨度与瞄准点，实际相机继续使用源码 rate=9 阻尼。生产只通过 requestDetail 发意图；setDetail 保留给已有固定状态/几何探针，不作为生产开关。
 
@@ -19,9 +19,9 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 产品回放分别记录请求交付到场景及 CPU 封面 ready、实际 Qt submission、atlasUploadBytes、resourceGeneration/postprocessRevision、CPU 租约/分块暂存、ResourceInventory 附件与保守重建重叠。motion 状态不能触发目标重建，普通上传批次上界 2MiB。GPU time 是 QRhi 已完成帧的可用观测，可能对应先前帧；不可用为 null。descriptor 字节是估算，不包含驱动 padding/PSO/SRB 和窗口/compositor，不冒充实测显存。局部回放不替代 R28 的 120 秒正常 VSYNC/产品预算，也不提供 input-to-photon。
 ## 检查入口
 
-- `node tools/review/export-detail-golden.mjs`生成冻结数学；`detail-motion`比较598轨迹帧、50旋转点、1200材质帧，x/v/a≤1e-6。覆盖20/30/60/120fps、1/120秒打断、三次换片/反向回收、满池最后目标、返回/搜索替换、拖动取消、隐藏/换库/九尺寸拾取和真实列边界。
-- `python3 tools/build/verify-detail.py --backend <目标后端> --dpr 1|1.5|2 --runs 1 --output 全新目录`通过真实App/FrameAnimation回放；夜间`--night`，前台仅授权轮次加`--foreground`。
+- `node tools/migration/export-detail-golden.mjs`生成冻结数学；`detail-motion`比较598轨迹帧、50旋转点、1200材质帧，x/v/a≤1e-6。覆盖20/30/60/120fps、1/120秒打断、三次换片/反向回收、满池最后目标、返回/搜索替换、拖动取消、隐藏/换库/九尺寸拾取和真实列边界。
+- `python3 tests/runners/verify-detail.py --backend <目标后端> --dpr 1|1.5|2 --runs 1 --output 全新目录`通过真实App/FrameAnimation回放；夜间`--night`，前台仅授权轮次加`--foreground`。
 - `--window-lifecycle`仅补生产App同窗口的一次hide与一次minimize/restore，核对隐藏无视觉工作、原窗口/SceneItem与实际提交/自身输出恢复；不增加换片压力或QML根重建。
 - 普通功能保持lifecycleStressRequested=false。性能/资源寿命先按performance.md严格静态审查，仅实际未决项才选择最小生命周期观测；以下次数是工具的完整压力能力，不是默认验收要求。`--lifecycle`另执行三十次换片、十次surface及十次完整App/QML根窗口重建，重绑输入并检查重建后换片；basic允许surface复用context，记录实际context初始化数。
 - ready核对同revision实体身份/CPU封面租约集合，最终owner回落且active/pending为0、运动不改target/postprocess代次、单批≤2MiB。旧窗口回调核对epoch；清理帧在有效context交付后再hide/destroy。
-- `audit-detail.py --report 报告路径`检查来源/实际覆盖；共享变更回归scene/archive-pool/real-columns/presentation/navigation/title-reels。macOS已完成两后端有效三DPR产品回放；尚欠目标系统、物理设备、系统焦点和R23/R24真实播放集成按计划R36分工归R18-P。
+- macOS已完成两后端有效三DPR产品回放；尚欠目标系统、物理设备、系统焦点和R23/R24真实播放集成按计划R36分工归R18-P。

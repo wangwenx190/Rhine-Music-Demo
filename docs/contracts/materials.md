@@ -29,11 +29,11 @@ IOR 固定 1.46，金属度为零，透明度为一，单面透射；侧脊独�
 
 ## 参数与独立Review检查
 
-- `node tools/review/export-material-parameters.mjs`执行冻结configure/CardAppearance/theme/clarity，生成45连续输入；`rhi-material-parameters`核对真正加载的QML/C++及210端点，生产显式采集检查每实体实际uniform，不能仅测helper。
+- `node tools/migration/export-material-parameters.mjs`执行冻结configure/CardAppearance/theme/clarity，生成45连续输入；`rhi-material-parameters`核对真正加载的QML/C++及210端点，生产显式采集检查每实体实际uniform，不能仅测helper。
 - `runtime-materials`在独立QQuickWindow加载GeometryScene，macOS默认RenderControl，其他平台按test-gates选择实际入口。源90状态与9纸面探针共99项，三表面参数≤1e-6、独立CPU/源/Quick3D投影≤2逻辑px。
 - 纸面输入`tests/fixtures/materials/paper-probe.png`为RGBA(96,160,208,255)，0/.25/2入射按`sRGBEncode(min(sRGBDecode(ink)*irradiance,sRGBDecode(ink)))`核对，≤3码值；正式三形状封面另验contain/细节。
 - 每状态真实事件驱动四个准备帧后采一次自身texture，核对request/warnings/有效输出。材质十次、灯光一次完整QML root+资源重建；报告区分root重建与同一View3D恢复。只invalidate/initialize后漏画时按计划对应经验重建拥有场景的root。
-- 已准备Release Review产物后，入口`python3 tools/build/verify-material-review.py materials|lighting`只执行所选组件，不配置/编译/格式化或切生产配置；完整组件入口仍包含既有恢复检查，是否需要运行按test-gates.md判断。薄包装verify-r07.ps1/verify-r08.ps1转交该驱动。矩阵工具audit-material-parameters.py/audit-material-review.py只输出本地。状态/公式通过不能替代生产RHI光学/连续质量/最终尺度检查。
+- 已准备Release Review产物后，按test-gates.md选择`ctest --preset qt-release-render -R '^runtime-(materials|lighting)$'`中的对应组件；状态/公式通过不能替代生产RHI光学/连续质量/最终尺度检查。
 
 ## Quick3D Review 的 OpenGL MSAA 适配
 

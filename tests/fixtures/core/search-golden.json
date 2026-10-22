@@ -2,7 +2,7 @@
   "baseline": "57f4f845c20cce646a15dbf4008c2a162aaaf4e2",
   "sourcePath": "src/music-search.ts",
   "sourceSha256": "77d317688e2739682c721d1bbf6081a1620a5461a305851fcc188b230539761b",
-  "fixtureSha256": "2f2f5afa76d2a0b141324187c3f5aad52ef955753d66209c5e5253a38a50fa24",
+  "fixtureSha256": "cc5fd41f737758e646463471d100c9fef666da61571b601eb0b50092f836cb79",
   "cases": [
     {
       "library": "empty",

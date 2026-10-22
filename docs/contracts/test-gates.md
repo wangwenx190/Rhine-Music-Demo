@@ -2,6 +2,13 @@
 
 本文只维护CTest标签/preset、选择与复用规则；窗口行为归[test-window-policy.md](test-window-policy.md)，格式命令归[code-style.md](code-style.md)，性能的静态优先策略及最小实测门槛唯一归[performance.md](performance.md)，组件断言在各组件契约。
 
+## 测试与审计边界
+
+- `tests/unit`、`tests/integration`、`tests/render`和`tests/tools`维护长期回归：直接执行生产算法、状态、Qt交互、真实渲染或工具错误路径。`tests/runners`只运行已构建的Release产物并校验当前结果，不隐式构建、格式化或扩展矩阵。原生回归宿主输出到`build/<配置>/tests/`，按功能命名。
+- `tools/audit`维护源码策略与编译器安全分析；`tools/migration`维护冻结来源导出、独立结构/字体核对和尚缺的目标环境探针。审计不注册为CTest，也不成为日常测试的运行依赖；长期数学测试消费已提交fixture，不读取Git历史、浏览器或本地审计报告。
+- 来源/网络审计的原生工具由`-DYALAHOO_MIGRATION_AUDIT=ON`单独启用，目标为`source-ui-probe`和`metadata-network-probe`，输出到`build/<配置>/tools/`；普通配置默认OFF。窗口仍按test-window-policy.md，实际任务与未验门槛只归迁移计划R36。
+- 保留依据是可重复的行为/数值断言或当前审计需求。源码改名、格式或无关实现调整不应使行为测试失败；语义/复杂度/所有权由人工沿实际调用链审查。资产来源和许可仍由对应manifest与专项契约维护。
+
 | 入口 | 范围与使用时机 |
 | --- | --- |
 | `ctest --preset qt-release -R 对应测试` | fast：只选择本次逻辑改动影响的源码/算法/状态/资产/模块/格式检查 |
@@ -35,7 +42,7 @@
 - 每项检查必须回答当前具体正确性、集成或目标环境问题；没有对应问题的历史报告、固定状态数、重复次数或遥测字段，不构成新增测试义务。静态结论、实际结果和缺环境分别记录；不为填满COMMON/PERF矩阵逐项新建报告或重复跑审计脚本，相关内容未变直接复用。
 - 构建只覆盖实际改动目标及其必要依赖；测试需要Review工具才构建对应目标，部署检查才准备生产包。注释/文档改动不配置、编译或启动应用；格式结果可复用时不为提交再跑一次完整命令串。官方qmllint仅选受影响QML模块，不一律两组齐跑。
 - `-R`使用准确名称或已确定的最小名称并集，运行前可用CTest列举模式核对展开范围；`fast`是分类，裸preset仍会选择一批测试。完整、render、visible或stress预置均不因标签名而自动触发。TIMEOUT是失败上界，不是建议观察时长；不为压缩耗时降低正确性容差，也不靠延长超时掩盖卡住。
-- 包装脚本与报告审计器可能实现完整组合协议，不能将其默认范围当作当前门槛。`verify-r14/r15/r16`和`verify-title.mjs`仍有组件矩阵/候选成本/生命周期捆绑，选用前沿实际分支核对；缺一份旧完整报告不意味着要重跑全部状态。确需相关事实时按本契约选择更小入口或局部解开，不提前改造整套工具。
+- 来源核对与实际运行结果分别验收；缺一份历史报告不触发重跑。当前缺口按对应组件入口选择最小状态集，不附带候选选型、成本采样或重复压力。
 - 算法/结构/颜色/状态的既有正确性容差继续用于被测断言；图像数量、完整协议中的固定轮数、历史性能数字只适用于其明确范围。数值失败先检查预期/输入/生产语义；确认真实产品缺陷就修复，无效环境或采集保留限制，不改阈值追分，也不为无法测量的字段新建研究任务。
 - 已有生产方案无具体缺陷或瓶颈时，不作候选API横评、最优参数搜索、额外文献/基准研究或新验证框架。当前缺口得到可靠答案、修复后的受影响断言通过即停止；不自动复核三次、补全其他后端/尺寸或追加“更稳妥”的长回归。用户另行指定的目标与范围优先。
 
@@ -44,8 +51,8 @@
 | 实际入口 | 分类 |
 | --- | --- |
 | rhi-bokeh-gpu、rhi-smaa-gpu | 直接QRhi offscreen，各平台入口均无可见窗口；实际后端能力另验 |
-| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、ui-drawing、ruler-drawing、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/shell-submission/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
+| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/shell-submission/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
 
-整场GUI显式入口为`python3 tools/build/verify-gui.py`，范围与采集语义见[rhi-integration.md](rhi-integration.md)；它不隐式加入fast/full集合。
+整场GUI显式入口为`python3 tests/runners/verify-gui.py`，范围与采集语义见[rhi-integration.md](rhi-integration.md)；它不隐式加入fast/full集合。
 
-Review OFF不注册相应开发测试。archive/real-columns/ruler源数学输入用对应导出器生成frozen-poses/frozen-fields至本地；普通构建不依赖它们。组件具体状态数/门槛只在组件契约维护。
+Review OFF不注册相应开发测试。archive/real-columns回归直接消费已提交的最小数学fixture；滑尺来源探针显式接收冻结导出文件，普通构建/CTest不依赖它。组件具体状态数/门槛只在组件契约维护。

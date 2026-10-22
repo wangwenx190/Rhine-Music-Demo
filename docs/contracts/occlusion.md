@@ -21,8 +21,8 @@ AO关闭只存在于独立算法探针，生产AO/normal/depth与颜色同尺寸
 
 ## 源公式检查
 
-`rhi-ao-gpu`：奇偶宽/三核全分辨率背景状态、243接触点、5×5/.22、R16F格式/缓存/十次SG重建。raw/blur≤1/255、.22合成≤2/255，背景恒1；完整生产回放另核对有效AO输入。
+`rhi-ao-gpu`：奇偶宽/三核全分辨率背景状态、243接触点、5×5/.22、R16F格式/缓存/一次SG重建。raw/blur≤1/255、.22合成≤2/255，背景恒1；完整生产回放另核对有效AO输入。
 
 GL未对齐R16F显式读回按实际PACK_ALIGNMENT同格式复制到补齐存储宽后解码，产品尺寸不变。核仅创建时上传，动态前缀80bytes/通道，三个AO pass常态240bytes；无闲置kernel纹理。
 
-入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`、`python3 tools/audit/audit-rhi-ao.py`、`python3 tools/audit/bake-occlusion-shaders.py`；选择实际测试分组见test-gates.md。目标欠验归R36。
+入口：`ctest --preset qt-release-render -R '^rhi-ao-gpu$'`；实际测试分组见test-gates.md，目标欠验归R36。

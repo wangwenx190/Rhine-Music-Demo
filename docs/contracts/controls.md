@@ -34,6 +34,6 @@ textarea用`TextAreaFormat`在公开QTextDocument上设置固定20.4段落行高
 
 ## 验证入口
 
-Release `controls-qml`（`ui-audit --controls 全新目录`）分开核对双主题自身输出、来源控制框/段落行高、checkbox空格、range方向键、combo打开/提交、选区/Unicode输入法、菜单方向键/Enter/Escape、只读操作能力与textarea撤销/重做/新增段落行高。`settings-qml/experiments-qml/library-panels-qml/playback-qml`核对实际宿主滚动、输入隔离、关闭及资源；浏览/标题/序章对应入口按test-gates.md选择。正式官方qmllint、格式、模块加载与默认隐藏策略分别执行。
+Release `controls-qml`（`ui-tests --controls 全新目录`）分开核对双主题自身输出、来源控制框/段落行高、checkbox空格、range方向键、combo打开/提交、选区/Unicode输入法、菜单方向键/Enter/Escape、只读操作能力与textarea撤销/重做/新增段落行高。`settings-qml/experiments-qml/library-panels-qml/playback-qml`核对实际宿主滚动、输入隔离、关闭及资源；浏览/标题/序章对应入口按test-gates.md选择。正式官方qmllint、格式、模块加载与默认隐藏策略分别执行。
 
-`python3 tools/audit/audit-controls.py`输出当前COMMON/PERF/平台调用链及全QML清单hash，只有源码审计意义。Windows/Linux目标编译、物理输入/无障碍/原生输入法与目录对话框、跨屏/原生窗口仍按计划UI-CONTROLS-P分工；自身RenderControl图像不能证明这些事实。
+Windows/Linux目标编译、物理输入/无障碍/原生输入法与目录对话框、跨屏/原生窗口仍按计划UI-CONTROLS-P分工；自身RenderControl图像不能证明这些事实。

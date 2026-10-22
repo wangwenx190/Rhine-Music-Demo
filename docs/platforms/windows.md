@@ -23,7 +23,7 @@ pwsh -NoProfile -File ./tools/deploy/windows.ps1
 
 脚本重新发现最新 Kit，以 `build/windows-release/` 的独立生产 Release 配置构建 `Yalahoo`，强制 Review OFF。应用 CMake 同时生成 `deployment.json`，其 QML 清单来自应用实际编译列表。部署扫描副本 `build/windows-release/deploy-scan/qml/` 只包含根 `qml/` 中的生产闭包，保留相对目录；同 Kit 的 windeployqt 以此为 `--qmldir`，避免扫描源码目录时把未编入产品的 Quick3D 研究场景当成生产依赖。不复制整个 Qt 安装目录，不从研究工具复制 DLL。
 
-[windeployqt](https://doc.qt.io/qt-6/windows-deployment.html)从真实 PE 和 QML 导入扫描运行库、插件及其依赖，包括 C++ `Qt6::CanvasPainter`、Qt Quick、Templates、Dialogs、Multimedia 和 Qt 随附媒体依赖。生产滑尺与二维序章使用 C++ Canvas Painter，没有 QtCanvas2D 导入。SVG image/icon 插件显式纳入。字体、品牌、封面、音频、模型、lookup 与 qsb 已在应用/静态库的 qrc 中；导入与链接闭包不依赖当前工作目录。`qt.conf` 将插件和 QML 解析限定到包内相对位置。未采用的 Quick3D/QtCanvas2D、测试库、qmltooling 和 PDB 不进入成品。
+[windeployqt](https://doc.qt.io/qt-6/windows-deployment.html)从真实 PE 和 QML 导入扫描运行库、插件及其依赖，包括 C++ `Qt6::CanvasPainter`、Qt Quick、Templates、Dialogs、Multimedia 和 Qt 随附媒体依赖。生产滑尺与二维序章使用 C++ Canvas Painter。SVG image/icon 插件显式纳入。字体、品牌、封面、音频、模型、lookup 与 qsb 已在应用/静态库的 qrc 中；导入与链接闭包不依赖当前工作目录。`qt.conf` 将插件和 QML 解析限定到包内相对位置。未采用的 Quick3D、测试库、qmltooling 和 PDB 不进入成品。
 
 输出 `out/windows/` 含 `yalahoo.exe`、Qt DLL、插件目录、`qml/`、`qt.conf`、许可证、使用说明、验证脚本、`package.json` 的相对路径/体积/SHA256 清单和 `prerequisites/vc_redist.<架构>.exe`。MSVC 运行库用所选 Visual Studio 的官方安装程序提供；脚本不复制开发机的散装 compiler runtime DLL，不自动执行安装或修改系统。目标用户先按系统提示安装该 prerequisites 文件，再直接运行 `yalahoo.exe`。这是本地部署目录，脚本不发布、签名或上传。
 
@@ -57,7 +57,6 @@ pwsh -NoProfile -File ./out/windows/verify-windows.ps1 -Scenario normal `
 ## 源码审计
 
 ```powershell
-python tools/audit/audit-windows-deployment.py
 pwsh -NoProfile -File ./tools/format/FormatTools.ps1 -Check
 ```
 

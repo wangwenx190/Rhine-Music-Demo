@@ -14,7 +14,7 @@ LibrarySession在快照替换时缓存已使用流派列表。搜索筛选由Gen
 
 SearchListModel按不可变快照建立专辑ID→索引、每专辑曲目ID→索引及搜索字符串/流派名缓存；同一快照改变query只归一化查询，复用全部条目。交互查询由单个worker筛选隐式共享的只读条目，最多一个在途任务与一个最新查询；新输入/换库按generation取消旧扫描，GUI仅接纳当前结果，筛选中禁止激活旧查询结果，退出先取消再等待worker。重复的归一化查询复用当前结果。查询结果保留相同前后缀，中间重叠行以单批dataChanged复用，仅数量差触发一次区间删除或插入，不按键重置模型；新查询清除旧键盘选择行号；委托按下时保存专辑/曲目身份，释放时身份已变化则取消定位；快照更换/清空时事务重置并重建/清空索引。role与resultAt按稳定ID索引读取，曲目定位仍在所属专辑内，不假设跨专辑曲目ID全局唯一。内存为O(专辑+曲目+搜索文本)，非空查询为O(总搜索文本+结果)，空查询通过专辑边界索引跳过曲目，成本为O(专辑数量)，不改变匹配和返回顺序。
 
-搜索逐式保留 `music-search.ts`：仅 trim 和 lowercase，匹配专辑标题/歌手/流派显示名（缺失则“未分类”）与曲目标题/歌手；匹配专辑后仍逐曲匹配，空查询只返回专辑，流派过滤按 ID。不匹配备注、制作信息或原始流派数组，也不加入排序的 NFKC/空白归并。`tools/review/export-search-golden.mjs` 从 Git 冻结源码去掉类型声明后执行原函数，生成 216 个用例与源码/fixture hash；Node 仅用于可选的 Web 验证数据导出，原生运行、CMake 和 CTest 不依赖它。
+搜索逐式保留 `music-search.ts`：仅 trim 和 lowercase，匹配专辑标题/歌手/流派显示名（缺失则“未分类”）与曲目标题/歌手；匹配专辑后仍逐曲匹配，空查询只返回专辑，流派过滤按 ID。不匹配备注、制作信息或原始流派数组，也不加入排序的 NFKC/空白归并。`tools/migration/export-search-golden.mjs` 从 Git 冻结源码去掉类型声明后执行原函数，生成 216 个用例与源码/fixture hash；Node 仅用于可选的 Web 验证数据导出，原生运行、CMake 和 CTest 不依赖它。
 
 模型角色在 `LibraryModels.h` 的枚举及 `roleNames()` 固定，新角色只能追加。AlbumListModel 提供 albumId/title/artist/year/genreId/coverUrl/folder/tracks/producers/description/descriptionSource/introduction/creditsLookup/online/localNote/offline/albumData，另有 count/columns/slotStride。Tracks 中保留每首稳定 ID、源 QUrl 和 mediaSupport。SearchListModel 提供 kind/albumId/trackId/title/artist/count。QML 类型通过 `src/app/QmlTypes.h` 的 foreign 类型注册，不允许 QML 自行创建或更换 Provider。
 
@@ -81,7 +81,7 @@ LibraryStore按实体/kind合并已接受结果；批次结束、取消或累计
 
 TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项完成polish；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
 
-`ui-audit --library 输出目录 --representative`使用桌面/窄屏、DPR1/2与双主题的既有代表组合，保留该范围内的实际输入、焦点及资料状态断言；省略选项保持完整库面板检查范围。设置入口同样支持`--representative`。代表检查不冒称其余矩阵或物理设备事实。
+`ui-tests --library 输出目录 --representative`使用桌面/窄屏、DPR1/2与双主题的既有代表组合，保留该范围内的实际输入、焦点及资料状态断言；省略选项保持完整库面板检查范围。设置入口同样支持`--representative`。代表检查不冒称其余矩阵或物理设备事实。
 
 ## 设置与偏好
 
@@ -99,14 +99,14 @@ PreferencesStore在事件循环合并变化，只有一个在途worker保存和�
 
 ## 检查入口
 
-`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/review/export-search-golden.mjs`导出；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。
+`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/migration/export-search-golden.mjs`导出；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。
 
-`directory-scanner`用临时合成目录覆盖扫描/重扫/改名/删除/离线/读取拒绝、取消/切根/加载竞态、缓存原子读写/损坏保护、源hash及GUI事件循环/一次模型重置；不加载媒体或显示窗口。`node tools/review/verify-scan-fingerprint.mjs`额外用本机Node的真实stat核对原fingerprint与UTF-8哈希；原生构建/CTest不依赖Node。`python3 tools/audit/audit-library-scan.py`生成COMMON/PERF和三平台逐符号/hash矩阵至本地verification；目标环境待验归计划R21-P。
+`directory-scanner`用临时合成目录覆盖扫描/重扫/改名/删除/离线/读取拒绝、取消/切根/加载竞态、缓存原子读写/损坏保护、源hash及GUI事件循环/一次模型重置；不加载媒体或显示窗口。`node tools/migration/verify-scan-fingerprint.mjs`额外用本机Node的真实stat核对原fingerprint与UTF-8哈希；原生构建/CTest不依赖Node。
 
-`media-metadata`用运行时匿名RIFF/INFO/ID3-PNG输入实际执行Qt无声加载、内嵌封面/同名图优先级及损坏文件；注入仅用于复用生产调度器测试公开字段、两个槽位、8秒超时、取消/晚到/复用。另核对坏图/30MiB/展开上限、Unicode、v3/v4导入、只读源、未知字段、一次模型重置、显式偏好JSON与探测中切根。`python3 tools/audit/audit-media-metadata.py`生成COMMON/PERF/平台逐符号/hash矩阵；目标欠验入口和门槛集中于迁移计划R22-P。
+`media-metadata`用运行时匿名RIFF/INFO/ID3-PNG输入实际执行Qt无声加载、内嵌封面/同名图优先级及损坏文件；注入仅用于复用生产调度器测试公开字段、两个槽位、8秒超时、取消/晚到/复用。另核对坏图/30MiB/展开上限、Unicode、v3/v4导入、只读源、未知字段、一次模型重置、显式偏好JSON与探测中切根。
 
-`track-focus`使用实际Selection/SceneAdapter/Presentation状态机验证跨歌手列的最后目标、当前专辑复用、取消/过期回调、减少动态和播放隔离；`library-data`同时核对冻结216例的缓存搜索及1024专辑连续查询无reset。`library-panels-qml`（`ui-audit --library 输出目录`）使用实际MusicStage、九尺寸/双主题/DPR1/1.5/2、4000命中虚拟列表、真实Qt按键、模态/关闭、详情滚动聚焦、背景附件释放与默认隐藏策略；自身输出用于质量检查，不做图像评分或正常呈现性能推断。`python3 tools/audit/audit-library-panels.py`绑定COMMON/PERF/三平台符号与冻结hash，目标/物理输入欠验归计划R23-P。
+`track-focus`使用实际Selection/SceneAdapter/Presentation状态机验证跨歌手列的最后目标、当前专辑复用、取消/过期回调、减少动态和播放隔离；`library-data`同时核对冻结216例的缓存搜索及1024专辑连续查询无reset。`library-panels-qml`（`ui-tests --library 输出目录`）使用实际MusicStage、九尺寸/双主题/DPR1/1.5/2、4000命中虚拟列表、真实Qt按键、模态/关闭、详情滚动聚焦、背景附件释放与默认隐藏策略；自身输出用于质量检查，不做图像评分或正常呈现性能推断。
 
-`settings`检查完整偏好持久化/导入/坏文件/未知schema、字段路由、原子合并保存、配置未知字段与重载状态保留；`library-data`覆盖单请求及批次取消/不同代订阅者晚到结果。`settings-qml`（`ui-audit --settings 输出目录`）在实际MusicStage上覆盖九尺寸、双主题、DPR1/1.5/2、折叠/滚动/Qt输入/反向打开、离线按钮及测试Provider状态/能力，另在真实App上十次重建视觉树并核对播放源/意图/用户画质。macOS默认Metal真正隐藏，其他目标入口按test-gates.md/window契约执行；截图只检查自身正常输出，无图像评分或屏幕/VSYNC推断。`python3 tools/audit/audit-settings.py`绑定COMMON/PERF与三平台源码，目标欠验归R26-P。
+`settings`检查完整偏好持久化/导入/坏文件/未知schema、字段路由、原子合并保存、配置未知字段与重载状态保留；`library-data`覆盖单请求及批次取消/不同代订阅者晚到结果。`settings-qml`（`ui-tests --settings 输出目录`）在实际MusicStage上覆盖九尺寸、双主题、DPR1/1.5/2、折叠/滚动/Qt输入/反向打开、离线按钮及测试Provider状态/能力，另在真实App上十次重建视觉树并核对播放源/意图/用户画质。macOS默认Metal真正隐藏，其他目标入口按test-gates.md/window契约执行；截图只检查自身正常输出，无图像评分或屏幕/VSYNC推断。
 
 `online-metadata`使用合成音乐资料与注入的QNetworkAccessManager响应，验证真实worker/HTTP调度、保守匹配、职责/曲目映射、来源/许可、缓存、取消确认容量、限流冷却、超大/坏响应、离线复用及原子持久化和详情增量更新，不访问真实网络。`metadata-network-probe`仅用于显式公开专辑联网验证，不注册为常规CTest、不读用户曲库：`build/release/tools/metadata-network-probe --kind introduction --title 'OK Computer' --artist Radiohead --year 1997 [--proxy http://127.0.0.1:7897]`；`--kind credits|enrichment`可配`--release`指定公开MusicBrainz发行ID，`--tracks`读取显式公开测试曲目数组（title/duration/disc/number），不接受歌曲文件作为输入。成功/部分资料退出0，查询未匹配/错误退出2，总超时退出4。目标系统的Qt Network/TLS/代理实际运行仍须对应环境证明。

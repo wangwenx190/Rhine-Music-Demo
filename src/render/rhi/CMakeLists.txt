@@ -140,7 +140,7 @@ qt_add_resources(
 if(YALAHOO_REVIEW)
     # Build-only wrapper executes production GLSL functions with independent math inputs.
     set(optics_source "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/shell-body.glsl")
-    set(optics_tail "${PROJECT_SOURCE_DIR}/tools/review/OpticsProbe.frag")
+    set(optics_tail "${PROJECT_SOURCE_DIR}/tests/render/OpticsProbe.frag")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${optics_source}" "${optics_tail}")
     file(READ "${optics_source}" optics_body)
     string(PREPEND optics_body "#version 440\n")
@@ -159,7 +159,7 @@ if(YALAHOO_REVIEW)
     qt_add_shaders(YalahooRhi review_optics PREFIX /rhi BASE "${CMAKE_CURRENT_BINARY_DIR}"
         GLSL "330,300 es" HLSL 50 MSL 12 FILES "${optics_generated}")
     qt_add_shaders(YalahooRhi review_visibility PREFIX /rhi
-        BASE "${PROJECT_SOURCE_DIR}/tools/review" GLSL "330,300 es" HLSL 50 MSL 12
-        FILES "${PROJECT_SOURCE_DIR}/tools/review/VisibilityProbe.frag"
-              "${PROJECT_SOURCE_DIR}/tools/review/CoverSamplingProbe.frag")
+        BASE "${PROJECT_SOURCE_DIR}/tests/render" GLSL "330,300 es" HLSL 50 MSL 12
+        FILES "${PROJECT_SOURCE_DIR}/tests/render/VisibilityProbe.frag"
+              "${PROJECT_SOURCE_DIR}/tests/render/CoverSamplingProbe.frag")
 endif()

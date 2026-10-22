@@ -32,11 +32,11 @@ Qt `pixelDelta` 优先；没有 pixelDelta 时，angleDelta 的 120 单位映射
 
 ## Canvas Painter 选型、资源和失效
 
-生产采用 **C++ QCanvasPainterItem**，与同输入 Canvas2D、Qt Quick Rectangle/ShaderEffect 对照。两种 Canvas 均可表达源刻线；C++ 能直接同步固定值快照，在 resize/隐藏恢复时复用业务对象，并把三份静态路径缓存限定在所属 renderer，避免预览 Canvas2D 的绘制上下文重建成为产品生命周期的一部分。选择依据包含等价性和所有权复杂度，不把局部 CPU 诊断当作完整产品提速。
+生产采用 **C++ QCanvasPainterItem**，直接同步固定值快照；resize/隐藏恢复复用业务对象，三份静态路径缓存限定在所属renderer。局部CPU诊断不能解释为完整产品性能。
 
 绘制顺序为既有三维 SceneItem 输出→阅读遮罩→界面/数字层→滑尺透明附件的 Qt Quick 合成。刻线自身改变高度，没有覆盖指示条。Canvas 附件固定为桌面 130×30、窄屏 96×21 逻辑像素，RGBA8、1 sample、透明混合；空列不显示绘制项，宽度动画只改变 Qt Quick 的矩形 clip 节点，不重建附件；没有额外全屏遮罩、mips、封面上传或 MSAA resolve。绘制完整刻线后统一裁切，避免把不足一像素的露出部分重建成细矩形而改变抗锯齿覆盖。淡隐直接乘入边缘刻线的 fill alpha。三份 actual-size rest/full/hover 路径只在尺寸几何变更时替换并移除旧 path group；变化中的高度用 fillRect，不能拉伸已经细分好的抗锯齿边缘。
 
-renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不发布无效绘制，restore/scene graph release 重建所属渲染资源。QML 保留固定十六个按钮及有界字轮面；文字内容、字体和几何未变时不重建。比较用 Canvas2D 只保留一个 Loader 上下文，表面替换时重建，状态存在外层，没有独立 Timer 或 requestAnimationFrame。
+renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不发布无效绘制，restore/scene graph release 重建所属渲染资源。QML 保留固定十六个按钮及有界字轮面；文字内容、字体和几何未变时不重建。
 
 `ResourcePlan` 在原图集、三维目标和 Qt 输出之外加入物理 DPR 下 UI 附件估算：滑尺 130×30 的 RGBA8 与保守 D32FS8 上界、主数字层最多 700×65 的 RGBA8、四个最多 160×12 的小数字层。这里宽度取十位数字/最大导航字号的保守容量，不是每帧必须分配。DPR1 的这组描述符上界为 259520 bytes，DPR2 按实际取整尺寸计算；resize 时旧/新 UI 附件可能同时存活，要把二者相加，再加三维 resize 资源。Qt 字形图集、模块内部几何/PSO、驱动对齐及 compositor 储存另外列为未知，不当作显存实测。
 
@@ -44,12 +44,10 @@ renderer/路径/内部缓冲归 Qt render-thread item 生命周期；隐藏不�
 ## 非像素验证入口
 
 - `NavigationTest`：滚轮余量/反向/上限、有限列、36px/1.3/1400ms触摸边界、控件所有权、循环点击、rebase、待提交目标/方向、隐藏及数字重定向。
-- `node tools/review/export-ruler.mjs`导出冻结数学；`ui-audit --ruler 输出目录`（CTest `ruler-drawing`）中的状态检查覆盖20/30/60/120fps及1/120秒槽采样，double误差≤1e-6。生产C++路径检查完整刻线/Quick clip、淡隐、两主题/桌面窄屏/实际DPR及零无效重绘；性能/资源所有权先按performance.md静态审查，实际恢复/释放仍无法确定时只观察最少必要转换，不默认十次压力。候选API仅用于具体问题或明确选型；矩阵与必要入口调整按test-gates.md。自身输出不读取浏览器PNG或运行图像分数。
-- Canvas2D比较项显式rect/fill，antialias保持Qt默认1，与C++路径同值，DPR由所属目标处理；不足一像素露出仍绘完整刻线后裁切。
+- `node tools/migration/export-ruler.mjs --output 新目录`导出冻结数学；`build/release/tools/source-ui-probe --ruler 输出目录 源目录/report.json`检查20/30/60/120fps及1/120秒槽采样，double误差≤1e-6。该来源探针只检查生产C++刻线/Quick clip、淡隐、双主题/桌面窄屏/实际DPR、静止零重绘及一次真实窗口/根重建与释放；不读取浏览器PNG。构建开关和测试边界见test-gates.md。
 - `yalahoo --verify-navigation 输出目录`通过真实App发送pixelDelta/反向/切列/编辑焦点/有限端点/滑尺/主题/触摸/隐藏恢复事件，等待对应input revision的实际帧提交，滑尺重分组结束后再点真实按钮，恢复等待新提交；截止仍缺帧时失败，不以固定延时假定完成。核对导航与播放隔离。
-- Windows包装入口`verify-r15.ps1`及`audit-r15.ps1`复用非像素检查；源码审计统一为`python3 tools/audit/audit-browse-navigation.py`。共享测试分组见[test-gates.md](test-gates.md)，欠验只归计划后置专项的R19E-P。
+- 共享测试分组见[test-gates.md](test-gates.md)，欠验只归计划后置专项的R19E-P。
 
-滑尺Review的十次重建销毁并重建完整窗口/根，保留controller源状态，重新绑定同一有界读回链；旧回调按window epoch拒绝；读回完成始终排队到GUI，不能在RenderControl的endFrame内部销毁RHI。basic在有效context中提交清理帧，再释放窗口/renderer。报告真实initialized/invalidated、跨窗口附件峰值估算与最终renderer归零；同对象surface恢复另由产品窗口专项检查。
-
+滑尺来源探针的重建销毁并重建完整窗口/根，保留controller源状态，重新绑定同一有界读回链；旧回调按window epoch拒绝；读回完成始终排队到GUI，不能在RenderControl的endFrame内部销毁RHI。basic在有效context中提交清理帧，再释放窗口/renderer。报告真实initialized/invalidated、跨窗口附件峰值估算与最终renderer归零；同对象surface恢复另由产品窗口专项检查。
 
 导航行的自适应布局遵守[source-defect-exceptions.md的SDE-02](source-defect-exceptions.md)：按计数器固定列宽、两个操作组自然宽度及既有grid gap判断是否容纳。不足时列选择移到下一行并增加NavigationFrame高度；长列名在扣除两侧箭头与间距后省略，完整名称交Accessible。正常单行位置、字号、滑尺尺寸、帧源及输入语义保持来源定义，不能按均分列宽让操作组相交。

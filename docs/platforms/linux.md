@@ -20,11 +20,10 @@ python3 tests/tools/LinuxDeploymentTest.py
 
 ```sh
 sh tools/deploy/linux.sh
-python3 tools/audit/audit-linux-deployment.py --build-directory build/linux-release
 python3 tools/deploy/verify-linux.py --output /tmp/yalahoo-linux-check
 ```
 
-部署使用独立`build/linux-release`、生产Release/Review OFF及同Kit Qt CMake部署API，产物在`out/linux/`。Qt从实际编译的QML导入闭包部署Templates、Dialogs、Multimedia等模块，工具补齐运行期动态加载的会话集成，并递归核对ELF依赖。产品不使用QtCanvas2D，C++ CanvasPainter的共享库和内嵌shader随包保留；研究QML与测试工具不进产品包。官方依据为[Qt Linux部署](https://doc.qt.io/qt-6/linux-deployment.html)和[QML部署API](https://doc.qt.io/qt-6/qt-generate-deploy-qml-app-script.html)。
+部署使用独立`build/linux-release`、生产Release/Review OFF及同Kit Qt CMake部署API，产物在`out/linux/`。Qt从实际编译的QML导入闭包部署Templates、Dialogs、Multimedia等模块，工具补齐运行期动态加载的会话集成，并递归核对ELF依赖。C++ CanvasPainter的共享库和内嵌shader随包保留；研究QML与测试工具不进产品包。官方依据为[Qt Linux部署](https://doc.qt.io/qt-6/linux-deployment.html)和[QML部署API](https://doc.qt.io/qt-6/qt-generate-deploy-qml-app-script.html)。
 
 目录包含`bin/yalahoo`、相对`bin/qt.conf`、`lib/`、`plugins/`、`qml/`、`licenses/`、品牌desktop/SVG及`yalahoo.sh`。补齐全部运行依赖后，对暂存包中的每个ELF用`patchelf --set-rpath`更新相对自身`$ORIGIN`的RPATH，再用`strip --strip-unneeded`去除非运行必需符号，保留动态符号表；这些操作在清单hash和隐藏加载检查之前完成，不修改构建产物或开发Kit。启动脚本仅为子进程设置包内库路径并清除外来Qt/QML/预加载覆盖；保留显示会话、XDG、音频路由及显式后端选择。无需复制开发Kit、使用sudo或改动系统配置。desktop文件供用户安装到选定前缀时使用，当前目录包直接执行`./yalahoo.sh`，不自动注册桌面项。
 
@@ -70,4 +69,4 @@ QT_QPA_PLATFORM=wayland QSG_RHI_BACKEND=vulkan ./yalahoo.sh --demo
 | 生命周期/资源 | 同一窗口hide/minimize/restore、跨屏DPR及resize/画质/主题变化后输出有效；资源/寿命先静态审计，重复SG/视觉重建仅按test-gates.md补具体未决行为。 |
 | 呈现/性能 | xcb/Wayland各自核对实际上下文/swapchain、附件/格式/MSAA/resolve与正常呈现，共用无会话依赖结果。性能先按performance.md静态审计，具体未决问题才最小实测，不默认追加吞吐/计时；未知显示/GPU完成/driver显存保留null。 |
 
-需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL与实际启用Vulkan的剩余图形/窗口入口归R36，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tools/build/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。
+需要目标组件检查时才构建Review：`sh tools/build/linux.sh -DYALAHOO_REVIEW=ON`，按test-gates.md选择尚缺的断言。OpenGL与实际启用Vulkan的剩余图形/窗口入口归R36，分别显式选择后端并核对报告实际API。入口见各组件契约；只有已有组件证据未覆盖产品联动时才使用`python3 tests/runners/verify-gui.py --backend opengl或vulkan --output verification/全新目录`，不重复已有有效矩阵。具体性能问题按performance.md决定是否需要verify-startup及所需场景/时长，工具选项不成为本平台的额外任务清单。

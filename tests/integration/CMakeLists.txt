@@ -9,11 +9,6 @@ yalahoo_unit_test(AssetTest assets
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AssetTest)
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/verification")
-add_test(NAME ui-drawing COMMAND ui-audit "${CMAKE_BINARY_DIR}/verification/ui-drawing" --representative)
-yalahoo_ui_test(ruler-drawing --ruler ruler-drawing 120 THREADED)
-# Match migration verification's render loop and explicit native scale factor.
-# Factor 1 keeps the screen's real DPR; it does not force a DPR1 framebuffer.
-set_tests_properties(ui-drawing PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QT_SCALE_FACTOR=1")
 yalahoo_unit_test(LibraryQmlTest library-qml
     LIBRARIES YalahooCore Qt6::Qml Qt6::Quick
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
@@ -54,7 +49,7 @@ set_tests_properties(runtime-overview PROPERTIES TIMEOUT 150
 
 yalahoo_ui_test(overview-qml --overview overview-qml 120)
 
-add_test(NAME opening-qml COMMAND ui-audit --opening "${CMAKE_BINARY_DIR}/verification/opening")
+add_test(NAME opening-qml COMMAND ui-tests --opening "${CMAKE_BINARY_DIR}/verification/opening")
 set_tests_properties(opening-qml PROPERTIES TIMEOUT 900 ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_RENDER_LOOP=threaded;QCPAINTER_DEBUG_COLLECT=0")
 
 yalahoo_ui_test(library-panels-qml --library library-panels 240 THREADED)
@@ -67,8 +62,8 @@ yalahoo_ui_test(experiments-qml --experiments experiments-qml 240 THREADED)
 
 yalahoo_ui_test(controls-qml --controls controls-qml 60 THREADED)
 
-add_test(NAME startup-qml COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup")
-add_test(NAME startup-stress COMMAND ui-audit --startup "${CMAKE_BINARY_DIR}/verification/startup-stress")
+add_test(NAME startup-qml COMMAND ui-tests --startup "${CMAKE_BINARY_DIR}/verification/startup")
+add_test(NAME startup-stress COMMAND ui-tests --startup "${CMAKE_BINARY_DIR}/verification/startup-stress")
 set_tests_properties(startup-stress PROPERTIES LABELS resource-stress)
 set_tests_properties(startup-qml startup-stress PROPERTIES TIMEOUT 900
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"

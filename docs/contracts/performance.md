@@ -102,9 +102,9 @@ Linux的X11/Wayland分别完成实际窗口/输入/呈现检查，不为会话�
 
 ## 冷启动与产品压力入口
 
-`startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效。`startup-qml`（`ui-audit --startup 新目录 [0或12..120秒] [matrix或固定场景名]`）加载真实MusicStage；普通回放覆盖三次换片、缓存回选、暂停/播放各一次完整视觉root/SG重建、源revision/意图保留、renderer释放及资源回落。滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize仍走真实组件；隐藏、空闲零工作需要观察窗口，不以立即检查代替。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音合成WAV，禁止私人库。`audit-startup.py`维护COMMON/PERF三平台来源绑定。
+`startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效。`startup-qml`（`ui-tests --startup 新目录 [0或12..120秒] [matrix或固定场景名]`）加载真实MusicStage；普通回放覆盖三次换片、缓存回选、暂停/播放各一次完整视觉root/SG重建、源revision/意图保留、renderer释放及资源回落。滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize仍走真实组件；隐藏、空闲零工作需要观察窗口，不以立即检查代替。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音合成WAV，禁止私人库。
 
-`verify-startup.py --observe-only --mode vsync|uncapped --scenario day-wave|night-wave --seconds 12..120`只观察一个原生波浪场景：同一576专辑/有界实体池使用qrc封面，无歌曲、大封面生成、功能回放、换片、root重建或固定暖机，不能与formal/stress合用。底层为`ui-audit --startup 新目录 秒数 场景 observe`。只记录真实FrameClock帧回调、afterSynchronizing、RHI提交、frameSwapped及窗口事件；一个时限timer结束观测，不驱动渲染或轮询。三个原始时间流须在采样区间内有递增样本，持续曝光与窗口策略独立验收；短观察不执行长期性能门槛，不解释历史异常为已修复。`samples[].clockFrame`是在GUI接收遥测时读取的计数，精确GUI时序使用独立`guiFrames[].atNs`。
+`verify-startup.py --observe-only --mode vsync|uncapped --scenario day-wave|night-wave --seconds 12..120`只观察一个原生波浪场景：同一576专辑/有界实体池使用qrc封面，无歌曲、大封面生成、功能回放、换片、root重建或固定暖机，不能与formal/stress合用。底层为`ui-tests --startup 新目录 秒数 场景 observe`。只记录真实FrameClock帧回调、afterSynchronizing、RHI提交、frameSwapped及窗口事件；一个时限timer结束观测，不驱动渲染或轮询。三个原始时间流须在采样区间内有递增样本，持续曝光与窗口策略独立验收；短观察不执行长期性能门槛，不解释历史异常为已修复。`samples[].clockFrame`是在GUI接收遥测时读取的计数，精确GUI时序使用独立`guiFrames[].atNs`。
 
 | 目的 | 显式入口（Python工具需`--backend`及全新`--output`） | 结论 |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ Linux的X11/Wayland分别完成实际窗口/输入/呈现检查，不为会话�
 | 问题复现/修复对照 | 选择相关场景及实际所需观察时间，默认一次 | 有歧义才追加所需对照；不预设固定批次 |
 | 未限速吞吐诊断 | `verify-startup.py --mode uncapped --scenario 所选场景` | 仅实际吞吐问题调查时选择，不作呈现通过 |
 
-`--formal`与`--stress`互斥；压力限一次零秒采样，`--lifecycle`只用于原生压力。直接ui-audit的压力开关为`YALAHOO_VERIFY_STRESS=1`，不允许同时计时采样。普通/压力报告记录实际次数；短采样、离屏、未限速结果不写正式呈现通过，包装工具以`formalRequested/formalAcceptancePassed`区分。正式批次保留每次失败及原始样本，不自动追加新批次直到通过。常规入口不继承环境中的压力开关。
+`--formal`与`--stress`互斥；压力限一次零秒采样，`--lifecycle`只用于原生压力。直接ui-tests的压力开关为`YALAHOO_VERIFY_STRESS=1`，不允许同时计时采样。普通/压力报告记录实际次数；短采样、离屏、未限速结果不写正式呈现通过，包装工具以`formalRequested/formalAcceptancePassed`区分。正式批次保留每次失败及原始样本，不自动追加新批次直到通过。常规入口不继承环境中的压力开关。
 
 当前计时入口仍先执行完整功能回放，原生同窗口检查也会附带完整root压力。只有具体未决问题确需这些入口时，才在该任务内解开所需分支并核对报告，范围按test-gates.md；已有更小入口可用则直接使用。不能因只缺同窗口事实再次运行完整换片/root压力，也不提前安排通用工具改造。
 

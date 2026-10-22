@@ -26,6 +26,6 @@ RealColumns 保存 O(C) 的两个标量状态，但 update 只推进统一时间
 
 ## 检查入口
 
-`real-columns`使用`tests/fixtures/real-columns/trajectories.json`的独立源输入；完整逐帧数学由`node tools/review/export-real-columns-golden.mjs`输出本地，`YALAHOO_REAL_COLUMN_GOLDEN`可指定对应完整文件。核对x/v/a≤1e-6，包含20/30/60/120fps与.25/1/3×、空/单/奇偶/49/106列、长列尾部及归中打断。
+`real-columns`使用`tests/fixtures/real-columns/trajectories.json`的独立源输入；`node tools/migration/export-real-columns-golden.mjs`生成该轨迹fixture与独立源场数值`fields.json`。核对x/v/a≤1e-6，包含20/30/60/120fps与.25/1/3×、空/单/奇偶/49/106列、长列尾部及归中打断。
 
-Review `real-columns-gpu`检查有效实体/边界事件、列记忆/模式/库替换、物理ID与rebase、封面租约/上传、资源复用与十次SG重建；偏好检查未知字段、最新值合并与损坏原件。输入事件语义只在[navigation.md](navigation.md)维护。入口分组见test-gates.md，剩余目标验收归计划R36/R19B-P。
+Review `real-columns-gpu`检查有效实体/边界事件、列记忆/模式/库替换、物理ID与rebase、封面租约/上传、资源复用与一次SG重建；偏好检查未知字段、最新值合并与损坏原件。输入事件语义只在[navigation.md](navigation.md)维护。入口分组见test-gates.md，剩余目标验收归计划R36/R19B-P。

@@ -21,10 +21,10 @@
 
 下列固定状态/帧数与重建次数是工具覆盖能力；当前执行只补test-gates.md选出的实际缺口，不默认完整序列或压力。
 
-- `rhi-shell-gpu`保留61源状态（sourceIndex 2、4–57、60–65）、6排序/2隔离、1×/4×alpha和十次SG重建；sourceIndex的direct-material例外独立保持正确颜色域。10数学样本覆盖LTC/GGX/DFG/shadow、view-roll0/45，LTC≤.001，其余max(1e-6,abs(expected)×.001)；投影≤2逻辑px，alpha中心≤1/255/黑边≤原一码值，透明洞不写depth、4×有部分覆盖。
+- `rhi-shell-gpu`保留61源状态（sourceIndex 2、4–57、60–65）、6排序/2隔离、1×/4×alpha和一次SG重建；sourceIndex的direct-material例外独立保持正确颜色域。10数学样本覆盖LTC/GGX/DFG/shadow、view-roll0/45，LTC≤.001，其余max(1e-6,abs(expected)×.001)；投影≤2逻辑px，alpha中心≤1/255/黑边≤原一码值，透明洞不写depth、4×有部分覆盖。
 - `rhi-flicker-gpu`使用真实SceneItem/匿名9×64库与封面；1/7/8/9实例跨批量边界、1×/4×及双主题/640×480和1280×720，静止/波浪/浏览/总览/详情连续检查。当前完整序列1200帧，正常光学与覆盖探针均有效，missing/nonfinite精确0、shade>100，运动不重建无关资源。
-- 独立光学诊断`rhi-flicker-audit 输出目录 --optics-only`只证明其光学断言；其他未覆盖断言另保留，不能将局部报告写为完整通过。旧GL R16F诊断问题的修正归occlusion.md，不能继续把其旧非有限字节当产品缺陷或把optics-only当完整通过。
-- `rhi-shell-submission-gpu`或`rhi-flicker-audit 新目录 --isolated-only`只运行1/7/8/9实体×1×/4×的Equal覆盖与有限光学检查，不运行生产连续序列或性能采样。
-- 入口按test-gates.md选实际隐藏/窗口组；`audit-rhi-optics.py`/`audit-rhi-flicker.py`检查源适配/历史与平台分支。跨平台欠验与完整窗口/呈现要求归计划R36。
+- 独立光学诊断`rhi-flicker-test 输出目录 --optics-only`只证明其光学断言；其他未覆盖断言另保留，不能将局部报告写为完整通过。旧GL R16F诊断问题的修正归occlusion.md，不能继续把其旧非有限字节当产品缺陷或把optics-only当完整通过。
+- `rhi-shell-submission-gpu`或`rhi-flicker-test 新目录 --isolated-only`只运行1/7/8/9实体×1×/4×的Equal覆盖与有限光学检查，不运行生产连续序列或性能采样。
+- 入口按test-gates.md选实际隐藏/窗口组；跨平台欠验与完整窗口/呈现要求归计划R36。
 
 壳体四个入口只声明area/early编译期变体并包含`resources/shaders/rhi/shell-body.glsl`；`prepare-rhi-shell.py`由唯一来源生成该适配主体与`shell-lighting.glsl`公共LTC/GGX helper，地面直接包含后者。几何单实例与批量入口共用`geometry-body.glsl`，保留各自模型/实体输入与相同position invariant。
