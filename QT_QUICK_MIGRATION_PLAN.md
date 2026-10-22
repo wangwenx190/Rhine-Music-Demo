@@ -224,7 +224,7 @@
 | --- | --- |
 | DirectoryScanner/LibraryStore · R21-P · library-data.md | `directory-scanner`/`library-data`/`library-qml`中尚缺的目标分支；指纹语义需要核对时用`tools/migration/verify-scan-fingerprint.mjs`。核对原生UTF-8路径/ID、去重/重扫/取消/原子缓存；Windows实际UNC/junction/ACL，Linux大小写/权限/只读缓存及循环链接。无能力项保留具体缺口。 |
 | MediaMetadataProbe/ArtworkStore/LegacyImporter/PreferencesStore · R22-P · library-data.md | `media-metadata`及受影响缓存/导入测试。真实无输出/无play探测的取消/晚到/超时/退出，封面优先级及解码保护、内容寻址/符号链接拒写、显式只读旧JSON与未知字段/坏文件/原子保存错误符合契约；Loaded不代表可播放。 |
-| PlaybackController及三路声音 · R24-P/R25-P · playback.md | `playback`/`audio-ambience`；GUI共用一次`playback-qml`或`ui-tests --playback 新目录`。普通Qt公开API、队列/自然结束/暂停/seek/错误与导航隔离正常，歌曲/BGM/音效独立；静音事件不补合成音源。 |
+| PlaybackController及三路声音 · R24-P/R25-P · playback.md | `playback`/`audio-ambience`核对共用可控状态，`ctest --preset qt-release-media -R '^(playback-device|audio-ambience-device)$'`验证目标真实输出；GUI共用一次`playback-qml`或`ui-tests --playback 新目录`。普通Qt公开API、队列/自然结束/暂停/seek/错误与导航隔离正常，歌曲/BGM/音效独立；静音事件不补合成音源。 |
 
 物理声音检查在每个系统的一次正常产品会话中合并：真实支持样本的播放/暂停/seek/换曲/自然结束及损坏/不支持原因；默认改选、显式设备保持、消失回退/无输出/重连及加载中换曲换设备，保持暂停/停止意图与有效位置/音量；BGM/音效走各自规定路由，最小化继续、关闭停止，听感无意外重叠/突变。既有有效状态测试复用，不能以无声加载、程序进度或模拟设备替代尚缺的实物事实。
 

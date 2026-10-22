@@ -85,7 +85,8 @@ private Q_SLOTS:
         record(u"before-show"_s);
         show(u"first-show"_s);
         if (passed) {
-            for (int cycle = 0; cycle < 10; ++cycle) {
+            // One rebuild per distinct frameless/decorated policy.
+            for (int cycle = 0; cycle < 2; ++cycle) {
                 window.hide();
                 QTest::qWait(NativeEventSettleMilliseconds);
                 record(u"hide-%1"_s.arg(cycle), !window.isVisible());

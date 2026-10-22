@@ -19,7 +19,7 @@
 | `source-policy`构建target、`source-format`、官方qmllint、`localization` | CPP-30/QT-19–22源码与翻译要求、格式、QML类型/导入；各最佳实践及code-style.md |
 | `motion`、`scene`、`navigation`、`lighting`、`archive-pool`、`real-columns`、`presentation`、`detail-motion`、`overview`、`opening`、`track-focus`、`startup` | 独立冻结公式、边界/中断/身份/输入归属/通知及唯一帧源；对应组件契约，覆盖R36共用算法 |
 | `directory-scanner`、`library-data`、`library-qml`、`online-metadata`、`media-metadata`、`json-file` | 文件系统/事务保存、模型协议、来源与取消/晚到、解码/导入失败；library-data.md。网络单元测试仅用可控响应 |
-| `playback`、`audio-ambience`、`single-instance`、`settings`、`experiments`、`logging`、`logging-terminal`、`graphics-backend` | Qt媒体三路状态、跨进程仲裁、持久化/模式/错误、真实终端输出及后端选择；playback/logging/render-backend及相关组件契约 |
+| `playback`/`playback-device`、`audio-ambience`/`audio-ambience-device`、`single-instance`、`settings`、`experiments`、`logging`、`logging-terminal`、`graphics-backend` | 可控媒体状态与独立真实设备三路验证、跨进程仲裁、持久化/模式/错误、真实终端输出及后端选择；playback/logging/render-backend及相关组件契约 |
 | `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`rhi-material-parameters`、`render-quality`、`render-support` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命；assets/branding/covers/title-reels及RHI契约 |
 | `verification-window-policy`、显式可见窗口/输出检查、`macos-application-menu` | 不干扰窗口约束、实际native呈现与HDR/系统菜单；test-window-policy/display-output及R36实物事实，隐藏与可见事实分别保留 |
 | RHI与封面/阵列GPU组件、`display-transfer-gpu` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
@@ -28,7 +28,7 @@
 | `dry-tools`、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、有限测量/数值错误、独立采集文件、来源结构误判、三平台CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |
 | `launchers`、`unix-deployment`、`linux-package-tools` | 参数/子进程状态、包完整性/权限/依赖/符号链接、原生strip/相对加载；平台部署契约。目标对象格式分支只在对应系统执行 |
 | 冻结数学/DOM导出、`compare-ui-structure.py overview/presentation`、文字/滑尺与网络探针 | 独立来源重建、同输入结构/字体/轨迹及目标TLS/代理；web-baseline与组件契约及R36明确缺口，不是普通CTest依赖 |
-| clang-tidy安全审计、资产来源核对与生成器 | 编译器定向检查所有权/未定义行为及超时/诊断错误传播、冻结hash/许可及可复现生产输入；cpp23-best-practices/assets/web-baseline。`python3 tests/tools/AssetExportTest.py`在隔离目录验证源导出与已提交manifest；`node --test tests/tools/TitleVerificationTest.mjs`验证标题报告的严格成功/数值/唯一状态边界。两者显式需要Node（源导出另需锁定Web依赖），不加入普通CTest |
+| clang-tidy安全审计、资产来源核对与生成器 | 编译器定向检查所有权/未定义行为及超时/诊断错误传播、冻结hash/许可及可复现生产输入；cpp23-best-practices/assets/web-baseline。`python3 tests/tools/AssetExportTest.py`在隔离目录验证独立来源导出、滑尺操作输入、失败输出保护与已提交manifest；`node --test tests/tools/TitleVerificationTest.mjs`验证标题报告的严格成功/数值/唯一状态边界。两者显式需要Node（源导出另需锁定Web依赖），不加入普通CTest |
 
 ## 选择与复用
 
@@ -37,12 +37,14 @@
 | `ctest --preset qt-release -R 对应测试` | fast：只选择本次逻辑改动影响的源码/算法/状态/资产/模块/格式检查 |
 | `ctest --preset qt-release-render -R 组件` | 按需选择真正隐藏渲染项 |
 | `ctest --preset qt-release-stress -R 组件` | 仅静态审计仍无法确定的具体资源/寿命问题确需压力时选用最小范围；修改所有权代码或首次目标验收本身不触发 |
-| `ctest --preset qt-release-full` | fast+隐藏功能集成，不含独立压力；仅在用户明确要求完整测试/全量回归时执行；该请求不包含性能采样、研究选型或独立压力 |
+| `ctest --preset qt-release-media -R 对应测试` | 显式真实音频设备与媒体集成；纯状态/持久化仍在fast，GUI同时受窗口标签限制 |
+| `ctest --preset qt-release-full` | fast+不依赖音频设备的隐藏功能集成，不含独立压力；仅在用户明确要求完整测试/全量回归时执行；该请求不包含性能采样、研究选型或独立压力 |
 | `ctest --preset qt-release-visible -R 具体测试` | 显式窗口/输入/焦点/呈现/相关生命周期，不默认全选 |
 
-- `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/resource-stress，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
-- fast/full/render清YALAHOO_VERIFY_VISIBLE/FOREGROUND/LIFECYCLE/STRESS；常规入口排除resource-stress，fast/full/render另排除native-visible，fast另排除render-integration。stress preset仅选择隐藏resource-stress；其他系统的原生压力用组件显式工具运行。macOS默认可见OFF，disabled如实暂缓；默认窗口策略只调用hiddenNativeWindow槽。
+- `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/native-media/resource-stress，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
+- fast/full/render清YALAHOO_VERIFY_VISIBLE/FOREGROUND/LIFECYCLE/STRESS；常规入口排除resource-stress，fast/full/render另排除native-visible及native-media，fast另排除render-integration。media只选择native-media并排除native-visible/resource-stress，stress显式允许带媒体的隐藏压力入口。stress preset仅选择隐藏resource-stress；其他系统的原生压力用组件显式工具运行。macOS默认可见OFF，disabled如实暂缓；默认窗口策略只调用hiddenNativeWindow槽。
 - 先按被测行为、依赖、输入和运行条件判断已有结果是否仍有效，并尽可能复用。无关模块、Git版本号或重新链接导致二进制hash变化，本身不使结果失效；相关逻辑/输入/依赖或环境变化仅使对应结果失效。不影响行为的注释、文档或脚本注释改动无需专门运行测试；脚本逻辑变化检查其参数、错误传播与实际入口；代码逻辑变更只执行必要的对应检查。共享代码沿实际调用链确定范围，不自动扩大到fast集或完整回归。功能回放与性能问题分别选择；局部成本、计时、资源增长及重复重建压力先满足performance.md的静态未决门槛，不默认各跑一次。显式压力入口为verify-startup的--stress、verify-detail/overview的--lifecycle，报告实际完成次数；已有有效结果复用，真实失败仍保留。
+- `playback`仅运行队列/快照及可控晚到通知；`audio-ambience`仅运行静音事件/参数/持久化。`playback-device`保留真实暂停/seek/结束/错误及输出恢复，`audio-ambience-device`保留真实BGM交接/错误重试/QSoundEffect池；设备缺失时明确失败，不跳过为通过。startup-qml/startup-stress/settings-qml/playback-qml同时标native-media。
 - 剩余目标系统、后端和物理设备动态检查由迁移计划R36集中管理；Linux默认OpenGL入口同样受目标能力准入约束。算法/源码/模块/构建和qsb跨目标静态检查照常执行，缺环境不减少原门槛。
 - 对需要新验证的受影响行为按风险选择尺寸/主题/DPR，只覆盖其实际依赖的范围；未被改动触及的最终目标矩阵结果继续复用，未执行的目标门槛仍保留。报告区分本次实际、复用、未选、暂缓及原因。首次目标验收先区分已有共用证据与目标特有缺口，仅补后者；组件所列完整工具状态集不自动成为首次验收清单。必须实际运行才能确定的功能/画质/设备事实仍保留，不能以代表组合冒称全部通过。格式与官方qmllint的适用选择归code-style.md，同样不扩大为功能回归。
 - `production-app-root`属于fast且不依赖Review：通过生产可执行文件的`--verify-app`隐藏创建真实`App.qml`及业务接线，核对舞台、显示合成层、弹出层归属、尺寸、无QML警告、无播放和窗口策略。App根、生产QML导入/注册、合成宿主或其初始化依赖发生变化时，必须执行此检查与受影响模块的官方qmllint；组件/专用探针或仅构建成功不能替代生产根创建。实际输出与交互仍由对应集成检查证明。
@@ -74,7 +76,7 @@
 | 实际入口 | 分类 |
 | --- | --- |
 | rhi-bokeh-gpu、rhi-smaa-gpu | 直接QRhi offscreen，各平台入口均无可见窗口；实际后端能力另验 |
-| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、opening-qml、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/shell-submission/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
+| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、opening-qml、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
 
 整场GUI显式入口为`python3 tests/runners/verify-gui.py`，范围与采集语义见[rhi-integration.md](rhi-integration.md)；它不隐式加入fast/full集合。
 

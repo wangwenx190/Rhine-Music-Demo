@@ -55,7 +55,9 @@
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QSysInfo>
+#include <QTemporaryDir>
 #include <QTimer>
+#include <cstdio>
 #include <memory>
 
 using namespace Qt::StringLiterals;
@@ -123,11 +125,28 @@ bool initializeLibraryCommands(const QCommandLineParser &parser, yalahoo::Librar
 int main(int argc, char **argv)
 {
     yalahoo::initializeIdentity();
-    const yalahoo::LoggingSession logging;
+    bool temporarySession = false;
     for (int i = 1; i < argc; ++i) {
-        if (QByteArray(argv[i]).startsWith("--verify-"_ba))
+        const QByteArray argument(argv[i]);
+        if (argument.startsWith("--verify-"_ba)) {
             yalahoo::verification::prepareApplication();
+            temporarySession = true;
+        }
+        temporarySession = temporarySession || argument == "--demo"_ba
+                || argument == "--lighting-lab"_ba || argument == "--help"_ba || argument == "-h"_ba
+                || argument == "--help-all"_ba;
     }
+    std::unique_ptr<QTemporaryDir> temporaryLogs;
+    yalahoo::LoggingSession::Options loggingOptions;
+    if (temporarySession) {
+        temporaryLogs = std::make_unique<QTemporaryDir>();
+        if (!temporaryLogs->isValid()) {
+            std::fputs("Cannot create isolated session logs\n", stderr);
+            return InvalidCommandLine;
+        }
+        loggingOptions.directory = temporaryLogs->filePath(u"logs"_s);
+    }
+    const yalahoo::LoggingSession logging(std::move(loggingOptions));
     qCInfo(yalahoo::logApp) << "Application starting" << "Qt=" << qVersion()
                             << "platform=" << QSysInfo::prettyProductName()
                             << "architecture=" << QSysInfo::currentCpuArchitecture();
@@ -220,7 +239,15 @@ int main(int argc, char **argv)
                        QCoreApplication::translate("CommandLine", "Material source/state report"),
                        QCoreApplication::translate("CommandLine", "report") });
 #endif
-    parser.process(app);
+    if (!parser.parse(app.arguments())) {
+        qCWarning(yalahoo::logApp) << parser.errorText();
+        return InvalidCommandLine;
+    }
+    if (parser.isSet(u"help"_s) || parser.isSet(u"help-all"_s)) {
+        const auto help = parser.helpText().toUtf8();
+        std::fwrite(help.constData(), 1, size_t(help.size()), stdout);
+        return 0;
+    }
     const bool demonstration = parser.isSet(u"demo"_s) || parser.isSet(u"lighting-lab"_s);
     if (demonstration) {
         for (const auto &option : parser.optionNames()) {

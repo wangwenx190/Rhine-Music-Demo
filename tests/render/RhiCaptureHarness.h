@@ -111,12 +111,6 @@ public:
                        << window->isVisible() << window->isExposed();
         require(frames == count && state->error.isEmpty(), "RHI replay failed or timed out");
     }
-    void submitBurst(rhi::Input input, QSize size)
-    {
-        input.request = ++state->request;
-        input.captureAtlas = false;
-        setInput(std::move(input), size);
-    }
     void rebuild()
     {
         require(!state->loop, "Cannot rebuild during a Review capture");

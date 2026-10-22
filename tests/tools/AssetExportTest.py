@@ -15,6 +15,65 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class AssetExportTest(unittest.TestCase):
+    def test_source_commands_preserve_incomplete_output_directories(self):
+        for name, options in (("export-title.mjs", []), ("verify-title.mjs", []),
+                              ("export-browse-ui.mjs", ["--overview"]),
+                              ("export-ruler.mjs", [])):
+            with self.subTest(command=name), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "incomplete"
+                output.mkdir()
+                sentinel = output / "failed-run.log"
+                sentinel.write_text("retain original failure", encoding="utf-8")
+                result = subprocess.run(["node", str(ROOT / "tools/migration" / name),
+                                         *options, "--output", str(output)],
+                                        capture_output=True, text=True, timeout=10)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertRegex(result.stderr, "fresh|EEXIST")
+                self.assertEqual(list(output.iterdir()), [sentinel])
+                self.assertEqual(sentinel.read_text(), "retain original failure")
+
+    def test_ruler_export_consumes_the_committed_operations(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo ruler space-") as directory:
+            root = Path(directory)
+            for name in ("tools/migration/export-ruler.mjs", "tools/migration/ruler-harness.js",
+                         "tests/fixtures/navigation/ruler.json"):
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, root / name)
+            (root / "tools/migration/frozen-git.mjs").write_text(
+                "export const baselineRevision = 'fixture';\n"
+                "export const execFrozenGit = () => '';\n", encoding="utf-8")
+            # Execute the real exporter with a controlled page, without a browser or timing.
+            (root / "tools/migration/browser-source.mjs").write_text("""
+export async function wait() {}
+export async function withSourcePage(root, html, profile, run) {
+    const window = {resetRuler() {}, rulerOperation: (op, fps) => ({op, fps})};
+    await run({page: {send: async () => {},
+                     evaluate: async expression => Function('window', 'return ' + expression)(window)},
+               version: 'fixture', origin: 'http://127.0.0.1'});
+}
+export async function rollingNumberSource() {
+    return 'function L(a,b){return {target:b};}function fe(){}' +
+           'function J(track){return {position:track.target,velocity:0};}function Q(){}';
+}
+""", encoding="utf-8")
+            output = root / "output"
+            result = subprocess.run(["node", str(root / "tools/migration/export-ruler.mjs"),
+                                     "--output", str(output)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads((output / "report.json").read_text())
+            cases = json.loads((ROOT / "tests/fixtures/navigation/ruler.json").read_text())["cases"]
+            expected = {(case["name"], dpr, narrow, night, fps)
+                        for case in cases for dpr in (1, 1.5, 2) for narrow in (False, True)
+                        for night in (False, True) for fps in (20, 30, 60, 120)}
+            self.assertEqual({tuple(c[key] for key in ("name", "dpr", "narrow", "night", "fps"))
+                              for c in report["captures"]}, expected)
+            self.assertEqual(len(report["captures"]), len(expected))
+            operations = {case["name"]: case["operations"] for case in cases}
+            for capture in report["captures"]:
+                self.assertEqual([state["op"] for state in capture["states"]], operations[capture["name"]])
+                self.assertEqual([state["state"] for state in capture["states"]],
+                                 [dict(op=op, fps=capture["fps"]) for op in operations[capture["name"]]])
+
     def assert_oracle_equal(self, actual, expected):
         if isinstance(expected, float):
             # V8 versions can round transcendental source math by a few ULPs.
@@ -68,6 +127,18 @@ class AssetExportTest(unittest.TestCase):
                                         capture_output=True, text=True, timeout=10)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("Select exactly one source structure", result.stderr)
+
+    def test_structure_export_rejects_ambiguous_arguments_before_capture(self):
+        for arguments in (["--overview"], ["--overview", "--output"],
+                          ["--overview", "--output", "--dpr-1"],
+                          ["--overview", "--output", "a", "--output", "b"],
+                          ["--overview", "--overview"], ["--overview", "--unknown"],
+                          ["--presentation", "--overview-native", "report.json"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(["node", str(ROOT / "tools/migration/export-browse-ui.mjs"), *arguments],
+                                        capture_output=True, text=True, timeout=10)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertRegex(result.stderr, "Specify|Duplicate|Unknown|requires")
 
     def test_material_export_preserves_finite_half_float_input(self):
         manifest = json.loads((ROOT / "resources/manifests/materials.json").read_text())

@@ -19,7 +19,7 @@ struct RenderBackendContract final
                  { u"implementationReady"_s, true },
                  { u"activeImplementation"_s, u"rhi"_s },
                  { u"contractRevision"_s, 4 },
-                 { u"contract"_s, u"docs/contracts/render-backend.json"_s } };
+                 { u"contract"_s, u"docs/contracts/render-backend.md"_s } };
     }
 };
 }

@@ -21,10 +21,6 @@ namespace {
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int AsyncDeadlineMilliseconds = 10000;
 constexpr int BackendDeadlineMilliseconds = 5000;
-constexpr int MuteObservationMilliseconds = 80;
-constexpr int FadeCompletionMilliseconds = 700;
-constexpr int TeardownObservationMilliseconds = 300;
-constexpr int QueuedEventObservationMilliseconds = 100;
 }
 
 using namespace Qt::StringLiterals;
@@ -82,20 +78,19 @@ private Q_SLOTS:
             if (song.playing() && !background.silent())
                 overlap = true;
         });
-        QElapsedTimer elapsed;
-        elapsed.start();
+        QSignalSpy silenced(&background, &BackgroundMusicController::silenceReached);
         song.toggle();
         QVERIFY(song.requested());
         QVERIFY(!song.playing());
-        QTest::qWait(MuteObservationMilliseconds);
-        QVERIFY(!song.playing());
+        QVERIFY(background.m_fade.isActive());
+        QVERIFY(!background.silent());
         QTRY_VERIFY_WITH_TIMEOUT(song.playing(), AsyncDeadlineMilliseconds);
-        QVERIFY(elapsed.elapsed() >= 220);
+        QVERIFY(!silenced.isEmpty());
         QVERIFY(background.silent());
         QVERIFY(!overlap);
         QVERIFY(!background.m_fade.isActive());
         song.pause();
-        QTest::qWait(FadeCompletionMilliseconds);
+        QTRY_VERIFY(!background.m_fade.isActive());
         QVERIFY(background.silent());
         QVERIFY(!background.playing());
         // No window or visual clock exists: ordinary media progress continues while hidden.
@@ -113,11 +108,10 @@ private Q_SLOTS:
         QCOMPARE(background.m_output.volume(), .01f);
         song.toggle();
         song.pause();
-        QTest::qWait(TeardownObservationMilliseconds);
+        QTRY_VERIFY(!background.m_fade.isActive());
         QVERIFY(background.silent());
         QVERIFY(!song.playing());
         song.stop();
-        QTest::qWait(QueuedEventObservationMilliseconds);
         QVERIFY(background.m_fade.isActive());
         song.toggle();
         song.stop();
@@ -136,6 +130,7 @@ private Q_SLOTS:
     }
     void bgmErrorIsSilentAndExplicitEnableRetries()
     {
+        QVERIFY(!QMediaDevices::defaultAudioOutput().isNull());
         BackgroundMusicController background;
         background.setVolume(.01);
         background.start();
@@ -155,7 +150,7 @@ private Q_SLOTS:
         QCOMPARE(background.m_player.source(), QUrl(u"qrc:/assets/audio/atmosphere.ogg"_s));
         background.stop();
     }
-    void missingEventsAreSilentAndPoolIsBounded()
+    void missingEventsAreSilent()
     {
         InterfaceSoundController sounds;
         BackgroundMusicController background;
@@ -167,8 +162,7 @@ private Q_SLOTS:
         QVERIFY(!sounds.available());
         for (const auto &event : events)
             QVERIFY(!sounds.trigger(event.toObject()[u"event"_s].toString()));
-        for (int i = 0; i < 10000; ++i)
-            QVERIFY(!sounds.trigger(u"key"_s));
+        QVERIFY(!sounds.trigger(u"unknown-event"_s));
         for (const auto &effect : sounds.m_pool)
             QVERIFY(!effect);
         const auto original = sounds.volume();
@@ -180,6 +174,11 @@ private Q_SLOTS:
         sounds.setEnabled(false);
         QVERIFY(!sounds.trigger(u"confirm"_s));
         sounds.setEnabled(true);
+    }
+    void soundEffectPoolIsBounded()
+    {
+        QVERIFY(!QMediaDevices::defaultAudioOutput().isNull());
+        InterfaceSoundController sounds;
         // Test-only short WAV exercises the same production QSoundEffect dispatch.
         QTemporaryDir root;
         QFile file(root.filePath(u"short.wav"_s));

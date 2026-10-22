@@ -99,6 +99,30 @@ class StructureComparisonTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     COMPARE.compare("overview", native, source)
 
+    def test_overview_lane_types_and_expansion_must_match_the_declared_state(self):
+        for bad in (False, -1, "0"):
+            for target in ("native", "source"):
+                with self.subTest(lane=bad, target=target):
+                    native, source = self.reports("overview")
+                    if target == "native":
+                        native["captures"][0]["structures"][0]["lane"] = bad
+                    else:
+                        source["admissions"][0]["lanes"] = [bad]
+                    with self.assertRaises(ValueError):
+                        COMPARE.compare("overview", native, source)
+        native, source = self.reports("overview")
+        native["captures"][0]["structures"][0]["expanded"] = True
+        with self.assertRaises(ValueError):
+            COMPARE.compare("overview", native, source)
+
+    def test_reports_require_objects(self):
+        for bad in (None, [], True):
+            native, source = self.reports("presentation")
+            with self.subTest(report=bad), self.assertRaises(ValueError):
+                COMPARE.compare("presentation", bad, source)
+            with self.subTest(source=bad), self.assertRaises(ValueError):
+                COMPARE.compare("presentation", native, bad)
+
     def test_cli_persists_failure_and_preserves_previous_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -48,7 +48,7 @@
       },
       "filter": {
         "exclude": {
-          "label": "native-visible|render-integration|resource-stress"
+          "label": "native-visible|render-integration|resource-stress|native-media"
         }
       },
       "environment": {
@@ -70,7 +70,7 @@
       "inherits": "qt-release",
       "filter": {
         "exclude": {
-          "label": "native-visible|resource-stress"
+          "label": "native-visible|resource-stress|native-media"
         }
       }
     },
@@ -83,7 +83,7 @@
           "label": "hidden-render"
         },
         "exclude": {
-          "label": "native-visible|resource-stress"
+          "label": "native-visible|resource-stress|native-media"
         }
       }
     },
@@ -101,6 +101,19 @@
       },
       "environment": {
         "YALAHOO_VERIFY_STRESS": "1"
+      }
+    },
+    {
+      "name": "qt-release-media",
+      "displayName": "Release explicit native audio device integration",
+      "inherits": "qt-release",
+      "filter": {
+        "include": {
+          "label": "native-media"
+        },
+        "exclude": {
+          "label": "native-visible|resource-stress"
+        }
       }
     },
     {

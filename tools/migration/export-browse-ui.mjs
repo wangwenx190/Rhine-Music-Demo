@@ -7,15 +7,40 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const overview = process.argv.includes('--overview');
-const presentation = process.argv.includes('--presentation');
+const args = process.argv.slice(2);
+const options = new Map();
+const nativePaths = [];
+for (let i = 0; i < args.length; ++i) {
+    const option = args[i];
+    if (options.has(option))
+        throw Error('Duplicate option: ' + option);
+    if (['--overview', '--presentation', '--dpr-1'].includes(option)) {
+        options.set(option, true);
+    } else if (['--output', '--overview-native'].includes(option)) {
+        const value = args[++i];
+        if (!value || value.startsWith('--'))
+            throw Error('Specify a value for ' + option);
+        if (option === '--overview-native')
+            nativePaths.push(value);
+        else
+            options.set(option, value);
+    } else {
+        throw Error('Unknown option: ' + option);
+    }
+}
+const overview = options.has('--overview');
+const presentation = options.has('--presentation');
 if (overview === presentation)
     throw Error('Select exactly one source structure: --overview or --presentation');
+if (presentation && nativePaths.length)
+    throw Error('--overview-native requires --overview');
 const baseline = baselineRevision;
 const frozen = path.join(root, 'build/browse-ui-web/legacy-web');
-const output = path.join(root, presentation ? 'verification/presentation-source'
-                                            : 'verification/overview-source');
-await fs.mkdir(output, {recursive: true});
+if (!options.has('--output'))
+    throw Error('Specify --output fresh-directory');
+const output = path.resolve(options.get('--output'));
+await fs.mkdir(path.dirname(output), {recursive: true});
+await fs.mkdir(output);
 const sources = {};
 const source = frozenReader(sources);
 const appSource = source('src/music-app.ts');
@@ -55,8 +80,6 @@ await withSourcePage(
     frozen, html, path.join(root, 'build/browse-ui-profile-' + process.pid),
     async ({page, version, origin}) => {
         const admissions = [];
-        const nativePaths = process.argv.flatMap(
-            (arg, index) => arg === '--overview-native' ? [process.argv[index + 1]] : []);
         for (const nativePath of overview ? nativePaths : []) {
             const native = JSON.parse(await fs.readFile(nativePath, 'utf8'));
             const js = transpile(source('src/music-overview.ts'));
@@ -88,7 +111,7 @@ await withSourcePage(
             }
         }
         const captures = [];
-        for (const dpr of (process.argv.includes('--dpr-1') ? [1] : [1, 1.5, 2])) {
+        for (const dpr of (options.has('--dpr-1') ? [1] : [1, 1.5, 2])) {
             for (const [width, height] of [[1920, 1080], [1280, 720], [995, 858], [960, 900],
                                            [930, 900], [390, 844], [320, 720], [2560, 1080],
                                            [3440, 1440]]) {

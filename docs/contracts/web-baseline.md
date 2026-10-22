@@ -12,7 +12,7 @@
 
 ## 组件导出
 
-各组件契约列出`tools/migration/`下的专用导出入口；数学回归直接消费`tests/fixtures/`中的独立期望值。来源导出只在输入缺失或需要核对具体来源时使用，不作为普通构建/CTest前置步骤，也不能用当前生产实现生成自己的期望结果。
+各组件契约列出`tools/migration/`下的专用导出入口；数学回归直接消费`tests/fixtures/`中的独立期望值。DOM/字体/滑尺来源采集与原生标题核对使用全新输出目录，包括失败后未生成report的目录也不得复用；browse结构导出显式传`--output`。来源导出只在输入缺失或需要核对具体来源时使用，不作为普通构建/CTest前置步骤，也不能用当前生产实现生成自己的期望结果。
 
 `frozen-source.mjs`统一TypeScript配置、显式依赖与来源hash。`browser-source.mjs`为确需DOM/字体框的组件重建同一生产markup/CSS与字体，校验锁定rolling-number，使用已有无界面Chrome/Edge/Chromium；浏览器路径可由`REVIEW_BROWSER`提供，不下载浏览器。会话只访问回环服务，隔离storage/profile、拦截外部请求并禁音；正常和失败路径均关闭连接、进程、服务与临时profile。独立结构、数值轨迹和自身原生输出质量分别验收。
 

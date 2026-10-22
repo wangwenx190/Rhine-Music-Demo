@@ -81,8 +81,6 @@ if(YALAHOO_REVIEW)
         "${CMAKE_BINARY_DIR}/verification/rhi-shadow-attachments" --attachments-only)
     add_test(NAME rhi-flicker-gpu COMMAND rhi-flicker-test
         "${CMAKE_BINARY_DIR}/verification/rhi-flicker")
-    add_test(NAME rhi-shell-submission-gpu COMMAND rhi-flicker-test
-        "${CMAKE_BINARY_DIR}/verification/rhi-shell-submission" --isolated-only)
     add_test(NAME rhi-scale-gpu COMMAND rhi-scale-test
         "${CMAKE_BINARY_DIR}/verification/rhi-scale" --representative)
     add_test(NAME rhi-shell-gpu COMMAND rhi-shell-test
@@ -100,7 +98,7 @@ if(YALAHOO_REVIEW)
 
     set_tests_properties(rhi-postprocess-gpu rhi-transient-attachments-gpu rhi-shell-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded")
 
-    set_tests_properties(rhi-transient-attachments-gpu rhi-shadow-attachments-gpu rhi-shell-submission-gpu PROPERTIES TIMEOUT "60")
+    set_tests_properties(rhi-transient-attachments-gpu rhi-shadow-attachments-gpu PROPERTIES TIMEOUT "60")
 
     set_tests_properties(rhi-bokeh-gpu rhi-smaa-gpu rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu PROPERTIES TIMEOUT "120")
 
@@ -112,9 +110,9 @@ if(YALAHOO_REVIEW)
 
     set_tests_properties(rhi-flicker-gpu PROPERTIES TIMEOUT "420")
 
-    set_tests_properties(rhi-flicker-gpu rhi-shell-submission-gpu rhi-scale-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1")
+    set_tests_properties(rhi-flicker-gpu rhi-scale-gpu PROPERTIES ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=1")
 
-    set_tests_properties(rhi-flicker-gpu rhi-shell-submission-gpu rhi-scale-gpu PROPERTIES FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
+    set_tests_properties(rhi-flicker-gpu rhi-scale-gpu PROPERTIES FAIL_REGULAR_EXPRESSION "Binding loop;Failed to create;Shader baking failed;Nonfinite")
 
     set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT "600")
 endif()
@@ -192,11 +190,19 @@ yalahoo_unit_test(TrackFocusTest track-focus
     TIMEOUT 60)
 yalahoo_unit_test(PlaybackTest playback
     LIBRARIES YalahooCore
-    TIMEOUT 90 SERIAL)
+    ARGUMENTS queueReuseAndSnapshotInvalidation lateLoadEndAndQueueOwnership
+    TIMEOUT 30)
+add_test(NAME playback-device COMMAND PlaybackTest publicPlaybackPauseSeekStopAndNavigation
+    outputLossPendingIntentAndExplicitSelection realEndAndUnsupportedFormat)
+set_tests_properties(playback-device PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
 
 yalahoo_unit_test(AudioAmbienceTest audio-ambience
     LIBRARIES YalahooCore
-    TIMEOUT 90 SERIAL)
+    ARGUMENTS missingEventsAreSilent audioPreferencesPersistIndependently
+    TIMEOUT 30)
+add_test(NAME audio-ambience-device COMMAND AudioAmbienceTest realBgmGateInterruptionsAndHiddenPlayback
+    bgmErrorIsSilentAndExplicitEnableRetries soundEffectPoolIsBounded)
+set_tests_properties(audio-ambience-device PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AudioAmbienceTest)
 

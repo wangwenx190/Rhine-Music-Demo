@@ -5,6 +5,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 const root = path.resolve(import.meta.dirname, '../..');
 const baseline = baselineRevision;
+const fixture =
+    JSON.parse(await fs.readFile(path.join(root, 'tests/fixtures/navigation/ruler.json'), 'utf8'));
 const frozen = path.join(root, 'build/ruler-web');
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== '--output')

@@ -143,7 +143,7 @@ private Q_SLOTS:
     void lateLoadEndAndQueueOwnership()
     {
         Fixture f;
-        QVERIFY(f.player.outputAvailable());
+        f.player.applyDevices({ }, { });
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
         const auto old = f.player.sourceRevision();
         f.player.next();
@@ -169,7 +169,10 @@ private Q_SLOTS:
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         f.player.status(QMediaPlayer::EndOfMedia, f.player.sourceRevision());
         QTRY_COMPARE(f.player.trackId(), u"track-2"_s);
-        QTRY_VERIFY_WITH_TIMEOUT(!f.player.error().isEmpty(), AsyncDeadlineMilliseconds);
+        f.player.status(QMediaPlayer::InvalidMedia, old);
+        QVERIFY(f.player.error().isEmpty());
+        f.player.status(QMediaPlayer::InvalidMedia, f.player.sourceRevision());
+        QVERIFY(!f.player.error().isEmpty());
         QVERIFY(!f.player.playing());
         f.player.stop();
         QVERIFY(f.player.error().isEmpty());

@@ -33,7 +33,8 @@ class TestPolicyTest(unittest.TestCase):
                             "enable_testing()", f"set(APPLE {'TRUE' if target == 'macos' else 'FALSE'})",
                             f"set(WIN32 {'TRUE' if target == 'windows' else 'FALSE'})",
                             "set(YALAHOO_MACOS_VISIBLE_TESTS OFF)"]
-            names = ("unit-probe", "startup-qml", "startup-stress", "runtime-detail", "rhi-bokeh-gpu")
+            names = ("unit-probe", "startup-qml", "startup-stress", "runtime-detail", "rhi-bokeh-gpu",
+                     "playback-device", "audio-ambience-device", "settings-qml", "playback-qml")
             for name in names:
                 declarations.append(f'add_test(NAME {name} COMMAND "{Path(sys.executable).as_posix()}" '
                                     f'"{fixture.as_posix()}" "{(root / (name + ".json")).as_posix()}")')
@@ -44,10 +45,11 @@ class TestPolicyTest(unittest.TestCase):
             subprocess.run(["cmake", "--preset", "qt-release"], cwd=root, check=True, capture_output=True, timeout=20)
             environment = {**os.environ, **{f"YALAHOO_VERIFY_{flag}": "1" for flag in FLAGS}}
             for preset, expected in (("qt-release", {"unit-probe"}),
-                                     ("qt-release-full", {"unit-probe", "rhi-bokeh-gpu"}
-                                      | ({"startup-qml"} if target == "macos" else set())),
-                                     ("qt-release-render", {"rhi-bokeh-gpu"}
-                                      | ({"startup-qml"} if target == "macos" else set())),
+                                     ("qt-release-full", {"unit-probe", "rhi-bokeh-gpu"}),
+                                     ("qt-release-render", {"rhi-bokeh-gpu"}),
+                                     ("qt-release-media", {"playback-device", "audio-ambience-device"}
+                                      | ({"startup-qml", "settings-qml", "playback-qml"}
+                                         if target == "macos" else set())),
                                      ("qt-release-stress", {"startup-stress"} if target == "macos" else set())):
                 with self.subTest(preset=preset):
                     for name in names:

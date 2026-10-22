@@ -1,6 +1,6 @@
 # 渲染后端与业务边界
 
-本文只定义后端选择及业务隔离；具体通道、资源和生产接线分别归[rhi-opaque.md](rhi-opaque.md)、[rhi-shell.md](rhi-shell.md)、[rhi-postprocess.md](rhi-postprocess.md)、[rhi-integration.md](rhi-integration.md)。机器接口见[render-backend.json](render-backend.json)。
+本文只定义后端选择及业务隔离；具体通道、资源和生产接线分别归[rhi-opaque.md](rhi-opaque.md)、[rhi-shell.md](rhi-shell.md)、[rhi-postprocess.md](rhi-postprocess.md)、[rhi-integration.md](rhi-integration.md)。运行时字段由`RenderBackendContract::fields()`发布，通道参数只在对应专项契约维护。
 
 - 生产唯一实现为QQuickRhiItem + QRhi/qsb；`SceneAdapter.renderBackendContract`发布`implementationReady=true`、`activeImplementation=rhi`。Qt Quick 3D仅用于独立Review，普通产品不打包第二套场景。
 - SceneAdapter/QML/导航接口不随渲染实现变化。QRhi/GuiPrivate集中在`src/render/rhi/`并由最新Kit编译探测适配，不向core/media泄漏私有类型。

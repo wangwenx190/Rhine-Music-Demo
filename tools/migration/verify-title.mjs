@@ -41,7 +41,7 @@ const source = path.resolve(options.source);
 const output = options.output ? path.resolve(options.output)
                               : path.join(root, 'verification', platform, 'title-reels',
                                           options.backend + '-dpr-' + dpr + '-' + Date.now());
-if (fs.existsSync(path.join(output, 'report.json')))
+if (fs.existsSync(output))
     throw Error('Use a fresh output directory to retain earlier evidence');
 const reference = JSON.parse(fs.readFileSync(path.join(source, 'report.json'), 'utf8'));
 if (reference.captures.filter((capture) => Math.abs(capture.dpr - dpr) < 0.001).length !== 20)
@@ -71,7 +71,8 @@ environment.YALAHOO_VERIFY_FOREGROUND =
     visible ? (process.env.YALAHOO_VERIFY_FOREGROUND || '0') : '0';
 const executable = path.join(root, 'build/release/tools/source-ui-probe'
                                        + (process.platform === 'win32' ? '.exe' : ''));
-fs.mkdirSync(output, {recursive: true});
+fs.mkdirSync(path.dirname(output), {recursive: true});
+fs.mkdirSync(output);
 function run(arguments_, log) {
     const result = spawnSync(executable, arguments_, {
         cwd: root,

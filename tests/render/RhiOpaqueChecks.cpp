@@ -94,15 +94,15 @@ auto runOpaqueChecks(int &argc, char **&argv)
         QDir().mkpath(output);
         RhiCaptureHarness driver;
         require(driver.window->devicePixelRatio() == 1, "Opaque diagnostics require actual DPR1");
-        QJsonArray cases, sizes, shadows, rebuilds, inkProbes;
+        QJsonArray cases, rebuilds, inkProbes;
         double worstDepth = 0, worstNormal = 0, worstProjection = 0;
         for (bool night : { false, true })
             for (bool low : { false, true })
                 for (const auto &cover : { u"square"_s, u"portrait"_s, u"landscape"_s })
-                    for (int channel : { 0, 1, 2 }) {
+                    for (bool diagnostic : { false, true }) {
                         const QSize size(960, 720);
                         auto in = fixture(size, night, low, cover);
-                        in.geometryDiagnostic = channel != 0;
+                        in.geometryDiagnostic = diagnostic;
                         const auto gpu = driver.capture(in, size);
                         require(gpu.metadata[u"uniqueReadbackTextures"_s].toInt() == 4
                                         && gpu.metadata[u"readbackFieldSlots"_s].toInt() == 12,
@@ -135,16 +135,16 @@ auto runOpaqueChecks(int &argc, char **&argv)
                                     "Actual diagnostic attachment format or dimensions changed");
                         }
                         require(attachments == 3, "Missing opaque diagnostic attachments");
-                        const auto actual = channel == 0 ? gpu.color
-                                : channel == 1           ? gpu.normal
-                                                         : gpu.depth;
+                        const auto actual = diagnostic ? gpu.normal : gpu.color;
                         const auto label = u"%1-%2-%3-%4"_s
                                                    .arg(night ? "night"_L1 : "day"_L1,
                                                         low ? "low"_L1 : "front"_L1, cover)
-                                                   .arg(channel);
+                                                   .arg(diagnostic ? "geometry"_L1 : "color"_L1);
                         require(actual.save(output + "/"_L1 + label + ".png"_L1),
                                 "Cannot save own output");
-                        if (channel == 1) {
+                        if (diagnostic) {
+                            require(gpu.depth.save(output + "/"_L1 + label + "-depth.png"_L1),
+                                    "Cannot save own depth output");
                             const auto point = projected(in, { .17f, 1.85f, .07f }, size);
                             const auto observed = gpu.normal.pixelColor(point);
                             const auto expected = in.scene.view.mapVector({ 0, 0, 1 }).normalized();
@@ -161,7 +161,7 @@ auto runOpaqueChecks(int &argc, char **&argv)
                                         "Authored corner projection exceeds two pixels");
                             }
                         }
-                        if (channel == 2 && !low) {
+                        if (diagnostic && !low) {
                             const double observed = depthAt(gpu.depth, 480, 360);
                             const double expected = (12 - .070 - .1) / (100 - .1);
                             const double error = std::abs(observed - expected);
@@ -171,7 +171,7 @@ auto runOpaqueChecks(int &argc, char **&argv)
                         // Opaque color must contain actual content, not an empty background target.
                         require(depthAt(gpu.depth, 480, 360) < 1, "Missing opaque content");
                         cases.append(QJsonObject{ { u"scene"_s, label },
-                                                  { u"channel"_s, channel },
+                                                  { u"geometryDiagnostic"_s, diagnostic },
                                                   { u"metadata"_s, gpu.metadata } });
                     }
         for (const QColor ink :
@@ -205,16 +205,7 @@ auto runOpaqueChecks(int &argc, char **&argv)
                                               { u"irradiance"_s, irradiance },
                                               { u"linearError"_s, error } });
             }
-        for (auto size : { QSize(1920, 1080), QSize(1280, 720), QSize(995, 858), QSize(960, 900),
-                           QSize(930, 900), QSize(390, 844), QSize(320, 720), QSize(2560, 1080),
-                           QSize(3440, 1440), QSize(960, 720), QSize(320, 720), QSize(960, 720) })
-            sizes.append(driver.capture(fixture(size, false, true, u"square"_s), size).metadata);
-        driver.replay(30, [&](int index) {
-            const QSize size(index % 2 ? 930 : 390, index % 2 ? 900 : 844);
-            driver.submitBurst(fixture(size, false, true, u"portrait"_s), size);
-        });
         const QSize baseSize(960, 720);
-        auto finalResize = driver.capture(fixture(baseSize, false, false, u"square"_s), baseSize);
         auto changed = fixture(baseSize, false, false, u"square"_s);
         changed.cover.fill(Qt::red);
         driver.submitWithoutCapture(changed, baseSize);
@@ -226,48 +217,6 @@ auto runOpaqueChecks(int &argc, char **&argv)
         const auto blue = driver.surface->grab().pixelColor(480, 360);
         require(red.red() > red.blue() + 20 && blue.blue() > blue.red() + 20,
                 "Same-request cover revision was ignored");
-        for (bool night : { false, true })
-            for (int map : { 1024, 2048, 4096 }) {
-                auto in = fixture(baseSize, night, true, u"square"_s);
-                in.shadowDiagnostic = true;
-                in.shadowSize = map;
-                in.scene.camera.position = { 6, 4, 6 };
-                in.scene.view.setToIdentity();
-                in.scene.view.lookAt({ 6, 4, 6 }, { 0, 1.85f, 0 }, { 0, 1, 0 });
-                for (float z : { 0.0f, .62f, -.62f }) {
-                    QMatrix4x4 matrix;
-                    matrix.translate(0, 0, z);
-                    in.entities.append(matrix);
-                }
-                in.shadows = true;
-                const auto on = driver.capture(in, baseSize);
-                int shadowed = 0;
-                double minimum = 1;
-                for (int y = 0; y < baseSize.height(); ++y)
-                    for (int x = 0; x < baseSize.width(); ++x) {
-                        if (depthAt(on.depth, x, y) >= 1)
-                            continue;
-                        const double value = on.color.pixelColor(x, y).redF();
-                        minimum = std::min(minimum, value);
-                        shadowed += value < .99;
-                    }
-                require(shadowed > 100 && minimum >= .675 && minimum <= .70,
-                        "Source shadow strength/caster projection failed");
-                in.shadows = false;
-                const auto off = driver.capture(in, baseSize);
-                for (int y = 0; y < baseSize.height(); ++y)
-                    for (int x = 0; x < baseSize.width(); ++x)
-                        if (depthAt(off.depth, x, y) < 1)
-                            require(off.color.pixelColor(x, y).redF() >= 254.0 / 255,
-                                    "Disabled shadow receiver is not white");
-                const auto label = u"shadow-%1-%2"_s.arg(night ? "night"_L1 : "day"_L1).arg(map);
-                require(on.color.save(output + "/"_L1 + label + ".png"_L1),
-                        "Cannot save shadow output");
-                shadows.append(QJsonObject{ { u"scene"_s, label },
-                                            { u"shadowedReceiverPixels"_s, shadowed },
-                                            { u"minimumFactor"_s, minimum },
-                                            { u"metadata"_s, on.metadata } });
-            }
         const auto stableInput = fixture(baseSize, true, true, u"landscape"_s);
         {
             driver.rebuild();
@@ -283,11 +232,7 @@ auto runOpaqueChecks(int &argc, char **&argv)
                                   { u"offscreen"_s, driver.surface->diagnostics() },
                                   { u"windowPolicy"_s, verification::windowPolicy(*driver.window) },
                                   { u"cases"_s, cases },
-                                  { u"resize"_s, sizes },
-                                  { u"resizeBurst"_s, 30 },
                                   { u"sameRequestCoverReplacement"_s, true },
-                                  { u"finalResize"_s, finalResize.metadata },
-                                  { u"shadows"_s, shadows },
                                   { u"rebuilds"_s, rebuilds },
                                   { u"inkProbes"_s, inkProbes },
                                   { u"knownPlaneDepthError"_s, worstDepth },

@@ -11,6 +11,7 @@ sh tools/build/linux.sh
 cmake --build --preset qt-release --target format
 cmake --build --preset qt-release --target check-format
 ctest --preset qt-release -R '^(kit-selection|identity|module-link-and-plugins|source-format|directory-scanner|library-data|media-metadata|settings|playback|audio-ambience|verification-window-policy)$' --output-on-failure
+ctest --preset qt-release-media -R '^(playback-device|audio-ambience-device)$' --output-on-failure
 python3 tests/tools/LinuxDeploymentTest.py
 ```
 

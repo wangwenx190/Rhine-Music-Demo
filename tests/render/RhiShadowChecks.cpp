@@ -608,8 +608,8 @@ auto runShadowChecks(int &argc, char **&argv)
                                                { u"windowPolicy"_s,
                                                  verification::windowPolicy(*driver.window) } })),
                 "Cannot write shadow report");
-        std::printf("Shadow source math/cache passed %lld states and ten rebuilds\n",
-                    results.size());
+        std::printf("Shadow source math/cache passed %lld states and %lld rebuilds\n",
+                    results.size(), lifecycle.size());
         return 0;
     } catch (const std::exception &error) {
         std::fprintf(stderr, "%s\n", error.what());

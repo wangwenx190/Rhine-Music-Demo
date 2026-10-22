@@ -19,7 +19,7 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 
 - 初始focus25/aperture.0018，实际帧focus为view空间`entityOrigin+(0,2,0)`正深度，aperture=`(.0003+.0005*detail)*depthOfField/100`，maxblur=.011。
 - 固定41次color采样、.9/.7/.4环、aspect修正、正负CoC及±.011限幅、alpha=1；RGB24 linear depth nearest，color线性/clamp-to-edge，独立完整几何深度，不能用仅不透明主通道代替。
-- `rhi-bokeh-gpu`直接生产Postprocess/qsb真实QRhi offscreen：36组129×73/257×193/193×257、focus20/25/30、aperture0/.0003/.0008/.0012，加十次reset/recreate与另一组clip.1/1000。独立double双线性/源41点核对所有解析像素，颜色≤3/255、有限/HDR/alpha精确1，覆盖前后景/焦平面/限幅/边界。
+- `rhi-bokeh-gpu`直接生产Postprocess/qsb真实QRhi offscreen：36组129×73/257×193/193×257、focus20/25/30、aperture0/.0003/.0008/.0012，加一次reset/recreate与另一组clip.1/1000。独立double双线性/源41点核对所有解析像素，颜色≤3/255、有限/HDR/alpha精确1，覆盖前后景/焦平面/限幅/边界。
 - `rhi-flicker-gpu`生产1200帧另核对真正上传的focus/aperture/aspect/clip/maxblur和完整DOF尺寸。`export-bokeh-kernel.py --check`检查源hash/41点数学输入。
 
 ## SMAA

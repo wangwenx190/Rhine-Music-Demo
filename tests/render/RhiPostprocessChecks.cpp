@@ -11,7 +11,6 @@
 #include "JsonFile.h"
 #include <QDir>
 #include <QPainter>
-#include <QElapsedTimer>
 #include <mutex>
 #include <cstdio>
 #include <cmath>
@@ -184,25 +183,10 @@ QJsonObject checkAttachments(const QJsonArray &sourceCases)
              { u"offscreen"_s, driver.surface->diagnostics() },
              { u"windowPolicy"_s, verification::windowPolicy(*driver.window) } };
 }
-QJsonObject distribution(QVector<double> values)
-{
-    require(!values.isEmpty(), "Empty local CPU submission sample");
-    std::sort(values.begin(), values.end());
-    return { { u"count"_s, values.size() },
-             { u"p50Ms"_s, values[(values.size() - 1) / 2] },
-             { u"p95Ms"_s, values[int((values.size() - 1) * .95)] },
-             { u"maxMs"_s, values.last() } };
-}
-
 auto runPostprocessChecks(int &argc, char **&argv)
 {
-    if (argc == 2 && QByteArray(argv[1]) == "--adapters"_ba) {
-        std::printf("%s\n", QJsonDocument(adapterInventory()).toJson().constData());
-        return 0;
-    }
-    const bool profile = argc == 3 && QByteArray(argv[2]) == "--profile"_ba;
     const bool attachmentsOnly = argc == 3 && QByteArray(argv[2]) == "--attachments-only"_ba;
-    if (argc != 2 && !profile && !attachmentsOnly)
+    if (argc != 2 && !attachmentsOnly)
         return 2;
     if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1)
         OffscreenSurface::Enabled = false;
@@ -502,72 +486,21 @@ auto runPostprocessChecks(int &argc, char **&argv)
             { u"gpuPageExact"_s, true },       { u"unchangedOutsideTile"_s, true },
             { u"stablePixelsExact"_s, true },  { u"revertPixelsExact"_s, true }
         };
-        QJsonArray costs;
-        if (profile) {
-            // Local CPU command submission only. RenderControl has no physical presentation/VSYNC.
-            struct Samples final
-            {
-                std::mutex mutex;
-                QVector<double> cpu;
-            };
-            auto samples = std::make_shared<Samples>();
-            driver.item->profiled = [samples](QJsonObject sample) {
-                std::scoped_lock lock(samples->mutex);
-                samples->cpu.append(sample[u"cpuSubmitMs"_s].toDouble());
-            };
-            driver.item->captured = { };
-            atlas.profile = true;
-            atlas.atlasUploads.clear();
-            atlas.shadows = true;
-            atlas.rawOutput = false;
-            atlas.smaa = true;
-            for (int run = 0; run < 3; ++run) {
-                for (int stage = 0; stage < 6; ++stage) {
-                    auto local = atlas;
-                    local.shadows = stage != 1 && stage != 5;
-                    local.aoSamples = stage == 2 || stage == 5 ? 0 : 32;
-                    local.bokeh = stage != 3 && stage != 5;
-                    local.shells = stage != 4 && stage != 5;
-                    local.postprocess = stage != 5;
-                    const auto advance = [&](int) {
-                        driver.submitWithoutCapture(local, { 960, 720 });
-                    };
-                    driver.replay(10, advance);
-                    {
-                        std::scoped_lock lock(samples->mutex);
-                        samples->cpu.clear();
-                    }
-                    driver.replay(60, advance);
-                    std::scoped_lock lock(samples->mutex);
-                    costs.append(QJsonObject{ { u"run"_s, run },
-                                              { u"stage"_s, stage },
-                                              { u"cpuSubmission"_s, distribution(samples->cpu) } });
-                }
-            }
-            driver.item->profiled = { };
-        }
-        QJsonObject report{
-            { u"qt"_s, QString::fromUtf8(qVersion()) },
-            { u"configuration"_s, u"Release"_s },
-            { u"passed"_s, true },
-            { u"states"_s, states },
-            { u"rebuilds"_s, rebuilds },
-            { u"atlas"_s, atlasReport },
-            { u"capacityCases"_s, capacityCases },
-            { u"steadyBudget"_s,
-              QJsonObject{ { u"firstFrame"_s, budget.metadata },
-                           { u"drainedFrame"_s, drained.metadata } } },
-            { u"nativeTransferByteProof"_s, nativeProof },
-            { u"coverSnapshotReuse"_s, true },
-            { u"finalOutputError"_s, finalError },
-            { u"localCosts"_s, costs },
-            { u"costScope"_s,
-              u"CPU submission only; renderer-only anonymous pool. Three independent batches per stage; no GPU/display/VSYNC or full-product performance claim."_s },
-            { u"gpuCompletedMs"_s, QJsonValue() },
-            { u"displayLatencyMs"_s, QJsonValue() },
-            { u"offscreen"_s, driver.surface->diagnostics() },
-            { u"windowPolicy"_s, verification::windowPolicy(*driver.window) }
-        };
+        QJsonObject report{ { u"qt"_s, QString::fromUtf8(qVersion()) },
+                            { u"configuration"_s, u"Release"_s },
+                            { u"passed"_s, true },
+                            { u"states"_s, states },
+                            { u"rebuilds"_s, rebuilds },
+                            { u"atlas"_s, atlasReport },
+                            { u"capacityCases"_s, capacityCases },
+                            { u"steadyBudget"_s,
+                              QJsonObject{ { u"firstFrame"_s, budget.metadata },
+                                           { u"drainedFrame"_s, drained.metadata } } },
+                            { u"nativeTransferByteProof"_s, nativeProof },
+                            { u"coverSnapshotReuse"_s, true },
+                            { u"finalOutputError"_s, finalError },
+                            { u"offscreen"_s, driver.surface->diagnostics() },
+                            { u"windowPolicy"_s, verification::windowPolicy(*driver.window) } };
         require(yalahoo::writeJsonFile(output + "/runtime.json"_L1, QJsonDocument(report)),
                 "Cannot commit report");
         std::puts("MSAA/resolve, combined postprocess and bounded atlas checks passed.");

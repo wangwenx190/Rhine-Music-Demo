@@ -55,6 +55,8 @@ def box_checks(actual, expected, fields, state):
 
 
 def compare(component, native, source):
+    if not isinstance(native, dict) or not isinstance(source, dict):
+        raise ValueError("Native and source reports must be objects")
     if native.get("passed") is not True or native.get("qmlWarnings"):
         raise ValueError("Passing native report without QML warnings required")
     if component == "overview" and native.get("retired") is not True:
@@ -81,14 +83,18 @@ def compare(component, native, source):
             cards = capture["structures"]
             lanes = [card["lane"] for card in cards]
             expected_lanes = admissions[key]["lanes"]
+            if (not isinstance(expected_lanes, list)
+                    or any(type(lane) is not int or lane < 0 for lane in lanes + expected_lanes)):
+                raise ValueError("Nonnegative integer lanes required")
             if len(set(lanes)) != len(lanes) or sorted(lanes) != sorted(expected_lanes):
                 raise ValueError("Frozen label admission mismatch")
             variants = indexed(references[key[:4]]["variants"], lambda v: v["expanded"])
             if set(variants) != {False, True} or any(type(v) is not bool for v in variants):
                 raise ValueError("Collapsed and expanded source variants required")
             for card in cards:
-                if type(card["expanded"]) is not bool:
-                    raise ValueError("Boolean card expansion required")
+                if (type(card["expanded"]) is not bool
+                        or card["expanded"] != (card["lane"] == key[-1])):
+                    raise ValueError("Card expansion must match the declared expanded lane")
                 checks.extend(box_checks(card, variants[card["expanded"]], FIELDS[component], key))
     else:
         actual = indexed(captures, identity)

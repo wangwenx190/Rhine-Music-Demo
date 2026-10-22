@@ -13,7 +13,6 @@
 #include <rhi/qrhi_platform.h>
 #include <QOffscreenSurface>
 #include <QGuiApplication>
-#include <QElapsedTimer>
 #include <QJsonDocument>
 #include "JsonFile.h"
 #include <QDir>
@@ -137,10 +136,7 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
                                QRhiTextureSubresourceUploadDescription(
                                        encode(input, api->isYUpInFramebuffer())) } });
     cb->resourceUpdate(updates);
-    QElapsedTimer timer;
-    timer.start();
     post.render(cb);
-    const auto submitNs = timer.nsecsElapsed();
     require(post.uniformUploadBytes() == 240, "SMAA uploaded unused uniform capacity");
     std::array<QRhiReadbackResult, 3> reads;
     const std::array targets{ post.smaaEdges(), post.smaaWeights(), post.output() };
@@ -204,7 +200,6 @@ QJsonObject verify(QRhi *api, Postprocess &post, QRhiTexture *texture, const Ima
              { u"blendError"_s, blendError },
              { u"softenedPixels"_s, softened },
              { u"checkedPixels"_s, input.size.width() * input.size.height() },
-             { u"cpuSubmitNs"_s, submitNs },
              { u"uniformUploadBytes"_s, post.uniformUploadBytes() } };
 }
 

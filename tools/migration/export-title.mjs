@@ -29,13 +29,14 @@ for (let i = 0; i < args.length; i += 2) {
     }
 }
 try {
-    await fs.access(path.join(output, 'report.json'));
+    await fs.access(output);
     throw Error('Use a fresh source directory to retain earlier evidence');
 } catch (error) {
     if (error.code !== 'ENOENT')
         throw error;
 }
-await fs.mkdir(output, {recursive: true});
+await fs.mkdir(path.dirname(output), {recursive: true});
+await fs.mkdir(output);
 const sources = {};
 const source = frozenReader(sources);
 const appSource = source('src/music-app.ts');
