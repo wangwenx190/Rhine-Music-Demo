@@ -19,4 +19,4 @@
 - 功能图标保留源SVG几何。settings的横线/圆点以同几何Quick Shape分层；其他图标与品牌SVG使用VectorImage曲线渲染，质量默认值见[display-output.md](display-output.md)。
 - 静态文字用同源字体、CurveRendering和局部矢量比例表达分数字号；不能由截图反推布局常量。静态盒模型判定见source-fidelity-review.md的R19E；完整字体/标题采样仍按R19F复审。
 
-组件入口：`yalahoo --verify-browse 输出目录`；源码导出`node tools/migration/export-browse-ui.mjs`。生产回放检查九尺寸/双主题、最终song-cap及自身Qt键盘动作；用`python3 tools/migration/compare-browse-structure.py 原生report.json 冻结report.json 输出.json`检查同尺寸/主题/DPR的CSS锚点≤1逻辑px，不读取图像。字体身份/内容与实际质量单列。
+静态CSS锚点及容器判定见source-fidelity-review.md的R19E；字体/标题和动态页眉通过`export-title.mjs`与`verify-title.mjs`独立核对。`verify-gui.py`使用真实MusicStage核对布局/主题/两阵列联动，范围按test-gates.md选择；实际质量和目标输入事实归计划R36。

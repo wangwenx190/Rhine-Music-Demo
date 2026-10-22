@@ -1,3 +1,4 @@
+import {validateTitleState} from './title-report.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -97,27 +98,8 @@ if (/Binding loop detected|Failed to build graphics pipeline|No GLSL shader code
 if (result.status !== 0)
     throw Error('Title audit exited ' + result.status + '; output retained in ' + output);
 const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
-if (visible && (report.offscreen || report.renderProtocol !== 'native-window'))
-    throw Error('Visible verification requires an actual native window');
-if (process.platform === 'darwin' && !visible
-    && (!report.offscreen || report.renderProtocol !== 'render-control-gui-thread'
-        || report.offscreenResourcePlan?.nativeWindowVisible !== false
-        || report.offscreenResourcePlan?.attachmentEstimateBytesPerPixel !== 12
-        || report.offscreenResourcePlan?.actualDriverAllocationBytes !== null))
-    throw Error('macOS title verification requires a hidden RenderControl target');
-const production = report.captures;
-if (report.backend !== options.backend || Math.abs(report.dpr - dpr) > 0.001 || !report.released
-    || !report.windowPolicy.passed || report.motionError > 0.000001 || production.length !== 20
-    || report.headerChecks.length !== 18 || report.lifecycle.length !== 1
-    || report.animationChecks.length !== 1)
-    throw Error('Backend, DPR, motion, window, capture or lifecycle gates failed');
-if (production.some((capture) =>
-                        !capture.valid || !capture.geometry.passed || !capture.structurePassed)
-    || report.headerChecks.some((check) => !check.passed)
-    || report.lifecycle.some((check) => !check.passed))
-    throw Error('Structure, header or lifecycle gates failed');
-if (report.animationChecks.some((sample) => !sample.passed || sample.glyphNodesReused <= 0))
-    throw Error('Production glyph reuse failed');
+const production = validateTitleState(
+    report, {backend: options.backend, dpr, visible, platform: process.platform});
 // Source DOM font boxes are audited independently of the native geometry assertions.
 let baselines = 0, colorFaces = 0;
 const references = reference.captures.filter((capture) => Math.abs(capture.dpr - dpr) < .001);
@@ -152,8 +134,6 @@ for (const capture of production) {
 }
 if (process.platform === 'darwin' && (!baselines || colorFaces !== 8))
     throw Error('Primary and color-font coverage missing');
-if (!report.passed)
-    throw Error('Native checks failed');
 const summary = {
     passed: true,
     primaryFontBoxesChecked: baselines,

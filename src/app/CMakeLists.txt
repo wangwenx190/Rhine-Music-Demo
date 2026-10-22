@@ -5,8 +5,6 @@ qt_add_executable(
     DeploymentProbe.h
     AssetCatalog.cpp
     AssetCatalog.h
-    BrowseReview.cpp
-    BrowseReview.h
     OverviewReview.cpp
     OverviewReview.h
     DetailReview.cpp
@@ -20,30 +18,10 @@ if(YALAHOO_REVIEW)
     target_sources(
         Yalahoo
         PRIVATE
-        SceneReview.cpp
-        SceneReview.h
         MaterialReview.cpp
         MaterialReview.h
-        RenderProbe.cpp
-        RenderProbe.h
-        IntegrationReview.cpp
-        IntegrationReview.h
         FixedTextureData.cpp
         FixedTextureData.h
-    )
-    qt_add_resources(
-        Yalahoo
-        render_probe
-        PREFIX
-        /review
-        BASE
-        "${PROJECT_SOURCE_DIR}/tests/render"
-        FILES
-        "${PROJECT_SOURCE_DIR}/tests/render/InstanceProbe.qml"
-        "${PROJECT_SOURCE_DIR}/tests/render/probe-atlas.vert"
-        "${PROJECT_SOURCE_DIR}/tests/render/probe-atlas.frag"
-        "${PROJECT_SOURCE_DIR}/tests/render/instanced-glass.vert"
-        "${PROJECT_SOURCE_DIR}/tests/render/instanced-paper.vert"
     )
     target_include_directories(Yalahoo PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
     target_link_libraries(Yalahoo PRIVATE Qt6::GuiPrivate)
@@ -96,10 +74,6 @@ set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
 set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
 yalahoo_browse_qml(browse_qml_files)
-set(bootstrap_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/BootstrapProbe.qml")
-set(probe_window_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/ProbeWindow.qml")
-set_source_files_properties("${probe_window_qml}" PROPERTIES QT_RESOURCE_ALIAS ProbeWindow.qml)
-set_source_files_properties("${bootstrap_qml}" PROPERTIES QT_RESOURCE_ALIAS BootstrapProbe.qml)
 qt_add_resources(Yalahoo branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
     FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
     "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
@@ -112,8 +86,7 @@ set(review_dependencies)
 if(YALAHOO_REVIEW)
     set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
     set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
-    yalahoo_qml_group(material_qml_files scene CaseMaterials GlassMaterial LightingMaterial
-        CaseGeometry OcclusionPrepass SsaoEffect PostprocessEffect)
+    yalahoo_qml_group(material_qml_files scene CaseMaterials GlassMaterial LightingMaterial)
     qt_add_resources(
         Yalahoo
         material_assets
@@ -136,58 +109,16 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/licenses/materials-NOTICE.md"
         "${PROJECT_SOURCE_DIR}/resources/manifests/materials.json"
     )
-    set(occlusion_assets)
-    list(APPEND occlusion_assets "${PROJECT_SOURCE_DIR}/resources/manifests/occlusion.json")
-    foreach(name ao-prepass.frag ssao.frag ssao-blur.frag ssao-composite.frag shadow-probe.frag)
-        list(APPEND occlusion_assets "${PROJECT_SOURCE_DIR}/resources/shaders/${name}")
-    endforeach()
-    foreach(count 16 32 64)
-        foreach(kind kernel noise)
-            list(
-                APPEND
-                occlusion_assets
-                "${PROJECT_SOURCE_DIR}/resources/environment/ssao-${kind}-${count}.rgba32f"
-            )
-        endforeach()
-    endforeach()
-    qt_add_resources(
-        Yalahoo
-        occlusion_assets
-        PREFIX
-        /assets
-        BASE
-        "${PROJECT_SOURCE_DIR}/resources"
-        FILES
-        ${occlusion_assets}
-    )
-    qt_add_resources(
-        Yalahoo
-        postprocess_assets
-        PREFIX
-        /assets
-        BASE
-        "${PROJECT_SOURCE_DIR}/resources"
-        FILES
-        "${PROJECT_SOURCE_DIR}/resources/shaders/bokeh.frag"
-        "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-edges.frag"
-        "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-weights.frag"
-        "${PROJECT_SOURCE_DIR}/resources/shaders/smaa-blend.frag"
-        "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-area.png"
-        "${PROJECT_SOURCE_DIR}/resources/postprocess/smaa-search.png"
-        "${PROJECT_SOURCE_DIR}/resources/manifests/postprocess.json"
-    )
-    set(research_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/ResearchApp.qml")
-    set_source_files_properties("${research_qml}" PROPERTIES QT_RESOURCE_ALIAS ResearchApp.qml)
-    list(APPEND review_qml_files "${research_qml}" "${scene_qml}" ${material_qml_files})
+    list(APPEND review_qml_files "${scene_qml}" ${material_qml_files})
     list(APPEND review_sources FixedTextureData.h)
     list(APPEND review_dependencies QtQuick3D)
 endif()
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     DEPENDENCIES QtQuick ${review_dependencies}
     RESOURCE_PREFIX /qt/qml
-    QML_FILES "${app_qml}" "${bootstrap_qml}" "${probe_window_qml}" ${browse_qml_files} ${review_qml_files}
+    QML_FILES "${app_qml}" ${browse_qml_files} ${review_qml_files}
     SOURCES QmlTypes.h ApplicationIdentity.h ${review_sources})
-yalahoo_add_ui_shaders(Yalahoo probe.frag)
+yalahoo_add_ui_shaders(Yalahoo)
 target_link_libraries(
     Yalahoo
     PRIVATE

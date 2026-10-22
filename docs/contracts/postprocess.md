@@ -27,7 +27,6 @@ raw AO/normal/depth/linearColor绕过全部最终转换。浏览器线性诊断�
 - 生产颜色阈值.05、最多32步，保留锁定源helper和lookup：160×560 area线性/66×33 search nearest，gamma2.2及alpha混合。lookup原内嵌PNG→RGBA8，flipY=false解码行序，不转sRGB、不建mip；framebuffer Y变换不能作用于lookup。
 - 源crossing宏`float(ivec2)`取首分量后广播：(1,0)两轴各+1，(0,1)不增轴并保留调用前y减1，独立公式必须遵守该语义。
 - `rhi-smaa-gpu`直接生产三pass真正离屏；状态覆盖64×64/129×73/73×129、七种解析模式、动态后flat清零与一次重建。edges≤1/255、weights/blend≤3/255，全部RGBA通道有限，HDR/变化alpha保持。
-- Quick3D Review保留仅DOF/仅SMAA/DOF→SMAA三个固定Effect实例；组合在同Effect内用具名RGBA16F中间目标，最终pass必须输出最终目标；不动态重定向Pass.output/BufferInput。
 
 HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR颜色和独立后处理公式门槛不变。
 
@@ -37,4 +36,4 @@ HDR最终输出扩展由[display-output.md](display-output.md)维护；此处SDR
 
 Bokeh/SMAA独立项无swapchain/可见窗口，GL fallback surface须活到QRhi销毁之后。`ctest --preset qt-release-render -R '^rhi-(bokeh|smaa)-gpu$'`运行组件公式；完整资源图/计数在rhi-postprocess.md维护。逐项覆盖映射见source-fidelity-review.md的R19D4B2。MSAA/resolve与生产组合入口见rhi-postprocess.md；目标尺度与BLUR修正的集成入口见rhi-integration.md。
 
-`resources/shaders/gaussian-blur.glsl`统一执行各二维背景的有序高斯累加，各调用shader保留自己的来源sigma与成对权重表；审计从指定表读取核，不把其他vec2常量算作采样。RHI后处理入口通过`post-input.glsl`共享std140输入，并直接包含对应Quick3D核；SSAO的16/32/64入口以编译期宏选择`ssao-body.glsl`的完整有序样本。
+`resources/shaders/gaussian-blur.glsl`统一执行各二维背景的有序高斯累加，各调用shader保留自己的来源sigma与成对权重表；审计从指定表读取核，不把其他vec2常量算作采样。RHI后处理入口通过`post-input.glsl`共享std140输入，并直接包含共享源算法核；SSAO的16/32/64入口以编译期宏选择`ssao-body.glsl`的完整有序样本。

@@ -1,9 +1,6 @@
 #include "RenderQuality.h"
 #include "SceneAdapter.h"
 #include <QtTest>
-#include <QFile>
-#include <QJsonDocument>
-#include <QJsonArray>
 #include <QJsonObject>
 #include <cmath>
 #include <limits>
@@ -18,15 +15,6 @@ class RenderQualityTest final : public QObject
 public:
     RenderQualityTest() = default;
 
-private:
-    QJsonObject load(const char *name)
-    {
-        QFile f((QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/occlusion/"_s)
-                + QString::fromUtf8(name));
-        if (!f.open(QIODevice::ReadOnly))
-            return { };
-        return QJsonDocument::fromJson(f.readAll()).object();
-    }
 private Q_SLOTS:
     void nativeOutputDimensions()
     {
@@ -43,32 +31,6 @@ private Q_SLOTS:
         quality.resize(640, 480, 1.5);
         QCOMPARE(quality.targetSize(), QSize(960, 720));
         QCOMPARE(quality.aoSamples(), 64);
-    }
-    void seededKernel()
-    {
-        const auto oracle = load("kernel.json");
-        QVERIFY(!oracle.isEmpty());
-        for (int count : { 16, 32, 64 }) {
-            quint32 state = 417;
-            auto random = [&] {
-                state = state * 1664525u + 1013904223u;
-                return double(state) / 4294967296.0;
-            };
-            const auto samples = oracle[u"kernels"_s]
-                                         .toObject()[QString::number(count)]
-                                         .toObject()[u"samples"_s]
-                                         .toArray();
-            QCOMPARE(samples.size(), count);
-            for (int i = 0; i < count; ++i) {
-                double x = 2 * random() - 1, y = 2 * random() - 1, z = random(),
-                       length = std::sqrt(x * x + y * y + z * z),
-                       scale = .1 + .9 * std::pow(double(i) / count, 2);
-                const auto s = samples[i].toArray();
-                QVERIFY(std::abs(x / length * scale - s[0].toDouble()) < 1e-12);
-                QVERIFY(std::abs(y / length * scale - s[1].toDouble()) < 1e-12);
-                QVERIFY(std::abs(z / length * scale - s[2].toDouble()) < 1e-12);
-            }
-        }
     }
     void effectChangesKeepOutputAndScene()
     {
@@ -94,7 +56,7 @@ private Q_SLOTS:
         QCOMPARE(scene.quality()->values(), values);
         scene.quality()->resize(-1, 10, 2);
         QCOMPARE(scene.quality()->targetSize(), QSize(3840, 2160));
-        QVERIFY_EXCEPTION_THROWN(scene.quality()->resize(1e100, 10, 2), std::runtime_error);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, scene.quality()->resize(1e100, 10, 2));
     }
     void focalPlaneFollowsCamera()
     {

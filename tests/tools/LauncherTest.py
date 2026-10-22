@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix="yalahoo 匿名 参数 ") as temporary:
         assert result.returncode == 7, (launcher, result.returncode, result.stderr.decode())
         assert b"cannot be combined" in result.stderr
         assert not target.exists(), "Invalid demo arguments touched a data root"
-    for option in ["--music-root", "--import-legacy", "--import-preferences", "--verify-runtime"]:
+    for option in ["--music-root", "--import-legacy", "--import-preferences", "--verify-app"]:
         result = subprocess.run([str(ROOT / "yalahoo.sh"), "--lighting-lab", option, str(target)],
                                 cwd=temporary, env=env, capture_output=True, timeout=15)
         assert result.returncode == 7 and not target.exists(), (option, result.stderr.decode())

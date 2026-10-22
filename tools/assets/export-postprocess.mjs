@@ -1,8 +1,7 @@
-import {execFrozenGit, baselineRevision} from '../review/frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from '../migration/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '../..');
 const baseline = baselineRevision;
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');

@@ -18,6 +18,6 @@
 
 `node tools/migration/export-motion-golden.mjs`直接执行映射后的冻结motion/archive/real-columns/boot-timing源码，生成`tests/fixtures/motion/kernel-golden.json`及来源hash；Node仅用于维护导出。
 
-`motion`检查两组各694源状态、13函数向量、弹簧时间分割、五次C2、同目标/精确终点/revision、隐藏恢复及片头速度独立，x/v/a各≤1e-6。`runtime-motion`单独验证真实生产帧源的后台不增长、恢复首帧dt=0及减少动态终点；窗口选择由test-gates.md决定。新增QObject源后旧autogen引用失效时以干净Release重建moc。
+`motion`检查两组各694源状态、13函数向量、弹簧时间分割、五次C2、同目标/精确终点/revision、隐藏恢复及片头速度独立，x/v/a各≤1e-6。`startup`验证生产FrameClock暂停/恢复与减少动态终点，`ui-tests --window-lifecycle`核对真实MusicStage的隐藏/恢复；窗口选择由test-gates.md决定。新增QObject源后旧autogen引用失效时以干净Release重建moc。
 
 `MotionPanel`使用同一个SettingsController/FrameClock速度值，范围0.25×–3×、步进.05，恢复为1×；折叠/关闭保留速度。既有设置页速度控件读取同一值，不建立第二套时间或偏好。面板滚动、控件方向键和空格由输入所有权隔离；`experiments`覆盖在途往返改速不改变当前轨迹/revision，片头每步仍只增加未缩放dt。光照面板及共用验证入口见lighting.md。

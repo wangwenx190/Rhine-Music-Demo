@@ -21,17 +21,6 @@
     </message>
 </context>
 <context>
-    <name>BootstrapProbe</name>
-    <message>
-        <source>Graphics configuration unavailable: %1</source>
-        <translation>图形配置不可用：%1</translation>
-    </message>
-    <message>
-        <source>Output reached the size protection limit. Quality preferences are preserved.</source>
-        <translation>输出达到尺寸保护上限，画质设置保持原值。</translation>
-    </message>
-</context>
-<context>
     <name>Browse</name>
     <message>
         <source>Thumbnail view     V</source>
@@ -114,10 +103,6 @@
         <translation>验证生产界面的导航，然后退出</translation>
     </message>
     <message>
-        <source>Verify production browse UI and exit</source>
-        <translation>验证生产界面的浏览页面，然后退出</translation>
-    </message>
-    <message>
         <source>Override the native data root</source>
         <translation>指定原生数据根目录</translation>
     </message>
@@ -142,40 +127,8 @@
         <translation>重新扫描保存的本地音乐目录</translation>
     </message>
     <message>
-        <source>Write runtime evidence and exit</source>
-        <translation>写入运行验证资料，然后退出</translation>
-    </message>
-    <message>
-        <source>Load anonymous mixed library for runtime verification only</source>
-        <translation>仅为运行验证加载匿名混合音乐库</translation>
-    </message>
-    <message>
         <source>fixture</source>
         <translation>测试输入</translation>
-    </message>
-    <message>
-        <source>Exercise the production filled demonstration with verify-runtime</source>
-        <translation>配合 verify-runtime 验证生产界面的填充演示</translation>
-    </message>
-    <message>
-        <source>Verify the production frame source, hide/restore and motion completion</source>
-        <translation>验证生产帧源、隐藏与恢复以及运动完成状态</translation>
-    </message>
-    <message>
-        <source>Exercise production material/shadow/AO rendering with verify-runtime</source>
-        <translation>配合 verify-runtime 验证生产材质、阴影与环境光遮蔽渲染</translation>
-    </message>
-    <message>
-        <source>Measure RHI production integration and exit</source>
-        <translation>测量 RHI 生产集成，然后退出</translation>
-    </message>
-    <message>
-        <source>Production sampling duration (12-120 seconds)</source>
-        <translation>生产采样时长（12 至 120 秒）</translation>
-    </message>
-    <message>
-        <source>seconds</source>
-        <translation>秒</translation>
     </message>
     <message>
         <source>Verify source material state and native output</source>
@@ -184,14 +137,6 @@
     <message>
         <source>Material source/state report</source>
         <translation>材质来源与状态报告</translation>
-    </message>
-    <message>
-        <source>Run deterministic geometry fixtures</source>
-        <translation>运行确定性几何测试输入</translation>
-    </message>
-    <message>
-        <source>Geometry review report</source>
-        <translation>几何审查报告</translation>
     </message>
 </context>
 <context>
@@ -919,45 +864,6 @@
     <message>
         <source>Waiting for an audio output device</source>
         <translation>等待音频输出设备</translation>
-    </message>
-</context>
-<context>
-    <name>ProbeWindow</name>
-    <message>
-        <source>One album at a time</source>
-        <translation>一张一张，慢慢听</translation>
-    </message>
-    <message>
-        <source>Qt native runtime probe · QML / 3D / ShaderTools / Multimedia</source>
-        <translation>Qt 原生运行探针 · QML / 3D / ShaderTools / Multimedia</translation>
-    </message>
-    <message>
-        <source>Warm day</source>
-        <translation>暖昼</translation>
-    </message>
-    <message>
-        <source>Deep night</source>
-        <translation>深夜</translation>
-    </message>
-    <message>
-        <source>Real album columns</source>
-        <translation>真实专辑列</translation>
-    </message>
-    <message>
-        <source>Remember each column&apos;s position</source>
-        <translation>保留每列浏览位置</translation>
-    </message>
-    <message>
-        <source>Verify window interaction</source>
-        <translation>验证窗口交互</translation>
-    </message>
-    <message>
-        <source>Interaction received %1</source>
-        <translation>交互已响应 %1</translation>
-    </message>
-    <message>
-        <source>Anonymous library model · %1 albums</source>
-        <translation>匿名库模型 · %1 张专辑</translation>
     </message>
 </context>
 <context>

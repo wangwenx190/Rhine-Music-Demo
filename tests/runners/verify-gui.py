@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run one integrated GUI matrix and preserve its inputs, output and failure status."""
-from native_replay import (BACKEND_IDS, cmake_cache, executable_path, read_report,
+from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
                            replay_environment, run_logged, write_json)
 import argparse
 import hashlib
@@ -78,7 +78,8 @@ if not isinstance(captures, list) or not all(valid_capture(capture) for capture 
 actual = {(c['width'], c['height'], c['night'], c['realistic'], c['phase']) for c in captures}
 images = [args.output / 'matrix' / c['image'] for c in captures]
 valid = (code == 0 and report.get('passed') is True and report.get('backend') == BACKEND_IDS[args.backend]
-         and actual == expected and len(captures) == len(expected) and all(p.is_file() for p in images))
+         and actual == expected and len(captures) == len(expected) and all(p.is_file() for p in images)
+         and not any(token in (args.output / 'run.log').read_text(encoding='utf-8') for token in QML_ERRORS))
 manifest.update(exitCode=code, completed=report_path.is_file(), passed=bool(valid),
                 capturedCheckpoints=len(captures), expectedCheckpoints=len(expected),
                 imageSha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in images if p.is_file()})

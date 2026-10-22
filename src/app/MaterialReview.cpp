@@ -7,11 +7,9 @@
 #include "MaterialReview.h"
 #include "OffscreenSurface.h"
 #include "ReviewGlCapabilities.h"
-#include "RenderProbe.h"
 #include "VerificationWindow.h"
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QQuick3DObject>
 #include "SceneAdapter.h"
 #include <QCryptographicHash>
 #include <QDir>
@@ -43,15 +41,11 @@ namespace {
 constexpr auto DefaultWidthPixels = 960;
 constexpr auto DefaultHeightPixels = 720;
 constexpr auto SourceMaterialCaseCount = 90;
-constexpr auto LifecycleRestoreCount = 10;
-constexpr auto DefaultAoRadius = .18;
+constexpr auto LifecycleRestoreCount = 1;
 constexpr auto ProbeFovDegrees = 32;
 constexpr auto DegreesPerTurn = 360;
 constexpr auto ForegroundDifferenceThreshold = 9;
 constexpr auto ParameterTolerance = 1e-6;
-constexpr auto FocusTolerance = 1e-4;
-constexpr auto ApertureTolerance = 1e-10;
-constexpr auto PostprocessDeadlineMilliseconds = 600000;
 constexpr auto MaterialDeadlineMilliseconds = 120000;
 
 // Nonzero process results are part of the standalone review command protocol.
@@ -82,10 +76,7 @@ struct MaterialReviewState final
     QJsonObject &latestQuick3DTarget;
     std::atomic<bool> &multisampleBufferAdaptation;
     QJsonArray &cases;
-    const bool &backendReview;
     const bool &lightingReview;
-    const bool &occlusionReview;
-    const bool &postprocessReview;
     SceneAdapter &scene;
     std::unique_ptr<OffscreenSurface> &surface;
     const QString &report;
@@ -126,28 +117,13 @@ auto recordMaterialSceneGraph(MaterialReviewState &state)
     return nextSurface;
 }
 
-auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, auto &pool,
-                           auto &table, auto &atlas, auto &start, auto &frames)
+auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, auto &start,
+                           auto &frames)
 {
     const auto c = state.cases[index].toObject();
-    if (state.backendReview)
-        qCInfo(yalahoo::logRender) << "R10 GPU case" << index;
     view->setProperty("warmth", c[u"day"_s].toBool() ? 1.0 : 0.0);
     view->setProperty("clarity", c[u"clarity"_s].toDouble());
-    if (pool) {
-        const bool enabled = c[u"instancePool"_s].toBool();
-        pool->setProperty("visible", enabled);
-        table.setPositions(c[u"instances"_s].toArray().toVariantList());
-        table.setDepthSortingEnabled(c[u"depthSort"_s].toBool());
-        pool->setProperty("atlasEnabled", c[u"atlas"_s].toBool());
-        pool->setProperty(
-                "coverSource",
-                QUrl("qrc:/assets/demo-covers/"_L1 + c[u"cover"_s].toString() + ".png"_L1));
-        if (c[u"atlas"_s].toBool())
-            atlas->setPhase(c[u"atlasPhase"_s].toInt());
-    }
-    view->setProperty("reviewLayer",
-                      c[u"instancePool"_s].toBool() ? u"none"_s : c[u"layer"_s].toString());
+    view->setProperty("reviewLayer", c[u"layer"_s].toString());
     view->setProperty("coverSource",
                       c[u"paperProbe"_s].toBool() ? QUrl(u"qrc:/review/paper-probe.png"_s)
                                                   : QUrl("qrc:/assets/demo-covers/"_L1
@@ -159,29 +135,9 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
     view->setProperty("reviewCasePosition", QVariant::fromValue(caseOrigin.qt()));
     view->setProperty("lightingEnabled",
                       state.lightingReview && !c[u"materialBaseline"_s].toBool());
-    view->setProperty("occlusionEnabled",
-                      (state.occlusionReview || state.postprocessReview)
-                              && !c[u"materialBaseline"_s].toBool());
-    view->setProperty("postprocessEnabled",
-                      state.postprocessReview && !c[u"materialBaseline"_s].toBool());
-    view->setProperty("reviewDisableBokeh", c[u"disableBokeh"_s].toBool());
-    view->setProperty("reviewDisableSmaa", c[u"disableSmaa"_s].toBool());
-    view->setProperty("reviewAntialiasing", c.value(u"aaMode"_s).toInt(1));
     const int w = c.value(u"width"_s).toInt(DefaultWidthPixels),
               h = c.value(u"height"_s).toInt(DefaultHeightPixels);
     state.window->resize(w, h);
-    view->setProperty("shadowsEnabled",
-                      (state.occlusionReview || state.backendReview)
-                              && c.value(u"shadows"_s).toBool());
-    view->setProperty("occlusionChannel", c.value(u"channel"_s).toInt());
-    view->setProperty("renderNear", c.value(u"clipNear"_s).toDouble(state.scene.clipNear()));
-    view->setProperty("renderFar", c.value(u"clipFar"_s).toDouble(state.scene.clipFar()));
-    view->setProperty("aoRadius", c.value(u"kernelRadius"_s).toDouble(DefaultAoRadius));
-    view->setProperty("shadowProbe", c.value(u"shadowProbe"_s).toBool());
-    view->setProperty("reviewNeighbors",
-                      c[u"instancePool"_s].toBool()
-                              ? QVariantList{ }
-                              : c.value(u"neighbors"_s).toArray().toVariantList());
     if (state.lightingReview) {
         state.scene.lighting()->setReducedMotion(true);
         state.scene.lighting()->setNight(!c[u"day"_s].toBool());
@@ -202,10 +158,6 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
                           2 * (pos - aim).length()
                                   * std::tan(ProbeFovDegrees * std::acos(-1.0) / DegreesPerTurn) },
                         0);
-    if (state.occlusionReview || state.postprocessReview)
-        state.scene.quality()->resize(c.value(u"width"_s).toInt(DefaultWidthPixels),
-                                      c.value(u"height"_s).toInt(DefaultHeightPixels),
-                                      state.window->devicePixelRatio());
     if (state.lightingReview) {
         const auto offset = state.scene.cameraRotation().rotatedVector(
                 { -yalahoo::cameraFraming::LightOffsetX, -yalahoo::cameraFraming::LightOffsetY,
@@ -228,10 +180,9 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
 
 auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start, auto &index,
                           auto &restore, auto &view, auto &output, auto &maxProjection, auto &pass,
-                          auto &atlas, auto &results, auto &previousInvalidations, auto &restores,
-                          auto &next, auto &restoreCount, auto &pool, auto &object,
-                          auto &makeWindow, auto &bindFrames, auto &component, auto &applyState,
-                          auto &warnings)
+                          auto &results, auto &previousInvalidations, auto &restores, auto &next,
+                          auto &restoreCount, auto &object, auto &makeWindow, auto &bindFrames,
+                          auto &component, auto &applyState, auto &warnings)
 {
     ++frames;
     if (frames - start < 4) {
@@ -282,9 +233,7 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
                 ++foreground;
         }
     }
-    valid = valid
-            && (state.occlusionReview || state.postprocessReview
-                || foreground > yalahoo::review::MinimumForegroundPixels);
+    valid = valid && foreground > yalahoo::review::MinimumForegroundPixels;
     double webProjection = 0;
     for (auto value : c[u"projections"_s].toArray()) {
         const auto p = value.toObject();
@@ -324,70 +273,38 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
         maxProjection = std::max(maxProjection, error);
         valid = valid && std::isfinite(error) && error <= 2;
     }
-    if (state.occlusionReview || state.postprocessReview)
-        valid = valid
-                && view->property("effectiveTextureSize").toSize()
-                        == state.scene.quality()->targetSize();
-    const auto *bokeh = state.window->findChild<QObject *>("bokehEffect");
-    const double focus = bokeh->property("focus").toDouble(),
-                 aperture = bokeh->property("aperture").toDouble();
-    if (state.postprocessReview)
-        valid = valid && std::abs(focus - c[u"focus"_s].toDouble()) < FocusTolerance
-                && std::abs(aperture - c[u"aperture"_s].toDouble()) < ApertureTolerance;
     QJsonObject quick3DTarget;
     {
         const QMutexLocker lock(&state.targetMutex);
         quick3DTarget = state.latestQuick3DTarget;
     }
-    if (state.multisampleBufferAdaptation.load()
-        && view->property("reviewAntialiasing").toInt() == 1)
+    if (state.multisampleBufferAdaptation.load())
         valid = valid && quick3DTarget[u"samples"_s].toInt() == 4
                 && quick3DTarget[u"renderbuffer"_s].toBool()
                 && quick3DTarget[u"resolved"_s].toBool()
                 && quick3DTarget[u"formatPreserved"_s].toBool();
     pass = pass && valid;
-    QJsonObject result{
-        { u"quick3DTarget"_s, quick3DTarget },
-        { u"multisampleBufferAdaptation"_s, state.multisampleBufferAdaptation.load() },
-        { u"instancePool"_s, c[u"instancePool"_s] },
-        { u"depthSort"_s, c[u"depthSort"_s] },
-        { u"atlas"_s, c[u"atlas"_s] },
-        { u"atlasPhase"_s, atlas ? atlas->phase() : -1 },
-        { u"atlasSubmissions"_s, atlas ? atlas->submissions() : 0 },
-        { u"atlasCpuPayloadBytes"_s, atlas ? RenderProbeAtlas::pageBytes : 0 },
-        { u"atlasModifiedTileBytes"_s, atlas ? RenderProbeAtlas::tileBytes : 0 },
-        { u"atlasGpuUploadBytes"_s, QJsonValue(QJsonValue::Null) },
-        { u"index"_s, state.postprocessReview ? c[u"index"_s].toInt() : index },
-        { u"focus"_s, focus },
-        { u"aperture"_s, aperture },
-        { u"bokehActive"_s, view->property("bokehActive").toBool() },
-        { u"smaaActive"_s, view->property("smaaActive").toBool() },
-        { u"aaMode"_s, c.value(u"aaMode"_s).toInt(1) },
-        { u"width"_s, state.window->width() },
-        { u"height"_s, state.window->height() },
-        { u"channel"_s, c[u"channel"_s] },
-        { u"shadows"_s, c[u"shadows"_s] },
-        { u"quality"_s, c[u"quality"_s] },
-        { u"targetWidth"_s, view->property("effectiveTextureSize").toSize().width() },
-        { u"targetHeight"_s, view->property("effectiveTextureSize").toSize().height() },
-        { u"aoWidth"_s, state.scene.quality()->targetSize().width() },
-        { u"aoHeight"_s, state.scene.quality()->targetSize().height() },
-        { u"paperProbe"_s, paperProbe },
-        { u"paperProbeError"_s, paperProbeError },
-        { u"paperLight"_s, c[u"paperLight"_s] },
-        { u"foregroundPixels"_s, foreground },
-        { u"sourceParameterMatch"_s, parameters },
-        { u"webProjectionPixels"_s, webProjection },
-        { u"theme"_s, c[u"day"_s].toBool() ? u"day"_s : u"night"_s },
-        { u"angle"_s, c[u"angle"_s] },
-        { u"cover"_s, c[u"cover"_s] },
-        { u"layer"_s, c[u"layer"_s] },
-        { u"mode"_s, c[u"mode"_s] },
-        { u"origin"_s, c[u"origin"_s] },
-        { u"passed"_s, valid },
-        { u"frames"_s, frames - start },
-        { u"screenshot"_s, name }
-    };
+    QJsonObject result{ { u"quick3DTarget"_s, quick3DTarget },
+                        { u"multisampleBufferAdaptation"_s,
+                          state.multisampleBufferAdaptation.load() },
+                        { u"index"_s, index },
+                        { u"width"_s, state.window->width() },
+                        { u"height"_s, state.window->height() },
+                        { u"paperProbe"_s, paperProbe },
+                        { u"paperProbeError"_s, paperProbeError },
+                        { u"paperLight"_s, c[u"paperLight"_s] },
+                        { u"foregroundPixels"_s, foreground },
+                        { u"sourceParameterMatch"_s, parameters },
+                        { u"webProjectionPixels"_s, webProjection },
+                        { u"theme"_s, c[u"day"_s].toBool() ? u"day"_s : u"night"_s },
+                        { u"angle"_s, c[u"angle"_s] },
+                        { u"cover"_s, c[u"cover"_s] },
+                        { u"layer"_s, c[u"layer"_s] },
+                        { u"mode"_s, c[u"mode"_s] },
+                        { u"origin"_s, c[u"origin"_s] },
+                        { u"passed"_s, valid },
+                        { u"frames"_s, frames - start },
+                        { u"screenshot"_s, name } };
     if (restore == 0)
         results.append(result);
     else {
@@ -406,7 +323,6 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
         previousInvalidations = state.invalidations.load();
         // Rebuild the complete Review scene, including Quick3D scene-manager ownership.
         // Reusing a View3D after this manually driven context loss can leave it blank.
-        pool.reset();
         view->setParentItem(nullptr);
         object.reset();
         state.surface->hide();
@@ -419,8 +335,7 @@ auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start,
             bindFrames();
         }
         object.reset(component.createWithInitialProperties(
-                { { u"adapter"_s, QVariant::fromValue(&state.scene) },
-                  { u"materialReview"_s, true } }));
+                { { u"adapter"_s, QVariant::fromValue(&state.scene) } }));
         view = qobject_cast<QQuickItem *>(object.get());
         if (!view) {
             state.app.exit(InvalidReviewInput);
@@ -478,19 +393,14 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         return InvalidReviewInput;
     const auto bytes = input.readAll();
     const auto oracle = QJsonDocument::fromJson(bytes).object();
-    const bool backendReview = oracle[u"renderBackend"_s].toBool();
-    const bool postprocessReview = oracle[u"postprocess"_s].toBool();
-    const bool occlusionReview = oracle[u"occlusion"_s].toBool(),
-               lightingReview =
-                       oracle[u"lighting"_s].toBool() || occlusionReview || postprocessReview;
+    const bool lightingReview = oracle[u"lighting"_s].toBool();
     auto cases = oracle[u"cases"_s].toArray();
     for (const auto &value : cases) {
         const auto state = value.toObject();
         if (state[u"position"_s].toArray().size() != 3)
             return InvalidReviewInput;
-        if (!backendReview && !occlusionReview && !postprocessReview
-            && (state[u"parameters"_s].toArray().size() != 3
-                || state[u"projections"_s].toArray().size() != 5))
+        if (state[u"parameters"_s].toArray().size() != 3
+            || state[u"projections"_s].toArray().size() != 5)
             return InvalidReviewInput;
     }
     if (cases.isEmpty() || (!lightingReview && cases.size() != SourceMaterialCaseCount))
@@ -524,10 +434,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
                                latestQuick3DTarget,
                                multisampleBufferAdaptation,
                                cases,
-                               backendReview,
                                lightingReview,
-                               occlusionReview,
-                               postprocessReview,
                                scene,
                                surface,
                                report,
@@ -546,7 +453,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     QQmlComponent component(&engine);
     component.loadFromModule("Yalahoo.Music", "GeometryScene");
     std::unique_ptr<QObject> object(component.createWithInitialProperties(
-            { { u"adapter"_s, QVariant::fromValue(&scene) }, { u"materialReview"_s, true } }));
+            { { u"adapter"_s, QVariant::fromValue(&scene) } }));
     auto *view = qobject_cast<QQuickItem *>(object.get());
     if (!view) {
         qCWarning(yalahoo::logRender) << component.errors();
@@ -557,35 +464,14 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     const QString output = QFileInfo(report).absolutePath();
     QDir().mkpath(output);
     int frames = 0;
-    RenderProbeInstances table;
-    std::unique_ptr<RenderProbeAtlas> atlas;
-    std::unique_ptr<QObject> pool;
-    if (backendReview) {
-        atlas = std::make_unique<RenderProbeAtlas>();
-        qCInfo(yalahoo::logRender) << "R10: creating instance probe";
-        QQmlComponent component(&engine, QUrl(u"qrc:/review/InstanceProbe.qml"_s));
-        pool.reset(component.createWithInitialProperties(
-                { { u"adapter"_s, QVariant::fromValue(&scene) },
-                  { u"table"_s, QVariant::fromValue(static_cast<QQuick3DInstancing *>(&table)) },
-                  { u"atlas"_s,
-                    QVariant::fromValue(static_cast<QQuick3DTextureData *>(atlas.get())) } }));
-        if (!pool) {
-            qCWarning(yalahoo::logRender) << component.errors();
-            return InvalidReviewInput;
-        }
-        auto *node = qobject_cast<QQuick3DObject *>(pool.get());
-        node->setParentItem(window->findChild<QQuick3DObject *>("inspectionCase")->parentItem());
-        node->setProperty("visible", false);
-        qCInfo(yalahoo::logRender) << "R10: instance probe ready";
-    }
     int index = -1, start = 0;
     QJsonArray results, restores;
     int restore = 0, previousInvalidations = 0;
-    const int restoreCount = backendReview ? 0 : lightingReview ? 1 : LifecycleRestoreCount;
+    const int restoreCount = LifecycleRestoreCount;
     bool pass = true;
     double maxProjection = 0;
     const auto applyState = [&] {
-        return captureMaterialReview(state, index, view, pool, table, atlas, start, frames);
+        return captureMaterialReview(state, index, view, start, frames);
     };
     const auto next = [&] {
         ++index;
@@ -598,9 +484,9 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     };
     collectFrame = [&] {
         return finishMaterialReview(state, frames, start, index, restore, view, output,
-                                    maxProjection, pass, atlas, results, previousInvalidations,
-                                    restores, next, restoreCount, pool, object, makeWindow,
-                                    bindFrames, component, applyState, warnings);
+                                    maxProjection, pass, results, previousInvalidations, restores,
+                                    next, restoreCount, object, makeWindow, bindFrames, component,
+                                    applyState, warnings);
     };
     QTimer timeout;
     timeout.setSingleShot(true);
@@ -609,12 +495,10 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     });
     bindFrames();
     next();
-    timeout.start(postprocessReview ? PostprocessDeadlineMilliseconds
-                                    : MaterialDeadlineMilliseconds);
+    timeout.start(MaterialDeadlineMilliseconds);
     surface->show();
     const int code = app.exec();
     surface->hide();
-    pool.reset();
     object.reset();
     auto previousSurface = std::move(surface);
     window.reset();

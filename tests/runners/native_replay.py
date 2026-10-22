@@ -33,6 +33,9 @@ def run_logged(command, log_path, *, cwd, environment, timeout):
                                   stderr=subprocess.STDOUT, timeout=timeout, check=False).returncode
         except subprocess.TimeoutExpired:
             return "timeout"
+        except OSError as error:
+            log.write(f"Cannot launch verification process: {error}\n")
+            return "launch-error"
 
 
 def executable_path(root=ROOT, tool=None):

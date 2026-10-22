@@ -1,0 +1,58 @@
+"""Run the real CMake policy and CTest presets against harmless process fixtures."""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+FLAGS = ("VISIBLE", "FOREGROUND", "LIFECYCLE", "WINDOW_LIFECYCLE", "STRESS")
+
+
+class TestPolicyTest(unittest.TestCase):
+    def test_presets_isolate_opt_ins_and_select_only_the_declared_scope(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo ctest space-") as directory:
+            root = Path(directory)
+            shutil.copyfile(ROOT / "CMakePresets.json", root / "CMakePresets.json")
+            fixture = root / "fixture.py"
+            fixture.write_text("import json, os, pathlib, sys\n"
+                               "pathlib.Path(sys.argv[1]).write_text(json.dumps({k: v for k, v in os.environ.items() "
+                               "if k.startswith('YALAHOO_VERIFY_')}))\n", encoding="utf-8")
+            for folder in ("tests/unit", "tests/integration", "tests/render"):
+                (root / folder).mkdir(parents=True)
+                (root / folder / "CMakeLists.txt").write_text("", encoding="utf-8")
+            declarations = ["cmake_minimum_required(VERSION 3.25)", "project(PolicyFixture NONE)",
+                            "enable_testing()", "set(APPLE TRUE)", "set(YALAHOO_MACOS_VISIBLE_TESTS OFF)"]
+            names = ("unit-probe", "startup-qml", "startup-stress", "runtime-detail", "rhi-bokeh-gpu")
+            for name in names:
+                declarations.append(f'add_test(NAME {name} COMMAND "{Path(sys.executable).as_posix()}" '
+                                    f'"{fixture.as_posix()}" "{(root / (name + ".json")).as_posix()}")')
+            declarations += ["set_tests_properties(startup-stress PROPERTIES LABELS resource-stress)",
+                             *[f"add_subdirectory({folder})" for folder in ("tests/unit", "tests/integration", "tests/render")],
+                             f'include("{(ROOT / "cmake/TestPolicy.cmake").as_posix()}")']
+            (root / "CMakeLists.txt").write_text("\n".join(declarations) + "\n", encoding="utf-8")
+            subprocess.run(["cmake", "--preset", "qt-release"], cwd=root, check=True, capture_output=True, timeout=20)
+            environment = {**os.environ, **{f"YALAHOO_VERIFY_{flag}": "1" for flag in FLAGS}}
+            for preset, expected in (("qt-release", {"unit-probe"}),
+                                     ("qt-release-full", {"unit-probe", "startup-qml", "rhi-bokeh-gpu"}),
+                                     ("qt-release-render", {"startup-qml", "rhi-bokeh-gpu"}),
+                                     ("qt-release-stress", {"startup-stress"})):
+                with self.subTest(preset=preset):
+                    for name in names:
+                        (root / (name + ".json")).unlink(missing_ok=True)
+                    result = subprocess.run(["ctest", "--preset", preset], cwd=root, env=environment,
+                                            capture_output=True, text=True, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual({name for name in names if (root / (name + ".json")).exists()}, expected)
+                    for name in expected:
+                        actual = json.loads((root / (name + ".json")).read_text())
+                        for flag in FLAGS:
+                            wanted = "1" if flag == "STRESS" and preset == "qt-release-stress" else "0"
+                            self.assertEqual(actual[f"YALAHOO_VERIFY_{flag}"], wanted)
+
+
+if __name__ == "__main__":
+    unittest.main()

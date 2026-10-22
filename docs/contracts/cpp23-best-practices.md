@@ -60,6 +60,6 @@
 
 ## 审计入口与专项职责
 
-`python3 tools/audit/audit-best-practices.py --output verification/全新目录`读取Release compile database，输出实际编译单元的hash、所选clang-tidy诊断及QML人工复查位置。[clang-tidy官方说明](https://clang.llvm.org/extra/clang-tidy/index.html)界定工具能力；`compilerChecksClean`仅表示所列检查无诊断，不能证明架构、未编译分支或全项目语义正确。
+`python3 tools/audit/audit-best-practices.py --output verification/全新目录`读取Release compile database，输出实际编译单元的hash和所选clang-tidy诊断。[clang-tidy官方说明](https://clang.llvm.org/extra/clang-tidy/index.html)界定工具能力；`compilerChecksClean`仅表示所列检查无诊断，不能证明架构、未编译分支或全项目语义正确。
 
 人工审查关联文件/符号、调用者、状态前提、失败/取消/销毁路径、判定与局限；文件清单、规则命中数和少量示例不能代表完整覆盖。格式见[code-style.md](code-style.md)，性能上界见[performance.md](performance.md)，验证选择见[test-gates.md](test-gates.md)，不在此重复维护数值和门槛。

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-foreach(shader IN ITEMS src/app/.qsb/probe.frag.qsb src/app/.qsb/reel-slot.frag.qsb
+foreach(shader IN ITEMS src/app/.qsb/reel-slot.frag.qsb
         src/app/.qsb/display-output.frag.qsb src/render/rhi/.qsb/output.frag.qsb)
     execute_process(
         COMMAND "${QSB}" --dump "${BUILD_DIRECTORY}/${shader}"

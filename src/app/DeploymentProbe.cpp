@@ -98,7 +98,7 @@ auto finishDeploymentProbe(DeploymentState &state)
     bool assets = true;
     for (const auto *path :
          { ":/qt/qml/Yalahoo/Music/App.qml", ":/assets/icons/yalahoo/png/yalahoo-32.png",
-           ":/assets/branding/logo-light.svg", ":/assets/shaders/probe.frag.qsb",
+           ":/assets/branding/logo-light.svg", ":/assets/shaders/reel-slot.frag.qsb",
            ":/assets/shaders/opening-paper.frag.qsb", ":/assets/audio/atmosphere.ogg" }) {
         QFile file(QString::fromUtf8(path));
         const bool valid = file.open(QIODevice::ReadOnly) && file.size() > 0;

@@ -9,22 +9,22 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '../..');
 const overview = process.argv.includes('--overview');
 const presentation = process.argv.includes('--presentation');
+if (overview === presentation)
+    throw Error('Select exactly one source structure: --overview or --presentation');
 const baseline = baselineRevision;
 const frozen = path.join(root, 'build/browse-ui-web/legacy-web');
 const output = path.join(root, presentation ? 'verification/presentation-source'
-                               : overview   ? 'verification/overview-source'
-                                            : 'verification/windows/browse-ui/web');
+                                            : 'verification/overview-source');
 await fs.mkdir(output, {recursive: true});
 const sources = {};
 const source = frozenReader(sources);
 const appSource = source('src/music-app.ts');
 const markup = sourceMarkup(appSource);
 await writeSourceUi(frozen, source, sources);
-let harness = await fs.readFile(path.join(root, 'tools/migration/'
-                                                    + (presentation ? 'presentation-ui-harness.js'
-                                                       : overview   ? 'overview-ui-harness.js'
-                                                                    : 'browse-ui-harness.js')),
-                                'utf8');
+let harness = await fs.readFile(
+    path.join(root, 'tools/migration/'
+                        + (presentation ? 'presentation-ui-harness.js' : 'overview-ui-harness.js')),
+    'utf8');
 if (presentation) {
     const select = (text, names) => {
         const file = ts.createSourceFile('source.ts', text, ts.ScriptTarget.Latest, true);

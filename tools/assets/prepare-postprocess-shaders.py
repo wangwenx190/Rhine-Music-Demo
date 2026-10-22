@@ -1,4 +1,4 @@
-"""Port the locked Three postprocessing kernels to public Quick3D Effect snippets."""
+"""Port the locked Three postprocessing kernels to shared Qt shader snippets."""
 from pathlib import Path
 import re
 root = Path(__file__).resolve().parents[2]

@@ -30,7 +30,6 @@ T.ApplicationWindow {
     property string reviewPlayingTitle: ""
     property string preferencesError: ""
     property bool lightingLab: false
-    property bool geometryProbe: false
     property bool verificationRun: false
     property DisplayOutput displayOutput: null
     property int verificationFlags: Qt.Window
@@ -81,7 +80,6 @@ T.ApplicationWindow {
                 preferencesError: window.preferencesError
                 experimentsVisible: window.lightingLab
                 onExperimentsVisibilityRequested: shown => window.lightingLab = shown
-                geometryProbe: window.geometryProbe
             }
         }
     }

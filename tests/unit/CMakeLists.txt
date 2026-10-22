@@ -121,28 +121,14 @@ if(YALAHOO_REVIEW)
 endif()
 yalahoo_unit_test(RenderQualityTest render-quality
     LIBRARIES YalahooScene
-    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     REPORT render-quality-test.xml)
 yalahoo_unit_test(SceneTest scene
     LIBRARIES YalahooScene
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" SCENE_REPORT="${CMAKE_BINARY_DIR}/verification/scene-errors.json"
     REPORT scene-test.xml TIMEOUT 60)
 if(YALAHOO_REVIEW)
-    set(material_errors "Failed to compile;QSpirvCompiler;TypeError;out of range")
-    yalahoo_review_test(runtime-render-backend materials render-backend/visual.json
-        render-backend/runtime.json 240 ERRORS "${material_errors}")
-    foreach(dpr IN ITEMS 1 1.5 2)
-        yalahoo_review_test(runtime-postprocess-dpr-${dpr} materials postprocess/visual-dpr-${dpr}.json
-            postprocess/dpr-${dpr}/runtime.json 420 DPR ${dpr} ERRORS "${material_errors}")
-    endforeach()
-    yalahoo_review_test(runtime-occlusion materials occlusion/visual.json
-        occlusion/runtime.json 180 ERRORS "${material_errors}")
-    yalahoo_review_test(runtime-materials materials materials/single-case.json materials/runtime.json 150)
-    yalahoo_review_test(runtime-lighting materials lighting/visual.json lighting/runtime.json 150)
-    foreach(dpr IN ITEMS 1 1.5 2)
-        yalahoo_review_test(runtime-scene-dpr-${dpr} scene scene/camera-golden.json
-            scene-dpr-${dpr}/runtime.json 90 DPR ${dpr} ENVIRONMENT "QSG_INFO=1")
-    endforeach()
+    yalahoo_material_test(runtime-materials materials/single-case.json materials/runtime.json 150)
+    yalahoo_material_test(runtime-lighting lighting/visual.json lighting/runtime.json 150)
 endif()
 yalahoo_unit_test(IdentityTest identity LIBRARIES YalahooCore Qt6::Gui)
 yalahoo_unit_test(ModuleProbe module-link-and-plugins
@@ -161,46 +147,11 @@ add_test(
     -P
     "${CMAKE_CURRENT_SOURCE_DIR}/KitSelectionTest.cmake"
 )
-add_test(
-    NAME
-    runtime
-    COMMAND
-    Yalahoo
-    --verify-runtime
-    "${CMAKE_BINARY_DIR}/verification/runtime.json"
-)
-set_tests_properties(runtime PROPERTIES TIMEOUT 30)
 yalahoo_unit_test(MotionTest motion
     LIBRARIES YalahooCore
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" MOTION_REPORT="${CMAKE_BINARY_DIR}/verification/motion-errors.json"
     REPORT motion-test.xml
     TIMEOUT 60)
-add_test(
-    NAME
-    runtime-motion
-    COMMAND
-    Yalahoo
-    --verify-runtime
-    "${CMAKE_BINARY_DIR}/verification/runtime-motion.json"
-    --verify-motion
-)
-set_tests_properties(
-    runtime-motion
-    PROPERTIES
-    TIMEOUT
-    30
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
-)
-set_tests_properties(
-    identity
-    module-link-and-plugins
-    shader-tools
-    runtime
-    PROPERTIES
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
-)
 yalahoo_unit_test(DirectoryScannerTest directory-scanner
     LIBRARIES YalahooCore
     TIMEOUT 90)
@@ -209,39 +160,12 @@ yalahoo_unit_test(LibraryDataTest library-data
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     REPORT library-data-test.xml TIMEOUT 60
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
-add_test(
-    NAME
-    runtime-library
-    COMMAND
-    Yalahoo
-    --verify-runtime
-    "${CMAKE_BINARY_DIR}/verification/runtime-library.json"
-    --verify-library
-    "${PROJECT_SOURCE_DIR}/tests/fixtures/web-baseline/anonymous.json"
-)
-set_tests_properties(
-    runtime-library
-    PROPERTIES
-    TIMEOUT
-    30
-    ENVIRONMENT
-    "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
-)
-
 yalahoo_unit_test(LightingTest lighting
     LIBRARIES YalahooScene
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" LIGHTING_REPORT="${CMAKE_BINARY_DIR}/verification/lighting-errors.json"
     REPORT lighting-test.xml
     TIMEOUT 60)
 
-if(YALAHOO_REVIEW)
-    add_test(NAME runtime-rhi-integration COMMAND Yalahoo --verify-integration
-        "${CMAKE_BINARY_DIR}/verification/rhi-integration/ctest")
-    set_tests_properties(runtime-rhi-integration PROPERTIES TIMEOUT 90
-        ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0;QSG_RENDER_LOOP=threaded"
-        ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
-        FAIL_REGULAR_EXPRESSION "Failed to compile;QSpirvCompiler;Nonfinite RHI pixel")
-endif()
 yalahoo_unit_test(RealColumnsTest real-columns
     LIBRARIES YalahooScene
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
@@ -250,11 +174,6 @@ yalahoo_unit_test(ArchivePoolTest archive-pool
     LIBRARIES YalahooScene
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     TIMEOUT 60)
-add_test(NAME runtime-filled COMMAND Yalahoo --verify-runtime
-    "${CMAKE_BINARY_DIR}/verification/runtime-filled/runtime.json" --verify-shading --verify-filled)
-set_tests_properties(runtime-filled PROPERTIES TIMEOUT 60
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_ENABLE_HIGHDPI_SCALING=0")
-
 yalahoo_unit_test(PresentationTest presentation
     LIBRARIES YalahooCore
     TIMEOUT 60)
@@ -311,6 +230,11 @@ set_tests_properties(dry-tools PROPERTIES TIMEOUT 10)
 add_test(NAME startup-verification COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/StartupVerificationTest.py")
 set_tests_properties(startup-verification PROPERTIES TIMEOUT 10)
+add_test(NAME structure-comparison COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/StructureComparisonTest.py")
+add_test(NAME test-policy COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/TestPolicyTest.py")
+set_tests_properties(structure-comparison test-policy PROPERTIES TIMEOUT 30)
 add_test(NAME logging-terminal COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/LoggingTerminalTest.py" "$<TARGET_FILE:LoggingTest>")
 set_tests_properties(logging logging-terminal PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
@@ -340,6 +264,11 @@ yalahoo_unit_test(RenderSupportTest render-support
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_QPA_PLATFORM=offscreen")
 
 if(UNIX)
+    add_test(NAME unix-deployment COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/UnixDeploymentTest.py")
+    add_test(NAME linux-package-tools COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/LinuxDeploymentTest.py")
+    set_tests_properties(unix-deployment linux-package-tools PROPERTIES TIMEOUT 60)
     add_test(NAME launchers COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tests/tools/LauncherTest.py")
     set_tests_properties(launchers PROPERTIES TIMEOUT 90)

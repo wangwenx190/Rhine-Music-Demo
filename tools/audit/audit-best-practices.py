@@ -1,4 +1,4 @@
-"""Inventory native sources and run compiler-backed safety checks; architecture needs review."""
+"""Run compiler-backed native safety checks; architecture needs manual review."""
 import argparse
 import concurrent.futures
 import hashlib
@@ -16,32 +16,10 @@ CHECKS = ",".join((
     "bugprone-use-after-move", "bugprone-infinite-loop",
     "bugprone-undefined-memory-manipulation", "bugprone-sizeof-expression",
 ))
-EXTENSIONS = {".cpp", ".h", ".mm", ".qml", ".cmake", ".py", ".mjs", ".ps1", ".sh", ".js", ".ts", ".command", ".psd1", ".in", ".vert", ".frag", ".glsl"}
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def inventory():
-    records = []
-    paths = {path for folder in ("src", "qml", "tests", "tools", "cmake", "resources/shaders")
-             for path in (ROOT / folder).rglob("*")
-             if path.is_file() and (path.suffix in EXTENSIONS or path.name == "CMakeLists.txt")}
-    paths.update(ROOT / name for name in ("CMakeLists.txt", "CMakePresets.json"))
-    paths.update(path for path in ROOT.iterdir()
-                 if path.is_file() and path.suffix in (".ps1", ".sh", ".command"))
-    for path in sorted(paths):
-        text = path.read_text(encoding="utf-8")
-        record = {"sourcePath": str(path.relative_to(ROOT)), "sha256": digest(path)}
-        if path.suffix == ".qml":
-            record["manualReviewSites"] = [
-                {"line": line, "text": value.strip()}
-                for line, value in enumerate(text.splitlines(), 1)
-                if re.search(r"\bfunction\b|\bfor\s*\(|\bwhile\s*\(|\bon\w+:\s*[{]", value)
-            ]
-        records.append(record)
-    return records
 
 
 def main():
@@ -110,7 +88,7 @@ def main():
         "tool": subprocess.check_output([str(tidy), "--version"], text=True).strip(),
         "toolchain": json.loads((build / "toolchain.json").read_text()),
         "compileDatabaseSha256": digest(build / "compile_commands.json"),
-        "inventory": inventory(), "translationUnits": units,
+        "translationUnits": units,
         "limitations": [
             "Automatic safety analysis is not an architecture or best-practices compliance proof.",
             "QML logic sites need manual classification using qml-best-practices.md.",
@@ -120,7 +98,7 @@ def main():
     }
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({"compilerChecksClean": clean, "units": len(units),
-                      "inventoryFiles": len(report["inventory"]), "report": str(output / "report.json")}))
+                      "report": str(output / "report.json")}))
     return 0 if clean else 1
 
 

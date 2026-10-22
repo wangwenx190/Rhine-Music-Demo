@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools/deploy"))
 import qml_closure
 import native_replay
+import LoggingTerminalTest as terminal
 from shader_source import gaussian_kernel, read_shader
 
 
@@ -43,10 +44,12 @@ class ReplayTest(unittest.TestCase):
             context.start()
             self.addCleanup(context.stop)
 
-    def run_replay(self, report=None, log_text="", timeout=False):
+    def run_replay(self, report=None, log_text="", timeout=False, launch_error=False):
         def execute(command, **options):
             if timeout:
                 raise subprocess.TimeoutExpired(command, 1)
+            if launch_error:
+                raise PermissionError("fixture executable permission denied")
             if report is not None:
                 path = Path(command[2]) / "report.json"
                 path.parent.mkdir(parents=True)
@@ -58,8 +61,9 @@ class ReplayTest(unittest.TestCase):
                                                "--verify-test", lambda report, args: report.get("dpr") == args.dpr)
         return result, json.loads((self.args.output / "manifest.json").read_text())
 
-    def run_gui(self, output, report):
+    def run_gui(self, output, report, log_text=""):
         def execute(command, **options):
+            options['stdout'].write(log_text)
             destination = Path(command[2]) / 'report.json'
             destination.parent.mkdir(parents=True)
             if report is not None:
@@ -92,13 +96,17 @@ class ReplayTest(unittest.TestCase):
                 self.assertEqual(code, 1)
                 self.assertFalse(manifest['passed'])
 
-    def test_gui_requires_complete_captures_and_boolean_success(self):
-        captures = [dict(width=w, height=h, night=night, realistic=real, phase=phase,
+    @staticmethod
+    def gui_captures():
+        return [dict(width=w, height=h, night=night, realistic=real, phase=phase,
                          image=f'{w}-{h}-{night}-{real}-{phase}.png')
                     for w, h in ((1280, 720), (930, 900), (390, 844))
                     for night in (False, True) for real in (False, True)
                     for phase in (('browse', 'overview', 'detail', 'search') if real else
                                   ('browse', 'overview', 'detail', 'search', 'opening-mark', 'opening-scene'))]
+
+    def test_gui_requires_complete_captures_and_boolean_success(self):
+        captures = self.gui_captures()
         for index, marker in enumerate((True, 'true', 1)):
             with self.subTest(marker=marker):
                 report = json.dumps(dict(passed=marker, backend=6, captures=captures))
@@ -106,6 +114,14 @@ class ReplayTest(unittest.TestCase):
                 self.assertEqual(code, 0 if marker is True else 1)
                 self.assertEqual(manifest['passed'], marker is True)
                 self.assertEqual(manifest['capturedCheckpoints'], 60)
+
+    def test_gui_rejects_qml_diagnostics_even_when_report_claims_success(self):
+        captures = self.gui_captures()
+        code, manifest = self.run_gui(self.root / "gui-warning",
+                                      json.dumps(dict(passed=True, backend=6, captures=captures)),
+                                      "ReferenceError: fixture")
+        self.assertEqual(code, 1)
+        self.assertFalse(manifest["passed"])
 
     def test_replay_environment_does_not_inherit_visible_or_stress_authorization(self):
         flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_STRESS",
@@ -148,6 +164,13 @@ class ReplayTest(unittest.TestCase):
         self.assertEqual(manifest["runs"][0]["exitCode"], "timeout")
         self.assertFalse(manifest["passed"])
 
+    def test_launch_failure_is_recorded_without_abandoning_the_manifest(self):
+        result, manifest = self.run_replay(launch_error=True)
+        self.assertEqual(result, 1)
+        self.assertEqual(manifest["runs"][0]["exitCode"], "launch-error")
+        self.assertFalse(manifest["passed"])
+        self.assertIn("permission denied", (self.args.output / "run-1.log").read_text())
+
     def test_existing_evidence_is_preserved(self):
         self.args.output.mkdir()
         sentinel = self.args.output / "prior.json"
@@ -155,6 +178,29 @@ class ReplayTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.run_replay()
         self.assertEqual(sentinel.read_text(), "prior")
+
+
+@unittest.skipIf(os.name == "nt", "PTY is a POSIX terminal boundary")
+class TerminalCaptureTest(unittest.TestCase):
+    def capture(self, source, timeout):
+        import pty
+        master, slave = pty.openpty()
+        process = subprocess.Popen([sys.executable, "-c", source], stderr=slave)
+        os.close(slave)
+        try:
+            return terminal.read_terminal(master, process, timeout)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            os.close(master)
+
+    def test_terminal_is_drained_while_the_child_writes(self):
+        self.assertEqual(self.capture("import os; os.write(2, b'x' * 100000)", 5), b'x' * 100000)
+
+    def test_stalled_terminal_read_is_bounded(self):
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.capture("import os, time; os.write(2, b'fixture'); time.sleep(30)", .1)
 
 
 class ShaderSourceTest(unittest.TestCase):

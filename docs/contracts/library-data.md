@@ -99,7 +99,7 @@ PreferencesStore在事件循环合并变化，只有一个在途worker保存和�
 
 ## 检查入口
 
-`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。`runtime-library`是匿名库的窗口/资源检查，分组见test-gates.md。源码输入由`node tools/migration/export-search-golden.mjs`导出；`--verify-library 匿名JSON`仅配合Review运行验证，默认不读真实库。
+`library-data`核对冻结库列、216搜索用例、JSON/URL/模型通知、导航播放独立与Provider竞态；`library-qml`核对稳定角色及离线/测试Provider读值。生产资料面板接线由`library-panels-qml`验证，窗口/资源由生产根与部署检查覆盖。源码输入由`node tools/migration/export-search-golden.mjs`导出。
 
 `directory-scanner`用临时合成目录覆盖扫描/重扫/改名/删除/离线/读取拒绝、取消/切根/加载竞态、缓存原子读写/损坏保护、源hash及GUI事件循环/一次模型重置；不加载媒体或显示窗口。`node tools/migration/verify-scan-fingerprint.mjs`额外用本机Node的真实stat核对原fingerprint与UTF-8哈希；原生构建/CTest不依赖Node。
 

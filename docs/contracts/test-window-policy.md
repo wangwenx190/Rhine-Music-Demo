@@ -16,7 +16,7 @@ macOS 必须落实原生窗口策略，不能只检查 Qt flags。Qt Cocoa 的 `
 
 需要真实 exposed 窗口、真实 RHI 呈现或 hide/minimize/restore 行为的测试使用 `src/app/VerificationWindow.h`。默认在创建/第一次 show 之前设置 `Qt::WindowStaysOnBottomHint` 和 `Qt::WindowDoesNotAcceptFocus`；需要无边框时额外加 FramelessWindowHint。默认禁止 WindowStaysOnTopHint、raise、requestActivate、activateWindow 与系统前台激活；本契约的显式授权轮次可按需前置、激活。任何模式均不自动点击用户桌面。窗口重建、改变尺寸和 showNormal 后必须继续保持选定策略；默认模式保留置底/不接受焦点标志。不能依靠隐藏启动进程代替 Qt 窗口标志：程序后续 show 仍可能显示窗口。
 
-`yalahoo --verify-runtime`（含 motion/library/shading）、`--verify-scene`、`--verify-materials` 在 QML 构建前注入 verificationRun/verificationFlags，ApplicationWindow 先保持隐藏；参数验证后，必要的 GPU 入口才 show。QML root 在首次显示前已有所选策略的 flags；SceneReview、MaterialReview、RhiOpaqueChecks、RhiShellChecks 和品牌窗口均复用同一 helper，不在某个测试中偷偷改变模式。报告写入 windowPolicy；默认模式核对无激活，授权前台模式明确记录该例外，违反所选策略使测试失败。测试输入使用直接发送到自身对象的 Qt 事件，不全局模拟用户键鼠；前置/激活只在授权前台模式进行。
+生产`--verify-app`/部署/详情/总览/导航入口在QML构建前注入verificationRun/verificationFlags，ApplicationWindow先保持隐藏；必要的GPU入口才show。独立MaterialReview、RhiOpaqueChecks、RhiShellChecks和品牌窗口同样复用统一helper，在首次显示前落实策略。报告写入 windowPolicy；默认模式核对无激活，授权前台模式明确记录该例外，违反所选策略使测试失败。测试输入使用直接发送到自身对象的 Qt 事件，不全局模拟用户键鼠；前置/激活只在授权前台模式进行。
 
 QQuickWindow 使用自身 grabWindow / GPU texture readback 获取完整渲染结果；未获轮次授权时，置底或被其他应用遮挡不成为提高 Z 顺序的理由。品牌 QWindow 使用自己真实 expose/paint 产生的 backing 图像，显式记录 captureMethod；不调用 QScreen::grabWindow 采集桌面区域，避免把用户工作内容混入证据。导出的自己渲染图不能宣称是桌面截屏。手工窗口外观检查由用户主动执行，后台测试前置仍须本契约的轮次授权。
 

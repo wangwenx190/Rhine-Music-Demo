@@ -56,26 +56,12 @@ function(yalahoo_test_tool target)
     set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 endfunction()
 
-# Source-fixture reviews share the native argument, report and scale protocol.
-function(yalahoo_review_test name mode fixture report timeout)
-    cmake_parse_arguments(PARSE_ARGV 5 review "" "DPR;ERRORS" "ENVIRONMENT")
-    if(review_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR "Unknown review test arguments: ${review_UNPARSED_ARGUMENTS}")
-    endif()
-    if(NOT review_DPR)
-        set(review_DPR 1)
-    endif()
-    set(report_option "${mode}")
-    if(mode STREQUAL "materials")
-        set(report_option material)
-    endif()
-    add_test(NAME ${name} COMMAND Yalahoo --verify-${mode}
+# Isolated material and lighting checks share the same source-fixture protocol.
+function(yalahoo_material_test name fixture report timeout)
+    add_test(NAME ${name} COMMAND Yalahoo --verify-materials
         "${PROJECT_SOURCE_DIR}/tests/fixtures/${fixture}"
-        --${report_option}-report "${CMAKE_BINARY_DIR}/verification/${report}")
-    set(environment "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${review_DPR};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
-    list(APPEND environment ${review_ENVIRONMENT})
-    set_tests_properties(${name} PROPERTIES TIMEOUT ${timeout} ENVIRONMENT "${environment}")
-    if(review_ERRORS)
-        set_tests_properties(${name} PROPERTIES FAIL_REGULAR_EXPRESSION "${review_ERRORS}")
-    endif()
+        --material-report "${CMAKE_BINARY_DIR}/verification/${report}")
+    set_tests_properties(${name} PROPERTIES TIMEOUT ${timeout}
+        ENVIRONMENT "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
+        FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile;QSpirvCompiler")
 endfunction()

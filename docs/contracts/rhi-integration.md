@@ -5,7 +5,7 @@
 ## 生产与同步
 
 - `App.qml → MusicStage.qml → SceneItem → SceneAdapter::frame/SelectionLighting/RenderQuality → RhiItem::submit → synchronize/renderFrame`。SceneAdapter独占相机/实体/投影/拾取/focalDepth；QML不维护后端专属状态。生产实体由填充/真实列和有限选中/归位池提供，封面消费者见archive-pool.md。
-- 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册ResearchApp及隔离材质入口。几何验证使用生产提交矩阵。
+- 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册隔离材质入口。几何验证使用生产提交矩阵。
 - SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；原生尺寸与失败语义归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，各屏幕空间附件与最终输出保持相同物理尺寸。
 - 相机/布局/实体实际变化才更新几何revision，输入revision独立。polish合并同帧相机/灯光/画质/封面；相同submission不重复复制。实体ID序列与上个已接受的非空壳体输入相同时复用其唯一性验证；身份变化、空实体或非壳体输入后重新验证。封面owned immutable像素共享，外部Review输入隔离一次，cacheKey变化才交接。
 - SceneItem在实际可绘制的polish中按已确定的pool/单盒模式请求对应封面。
@@ -26,8 +26,7 @@
 - 遥测与诊断在隐藏/恢复时重起分段，GUI邮箱回调按各自epoch拒绝旧结果；callbackRevision参与changed-only提交，静止恢复同样刷新render持有的回调。
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
 - Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
-- `yalahoo --verify-integration 新目录 --integration-seconds 12..120`按真实事件推进，FrameAnimation仍唯一帧源，无processEvents/msleep轮询。功能边界包括九尺寸/景深变化/双主题，独立压力包括十次完整QML根窗口重建；重建后重新绑定输入/遥测并以epoch拒绝旧回调，核对新renderer首批封面上传与资源回落。当前入口仍捆绑上述工作，仅具体未决问题确需运行时按test-gates.md解开最小分支，不默认执行矩阵/压力或为此单设工具改造任务；短单盒输入不能冒充完整产品。
-- `rhi-postprocess-test --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。定向运行使用`yalahoo --verify-integration 输出目录`，采样时长和是否运行由performance.md的具体未决问题决定。
+- `rhi-postprocess-test --profile`是独立分通道CPU提交诊断，不能混入正常120秒性能样本；范围见rhi-postprocess.md。record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。产品定向诊断使用`tests/runners/verify-startup.py`，采样时长和是否运行由performance.md的具体未决问题决定。
 
 ## 原生同窗口恢复
 

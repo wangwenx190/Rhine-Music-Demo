@@ -33,7 +33,6 @@ Item {
     property DetailModel detailModel: null
     property OverviewController overviewController: null
     property Item presentationReturnFocus: null
-    property bool geometryProbe: false
     property real hdrHeadroom: 1
     property bool hdrActive: false
     property string preferencesError: ""

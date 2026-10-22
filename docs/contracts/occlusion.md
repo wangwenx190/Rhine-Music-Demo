@@ -9,7 +9,6 @@
 - 完整壳体/纸面（含contain留白）不透明几何覆盖，复用生产origin/矩阵/相机；normal只unpack，不额外normalize。独立view normal/RGB24线性距离，nearest深度/原滤波；RGB24白色精确背景哨兵。near/far恢复viewZ，不把主不透明depth当玻璃几何。
 - 标准透视还原`viewZ=n*f/((f-n)*depth-f)`，`xy=ndcXY*tan(fov/2)*(aspect,1)*(-viewZ)`；framebuffer Y转换与hardware [0,1]深度分开。
 - 保留原半球样本、scalar noise xyz复制、TBN、严格min<delta<max、原累加顺序、5×5 box与`mix(1,blur,.22)`。raw/blur当前R16F；采样通道唯一.r，诊断重建重复RGB/alpha，不降half精度。
-- Quick3D Review的OcclusionPrepass显式将有符号world normal变view/pack，将可能量化的provider输出编码RGB24；不能把请求格式当底层实测。生产QRhi显式附件格式以资源契约为准。
 
 ## 画质边界
 

@@ -4,7 +4,7 @@
 
 ## 共用对象与坐标
 
-`src/render/` 的 C++23 `YalahooScene` 链接 Core/Gui 与已有运动内核；它不依赖 Quick3D 私有类型。`SceneAdapter` 在 `main` 中由唯一 `FrameClock` 注入，寿命覆盖 QML 引擎；生产 QML 使用 `SceneItem`，它只读取 SceneAdapter 的不可变相机/实体快照及既有灯光/画质值；`GeometryScene` 仅是 Review 的 Quick3D oracle。接入边界见 [rhi-integration.md](rhi-integration.md)。物理单位不缩放，三个导入 mesh 的变换只应用一次，不翻转 Z。几何 Review/旧运行探针保留无光、不透明调试材质以隔离几何；普通场景使用 [单盒材质](materials.md)，几何和材质验收各自冻结相机与图层。动态灯光、阵列和后续后处理按对应轮次接入。
+`src/render/` 的 C++23 `YalahooScene` 链接 Core/Gui 与已有运动内核；它不依赖 Quick3D 私有类型。`SceneAdapter` 在 `main` 中由唯一 `FrameClock` 注入，寿命覆盖 QML 引擎；生产 QML 使用 `SceneItem`，它只读取 SceneAdapter 的不可变相机/实体快照及既有灯光/画质值；`GeometryScene` 仅是 Review 的 Quick3D oracle。接入边界见 [rhi-integration.md](rhi-integration.md)。物理单位不缩放，三个导入 mesh 的变换只应用一次，不翻转 Z。生产RHI几何诊断使用独立法线/深度输出以隔离几何；材质检查见[单盒材质](materials.md)，几何和材质验收各自冻结相机与图层。动态灯光、阵列和后续后处理按对应轮次接入。
 
 `SceneFrame` 是按值复制的只读快照，含 revision、double 相机 position/aim/span、Qt view/projection、caseTransform、内容尺寸、布局类别与 clipNear=5/clipFar=300。RHI 在同步边界复制快照；所有状态写入在 GUI 线程，矩阵实际不变时不重新发布几何 revision。输入 revision/time 另按集成契约记录。`projectWorldPoint(world)` 返回内容逻辑像素 x/y 和 OpenGL 约定 NDC z；相机后方返回 NaN x/y、z=-1。不得将此 z 直接写入 D3D/Metal 深度：Quick3D 负责自身后端修正，生产 RHI 使用 QRhi 修正矩阵。
 
@@ -28,6 +28,6 @@
 
 `node tools/migration/export-scene-golden.mjs`生成`tests/fixtures/scene/`；`scene`检查48布局/相机目标、528顶点/锚点、694帧20/30/60/120fps的非零初态、反向/改速/长帧/resize/减少动态，double≤1e-6。
 
-Review真实投影≤2逻辑px；QML浮点属性适配允许position1e-3/FOV1e-4，不能放宽最终投影。窗口记录实际QWindow DPR和目标像素；验证进程缩放环境变量不能替代真实DPR。`--verify-scene`/`--scene-report`仅Review，几何输出须renderError为空并排除错误提示区域，超大目标共用RenderQuality保护并检查恢复。
+生产RHI真实投影≤2逻辑px；`rhi-opaque-gpu`验证实际几何/深度，`archive-pool-gpu`/`real-columns-gpu`核对阵列投影与生产快照。窗口记录实际QWindow DPR和目标像素；验证进程缩放环境变量不能替代真实DPR。几何输出须renderError为空，超大目标共用RenderQuality保护并检查恢复。
 
-源码/投影检查使用已注册的`scene`与`runtime-scene-dpr-*`组件测试；公共构建与窗口行为由native-bootstrap/test-gates/test-window-policy维护。材质/光照/后处理各有独立组件契约。
+源码/投影检查使用已注册的`scene`及上述生产RHI组件测试；公共构建与窗口行为由native-bootstrap/test-gates/test-window-policy维护。材质/光照/后处理各有独立组件契约。

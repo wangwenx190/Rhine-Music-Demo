@@ -68,9 +68,9 @@
 
 | 后续轮次 | 必须分离的现存入口 | 保留的有效检查 |
 | --- | --- | --- |
-| R19B | `SceneReview` 仅按自身渲染检查模型存在，不比较来源图；`ArchivePoolChecks` 核对填充与真实列状态 | x/v/a、矩阵、投影、拾取、边界、两模式/改速/减少动态、稳定身份、实际 fallback 区域及资源 |
-| R19D | `RhiPostprocessAudit`与实际RHI通道 | 真实附件/采样/resolve、shader 执行、实际质量、上传、生命周期与局部成本 |
-| R19E | 生产Browse/Navigation回放、`RulerSourceProbe` | 控件几何/状态/交互、Canvas 隐藏工作、数字轨迹及合成质量 |
+| R19B | `SceneTest`核对源相机/投影；`RhiOpaqueChecks`与`ArchivePoolChecks`核对生产几何及两阵列状态 | x/v/a、矩阵、投影、拾取、边界、两模式/改速/减少动态、稳定身份、实际 fallback 区域及资源 |
+| R19D | `RhiPostprocessChecks`与实际RHI通道 | 真实附件/采样/resolve、shader 执行、实际质量、上传、生命周期与局部成本 |
+| R19E | 生产GUI/Navigation回放、`RulerSourceProbe` | 控件几何/状态/交互、Canvas 隐藏工作、数字轨迹及合成质量 |
 | R19F | `verify-title.mjs`/`TitleSourceProbe` | 字体物理身份、整行 shaping/布局、时序/宽度、真实清晰度、隐藏绘制/生命周期与成本 |
 | R19G | presentation/detail/overview Review、CSS导出器与状态输入 | 展示布局/虚拟化、场景轨迹、相机/投影/状态、资源及实际质量 |
 
@@ -106,9 +106,6 @@
 | --- | --- |
 | R07：MaterialReview的90状态与9纸面探针 | 投影与三个表面参数按源公式核对；均匀墨色推导纸面的线性入射、限制与编码，容差3码值。 |
 | R08：MaterialReview的48灯光状态与场核 | 实际光场模式、detail、主题、相机及源表面参数独立核对；LightingTest覆盖924轨迹与392场核。 |
-| R09：MaterialReview的AO/阴影诊断与目标尺寸 | 核对channel、shadows、near/far、aoRadius及实际effectiveTextureSize。 |
-| R09B：MaterialReview的Bokeh/SMAA/AA与focus/aperture | 核对实际画质、目标尺寸和focus/aperture，核、曝光及采样遵循postprocess契约。 |
-| R10：MaterialReview的instance/atlas probe与颜色输出 | 核对实例、深度排序、atlas phase与字节元数据；生产RHI由独立资源图入口验证。 |
 | R10B：VerificationWindow接入、MaterialReview首次show与引擎所有权 | 新CLI在ApplicationWindow加载前分派；独立GeometryScene在macOS使用真正隐藏RenderControl，普通产品窗口及生产RHI不变。 |
 
 ## R19C2B1 不透明RHI源数学、资源与门禁复查
@@ -230,7 +227,7 @@
 | R10C `1f2352a` / R10D `75775b3` / `b7f73d4`：附件与生产接线 | 保留RGBA16F颜色、RGBA8法线/RGB24距离、相同采样的depth、独立resolve与共享保留depth。实际RT/PSO/SRB逐项检查，不以设置值或名称证明。源算法不变；图集/数值更新不重建兼容目标。 |
 | `e98c798`：macOS GL MSAA renderbuffer fallback | 仅当实际context缺多样本texture storage时使用同格式、同样本renderbuffer，resolve仍单样本。属于必要API适配，不降到RGBA8或少样本；真实GL检查读取backingFormat/样本/目标和解析部分覆盖，Metal仍使用texture。 |
 | 默认隐藏策略的前台PID误报 | 初始/当前PID均为其他进程且无自身激活/焦点历史时，旧foregroundUnchanged仍阻断采集。沿AppKit自身通知增加NSWorkspace工作区激活历史监测；任一初始/当前PID属于验证进程、任一自身激活/焦点均继续失败。外部应用切换单列计数和原布尔值；回归覆盖未知PID、切入验证进程及切出后保留失败，不屏蔽自身短暂抢前台。 |
-| `RhiPostprocessAudit`恢复后的可选租约采集 | 空primary lease是既有合法输入，诊断原先无条件索引导致越界。缺租约的metadata现在为null；带fallback必须有完整primary/fallback lease，提交边界先拒绝。该修正不改变生产采样/图集预算。 |
+| `RhiPostprocessChecks`恢复后的可选租约采集 | 空primary lease是既有合法输入，诊断原先无条件索引导致越界。缺租约的metadata现在为null；带fallback必须有完整primary/fallback lease，提交边界先拒绝。该修正不改变生产采样/图集预算。 |
 
 组合通道由`rhi-postprocess-gpu`核对资源图，Bokeh/SMAA/AO/雾/阴影/透明覆盖由各自组件验证，显示尺度由`rhi-scale-gpu`验证。实际门槛与输入归对应专项契约，自身输出供质量检查；source-math、目标GPU、原生窗口和正常呈现分别记录。
 
@@ -352,7 +349,7 @@ Quick3D Review补漏：`MaterialReview → sceneGraphInitialized → ReviewGlCap
 
 本机实际质量边界：BLUR-01的额外降采样来自生产viewport重复舞台比例，D4C已按最终宿主CSS消除；目标尺寸、DPR与附件链由独立源公式验证。FLICKER-01的已确认根因为visibility/Equal颜色pass位置不一致，C2C统一顶点顺序及invariant；当前正常光学与诊断连续覆盖静止、波浪、浏览、总览进退和详情转换，保留原实体数量、源透明度、景深/磨砂及后处理。本机Metal/OpenGL正常输出未见漏画、额外模糊或重叠闪烁；结构/数学、实际输出和资源恢复分别验证，没有用图像相似度关闭问题。Windows/D3D11、Linux/OpenGL、物理屏幕/输入及后续完整播放器范围按计划后置专项分工验收，不能外推为全平台理想渲染或完整产品性能通过。
 
-R10D的`IntegrationReview`只覆盖单盒生产bootstrap；完整阵列/搜索/展示/扫描使用`StartupChecks`的MusicStage入口。VSYNC请求按performance.md移除禁用变量并核对requestedFormat，Qt呈现事件不等于屏幕显示；单盒样本不能推断完整播放器预算、GPU完成或实测显存。
+完整阵列/搜索/展示/扫描使用`StartupChecks`的MusicStage入口。VSYNC请求按performance.md移除禁用变量并核对requestedFormat，Qt呈现事件不等于屏幕显示；单盒样本不能推断完整播放器预算、GPU完成或实测显存。
 
 ## R20 · 序章与交接来源
 

@@ -122,7 +122,7 @@
     "contract": "docs/contracts/rhi-integration.md",
     "implementation": "App.qml -> SceneItem -> SceneAdapter/SelectionLighting/RenderQuality -> RhiItem",
     "evidence": "verification/windows/rhi-integration/",
-    "rebuild": "yalahoo --verify-integration 输出目录",
-    "research": "Review-only ResearchApp/Quick3D capability studies; not linked or packaged in production. Historical image oracles are retired."
+    "rebuild": "python3 tests/runners/verify-gui.py --backend <target> --representative --output <fresh-directory>",
+    "research": "Review-only isolated Quick3D material/lighting checks; not linked or packaged in production."
   }
 }

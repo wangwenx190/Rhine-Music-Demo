@@ -4,7 +4,7 @@
 
 - CMake project：`yalahoo`；目标：`YalahooCore`、`Yalahoo`；输出：`build/<configuration>/bin/yalahoo.exe`，macOS 为同位置的 `yalahoo.app`，Linux 为 `yalahoo`。
 - QML URI：`Yalahoo.Music`；入口：`loadFromModule("Yalahoo.Music", "App")`；资源：`:/qt/qml/Yalahoo/Music/App.qml`。源目录中的 `App.qml` 设置相对别名，不依赖当前工作目录。
-- 非 QML shader：`resources/shaders/probe.frag` → 同 Kit `qsb` → `:/assets/shaders/probe.frag.qsb`。Qt 标准默认变体包含 SPIR-V、GLSL、HLSL、MSL。
+- 非 QML shader：`resources/shaders/reel-slot.frag` → 同 Kit `qsb` → `:/assets/shaders/reel-slot.frag.qsb`。Qt 标准默认变体包含 SPIR-V、GLSL、HLSL、MSL。
 - organization/applicationName 均为 `yalahoo`，display/title 为 `yalahOO!!!`。身份设置在 QGuiApplication、引擎与 QStandardPaths 之前；更改展示名不改数据目录。探针不创建或读取用户音乐库。
 - 默认/可选API与能力探测/回退由[render-backend.md](render-backend.md)维护；全平台采用逻辑像素和Qt公开API。平台选项在 `cmake/Platform.cmake` 隔离，macOS bundle 使用 `cmake/Info.plist.in`。
 
@@ -62,7 +62,7 @@ Review另要求同Kit的Quick3DPrivate/Quick3DRuntimeRenderPrivate，仅用于�
 
 基础CTest覆盖Kit数值排序/平台/架构/ABI/模块/过期覆盖、身份/模块插件和qsb变体；具体选择见test-gates.md，格式命令见code-style.md。
 
-`--verify-runtime 报告路径`为Review基础资源/窗口探针，可组合motion/library/shading参数；不设置歌曲来源或播放音频。它不替代相应生产组件/平台验收。工具输出位置与字段以实现及test-gates为准，不在本契约复制各轮次通过记录。
+`--verify-app`隐藏创建生产根，`--verify-deployment 报告路径`检查包内资源、依赖及媒体加载；实际交互、算法和输出使用test-gates.md索引的组件入口。
 
 ## 启动入口
 

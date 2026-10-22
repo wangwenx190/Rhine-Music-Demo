@@ -1,9 +1,8 @@
-import {execFrozenGit, baselineRevision} from '../review/frozen-git.mjs';
+import {execFrozenGit, baselineRevision} from '../migration/frozen-git.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-import {execFileSync} from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '../..'), baseline = baselineRevision;
 const {SSAOPass} = await import(pathToFileURL(
     path.join(root, 'legacy-web/node_modules/three/examples/jsm/postprocessing/SSAOPass.js'),
@@ -11,7 +10,7 @@ const {SSAOPass} = await import(pathToFileURL(
 const {PerspectiveCamera} = await import(
     pathToFileURL(path.join(root, 'legacy-web/node_modules/three/build/three.module.js')));
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
-const output = path.join(root, 'resources/environment'), assets = [], kernels = {};
+const output = path.join(root, 'resources/environment'), assets = [];
 await fs.mkdir(output, {recursive: true});
 for (const count of [16, 32, 64]) {
     const camera = new PerspectiveCamera(32, 4 / 3, 5, 300);
@@ -29,7 +28,6 @@ for (const count of [16, 32, 64]) {
     }
     const samples = pass.kernel.map((v) => [v.x, v.y, v.z, 1]),
           noise = Array.from(pass.noiseTexture.image.data, (v) => [v, 0, 0, 1]);
-    kernels[count] = {samples, noise: noise.map((v) => v[0])};
     for (const [kind, data, width, height] of [['kernel', samples, count, 1],
                                                ['noise', noise, 4, 4],
     ]) {
@@ -64,11 +62,6 @@ for (const name of ['postprocessing/SSAOPass.js',
     const p = 'legacy-web/node_modules/three/examples/jsm/' + name;
     algorithms[p] = sha(await fs.readFile(path.join(root, p)));
 }
-await fs.mkdir(path.join(root, 'tests/fixtures/occlusion'), {recursive: true});
-await fs.writeFile(
-    path.join(root, 'tests/fixtures/occlusion/kernel.json'),
-    JSON.stringify({baseline, seed: 417, kernels}, null, 2) + '\n',
-);
 await fs.writeFile(
     path.join(root, 'resources/manifests/occlusion.json'),
     JSON.stringify(

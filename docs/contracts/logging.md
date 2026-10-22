@@ -14,7 +14,7 @@
 
 同一份UTF-8文本同时写stderr及文件。终端Warning使用VT黄色，Critical/Fatal使用VT红色，其余默认颜色；每条彩色记录恢复终端颜色。POSIX用isatty判定stderr；Windows核对真实输出handle、文件类型及GetConsoleMode，开启ENABLE_PROCESSED_OUTPUT/ENABLE_VIRTUAL_TERMINAL_PROCESSING，并显式设置输入/输出控制台编码页CP_UTF8。GUI进程仅在缺输出handle时尝试连接父控制台；保留继承的管道/文件。重定向不写颜色控制序列；无控制台时仍写文件。
 
-验证诊断采集链到统一处理器，不替换双路输出；其最近消息缓存最多1024条。日志内部I/O错误直接通过qFormatLogMessage输出stderr，不递归调用Qt日志，不静默宣告文件写入成功。
+验证入口的引擎警告由各宿主检查，日志仍走统一双路输出。日志内部I/O错误直接通过qFormatLogMessage输出stderr，不递归调用Qt日志，不静默宣告文件写入成功。
 
 ## 文件与上界
 
