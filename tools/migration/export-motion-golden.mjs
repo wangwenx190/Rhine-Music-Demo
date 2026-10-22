@@ -1,26 +1,14 @@
-import {typescript as ts} from './frozen-source.mjs';
-import {transpile} from './frozen-source.mjs';
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
+import {FrozenSource} from './frozen-source.mjs';
+import {baselineRevision} from './frozen-git.mjs';
 // Verification-only: execute immutable Git blobs using the already frozen TS dependency.
 import {writeFileSync, mkdirSync} from 'node:fs';
-import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baseline = baselineRevision;
 const sources = [];
-const frozen = (name) => {
-    const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
-        cwd: root,
-        encoding: 'utf8',
-    });
-    sources.push({
-        path: `src/${name}.ts`,
-        sha256: createHash('sha256').update(source).digest('hex'),
-    });
-    return source;
-};
-const spacing = frozen('archive-loop');
+const frozenSource = new FrozenSource(sources);
+const spacing = frozenSource.read('archive-loop');
 const constants = Object.fromEntries(
     ['COLUMN_SPACING', 'ROW_SPACING'].map(
         (key) => [key,
@@ -30,16 +18,8 @@ const constants = Object.fromEntries(
 const modules = {
     './archive-loop.ts': constants
 };
-for (const name of ['motion', 'music-archive-motion', 'music-real-columns', 'music-boot-timing']) {
-    const js = transpile(frozen(name));
-    const exports = {};
-    new Function('exports', 'require', js)(exports, (id) => {
-        if (!modules[id])
-            throw new Error(`Unexpected frozen dependency ${id}`);
-        return modules[id];
-    });
-    modules[`./${name}.ts`] = exports;
-}
+for (const name of ['motion', 'music-archive-motion', 'music-real-columns', 'music-boot-timing'])
+    modules[`./${name}.ts`] = frozenSource.load(name, modules);
 const motion = modules['./motion.ts'], archive = modules['./music-archive-motion.ts'];
 const real = modules['./music-real-columns.ts'];
 const keys = archive.ARCHIVE_TRACK_KEYS;

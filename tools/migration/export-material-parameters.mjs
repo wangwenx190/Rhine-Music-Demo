@@ -1,34 +1,20 @@
-import {transpile} from './frozen-source.mjs';
+import {FrozenSource} from './frozen-source.mjs';
 // Execute frozen material/theme functions without a browser or GPU image oracle.
-import {execFrozenGit, baselineRevision} from './frozen-git.mjs';
-import {createHash} from 'node:crypto';
+import {baselineRevision} from './frozen-git.mjs';
 import {createRequire} from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '../..');
 const require = createRequire(path.join(root, 'legacy-web/package.json'));
-const ts = require('typescript'), THREE = require('three');
+const THREE = require('three');
 const baseline = baselineRevision;
 const sources = [], modules = {
     three: THREE
 };
+const frozenSource = new FrozenSource(sources);
 for (const name
-         of ['glass-reveal', 'internal-optics', 'music-model', 'theme-transition', 'appearance']) {
-    const source = execFrozenGit(['show', `${baseline}:src/${name}.ts`], {
-        cwd: root,
-        encoding: 'utf8',
-    });
-    sources.push(
-        {path: `src/${name}.ts`, sha256: createHash('sha256').update(source).digest('hex')});
-    const js = transpile(source);
-    const exports = {};
-    new Function('exports', 'require', js)(exports, (id) => {
-        if (!(id in modules))
-            throw Error(`Unknown frozen dependency: ${id}`);
-        return modules[id];
-    });
-    modules[`./${name}.ts`] = exports;
-}
+         of ['glass-reveal', 'internal-optics', 'music-model', 'theme-transition', 'appearance'])
+    modules[`./${name}.ts`] = frozenSource.load(name, modules);
 const {configureMusicGlass, setMusicGlassClarity} = modules['./music-model.ts'];
 const {CardAppearance} = modules['./appearance.ts'];
 const {ThemeTransition} = modules['./theme-transition.ts'];

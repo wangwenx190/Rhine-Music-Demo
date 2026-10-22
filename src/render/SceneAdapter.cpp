@@ -1,3 +1,4 @@
+#include "SceneMath.h"
 #include "CameraFraming.h"
 #include "Units.h"
 #include "SceneFrame.h"
@@ -446,13 +447,7 @@ double SceneAdapter::focalDepth(QVector3D origin) const
 }
 QVector3D SceneAdapter::projectWorldPoint(QVector3D world) const
 {
-    const auto clip = m_viewProjection * QVector4D(world, 1);
-    if (clip.w() <= 0)
-        return { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
-                 -1 };
-    const auto ndc = clip.toVector3DAffine();
-    return { float((ndc.x() + 1) * .5 * m_frame.width), float((1 - ndc.y()) * .5 * m_frame.height),
-             ndc.z() };
+    return projectToViewport(m_viewProjection, world, { m_frame.width, m_frame.height });
 }
 QVariantMap SceneAdapter::hitTest(double x, double y) const
 {
@@ -470,27 +465,10 @@ QVariantMap SceneAdapter::hitTest(double x, double y) const
     const auto start = (inverse * QVector4D(float(nx), float(ny), -1, 1)).toVector3DAffine();
     const auto end = (inverse * QVector4D(float(nx), float(ny), 1, 1)).toVector3DAffine();
     const auto delta = end - start;
-    double enter = 0, exit = 1;
-    const std::array<double, yalahoo::units::VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
-                                                             sceneGeometry::CaseBottom,
-                                                             -sceneGeometry::CaseHalfDepth },
-            hi{ sceneGeometry::CaseHalfWidth, sceneGeometry::CaseTop,
-                sceneGeometry::CaseHalfDepth };
-    for (int i = 0; i < yalahoo::units::VectorAxes; ++i) {
-        if (std::abs(delta[i]) < yalahoo::sceneGeometry::ParallelRayTolerance) {
-            if (start[i] < lo[i] || start[i] > hi[i])
-                return { };
-        } else {
-            double a = (lo[i] - start[i]) / delta[i], b = (hi[i] - start[i]) / delta[i];
-            if (a > b)
-                std::swap(a, b);
-            enter = std::max(enter, a);
-            exit = std::min(exit, b);
-            if (enter > exit)
-                return { };
-        }
-    }
-    const auto local = start + delta * float(enter);
+    const auto enter = caseRayEntry(start, delta);
+    if (!enter)
+        return { };
+    const auto local = start + delta * float(*enter);
     return { { u"objectId"_s, u"inspection-case"_s },
              { u"localPoint"_s, QVariant::fromValue(local) },
              { u"worldPoint"_s, QVariant::fromValue(m_frame.caseTransform.map(local)) },

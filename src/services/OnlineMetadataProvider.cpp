@@ -12,7 +12,6 @@
 #include <QJsonDocument>
 #include <QNetworkProxyFactory>
 #include <QRegularExpression>
-#include <QSet>
 #include <QUrlQuery>
 #include <optional>
 #include <utility>

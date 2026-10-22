@@ -1,5 +1,4 @@
 #include "RulerInk.h"
-#include <QCanvasPainterItemRenderer>
 #include <QCanvasLinearGradient>
 #include <QCanvasPath>
 #include <QElapsedTimer>
@@ -14,19 +13,13 @@ constexpr auto ActiveHeight = 30.0;
 constexpr auto NarrowHoverHeight = 16.0;
 constexpr auto HoverHeight = 22.0;
 
-RulerInkStats stats;
-class Renderer final : public QCanvasPainterItemRenderer
+CanvasInkStats stats;
+class Renderer final : public CanvasRenderer
 {
     Q_DISABLE_COPY_MOVE(Renderer)
 public:
-    Renderer()
+    Renderer() : CanvasRenderer(stats)
     {
-        setSharedPainter(false);
-        ++stats.renderers;
-    }
-    ~Renderer() override
-    {
-        --stats.renderers;
     }
 
 protected:
@@ -108,15 +101,13 @@ private:
     bool invalidatePaths = false;
 };
 }
-RulerInkStats &rulerInkStats()
+CanvasInkStats &rulerInkStats()
 {
     return stats;
 }
 RulerInk::RulerInk(QQuickItem *parent) : QCanvasPainterItem(parent)
 {
-    setFillColor(Qt::transparent);
-    setAlphaBlending(true);
-    setSampleCount(1);
+    configureTransparentCanvas(*this);
 }
 RulerController *RulerInk::controller() const
 {

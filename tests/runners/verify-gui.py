@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Run one integrated GUI matrix and preserve its inputs, output and failure status."""
-from native_replay import BACKEND_IDS, cmake_cache, executable_path, replay_environment
+from native_replay import (BACKEND_IDS, cmake_cache, executable_path, read_report,
+                           replay_environment, run_logged, write_json)
 import argparse
 import hashlib
-import json
 from pathlib import Path
 import platform
-import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -47,23 +46,16 @@ manifest = dict(system=platform.platform(), backend=args.backend,
                 completed=False, passed=False)
 manifest_path = args.output / 'manifest.json'
 def save():
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    write_json(manifest_path, manifest)
 save()
-with (args.output / 'run.log').open('w', encoding='utf-8') as log:
-    try:
-        command = [str(executable), '--gui', str((args.output / 'matrix').resolve())]
-        if args.narrow:
-            command.append('narrow')
-        elif args.representative:
-            command.append('--representative')
-        result = subprocess.run(command,
-                                cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
-                                timeout=1800, check=False)
-        code = result.returncode
-    except subprocess.TimeoutExpired:
-        code = 'timeout'
+command = [str(executable), '--gui', str((args.output / 'matrix').resolve())]
+if args.narrow:
+    command.append('narrow')
+elif args.representative:
+    command.append('--representative')
+code = run_logged(command, args.output / 'run.log', cwd=ROOT, environment=env, timeout=1800)
 report_path = args.output / 'matrix/report.json'
-report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.is_file() else {}
+report = read_report(report_path)
 sizes = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
          (390, 844), (320, 720), (2560, 1080), (3440, 1440))
 if args.narrow:
@@ -74,10 +66,18 @@ expected = {(w, h, night, real, phase) for w, h in sizes for night in (False, Tr
             for real in (False, True) for phase in
             (('browse', 'overview', 'detail', 'search') if real else
              ('browse', 'overview', 'detail', 'search', 'opening-mark', 'opening-scene'))}
+def valid_capture(capture):
+    return (isinstance(capture, dict)
+            and all(type(capture.get(key)) is int for key in ('width', 'height'))
+            and all(type(capture.get(key)) is bool for key in ('night', 'realistic'))
+            and all(isinstance(capture.get(key), str) for key in ('phase', 'image')))
+
 captures = report.get('captures', [])
+if not isinstance(captures, list) or not all(valid_capture(capture) for capture in captures):
+    captures = []
 actual = {(c['width'], c['height'], c['night'], c['realistic'], c['phase']) for c in captures}
 images = [args.output / 'matrix' / c['image'] for c in captures]
-valid = (code == 0 and report.get('passed') and report.get('backend') == BACKEND_IDS[args.backend]
+valid = (code == 0 and report.get('passed') is True and report.get('backend') == BACKEND_IDS[args.backend]
          and actual == expected and len(captures) == len(expected) and all(p.is_file() for p in images))
 manifest.update(exitCode=code, completed=report_path.is_file(), passed=bool(valid),
                 capturedCheckpoints=len(captures), expectedCheckpoints=len(expected),

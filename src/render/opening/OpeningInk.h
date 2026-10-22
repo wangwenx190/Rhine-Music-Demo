@@ -3,10 +3,9 @@
 
 #pragma once
 #include "OpeningFrame.h"
-#include <QCanvasPainterItem>
+#include "CanvasSupport.h"
 #include <QCanvasPath>
 #include <QPainterPath>
-#include <atomic>
 
 using Qt::StringLiterals::operator""_L1;
 
@@ -24,12 +23,7 @@ struct OpeningPath final
     double start = 0, end = 1, width = openingInkMetrics::DefaultStrokeWidth;
     bool accent = false, decoration = false, point = false;
 };
-struct OpeningInkStats final
-{
-    std::atomic<quint64> paints{ 0 }, syncs{ 0 }, paintNs{ 0 }, syncNs{ 0 };
-    std::atomic<int> renderers{ 0 };
-};
-OpeningInkStats &openingInkStats();
+CanvasInkStats &openingInkStats();
 QVector<OpeningPath> loadOpeningPaths();
 class OpeningInk : public QCanvasPainterItem
 {

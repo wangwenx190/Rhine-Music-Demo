@@ -4,7 +4,6 @@
 #pragma once
 #include <QObject>
 #include <QEasingCurve>
-#include <QObject>
 #include <functional>
 #include <optional>
 

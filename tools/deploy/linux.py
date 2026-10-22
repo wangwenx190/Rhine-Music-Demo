@@ -12,7 +12,7 @@ import sys
 import tempfile
 sys.dont_write_bytecode = True
 from qml_closure import production_qml
-from package_support import install_package
+from package_support import copy_licenses, install_package
 from linux_package import (clean_environment, dependencies, elf_files, inspect_package,
                            inventory, is_system, requires_bundle, run)
 
@@ -108,16 +108,7 @@ def main():
         (staging / 'bin/qt.conf').write_text(
             '[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\nQmlImports=qml\n')
         shutil.copy2(ROOT / 'tools/deploy/linux-launch.sh', staging / 'yalahoo.sh')
-        licenses = staging / 'licenses'
-        shutil.copytree(ROOT / 'resources/licenses', licenses / 'project')
-        for name in ('NOTICE.txt', 'MiSans-license.pdf'):
-            shutil.copyfile(ROOT / 'resources/fonts' / name, licenses / name)
-        shutil.copyfile(ROOT / 'resources/audio/README.md', licenses / 'audio.md')
-        qt_licenses = next((path / 'Licenses' for path in (kit, *kit.parents)
-                            if (path / 'Licenses').is_dir()), None)
-        if qt_licenses is None:
-            raise RuntimeError('Selected Qt installation attribution directory is missing')
-        shutil.copytree(qt_licenses, licenses / 'Qt')
+        copy_licenses(ROOT, kit, staging / 'licenses')
         for name in ('verify-linux.py', 'linux_package.py', 'package_support.py'):
             shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
         closure = inspect_package(staging)

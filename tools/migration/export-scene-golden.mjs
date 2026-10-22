@@ -81,37 +81,30 @@ for (const x of [-2.225, 2.225])
         for (const z of [-0.07, 0.07])
             points.push([x, y, z]);
 points.push([0, 1.85, 0], [0.17, 1.85, 0.027], [-1.875, 1.85, 0.052]);
+function targetPose(fixture, dt, detail) {
+    return target.call(fixture, THREE, motion.smooth, motion.settlingWave, music.musicArchiveOffset,
+                       layout.archiveFraming, music.musicCinematicPose, music.musicExtractionAnchor,
+                       () => ({distance: 172}), modelInfo, 20 * Math.PI / 180, 3.47, dt, detail);
+}
+function cameraFixture(width, height, coarse = false) {
+    const metrics = layout.viewportLayout(width, height, coarse);
+    return {
+        container: {
+            clientWidth: width,
+            clientHeight: height,
+            closest: () => ({dataset: {layout: metrics.kind}}),
+        },
+        columnCamera: {velocity: 0},
+        rail: {velocity: 0},
+        musicArrayMode: 'filled',
+        musicCamera: new music.MusicCameraMotion(),
+    };
+}
 const cases = [];
 for (const [width, height] of dimensions)
     for (const detail of [0, 0.35, 1]) {
         const metrics = layout.viewportLayout(width, height, false);
-        const fixture = {
-            container: {
-                clientWidth: width,
-                clientHeight: height,
-                closest: () => ({dataset: {layout: metrics.kind}}),
-            },
-            columnCamera: {velocity: 0},
-            rail: {velocity: 0},
-            musicArrayMode: 'filled',
-            musicCamera: new music.MusicCameraMotion(),
-        };
-        const pose = target.call(
-            fixture,
-            THREE,
-            motion.smooth,
-            motion.settlingWave,
-            music.musicArchiveOffset,
-            layout.archiveFraming,
-            music.musicCinematicPose,
-            music.musicExtractionAnchor,
-            () => ({distance: 172}),
-            modelInfo,
-            (20 * Math.PI) / 180,
-            3.47,
-            0,
-            detail,
-        );
+        const pose = targetPose(cameraFixture(width, height), 0, detail);
         const camera = new THREE.PerspectiveCamera(
             (2 * Math.atan(pose.span / (2 * pose.position.distanceTo(pose.aim))) * 180) / Math.PI,
             width / height,
@@ -209,17 +202,7 @@ for (const [width, height, coarse] of [[960, 640, false],
                                        [944, 900, false],
                                        [1400, 500, true],
 ]) {
-    const metrics = layout.viewportLayout(width, height, coarse);
-    const fixture = {
-        container: {
-            clientWidth: width,
-            clientHeight: height,
-            closest: () => ({dataset: {layout: metrics.kind}}),
-        },
-        columnCamera: {velocity: 0},
-        rail: {velocity: 0},
-        musicCamera: new music.MusicCameraMotion(),
-    };
+    const fixture = cameraFixture(width, height, coarse);
     const samples = [];
     for (const [dt, detail, laneSpeed, rowSpeed, realistic,
                 reduced] of [[.05, 0, 3, 4, false, false],
@@ -233,22 +216,7 @@ for (const [width, height, coarse] of [[960, 640, false],
         fixture.rail.velocity = rowSpeed * rowSpacing;
         fixture.musicArrayMode = realistic ? 'realistic' : 'filled';
         fixture.reduced = reduced;
-        const pose = target.call(
-            fixture,
-            THREE,
-            motion.smooth,
-            motion.settlingWave,
-            music.musicArchiveOffset,
-            layout.archiveFraming,
-            music.musicCinematicPose,
-            music.musicExtractionAnchor,
-            () => ({distance: 172}),
-            modelInfo,
-            20 * Math.PI / 180,
-            3.47,
-            dt,
-            detail,
-        );
+        const pose = targetPose(fixture, dt, detail);
         samples.push({
             dt,
             detail,

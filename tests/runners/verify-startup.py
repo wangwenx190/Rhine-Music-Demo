@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Separate product diagnostics, resource stress and formal presentation sampling."""
-from native_replay import BACKEND_IDS, cmake_cache, executable_path, replay_environment
+from native_replay import (BACKEND_IDS, cmake_cache, executable_path, read_report,
+                           replay_environment, run_logged, write_json)
 import argparse
 import hashlib
-import json
 from pathlib import Path
 import platform
-import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = [f"{theme}-{action}" for theme in ("day", "night")
@@ -136,32 +135,26 @@ def main(argv=None):
     manifest_path = args.output / "manifest.json"
 
     def save():
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(manifest_path, manifest)
 
     save()
     passed = True
     for index in range(1, args.runs + 1):
         output = args.output / f"run-{index}"
-        with (args.output / f"run-{index}.log").open("w", encoding="utf-8") as log:
-            try:
-                command = [str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario]
-                if args.observe_only:
-                    command.append("observe")
-                result = subprocess.run(command,
-                                        cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
-                                        timeout=1200, check=False)
-                code = result.returncode
-            except subprocess.TimeoutExpired:
-                code = "timeout"
+        command = [str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario]
+        if args.observe_only:
+            command.append("observe")
+        code = run_logged(command, args.output / f"run-{index}.log", cwd=ROOT,
+                          environment=environment, timeout=1200)
         report_path = output / "report.json"
+        report = read_report(report_path)
         try:
-            report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
-            valid = isinstance(report, dict) and validate_report(report, args, code)
+            valid = validate_report(report, args, code)
         except (ValueError, TypeError):
             report = {}
             valid = False
         manifest["runs"].append(dict(index=index, exitCode=code, passed=valid, report=str(report_path),
-                                      scope=report.get("measurementScope") if isinstance(report, dict) else None))
+                                      scope=report.get("measurementScope")))
         passed = passed and valid
         save()
         print(f"{args.backend} {args.mode} run {index}: {'passed' if valid else 'FAILED'}", flush=True)

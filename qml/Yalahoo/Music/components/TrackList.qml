@@ -183,56 +183,39 @@ Item {
         sourceComponent: root.about ? aboutView : tracksView
         onLoaded: Qt.callLater(root.restoreScroll)
     }
+    component ContentList: ListView {
+        onContentHeightChanged: Qt.callLater(root.updateScrollbar)
+        onHeightChanged: Qt.callLater(root.updateScrollbar)
+        clip: true
+        reuseItems: true
+        cacheBuffer: 100
+        boundsBehavior: Flickable.StopAtBounds
+        header: root.header
+        onMovementStarted: {
+            root.preserveBeginning = false;
+            root.cancelReveal();
+        }
+        onCurrentIndexChanged: if (currentIndex > 0)
+                                   root.preserveBeginning = false
+        T.ScrollBar.vertical: ArchiveScrollBar {
+            tokens: root.tokens
+            policy: T.ScrollBar.AsNeeded
+            onPressedChanged: if (pressed)
+                                  root.preserveBeginning = false
+        }
+    }
     Component {
         id: tracksView
-        ListView {
-            onContentHeightChanged: Qt.callLater(root.updateScrollbar)
-            onHeightChanged: Qt.callLater(root.updateScrollbar)
-            clip: true
-            reuseItems: true
-            cacheBuffer: 100
-            boundsBehavior: Flickable.StopAtBounds
+        ContentList {
             model: root.detailModel
-            header: root.header
-            onMovementStarted: {
-                root.preserveBeginning = false;
-                root.cancelReveal();
-            }
-            onCurrentIndexChanged: if (currentIndex > 0)
-                                       root.preserveBeginning = false
             delegate: trackDelegate
-            T.ScrollBar.vertical: ArchiveScrollBar {
-                tokens: root.tokens
-                policy: T.ScrollBar.AsNeeded
-                onPressedChanged: if (pressed)
-                                      root.preserveBeginning = false
-            }
         }
     }
     Component {
         id: aboutView
-        ListView {
-            onContentHeightChanged: Qt.callLater(root.updateScrollbar)
-            onHeightChanged: Qt.callLater(root.updateScrollbar)
-            clip: true
-            reuseItems: true
-            cacheBuffer: 100
-            boundsBehavior: Flickable.StopAtBounds
+        ContentList {
             model: Math.ceil(root.producerGroups.length / root.creditColumns)
-            header: root.header
-            onMovementStarted: {
-                root.preserveBeginning = false;
-                root.cancelReveal();
-            }
-            onCurrentIndexChanged: if (currentIndex > 0)
-                                       root.preserveBeginning = false
             delegate: creditDelegate
-            T.ScrollBar.vertical: ArchiveScrollBar {
-                tokens: root.tokens
-                policy: T.ScrollBar.AsNeeded
-                onPressedChanged: if (pressed)
-                                      root.preserveBeginning = false
-            }
         }
     }
     Component {

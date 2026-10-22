@@ -2,7 +2,6 @@
 #include "Logging.h"
 #include "OpeningInk.h"
 #include "BrandPaths.h"
-#include <QCanvasPainterItemRenderer>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
@@ -39,7 +38,7 @@ constexpr auto CrossLineWidthPixels = 1.1;
 constexpr auto DefaultPathWidth = 16;
 constexpr auto PointPathLengthThreshold = .02;
 
-OpeningInkStats stats;
+CanvasInkStats stats;
 QString svgPath(const QPainterPath &p)
 {
     QString result;
@@ -61,18 +60,12 @@ QString svgPath(const QPainterPath &p)
     }
     return result;
 }
-class Renderer final : public QCanvasPainterItemRenderer
+class Renderer final : public CanvasRenderer
 {
     Q_DISABLE_COPY_MOVE(Renderer)
 public:
-    Renderer()
+    Renderer() : CanvasRenderer(stats)
     {
-        setSharedPainter(false);
-        ++stats.renderers;
-    }
-    ~Renderer() override
-    {
-        --stats.renderers;
     }
 
 protected:
@@ -235,7 +228,7 @@ private:
     bool orbit = false, visible = false;
 };
 }
-OpeningInkStats &openingInkStats()
+CanvasInkStats &openingInkStats()
 {
     return stats;
 }
@@ -295,9 +288,7 @@ OpeningInk::OpeningInk(QQuickItem *parent) : QCanvasPainterItem(parent)
 {
     static const auto paths = loadOpeningPaths();
     m_paths = paths;
-    setFillColor(Qt::transparent);
-    setAlphaBlending(true);
-    setSampleCount(1);
+    configureTransparentCanvas(*this);
     connect(this, &QQuickItem::visibleChanged, this, &OpeningInk::invalidate);
 }
 void OpeningInk::invalidate()

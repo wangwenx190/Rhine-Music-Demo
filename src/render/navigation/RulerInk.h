@@ -3,16 +3,10 @@
 
 #pragma once
 #include "RulerController.h"
-#include <QCanvasPainterItem>
-#include <atomic>
+#include "CanvasSupport.h"
 
 namespace yalahoo {
-struct RulerInkStats final
-{
-    std::atomic<quint64> paints{ 0 }, syncs{ 0 }, paintNs{ 0 }, syncNs{ 0 };
-    std::atomic<int> renderers{ 0 };
-};
-RulerInkStats &rulerInkStats();
+CanvasInkStats &rulerInkStats();
 class RulerInk : public QCanvasPainterItem
 {
     Q_OBJECT

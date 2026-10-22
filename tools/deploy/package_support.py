@@ -2,9 +2,11 @@
 from dataclasses import dataclass
 import hashlib
 import json
+from pathlib import Path
 import shutil
 import subprocess
 import uuid
+import tempfile
 
 PROBE_TIMEOUT_SECONDS = 60
 HASH_BLOCK_BYTES = 1024 * 1024
@@ -18,11 +20,60 @@ def digest(path):
     return checksum.hexdigest()
 
 
+def package_inventory(root, *, file_permissions=False):
+    root = root.resolve()
+    files = {}
+    for path in sorted(root.rglob('*')):
+        relative = str(path.relative_to(root))
+        if path.is_symlink():
+            target = path.readlink()
+            if target.is_absolute() or not path.resolve(strict=True).is_relative_to(root):
+                raise RuntimeError(f'External package symlink: {path}')
+            files[relative] = dict(symlink=str(target))
+        elif path.is_file() and relative != 'package.json':
+            mode = path.stat().st_mode
+            permission = dict(mode=mode & 0o777) if file_permissions else dict(executable=bool(mode & 0o111))
+            files[relative] = dict(bytes=path.stat().st_size, sha256=digest(path), **permission)
+    return files
+
+
+def copy_licenses(root, kit, destination):
+    qt_licenses = next((path / 'Licenses' for path in (kit, *kit.parents)
+                        if (path / 'Licenses').is_dir()), None)
+    if qt_licenses is None:
+        raise RuntimeError('Selected Qt installation license directory is missing')
+    shutil.copytree(root / 'resources/licenses', destination / 'project')
+    for name in ('NOTICE.txt', 'MiSans-license.pdf'):
+        shutil.copyfile(root / 'resources/fonts' / name, destination / name)
+    shutil.copyfile(root / 'resources/audio/README.md', destination / 'audio.md')
+    shutil.copytree(qt_licenses, destination / 'Qt')
+
+
+def verification_output(package, requested, prefix):
+    output = requested.resolve() if requested else Path(tempfile.mkdtemp(prefix=prefix))
+    if output.is_relative_to(package.resolve()):
+        raise RuntimeError('Verification output must be outside the package')
+    if requested:
+        output.mkdir(parents=True, exist_ok=False)
+    return output
+
+
+def finish_verification(output, evidence):
+    (output / 'environment.json').write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8')
+    if not evidence['passed']:
+        raise SystemExit(f'Deployed product probe failed; evidence: {output}')
+    print(f'Deployed product hidden QML/resources/media load passed; evidence: {output}')
+
+
 @dataclass(frozen=True)
 class ProbeResult:
     exit_code: int
     timed_out: bool
     report: dict
+
+    @property
+    def passed(self):
+        return not self.timed_out and self.exit_code == 0 and self.report.get('passed') is True
 
 
 def run_probe(command, output, environment, *, timeout=PROBE_TIMEOUT_SECONDS):

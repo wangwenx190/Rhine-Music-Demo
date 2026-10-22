@@ -5,7 +5,7 @@ import plistlib
 import re
 import shutil
 import subprocess
-from package_support import digest
+from package_support import package_inventory
 
 
 MACHO = {bytes.fromhex(value) for value in
@@ -17,17 +17,7 @@ def run(*arguments):
 
 
 def inventory(root):
-    result = []
-    for path in sorted(root.rglob('*')):
-        relative = str(path.relative_to(root))
-        if path.is_symlink():
-            if not path.resolve().is_relative_to(root.resolve()):
-                raise RuntimeError(f'Escaping package symlink: {relative}')
-            result.append(dict(path=relative, symlink=str(path.readlink())))
-        elif path.is_file():
-            result.append(dict(path=relative, bytes=path.stat().st_size,
-                               executable=bool(path.stat().st_mode & 0o111), sha256=digest(path)))
-    return result
+    return [dict(path=relative, **entry) for relative, entry in package_inventory(root).items()]
 
 
 def macho(path):
@@ -185,7 +175,7 @@ def inspect_bundle(bundle):
 def verify_inventory(package):
     metadata = json.loads((package / 'package.json').read_text())
     # package.json describes every other file, including the verifier and symlinks.
-    actual = [entry for entry in inventory(package) if entry['path'] != 'package.json']
+    actual = inventory(package)
     if (metadata['files'] != actual or metadata.get('review') is not False
             or metadata.get('configuration') != 'Release'):
         raise RuntimeError('Production package inventory or configuration changed')

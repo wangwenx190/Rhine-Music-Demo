@@ -14,6 +14,8 @@ qt_add_library(
     SourceOptics.h
     OpticalParameters.h
     SceneFrame.h
+    SceneMath.h
+    CanvasSupport.h
     CameraFraming.h
     opening/OpeningFrame.cpp
     opening/OpeningFrame.h

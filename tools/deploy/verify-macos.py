@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """Verify an immutable deployed bundle from a fresh unrelated directory."""
 import argparse
-import json
 import os
 from pathlib import Path
 import platform
-import tempfile
 import sys
 
 # The verifier must not mutate the package when importing its helper.
 sys.dont_write_bytecode = True
 from macos_bundle import inspect_bundle, verify_inventory
 
-from package_support import run_probe
+from package_support import finish_verification, run_probe, verification_output
 
 
 def main():
@@ -28,11 +26,7 @@ def main():
     metadata = verify_inventory(package)
     bundle = package / 'yalahoo.app'
     closure = inspect_bundle(bundle)
-    output = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix='yalahoo-deployment-'))
-    if output.is_relative_to(package):
-        raise RuntimeError('Verification output must be outside the package')
-    if args.output:
-        output.mkdir(parents=True, exist_ok=False)
+    output = verification_output(package, args.output, 'yalahoo-deployment-')
     environment = {key: value for key, value in os.environ.items() if not key.startswith(
         ('QT_', 'QML', 'QSG_', 'DYLD_', 'YALAHOO_', 'QCPAINTER_'))}
     environment.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin', QSG_RHI_BACKEND='metal',
@@ -40,14 +34,11 @@ def main():
                        YALAHOO_VERIFY_FOREGROUND='0', QCPAINTER_DEBUG_COLLECT='0')
     program = bundle / 'Contents/MacOS/yalahoo'
     probe = run_probe([program], output, environment)
-    passed = not probe.timed_out and probe.exit_code == 0 and bool(probe.report.get('passed'))
+    passed = probe.passed
     evidence = dict(passed=passed, exitCode=probe.exit_code, timedOut=probe.timed_out, qtVersion=metadata['qtVersion'],
                     os=platform.platform(), cleanPath=environment['PATH'],
                     workingDirectoryOutsidePackage=True, closure=closure)
-    (output / 'environment.json').write_text(json.dumps(evidence, indent=2) + '\n')
-    if not passed:
-        raise SystemExit(f'Deployed product probe failed; evidence: {output}')
-    print(f'Deployed product hidden QML/resources/media load passed; evidence: {output}')
+    finish_verification(output, evidence)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+#include "../support/LibraryFixture.h"
 #include "ReviewSupport.h"
 #include "LibrarySession.h"
 #include "MotionController.h"
@@ -406,12 +407,8 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     library.setSnapshot(snapshot);
     library.sort(u"artist"_s);
     selection.setColumns(library.albums()->order().columns, library.snapshot());
-    scene.setSelection(&selection);
-    library.navigate(selection.albumId());
+    test::bindLibrarySelection(library, selection, scene);
     library.setPlaybackIds(u"album-0"_s, u"track-0"_s);
-    QObject::connect(&selection, &SelectionController::selectionChanged, &library, [&] {
-        library.navigate(selection.albumId());
-    });
     PresentationController presentation(motion.clock(), detailPorts(scene, selection, library));
     DetailModel detail;
     QObject::connect(&presentation, &PresentationController::prepared, &detail, [&] {

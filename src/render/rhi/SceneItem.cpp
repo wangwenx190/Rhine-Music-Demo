@@ -1,3 +1,4 @@
+#include "SceneMath.h"
 #include "Units.h"
 #include "RenderData.h"
 #include "SelectionLighting.h"
@@ -734,13 +735,7 @@ void SceneItem::configureTelemetry()
 QVector3D SceneItem::qtProjection(QVector3D world) const
 {
     const auto &scene = input().scene;
-    const auto clip = scene.projection * scene.view * QVector4D(world, 1);
-    if (clip.w() <= 0)
-        return { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
-                 -1 };
-    const auto ndc = clip.toVector3DAffine();
-    return { float((ndc.x() + 1) * .5 * scene.width), float((1 - ndc.y()) * .5 * scene.height),
-             ndc.z() };
+    return projectToViewport(scene.projection * scene.view, world, { scene.width, scene.height });
 }
 QJsonObject SceneItem::coverStatistics() const
 {

@@ -52,54 +52,31 @@ QtObject {
     readonly property real paletteDuration: reducedMotion ? 0 : root.paletteTransitionMilliseconds
                                                             / motionSpeed
     property real nightMix: night ? 1 : 0
+    component PaletteColorAnimation: ColorAnimation {
+        duration: root.paletteDuration
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: root.paletteCurve
+    }
     Behavior on ink {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on muted {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on line {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on accent {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on surface {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on page {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on veil {
-        ColorAnimation {
-            duration: root.paletteDuration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.paletteCurve
-        }
+        PaletteColorAnimation {}
     }
     Behavior on nightMix {
         NumberAnimation {

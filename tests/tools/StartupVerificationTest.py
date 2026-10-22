@@ -16,6 +16,7 @@ sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("startup_verification", MODULE_PATH)
 VERIFY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY)
+import native_replay
 
 
 class StartupVerificationTest(unittest.TestCase):
@@ -164,7 +165,7 @@ class StartupVerificationTest(unittest.TestCase):
 
         with patch.object(VERIFY, "ROOT", self.root), patch.object(VERIFY, "__file__", str(script)), \
                 patch.object(VERIFY.platform, "platform", return_value="test-platform"), \
-                patch.object(VERIFY.subprocess, "run", side_effect=sample), \
+                patch.object(native_replay.subprocess, "run", side_effect=sample), \
                 patch.dict(os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(VERIFY.main(options), 1)

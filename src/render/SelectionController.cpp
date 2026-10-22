@@ -1,3 +1,4 @@
+#include "SceneMath.h"
 #include "Units.h"
 #include "OpeningTimeline.h"
 #include "SceneGeometry.h"
@@ -1029,29 +1030,11 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
         if (!valid)
             continue;
         const auto localStart = localInverse.map(start), delta = localInverse.map(end) - localStart;
-        double enter = 0, exit = 1;
-        const std::array<double, yalahoo::units::VectorAxes> lo{ -sceneGeometry::CaseHalfWidth,
-                                                                 sceneGeometry::CaseBottom,
-                                                                 -sceneGeometry::CaseHalfDepth },
-                hi{ sceneGeometry::CaseHalfWidth, sceneGeometry::CaseTop,
-                    sceneGeometry::CaseHalfDepth };
-        for (int axis = 0; axis < yalahoo::units::VectorAxes; ++axis) {
-            if (std::abs(delta[axis]) < yalahoo::sceneGeometry::ParallelRayTolerance) {
-                if (localStart[axis] < lo[axis] || localStart[axis] > hi[axis])
-                    exit = -1;
-            } else {
-                double a = (lo[axis] - localStart[axis]) / delta[axis];
-                double b = (hi[axis] - localStart[axis]) / delta[axis];
-                if (a > b)
-                    std::swap(a, b);
-                enter = std::max(enter, a);
-                exit = std::min(exit, b);
-            }
-        }
-        if (enter > exit || enter >= nearest)
+        const auto enter = caseRayEntry(localStart, delta);
+        if (!enter || *enter >= nearest)
             continue;
-        nearest = enter;
-        const auto local = localStart + delta * float(enter);
+        nearest = *enter;
+        const auto local = localStart + delta * float(*enter);
         hit = { { u"albumId"_s, instance.albumId },
                 { u"objectId"_s, QVariant::fromValue(instance.objectId) },
                 { u"lane"_s, instance.cell.lane },

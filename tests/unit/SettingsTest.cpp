@@ -1,3 +1,4 @@
+#include "../support/SettingsFixture.h"
 #include "../support/FileFixture.h"
 #include "RenderQuality.h"
 #include "SceneAdapter.h"
@@ -37,18 +38,12 @@ private Q_SLOTS:
     {
         QTemporaryDir directory;
         {
-            PreferencesStore preferences(directory.path());
-            OfflineMetadataProvider provider;
-            LibrarySession library(&provider);
-            MotionController motion;
-            SceneAdapter scene(motion.clock());
-            SelectionController selection(&motion);
-            SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-            QVERIFY(settings.values().value(u"singleInstance"_s).toBool());
-            QVERIFY(!settings.update(u"singleInstance"_s, u"false"_s));
-            QVERIFY(!preferences.update({ { u"singleInstance"_s, 1 } }));
-            QVERIFY(settings.update(u"singleInstance"_s, false));
-            QVERIFY(!settings.values().value(u"singleInstance"_s).toBool());
+            test::SettingsFixture fixture(directory.path());
+            QVERIFY(fixture.settings.values().value(u"singleInstance"_s).toBool());
+            QVERIFY(!fixture.settings.update(u"singleInstance"_s, u"false"_s));
+            QVERIFY(!fixture.preferences.update({ { u"singleInstance"_s, 1 } }));
+            QVERIFY(fixture.settings.update(u"singleInstance"_s, false));
+            QVERIFY(!fixture.settings.values().value(u"singleInstance"_s).toBool());
         }
         PreferencesStore restored(directory.path());
         QVERIFY(!restored.values().value(u"singleInstance"_s).toBool());
@@ -56,20 +51,14 @@ private Q_SLOTS:
     void qualityFieldKeepsOtherRuntimeValues()
     {
         QTemporaryDir directory;
-        PreferencesStore preferences(directory.path());
-        OfflineMetadataProvider provider;
-        LibrarySession library(&provider);
-        MotionController motion;
-        SceneAdapter scene(motion.clock());
-        SelectionController selection(&motion);
-        SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-        const auto before = scene.quality()->values();
-        QVERIFY(settings.updateQuality(u"depthOfField"_s, 75));
+        test::SettingsFixture fixture(directory.path());
+        const auto before = fixture.scene.quality()->values();
+        QVERIFY(fixture.settings.updateQuality(u"depthOfField"_s, 75));
         auto expected = before;
         expected.insert(u"depthOfField"_s, 75.);
-        QCOMPARE(scene.quality()->values(), expected);
-        QVERIFY(!settings.updateQuality(u"unknown"_s, 1));
-        QCOMPARE(scene.quality()->values(), expected);
+        QCOMPARE(fixture.scene.quality()->values(), expected);
+        QVERIFY(!fixture.settings.updateQuality(u"unknown"_s, 1));
+        QCOMPARE(fixture.scene.quality()->values(), expected);
     }
 
     void persistenceImportAndDamage()

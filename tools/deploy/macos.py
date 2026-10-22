@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from macos_bundle import inspect_bundle, inventory, normalize_bundle, run, strip_bundle
 from qml_closure import production_qml
-from package_support import digest, install_package
+from package_support import copy_licenses, digest, install_package
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -64,16 +64,7 @@ def main():
         resources = bundle / 'Contents/Resources'
         # Qt's macOS prefix is Contents; every override remains relative to it.
         (resources / 'qt.conf').write_text('[Paths]\nPlugins=PlugIns\nQmlImports=Resources/qml\n')
-        licenses = resources / 'licenses'
-        shutil.copytree(ROOT / 'resources/licenses', licenses / 'project')
-        for name in ('NOTICE.txt', 'MiSans-license.pdf'):
-            shutil.copyfile(ROOT / 'resources/fonts' / name, licenses / name)
-        shutil.copyfile(ROOT / 'resources/audio/README.md', licenses / 'audio.md')
-        # Preserve the installed Qt attribution texts without copying development modules.
-        qt_licenses = next((path / 'Licenses' for path in kit.parents if (path / 'Licenses').is_dir()), None)
-        if qt_licenses is None:
-            raise RuntimeError('Selected Qt installation license directory is missing')
-        shutil.copytree(qt_licenses, licenses / 'Qt')
+        copy_licenses(ROOT, kit, resources / 'licenses')
         normalization = normalize_bundle(bundle)
         strip_bundle(bundle)
         subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(bundle)], check=True)

@@ -119,158 +119,29 @@ if(YALAHOO_REVIEW)
 
     set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT "600")
 endif()
-qt_add_executable(RenderQualityTest RenderQualityTest.cpp)
-target_link_libraries(RenderQualityTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(RenderQualityTest PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
-yalahoo_platform(RenderQualityTest)
-add_test(
-    NAME
-    render-quality
-    COMMAND
-    RenderQualityTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/render-quality-test.xml,junitxml"
-    -o
-    -,txt
-)
-qt_add_executable(SceneTest SceneTest.cpp)
-target_link_libraries(SceneTest PRIVATE YalahooScene Qt6::Test)
-target_compile_definitions(
-    SceneTest
-    PRIVATE
-    FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    SCENE_REPORT="${CMAKE_BINARY_DIR}/verification/scene-errors.json"
-)
-yalahoo_platform(SceneTest)
-add_test(
-    NAME
-    scene
-    COMMAND
-    SceneTest
-    -o
-    "${CMAKE_BINARY_DIR}/verification/scene-test.xml,junitxml"
-    -o
-    -,txt
-)
-set_tests_properties(scene PROPERTIES TIMEOUT 60)
+yalahoo_unit_test(RenderQualityTest render-quality
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    REPORT render-quality-test.xml)
+yalahoo_unit_test(SceneTest scene
+    LIBRARIES YalahooScene
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" SCENE_REPORT="${CMAKE_BINARY_DIR}/verification/scene-errors.json"
+    REPORT scene-test.xml TIMEOUT 60)
 if(YALAHOO_REVIEW)
-    add_test(
-        NAME
-        runtime-render-backend
-        COMMAND
-        Yalahoo
-        --verify-materials
-        "${PROJECT_SOURCE_DIR}/tests/fixtures/render-backend/visual.json"
-        --material-report
-        "${CMAKE_BINARY_DIR}/verification/render-backend/runtime.json"
-    )
-    set_tests_properties(
-        runtime-render-backend
-        PROPERTIES
-        TIMEOUT
-        240
-        FAIL_REGULAR_EXPRESSION
-        "Failed to compile;QSpirvCompiler;TypeError;out of range"
-        ENVIRONMENT
-        "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-    )
+    set(material_errors "Failed to compile;QSpirvCompiler;TypeError;out of range")
+    yalahoo_review_test(runtime-render-backend materials render-backend/visual.json
+        render-backend/runtime.json 240 ERRORS "${material_errors}")
     foreach(dpr IN ITEMS 1 1.5 2)
-        add_test(
-            NAME
-            runtime-postprocess-dpr-${dpr}
-            COMMAND
-            Yalahoo
-            --verify-materials
-            "${PROJECT_SOURCE_DIR}/tests/fixtures/postprocess/visual-dpr-${dpr}.json"
-            --material-report
-            "${CMAKE_BINARY_DIR}/verification/postprocess/dpr-${dpr}/runtime.json"
-        )
-        set_tests_properties(
-            runtime-postprocess-dpr-${dpr}
-            PROPERTIES
-            TIMEOUT
-            420
-            FAIL_REGULAR_EXPRESSION
-            "Failed to compile;QSpirvCompiler;TypeError;out of range"
-            ENVIRONMENT
-            "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-        )
+        yalahoo_review_test(runtime-postprocess-dpr-${dpr} materials postprocess/visual-dpr-${dpr}.json
+            postprocess/dpr-${dpr}/runtime.json 420 DPR ${dpr} ERRORS "${material_errors}")
     endforeach()
-    add_test(
-        NAME
-        runtime-occlusion
-        COMMAND
-        Yalahoo
-        --verify-materials
-        "${PROJECT_SOURCE_DIR}/tests/fixtures/occlusion/visual.json"
-        --material-report
-        "${CMAKE_BINARY_DIR}/verification/occlusion/runtime.json"
-    )
-    set_tests_properties(
-        runtime-occlusion
-        PROPERTIES
-        TIMEOUT
-        180
-        FAIL_REGULAR_EXPRESSION
-        "Failed to compile;QSpirvCompiler;TypeError;out of range"
-        ENVIRONMENT
-        "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-    )
-    add_test(
-        NAME
-        runtime-materials
-        COMMAND
-        Yalahoo
-        --verify-materials
-        "${PROJECT_SOURCE_DIR}/tests/fixtures/materials/single-case.json"
-        --material-report
-        "${CMAKE_BINARY_DIR}/verification/materials/runtime.json"
-    )
-    set_tests_properties(
-        runtime-materials
-        PROPERTIES
-        TIMEOUT
-        150
-        ENVIRONMENT
-        "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-    )
-    add_test(
-        NAME
-        runtime-lighting
-        COMMAND
-        Yalahoo
-        --verify-materials
-        "${PROJECT_SOURCE_DIR}/tests/fixtures/lighting/visual.json"
-        --material-report
-        "${CMAKE_BINARY_DIR}/verification/lighting/runtime.json"
-    )
-    set_tests_properties(
-        runtime-lighting
-        PROPERTIES
-        TIMEOUT
-        150
-        ENVIRONMENT
-        "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=1;QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins"
-    )
+    yalahoo_review_test(runtime-occlusion materials occlusion/visual.json
+        occlusion/runtime.json 180 ERRORS "${material_errors}")
+    yalahoo_review_test(runtime-materials materials materials/single-case.json materials/runtime.json 150)
+    yalahoo_review_test(runtime-lighting materials lighting/visual.json lighting/runtime.json 150)
     foreach(dpr IN ITEMS 1 1.5 2)
-        add_test(
-            NAME
-            runtime-scene-dpr-${dpr}
-            COMMAND
-            Yalahoo
-            --verify-scene
-            "${PROJECT_SOURCE_DIR}/tests/fixtures/scene/camera-golden.json"
-            --scene-report
-            "${CMAKE_BINARY_DIR}/verification/scene-dpr-${dpr}/runtime.json"
-        )
-        set_tests_properties(
-            runtime-scene-dpr-${dpr}
-            PROPERTIES
-            TIMEOUT
-            90
-            ENVIRONMENT
-            "QT_ENABLE_HIGHDPI_SCALING=0;QT_SCALE_FACTOR=${dpr};QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QSG_INFO=1"
-        )
+        yalahoo_review_test(runtime-scene-dpr-${dpr} scene scene/camera-golden.json
+            scene-dpr-${dpr}/runtime.json 90 DPR ${dpr} ENVIRONMENT "QSG_INFO=1")
     endforeach()
 endif()
 yalahoo_unit_test(IdentityTest identity LIBRARIES YalahooCore Qt6::Gui)

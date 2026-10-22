@@ -5,6 +5,7 @@ import io
 import json
 import math
 import os
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
@@ -57,6 +58,55 @@ class ReplayTest(unittest.TestCase):
                                                "--verify-test", lambda report, args: report.get("dpr") == args.dpr)
         return result, json.loads((self.args.output / "manifest.json").read_text())
 
+    def run_gui(self, output, report):
+        def execute(command, **options):
+            destination = Path(command[2]) / 'report.json'
+            destination.parent.mkdir(parents=True)
+            if report is not None:
+                destination.write_text(report)
+                try:
+                    data = json.loads(report)
+                except ValueError:
+                    data = {}
+                captures = data.get('captures', []) if isinstance(data, dict) else []
+                if not isinstance(captures, list):
+                    captures = []
+                for capture in captures:
+                    if isinstance(capture, dict) and isinstance(capture.get('image'), str):
+                        (destination.parent / capture['image']).write_bytes(b'anonymous output fixture')
+            return SimpleNamespace(returncode=0)
+        with patch.object(sys, 'argv', ['verify-gui.py', '--backend', 'metal', '--representative',
+                                       '--output', str(output)]), \
+                patch.object(native_replay, 'cmake_cache', return_value={'YALAHOO_SELECTED_QT:PATH': str(self.root),
+                                                                       'CMAKE_BUILD_TYPE:STRING': 'Release'}), \
+                patch.object(native_replay.subprocess, 'run', side_effect=execute), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as result:
+            runpy.run_path(str(ROOT / 'tests/runners/verify-gui.py'), run_name='__main__')
+        return result.exception.code, json.loads((output / 'manifest.json').read_text())
+
+    def test_gui_persists_failure_for_invalid_reports(self):
+        for index, report in enumerate((None, '{broken', '[]', '{"captures": null}', '{"captures": [1]}',
+                                        '{"captures": [{"width": []}]}')):
+            with self.subTest(report=report):
+                code, manifest = self.run_gui(self.root / f'gui-{index}', report)
+                self.assertEqual(code, 1)
+                self.assertFalse(manifest['passed'])
+
+    def test_gui_requires_complete_captures_and_boolean_success(self):
+        captures = [dict(width=w, height=h, night=night, realistic=real, phase=phase,
+                         image=f'{w}-{h}-{night}-{real}-{phase}.png')
+                    for w, h in ((1280, 720), (930, 900), (390, 844))
+                    for night in (False, True) for real in (False, True)
+                    for phase in (('browse', 'overview', 'detail', 'search') if real else
+                                  ('browse', 'overview', 'detail', 'search', 'opening-mark', 'opening-scene'))]
+        for index, marker in enumerate((True, 'true', 1)):
+            with self.subTest(marker=marker):
+                report = json.dumps(dict(passed=marker, backend=6, captures=captures))
+                code, manifest = self.run_gui(self.root / f'gui-valid-{index}', report)
+                self.assertEqual(code, 0 if marker is True else 1)
+                self.assertEqual(manifest['passed'], marker is True)
+                self.assertEqual(manifest['capturedCheckpoints'], 60)
+
     def test_replay_environment_does_not_inherit_visible_or_stress_authorization(self):
         flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_STRESS",
                  "YALAHOO_VERIFY_LIFECYCLE", "YALAHOO_VERIFY_WINDOW_LIFECYCLE")
@@ -75,7 +125,9 @@ class ReplayTest(unittest.TestCase):
 
     def test_missing_malformed_and_mismatched_reports_fail(self):
         reports = [None, "{broken", "[]", json.dumps(dict(passed=True, backend="opengl", dpr=1)),
-                   json.dumps(dict(passed=True, backend="metal", dpr=2))]
+                   json.dumps(dict(passed=True, backend="metal", dpr=2)),
+                   json.dumps(dict(passed="true", backend="metal", dpr=1)),
+                   json.dumps(dict(passed=1, backend="metal", dpr=1))]
         for index, report in enumerate(reports):
             with self.subTest(report=report):
                 self.args.output = self.root / f"result-{index}"

@@ -18,6 +18,23 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def read_report(path):
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return report if isinstance(report, dict) else {}
+
+
+def run_logged(command, log_path, *, cwd, environment, timeout):
+    with log_path.open("w", encoding="utf-8") as log:
+        try:
+            return subprocess.run(command, cwd=cwd, env=environment, stdout=log,
+                                  stderr=subprocess.STDOUT, timeout=timeout, check=False).returncode
+        except subprocess.TimeoutExpired:
+            return "timeout"
+
+
 def executable_path(root=ROOT, tool=None):
     if tool:
         return root / "build/release/tests" / (tool + (".exe" if platform.system() == "Windows" else ""))
@@ -89,17 +106,12 @@ def run_replays(parser, args, command, validate, **scope):
     for index in range(1, args.runs + 1):
         output = args.output / f"run-{index}"
         log_path = args.output / f"run-{index}.log"
-        with log_path.open("w", encoding="utf-8") as log:
-            try:
-                code = subprocess.run([str(executable), command, str(output.resolve())], cwd=ROOT,
-                                      env=environment, stdout=log, stderr=subprocess.STDOUT,
-                                      timeout=REPLAY_TIMEOUT_SECONDS, check=False).returncode
-            except subprocess.TimeoutExpired:
-                code = "timeout"
+        code = run_logged([str(executable), command, str(output.resolve())], log_path,
+                          cwd=ROOT, environment=environment, timeout=REPLAY_TIMEOUT_SECONDS)
         report_path = output / "report.json"
+        report = read_report(report_path)
         try:
-            report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
-            valid = bool(isinstance(report, dict) and code == 0 and report.get("passed")
+            valid = bool(code == 0 and report.get("passed") is True
                          and report.get("backend") == args.backend and validate(report, args)
                          and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
         except (ValueError, TypeError, KeyError):

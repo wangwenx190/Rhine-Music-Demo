@@ -18,17 +18,20 @@ Item {
     implicitHeight: cssPixelSize
     Accessible.role: Accessible.StaticText
     Accessible.name: value.toString().padStart(digits, "0")
-    ArchiveText {
-        id: measure
-        visible: false
+    component DigitText: ArchiveText {
         tokens: root.tokens
-        text: root.value.toString().padStart(root.digits, "0")
+        color: root.color
         cssPixelSize: root.cssPixelSize
         cssLineHeight: root.cssPixelSize
         font.family: root.digitFont.family
         font.styleName: root.digitFont.styleName
         font.weight: root.digitFont.weight
         font.letterSpacing: root.letterSpacing
+    }
+    DigitText {
+        id: measure
+        visible: false
+        text: root.value.toString().padStart(root.digits, "0")
     }
     OrdinalMotion {
         id: motion
@@ -57,29 +60,13 @@ Item {
                 width: upper.width
                 height: root.cssPixelSize
                 clip: true
-                ArchiveText {
+                DigitText {
                     id: upper
-                    tokens: root.tokens
                     text: slot.modelData.upper.toString()
-                    color: root.color
-                    cssPixelSize: root.cssPixelSize
-                    cssLineHeight: root.cssPixelSize
-                    font.family: root.digitFont.family
-                    font.styleName: root.digitFont.styleName
-                    font.weight: root.digitFont.weight
-                    font.letterSpacing: root.letterSpacing
                     y: -slot.modelData.fraction * root.cssPixelSize
                 }
-                ArchiveText {
-                    tokens: root.tokens
+                DigitText {
                     text: slot.modelData.lower.toString()
-                    color: root.color
-                    cssPixelSize: root.cssPixelSize
-                    cssLineHeight: root.cssPixelSize
-                    font.family: root.digitFont.family
-                    font.styleName: root.digitFont.styleName
-                    font.weight: root.digitFont.weight
-                    font.letterSpacing: root.letterSpacing
                     y: (1 - slot.modelData.fraction) * root.cssPixelSize
                 }
             }

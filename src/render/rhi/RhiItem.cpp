@@ -442,6 +442,7 @@ private:
     QSize plannedOpeningLayer, plannedPanelLayer, plannedDisplayLayer;
     bool plannedHdr = false;
     void reset();
+    void resetTargetPipelines();
     void enqueueAtlas();
     void makeTarget(Target &target, QSize size, bool mrt, int samples = 1, bool mips = false,
                     QRhiTexture::Format format = QRhiTexture::RGBA16F,
@@ -567,17 +568,13 @@ void Renderer::enqueueAtlas()
     }
     atlasQueue.enqueue(input.atlasUploads);
 }
-void Renderer::reset()
+void Renderer::resetTargetPipelines()
 {
-    for (auto &texture : alignedReadbacks)
-        texture.reset();
-    readbackPackAlignment = 0;
-    alignedReadbackRevision = 0;
+    // Drop users before the target render passes are recreated. Shadow resources are independent.
     post.reset();
     prepassPipeline.reset();
     prepassBackgroundPipeline.reset();
     opaqueInstances.reset();
-    shadowInstances.reset();
     prepassInstances.reset();
     coverageInstances.reset();
     outputSource = nullptr;
@@ -590,16 +587,25 @@ void Renderer::reset()
     outputPipeline.reset();
     backgroundPipeline.reset();
     opaquePipeline.reset();
-    shadowPipeline.reset();
     outputBindings.reset();
     geometryBindings.reset();
+    postTargets = false;
+}
+void Renderer::reset()
+{
+    for (auto &texture : alignedReadbacks)
+        texture.reset();
+    readbackPackAlignment = 0;
+    alignedReadbackRevision = 0;
+    resetTargetPipelines();
+    shadowInstances.reset();
+    shadowPipeline.reset();
     shadowBindings.reset();
     opaque.reset();
     composite.reset();
     shadow.reset();
     aoGeometry.reset();
     dofGeometry.reset();
-    postTargets = false;
     uniforms.reset();
     uniformScratch.clear();
     outputUniform.reset();
@@ -1162,24 +1168,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         }
     }
     if (replaceTargets) {
-        post.reset();
-        prepassPipeline.reset();
-        opaqueInstances.reset();
-        prepassInstances.reset();
-        coverageInstances.reset();
-        prepassBackgroundPipeline.reset();
-        postTargets = false;
-        outputSource = nullptr;
-        shellPipeline.reset();
-        coveragePipeline.reset();
-        copyPipeline.reset();
-        copyBindings.reset();
-        shellBindings.reset();
-        outputPipeline.reset();
-        backgroundPipeline.reset();
-        opaquePipeline.reset();
-        outputBindings.reset();
-        geometryBindings.reset();
+        resetTargetPipelines();
         targetSize = renderTarget()->pixelSize();
         captureSamples = input.captureSamples;
         targetsHaveShells = input.shells;

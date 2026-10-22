@@ -76,45 +76,33 @@ foreach(source IN LISTS cpp_files)
 endforeach()
 
 foreach(source IN LISTS qml_files)
+    set(arguments)
+    if(NOT check)
+        set(arguments -i)
+    endif()
+    execute_process(
+        COMMAND
+        "${QML_FORMAT}"
+        -s
+        "${SOURCE_ROOT}/.qmlformat.ini"
+        ${arguments}
+        "${source}"
+        RESULT_VARIABLE
+        result
+        OUTPUT_VARIABLE
+        formatted
+        ERROR_VARIABLE
+        error
+        ENCODING
+        UTF-8
+    )
     if(check)
-        execute_process(
-            COMMAND
-            "${QML_FORMAT}"
-            -s
-            "${SOURCE_ROOT}/.qmlformat.ini"
-            "${source}"
-            RESULT_VARIABLE
-            result
-            OUTPUT_VARIABLE
-            formatted
-            ERROR_VARIABLE
-            error
-            ENCODING
-            UTF-8
-        )
         file(READ "${source}" original)
         string(REPLACE "\r\n" "\n" original "${original}")
         string(REPLACE "\r\n" "\n" formatted "${formatted}")
         if(result EQUAL 0 AND NOT original STREQUAL formatted)
             list(APPEND failures "${source}: run the format target")
         endif()
-    else()
-        execute_process(
-            COMMAND
-            "${QML_FORMAT}"
-            -s
-            "${SOURCE_ROOT}/.qmlformat.ini"
-            -i
-            "${source}"
-            RESULT_VARIABLE
-            result
-            OUTPUT_VARIABLE
-            output
-            ERROR_VARIABLE
-            error
-            ENCODING
-            UTF-8
-        )
     endif()
     if(NOT result EQUAL 0)
         list(APPEND failures "${source}: ${error}")

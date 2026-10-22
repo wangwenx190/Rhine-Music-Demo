@@ -1,3 +1,4 @@
+#include "../support/SettingsFixture.h"
 #include "RowLightController.h"
 #include "SelectionLighting.h"
 #include "SceneAdapter.h"
@@ -27,14 +28,8 @@ private Q_SLOTS:
     void authoredLightingAndTemporaryComparison()
     {
         QTemporaryDir directory;
-        PreferencesStore preferences(directory.path());
-        OfflineMetadataProvider provider;
-        LibrarySession library(&provider);
-        MotionController motion;
-        SceneAdapter scene(motion.clock());
-        SelectionController selection(&motion);
-        SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-        auto *lighting = scene.lighting();
+        test::SettingsFixture fixture(directory.path());
+        auto *lighting = fixture.scene.lighting();
         QSignalSpy changes(lighting, &SelectionLighting::settingsChanged);
         const auto defaults = lighting->settings();
         RowLightingInput input;
@@ -57,7 +52,7 @@ private Q_SLOTS:
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Baseline);
         QCOMPARE(lighting->settings(), authored);
         QCOMPARE(changes.size(), 1);
-        QCOMPARE(preferences.values()[u"lighting"_s].toMap(), authored);
+        QCOMPARE(fixture.preferences.values()[u"lighting"_s].toMap(), authored);
         lighting->setComparing(false);
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Hybrid);
         for (const auto &invalid : { QVariant(u"1"_s), QVariant(true),
@@ -75,35 +70,24 @@ private Q_SLOTS:
         QVERIFY(!lighting->comparing());
         QCOMPARE(lighting->settings(), defaults);
         QCOMPARE(lighting->ribbon.settings.mode, RowLightingMode::Guided);
-        QVERIFY(preferences.update({ { u"lighting"_s, QVariantMap{ { u"future"_s, 7 } } } }));
+        QVERIFY(fixture.preferences.update(
+                { { u"lighting"_s, QVariantMap{ { u"future"_s, 7 } } } }));
         lighting->configure({ { u"mode"_s, u"area"_s } });
-        QCOMPARE(preferences.values()[u"lighting"_s].toMap()[u"future"_s].toInt(), 7);
+        QCOMPARE(fixture.preferences.values()[u"lighting"_s].toMap()[u"future"_s].toInt(), 7);
     }
     void lightingPreferenceSurvivesRestart()
     {
         QTemporaryDir directory;
         {
-            PreferencesStore preferences(directory.path());
-            OfflineMetadataProvider provider;
-            LibrarySession library(&provider);
-            MotionController motion;
-            SceneAdapter scene(motion.clock());
-            SelectionController selection(&motion);
-            SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-            scene.lighting()->configure({ { u"mode"_s, u"area"_s }, { u"width"_s, 2.2 } });
-            scene.lighting()->setComparing(true);
+            test::SettingsFixture fixture(directory.path());
+            fixture.scene.lighting()->configure({ { u"mode"_s, u"area"_s }, { u"width"_s, 2.2 } });
+            fixture.scene.lighting()->setComparing(true);
         }
-        PreferencesStore preferences(directory.path());
-        OfflineMetadataProvider provider;
-        LibrarySession library(&provider);
-        MotionController motion;
-        SceneAdapter scene(motion.clock());
-        SelectionController selection(&motion);
-        SettingsController settings(&preferences, &library, &motion, &scene, &selection);
-        QCOMPARE(scene.lighting()->settings()[u"mode"_s].toString(), u"area"_s);
-        QCOMPARE(scene.lighting()->settings()[u"width"_s].toDouble(), 2.2);
-        QVERIFY(!scene.lighting()->comparing());
-        QCOMPARE(scene.lighting()->ribbon.settings.mode, RowLightingMode::Area);
+        test::SettingsFixture fixture(directory.path());
+        QCOMPARE(fixture.scene.lighting()->settings()[u"mode"_s].toString(), u"area"_s);
+        QCOMPARE(fixture.scene.lighting()->settings()[u"width"_s].toDouble(), 2.2);
+        QVERIFY(!fixture.scene.lighting()->comparing());
+        QCOMPARE(fixture.scene.lighting()->ribbon.settings.mode, RowLightingMode::Area);
     }
     void speedDoesNotRestartTrajectoryOrOpening()
     {

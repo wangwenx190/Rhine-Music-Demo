@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
-from package_support import digest
+from package_support import package_inventory
 
 
 def run(*args, env=None):
@@ -14,18 +14,7 @@ def run(*args, env=None):
 
 
 def inventory(root):
-    root = root.resolve()
-    files = {}
-    for path in sorted(root.rglob('*')):
-        if path.is_symlink():
-            target = os.readlink(path)
-            if Path(target).is_absolute() or not path.resolve(strict=True).is_relative_to(root):
-                raise RuntimeError(f'External package symlink: {path}')
-            files[str(path.relative_to(root))] = dict(symlink=target)
-        elif path.is_file() and path != root / 'package.json':
-            files[str(path.relative_to(root))] = dict(sha256=digest(path), bytes=path.stat().st_size,
-                                                    mode=path.stat().st_mode & 0o777)
-    return files
+    return package_inventory(root, file_permissions=True)
 
 
 def verify_inventory(root):

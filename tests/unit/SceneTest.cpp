@@ -2,6 +2,7 @@
 #include "MotionController.h"
 #include "SelectionController.h"
 #include "SceneAdapter.h"
+#include "SceneMath.h"
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -42,6 +43,26 @@ private Q_SLOTS:
         QVERIFY(input.open(QIODevice::ReadOnly));
         oracle = QJsonDocument::fromJson(input.readAll()).object();
         QCOMPARE(oracle[u"cases"_s].toArray().size(), 48);
+    }
+    void caseIntersectionHandlesParallelInsideAndClippedSegments()
+    {
+        const auto front = caseRayEntry({ 0, 1, 1 }, { 0, 0, -2 });
+        QVERIFY(front);
+        QVERIFY(std::abs(*front - .465) < 1e-12);
+        const auto back = caseRayEntry({ 0, 1, -1 }, { 0, 0, 2 });
+        QCOMPARE(back, front);
+        QCOMPARE(caseRayEntry({ 0, 1, 0 }, { 0, 0, 2 }), std::optional<double>(0));
+        QVERIFY(!caseRayEntry({ 3, 1, 1 }, { 0, 0, -2 }));
+        QVERIFY(!caseRayEntry({ 0, 0, 1 }, { 0, 0, -2 }));
+        QVERIFY(!caseRayEntry({ 0, 1, 1 }, { 0, 0, -.5 }));
+        QVERIFY(!caseRayEntry({ 0, 1, 1 }, { 0, 0, 2 }));
+        QMatrix4x4 identity;
+        QCOMPARE(projectToViewport(identity, { 0, 0, .5 }, { 800, 600 }), QVector3D(400, 300, .5));
+        QCOMPARE(projectToViewport(identity, { -1, 1, 0 }, { 800, 600 }), QVector3D(0, 0, 0));
+        identity(3, 3) = -1;
+        const auto behind = projectToViewport(identity, { 0, 0, 0 }, { 800, 600 });
+        QVERIFY(std::isnan(behind.x()) && std::isnan(behind.y()));
+        QCOMPARE(behind.z(), -1);
     }
     void fogTracksRenderedCameraAndDetail()
     {

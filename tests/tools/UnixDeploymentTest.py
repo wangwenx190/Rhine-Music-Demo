@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise strip and relocatable runtime imports on the native UNIX object format."""
 import os
+import json
 from pathlib import Path
 import platform
 import plistlib
@@ -25,6 +26,84 @@ def run(*arguments, **kwargs):
 
 
 class PackageSupportTest(unittest.TestCase):
+    def test_inventory_rejects_nonrelocatable_and_dangling_links_on_both_platforms(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            (root / "player").write_bytes(b"anonymous product")
+            link = root / "link"
+            for module in (linux_package, macos_bundle):
+                for target in (str(root / "player"), "missing", "../outside"):
+                    with self.subTest(module=module.__name__, target=target):
+                        link.symlink_to(target)
+                        try:
+                            with self.assertRaises((RuntimeError, FileNotFoundError)):
+                                module.inventory(root)
+                        finally:
+                            link.unlink()
+                link.symlink_to("player")
+                module.inventory(root)
+                link.unlink()
+
+    def test_inventory_excludes_only_root_metadata_and_keeps_platform_permissions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            binary = root / "player"
+            binary.write_bytes(b"anonymous product")
+            binary.chmod(0o755)
+            (root / "qml").mkdir()
+            (root / "qml/package.json").write_text("{}")
+            (root / "package.json").write_text("{}")
+            linux = linux_package.inventory(root)
+            macos = {entry['path']: entry for entry in macos_bundle.inventory(root)}
+            self.assertEqual(set(linux), {"player", "qml/package.json"})
+            self.assertEqual(set(macos), set(linux))
+            self.assertEqual(linux['player']['mode'], 0o755)
+            self.assertTrue(macos['player']['executable'])
+            self.assertEqual(linux['player']['sha256'], macos['player']['sha256'])
+            metadata = dict(configuration='Release', review=False, files=list(macos.values()))
+            (root / 'package.json').write_text(json.dumps(metadata))
+            macos_bundle.verify_inventory(root)
+            binary.chmod(0o644)
+            with self.assertRaises(RuntimeError):
+                macos_bundle.verify_inventory(root)
+
+    def test_license_copy_uses_kit_or_ancestor_and_preserves_all_attribution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ('licenses/NOTICE', 'fonts/NOTICE.txt', 'fonts/MiSans-license.pdf', 'audio/README.md'):
+                path = root / 'resources' / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            kit = root / 'qt/kit'
+            kit.mkdir(parents=True)
+            for index, location in enumerate((kit, kit.parent)):
+                licenses = location / 'Licenses'
+                licenses.mkdir()
+                (licenses / 'Qt.txt').write_text('Qt attribution')
+                destination = root / f'output-{index}'
+                package_support.copy_licenses(root, kit, destination)
+                self.assertEqual({str(p.relative_to(destination)) for p in destination.rglob('*') if p.is_file()},
+                                 {'project/NOTICE', 'NOTICE.txt', 'MiSans-license.pdf', 'audio.md', 'Qt/Qt.txt'})
+                self.assertEqual((destination / 'Qt/Qt.txt').read_text(), 'Qt attribution')
+                shutil.rmtree(licenses)
+            with self.assertRaisesRegex(RuntimeError, 'license directory is missing'):
+                package_support.copy_licenses(root, kit, root / 'missing')
+
+    def test_verification_output_preserves_package_and_previous_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            package = root / 'package'
+            package.mkdir()
+            for path in (package, package / 'new-result'):
+                with self.assertRaisesRegex(RuntimeError, 'outside the package'):
+                    package_support.verification_output(package, path, 'unused-')
+            output = package_support.verification_output(package, root / 'evidence', 'unused-')
+            (output / 'prior').write_text('preserve')
+            with self.assertRaises(FileExistsError):
+                package_support.verification_output(package, output, 'unused-')
+            self.assertEqual((output / 'prior').read_text(), 'preserve')
+            self.assertEqual(list(package.iterdir()), [])
+
     def test_install_replaces_whole_package_and_restores_on_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -109,7 +188,8 @@ class PackageSupportTest(unittest.TestCase):
             base = Path(temporary)
             script = base / "probe.py"
             cases = [('{"passed": true}', 0, False), ('{broken', 0, False),
-                     ('[]', 0, False), ('{"passed": true}', 7, False), ('', 0, True)]
+                     ('[]', 0, False), ('{"passed": true}', 7, False), ('', 0, True),
+                     ('{"passed": "true"}', 0, False), ('{"passed": 1}', 0, False)]
             for index, (report, code, timeout) in enumerate(cases):
                 output = base / str(index)
                 output.mkdir()
@@ -119,6 +199,7 @@ class PackageSupportTest(unittest.TestCase):
                 probe = package_support.run_probe([sys.executable, script], output, os.environ,
                                                    timeout=.1 if timeout else 5)
                 self.assertEqual(probe.timed_out, timeout)
+                self.assertEqual(probe.passed, report == '{"passed": true}' and code == 0 and not timeout)
                 if not timeout:
                     self.assertEqual(probe.exit_code, code)
                 if report.startswith('{"passed"'):
