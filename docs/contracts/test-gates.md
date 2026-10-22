@@ -4,7 +4,7 @@
 
 ## 验收对象与最低充分证据
 
-验收服务于桌面本地播放器及其源视觉设计；每个门槛须对应生产功能、正确性、质量、资源边界或明确支持的目标能力。测试完整输入集是工具能力，实际执行范围由改动影响和独立缺口决定。
+验收服务于桌面本地播放器及其源视觉设计；每个门槛须对应生产功能、正确性、质量、资源边界或明确支持的目标能力。相同输入与状态的固定重复次数本身不形成独立门禁；资源恢复须核对实际释放和恢复后的消费者，不能仅检查对象仍存活。测试完整输入集是工具能力，实际执行范围由改动影响和独立缺口决定。
 
 | 改动或待确认事实 | 必要证据 |
 | --- | --- |
@@ -47,9 +47,9 @@
 | `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`rhi-material-parameters`、`render-quality`、`render-support` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命；assets/branding/covers/title-reels及RHI契约 |
 | `verification-window-policy`、显式可见窗口/输出检查、`macos-application-menu` | 不干扰窗口约束、实际native呈现与HDR/系统菜单；test-window-policy/display-output及R36实物事实，隐藏与可见事实分别保留 |
 | RHI与封面/阵列GPU组件、`display-transfer-gpu` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
-| QML组件回放、生产详情/总览/导航、GUI与同窗口生命周期 | 真实控件/面板/音乐舞台的交互、布局、模态、播放隔离与恢复；组件契约及R36产品接线。独立资源压力和性能入口仅按performance.md选用 |
+| QML组件回放、生产详情/总览/导航、GUI与同窗口生命周期 | 真实控件/面板/音乐舞台的交互、布局、模态、播放隔离与恢复；组件契约及R36产品接线。诊断采样入口仅按performance.md选用 |
 | `runtime-materials`、`runtime-lighting` | 隔离Quick3D三表面/纸面与光场适配，R36明确保留的源参数/投影及有效输出边界；materials/lighting.md |
-| `dry-tools`、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、有限测量/数值错误、独立采集文件、来源结构误判、三平台CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |
+| `dry-tools`（含详情/总览报告的严格字段、状态集合及输出存在性）、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、有限测量/数值错误、独立采集文件、来源结构误判、三平台CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |
 | `launchers`、`unix-deployment`、`linux-package-tools` | 参数/子进程状态、包完整性/权限/依赖/符号链接、原生strip/相对加载；平台部署契约。目标对象格式分支只在对应系统执行 |
 | 冻结数学/DOM导出、`compare-ui-structure.py overview/presentation`、文字/滑尺与网络探针 | 独立来源重建、同输入结构/字体/轨迹及目标TLS/代理；web-baseline与组件契约及R36明确缺口，不是普通CTest依赖 |
 | clang-tidy安全审计、资产来源核对与生成器 | 编译器定向检查所有权/未定义行为及超时/诊断错误传播、冻结hash/许可及可复现生产输入；cpp23-best-practices/assets/web-baseline。`python3 tests/tools/AssetExportTest.py`在隔离目录验证独立来源导出、滑尺操作输入、失败输出保护与已提交manifest；`node --test tests/tools/TitleVerificationTest.mjs`验证标题报告的严格成功/数值/唯一状态边界。AssetExportTest另须先构建Release prepare-assets并准备同Kit balsam，用隔离副本验证原生说明不会被重新导入覆盖；其余导出需要Node及锁定Web依赖。TitleVerificationTest需要Node；两者不加入普通CTest |
@@ -60,15 +60,14 @@
 | --- | --- |
 | `ctest --preset qt-release -R 对应测试` | fast：只选择本次逻辑改动影响的源码/算法/状态/资产/模块/格式检查 |
 | `ctest --preset qt-release-render -R 组件` | 按需选择真正隐藏渲染项 |
-| `ctest --preset qt-release-stress -R 组件` | 仅静态审计仍无法确定的具体资源/寿命问题确需压力时选用最小范围；修改所有权代码或首次目标验收本身不触发 |
 | `ctest --preset qt-release-media -R 对应测试` | 显式真实音频设备与媒体集成；纯状态/持久化仍在fast，GUI同时受窗口标签限制 |
 | `ctest --preset qt-release-full` | fast+不依赖音频设备的隐藏功能集成，不含独立压力；用户明确要求完整测试/全量回归，或影响分析确认确需此完整范围时执行；该请求不包含性能采样、研究选型或独立压力 |
 | `ctest --preset qt-release-visible -R 具体测试` | 显式窗口/输入/焦点/呈现/相关生命周期，不默认全选 |
 
-- `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/native-media/resource-stress，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
-- fast/full/render清YALAHOO_VERIFY_VISIBLE/FOREGROUND/LIFECYCLE/STRESS；常规入口排除resource-stress，fast/full/render另排除native-visible及native-media，fast另排除render-integration。media只选择native-media并排除native-visible/resource-stress，stress显式允许带媒体的隐藏压力入口。stress preset仅选择隐藏resource-stress；其他系统的原生压力用组件显式工具运行。macOS默认可见OFF，disabled如实暂缓；默认窗口策略只调用hiddenNativeWindow槽。
-- 先按被测行为、依赖、输入和运行条件判断已有结果是否仍有效，并尽可能复用。无关模块、Git版本号或重新链接导致二进制hash变化，本身不使结果失效；相关逻辑/输入/依赖或环境变化仅使对应结果失效。不影响行为的注释、文档或脚本注释改动无需专门运行测试；脚本逻辑变化检查其参数、错误传播与实际入口；代码逻辑变更只执行必要的对应检查。共享代码沿实际调用链确定范围，不自动扩大到fast集或完整回归。功能回放与性能问题分别选择；局部成本、计时、资源增长及重复重建压力先满足performance.md的静态未决门槛，不默认各跑一次。显式压力入口为verify-startup的--stress、verify-detail/overview的--lifecycle，报告实际完成次数；已有有效结果复用，真实失败仍保留。
-- `playback`仅运行队列/快照及可控晚到通知；`audio-ambience`仅运行静音事件/参数/持久化。`playback-device`保留真实暂停/seek/结束/错误及输出恢复，`audio-ambience-device`保留真实BGM交接/错误重试/QSoundEffect池；设备缺失时明确失败，不跳过为通过。startup-qml/startup-stress/settings-qml/playback-qml同时标native-media。
+- `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/native-media，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
+- fast/full/render/media清YALAHOO_VERIFY_VISIBLE/FOREGROUND/WINDOW_LIFECYCLE；fast/full/render排除native-visible及native-media，fast另排除render-integration。media只选择native-media并排除native-visible。macOS默认可见OFF，disabled如实暂缓；默认窗口策略检查前台归属判定与隐藏原生窗口，不显示窗口。
+- 先按被测行为、依赖、输入和运行条件判断已有结果是否仍有效，并尽可能复用。无关模块、Git版本号或重新链接导致二进制hash变化，本身不使结果失效；相关逻辑/输入/依赖或环境变化仅使对应结果失效。不影响行为的注释、文档或脚本注释改动无需专门运行测试；脚本逻辑变化检查其参数、错误传播与实际入口；代码逻辑变更只执行必要的对应检查。共享代码沿实际调用链确定范围，不自动扩大到fast集或完整回归。功能回放与性能问题分别选择；局部成本、计时、资源增长及重复重建压力先满足performance.md的静态未决门槛，不默认各跑一次。已有有效结果复用，真实失败仍保留。
+- `playback`仅运行队列/快照及可控晚到通知；`audio-ambience`仅运行静音事件/参数/持久化。`playback-device`保留真实暂停/seek/结束/错误及输出恢复，`audio-ambience-device`保留真实BGM交接/错误重试/QSoundEffect池；设备缺失时明确失败，不跳过为通过。startup-qml/settings-qml/playback-qml同时标native-media。
 - 剩余目标系统、后端和物理设备动态检查由迁移计划R36集中管理；Linux显式OpenGL入口同样受目标能力准入约束。受影响的算法/源码/模块/构建及适用qsb变体照常检查，缺环境不减少原门槛。
 - 对需要新验证的受影响行为按风险选择尺寸/主题/DPR，只覆盖其实际依赖的范围；未被改动触及的最终目标矩阵结果继续复用，未执行的目标门槛仍保留。报告区分本次实际、复用、未选、暂缓及原因。首次目标验收先区分已有共用证据与目标特有缺口，仅补后者；组件所列完整工具状态集不自动成为首次验收清单。必须实际运行才能确定的功能/画质/设备事实仍保留，不能以代表组合冒称全部通过。格式与官方qmllint的适用选择归code-style.md，同样不扩大为功能回归。
 - `production-app-root`属于fast且不依赖Review：通过生产可执行文件的`--verify-app`隐藏创建真实`App.qml`及业务接线，核对舞台、显示合成层、弹出层归属、尺寸、无QML警告、无播放和窗口策略。App根、生产QML导入/注册、合成宿主或其初始化依赖发生变化时，必须执行此检查与受影响模块的官方qmllint；组件/专用探针或仅构建成功不能替代生产根创建。实际输出与交互仍由对应集成检查证明。
@@ -94,7 +93,7 @@
 
 - 每项检查必须回答当前具体正确性、集成或目标环境问题；没有对应问题的历史报告、固定状态数、重复次数或遥测字段，不构成新增测试义务。静态结论、实际结果和缺环境分别记录；不为填满COMMON/PERF矩阵逐项新建报告或重复跑审计脚本，相关内容未变直接复用。
 - 构建只覆盖实际改动目标及其必要依赖；测试需要Review工具才构建对应目标，部署检查才准备生产包。注释/文档改动不配置、编译或启动应用；格式结果可复用时不为提交再跑一次完整命令串。官方qmllint仅选受影响QML模块，不一律两组齐跑。
-- `-R`使用准确名称或已确定的最小名称并集，运行前可用CTest列举模式核对展开范围；`fast`是分类，裸preset仍会选择一批测试。完整、render、visible或stress预置均不因标签名而自动触发。TIMEOUT是失败上界，不是建议观察时长；不为压缩耗时降低正确性容差，也不靠延长超时掩盖卡住。
+- `-R`使用准确名称或已确定的最小名称并集，运行前可用CTest列举模式核对展开范围；`fast`是分类，裸preset仍会选择一批测试。完整、render或visible预置均不因标签名而自动触发。TIMEOUT是失败上界，不是建议观察时长；不为压缩耗时降低正确性容差，也不靠延长超时掩盖卡住。
 - 来源核对与实际运行结果分别验收；缺一份历史报告不触发重跑。当前缺口按对应组件入口选择最小状态集，不附带候选选型、成本采样或重复压力。
 - 算法/结构/颜色/状态的既有正确性容差继续用于被测断言；图像数量、完整协议中的固定轮数、历史性能数字只适用于其明确范围。数值失败先检查预期/输入/生产语义；确认真实产品缺陷就修复，无效环境或采集保留限制，不改阈值追分，也不为无法测量的字段新建研究任务。
 - 已有生产方案无具体缺陷或瓶颈时，不作候选API横评、最优参数搜索、额外文献/基准研究或新验证框架。当前缺口得到可靠答案、修复后的受影响断言通过即停止；不自动复核三次、补全其他后端/尺寸或追加“更稳妥”的长回归。用户另行指定的目标与范围优先。
@@ -104,7 +103,7 @@
 | 实际入口 | 分类 |
 | --- | --- |
 | rhi-bokeh-gpu、rhi-smaa-gpu、display-transfer-gpu | 直接QRhi offscreen，各平台入口均无可见窗口；实际后端能力另验 |
-| startup-qml、startup-stress、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、opening-qml、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
+| startup-qml、controls-qml、experiments-qml、settings-qml、playback-qml、library-panels-qml、opening-qml、presentation-qml、overview-qml、archive-pool-gpu、real-columns-gpu、runtime-materials、runtime-lighting、rhi-opaque/shell/flicker/ao/fog/shadow/postprocess/transient-attachments/scale-gpu | macOS当前RenderControl真正隐藏；其他系统当前需native窗口，按能力变化重评 |
 
 整场GUI显式入口为`python3 tests/runners/verify-gui.py`，范围与采集语义见[rhi-integration.md](rhi-integration.md)；它不隐式加入fast/full集合。
 

@@ -16,7 +16,6 @@ using namespace Qt::StringLiterals;
 namespace yalahoo {
 namespace {
 // View boxes and stable path IDs come from bundled brand geometry; ring dashes use source arc lengths.
-constexpr auto DoubleRoundTripDigits = 17;
 constexpr auto ExpectedRevealEntries = 17;
 constexpr auto LastBrandPathId = 19;
 constexpr auto OrbitRingPathId = 101;
@@ -39,27 +38,6 @@ constexpr auto DefaultPathWidth = 16;
 constexpr auto PointPathLengthThreshold = .02;
 
 CanvasInkStats stats;
-QString svgPath(const QPainterPath &p)
-{
-    QString result;
-    auto point = [&](int i) {
-        const auto e = p.elementAt(i);
-        return QString::number(e.x, 'g', DoubleRoundTripDigits) + " "_L1
-                + QString::number(e.y, 'g', DoubleRoundTripDigits) + " "_L1;
-    };
-    for (int i = 0; i < p.elementCount(); ++i) {
-        const auto e = p.elementAt(i);
-        if (e.isMoveTo())
-            result += "M"_L1 + point(i);
-        else if (e.isLineTo())
-            result += "L"_L1 + point(i);
-        else if (e.isCurveTo()) {
-            result += "C"_L1 + point(i) + point(i + 1) + point(i + 2);
-            i += 2;
-        }
-    }
-    return result;
-}
 class Renderer final : public CanvasRenderer
 {
     Q_DISABLE_COPY_MOVE(Renderer)
@@ -257,8 +235,7 @@ QVector<OpeningPath> loadOpeningPaths()
             width = a.value("stroke-width").toDouble();
         } else if (xml.name() == u"path") {
             OpeningPath path;
-            path.fullSvg = a.value("d").toString();
-            path.full.addPath(path.fullSvg);
+            path.full.addPath(a.value("d").toString());
             const auto entry = entries.value(a.value("id").toString());
             path.decoration = entry.isEmpty();
             path.width =
@@ -330,25 +307,6 @@ void OpeningInk::setAccent(QColor value)
     m_accent = value;
     Q_EMIT colorsChanged();
     invalidate();
-}
-QVariantList OpeningInk::comparisonPaths() const
-{
-    const auto state = openingFrame(m_time);
-    QVariantList result;
-    for (const auto &path : m_paths) {
-        const double progress = path.decoration
-                ? double(state.contour == 1)
-                : std::clamp((state.contour - path.start) / (path.end - path.start), 0.0, 1.0);
-        result.append(QVariantMap{ { u"d"_s,
-                                     progress == 1 ? path.fullSvg
-                                             : progress > 0
-                                             ? svgPath(path.centerline.trimmed(0, progress))
-                                             : QString() },
-                                   { u"width"_s, path.width },
-                                   { u"color"_s, path.accent ? m_accent : m_ink },
-                                   { u"alpha"_s, path.accent ? state.symbols : 1 } });
-    }
-    return result;
 }
 QCanvasPainterItemRenderer *OpeningInk::createItemRenderer() const
 {

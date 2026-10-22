@@ -8,6 +8,7 @@ using Qt::StringLiterals::operator""_s;
 using Qt::StringLiterals::operator""_L1;
 #include "RhiItem.h"
 #include "SceneAdapter.h"
+#include "LayoutMetrics.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>

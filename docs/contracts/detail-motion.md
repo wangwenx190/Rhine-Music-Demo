@@ -22,6 +22,5 @@ CaseClarity 直接移植冻结 decryption.ts 的材质状态：原时间 34.12�
 - `node tools/migration/export-detail-golden.mjs`生成冻结数学；`detail-motion`比较598轨迹帧、50旋转点、1200材质帧，x/v/a≤1e-6。覆盖20/30/60/120fps、1/120秒打断、三次换片/反向回收、满池最后目标、返回/搜索替换、拖动取消、隐藏/换库/九尺寸拾取和真实列边界。
 - `python3 tests/runners/verify-detail.py --backend <目标后端> --dpr 1|1.5|2 --runs 1 --output 全新目录`通过真实App/FrameAnimation回放；夜间`--night`，前台仅授权轮次加`--foreground`。
 - `--window-lifecycle`仅补生产App同窗口的一次hide与一次minimize/restore，核对隐藏无视觉工作、原窗口/SceneItem与实际提交/自身输出恢复；不增加换片压力或QML根重建。
-- 普通功能保持lifecycleStressRequested=false。性能/资源寿命先按performance.md严格静态审查，仅实际未决项才选择最小生命周期观测；以下次数是工具的完整压力能力，不是默认验收要求。`--lifecycle`另执行三十次换片、十次surface及十次完整App/QML根窗口重建，重绑输入并检查重建后换片；basic允许surface复用context，记录实际context初始化数。
-- ready核对同revision实体身份/CPU封面租约集合，最终owner回落且active/pending为0、运动不改target/postprocess代次、单批≤2MiB。旧窗口回调核对epoch；清理帧在有效context交付后再hide/destroy。
+- ready核对同revision实体身份/CPU封面租约集合，最终owner回落且active/pending为0、运动不改target/postprocess代次、单批≤2MiB。验证回调以本轮QObject context绑定寿命；清理帧在有效context交付后再hide/destroy。
 - 目标系统、物理设备与实际焦点/播放集成的剩余事实唯一由迁移计划R36维护。

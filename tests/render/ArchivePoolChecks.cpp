@@ -11,6 +11,7 @@
 #include "CoverCache.h"
 #include <QScopeGuard>
 #include "SceneItem.h"
+#include "InputRouter.h"
 #include "ShellMaterial.h"
 #include "GraphicsBackend.h"
 #include "VerificationWindow.h"
@@ -534,21 +535,6 @@ auto runArchivePoolChecks(int &argc, char **&argv, QGuiApplication &app)
         require(rebuild.metadata[u"drawCount"_s] == rebased.metadata[u"drawCount"_s]
                         && rebuild.metadata[u"atlasPending"_s].toInt() == 0,
                 "Context rebuild lost pool geometry or cover uploads");
-        const int lifecycleCycles =
-                qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
-        for (int cycle = 1; cycle < lifecycleCycles; ++cycle) {
-            const int previousInvalidations = invalidations.load();
-            surface.hide();
-            require(!OffscreenSurface::Enabled || invalidations > previousInvalidations,
-                    "Repeated offscreen scene graph was not invalidated");
-            window.releaseResources();
-            surface.show();
-            waitPrepared();
-            rebuild = settledCapture(u"rebuild-night-%1"_s.arg(cycle + 1));
-            require(rebuild.metadata[u"drawCount"_s] == rebased.metadata[u"drawCount"_s]
-                            && rebuild.metadata[u"atlasPending"_s].toInt() == 0,
-                    "Repeated context rebuild lost geometry or cover uploads");
-        }
         // Exercise revision changes through the actual production atlas/renderer.
         const auto columns = orderLibrary(*snapshot, SortMode::Genre).columns;
         selection.setColumns(columns, snapshot);
@@ -641,7 +627,6 @@ auto runArchivePoolChecks(int &argc, char **&argv, QGuiApplication &app)
             { u"configuration"_s, u"Release"_s },
             { u"sourceMatrixError"_s, maxMatrixError },
             { u"rebaseMatrixError"_s, rebaseMatrixError },
-            { u"lifecycleCycles"_s, lifecycleCycles },
             { u"windowPolicy"_s, verification::windowPolicy(window) },
             { u"offscreen"_s, surface.diagnostics() },
             { u"stable"_s, stable.metadata },

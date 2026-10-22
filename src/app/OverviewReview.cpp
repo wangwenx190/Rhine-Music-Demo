@@ -56,7 +56,6 @@ constexpr auto ReversalSettleFrames = 8;
 constexpr auto ResizeSettleFrames = 20;
 constexpr auto EntryWidthPixels = 76;
 constexpr auto LabelRightInsetPixels = 14;
-constexpr auto HiddenSettleMilliseconds = 40;
 constexpr auto ShortcutSettleFrames = 5;
 constexpr auto ReviewDeadlineMilliseconds = 120000;
 
@@ -82,12 +81,11 @@ enum ReviewStage {
     ReduceOverviewMotion = 11,
     ResizeViewport = 12,
     CheckViewport = 13,
-    PrepareWindowCycle = 14,
-    AwaitWindowCycle = 15,
-    AwaitOverviewRelease = 16,
-    AwaitShortcutExit = 17,
-    AwaitLabelRelease = 18,
-    OverviewComplete = 19
+    ExitAfterResize = 14,
+    AwaitOverviewRelease = 15,
+    AwaitShortcutExit = 16,
+    AwaitLabelRelease = 17,
+    OverviewComplete = 18
 };
 
 // Shared references remain valid until this review event loop has stopped.
@@ -95,8 +93,6 @@ struct OverviewReviewState final
 {
     bool &finished;
     int &stage;
-    int &cycle;
-    const int &requestedCycles;
     const QString &playback;
     LibrarySession &library;
     QStringList &warnings;
@@ -127,9 +123,6 @@ struct OverviewReviewState final
     const QList<QSize> &sizes;
     int &sizeIndex;
     const bool &initialNight;
-    double &pausedProgress;
-    quint64 &priorSubmission;
-    QObject &lifetime;
 };
 auto finishOverviewReview(OverviewReviewState &state, auto &check)
 {
@@ -137,7 +130,6 @@ auto finishOverviewReview(OverviewReviewState &state, auto &check)
         return;
     state.finished = true;
     check(u"sequence-completed"_s, state.stage == OverviewComplete);
-    check(u"requested-lifecycle-cycles"_s, state.cycle == state.requestedCycles);
     check(u"playback-isolated"_s, state.playback == state.library.playbackTrackId());
     check(u"qml-warnings"_s, state.warnings.isEmpty());
     check(u"window-policy"_s, verification::windowPolicySatisfied(state.window));
@@ -167,8 +159,6 @@ auto finishOverviewReview(OverviewReviewState &state, auto &check)
         { u"qmlWarnings"_s, QJsonArray::fromStringList(state.warnings) },
         { u"states"_s, state.states },
         { u"samples"_s, state.samples },
-        { u"cycles"_s, state.cycle },
-        { u"requestedLifecycleCycles"_s, state.requestedCycles },
         { u"peakLabelSlots"_s, state.peakLabels },
         { u"overviewUiAttachments"_s,
           QJsonObject{
@@ -467,51 +457,15 @@ void advanceOverviewCheckViewport(auto &context)
         return;
     }
 }
-void advanceOverviewPrepareWindowCycle(auto &context)
+void advanceOverviewExitAfterResize(auto &context)
 {
     OverviewReviewState &state = context.state;
     auto &ready = context.ready;
-    auto &check = context.check;
 
     if (!ready())
         return;
-    if (!state.requestedCycles) {
-        state.overview.setActive(false);
-        state.stage = AwaitOverviewRelease;
-        return;
-    }
-    state.pausedProgress = state.overview.progress();
-    state.priorSubmission = quint64(state.samples.size());
-    state.window.hide();
-    state.window.releaseResources();
-    state.window.destroy();
-    ++state.stage;
-    QTimer::singleShot(HiddenSettleMilliseconds, &state.lifetime, [&] {
-        check(u"hidden-clock-paused"_s,
-              !state.motion.clock()->active() && state.overview.progress() == state.pausedProgress);
-        state.window.create();
-        state.window.show();
-        state.window.update();
-    });
-    return;
-}
-void advanceOverviewAwaitWindowCycle(auto &context)
-{
-    OverviewReviewState &state = context.state;
-    auto &ready = context.ready;
-    auto &capture = context.capture;
-
-    if (!ready() || quint64(state.samples.size()) <= state.priorSubmission
-        || !state.window.isExposed())
-        return;
-    if (++state.cycle < state.requestedCycles)
-        state.stage = PrepareWindowCycle;
-    else {
-        capture(u"restored"_s);
-        state.overview.setActive(false);
-        ++state.stage;
-    }
-    return;
+    state.overview.setActive(false);
+    state.stage = AwaitOverviewRelease;
 }
 void advanceOverviewAwaitOverviewRelease(auto &context)
 {
@@ -600,8 +554,7 @@ auto advanceOverviewReview(OverviewReviewState &state, auto &check, auto &ready,
             { ReduceOverviewMotion, &advanceOverviewReduceOverviewMotion },
             { ResizeViewport, &advanceOverviewResizeViewport },
             { CheckViewport, &advanceOverviewCheckViewport },
-            { PrepareWindowCycle, &advanceOverviewPrepareWindowCycle },
-            { AwaitWindowCycle, &advanceOverviewAwaitWindowCycle },
+            { ExitAfterResize, &advanceOverviewExitAfterResize },
             { AwaitOverviewRelease, &advanceOverviewAwaitOverviewRelease },
             { AwaitShortcutExit, &advanceOverviewAwaitShortcutExit },
             { AwaitLabelRelease, &advanceOverviewAwaitLabelRelease }
@@ -628,9 +581,6 @@ int reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sce
     window.setPersistentSceneGraph(false);
     window.resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
     const bool initialNight = qEnvironmentVariableIntValue("YALAHOO_VERIFY_NIGHT") == 1;
-    const int requestedCycles = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1
-            ? yalahoo::review::LifecycleRebuildCount
-            : 0;
     scene.lighting()->setNight(initialNight);
     window.setProperty("reviewPlayingTitle",
                        u"\u6b63\u5728\u64ad\u653e \u00b7 \u56fa\u5b9a\u4f4d\u7f6e"_s);
@@ -640,10 +590,8 @@ int reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sce
     QStringList warnings;
     QElapsedTimer time;
     time.start();
-    int stage = AwaitInitialFrame, frames = 0, sizeIndex = 0, cycle = 0, peakLabels = 0;
+    int stage = AwaitInitialFrame, frames = 0, sizeIndex = 0, peakLabels = 0;
     int visibleLane = -1;
-    quint64 priorSubmission = 0;
-    double pausedProgress = 0;
     QString selected;
     QPointF playPosition, stopPosition;
     QMutex positionsMutex;
@@ -717,43 +665,22 @@ int reviewOverview(QGuiApplication &app, QQuickWindow &window, SceneAdapter &sce
         }
         return -1;
     };
-    OverviewReviewState state{ finished,
-                               stage,
-                               cycle,
-                               requestedCycles,
-                               playback,
-                               library,
-                               warnings,
-                               window,
-                               native,
-                               samples,
-                               passed,
-                               checks,
-                               pictures,
-                               states,
-                               peakLabels,
-                               time,
-                               motion,
-                               scene,
-                               selection,
-                               output,
-                               app,
-                               frames,
-                               overview,
-                               positionsMutex,
-                               playPosition,
-                               synchronizedPlay,
-                               stopPosition,
-                               synchronizedStop,
-                               selected,
-                               visibleLane,
-                               presentation,
-                               sizes,
-                               sizeIndex,
-                               initialNight,
-                               pausedProgress,
-                               priorSubmission,
-                               lifetime };
+    OverviewReviewState state{ finished,     stage,
+                               playback,     library,
+                               warnings,     window,
+                               native,       samples,
+                               passed,       checks,
+                               pictures,     states,
+                               peakLabels,   time,
+                               motion,       scene,
+                               selection,    output,
+                               app,          frames,
+                               overview,     positionsMutex,
+                               playPosition, synchronizedPlay,
+                               stopPosition, synchronizedStop,
+                               selected,     visibleLane,
+                               presentation, sizes,
+                               sizeIndex,    initialNight };
     const auto finish = [&] {
         return finishOverviewReview(state, check);
     };

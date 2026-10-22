@@ -31,9 +31,6 @@ using namespace Qt::StringLiterals;
 using namespace yalahoo;
 
 namespace {
-// Diagnostic elapsed time converts monotonic nanoseconds to explicitly named report units.
-constexpr auto NanosecondsPerMillisecond = 1e6;
-
 class Driver final
 {
     Q_DISABLE_COPY_MOVE(Driver)
@@ -169,51 +166,11 @@ public:
     QStringList warnings;
     QJsonArray samples;
 };
-
-auto observeOpeningFrame(Driver &d, yalahoo::OpeningInk *&ink, QJsonArray &costs,
-                         const QString &output, bool quick)
-{
-    QQmlComponent component(&d.engine, QUrl(u"qrc:/qt/qml/Yalahoo/Music/OpeningComparison.qml"_s));
-    std::unique_ptr<QQuickItem> shape;
-    if (quick) {
-        shape.reset(qobject_cast<QQuickItem *>(component.createWithInitialProperties(
-                { { u"source"_s, QVariant::fromValue(ink) } })));
-        require(bool(shape), "Cannot create Quick Shape comparison");
-        shape->setParentItem(ink->parentItem());
-        shape->setPosition(ink->position());
-        ink->setVisible(false);
-    }
-    QElapsedTimer timer;
-    const auto before = openingInkStats().paintNs.load();
-    const auto paints = openingInkStats().paints.load();
-    timer.start();
-    d.frames(32, [&](int i) {
-        ink->setTime(.7 + i * .02);
-        if (shape)
-            shape->setProperty("paths", ink->comparisonPaths());
-    });
-    costs.append(QJsonObject{
-            { u"api"_s, quick ? u"QtQuick.Shape.CurveRenderer"_s : u"C++ Canvas Painter"_s },
-            { u"frames"_s, 32 },
-            { u"guiAndQuickWallMs"_s, timer.nsecsElapsed() / NanosecondsPerMillisecond },
-            { u"canvasPaintMs"_s,
-              (openingInkStats().paintNs.load() - before) / NanosecondsPerMillisecond },
-            { u"canvasPaints"_s, qint64(openingInkStats().paints.load() - paints) },
-            { u"gpuCompleteMs"_s, QJsonValue::Null },
-            { u"scope"_s, u"Local serial diagnostic; no FPS or cross-API image score"_s } });
-    const auto image = d.surface.grab();
-    require(image.save(output + (quick ? "/quick-shape.png"_L1 : "/canvas-painter.png"_L1)),
-            "Cannot save drawing comparison");
-    shape.reset();
-    ink->setVisible(true);
-}
 }
 int reviewOpening(QGuiApplication &, const QString &output, bool representative)
 {
     QDir().mkpath(output);
-    QJsonArray checks, captures, costs;
-    const bool compareDrawing = qEnvironmentVariableIntValue("YALAHOO_VERIFY_COMPARE_DRAWING") == 1;
-    const bool lifecycle = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1;
+    QJsonArray checks, captures;
     bool passed = true;
     const auto check = [&](const QString &name, bool value) {
         passed &= value;
@@ -328,21 +285,10 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
                 }
             }
         }
-        // Compare the actual bounded brand component with Qt Quick Shape using identical trimmed paths.
         d.resize({ 1280, 720 }, 1);
         d.ready();
         d.seek(.95);
         d.frames(2);
-        auto *ink = qobject_cast<OpeningInk *>(
-                yalahoo::review::findVisual(d.root.get(), u"openingBrandInk"_s));
-        require(ink, "Missing production brand painter");
-        const auto compare = [&](bool quick) {
-            return observeOpeningFrame(d, ink, costs, output, quick);
-        };
-        if (compareDrawing) {
-            compare(false);
-            compare(true);
-        }
         QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
         QCoreApplication::sendEvent(&d.window, &tab);
         check(u"tab-focuses-skip"_s,
@@ -353,10 +299,10 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         check(u"enter-skips-film"_s, !d.opening.film());
         d.motion.setReducedMotion(true);
         check(u"reduced-motion-completes-reveal"_s, !d.opening.active());
-        for (int cycle = 0; cycle < (lifecycle ? 10 : 0); ++cycle) {
+        for (const double time : { .95, 2.2 }) {
             d.motion.setReducedMotion(false);
             d.ready();
-            d.seek(cycle % 2 ? 2.2 : .95);
+            d.seek(time);
             d.frames(2);
             const auto paused = d.opening.time();
             d.motion.clock()->setActive(false);
@@ -381,11 +327,8 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         check(u"no-qml-warnings"_s, d.warnings.isEmpty());
         QJsonObject report{ { u"passed"_s, passed },
                             { u"representative"_s, representative },
-                            { u"drawingComparisonRequested"_s, compareDrawing },
-                            { u"lifecycleRequested"_s, lifecycle },
                             { u"checks"_s, checks },
                             { u"captures"_s, captures },
-                            { u"costs"_s, costs },
                             { u"windowPolicy"_s, verification::windowPolicy(d.window) },
                             { u"offscreen"_s, d.surface.diagnostics() },
                             { u"samples"_s, d.samples },

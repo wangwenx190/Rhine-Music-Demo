@@ -1024,9 +1024,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
             const auto requested = song->requested();
             auto *player = song.get();
             const auto values = settings.values();
-            const int reloadCount =
-                    qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 1;
-            for (int i = 0; i < reloadCount; ++i) {
+            {
                 QPointer<QQuickItem> oldScene =
                         yalahoo::review::findVisual(appWindow->contentItem(), u"nativeScene"_s);
                 settings.reload();

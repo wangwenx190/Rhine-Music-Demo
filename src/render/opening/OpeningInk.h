@@ -19,7 +19,6 @@ struct OpeningPath final
 {
     QPainterPath centerline;
     QCanvasPath full;
-    QString fullSvg;
     double start = 0, end = 1, width = openingInkMetrics::DefaultStrokeWidth;
     bool accent = false, decoration = false, point = false;
 };
@@ -59,7 +58,6 @@ public:
     {
         return m_paths;
     }
-    Q_INVOKABLE QVariantList comparisonPaths() const;
     QCanvasPainterItemRenderer *createItemRenderer() const override;
 Q_SIGNALS:
     void timeChanged();

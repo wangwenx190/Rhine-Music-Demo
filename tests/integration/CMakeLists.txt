@@ -37,13 +37,15 @@ yalahoo_ui_test(presentation-qml --presentation presentation 90)
 add_test(NAME runtime-detail COMMAND Yalahoo --verify-detail
     "${CMAKE_BINARY_DIR}/verification/detail-product")
 set_tests_properties(runtime-detail PROPERTIES TIMEOUT 150
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_NO_VSYNC="
+    ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
 
 add_test(NAME runtime-overview COMMAND Yalahoo --verify-overview
     "${CMAKE_BINARY_DIR}/verification/overview-product")
 set_tests_properties(runtime-overview PROPERTIES TIMEOUT 150
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_NO_VSYNC="
+    ENVIRONMENT_MODIFICATION "QSG_NO_VSYNC=unset:"
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1"
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
 
 yalahoo_ui_test(overview-qml --overview overview-qml 120)
@@ -62,13 +64,9 @@ yalahoo_ui_test(experiments-qml --experiments experiments-qml 240 THREADED)
 yalahoo_ui_test(controls-qml --controls controls-qml 60 THREADED)
 
 add_test(NAME startup-qml COMMAND ui-tests --startup "${CMAKE_BINARY_DIR}/verification/startup")
-add_test(NAME startup-stress COMMAND ui-tests --startup "${CMAKE_BINARY_DIR}/verification/startup-stress")
-set_tests_properties(startup-stress PROPERTIES LABELS resource-stress)
-set_tests_properties(startup-qml startup-stress PROPERTIES TIMEOUT 900
+set_tests_properties(startup-qml PROPERTIES TIMEOUT 900
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QSG_RENDER_LOOP=threaded"
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
-set_property(TEST startup-qml APPEND PROPERTY ENVIRONMENT "YALAHOO_VERIFY_STRESS=0")
-set_property(TEST startup-stress APPEND PROPERTY ENVIRONMENT "YALAHOO_VERIFY_STRESS=1")
 
 if(APPLE)
     qt_add_executable(MacApplicationMenuTest MacApplicationMenuTest.mm

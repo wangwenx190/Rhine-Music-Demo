@@ -66,8 +66,8 @@ def replay_environment(kit, backend, dpr, foreground=False):
                        QT_PLUGIN_PATH=str(kit / "plugins"),
                        YALAHOO_VERIFY_FOREGROUND="1" if foreground else "0",
                        QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM="1",
-                       YALAHOO_VERIFY_VISIBLE="0", YALAHOO_VERIFY_LIFECYCLE="0",
-                       YALAHOO_VERIFY_WINDOW_LIFECYCLE="0", YALAHOO_VERIFY_STRESS="0",
+                       YALAHOO_VERIFY_VISIBLE="0",
+                       YALAHOO_VERIFY_WINDOW_LIFECYCLE="0",
                        QCPAINTER_DEBUG_COLLECT="0",
                        QSG_RENDER_LOOP="basic" if platform.system() == "Darwin" and backend == "opengl" else "threaded")
     environment.pop("QSG_NO_VSYNC", None)
@@ -82,7 +82,6 @@ def replay_parser():
     parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--foreground", action="store_true")
-    parser.add_argument("--lifecycle", action="store_true", help="Include lifecycle stress and repeated window rebuilds")
     parser.add_argument("--night", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     return parser
@@ -103,7 +102,6 @@ def run_replays(parser, args, command, validate, **scope):
     args.output.mkdir(parents=True)
     environment = replay_environment(Path(chain["qtKit"]), args.backend, args.dpr, args.foreground)
     environment.update(YALAHOO_VERIFY_NIGHT="1" if args.night else "0",
-                       YALAHOO_VERIFY_LIFECYCLE="1" if args.lifecycle else "0",
                        YALAHOO_VERIFY_WINDOW_LIFECYCLE="1" if getattr(args, "window_lifecycle", False) else "0")
     if visual:
         environment["YALAHOO_VERIFY_VISIBLE"] = "0"
@@ -111,7 +109,7 @@ def run_replays(parser, args, command, validate, **scope):
                     sourceRevision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     workingTreeDiffSha256=hashlib.sha256(subprocess.check_output(["git", "diff"], cwd=ROOT)).hexdigest(),
                     system=platform.platform(), backend=args.backend, dpr=args.dpr,
-                    lifecycleStress=args.lifecycle, foreground=args.foreground, night=args.night,
+                    foreground=args.foreground, night=args.night,
                     requestedRuns=args.runs, runs=[], completed=False, passed=False, **scope)
     manifest_path = args.output / "manifest.json"
     write_json(manifest_path, manifest)
@@ -125,9 +123,9 @@ def run_replays(parser, args, command, validate, **scope):
         report = read_report(report_path)
         try:
             valid = bool(code == 0 and report.get("passed") is True
-                         and report.get("backend") == args.backend and validate(report, args)
+                         and report.get("backend") == args.backend and validate(report, args, output)
                          and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
-        except (ValueError, TypeError, KeyError, AttributeError):
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
             valid = False
         passed = valid and passed
         manifest["runs"].append(dict(run=index, exitCode=code, passed=valid, report=str(report_path)))

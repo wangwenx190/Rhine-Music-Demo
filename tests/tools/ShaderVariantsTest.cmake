@@ -4,6 +4,7 @@ foreach(shader IN ITEMS src/app/.qsb/reel-slot.frag.qsb
         src/app/.qsb/display-output.frag.qsb src/render/rhi/.qsb/output.frag.qsb)
     execute_process(
         COMMAND "${QSB}" --dump "${BUILD_DIRECTORY}/${shader}"
+        TIMEOUT 10
         RESULT_VARIABLE result
         OUTPUT_VARIABLE dump
         ERROR_VARIABLE error)

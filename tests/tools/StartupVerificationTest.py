@@ -33,10 +33,10 @@ class StartupVerificationTest(unittest.TestCase):
 
     def report(self, args):
         return dict(functionalPassed=True, samplingComplete=True, backend=6, dpr=args.dpr,
-                    scenario=args.scenario, stressRequested=args.stress,
+                    scenario=args.scenario,
                     samplingRequestedSeconds=args.seconds, samplingSeconds=args.seconds,
-                    switches=0 if args.observe_only else 30 if args.stress else 3,
-                    rebuilds=0 if args.observe_only else 10 if args.stress else 2,
+                    switches=0 if args.observe_only else 3,
+                    rebuilds=0 if args.observe_only else 2,
                     stages={args.scenario: {"cpuSubmit": {"count": 100}}},
                     swapIntervalRequested=0 if args.mode == "uncapped" else 1,
                     qsgNoVsyncRequested=args.mode == "uncapped", nativeSamplingValid=True,
@@ -47,7 +47,7 @@ class StartupVerificationTest(unittest.TestCase):
                     synchronizationTimestampsNs=[1, 2], qtPresentationTimestampsNs=[1, 2])
 
     def test_scopes_have_distinct_defaults_and_acceptance(self):
-        for options, expected in [((), (30, 1)), (("--stress",), (0, 1)),
+        for options, expected in [((), (30, 1)),
                                   (("--formal", "--mode", "vsync", "--scenario", "day-wave"), (120, 1)),
                                   (("--formal", "--mode", "vsync", "--scenario", "day-wave",
                                     "--runs", "3"), (120, 3))]:
@@ -57,8 +57,7 @@ class StartupVerificationTest(unittest.TestCase):
                 self.assertTrue(VERIFY.validate_report(self.report(args), args, 0))
 
     def test_invalid_scope_combinations_stop_before_execution(self):
-        combinations = [("--stress", "--seconds", "30"), ("--stress", "--runs", "3"),
-                        ("--formal",), ("--formal", "--stress"), ("--lifecycle",),
+        combinations = [("--seconds", "0"), ("--seconds", "121"), ("--formal",),
                         ("--formal", "--mode", "vsync", "--scenario", "day-wave", "--runs", "2"),
                         ("--runs", "10"),
                         ("--formal", "--mode", "uncapped", "--scenario", "day-wave"),
@@ -74,7 +73,7 @@ class StartupVerificationTest(unittest.TestCase):
         args = self.arguments()
         for field, value in [("functionalPassed", False), ("samplingComplete", False),
                              ("samplingSeconds", 12), ("stages", {}), ("backend", 4),
-                             ("stressRequested", True), ("switches", 2), ("rebuilds", 1),
+                             ("switches", 2), ("rebuilds", 1),
                              ("scenario", "day-wave"), ("samplingRequestedSeconds", 120)]:
             with self.subTest(field=field):
                 report = self.report(args)
@@ -133,20 +132,11 @@ class StartupVerificationTest(unittest.TestCase):
         invalid = [("--observe-only",),
                    ("--observe-only", "--mode", "vsync", "--scenario", "night-detail"),
                    ("--observe-only", "--mode", "vsync", "--scenario", "night-wave", "--runs", "3"),
-                   ("--observe-only", "--formal"), ("--observe-only", "--stress")]
+                   ("--observe-only", "--formal")]
         for options in invalid:
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
                     self.arguments(*options)
-
-    def test_native_stress_requires_requested_transitions_and_full_pressure(self):
-        args = self.arguments("--stress", "--mode", "vsync", "--lifecycle")
-        report = self.report(args)
-        self.assertFalse(VERIFY.validate_report(report, args, 0))
-        report["nativeWindowTransitions"] = 4
-        self.assertTrue(VERIFY.validate_report(report, args, 0))
-        report["switches"] = 3
-        self.assertFalse(VERIFY.validate_report(report, args, 0))
 
     def test_formal_runs_preserve_failure_without_implicit_retries(self):
         for runs in (1, 3):
@@ -176,7 +166,6 @@ class StartupVerificationTest(unittest.TestCase):
         def sample(command, **kwargs):
             calls.append(command)
             self.assertNotIn("QSG_NO_VSYNC", kwargs["env"])
-            self.assertEqual(kwargs["env"]["YALAHOO_VERIFY_STRESS"], "0")
             report = self.report(args)
             report["performanceGatePassed"] = bool(log_text) or len(calls) != 1
             kwargs["stdout"].write(log_text)
@@ -188,7 +177,7 @@ class StartupVerificationTest(unittest.TestCase):
         with patch.object(VERIFY, "ROOT", self.root), patch.object(VERIFY, "__file__", str(script)), \
                 patch.object(VERIFY.platform, "platform", return_value="test-platform"), \
                 patch.object(native_replay.subprocess, "run", side_effect=sample), \
-                patch.dict(os.environ, {"QSG_NO_VSYNC": "", "YALAHOO_VERIFY_STRESS": "1"}), \
+                patch.dict(os.environ, {"QSG_NO_VSYNC": ""}), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(VERIFY.main(options), 1)
         manifest = json.loads((self.root / f"result-{runs}/manifest.json").read_text(encoding="utf-8"))

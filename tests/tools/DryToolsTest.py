@@ -36,7 +36,7 @@ class ReplayTest(unittest.TestCase):
         chain.parent.mkdir(parents=True)
         chain.write_text(json.dumps(dict(configuration="Release", qtKit=str(self.root / "kit"))))
         self.args = SimpleNamespace(backend="metal", dpr=1, runs=1, foreground=False,
-                                    lifecycle=False, night=False, output=self.root / "result")
+                                    night=False, output=self.root / "result")
         for context in [patch.object(native_replay, "ROOT", self.root),
                         patch.object(native_replay, "executable_path", return_value=self.executable),
                         patch.object(native_replay.subprocess, "check_output",
@@ -44,7 +44,8 @@ class ReplayTest(unittest.TestCase):
             context.start()
             self.addCleanup(context.stop)
 
-    def run_replay(self, report=None, log_text="", timeout=False, launch_error=False):
+    def run_replay(self, report=None, log_text="", timeout=False, launch_error=False,
+                   validation_error=False):
         def execute(command, **options):
             if timeout:
                 raise subprocess.TimeoutExpired(command, 1)
@@ -56,9 +57,14 @@ class ReplayTest(unittest.TestCase):
                 path.write_text(report)
             options["stdout"].write(log_text)
             return SimpleNamespace(returncode=0)
+        def validate(report, args, output):
+            if validation_error:
+                raise PermissionError("fixture output permission denied")
+            return report.get("dpr") == args.dpr
+
         with patch.object(native_replay.subprocess, "run", side_effect=execute), contextlib.redirect_stdout(io.StringIO()):
             result = native_replay.run_replays(argparse.ArgumentParser(), self.args,
-                                               "--verify-test", lambda report, args: report.get("dpr") == args.dpr)
+                                               "--verify-test", validate)
         return result, json.loads((self.args.output / "manifest.json").read_text())
 
     def run_gui(self, output, report, log_text=""):
@@ -146,9 +152,8 @@ class ReplayTest(unittest.TestCase):
         path.write_text('{"passed": true, "value": 1.5}')
         self.assertEqual(native_replay.read_report(path), dict(passed=True, value=1.5))
 
-    def test_replay_environment_does_not_inherit_visible_or_stress_authorization(self):
-        flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_STRESS",
-                 "YALAHOO_VERIFY_LIFECYCLE", "YALAHOO_VERIFY_WINDOW_LIFECYCLE")
+    def test_replay_environment_does_not_inherit_visible_or_lifecycle_authorization(self):
+        flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_WINDOW_LIFECYCLE")
         with patch.dict(os.environ, {**dict.fromkeys(flags, "1"), "QSG_NO_VSYNC": "1"}):
             environment = native_replay.replay_environment(self.root / "kit", "metal", 1)
             self.assertTrue(all(environment[flag] == "0" for flag in flags))
@@ -193,6 +198,43 @@ class ReplayTest(unittest.TestCase):
         self.assertEqual(manifest["runs"][0]["exitCode"], "launch-error")
         self.assertFalse(manifest["passed"])
         self.assertIn("permission denied", (self.args.output / "run-1.log").read_text())
+
+    def test_component_reports_reject_duplicate_states_and_missing_output(self):
+        overview = runpy.run_path(str(ROOT / "tests/runners/verify-overview.py"))
+        detail = runpy.run_path(str(ROOT / "tests/runners/verify-detail.py"))
+        args = SimpleNamespace(visual=True, dpr=1, window_lifecycle=False)
+        captures = [dict(width=w, height=h, night=night, variant=variant, expanded=variant - 1, dpr=1,
+                         file=f"{w}-{h}-{night}-{variant}.png")
+                    for w, h in overview["SIZES"] for night in (False, True) for variant in (0, 1)]
+        for capture in captures:
+            (self.root / capture["file"]).write_bytes(b"anonymous capture")
+        validate = overview["validate_report"]
+        self.assertTrue(validate(dict(captures=captures), args, self.root))
+        for change in (dict(width=True), dict(dpr=True), dict(night=1), dict(expanded=True), dict(variant=True),
+                       dict(variant=1), dict(expanded=-2),
+                       dict(file="missing.png"), dict(file="../foreign.png"),
+                       dict(file=captures[1]["file"])):
+            invalid = [dict(c) for c in captures]
+            invalid[0].update(change)
+            with self.subTest(change=change):
+                self.assertFalse(validate(dict(captures=invalid), args, self.root))
+        repeated = [captures[0]] * len(captures)
+        self.assertFalse(validate(dict(captures=repeated), args, self.root))
+        self.assertFalse(validate(dict(captures=None), args, self.root))
+        (self.root / captures[0]["file"]).write_bytes(b"")
+        self.assertFalse(validate(dict(captures=captures), args, self.root))
+        report = dict(dpr=1, windowLifecycleRequested=False, windowTransitions=[])
+        self.assertTrue(detail["validate_report"](report, args, self.root))
+        for change in (dict(dpr=True), dict(windowLifecycleRequested=0), dict(windowTransitions=None)):
+            with self.subTest(change=change):
+                self.assertFalse(detail["validate_report"]({**report, **change}, args, self.root))
+
+    def test_validation_io_failure_keeps_a_failed_manifest(self):
+        result, manifest = self.run_replay(json.dumps(dict(passed=True, backend="metal", dpr=1)),
+                                           validation_error=True)
+        self.assertEqual(result, 1)
+        self.assertFalse(manifest["passed"])
+        self.assertFalse(manifest["runs"][0]["passed"])
 
     def test_existing_evidence_is_preserved(self):
         self.args.output.mkdir()

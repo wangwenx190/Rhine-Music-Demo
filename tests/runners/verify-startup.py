@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Separate product diagnostics, resource stress and formal presentation sampling."""
+"""Run explicit product diagnostics and presentation sampling."""
 from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
                            replay_environment, run_logged, write_json)
 import argparse
@@ -20,7 +20,6 @@ def parse_arguments(argv=None):
     parser.add_argument("--scenario", choices=["matrix", *SCENARIOS])
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--formal", action="store_true", help="One 120-second normal VSYNC acceptance sample")
-    scope.add_argument("--stress", action="store_true", help="One resource stress replay without timed sampling")
     scope.add_argument("--observe-only", action="store_true",
                        help="Observe one native wave scenario without functional replay or large input generation")
     parser.add_argument("--seconds", type=int)
@@ -28,26 +27,22 @@ def parse_arguments(argv=None):
                         help="One run by default; three only for an explicit comparison or fixed recheck")
     parser.add_argument("--dpr", type=float, choices=(1, 1.5, 2), default=1)
     parser.add_argument("--foreground", action="store_true")
-    parser.add_argument("--lifecycle", action="store_true", help="Add native hide/minimize to --stress")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.seconds is None:
-        args.seconds = 0 if args.stress else 120 if args.formal else 30
+        args.seconds = 120 if args.formal else 30
     if args.runs is None:
         args.runs = 1
-    if args.stress:
-        if args.seconds != 0 or args.runs != 1:
-            parser.error("Resource stress runs once without timed sampling (--seconds 0 --runs 1)")
-    elif not 12 <= args.seconds <= 120:
+    if not 12 <= args.seconds <= 120:
         parser.error("seconds must be 12..120")
     if args.formal and (args.seconds != 120 or args.mode != "vsync" or args.dpr != 1):
         parser.error("Formal acceptance requires normal VSYNC, DPR 1 and 120 seconds")
     if args.scenario is None:
-        if args.mode == "offscreen" or args.stress:
+        if args.mode == "offscreen":
             args.scenario = "matrix"
         else:
             parser.error("Native sampling requires --scenario with one fixed day/night scenario")
-    if not args.stress and args.mode != "offscreen" and args.scenario == "matrix":
+    if args.mode != "offscreen" and args.scenario == "matrix":
         parser.error("Choose one fixed scenario for native sampling")
     if args.observe_only and (args.mode == "offscreen" or args.scenario not in ("day-wave", "night-wave")
                               or args.runs != 1):
@@ -55,10 +50,8 @@ def parse_arguments(argv=None):
     if args.mode == "offscreen":
         if platform.system() != "Darwin":
             parser.error("The genuine hidden RenderControl entry is currently implemented on macOS only")
-        if args.foreground or args.lifecycle:
-            parser.error("Offscreen runs have no foreground or native hide/minimize lifecycle")
-    if args.lifecycle and not args.stress:
-        parser.error("Native hide/minimize lifecycle requires a separate --stress run")
+        if args.foreground:
+            parser.error("Offscreen runs have no foreground window")
     if args.output.exists():
         parser.error("Choose a fresh output directory; preserve failed and raw runs")
     return args
@@ -73,13 +66,12 @@ def validate_report(report, args, exit_code):
     dpr = report.get("dpr")
     if type(dpr) not in (int, float) or not math.isfinite(dpr):
         return False
-    expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (30, 10) if args.stress else (3, 2)
+    expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (3, 2)
     valid = (exit_code == 0 and report.get("functionalPassed") is True
              and report.get("samplingComplete") is True
              and report.get("backend") == BACKEND_IDS[args.backend]
              and report.get("dpr") == args.dpr
              and report.get("scenario") == args.scenario
-             and report.get("stressRequested") is args.stress
              and report.get("samplingRequestedSeconds") == args.seconds
              and report.get("observationOnly", False) is args.observe_only
              and report.get("switches") == expected_switches
@@ -95,8 +87,6 @@ def validate_report(report, args, exit_code):
                  and report.get("qsgNoVsyncRequested") is (args.mode == "uncapped"))
         if args.seconds:
             valid = valid and report.get("nativeSamplingValid") is True
-    if args.lifecycle:
-        valid = valid and report.get("nativeWindowTransitions") == 4
     if args.formal:
         valid = (valid and report.get("performanceGateEnforced") is True
                  and report.get("performanceGatePassed") is True)
@@ -134,9 +124,7 @@ def main(argv=None):
         raise SystemExit("Build the latest native Kit qt-release ui-tests first")
     args.output.mkdir(parents=True)
     environment = replay_environment(kit, args.backend, args.dpr, args.foreground)
-    environment.update(YALAHOO_VERIFY_VISIBLE="0" if args.mode == "offscreen" else "1",
-                       YALAHOO_VERIFY_LIFECYCLE="1" if args.lifecycle else "0",
-                       YALAHOO_VERIFY_STRESS="1" if args.stress else "0")
+    environment["YALAHOO_VERIFY_VISIBLE"] = "0" if args.mode == "offscreen" else "1"
     if args.mode == "uncapped":
         environment["QSG_NO_VSYNC"] = "1"
     source_files = [*ROOT.glob("src/**/*.cpp"), *ROOT.glob("src/**/*.h"), *ROOT.glob("qml/**/*.qml"),
@@ -150,9 +138,9 @@ def main(argv=None):
                              if args.observe_only else
                              "StartupChecks::fixture: generated 576 albums/96 distinct 2048-square JPEGs; test::wave(600000), no private library"),
                     backend=args.backend, dpr=args.dpr, mode=args.mode, scenario=args.scenario, seconds=args.seconds,
-                    formalRequested=args.formal, stressRequested=args.stress, observationOnly=args.observe_only,
+                    formalRequested=args.formal, observationOnly=args.observe_only,
                     formalAcceptancePassed=None,
-                    foreground=args.foreground, lifecycle=args.lifecycle, requestedRuns=args.runs,
+                    foreground=args.foreground, requestedRuns=args.runs,
                     runs=[], completed=False, passed=False)
     manifest_path = args.output / "manifest.json"
 

@@ -4,7 +4,7 @@ qt_add_executable(ui-tests UiTests.cpp StartupChecks.cpp ControlsChecks.cpp Expe
 target_link_libraries(ui-tests PRIVATE Qt6::Test)
 yalahoo_test_tool(ui-tests)
 yalahoo_probe_qml(ui-tests
-    DetailReview.qml OverviewVisual.qml OpeningComparison.qml LibraryReview.qml ControlsReview.qml)
+    DetailReview.qml OverviewVisual.qml LibraryReview.qml ControlsReview.qml)
 
 # Native RHI probes share executable policy; only real dependencies vary below.
 function(yalahoo_render_test target)

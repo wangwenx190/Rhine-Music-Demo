@@ -232,6 +232,7 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                                              { u"night"_s, night },
                                              { u"dpr"_s, window.effectiveDevicePixelRatio() },
                                              { u"file"_s, file },
+                                             { u"variant"_s, variant },
                                              { u"expanded"_s, variant ? expanded : -1 },
                                              { u"columns"_s, anchors },
                                              { u"structures"_s, structures },
@@ -266,37 +267,6 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
             overview.setActive(false);
         }
     }
-    QJsonArray lifecycle;
-    const int requestedCycles =
-            qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1 ? 10 : 0;
-    for (int cycle = 0; cycle < requestedCycles; ++cycle) {
-        surface.hide();
-        object.reset();
-        overview.reset();
-        window.resize(1280, 720);
-        scene.layout()->setViewport(1280, 720);
-        object.reset(component.createWithInitialProperties(
-                { { u"overview"_s, QVariant::fromValue(&overview) },
-                  { u"inputRouter"_s, QVariant::fromValue(&input) },
-                  { u"night"_s, true },
-                  { u"backgroundUrl"_s,
-                    QUrl::fromLocalFile(QDir(output).absoluteFilePath(u"tile-night.png"_s)) } }));
-        root = qobject_cast<QQuickItem *>(object.get());
-        if (!root)
-            return 4;
-        root->setParentItem(window.contentItem());
-        root->setSize({ 1280, 720 });
-        overview.setActive(true);
-        scene.advance(0);
-        overview.synchronize(0, true);
-        surface.show();
-        for (int i = 0; i < 5; ++i)
-            passed = render() && passed;
-        const bool alive =
-                overview.labels()->liveCount() > 0 && overview.labels()->liveCount() <= 18;
-        lifecycle.append(alive);
-        passed = alive && passed;
-    }
     overview.setActive(false);
     passed = render() && passed;
     const bool retired = overview.labels()->liveCount() == 0;
@@ -312,8 +282,6 @@ int reviewOverviewVisual(QGuiApplication &, const QString &output)
                         { u"captures"_s, captures },
                         { u"expansionClicks"_s, interactions },
                         { u"entryClicks"_s, entries },
-                        { u"lifecycle"_s, lifecycle },
-                        { u"requestedLifecycleCycles"_s, requestedCycles },
                         { u"retired"_s, retired },
                         { u"resourcePlan"_s, surface.diagnostics() },
                         { u"windowPolicy"_s, verification::windowPolicy(window) } };

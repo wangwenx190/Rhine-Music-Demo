@@ -42,6 +42,5 @@ inline constexpr auto DefaultDeadlineMilliseconds = 60000;
 inline constexpr auto WorkerDrainDeadlineMilliseconds = 30000;
 inline constexpr auto WidthPixels = 1280;
 inline constexpr auto HeightPixels = 720;
-inline constexpr auto LifecycleRebuildCount = 10;
 inline constexpr auto MinimumForegroundPixels = 100;
 }

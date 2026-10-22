@@ -49,7 +49,8 @@ target_compile_definitions(VerificationWindowTest PRIVATE
     VISIBLE_WINDOW_REPORT="${CMAKE_BINARY_DIR}/verification/native-window-visible.json")
 yalahoo_platform(VerificationWindowTest)
 add_test(NAME verification-window-policy COMMAND VerificationWindowTest foregroundOwnership hiddenNativeWindow)
-set_tests_properties(verification-window-policy PROPERTIES ENVIRONMENT "YALAHOO_VERIFY_FOREGROUND=0")
+set_tests_properties(verification-window-policy PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
+    ENVIRONMENT "YALAHOO_VERIFY_FOREGROUND=0")
 if(NOT APPLE OR YALAHOO_MACOS_VISIBLE_TESTS)
     add_test(NAME verification-window-visible COMMAND VerificationWindowTest visibleNativeWindow)
     set_tests_properties(verification-window-visible PROPERTIES TIMEOUT 60
@@ -135,6 +136,7 @@ set_tests_properties(production-app-root PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE
 add_test(NAME shader-tools COMMAND "${CMAKE_COMMAND}"
     "-DQSB=${YALAHOO_qsb}" "-DBUILD_DIRECTORY=${CMAKE_BINARY_DIR}"
     -P "${PROJECT_SOURCE_DIR}/tests/tools/ShaderVariantsTest.cmake")
+set_tests_properties(shader-tools PROPERTIES TIMEOUT 35)
 add_test(
     NAME
     kit-selection
@@ -143,6 +145,7 @@ add_test(
     -P
     "${CMAKE_CURRENT_SOURCE_DIR}/KitSelectionTest.cmake"
 )
+set_tests_properties(kit-selection PROPERTIES TIMEOUT 10)
 yalahoo_unit_test(MotionTest motion
     LIBRARIES YalahooCore
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"

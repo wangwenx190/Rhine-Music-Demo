@@ -94,24 +94,23 @@ Linux的X11/Wayland分别完成实际窗口/输入/呈现检查，不为会话�
 
 面板的“提交吞吐”是该批间隔数/时间，反映当前调度与等待，不宣称未限速benchmark；CPU同步与提交分别列出，不相加分位；GPU范围为QRhi后端提供的已完成帧，缺样本显示不可用。VSYNC只显示请求swapInterval，实际VSYNC、屏幕扫描时刻及input-to-photon均不可用；零上传是有效计数，空时间样本不能显示为0。
 
-## 冷启动与产品压力入口
+## 冷启动与产品回放入口
 
 `startup`核对准备/Film快照门槛、隐藏最新值合并、恢复首间隔与帧内失效。`startup-qml`（`ui-tests --startup 新目录 [0或12..120秒] [matrix或固定场景名]`）加载真实MusicStage；普通回放覆盖三次换片、缓存回选、暂停/播放各一次完整视觉root/SG重建、源revision/意图保留、renderer释放及资源回落。滑尺往返、文字、总览、搜索、序章重播/跳过、主题/DPR/resize仍走真实组件；隐藏、空闲零工作需要观察窗口，不以立即检查代替。匿名输入为9×64专辑、96张独立2048² JPEG、qrc封面和静音合成WAV，禁止私人库。
 
-`verify-startup.py --observe-only --mode vsync|uncapped --scenario day-wave|night-wave --seconds 12..120`只观察一个原生波浪场景：同一576专辑/有界实体池使用qrc封面，无歌曲、大封面生成、功能回放、换片、root重建或固定暖机，不能与formal/stress合用。底层为`ui-tests --startup 新目录 秒数 场景 observe`。只记录真实FrameClock帧回调、afterSynchronizing、RHI提交、frameSwapped及窗口事件；一个时限timer结束观测，不驱动渲染或轮询。三个原始时间流须在采样区间内有递增样本，持续曝光与窗口策略独立验收；短观察不执行长期性能门槛，不解释历史异常为已修复。`samples[].clockFrame`是在GUI接收遥测时读取的计数，精确GUI时序使用独立`guiFrames[].atNs`。
+`verify-startup.py --observe-only --mode vsync|uncapped --scenario day-wave|night-wave --seconds 12..120`只观察一个原生波浪场景：同一576专辑/有界实体池使用qrc封面，无歌曲、大封面生成、功能回放、换片、root重建或固定暖机，不能与formal合用。底层为`ui-tests --startup 新目录 秒数 场景 observe`。只记录真实FrameClock帧回调、afterSynchronizing、RHI提交、frameSwapped及窗口事件；一个时限timer结束观测，不驱动渲染或轮询。三个原始时间流须在采样区间内有递增样本，持续曝光与窗口策略独立验收；短观察不执行长期性能门槛，不解释历史异常为已修复。`samples[].clockFrame`是在GUI接收遥测时读取的计数，精确GUI时序使用独立`guiFrames[].atNs`。
 
 | 目的 | 显式入口（Python工具需`--backend`及全新`--output`） | 结论 |
 | --- | --- | --- |
 | 局部诊断 | `verify-startup.py --mode offscreen`；原生模式指定相关`--scenario` | 仅静态未决项确实需要该观测时选择；现有默认30秒不是任务要求，先按问题收窄入口 |
-| 资源压力 | `verify-startup.py --stress`或`qt-release-stress` | 工具现有能力为30次换片/10次完整root重建；只在静态无法判定的资源/寿命问题确实需要重复时使用，不作为默认次数 |
-| 原生同窗口生命周期 | `verify-startup.py --stress --mode vsync --lifecycle` | 仅补无法静态确定的真实窗口行为；不为一个未决事实附带整套换片/root压力 |
+| 原生同窗口生命周期 | `ui-tests --window-lifecycle 全新目录` | 暂停/播放×隐藏/最小化，核对实际恢复与媒体连续；准确环境及R36边界见rhi-integration.md |
 | 明确指定的既有性能专项 | `verify-startup.py --formal --mode vsync --scenario 所选场景` | 该显式模式使用既有120秒协议；不属于普通验收 |
 | 问题复现/修复对照 | 选择相关场景及实际所需观察时间，默认一次 | 有歧义才追加所需对照；不预设固定批次 |
 | 未限速吞吐诊断 | `verify-startup.py --mode uncapped --scenario 所选场景` | 仅实际吞吐问题调查时选择，不作呈现通过 |
 
-`--formal`与`--stress`互斥；压力限一次零秒采样，`--lifecycle`只用于原生压力。直接ui-tests的压力开关为`YALAHOO_VERIFY_STRESS=1`，不允许同时计时采样。普通/压力报告记录实际次数；短采样、离屏、未限速结果不写正式呈现通过，包装工具以`formalRequested/formalAcceptancePassed`区分。正式批次保留每次失败及原始样本，不自动追加新批次直到通过。常规入口不继承环境中的压力开关。
+普通功能回放覆盖换片和暂停/播放各一次完整root重建，记录实际次数及释放/恢复结果。短采样、离屏、未限速结果不写正式呈现通过，包装工具以`formalRequested/formalAcceptancePassed`区分；正式批次保留每次失败及原始样本，不自动追加新批次直到通过。
 
-当前计时入口仍先执行完整功能回放，原生同窗口检查也会附带完整root压力。只有具体未决问题确需这些入口时，才在该任务内解开所需分支并核对报告，范围按test-gates.md；已有更小入口可用则直接使用。不能因只缺同窗口事实再次运行完整换片/root压力，也不提前安排通用工具改造。
+计时入口除observe-only外仍先执行完整功能回放；仅具体未决问题确需这些输入时使用。单独的同窗口事实使用上表最小入口，不附带大封面、换片或root重建。
 
 工具提供的`day/night`与`wave/ruler/detail/switch/overview/search`是问题定位选项，不是必跑清单。按问题选择所需场景，不能将其展开成十二项长采样；混合`matrix`也不产生正式性能结论。窗口策略按test-window-policy.md；原生frameSwapped在实际发出点计时，样本不足或曝光丢失时如实说明测量限制。
 

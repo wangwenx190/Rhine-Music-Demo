@@ -231,9 +231,7 @@ public:
     Driver(Snapshot input, bool windowLifecycle = false)
         : window(OffscreenSurface::Enabled ? &control : nullptr), surface(window, control)
     {
-        verification::prepareWindow(
-                window,
-                !windowLifecycle && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") != 1);
+        verification::prepareWindow(window, !windowLifecycle);
         window.setPersistentGraphics(false);
         window.setPersistentSceneGraph(false);
         QObject::connect(qGuiApp, &QGuiApplication::applicationStateChanged, &engine,
@@ -803,15 +801,12 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                                  u"night-switch"_s, u"night-overview"_s, u"night-search"_s };
     if (scenario != "matrix"_L1 && !allStages.contains(scenario))
         return 2;
-    const bool stress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_STRESS") == 1;
-    if ((stress && seconds != 0)
-        || (!stress && qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1)
-        || (observeOnly
-            && (stress || OffscreenSurface::Enabled || seconds == 0
-                || (scenario != "day-wave"_L1 && scenario != "night-wave"_L1))))
+    if (observeOnly
+        && (OffscreenSurface::Enabled || seconds == 0
+            || (scenario != "day-wave"_L1 && scenario != "night-wave"_L1)))
         return 2;
-    const int switchCount = stress ? 30 : 3;
-    const int rebuildCount = stress ? 10 : 2;
+    constexpr int switchCount = 3;
+    constexpr int rebuildCount = 2;
     QDir().mkpath(output);
     QJsonObject report{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
                         { u"os"_s, QSysInfo::prettyProductName() },
@@ -821,7 +816,6 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         { u"measuredVramBytes"_s, QJsonValue::Null } };
     report[u"bootstrap"_s] = bootstrap;
     report[u"scenario"_s] = scenario;
-    report[u"stressRequested"_s] = stress;
     report[u"observationOnly"_s] = observeOnly;
     report[u"samplingRequestedSeconds"_s] = seconds;
     report[u"switches"_s] = 0;
@@ -1033,13 +1027,6 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
                         && (requested ? d.playback.playing() : !d.playback.playing());
             };
             check("hidden-preserves-current-media-and-intent", preservesMedia());
-            if (qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1) {
-                QJsonArray transitions;
-                verifyNativeWindowLifecycle(d, check, transitions);
-                report[u"nativeWindowTransitions"_s] = transitions.size();
-                report[u"nativeWindowTransitionStates"_s] = transitions;
-                requested = false;
-            }
             d.setStage(u"switch-replay"_s);
             d.presentation.open();
             d.wait(

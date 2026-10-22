@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-FLAGS = ("VISIBLE", "FOREGROUND", "LIFECYCLE", "WINDOW_LIFECYCLE", "STRESS")
+FLAGS = ("VISIBLE", "FOREGROUND", "WINDOW_LIFECYCLE")
 
 
 class TestPolicyTest(unittest.TestCase):
@@ -33,13 +33,12 @@ class TestPolicyTest(unittest.TestCase):
                             "enable_testing()", f"set(APPLE {'TRUE' if target == 'macos' else 'FALSE'})",
                             f"set(WIN32 {'TRUE' if target == 'windows' else 'FALSE'})",
                             "set(YALAHOO_MACOS_VISIBLE_TESTS OFF)"]
-            names = ("unit-probe", "startup-qml", "startup-stress", "runtime-detail", "rhi-bokeh-gpu",
+            names = ("unit-probe", "startup-qml", "runtime-detail", "rhi-bokeh-gpu",
                      "playback-device", "audio-ambience-device", "settings-qml", "playback-qml")
             for name in names:
                 declarations.append(f'add_test(NAME {name} COMMAND "{Path(sys.executable).as_posix()}" '
                                     f'"{fixture.as_posix()}" "{(root / (name + ".json")).as_posix()}")')
-            declarations += ["set_tests_properties(startup-stress PROPERTIES LABELS resource-stress)",
-                             *[f"add_subdirectory({folder})" for folder in ("tests/unit", "tests/integration", "tests/render")],
+            declarations += [*[f"add_subdirectory({folder})" for folder in ("tests/unit", "tests/integration", "tests/render")],
                              f'include("{(ROOT / "cmake/TestPolicy.cmake").as_posix()}")']
             (root / "CMakeLists.txt").write_text("\n".join(declarations) + "\n", encoding="utf-8")
             subprocess.run(["cmake", "--preset", "qt-release"], cwd=root, check=True, capture_output=True, timeout=20)
@@ -49,23 +48,18 @@ class TestPolicyTest(unittest.TestCase):
                                      ("qt-release-render", {"rhi-bokeh-gpu"}),
                                      ("qt-release-media", {"playback-device", "audio-ambience-device"}
                                       | ({"startup-qml", "settings-qml", "playback-qml"}
-                                         if target == "macos" else set())),
-                                     ("qt-release-stress", {"startup-stress"} if target == "macos" else set())):
+                                         if target == "macos" else set()))):
                 with self.subTest(preset=preset):
                     for name in names:
                         (root / (name + ".json")).unlink(missing_ok=True)
                     result = subprocess.run(["ctest", "--preset", preset], cwd=root, env=environment,
                                             capture_output=True, text=True, timeout=20)
-                    if expected:
-                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    else:
-                        self.assertNotEqual(result.returncode, 0)
-                        self.assertIn("No tests were found", result.stdout + result.stderr)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertEqual({name for name in names if (root / (name + ".json")).exists()}, expected)
                     for name in expected:
                         actual = json.loads((root / (name + ".json")).read_text())
                         for flag in FLAGS:
-                            wanted = "1" if flag == "STRESS" and preset == "qt-release-stress" else "0"
+                            wanted = "0"
                             self.assertEqual(actual[f"YALAHOO_VERIFY_{flag}"], wanted)
 
 

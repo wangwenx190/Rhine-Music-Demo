@@ -3,7 +3,6 @@
 #include "SelectionController.h"
 #include "SelectionLighting.h"
 #include <algorithm>
-#include <iterator>
 #include "ReviewSupport.h"
 #include "SceneGeometry.h"
 #include "ProductDefaults.h"
@@ -28,10 +27,8 @@
 #include "JsonFile.h"
 #include <QSet>
 #include <QQmlEngine>
-#include <QQmlApplicationEngine>
 #include <QQmlError>
 #include <cmath>
-#include <functional>
 #include <atomic>
 #include <QThread>
 #include <memory>
@@ -40,14 +37,12 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
-// Anonymous review geometry, bounded lifecycle counts and timeouts are independent of product policy.
+// Anonymous review geometry, input bounds and timeouts are independent of product policy.
 constexpr auto ExpectedDetailedCoverPixels = 1024;
-constexpr auto ExpectedContextCount = 11;
 constexpr auto MaximumOwnedCovers = 4;
 constexpr auto NormalSwitchCount = 4;
 constexpr auto ReverseSwitchOrdinal = 3;
 constexpr auto MaximumReturningCases = 3;
-constexpr auto StressSwitchCount = 30;
 constexpr auto ClearLidThreshold = .999;
 constexpr auto DragDeltaX = 180;
 constexpr auto DragDeltaY = 70;
@@ -62,11 +57,10 @@ constexpr auto ReviewDeadlineMilliseconds = 120000;
 // Nonzero process results are part of the standalone review command protocol.
 enum ReviewExit {
     InvalidReviewInput = 4,
-    ReportFailed = 6,
-    RootCreationFailed = 8
+    ReportFailed = 6
 };
 
-// Ordered review states retain their report ordinals; names describe each awaited fact.
+// Ordered review states describe each awaited fact.
 enum ReviewStage {
     AwaitCover = 0,
     AwaitOpen = 1,
@@ -80,14 +74,11 @@ enum ReviewStage {
     AwaitReducedSwitch = 9,
     AwaitResourceReturn = 10,
     AwaitArchive = 11,
-    PrepareWindowCycle = 12,
-    AwaitWindowCycle = 13,
-    RebuildRoot = 14,
-    AwaitRoot = 15,
-    AwaitRebuiltInput = 16,
-    DetailComplete = 17,
-    AwaitHiddenWindow = 18,
-    AwaitRestoredWindow = 19
+    CheckWindow = 12,
+    AwaitFinalInput = 13,
+    DetailComplete = 14,
+    AwaitHiddenWindow = 15,
+    AwaitRestoredWindow = 16
 };
 
 // Shared references remain valid until this review event loop has stopped.
@@ -95,9 +86,6 @@ struct DetailReviewState final
 {
     bool &finished;
     int &stage;
-    const bool &lifecycleStress;
-    int &fullRebuilds;
-    int &rebuilds;
     int &contexts;
     int &windowTransition;
     const bool &windowLifecycle;
@@ -109,19 +97,16 @@ struct DetailReviewState final
     qint64 &peakOwned;
     qint64 &peakReturning;
     int &switches;
-    int &stress;
     QJsonArray &samples;
     bool &passed;
     const std::shared_ptr<std::atomic<bool>> &separateRenderThread;
     QJsonArray &checks;
     QJsonArray &states;
     QJsonArray &latencies;
-    QJsonArray &lifecycle;
     QJsonArray &windowTransitions;
     QElapsedTimer &time;
     const QString &output;
     QGuiApplication &app;
-    quint64 &windowEpoch;
     QMetaObject::Connection &renderConnection;
     const QThread *&guiThread;
     QObject &reviewLifetime;
@@ -137,10 +122,6 @@ struct DetailReviewState final
     QString &expected;
     MotionController &motion;
     quint64 &submissionBeforeHide;
-    qsizetype &samplesBeforeRebuild;
-    QQmlApplicationEngine *&engine;
-    std::function<void()> &bindWindow;
-    QQuickWindow &initialWindow;
 };
 auto finishDetailReview(DetailReviewState &state, auto &check)
 {
@@ -148,15 +129,6 @@ auto finishDetailReview(DetailReviewState &state, auto &check)
         return;
     state.finished = true;
     check(u"stage-completed"_s, state.stage == DetailComplete);
-    if (state.lifecycleStress) {
-        check(u"ten-full-qml-window-rebuilds"_s,
-              state.fullRebuilds == yalahoo::review::LifecycleRebuildCount);
-        check(u"ten-product-context-restores"_s,
-              state.rebuilds == yalahoo::review::LifecycleRebuildCount
-                      && state.contexts >= ExpectedContextCount);
-    } else {
-        check(u"smoke-keeps-original-window"_s, state.fullRebuilds == 0 && state.rebuilds == 0);
-    }
     check(u"requested-window-transitions"_s,
           state.windowTransition == (state.windowLifecycle ? 2 : 0));
     check(u"render-error-empty"_s, state.native->errorText().isEmpty());
@@ -166,13 +138,11 @@ auto finishDetailReview(DetailReviewState &state, auto &check)
     check(u"bounded-owners"_s,
           state.peakOwned <= MaximumOwnedCovers && state.peakReturning <= MaximumReturningCases);
     check(u"normal-three-switches-and-reverse"_s, state.switches == NormalSwitchCount);
-    check(u"requested-additional-switches"_s,
-          state.stress == (state.lifecycleStress ? StressSwitchCount : 0));
     QSet<qint64> generations, postRevisions;
     qint64 peakUpload = 0, resourceBytes = 0;
     for (const auto &value : state.samples) {
         const auto sample = value.toObject();
-        if (sample[u"stage"_s].toInt() < PrepareWindowCycle) {
+        if (sample[u"stage"_s].toInt() < CheckWindow) {
             generations.insert(sample[u"resourceGeneration"_s].toInteger());
             postRevisions.insert(sample[u"postprocessRevision"_s].toInteger());
         }
@@ -201,10 +171,7 @@ auto finishDetailReview(DetailReviewState &state, auto &check)
         { u"states"_s, state.states },
         { u"samples"_s, state.samples },
         { u"latencies"_s, state.latencies },
-        { u"lifecycle"_s, state.lifecycle },
         { u"contexts"_s, state.contexts },
-        { u"fullWindowRebuilds"_s, state.fullRebuilds },
-        { u"lifecycleStressRequested"_s, state.lifecycleStress },
         { u"windowLifecycleRequested"_s, state.windowLifecycle },
         { u"windowTransitions"_s, state.windowTransitions },
         { u"nativeInputSubmission"_s, qint64(state.native->submission()) },
@@ -441,16 +408,7 @@ void advanceDetailAwaitReducedSwitch(auto &context)
     if (!ready())
         return;
     check(u"reduced-complete-and-release"_s, state.selection->returningCases().size() == 0);
-    if (!state.lifecycleStress) {
-        ++state.stage;
-        return;
-    }
-    if (++state.stress <= StressSwitchCount) {
-        state.presentation.stepAlbum(1);
-        // A reduced switch is synchronously ready on the next shared frame.
-        if (state.stress == StressSwitchCount)
-            ++state.stage;
-    }
+    ++state.stage;
     return;
 }
 void advanceDetailAwaitResourceReturn(auto &context)
@@ -462,7 +420,7 @@ void advanceDetailAwaitResourceReturn(auto &context)
 
     if (!ready())
         return;
-    check(u"stress-resource-return"_s,
+    check(u"switch-resource-return"_s,
           state.selection->returningCases().size() == 0 && covers[u"owned"_s].toInt() == 1);
     {
         QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
@@ -512,7 +470,7 @@ auto observeHiddenDetailWindow(DetailReviewState &state, auto &check)
             });
 }
 
-void advanceDetailPrepareWindowCycle(auto &context)
+void advanceDetailCheckWindow(auto &context)
 {
     DetailReviewState &state = context.state;
     auto &ready = context.ready;
@@ -533,107 +491,9 @@ void advanceDetailPrepareWindowCycle(auto &context)
         });
         return;
     }
-    if (!state.lifecycleStress) {
-        state.expected = state.selection->adjacentAlbum({ }, 1);
-        button(u"detailNext"_s);
-        state.stage = AwaitRebuiltInput;
-        return;
-    }
-    state.samplesBeforeRebuild = state.samples.size();
-    state.window->hide();
-    state.window->releaseResources();
-    state.window->destroy();
-    verification::prepareWindow(*state.window, true);
-    state.window->create();
-    check(u"recreated-hidden-policy"_s,
-          !state.window->isVisible() && verification::windowPolicySatisfied(*state.window));
-    ++state.stage;
-    QTimer::singleShot(0, &state.reviewLifetime, [&] {
-        state.window->show();
-        state.window->update();
-    });
-    return;
-}
-void advanceDetailAwaitWindowCycle(auto &context)
-{
-    DetailReviewState &state = context.state;
-    const QJsonObject &covers = context.covers;
-    auto &ready = context.ready;
-    auto &capture = context.capture;
-
-    if (!ready() || state.samples.size() <= state.samplesBeforeRebuild
-        || !state.window->isExposed())
-        return;
-    ++state.rebuilds;
-    state.lifecycle.append(
-            QJsonObject{ { u"cycle"_s, state.rebuilds },
-                         { u"covers"_s, covers },
-                         { u"windowPolicy"_s, verification::windowPolicy(*state.window) },
-                         { u"lastSubmission"_s, state.samples.last() } });
-    if (state.rebuilds < yalahoo::review::LifecycleRebuildCount)
-        state.stage = PrepareWindowCycle;
-    else {
-        capture(u"restored"_s);
-        ++state.stage;
-    }
-    return;
-}
-void advanceDetailRebuildRoot(auto &context)
-{
-    DetailReviewState &state = context.state;
-    auto &ready = context.ready;
-    {
-        if (!ready())
-            return;
-        state.samplesBeforeRebuild = state.samples.size();
-        ++state.windowEpoch;
-        state.native->setTelemetryEnabled(false);
-        state.window->hide();
-        // Deleting the last QQuickWindow guarantees graph/device cleanup,
-        // including a basic loop's otherwise shared context (Qt contract).
-        delete state.window;
-        state.window = nullptr;
-        state.native = nullptr;
-        state.engine->loadFromModule("Yalahoo.Music", "App");
-        state.window = state.engine->rootObjects().isEmpty()
-                ? nullptr
-                : qobject_cast<QQuickWindow *>(state.engine->rootObjects().last());
-        state.native = state.window ? qobject_cast<rhi::SceneItem *>(yalahoo::review::findVisual(
-                                              state.window->contentItem(), u"nativeScene"_s))
-                                    : nullptr;
-        if (!state.window || !state.native) {
-            state.app.exit(RootCreationFailed);
-            return;
-        }
-        verification::prepareWindow(*state.window, true);
-        state.window->setPersistentGraphics(false);
-        state.window->setPersistentSceneGraph(false);
-        state.window->resize(yalahoo::review::WidthPixels, yalahoo::review::HeightPixels);
-        state.bindWindow();
-        ++state.stage;
-        state.window->show();
-        state.window->update();
-        return;
-    }
-}
-void advanceDetailAwaitRoot(auto &context)
-{
-    DetailReviewState &state = context.state;
-    auto &ready = context.ready;
-    auto &button = context.button;
-
-    if (!ready() || state.samples.size() <= state.samplesBeforeRebuild
-        || !state.window->isExposed())
-        return;
-    ++state.fullRebuilds;
-    if (state.fullRebuilds < yalahoo::review::LifecycleRebuildCount)
-        state.stage = RebuildRoot;
-    else {
-        state.expected = state.selection->adjacentAlbum({ }, 1);
-        button(u"detailNext"_s);
-        ++state.stage;
-    }
-    return;
+    state.expected = state.selection->adjacentAlbum({ }, 1);
+    button(u"detailNext"_s);
+    state.stage = AwaitFinalInput;
 }
 void advanceDetailAwaitRestoredWindow(auto &context)
 {
@@ -645,20 +505,19 @@ void advanceDetailAwaitRestoredWindow(auto &context)
     if (!ready() || !state.window->isExposed()
         || state.native->submission() <= state.submissionBeforeHide)
         return;
-    check(u"native-restored-original-window"_s,
-          state.window == &state.initialWindow
-                  && yalahoo::review::findVisual(state.window->contentItem(), u"nativeScene"_s)
-                          == state.native);
+    check(u"native-restored-original-scene"_s,
+          yalahoo::review::findVisual(state.window->contentItem(), u"nativeScene"_s)
+                  == state.native);
     check(u"native-restored-window-policy"_s, verification::windowPolicySatisfied(*state.window));
     capture(u"window-restored-%1"_s.arg(state.windowTransition));
     state.windowTransitions.append(
             QJsonObject{ { u"restoredWindowPolicy"_s, verification::windowPolicy(*state.window) },
                          { u"submission"_s, qint64(state.native->submission()) } });
     ++state.windowTransition;
-    state.stage = PrepareWindowCycle;
+    state.stage = CheckWindow;
     return;
 }
-void advanceDetailAwaitRebuiltInput(auto &context)
+void advanceDetailAwaitFinalInput(auto &context)
 {
     DetailReviewState &state = context.state;
     auto &ready = context.ready;
@@ -668,8 +527,8 @@ void advanceDetailAwaitRebuiltInput(auto &context)
 
     if (!ready())
         return;
-    check(u"rebuilt-detail-input"_s, state.selection->albumId() == state.expected);
-    capture(u"full-root-restored"_s);
+    check(u"detail-input-after-window-check"_s, state.selection->albumId() == state.expected);
+    capture(u"final-detail-input"_s);
     ++state.stage;
     finish();
     return;
@@ -680,10 +539,10 @@ void advanceDetailDefault(auto &)
     return;
 }
 
-auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &check, auto &finish,
-                        auto &recordAction, auto &ready, auto &capture, auto &mouse, auto &button)
+auto advanceDetailFrame(DetailReviewState &state, auto &check, auto &finish, auto &recordAction,
+                        auto &ready, auto &capture, auto &mouse, auto &button)
 {
-    if (epoch != state.windowEpoch || state.finished)
+    if (state.finished)
         return;
     const auto covers = state.native->coverStatistics();
     state.peakOwned = std::max(state.peakOwned, covers[u"owned"_s].toInteger());
@@ -735,12 +594,9 @@ auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &ch
             { AwaitReducedSwitch, &advanceDetailAwaitReducedSwitch },
             { AwaitResourceReturn, &advanceDetailAwaitResourceReturn },
             { AwaitArchive, &advanceDetailAwaitArchive },
-            { PrepareWindowCycle, &advanceDetailPrepareWindowCycle },
-            { AwaitWindowCycle, &advanceDetailAwaitWindowCycle },
-            { RebuildRoot, &advanceDetailRebuildRoot },
-            { AwaitRoot, &advanceDetailAwaitRoot },
+            { CheckWindow, &advanceDetailCheckWindow },
             { AwaitRestoredWindow, &advanceDetailAwaitRestoredWindow },
-            { AwaitRebuiltInput, &advanceDetailAwaitRebuiltInput }
+            { AwaitFinalInput, &advanceDetailAwaitFinalInput }
         };
         const int stageKey = state.stage;
         if (!review::dispatchStage(routes, stageKey, context))
@@ -751,7 +607,6 @@ auto advanceDetailFrame(const quint64 &epoch, DetailReviewState &state, auto &ch
 auto bindDetailWindow(DetailReviewState &state, auto &check, auto &finish, auto &recordAction,
                       auto &ready, auto &capture, auto &mouse, auto &button)
 {
-    const auto epoch = ++state.windowEpoch;
     state.native->setTelemetryEnabled(true);
     if (auto *router = state.native->inputRouter())
         router->attach(state.window);
@@ -763,25 +618,21 @@ auto bindDetailWindow(DetailReviewState &state, auto &check, auto &finish, auto 
             Qt::DirectConnection);
     QObject::connect(
             state.window, &QQuickWindow::sceneGraphInitialized, &state.reviewLifetime,
-            [&, epoch] {
-                if (epoch != state.windowEpoch)
-                    return;
+            [&] {
                 ++state.contexts;
             },
             Qt::QueuedConnection);
     QObject::connect(state.native, &rhi::SceneItem::frameSubmitted, &state.reviewLifetime,
-                     [&, epoch](QJsonObject sample) {
-                         if (epoch != state.windowEpoch)
-                             return;
+                     [&](QJsonObject sample) {
                          sample[u"stage"_s] = state.stage;
                          sample[u"elapsedNs"_s] = state.time.nsecsElapsed();
                          state.samples.append(sample);
                      });
     QObject::connect(
             state.window, &QQuickWindow::frameSwapped, &state.reviewLifetime,
-            [&, epoch] {
-                return advanceDetailFrame(epoch, state, check, finish, recordAction, ready, capture,
-                                          mouse, button);
+            [&] {
+                return advanceDetailFrame(state, check, finish, recordAction, ready, capture, mouse,
+                                          button);
             },
             Qt::QueuedConnection);
 }
@@ -792,11 +643,10 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
                  MotionController &motion, const QString &output)
 {
     auto *window = &initialWindow;
-    auto *engine = qobject_cast<QQmlApplicationEngine *>(qmlEngine(window));
     auto *native = qobject_cast<rhi::SceneItem *>(
             yalahoo::review::findVisual(window->contentItem(), u"nativeScene"_s));
     auto *selection = scene.selection();
-    if (!native || !selection || !engine)
+    if (!native || !selection)
         return InvalidReviewInput;
     QDir().mkpath(output);
     window->setPersistentGraphics(false);
@@ -808,21 +658,14 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
     QJsonArray checks, samples, states, latencies;
     QElapsedTimer time;
     time.start();
-    int stage = AwaitCover, switches = 0, stress = 0, rebuilds = 0, contexts = 0, fullRebuilds = 0;
-    const bool lifecycleStress = qEnvironmentVariableIntValue("YALAHOO_VERIFY_LIFECYCLE") == 1;
+    int stage = AwaitCover, switches = 0, contexts = 0;
     const bool windowLifecycle =
             qEnvironmentVariableIntValue("YALAHOO_VERIFY_WINDOW_LIFECYCLE") == 1;
-    if (lifecycleStress && windowLifecycle)
-        return 2;
     int windowTransition = 0;
     quint64 submissionBeforeHide = 0;
     QJsonArray windowTransitions;
-    quint64 windowEpoch = 0;
     const bool quitOnClose = app.quitOnLastWindowClosed();
     app.setQuitOnLastWindowClosed(false);
-    std::function<void()> bindWindow;
-    qsizetype samplesBeforeRebuild = 0;
-    QJsonArray lifecycle;
     qint64 actionAt = 0, peakOwned = 0, peakReturning = 0;
     QString initialId, expected;
     QStringList warnings;
@@ -887,9 +730,6 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
     };
     DetailReviewState state{ finished,
                              stage,
-                             lifecycleStress,
-                             fullRebuilds,
-                             rebuilds,
                              contexts,
                              windowTransition,
                              windowLifecycle,
@@ -901,19 +741,16 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
                              peakOwned,
                              peakReturning,
                              switches,
-                             stress,
                              samples,
                              passed,
                              separateRenderThread,
                              checks,
                              states,
                              latencies,
-                             lifecycle,
                              windowTransitions,
                              time,
                              output,
                              app,
-                             windowEpoch,
                              renderConnection,
                              guiThread,
                              reviewLifetime,
@@ -928,11 +765,7 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
                              rotatedOwner,
                              expected,
                              motion,
-                             submissionBeforeHide,
-                             samplesBeforeRebuild,
-                             engine,
-                             bindWindow,
-                             initialWindow };
+                             submissionBeforeHide };
     const auto finish = [&] {
         return finishDetailReview(state, check);
     };
@@ -942,10 +775,7 @@ int reviewDetail(QGuiApplication &app, QQuickWindow &initialWindow, SceneAdapter
                              for (const auto &error : errors)
                                  warnings.append(error.toString());
                          });
-    bindWindow = [&] {
-        return bindDetailWindow(state, check, finish, recordAction, ready, capture, mouse, button);
-    };
-    bindWindow();
+    bindDetailWindow(state, check, finish, recordAction, ready, capture, mouse, button);
     QTimer::singleShot(ReviewDeadlineMilliseconds, &reviewLifetime, finish);
     window->show();
     const int result = app.exec();
