@@ -9,8 +9,6 @@ import "../components"
 
 T.Popup {
     id: root
-    readonly property real outputDpr: sceneSource.Window.window
-                                      ? sceneSource.Window.window.devicePixelRatio : 1
     required property DesignTokens tokens
     required property LibrarySession librarySession
     required property PanelController controller
@@ -24,8 +22,6 @@ T.Popup {
     signal fullscreenRequested
     property LibraryStore store: null
     required property Item sceneSource
-    property string pendingAlbum: ""
-    property string pendingTrack: ""
     readonly property bool narrow: width <= 700
     readonly property real outerPadding: narrow ? 12 : 28
     readonly property real insetX: narrow ? 21 : 35
@@ -45,26 +41,25 @@ T.Popup {
     background: Item {}
     onOpened: Qt.callLater(focusContent)
     function focusContent(): void {
-        const targets = {
-            "search": search.focusSearch,
-            "library": library.focusEditor,
-            "settings": settingsLoader.item ? (settingsLoader.item as SettingsPanel).focusControl :
-                                              null,
-            "playback": playbackLoader.item ? (playbackLoader.item as PlaybackPanel).focusControl :
-                                              null
-        };
-        const focusTarget = targets[controller.panel];
-        if (focusTarget)
-            focusTarget();
+        switch (controller.panel) {
+        case "search":
+            search.focusSearch();
+            break;
+        case "library":
+            library.focusEditor();
+            break;
+        case "settings":
+            if (settingsLoader.item)
+                (settingsLoader.item as SettingsPanel).focusControl();
+            break;
+        case "playback":
+            if (playbackLoader.item)
+                (playbackLoader.item as PlaybackPanel).focusControl();
+            break;
+        }
     }
+
     function dismiss(): void {
-        pendingAlbum = "";
-        pendingTrack = "";
-        controller.close();
-    }
-    function selectResult(albumId: string, trackId: string): void {
-        pendingAlbum = albumId;
-        pendingTrack = trackId;
         controller.close();
     }
     contentItem: Item {
@@ -75,44 +70,22 @@ T.Popup {
             objectName: "panelBackdropLoader"
             anchors.fill: parent
             active: root.visible
-            sourceComponent: Item {
-                ShaderEffectSource {
-                    id: backdropTexture
-                    format: root.tokens.hdrActive ? ShaderEffectSource.RGBA16F :
-                                                    ShaderEffectSource.RGBA8
-                    mipmap: true
-                    sourceItem: root.sceneSource
-                    anchors.fill: parent
-                    textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
-                                                                                        * root.outputDpr))
-                    visible: false
-                    smooth: true
-                }
-                ShaderEffect {
+            sourceComponent: BackdropBlur {
+                anchors.fill: parent
+                hdrActive: root.tokens.hdrActive
+                sceneSource: root.sceneSource
+                sceneX: 0
+                sceneY: 0
+                blurRadius: 0
+                horizontalPass: horizontal
+                BackdropBlurPass {
                     id: horizontal
-                    anchors.fill: parent
-                    visible: false
-                    property var source: backdropTexture
-                    property vector2d sampleStep: Qt.vector2d(1 / width, 0)
+                    backdrop: parent
+                    horizontal: true
                     fragmentShader: "qrc:/assets/shaders/panel-blur.frag.qsb"
                 }
-                ShaderEffectSource {
-                    id: intermediate
-                    format: root.tokens.hdrActive ? ShaderEffectSource.RGBA16F :
-                                                    ShaderEffectSource.RGBA8
-                    mipmap: true
-                    sourceItem: horizontal
-                    anchors.fill: parent
-                    textureSize: Qt.size(Math.round(width * root.outputDpr), Math.round(height
-                                                                                        * root.outputDpr))
-                    visible: false
-                    hideSource: true
-                    smooth: true
-                }
-                ShaderEffect {
-                    anchors.fill: parent
-                    property var source: intermediate
-                    property vector2d sampleStep: Qt.vector2d(0, 1 / height)
+                BackdropBlurPass {
+                    backdrop: parent
                     fragmentShader: "qrc:/assets/shaders/panel-blur.frag.qsb"
                 }
             }
@@ -170,7 +143,8 @@ T.Popup {
                     }
                     tokens: root.tokens
                     librarySession: root.librarySession
-                    onResultRequested: (albumId, trackId) => root.selectResult(albumId, trackId)
+                    onResultRequested: (albumId, trackId) => root.controller.selectResult(albumId,
+                                                                                          trackId)
                 }
                 Loader {
                     id: playbackLoader
@@ -252,7 +226,6 @@ T.Popup {
         target: root.controller
         function onChanged() {
             if (root.controller.panel) {
-                root.pendingAlbum = root.pendingTrack = "";
                 root.trackFocus.cancel();
                 if (root.controller.panel === "library")
                     library.loadRoots();
@@ -261,12 +234,8 @@ T.Popup {
                 Qt.callLater(root.focusContent);
             }
         }
-        function onClosed() {
-            const album = root.pendingAlbum;
-            const track = root.pendingTrack;
-            root.pendingAlbum = root.pendingTrack = "";
-            if (album)
-                root.trackFocus.request(album, track);
+        function onResultRequested(albumId: string, trackId: string) {
+            root.trackFocus.request(albumId, trackId);
         }
     }
 }

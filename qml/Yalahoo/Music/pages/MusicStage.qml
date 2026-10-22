@@ -14,7 +14,6 @@ Item {
     required property MotionController motionController
     property StartupCoordinator startupCoordinator: null
     property OpeningController openingController: null
-    property Item openingReturnFocus: null
     readonly property var hostWindow: Window.window
     property bool offscreenRendering: false
     readonly property Opening openingOverlay: openingLoader.item as Opening
@@ -32,49 +31,41 @@ Item {
     property LibraryStore libraryStore: null
     property DetailModel detailModel: null
     property OverviewController overviewController: null
-    property Item presentationReturnFocus: null
     property real hdrHeadroom: 1
     property bool hdrActive: false
     property string preferencesError: ""
-    property string navigationError: ""
-    readonly property ExperimentPanels experimentPanel: experiments.item as ExperimentPanels
+    readonly property ExperimentPanels experimentPanel: panels.experimentPanel
     property bool experimentsVisible: false
     signal experimentsVisibilityRequested(bool shown)
     onExperimentsVisibilityRequested: shown => experimentsVisible = shown
-    readonly property var headerActions: ({
-                                              "play-pause": function () {
-                                                  if (stage.playbackController)
-                                                      stage.playbackController.toggle();
-                                              },
-                                              "stop": function () {
-                                                  if (stage.playbackController)
-                                                      stage.playbackController.stop();
-                                              },
-                                              "settings": function () {
-                                                  if (stage.panelController)
-                                                      stage.panelController.open(
-                                                                  stage.settingsController
-                                                                  ? "settings" : "playback");
-                                              },
-                                              "search": stage.openLibraryPanel,
-                                              "library": stage.openLibraryPanel,
-                                              "locate-song": function () {
-                                                  if (stage.trackFocusController)
-                                                      stage.trackFocusController.locatePlayback();
-                                              },
-                                              "open": function () {
-                                                  if (stage.presentationController)
-                                                      stage.presentationController.open();
-                                              }
-                                          })
-    function openLibraryPanel(action: string): void {
-        if (stage.panelController)
-            stage.panelController.open(action);
-    }
     function dispatchHeaderAction(action: string): void {
-        const handler = headerActions[action];
-        if (handler)
-            handler(action);
+        switch (action) {
+        case "play-pause":
+            if (playbackController)
+                playbackController.toggle();
+            break;
+        case "stop":
+            if (playbackController)
+                playbackController.stop();
+            break;
+        case "settings":
+            if (panelController)
+                panelController.open(settingsController ? "settings" : "playback");
+            break;
+        case "search":
+        case "library":
+            if (panelController)
+                panelController.open(action);
+            break;
+        case "locate-song":
+            if (trackFocusController)
+                trackFocusController.locatePlayback();
+            break;
+        case "open":
+            if (presentationController)
+                presentationController.open();
+            break;
+        }
     }
     focus: true
     width: 1280
@@ -102,61 +93,31 @@ Item {
                                                                           && stage.hostWindow.visible
                                                                           && stage.hostWindow.visibility
                                                                           !== Window.Minimized))
-    function restorePresentationFocus(): void {
-        if (!presentationController || !presentationController.archiveEnabled)
-            return;
-        const target = presentationReturnFocus;
-        if (target && target.visible && target.enabled)
-            target.forceActiveFocus(Qt.OtherFocusReason);
-        else
-            browse.forceActiveFocus(Qt.OtherFocusReason);
-        presentationReturnFocus = null;
+
+    StageFocus {
+        openingController: stage.openingController
+        presentationController: stage.presentationController
+        overviewController: stage.overviewController
+        openingOverlay: stage.openingOverlay
+        browse: browsePage
+        onPreparationRequested: nativeScene.restartPreparation()
     }
-    Connections {
-        target: stage.sceneAdapter
-        function onFrameChanged() {
-            stage.motionController.clock.requestVisualFrame();
-        }
-    }
-    Connections {
-        target: stage.motionController
-        function onStateChanged() {
-            stage.motionController.clock.requestVisualFrame();
-        }
-        function onReducedMotionChanged() {
-            stage.motionController.clock.requestVisualFrame();
-        }
-    }
-    Connections {
-        target: stage.inputRouter
-        function onInputReceived() {
-            stage.motionController.clock.requestVisualFrame();
-        }
-    }
-    Binding {
-        target: stage.startupCoordinator
-        property: "visualActive"
-        value: stage.visualActive
-        when: stage.startupCoordinator !== null
+    StageFrameDriver {
+        sceneAdapter: stage.sceneAdapter
+        motionController: stage.motionController
+        inputRouter: stage.inputRouter
+        startupCoordinator: stage.startupCoordinator
+        trackFocusController: stage.trackFocusController
+        presentationController: stage.presentationController
+        openingController: stage.openingController
+        visualActive: stage.visualActive
+        offscreenRendering: stage.offscreenRendering
     }
     Connections {
         target: stage.startupCoordinator
         function onPreparationInvalidated() {
             nativeScene.restartPreparation();
         }
-    }
-    FrameAnimation {
-        running: !stage.offscreenRendering && stage.visualActive && (
-                     !stage.motionController.reducedMotion
-                     || stage.motionController.clock.workPending || (stage.trackFocusController
-                                                                     && stage.trackFocusController.active)
-                     || (stage.presentationController && stage.presentationController.phase
-                         !== "archive" && stage.presentationController.phase !== "detail") || (
-                         stage.openingController && stage.openingController.active &&
-                         !stage.openingController.preparing))
-        onRunningChanged: stage.motionController.clock.active = running
-        Component.onCompleted: stage.motionController.clock.active = running
-        onTriggered: stage.motionController.clock.advance(frameTime)
     }
     Item {
         id: visualContent
@@ -191,8 +152,8 @@ Item {
             inputRouter: stage.inputRouter
             inspectionEnabled: stage.presentationController !== null
                                && stage.presentationController.detailEnabled
-            titleReel: browse.titleController
-            transportReel: browse.transportController
+            titleReel: browsePage.titleController
+            transportReel: browsePage.transportController
         }
         Loader {
             id: openingLoader
@@ -206,7 +167,7 @@ Item {
             }
         }
         Browse {
-            id: browse
+            id: browsePage
             anchors.fill: parent
             metrics: stage.sceneAdapter.layout
             tokens: design
@@ -242,32 +203,7 @@ Item {
                 inputRouter: stage.inputRouter
             }
         }
-        Connections {
-            target: stage.openingController
-            function onStarted() {
-                nativeScene.restartPreparation();
-                if (!stage.openingReturnFocus)
-                    stage.openingReturnFocus = (stage.hostWindow ? stage.hostWindow.activeFocusItem :
-                                                                   null);
-                if (stage.openingOverlay)
-                    stage.openingOverlay.focusSkip();
-            }
-            function onCompleted() {
-                const target = stage.openingReturnFocus;
-                if (target && target.visible && target.enabled)
-                    target.forceActiveFocus(Qt.OtherFocusReason);
-                else
-                    browse.forceActiveFocus(Qt.OtherFocusReason);
-                stage.openingReturnFocus = null;
-            }
-        }
-        Connections {
-            target: stage.overviewController
-            function onFocusRequested(overview: bool) {
-                if (!overview)
-                    browse.focusOverviewToggle();
-            }
-        }
+
         Loader {
             anchors.fill: parent
             active: stage.presentationController !== null && stage.detailModel !== null
@@ -289,125 +225,27 @@ Item {
                 }
             }
         }
-        Connections {
-            target: stage.presentationController
-            function onPrepared() {
-                if (stage.presentationController.phase === "opening" &&
-                        !stage.presentationReturnFocus)
-                    stage.presentationReturnFocus = (stage.hostWindow
-                                                     ? stage.hostWindow.activeFocusItem : null);
-            }
-            function onFocusRequested(detail) {
-                if (!detail)
-                    Qt.callLater(stage.restorePresentationFocus);
-            }
-        }
     }
-    Loader {
+    StagePanels {
+        id: panels
         anchors.fill: parent
-        active: stage.panelController !== null && stage.trackFocusController !== null
-        sourceComponent: LibraryPanels {
-            tokens: design
-            librarySession: stage.librarySession
-            controller: stage.panelController
-            trackFocus: stage.trackFocusController
-            playback: stage.playbackController
-            backgroundMusic: stage.backgroundMusicController
-            interfaceSound: stage.interfaceSoundController
-            settings: stage.settingsController
-            onExperimentsRequested: {
-                stage.panelController.close();
-                stage.experimentsVisibilityRequested(true);
-            }
-            onReplayRequested: {
-                stage.panelController.close();
-                if (stage.openingController)
-                    stage.openingController.replay();
-            }
-            onFullscreenRequested: {
-                const host = stage.hostWindow;
-                if (host) {
-                    if (host.visibility === Window.FullScreen)
-                        host.showNormal();
-                    else
-                        host.showFullScreen();
-                }
-            }
-            store: stage.libraryStore
-            sceneSource: visualContent
-        }
-    }
-    Loader {
-        id: experiments
-        objectName: "experimentsLoader"
-        x: stage.width <= 540 ? 20 : stage.width <= 1100 ? 25 : 40
-        y: stage.width / stage.height < 1.05 ? 150 : stage.width >= 1800 ? 190 : stage.width <= 540
-                                                                           ? 125 : stage.width
-                                                                             <= 1100 ? 140 : 160
-        width: Math.max(0, Math.min(stage.width <= 760 || stage.height <= 650 ? 248 : stage.width
-                                                                                <= 1100 ? 254 : 272,
-                                    stage.width - 2 * x))
-        height: Math.max(0, stage.height - y - (stage.width / stage.height < 1.05 ? 85 : 100))
-        active: stage.experimentsVisible && stage.settingsController !== null
-        visible: active && (!stage.openingController || !stage.openingController.active) && (
-                     !stage.panelController || !stage.panelController.surface.shown)
-        sourceComponent: ExperimentPanels {
-            compact: stage.width <= 760 || stage.height <= 650
-            tokens: design
-            settings: stage.settingsController
-            lighting: stage.sceneAdapter.lighting
-            sceneSource: nativeScene
-            onCloseRequested: {
-                stage.experimentsVisibilityRequested(false);
-                browse.forceActiveFocus(Qt.OtherFocusReason);
-            }
-        }
-    }
-    Connections {
-        target: stage.playbackController
-        function onRejected(message) {
-            stage.navigationError = message;
-        }
-        function onCurrentChanged() {
-            stage.navigationError = "";
-        }
-    }
-    Connections {
-        target: stage.trackFocusController
-        function onRejected(message) {
-            stage.navigationError = message;
-        }
-        function onNavigationRequested() {
-            stage.navigationError = "";
-        }
-    }
-    Shortcut {
-        sequences: [StandardKey.Find]
-        enabled: stage.panelController !== null && (!stage.openingController ||
-                                                    !stage.openingController.active)
-        onActivated: stage.panelController.open("search")
-    }
-    Shortcut {
-        sequence: "Escape"
-        enabled: (!stage.openingController || !stage.openingController.active) && (
-                     !stage.panelController || !stage.panelController.surface.shown)
-                 && stage.presentationController !== null &&
-                 !stage.presentationController.archiveEnabled
-        onActivated: stage.presentationController.back()
-    }
-    ArchiveText {
         tokens: design
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.margins: 24
-        visible: stage.navigationError.length > 0 || stage.preferencesError.length > 0
-                 || nativeScene.errorText.length > 0
-        text: stage.navigationError.length > 0 ? stage.navigationError :
-                                                 stage.preferencesError.length > 0
-                                                 ? stage.preferencesError : qsTr(
-                                                       "Graphics configuration unavailable: ")
-                                                   + nativeScene.errorText
-        color: design.accent
+        librarySession: stage.librarySession
+        panelController: stage.panelController
+        trackFocusController: stage.trackFocusController
+        playbackController: stage.playbackController
+        backgroundMusicController: stage.backgroundMusicController
+        interfaceSoundController: stage.interfaceSoundController
+        settingsController: stage.settingsController
+        libraryStore: stage.libraryStore
+        openingController: stage.openingController
+        presentationController: stage.presentationController
+        sceneSource: nativeScene
+        backdropSource: visualContent
+        preferencesError: stage.preferencesError
+        experimentsVisible: stage.experimentsVisible
+        onExperimentsVisibilityRequested: shown => stage.experimentsVisibilityRequested(shown)
+        onReturnFocusRequested: browsePage.forceActiveFocus(Qt.OtherFocusReason)
     }
     onWidthChanged: sceneAdapter.layout.setViewport(width, height)
     onHeightChanged: sceneAdapter.layout.setViewport(width, height)

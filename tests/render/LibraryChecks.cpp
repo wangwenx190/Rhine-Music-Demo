@@ -387,7 +387,7 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
     }
     LibrarySnapshot snapshot;
     snapshot.genres = { { u"g"_s, u"\u6d41\u6d3e\u4e00"_s, { }, { }, { } },
-                        { u"h"_s, u"\u6d41\u6d3e\u4e8c"_s, { }, { }, { } } };
+                        { u"h"_s, u"<b>\u6d41\u6d3e\u4e8c</b>"_s, { }, { }, { } } };
     for (int i = 0; i < 20; ++i) {
         Album album;
         album.id = u"album-%1"_s.arg(i);
@@ -599,9 +599,12 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                     auto *query = yalahoo::review::findVisual(window.contentItem(),
                                                               u"introductionMetadataQuery"_s);
                     check(u"offline-query-disabled"_s, query && !query->isEnabled());
-                    if (settingsPanel) {
-                        settingsPanel->setProperty("musicBrainzExpanded", true);
-                    }
+                    auto *metadataSettings = settingsPanel
+                            ? yalahoo::review::findVisual(settingsPanel, u"metadataSettings"_s)
+                            : nullptr;
+                    check(u"metadata-settings-section"_s, metadataSettings != nullptr);
+                    if (metadataSettings)
+                        metadataSettings->setProperty("expanded", true);
                     check(u"expanded-settings-render"_s, render());
                     auto *proxySwitch = yalahoo::review::findVisual(window.contentItem(),
                                                                     u"settingsProxyEnabled"_s);
@@ -678,6 +681,16 @@ int reviewLibrary(QGuiApplication &, const QString &output, bool playbackVerific
                                                             u"librarySearchResults"_s);
                 if (!pane || !query || !results)
                     return 4;
+                auto *genreFilter =
+                        yalahoo::review::findVisual(window.contentItem(), u"genreFilter-h"_s);
+                auto *genreCaption = genreFilter
+                        ? genreFilter->property("contentItem").value<QQuickItem *>()
+                        : nullptr;
+                check(u"genre-label-is-literal-text"_s,
+                      genreCaption
+                              && genreCaption->property("text").toString()
+                                      == u"<b>\u6d41\u6d3e\u4e8c</b>"_s
+                              && genreCaption->property("textFormat").toInt() == 0);
                 check(u"source-panel-width"_s,
                       std::abs(pane->width()
                                - std::min(650., size.width() - (size.width() <= 700 ? 24. : 56.)))

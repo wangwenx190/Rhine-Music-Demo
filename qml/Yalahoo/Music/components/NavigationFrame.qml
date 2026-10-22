@@ -123,14 +123,9 @@ Item {
     readonly property real middleWidth: (width - firstColumnWidth - 2 * gridGap) / (metrics.width
                                                                                     <= 1100 ? 2 :
                                                                                               2.1)
-    readonly property real naturalColumnWidth: Math.max(metrics.width <= 700 ? 64 : 118,
-                                                        columnName.implicitWidth, position.width)
-    readonly property real naturalGenreWidth: previousColumn.implicitWidth
-                                              + nextColumn.implicitWidth + 2 * genreStepper.spacing
-                                              + naturalColumnWidth
     readonly property bool wrapped: rulerController !== null && inputRouter !== null
                                     && firstColumnWidth + 2 * gridGap + stepper.width
-                                    + naturalGenreWidth > width
+                                    + genreStepper.naturalWidth > width
     Row {
         id: stepper
         objectName: "albumStepper"
@@ -163,93 +158,22 @@ Item {
             onClicked: root.inputRouter.row(1)
         }
     }
-    Row {
+    ColumnNavigation {
         id: genreStepper
-        objectName: "genreStepper"
+        tokens: root.tokens
+        inputRouter: root.inputRouter
+        clock: root.clock
+        viewportWidth: root.metrics.width
+        wrapped: root.wrapped
+        availableWidth: root.width
+        columnLabel: root.columnLabel
+        columnNumber: root.columnNumber
+        columnCount: root.columnCount
         visible: Boolean(root.inputRouter)
         x: root.wrapped ? (root.width - width) / 2 : root.firstColumnWidth + root.gridGap * 2
                           + root.middleWidth + (root.width - root.firstColumnWidth - root.gridGap
                                                 * 2 - root.middleWidth - width) / 2
-        spacing: root.metrics.width <= 700 ? 10 : root.metrics.width <= 1100 ? 15 : 28
         y: root.wrapped ? root.counterHeight + root.gridGap : (root.counterHeight - height) / 2
-        ArchiveButton {
-            id: previousColumn
-            tokens: root.tokens
-            text: "\u2190"
-            cssPixelSize: root.metrics.width <= 700 ? 20 : 25
-            Accessible.name: qsTr("Previous column")
-            onClicked: root.inputRouter.lane(-1)
-        }
-        Column {
-            id: columnLabels
-            spacing: 5
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.wrapped ? Math.min(root.naturalColumnWidth, Math.max(0, root.width
-                                                                             - previousColumn.width
-                                                                             - nextColumn.width - 2
-                                                                             * genreStepper.spacing)) :
-                                  root.naturalColumnWidth
-            Row {
-                id: position
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 3
-                readonly property real size: root.metrics.width <= 700 ? 6 : 8
-                ArchiveText {
-                    tokens: root.tokens
-                    text: qsTr("GENRE")
-                    cssPixelSize: position.size
-                    font.letterSpacing: 1.3
-                    color: root.tokens.muted
-                }
-                OrdinalReel {
-                    tokens: root.tokens
-                    clock: root.clock
-                    value: root.columnNumber
-                    direction: root.inputRouter ? root.inputRouter.columnDirection : 0
-                    digitFont: root.tokens.regular
-                    cssPixelSize: position.size
-                    letterSpacing: 1.3
-                    color: root.tokens.muted
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    text: "/"
-                    cssPixelSize: position.size
-                    color: root.tokens.muted
-                }
-                OrdinalReel {
-                    tokens: root.tokens
-                    clock: root.clock
-                    value: root.columnCount
-                    digitFont: root.tokens.regular
-                    cssPixelSize: position.size
-                    letterSpacing: 1.3
-                    color: root.tokens.muted
-                }
-            }
-            ArchiveText {
-                id: columnName
-                objectName: "navigationColumnLabel"
-                Accessible.role: Accessible.StaticText
-                Accessible.name: text
-                width: columnLabels.width
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignHCenter
-                tokens: root.tokens
-                text: root.columnLabel
-                cssPixelSize: root.metrics.width <= 700 ? 11 : 14
-                font.letterSpacing: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-        }
-        ArchiveButton {
-            id: nextColumn
-            tokens: root.tokens
-            text: "\u2192"
-            cssPixelSize: root.metrics.width <= 700 ? 20 : 25
-            Accessible.name: qsTr("Next column")
-            onClicked: root.inputRouter.lane(1)
-        }
     }
     Binding {
         target: root.rulerController

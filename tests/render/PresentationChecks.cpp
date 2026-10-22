@@ -361,8 +361,19 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     const auto *badge = findVisual(root, u"detailOfflineBadge"_s);
     const bool offlineInput = badge && badge->isVisible()
             && click(findVisual(root, u"detailTrackTitle"_s)) && trackRequests.size() == 1;
+    auto *offlineTitle = findVisual(root, u"detailTrackTitle"_s);
+    auto *offlineRow = offlineTitle;
+    while (offlineRow && offlineRow->objectName() != "trackDelegate"_L1)
+        offlineRow = offlineRow->parentItem();
+    if (offlineRow) {
+        offlineRow->forceActiveFocus(Qt::OtherFocusReason);
+        QTest::keyClick(&window, Qt::Key_Return);
+        QTest::keyClick(&window, Qt::Key_Space);
+    }
+    const bool offlineKeyboard = offlineRow && trackRequests.size() == 1;
     interaction[u"offlineBadgeAndDisabledTrack"_s] = offlineInput;
-    passed = offlineInput && passed;
+    interaction[u"offlineKeyboardDisabled"_s] = offlineKeyboard;
+    passed = offlineInput && offlineKeyboard && passed;
     presentation.setReducedMotion(false);
     presentation.back();
     passed = !page->isEnabled() && page->isVisible() && passed;

@@ -10,15 +10,10 @@ Item {
     // Source breakpoints and SVG view-box coordinates are independent of actual window DPR.
     readonly property real compactWidthPixels: 1100
     readonly property real wideWidthPixels: 1700
-    readonly property real smallWidthPixels: 700
     readonly property real brandViewWidth: 816
     readonly property real brandCapitalHeight: 104
     readonly property real brandBaseline: 188
     readonly property real brandViewHeight: 208
-    readonly property real compactTransportReservedPixels: 610
-    readonly property real desktopTransportReservedPixels: 760
-    readonly property real smallTransportReservedPixels: 340
-    readonly property real portraitTransportReservedPixels: 320
 
     required property LayoutMetrics metrics
     required property DesignTokens tokens
@@ -32,7 +27,7 @@ Item {
     readonly property real chromeOffset: overviewController ? overviewController.navigationOffset :
                                                               0
     readonly property bool chromeEnabled: !overviewController || !overviewController.active
-    readonly property TitleReelMotion transportController: song.reelController
+    readonly property TitleReelMotion transportController: transport.transportController
     signal actionRequested(string action)
     signal themeRequested(bool night)
     readonly property bool narrow: metrics.width <= root.compactWidthPixels
@@ -130,100 +125,19 @@ Item {
             cssPixelSize: 16
             onClicked: root.actionRequested("settings")
         }
-        Item {
+        HeaderTransport {
             id: transport
-            objectName: "minimalTransport"
-            readonly property real songCap: root.metrics.portrait ? Math.max(0, Math.min(280,
-                                                                                         root.metrics.width
-                                                                                         - root.portraitTransportReservedPixels)) :
-                                                                    root.metrics.width
-                                                                    <= root.smallWidthPixels
-                                                                    ? Math.max(0, Math.min(100,
-                                                                                           root.metrics.width
-                                                                                           - root.smallTransportReservedPixels)) :
-                                                                      root.narrow ? Math.max(0,
-                                                                                             Math.min(180,
-                                                                                                      root.metrics.width
-                                                                                                      - root.compactTransportReservedPixels)) :
-                                                                                    Math.max(0,
-                                                                                             Math.min(240,
-                                                                                                      root.metrics.width
-                                                                                                      - root.desktopTransportReservedPixels))
-            readonly property real songWidth: song.width
-            width: root.metrics.portrait ? root.width - 28 - 28 - root.brandCapitalHeight - 28 - root.navGap
-                                           * 4 : 12 + songWidth + 29 * 2 + 7
-            height: 29
-            y: (nav.height - (height - (root.metrics.portrait ? 0 : 5))) / 2 - (
-                   root.metrics.portrait ? 0 : 5)
-            Rectangle {
-                antialiasing: true
-                width: 1
-                height: parent.height
-                color: root.tokens.line
-            }
-            TransportTitle {
-                id: song
-                objectName: "playingTitle"
-                tokens: root.tokens
-                clock: root.clock
-                x: root.metrics.portrait ? parent.width - 49 - transport.songWidth : 13
-                title: root.playingTitle
-                cap: transport.songCap
-                pixelSize: root.metrics.width <= root.smallWidthPixels ? 10 : root.narrow ? 11 : 12
-                onLocateRequested: root.actionRequested("locate-song")
-            }
-            TransportMotion {
-                id: iconMotion
-                clock: root.clock
-                playing: root.playing
-                reducedMotion: root.tokens.reducedMotion
-                active: root.visible && (root.tokens.offscreenRendering || !root.Window.window
-                                         || root.Window.window.visible)
-            }
-            ArchiveButton {
-                objectName: "playButton"
-                iconSize: root.metrics.width <= root.smallWidthPixels ? 15 : 17
-                opacity: hovered || root.playing ? 1 : 0.8
-                tokens: root.tokens
-                x: parent.width - width * 2 - (root.metrics.portrait ? 1 : 6)
-                width: root.metrics.portrait ? 24 : 29
-                iconName: ""
-                text: root.playing ? qsTr("Pause") : qsTr("Play")
-                showText: false
-                contentItem: Item {
-                    ArchiveVectorImage {
-                        anchors.centerIn: parent
-                        width: root.metrics.width <= root.smallWidthPixels ? 15 : 17
-                        height: width
-                        opacity: 1 - iconMotion.pauseOpacity
-                        scale: .7 + .3 * opacity
-                        source: "qrc:/assets/icons/play-" + (root.tokens.night ? "night" : "day")
-                                + ".svg"
-                    }
-                    ArchiveVectorImage {
-                        anchors.centerIn: parent
-                        width: root.metrics.width <= root.smallWidthPixels ? 15 : 17
-                        height: width
-                        opacity: iconMotion.pauseOpacity
-                        scale: .7 + .3 * opacity
-                        source: "qrc:/assets/icons/pause-" + (root.tokens.night ? "night" : "day")
-                                + ".svg"
-                    }
-                }
-                onClicked: root.actionRequested("play-pause")
-            }
-            ArchiveButton {
-                objectName: "stopButton"
-                iconSize: root.metrics.width <= root.smallWidthPixels ? 15 : 17
-                opacity: hovered ? 1 : 0.8
-                tokens: root.tokens
-                x: parent.width - width
-                width: root.metrics.portrait ? 24 : 29
-                iconName: "stop"
-                text: qsTr("Stop")
-                showText: false
-                onClicked: root.actionRequested("stop")
-            }
+            tokens: root.tokens
+            clock: root.clock
+            portrait: root.metrics.portrait
+            narrow: root.narrow
+            viewportWidth: root.metrics.width
+            headerWidth: root.width
+            navigationGap: root.navGap
+            navigationHeight: nav.height
+            playingTitle: root.playingTitle
+            playing: root.playing
+            onActionRequested: action => root.actionRequested(action)
         }
     }
 }

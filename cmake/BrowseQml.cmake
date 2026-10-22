@@ -10,11 +10,28 @@ endfunction()
 
 function(yalahoo_browse_qml output)
     set(files)
-    yalahoo_qml_group(group components SceneGraphVisual ArchiveVectorImage DisplaySurface DesignTokens ArchiveText ArchiveButton ArchiveSlider ArchiveProgressBar ArchiveCheckBox ArchiveComboBox ArchiveScrollBar ArchiveScrollView ArchiveTextField ArchiveTextArea ArchiveEditorSurface BackdropTexture BackdropBlur BackdropBlurPass ArchiveEditMenu ArchiveToolTip ThemeSwitch Header BrowseInfo Footer ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop)
+    yalahoo_qml_group(group components StageFocus
+        ColumnNavigation TrackRow CreditCard DetailHeader DetailAlbumInfo DetailIntroduction
+        DetailTabs HeaderTransport OverviewLabel StageFrameDriver SceneGraphVisual
+        ArchiveVectorImage DisplaySurface DesignTokens ArchiveText ArchiveButton ArchiveSlider
+        ArchiveProgressBar ArchiveCheckBox ArchiveComboBox ArchiveScrollBar ArchiveScrollView
+        ArchiveTextField ArchiveTextArea ArchiveEditorSurface BackdropTexture BackdropBlur
+        BackdropBlurPass ArchiveEditMenu ArchiveToolTip ThemeSwitch Header BrowseInfo Footer
+        ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList
+        PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop
+    )
     list(APPEND files ${group})
-    yalahoo_qml_group(group pages Browse Detail Overview Opening MusicStage)
+    yalahoo_qml_group(group pages Browse
+        Detail Overview Opening MusicStage
+    )
     list(APPEND files ${group})
-    yalahoo_qml_group(group panels SearchPanel LibraryPanel LibraryPanels PanelHeading PanelDescription PlaybackPanel SettingsPanel SettingChoice SettingRange MotionSpeedRange InterfaceSoundPreview MetadataSection ThemeCard SettingsSection LightingPanel MotionPanel ExperimentPanels)
+    yalahoo_qml_group(group panels StagePanels
+        SearchFilters SearchResult AppearanceSettings ArrayQualitySettings SoundSettings
+        MetadataSettings ExperimentOverlay SearchPanel LibraryPanel LibraryPanels PanelHeading
+        PanelDescription PlaybackPanel SettingsPanel SettingChoice SettingRange MotionSpeedRange
+        InterfaceSoundPreview MetadataSection ThemeCard SettingsSection LightingPanel
+        MotionPanel ExperimentPanels
+    )
     list(APPEND files ${group})
     set(${output} ${files} PARENT_SCOPE)
 endfunction()

@@ -143,6 +143,7 @@ ArchiveScrollView {
                     width: parent.width / 3
                     spacing: 12
                     ArchiveText {
+                        id: metricValue
                         tokens: root.tokens
                         text: parent.modelData.value.toString()
                         cssPixelSize: 29
@@ -152,7 +153,7 @@ ArchiveScrollView {
                         text: parent.modelData.label
                         cssPixelSize: 10
                         color: root.tokens.muted
-                        anchors.baseline: parent.children[0].baseline
+                        anchors.baseline: metricValue.baseline
                     }
                 }
             }

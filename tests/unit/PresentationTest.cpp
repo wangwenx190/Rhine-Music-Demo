@@ -318,8 +318,13 @@ private Q_SLOTS:
                 u"\u79bb\u7ebf\u9605\u8bfb"_s));
         QVERIFY(model.album()[u"creditsStatus"_s].toString().contains(u"1 / 2"_s));
         QVERIFY(model.album()[u"creditsStatus"_s].toString().contains(u"2099"_s));
-        QCOMPARE(model.album()[u"producers"_s].toList()[0].toMap()[u"trackTitle"_s].toString(),
-                 t.title);
+        const auto credit = model.album()[u"producerGroups"_s].toList().first().toMap();
+        const auto creditedTrack = credit[u"tracks"_s].toStringList().first();
+        QVERIFY(creditedTrack.startsWith(t.title));
+        QVERIFY(!creditedTrack.contains(u"\u8fc7\u671f\u66f2\u540d"_s));
+        QCOMPARE(credit[u"rolesText"_s].toString(), u"\u5236\u4f5c"_s);
+        QCOMPARE(credit[u"sourcesText"_s].toString(),
+                 u"manual \u00b7 https://example.invalid/credit"_s);
         QCOMPARE(model.album()[u"description"_s].toString(), a.description);
         QVERIFY(library.playbackTrackId().isEmpty());
     }
@@ -361,7 +366,9 @@ private Q_SLOTS:
         QCOMPARE(model.data(model.index(5001), DetailModel::DiscHeading).toBool(), false);
         QCOMPARE(model.data(model.index(9999), DetailModel::Duration).toString(), u"1:01"_s);
         QCOMPARE(model.album().value(u"localNote"_s).toString(), a.localNote);
-        QCOMPARE(model.album().value(u"producers"_s).toList().size(), 1);
+        const auto groups = model.album().value(u"producerGroups"_s).toList();
+        QCOMPARE(groups.size(), 1);
+        QCOMPARE(groups.first().toMap()[u"unscopedText"_s].toString(), u"\u5236\u4f5c"_s);
         model.prepare(library);
         QCOMPARE(reset.size(), 1);
         library.search(u"other"_s);

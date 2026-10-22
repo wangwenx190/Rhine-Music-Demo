@@ -12,7 +12,6 @@ FocusScope {
     // Responsive geometry follows the final source detail CSS and actual logical content width.
     readonly property real portraitInsetRatio: 0.04
     readonly property real portraitTitleHeightRatio: 0.54
-    readonly property real titleFontWidthRatio: 0.0245
     readonly property real wideWidthPixels: 1700
 
     required property LayoutMetrics metrics
@@ -72,39 +71,7 @@ FocusScope {
         root.backRequested();
         event.accepted = true;
     }
-    component DetailTab: ArchiveButton {
-        id: tab
-        required property int tabIndex
-        readonly property color ink: root.activeTab === tabIndex ? root.tokens.ink :
-                                                                   root.tokens.muted
 
-        tokens: root.tokens
-        height: tabBar.height - 7
-        onXChanged: tabBar.syncIndicator(false)
-        onWidthChanged: tabBar.syncIndicator(false)
-        contentItem: Row {
-            spacing: 6
-            topPadding: 15
-            ArchiveText {
-                tokens: root.tokens
-                text: (tab.tabIndex + 1).toString().padStart(2, "0")
-                cssPixelSize: 8
-                color: tab.ink
-            }
-            ArchiveText {
-                id: label
-                tokens: root.tokens
-                text: tab.text
-                cssPixelSize: root.width >= root.wideWidthPixels ? 14 : root.width <= 1100 ? 10 : 11
-                color: tab.ink
-            }
-        }
-        implicitWidth: contentItem.implicitWidth
-        implicitHeight: label.implicitHeight
-        onClicked: root.setTab(tabIndex)
-        Accessible.role: Accessible.PageTab
-        Accessible.selected: root.activeTab === tabIndex
-    }
     Connections {
         target: root.presentation
         function onPrepared() {
@@ -211,372 +178,37 @@ FocusScope {
                                                                                                  <= 1100 ? 40 :
                                                                                                            52))
         onTrackRequested: trackId => root.trackRequested(trackId)
-        header: Column {
+        header: DetailHeader {
             width: tracks.contentWidth
-            property real tabsY: tabSpace.y
-            property real tabsHeight: tabBar.height
-            spacing: 0
+            tokens: root.tokens
+            presentation: root.presentation
+            album: root.album
+            viewportWidth: root.width
+            tabHeight: tabBar.height
+            activeTab: root.activeTab
+            trackCount: root.detailModel.count
             onHeightChanged: {
                 if (tracks.preserveBeginning)
                     Qt.callLater(tracks.restoreBeginning);
             }
-            Item {
-                id: overline
-                width: parent.width
-                readonly property real contentHeight: Math.max(ordinal.implicitHeight,
-                                                               navigation.implicitHeight)
-                height: contentHeight + (root.width <= 700 ? 12 : 18)
-                ArchiveText {
-                    id: ordinal
-                    objectName: "detailOrdinal"
-                    y: (overline.contentHeight - height) / 2
-                    tokens: root.tokens
-                    text: qsTr("ALBUM %1").arg((root.album.code || 1).toString().padStart(3, "0"))
-                    cssPixelSize: root.width <= 700 ? 7 : 8
-                    font.letterSpacing: 1.6
-                }
-                ArchiveText {
-                    id: navigationMeasure
-                    tokens: root.tokens
-                    visible: false
-                    text: qsTr("Next album \u2193")
-                    cssPixelSize: 9
-                }
-                Row {
-                    id: navigation
-                    anchors.right: parent.right
-                    y: (overline.contentHeight - height) / 2
-                    spacing: 20
-                    ArchiveButton {
-                        objectName: "detailPrevious"
-                        tokens: root.tokens
-                        text: qsTr("\u2191 Previous album")
-                        cssPixelSize: 9
-                        height: navigationMeasure.implicitHeight
-                        enabled: root.presentation.canMovePrevious
-                        onClicked: root.presentation.stepAlbum(-1)
-                    }
-                    ArchiveButton {
-                        objectName: "detailNext"
-                        tokens: root.tokens
-                        text: qsTr("Next album \u2193")
-                        cssPixelSize: 9
-                        height: navigationMeasure.implicitHeight
-                        enabled: root.presentation.canMoveNext
-                        onClicked: root.presentation.stepAlbum(1)
-                    }
-                }
-            }
-            Column {
-                width: parent.width
-                bottomPadding: 10
-                spacing: title.cssPixelSize * 0.5 * 0.48
-                ArchiveText {
-                    id: title
-                    objectName: "detailTitle"
-                    tokens: root.tokens
-                    width: parent.width
-                    text: root.album.mainTitle || root.album.title || ""
-                    cssPixelSize: Math.min(39, Math.max(24, root.width * root.titleFontWidthRatio))
-                    cssLineHeight: cssPixelSize * 1.22
-                    font.styleName: root.tokens.demibold.styleName
-                    font.weight: root.tokens.demibold.weight
-                    font.letterSpacing: -0.6
-                    wrapMode: Text.WrapAnywhere
-                    Accessible.name: root.album.title || ""
-                }
-                ArchiveText {
-                    objectName: "detailTranslation"
-                    tokens: root.tokens
-                    width: parent.width
-                    visible: text.length > 0
-                    text: root.album.translation || ""
-                    cssPixelSize: title.cssPixelSize * 0.5
-                    cssLineHeight: cssPixelSize * 1.45
-                    font.styleName: root.tokens.demibold.styleName
-                    font.weight: root.tokens.demibold.weight
-                    font.letterSpacing: cssPixelSize * 0.01
-                    color: root.tokens.muted
-                    wrapMode: Text.WrapAnywhere
-                }
-            }
-            Row {
-                id: artistRow
-                objectName: "detailArtist"
-                readonly property real contentHeight: Math.max(artistLine.height, offline.visible
-                                                               ? offline.height : 0)
-                width: parent.width
-                spacing: 12
-                bottomPadding: root.width <= 700 ? 16 : 22
-                ArchiveText {
-                    id: artistLine
-                    tokens: root.tokens
-                    y: (artistRow.contentHeight - height) / 2
-                    text: root.album.artist || ""
-                    width: Math.min(implicitWidth, parent.width - (offline.visible ? offline.width + 12 :
-                                                                                     0))
-                    cssPixelSize: root.width <= 700 ? 12 : root.width >= root.wideWidthPixels ? 17 :
-                                                                                                14
-                    wrapMode: Text.Wrap
-                }
-                Rectangle {
-                    id: offline
-                    antialiasing: true
-                    objectName: "detailOfflineBadge"
-                    visible: root.album.offline || false
-                    width: badge.implicitWidth + 14
-                    height: badge.implicitHeight + 8
-                    color: "transparent"
-                    border.color: root.tokens.line
-                    y: (artistRow.contentHeight - height) / 2
-                    ArchiveText {
-                        id: badge
-                        anchors.centerIn: parent
-                        tokens: root.tokens
-                        text: qsTr("Directory offline")
-                        cssPixelSize: 10
-                        color: root.tokens.accent
-                    }
-                }
-            }
-            Rectangle {
-                antialiasing: true
-                width: parent.width
-                height: 1
-                color: root.tokens.ink
-            }
-            Grid {
-                id: facts
-                objectName: "detailFacts"
-                width: parent.width
-                columns: 2
-                columnSpacing: root.width <= 700 ? 16 : root.width <= 1100 ? 14 : 18
-                rowSpacing: root.width <= 700 ? 11 : root.width <= 1100 ? 12 : 14
-                topPadding: root.width <= 700 ? 15 : 19
-                bottomPadding: root.width <= 700 ? 15 : 19
-                Repeater {
-                    model: root.album.facts || []
-                    delegate: Column {
-                        required property var modelData
-                        width: (tracks.contentWidth - facts.columnSpacing) / 2
-                        spacing: 5
-                        ArchiveText {
-                            tokens: root.tokens
-                            width: parent.width
-                            text: parent.modelData.label
-                            objectName: "detailFactLabel"
-                            cssPixelSize: root.width >= root.wideWidthPixels ? 9 : root.width
-                                                                               <= 700 ? 6 : 7
-                            font.letterSpacing: 0.6
-                            color: root.tokens.muted
-                            wrapMode: Text.Wrap
-                        }
-                        ArchiveText {
-                            tokens: root.tokens
-                            width: parent.width
-                            text: parent.modelData.value
-                            objectName: "detailFactValue"
-                            cssPixelSize: root.width >= root.wideWidthPixels ? 13 : root.width
-                                                                               <= 1100 ? 10 : 11
-                            cssLineHeight: cssPixelSize * 1.5
-                            wrapMode: Text.WrapAnywhere
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                antialiasing: true
-                width: parent.width
-                height: 1
-                color: root.tokens.line
-            }
-            Item {
-                id: tabSpace
-                width: parent.width
-                height: tabBar.height
-            }
-            Column {
-                visible: root.activeTab === 1
-                opacity: root.presentation.tabOpacity
-                width: parent.width
-                spacing: 14
-                topPadding: 27
-                bottomPadding: 20
-                ArchiveText {
-                    tokens: root.tokens
-                    text: qsTr("ABOUT THIS ALBUM")
-                    cssPixelSize: 8
-                    color: root.tokens.muted
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    width: parent.width
-                    objectName: "detailDescription"
-                    text: root.album.description || qsTr("Album introduction pending")
-                    cssPixelSize: 12
-                    cssLineHeight: cssPixelSize * 1.95
-                    wrapMode: Text.Wrap
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    width: parent.width
-                    text: root.album.descriptionSourceText || ""
-                    cssPixelSize: 9
-                    wrapMode: Text.WrapAnywhere
-                    color: root.tokens.muted
-                }
-                ArchiveText {
-                    objectName: "detailIntroductionStatus"
-                    tokens: root.tokens
-                    width: parent.width
-                    text: root.album.introductionStatus || ""
-                    cssPixelSize: 11
-                    cssLineHeight: cssPixelSize * 1.9
-                    wrapMode: Text.Wrap
-                    color: root.tokens.muted
-                    Accessible.role: Accessible.StaticText
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    width: parent.width
-                    text: qsTr("Local note\n%1").arg(root.album.localNote || qsTr("Not provided"))
-                    cssPixelSize: 11
-                    wrapMode: Text.Wrap
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    width: parent.width
-                    text: qsTr("Local directory\n%1\n%2").arg(root.album.folder || "").arg((
-                                                                                               root.album.rawGenres
-                                                                                               || []).join(
-                                                                                               " \u00b7 "))
-                    cssPixelSize: 9
-                    wrapMode: Text.WrapAnywhere
-                    color: root.tokens.muted
-                }
-                Column {
-                    width: parent.width
-                    spacing: 6
-                    topPadding: 24
-                    ArchiveText {
-                        tokens: root.tokens
-                        text: qsTr("ALBUM CREDITS")
-                        cssPixelSize: 9
-                        font.letterSpacing: 1.4
-                        color: root.tokens.muted
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        text: qsTr("Contributors")
-                        cssPixelSize: 16
-                        font.letterSpacing: 0.4
-                    }
-                }
-                ArchiveText {
-                    objectName: "detailCreditsStatus"
-                    tokens: root.tokens
-                    width: parent.width
-                    text: root.album.creditsStatus || qsTr("No credits available.")
-                    cssPixelSize: 11
-                    cssLineHeight: cssPixelSize * 1.9
-                    wrapMode: Text.Wrap
-                    color: root.tokens.muted
-                }
-            }
-            ArchiveText {
-                tokens: root.tokens
-                visible: root.activeTab === 0 && root.detailModel.count === 0
-                width: parent.width
-                topPadding: 25
-                text: qsTr("This album has no playable tracks")
-                cssPixelSize: 13
-                wrapMode: Text.Wrap
-            }
         }
-        Item {
+        DetailTabs {
             id: tabBar
-            objectName: "detailTabs"
+            tokens: root.tokens
+            presentation: root.presentation
+            activeTab: root.activeTab
+            viewportWidth: root.width
+            viewportHeight: tracks.height
+            tabsY: tracks.tabsY
             width: tracks.contentWidth
-            height: 6 + Math.max(trackTab.implicitHeight, aboutTab.implicitHeight) + 26 + 1
-            y: Math.max(0, tracks.tabsY)
-            Loader {
-                objectName: "detailTabsBlurLoader"
-                anchors.fill: parent
-                active: root.visible && tabBar.y < tracks.height
-                sourceComponent: DetailTabsBackdrop {
-                    hdrActive: root.tokens.hdrActive
-                    sceneSource: root.metrics.portrait ? portraitBackdrop : root.sceneSource
-                    contentSource: tracks.currentView
-                    sceneX: tracks.x
-                    sceneY: tracks.y + tabBar.y - (root.metrics.portrait ? portraitBackdrop.y : 0)
-                    contentY: tabBar.y
-                }
-            }
-            Rectangle {
-                antialiasing: true
-                anchors.fill: parent
-                color: root.tokens.veil
-            }
-            Row {
-                id: tabs
-                y: 6
-                spacing: root.width <= 1100 ? 14 : 22
-                DetailTab {
-                    id: trackTab
-                    tabIndex: 0
-                    objectName: "detailTracksTab"
-                    text: qsTr("Track list")
-                    Keys.onRightPressed: {
-                        root.setTab(1);
-                        aboutTab.forceActiveFocus();
-                    }
-                }
-                DetailTab {
-                    id: aboutTab
-                    tabIndex: 1
-                    objectName: "detailAboutTab"
-                    text: qsTr("Album introductions")
-                    Keys.onLeftPressed: {
-                        root.setTab(0);
-                        trackTab.forceActiveFocus();
-                    }
-                }
-            }
-            Rectangle {
-                antialiasing: true
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: root.tokens.line
-            }
-            Rectangle {
-                antialiasing: true
-                objectName: "detailTabIndicator"
-                y: parent.height - 1
-                height: 2
-                x: root.presentation.tabX
-                width: root.presentation.tabWidth
-                color: root.tokens.ink
-            }
-            function syncIndicator(animate: bool): void {
-                if (!root.presentation || !trackTab || !aboutTab)
-                    return;
-                const button = root.activeTab === 0 ? trackTab : aboutTab;
-                root.presentation.setTabIndicator(button.x, button.width, animate);
-            }
-            onWidthChanged: syncIndicator(false)
-            Connections {
-                target: root
-                function onActiveTabChanged() {
-                    tabBar.syncIndicator(true);
-                }
-            }
-            Connections {
-                target: root.presentation
-                function onPrepared() {
-                    tabBar.syncIndicator(false);
-                }
-            }
+            portrait: root.metrics.portrait
+            portraitSource: portraitBackdrop
+            portraitY: portraitBackdrop.y
+            sceneSource: root.sceneSource
+            contentSource: tracks.currentView
+            sceneX: tracks.x
+            sceneY: tracks.y
+            onTabRequested: tab => root.setTab(tab)
         }
     }
 }

@@ -28,16 +28,21 @@ public:
     }
     Q_INVOKABLE void open(const QString &panel);
     Q_INVOKABLE void close();
+    Q_INVOKABLE void selectResult(const QString &albumId, const QString &trackId);
     Q_INVOKABLE void reset();
     void setReducedMotion(bool reduced);
 Q_SIGNALS:
     void changed();
     void closed();
+    void resultRequested(const QString &albumId, const QString &trackId);
 
 private:
+    void beginClose();
     SurfaceTransition m_surface{ panelMotion::EnterMilliseconds, panelMotion::ExitMilliseconds,
                                  false, false, this };
     QString m_panel;
+    QString m_pendingAlbum, m_pendingTrack;
+    quint64 m_revision = 0;
     bool m_reduced = false;
 };
 }

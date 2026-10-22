@@ -255,8 +255,7 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
     d->m_info.clear();
     if (album) {
         const auto &a = *album;
-        QVariantList facts, producers;
-        producers.reserve(a.producers.size());
+        QVariantList facts;
         QHash<QString, QString> trackTitles;
         trackTitles.reserve(a.tracks.size());
         const auto fact = [&](const QString &label, const QString &value) {
@@ -326,15 +325,6 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
         fact(QCoreApplication::translate("Yalahoo", "BITRATE"),
              displayMetadataRange(minBitrate, maxBitrate, MetricPrefixScale, u"kbps"_s));
         fact(QCoreApplication::translate("Yalahoo", "DURATION / Total time"), time(duration));
-        for (const auto &producer : a.producers) {
-            producers.append(QVariantMap{
-                    { u"name"_s, producer.name },
-                    { u"role"_s, producer.role },
-                    { u"source"_s, producer.source },
-                    { u"url"_s, producer.url },
-                    { u"trackTitle"_s, trackTitles.value(producer.trackId, producer.trackTitle) },
-                    { u"trackId"_s, producer.trackId } });
-        }
         // Group once per immutable album. Stable track IDs resolve through the index above.
         struct CreditGroup final
         {
@@ -388,10 +378,10 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
         groups.reserve(grouped.size());
         for (const auto &group : grouped)
             groups.append(QVariantMap{ { u"name"_s, group.name },
-                                       { u"roles"_s, group.roles },
-                                       { u"sources"_s, group.sources },
+                                       { u"rolesText"_s, group.roles.join(u" \u00b7 "_s) },
+                                       { u"sourcesText"_s, group.sources.join(u" \u00b7 "_s) },
                                        { u"tracks"_s, group.tracks },
-                                       { u"unscoped"_s, group.unscoped } });
+                                       { u"unscopedText"_s, group.unscoped.join(u" \u00b7 "_s) } });
         const auto title = albumTitleParts(a.title);
         QStringList descriptionSource{ a.descriptionSource.value(u"name"_s).toString(),
                                        a.descriptionSource.value(u"url"_s).toString(),
@@ -405,11 +395,7 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                       { u"offline"_s, a.offline },
                       { u"description"_s, a.description },
                       { u"localNote"_s, a.localNote },
-                      { u"descriptionSource"_s, a.descriptionSource.toVariantMap() },
                       { u"descriptionSourceText"_s, descriptionSource.join(u" \u00b7 "_s) },
-                      { u"introduction"_s, a.introduction.toVariantMap() },
-                      { u"creditsLookup"_s, a.creditsLookup.toVariantMap() },
-                      { u"producers"_s, producers },
                       { u"producerGroups"_s, groups },
                       { u"introductionStatus"_s,
                         lookupStatus(a.introduction, !a.description.isEmpty(), false) },
@@ -417,7 +403,7 @@ void DetailModel::prepare(const LibrarySession &library, bool metadataOnly)
                         lookupStatus(a.creditsLookup, !a.producers.isEmpty(), true,
                                      a.tracks.size()) },
                       { u"folder"_s, a.folder.toDisplayString() },
-                      { u"rawGenres"_s, a.rawGenres },
+                      { u"rawGenresText"_s, a.rawGenres.join(u" \u00b7 "_s) },
                       { u"facts"_s, facts },
                       { u"discs"_s, discs },
                       { u"code"_s, library.browseInfo().value(u"code"_s) } };

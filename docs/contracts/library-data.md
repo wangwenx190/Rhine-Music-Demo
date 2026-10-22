@@ -77,6 +77,8 @@ LibraryStore按实体/kind合并已接受结果；批次结束、取消或累计
 
 面板背景复用现有可见内容，两个RGBA8逻辑像素附件执行源CSS sigma=8的离散Gaussian，线性采样配对、3 sigma截断；该滤波网格对应逻辑CSS像素，不改变三维输出或其他原生内容的DPR/画质。阴影按源0/24/90/.13的矩形Gaussian积分直接绘制，不增加捕获附件。Loader只在面板可见生命周期保留背景；ResourcePlan记录两份颜色/保守深度和resize新旧重叠，Qt/driver内部开销仍未知。关闭销毁所属捕获，不新增生产readback、mips、MSAA或独立时钟。
 
+PanelController::selectResult只接纳搜索面板的稳定专辑/曲目ID，保留一个可替换意图，退出完成后发出resultRequested。显式close/reset、重新open及完成信号中的新命令会清除或替换旧意图；changed/closed同步重入后按revision复核，不能重新显示已关闭面板或交付过期定位。焦点操作和ListView真实几何仍由QML处理。
+
 `TrackFocusController`验证稳定专辑/所属曲目身份，复用PresentationController的archiveRoute：必要时退字/归架，再以既有五次轨迹定位和重新打开，真正detailEnabled后才交付行号。当前打开专辑直接切歌单并滚动，不重新抽取。搜索结果和播放歌名使用同一个request接口，只读播放ID，任何定位均不调用媒体命令。最后目标覆盖未完成请求，回退/换库/重播/打开面板与用户滚轮/按下/触摸/按键/resize取消旧revealing revision；旧布局回调不能恢复高亮。
 
 TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项完成polish；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。

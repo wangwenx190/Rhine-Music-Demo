@@ -12,8 +12,6 @@ Item {
     readonly property real creditColumnStridePixels: 236
     readonly property real creditColumnGapPixels: 26
     readonly property real scrollbarOccupancyPixels: 11
-    readonly property real creditTrackRowPixels: 80
-    readonly property real creditPopupHeightRatio: 0.7
 
     clip: true
     property real contentOpacity: 1
@@ -220,141 +218,22 @@ Item {
     }
     Component {
         id: trackDelegate
-        TrackRow {}
-    }
-    component TrackRow: Item {
-        id: row
-        objectName: "trackDelegate"
-        opacity: root.contentOpacity
-        required property int index
-        required property string trackId
-        required property string number
-        required property string trackTitle
-        required property string artist
-        required property string format
-        required property string duration
-        required property int disc
-        readonly property real trackTop: discHeading ? discLabel.implicitHeight + 28 : 0
-        readonly property real trackHeight: height - trackTop - 1
-        required property bool discHeading
-        activeFocusOnTab: true
-        Keys.onReturnPressed: root.trackRequested(trackId)
-        Keys.onSpacePressed: root.trackRequested(trackId)
-        Accessible.role: Accessible.ListItem
-        Accessible.name: number + " " + trackTitle + " " + duration
-        width: root.contentWidth
-        height: names.implicitHeight + (root.viewportWidth >= 1700 ? 28 : 22) + 1 + (discHeading
-                                                                                     ? discLabel.implicitHeight
-                                                                                       + 28 : 0)
-        ArchiveText {
-            id: discLabel
+        TrackRow {
             tokens: root.tokens
-            visible: row.discHeading
-            text: qsTr("DISC %1").arg(row.disc.toString().padStart(2, "0"))
-            cssPixelSize: 8
-            color: root.tokens.muted
-            y: 20
-        }
-        Rectangle {
-            y: row.discHeading ? discLabel.implicitHeight + 28 : 0
-            width: parent.width
-            height: parent.height - y - 1
-            color: row.trackId === (root.trackFocus ? root.trackFocus.trackId : "") ? Qt.rgba(
-                                                                                          root.tokens.accent.r,
-                                                                                          root.tokens.accent.g,
-                                                                                          root.tokens.accent.b,
-                                                                                          .2 * root.trackFocus.highlight) :
-                                                                                      hit.hovered
-                                                                                      ? root.tokens.veil :
-                                                                                        "transparent"
-            Rectangle {
-                antialiasing: true
-                width: 3
-                height: parent.height
-                color: root.tokens.accent
-                opacity: root.trackFocus && row.trackId === root.trackFocus.trackId
-                         ? root.trackFocus.highlight : 0
-            }
-            ArchiveText {
-                tokens: root.tokens
-                x: 0
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.number
-                cssPixelSize: root.viewportWidth >= 1700 ? root.scrollbarOccupancyPixels : 9
-                color: root.tokens.muted
-            }
-            Column {
-                id: names
-                x: root.numberWidth + root.columnGap
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(0, parent.width - x - root.formatWidth - root.durationWidth - root.columnGap
-                                * 2)
-                spacing: 5
-                ArchiveText {
-                    id: trackTitleText
-                    tokens: root.tokens
-                    width: parent.width
-                    objectName: "detailTrackTitle"
-                    text: row.trackTitle
-                    cssPixelSize: root.viewportWidth >= 1700 ? 14 : root.viewportWidth <= 1100
-                                                               && root.viewportWidth > 700 ? 10 :
-                                                                                             root.scrollbarOccupancyPixels
-                    cssLineHeight: root.detailModel.normalLineHeight(row.trackTitle, font)
-                                   * fontScale
-                    elide: Text.ElideRight
-                    color: row.trackId === root.playingTrackId ? root.tokens.accent :
-                                                                 root.tokens.ink
-                }
-                ArchiveText {
-                    tokens: root.tokens
-                    width: parent.width
-                    objectName: "detailTrackArtist"
-                    text: row.artist
-                    cssPixelSize: root.viewportWidth >= 1700 ? 10 : 8
-                    color: root.tokens.muted
-                    elide: Text.ElideRight
-                }
-            }
-            ArchiveText {
-                tokens: root.tokens
-                x: parent.width - root.durationWidth - root.columnGap - root.formatWidth
-                width: root.formatWidth
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.format
-                cssPixelSize: 7
-                horizontalAlignment: Text.AlignRight
-                color: root.tokens.muted
-                elide: Text.ElideRight
-            }
-            ArchiveText {
-                tokens: root.tokens
-                x: parent.width - root.durationWidth
-                width: root.durationWidth
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.duration
-                cssPixelSize: root.viewportWidth >= 1700 ? root.scrollbarOccupancyPixels : 9
-                horizontalAlignment: Text.AlignRight
-                color: root.tokens.muted
-            }
-            Rectangle {
-                antialiasing: true
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: -1
-                width: parent.width
-                height: 1
-                color: root.tokens.line
-            }
-            HoverHandler {
-                id: hit
-            }
-            TapHandler {
-                enabled: !root.detailModel.album.offline
-                onTapped: root.trackRequested(row.trackId)
-            }
-            Accessible.role: Accessible.ListItem
-            Accessible.name: row.number + " " + row.trackTitle + " " + row.duration
+            detailModel: root.detailModel
+            trackFocus: root.trackFocus
+            playingTrackId: root.playingTrackId
+            viewportWidth: root.viewportWidth
+            contentWidth: root.contentWidth
+            columnGap: root.columnGap
+            numberWidth: root.numberWidth
+            formatWidth: root.formatWidth
+            durationWidth: root.durationWidth
+            opacity: root.contentOpacity
+            onTrackRequested: trackId => root.trackRequested(trackId)
         }
     }
+
     Component {
         id: creditDelegate
         Row {
@@ -366,105 +245,13 @@ Item {
             Repeater {
                 model: Math.min(root.creditColumns, root.producerGroups.length - creditRow.index
                                 * root.creditColumns)
-                delegate: Column {
-                    id: person
-                    objectName: "detailCredit"
+                delegate: CreditCard {
                     required property int index
-                    readonly property var credit: root.producerGroups[creditRow.index
-                                                                      * root.creditColumns + index]
-                    property bool expanded: false
-                    onCreditChanged: expanded = false
+                    tokens: root.tokens
+                    credit: root.producerGroups[creditRow.index * root.creditColumns + index]
+                    viewportHeight: root.height
                     width: (root.contentWidth - root.creditColumnGapPixels * (root.creditColumns
                                                                               - 1)) / root.creditColumns
-                    spacing: 4
-                    bottomPadding: 18
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        text: person.credit.name
-                        cssPixelSize: 14
-                        cssLineHeight: cssPixelSize * 1.6
-                        wrapMode: Text.WrapAnywhere
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        text: person.credit.roles.join(" \u00b7 ")
-                        cssPixelSize: 12
-                        cssLineHeight: cssPixelSize * 1.7
-                        wrapMode: Text.WrapAnywhere
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        text: qsTr("Source: %1").arg(person.credit.sources.join(" \u00b7 "))
-                        cssPixelSize: 10
-                        cssLineHeight: cssPixelSize * 1.5
-                        wrapMode: Text.WrapAnywhere
-                        color: root.tokens.muted
-                    }
-                    ArchiveButton {
-                        objectName: "detailCreditExpand"
-                        tokens: root.tokens
-                        visible: person.credit.tracks.length > 1
-                        text: (person.expanded ? qsTr("Hide credited tracks \u2212") : qsTr(
-                                                     "Show credited tracks +"))
-                        cssPixelSize: root.scrollbarOccupancyPixels
-                        onClicked: person.expanded = !person.expanded
-                        Accessible.expanded: person.expanded
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        visible: person.credit.tracks.length === 1
-                        text: person.credit.tracks.length === 1 ? person.credit.tracks[0] : ""
-                        cssPixelSize: root.scrollbarOccupancyPixels
-                        cssLineHeight: cssPixelSize * 1.7
-                        wrapMode: Text.WrapAnywhere
-                    }
-                    ListView {
-                        visible: person.expanded && person.credit.tracks.length > 1
-                        width: parent.width
-                        height: visible ? Math.min(root.height * root.creditPopupHeightRatio,
-                                                   person.credit.tracks.length
-                                                   * root.creditTrackRowPixels) : 0
-                        clip: true
-                        reuseItems: true
-                        cacheBuffer: 100
-                        boundsBehavior: Flickable.StopAtBounds
-                        model: visible ? person.credit.tracks : []
-                        delegate: ArchiveText {
-                            required property string modelData
-                            tokens: root.tokens
-                            width: ListView.view.width
-                            text: modelData
-                            cssPixelSize: root.scrollbarOccupancyPixels
-                            cssLineHeight: cssPixelSize * 1.7
-                            bottomPadding: 12
-                            wrapMode: Text.WrapAnywhere
-                        }
-                        T.ScrollBar.vertical: ArchiveScrollBar {
-                            tokens: root.tokens
-                            policy: T.ScrollBar.AsNeeded
-                        }
-                    }
-                    ArchiveText {
-                        tokens: root.tokens
-                        width: parent.width
-                        visible: person.credit.unscoped.length > 0
-                        text: qsTr("Credits without track assignments \u00b7 %1").arg(
-                                  person.credit.unscoped.join(" \u00b7 "))
-                        cssPixelSize: root.scrollbarOccupancyPixels
-                        cssLineHeight: cssPixelSize * 1.7
-                        wrapMode: Text.WrapAnywhere
-                        color: root.tokens.muted
-                    }
-                    Rectangle {
-                        antialiasing: true
-                        width: parent.width
-                        height: 1
-                        color: root.tokens.line
-                    }
                 }
             }
         }

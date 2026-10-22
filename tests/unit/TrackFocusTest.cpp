@@ -221,6 +221,72 @@ private Q_SLOTS:
         QCOMPARE(closed.size(), 1);
         QVERIFY(!panels.surface()->shown());
     }
+    void panelResultWaitsForExitAndKeepsLastIntent()
+    {
+        FrameClock clock;
+        PanelController panels(&clock);
+        QSignalSpy result(&panels, &PanelController::resultRequested);
+        panels.open(u"search"_s);
+        panels.surface()->finish();
+        panels.selectResult(u"first"_s, u"old-track"_s);
+        QVERIFY(result.isEmpty());
+        panels.selectResult(u"last"_s, u"new-track"_s);
+        panels.surface()->finish();
+        QCOMPARE(result.size(), 1);
+        QCOMPARE(result.first(), QVariantList({ u"last"_s, u"new-track"_s }));
+        QVERIFY(panels.panel().isEmpty());
+        QVERIFY(!panels.surface()->shown());
+
+        panels.open(u"search"_s);
+        panels.selectResult(u"cancelled"_s, { });
+        panels.open(u"library"_s);
+        panels.surface()->finish();
+        QCOMPARE(result.size(), 1);
+        QCOMPARE(panels.panel(), u"library"_s);
+        panels.selectResult(u"wrong-panel"_s, { });
+        QVERIFY(panels.surface()->shown());
+
+        panels.open(u"search"_s);
+        panels.selectResult(u"dismissed"_s, { });
+        panels.close();
+        panels.surface()->finish();
+        QCOMPARE(result.size(), 1);
+        panels.setReducedMotion(true);
+        panels.open(u"search"_s);
+        panels.selectResult(u"immediate"_s, { });
+        QCOMPARE(result.size(), 2);
+        panels.setReducedMotion(false);
+        panels.open(u"search"_s);
+        panels.selectResult(u"reset"_s, { });
+        panels.reset();
+        QVERIFY(!panels.surface()->shown());
+        QCOMPARE(result.size(), 2);
+    }
+    void panelSignalsCannotResurrectOrNavigateObsoleteIntent()
+    {
+        FrameClock clock;
+        PanelController panels(&clock);
+        QSignalSpy result(&panels, &PanelController::resultRequested);
+        const auto dismiss = connect(&panels, &PanelController::changed, &panels, [&] {
+            if (panels.panel() == "search"_L1)
+                panels.close();
+        });
+        panels.open(u"search"_s);
+        QVERIFY(panels.panel().isEmpty());
+        QVERIFY(!panels.surface()->shown());
+        disconnect(dismiss);
+
+        panels.open(u"search"_s);
+        panels.surface()->finish();
+        connect(&panels, &PanelController::closed, &panels, [&] {
+            panels.open(u"settings"_s);
+        });
+        panels.selectResult(u"obsolete"_s, u"track"_s);
+        panels.surface()->finish();
+        QVERIFY(result.isEmpty());
+        QCOMPARE(panels.panel(), u"settings"_s);
+        QVERIFY(panels.surface()->shown());
+    }
 };
 QTEST_GUILESS_MAIN(TrackFocusTest)
 #include "TrackFocusTest.moc"
