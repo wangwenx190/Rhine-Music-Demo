@@ -3,8 +3,7 @@ yalahoo_unit_test(AssetTest assets
         "${PROJECT_SOURCE_DIR}/src/app/AssetCatalog.cpp"
     INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/src/app"
     LIBRARIES YalahooCore Qt6::Gui Qt6::Quick3D Qt6::Qml Qt6::Svg Qt6::Multimedia
-    REPORT assets-test.xml TIMEOUT 90
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/verification"
+    TIMEOUT 90
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AssetTest)
@@ -12,7 +11,7 @@ file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/verification")
 yalahoo_unit_test(LibraryQmlTest library-qml
     LIBRARIES YalahooCore Qt6::Qml Qt6::Quick
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    REPORT library-qml-test.xml TIMEOUT 30
+    TIMEOUT 30
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 add_test(
     NAME

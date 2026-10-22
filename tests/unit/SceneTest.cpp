@@ -1,3 +1,4 @@
+#include "NumericChecks.h"
 #include "FrameClock.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -7,13 +8,13 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <numbers>
 #include <limits>
 
 using namespace Qt::StringLiterals;
+using yalahoo::test::errorMagnitude;
 using namespace yalahoo;
 namespace {
 SceneVector vector(const QJsonValue &v)
@@ -23,7 +24,7 @@ SceneVector vector(const QJsonValue &v)
 }
 double difference(SceneVector a, SceneVector b)
 {
-    return (a - b).length();
+    return errorMagnitude((a - b).length());
 }
 }
 class SceneTest final : public QObject
@@ -35,7 +36,6 @@ public:
 
 private:
     QJsonObject oracle;
-    double maxProjection = 0, maxPose = 0, maxMotion = 0, maxFov = 0, maxNavigation = 0;
 private Q_SLOTS:
     void initTestCase()
     {
@@ -49,7 +49,7 @@ private Q_SLOTS:
     {
         const auto front = caseRayEntry({ 0, 1, 1 }, { 0, 0, -2 });
         QVERIFY(front);
-        QVERIFY(std::abs(*front - .465) < 1e-12);
+        QVERIFY(errorMagnitude(*front - .465) < 1e-12);
         const auto back = caseRayEntry({ 0, 1, -1 }, { 0, 0, 2 });
         QCOMPARE(back, front);
         QCOMPARE(caseRayEntry({ 0, 1, 0 }, { 0, 0, 2 }), std::optional<double>(0));
@@ -93,8 +93,9 @@ private Q_SLOTS:
                 scene.advance(1.0 / 120);
                 const auto &frame = scene.frame();
                 const double distance = (frame.camera.position - frame.camera.aim).length();
-                QVERIFY(std::abs(frame.fogNear - (distance + 5 * (1 - detail) - detail)) < 1e-12);
-                QVERIFY(std::abs(frame.fogFar - (distance + 25 * (1 - detail) + 12 * detail))
+                QVERIFY(errorMagnitude(frame.fogNear - (distance + 5 * (1 - detail) - detail))
+                        < 1e-12);
+                QVERIFY(errorMagnitude(frame.fogFar - (distance + 25 * (1 - detail) + 12 * detail))
                         < 1e-12);
                 QVERIFY(frame.fogFar > frame.fogNear);
             }
@@ -115,16 +116,17 @@ private Q_SLOTS:
             scene.setDetail(c[u"detail"_s].toDouble());
             scene.snapToTarget();
             const auto &f = scene.frame();
-            maxPose = std::max({ maxPose, difference(f.camera.position, vector(p[u"position"_s])),
-                                 difference(f.camera.aim, vector(p[u"aim"_s])),
-                                 std::abs(f.camera.span - p[u"span"_s].toDouble()) });
+            const auto maxPose =
+                    std::max({ difference(f.camera.position, vector(p[u"position"_s])),
+                               difference(f.camera.aim, vector(p[u"aim"_s])),
+                               errorMagnitude(f.camera.span - p[u"span"_s].toDouble()) });
             QVERIFY(maxPose < 1e-6);
             QCOMPARE(scene.layout()->kind(), c[u"metrics"_s].toObject()[u"kind"_s].toString());
-            QVERIFY(std::abs(scene.layout()->layoutScale()
-                             - c[u"metrics"_s].toObject()[u"scale"_s].toDouble())
+            QVERIFY(errorMagnitude(scene.layout()->layoutScale()
+                                   - c[u"metrics"_s].toObject()[u"scale"_s].toDouble())
                     < 1e-10);
             QVERIFY(difference(f.casePosition, vector(c[u"casePosition"_s])) < 1e-10);
-            QVERIFY(std::abs(f.fieldOfView - c[u"fov"_s].toDouble()) < 1e-10);
+            QVERIFY(errorMagnitude(f.fieldOfView - c[u"fov"_s].toDouble()) < 1e-10);
             const auto forward = f.cameraRotation.rotatedVector({ 0, 0, -1 });
             QVERIFY((forward - (f.camera.aim - f.camera.position).normalized().qt()).length()
                     < 1e-5);
@@ -135,7 +137,6 @@ private Q_SLOTS:
                 const auto expected = q[u"pixel"_s].toArray();
                 const double error = std::hypot(actual->x() - expected[0].toDouble(),
                                                 actual->y() - expected[1].toDouble());
-                maxProjection = std::max(maxProjection, error);
                 QVERIFY2(error <= 2, qPrintable(QString::number(error)));
             }
             const auto center =
@@ -160,11 +161,10 @@ private Q_SLOTS:
                 scene.setDetail(c[u"detail"_s].toDouble());
                 scene.setReducedMotion(c[u"reduced"_s].toBool());
                 scene.advance(c[u"dt"_s].toDouble());
-                maxMotion = std::max(
-                        { maxMotion,
-                          difference(scene.frame().camera.position, vector(c[u"position"_s])),
+                const auto maxMotion = std::max(
+                        { difference(scene.frame().camera.position, vector(c[u"position"_s])),
                           difference(scene.frame().camera.aim, vector(c[u"aim"_s])) });
-                maxFov = std::max(maxFov, std::abs(scene.fieldOfView() - c[u"fov"_s].toDouble()));
+                const auto maxFov = errorMagnitude(scene.fieldOfView() - c[u"fov"_s].toDouble());
                 QVERIFY(maxMotion < 1e-6);
                 QVERIFY(maxFov < 1e-6);
             }
@@ -223,10 +223,10 @@ private Q_SLOTS:
                 scene.setReducedMotion(sample[u"reduced"_s].toBool());
                 scene.advance(sample[u"dt"_s].toDouble());
                 const auto pose = scene.target();
-                maxNavigation = std::max({ maxNavigation,
-                                           difference(pose.position, vector(sample[u"position"_s])),
-                                           difference(pose.aim, vector(sample[u"aim"_s])),
-                                           std::abs(pose.span - sample[u"span"_s].toDouble()) });
+                const auto maxNavigation =
+                        std::max({ difference(pose.position, vector(sample[u"position"_s])),
+                                   difference(pose.aim, vector(sample[u"aim"_s])),
+                                   errorMagnitude(pose.span - sample[u"span"_s].toDouble()) });
                 QVERIFY(maxNavigation <= 1e-6);
             }
         }
@@ -275,20 +275,6 @@ private Q_SLOTS:
         QVERIFY(!scene.selection());
         QVERIFY(!scene.frame().hasArchivePool);
         QVERIFY(scene.frame().instances.isEmpty());
-    }
-    void cleanupTestCase()
-    {
-        QVERIFY(yalahoo::writeJsonFile(
-                QString::fromUtf8(SCENE_REPORT),
-                QJsonDocument(QJsonObject{ { u"targetCases"_s, 48 },
-                                           { u"navigationTargets"_s, 36 },
-                                           { u"maxNavigationTargetError"_s, maxNavigation },
-                                           { u"cameraSamples"_s, 694 },
-                                           { u"projectionPoints"_s, 528 },
-                                           { u"maxProjectionPixels"_s, maxProjection },
-                                           { u"maxTargetError"_s, maxPose },
-                                           { u"maxCameraPositionAimError"_s, maxMotion },
-                                           { u"maxFovError"_s, maxFov } })));
     }
 };
 QTEST_GUILESS_MAIN(SceneTest)

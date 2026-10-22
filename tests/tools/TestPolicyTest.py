@@ -14,6 +14,11 @@ FLAGS = ("VISIBLE", "FOREGROUND", "LIFECYCLE", "WINDOW_LIFECYCLE", "STRESS")
 
 class TestPolicyTest(unittest.TestCase):
     def test_presets_isolate_opt_ins_and_select_only_the_declared_scope(self):
+        for target in ("macos", "windows", "linux"):
+            with self.subTest(target=target):
+                self.check_presets(target)
+
+    def check_presets(self, target):
         with tempfile.TemporaryDirectory(prefix="yalahoo ctest space-") as directory:
             root = Path(directory)
             shutil.copyfile(ROOT / "CMakePresets.json", root / "CMakePresets.json")
@@ -25,7 +30,9 @@ class TestPolicyTest(unittest.TestCase):
                 (root / folder).mkdir(parents=True)
                 (root / folder / "CMakeLists.txt").write_text("", encoding="utf-8")
             declarations = ["cmake_minimum_required(VERSION 3.25)", "project(PolicyFixture NONE)",
-                            "enable_testing()", "set(APPLE TRUE)", "set(YALAHOO_MACOS_VISIBLE_TESTS OFF)"]
+                            "enable_testing()", f"set(APPLE {'TRUE' if target == 'macos' else 'FALSE'})",
+                            f"set(WIN32 {'TRUE' if target == 'windows' else 'FALSE'})",
+                            "set(YALAHOO_MACOS_VISIBLE_TESTS OFF)"]
             names = ("unit-probe", "startup-qml", "startup-stress", "runtime-detail", "rhi-bokeh-gpu")
             for name in names:
                 declarations.append(f'add_test(NAME {name} COMMAND "{Path(sys.executable).as_posix()}" '
@@ -37,15 +44,21 @@ class TestPolicyTest(unittest.TestCase):
             subprocess.run(["cmake", "--preset", "qt-release"], cwd=root, check=True, capture_output=True, timeout=20)
             environment = {**os.environ, **{f"YALAHOO_VERIFY_{flag}": "1" for flag in FLAGS}}
             for preset, expected in (("qt-release", {"unit-probe"}),
-                                     ("qt-release-full", {"unit-probe", "startup-qml", "rhi-bokeh-gpu"}),
-                                     ("qt-release-render", {"startup-qml", "rhi-bokeh-gpu"}),
-                                     ("qt-release-stress", {"startup-stress"})):
+                                     ("qt-release-full", {"unit-probe", "rhi-bokeh-gpu"}
+                                      | ({"startup-qml"} if target == "macos" else set())),
+                                     ("qt-release-render", {"rhi-bokeh-gpu"}
+                                      | ({"startup-qml"} if target == "macos" else set())),
+                                     ("qt-release-stress", {"startup-stress"} if target == "macos" else set())):
                 with self.subTest(preset=preset):
                     for name in names:
                         (root / (name + ".json")).unlink(missing_ok=True)
                     result = subprocess.run(["ctest", "--preset", preset], cwd=root, env=environment,
                                             capture_output=True, text=True, timeout=20)
-                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    if expected:
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn("No tests were found", result.stdout + result.stderr)
                     self.assertEqual({name for name in names if (root / (name + ".json")).exists()}, expected)
                     for name in expected:
                         actual = json.loads((root / (name + ".json")).read_text())

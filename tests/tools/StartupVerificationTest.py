@@ -98,6 +98,24 @@ class StartupVerificationTest(unittest.TestCase):
         report["performanceGateEnforced"] = False
         self.assertFalse(VERIFY.validate_report(report, args, 0))
 
+    def test_malformed_and_nonfinite_measurements_cannot_pass(self):
+        args = self.arguments("--observe-only", "--mode", "vsync", "--scenario", "night-wave")
+        for field, values in {
+            "samplingSeconds": (float("inf"), float("nan"), "30", True),
+            "dpr": (True, "1", float("nan")),
+            "switches": (False,), "rebuilds": (False,), "stages": ([1], "timing"),
+            "samplingStartedNs": (None, True, "1", float("nan")),
+            "samplingEndedNs": (None, "3", float("inf")),
+            "guiFrames": (None, [1], [{"atNs": True}, {"atNs": 2}]),
+            "synchronizationTimestampsNs": (None, [1, float("inf")], [True, 2]),
+            "windowPolicy": (None, True),
+        }.items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    report = self.report(args)
+                    report[field] = value
+                    self.assertFalse(VERIFY.validate_report(report, args, 0))
+
     def test_observation_omits_replay_and_requires_all_timing_streams(self):
         args = self.arguments("--observe-only", "--mode", "vsync", "--scenario", "night-wave",
                               "--seconds", "12")
@@ -135,7 +153,10 @@ class StartupVerificationTest(unittest.TestCase):
             with self.subTest(runs=runs):
                 self.check_formal_runs(runs)
 
-    def check_formal_runs(self, runs):
+    def test_qml_diagnostics_fail_successful_startup_reports(self):
+        self.check_formal_runs(1, log_text="ReferenceError: fixture")
+
+    def check_formal_runs(self, runs, log_text=""):
         script = self.root / "tests/runners/verify-startup.py"
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("# fixture\n", encoding="utf-8")
@@ -157,7 +178,8 @@ class StartupVerificationTest(unittest.TestCase):
             self.assertNotIn("QSG_NO_VSYNC", kwargs["env"])
             self.assertEqual(kwargs["env"]["YALAHOO_VERIFY_STRESS"], "0")
             report = self.report(args)
-            report["performanceGatePassed"] = len(calls) != 1
+            report["performanceGatePassed"] = bool(log_text) or len(calls) != 1
+            kwargs["stdout"].write(log_text)
             output = Path(command[2])
             output.mkdir()
             (output / "report.json").write_text(json.dumps(report), encoding="utf-8")

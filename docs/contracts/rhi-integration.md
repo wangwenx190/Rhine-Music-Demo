@@ -38,7 +38,7 @@
 
 ## 目标尺度与生产阵列检查
 
-`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`postprocess/visual*.json`九尺寸和与连续阵列入口共用的匿名9×64库，原生质量与双主题、64核全分辨率AO及SMAA。CTest使用`rhi-scale-test 新目录 --representative`选择321×241与640×480，核对封面过滤及同窗口DPR转换，供尺寸规则改动后的定向检查。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
+`ctest --preset qt-release-render -R '^rhi-scale-gpu$'`在macOS使用真正隐藏RenderControl；其他平台按test-gates选择native入口。输入为`RhiScaleChecks.cpp`中计划规定的九尺寸和与连续阵列入口共用的匿名9×64库，原生质量与双主题、64核全分辨率AO及SMAA。CTest使用`rhi-scale-test 新目录 --representative`选择321×241与640×480，核对封面过滤及同窗口DPR转换，供尺寸规则改动后的定向检查。显式RenderControl DPR为1/1.5/2，核对`effectiveDevicePixelRatio`和真实外层target；外部RenderControl target变更DPR不产生原生screen事件，入口在target设置后、polish前投递标准`DevicePixelRatioChange`窗口事件，再由生产信号合并更新；环境变量不能代替该证明。native入口仅报告实际DPR，其余目标矩阵按计划R36分工。
 
 九尺寸布局、主题和DPR边界按test-gates.md分开选择；必要入口调整按test-gates.md，不把九尺寸×双主题×三DPR固定为必跑GPU全组合。奇数尺寸/格式/MSAA、半AO/full DOF/CoC等真实耦合边界仍须独立覆盖。
 

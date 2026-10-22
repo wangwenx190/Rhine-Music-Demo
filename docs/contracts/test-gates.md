@@ -25,10 +25,10 @@
 | RHI与封面/阵列GPU组件、`display-transfer-gpu` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
 | QML组件回放、生产详情/总览/导航、GUI与同窗口生命周期 | 真实控件/面板/音乐舞台的交互、布局、模态、播放隔离与恢复；组件契约及R36产品接线。独立资源压力和性能入口仅按performance.md选用 |
 | `runtime-materials`、`runtime-lighting` | 隔离Quick3D三表面/纸面与光场适配，R36明确保留的源参数/投影及有效输出边界；materials/lighting.md |
-| `dry-tools`、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、测量范围、来源结构误判、实际CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |
+| `dry-tools`、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、有限测量/数值错误、独立采集文件、来源结构误判、三平台CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |
 | `launchers`、`unix-deployment`、`linux-package-tools` | 参数/子进程状态、包完整性/权限/依赖/符号链接、原生strip/相对加载；平台部署契约。目标对象格式分支只在对应系统执行 |
 | 冻结数学/DOM导出、`compare-ui-structure.py overview/presentation`、文字/滑尺与网络探针 | 独立来源重建、同输入结构/字体/轨迹及目标TLS/代理；web-baseline与组件契约及R36明确缺口，不是普通CTest依赖 |
-| clang-tidy安全审计、资产来源核对与生成器 | 编译器检查所有权/未定义行为、冻结hash/许可及可复现生产输入；cpp23-best-practices/assets/web-baseline。`python3 tests/tools/AssetExportTest.py`在隔离目录验证源导出与已提交manifest；`node --test tests/tools/TitleVerificationTest.mjs`验证标题报告的严格成功/数值/唯一状态边界。两者显式需要Node（源导出另需锁定Web依赖），不加入普通CTest |
+| clang-tidy安全审计、资产来源核对与生成器 | 编译器定向检查所有权/未定义行为及超时/诊断错误传播、冻结hash/许可及可复现生产输入；cpp23-best-practices/assets/web-baseline。`python3 tests/tools/AssetExportTest.py`在隔离目录验证源导出与已提交manifest；`node --test tests/tools/TitleVerificationTest.mjs`验证标题报告的严格成功/数值/唯一状态边界。两者显式需要Node（源导出另需锁定Web依赖），不加入普通CTest |
 
 ## 选择与复用
 

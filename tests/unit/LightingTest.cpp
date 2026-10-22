@@ -1,3 +1,4 @@
+#include "NumericChecks.h"
 #include "RowLightController.h"
 #include "FrameClock.h"
 #include "SelectionLighting.h"
@@ -7,10 +8,10 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
-#include "JsonFile.h"
 #include <limits>
 
 using namespace Qt::StringLiterals;
+using yalahoo::test::errorMagnitude;
 using namespace yalahoo;
 class LightingTest final : public QObject
 {
@@ -71,9 +72,9 @@ private Q_SLOTS:
                                         : theme == "night"_L1 ? "#0b1828"
                                                               : "#a6b8c0");
             const auto actual = LightingPalette::floorColor(theme);
-            QVERIFY(std::abs(actual.x - decode(source.red())) < 1e-7);
-            QVERIFY(std::abs(actual.y - decode(source.green())) < 1e-7);
-            QVERIFY(std::abs(actual.z - decode(source.blue())) < 1e-7);
+            QVERIFY(errorMagnitude(actual.x - decode(source.red())) < 1e-7);
+            QVERIFY(errorMagnitude(actual.y - decode(source.green())) < 1e-7);
+            QVERIFY(errorMagnitude(actual.z - decode(source.blue())) < 1e-7);
         }
         SelectionLighting light;
         const auto day = light.palette().floor;
@@ -99,13 +100,13 @@ private Q_SLOTS:
         QVERIFY(file.open(QIODevice::ReadOnly));
         const auto data = QJsonDocument::fromJson(file.readAll()).object();
         double trajectoryError = 0, paletteError = 0, positionError = 0, fieldError = 0;
-        int samples = 0;
         auto vector = [](QJsonValue v) {
             const auto a = v.toArray();
             return SceneVector{ a[0].toDouble(), a[1].toDouble(), a[2].toDouble() };
         };
         auto diff = [](SceneVector a, SceneVector b) {
-            return std::max({ std::abs(a.x - b.x), std::abs(a.y - b.y), std::abs(a.z - b.z) });
+            return std::max({ errorMagnitude(a.x - b.x), errorMagnitude(a.y - b.y),
+                              errorMagnitude(a.z - b.z) });
         };
         for (auto c : data[u"cases"_s].toArray()) {
             SelectionLighting light;
@@ -131,7 +132,7 @@ private Q_SLOTS:
                              { -48, -17.6, 36 }, i[u"detail"_s].toDouble(), i[u"dt"_s].toDouble());
                 auto scalar = [&](double actual, QJsonValue expected) {
                     trajectoryError =
-                            std::max(trajectoryError, std::abs(actual - expected.toDouble()));
+                            std::max(trajectoryError, errorMagnitude(actual - expected.toDouble()));
                 };
                 scalar(light.ribbon.row.value, sample[u"row"_s].toArray()[0]);
                 scalar(light.ribbon.row.velocity, sample[u"row"_s].toArray()[1]);
@@ -163,12 +164,11 @@ private Q_SLOTS:
                                    std::pair{ palette.area, p[u"area"_s] },
                                    std::pair{ palette.scatter, p[u"scatter"_s] },
                                    std::pair{ palette.printAmbient, p[u"printAmbient"_s] } })
-                    paletteError =
-                            std::max(paletteError, std::abs(pair.first - pair.second.toDouble()));
+                    paletteError = std::max(paletteError,
+                                            errorMagnitude(pair.first - pair.second.toDouble()));
                 paletteError = std::max({ paletteError,
                                           diff(palette.scatterColor, vector(p[u"scatterColor"_s])),
                                           diff(palette.spotColor, vector(p[u"spotColor"_s])) });
-                ++samples;
             }
         }
         for (auto value : data[u"fields"_s].toArray()) {
@@ -177,18 +177,10 @@ private Q_SLOTS:
             light.settings.mode = RowLightingMode(field[u"mode"_s].toInt());
             light.settings.fill = field[u"fill"_s].toDouble();
             fieldError = std::max(fieldError,
-                                  std::abs(light.sample({ field[u"dx"_s].toDouble(), 0,
-                                                          field[u"dz"_s].toDouble() })
-                                           - field[u"value"_s].toDouble()));
+                                  errorMagnitude(light.sample({ field[u"dx"_s].toDouble(), 0,
+                                                                field[u"dz"_s].toDouble() })
+                                                 - field[u"value"_s].toDouble()));
         }
-        QVERIFY(yalahoo::writeJsonFile(
-                QString::fromUtf8(LIGHTING_REPORT),
-                QJsonDocument(QJsonObject{ { u"samples"_s, samples },
-                                           { u"fields"_s, data[u"fields"_s].toArray().size() },
-                                           { u"trajectoryError"_s, trajectoryError },
-                                           { u"paletteError"_s, paletteError },
-                                           { u"gpuUniformPositionError"_s, positionError },
-                                           { u"fieldError"_s, fieldError } })));
         QVERIFY2(trajectoryError <= 1e-6, qPrintable(QString::number(trajectoryError, 'g', 12)));
         QVERIFY2(paletteError <= 1e-6, qPrintable(QString::number(paletteError, 'g', 12)));
         QVERIFY(positionError <= 1e-4);
@@ -222,7 +214,7 @@ private Q_SLOTS:
         input.origin.z = -9;
         const double world = ribbon.column.z;
         ribbon.update(input, 0);
-        QVERIFY(std::abs(ribbon.column.z - world) < 1e-12);
+        QVERIFY(errorMagnitude(ribbon.column.z - world) < 1e-12);
         // Identical print/shell ownership origins give exactly the same row mask; y/local/camera are excluded.
         QCOMPARE(ribbon.sample({ 2, 0, 1 }), ribbon.sample({ 2, 999, 1 }));
         FrameClock clock;
@@ -233,7 +225,7 @@ private Q_SLOTS:
         clock.setSpeed(3);
         clock.advance(1.0 / 60);
         const double expected = 1 - SelectionLighting::themeProgress((3.0 / 60) / .65);
-        QVERIFY(std::abs(scene.lighting()->warmth() - expected) < 1e-12);
+        QVERIFY(errorMagnitude(scene.lighting()->warmth() - expected) < 1e-12);
         clock.setActive(false);
         const auto warmth = scene.lighting()->warmth();
         clock.advance(1);

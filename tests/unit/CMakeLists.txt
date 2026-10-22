@@ -39,7 +39,6 @@ yalahoo_unit_test(NavigationTest navigation
     TIMEOUT 60)
 yalahoo_unit_test(CoverCacheTest cover-cache
     LIBRARIES YalahooRhi
-    DEFINITIONS COVER_REPORT="${CMAKE_BINARY_DIR}/verification/cover-cache.json"
     TIMEOUT 90)
 yalahoo_unit_test(AtlasUploadTest rhi-atlas-queue
     LIBRARIES YalahooRhi)
@@ -120,12 +119,11 @@ if(YALAHOO_REVIEW)
     set_tests_properties(rhi-scale-gpu PROPERTIES TIMEOUT "600")
 endif()
 yalahoo_unit_test(RenderQualityTest render-quality
-    LIBRARIES YalahooScene
-    REPORT render-quality-test.xml)
+    LIBRARIES YalahooScene)
 yalahoo_unit_test(SceneTest scene
     LIBRARIES YalahooScene
-    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" SCENE_REPORT="${CMAKE_BINARY_DIR}/verification/scene-errors.json"
-    REPORT scene-test.xml TIMEOUT 60)
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
+    TIMEOUT 60)
 if(YALAHOO_REVIEW)
     yalahoo_material_test(runtime-materials materials/single-case.json materials/runtime.json 150)
     yalahoo_material_test(runtime-lighting lighting/visual.json lighting/runtime.json 150)
@@ -149,8 +147,7 @@ add_test(
 )
 yalahoo_unit_test(MotionTest motion
     LIBRARIES YalahooCore
-    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" MOTION_REPORT="${CMAKE_BINARY_DIR}/verification/motion-errors.json"
-    REPORT motion-test.xml
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     TIMEOUT 60)
 yalahoo_unit_test(DirectoryScannerTest directory-scanner
     LIBRARIES YalahooCore
@@ -158,12 +155,11 @@ yalahoo_unit_test(DirectoryScannerTest directory-scanner
 yalahoo_unit_test(LibraryDataTest library-data
     LIBRARIES YalahooCore Qt6::Gui
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    REPORT library-data-test.xml TIMEOUT 60
+    TIMEOUT 60
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins")
 yalahoo_unit_test(LightingTest lighting
     LIBRARIES YalahooScene
-    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}" LIGHTING_REPORT="${CMAKE_BINARY_DIR}/verification/lighting-errors.json"
-    REPORT lighting-test.xml
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     TIMEOUT 60)
 
 yalahoo_unit_test(RealColumnsTest real-columns
@@ -196,12 +192,10 @@ yalahoo_unit_test(TrackFocusTest track-focus
     TIMEOUT 60)
 yalahoo_unit_test(PlaybackTest playback
     LIBRARIES YalahooCore
-    INCLUDES "${PROJECT_SOURCE_DIR}/tests/support"
     TIMEOUT 90 SERIAL)
 
 yalahoo_unit_test(AudioAmbienceTest audio-ambience
     LIBRARIES YalahooCore
-    INCLUDES "${PROJECT_SOURCE_DIR}/tests/support"
     TIMEOUT 90 SERIAL)
 include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
 yalahoo_add_assets(AudioAmbienceTest)
@@ -251,6 +245,7 @@ yalahoo_unit_test(OnlineMetadataTest online-metadata
 yalahoo_unit_test(JsonFileTest json-file LIBRARIES YalahooCore)
 
 add_executable(NativeToolTest NativeToolTest.cpp)
+target_include_directories(NativeToolTest PRIVATE "${PROJECT_SOURCE_DIR}/tests/support")
 set_target_properties(NativeToolTest PROPERTIES AUTOMOC FALSE AUTOUIC FALSE)
 yalahoo_test_tool(NativeToolTest)
 add_test(NAME native-tool COMMAND NativeToolTest)

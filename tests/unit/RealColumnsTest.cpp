@@ -1,3 +1,4 @@
+#include "NumericChecks.h"
 #include "MotionController.h"
 #include <limits>
 #include "SelectionController.h"
@@ -12,6 +13,7 @@
 #include <cmath>
 
 using namespace Qt::StringLiterals;
+using yalahoo::test::errorMagnitude;
 using namespace yalahoo;
 namespace {
 QList<LibraryColumn> columns(const QList<int> &counts)
@@ -108,7 +110,7 @@ private Q_SLOTS:
         QCOMPARE(real.row(1, 1), 64.5);
         real.select({ 1, 12 }, false, true);
         real.update(4, false);
-        QVERIFY(std::abs(real.row(1) - 12) <= 1e-6);
+        QVERIFY(errorMagnitude(real.row(1) - 12) <= 1e-6);
     }
     void frozenTrajectories()
     {
@@ -146,7 +148,8 @@ private Q_SLOTS:
                         };
                         const auto expected = states[lane].toArray();
                         for (int i = 0; i < 6; ++i)
-                            error = std::max(error, std::abs(actual[i] - expected[i].toDouble()));
+                            error = std::max(error,
+                                             errorMagnitude(actual[i] - expected[i].toDouble()));
                     }
                 }
             }

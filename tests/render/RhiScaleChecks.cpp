@@ -12,7 +12,6 @@
 #include "GraphicsBackend.h"
 #include <QGuiApplication>
 #include <QDir>
-#include <QFile>
 #include "JsonFile.h"
 #include <QSet>
 #include <cmath>
@@ -56,27 +55,6 @@ QJsonObject sourceState(const Input &input)
 QSize sourceTarget(QSize logical, double dpr)
 {
     return logical * dpr;
-}
-QList<QSize> sourceSizes()
-{
-    QList<QSize> sizes;
-    for (const char *name :
-         { "visual.json", "visual-dpr-1.json", "visual-dpr-1.5.json", "visual-dpr-2.json" }) {
-        QFile file((QString::fromUtf8(FIXTURE_ROOT)) + "/tests/fixtures/postprocess/"_L1
-                   + QString::fromUtf8(name));
-        require(file.open(QIODevice::ReadOnly), "Missing postprocess source size input");
-        for (const auto &value :
-             QJsonDocument::fromJson(file.readAll()).object()[u"cases"_s].toArray()) {
-            const auto row = value.toObject();
-            if (row[u"group"_s] != u"size-aa"_s)
-                continue;
-            const QSize size(row[u"width"_s].toInt(), row[u"height"_s].toInt());
-            if (!sizes.contains(size))
-                sizes.append(size);
-        }
-    }
-    require(sizes.size() == 9, "Postprocess input must contain all nine source sizes");
-    return sizes;
 }
 void waitForCovers(RhiCaptureHarness &driver, SceneItem *item)
 {
@@ -347,8 +325,11 @@ auto runScaleChecks(int &argc, char **&argv)
         const QList<double> dprs =
                 OffscreenSurface::Enabled ? QList<double>{ 1, 1.5, 2 } : QList<double>{ 0 };
         const bool representative = argc == 3;
-        const auto sizes =
-                representative ? QList<QSize>{ { 321, 241 }, { 640, 480 } } : sourceSizes();
+        const auto sizes = representative
+                ? QList<QSize>{ { 321, 241 }, { 640, 480 } }
+                : QList<QSize>{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
+                                { 960, 900 },   { 930, 900 },   { 390, 844 },
+                                { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
         for (auto size : filteringOnly ? QList<QSize>() : sizes) {
             QJsonArray sourceThemes;
             for (double dpr : dprs) {

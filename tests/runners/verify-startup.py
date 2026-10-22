@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Separate product diagnostics, resource stress and formal presentation sampling."""
-from native_replay import (BACKEND_IDS, cmake_cache, executable_path, read_report,
+from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
                            replay_environment, run_logged, write_json)
 import argparse
 import hashlib
+import math
 from pathlib import Path
 import platform
 
@@ -64,6 +65,14 @@ def parse_arguments(argv=None):
 
 
 def validate_report(report, args, exit_code):
+    if not isinstance(report, dict):
+        return False
+    if any(type(report.get(field)) is not int for field in
+           ("backend", "samplingRequestedSeconds", "switches", "rebuilds")):
+        return False
+    dpr = report.get("dpr")
+    if type(dpr) not in (int, float) or not math.isfinite(dpr):
+        return False
     expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (30, 10) if args.stress else (3, 2)
     valid = (exit_code == 0 and report.get("functionalPassed") is True
              and report.get("samplingComplete") is True
@@ -76,10 +85,13 @@ def validate_report(report, args, exit_code):
              and report.get("switches") == expected_switches
              and report.get("rebuilds") == expected_rebuilds)
     if args.seconds:
-        valid = (valid and report.get("samplingSeconds", 0) >= args.seconds
-                 and bool(report.get("stages")))
+        seconds = report.get("samplingSeconds")
+        stages = report.get("stages")
+        valid = (valid and type(seconds) in (int, float) and math.isfinite(seconds)
+                 and seconds >= args.seconds and isinstance(stages, dict) and bool(stages))
     if args.mode != "offscreen":
-        valid = (valid and report.get("swapIntervalRequested") == (0 if args.mode == "uncapped" else 1)
+        valid = (valid and type(report.get("swapIntervalRequested")) is int
+                 and report.get("swapIntervalRequested") == (0 if args.mode == "uncapped" else 1)
                  and report.get("qsgNoVsyncRequested") is (args.mode == "uncapped"))
         if args.seconds:
             valid = valid and report.get("nativeSamplingValid") is True
@@ -89,15 +101,25 @@ def validate_report(report, args, exit_code):
         valid = (valid and report.get("performanceGateEnforced") is True
                  and report.get("performanceGatePassed") is True)
     if args.observe_only:
-        start, end = report.get("samplingStartedNs", 0), report.get("samplingEndedNs", 0)
-        streams = [[frame.get("atNs", 0) for frame in report.get("guiFrames", [])],
+        policy = report.get("windowPolicy")
+        if not isinstance(policy, dict):
+            return False
+        start, end = report.get("samplingStartedNs"), report.get("samplingEndedNs")
+        if type(start) is not int or type(end) is not int or start <= 0 or end <= start:
+            return False
+        frames = report.get("guiFrames")
+        if not isinstance(frames, list) or not all(isinstance(frame, dict) for frame in frames):
+            return False
+        streams = [[frame.get("atNs") for frame in frames],
                    report.get("synchronizationTimestampsNs", []),
                    report.get("qtPresentationTimestampsNs", [])]
+        if not all(isinstance(stream, list) and all(type(stamp) is int for stamp in stream)
+                   for stream in streams):
+            return False
         during_sampling = [[stamp for stamp in stream if start <= stamp <= end] for stream in streams]
-        valid = (valid and report.get("windowPolicy", {}).get("passed") is True
+        valid = (valid and policy.get("passed") is True
                  and report.get("performanceGateEnforced") is False
                  and report.get("continuouslyExposedDuringSampling") is True
-                 and start > 0 and end > start
                  and all(len(stream) >= 2 and all(a < b for a, b in zip(stream, stream[1:]))
                          for stream in during_sampling))
     return bool(valid)
@@ -144,13 +166,15 @@ def main(argv=None):
         command = [str(executable), "--startup", str(output.resolve()), str(args.seconds), args.scenario]
         if args.observe_only:
             command.append("observe")
-        code = run_logged(command, args.output / f"run-{index}.log", cwd=ROOT,
+        log_path = args.output / f"run-{index}.log"
+        code = run_logged(command, log_path, cwd=ROOT,
                           environment=environment, timeout=1200)
         report_path = output / "report.json"
         report = read_report(report_path)
         try:
-            valid = validate_report(report, args, code)
-        except (ValueError, TypeError):
+            valid = (validate_report(report, args, code)
+                     and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
+        except (ValueError, TypeError, KeyError, AttributeError):
             report = {}
             valid = False
         manifest["runs"].append(dict(index=index, exitCode=code, passed=valid, report=str(report_path),

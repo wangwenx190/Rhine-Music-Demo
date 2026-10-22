@@ -123,6 +123,29 @@ class ReplayTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertFalse(manifest["passed"])
 
+    def test_gui_requires_distinct_images_inside_its_output(self):
+        for index, filename in enumerate(("../foreign.png", "duplicate.png")):
+            with self.subTest(filename=filename):
+                captures = self.gui_captures()
+                captures[0]["image"] = filename
+                if filename == "duplicate.png":
+                    captures[1]["image"] = filename
+                code, manifest = self.run_gui(self.root / f"gui-path-{index}",
+                                              json.dumps(dict(passed=True, backend=6, captures=captures)))
+                self.assertEqual(code, 1)
+                self.assertFalse(manifest["passed"])
+                self.assertTrue(manifest["imageSha256"])
+                self.assertNotIn("../foreign.png", manifest["imageSha256"])
+
+    def test_report_reader_rejects_nonfinite_json_values(self):
+        path = self.root / "report.json"
+        for token in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999"):
+            with self.subTest(token=token):
+                path.write_text('{"passed": true, "value": ' + token + '}')
+                self.assertEqual(native_replay.read_report(path), {})
+        path.write_text('{"passed": true, "value": 1.5}')
+        self.assertEqual(native_replay.read_report(path), dict(passed=True, value=1.5))
+
     def test_replay_environment_does_not_inherit_visible_or_stress_authorization(self):
         flags = ("YALAHOO_VERIFY_VISIBLE", "YALAHOO_VERIFY_FOREGROUND", "YALAHOO_VERIFY_STRESS",
                  "YALAHOO_VERIFY_LIFECYCLE", "YALAHOO_VERIFY_WINDOW_LIFECYCLE")
@@ -242,6 +265,73 @@ const vec2 GaussianPairs[1] = vec2[](vec2(1.5, 0.25));
                     self.assertAlmostEqual(actual, expected, delta=1e-10)
                 self.assertAlmostEqual(actual_weights[0] + 2 * sum(actual_weights[1:]), 1,
                                        delta=1e-10)
+
+
+class CompilerAuditTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory(prefix="yalahoo audit space-")
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name).resolve()
+        self.build = self.root / "build/release"
+        self.build.mkdir(parents=True)
+        paths = ("src/one.cpp", "tests/two.cpp", "build/generated.cpp")
+        for name in paths:
+            path = self.root / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("// fixture\n")
+        commands = [dict(directory=str(self.root), file=name) for name in (*paths, paths[0])]
+        (self.build / "compile_commands.json").write_text(json.dumps(commands))
+        (self.build / "CMakeCache.txt").write_text("CMAKE_BUILD_TYPE:STRING=Release\n")
+        (self.build / "toolchain.json").write_text('{}')
+        self.main = runpy.run_path(str(ROOT / "tools/audit/audit-best-practices.py"))["main"]
+        self.main.__globals__["ROOT"] = self.root
+
+    def execute(self, *options, outcome=0):
+        calls = []
+
+        def analyze(command, **kwargs):
+            calls.append(Path(command[3]).relative_to(self.root).as_posix())
+            self.assertEqual(kwargs["timeout"], 2)
+            if isinstance(outcome, Exception):
+                raise outcome
+            if outcome == "diagnostic":
+                kwargs["stdout"].write("fixture.cpp:1:1: warning: fixture safety defect\n")
+            return SimpleNamespace(returncode=0)
+
+        output = self.root / "result"
+        with patch.object(subprocess, "run", side_effect=analyze), \
+                patch.object(subprocess, "check_output", return_value="fixture-tool"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = self.main(["--build-directory", str(self.build), "--output", str(output),
+                                "--clang-tidy", "fixture-tool", "--jobs", "1", "--timeout", "2", *options])
+        return result, calls, json.loads((output / "report.json").read_text())
+
+    def test_compiled_units_are_deduplicated_and_generated_units_are_excluded(self):
+        result, calls, report = self.execute()
+        self.assertEqual(result, 0)
+        self.assertEqual(calls, ["src/one.cpp", "tests/two.cpp"])
+        self.assertTrue(report["compilerChecksClean"])
+
+    def test_explicit_scope_runs_only_requested_compiled_sources(self):
+        result, calls, report = self.execute("--source", "tests/two.cpp", "--source", "tests/two.cpp")
+        self.assertEqual(result, 0)
+        self.assertEqual(calls, ["tests/two.cpp"])
+        self.assertEqual(len(report["translationUnits"]), 1)
+
+    def test_diagnostics_timeout_and_launch_errors_preserve_failure_reports(self):
+        for index, outcome in enumerate(("diagnostic", subprocess.TimeoutExpired("fixture", 2),
+                                         PermissionError("fixture denied"))):
+            with self.subTest(outcome=outcome):
+                result, calls, report = self.execute("--source", "src/one.cpp", outcome=outcome)
+                self.assertEqual(result, 1)
+                self.assertFalse(report["compilerChecksClean"])
+                self.assertEqual(report["translationUnits"][0]["result"], "review-required")
+                (self.root / "result").rename(self.root / f"failure-{index}")
+
+    def test_uncompiled_scope_fails_before_launching_analysis(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+            self.execute("--source", "src/missing.cpp")
+        self.assertEqual(caught.exception.code, 2)
 
 
 @unittest.skipUnless(shutil.which("sh"), "POSIX asset entry tests require sh; Windows uses PowerShell entries")

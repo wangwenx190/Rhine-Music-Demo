@@ -33,8 +33,6 @@ class AssetTest final : public QObject
 public:
     AssetTest() = default;
 
-private:
-    QJsonArray evidence;
 private Q_SLOTS:
     void initTestCase()
     {
@@ -58,9 +56,6 @@ private Q_SLOTS:
             QVERIFY(!entry[u"path"_s].toString().contains(u"typing-preview"_s));
             QVERIFY(!entry[u"path"_s].toString().contains(u"app-icon"_s));
         }
-        evidence.append(QJsonObject{ { u"check"_s, u"qrc-hashes"_s },
-                                     { u"entries"_s, entries.size() },
-                                     { u"passed"_s, true } });
     }
     void geometry()
     {
@@ -86,10 +81,6 @@ private Q_SLOTS:
         QVERIFY2(object, qPrintable(component.errorString()));
         for (const auto &name : { "Frosted_Polymer", "Ivory_Edges", "Optical_Diffuser" })
             QVERIFY(object->findChild<QObject *>(u"Music_Case_V040__"_s + QString::fromUtf8(name)));
-        evidence.append(QJsonObject{ { u"check"_s, u"geometry"_s },
-                                     { u"report"_s, report },
-                                     { u"paperGap"_s, true },
-                                     { u"qmlImport"_s, true } });
     }
     void malformedGeometryRejected()
     {
@@ -115,12 +106,7 @@ private Q_SLOTS:
         const QString latin = u"AV To gyjp (Album) 0123456789"_s;
         const std::array<int, 4> weights{ 250, 330, 450, 630 };
         int index = 0;
-        QJsonArray faces;
         QSet<QByteArray> outlines;
-        QImage preview(1100, 280, QImage::Format_ARGB32_Premultiplied);
-        preview.fill(QColor("#efede7"_L1));
-        QPainter painter(&preview);
-        painter.setPen(QColor("#232722"_L1));
         for (const auto &value : manifest[u"fonts"_s].toArray()) {
             const auto face = value.toObject();
             const auto bytes = readFile(":/assets/"_L1 + face[u"path"_s].toString());
@@ -155,40 +141,19 @@ private Q_SLOTS:
                 QVERIFY(line.naturalTextWidth() < 2000);
                 for (const auto &run : layout.glyphRuns())
                     QCOMPARE(run.rawFont().fontTable(outlineTable), raw.fontTable(outlineTable));
-                faces.append(QJsonObject{ { u"face"_s, face[u"weight"_s] },
-                                          { u"weight"_s, weights[index] },
-                                          { u"nativeWeight"_s, int(raw.weight()) },
-                                          { u"text"_s, text },
-                                          { u"widthAt24px"_s, line.naturalTextWidth() } });
             };
             measure(chinese);
             measure(latin);
-            painter.setFont(font);
-            painter.drawText(20, index * 65 + 30,
-                             face[u"weight"_s].toString() + ": "_L1 + chinese + u" \u00b7 "_s
-                                     + latin);
             const auto outlinesData = raw.fontTable(outlineTable);
             QVERIFY(!outlinesData.isEmpty());
             outlines.insert(QCryptographicHash::hash(outlinesData, QCryptographicHash::Sha256));
             ++index;
         }
-        painter.end();
-        QVERIFY(preview.save(u"fonts.png"_s));
         QCOMPARE(outlines.size(), 4);
-        evidence.append(QJsonObject{ { u"check"_s, u"fonts"_s },
-                                     { u"faces"_s, faces },
-                                     { u"distinctOutlineCount"_s, 4 } });
     }
     void icons()
     {
-        QImage preview(8 * 96, 2 * 96, QImage::Format_ARGB32_Premultiplied);
-        preview.fill(Qt::transparent);
-        QPainter painter(&preview);
-        int row = 0;
         for (const auto &theme : { u"day"_s, u"night"_s }) {
-            painter.fillRect(0, row * 96, preview.width(), 96,
-                             theme == "day"_L1 ? QColor("#efede7"_L1) : QColor("#162234"_L1));
-            int col = 0;
             for (const auto &name : { "play", "pause", "stop", "search", "settings", "folder",
                                       "overview", "overview-return" }) {
                 QSvgRenderer renderer(u":/assets/icons/%1-%2.svg"_s.arg(name, theme));
@@ -205,17 +170,8 @@ private Q_SLOTS:
                         if (qAlpha(tiny.pixel(x, y)))
                             ++painted;
                 QVERIFY(painted > 15);
-                renderer.render(&painter, QRectF(col++ * 96 + 16, row * 96 + 16, 64, 64));
             }
-            ++row;
         }
-        painter.end();
-        QVERIFY(preview.save(u"icons.png"_s));
-        evidence.append(QJsonObject{ { u"check"_s, u"icons"_s },
-                                     { u"themes"_s, 2 },
-                                     { u"functionalPaths"_s, 8 },
-                                     { u"viewBox"_s, u"0 0 24 24"_s },
-                                     { u"passed"_s, true } });
     }
     void silentInterfaceEvents()
     {
@@ -228,9 +184,6 @@ private Q_SLOTS:
             QVERIFY(event.toObject()[u"source"_s].isNull());
             QVERIFY(!event.toObject()[u"enabled"_s].toBool());
         }
-        evidence.append(QJsonObject{ { u"check"_s, u"interface-audio"_s },
-                                     { u"silentEvents"_s, 17 },
-                                     { u"pcmOrPreviewPlayback"_s, false } });
     }
     void audioLoadsWithoutPlayback_data()
     {
@@ -258,19 +211,6 @@ private Q_SLOTS:
         QVERIFY(player.duration() > 1000);
         QCOMPARE(player.playbackState(), QMediaPlayer::StoppedState);
         QCOMPARE(playing, 0);
-        evidence.append(QJsonObject{ { u"check"_s, u"audio"_s },
-                                     { u"file"_s, file },
-                                     { u"durationMs"_s, player.duration() },
-                                     { u"loaded"_s, true },
-                                     { u"playingEvents"_s, playing },
-                                     { u"audioOutput"_s, false } });
-    }
-    void cleanupTestCase()
-    {
-        saveFile(u"assets-report.json"_s,
-                 QJsonDocument(QJsonObject{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
-                                            { u"checks"_s, evidence } })
-                         .toJson());
     }
 };
 QTEST_MAIN(AssetTest)

@@ -12,12 +12,9 @@
 #include "SceneItem.h"
 #include <QQuickWindow>
 #include <QFile>
-#include <QElapsedTimer>
 #include <QColorSpace>
 #include <QImageReader>
 #include <QEventLoop>
-#include <QJsonDocument>
-#include "JsonFile.h"
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -387,17 +384,6 @@ private Q_SLOTS:
         timeout.setSingleShot(true);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
         bool valid = true, scaling = true;
-        QElapsedTimer elapsed;
-        elapsed.start();
-        QList<qint64> gaps;
-        qint64 lastTick = 0;
-        QTimer input;
-        input.setInterval(1);
-        connect(&input, &QTimer::timeout, this, [&] {
-            const auto now = elapsed.nsecsElapsed();
-            gaps.append(now - lastTick);
-            lastTick = now;
-        });
         connect(&cache, &CoverCache::ready, this, [&](CoverSnapshot p) {
             ready.insert(p->identity);
             valid = valid && p->error.isEmpty() && p->image.size() == QSize(256, 256)
@@ -406,7 +392,6 @@ private Q_SLOTS:
             if (ready.size() == 96)
                 loop.quit();
         });
-        input.start();
         for (int i = 0; i < 96; ++i) {
             const auto id = QString::number(i);
             QVERIFY(cache.request(id, directory.filePath(id + u".jpg"_s), 256));
@@ -415,7 +400,6 @@ private Q_SLOTS:
         timeout.start(WorkerDrainDeadlineMilliseconds);
         loop.exec();
         QCOMPARE(ready.size(), 96);
-        input.stop();
         const auto stats = cache.statistics();
         QVERIFY(valid);
         QVERIFY(scaling);
@@ -428,17 +412,6 @@ private Q_SLOTS:
         QVERIFY(cached);
         QVERIFY(cache.request(u"95"_s, directory.filePath(u"95.jpg"_s), 256));
         QCOMPARE(cache.statistics()[u"decodeStarts"_s], stats[u"decodeStarts"_s]);
-        QVERIFY(gaps.size() > 5);
-        std::sort(gaps.begin(), gaps.end());
-        QJsonObject report = stats;
-        report[u"readyCount"_s] = ready.size();
-        report[u"readyMs"_s] = elapsed.elapsed();
-        report[u"eventTimerGapP95Ms"_s] = gaps[(gaps.size() - 1) * 95 / 100] / 1e6;
-        report[u"eventTimerGapMaxMs"_s] = gaps.last() / 1e6;
-        report[u"scope"_s] =
-                u"96 independent 2048-square JPEG sources; GUI event timer responsiveness, no scanout claim"_s;
-        report[u"passed"_s] = true;
-        QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(COVER_REPORT), QJsonDocument(report)));
     }
     void cancellationAndClose()
     {

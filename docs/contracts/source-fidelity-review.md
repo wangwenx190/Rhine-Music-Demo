@@ -329,7 +329,7 @@ R19C、R19C2、R19C2B、R19D、R19D3、R19D4、R19D4B、R19G是历史拆分父�
 
 跨组件提交额外核对：`5b2df80`按词法/字面量与分支顺序检查格式整理，展开短句未改变算法；`d03527e`的预排序键、可见实体/深度预计算与generation先拒绝保留，比较器/帧路径不读盘或遍历曲库。`e98c798`的Cocoa窗口策略、GL4.1/basic、MSAA renderbuffer、RenderControl/DPR、surface恢复与清理均有平台API/资源依据；恢复输出与原生物理呈现继续分开证明。其后生产覆写由B–G专题逐项追踪。
 
-`CoverAudit`按contain/inset、解析点与源UV公式核对采样，检查实际上传尺寸/载荷、lease/generation/背压、图集GPU读回及SG重建。矩阵、身份、draw、上传与恢复分别有实际检查，自身输出供质量检查。
+`cover-gpu`按contain/inset、解析点与源UV公式核对采样，检查实际上传尺寸/载荷、lease/generation/背压、图集GPU读回及SG重建。矩阵、身份、draw、上传与恢复分别有实际检查，自身输出供质量检查。
 
 必要适配归类：布局/文字使用原生字体框、整行glyph与彩色字体；运动/输入使用唯一帧源、原生Qt事件和有限副本；渲染使用同一SceneFrame、显式通道/resolve/排序/clip与资源所有者；数据/封面使用稳定ID、值快照、有界worker/缓存/generation淘汰。已去除的ROI系数、重复viewport缩放、额外图标/标题倍采样没有独立源或技术依据，不保留为画质特性。
 

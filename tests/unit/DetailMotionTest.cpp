@@ -2,6 +2,7 @@
 // images. Explicit fixture literals are independent inputs or expected results; timing bounds
 // have named constants.
 
+#include "NumericChecks.h"
 #include "PresentationController.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -18,6 +19,7 @@
 #include <cmath>
 
 using namespace Qt::StringLiterals;
+using yalahoo::test::errorMagnitude;
 
 using namespace yalahoo;
 namespace {
@@ -132,7 +134,8 @@ private Q_SLOTS:
                 const auto state = detail.state();
                 const double actual[] = { state.value, state.velocity, state.acceleration };
                 for (int i = 0; i < 3; ++i)
-                    errors[i] = std::max(errors[i], std::abs(actual[i] - expected[i].toDouble()));
+                    errors[i] =
+                            std::max(errors[i], errorMagnitude(actual[i] - expected[i].toDouble()));
             }
         }
         for (double error : errors)
@@ -151,7 +154,7 @@ private Q_SLOTS:
                 for (const auto value : golden[u"rotations"_s].toArray()) {
                     const auto s = value.toObject();
                     if (s[u"frame"_s].toInt() == frame && s[u"reduced"_s].toBool() == reduced)
-                        QVERIFY(std::abs(rotation - s[u"rotation"_s].toDouble()) <= 1e-6);
+                        QVERIFY(errorMagnitude(rotation - s[u"rotation"_s].toDouble()) <= 1e-6);
                 }
             }
         }
@@ -186,7 +189,7 @@ private Q_SLOTS:
                 clarity.enter();
             }
             clarity.advance(sample[1].toDouble(), sample[2].toBool(), sample[3].toBool());
-            error = std::max(error, std::abs(clarity.value() - sample[4].toDouble()));
+            error = std::max(error, errorMagnitude(clarity.value() - sample[4].toDouble()));
         }
         QVERIFY(error <= 1e-6);
         qInfo() << "Frozen material clarity max error:" << error;
@@ -200,7 +203,7 @@ private Q_SLOTS:
         QCOMPARE(f.selection.returningCases().begin()->clarity, 1);
         f.step();
         const double returning = f.selection.returningCases().begin()->clarity;
-        QVERIFY(std::abs(returning - std::exp(-9.0 / 120)) < 1e-12);
+        QVERIFY(errorMagnitude(returning - std::exp(-9.0 / 120)) < 1e-12);
         for (const auto &instance : f.selection.instances())
             if (!instance.owned)
                 QCOMPARE(instance.clarity, 0);
@@ -285,9 +288,10 @@ private Q_SLOTS:
         QVERIFY(!f.selection.dragging());
         QVERIFY(f.until(u"switching"_s));
         QVERIFY(!f.selection.returningCases().begin()->returnY.has_value()
-                || std::abs(f.selection.instances()[f.selection.instances().size() - 2].transform(1,
-                                                                                                  3)
-                            - y)
+                || errorMagnitude(
+                           f.selection.instances()[f.selection.instances().size() - 2].transform(1,
+                                                                                                 3)
+                           - y)
                         < 1e-5);
         const auto copy = *f.selection.returningCases().begin();
         QCOMPARE(copy.objectId, old.objectId);
@@ -307,7 +311,7 @@ private Q_SLOTS:
         if (f.selection.rotation() != 0) {
             QCOMPARE(f.selection.detailMotion().phase(), DetailMotion::Phase::ReturningCenter);
             QCOMPARE(f.scene.detail(), 1);
-            QVERIFY(std::abs(f.selection.selectedPosition().y - heldY) < 1e-5);
+            QVERIFY(errorMagnitude(f.selection.selectedPosition().y - heldY) < 1e-5);
         }
         QVERIFY(f.until(u"archive"_s));
         f.step(480);
@@ -322,7 +326,7 @@ private Q_SLOTS:
         f.step(25);
         const auto lift = f.selection.liftState();
         f.presentation.back();
-        QVERIFY(std::abs(f.selection.liftState().value - lift.value) < 1e-12);
+        QVERIFY(errorMagnitude(f.selection.liftState().value - lift.value) < 1e-12);
         f.presentation.select(u"a8"_s, true, true, u"track-intent"_s);
         f.presentation.select(u"a7"_s, true, true);
         QVERIFY(f.until(u"detail"_s));
@@ -396,7 +400,7 @@ private Q_SLOTS:
             const auto hit = f.scene.hitTest(projected->x(), projected->y());
             QCOMPARE(hit[u"albumId"_s].toString(), f.selection.albumId());
             QCOMPARE(hit[u"objectId"_s].toULongLong(), f.selection.instances().last().objectId);
-            QVERIFY(std::abs(transform(0, 2) - std::sin(f.selection.rotation())) < 1e-6);
+            QVERIFY(errorMagnitude(transform(0, 2) - std::sin(f.selection.rotation())) < 1e-6);
             f.presentation.stepAlbum(1);
             QVERIFY(f.until(u"detail"_s));
             QCOMPARE(f.scene.target().position, fixed.position);

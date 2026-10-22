@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -19,8 +20,17 @@ def write_json(path, value):
 
 
 def read_report(path):
+    def reject_constant(value):
+        raise ValueError(f"Nonfinite JSON number: {value}")
+
+    def finite_float(value):
+        result = float(value)
+        if not math.isfinite(result):
+            reject_constant(value)
+        return result
     try:
-        report = json.loads(path.read_text(encoding="utf-8"))
+        report = json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_constant,
+                            parse_float=finite_float)
     except (OSError, ValueError):
         return {}
     return report if isinstance(report, dict) else {}
@@ -117,7 +127,7 @@ def run_replays(parser, args, command, validate, **scope):
             valid = bool(code == 0 and report.get("passed") is True
                          and report.get("backend") == args.backend and validate(report, args)
                          and not any(token in log_path.read_text(encoding="utf-8") for token in QML_ERRORS))
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, AttributeError):
             valid = False
         passed = valid and passed
         manifest["runs"].append(dict(run=index, exitCode=code, passed=valid, report=str(report_path)))

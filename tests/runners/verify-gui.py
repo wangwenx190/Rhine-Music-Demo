@@ -76,13 +76,17 @@ captures = report.get('captures', [])
 if not isinstance(captures, list) or not all(valid_capture(capture) for capture in captures):
     captures = []
 actual = {(c['width'], c['height'], c['night'], c['realistic'], c['phase']) for c in captures}
-images = [args.output / 'matrix' / c['image'] for c in captures]
+matrix = (args.output / 'matrix').resolve()
+images = [(matrix / c['image']).resolve() for c in captures]
 valid = (code == 0 and report.get('passed') is True and report.get('backend') == BACKEND_IDS[args.backend]
-         and actual == expected and len(captures) == len(expected) and all(p.is_file() for p in images)
+         and actual == expected and len(captures) == len(expected) and len(set(images)) == len(expected)
+         and all(not Path(c['image']).is_absolute() for c in captures)
+         and all(p.is_relative_to(matrix) and p.is_file() and p.stat().st_size > 0 for p in images)
          and not any(token in (args.output / 'run.log').read_text(encoding='utf-8') for token in QML_ERRORS))
 manifest.update(exitCode=code, completed=report_path.is_file(), passed=bool(valid),
                 capturedCheckpoints=len(captures), expectedCheckpoints=len(expected),
-                imageSha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in images if p.is_file()})
+                imageSha256={str(p.relative_to(matrix)): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in images if p.is_relative_to(matrix) and p.is_file()})
 save()
 print(f"GUI {args.backend}: {len(captures)}/{len(expected)} checkpoints; passed={bool(valid)}")
 raise SystemExit(0 if valid else 1)

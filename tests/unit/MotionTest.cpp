@@ -9,7 +9,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include "JsonFile.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <algorithm>
@@ -41,12 +40,9 @@ public:
     MotionTest() = default;
 
 private:
-    std::array<double, 3> maxError{ };
-    int extendedSamples = 0;
-    void near(double actual, double expected, size_t derivative = 0)
+    void near(double actual, double expected)
     {
         const double error = std::abs(actual - expected);
-        maxError[derivative] = std::max(maxError[derivative], error);
         QVERIFY2(std::isfinite(actual) && error <= 1e-6,
                  qPrintable(u"actual %1 expected %2 error %3"_s.arg(actual, 0, 'g', 17)
                                     .arg(expected, 0, 'g', 17)
@@ -55,8 +51,8 @@ private:
     void compareState(Kinematics state, const QJsonObject &expected)
     {
         near(state.value, expected.value(u"value"_s).toDouble());
-        near(state.velocity, expected.value(u"velocity"_s).toDouble(), 1);
-        near(state.acceleration, expected.value(u"acceleration"_s).toDouble(), 2);
+        near(state.velocity, expected.value(u"velocity"_s).toDouble());
+        near(state.acceleration, expected.value(u"acceleration"_s).toDouble());
     }
     void compareArchive(const ArchiveMotion &motion, const QJsonObject &expected)
     {
@@ -125,10 +121,9 @@ private Q_SLOTS:
                 near(spring.value,
                      sample.value(u"spring"_s).toObject().value(u"value"_s).toDouble());
                 near(spring.velocity,
-                     sample.value(u"spring"_s).toObject().value(u"velocity"_s).toDouble(), 1);
+                     sample.value(u"spring"_s).toObject().value(u"velocity"_s).toDouble());
                 QCOMPARE(scalar.guided(),
                          sample.value(u"scalar"_s).toObject().value(u"guided"_s).toBool());
-                ++extendedSamples;
             }
         }
     }
@@ -164,8 +159,8 @@ private Q_SLOTS:
         for (int i = 0; i < 192; ++i)
             split.update(-2, 3.7, 1.6 / 192);
         near(split.value, whole.value);
-        near(split.velocity, whole.velocity, 1);
-        near(split.acceleration, whole.acceleration, 2);
+        near(split.velocity, whole.velocity);
+        near(split.acceleration, whole.acceleration);
         QuinticTrack track;
         track.observe({ 1, .7, -.3 });
         track.retarget(8, 1.4);
@@ -173,8 +168,8 @@ private Q_SLOTS:
         const auto before = track.state();
         QVERIFY(track.retarget(-2, 1.4));
         near(track.state().value, before.value);
-        near(track.state().velocity, before.velocity, 1);
-        near(track.state().acceleration, before.acceleration, 2);
+        near(track.state().velocity, before.velocity);
+        near(track.state().acceleration, before.acceleration);
         track.update(.2);
         const auto elapsed = track.elapsed();
         QVERIFY(!track.retarget(-2, .1));
@@ -183,8 +178,8 @@ private Q_SLOTS:
         track.translate(1000);
         track.update(0);
         near(track.state().value, beforeRebase.value + 1000);
-        near(track.state().velocity, beforeRebase.velocity, 1);
-        near(track.state().acceleration, beforeRebase.acceleration, 2);
+        near(track.state().velocity, beforeRebase.velocity);
+        near(track.state().acceleration, beforeRebase.acceleration);
         track.update(100);
         QCOMPARE(track.state().value, 998.0);
         QCOMPARE(track.state().velocity, 0.0);
@@ -196,8 +191,8 @@ private Q_SLOTS:
         QVERIFY(!scalar.retarget(8, true, .1));
         scalar.update(0);
         near(scalar.state().value, scalarBefore.value);
-        near(scalar.state().velocity, scalarBefore.velocity, 1);
-        near(scalar.state().acceleration, scalarBefore.acceleration, 2);
+        near(scalar.state().velocity, scalarBefore.velocity);
+        near(scalar.state().acceleration, scalarBefore.acceleration);
         scalar.translate(-100);
         scalar.update(0, true);
         QCOMPARE(scalar.state().value, -92.0);
@@ -289,8 +284,8 @@ private Q_SLOTS:
         const auto after = controller.archive().state();
         for (size_t i = 0; i < 4; ++i) {
             near(after[i].value, before[i].value);
-            near(after[i].velocity, before[i].velocity, 1);
-            near(after[i].acceleration, before[i].acceleration, 2);
+            near(after[i].velocity, before[i].velocity);
+            near(after[i].acceleration, before[i].acceleration);
         }
         controller.translate({ -.62, -5.2, -1, -1 });
         controller.clock()->startOpening();
@@ -326,15 +321,6 @@ private Q_SLOTS:
         QCOMPARE(controller.revision(), quint64(6));
         QVERIFY(controller.moving());
         QCOMPARE(done.last()[0].toULongLong(), quint64(5));
-    }
-    void cleanupTestCase()
-    {
-        const QJsonObject report{
-            { u"samples"_s, extendedSamples },          { u"fps"_s, QJsonArray{ 20, 30, 60, 120 } },
-            { u"maxPositionError"_s, maxError[0] },     { u"maxVelocityError"_s, maxError[1] },
-            { u"maxAccelerationError"_s, maxError[2] }, { u"tolerance"_s, 1e-6 }
-        };
-        QVERIFY(yalahoo::writeJsonFile(QString::fromUtf8(MOTION_REPORT), QJsonDocument(report)));
     }
 };
 QTEST_GUILESS_MAIN(MotionTest)

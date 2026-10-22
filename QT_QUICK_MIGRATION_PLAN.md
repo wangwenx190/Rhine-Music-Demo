@@ -261,7 +261,7 @@
 | R19D1-P/R19D2-P | SSAO/Fog生产helper与uniform、occlusion/visual、kernel/noise资源和rhi-shell/visual；occlusion/postprocess | `rhi-ao-gpu`/`rhi-fog-gpu`；R16F及奇数宽stride/GL pack、标量/颜色读回、真实camera/detail/线性fog上传与捕获→最终输出次序。 |
 | R19D3A-P/R19D3B-P | Shadow及productFloor、源shadow/Standard/GLB/地面主题参数；rhi-opaque | 共用`rhi-shadow-gpu`及`rhi-shadow-test 新目录 --attachments-only/--invalidation-only`；生产D32F-only、显式采集R32F生命周期/预算及同尺寸深度身份保留、normalBias/PCF、地面实际occluded>0、PBR/fog/完整AO与DOF depth。地面不另跑整套阴影。 |
 | R19D4A-P/R19D4B1-P | Postprocess/Bokeh/SMAA、postprocess/bokeh-kernel与锁定lookup；postprocess | export-bokeh-kernel --check及真正离屏`rhi-bokeh-gpu`/`rhi-smaa-gpu`；真实生产pass解析颜色、HDR/alpha/过滤/边界。 |
-| R19D4B2-P/R19D4C-P | Postprocess/AtlasUploadQueue、SceneItem有效DPR→RenderQuality、render-backend/visual与postprocess/visual；rhi-postprocess/rhi-integration | `rhi-postprocess-gpu`/`rhi-scale-gpu`；实际MSAA/resolve/无反馈资源图、附件尺度/保护/CoC/租约与tile上传。Windows原生UpdateSubresource boxes/bytes仅该目标可证明；其他后端不伪造。 |
+| R19D4B2-P/R19D4C-P | Postprocess/AtlasUploadQueue、SceneItem有效DPR→RenderQuality、render-backend/visual与RhiScaleChecks九尺寸；rhi-postprocess/rhi-integration | `rhi-postprocess-gpu`/`rhi-scale-gpu`；实际MSAA/resolve/无反馈资源图、附件尺度/保护/CoC/租约与tile上传。Windows原生UpdateSubresource boxes/bytes仅该目标可证明；其他后端不伪造。 |
 | R19C2C-P及上述pass生产接线 | SceneItem→RhiItem实际生产阵列/几何与光学；rhi-shell/rhi-integration | `rhi-flicker-gpu`所选状态，或已有产品输出/上传报告；共同证明跨批量边界、运动/进退中的实际uniform与连续透明覆盖，missing/nonfinite精确0、shade>100，保持源实体数量/效果，不默认完整1200帧。 |
 
 退出：相关实际输出满足所属契约的原公式、格式、采样、颜色/几何容差及容量/上传边界；静态结论与GPU实际事实分开。无未决项不补性能/缓存成本/重复释放压力；已有实际失败仍须修复并最小复验，未执行目标不记通过。

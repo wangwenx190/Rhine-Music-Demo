@@ -29,11 +29,11 @@ if(YALAHOO_REVIEW)
     yalahoo_render_test(rhi-opaque-test RhiOpaqueChecks.cpp RhiCaptureHarness.h "${PROJECT_SOURCE_DIR}/tests/support/OffscreenSurface.h")
     set(rhi_fixture_targets archive-pool-test rhi-postprocess-test rhi-bokeh-test
         rhi-smaa-test rhi-ao-test rhi-fog-test rhi-shadow-test rhi-flicker-test
-        rhi-scale-test rhi-shell-test)
+        rhi-shell-test)
     foreach(target IN LISTS rhi_fixture_targets)
         target_compile_definitions(${target} PRIVATE FIXTURE_ROOT="${PROJECT_SOURCE_DIR}")
     endforeach()
-    foreach(target IN ITEMS ${rhi_fixture_targets} rhi-opaque-test)
+    foreach(target IN ITEMS ${rhi_fixture_targets} rhi-scale-test rhi-opaque-test)
         target_link_libraries(${target} PRIVATE Qt6::GuiPrivate)
     endforeach()
     foreach(target IN ITEMS rhi-bokeh-test rhi-smaa-test rhi-shadow-test rhi-scale-test)
