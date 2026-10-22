@@ -3,8 +3,6 @@
 #include <QCoreApplication>
 #include "PlaybackController.h"
 #include "Logging.h"
-#include <QDir>
-#include <QSet>
 #include <QTimer>
 #include <algorithm>
 #include <cmath>
@@ -70,7 +68,7 @@ void PlaybackController::setIntent(Intent intent)
 }
 const Track *PlaybackController::track() const
 {
-    return m_index >= 0 && m_index < m_queue.size() ? &m_queue[m_index] : nullptr;
+    return m_queue.current();
 }
 QString PlaybackController::title() const
 {
@@ -123,40 +121,18 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
                 "Yalahoo", "The album directory is unavailable. Rescan or choose another track."));
         return false;
     }
-    const auto snapshot = m_library->snapshot();
-    const bool reuse = m_queueSnapshot.lock() == snapshot && !m_queue.isEmpty()
-            && std::as_const(m_queue).first().albumId == albumId;
-    QList<Track> queue;
-    QHash<QString, int> indices;
-    if (!reuse) {
-        queue.reserve(album->tracks.size());
-        indices.reserve(album->tracks.size());
-        for (const auto &entry : album->tracks) {
-            if (indices.tryEmplace(entry.id, int(queue.size())).inserted)
-                queue.append(entry);
-        }
-    }
-    const int target = (reuse ? m_queueIndices : indices).value(trackId, -1);
-    if (target < 0) {
-        Q_EMIT rejected(QCoreApplication::translate(
-                "Yalahoo",
-                "The track is no longer in the library. Choose another track or rescan."));
+    const auto result = m_queue.select(m_library->snapshot(), *album, trackId);
+    if (result != PlaybackQueue::Selection::Accepted) {
+        Q_EMIT rejected(
+                result == PlaybackQueue::Selection::MissingTrack
+                        ? QCoreApplication::translate(
+                                  "Yalahoo",
+                                  "The track is no longer in the library. Choose another track or rescan.")
+                        : QCoreApplication::translate(
+                                  "Yalahoo", "Tracks require a local absolute file path."));
         return false;
     }
-    const auto &tracks = reuse ? std::as_const(m_queue) : std::as_const(queue);
-    const auto &url = tracks[target].sourceUrl;
-    if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery()
-        || url.hasFragment() || url.toLocalFile().contains(QChar::Null)) {
-        Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
-                                                    "Tracks require a local absolute file path."));
-        return false;
-    }
-    if (!reuse) {
-        m_queue = std::move(queue);
-        m_queueIndices = std::move(indices);
-        m_queueSnapshot = snapshot;
-    }
-    start(target);
+    start(m_queue.index());
     return true;
 }
 bool PlaybackController::playAlbum(const QString &albumId)
@@ -166,16 +142,11 @@ bool PlaybackController::playAlbum(const QString &albumId)
 }
 void PlaybackController::start(int index)
 {
-    if (index < 0 || index >= m_queue.size())
-        return;
-    const auto url = m_queue[index].sourceUrl;
-    if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile()) || url.hasQuery()
-        || url.hasFragment() || url.toLocalFile().contains(QChar::Null)) {
+    if (!m_queue.selectIndex(index)) {
         Q_EMIT rejected(QCoreApplication::translate("Yalahoo",
                                                     "Tracks require a local absolute file path."));
         return;
     }
-    m_index = index;
     m_source = track()->sourceUrl;
     setIntent(Intent::Playing);
     m_error.clear();
@@ -414,7 +385,7 @@ void PlaybackController::stop()
 void PlaybackController::next()
 {
     if (canNext())
-        start(m_index + 1);
+        start(m_queue.index() + 1);
     else
         stop();
 }
@@ -426,13 +397,13 @@ void PlaybackController::previous()
         seek(0);
         return;
     }
-    if (m_index == 0) {
+    if (m_queue.index() == 0) {
         if (seekable())
             seek(0);
         if (!requested())
             toggle();
     } else
-        start(m_index - 1);
+        start(m_queue.index() - 1);
 }
 void PlaybackController::retry()
 {

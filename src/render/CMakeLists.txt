@@ -33,6 +33,8 @@ qt_add_library(
     PointerDragController.h
     ReturningCasePool.cpp
     ReturningCasePool.h
+    ArchiveField.cpp
+    ArchiveField.h
     SelectionController.cpp
     SelectionController.h
     RealColumns.cpp

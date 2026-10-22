@@ -16,7 +16,6 @@
 namespace {
 // Archive state uses stable IDs; bounded return copies, pulses and coordinate rebasing keep long sessions finite.
 constexpr auto AdditionalCaseCapacity = 4;
-constexpr auto IdleReleaseRate = 4;
 constexpr auto MaximumPlaceholderTitleCharacters = 256;
 constexpr auto RailOriginRow = 15.5;
 constexpr auto InvisibleCaseThreshold = .0001;
@@ -24,7 +23,6 @@ constexpr auto AlreadyClearThreshold = .999;
 constexpr auto LastAlbumRowOffset = 11;
 constexpr auto MaximumCoordinateMagnitude = 1e12;
 constexpr auto DetailPlacementThreshold = .99;
-constexpr auto MaximumSelectionPulses = 6;
 constexpr auto MinimumHitExtent = .12;
 constexpr auto TrackPositionTolerance = .008;
 constexpr auto TrackVelocityTolerance = .025;
@@ -33,24 +31,17 @@ constexpr auto ActivityThreshold = .01;
 constexpr auto DetailOcclusionProgress = .9;
 constexpr auto NeighborRadiusRows = 5;
 constexpr auto NeighborClearance = .05;
-constexpr auto MaximumRippleDisplacement = .24;
-constexpr auto RippleLaneDistanceScale = 2.2;
 constexpr auto OpeningEntryDepth = 23;
 constexpr auto OpeningEntrySeconds = .75;
 constexpr auto LiftPitchFadeDistance = .4;
 constexpr auto SlopePitchGain = .024;
 constexpr auto RoundoffUlps = 8;
-constexpr auto PulseGainFollowRate = 8;
 constexpr auto RebaseCoordinateMagnitude = 2048;
 constexpr auto RebaseRowMagnitude = 2048.0;
 constexpr auto ReducedFollowRate = 35.0;
 constexpr auto ShoulderFollowRate = 5.0;
 constexpr auto LaneFollowRate = 4.0;
-constexpr auto ScanBlendDecayRate = 3;
 constexpr auto TranslationColumn = 3;
-constexpr auto PulseLifetimeSeconds = 3.2;
-constexpr auto IdleDelaySeconds = 2.5;
-constexpr auto IdleAttackRate = .8;
 constexpr auto LiftFollowRate = 4.2;
 constexpr auto ClarityReadyProgress = .78;
 constexpr auto ClarityReadyLift = 3.3;
@@ -107,7 +98,7 @@ void SelectionController::setColumns(QList<LibraryColumn> columns, const Snapsho
     m_detail = 0;
     m_liftTarget = sceneGeometry::PreviewLift;
     m_poolObjects.fill({ });
-    m_pulses.clear();
+    m_field.clearPulses();
     m_origin = { 0, 0 };
     m_cell = m_pool.location(oldId).value_or(m_pool.location(firstId).value_or(
             ArchiveCell{ 0, yalahoo::sceneGeometry::FirstAlbumRow }));
@@ -242,7 +233,7 @@ void SelectionController::setRealistic(bool realistic)
     m_origin = { 0, 0 };
     m_returning.clear();
     m_poolObjects.fill({ });
-    m_pulses.clear();
+    m_field.clearPulses();
     Q_EMIT arrayModeChanged();
     publish();
     Q_EMIT selectionChanged();
@@ -412,7 +403,7 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
         m_realColumns.select(cell, guided,
                              m_managedDetail ? m_detailMotion.placed()
                                              : m_detail > DetailPlacementThreshold);
-    m_lastInteraction = m_time;
+    m_field.interact();
     m_lift = previous ? previous->lift : ScalarSpring{ };
     m_rotation = previous ? previous->rotation : 0;
     m_returnY = previous ? previous->returnY : std::nullopt;
@@ -429,9 +420,7 @@ bool SelectionController::selectCell(ArchiveCell cell, bool guided)
     else if (guided || distant || m_motion->moving())
         m_motion->retarget(targets);
     if (!detailNavigation)
-        m_pulses.append({ cell, m_time, { } });
-    if (m_pulses.size() > MaximumSelectionPulses)
-        m_pulses.removeFirst();
+        m_field.pulse(cell);
     publish();
     Q_EMIT selectionChanged();
     return true;
@@ -469,7 +458,7 @@ void SelectionController::returnSelected()
 }
 void SelectionController::requestDetail(bool detail)
 {
-    m_lastInteraction = m_time;
+    m_field.interact();
     m_managedDetail = true;
     m_detailMotion.request(detail);
     m_drag.cancel();
@@ -538,7 +527,7 @@ bool SelectionController::archiveInteractive() const
 bool SelectionController::canInspect() const
 {
     if (!m_managedDetail || m_detailMotion.phase() != DetailMotion::Phase::Presented
-        || m_detail <= DetailOcclusionProgress || m_pulseGain >= ActivityThreshold)
+        || m_detail <= DetailOcclusionProgress || m_field.pulseGain() >= ActivityThreshold)
         return false;
     const auto top = [this](ArchiveCell cell, double lift = 0) {
         return -sceneGeometry::FloorDepth + field(cell.row, cell.lane) + lift
@@ -576,9 +565,9 @@ void SelectionController::cancelDrag()
 {
     m_drag.cancel();
 }
-SelectionController::FieldColumn SelectionController::fieldColumn(double lane) const
+ArchiveField::Column SelectionController::fieldColumn(double lane) const
 {
-    FieldColumn column;
+    ArchiveField::Column column;
     column.lane = lane;
     column.reduced = m_motion->reducedMotion();
     if (m_realistic) {
@@ -595,59 +584,13 @@ SelectionController::FieldColumn SelectionController::fieldColumn(double lane) c
                               / openingTimeline::PreviewDurationSeconds);
     return column;
 }
-double SelectionController::realisticField(double row, const FieldColumn &column) const
-{
-    const double lane = column.lane, activity = column.activity;
-    double height =
-            column.reduced ? 0 : idleWave(row, lane, m_time) * (1 + (m_idleGain - 1) * activity);
-    if (!column.reduced && activity > 0 && m_pulseGain != 0) {
-        double ripple = 0;
-        for (const auto &pulse : m_pulses)
-            if (pulse.cell.lane == lane)
-                ripple += pulse.wave.sample(std::abs(row - pulse.cell.row));
-        height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
-                * m_pulseGain * activity;
-    }
-    return height
-            + settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds) * activity;
-}
 double SelectionController::field(double row, double lane) const
 {
     return m_motion ? field(row, fieldColumn(lane)) : 0;
 }
-double SelectionController::field(double row, const FieldColumn &column) const
+double SelectionController::field(double row, const ArchiveField::Column &column) const
 {
-    const double lane = column.lane;
-    if (m_openingTime) {
-        const double intro = column.intro;
-        const double opening = intro == 1
-                ? 0
-                : cinematicField(row - m_cell.row + sceneGeometry::FirstAlbumRow,
-                                 lane - m_cell.lane + 2, *m_openingTime);
-        if (intro == 0)
-            return opening;
-        const double resting = settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds)
-                * (m_realistic ? column.activity : column.strength);
-        return opening * (1 - intro) + resting * intro;
-    }
-    if (m_realistic)
-        return realisticField(row, column);
-    double height = 0;
-    if (m_scanBlend != 0)
-        height += archiveWave(row + m_origin.row, lane + m_origin.lane, m_scanTime) * m_scanBlend;
-    if (m_idleGain != 0)
-        height += idleWave(row + m_origin.row, lane + m_origin.lane, m_time) * m_idleGain;
-    if (!column.reduced && m_pulseGain != 0) {
-        double ripple = 0;
-        for (const auto &pulse : m_pulses)
-            ripple += pulse.wave.sample(std::hypot(
-                    row - pulse.cell.row, (lane - pulse.cell.lane) * RippleLaneDistanceScale));
-        height += std::clamp(ripple, -MaximumRippleDisplacement, MaximumRippleDisplacement)
-                * m_pulseGain;
-    }
-    return height
-            + settlingWave(row - column.center, sceneGeometry::SettledSceneSeconds)
-            * column.strength;
+    return m_field.sample(row, column, { m_realistic, m_openingTime, m_cell, m_origin });
 }
 QMatrix4x4 SelectionController::transform(ArchiveCell cell, double lift, double rotation,
                                           bool folded) const
@@ -767,10 +710,7 @@ ArchiveCell SelectionController::rebase()
         copy.cell.lane -= shift.lane;
         copy.cell.row -= shift.row;
     }
-    for (auto &pulse : m_pulses) {
-        pulse.cell.lane -= shift.lane;
-        pulse.cell.row -= shift.row;
-    }
+    m_field.rebase(shift);
     m_motion->translate({ shift.row * sceneGeometry::RowSpacing,
                           -shift.lane * sceneGeometry::ColumnSpacing, -shift.row, -shift.lane });
     Q_EMIT coordinatesRebased(shift.lane, shift.row);
@@ -783,9 +723,7 @@ void SelectionController::setOpeningTime(std::optional<double> time)
         return;
     const bool entering = time && !m_openingTime;
     m_openingTime = time;
-    m_scanBlend = m_idleGain = 0;
-    m_pulses.clear();
-    m_lastInteraction = m_time;
+    m_field.beginOpening();
     if (time) {
         m_returning.clear();
         m_rotation = m_detail = 0;
@@ -874,28 +812,15 @@ void SelectionController::advance(double dt)
         }
         m_motion->observe(springs, targets, rates);
     }
-    m_time += dt;
     if (m_realistic)
         m_realColumns.update(dt, reduced);
-    m_scanTime += dt;
-    m_scanBlend *= std::exp(-dt * ScanBlendDecayRate);
-    m_pulses.removeIf([&](const Pulse &p) {
-        return m_time - p.time >= PulseLifetimeSeconds;
-    });
-    for (auto &pulse : m_pulses)
-        pulse.wave = prepareMusicSelectionWave(m_time - pulse.time);
     const bool aligning =
             std::any_of(m_returning.cbegin(), m_returning.cend(), [](const Copy &copy) {
                 return copy.returnY.has_value();
             });
-    const bool idle = !reduced && m_liftTarget > 0 && m_detail < ActivityThreshold && !m_returnY
-            && !aligning && m_time - m_lastInteraction > IdleDelaySeconds;
-    m_idleGain += ((idle ? 1 : 0) - m_idleGain)
-            * (1 - std::exp(-dt * (idle ? IdleAttackRate : IdleReleaseRate)));
-    const bool mutePulse = m_detail > 0 || m_returnY || aligning;
-    m_pulseGain += ((mutePulse ? 0 : 1) - m_pulseGain) * (1 - std::exp(-dt * PulseGainFollowRate));
-    if (reduced)
-        m_idleGain = 0;
+    const bool idleEligible =
+            m_liftTarget > 0 && m_detail < ActivityThreshold && !m_returnY && !aligning;
+    m_field.advance(dt, reduced, idleEligible, m_detail > 0 || m_returnY || aligning);
     const bool inspecting = m_managedDetail && m_detailMotion.placed() && !m_returnY;
     m_rotation = m_drag.advance(m_rotation, dt, inspecting, reduced);
     if (m_managedDetail) {
@@ -957,7 +882,7 @@ void SelectionController::publish()
         double upper;
     };
     std::optional<PreviousField> previousField;
-    std::optional<FieldColumn> column;
+    std::optional<ArchiveField::Column> column;
     for (auto instance : m_pool.instances()) {
         // Optical depth ties use the physical identity, which survives logical rebase.
         const PoolObject::PhysicalCell physical{ qint64(instance.cell.lane + m_origin.lane),

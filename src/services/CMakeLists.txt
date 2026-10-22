@@ -6,6 +6,8 @@ target_sources(
     IMetadataProvider.h
     IMetadataProvider.cpp
     OnlineMetadataProvider.h
+    metadata/MetadataWorker.cpp metadata/MetadataWorker.h
+    metadata/MetadataCachePolicy.cpp metadata/MetadataCachePolicy.h
     OnlineMetadataProvider.cpp
     metadata/MetadataHttp.h
     metadata/MetadataHttp.cpp

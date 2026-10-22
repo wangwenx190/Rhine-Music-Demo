@@ -60,6 +60,45 @@ public:
     PlaybackTest() = default;
 
 private Q_SLOTS:
+    void queueRejectsCandidatesAtomically()
+    {
+        PlaybackQueue queue;
+        Album album;
+        album.id = u"album"_s;
+        Track first;
+        first.albumId = album.id;
+        first.id = u"one"_s;
+        first.title = u"Original"_s;
+        first.sourceUrl = QUrl::fromLocalFile(u"/anonymous/one.wav"_s);
+        auto duplicate = first;
+        duplicate.title = u"Duplicate"_s;
+        auto invalid = first;
+        invalid.id = u"remote"_s;
+        invalid.sourceUrl = QUrl(u"https://example.invalid/remote.wav"_s);
+        album.tracks = { first, duplicate, invalid };
+        auto snapshot = std::make_shared<const LibrarySnapshot>();
+        QCOMPARE(queue.select(snapshot, album, first.id), PlaybackQueue::Selection::Accepted);
+        QCOMPARE(queue.tracks().size(), 2);
+        QCOMPARE(queue.current()->title, u"Original"_s);
+        const auto *storage = queue.tracks().constData();
+        QCOMPARE(queue.select(snapshot, album, first.id), PlaybackQueue::Selection::Accepted);
+        QCOMPARE(queue.tracks().constData(), storage);
+        QCOMPARE(queue.select(snapshot, album, invalid.id),
+                 PlaybackQueue::Selection::InvalidSource);
+        QCOMPARE(queue.select({ }, album, u"missing"_s), PlaybackQueue::Selection::MissingTrack);
+        QVERIFY(!queue.selectIndex(1));
+        QVERIFY(!queue.selectIndex(-1));
+        QCOMPARE(queue.current()->id, first.id);
+        QCOMPARE(queue.index(), 0);
+        const std::weak_ptr<const LibrarySnapshot> weak = snapshot;
+        snapshot.reset();
+        QVERIFY(weak.expired());
+        QVERIFY(queue.current());
+        album.tracks[0].title = u"Updated without a snapshot"_s;
+        QCOMPARE(queue.select({ }, album, first.id), PlaybackQueue::Selection::Accepted);
+        QCOMPARE(queue.current()->title, album.tracks[0].title);
+    }
+
     void publicPlaybackPauseSeekStopAndNavigation()
     {
         Fixture f;
@@ -123,20 +162,20 @@ private Q_SLOTS:
         Fixture f;
         f.player.applyDevices({ }, { });
         QVERIFY(f.player.playTrack(u"album"_s, u"track-0"_s));
-        const auto *storage = std::as_const(f.player.m_queue).constData();
+        const auto *storage = f.player.m_queue.tracks().constData();
         QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
-        QCOMPARE(std::as_const(f.player.m_queue).constData(), storage);
+        QCOMPARE(f.player.m_queue.tracks().constData(), storage);
         QVERIFY(!f.player.playTrack(u"album"_s, u"missing"_s));
         QCOMPARE(f.player.trackId(), u"track-1"_s);
         auto replacement = *f.library.snapshot();
         replacement.albums[0].tracks[1].title = u"Replacement title"_s;
-        const auto old = f.player.m_queueSnapshot;
+        const std::weak_ptr<const LibrarySnapshot> old = f.library.snapshot();
         f.library.setSnapshot(std::move(replacement));
         QVERIFY(old.expired());
         QVERIFY(f.player.playTrack(u"album"_s, u"track-1"_s));
         QCOMPARE(f.player.title(), u"Replacement title"_s);
         f.library.setSnapshot({ });
-        QVERIFY(f.player.m_queueSnapshot.expired());
+        QVERIFY(old.expired());
         f.player.next();
         QCOMPARE(f.player.trackId(), u"track-2"_s);
     }

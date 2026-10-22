@@ -38,7 +38,7 @@
       "sha256": "c9988492f7b2391a23cd6b7bdfb4be51d6990d50e901c7a68960ad4e7b58ac4b",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/render/ArchivePool.cpp + src/render/SelectionController.cpp",
+      "target": "src/render/ArchivePool.cpp + src/render/SelectionController.cpp + src/render/ArchiveField.cpp",
       "responsibility": "Bounded array and selection field",
       "imports": [
         "src/data.ts"
@@ -1117,7 +1117,7 @@
   "services": [
     {
       "sourcePath": "legacy-web/scripts/album-introductions.mjs",
-      "target": "src/services/OnlineMetadataProvider.cpp + src/services/metadata/WikipediaSource.cpp",
+      "target": "src/services/metadata/MetadataWorker.cpp + src/services/metadata/WikipediaSource.cpp",
       "policy": "Explicitly authorized Wikipedia/Wikidata queries with attributed offline cache"
     },
     {

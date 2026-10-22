@@ -7,6 +7,7 @@
 #include "LibraryStore.h"
 #include "DetailModel.h"
 #include "metadata/MetadataHttp.h"
+#include "metadata/MetadataCachePolicy.h"
 #include "metadata/MetadataMerge.h"
 #include "metadata/MusicBrainzSource.h"
 #include "metadata/WikipediaSource.h"
@@ -235,6 +236,44 @@ public:
     OnlineMetadataTest() = default;
 
 private Q_SLOTS:
+    void cachePolicyUsesExpiryTransportAndCurrentProvenance()
+    {
+        AlbumQuery query;
+        query.album = sampleAlbum();
+        query.albumId = query.album.id;
+        query.enabled = true;
+        query.contact = u"fixture@example.invalid"_s;
+        query.album.creditsLookup = { { u"sourceUrl"_s, u"https://old.example.invalid"_s } };
+        const auto now = QDateTime::fromString(u"2026-10-22T00:00:00.000Z"_s, Qt::ISODateWithMs);
+        const RequestToken token{ 7, 3, query.album.id };
+        ProviderResult result;
+        result.kind = MetadataKind::Credits;
+        result.status = ProviderStatus::Matched;
+        result.inputKey = metadataKey(query.album, result.kind);
+        stampMetadata(result, query, releaseId(), now);
+        const auto state = result.payload.value(u"creditsLookup"_s).toObject();
+        QCOMPARE(state.value(u"expiresAt"_s).toString(), u"2026-11-21T00:00:00.000Z"_s);
+        QVERIFY(!state.contains(u"sourceUrl"_s));
+        query.album.creditsLookup = state;
+        auto hit = reusableMetadata(query, token, result.kind, result.inputKey, now.addDays(29));
+        QVERIFY(hit);
+        QVERIFY(hit->fromCache);
+        QCOMPARE(hit->requestId, quint64(7));
+        QVERIFY(!reusableMetadata(query, token, result.kind, result.inputKey, now.addDays(30)));
+        query.force = true;
+        QVERIFY(!reusableMetadata(query, token, result.kind, result.inputKey, now));
+        result.status = ProviderStatus::Error;
+        result.retryAt.clear();
+        stampMetadata(result, query, releaseId(), now);
+        query.album.creditsLookup = result.payload.value(u"creditsLookup"_s).toObject();
+        QVERIFY(reusableMetadata(query, token, result.kind, result.inputKey, now.addSecs(59)));
+        QVERIFY(!reusableMetadata(query, token, result.kind, result.inputKey, now.addSecs(60)));
+        query.contact = u"changed@example.invalid"_s;
+        QVERIFY(!reusableMetadata(query, token, result.kind, result.inputKey, now));
+        query.enabled = false;
+        QVERIFY(reusableMetadata(query, token, result.kind, result.inputKey, now));
+    }
+
     void rejectedMetadataBatchDoesNotSaveOrNotify()
     {
         QTemporaryDir directory;

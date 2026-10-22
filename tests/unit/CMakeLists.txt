@@ -190,7 +190,7 @@ yalahoo_unit_test(TrackFocusTest track-focus
     TIMEOUT 60)
 yalahoo_unit_test(PlaybackTest playback
     LIBRARIES YalahooCore
-    ARGUMENTS queueReuseAndSnapshotInvalidation lateLoadEndAndQueueOwnership
+    ARGUMENTS queueRejectsCandidatesAtomically queueReuseAndSnapshotInvalidation lateLoadEndAndQueueOwnership
     TIMEOUT 30)
 add_test(NAME playback-device COMMAND PlaybackTest publicPlaybackPauseSeekStopAndNavigation
     outputLossPendingIntentAndExplicitSelection realEndAndUnsupportedFormat)
@@ -259,7 +259,7 @@ set_tests_properties(native-tool PROPERTIES TIMEOUT 10)
 
 yalahoo_unit_test(RenderSupportTest render-support
     TIMEOUT 30
-    LIBRARIES YalahooRhi
+    LIBRARIES YalahooRhi Qt6::GuiPrivate
     INCLUDES "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/render"
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_QPA_PLATFORM=offscreen")

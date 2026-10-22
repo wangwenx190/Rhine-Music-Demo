@@ -6,13 +6,28 @@ qt_add_library(
     DisplayOutput.cpp
     DisplayOutput.h
     DisplayState.h
+    RhiRenderer.cpp
+    RhiRenderer.h
     RhiItem.cpp
+    RenderTarget.cpp
+    RenderTarget.h
+    SceneGeometryData.cpp
+    SceneGeometryData.h
+    ScenePipeline.cpp
+    ScenePipeline.h
+    DrawUniform.h
+    FrameUniforms.cpp
+    FrameUniforms.h
     RenderData.h
     RhiItem.h
     SceneItem.cpp
     SceneItem.h
+    SceneCovers.cpp
+    SceneCovers.h
     PreparedAssets.cpp
     PreparedAssets.h
+    ReadbackQueue.cpp
+    ReadbackQueue.h
     ReadbackImage.cpp
     ReadbackImage.h
     AtlasUpload.cpp

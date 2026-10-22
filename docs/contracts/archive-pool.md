@@ -1,6 +1,6 @@
 # 填充实例池与选择坐标契约
 
-`ArchivePool` / `SelectionController` 位于 `src/render/`，连接既有 `MotionController` 和唯一 `FrameClock`。`SceneAdapter` 将实例、相机和选择变换一并发布为不可变 `SceneFrame`；`SceneItem` 的 atlas 租约、世界空间灯光、投影、ray hit、阴影 caster 和归位副本使用同一显示变换。导航通过稳定 albumId 同步 LibrarySession，搜索和导航不改变播放 ID。
+`ArchivePool` / `SelectionController` 位于 `src/render/`，连接既有 `MotionController` 和唯一 `FrameClock`。`SelectionController`组合`ArchiveField`维护有界脉冲、idle包络与纯场采样，继续由唯一FrameClock推进；坐标重基同步平移脉冲，不重置绝对波相位。`SceneAdapter` 将实例、相机和选择变换一并发布为不可变 `SceneFrame`；`SceneItem` 的 atlas 租约、世界空间灯光、投影、ray hit、阴影 caster 和归位副本使用同一显示变换。导航通过稳定 albumId 同步 LibrarySession，搜索和导航不改变播放 ID。
 
 ## 冻结语义
 

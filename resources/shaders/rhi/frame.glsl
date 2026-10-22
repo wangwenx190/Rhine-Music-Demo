@@ -1,4 +1,4 @@
-// std140; byte layout asserted in RhiItem.cpp. Same interface in every stage.
+// std140; byte layout asserted in DrawUniform.h. Same interface in every stage.
 layout(std140, binding = 0) uniform Frame
 {
     mat4 mvp; // Reserved ABI slot; geometry reuses nativeVP * world position.

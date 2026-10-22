@@ -63,6 +63,62 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void projectedDemandRejectsInvalidValues()
+    {
+        SceneCovers covers;
+        covers.setSuspended(true);
+        const auto revision = covers.revision();
+        const auto size = covers.statistics().value(u"atlasSize"_s);
+        for (const double demand :
+             { 0., -1., std::numeric_limits<double>::quiet_NaN(),
+               std::numeric_limits<double>::infinity(), std::numeric_limits<double>::max() }) {
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, covers.setDemand(demand));
+            QCOMPARE(covers.revision(), revision);
+            QCOMPARE(covers.statistics()[u"atlasSize"_s], size);
+        }
+    }
+    void failedDetailUpgradeStillCompletesPreparation()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto path = directory.filePath(u"artwork.png"_s);
+        QImage image(32, 32, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        QVERIFY(image.save(path));
+        Album album;
+        album.id = u"one"_s;
+        album.title = u"One"_s;
+        album.coverUrl = QUrl::fromLocalFile(path);
+        LibrarySnapshot library;
+        library.albums.append(album);
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns({ { u"column"_s, u"Column"_s, { album.id } } },
+                             std::make_shared<const LibrarySnapshot>(library));
+        SceneCovers covers;
+        covers.setSelection(&selection);
+        covers.setDemand(256);
+        Input input;
+        input.scene.instances = selection.instances();
+        auto publish = [&] {
+            auto next = input;
+            next.atlasUploads.clear();
+            covers.prepare(next, input);
+            input = std::move(next);
+        };
+        publish();
+        QTRY_VERIFY_WITH_TIMEOUT((publish(), covers.prepared()), AsyncDeadlineMilliseconds);
+        QVERIFY(QFile::remove(path));
+        covers.setDemand(2048);
+        publish();
+        QTRY_VERIFY_WITH_TIMEOUT((publish(),
+                                  covers.cacheStatistics()[u"active"_s].toInt() == 0
+                                          && covers.cacheStatistics()[u"pending"_s].toInt() == 0),
+                                 AsyncDeadlineMilliseconds);
+        QVERIFY(!covers.statistics()[u"selectedDetailed"_s].toBool());
+        QVERIFY(covers.prepared());
+    }
+
     void failedDetailedUpgradeReusesPublishedDescriptors()
     {
         QTemporaryDir directory;
@@ -419,6 +475,9 @@ private Q_SLOTS:
         QVERIFY(item.coverStatistics()[u"cache"_s].toObject()[u"peakActive"_s].toInt() > 0);
         adapter.reset();
         QVERIFY(!item.adapter());
+        QCOMPARE(item.coverStatistics()[u"identities"_s].toInt(), 0);
+        QCOMPARE(item.coverStatistics()[u"ready"_s].toInt(), 0);
+        QCOMPARE(item.coverStatistics()[u"owned"_s].toInt(), 0);
         QTRY_COMPARE_WITH_TIMEOUT(
                 item.coverStatistics()[u"cache"_s].toObject()[u"active"_s].toInt(), 0,
                 AsyncDeadlineMilliseconds);

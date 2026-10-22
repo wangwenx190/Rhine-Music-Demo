@@ -3,6 +3,7 @@
 
 #pragma once
 #include "SceneGeometry.h"
+#include "ArchiveField.h"
 #include "ArchivePool.h"
 #include "MotionController.h"
 #include "MotionFunctions.h"
@@ -122,22 +123,9 @@ Q_SIGNALS:
     void memoryChanged();
 
 private:
-    // Lane-only values are sampled once for a publication, never retained across state changes.
-    struct FieldColumn final
-    {
-        double lane = 0, center = 0, strength = 1, activity = 0, intro = 0;
-        bool reduced = false;
-    };
-    FieldColumn fieldColumn(double lane) const;
-    double field(double row, const FieldColumn &column) const;
-    double realisticField(double row, const FieldColumn &column) const;
+    ArchiveField::Column fieldColumn(double lane) const;
+    double field(double row, const ArchiveField::Column &column) const;
     void advanceLift(double dt, bool reduced, bool detailNavigation);
-    struct Pulse final
-    {
-        ArchiveCell cell;
-        double time = 0;
-        SelectionWave wave;
-    };
     void publish();
     bool tracksSettled() const;
     std::optional<ArchiveCell> selectionCell(const QString &id) const;
@@ -192,10 +180,9 @@ private:
     CaseClarity m_clarity;
     PointerDragController m_drag;
     bool m_managedDetail = false, m_navigationLift = false;
-    QVector<Pulse> m_pulses;
+    ArchiveField m_field;
     ScalarSpring m_lift;
-    double m_time = 0, m_scanTime = yalahoo::sceneGeometry::SettledSceneSeconds, m_scanBlend = 0;
-    double m_lastInteraction = 0, m_idleGain = 0, m_pulseGain = 1, m_rotation = 0;
+    double m_rotation = 0;
     double m_liftTarget = yalahoo::sceneGeometry::PreviewLift, m_detail = 0;
     std::optional<double> m_openingTime;
     std::optional<double> m_returnY;

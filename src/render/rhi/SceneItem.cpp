@@ -7,7 +7,6 @@
 #include <QCoreApplication>
 #include "SceneItem.h"
 #include <QLineF>
-#include <QImageReader>
 #include <QQuickRenderTarget>
 #include "MonotonicTime.h"
 #include <QGuiApplication>
@@ -31,7 +30,6 @@ constexpr auto MaximumFeedbackSamples = 128;
 constexpr auto ClickSlopPixels = 6;
 constexpr auto PaperTileExtent = 64;
 constexpr auto PaperInteriorExtent = 62;
-constexpr auto MaximumResolutionShift = 29;
 constexpr auto CaptureSamples = 4;
 constexpr auto PaperCornerCount = 4;
 constexpr auto BrowseAperture = .0003;
@@ -198,20 +196,7 @@ void SceneItem::publishPrepared(const QPointer<SceneItem> &guard, quint64 token,
     if (!guard || !guard->m_renderingActive || !guard->m_preparing
         || token != guard->m_preparationToken || submission != guard->submission() || !uploaded)
         return;
-    if (guard->m_readyCovers.size() != guard->m_poolLeases.size())
-        return;
-    const bool hasOwned = std::any_of(guard->m_ownedCovers.cbegin(), guard->m_ownedCovers.cend(),
-                                      [](const OwnedCover &cover) {
-                                          return bool(cover.pixels);
-                                      });
-    const bool selectedDetailed = std::any_of(
-            guard->m_ownedCovers.cbegin(), guard->m_ownedCovers.cend(),
-            [guard](const OwnedCover &cover) {
-                return cover.objectId == guard->m_activeObject && cover.pixels
-                        && cover.pixels->pixels
-                        && cover.pixels->pixels->resolution >= guard->m_detailResolution;
-            });
-    if (hasOwned && !selectedDetailed)
+    if (!guard->m_sceneCovers.prepared())
         return;
     Q_EMIT guard->scenePrepared();
 }
@@ -241,49 +226,7 @@ void SceneItem::bindWindow(QQuickWindow *window)
     configureDiagnostics();
     schedule();
 }
-void SceneItem::handlePoolCoverReady(const CoverSnapshot &pixels)
-{
-    if (!m_adapter)
-        return;
-    if (m_poolSelection && !pixels->error.isEmpty()
-        && pixels->fallbackTitle
-                != m_poolSelection->coverSource(pixels->identity).placeholderTitle) {
-        schedule();
-        return;
-    }
-    const auto &instances = m_adapter->frame().instances;
-    const auto activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
-    if (pixels->resolution == renderData::CoverTilePixels) {
-        const auto lease = m_poolLeases.constFind(pixels->identity);
-        if (lease != m_poolLeases.cend() && m_atlas.publish(lease->lease, pixels))
-            m_readyCovers.insert(pixels->identity, pixels->error.isEmpty());
-    }
-    for (auto &owned : m_ownedCovers)
-        if (owned.objectId == activeObject && owned.pixels
-            && owned.pixels->identity == pixels->identity) {
-            if (pixels->resolution >= m_detailResolution)
-                owned.highResolutionFailed = !pixels->error.isEmpty();
-            m_coverPool.upgrade(owned.pixels, pixels);
-        }
-    ++m_coverRevision;
-    schedule();
-    return;
-}
-void SceneItem::handleCoverReady(const CoverSnapshot &pixels)
-{
-    if (m_poolMode) {
-        handlePoolCoverReady(pixels);
-        return;
-    }
-    if (m_coverPool.upgrade(m_selectedCover, pixels)) {
-        m_cover = pixels->image;
-        schedule();
-    }
-}
-SceneItem::SceneItem(QQuickItem *parent)
-    : RhiItem(parent),
-      m_cover(renderData::CoverTilePixels, renderData::CoverTilePixels,
-              QImage::Format_RGBA8888_Premultiplied)
+SceneItem::SceneItem(QQuickItem *parent) : RhiItem(parent)
 {
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this,
             &SceneItem::configureDiagnostics);
@@ -292,11 +235,7 @@ SceneItem::SceneItem(QQuickItem *parent)
     setAcceptHoverEvents(true);
     setFlag(QQuickItem::ItemIsFocusScope, true);
     setFocus(true);
-    m_cover.fill(Qt::transparent);
-    m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
-    connect(&m_covers, &CoverCache::ready, this, [this](const CoverSnapshot &pixels) {
-        return handleCoverReady(pixels);
-    });
+    connect(&m_sceneCovers, &SceneCovers::changed, this, &SceneItem::schedule);
     connect(this, &QQuickItem::widthChanged, this, &SceneItem::schedule);
     connect(this, &RhiItem::hdrHeadroomChanged, this, &SceneItem::schedule);
     connect(this, &QQuickItem::heightChanged, this, &SceneItem::schedule);
@@ -323,290 +262,22 @@ void SceneItem::setAdapter(SceneAdapter *adapter)
     }
     m_adapter = adapter;
     if (adapter) {
-        connect(adapter, &SceneAdapter::frameChanged, this, &SceneItem::schedule);
+        connect(adapter, &SceneAdapter::frameChanged, this, [this, adapter] {
+            m_sceneCovers.observeFrame(adapter->frame());
+            schedule();
+        });
+        connect(adapter, &QObject::destroyed, this, [this] {
+            m_sceneCovers.setSelection(nullptr);
+        });
         connect(adapter->lighting(), &SelectionLighting::changed, this, &SceneItem::schedule);
         connect(adapter->quality(), &RenderQuality::changed, this, &SceneItem::schedule);
         connect(adapter, &SceneAdapter::selectionControllerChanged, this, &SceneItem::schedule);
     }
+    m_sceneCovers.setSelection(adapter ? adapter->selection() : nullptr);
+    if (adapter)
+        m_sceneCovers.observeFrame(adapter->frame());
     schedule();
     Q_EMIT adapterChanged();
-}
-void SceneItem::resetPool()
-{
-    m_covers.reset();
-    m_coverPool.reset();
-    m_selectedCover.reset();
-    m_poolLeases.clear();
-    m_readyCovers.clear();
-    m_atlas.reset();
-    m_ownedCovers = { };
-    m_ownedSide = renderData::CoverTilePixels;
-    m_detailResolution = renderData::CoverTilePixels;
-    m_activeObject = 0;
-    ++m_coverRevision;
-    schedule();
-}
-void SceneItem::refreshPool()
-{
-    if (!m_poolSelection)
-        return;
-    // Only the bounded visible pool is reconciled; content-addressed native paths
-    // carry revisions, while missing artwork also depends on its fallback title.
-    for (auto it = m_poolLeases.begin(); it != m_poolLeases.end();) {
-        const auto next = m_poolSelection->coverSource(it.key());
-        if (it->source == next) {
-            ++it;
-            continue;
-        }
-        const bool ownedPlaceholder = std::any_of(
-                m_ownedCovers.cbegin(), m_ownedCovers.cend(), [&it](const OwnedCover &owned) {
-                    return owned.pixels && owned.pixels->identity == it.key()
-                            && owned.pixels->pixels && !owned.pixels->pixels->error.isEmpty();
-                });
-        if (!next.path.isEmpty() && next.path == it->source.path
-            && m_readyCovers.value(it.key(), false) && !ownedPlaceholder) {
-            it->source = next;
-            ++it;
-            continue;
-        }
-        const auto id = it.key();
-        m_covers.invalidate(id);
-        m_atlas.release(it->lease);
-        m_readyCovers.remove(id);
-        for (auto &owned : m_ownedCovers)
-            if (owned.pixels && owned.pixels->identity == id)
-                owned = { };
-        it = m_poolLeases.erase(it);
-    }
-    ++m_coverRevision;
-    schedule();
-}
-// Resolve leases by stable identity and content generation. Detailed tiles share an owned image
-// snapshot, so a GUI publication never borrows pixels from a temporary cache lookup.
-void SceneItem::ensureBaseCover(const QString &id, const CoverSource &source,
-                                const AtlasLease &lease)
-{
-    if (m_readyCovers.contains(id))
-        return;
-
-    if (auto pixels = m_covers.lookup(id, source.path, renderData::CoverTilePixels,
-                                      source.placeholderTitle)) {
-        if (m_atlas.publish(lease, pixels))
-            m_readyCovers.insert(id, pixels->error.isEmpty());
-    } else if (m_covers.hasPendingCapacity())
-        m_covers.request(id, source.path, renderData::CoverTilePixels, source.placeholderTitle);
-}
-SceneItem::CoverRegion SceneItem::prepareOwnedCover(Input &in, const ArchiveInstance &instance,
-                                                    const CoverSource &source, QRect tile,
-                                                    quint64 coverLease)
-{
-    auto *it = acquireOwnedCover(instance, source);
-    if (!it || !it->pixels)
-        return { tile, coverLease };
-    requestDetailedCover(*it, instance.albumId, source);
-    const auto pixels = it->pixels->pixels;
-    if (!pixels || pixels->resolution <= renderData::CoverTilePixels)
-        return { tile, coverLease };
-    const int block = int(it - m_ownedCovers.data());
-    const int top = ((yalahoo::rhi::sceneAtlas::BaseWidthPixels + m_ownedSide - 1) / m_ownedSide)
-            * m_ownedSide;
-    tile = { (block % 2) * m_ownedSide, top + (block / 2) * m_ownedSide, pixels->resolution,
-             pixels->resolution };
-    coverLease = it->lease;
-    if (it->tiledPixels != pixels || it->tiledRegion != tile) {
-        it->uploads.clear();
-        it->uploads.reserve(pixels->tiles.size());
-        for (const auto &part : pixels->tiles) {
-            const int slot = ((tile.y() + part.origin.y()) / renderData::CoverTilePixels)
-                            * (m_atlasSize.width() / renderData::CoverTilePixels)
-                    + (tile.x() + part.origin.x()) / renderData::CoverTilePixels;
-            it->uploads.append({ m_atlas.generation(), it->lease, ++m_ownedSerial, slot, part.image,
-                                 true, part.mipmaps });
-        }
-        it->tiledPixels = pixels;
-        it->tiledRegion = tile;
-    }
-    in.atlasUploads += it->uploads;
-    return { tile, coverLease };
-}
-SceneItem::OwnedCover *SceneItem::acquireOwnedCover(const ArchiveInstance &instance,
-                                                    const CoverSource &source)
-{
-    auto it =
-            std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(), [&](const OwnedCover &cover) {
-                return cover.objectId == instance.objectId;
-            });
-    if (it != m_ownedCovers.end())
-        return &*it;
-    it = std::find_if(m_ownedCovers.begin(), m_ownedCovers.end(), [](const OwnedCover &cover) {
-        return cover.objectId == 0;
-    });
-    if (it == m_ownedCovers.end())
-        return nullptr;
-    it->objectId = instance.objectId;
-    it->lease = ++m_ownedSerial;
-    it->pixels = m_coverPool.acquire(instance.albumId,
-                                     m_covers.lookup(instance.albumId, source.path,
-                                                     renderData::CoverTilePixels,
-                                                     source.placeholderTitle),
-                                     m_covers.generation());
-    return &*it;
-}
-void SceneItem::requestDetailedCover(OwnedCover &owned, const QString &id,
-                                     const CoverSource &source)
-{
-    if (owned.objectId != m_activeObject
-        || (owned.highResolutionFailed
-            && (!owned.pixels->pixels || owned.pixels->pixels->error.isEmpty()))
-        || (owned.pixels->pixels && owned.pixels->pixels->resolution >= m_detailResolution))
-        return;
-    if (auto pixels =
-                m_covers.lookup(id, source.path, m_detailResolution, source.placeholderTitle)) {
-        owned.highResolutionFailed = !pixels->error.isEmpty();
-        m_coverPool.upgrade(owned.pixels, pixels);
-        return;
-    }
-    if (m_covers.hasPendingCapacity())
-        m_covers.request(id, source.path, m_detailResolution, source.placeholderTitle);
-}
-bool SceneItem::reusePool(Input &in) const
-{
-    const auto &previous = input();
-    const auto &instances = std::as_const(in.scene.instances);
-    if (!previous.poolFrame || previous.atlasGeneration != m_atlas.generation()
-        || m_coverRevision != m_publishedCoverRevision
-        || m_detailResolution != m_publishedDetailResolution
-        || m_readyCovers.size() != m_poolLeases.size()
-        || !std::equal(instances.cbegin(), instances.cend(), previous.entityIds.cbegin(),
-                       previous.entityIds.cend(), [](const ArchiveInstance &instance, quint64 id) {
-                           return instance.objectId == id;
-                       }))
-        return false;
-    // Unready work must keep visiting admission until it has a usable selected snapshot.
-    if (!instances.isEmpty() && instances.last().owned) {
-        const auto selected = std::find_if(m_ownedCovers.cbegin(), m_ownedCovers.cend(),
-                                           [this](const OwnedCover &cover) {
-                                               return cover.objectId == m_activeObject;
-                                           });
-        if (selected == m_ownedCovers.cend() || !selected->pixels || !selected->pixels->pixels
-            || (selected->pixels->pixels->resolution < m_detailResolution
-                && !selected->highResolutionFailed))
-            return false;
-    }
-    if (instances.isSharedWith(previous.scene.instances)) {
-        in.entities = previous.entities;
-    } else {
-        in.entities.resize(instances.size());
-        for (qsizetype i = 0; i < in.entities.size(); ++i)
-            in.entities[i] = instances[i].transform;
-    }
-    // Geometry/camera animation changes no cover ownership. Retain the immutable descriptor
-    // storage until identity order, content, atlas layout or projected demand changes.
-    in.entityIds = previous.entityIds;
-    in.coverTiles = previous.coverTiles;
-    in.coverLeases = previous.coverLeases;
-    in.fallbackCoverTiles = previous.fallbackCoverTiles;
-    in.fallbackCoverLeases = previous.fallbackCoverLeases;
-    in.atlasUploads = previous.atlasUploads;
-    in.atlasSize = previous.atlasSize;
-    in.atlasGeneration = previous.atlasGeneration;
-    in.poolFrame = true;
-    return true;
-}
-void SceneItem::preparePool(Input &in)
-{
-    auto *selection = m_adapter->selection();
-    const auto &instances = std::as_const(in.scene.instances);
-    m_activeObject = instances.isEmpty() ? 0 : instances.last().objectId;
-    if (reusePool(in))
-        return;
-    in.entities.clear();
-    in.entityIds.clear();
-    std::array<quint64, SelectedCoverPool::capacity> ownedIds;
-    qsizetype ownedCount = 0;
-    const int count = int(instances.size());
-    for (auto &cover : m_poolLeases)
-        cover.wanted = false;
-    in.entities.resize(count);
-    in.entityIds.resize(count);
-    in.coverTiles.resize(count);
-    in.coverLeases.resize(count);
-    in.fallbackCoverTiles.resize(count);
-    in.fallbackCoverLeases.resize(count);
-    for (const auto &instance : instances) {
-        if (auto cover = m_poolLeases.find(instance.albumId); cover != m_poolLeases.end())
-            cover->wanted = true;
-        if (instance.owned) {
-            if (ownedCount >= SelectedCoverPool::capacity)
-                throw std::runtime_error("Owned cover capacity exceeded");
-            ownedIds[ownedCount++] = instance.objectId;
-        }
-    }
-    for (auto it = m_poolLeases.begin(); it != m_poolLeases.end();) {
-        if (!it->wanted) {
-            m_covers.cancel(it.key());
-            m_atlas.release(it->lease);
-            m_readyCovers.remove(it.key());
-            it = m_poolLeases.erase(it);
-        } else
-            ++it;
-    }
-    for (auto &owned : m_ownedCovers) {
-        if (!owned.objectId
-            || std::find(ownedIds.begin(), ownedIds.begin() + ownedCount, owned.objectId)
-                    != ownedIds.begin() + ownedCount)
-            continue;
-        if (instances.isEmpty()) {
-            owned = { };
-            continue;
-        }
-        const auto &active = instances.last();
-        if (active.owned && owned.pixels && owned.pixels->identity == active.albumId
-            && std::none_of(m_ownedCovers.begin(), m_ownedCovers.end(),
-                            [&](const OwnedCover &other) {
-                                return other.objectId == active.objectId;
-                            }))
-            owned.objectId = active.objectId;
-        else
-            owned = { };
-    }
-    // Source descriptors are indexed at library/sort boundaries, outside the frame path.
-    for (int offset = 0; offset < count; ++offset) {
-        // Admit the selected cover first, without changing the instance/sort ordering.
-        const int index = offset == 0 ? count - 1 : offset - 1;
-        const auto &instance = instances[index];
-        const auto &id = instance.albumId;
-        const auto entry = m_poolLeases.tryEmplace(id);
-        if (entry.inserted) {
-            entry.iterator->lease = m_atlas.acquire(id, m_covers.generation());
-            entry.iterator->source = selection->coverSource(id);
-        }
-        const auto &source = entry.iterator->source;
-        const auto &lease = entry.iterator->lease;
-        auto tile = m_atlas.tile(lease);
-        auto coverLease = lease.lease;
-        in.fallbackCoverTiles[index] = tile;
-        in.fallbackCoverLeases[index] = coverLease;
-        ensureBaseCover(id, source, lease);
-
-        if (instance.owned) {
-            const auto owned = prepareOwnedCover(in, instance, source, tile, coverLease);
-            tile = owned.tile;
-            coverLease = owned.lease;
-        }
-
-        in.entities[index] = instance.transform;
-        in.entityIds[index] = instance.objectId;
-        in.coverTiles[index] = tile;
-        in.coverLeases[index] = coverLease;
-    }
-    in.atlasSize = m_atlasSize;
-    in.atlasGeneration = m_atlas.generation();
-    in.poolFrame = true;
-    // Immutable replay handles render-context recreation and superseded GUI submissions;
-    // the render queue rejects known revisions before conversion or upload.
-    in.atlasUploads += m_atlas.replay(0, m_atlasSize.width() / renderData::CoverTilePixels);
-    in.immutableCover = true;
 }
 void SceneItem::setInspectionEnabled(bool enabled)
 {
@@ -647,7 +318,7 @@ void SceneItem::publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mai
     }
     if (!guard || epoch != guard->m_diagnosticsEpoch)
         return;
-    const auto cache = guard->m_covers.statistics();
+    const auto cache = guard->m_sceneCovers.cacheStatistics();
     guard->m_diagnosticValues = {
         { u"cpu"_s, batch.cpu.distribution() },
         { u"sync"_s, batch.sync.distribution() },
@@ -792,46 +463,14 @@ void SceneItem::configureTelemetry()
 }
 QJsonObject SceneItem::coverStatistics() const
 {
-    int detailed = 0, owned = 0;
-    qint64 ownedBytes = 0, tiledBytes = 0;
-    bool selectedDetailed = false;
-    QJsonArray owners;
-    for (const auto &cover : m_ownedCovers) {
-        if (!cover.pixels)
-            continue;
-        ++owned;
-        owners.append(QJsonObject{
-                { u"objectId"_s, qint64(cover.objectId) },
-                { u"albumId"_s, cover.pixels->identity },
-                { u"lease"_s, qint64(cover.lease) },
-                { u"resolution"_s, cover.pixels->pixels ? cover.pixels->pixels->resolution : 0 } });
-        if (cover.pixels->pixels) {
-            ownedBytes += cover.pixels->pixels->byteSize();
-            detailed += cover.pixels->pixels->resolution >= m_detailResolution;
-            if (cover.objectId == m_activeObject)
-                selectedDetailed = cover.pixels->pixels->resolution >= m_detailResolution;
-        }
-        for (const auto &upload : cover.uploads)
-            tiledBytes += AtlasUploadQueue::payloadBytes(upload);
-    }
-    return { { u"owners"_s, owners },
-             { u"cache"_s, m_covers.statistics() },
-             { u"identities"_s, m_poolLeases.size() },
-             { u"ready"_s, m_readyCovers.size() },
-             { u"owned"_s, owned },
-             { u"detailed"_s, detailed },
-             { u"selectedDetailed"_s, selectedDetailed },
-             { u"atlasRetainedBytes"_s, m_atlas.retainedBytes() },
-             { u"ownedBytes"_s, ownedBytes },
-             { u"tiledBytes"_s, tiledBytes },
-             { u"atlasSize"_s, QJsonArray{ m_atlasSize.width(), m_atlasSize.height() } } };
+    return m_sceneCovers.statistics();
 }
 void SceneItem::setRenderingActive(bool active)
 {
     if (m_renderingActive == active)
         return;
     m_renderingActive = active;
-    m_covers.setSuspended(!active);
+    m_sceneCovers.setSuspended(!active);
     configureTelemetry();
     configureDiagnostics();
     if (active) {
@@ -1062,25 +701,13 @@ void SceneItem::submitOccluded()
         next.sceneOccluded = true;
         next.preparationToken = 0;
         if (next.cover.isNull())
-            next.cover = m_cover;
+            next.cover = m_sceneCovers.image();
         auto target = QSize(fixedColorBufferWidth(), fixedColorBufferHeight());
         if (target.isEmpty())
             target = m_adapter->quality()->targetSize();
         submit(std::move(next), target.expandedTo(QSize(1, 1)));
     }
     return;
-}
-void SceneItem::requestDemoCover()
-{
-    const auto identity = u"demo-square"_s;
-    const auto path = u":/assets/demo-covers/square.png"_s;
-    if (auto pixels = m_covers.lookup(identity, path, m_detailResolution)) {
-        if (m_coverPool.upgrade(m_selectedCover, pixels))
-            m_cover = pixels->image;
-    } else {
-        m_covers.request(identity, path, renderData::CoverTilePixels);
-        m_covers.request(identity, path, m_detailResolution);
-    }
 }
 double SceneItem::projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const
 {
@@ -1121,18 +748,7 @@ try {
         return;
     }
     auto &adapter = *m_adapter;
-    if (m_poolSelection != adapter.selection()) {
-        disconnect(m_poolResetConnection);
-        m_poolSelection = adapter.selection();
-        m_poolMode = m_poolSelection;
-        resetPool();
-        if (m_poolSelection)
-            m_poolResetConnection = connect(m_poolSelection, &SelectionController::libraryChanged,
-                                            this, &SceneItem::refreshPool);
-        else {
-            m_selectedCover = m_coverPool.acquire(u"demo-square"_s);
-        }
-    }
+    m_sceneCovers.setSelection(adapter.selection());
     // Cover demand follows the projected paper at native DPR, including its source inset.
     // A power-of-two cache tier avoids decoding again for every animation pixel.
     double demand = renderData::CoverTilePixels;
@@ -1147,36 +763,7 @@ try {
         for (const auto &instance : frame.instances)
             if (instance.owned)
                 inspect(instance.transform);
-    m_detailResolution = renderData::CoverTilePixels;
-    while (m_detailResolution < demand && m_detailResolution < (1 << MaximumResolutionShift))
-        m_detailResolution *= 2;
-    const auto allocationLimit = QImageReader::allocationLimit();
-    if (allocationLimit > 0
-        && qint64(m_detailResolution) * m_detailResolution * yalahoo::units::RgbaBytesPerPixel
-                > qint64(allocationLimit) * yalahoo::units::BytesPerKiB
-                        * yalahoo::units::BytesPerKiB)
-        throw std::runtime_error("Projected cover exceeds the image allocation capability");
-    m_ownedSide = std::max(m_ownedSide, m_detailResolution);
-    for (const auto &owned : m_ownedCovers)
-        if (owned.pixels && owned.pixels->pixels)
-            m_ownedSide = std::max(m_ownedSide, owned.pixels->pixels->resolution);
-    const int top = ((yalahoo::rhi::sceneAtlas::BaseWidthPixels + m_ownedSide - 1) / m_ownedSide)
-            * m_ownedSide;
-    const QSize nextAtlasSize(std::max(yalahoo::rhi::sceneAtlas::BaseWidthPixels, 2 * m_ownedSide),
-                              top + 2 * m_ownedSide);
-    if (nextAtlasSize != m_atlasSize) {
-        m_atlasSize = nextAtlasSize;
-        m_atlas.advanceGeneration();
-        for (auto &cover : m_poolLeases)
-            cover.lease.generation = m_atlas.generation();
-        for (auto &owned : m_ownedCovers)
-            owned.tiledPixels.reset();
-        ++m_coverRevision;
-    }
-    if (!m_poolMode && m_selectedCover
-        && (!m_selectedCover->pixels || m_selectedCover->pixels->resolution < m_detailResolution)) {
-        requestDemoCover();
-    }
+    m_sceneCovers.setDemand(demand);
     auto &quality = *adapter.quality();
     const double dpr = window()->effectiveDevicePixelRatio();
     quality.resize(width(), height(), dpr);
@@ -1198,12 +785,7 @@ try {
     in.navigationDpr = m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
     in.textLayerSizes = m_textSizes;
     in.textResourceRevision = m_textRevision;
-    in.cover = m_cover;
-    if (m_selectedCover && m_selectedCover->pixels)
-        in.coverMipmaps = m_selectedCover->pixels->mipmaps;
-    in.coverPainted = true;
-    in.filterCovers = m_poolMode || !in.coverMipmaps.isEmpty();
-    in.immutableCover = true;
+    m_sceneCovers.applyImage(in);
     in.geometryDiagnostic = m_geometryOnly;
     in.fogEnabled = !m_geometryOnly;
     in.productFloor = !m_geometryOnly;
@@ -1245,7 +827,7 @@ try {
             && in.scene.navigationCommittedNs == old.scene.navigationCommittedNs
             && in.navigationDpr == old.navigationDpr
             && in.textResourceRevision == old.textResourceRevision
-            && m_coverRevision == m_publishedCoverRevision
+            && m_sceneCovers.revision() == m_publishedCoverRevision
             && in.scene.inputRevision == old.scene.inputRevision
             && in.cover.cacheKey() == old.cover.cacheKey() && in.filterCovers == old.filterCovers
             && target == QSize(fixedColorBufferWidth(), fixedColorBufferHeight())
@@ -1273,15 +855,14 @@ try {
             && in.exposure == old.exposure;
     if (unchanged)
         return;
-    if (m_poolMode)
-        preparePool(in);
+    if (m_sceneCovers.poolMode())
+        m_sceneCovers.prepare(in, input());
     else {
         in.entities = { in.scene.caseTransform };
         in.entityIds = { 1 };
     }
     m_publishedCallbackRevision = m_callbackRevision;
-    m_publishedCoverRevision = m_coverRevision;
-    m_publishedDetailResolution = m_detailResolution;
+    m_publishedCoverRevision = m_sceneCovers.revision();
     submit(std::move(in), target);
 } catch (const std::runtime_error &error) {
     m_errorText = QString::fromUtf8(error.what());

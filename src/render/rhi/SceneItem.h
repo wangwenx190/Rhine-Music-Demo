@@ -7,20 +7,11 @@
 #include "SceneAdapter.h"
 #include "SelectionController.h"
 #include "InputRouter.h"
-#include "AtlasAllocator.h"
+#include "SceneCovers.h"
 #include "TitleReel.h"
 #include <QPointer>
 
 namespace yalahoo::rhi {
-namespace sceneAtlas {
-// The fixed archive plus owned detail tiles determine the initial atlas allocation.
-inline constexpr auto MaximumAtlasSide = 8192;
-inline constexpr auto BaseColumns = 24;
-inline constexpr auto OwnedCoverCount = 4;
-inline constexpr auto BaseWidthPixels = 6144;
-inline constexpr auto InitialHeightPixels = 6656;
-}
-
 class SceneItem : public RhiItem
 {
     Q_OBJECT
@@ -140,21 +131,18 @@ protected:
 
 private:
     void submitOccluded();
-    void requestDemoCover();
     double projectedCoverDemand(const QMatrix4x4 &vp, const QMatrix4x4 &model) const;
     void handleVisibility(bool visible);
     static void queuePrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
                               bool uploaded);
     static void publishPrepared(const QPointer<SceneItem> &guard, quint64 token, quint64 submission,
                                 bool uploaded);
-    void handlePoolCoverReady(const CoverSnapshot &pixels);
     struct DiagnosticMailbox;
     struct TelemetryMailbox;
     static void publishTelemetry(const std::shared_ptr<TelemetryMailbox> &mailbox,
                                  const QPointer<SceneItem> &guard, quint64 epoch);
     static void publishDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
                                    const QPointer<SceneItem> &guard, quint64 epoch);
-    void handleCoverReady(const CoverSnapshot &pixels);
     void bindWindow(QQuickWindow *window);
     static void queueDiagnostics(const std::shared_ptr<DiagnosticMailbox> &mailbox,
                                  const QPointer<SceneItem> &guard, const quint64 &epoch,
@@ -166,21 +154,6 @@ private:
     void schedule();
     void configureDiagnostics();
     bool selectAt(QPointF point);
-    struct OwnedCover;
-    void ensureBaseCover(const QString &id, const CoverSource &source, const AtlasLease &lease);
-    struct CoverRegion final
-    {
-        QRect tile;
-        quint64 lease;
-    };
-    CoverRegion prepareOwnedCover(Input &in, const ArchiveInstance &instance,
-                                  const CoverSource &source, QRect tile, quint64 coverLease);
-    OwnedCover *acquireOwnedCover(const ArchiveInstance &instance, const CoverSource &source);
-    void requestDetailedCover(OwnedCover &owned, const QString &id, const CoverSource &source);
-    bool reusePool(Input &input) const;
-    void preparePool(Input &input);
-    void resetPool();
-    void refreshPool();
     void refreshTextResources();
     void bindTextReel(QPointer<TitleReel> &current, QMetaObject::Connection &changed,
                       QMetaObject::Connection &destroyed, TitleReel *reel);
@@ -189,48 +162,16 @@ private:
     QMetaObject::Connection m_titleDestroyedConnection, m_transportDestroyedConnection;
     QList<QSize> m_textSizes;
     quint64 m_textRevision = 0;
-    struct OwnedCover final
-    {
-        quint64 objectId = 0, lease = 0;
-        std::shared_ptr<SelectedCoverLease> pixels;
-        CoverSnapshot tiledPixels;
-        QRect tiledRegion;
-        QVector<AtlasUpload> uploads;
-        bool highResolutionFailed = false;
-    };
-    AtlasAllocator m_atlas{ sceneAtlas::MaximumAtlasSide,
-                            yalahoo::rhi::renderData::MaximumCaseEntities,
-                            sceneAtlas::BaseColumns };
-    struct PoolCover final
-    {
-        AtlasLease lease;
-        CoverSource source;
-        bool wanted = false;
-    };
-    QHash<QString, PoolCover> m_poolLeases;
-    // Ready identities map to whether the tile contains real artwork rather than a placeholder.
-    QHash<QString, bool> m_readyCovers;
-    std::array<OwnedCover, sceneAtlas::OwnedCoverCount> m_ownedCovers;
-    quint64 m_ownedSerial = 0;
-    int m_detailResolution = yalahoo::rhi::renderData::CoverTilePixels;
-    int m_publishedDetailResolution = 0;
-    int m_ownedSide = yalahoo::rhi::renderData::CoverTilePixels;
-    QSize m_atlasSize{ sceneAtlas::BaseWidthPixels, sceneAtlas::InitialHeightPixels };
-    quint64 m_activeObject = 0;
-    QPointer<SelectionController> m_poolSelection;
-    QMetaObject::Connection m_poolResetConnection, m_visibilityConnection, m_activeConnection;
+    SceneCovers m_sceneCovers;
+    QMetaObject::Connection m_visibilityConnection, m_activeConnection;
     QMetaObject::Connection m_dprConnection, m_screenConnection;
-    bool m_poolMode = false, m_renderingActive = true;
+    bool m_renderingActive = true;
     bool m_sceneOccluded = false, m_preparing = false;
     quint64 m_preparationToken = 0;
     QSize m_openingLayerSize, m_panelLayerSize;
-    quint64 m_coverRevision = 0, m_publishedCoverRevision = 0;
+    quint64 m_publishedCoverRevision = 0;
     QPointer<SceneAdapter> m_adapter;
     QPointer<InputRouter> m_inputRouter;
-    QImage m_cover;
-    CoverCache m_covers;
-    SelectedCoverPool m_coverPool;
-    std::shared_ptr<SelectedCoverLease> m_selectedCover;
     QString m_errorText;
     bool m_geometryOnly = false, m_inspectionEnabled = true;
     bool m_telemetryEnabled = false, m_diagnosticsEnabled = false;

@@ -1,4 +1,8 @@
 #include "CaptureMailbox.h"
+#include "FrameUniforms.h"
+#include "RenderTarget.h"
+#include <rhi/qrhi_platform.h>
+#include <cmath>
 #include "ReviewSupport.h"
 #include "VerificationWindow.h"
 #include <QQmlComponent>
@@ -20,6 +24,45 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void incompatibleSharedTargetIsRejected()
+    {
+        QRhiNullInitParams parameters;
+        const std::unique_ptr<QRhi> api(QRhi::create(QRhi::Null, &parameters));
+        QVERIFY(api);
+        rhi::Target prepass, composite;
+        prepass.create(api.get(), { 16, 16 }, true, 1, false, QRhiTexture::RGBA8);
+        QVERIFY(!prepass.color);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                 composite.create(api.get(), { 16, 16 }, true, 1, false,
+                                                  QRhiTexture::RGBA8, &prepass));
+    }
+
+    void frameUniformsKeepDisabledRibbonFiniteAndInvalidateLightCache()
+    {
+        rhi::FrameUniforms uniforms;
+        rhi::Input input;
+        const QVector<QMatrix4x4> entities{ QMatrix4x4() };
+        const QVector<bool> visible{ true };
+        uniforms.prepare(input, { }, false, true, { 320, 240 }, 2048, entities, visible, false);
+        auto upload = uniforms.uniform(input, { }, rhi::PaperKind, 0, { });
+        for (float value : upload.originLight0)
+            QVERIFY(std::isfinite(value));
+        QCOMPARE(upload.originLight0[0], 0.f);
+        input.rowSettings = { 1, .8f, 1, 0 };
+        input.printAmbient = .2f;
+        input.rowDetail = .25f;
+        uniforms.prepare(input, { }, false, true, { 320, 240 }, 2048, entities, visible, false);
+        upload = uniforms.uniform(input, { }, rhi::PaperKind, 0, { });
+        QCOMPARE(upload.originLight0[0], 1.f);
+        QVERIFY(std::abs(upload.originLight0[1] - .34375f) < 1e-6f);
+        QCOMPARE(upload.originLight0[2], 1.f);
+        QCOMPARE(upload.originLight0[3], 1.f);
+        input.rowDetail = 1;
+        uniforms.prepare(input, { }, false, true, { 320, 240 }, 2048, entities, visible, false);
+        upload = uniforms.uniform(input, { }, rhi::PaperKind, 0, { });
+        QCOMPARE(upload.originLight0[1], 1.f);
+    }
+
     void dispatchUsesStageIdentityAndPreservesUnknownState()
     {
         struct Context final

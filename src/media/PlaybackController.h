@@ -3,11 +3,9 @@
 
 #pragma once
 #include <QTimer>
-#include "MusicTypes.h"
+#include "PlaybackQueue.h"
 #include "BackgroundMusicController.h"
 #include <QPointer>
-#include <QHash>
-#include <memory>
 #include <QAudioDevice>
 #include <QAudioOutput>
 #include <QMediaDevices>
@@ -104,11 +102,11 @@ public:
     }
     bool canNext() const
     {
-        return m_index >= 0 && m_index + 1 < m_queue.size();
+        return m_queue.hasNext();
     }
     bool canPrevious() const
     {
-        return m_index >= 0;
+        return m_queue.current() != nullptr;
     }
     QString outputName() const
     {
@@ -169,9 +167,7 @@ private:
     QAudioOutput m_output;
     QMediaPlayer m_player;
     QList<QMetaObject::Connection> m_connections;
-    QList<Track> m_queue;
-    QHash<QString, int> m_queueIndices;
-    std::weak_ptr<const LibrarySnapshot> m_queueSnapshot;
+    PlaybackQueue m_queue;
     QList<QAudioDevice> m_outputs;
     QUrl m_source;
     QByteArray m_preferred;
@@ -179,7 +175,6 @@ private:
     Intent m_intent = Intent::Stopped;
     MediaSupport m_support = MediaSupport::Unknown;
     quint64 m_revision = 0, m_endedRevision = 0;
-    int m_index = -1;
     qint64 m_position = 0, m_lastPosition = 0, m_duration = 0, m_restore = -1, m_preview = 0;
     bool m_seekable = false, m_dragging = false, m_unavailable = true;
 };
