@@ -1,4 +1,5 @@
 #include "SceneGeometry.h"
+#include "SceneMath.h"
 #include "Units.h"
 #include "RenderData.h"
 #include "RhiItem.h"
@@ -104,7 +105,6 @@ enum FrameBinding {
 };
 constexpr int VectorScalars = 4;
 constexpr int MatrixScalars = 16;
-constexpr int ClipPlaneCount = 6;
 constexpr int UniformBytes = 832;
 constexpr int BackgroundOffsetBytes = 320;
 constexpr int OpticsOffsetBytes = 544;
@@ -241,28 +241,9 @@ void visibleEntities(const Input &input, const QVector<QMatrix4x4> &entities,
 {
     visible.resize(entities.size());
     const auto viewProjection = input.scene.projection * input.scene.view;
-    // Conservative homogeneous clip test of the authored complete case bounds.
-    // Keep every logical identity and its global sort; skip only provably off-screen draws.
-    for (int i = 0; i < entities.size(); ++i) {
-        const auto matrix = viewProjection * entities[i];
-        std::array<bool, ClipPlaneCount> outside{ true, true, true, true, true, true };
-        for (float x :
-             { -yalahoo::sceneGeometry::CaseHalfWidth, yalahoo::sceneGeometry::CaseHalfWidth })
-            for (float y : { yalahoo::sceneGeometry::CaseBottom, yalahoo::sceneGeometry::CaseTop })
-                for (float z : { -yalahoo::sceneGeometry::CaseHalfDepth,
-                                 yalahoo::sceneGeometry::CaseHalfDepth }) {
-                    const auto v = matrix * QVector4D(x, y, z, 1);
-                    outside[0] = outside[0] && v.x() < -v.w();
-                    outside[1] = outside[1] && v.x() > v.w();
-                    outside[2] = outside[2] && v.y() < -v.w();
-                    outside[3] = outside[3] && v.y() > v.w();
-                    outside[4] = outside[4] && v.z() < -v.w();
-                    outside[5] = outside[5] && v.z() > v.w();
-                }
-        visible[i] = std::none_of(outside.begin(), outside.end(), [](bool v) {
-            return v;
-        });
-    }
+    // Keep every logical identity and its global sort, including off-screen shadow casters.
+    for (int i = 0; i < entities.size(); ++i)
+        visible[i] = caseIntersectsClip(viewProjection * entities[i]);
 }
 struct ShellDraw final
 {
@@ -1781,14 +1762,34 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         selectedTotalUploadBytes += selectedUploadBytes;
     }
     totalUploadBytes += frameUploadBytes;
-    effectiveCoverTiles = input.coverTiles;
-    effectiveCoverLeases = input.coverLeases;
-    for (int i = 0; i < input.fallbackCoverTiles.size(); ++i)
-        if (!atlasQueue.ready(std::as_const(effectiveCoverTiles)[i],
-                              std::as_const(effectiveCoverLeases)[i])) {
-            effectiveCoverTiles[i] = std::as_const(input.fallbackCoverTiles)[i];
-            effectiveCoverLeases[i] = std::as_const(input.fallbackCoverLeases)[i];
+    // Keep renderer-owned scratch storage. Sharing the input and then replacing
+    // unready regions would detach/copy both arrays on every pending-upload frame.
+    if (input.atlasGeneration) {
+        effectiveCoverTiles.resize(input.coverTiles.size());
+        effectiveCoverLeases.resize(input.coverLeases.size());
+        entityCoverUv.resize(input.coverTiles.size());
+        for (int i = 0; i < input.coverTiles.size(); ++i) {
+            auto tile = std::as_const(input.coverTiles)[i];
+            auto lease = input.coverLeases.isEmpty() ? 0 : std::as_const(input.coverLeases)[i];
+            bool ready = input.coverLeases.isEmpty() || atlasQueue.ready(tile, lease);
+            if (!ready && i < input.fallbackCoverTiles.size()) {
+                tile = std::as_const(input.fallbackCoverTiles)[i];
+                lease = std::as_const(input.fallbackCoverLeases)[i];
+                ready = atlasQueue.ready(tile, lease);
+            }
+            effectiveCoverTiles[i] = tile;
+            if (!effectiveCoverLeases.isEmpty())
+                effectiveCoverLeases[i] = lease;
+            entityCoverUv[i] = ready ? QVector4D(float(tile.x()) / input.atlasSize.width(),
+                                                 float(tile.y()) / input.atlasSize.height(),
+                                                 float(tile.width()) / input.atlasSize.width(),
+                                                 float(tile.height()) / input.atlasSize.height())
+                                     : QVector4D();
         }
+    } else {
+        effectiveCoverTiles = input.coverTiles;
+        effectiveCoverLeases = input.coverLeases;
+    }
     const bool standalone = input.entities.isEmpty() && !input.poolFrame;
     if (standalone) {
         standaloneEntities.resize(1);
@@ -1810,19 +1811,6 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
         for (int i = 0; i < entities.size(); ++i)
             if (visible[i] || !batched)
                 lightModels[i] = nativeLightVP * entities[i];
-    }
-    if (input.atlasGeneration) {
-        entityCoverUv.resize(entities.size());
-        for (int i = 0; i < entities.size(); ++i) {
-            const auto tile = std::as_const(effectiveCoverTiles)[i];
-            entityCoverUv[i] = !effectiveCoverLeases.isEmpty()
-                            && !atlasQueue.ready(tile, std::as_const(effectiveCoverLeases)[i])
-                    ? QVector4D()
-                    : QVector4D(float(tile.x()) / input.atlasSize.width(),
-                                float(tile.y()) / input.atlasSize.height(),
-                                float(tile.width()) / input.atlasSize.width(),
-                                float(tile.height()) / input.atlasSize.height());
-        }
     }
     for (int kind = ShadowKind; kind <= ProductFloorKind; ++kind)
         uniformBases[kind + 1] = uniformTemplate(kind);

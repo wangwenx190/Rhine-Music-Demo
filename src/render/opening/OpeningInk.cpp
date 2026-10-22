@@ -272,6 +272,9 @@ QVector<OpeningPath> loadOpeningPaths()
                     qCFatal(yalahoo::logRender, "Invalid embedded opening centerline: %s",
                             error.what());
                 }
+                // The immutable centerline is trimmed on every reveal frame. Build
+                // its arc-length cache once, before sharing it with renderers.
+                path.centerline.setCachingEnabled(true);
                 path.point = path.centerline.length() < PointPathLengthThreshold;
                 path.start = entry.value(u"start"_s).toDouble();
                 path.end = entry.value(u"end"_s).toDouble();

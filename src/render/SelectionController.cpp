@@ -1016,7 +1016,8 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
     const auto start = (inverse * QVector4D(nx, ny, -1, 1)).toVector3DAffine();
     const auto end = (inverse * QVector4D(nx, ny, 1, 1)).toVector3DAffine();
     double nearest = 2;
-    QVariantMap hit;
+    const ArchiveInstance *nearestInstance = nullptr;
+    QVector3D nearestLocal;
     for (const auto &instance : frame.instances) {
         if (columnExtent(instance.cell.lane) <= MinimumHitExtent)
             continue;
@@ -1028,15 +1029,19 @@ QVariantMap SelectionController::hitTest(const SceneFrame &frame, double x, doub
         if (!enter || *enter >= nearest)
             continue;
         nearest = *enter;
-        const auto local = localStart + delta * float(*enter);
-        hit = { { u"albumId"_s, instance.albumId },
-                { u"objectId"_s, QVariant::fromValue(instance.objectId) },
-                { u"lane"_s, instance.cell.lane },
-                { u"row"_s, instance.cell.row },
-                { u"localPoint"_s, QVariant::fromValue(local) },
-                { u"worldPoint"_s, QVariant::fromValue(instance.transform.map(local)) },
-                { u"frameRevision"_s, QVariant::fromValue(frame.revision) } };
+        nearestInstance = &instance;
+        nearestLocal = localStart + delta * float(*enter);
     }
-    return hit;
+    if (!nearestInstance)
+        return { };
+    // Only the winning intersection needs a QML map and a world-space conversion.
+    const auto &hit = *nearestInstance;
+    return { { u"albumId"_s, hit.albumId },
+             { u"objectId"_s, QVariant::fromValue(hit.objectId) },
+             { u"lane"_s, hit.cell.lane },
+             { u"row"_s, hit.cell.row },
+             { u"localPoint"_s, QVariant::fromValue(nearestLocal) },
+             { u"worldPoint"_s, QVariant::fromValue(hit.transform.map(nearestLocal)) },
+             { u"frameRevision"_s, QVariant::fromValue(frame.revision) } };
 }
 }

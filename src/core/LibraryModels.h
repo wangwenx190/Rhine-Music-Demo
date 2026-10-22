@@ -143,6 +143,7 @@ private:
     struct PendingSearch;
     void startSearch();
     void replaceResults(QList<SearchResult> results);
+    void notifyCount();
     static QList<SearchResult> filter(const QList<SearchEntry> &entries, const QString &needle,
                                       const QString &genreId,
                                       const std::atomic<quint64> &generation, quint64 ticket);
@@ -151,6 +152,7 @@ private:
     QList<SearchEntry> m_entries;
     QHash<QString, QString> m_genreNames;
     QList<SearchResult> m_results;
+    int m_notifiedCount = 0;
     QHash<QString, qsizetype> m_albumIndices;
     QHash<QString, QHash<QString, qsizetype>> m_trackIndices;
 };

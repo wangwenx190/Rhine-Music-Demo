@@ -11,9 +11,39 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 namespace yalahoo {
+inline bool caseIntersectsClip(const QMatrix4x4 &matrix)
+{
+    constexpr std::array<double, units::VectorAxes> low{ -sceneGeometry::CaseHalfWidth,
+                                                         sceneGeometry::CaseBottom,
+                                                         -sceneGeometry::CaseHalfDepth };
+    constexpr std::array<double, units::VectorAxes> high{ sceneGeometry::CaseHalfWidth,
+                                                          sceneGeometry::CaseTop,
+                                                          sceneGeometry::CaseHalfDepth };
+    // Maximize w +/- axis over the local AABB instead of transforming eight corners.
+    // Double evaluation and a float roundoff allowance keep boundary boxes conservative
+    // relative to the shader's float matrix/vector arithmetic, including folded cases.
+    constexpr auto RoundoffAllowance = 8 * std::numeric_limits<float>::epsilon();
+    for (int axis = 0; axis < units::VectorAxes; ++axis) {
+        for (const double sign : { -1.0, 1.0 }) {
+            double maximum = double(matrix(3, 3)) + sign * matrix(axis, 3);
+            double magnitude = std::abs(double(matrix(3, 3))) + std::abs(double(matrix(axis, 3)));
+            for (int component = 0; component < units::VectorAxes; ++component) {
+                const double w = matrix(3, component), a = matrix(axis, component);
+                const double coefficient = w + sign * a;
+                maximum += coefficient * (coefficient >= 0 ? high[component] : low[component]);
+                magnitude += (std::abs(w) + std::abs(a))
+                        * std::max(std::abs(low[component]), std::abs(high[component]));
+            }
+            if (maximum < -RoundoffAllowance * magnitude)
+                return false;
+        }
+    }
+    return true;
+}
 inline std::optional<QVector3D> projectToViewport(const QMatrix4x4 &viewProjection, QVector3D world,
                                                   QSizeF viewport)
 {

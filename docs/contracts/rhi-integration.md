@@ -7,6 +7,7 @@
 - `App.qml → MusicStage.qml → SceneItem → SceneAdapter::frame/SelectionLighting/RenderQuality → RhiItem::submit → synchronize/renderFrame`。SceneAdapter独占相机/实体/投影/拾取/focalDepth；QML不维护后端专属状态。生产实体由填充/真实列和有限选中/归位池提供，封面消费者见archive-pool.md。
 - 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册隔离材质入口。几何验证使用生产提交矩阵。
 - SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；原生尺寸与失败语义归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，各屏幕空间附件与最终输出保持相同物理尺寸。
+- 可见性以本地盒体包围盒对六个齐次裁剪平面求最大值，使用double中间值与float舍入余量保守判定；只跳过确定离屏的绘制，保留全部身份、全局排序和离屏阴影caster。拾取只为最近交点构造最终QML结果。
 - 相机/布局/实体实际变化才更新几何revision，输入revision独立。polish合并同帧相机/灯光/画质/封面；相同submission不重复复制。实体ID序列与上个已接受的非空壳体输入相同时复用其唯一性验证；身份变化、空实体或非壳体输入后重新验证。封面owned immutable像素共享，外部Review输入隔离一次，cacheKey变化才交接。
 - SceneItem在实际可绘制的polish中按已确定的pool/单盒模式请求对应封面。
 - PreparedAssets在首个RhiItem的GUI构造/show前一次预载固定qrc GLB/qsb/PMREM half/lookup，进程内有界不可变；render/同步不读盘或解码。

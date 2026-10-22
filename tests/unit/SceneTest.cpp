@@ -37,6 +37,51 @@ public:
 private:
     QJsonObject oracle;
 private Q_SLOTS:
+    void clipPlanesAgreeWithIndependentCornerOracle()
+    {
+        const auto cornerOracle = [](const QMatrix4x4 &matrix) {
+            std::array<bool, 6> outside{ true, true, true, true, true, true };
+            for (const float x : { -2.225f, 2.225f })
+                for (const float y : { .175f, 3.525f })
+                    for (const float z : { -.07f, .07f }) {
+                        const auto point = matrix * QVector4D(x, y, z, 1);
+                        for (int axis = 0; axis < 3; ++axis) {
+                            outside[2 * axis] = outside[2 * axis] && point[axis] < -point.w();
+                            outside[2 * axis + 1] =
+                                    outside[2 * axis + 1] && point[axis] > point.w();
+                        }
+                    }
+            return std::none_of(outside.cbegin(), outside.cend(), [](bool value) {
+                return value;
+            });
+        };
+        QMatrix4x4 projection;
+        projection.perspective(55, 1.5f, .1f, 100);
+        for (const float x : { -30.f, -2.f, 0.f, 2.f, 30.f })
+            for (const float y : { -30.f, 0.f, 30.f })
+                for (const float z : { -120.f, -20.f, -1.f, 0.f, 20.f })
+                    for (const float angle : { 0.f, 35.f, 90.f })
+                        for (const float fold : { 0.f, .4f, 1.f }) {
+                            QMatrix4x4 model;
+                            model.translate(x, y, z);
+                            model.rotate(angle, 1, 1, 0);
+                            model.scale(1, fold, 1);
+                            const auto matrix = projection * model;
+                            QCOMPARE(caseIntersectsClip(matrix), cornerOracle(matrix));
+                        }
+        // Touching any clip plane is visible; a strictly separated box is rejected.
+        for (int axis = 0; axis < 3; ++axis)
+            for (const float sign : { -1.f, 1.f }) {
+                QMatrix4x4 boundary;
+                boundary.scale(0);
+                boundary(axis, 3) = sign;
+                QVERIFY(caseIntersectsClip(boundary));
+                boundary(axis, 3) = sign * 1.01f;
+                QVERIFY(!caseIntersectsClip(boundary));
+                boundary(axis, 3) = std::nextafter(sign, sign * 2);
+                QVERIFY(caseIntersectsClip(boundary));
+            }
+    }
     void initTestCase()
     {
         QFile input(

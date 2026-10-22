@@ -222,6 +222,18 @@ private Q_SLOTS:
             QVERIFY(length > 0);
             const auto half = path.centerline.trimmed(0, .5);
             QVERIFY(std::abs(half.length() - length / 2) < .1);
+            auto uncached = path.centerline;
+            uncached.setCachingEnabled(false);
+            for (const double progress : { .1, .37, .75, 1.0 }) {
+                const auto actual = path.centerline.trimmed(0, progress);
+                const auto expected = uncached.trimmed(0, progress);
+                QCOMPARE(actual.elementCount(), expected.elementCount());
+                for (int i = 0; i < actual.elementCount(); ++i) {
+                    QCOMPARE(actual.elementAt(i).type, expected.elementAt(i).type);
+                    near(actual.elementAt(i).x, expected.elementAt(i).x);
+                    near(actual.elementAt(i).y, expected.elementAt(i).y);
+                }
+            }
         }
         QCOMPARE(centerlines, 17);
         near(last, 1);

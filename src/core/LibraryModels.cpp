@@ -498,7 +498,6 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
     m_search->pending = false;
     m_search->needle = query.trimmed().toLower();
     m_search->genreId = genreId;
-    const int oldCount = rowCount();
     if (replaced) {
         beginResetModel();
         m_snapshot = std::move(snapshot);
@@ -544,8 +543,7 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
     if (replaced) {
         m_results = std::move(results);
         endResetModel();
-        if (oldCount != rowCount())
-            Q_EMIT countChanged();
+        notifyCount();
         if (wasSearching != searching())
             Q_EMIT searchingChanged();
         return;
@@ -556,7 +554,7 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
 }
 void SearchListModel::replaceResults(QList<SearchResult> results)
 {
-    const int oldCount = rowCount();
+    const auto ticket = m_search->generation.load(std::memory_order_relaxed);
     int prefix = 0;
     while (prefix < m_results.size() && prefix < results.size()
            && m_results[prefix] == results[prefix])
@@ -570,19 +568,40 @@ void SearchListModel::replaceResults(QList<SearchResult> results)
     const int reused = std::min(removed, inserted);
     for (int i = 0; i < reused; ++i)
         m_results[prefix + i] = results[prefix + i];
+    // Synchronous observers can replace the snapshot or request another query.
+    // Already-notified edits are valid, but no stale edit may follow that callback.
     if (reused)
         Q_EMIT dataChanged(index(prefix), index(prefix + reused - 1));
+    if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+        notifyCount();
+        return;
+    }
     if (removed > reused) {
         beginRemoveRows({ }, prefix + reused, prefix + removed - 1);
         m_results.remove(prefix + reused, removed - reused);
         endRemoveRows();
+        if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+            notifyCount();
+            return;
+        }
     }
     if (inserted > reused) {
         beginInsertRows({ }, prefix + reused, prefix + inserted - 1);
         m_results = std::move(results);
         endInsertRows();
+        if (ticket != m_search->generation.load(std::memory_order_relaxed)) {
+            notifyCount();
+            return;
+        }
     }
-    if (oldCount != rowCount())
+    notifyCount();
+}
+void SearchListModel::notifyCount()
+{
+    const int count = rowCount();
+    if (count != m_notifiedCount) {
+        m_notifiedCount = count;
         Q_EMIT countChanged();
+    }
 }
 }

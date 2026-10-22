@@ -63,6 +63,66 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void failedDetailedUpgradeReusesPublishedDescriptors()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto path = directory.filePath(u"cover.png"_s);
+        QImage image(32, 32, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        QVERIFY(image.save(path));
+        LibrarySnapshot library;
+        Album album;
+        album.id = u"one"_s;
+        album.title = u"One"_s;
+        album.coverUrl = QUrl::fromLocalFile(path);
+        library.albums.append(album);
+        MotionController motion;
+        SelectionController selection(&motion);
+        selection.setColumns({ { u"column"_s, u"Column"_s, { album.id } } },
+                             std::make_shared<const LibrarySnapshot>(library));
+        SceneAdapter adapter;
+        adapter.setSelection(&selection);
+        QQuickWindow window;
+        HiddenSceneItem item(window.contentItem());
+        item.setSize({ 320, 240 });
+        item.setAdapter(&adapter);
+        item.publishNow();
+        QTRY_VERIFY_WITH_TIMEOUT(
+                (item.publishNow(), item.coverStatistics()[u"selectedDetailed"_s].toBool()),
+                AsyncDeadlineMilliseconds);
+        const auto initial = item.coverStatistics();
+        const auto originalResolution =
+                initial[u"owners"_s].toArray().first().toObject()[u"resolution"_s].toInt();
+        QVERIFY(QFile::remove(path));
+        // The already-decoded artwork remains usable when the backing file disappears.
+        item.setSize({ 1920, 1440 });
+        item.publishNow();
+        QTRY_VERIFY_WITH_TIMEOUT(
+                (item.publishNow(),
+                 item.coverStatistics()[u"cache"_s].toObject()[u"decodeStarts"_s].toInteger()
+                                 > initial[u"cache"_s].toObject()[u"decodeStarts"_s].toInteger()
+                         && item.coverStatistics()[u"cache"_s].toObject()[u"active"_s].toInt() == 0
+                         && item.coverStatistics()[u"cache"_s].toObject()[u"pending"_s].toInt()
+                                 == 0),
+                AsyncDeadlineMilliseconds);
+        item.publishNow();
+        QVERIFY(!item.coverStatistics()[u"selectedDetailed"_s].toBool());
+        QCOMPARE(item.coverStatistics()[u"owners"_s]
+                         .toArray()
+                         .first()
+                         .toObject()[u"resolution"_s]
+                         .toInt(),
+                 originalResolution);
+        const auto previous = item.input();
+        selection.setLift(.41);
+        item.publishNow();
+        QVERIFY(item.input().entities.last() != previous.entities.last());
+        QVERIFY(item.input().coverTiles.isSharedWith(previous.coverTiles));
+        QVERIFY(item.input().coverLeases.isSharedWith(previous.coverLeases));
+        QVERIFY(item.input().atlasUploads.isSharedWith(previous.atlasUploads));
+        QVERIFY(!window.isVisible());
+    }
     void readOnlySubmissionPreservesSharedDescriptors()
     {
         RhiItem item;

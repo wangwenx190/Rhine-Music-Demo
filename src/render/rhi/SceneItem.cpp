@@ -489,7 +489,8 @@ bool SceneItem::reusePool(Input &in) const
                                                return cover.objectId == m_activeObject;
                                            });
         if (selected == m_ownedCovers.cend() || !selected->pixels || !selected->pixels->pixels
-            || selected->pixels->pixels->resolution < m_detailResolution)
+            || (selected->pixels->pixels->resolution < m_detailResolution
+                && !selected->highResolutionFailed))
             return false;
     }
     if (instances.isSharedWith(previous.scene.instances)) {
