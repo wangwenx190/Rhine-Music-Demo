@@ -21,6 +21,10 @@ public:
     explicit AssetTransaction(const QDir &root)
         : m_root(root), m_staging(root.filePath(u".asset-transaction-XXXXXX"_s))
     {
+        const auto canonical = m_root.canonicalPath();
+        if (canonical.isEmpty())
+            throw std::runtime_error("Invalid asset repository root");
+        m_root.setPath(canonical);
         if (!m_staging.isValid())
             throw std::runtime_error("Cannot create asset staging directory");
     }
@@ -30,7 +34,8 @@ public:
     }
     void stage(const QString &relative, const QByteArray &bytes)
     {
-        if (QDir::isAbsolutePath(relative) || relative != QDir::cleanPath(relative)
+        if (relative.isEmpty() || relative == "."_L1 || relative == ".."_L1
+            || QDir::isAbsolutePath(relative) || relative != QDir::cleanPath(relative)
             || relative.startsWith(u"../"_s) || m_paths.contains(relative))
             throw std::runtime_error("Invalid or duplicate staged asset path");
         saveFile(m_staging.filePath(u"new/"_s + relative), bytes);
@@ -48,7 +53,10 @@ public:
         };
         QList<Replacement> replacements;
         try {
+            for (const auto &relative : std::as_const(m_paths))
+                validateDestination(relative);
             for (const auto &relative : std::as_const(m_paths)) {
+                validateDestination(relative);
                 const auto destination = m_root.filePath(relative);
                 const QFileInfo existing(destination);
                 if (existing.isSymLink() || (existing.exists() && !existing.isFile()))
@@ -57,6 +65,7 @@ public:
                 if (!QDir().mkpath(QFileInfo(destination).absolutePath())
                     || !QDir().mkpath(QFileInfo(backup).absolutePath()))
                     throw std::runtime_error("Cannot prepare asset publication directories");
+                validateDestination(relative);
                 replacements.append({ destination, { }, false });
                 auto &replacement = replacements.last();
                 if (existing.exists()) {
@@ -87,6 +96,24 @@ public:
     }
 
 private:
+    void validateDestination(const QString &relative) const
+    {
+        QString current = m_root.absolutePath();
+        const auto components = relative.split('/'_L1);
+        for (qsizetype index = 0; index < components.size(); ++index) {
+            current = QDir(current).filePath(components[index]);
+            const QFileInfo info(current);
+            if (info.isSymLink() || info.isJunction())
+                throw std::runtime_error("Asset destination has a symbolic link component");
+            if (!info.exists())
+                continue;
+            const auto canonical = info.canonicalFilePath();
+            if (!canonical.startsWith(m_root.absolutePath() + '/'_L1)
+                || (index + 1 < components.size() && !info.isDir()))
+                throw std::runtime_error(
+                        "Asset destination escapes the repository or is not a directory");
+        }
+    }
     QDir m_root;
     QTemporaryDir m_staging;
     QStringList m_paths;

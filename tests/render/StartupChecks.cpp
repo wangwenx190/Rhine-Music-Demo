@@ -1,5 +1,6 @@
 #include "TitleReel.h"
 #include "StartupChecks.h"
+#include "RequiredOutput.h"
 #include "SelectionLighting.h"
 #include "LayoutMetrics.h"
 #include "MonotonicTime.h"
@@ -804,7 +805,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         return 2;
     constexpr int switchCount = 3;
     constexpr int rebuildCount = 2;
-    QDir().mkpath(output);
+    if (!yalahoo::review::createFreshOutputDirectory(output))
+        return 2;
     QJsonObject report{ { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
                         { u"os"_s, QSysInfo::prettyProductName() },
                         { u"architecture"_s, QSysInfo::currentCpuArchitecture() },

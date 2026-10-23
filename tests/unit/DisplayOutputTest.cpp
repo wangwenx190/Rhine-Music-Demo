@@ -11,10 +11,7 @@
 #include <QOffscreenSurface>
 #include <QDir>
 #include <QFileInfo>
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-#  include <QVulkanInstance>
-#  include <QVersionNumber>
-#endif
+#include "OffscreenRhi.h"
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 #include <rhi/qshader.h>
@@ -139,27 +136,16 @@ private Q_SLOTS:
     }
     void transferShader()
     {
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-        QVulkanInstance instance;
-#endif
-        std::unique_ptr<QRhi> api;
-#if defined(Q_OS_MACOS)
-        QRhiMetalInitParams params;
-        api.reset(QRhi::create(QRhi::Metal, &params));
-#elif defined(Q_OS_WIN)
-        QRhiD3D11InitParams params;
-        api.reset(QRhi::create(QRhi::D3D11, &params));
-#elif defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-        instance.setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
-        instance.setApiVersion(QVersionNumber(1, 1));
-        QVERIFY(instance.create());
-        QRhiVulkanInitParams params;
-        params.inst = &instance;
-        api.reset(QRhi::create(QRhi::Vulkan, &params));
-#else
-        QFAIL("Vulkan development support is required; no OpenGL test fallback");
-#endif
-        QVERIFY(api);
+        review::OffscreenRhi context;
+        auto *api = context.get();
+        const auto selected = QQuickWindow::graphicsApi();
+        const auto expected = selected == QSGRendererInterface::OpenGL ? QRhi::OpenGLES2
+                : selected == QSGRendererInterface::Metal              ? QRhi::Metal
+                : selected == QSGRendererInterface::Direct3D11         ? QRhi::D3D11
+                : selected == QSGRendererInterface::Direct3D12         ? QRhi::D3D12
+                                                                       : QRhi::Vulkan;
+        QCOMPARE(api->backend(), expected);
+        qInfo() << "Transfer shader backend:" << api->backendName();
         const QSize size(5, 1);
         const std::array<float, 5> levels{ 0, .04045f, .5f, 1, 2 };
         std::array<qfloat16, 20> pixels;
@@ -195,7 +181,7 @@ private Q_SLOTS:
         QVERIFY(bindings->create());
         const std::unique_ptr<QRhiGraphicsPipeline> pipeline(api->newGraphicsPipeline());
         pipeline->setShaderStages(
-                { { QRhiShaderStage::Vertex, loadShader(u":/display/output.vert.qsb"_s) },
+                { { QRhiShaderStage::Vertex, loadShader(u":/display/DisplayTransfer.vert.qsb"_s) },
                   { QRhiShaderStage::Fragment,
                     loadShader(u":/assets/shaders/display-output.frag.qsb"_s) } });
         pipeline->setShaderResourceBindings(bindings.get());

@@ -2,6 +2,7 @@
 #include "FrameClock.h"
 #include "OffscreenSurface.h"
 #include "TitleSourceProbe.h"
+#include "ProbeInput.h"
 #include "BackendCapabilities.h"
 #include "TitleReel.h"
 #include "ReelInk.h"
@@ -568,7 +569,14 @@ auto finishTitleProbe(int &step, const int &staticSteps, const int &animationSte
     if (step < staticSteps) {
         const auto test = cases[step].toObject();
         root->setProperty("night", test[u"night"_s].toBool());
-        const QSize size(test[u"width"_s].toInt() + 2, test[u"budget"_s].toInt() + 2);
+        QSize size;
+        try {
+            size = yalahoo::probe::titleCaptureSize(test, window.devicePixelRatio(), 2);
+        } catch (const std::exception &error) {
+            qWarning("Invalid title capture: %s", error.what());
+            app.exit(3);
+            return;
+        }
         window.resize(size);
         root->setSize(size);
         controller.setAvailableWidth(test[u"width"_s].toDouble());
@@ -663,12 +671,14 @@ int probeTitleSource(QGuiApplication &app, const QString &output, const QString 
     QFile input(sourceDirectory + "/report.json"_L1);
     if (!input.open(QIODevice::ReadOnly))
         return 3;
-    const auto reference = QJsonDocument::fromJson(input.readAll()).object();
-    if (reference[u"protocol"_s].toString() != "source-structure-font-metrics-motion-v1"_L1
-        || reference[u"captures"_s].toArray().isEmpty()
-        || reference[u"tracks"_s].toArray().isEmpty()
-        || reference[u"rolling"_s].toArray().isEmpty())
+    const auto document = QJsonDocument::fromJson(input.readAll());
+    try {
+        yalahoo::probe::validateTitle(document);
+    } catch (const std::exception &error) {
+        qWarning("Invalid title reference: %s", error.what());
         return 3;
+    }
+    const auto reference = document.object();
     QDir().mkpath(output);
     QQmlEngine engine;
     yalahoo::LayoutMetrics metrics;
@@ -733,8 +743,15 @@ int probeTitleSource(QGuiApplication &app, const QString &output, const QString 
     controller.setDpr(window.devicePixelRatio());
     QJsonArray cases;
     for (const auto &entry : reference[u"captures"_s].toArray())
-        if (std::abs(entry.toObject()[u"dpr"_s].toDouble() - window.devicePixelRatio()) < .001)
+        if (std::abs(entry.toObject()[u"dpr"_s].toDouble() - window.devicePixelRatio()) < .001) {
+            try {
+                yalahoo::probe::titleCaptureSize(entry.toObject(), window.devicePixelRatio(), 2);
+            } catch (const std::exception &error) {
+                qWarning("Invalid title capture: %s", error.what());
+                return 3;
+            }
             cases.append(entry);
+        }
     if (cases.isEmpty())
         return 3;
     const double motionError = std::max(trackError(reference[u"tracks"_s].toArray()),

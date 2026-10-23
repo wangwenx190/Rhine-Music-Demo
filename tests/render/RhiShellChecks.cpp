@@ -3,6 +3,7 @@
 #include "ReviewApplication.h"
 #include "RhiCaptureHarness.h"
 #include "RhiReviewInput.h"
+#include "ShellFixture.h"
 #include "GraphicsBackend.h"
 #include <QGuiApplication>
 #include <QDir>
@@ -142,7 +143,7 @@ auto runShellChecks(int &argc, char **&argv)
         const QString output = QString::fromLocal8Bit(argv[2]);
         const auto source = readFixture(fixturePath);
         const auto cases = source[u"cases"_s].toArray();
-        require(cases.size() == 61, "Incomplete source shell states");
+        validateShellFixture(source);
         QDir().mkpath(output);
         RhiCaptureHarness driver;
         require(driver.window->devicePixelRatio() == 1, "Shell diagnostics require actual DPR1");

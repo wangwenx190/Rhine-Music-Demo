@@ -64,6 +64,6 @@ font.pixelSize: 24
 
 `prepare-assets` 自身在任何生成写入前读取 `history-rewrite.json`，核对 24 个资产/CSS 输入的冻结 Git blob、归档文件与 manifest hash。PowerShell、POSIX 和直接运行共享该保护；输入变化或来源不完整立即失败。`prepare-assets <repository> <selected-Qt-Kit> --verify-inputs` 只检查同 Kit qmake 与来源，不导入、不覆盖产品资产；正常生成仍经过相同保护。适配理由见[source-fidelity-review.md](source-fidelity-review.md)。
 
-完整生成先在仓库内的临时目录执行导入、几何、字体及资源校验，全部通过后才发布资源、manifest和构建清单。发布期间保留旧文件，任一替换失败即逆序恢复；恢复失败时保留临时目录并明确报告恢复路径，不删除唯一旧副本。
+完整生成先在仓库内的临时目录执行导入、几何、字体及资源校验，全部通过后才发布资源、manifest和构建清单。发布前校验整批目的路径，拒绝仓库根以下任一级符号链接或junction，并核对已解析路径仍在规范仓库根内。发布期间保留旧文件，任一替换失败即逆序恢复；恢复失败时保留临时目录并明确报告恢复路径，不删除唯一旧副本。
 
 重新导入后的说明保留回归：先构建Release的prepare-assets，再运行`python3 tests/tools/AssetExportTest.py -k native_reimport`。该检查在隔离副本运行真实导入器，核对三份原生说明、输出hash及冻结输入来源，不修改仓库产品资产。

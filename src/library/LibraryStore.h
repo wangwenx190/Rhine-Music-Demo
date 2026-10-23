@@ -7,6 +7,8 @@
 #include "MusicTypes.h"
 #include <QObject>
 
+class DirectoryScannerTest;
+
 namespace yalahoo {
 struct ProviderResult;
 // One running job, one latest scan intent and one coalesced accepted save.
@@ -53,6 +55,7 @@ Q_SIGNALS:
     void scanFinished(quint64 generation, quint64 filesVisited);
 
 private:
+    friend class ::DirectoryScannerTest;
     struct Private;
     std::unique_ptr<Private> d;
 };

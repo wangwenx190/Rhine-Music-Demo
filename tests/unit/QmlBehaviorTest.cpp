@@ -168,6 +168,7 @@ private Q_SLOTS:
     void metadataDraftSurvivesImmediateConfigurationSaves()
     {
         QTemporaryDir directory;
+        QVERIFY(directory.isValid());
         yalahoo::LibraryStore store(directory.path());
         yalahoo::OfflineMetadataProvider provider;
         yalahoo::LibrarySession library(&provider);
@@ -248,6 +249,7 @@ private Q_SLOTS:
     void detailNavigationTracksArrayMode()
     {
         QTemporaryDir directory;
+        QVERIFY(directory.isValid());
         yalahoo::test::SettingsFixture fixture(directory.path());
         yalahoo::LibrarySnapshot snapshot;
         for (const auto &id : { u"first"_s, u"last"_s }) {
@@ -318,6 +320,7 @@ private Q_SLOTS:
     void overviewColumnKindFollowsLiveAndRestoredSorting()
     {
         QTemporaryDir directory;
+        QVERIFY(directory.isValid());
         const QStringList modes{ u"genre"_s, u"artist"_s, u"album"_s };
         const QStringList names{ u"\u6d41\u6d3e"_s, u"\u827a\u672f\u5bb6"_s,
                                  u"\u4e13\u8f91\u6807\u9898"_s };

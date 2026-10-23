@@ -2,6 +2,9 @@
 // network access, rendering, or touching repository assets.
 #include "ProbeInput.h"
 #include "AssetTransaction.h"
+#include "ShellFixture.h"
+#include "RequiredOutput.h"
+#include <filesystem>
 #include <QTest>
 #include <QTemporaryDir>
 
@@ -40,6 +43,34 @@ QJsonObject rulerInput()
                                         { u"value"_s, 0 },
                                         { u"velocity"_s, 0 } } } } };
 }
+QJsonObject titleInput()
+{
+    const QJsonObject capture{
+        { u"width"_s, 300 },
+        { u"budget"_s, 150 },
+        { u"dpr"_s, 1 },
+        { u"size"_s, 29.75 },
+        { u"text"_s, u"Title"_s },
+        { u"night"_s, false },
+        { u"state"_s,
+          QJsonObject{ { u"size"_s, 29.75 }, { u"height"_s, 30 }, { u"glyphs"_s, QJsonArray() } } }
+    };
+    const QJsonObject track{ { u"fps"_s, 60 },
+                             { u"op"_s, QJsonObject{ { u"target"_s, 60 } } },
+                             { u"sample"_s,
+                               QJsonObject{ { u"value"_s, QJsonArray{ 0 } },
+                                            { u"velocity"_s, QJsonArray{ 0 } } } } };
+    const QJsonObject motion{ { u"position"_s, 0 }, { u"velocity"_s, 0 } };
+    return { { u"protocol"_s, u"source-structure-font-metrics-motion-v1"_s },
+             { u"captures"_s, QJsonArray{ capture } },
+             { u"tracks"_s, QJsonArray{ track } },
+             { u"rolling"_s,
+               QJsonArray{ QJsonObject{ { u"dt"_s, 0 },
+                                        { u"entry"_s, motion },
+                                        { u"entryBlur"_s, motion },
+                                        { u"roll"_s, motion } } } } };
+}
+
 }
 class VerificationInputTest final : public QObject
 {
@@ -48,6 +79,143 @@ class VerificationInputTest final : public QObject
 public:
     VerificationInputTest() = default;
 private Q_SLOTS:
+    void shellRequiresEverySourceIdentityAndProjectionSample()
+    {
+        const auto valid = QJsonDocument::fromJson(
+                                   assets::readFile(QString::fromUtf8(FIXTURE_ROOT)
+                                                    + u"/tests/fixtures/rhi-shell/visual.json"_s))
+                                   .object();
+        review::validateShellFixture(valid);
+        const auto original = valid[u"cases"_s].toArray();
+        for (int mutation = 0; mutation < 9; ++mutation) {
+            auto source = valid;
+            auto cases = original;
+            auto state = cases[1].toObject();
+            if (mutation == 0)
+                state[u"sourceIndex"_s] = cases[2].toObject()[u"sourceIndex"_s];
+            else if (mutation == 1)
+                state[u"sourceIndex"_s] = 3;
+            else if (mutation == 2)
+                state[u"sourceIndex"_s] = 4.5;
+            else if (mutation == 3)
+                state.remove(u"projections"_s);
+            else if (mutation == 4)
+                state[u"projections"_s] = QJsonArray();
+            else {
+                auto projections = state[u"projections"_s].toArray();
+                if (mutation == 5)
+                    projections.removeLast();
+                else {
+                    auto point = projections[0].toObject();
+                    point[mutation == 6 ? u"world"_s : u"pixel"_s] =
+                            mutation == 8 ? QJsonArray{ u"invalid"_s, 0 } : QJsonArray{ 0 };
+                    projections[0] = point;
+                }
+                state[u"projections"_s] = projections;
+            }
+            cases[1] = state;
+            source[u"cases"_s] = cases;
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, review::validateShellFixture(source));
+        }
+    }
+    void titleRejectsUnsafeDimensionsBeforePaddingAndDprScaling()
+    {
+        const auto valid = titleInput();
+        probe::validateTitle(QJsonDocument(valid));
+        QCOMPARE(probe::titleCaptureSize(valid[u"captures"_s].toArray()[0].toObject(), 2, 2),
+                 QSize(302, 152));
+        auto scaled = valid;
+        auto fractionalDpr = valid[u"captures"_s].toArray()[0].toObject();
+        fractionalDpr[u"dpr"_s] = 1.5;
+        scaled[u"captures"_s] = QJsonArray{ fractionalDpr };
+        probe::validateTitle(QJsonDocument(scaled));
+        for (const auto key : { "width"_L1, "budget"_L1, "dpr"_L1 }) {
+            for (const auto &invalid :
+                 { QJsonValue(2147483647), QJsonValue(1e100), QJsonValue(-1), QJsonValue(0),
+                   QJsonValue(u"300"_s), QJsonValue(true), QJsonValue(QJsonValue::Null) }) {
+                auto source = valid;
+                auto capture = valid[u"captures"_s].toArray()[0].toObject();
+                capture[key] = invalid;
+                source[u"captures"_s] = QJsonArray{ capture };
+                QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                         probe::validateTitle(QJsonDocument(source)));
+            }
+        }
+        for (const auto key : { "width"_L1, "budget"_L1 }) {
+            auto capture = valid[u"captures"_s].toArray()[0].toObject();
+            capture[key] = 150.5;
+            auto source = valid;
+            source[u"captures"_s] = QJsonArray{ capture };
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                     probe::validateTitle(QJsonDocument(source)));
+        }
+        auto capture = valid[u"captures"_s].toArray()[0].toObject();
+        capture[u"width"_s] = 4096;
+        capture[u"budget"_s] = 4096;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::titleCaptureSize(capture, 1, 2));
+        capture[u"budget"_s] = 10;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::titleCaptureSize(capture, 2, 2));
+        QCOMPARE(probe::titleCaptureSize(capture, 1, 2), QSize(4098, 12));
+        for (const auto key : { "captures"_L1, "tracks"_L1, "rolling"_L1 }) {
+            auto source = valid;
+            source[key] = QJsonArray{ QJsonObject() };
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                     probe::validateTitle(QJsonDocument(source)));
+        }
+    }
+    void outputDirectoryRejectsExistingEvidenceAndCreationFailure()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto output = directory.filePath(u"run"_s);
+        QVERIFY(review::createFreshOutputDirectory(output));
+        const auto report = QDir(output).filePath(u"report.json"_s);
+        const auto image = QDir(output).filePath(u"product-restored.png"_s);
+        assets::saveFile(report, "failed report"_ba);
+        assets::saveFile(image, "original image"_ba);
+        QVERIFY(!review::createFreshOutputDirectory(output));
+        QCOMPARE(assets::readFile(report), "failed report"_ba);
+        QCOMPARE(assets::readFile(image), "original image"_ba);
+        QVERIFY(!review::createFreshOutputDirectory(report));
+        QVERIFY(!review::createFreshOutputDirectory(report + u"/blocked"_s));
+        QVERIFY(!review::createFreshOutputDirectory(QString()));
+        const auto nested = directory.filePath(u"new-parent/run"_s);
+        QVERIFY(review::createFreshOutputDirectory(nested));
+    }
+    void assetPublicationRejectsLinkedAncestorsWithoutTouchingExternalFiles()
+    {
+        QTemporaryDir directory, external;
+        QVERIFY(directory.isValid());
+        QVERIFY(external.isValid());
+        const QDir root(directory.path());
+        QVERIFY(root.mkpath(u"resources"_s));
+        const auto link = root.filePath(u"resources/audio"_s);
+        std::error_code error;
+        std::filesystem::create_directory_symlink(
+                std::filesystem::path(external.path().toStdU16String()),
+                std::filesystem::path(link.toStdU16String()), error);
+#if defined(Q_OS_WIN)
+        if (error)
+            QSKIP("Native symlink creation unavailable; target filesystem checks remain R36.");
+#endif
+        QVERIFY2(!error, error.message().c_str());
+        const auto outside = external.filePath(u"atmosphere.ogg"_s);
+        assets::saveFile(outside, "external original"_ba);
+        const auto local = root.filePath(u"resources/local"_s);
+        assets::saveFile(local, "local original"_ba);
+        assets::AssetTransaction batch(root);
+        batch.stage(u"resources/local"_s, "local replacement"_ba);
+        batch.stage(u"resources/audio/atmosphere.ogg"_s, "external replacement"_ba);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, batch.publish());
+        QCOMPARE(assets::readFile(outside), "external original"_ba);
+        QCOMPARE(assets::readFile(local), "local original"_ba);
+        assets::AssetTransaction missing(root);
+        missing.stage(u"resources/audio/new/sub/file"_s, "new external file"_ba);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, missing.publish());
+        QVERIFY(!QFileInfo::exists(external.filePath(u"new"_s)));
+        for (const auto &relative : { QString(), u"."_s, u".."_s, u"../escape"_s })
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, missing.stage(relative, "invalid"_ba));
+    }
     void tracksKeepOptionalDefaultsAndRejectInvalidSuppliedFields()
     {
         const QJsonObject valid{ { u"title"_s, u"Public track"_s }, { u"number"_s, 1 } };

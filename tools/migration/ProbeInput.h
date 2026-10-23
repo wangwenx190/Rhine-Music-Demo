@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSize>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -42,6 +43,75 @@ inline QJsonArray array(QJsonValue value)
 inline void boolean(QJsonValue value)
 {
     requireInput(value.isBool());
+}
+// Title probes are small text captures: cap logical extents, physical edges and pixel area
+// before padding, DPR multiplication, integer conversion or render-target allocation.
+inline QSize titleCaptureSize(const QJsonObject &capture, double dpr, int padding = 0)
+{
+    constexpr int MaximumLogicalExtent = 4096;
+    constexpr int MaximumPhysicalExtent = 8192;
+    constexpr double MaximumCapturePixels = 16 * 1024 * 1024;
+    requireInput(std::isfinite(dpr) && dpr > 0 && dpr <= 4);
+    requireInput(padding >= 0 && padding <= 2);
+    const int width = integer(capture[u"width"_s], 1);
+    const int height = integer(capture[u"budget"_s], 1);
+    requireInput(width <= MaximumLogicalExtent && height <= MaximumLogicalExtent);
+    const double physicalWidth = std::ceil((double(width) + padding) * dpr);
+    const double physicalHeight = std::ceil((double(height) + padding) * dpr);
+    requireInput(physicalWidth <= MaximumPhysicalExtent && physicalHeight <= MaximumPhysicalExtent
+                 && physicalWidth * physicalHeight <= MaximumCapturePixels);
+    return { width + padding, height + padding };
+}
+inline void validateTitle(const QJsonDocument &document)
+{
+    requireInput(document.isObject());
+    const auto source = document.object();
+    requireInput(source[u"protocol"_s].toString() == "source-structure-font-metrics-motion-v1"_L1);
+    for (const auto &value : array(source[u"captures"_s])) {
+        const auto capture = object(value);
+        const double dpr = number(capture[u"dpr"_s], 0);
+        titleCaptureSize(capture, dpr, 2);
+        number(capture[u"size"_s], 1, 4096);
+        requireInput(capture[u"text"_s].isString());
+        boolean(capture[u"night"_s]);
+        const auto state = object(capture[u"state"_s]);
+        number(state[u"size"_s], 0, 4096);
+        number(state[u"height"_s], 0, 4096);
+        requireInput(state[u"glyphs"_s].isArray());
+        for (const auto &value : state[u"glyphs"_s].toArray()) {
+            const auto glyph = object(value);
+            requireInput(glyph[u"text"_s].isString());
+            for (const auto key : { "x"_L1, "y"_L1, "width"_L1, "height"_L1 })
+                number(glyph[key]);
+        }
+    }
+    for (const auto &value : array(source[u"tracks"_s])) {
+        const auto track = object(value);
+        integer(track[u"fps"_s], 1);
+        const auto op = object(track[u"op"_s]);
+        requireInput(op.contains(u"target"_s) != op.contains(u"dt"_s));
+        if (op.contains(u"target"_s))
+            number(op[u"target"_s]);
+        else
+            number(op[u"dt"_s], 0);
+        const auto sample = object(track[u"sample"_s]);
+        for (const auto key : { "value"_L1, "velocity"_L1 }) {
+            const auto components = array(sample[key]);
+            requireInput(components.size() == 1);
+            number(components[0]);
+        }
+    }
+    double elapsed = 0;
+    for (const auto &value : array(source[u"rolling"_s])) {
+        const auto sample = object(value);
+        elapsed = number(sample[u"dt"_s], elapsed);
+        for (const auto key : { "entry"_L1, "entryBlur"_L1, "roll"_L1 }) {
+            const auto state = object(sample[key]);
+            number(state[u"position"_s]);
+            if (key != "entryBlur"_L1)
+                number(state[u"velocity"_s]);
+        }
+    }
 }
 inline void validateTracks(const QJsonDocument &document)
 {

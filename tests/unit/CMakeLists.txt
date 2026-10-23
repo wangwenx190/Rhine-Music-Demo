@@ -1,5 +1,5 @@
 qt_add_executable(DisplayOutputTest DisplayOutputTest.cpp)
-target_include_directories(DisplayOutputTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_include_directories(DisplayOutputTest PRIVATE "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/render")
 target_link_libraries(DisplayOutputTest PRIVATE YalahooRhi Qt6::Test Qt6::GuiPrivate Qt6::QuickVectorImage)
 target_compile_definitions(DisplayOutputTest PRIVATE DISPLAY_OUTPUT_REPORT="${CMAKE_BINARY_DIR}/verification/display-output.json")
 set_source_files_properties("${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/components/DisplaySurface.qml"
@@ -19,6 +19,9 @@ qt_add_shaders(DisplayOutputTest display_vertex PREFIX /display
     BASE "${PROJECT_SOURCE_DIR}/resources/shaders/rhi"
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
         "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag")
+qt_add_shaders(DisplayOutputTest display_transfer_vertex PREFIX /display
+    BASE "${PROJECT_SOURCE_DIR}/tests/render"
+    FILES "${PROJECT_SOURCE_DIR}/tests/render/DisplayTransfer.vert")
 yalahoo_platform(DisplayOutputTest)
 add_test(NAME display-output-probe COMMAND DisplayOutputTest asynchronousMonitorDoesNotFreezeProvisionalSdr)
 set_tests_properties(display-output-probe PROPERTIES TIMEOUT 10 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -307,7 +310,8 @@ yalahoo_unit_test(ApplicationOptionsTest application-options
 
 yalahoo_unit_test(VerificationInputTest verification-input
     SOURCES "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
-    INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/tools/migration" "${PROJECT_SOURCE_DIR}/src/core"
+    INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/tools/migration" "${PROJECT_SOURCE_DIR}/src/core" "${PROJECT_SOURCE_DIR}/tests/render"
+    DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
     LIBRARIES Qt6::Gui)
 
 yalahoo_unit_test(ReadbackQueueTest readback-queue

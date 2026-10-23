@@ -35,5 +35,6 @@
 - `ctest --preset qt-release -R '^title-reels$'`覆盖grapheme/连字/组合字、长文省略、缓存容量、20/30/60/120fps/打断/反转/速度/减少动态/复用、宽度通知、hide合并与恢复取消。
 - 来源探针检查20项双主题文字、18项九尺寸页眉、生产glyph复用、一次隐藏/恢复和节点释放。轨迹≤1e-6、结构≤1逻辑px。实际播放与定位由[playback.md](playback.md)和[library-data.md](library-data.md)验证，匿名歌名事件不能替代。
 - 源数据导出`node tools/migration/export-title.mjs --dpr 数值 --output 新目录`；原生驱动`node tools/migration/verify-title.mjs --backend <目标后端> --dpr 数值 --source 源目录 --output 新目录`。导出器只生成`source-structure-font-metrics-motion-v1`结构、DOM字体框和数值轨迹，不生成浏览器PNG或放大轮廓；当前检查确需源输入且没有有效同协议结果时才导出。原生入口不读取参考图，保留自身输出供质量检查，自动passed只表示结构/运动/资源等非图像门槛。
+- 来源报告在创建渲染资源前校验全部文字结构和运动数值；捕获宽度/垂直预算须为正整数且各不超过4096逻辑px，DPR须在(0,4]。含2px留边后的物理边长不超过8192px、面积不超过16Mi像素；转换和分配前拒绝超限，不截断输入。
 - 字体物理身份、同机DOM字体框/主字体基线和彩色字体身份直接由`verify-title.mjs`独立核对；实际DPR读取窗口报告，`--visible`遵守公共窗口策略。来源探针构建开关和测试边界见test-gates.md。
 - 受控target DPR不等于物理跨屏；目标字体、系统输入/显示与后端未验项只在迁移计划R36维护。结构/字形探针不产生performance.md以外的性能验收义务。

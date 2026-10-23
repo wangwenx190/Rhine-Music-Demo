@@ -2,6 +2,7 @@
 // values. Explicit fixture literals are independent inputs or expected results; timing bounds
 // have named constants.
 
+#include "NumericChecks.h"
 #include "LayoutMetrics.h"
 #include "MotionController.h"
 #include "SelectionController.h"
@@ -22,6 +23,7 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+using yalahoo::test::errorMagnitude;
 namespace {
 struct Fixture final
 {
@@ -154,6 +156,24 @@ private Q_SLOTS:
             QVERIFY(!overview.active());
         }
     }
+    void maximumErrorRejectsNonfiniteComponents()
+    {
+        const double nan = std::numeric_limits<double>::quiet_NaN();
+        for (const double invalid : { nan, std::numeric_limits<double>::infinity(),
+                                      -std::numeric_limits<double>::infinity() }) {
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                     static_cast<void>(std::max(
+                                             { 0.0, errorMagnitude(invalid), errorMagnitude(0) })));
+            const SceneVector expected{ 0, 0, 0 };
+            for (const SceneVector actual :
+                 { SceneVector{ invalid, 0, 0 }, SceneVector{ 0, invalid, 0 },
+                   SceneVector{ 0, 0, invalid } })
+                QVERIFY_THROWS_EXCEPTION(
+                        std::runtime_error,
+                        static_cast<void>(
+                                std::max(0.0, errorMagnitude((actual - expected).length()))));
+        }
+    }
     void frozenMotionEdgesAndCollisions()
     {
         double maximum = 0;
@@ -165,19 +185,19 @@ private Q_SLOTS:
                 f.overview.setActive(s[u"active"_s].toBool());
                 f.overview.advance(s[u"dt"_s].toDouble(), s[u"reduced"_s].toBool());
                 maximum = std::max(
-                        { maximum, std::abs(f.overview.progress() - s[u"value"_s].toDouble()),
-                          std::abs(f.overview.state().velocity - s[u"velocity"_s].toDouble()),
-                          std::abs(f.overview.state().acceleration
-                                   - s[u"acceleration"_s].toDouble()) });
+                        { maximum, errorMagnitude(f.overview.progress() - s[u"value"_s].toDouble()),
+                          errorMagnitude(f.overview.state().velocity - s[u"velocity"_s].toDouble()),
+                          errorMagnitude(f.overview.state().acceleration
+                                         - s[u"acceleration"_s].toDouble()) });
             }
         }
         QVERIFY2(maximum <= 1e-6, qPrintable(QString::number(maximum, 'g', 16)));
         for (const auto value : source[u"extents"_s].toArray()) {
             const auto s = value.toObject();
-            QVERIFY(std::abs(OverviewController::columnExtent(s[u"lane"_s].toDouble(),
-                                                              s[u"center"_s].toDouble(),
-                                                              s[u"progress"_s].toDouble())
-                             - s[u"value"_s].toDouble())
+            QVERIFY(errorMagnitude(OverviewController::columnExtent(s[u"lane"_s].toDouble(),
+                                                                    s[u"center"_s].toDouble(),
+                                                                    s[u"progress"_s].toDouble())
+                                   - s[u"value"_s].toDouble())
                     <= 1e-6);
         }
         for (const auto value : source[u"labels"_s].toArray()) {
@@ -210,9 +230,11 @@ private Q_SLOTS:
                     { vector(b[u"position"_s]), vector(b[u"aim"_s]), b[u"span"_s].toDouble() },
                     c[u"width"_s].toDouble(), c[u"height"_s].toDouble(),
                     c[u"progress"_s].toDouble());
-            maximum = std::max({ maximum, (actual.position - vector(e[u"position"_s])).length(),
-                                 (actual.aim - vector(e[u"aim"_s])).length(),
-                                 std::abs(actual.span - e[u"span"_s].toDouble()) });
+            maximum = std::max(
+                    { maximum,
+                      errorMagnitude((actual.position - vector(e[u"position"_s])).length()),
+                      errorMagnitude((actual.aim - vector(e[u"aim"_s])).length()),
+                      errorMagnitude(actual.span - e[u"span"_s].toDouble()) });
         }
         QVERIFY2(maximum <= 1e-6, qPrintable(QString::number(maximum, 'g', 16)));
         qInfo() << "Maximum frozen camera error" << maximum;
@@ -289,9 +311,9 @@ private Q_SLOTS:
             for (int i = 0; i < actual.size(); ++i) {
                 QCOMPARE(actual[i].lane, expected[i].lane);
                 QCOMPARE(actual[i].count, expected[i].count);
-                QVERIFY(std::abs(actual[i].extent - expected[i].extent) <= 1e-6);
-                maximum = std::max({ maximum, std::abs(actual[i].x - expected[i].x),
-                                     std::abs(actual[i].y - expected[i].y) });
+                QVERIFY(errorMagnitude(actual[i].extent - expected[i].extent) <= 1e-6);
+                maximum = std::max({ maximum, errorMagnitude(actual[i].x - expected[i].x),
+                                     errorMagnitude(actual[i].y - expected[i].y) });
             }
         }
         QVERIFY2(maximum <= 2, qPrintable(QString::number(maximum, 'g', 16)));

@@ -26,20 +26,10 @@
 
 ## 确认事项索引
 
-尚未解决的独立深度审查确认事项 15 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
+尚未解决的独立深度审查确认事项 5 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
 
 | ID | 类型 | 源码位置 | 事项 |
 | --- | --- | --- | --- |
-| [D-021] | 行为/错误路径 | `tests/render/RhiShellChecks.cpp:145` | Incomplete shell fixture can pass the source-state gate |
-| [D-022] | 行为/错误路径 | `tests/render/StartupChecks.cpp:807` | Startup probe can overwrite an earlier run’s evidence |
-| [D-023] | 行为/错误路径 | `tests/unit/DirectoryScannerTest.cpp:381` | Cancellation regression never establishes the late-completion boundary |
-| [D-024] | 行为/错误路径 | `tests/unit/DisplayOutputTest.cpp:146` | Transfer test silently uses a different graphics backend from the requested one |
-| [D-025] | 行为/错误路径 | `tests/unit/LibraryDataTest.cpp:1389` | Failed assertions can leave a provider callback referencing expired locals |
-| [D-026] | 行为/错误路径 | `tests/unit/OnlineMetadataTest.cpp:913` | Cooldown rows skip the untrusted-host assertion |
-| [D-027] | 行为/错误路径 | `tests/unit/OverviewTest.cpp:167` | Maximum-error reductions silently discard NaN results |
-| [D-028] | 行为/错误路径 | `tests/unit/QmlBehaviorTest.cpp:170` | Failed temporary-directory creation redirects persistence tests into the working directory |
-| [D-029] | 行为/错误路径 | `tools/assets/AssetTransaction.h:52` | Publication follows symlinked destination directories outside the repository |
-| [D-030] | 行为/错误路径 | `tools/migration/TitleSourceProbe.cpp:571` | Validate title capture dimensions before integer arithmetic |
 | [D-031] | 行为/错误路径 | `tools/migration/ProbeInput.h:95` | Accepted ruler frame counts can prevent the deadline from running |
 | [D-032] | 行为/错误路径 | `tools/assets/ExportBranding.cpp:800` | Branding manifest inventory validation accepts duplicate entries |
 | [D-033] | 代码规范/维护 | `qml/Yalahoo/Music/components/ArchiveSlider.qml:19` | Slider rail has an unused id |
@@ -55,7 +45,7 @@
 
 **Files reviewed**: 369（66,262 行）
 
-**Issues found**: 890（878 from original lint，12 unresolved from deep analysis；lint 是原始诊断计数）
+**Issues found**: 880（878 from original lint，2 unresolved from deep analysis；lint 是原始诊断计数）
 
 **Agents**: 27（独立分片，逐文件编号读取并恢复截断内容）
 
@@ -105,86 +95,6 @@
 ---
 
 ### Deep analysis findings
-
-#### [D-021] Incomplete shell fixture can pass the source-state gate
-- **File**: `tests/render/RhiShellChecks.cpp:145`
-- **Category**: Error Handling & Validation
-- **Confidence**: 92/100
-- **Finding**: Only the number of cases is validated. Replacing one ordinary case, such as sourceIndex 4, with a duplicate of sourceIndex 5 preserves the 61-row count and final six sorting/two isolation counts. The omitted source state is never checked, the duplicate output overwrites the same PNG, and the report can still publish `passed=true`. Missing `projections` arrays likewise skip projection validation entirely while leaving `maxProjectionPixels` at zero.
-- **Trace**: Followed `readFixture()` in `RhiReviewInput.h:19–25`, the case loop at `RhiShellChecks.cpp:151–195`, and final counts/report at `344–365`. `readFixture()` checks only that JSON is an object. No distinct/expected sourceIndex set or required projection evidence is checked. `docs/contracts/rhi-shell.md:24` explicitly defines the 61 source states and projection gate.
-- **Mitigation**: Validate the expected distinct sourceIndex set and required projection sample structure before rendering. Reject missing or empty projection evidence and duplicate output identities.
-
-#### [D-022] Startup probe can overwrite an earlier run’s evidence
-- **File**: `tests/render/StartupChecks.cpp:807`
-- **Category**: Error Handling & Validation
-- **Confidence**: 96/100
-- **Finding**: `reviewStartup()` accepts an existing output directory, ignores `mkpath()` failure, and subsequently replaces `product-restored.png` and `report.json`. Repeating the documented direct `ui-tests --startup` command with the same path can overwrite a failed run with a successful report, contrary to the evidence preservation contract.
-- **Trace**: `UiTests.cpp:93–107` directly forwards the supplied path; `StartupChecks.cpp:1209` saves the fixed screenshot name and line 1380 calls `writeJsonFile()`, whose `QSaveFile::commit()` replaces an existing report. `verify-startup.py:54` protects only callers using that wrapper. Sibling `reviewGui()` and `reviewWindowLifecycle()` reject existing output paths.
-- **Mitigation**: Reject existing output paths and failed directory creation before fixture generation or rendering; retain the existing report and image unchanged.
-
-#### [D-023] Cancellation regression never establishes the late-completion boundary
-- **File**: `tests/unit/DirectoryScannerTest.cpp:381`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 97/100
-- **Finding**: The comment promises cancellation after worker completion but before queued delivery, yet `setRoots()` is immediately followed by `cancel()`. The worker can observe cancellation before scanning and return no snapshot, so all assertions pass without exercising rejection of an already completed result. A regression limited to late completion acceptance can therefore escape this test.
-- **Trace**: `LibraryStore::setRoots()` → `rescan()` → `Private::startScan()` launches QtConcurrent work. `cancel()` sets its atomic token immediately. `DirectoryScanner::scan()` checks that token before constructing a snapshot and repeatedly during traversal. Nothing in the test establishes worker completion before cancellation.
-- **Mitigation**: Use a controlled completion barrier or existing test seam to establish that a successful worker result exists while GUI completion remains undelivered, then cancel and verify publication and persistence remain unchanged.
-
-#### [D-024] Transfer test silently uses a different graphics backend from the requested one
-- **File**: `tests/unit/DisplayOutputTest.cpp:146`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 96/100
-- **Finding**: `main()` accepts and probes `QSG_RHI_BACKEND`, but `transferShader()` creates Metal on macOS, D3D11 on Windows, and Vulkan on Linux unconditionally. For example, a successful Windows run requested as D3D12 still tests the production transfer shader on D3D11. Linux OpenGL requests likewise cannot exercise OpenGL and can fail solely because Vulkan development support is absent. This prevents this entry from providing reliable evidence for the selected target backend.
-- **Trace**: `main():433–437` calls `selectGraphicsBackend()` and `probeOptionalGraphicsBackend()`. `transferShader():146–160` then chooses QRhi directly from platform macros without consulting the selected API. CTest registers this function as `display-transfer-gpu`; `test-gates.md` assigns it production shader and target backend coverage.
-- **Mitigation**: Construct QRhi using the selected graphics API and its required initialization resources, and verify/report the actual API. Explicitly reject any unsupported test backend instead of running another one.
-
-#### [D-025] Failed assertions can leave a provider callback referencing expired locals
-- **File**: `tests/unit/LibraryDataTest.cpp:1389`
-- **Category**: Ownership & Lifecycle
-- **Confidence**: 90/100
-- **Finding**: `provider.onCancel` captures `replaced` and other locals by reference, but cleanup happens only at line 1401 after several assertions. If an assertion returns early while a request remains pending, `replaced` reaches the end of its lifetime before `session` is destroyed. Session shutdown cancels pending provider requests and invokes the still-installed callback, which reads that expired capture. A failing regression can consequently invoke undefined behavior during teardown.
-- **Trace**: Declaration order is provider, session, then `replaced`. `TestProvider::cancel():51–55` invokes `onCancel`. `LibrarySession::~LibrarySession()` calls `MetadataCoordinator::shutdown()`, whose `Private::invalidate():358–370` cancels every pending token. The explicit callback reset is bypassed by failed `QVERIFY`/`QCOMPARE`/`QTRY_COMPARE` macros.
-- **Mitigation**: Install unconditional scope-bound callback cleanup that runs before captured locals expire and before session destruction, or restructure ownership/declaration order so every callback dependency outlives shutdown.
-
-#### [D-026] Cooldown rows skip the untrusted-host assertion
-- **File**: `tests/unit/OnlineMetadataTest.cpp:913`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 96/100
-- **Finding**: For the `rate-limit` and `maxlag` rows, `responses.size()` is already 2 after the cooldown check. The subsequent `QTRY_VERIFY(responses.size() >= 2)` therefore succeeds immediately, before the untrusted-host request executes. `server->count() == 1` also passes using the preceding state. These rows finish without exercising or validating rejection of the unsupported address.
-- **Trace**: Followed `httpFailureBoundaries()` lines 907–915 into `MetadataHttp::get()` (`src/services/metadata/MetadataHttp.cpp:103`), which schedules processing with a zero-delay timer. `MetadataHttp::~MetadataHttp()` cancels that timer. Host validation occurs later in `Private::start()` at lines 118–121.
-- **Mitigation**: Record the response count before submitting the unsupported URL, wait for exactly one additional response, and assert that the new response contains the expected rejection while the network request count stays unchanged.
-
-#### [D-027] Maximum-error reductions silently discard NaN results
-- **File**: `tests/unit/OverviewTest.cpp:167`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: The maximum-error reductions start with a finite accumulator and feed unchecked `std::abs()`/vector-length results into `std::max`. A NaN comparison does not replace the accumulator, so nonfinite production results can leave `maximum == 0` and pass the tolerance assertion. The same defect occurs in camera interpolation at lines 213–217 and projection coordinates at lines 293–297.
-- **Trace**: Followed all three reducers and their final assertions; `SceneVector::length()` propagates NaN. Compared `RealColumnsTest.cpp:151–152`, which uses `tests/support/NumericChecks.h::errorMagnitude()` specifically to reject nonfinite differences before reduction.
-- **Mitigation**: Reject nonfinite values before every reduction, using the existing numeric-check helper where suitable; verify the regression assertion fails when a compared component is NaN.
-
-#### [D-028] Failed temporary-directory creation redirects persistence tests into the working directory
-- **File**: `tests/unit/QmlBehaviorTest.cpp:170`
-- **Category**: Error Handling & Validation
-- **Confidence**: 95/100
-- **Finding**: The test passes `directory.path()` to `LibraryStore` without checking `directory.isValid()`. If temporary-directory creation fails, its empty path makes `QDir(dataRoot).filePath("library-index.json")` target the working directory, where the test loads and saves metadata configuration. The settings tests repeat this at lines 250–251 and 320–329, allowing their updates to read/write a working-directory `preferences.json`.
-- **Trace**: Followed `LibraryStore` construction at `src/library/LibraryStore.cpp:89–94` and metadata persistence at lines 230–236; followed `SettingsFixture` into `PreferencesStore` construction at `src/services/PreferencesStore.cpp:63–68` and shutdown persistence at lines 89–97.
-- **Mitigation**: Assert temporary-directory validity before constructing any store or fixture so setup failure stops the test before filesystem access.
-
-#### [D-029] Publication follows symlinked destination directories outside the repository
-- **File**: `tools/assets/AssetTransaction.h:52`
-- **Category**: Error Handling & Validation
-- **Confidence**: 88/100
-- **Finding**: Publication rejects a symlink at the final filename but follows symlinks in parent directories. For example, if `resources/audio` points outside the repository, publishing `resources/audio/atmosphere.ogg` moves and replaces the external file while the leaf passes `isSymLink()`. This bypasses the intended root-relative output boundary and the assumption that staging and destination share a filesystem.
-- **Trace**: Followed `stage()` path validation, `publish()` destination checks and rollback, `GeometryAudit::saveFile()`, and `PrepareAssets.cpp` construction/staging/publication. The CLI accepts its repository root directly; neither caller nor transaction validates destination ancestors or canonical containment.
-- **Mitigation**: Validate destination parent components before publication, reject symlinked ancestors, and verify that resolved destinations remain beneath the canonical repository root. Cover an external directory symlink with a regression that proves external files remain untouched.
-
-#### [D-030] Validate title capture dimensions before integer arithmetic
-- **File**: `tools/migration/TitleSourceProbe.cpp:571`
-- **Category**: Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: The external reference report receives only a protocol and nonempty-array check before its capture dimensions reach `toInt() + 2`. A matching-DPR capture with `width` or `budget` equal to `2147483647` passes the input checks and causes signed integer overflow here. Fractional, negative and incorrectly typed dimensions are also silently converted rather than rejected.
-- **Trace**: `SourceUiProbe::main` passes the supplied source directory directly to `probeTitleSource`; lines 666–671 check only protocol and nonempty arrays; lines 735–737 filter only DPR; `finishTitleProbe` consumes unchecked dimensions at line 571. `verify-title.mjs` checks capture count/platform/protocol but does not validate dimensions.
-- **Mitigation**: Validate the complete title report before creating rendering resources. Require finite positive dimensions with explicit practical limits, validate their integer representation, and check padding and DPR-scaled arithmetic before conversion or allocation.
 
 #### [D-031] Accepted ruler frame counts can prevent the deadline from running
 - **File**: `tools/migration/ProbeInput.h:95`
@@ -237,12 +147,10 @@
 | Category | Lint | Deep | Investigate | Total |
 | --- | ---: | ---: | ---: | ---: |
 | 原始 lint 规则诊断（未按深度领域重分类） | 878 | 0 | 0 | 878 |
-| API, Naming & C++ Correctness | 0 | 4 | 0 | 4 |
-| Error Handling & Validation | 0 | 7 | 0 | 7 |
+| Error Handling & Validation | 0 | 2 | 0 | 2 |
 | Model Contracts | 0 | 0 | 1 | 1 |
-| Ownership & Lifecycle | 0 | 1 | 0 | 1 |
 | Performance & Code Quality | 0 | 0 | 2 | 2 |
-| **Total** | **878** | **12** | **3** | **893** |
+| **Total** | **878** | **2** | **3** | **883** |
 
 Findings below confidence 60 are suppressed. 诊断、确认事项和调查项的计数不可解释为同等严重性的缺陷总数。
 

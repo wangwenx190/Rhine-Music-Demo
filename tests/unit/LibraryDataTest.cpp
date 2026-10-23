@@ -5,6 +5,7 @@
 #include "Localization.h"
 #include "LibrarySearchOracle.h"
 #include "LibrarySession.h"
+#include <QScopeGuard>
 #include "LibraryIndex.h"
 #include "GenreRowsModel.h"
 #include "OptionMetrics.h"
@@ -1419,27 +1420,48 @@ private Q_SLOTS:
         QCOMPARE(session.metadataProgress().value(u"completed"_s).toInt(), 1);
         QCOMPARE(session.metadataProgress().value(u"status"_s).toString(), u"Matched"_s);
     }
+    void providerCancellationCannotOverwriteNewerBatchIntent_data()
+    {
+        QTest::addColumn<bool>("completeRequest");
+        QTest::newRow("complete-request") << true;
+        QTest::newRow("early-return-with-pending-request") << false;
+    }
     void providerCancellationCannotOverwriteNewerBatchIntent()
     {
+        QFETCH(bool, completeRequest);
         TestProvider provider;
-        LibrarySession session(&provider);
-        session.setSnapshot(library(u"single"_s));
-        const auto id = session.snapshot()->albums.first().id;
-        QVERIFY(session.requestMetadata(id, u"introduction"_s));
-        bool replaced = false;
-        provider.onCancel = [&] {
-            if (!replaced) {
-                replaced = true;
-                QVERIFY(session.requestMetadataBatch(u"credits"_s));
-            }
-        };
-        QVERIFY(!session.requestMetadataBatch(u"introduction"_s));
-        QVERIFY(replaced);
-        QCOMPARE(provider.requests.size(), 2);
-        QCOMPARE(session.metadataProgress().value(u"kind"_s).toString(), u"credits"_s);
-        provider.deliver(1, ProviderStatus::Matched);
-        QTRY_COMPARE(session.metadataProgress().value(u"completed"_s).toInt(), 1);
-        provider.onCancel = { };
+        {
+            LibrarySession session(&provider);
+            session.setSnapshot(library(u"single"_s));
+            // QtTest assertions return from this scope. The callback must be gone before
+            // its captures expire, even when the replacement request is still pending.
+            const auto exercise = [&] {
+                const auto id = session.snapshot()->albums.first().id;
+                QVERIFY(session.requestMetadata(id, u"introduction"_s));
+                bool replaced = false;
+                const auto clearCallback = qScopeGuard([&provider] {
+                    provider.onCancel = { };
+                });
+                provider.onCancel = [&] {
+                    if (!replaced) {
+                        replaced = true;
+                        QVERIFY(session.requestMetadataBatch(u"credits"_s));
+                    }
+                };
+                QVERIFY(!session.requestMetadataBatch(u"introduction"_s));
+                QVERIFY(replaced);
+                QCOMPARE(provider.requests.size(), 2);
+                QCOMPARE(session.metadataProgress().value(u"kind"_s).toString(), u"credits"_s);
+                if (!completeRequest)
+                    return;
+                provider.deliver(1, ProviderStatus::Matched);
+                QTRY_COMPARE(session.metadataProgress().value(u"completed"_s).toInt(), 1);
+            };
+            exercise();
+            QVERIFY(!provider.onCancel);
+            QCOMPARE(session.metadataBusy(), !completeRequest);
+        }
+        QCOMPARE(provider.cancelled.size(), completeRequest ? 1 : 2);
     }
     void shutdownRejectsReentrantProviderRequests()
     {
@@ -1451,6 +1473,9 @@ private Q_SLOTS:
         auto *closing = session.get();
         quint64 request = 1;
         bool batch = true;
+        const auto clearCallback = qScopeGuard([&provider] {
+            provider.onCancel = { };
+        });
         provider.onCancel = [&] {
             request = closing->requestMetadata(id, u"credits"_s);
             batch = closing->requestMetadataBatch(u"credits"_s);
@@ -1459,7 +1484,6 @@ private Q_SLOTS:
         QCOMPARE(request, quint64(0));
         QVERIFY(!batch);
         QCOMPARE(provider.requests.size(), 1);
-        provider.onCancel = { };
     }
     void injectedProviderStaleResults()
     {

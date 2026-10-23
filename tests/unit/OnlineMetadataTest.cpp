@@ -1018,8 +1018,12 @@ private Q_SLOTS:
             QTRY_COMPARE(responses.size(), 2);
             QCOMPARE(server->count(), 1);
         }
+        const auto beforeUntrusted = responses.size();
         http.get(QUrl(u"https://untrusted.invalid/"_s), { }, { });
-        QTRY_VERIFY(responses.size() >= 2);
+        QTRY_COMPARE(responses.size(), beforeUntrusted + 1);
+        QCOMPARE(responses.last().error, MetadataHttp::tr("Unsupported metadata address."));
+        QVERIFY(responses.last().data.isEmpty());
+        QVERIFY(responses.last().retryAt.isEmpty());
         QCOMPARE(server->count(), 1);
     }
     void proxySelection_data()

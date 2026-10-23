@@ -5,7 +5,7 @@
 #include "../support/FileFixture.h"
 #include "DirectoryScanner.h"
 #include "LibrarySession.h"
-#include "LibraryStore.h"
+#include "LibraryStore_p.h"
 #include "OfflineMetadataProvider.h"
 
 #include <QCryptographicHash>
@@ -363,6 +363,7 @@ void DirectoryScannerTest::storeRoundTripAndResponsiveness()
 void DirectoryScannerTest::latestRootAndCancelledResult()
 {
     QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
     const QString a = temporary.path() + "/a"_L1, b = temporary.path() + "/b"_L1;
     QVERIFY(put(a + u"/old.mp3"_s));
     QVERIFY(put(b + u"/new.mp3"_s));
@@ -377,8 +378,18 @@ void DirectoryScannerTest::latestRootAndCancelledResult()
     QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
     const auto bytes = yalahoo::test::readFile(data + "/library-index.json"_L1);
     ready.clear();
-    // Cancel after the worker finishes but before its queued completion is delivered.
+    // Waiting on the worker does not deliver the GUI watcher's queued completion.
     QVERIFY(store.setRoots({ QUrl::fromLocalFile(a) }));
+    QCOMPARE(store.d->m_active, LibraryStore::Private::Kind::Scan);
+    QVERIFY(store.d->m_worker.waitForDone(AsyncDeadlineMilliseconds));
+    const auto completed = store.d->m_job.result();
+    QVERIFY(!completed.cancelled);
+    QVERIFY(completed.error.isEmpty());
+    QVERIFY(completed.snapshot);
+    QCOMPARE(completed.snapshot->albums.size(), 1);
+    QCOMPARE(completed.snapshot->albums.first().title, u"old"_s);
+    QCOMPARE(ready.size(), 0);
+    QCOMPARE(store.snapshot()->albums.first().title, u"new"_s);
     store.cancel();
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(ready.size(), 0);
