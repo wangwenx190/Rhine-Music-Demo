@@ -27,11 +27,13 @@ struct Track final
     MediaSupport mediaSupport = MediaSupport::Unknown;
     QUrl sourceUrl;
     QJsonObject fields;
+    bool operator==(const Track &) const = default;
 };
 struct Producer final
 {
     QString name, role, source, trackId, trackTitle, url;
     QJsonObject fields;
+    bool operator==(const Producer &) const = default;
 };
 struct Album final
 {
@@ -51,12 +53,14 @@ struct Genre final
     QStringList aliases;
     std::optional<int> albumCount;
     QJsonObject fields;
+    bool operator==(const Genre &) const = default;
 };
 struct LibraryRoot final
 {
     QUrl path;
     QString status, error;
     QJsonObject fields;
+    bool operator==(const LibraryRoot &) const = default;
 };
 struct LibrarySnapshot final
 {

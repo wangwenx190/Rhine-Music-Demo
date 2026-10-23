@@ -1,5 +1,6 @@
 target_sources(YalahooCore PRIVATE MediaMetadataProbe.cpp MediaMetadataProbe.h
     PlaybackQueue.cpp PlaybackQueue.h
+    AudioPreferencesBinding.cpp AudioPreferencesBinding.h
     PlaybackController.cpp PlaybackController.h
     BackgroundMusicController.cpp BackgroundMusicController.h
     InterfaceSoundController.cpp InterfaceSoundController.h)

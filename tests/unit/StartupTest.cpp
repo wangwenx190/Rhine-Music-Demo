@@ -6,6 +6,10 @@
 #include "SelectionController.h"
 #include "StartupCoordinator.h"
 #include "DemoLibrary.h"
+#include "LibraryPersistence.h"
+#include "LibraryStore.h"
+#include "OnlineMetadataProvider.h"
+#include <QTemporaryDir>
 #include <QTest>
 #include <QSignalSpy>
 
@@ -20,7 +24,10 @@ Snapshot snapshot(const QString &title)
 }
 struct Fixture final
 {
-    LibrarySession library{ nullptr };
+    explicit Fixture(IMetadataProvider *provider = nullptr) : library(provider)
+    {
+    }
+    LibrarySession library;
     MotionController motion;
     SelectionController selection{ &motion };
     SceneAdapter scene{ motion.clock() };
@@ -36,6 +43,37 @@ public:
     StartupTest() = default;
 
 private Q_SLOTS:
+    void persistentLibraryBindingPropagatesAndDisconnects()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        OnlineMetadataProvider provider;
+        Fixture f(&provider);
+        LibraryStore store(root.path());
+        auto binding = std::make_unique<LibraryPersistence>(store, provider, f.library, f.startup);
+        store.load();
+        QTRY_VERIFY(!store.busy());
+        QTRY_VERIFY(f.startup.statistics().value(u"initialReady"_s).toBool());
+        QVERIFY(store.setMetadataConfiguration(
+                { { u"networkEnabled"_s, false },
+                  { u"musicBrainzContact"_s, u"first@example.test"_s } }));
+        QCOMPARE(f.library.metadataConfiguration().value(u"musicBrainzContact"_s).toString(),
+                 u"first@example.test"_s);
+        const auto received = f.startup.statistics().value(u"receivedSnapshots"_s).toInteger();
+        QTRY_VERIFY(!store.busy());
+        // A queued enrichment wakeup belongs to the binding, as do all durable/live connections.
+        Q_EMIT store.scanFinished(1, 0);
+        binding.reset();
+        QVERIFY(store.setMetadataConfiguration(
+                { { u"musicBrainzContact"_s, u"second@example.test"_s } }));
+        QCOMPARE(f.library.metadataConfiguration().value(u"musicBrainzContact"_s).toString(),
+                 u"first@example.test"_s);
+        QTRY_VERIFY(!store.busy());
+        store.load();
+        QTRY_VERIFY(!store.busy());
+        QCOMPARE(f.startup.statistics().value(u"receivedSnapshots"_s).toInteger(), received);
+        QVERIFY(!f.library.metadataBusy());
+    }
     void initialReadinessAndLateSnapshot()
     {
         Fixture f;

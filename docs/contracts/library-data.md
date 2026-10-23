@@ -35,7 +35,7 @@ HTTP仅允许`musicbrainz.org`、`zh.wikipedia.org`、`en.wikipedia.org`与`www.
 
 缓存输入摘要覆盖查询种类、专辑名/歌手/年份及本地曲目身份、名称、时长、disc/track；输入变化使相应缓存失效。成功/部分资料有效30天，NotFound/Uncertain有效一天，错误按retryAt（默认60秒）保留，连接配置变更可重新尝试普通连接错误，但不能绕过服务限流冷却；未知字段和有效历史来源保留，不伪造checkedAt。关闭联网仍可读取过期缓存。失败刷新只更新查询状态，保留已有正文/制作人员；成功制作查询在creditsLookup保存已核对的发行标识并清除旧候选；制作与流派查询状态各自保存，后续查询采用较新的已核对标识，避免不同查询种类互相覆盖；只替换MusicBrainz来源，保留本地及其他来源。OfflineMetadataProvider以对象所属FIFO timer异步读取快照，最多八项，不创建网络对象或写缓存；无缓存返回Deferred，已有历史状态原样交付。
 
-LibrarySession以稳定ID串行推进批次，metadataProgress显示真实状态与完成/错误数；取消保留已经接受的结果。metadataRevision驱动当前实体读取，QML不解析JSON。当前专辑的元数据通过DetailModel刷新，保持曲目模型、滚动与播放；模型metadata提交使用定向dataChanged，不触发排序、导航或整个场景重建。来源、许可和查询错误可离线查看。
+LibrarySession组合LibraryIndex与MetadataCoordinator：前者持有不可变快照及专辑/所属曲目的身份索引，后者独占请求token、已接纳资料、取消代次与串行批次。协调器借用的索引先构造后销毁，Provider仍经IMetadataProvider注入；会话只路由界面命令和通知，不另存一份请求状态。LibraryPersistence负责LibraryStore、Provider和启动快照的持久化接线与扫描后自动查询，零间隔单次timer合并等待，销毁即取消待唤醒。MetadataCoordinator以稳定ID串行推进批次，metadataProgress显示真实状态与完成/错误数；取消保留已经接受的结果。metadataRevision驱动当前实体读取，QML不解析JSON。当前专辑的元数据通过DetailModel刷新，保持曲目模型、滚动与播放；模型metadata提交使用定向dataChanged，不触发排序、导航或整个场景重建。元数据入口须验证专辑顺序、排序/搜索字段、完整曲目记录、流派、根和扫描身份不变；会话另拒绝旧配置的提交。仅介绍/来源、制作人员、查询状态及在线流派扩展可更新；正文或署名变化即使查询状态相同也通知。dataChanged中同步换库后，旧提交停止，不再覆盖搜索模型。批次在请求通知前建立请求归属，任何同步取消/换批后核对代次，旧调用不得覆盖新批次或把Cancelled改成Error。来源、许可和查询错误可离线查看。
 
 LibraryStore按实体/kind合并已接受结果；批次结束、取消或累计载荷达到8MiB时，在其唯一worker中按索引合并进最新快照。批次先按专辑ID索引，只为命中的专辑验证输入摘要和构造候选；整批被拒绝时保留原快照身份，不分离专辑数组、不发送提交通知或保存全库。仅修改资料字段，不写音乐文件、不覆盖人工分类。元数据快照与保存共用既有有界串行调度和QSaveFile/256MiB缓存门槛；GUI不逐结果复制/序列化全库。单次合并最坏O(专辑数+被修改专辑曲目/资料数)，暂存最多当前库每专辑三类结果，HTTP等待/在途/完成容量独立有界。元数据提交不作为换库，不中断批次。保存失败保留原文件并暴露错误，退出处理已接纳结果；内存结果与磁盘保存成功是独立事实。
 

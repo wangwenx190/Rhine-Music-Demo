@@ -633,8 +633,8 @@
       "sha256": "b89dbb47c83718a940099738dc3c0600897a39848937687e4cc8c86b324028c0",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/core/LibraryModels.cpp",
-      "responsibility": "Cached ordering, grouping and search models",
+      "target": "src/core/LibraryOrder.cpp + src/core/AlbumListModel.cpp",
+      "responsibility": "Cached ordering, grouping and album model",
       "imports": [
         "src/music-types.ts"
       ]
@@ -753,7 +753,7 @@
       "sha256": "77d317688e2739682c721d1bbf6081a1620a5461a305851fcc188b230539761b",
       "musicReachable": true,
       "role": "migrate",
-      "target": "src/core/LibraryModels.cpp",
+      "target": "src/core/LibraryOrder.cpp + src/core/SearchListModel.cpp + src/core/LibraryIndex.cpp",
       "responsibility": "Indexed asynchronous search and stable result models",
       "imports": [
         "src/music-types.ts"

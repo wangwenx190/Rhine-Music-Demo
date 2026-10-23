@@ -1,6 +1,10 @@
 qt_add_executable(
     Yalahoo
     main.cpp
+    ApplicationOptions.cpp
+    ApplicationOptions.h
+    LibraryPersistence.cpp
+    LibraryPersistence.h
     DeploymentProbe.cpp
     DeploymentProbe.h
     AssetCatalog.cpp

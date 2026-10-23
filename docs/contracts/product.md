@@ -26,7 +26,7 @@
 
 ## 顶层组合与目录
 
-`src/app/main.cpp`在GUI线程构造长期业务控制器、Provider、媒体和QML引擎，显式注入`App.qml → MusicStage.qml`。控制器各自拥有状态，通过窄接口协作；QML视觉重载不销毁库/偏好/媒体。模型通知、异步对象与渲染快照边界分别遵守Qt/QML及RHI契约。
+`src/app/main.cpp`在GUI线程构造长期业务控制器、Provider、媒体和QML引擎，显式注入`App.qml → MusicStage.qml`。ApplicationOptions在持久化对象创建前解析并验证互斥启动模式与绝对输入路径；LibraryPersistence组合库持久化接线，AudioPreferencesBinding独占音频设置同步。控制器各自拥有状态，通过窄接口协作；QML视觉重载不销毁库/偏好/媒体。模型通知、异步对象与渲染快照边界分别遵守Qt/QML及RHI契约。
 
 | 路径 | 归属 |
 | --- | --- |

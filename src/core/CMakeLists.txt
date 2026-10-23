@@ -17,7 +17,11 @@ qt_add_library(
     AppIdentity.h
     MusicTypes.cpp
     MusicTypes.h
-    LibraryModels.cpp
+    LibraryIndex.cpp
+    LibraryIndex.h
+    LibraryOrder.cpp
+    AlbumListModel.cpp
+    SearchListModel.cpp
     LibraryModels.h
     Localization.cpp
     Localization.h

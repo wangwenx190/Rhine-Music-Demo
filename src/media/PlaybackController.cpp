@@ -125,7 +125,7 @@ qint64 PlaybackController::position() const
 }
 bool PlaybackController::playTrack(const QString &albumId, const QString &trackId)
 {
-    const auto *album = d->m_library->d->album(albumId);
+    const auto *album = d->m_library->album(albumId);
     if (!album || album->offline) {
         Q_EMIT rejected(QCoreApplication::translate(
                 "Yalahoo", "The album directory is unavailable. Rescan or choose another track."));
@@ -147,7 +147,7 @@ bool PlaybackController::playTrack(const QString &albumId, const QString &trackI
 }
 bool PlaybackController::playAlbum(const QString &albumId)
 {
-    const auto *album = d->m_library->d->album(albumId);
+    const auto *album = d->m_library->album(albumId);
     return album && !album->tracks.isEmpty() && playTrack(albumId, album->tracks.first().id);
 }
 void PlaybackController::Private::start(int index)

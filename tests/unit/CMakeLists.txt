@@ -202,6 +202,7 @@ set_tests_properties(playback-device PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE)
 yalahoo_unit_test(AudioAmbienceTest audio-ambience
     LIBRARIES YalahooCore
     ARGUMENTS missingEventsAreSilent audioPreferencesPersistIndependently
+        importedAudioAppliesAtomicallyWithoutSavingIntermediateValues
     TIMEOUT 30)
 add_test(NAME audio-ambience-device COMMAND AudioAmbienceTest realBgmGateInterruptionsAndHiddenPlayback
     bgmErrorIsSilentAndExplicitEnableRetries soundEffectPoolIsBounded)
@@ -222,6 +223,8 @@ yalahoo_unit_test(ExperimentTest experiments
     TIMEOUT 60)
 
 yalahoo_unit_test(StartupTest startup
+    SOURCES "${PROJECT_SOURCE_DIR}/src/app/LibraryPersistence.cpp"
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
     LIBRARIES YalahooScene
     TIMEOUT 60)
 yalahoo_unit_test(LoggingTest logging
@@ -277,3 +280,8 @@ if(UNIX)
         "${PROJECT_SOURCE_DIR}/tests/tools/LauncherTest.py")
     set_tests_properties(launchers PROPERTIES TIMEOUT 90)
 endif()
+
+yalahoo_unit_test(ApplicationOptionsTest application-options
+    SOURCES "${PROJECT_SOURCE_DIR}/src/app/ApplicationOptions.cpp"
+    INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
+    LIBRARIES YalahooCore)

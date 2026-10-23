@@ -21,6 +21,8 @@ target_sources(
     OfflineMetadataProvider.cpp
     LibrarySession.h
     LibrarySession.cpp
+    metadata/MetadataCoordinator.h
+    metadata/MetadataCoordinator.cpp
     MetadataPresentation.h
     MetadataPresentation.cpp
     CoverCache.h

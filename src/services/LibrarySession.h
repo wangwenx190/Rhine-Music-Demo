@@ -34,6 +34,8 @@ public:
     SearchListModel *searchResults();
     void setSnapshot(LibrarySnapshot snapshot);
     Snapshot snapshot() const;
+    // Borrowed records remain valid until the next snapshot replacement.
+    const Album *album(const QString &id) const;
     const Album *navigationAlbum() const;
     QVariantList genres() const;
     Q_INVOKABLE bool hasGenre(const QString &id) const;

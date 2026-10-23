@@ -9,6 +9,7 @@
 #include "InterfaceSoundController.h"
 #include "PlaybackController.h"
 #include "PreferencesStore.h"
+#include "AudioPreferencesBinding.h"
 #include "OfflineMetadataProvider.h"
 #include "AudioFixture.h"
 #include <QTest>
@@ -205,6 +206,43 @@ private Q_SLOTS:
         sounds.setEnabled(false);
         for (const auto &effect : sounds.d->m_pool)
             QVERIFY(!effect->isPlaying());
+    }
+    void importedAudioAppliesAtomicallyWithoutSavingIntermediateValues()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        PreferencesStore preferences(root.path());
+        LibrarySession library(nullptr);
+        PlaybackController playback(&library);
+        BackgroundMusicController background;
+        InterfaceSoundController sounds;
+        AudioPreferencesBinding binding(preferences, playback, background, sounds);
+        const QJsonObject imported{ { u"volume"_s, .2 },
+                                    { u"bgm"_s, false },
+                                    { u"bgmVolume"_s, .3 },
+                                    { u"sound"_s, false },
+                                    { u"soundVolume"_s, .4 } };
+        QFile source(root.filePath(u"import.json"_s));
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QVERIFY(source.write(QJsonDocument(imported).toJson()) > 0);
+        source.close();
+        QSignalSpy restored(&preferences, &PreferencesStore::imported);
+        QSignalSpy changed(&preferences, &PreferencesStore::changed);
+        QVERIFY(preferences.importJson(QUrl::fromLocalFile(source.fileName())));
+        QTRY_COMPARE(restored.size(), 1);
+        QCOMPARE(changed.size(), 1);
+        QCOMPARE(preferences.audio(), imported);
+        QCOMPARE(playback.volume(), double(.2f));
+        QCOMPARE(background.volume(), .3);
+        QCOMPARE(sounds.volume(), .4);
+        QVERIFY(!background.enabled());
+        QVERIFY(!sounds.enabled());
+        QVERIFY(playback.source().isEmpty());
+        QVERIFY(!background.playing());
+        // Later user edits still persist the complete current audio settings.
+        sounds.setEnabled(true);
+        QCOMPARE(preferences.audio().value(u"sound"_s).toBool(), true);
+        QCOMPARE(preferences.audio().value(u"bgmVolume"_s).toDouble(), .3);
     }
     void audioPreferencesPersistIndependently()
     {

@@ -1,4 +1,4 @@
-#include "ProductDefaults.h"
+#include "AudioPreferencesBinding.h"
 #include "FrameClock.h"
 #include "SelectionController.h"
 #include "CoverCache.h"
@@ -11,6 +11,7 @@
 #include "BackgroundMusicController.h"
 #include "InterfaceSoundController.h"
 #include "LibraryStore.h"
+#include "LibraryPersistence.h"
 #include "PresentationController.h"
 #include "DetailModel.h"
 #include "TrackFocusController.h"
@@ -46,7 +47,7 @@
 #  include "MaterialReview.h"
 #endif
 
-#include <QCommandLineParser>
+#include "ApplicationOptions.h"
 #include <QDir>
 #include <QIcon>
 #include <QJsonObject>
@@ -59,6 +60,7 @@
 #include <QTimer>
 #include <cstdio>
 #include <memory>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 
@@ -68,8 +70,7 @@ enum ReviewExit {
     QmlCreationFailed = 2,
     RootWindowMissing = 3,
     AssetFontInitializationFailed = 6,
-    InvalidCommandLine = 7,
-    MaterialInputMissing = 12,
+    InvalidCommandLine = std::to_underlying(yalahoo::ApplicationArgumentError::InvalidCommandLine),
     GraphicsBackendUnavailable = 22,
     AppVerificationFailed = 25
 };
@@ -85,33 +86,24 @@ QQuickItem *findVisualItem(QQuickItem *item, const QString &name)
     return nullptr;
 }
 
-bool initializeLibraryCommands(const QCommandLineParser &parser, yalahoo::LibraryStore &store,
-                               yalahoo::PreferencesStore &preferences)
+bool initializeLibraryCommands(const yalahoo::ApplicationOptions &options,
+                               yalahoo::LibraryStore &store, yalahoo::PreferencesStore &preferences)
 {
-    if (parser.isSet(u"import-preferences"_s)
-        && !preferences.importJson(QUrl::fromLocalFile(parser.value(u"import-preferences"_s))))
+    if (!options.preferencesImport.isEmpty()
+        && !preferences.importJson(QUrl::fromLocalFile(options.preferencesImport)))
         return false;
-    if (parser.isSet(u"import-legacy"_s)
-        && (parser.isSet(u"music-root"_s) || parser.isSet(u"rescan-library"_s))) {
-        qCWarning(yalahoo::logApp, "--import-legacy cannot be combined with scan options");
-        return false;
-    }
     store.load();
-    if (parser.isSet(u"import-legacy"_s)) {
-        if (!store.importLegacy(QUrl::fromLocalFile(parser.value(u"import-legacy"_s))))
+    if (!options.legacyImport.isEmpty()) {
+        if (!store.importLegacy(QUrl::fromLocalFile(options.legacyImport)))
             return false;
-    } else if (parser.isSet(u"music-root"_s)) {
+    } else if (!options.musicRoots.isEmpty()) {
         QList<QUrl> roots;
-        for (const auto &path : parser.values(u"music-root"_s)) {
-            if (!QDir::isAbsolutePath(path)) {
-                qCWarning(yalahoo::logApp, "--music-root requires absolute paths");
-                return false;
-            }
+        for (const auto &path : options.musicRoots) {
             roots.append(QUrl::fromLocalFile(path));
         }
         if (!store.setRoots(roots))
             return false;
-    } else if (parser.isSet(u"rescan-library"_s)) {
+    } else if (options.rescan) {
         const auto once = std::make_shared<QMetaObject::Connection>();
         *once = QObject::connect(&store, &yalahoo::LibraryStore::snapshotReady, &store,
                                  [store = &store, once] {
@@ -175,108 +167,33 @@ int main(int argc, char **argv)
         qCCritical(yalahoo::logApp) << "Embedded MiSans font registration failed";
         return AssetFontInitializationFailed;
     }
-    QCommandLineParser parser;
-    parser.setApplicationDescription(
-            QCoreApplication::translate("CommandLine", "yalahOO!!! native music archive"));
-    parser.addHelpOption();
-    parser.addOption({ u"verify-app"_s,
-                       QCoreApplication::translate(
-                               "CommandLine", "Verify hidden product QML creation, then exit") });
-    parser.addOption(
-            { u"demo"_s,
-              QCoreApplication::translate(
-                      "CommandLine",
-                      "Use anonymous albums without reading saved data or starting audio") });
-    parser.addOption({ u"lighting-lab"_s,
-                       QCoreApplication::translate(
-                               "CommandLine",
-                               "Open lighting/motion controls with the anonymous demonstration") });
-    parser.addOption({ u"verify-deployment"_s,
-                       QCoreApplication::translate(
-                               "CommandLine",
-                               "Verify hidden product resources and media loading, then exit"),
-                       QCoreApplication::translate("CommandLine", "report") });
-    parser.addOption(
-            { u"verify-overview"_s,
-              QCoreApplication::translate("CommandLine", "Verify production overview and exit"),
-              QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption({ u"verify-detail"_s,
-                       QCoreApplication::translate("CommandLine",
-                                                   "Verify production detail motion and exit"),
-                       QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption(
-            { u"verify-navigation"_s,
-              QCoreApplication::translate("CommandLine", "Verify production navigation and exit"),
-              QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption({ u"data-dir"_s,
-                       QCoreApplication::translate("CommandLine", "Override the native data root"),
-                       QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption(
-            { u"music-root"_s,
-              QCoreApplication::translate(
-                      "CommandLine",
-                      "Scan a local absolute music directory (repeatable, replaces saved roots)"),
-              QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption(
-            { u"import-legacy"_s,
-              QCoreApplication::translate(
-                      "CommandLine", "Read a legacy music-data-v3 directory into the native cache"),
-              QCoreApplication::translate("CommandLine", "directory") });
-    parser.addOption(
-            { u"import-preferences"_s,
-              QCoreApplication::translate("CommandLine",
-                                          "Import an explicitly exported browser preferences JSON"),
-              QCoreApplication::translate("CommandLine", "file") });
-    parser.addOption(
-            { u"rescan-library"_s,
-              QCoreApplication::translate("CommandLine", "Rescan saved local music directories") });
 #ifdef YALAHOO_REVIEW
-    parser.addOption({ u"verify-materials"_s,
-                       QCoreApplication::translate(
-                               "CommandLine", "Verify source material state and native output"),
-                       QCoreApplication::translate("CommandLine", "fixture") });
-    parser.addOption({ u"material-report"_s,
-                       QCoreApplication::translate("CommandLine", "Material source/state report"),
-                       QCoreApplication::translate("CommandLine", "report") });
+    constexpr bool ReviewEnabled = true;
+#else
+    constexpr bool ReviewEnabled = false;
 #endif
-    if (!parser.parse(app.arguments())) {
-        qCWarning(yalahoo::logApp) << parser.errorText();
-        return InvalidCommandLine;
+    const auto parsed = yalahoo::parseApplicationOptions(app.arguments(), ReviewEnabled);
+    if (!parsed.error.isEmpty()) {
+        qCWarning(yalahoo::logApp) << parsed.error;
+        return std::to_underlying(parsed.errorCode);
     }
-    if (parser.isSet(u"help"_s) || parser.isSet(u"help-all"_s)) {
-        const auto help = parser.helpText().toUtf8();
+    if (!parsed.help.isEmpty()) {
+        const auto help = parsed.help.toUtf8();
         std::fwrite(help.constData(), 1, size_t(help.size()), stdout);
         return 0;
     }
-    const bool demonstration = parser.isSet(u"demo"_s) || parser.isSet(u"lighting-lab"_s);
-    if (demonstration) {
-        for (const auto &option : parser.optionNames()) {
-            if (option.startsWith(u"verify-"_s)
-                || QStringList{ u"data-dir"_s, u"music-root"_s, u"import-legacy"_s,
-                                u"import-preferences"_s, u"rescan-library"_s }
-                           .contains(option)) {
-                qCWarning(yalahoo::logApp,
-                          "Demonstration cannot be combined with data or verification options");
-                return InvalidCommandLine;
-            }
-        }
-    }
-    const bool appVerification = parser.isSet(u"verify-app"_s)
-            || parser.isSet(u"verify-deployment"_s) || parser.isSet(u"verify-navigation"_s)
-            || parser.isSet(u"verify-detail"_s) || parser.isSet(u"verify-overview"_s);
-    const bool verificationRun = appVerification
-#ifdef YALAHOO_REVIEW
-            || parser.isSet(u"verify-materials"_s)
-#endif
-            ;
-    const bool persistentSession = !verificationRun && !demonstration;
+    const auto &options = *parsed.options;
+    const bool demonstration = options.demonstration();
+    const bool appVerification = options.appVerification();
+    const bool verificationRun = options.verificationRun();
+    const bool persistentSession = options.persistent();
     // Keep the ownership lock until library and final preference writes have finished.
     yalahoo::SingleInstance singleInstance;
     std::unique_ptr<yalahoo::PreferencesStore> preferences;
     QString dataRoot;
     if (persistentSession) {
-        dataRoot = parser.isSet(u"data-dir"_s)
-                ? parser.value(u"data-dir"_s)
+        dataRoot = !options.dataRoot.isEmpty()
+                ? options.dataRoot
                 : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir::isAbsolutePath(dataRoot)) {
             qCWarning(yalahoo::logApp, "--data-dir requires an absolute path");
@@ -337,89 +254,17 @@ int main(int argc, char **argv)
     updateApplicationVisibility(app.applicationState());
     QObject::connect(&app, &QGuiApplication::applicationStateChanged, &motion,
                      updateApplicationVisibility);
+    std::unique_ptr<yalahoo::AudioPreferencesBinding> audioPreferences;
     std::unique_ptr<yalahoo::LibraryStore> libraryStore;
+    std::unique_ptr<yalahoo::LibraryPersistence> libraryPersistence;
     if (persistentSession) {
-        const auto applyAudio = [&] {
-            const auto audio = preferences->audio();
-            playback.setVolume(
-                    audio.value(u"volume"_s).toDouble(yalahoo::productDefaults::DefaultSongVolume));
-            background.setVolume(
-                    audio.value(u"bgmVolume"_s)
-                            .toDouble(yalahoo::productDefaults::DefaultBackgroundVolume));
-            background.setEnabled(audio.value(u"bgm"_s).toBool(true));
-            sounds.setVolume(audio.value(u"soundVolume"_s)
-                                     .toDouble(yalahoo::productDefaults::DefaultFeedbackVolume));
-            sounds.setEnabled(audio.value(u"sound"_s).toBool(true));
-        };
-        applyAudio();
-        QObject::connect(preferences.get(), &yalahoo::PreferencesStore::imported, &background,
-                         applyAudio);
-        const auto saveAudio = [&] {
-            preferences->setAudio({ { u"volume"_s, playback.volume() },
-                                    { u"bgm"_s, background.enabled() },
-                                    { u"bgmVolume"_s, background.volume() },
-                                    { u"sound"_s, sounds.enabled() },
-                                    { u"soundVolume"_s, sounds.volume() } });
-        };
-        QObject::connect(&playback, &yalahoo::PlaybackController::volumeChanged, preferences.get(),
-                         saveAudio);
-        QObject::connect(&background, &yalahoo::BackgroundMusicController::settingsChanged,
-                         preferences.get(), saveAudio);
-        QObject::connect(&sounds, &yalahoo::InterfaceSoundController::settingsChanged,
-                         preferences.get(), saveAudio);
+        audioPreferences = std::make_unique<yalahoo::AudioPreferencesBinding>(
+                *preferences, playback, background, sounds);
         libraryStore = std::make_unique<yalahoo::LibraryStore>(dataRoot);
-        const auto configureMetadata = [online = static_cast<yalahoo::OnlineMetadataProvider *>(
-                                                provider.get())](
-                                               const yalahoo::Snapshot &snapshot) {
-            online->configure(snapshot->fields.value(u"metadataConfiguration"_s).toObject());
-        };
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, provider.get(),
-                         configureMetadata);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
-                         provider.get(), configureMetadata);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataConfigurationChanged,
-                         &library, &yalahoo::LibrarySession::adoptMetadataConfiguration);
-        QObject::connect(&library, &yalahoo::LibrarySession::metadataDelivered, libraryStore.get(),
-                         &yalahoo::LibraryStore::stageMetadata);
-        QObject::connect(&library, &yalahoo::LibrarySession::metadataProgressChanged,
-                         libraryStore.get(), [&] {
-                             if (!library.metadataProgress().value(u"active"_s).toBool())
-                                 libraryStore->commitMetadata();
-                         });
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::metadataCommitted, &library,
-                         &yalahoo::LibrarySession::adoptMetadataSnapshot);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::statusChanged, &library, [&] {
-            if (libraryStore->scanning())
-                library.cancelAllMetadata();
-        });
-        auto automaticPending = std::make_shared<bool>(false);
-        const auto automatic = [&, automaticPending] {
-            if (!*automaticPending || libraryStore->scanning())
-                return;
-            const auto snapshot = library.snapshot();
-            const auto stored = libraryStore->snapshot();
-            if (snapshot->scan != stored->scan || snapshot->albums.size() != stored->albums.size())
-                return;
-            *automaticPending = false;
-            const auto config = snapshot->fields.value(u"metadataConfiguration"_s).toObject();
-            if (config.value(u"networkEnabled"_s).toBool()
-                && config.value(u"onlineEnabled"_s).toBool())
-                library.requestMetadataBatch(u"enrichment"_s, true);
-        };
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::scanFinished, &library,
-                         [&, automaticPending, automatic](quint64, quint64) {
-                             *automaticPending = true;
-                             QTimer::singleShot(0, &library, automatic);
-                         });
-        QObject::connect(&library, &yalahoo::LibrarySession::snapshotChanged, &library, automatic);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::snapshotReady, &startup,
-                         &yalahoo::StartupCoordinator::receive);
-        QObject::connect(libraryStore.get(), &yalahoo::LibraryStore::failed, &app,
-                         [&](const QString &) {
-                             if (!startup.statistics()[u"initialReady"_s].toBool())
-                                 startup.receive(libraryStore->snapshot());
-                         });
-        if (!initializeLibraryCommands(parser, *libraryStore, *preferences))
+        libraryPersistence = std::make_unique<yalahoo::LibraryPersistence>(
+                *libraryStore, *static_cast<yalahoo::OnlineMetadataProvider *>(provider.get()),
+                library, startup);
+        if (!initializeLibraryCommands(options, *libraryStore, *preferences))
             return InvalidCommandLine;
     }
     yalahoo::SettingsController settings(preferences.get(), &library, &motion, &scene, &selection);
@@ -535,7 +380,7 @@ int main(int argc, char **argv)
     const bool usesApp = !verificationRun || appVerification;
     QVariantMap presentationProperties;
     if (usesApp) {
-        if (!verificationRun || parser.isSet(u"verify-app"_s)) {
+        if (!verificationRun || options.verification == yalahoo::VerificationMode::App) {
             presentationProperties.insert(u"openingController"_s, QVariant::fromValue(&opening));
             presentationProperties.insert(u"startupCoordinator"_s, QVariant::fromValue(&startup));
         }
@@ -566,15 +411,14 @@ int main(int argc, char **argv)
     for (auto it = commonProperties.cbegin(); it != commonProperties.cend(); ++it)
         initialProperties.insert(it.key(), it.value());
 #ifdef YALAHOO_REVIEW
-    if (parser.isSet(u"verify-materials"_s)) {
-        if (!parser.isSet(u"material-report"_s))
-            return MaterialInputMissing;
-        return yalahoo::reviewMaterials(app, scene, parser.value(u"verify-materials"_s),
-                                        parser.value(u"material-report"_s));
+    if (options.verification == yalahoo::VerificationMode::Materials) {
+        return yalahoo::reviewMaterials(app, scene, options.verificationInput,
+                                        options.materialReport);
     }
 #endif
     if (usesApp)
-        initialProperties.insert(u"lightingLab"_s, parser.isSet(u"lighting-lab"_s));
+        initialProperties.insert(u"lightingLab"_s,
+                                 options.session == yalahoo::SessionMode::LightingLab);
     if (usesApp)
         initialProperties.insert(u"displayOutput"_s, QVariant::fromValue(&displayOutput));
     if (!verificationRun || appVerification)
@@ -636,7 +480,7 @@ int main(int argc, char **argv)
     if (verificationRun
         && (window->isVisible() || !yalahoo::verification::windowPolicySatisfied(*window)))
         return InvalidCommandLine;
-    if (parser.isSet(u"verify-app"_s)) {
+    if (options.verification == yalahoo::VerificationMode::App) {
         QTimer::singleShot(0, &engine, [&] {
             auto *surface = findVisualItem(window->contentItem(), u"displaySurface"_s);
             auto *overlay = findVisualItem(window->contentItem(), u"displayOverlay"_s);
@@ -653,18 +497,18 @@ int main(int argc, char **argv)
         });
         return app.exec();
     }
-    if (parser.isSet(u"verify-deployment"_s))
-        return yalahoo::verifyDeployment(app, *window, parser.value(u"verify-deployment"_s),
+    if (options.verification == yalahoo::VerificationMode::Deployment)
+        return yalahoo::verifyDeployment(app, *window, options.verificationInput,
                                          deploymentWarnings);
-    if (parser.isSet(u"verify-overview"_s))
+    if (options.verification == yalahoo::VerificationMode::Overview)
         return yalahoo::reviewOverview(app, *window, scene, overview, presentation, library, motion,
-                                       parser.value(u"verify-overview"_s));
-    if (parser.isSet(u"verify-detail"_s))
+                                       options.verificationInput);
+    if (options.verification == yalahoo::VerificationMode::Detail)
         return yalahoo::reviewDetail(app, *window, scene, library, presentation, motion,
-                                     parser.value(u"verify-detail"_s));
-    if (parser.isSet(u"verify-navigation"_s))
+                                     options.verificationInput);
+    if (options.verification == yalahoo::VerificationMode::Navigation)
         return yalahoo::reviewNavigation(app, *window, scene, library, inputRouter, rulerController,
-                                         parser.value(u"verify-navigation"_s));
+                                         options.verificationInput);
     const int result = app.exec();
     qCInfo(yalahoo::logApp) << "Application event loop stopped" << "exitCode=" << result;
     return result;

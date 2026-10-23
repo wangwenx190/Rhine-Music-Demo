@@ -4,6 +4,7 @@
 
 #include "Localization.h"
 #include "LibrarySession.h"
+#include "LibraryIndex.h"
 #include "GenreRowsModel.h"
 #include "OptionMetrics.h"
 #include <QFontMetricsF>
@@ -19,6 +20,7 @@
 #include <QSet>
 #include <QTest>
 #include <algorithm>
+#include <functional>
 
 using namespace Qt::StringLiterals;
 
@@ -32,6 +34,7 @@ public:
     QList<RequestToken> requests, cancelled;
     QList<MetadataKind> kinds;
     QList<AlbumQuery> queries;
+    std::function<void()> onCancel;
     ProviderCapabilities capabilities() const override
     {
         return { };
@@ -46,6 +49,8 @@ public:
     void cancel(RequestToken token) override
     {
         cancelled.append(token);
+        if (onCancel)
+            onCancel();
     }
     void deliver(int index, ProviderStatus status, quint64 generationOffset = 0,
                  QString albumOverride = { })
@@ -1144,6 +1149,211 @@ private Q_SLOTS:
         QVERIFY(session.playbackTrackId().isEmpty());
         QVERIFY(session.navigationAlbumId().isEmpty());
     }
+    void metadataUpdatesRejectStructuralChanges_data()
+    {
+        QTest::addColumn<int>("mutation");
+        QTest::newRow("removed-track") << 0;
+        QTest::newRow("renamed-track-id") << 1;
+        QTest::newRow("changed-album-sort-key") << 2;
+        QTest::newRow("changed-track-content") << 3;
+        QTest::newRow("changed-genre") << 4;
+        QTest::newRow("changed-cover") << 5;
+    }
+    void metadataUpdatesRejectStructuralChanges()
+    {
+        QFETCH(int, mutation);
+        LibrarySession session(nullptr);
+        session.setSnapshot(library(u"single"_s));
+        const auto original = session.snapshot();
+        const auto albumId = original->albums.first().id;
+        const auto trackId = original->albums.first().tracks.last().id;
+        QVERIFY(session.navigate(albumId, trackId));
+        session.searchResults()->update(original, original->albums.first().tracks.last().title,
+                                        { });
+        auto candidate = *original;
+        auto &album = candidate.albums.first();
+        switch (mutation) {
+        case 0:
+            album.tracks.removeLast();
+            break;
+        case 1:
+            album.tracks.last().id = u"replacement"_s;
+            break;
+        case 2:
+            album.title = u"Different sort key"_s;
+            break;
+        case 3:
+            album.tracks.last().title = u"Different search content"_s;
+            break;
+        case 4:
+            candidate.genres.first().name = u"Different genre"_s;
+            break;
+        case 5:
+            album.coverUrl = QUrl(u"qrc:/different.png"_s);
+            break;
+        }
+        const auto changed = std::make_shared<const LibrarySnapshot>(std::move(candidate));
+        QSignalSpy notifications(session.albums(), &QAbstractItemModel::dataChanged);
+        session.adoptMetadataSnapshot(changed);
+        QCOMPARE(session.snapshot(), original);
+        QCOMPARE(session.navigationTrackId(), trackId);
+        QVERIFY(session.contains(albumId, trackId));
+        QCOMPARE(session.trackIndex(albumId, trackId),
+                 int(original->albums.first().tracks.size() - 1));
+        QCOMPARE(notifications.size(), 0);
+        // The model entry points are independently safe for callers outside LibrarySession.
+        session.albums()->updateMetadataSnapshot(changed);
+        session.searchResults()->updateMetadataSnapshot(changed);
+        session.searchResults()->updateMetadataSnapshot({ });
+        QCOMPARE(session.albums()->snapshot(), original);
+        bool found = false;
+        for (int row = 0; row < session.searchResults()->rowCount(); ++row) {
+            const auto index = session.searchResults()->index(row);
+            if (session.searchResults()->data(index, SearchListModel::TrackId).toString()
+                == trackId) {
+                found = true;
+                QCOMPARE(session.searchResults()->data(index, SearchListModel::Title).toString(),
+                         original->albums.first().tracks.last().title);
+            }
+        }
+        QVERIFY(found);
+    }
+    void metadataContentChangesNotifyWithoutStateChanges()
+    {
+        LibrarySession session(nullptr);
+        session.setSnapshot(library(u"single"_s));
+        const auto original = session.snapshot();
+        auto updated = *original;
+        auto &album = updated.albums.first();
+        album.description = u"Updated text with the same query state"_s;
+        album.descriptionSource = { { u"url"_s, u"https://example.test/source"_s } };
+        Producer producer;
+        producer.name = u"New contributor"_s;
+        producer.role = u"Composer"_s;
+        album.producers.append(producer);
+        QSignalSpy changed(session.albums(), &QAbstractItemModel::dataChanged);
+        QSignalSpy reset(session.albums(), &QAbstractItemModel::modelReset);
+        session.adoptMetadataSnapshot(std::make_shared<const LibrarySnapshot>(updated));
+        QCOMPARE(changed.size(), 1);
+        QCOMPARE(reset.size(), 0);
+        QCOMPARE(session.albums()
+                         ->data(session.albums()->index(0), AlbumListModel::Description)
+                         .toString(),
+                 album.description);
+        QCOMPARE(session.snapshot()->albums.first().descriptionSource, album.descriptionSource);
+        QCOMPARE(original->albums.first().introduction, album.introduction);
+    }
+    void metadataNotificationCannotRestoreAReplacedLibrary()
+    {
+        LibrarySession session(nullptr);
+        session.setSnapshot(library(u"single"_s));
+        auto updated = *session.snapshot();
+        updated.albums.first().introduction = { { u"status"_s, u"matched"_s } };
+        bool replaced = false;
+        connect(session.albums(), &QAbstractItemModel::dataChanged, &session, [&] {
+            replaced = true;
+            session.setSnapshot({ });
+        });
+        session.adoptMetadataSnapshot(std::make_shared<const LibrarySnapshot>(updated));
+        QVERIFY(replaced);
+        QVERIFY(session.snapshot()->albums.isEmpty());
+        QCOMPARE(session.albums()->rowCount(), 0);
+        session.searchResults()->request(u"anything"_s, { });
+        QTRY_VERIFY(!session.searchResults()->searching());
+        QCOMPARE(session.searchResults()->rowCount(), 0);
+    }
+    void cancellingBatchFromRequestNotificationKeepsCancelledState_data()
+    {
+        QTest::addColumn<bool>("cancelAll");
+        QTest::newRow("cancel-all") << true;
+        QTest::newRow("cancel-current-request") << false;
+    }
+    void cancellingBatchFromRequestNotificationKeepsCancelledState()
+    {
+        QFETCH(bool, cancelAll);
+        TestProvider provider;
+        LibrarySession session(&provider);
+        session.setSnapshot(library(u"single"_s));
+        bool cancelled = false;
+        connect(&session, &LibrarySession::metadataChanged, &session, [&] {
+            if (!cancelled && session.metadataBusy()) {
+                cancelled = true;
+                if (cancelAll)
+                    session.cancelAllMetadata();
+                else
+                    session.cancelMetadata(provider.requests.last().requestId);
+            }
+        });
+        QVERIFY(session.requestMetadataBatch(u"introduction"_s));
+        QVERIFY(cancelled);
+        QVERIFY(!session.metadataBusy());
+        QVERIFY(!session.metadataProgress().value(u"active"_s).toBool());
+        QCOMPARE(session.metadataProgress().value(u"status"_s).toString(), u"Cancelled"_s);
+    }
+    void replacingBatchFromRequestNotificationPreservesNewBatch()
+    {
+        TestProvider provider;
+        LibrarySession session(&provider);
+        session.setSnapshot(library(u"single"_s));
+        bool replaced = false;
+        connect(&session, &LibrarySession::metadataChanged, &session, [&] {
+            if (!replaced && session.metadataBusy()) {
+                replaced = true;
+                QVERIFY(session.requestMetadataBatch(u"credits"_s));
+            }
+        });
+        QVERIFY(session.requestMetadataBatch(u"introduction"_s));
+        QVERIFY(replaced);
+        QCOMPARE(provider.requests.size(), 2);
+        QCOMPARE(session.metadataProgress().value(u"kind"_s).toString(), u"credits"_s);
+        QVERIFY(session.metadataProgress().value(u"active"_s).toBool());
+        provider.deliver(1, ProviderStatus::Matched);
+        QTRY_VERIFY(!session.metadataProgress().value(u"active"_s).toBool());
+        QCOMPARE(session.metadataProgress().value(u"completed"_s).toInt(), 1);
+        QCOMPARE(session.metadataProgress().value(u"status"_s).toString(), u"Matched"_s);
+    }
+    void providerCancellationCannotOverwriteNewerBatchIntent()
+    {
+        TestProvider provider;
+        LibrarySession session(&provider);
+        session.setSnapshot(library(u"single"_s));
+        const auto id = session.snapshot()->albums.first().id;
+        QVERIFY(session.requestMetadata(id, u"introduction"_s));
+        bool replaced = false;
+        provider.onCancel = [&] {
+            if (!replaced) {
+                replaced = true;
+                QVERIFY(session.requestMetadataBatch(u"credits"_s));
+            }
+        };
+        QVERIFY(!session.requestMetadataBatch(u"introduction"_s));
+        QVERIFY(replaced);
+        QCOMPARE(provider.requests.size(), 2);
+        QCOMPARE(session.metadataProgress().value(u"kind"_s).toString(), u"credits"_s);
+        provider.deliver(1, ProviderStatus::Matched);
+        QTRY_COMPARE(session.metadataProgress().value(u"completed"_s).toInt(), 1);
+        provider.onCancel = { };
+    }
+    void shutdownRejectsReentrantProviderRequests()
+    {
+        TestProvider provider;
+        auto session = std::make_unique<LibrarySession>(&provider);
+        session->setSnapshot(library(u"single"_s));
+        const auto id = session->snapshot()->albums.first().id;
+        QVERIFY(session->requestMetadata(id, u"introduction"_s));
+        auto *closing = session.get();
+        quint64 request = 1;
+        bool batch = true;
+        provider.onCancel = [&] {
+            request = closing->requestMetadata(id, u"credits"_s);
+            batch = closing->requestMetadataBatch(u"credits"_s);
+        };
+        session.reset();
+        QCOMPARE(request, quint64(0));
+        QVERIFY(!batch);
+        QCOMPARE(provider.requests.size(), 1);
+        provider.onCancel = { };
+    }
     void injectedProviderStaleResults()
     {
         TestProvider provider;
@@ -1202,7 +1412,16 @@ private Q_SLOTS:
         LibrarySession survivor(shortLived);
         survivor.setSnapshot(library(u"single"_s));
         survivor.requestMetadata(albumId, u"introduction"_s);
+        QCOMPARE(survivor.metadataFor(albumId, u"introduction"_s).value(u"status"_s).toString(),
+                 u"Pending"_s);
+        QSignalSpy providerLost(&survivor, &LibrarySession::metadataChanged);
+        const auto revision = survivor.metadataRevision();
         delete shortLived;
+        QVERIFY(!survivor.metadataBusy());
+        QCOMPARE(providerLost.size(), 1);
+        QCOMPARE(survivor.metadataRevision(), revision + 1);
+        QVERIFY(survivor.metadataFor(albumId, u"introduction"_s).value(u"status"_s).toString()
+                != u"Pending"_s);
         QCOMPARE(survivor.requestMetadata(albumId, u"credits"_s), quint64(0));
     }
 };

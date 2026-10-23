@@ -39,7 +39,7 @@
 
 | 设施 | 独立保留理由与权威职责 |
 | --- | --- |
-| `identity`、`module-link-and-plugins`、`kit-selection`、`shader-tools`、`production-app-root` | 身份/数据根、真实模块与媒体插件、Kit选择、生产qsb变体、真实App创建；native-bootstrap.md及R36目标构建闭包 |
+| `application-options`、`identity`、`module-link-and-plugins`、`kit-selection`、`shader-tools`、`production-app-root` | 身份/数据根、真实模块与媒体插件、Kit选择、生产qsb变体、真实App创建；native-bootstrap.md及R36目标构建闭包 |
 | `source-policy`构建target、`source-format`、官方qmllint、`localization` | CPP-30/QT-19–22源码与翻译要求、格式、QML类型/导入；各最佳实践及code-style.md |
 | `motion`、`scene`、`navigation`、`lighting`、`archive-pool`、`real-columns`、`presentation`、`detail-motion`、`overview`、`opening`、`track-focus`、`startup` | 独立冻结公式、边界/中断/身份/输入归属/通知及唯一帧源；对应组件契约，覆盖R36共用算法 |
 | `directory-scanner`、`library-data`、`library-qml`、`online-metadata`、`media-metadata`、`json-file` | 文件系统/事务保存、模型协议、来源与取消/晚到、解码/导入失败；library-data.md。网络单元测试仅用可控响应 |
