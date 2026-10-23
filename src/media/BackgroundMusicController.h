@@ -21,7 +21,7 @@ public:
     enum class SongActivity {
         Stopped,
         Paused,
-        Playing
+        Playing,
     };
     explicit BackgroundMusicController(QObject *parent = nullptr);
     ~BackgroundMusicController() override;

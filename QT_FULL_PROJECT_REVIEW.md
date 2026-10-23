@@ -1,6 +1,6 @@
 # 全项目 Qt 严格审查报告
 
-审查日期：2026-10-23（Asia/Shanghai）。源码基准：`15908cfd709e7f91345ce53d37b325d387c98791`。本报告是该版本的只读审查快照；按本次用户明确要求保留于根目录并提交，实现未修改。本报告不替代专项契约，也不将发现的问题标为已修复或已转交 R36。
+原始审查日期：2026-10-23（Asia/Shanghai）。审查源码基准：`15908cfd709e7f91345ce53d37b325d387c98791`。本报告保留尚未解决的确认事项及原始 lint 诊断、覆盖范围和证据边界；源码位置沿用审查基准。本报告不替代专项契约。
 
 使用用户指定 `agent-skills` 仓库提交 `6845f02d41171a6df8b6e6fe225b7f5d1a6f4adf` 的 `skills/qt-cpp-review/SKILL.md`（v3.0）与 `skills/qt-qml-review/SKILL.md`（v2.0），以及该仓库的专用 review-agent 定义和 A1–A6/A1–A7 规则。技能标注 Qt Company 版权与 LicenseRef-Qt-Commercial OR BSD-3-Clause。没有把技能的静态启发式输出宣称为 Qt 官方对本项目的认证。
 
@@ -22,24 +22,14 @@
 | 空 Qt 许可目录的匿名临时目录复现 | 实际接受空目录，见 S-001 | Unix 许可复制函数的边界行为 |
 | 后处理生成器的匿名隔离副本复现 | 退出 0，输出 SMAA 0.1/8，见 S-003 | 生成脚本和已提交生产 0.05/32 参数不一致 |
 
-本轮没有启动可见窗口、播放声音、读取用户曲库、联网查询用户资料、发布或上传；没有执行全量构建/CTest、性能采样、Windows/Linux 原生构建或跨设备/HDR/输入/听感验收。未执行的检查不记为通过；现有 R36 未完成项（包括 MAC-VISIBLE-3D 已知失败）仍以迁移计划为准。提交只涉及本报告，故不触发无关功能回归或源码格式重写。原始日志与机器路径保留在本地临时目录，不提交。
+本轮没有启动可见窗口、播放声音、读取用户曲库、联网查询用户资料、发布或上传；没有执行全量构建/CTest、性能采样、Windows/Linux 原生构建或跨设备/HDR/输入/听感验收。未执行的检查不记为通过；现有 R36 未完成项（包括 MAC-VISIBLE-3D 已知失败）仍以迁移计划为准。原始日志与机器路径保留在本地临时目录，不提交。
 
 ## 确认事项索引
 
-独立深度审查确认 35 项，构建/部署/生成链补查 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
+尚未解决的独立深度审查确认事项 25 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
 
 | ID | 类型 | 源码位置 | 事项 |
 | --- | --- | --- | --- |
-| [D-001] | 行为/错误路径 | `src/app/MaterialReview.cpp:140` | Material review accepts invalid render dimensions until a fatal GPU-target check |
-| [D-002] | 行为/错误路径 | `src/app/main.cpp:145` | Help exits through graphics failure before printing usage |
-| [D-003] | 行为/错误路径 | `src/core/MusicTypes.cpp:293` | JSON 整数验证接受负曲号和负碟号 |
-| [D-004] | 行为/错误路径 | `src/core/MusicTypes.cpp:170` | 库解析错误绕过 Qt 翻译系统 |
-| [D-005] | 代码规范/维护 | `src/library/LibraryStore.cpp:51` | Enum declarations omit the required trailing comma |
-| [D-006] | 行为/错误路径 | `src/media/MediaMetadataProbe.cpp:215` | Artwork re-probe timeout becomes permanently cached |
-| [D-007] | 行为/错误路径 | `src/presentation/PresentationController.cpp:100` | Indicator geometry updates prematurely complete the content fade |
-| [D-008] | 行为/错误路径 | `src/presentation/TrackFocusController.cpp:71` | 定位请求在同步取消或替换后仍继续导航 |
-| [D-009] | 行为/错误路径 | `src/presentation/TrackFocusController.cpp:175` | 开启减少动态会冻结正在显示的定位高亮 |
-| [D-010] | 代码规范/维护 | `src/render/ArchiveField.cpp:98` | 扫描波分支及其逐帧状态永久不可达 |
 | [D-011] | 行为/错误路径 | `src/render/SceneAdapter.cpp:348` | Opening reset changes detail without its property notification |
 | [D-012] | 代码规范/维护 | `src/render/opening/OpeningController.h:93` | Phase 枚举末项缺少尾随逗号 |
 | [D-013] | 代码规范/维护 | `src/render/opening/OpeningFrame.h:24` | OpeningFrame 用 QString 表达封闭阶段词汇 |
@@ -75,7 +65,7 @@
 
 **Files reviewed**: 369（66,262 行）
 
-**Issues found**: 910（878 from lint，32 from deep analysis；lint 是原始诊断计数）
+**Issues found**: 900（878 from original lint，22 unresolved from deep analysis；lint 是原始诊断计数）
 
 **Agents**: 27（独立分片，逐文件编号读取并恢复截断内容）
 
@@ -125,86 +115,6 @@
 ---
 
 ### Deep analysis findings
-
-#### [D-001] Material review accepts invalid render dimensions until a fatal GPU-target check
-- **File**: `src/app/MaterialReview.cpp:140`
-- **Category**: Error Handling & Validation
-- **Confidence**: 96/100
-- **Finding**: Fixture `width` and `height` are converted with `toInt()` and passed directly to `QQuickWindow::resize()` and `QQuickItem::setSize()`. The input-validation loop checks only array lengths, so a structurally accepted fixture can contain an oversized dimension such as `2147483647`. In the default offscreen path this reaches `OffscreenSurface::render()` and calls `qFatal()` when the render target exceeds the device texture limit. Invalid fixture data consequently aborts the process rather than following the existing `InvalidReviewInput` failure protocol. Wrong JSON types also silently become default dimensions. This violates repository CPP-11 and CPP-15.
-- **Trace**: `main.cpp:413–416` passes the user-selected `--verify-materials` fixture to `reviewMaterials()`; `MaterialReview.cpp:405–414` validates position/parameter/projection counts but no dimensions; `captureMaterialReview():140–142,157–158,178` converts and applies dimensions; `tests/support/OffscreenSurface.h:210–216` calculates target size and aborts on excess size. This is separate from the known JSON parse-validation lint diagnostic at line 402.
-- **Mitigation**: Validate each supplied dimension’s JSON type, integer representation, positive range, and explicit rendering budget before creating or resizing any window. Check the effective DPR and device limit before allocating the target, and return the ordinary review failure result for unsupported input.
-
-#### [D-002] Help exits through graphics failure before printing usage
-- **File**: `src/app/main.cpp:145`
-- **Category**: Performance & Code Quality
-- **Confidence**: 95/100
-- **Finding**: `--help` / `--help-all` is processed only at lines 175–183, after graphics selection, `QGuiApplication` creation, backend probing, and embedded font initialization. A user requesting usage with an unsupported `QSG_RHI_BACKEND`, unavailable explicitly selected Vulkan runtime, or failed font registration receives exit code 22/6 without help. The command also performs graphics initialization unnecessarily.
-- **Trace**: `main()` lines 121–129 recognizes help only to isolate logging; lines 145–168 can return before parsing. `parseApplicationOptions()` lines 94–95 already provides an early help result. `GraphicsBackend.h` lines 73–74 rejects unsupported backend names; `BackendCapabilities.cpp` lines 79–82 rejects unavailable explicit Vulkan. `ApplicationOptionsTest::helpDoesNotStartASession()` tests the parser alone, so it does not cover this executable path.
-- **Mitigation**: Process help and argument errors before initializing the GUI backend or loading product assets. Add an executable regression that requests help with an invalid backend setting and verifies successful usage output without graphics initialization.
-
-#### [D-003] JSON 整数验证接受负曲号和负碟号
-- **File**: `src/core/MusicTypes.cpp:293`
-- **Category**: Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: `validIntegers()`只验证整数性及 `int` 可表示范围，随后将负 `trackNumber`、`discNumber`、`discCount`、`bitsPerSample`、`sampleRate` 和 `bitrate` 接纳为有效领域值。例如合法整数 `trackNumber: -1` 会成功通过读取，并直接显示为负曲号；负碟号还参与排序和在线曲目匹配。缺失值已有 `std::optional` 表达，无须用负数表示未知。这违反项目 CPP-11 对外部数值符号和领域范围的验证要求。
-- **Trace**: `MusicTypes.cpp:79–97` 的 `validIntegers()/integer()` → `readLibrary():248–251,293–308`；生产缓存入口 `LibraryStore.cpp:330–366` 和旧库导入 `LegacyImporter.cpp:285–287` 均使用该解析器。`DetailModel.cpp:189,210` 直接显示曲号/碟号，`DirectoryScanner.cpp:212–215` 使用其排序，`MusicBrainzSource.cpp:294–295` 使用其匹配。相比之下，`MediaMetadataProbe.cpp:176–178,183–185` 仅接纳正曲号和正码率。现有数值回归 `LibraryDataTest.cpp:800–825` 未覆盖这些负整数。
-- **Mitigation**: 按字段定义域验证符号：曲号、碟号及技术参数应为正值，计数应非负；缺失保留为 optional。对失败维持现有事务式拒绝，并补充负整数与边界零值的针对性回归。
-
-#### [D-004] 库解析错误绕过 Qt 翻译系统
-- **File**: `src/core/MusicTypes.cpp:170`
-- **Category**: Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: 同一解析器中，数值错误使用 `QCoreApplication::translate()`，数组、字段类型、重复 ID 等错误却直接返回英文 `QString` 字面量。生产调用会把这些文本拼入可见的缓存/导入错误，因此中文界面仍显示未翻译的具体原因，且这些文本无法被 lupdate 提取。这违反项目 QT-19/QT-20。
-- **Trace**: `readLibrary()` 的 `fail()` 将原文写入输出错误（`MusicTypes.cpp:165–168`）；未翻译路径包括 `170–177,202–215,221–244,269–287,321–342`，与 `205–206,248–249,293–302` 的已翻译错误形成不一致。`LibraryStore.cpp:349–355` 将其附加到已翻译的可见错误；`LegacyImporter.cpp:286–287` 原样保留该错误。
-- **Mitigation**: 将所有面向用户的解析错误统一纳入明确 context 的 Qt 翻译调用，并更新相应 TS 目录；保留 ID、JSON 键等协议字段不翻译。
-
-#### [D-005] Enum declarations omit the required trailing comma
-- **File**: `src/library/LibraryStore.cpp:51`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: `LibraryStore::Private::Kind` ends with `Metadata` without a trailing comma. `BackgroundMusicController::SongActivity` similarly ends with `Playing` at `src/media/BackgroundMusicController.h:24`. Both violate A4 / ENM-1. This is a style finding with no identified runtime impact.
-- **Trace**: Inspected both complete enum declarations; these locations are absent from the supplied lint results.
-- **Mitigation**: Add a trailing comma after each enum’s final enumerator.
-
-#### [D-006] Artwork re-probe timeout becomes permanently cached
-- **File**: `src/media/MediaMetadataProbe.cpp:215`
-- **Category**: Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: A timeout preserves an existing current `_qtProbeVersion`. If a previously probed directory album loses its external cover, its tracks are re-probed for embedded artwork. When that attempt times out without an image, `persistArtwork()` records `_embeddedCover = null` (lines 150–154). On subsequent unchanged scans, `coverKnown` becomes true and the retained Qt version causes the track to be skipped (lines 333–342). Embedded artwork discovery therefore never retries, contrary to the documented timeout retry policy.
-- **Trace**: `ProbeWorker::pump()` artwork admission → `complete()` → `apply()` timeout handling → `persistArtwork()`. Confirmed `DirectoryScanner.cpp:188–195` preserves these fields for unchanged files. `MediaMetadataTest::timeout()` only checks an initially uncached track, whose Qt version was absent already.
-- **Mitigation**: Invalidate the completed-probe marker on timeout and avoid committing an absent-artwork result from an unfinished probe. Cover the sequence of successful cached probing, external-cover removal, timeout, and another unchanged scan.
-
-#### [D-007] Indicator geometry updates prematurely complete the content fade
-- **File**: `src/presentation/PresentationController.cpp:100`
-- **Category**: Performance & Code Quality
-- **Confidence**: 97/100
-- **Finding**: `setTabIndicator(..., false)` calls `advanceTab(TabSlideSeconds)`. That function advances both indicator geometry and content opacity, so it immediately completes any active 150 ms content fade. Resizing or changing tab-button geometry during a reveal therefore snaps the content to full opacity, violating the independent animation durations.
-- **Trace**: `Detail.qml:30–37` starts the content fade through `revealTabContent()`. `DetailTabs.qml:32–33,121–127` synchronizes indicator geometry without animation when button geometry or container width changes. `PresentationController.cpp:133–140` advances the content fade using the same synthetic 180 ms step.
-- **Mitigation**: Complete the indicator geometry independently when animation is disabled; advance content opacity only from the frame clock or an explicit reduced-motion completion.
-
-#### [D-008] 定位请求在同步取消或替换后仍继续导航
-- **File**: `src/presentation/TrackFocusController.cpp:71`
-- **Category**: Performance & Code Quality
-- **Confidence**: 93/100
-- **Finding**: `request()` 发出 `changed()` 后直接继续调用 `PresentationController::select()` 或 `LibrarySession::navigate()`。同步槽若调用 `cancel()`，请求已失效，但旧请求仍改变页面选择；若同步槽提交新请求，外层旧请求仍能继续导航，破坏最后请求优先语义。入口中的 `cancel()` 和 `navigationRequested()` 同样没有返回后的 revision 检查。
-- **Trace**: 检查 `request()`、`cancel()`、`ready()`、其他已经使用 revision 防护的 `beginReveal()`/`startHighlight()`/`advance()`；追踪 main.cpp 的连接及 TrackFocusTest 中同步取消的既有契约。现有测试覆盖滚动和高亮阶段，未覆盖请求发布阶段。
-- **Mitigation**: 为一次 request 建立独立 revision，在可同步重入的通知返回后检查请求是否仍有效；旧调用发现取消或替换后立即停止导航。增加请求发布期间取消和替换的回归覆盖。
-
-#### [D-009] 开启减少动态会冻结正在显示的定位高亮
-- **File**: `src/presentation/TrackFocusController.cpp:175`
-- **Category**: Performance & Code Quality
-- **Confidence**: 96/100
-- **Finding**: `setReducedMotion(true)` 只处理滚动阶段。若已经处于 `m_pulsing`，它既不将 `m_highlight` 更新为减少动态模式规定的 1，也不通知变化；随后 `advance()` 因 `m_reduced` 为 true 跳过高亮更新，直至取消。刚进入普通高亮时值为 0，因此此时切换会使整个剩余高亮不可见；其他时刻切换则冻结为部分透明。
-- **Trace**: `startHighlight()` 在普通模式设为 0、减少动态模式设为 1；`advance()` 的高亮计算受 `!m_reduced` 限制。main.cpp 将 reducedMotionChanged 接到该 setter。现有测试只验证开始定位前开启减少动态。
-- **Mitigation**: 切换到减少动态时同时收敛正在进行的高亮状态并发送必要通知，明确保留时间的处理规则；覆盖普通高亮开始及中途切换的情况。
-
-#### [D-010] 扫描波分支及其逐帧状态永久不可达
-- **File**: `src/render/ArchiveField.cpp:98`
-- **Category**: Performance & Code Quality
-- **Confidence**: 100/100
-- **Finding**: `m_scanBlend` 初始为 0，唯一赋值仍是置 0，其他操作仅乘以衰减系数，因此扫描波条件永久为 false。`m_scanTime` 仍逐帧递增，`m_scanBlend` 仍逐帧计算指数衰减，但这些状态不会产生输出。
-- **Trace**: 全根目录检索 `m_scanBlend`、`m_scanTime`，确认只有 ArchiveField 中的初始化、清零、衰减和该采样分支；追踪 SelectionController 的 ArchiveField 调用，未发现启动扫描波的入口。
-- **Mitigation**: 按当前产品意图移除退役分支及状态；若扫描波仍是必需行为，则补齐明确的启动入口和生命周期。不要保留无效果的逐帧维护。
 
 #### [D-011] Opening reset changes detail without its property notification
 - **File**: `src/render/SceneAdapter.cpp:348`

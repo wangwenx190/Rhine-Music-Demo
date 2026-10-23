@@ -241,6 +241,14 @@ endif()
 add_test(NAME dry-tools COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/DryToolsTest.py")
 set_tests_properties(dry-tools PROPERTIES TIMEOUT 10)
+add_test(NAME application-startup COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/ApplicationStartupTest.py" "$<TARGET_FILE:Yalahoo>")
+set_tests_properties(application-startup PROPERTIES TIMEOUT 60)
+if(YALAHOO_REVIEW)
+    add_test(NAME material-review-input COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/MaterialReviewInputTest.py" "$<TARGET_FILE:Yalahoo>")
+    set_tests_properties(material-review-input PROPERTIES TIMEOUT 50)
+endif()
 add_test(NAME startup-verification COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/StartupVerificationTest.py")
 set_tests_properties(startup-verification PROPERTIES TIMEOUT 10)

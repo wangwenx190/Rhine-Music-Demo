@@ -1,4 +1,6 @@
 #include "MaterialReview.h"
+#include "MaterialReviewInput.h"
+#include <QScreen>
 #include "SelectionLighting.h"
 #include "LayoutMetrics.h"
 #include "CameraFraming.h"
@@ -40,8 +42,8 @@ using namespace Qt::StringLiterals;
 namespace yalahoo {
 namespace {
 // Source parameter/projection expectations are independent from capture coverage and readback success.
-constexpr auto DefaultWidthPixels = 960;
-constexpr auto DefaultHeightPixels = 720;
+constexpr auto DefaultWidthPixels = review::DefaultMaterialWidth;
+constexpr auto DefaultHeightPixels = review::DefaultMaterialHeight;
 constexpr auto SourceMaterialCaseCount = 90;
 constexpr auto LifecycleRestoreCount = 1;
 constexpr auto ProbeFovDegrees = 32;
@@ -84,6 +86,7 @@ struct MaterialReviewState final
     const QString &report;
     const QJsonObject &oracle;
     const QByteArray &bytes;
+    std::atomic<int> textureLimit = review::MaximumMaterialDimension;
 };
 auto recordMaterialSceneGraph(MaterialReviewState &state)
 {
@@ -95,6 +98,13 @@ auto recordMaterialSceneGraph(MaterialReviewState &state)
     state.window->setPersistentSceneGraph(false);
     state.window->setPersistentGraphics(false);
     auto nextSurface = std::make_unique<OffscreenSurface>(*state.window, state.control);
+    nextSurface->targetSizeAccepted = [&](QSize size, qreal dpr, int limit) {
+        if (review::materialReviewTargetSupported(size, dpr, limit))
+            return true;
+        qCWarning(logRender) << "Material target exceeds capture budget or device limit";
+        state.app.exit(InvalidReviewInput);
+        return false;
+    };
     QObject::connect(
             state.window.get(), &QQuickWindow::sceneGraphInvalidated, &state.app,
             [&] {
@@ -112,8 +122,20 @@ auto recordMaterialSceneGraph(MaterialReviewState &state)
     QObject::connect(
             state.window.get(), &QQuickWindow::sceneGraphInitialized, state.window.get(),
             [&, targetSurface = nextSurface.get()] {
-                state.multisampleBufferAdaptation =
-                        review::useReviewGlMultisampleBuffers(targetSurface->rhi());
+                auto *api = targetSurface->rhi();
+                state.textureLimit = api->resourceLimit(QRhi::TextureSizeMax);
+                if (!review::materialReviewTargetSupported(
+                            state.window->size(), state.window->devicePixelRatio(),
+                            api->resourceLimit(QRhi::TextureSizeMax))) {
+                    QMetaObject::invokeMethod(
+                            &state.app,
+                            [&] {
+                                state.app.exit(InvalidReviewInput);
+                            },
+                            Qt::QueuedConnection);
+                    return;
+                }
+                state.multisampleBufferAdaptation = review::useReviewGlMultisampleBuffers(api);
             },
             Qt::DirectConnection);
     return nextSurface;
@@ -137,8 +159,13 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
     view->setProperty("reviewCasePosition", QVariant::fromValue(caseOrigin.qt()));
     view->setProperty("lightingEnabled",
                       state.lightingReview && !c[u"materialBaseline"_s].toBool());
-    const int w = c.value(u"width"_s).toInt(DefaultWidthPixels),
-              h = c.value(u"height"_s).toInt(DefaultHeightPixels);
+    const auto size = *review::materialReviewSize(c);
+    if (!review::materialReviewTargetSupported(size, state.window->devicePixelRatio(),
+                                               state.textureLimit.load())) {
+        state.app.exit(InvalidReviewInput);
+        return false;
+    }
+    const int w = size.width(), h = size.height();
     state.window->resize(w, h);
     if (state.lightingReview) {
         state.scene.lighting()->setReducedMotion(true);
@@ -154,8 +181,7 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
     const auto p = c[u"position"_s].toArray();
     const SceneVector pos{ p[0].toDouble(), p[1].toDouble(), p[2].toDouble() },
             aim = caseOrigin + SceneVector{ 0, 1.85, 0 };
-    state.scene.layout()->setViewport(c.value(u"width"_s).toInt(DefaultWidthPixels),
-                                      c.value(u"height"_s).toInt(DefaultHeightPixels));
+    state.scene.layout()->setViewport(w, h);
     state.scene.observe({ pos, aim,
                           2 * (pos - aim).length()
                                   * std::tan(ProbeFovDegrees * std::acos(-1.0) / DegreesPerTurn) },
@@ -178,6 +204,7 @@ auto captureMaterialReview(MaterialReviewState &state, auto &index, auto &view, 
     view->setSize(QSizeF(w, h));
     start = frames;
     state.surface->requestFrame();
+    return true;
 }
 
 auto finishMaterialReview(MaterialReviewState &state, auto &frames, auto &start, auto &index,
@@ -399,11 +426,22 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     if (!input.open(QIODevice::ReadOnly))
         return InvalidReviewInput;
     const auto bytes = input.readAll();
-    const auto oracle = QJsonDocument::fromJson(bytes).object();
+    const auto document = QJsonDocument::fromJson(bytes);
+    if (!document.isObject())
+        return InvalidReviewInput;
+    const auto oracle = document.object();
+    const auto *screen = app.primaryScreen();
+    if (!screen)
+        return InvalidReviewInput;
     const bool lightingReview = oracle[u"lighting"_s].toBool();
     auto cases = oracle[u"cases"_s].toArray();
     for (const auto &value : cases) {
         const auto state = value.toObject();
+        const auto size = review::materialReviewSize(state);
+        if (!value.isObject() || !size
+            || !review::materialReviewTargetSupported(*size, screen->devicePixelRatio(),
+                                                      review::MaximumMaterialDimension))
+            return InvalidReviewInput;
         if (state[u"position"_s].toArray().size() != 3)
             return InvalidReviewInput;
         if (state[u"parameters"_s].toArray().size() != 3
@@ -482,7 +520,7 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
     };
     const auto next = [&] {
         ++index;
-        applyState();
+        return applyState();
     };
     std::function<void()> collectFrame;
     QObject reviewLifetime;
@@ -501,7 +539,10 @@ int reviewMaterials(QGuiApplication &app, SceneAdapter &scene, const QString &fi
         app.exit(ReviewTimedOut);
     });
     bindFrames();
-    next();
+    if (!next()) {
+        app.setQuitOnLastWindowClosed(quitOnClose);
+        return InvalidReviewInput;
+    }
     timeout.start(MaterialDeadlineMilliseconds);
     surface->show();
     const int code = app.exec();

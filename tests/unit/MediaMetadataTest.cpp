@@ -164,6 +164,7 @@ private Q_SLOTS:
     void realSilentAndInvalid();
     void realEmbeddedPriority();
     void timeout();
+    void artworkTimeoutAfterCachedProbeRetries();
     void cancellationAndReuse();
     void artworkGuards();
     void artworkValidationUsesContentRatherThanPaths();
@@ -337,6 +338,61 @@ void MediaMetadataTest::timeout()
     QCOMPARE(track.title, u"hang"_s);
     QCOMPARE(stats->active, 0);
     QVERIFY(!track.fields.contains(u"_qtProbeVersion"_s));
+}
+void MediaMetadataTest::artworkTimeoutAfterCachedProbeRetries()
+{
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    const auto root = temp.filePath(u"root"_s);
+    const auto native = temp.filePath(u"native"_s);
+    const auto external = root + u"/album/cover.png"_s;
+    QVERIFY(test::writeFile(root + u"/album/song.wav"_s, wave()));
+    QImage image(8, 8, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    QVERIFY(image.save(external));
+    MediaObservation loaded;
+    loaded.status = MediaObservation::Loaded;
+    loaded.hasAudio = true;
+    auto stats = std::make_shared<FakeStats>();
+    Snapshot cached;
+    {
+        MediaMetadataProbe probe(nullptr, factory(stats, loaded, 0));
+        QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+        probe.start(scanned(root), native, { }, 1);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
+        cached = resultOf(done);
+    }
+    QCOMPARE(stats->opens, 1);
+    QVERIFY(cached->albums.first().tracks.first().fields.contains(u"_qtProbeVersion"_s));
+    QVERIFY(QFile::remove(external));
+    const auto withoutExternal =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, cached, { }).snapshot;
+    Snapshot timedOut;
+    {
+        MediaMetadataProbe probe(nullptr, factory(stats, { }, -1));
+        QSignalSpy done(&probe, &MediaMetadataProbe::finished);
+        probe.start(withoutExternal, native, { }, 2);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, ProbeTimeoutDeadlineMilliseconds);
+        timedOut = resultOf(done);
+    }
+    QCOMPARE(stats->opens, 2);
+    const auto &track = timedOut->albums.first().tracks.first();
+    QCOMPARE(track.fields.value(u"_probeStatus"_s).toString(), u"timeout"_s);
+    QVERIFY(!track.fields.contains(u"_qtProbeVersion"_s));
+    QVERIFY(!track.fields.contains(u"_embeddedCover"_s));
+    image.fill(Qt::blue);
+    loaded.metadata.insert(QMediaMetaData::CoverArtImage, image);
+    MediaMetadataProbe retry(nullptr, factory(stats, loaded, 0));
+    QSignalSpy done(&retry, &MediaMetadataProbe::finished);
+    const auto unchanged =
+            DirectoryScanner::scan({ QUrl::fromLocalFile(root) }, timedOut, { }).snapshot;
+    retry.start(unchanged, native, { }, 3);
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, AsyncDeadlineMilliseconds);
+    QCOMPARE(stats->opens, 3);
+    const auto result = resultOf(done);
+    QCOMPARE(QImage(result->albums.first().coverUrl.toLocalFile()).pixelColor(0, 0),
+             QColor(Qt::blue));
+    QVERIFY(result->albums.first().tracks.first().fields.contains(u"_qtProbeVersion"_s));
 }
 void MediaMetadataTest::cancellationAndReuse()
 {

@@ -48,7 +48,7 @@ struct LibraryStore::Private final
         Probe,
         Import,
         Save,
-        Metadata
+        Metadata,
     };
     struct JobResult final
     {

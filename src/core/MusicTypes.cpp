@@ -76,7 +76,8 @@ bool validStringArray(const QJsonValue &value)
             return false;
     return true;
 }
-bool validIntegers(const QJsonObject &json, std::initializer_list<QLatin1StringView> keys)
+bool validIntegers(const QJsonObject &json, std::initializer_list<QLatin1StringView> keys,
+                   int minimum = std::numeric_limits<int>::min())
 {
     for (const auto key : keys) {
         const auto value = json.value(key);
@@ -85,8 +86,8 @@ bool validIntegers(const QJsonObject &json, std::initializer_list<QLatin1StringV
         if (!value.isDouble())
             return false;
         const double number = value.toDouble();
-        if (!std::isfinite(number) || std::trunc(number) != number
-            || number < std::numeric_limits<int>::min() || number > std::numeric_limits<int>::max())
+        if (!std::isfinite(number) || std::trunc(number) != number || number < minimum
+            || number > std::numeric_limits<int>::max())
             return false;
     }
     return true;
@@ -168,13 +169,14 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         return false;
     };
     if (!json.value(u"albums"_s).isArray() || !json.value(u"genres"_s).isArray())
-        return fail(u"Library requires albums and genres arrays"_s);
+        return fail(QCoreApplication::translate("Yalahoo",
+                                                "Library requires albums and genres arrays"));
     if (json.contains(u"roots"_s) && !json.value(u"roots"_s).isArray())
-        return fail(u"Library roots must be an array"_s);
+        return fail(QCoreApplication::translate("Yalahoo", "Library roots must be an array"));
     if (!validFields(json, QJsonValue::Object,
                      { "scan"_L1, "enrich"_L1, "introductions"_L1, "credits"_L1 })
         || !validFields(json, QJsonValue::Bool, { "onlineEnabled"_L1 }))
-        return fail(u"Invalid library metadata types"_s);
+        return fail(QCoreApplication::translate("Yalahoo", "Invalid library metadata types"));
     LibrarySnapshot library;
     library.fields = extensionFields(json,
                                      { "albums"_L1, "genres"_L1, "roots"_L1, "scan"_L1, "enrich"_L1,
@@ -201,8 +203,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         const auto object = value.toObject();
         if (!value.isObject() || !validFields(object, QJsonValue::String, { "id"_L1, "name"_L1 })
             || !validStringArray(object.value("aliases"_L1)))
-            return fail(u"Invalid genre metadata types"_s);
-        if (!validIntegers(object, { "albumCount"_L1 }))
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid genre metadata types"));
+        if (!validIntegers(object, { "albumCount"_L1 }, 0))
             return fail(QCoreApplication::translate("Yalahoo", "Invalid genre integer metadata"));
         Genre genre{
             object.value(u"id"_s).toString(), object.value(u"name"_s).toString(),
@@ -212,7 +214,7 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         const auto count = genreIds.size();
         genreIds.insert(genre.id);
         if (genre.id.isEmpty() || genreIds.size() == count)
-            return fail(u"Invalid or duplicate genre ID"_s);
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid or duplicate genre ID"));
         library.genres.append(std::move(genre));
     }
     for (const auto &value : albums) {
@@ -227,10 +229,11 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                     { "descriptionSource"_L1, "introduction"_L1, "creditsLookup"_L1, "online"_L1 })
             || !validFields(object, QJsonValue::Bool, { "offline"_L1 })
             || !validStringArray(object.value("rawGenres"_L1)))
-            return fail(u"Invalid album metadata types"_s);
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid album metadata types"));
         if (!object.value(u"tracks"_s).isArray()
             || (object.contains(u"producers"_s) && !object.value(u"producers"_s).isArray()))
-            return fail(u"Album tracks/producers must be arrays"_s);
+            return fail(QCoreApplication::translate("Yalahoo",
+                                                    "Album tracks/producers must be arrays"));
         album.fields = extensionFields(
                 object,
                 { "id"_L1, "title"_L1, "artist"_L1, "genreId"_L1, "description"_L1, "localNote"_L1,
@@ -241,11 +244,11 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         const auto count = albumIds.size();
         albumIds.insert(album.id);
         if (album.id.isEmpty() || albumIds.size() == count)
-            return fail(u"Invalid or duplicate album ID"_s);
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid or duplicate album ID"));
         album.title = object.value(u"title"_s).toString();
         album.artist = object.value(u"artist"_s).toString();
         album.genreId = object.value(u"genreId"_s).toString();
-        if (!validIntegers(object, { "year"_L1, "discCount"_L1 }))
+        if (!validIntegers(object, { "year"_L1 }) || !validIntegers(object, { "discCount"_L1 }, 0))
             return fail(QCoreApplication::translate("Yalahoo", "Invalid album integer metadata"));
         album.year = integer(object, "year"_L1);
         album.discCount = integer(object, "discCount"_L1);
@@ -272,7 +275,7 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                                   "codec"_L1, "relativePath"_L1, "sourceUrl"_L1,
                                   "mediaSupport"_L1 })
                 || !validFields(trackObject, QJsonValue::Bool, { "lossless"_L1 }))
-                return fail(u"Invalid track metadata types"_s);
+                return fail(QCoreApplication::translate("Yalahoo", "Invalid track metadata types"));
             track.fields = extensionFields(trackObject,
                                            { "id"_L1, "albumId"_L1, "title"_L1, "artist"_L1,
                                              "format"_L1, "codec"_L1, "relativePath"_L1,
@@ -284,7 +287,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             const auto count = trackIds.size();
             trackIds.insert(track.id);
             if (track.id.isEmpty() || trackIds.size() == count || track.albumId != album.id)
-                return fail(u"Invalid, duplicate or mismatched track ID"_s);
+                return fail(QCoreApplication::translate(
+                        "Yalahoo", "Invalid, duplicate or mismatched track ID"));
             track.title = trackObject.value(u"title"_s).toString();
             track.artist = trackObject.value(u"artist"_s).toString();
             track.format = trackObject.value(u"format"_s).toString();
@@ -292,7 +296,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
             track.relativePath = trackObject.value(u"relativePath"_s).toString();
             if (!validIntegers(trackObject,
                                { "trackNumber"_L1, "discNumber"_L1, "bitsPerSample"_L1,
-                                 "sampleRate"_L1, "bitrate"_L1 }))
+                                 "sampleRate"_L1, "bitrate"_L1 },
+                               1))
                 return fail(
                         QCoreApplication::translate("Yalahoo", "Invalid track integer metadata"));
             const auto duration = trackObject.value(u"duration"_s);
@@ -324,7 +329,8 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
                 || !validFields(p, QJsonValue::String,
                                 { "name"_L1, "role"_L1, "source"_L1, "trackId"_L1, "trackTitle"_L1,
                                   "url"_L1 }))
-                return fail(u"Invalid producer metadata types"_s);
+                return fail(
+                        QCoreApplication::translate("Yalahoo", "Invalid producer metadata types"));
             album.producers.append(
                     { p.value(u"name"_s).toString(), p.value(u"role"_s).toString(),
                       p.value(u"source"_s).toString(), p.value(u"trackId"_s).toString(),
@@ -339,7 +345,7 @@ bool readLibrary(const QJsonObject &json, LibrarySnapshot &output, QString *erro
         const auto r = entry.toObject();
         if (!entry.isObject()
             || !validFields(r, QJsonValue::String, { "path"_L1, "status"_L1, "error"_L1 }))
-            return fail(u"Invalid root metadata types"_s);
+            return fail(QCoreApplication::translate("Yalahoo", "Invalid root metadata types"));
         library.roots.append({ localUrl(r.value(u"path"_s).toString()),
                                r.value(u"status"_s).toString(), r.value(u"error"_s).toString(),
                                r });

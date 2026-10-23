@@ -10,7 +10,6 @@ constexpr auto MaximumSelectionPulses = 6;
 constexpr auto MaximumRippleDisplacement = .24;
 constexpr auto RippleLaneDistanceScale = 2.2;
 constexpr auto PulseGainFollowRate = 8;
-constexpr auto ScanBlendDecayRate = 3;
 constexpr auto PulseLifetimeSeconds = 3.2;
 constexpr auto IdleDelaySeconds = 2.5;
 constexpr auto IdleAttackRate = .8;
@@ -31,7 +30,7 @@ void ArchiveField::clearPulses()
 }
 void ArchiveField::beginOpening()
 {
-    m_scanBlend = m_idleGain = 0;
+    m_idleGain = 0;
     clearPulses();
     interact();
 }
@@ -47,8 +46,6 @@ void ArchiveField::advance(double dt, bool reduced, bool idleEligible, bool mute
     if (!std::isfinite(dt) || dt < 0)
         return;
     m_time += dt;
-    m_scanTime += dt;
-    m_scanBlend *= std::exp(-dt * ScanBlendDecayRate);
     m_pulses.removeIf([&](const Pulse &p) {
         return m_time - p.time >= PulseLifetimeSeconds;
     });
@@ -95,9 +92,6 @@ double ArchiveField::sample(double row, const Column &column, const Context &con
     if (context.realistic)
         return realisticField(row, column);
     double height = 0;
-    if (m_scanBlend != 0)
-        height += archiveWave(row + context.origin.row, lane + context.origin.lane, m_scanTime)
-                * m_scanBlend;
     if (m_idleGain != 0)
         height +=
                 idleWave(row + context.origin.row, lane + context.origin.lane, m_time) * m_idleGain;

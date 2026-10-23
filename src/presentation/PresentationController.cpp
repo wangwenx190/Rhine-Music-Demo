@@ -97,8 +97,14 @@ void PresentationController::setTabIndicator(double x, double width, bool animat
     d->m_tabTargetX = x;
     d->m_tabTargetWidth = width;
     d->m_tabElapsed = 0;
-    if (!animate || d->m_reduced)
-        d->advanceTab(yalahoo::presentationMotion::TabSlideSeconds);
+    if (!animate || d->m_reduced) {
+        d->m_tabElapsed = presentationMotion::TabSlideSeconds;
+        const bool changed = d->m_tabX != x || d->m_tabWidth != width;
+        d->m_tabX = x;
+        d->m_tabWidth = width;
+        if (changed)
+            Q_EMIT tabIndicatorChanged();
+    }
 }
 void PresentationController::revealTabContent()
 {

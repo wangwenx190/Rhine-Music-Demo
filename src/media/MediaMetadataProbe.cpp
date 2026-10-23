@@ -215,6 +215,8 @@ void apply(Track &track, const MediaObservation &value, bool timeout)
     if (!timeout) {
         static const auto version = QString::fromUtf8(qVersion());
         track.fields.insert(u"_qtProbeVersion"_s, version);
+    } else {
+        track.fields.remove(u"_qtProbeVersion"_s);
     }
 }
 }
@@ -425,7 +427,8 @@ private:
         if (album.fields.value(u"_singleFile"_s).toBool() || album.coverUrl.isEmpty()) {
             const auto image =
                     observation.metadata.value(QMediaMetaData::CoverArtImage).value<QImage>();
-            persistArtwork(track, image, m_root);
+            if (!timeout || !image.isNull())
+                persistArtwork(track, image, m_root);
         }
         disconnect(slot.connection);
         slot.timer->stop();

@@ -1688,6 +1688,54 @@ Query status: %2</source>
         <translation>来源：%1</translation>
     </message>
     <message>
+        <source>Library requires albums and genres arrays</source>
+        <translation>音乐库必须包含专辑和流派数组。</translation>
+    </message>
+    <message>
+        <source>Library roots must be an array</source>
+        <translation>音乐库根目录必须为数组。</translation>
+    </message>
+    <message>
+        <source>Invalid library metadata types</source>
+        <translation>音乐库元数据类型无效。</translation>
+    </message>
+    <message>
+        <source>Invalid genre metadata types</source>
+        <translation>流派元数据类型无效。</translation>
+    </message>
+    <message>
+        <source>Invalid or duplicate genre ID</source>
+        <translation>流派标识无效或重复。</translation>
+    </message>
+    <message>
+        <source>Invalid album metadata types</source>
+        <translation>专辑元数据类型无效。</translation>
+    </message>
+    <message>
+        <source>Album tracks/producers must be arrays</source>
+        <translation>专辑曲目和制作人员必须为数组。</translation>
+    </message>
+    <message>
+        <source>Invalid or duplicate album ID</source>
+        <translation>专辑标识无效或重复。</translation>
+    </message>
+    <message>
+        <source>Invalid track metadata types</source>
+        <translation>曲目元数据类型无效。</translation>
+    </message>
+    <message>
+        <source>Invalid, duplicate or mismatched track ID</source>
+        <translation>曲目标识无效、重复或与专辑不匹配。</translation>
+    </message>
+    <message>
+        <source>Invalid producer metadata types</source>
+        <translation>制作人员元数据类型无效。</translation>
+    </message>
+    <message>
+        <source>Invalid root metadata types</source>
+        <translation>根目录元数据类型无效。</translation>
+    </message>
+    <message>
         <source>Invalid genre integer metadata</source>
         <translation>流派整数元数据无效。</translation>
     </message>

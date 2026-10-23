@@ -834,6 +834,47 @@ private Q_SLOTS:
             rejected(input);
         }
     }
+    void integerMetadataDomainBoundaries()
+    {
+        const auto base = fixtures.value(u"single"_s).toObject();
+        const auto check = [&](const QString &key, bool trackField, bool genreField, int minimum) {
+            for (const auto &value :
+                 QList<QJsonValue>{ QJsonValue(QJsonValue::Null), minimum,
+                                    std::numeric_limits<int>::max(), minimum - 1 }) {
+                auto input = base;
+                if (genreField) {
+                    auto genre = input[u"genres"_s].toArray().first().toObject();
+                    genre[key] = value;
+                    input[u"genres"_s] = QJsonArray{ genre };
+                } else {
+                    auto album = input[u"albums"_s].toArray().first().toObject();
+                    if (trackField) {
+                        auto track = album[u"tracks"_s].toArray().first().toObject();
+                        track[key] = value;
+                        album[u"tracks"_s] = QJsonArray{ track };
+                    } else {
+                        album[key] = value;
+                    }
+                    input[u"albums"_s] = QJsonArray{ album };
+                }
+                auto snapshot = library(u"single"_s);
+                const auto previous = toJson(snapshot);
+                QString error;
+                if (value.isNull() || value.toInt() >= minimum) {
+                    QVERIFY2(readLibrary(input, snapshot, &error), qPrintable(error));
+                } else {
+                    QVERIFY(!readLibrary(input, snapshot, &error));
+                    QVERIFY(!error.isEmpty());
+                    QCOMPARE(toJson(snapshot), previous);
+                }
+            }
+        };
+        check(u"albumCount"_s, false, true, 0);
+        check(u"discCount"_s, false, false, 0);
+        for (const auto &key : { u"trackNumber"_s, u"discNumber"_s, u"bitsPerSample"_s,
+                                 u"sampleRate"_s, u"bitrate"_s })
+            check(key, true, false, 1);
+    }
     void invalidLocalUrlsDoNotBecomeMediaSources()
     {
         for (const auto &url : { u"file:relative.flac"_s, u"file:///tmp/song.flac?download"_s,

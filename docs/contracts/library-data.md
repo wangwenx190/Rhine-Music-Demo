@@ -2,7 +2,7 @@
 
 冻结来源为 `57f4f845c20cce646a15dbf4008c2a162aaaf4e2` 中的 `src/music-types.ts`、`music-order.ts`、`music-search.ts`、`data.ts:setMusicAlbums`及`scripts/music-library.mjs`。本文管理值模型、身份/排序/搜索、本地扫描/存储序列化与Provider协议；媒体与UI消费者按各自专项契约接入。
 
-`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。LibrarySnapshot、Album、Track、Producer和Genre的`fields`只保留未由类型化成员持有的扩展字段，序列化由当前成员写出已知字段；未知扩展中的嵌套对象和null原样保留。解析直接构造扩展对象，不从完整JSON副本删除已知键，避免旧正文、查询状态及曲目载荷在资料刷新后继续占用扩展对象的底层存储。LibraryRoot保留原始路径字段供无效本地路径的只读往返，运行使用已验证的QUrl。`readLibrary` 使用临时值解析，重复/错配 ID、非法集合或已知字段类型、非整数或超int范围的可选整数、非数值/负数/非有限时长返回错误，原快照不变；缺失/null可选参数保持未知。本地file URL须有效、绝对且没有query/fragment/NUL，非法来源保持空URL，不猜测为可播放文件。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
+`src/core/MusicTypes.h` 中的 Album/Track/Producer/Genre/LibraryRoot/LibrarySnapshot 是值类型。专辑、曲目、制作人员、来源、介绍/制作查询、MusicBrainz、扫描与批量进度字段均保留；可选技术参数不猜测。LibrarySnapshot、Album、Track、Producer和Genre的`fields`只保留未由类型化成员持有的扩展字段，序列化由当前成员写出已知字段；未知扩展中的嵌套对象和null原样保留。解析直接构造扩展对象，不从完整JSON副本删除已知键，避免旧正文、查询状态及曲目载荷在资料刷新后继续占用扩展对象的底层存储。LibraryRoot保留原始路径字段供无效本地路径的只读往返，运行使用已验证的QUrl。`readLibrary` 使用临时值解析，重复/错配 ID、非法集合或已知字段类型、非整数、超int范围、非正曲号/碟号/技术参数或负计数的可选整数、非数值/负数/非有限时长返回错误，原快照不变；缺失/null可选参数保持未知。本地file URL须有效、绝对且没有query/fragment/NUL，非法来源保持空URL，不猜测为可播放文件。`Snapshot` 是共享的 const 快照；`LibrarySession::setSnapshot` 仅在 GUI 线程应用一次模型重置。
 
 歌曲 `sourceUrl`、目录 `folder` 和 roots.path 使用本地 QUrl；绝对 Unicode 原生路径用 `QUrl::fromLocalFile`，不从当前目录猜相对音乐路径。歌曲 URL 只接受本地文件；封面额外允许 qrc。来源/候选链接保留文本。显式目录导入见下节。`MediaSupport` 为 Unknown/Supported/Unsupported，只有实际媒体状态才能更新；无声标签加载不证明可解码播放，不按扩展名猜测。
 
@@ -81,7 +81,7 @@ PanelController::selectResult只接纳搜索面板的稳定专辑/曲目ID，保
 
 `TrackFocusController`验证稳定专辑/所属曲目身份，复用PresentationController的archiveRoute：必要时退字/归架，再以既有五次轨迹定位和重新打开，真正detailEnabled后才交付行号。当前打开专辑直接切歌单并滚动，不重新抽取。搜索结果和播放歌名使用同一个request接口，只读播放ID，任何定位均不调用媒体命令。最后目标覆盖未完成请求，回退/换库/重播/打开面板与用户滚轮/按下/触摸/按键/resize取消旧revealing revision；旧布局回调不能恢复高亮。
 
-TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项以显式祖先栈完成polish，保留子先父后及兄弟顺序，不递归；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
+TrackList只采集原生列表实际几何并执行视图操作；TrackFocusController按已布局的歌曲行（不含CD标题）/页签尺寸居中，以实际首尾范围钳制滚动，持有origin修正与目标偏移状态；只对有界已实现项以显式祖先栈完成polish，保留子先父后及兄弟顺序，不递归；虚拟行实现导致originY或未显示行高度估计变化时，以实际目标行转换同一坐标基准，保持到目标的源cubic距离轨迹，避免远距离滚动跳变或目标尚未实现。滚动后按revision等待布局再聚焦；切换介绍页取消旧高亮，定位返回歌单时保留当前请求。滚动沿冻结music-track-focus的cubic in/out与min(700,320+距离×.12)ms；到达后聚焦目标行，以1000ms两次、0/.32/.48/.88/1的CSS ease-in-out高亮。减少动态立即滚动并保持高亮1100ms；高亮中途开启时立即显示完整静态高亮，并从切换时刻重新计1100ms。该定位消费唯一FrameClock的原始dt，隐藏暂停视觉，不修改歌曲或全局动效速度。
 
 `ui-tests --library 输出目录 --representative`使用桌面/窄屏、DPR1/2与双主题的既有代表组合，保留该范围内的实际输入、焦点及资料状态断言；省略选项保持完整库面板检查范围。设置入口同样支持`--representative`。代表检查不冒称其余矩阵或物理设备事实。
 

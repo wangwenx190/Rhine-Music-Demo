@@ -31,6 +31,8 @@ class OffscreenSurface final : public QObject
     Q_DISABLE_COPY_MOVE(OffscreenSurface)
 public:
     bool measurementEnabled = false;
+    // Optional owner policy runs before scaling or allocating the render target.
+    std::function<bool(QSize, qreal, int)> targetSizeAccepted;
     static inline bool Enabled =
 #if defined(Q_OS_MACOS)
             true;
@@ -208,6 +210,12 @@ private:
             m_initialized = true;
         }
         const qreal dpr = m_requestedDpr > 0 ? m_requestedDpr : m_window.devicePixelRatio();
+        if (targetSizeAccepted
+            && !targetSizeAccepted(m_window.size(), dpr,
+                                   rhi()->resourceLimit(QRhi::TextureSizeMax))) {
+            m_active = false;
+            return;
+        }
         const QSize size = m_window.size() * dpr;
         bool targetChanged = false;
         if (!m_texture || m_texture->pixelSize() != size) {

@@ -283,6 +283,28 @@ private Q_SLOTS:
         QCOMPARE(controller.tabX(), 60);
         QCOMPARE(controller.tabWidth(), 70);
     }
+    void indicatorRelayoutDoesNotAdvanceContentFade()
+    {
+        FrameClock clock;
+        Fixture f;
+        PresentationController controller(&clock, f.ports());
+        clock.setActive(true);
+        clock.advance(0);
+        controller.revealTabContent();
+        controller.setTabIndicator(30, 60, false);
+        QCOMPARE(controller.tabOpacity(), .35);
+        QCOMPARE(controller.tabX(), 30);
+        QCOMPARE(controller.tabWidth(), 60);
+        clock.advance(.04);
+        const auto opacity = controller.tabOpacity();
+        QVERIFY(opacity > .35 && opacity < 1);
+        controller.setTabIndicator(50, 80, false);
+        QCOMPARE(controller.tabOpacity(), opacity);
+        QCOMPARE(controller.tabX(), 50);
+        for (int i = 0; i < 4; ++i)
+            clock.advance(.04);
+        QCOMPARE(controller.tabOpacity(), 1);
+    }
     void lookupStatusReflectsSavedResult()
     {
         OfflineMetadataProvider provider;

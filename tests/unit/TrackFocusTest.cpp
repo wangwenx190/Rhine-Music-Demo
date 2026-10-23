@@ -76,6 +76,79 @@ public:
     TrackFocusTest() = default;
 
 private Q_SLOTS:
+    void synchronousRequestNotifications_data()
+    {
+        QTest::addColumn<int>("stage");
+        QTest::addColumn<bool>("replace");
+        for (int stage = 0; stage < 3; ++stage)
+            for (bool replace : { false, true })
+                QTest::newRow(qPrintable(QString::number(stage)
+                                         + (replace ? u"-replace"_s : u"-cancel"_s)))
+                        << stage << replace;
+    }
+    void synchronousRequestNotifications()
+    {
+        QFETCH(int, stage);
+        QFETCH(bool, replace);
+        Fixture f;
+        bool acted = false;
+        const auto intervene = [&] {
+            if (acted)
+                return;
+            acted = true;
+            if (replace)
+                QVERIFY(f.focus.request(u"album-3"_s, u"track-17"_s));
+            else
+                f.focus.cancel();
+        };
+        if (stage == 1)
+            connect(&f.focus, &TrackFocusController::navigationRequested, &f.focus, intervene);
+        else
+            connect(&f.focus, &TrackFocusController::changed, &f.focus, [&] {
+                if (stage == 0 || f.focus.active())
+                    intervene();
+            });
+        QVERIFY(!f.focus.request(u"album-8"_s, u"track-59"_s));
+        QVERIFY(acted);
+        if (replace) {
+            QVERIFY(f.untilDetail());
+            QCOMPARE(f.selection.albumId(), u"album-3"_s);
+            QCOMPARE(f.library.navigationTrackId(), u"track-17"_s);
+        } else {
+            f.step(120);
+            QCOMPARE(f.presentation.phase(), u"archive"_s);
+            QVERIFY(!f.focus.active());
+        }
+        QCOMPARE(f.library.playbackAlbumId(), u"album-0"_s);
+    }
+    void reducedMotionDuringHighlight_data()
+    {
+        QTest::addColumn<double>("elapsed");
+        QTest::newRow("start") << 0.;
+        QTest::newRow("fade-in") << .1;
+        QTest::newRow("late-pulse") << 1.5;
+    }
+    void reducedMotionDuringHighlight()
+    {
+        QFETCH(double, elapsed);
+        Fixture f;
+        QVERIFY(f.focus.locatePlayback());
+        QVERIFY(f.untilDetail());
+        f.focus.beginReveal(f.focus.revision(), 0, 0);
+        f.focus.advance(elapsed);
+        QVERIFY(f.focus.highlight() < 1);
+        QSignalSpy changed(&f.focus, &TrackFocusController::changed);
+        f.focus.setReducedMotion(true);
+        QCOMPARE(f.focus.highlight(), 1.);
+        QCOMPARE(changed.size(), 1);
+        f.focus.setReducedMotion(true);
+        QCOMPARE(changed.size(), 1);
+        f.focus.advance(1.);
+        QVERIFY(f.focus.active());
+        QCOMPARE(f.focus.highlight(), 1.);
+        f.focus.advance(.11);
+        QVERIFY(!f.focus.active());
+    }
     void listOriginRefinementPreservesMotionDistance()
     {
         Fixture f;

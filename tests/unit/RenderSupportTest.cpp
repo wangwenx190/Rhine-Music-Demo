@@ -1,4 +1,5 @@
 #include "CaptureMailbox.h"
+#include "MaterialReviewInput.h"
 #include "SceneItem.h"
 #include "CoverCache.h"
 #include <QScopeGuard>
@@ -41,6 +42,27 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void materialCaptureDimensions()
+    {
+        QCOMPARE(materialReviewSize({ }).value(), QSize(960, 720));
+        for (const auto key : { "width"_L1, "height"_L1 }) {
+            for (const auto &invalid : QList<QJsonValue>{ QJsonValue::Null, true, u"960"_s, 0, -1,
+                                                          1.5, 4097, 2147483647, 1e100 }) {
+                QJsonObject state;
+                state[key] = invalid;
+                QVERIFY(!materialReviewSize(state));
+            }
+        }
+        QCOMPARE(materialReviewSize({ { u"width"_s, 1 }, { u"height"_s, 4096 } }).value(),
+                 QSize(1, 4096));
+        QVERIFY(materialReviewTargetSupported({ 2048, 2048 }, 2, 4096));
+        QVERIFY(!materialReviewTargetSupported({ 2049, 2048 }, 2, 4096));
+        QVERIFY(!materialReviewTargetSupported({ 960, 720 }, 2, 1024));
+        QVERIFY(!materialReviewTargetSupported({ 960, 720 }, 1, 0));
+        for (double dpr : { 0., -1., 1e100, std::numeric_limits<double>::infinity(),
+                            std::numeric_limits<double>::quiet_NaN() })
+            QVERIFY(!materialReviewTargetSupported({ 960, 720 }, dpr, 4096));
+    }
     void layerDimensionsKeepCeilingAndNearestRounding()
     {
         class SceneProbe final : public rhi::SceneItem

@@ -24,6 +24,7 @@ if(YALAHOO_REVIEW)
         PRIVATE
         MaterialReview.cpp
         MaterialReview.h
+        MaterialReviewInput.h
         FixedTextureData.cpp
         FixedTextureData.h
     )

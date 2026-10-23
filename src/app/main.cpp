@@ -117,6 +117,37 @@ bool initializeLibraryCommands(const yalahoo::ApplicationOptions &options,
 int main(int argc, char **argv)
 {
     yalahoo::initializeIdentity();
+#ifdef YALAHOO_REVIEW
+    constexpr bool ReviewEnabled = true;
+#else
+    constexpr bool ReviewEnabled = false;
+#endif
+    // Inspect product arguments without constructing a GUI platform. A Core application
+    // is created only for commands that exit here, so normal startup owns one application.
+    QStringList rawArguments;
+    bool helpRequested = false;
+    for (int i = 0; i < argc; ++i) {
+        const auto argument = QString::fromLocal8Bit(argv[i]);
+        rawArguments.append(argument);
+        helpRequested = helpRequested || argument == "--help"_L1 || argument == "-h"_L1
+                || argument == "--help-all"_L1;
+    }
+    if (helpRequested
+        || !yalahoo::parseApplicationOptions(rawArguments, ReviewEnabled).error.isEmpty()) {
+        QCoreApplication commandLineApp(argc, argv);
+        const yalahoo::Localization localization;
+        const auto parsed =
+                yalahoo::parseApplicationOptions(commandLineApp.arguments(), ReviewEnabled);
+        if (!parsed.error.isEmpty()) {
+            const auto error = parsed.error.toUtf8();
+            std::fwrite(error.constData(), 1, size_t(error.size()), stderr);
+            std::fputc('\n', stderr);
+            return std::to_underlying(parsed.errorCode);
+        }
+        const auto help = parsed.help.toUtf8();
+        std::fwrite(help.constData(), 1, size_t(help.size()), stdout);
+        return 0;
+    }
     bool temporarySession = false;
     for (int i = 1; i < argc; ++i) {
         const QByteArray argument(argv[i]);
@@ -124,9 +155,8 @@ int main(int argc, char **argv)
             yalahoo::verification::prepareApplication();
             temporarySession = true;
         }
-        temporarySession = temporarySession || argument == "--demo"_ba
-                || argument == "--lighting-lab"_ba || argument == "--help"_ba || argument == "-h"_ba
-                || argument == "--help-all"_ba;
+        temporarySession =
+                temporarySession || argument == "--demo"_ba || argument == "--lighting-lab"_ba;
     }
     std::unique_ptr<QTemporaryDir> temporaryLogs;
     yalahoo::LoggingSession::Options loggingOptions;
@@ -152,6 +182,12 @@ int main(int argc, char **argv)
     QGuiApplication::setFont(globalFont);
     yalahoo::DisplayOutput displayOutput;
     const yalahoo::Localization localization;
+    const auto parsed = yalahoo::parseApplicationOptions(app.arguments(), ReviewEnabled);
+    if (!parsed.error.isEmpty()) {
+        qCWarning(yalahoo::logApp) << parsed.error;
+        return std::to_underlying(parsed.errorCode);
+    }
+
     if (!yalahoo::probeOptionalGraphicsBackend())
         return GraphicsBackendUnavailable;
     QIcon applicationIcon;
@@ -166,21 +202,6 @@ int main(int argc, char **argv)
     if (!yalahoo::initializeAssetFonts()) {
         qCCritical(yalahoo::logApp) << "Embedded MiSans font registration failed";
         return AssetFontInitializationFailed;
-    }
-#ifdef YALAHOO_REVIEW
-    constexpr bool ReviewEnabled = true;
-#else
-    constexpr bool ReviewEnabled = false;
-#endif
-    const auto parsed = yalahoo::parseApplicationOptions(app.arguments(), ReviewEnabled);
-    if (!parsed.error.isEmpty()) {
-        qCWarning(yalahoo::logApp) << parsed.error;
-        return std::to_underlying(parsed.errorCode);
-    }
-    if (!parsed.help.isEmpty()) {
-        const auto help = parsed.help.toUtf8();
-        std::fwrite(help.constData(), 1, size_t(help.size()), stdout);
-        return 0;
     }
     const auto &options = *parsed.options;
     const bool demonstration = options.demonstration();

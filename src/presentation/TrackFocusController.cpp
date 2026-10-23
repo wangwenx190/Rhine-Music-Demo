@@ -57,26 +57,37 @@ TrackFocusController::TrackFocusController(LibrarySession *library,
 }
 bool TrackFocusController::request(const QString &albumId, const QString &trackId)
 {
+    // Callers may pass IDs owned by objects changed by synchronous observers.
+    const QString requestedAlbum = albumId, requestedTrack = trackId;
+    const auto revision = m_revision + 1;
     cancel();
-    if (!m_library->contains(albumId, trackId)) {
+    if (revision != m_revision)
+        return false;
+    if (!m_library->contains(requestedAlbum, requestedTrack)) {
         Q_EMIT rejected(QCoreApplication::translate(
                 "Yalahoo",
                 "This album or track is no longer in the library. Rescan and try again."));
         return false;
     }
     Q_EMIT navigationRequested();
-    m_albumId = albumId;
-    m_trackId = trackId;
-    m_row = m_library->trackIndex(albumId, trackId);
+    if (revision != m_revision)
+        return false;
+    m_albumId = requestedAlbum;
+    m_trackId = requestedTrack;
+    m_row = m_library->trackIndex(requestedAlbum, requestedTrack);
     Q_EMIT changed();
+    if (revision != m_revision)
+        return false;
     const auto phase = m_presentation->phase();
-    const bool reuse = !trackId.isEmpty() && m_library->navigationAlbumId() == albumId
+    const bool reuse = !requestedTrack.isEmpty() && m_library->navigationAlbumId() == requestedAlbum
             && !m_presentation->pendingSelection()
             && (phase == "detail"_L1 || phase == "opening"_L1 || phase == "switching"_L1);
     if (!reuse)
-        m_presentation->select(albumId, true, true, trackId);
+        m_presentation->select(requestedAlbum, true, true, requestedTrack);
     else
-        m_library->navigate(albumId, trackId);
+        m_library->navigate(requestedAlbum, requestedTrack);
+    if (revision != m_revision)
+        return false;
     ready();
     return true;
 }
@@ -174,9 +185,17 @@ void TrackFocusController::startHighlight()
 }
 void TrackFocusController::setReducedMotion(bool reduced)
 {
+    if (m_reduced == reduced)
+        return;
     m_reduced = reduced;
-    if (reduced && m_scrolling)
+    if (reduced && m_scrolling) {
         advance(m_duration);
+    } else if (reduced && m_pulsing) {
+        // Give the static highlight its full reduced-motion hold from this transition.
+        m_elapsed = 0;
+        m_highlight = 1;
+        Q_EMIT changed();
+    }
 }
 void TrackFocusController::advance(double dt)
 {

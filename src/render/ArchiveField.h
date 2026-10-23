@@ -42,7 +42,7 @@ private:
     };
     double realisticField(double row, const Column &column) const;
     QVector<Pulse> m_pulses;
-    double m_time = 0, m_scanTime = sceneGeometry::SettledSceneSeconds, m_scanBlend = 0;
+    double m_time = 0;
     double m_lastInteraction = 0, m_idleGain = 0, m_pulseGain = 1;
 };
 }
