@@ -5,7 +5,7 @@
 - `App.qml → MusicStage.qml`为唯一产品舞台，隐藏Review也实例化同一MusicStage。OpeningController消费FrameClock未缩放dt，按Preparing→Film→Reveal→Done驱动；准备、暂停和后台等待不消耗片长。重播先归档详情/总览，保留同一SceneItem、稳定选中ID与媒体会话。
 - StartupCoordinator在GUI持有一个最新待应用库快照；隐藏合并通知，Preparing按事件循环批量应用一致快照。初始模型未就绪不接受scenePrepared；最后一次polish后到达的扫描快照须先应用并重发preparationToken，等待真实封面/上传/渲染重新确认。Film冻结库展示更新，handedOff后才恢复普通交付；协调器不拥有媒体或GPU资源。
 - Preparing在底纸下暖真实RHI通道；SceneItem用本次preparationToken、当前submission、全部可见封面/选中高清租约和已排空上传队列确认就绪。旧回调失效，失败沿errorText显示；跳过准备阶段记住意图，待就绪后到达同一终态。
-- Film逐式采样冻结musicOpeningFrame与musicBootSceneTime：底纸6.32s消退，6.40s从源时间21.92起片，11.60s到源27.12的静止浏览姿态；相机、重定位波浪、entryZ、选中lift及row-light intro使用同一shot。二维cubic smooth与三维quintic ease各沿对应源函数。Reveal使用源cubic-bezier(.22,1,.36,1)和既有错峰，720ms后一次解锁/恢复有效焦点；途中减少动态直接完成，速度不改片长。
+- Film逐式采样冻结musicOpeningFrame与musicBootSceneTime：底纸6.32s消退，6.40s从源时间21.92起片，11.60s到源27.12的静止浏览姿态；相机、重定位波浪、entryZ、选中lift及row-light intro使用同一shot。二维cubic smooth与三维quintic ease各沿对应源函数。`drawing`按当前时间惰性计算一次并共享不可变属性表；时间推进、跳过及重播自然失效，Reveal同时间读取不重复构造。Reveal使用源cubic-bezier(.22,1,.36,1)和既有错峰，720ms后一次解锁/恢复有效焦点；途中减少动态直接完成，速度不改片长。
 - 完全遮挡期SceneItem停止preparePool/submit；RhiItem同步只收遮挡值，render仅清透明输出，跳过所有三维资源/上传/pass。恢复首次提交携带当前完整快照，即使遮挡期SG重建也重新准备资源；三维render与遮挡clear分别计数。准备暖帧不计作片中三维提交。
 - 主页Header的品牌节点始终保留，其他主页组在Film期间不可见/不可交互，交接复用原节点。键盘Tab留在跳过按钮，Enter/Escape跳过，退出后才恢复浏览输入。序章和定位不发媒体命令；设置重播按钮关闭设置面板并调用现有replay接口。
 - 品牌/圆环用C++ Canvas Painter：17条中心线及两条完整内纹从qrc SVG/map读取一次，中心线在共享前开启并预建弧长缓存，QPainterPath::trimmed按弧长揭示（[Qt长度缓存](https://doc.qt.io/qt-6/qpainterpath.html#setCachingEnabled)），完整路径按稳定组缓存。逻辑尺寸变化时重建有限路径组，shader只更新纸面颜色/透明度；圆环保留源dash/转角/缩放/静止中心十字。短点用原round-cap笔画的填充轮廓保留，避免模块将极短线当作重合顶点丢弃。

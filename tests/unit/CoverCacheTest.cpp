@@ -131,6 +131,17 @@ private Q_SLOTS:
                                  AsyncDeadlineMilliseconds);
         QVERIFY(!covers.statistics()[u"selectedDetailed"_s].toBool());
         QVERIFY(covers.prepared());
+        const auto failedDecodes = covers.cacheStatistics()[u"decodeStarts"_s].toInteger();
+        // A failed tier is terminal only for that demand. A new tier must be admitted,
+        // while retained base artwork remains available during the asynchronous upgrade.
+        QVERIFY(image.save(path));
+        covers.setDemand(512);
+        publish();
+        QVERIFY(!covers.prepared());
+        QTRY_VERIFY_WITH_TIMEOUT((publish(), covers.statistics()[u"selectedDetailed"_s].toBool()),
+                                 AsyncDeadlineMilliseconds);
+        QVERIFY(covers.cacheStatistics()[u"decodeStarts"_s].toInteger() > failedDecodes);
+        QVERIFY(covers.prepared());
     }
 
     void failedDetailedUpgradeReusesPublishedDescriptors()

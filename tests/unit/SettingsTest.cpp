@@ -13,6 +13,7 @@
 #include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <limits>
@@ -138,6 +139,31 @@ private Q_SLOTS:
             QVERIFY(!damaged.update({ { u"theme"_s, u"day"_s } }));
             QCOMPARE(yalahoo::test::readFile(path), invalid);
         }
+    }
+    void saveErrorCallbackCanSubmitNewPreferences()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto root = directory.filePath(u"blocked"_s);
+        QVERIFY(test::writeFile(root, "block directory creation"_ba));
+        PreferencesStore preferences(root);
+        QSignalSpy saved(&preferences, &PreferencesStore::saved);
+        QSignalSpy errors(&preferences, &PreferencesStore::saveError);
+        connect(&preferences, &PreferencesStore::saveError, &preferences, [&] {
+            if (errors.size() != 1)
+                return;
+            QVERIFY(QFile::remove(root));
+            QVERIFY(preferences.update({ { u"motionSpeed"_s, 2.0 } }));
+        });
+        QVERIFY(preferences.update({ { u"theme"_s, u"night"_s } }));
+        QTRY_COMPARE(errors.size(), 1);
+        QTRY_COMPARE(saved.size(), 1);
+        QVERIFY(preferences.error().isEmpty());
+        const auto stored =
+                QJsonDocument::fromJson(test::readFile(QDir(root).filePath(u"preferences.json"_s)))
+                        .object();
+        QCOMPARE(stored[u"theme"_s].toString(), u"night"_s);
+        QCOMPARE(stored[u"motionSpeed"_s].toDouble(), 2.0);
     }
     void fieldRoutingAndVisualReload()
     {

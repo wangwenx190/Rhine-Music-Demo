@@ -43,7 +43,7 @@ struct SceneCovers::Private final
         CoverSnapshot tiledPixels;
         QRect tiledRegion;
         QVector<AtlasUpload> uploads;
-        bool highResolutionFailed = false;
+        int failedResolution = 0;
     };
     struct CoverRegion final
     {
@@ -213,7 +213,7 @@ bool SceneCovers::prepared() const
                             return cover.objectId == d->m_activeObject && cover.pixels
                                     && cover.pixels->pixels
                                     && (cover.pixels->pixels->resolution >= d->m_detailResolution
-                                        || cover.highResolutionFailed);
+                                        || cover.failedResolution == d->m_detailResolution);
                         });
     if (hasOwned && !selectedUsable)
         return false;
@@ -235,8 +235,8 @@ void SceneCovers::Private::handlePoolCoverReady(const CoverSnapshot &pixels)
     for (auto &owned : m_ownedCovers)
         if (owned.objectId == m_activeObject && owned.pixels
             && owned.pixels->identity == pixels->identity) {
-            if (pixels->resolution >= m_detailResolution)
-                owned.highResolutionFailed = !pixels->error.isEmpty();
+            if (pixels->resolution == m_detailResolution)
+                owned.failedResolution = pixels->error.isEmpty() ? 0 : pixels->resolution;
             m_coverPool.upgrade(owned.pixels, pixels);
         }
     ++m_coverRevision;
@@ -378,14 +378,12 @@ SceneCovers::Private::acquireOwnedCover(const ArchiveInstance &instance, const C
 void SceneCovers::Private::requestDetailedCover(Private::OwnedCover &owned, const QString &id,
                                                 const CoverSource &source)
 {
-    if (owned.objectId != m_activeObject
-        || (owned.highResolutionFailed
-            && (!owned.pixels->pixels || owned.pixels->pixels->error.isEmpty()))
+    if (owned.objectId != m_activeObject || owned.failedResolution == m_detailResolution
         || (owned.pixels->pixels && owned.pixels->pixels->resolution >= m_detailResolution))
         return;
     if (auto pixels =
                 m_covers.lookup(id, source.path, m_detailResolution, source.placeholderTitle)) {
-        owned.highResolutionFailed = !pixels->error.isEmpty();
+        owned.failedResolution = pixels->error.isEmpty() ? 0 : pixels->resolution;
         m_coverPool.upgrade(owned.pixels, pixels);
         return;
     }
@@ -412,7 +410,7 @@ bool SceneCovers::Private::reusePool(Input &in, const Input &previous) const
                                            });
         if (selected == m_ownedCovers.cend() || !selected->pixels || !selected->pixels->pixels
             || (selected->pixels->pixels->resolution < m_detailResolution
-                && !selected->highResolutionFailed))
+                && selected->failedResolution != m_detailResolution))
             return false;
     }
     if (instances.isSharedWith(previous.scene.instances)) {

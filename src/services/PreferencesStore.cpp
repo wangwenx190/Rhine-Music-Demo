@@ -75,10 +75,12 @@ PreferencesStore::PreferencesStore(const QString &dataRoot, QObject *parent)
     connect(&d->m_save, &QFutureWatcher<QString>::finished, this, [this] {
         d->m_saving = false;
         const auto error = d->m_save.result();
-        d->reportError(error);
+        // End the failed save before notifying observers. A synchronous error handler
+        // may submit a newer edit, which must keep its own dirty state and save intent.
         if (!error.isEmpty())
             d->m_dirty = false;
-        else {
+        d->reportError(error);
+        if (error.isEmpty()) {
             qCInfo(logSettings) << "Preferences saved" << "path=" << d->m_path;
             Q_EMIT saved();
         }

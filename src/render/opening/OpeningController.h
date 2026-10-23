@@ -3,6 +3,7 @@
 
 #pragma once
 #include <QObject>
+#include <optional>
 #include "OpeningFrame.h"
 
 namespace yalahoo {
@@ -59,7 +60,12 @@ public:
     }
     QVariantMap drawing() const
     {
-        return openingFrame(m_time).values();
+        // Every QML field reader shares one immutable map for this timeline sample.
+        if (!m_drawingTime || *m_drawingTime != m_time) {
+            m_drawing = openingFrame(m_time).values();
+            m_drawingTime = m_time;
+        }
+        return m_drawing;
     }
     Q_INVOKABLE void replay();
     Q_INVOKABLE void skip();
@@ -95,6 +101,8 @@ private:
     SelectionController *m_selection;
     Phase m_phase = Phase::Idle;
     double m_time = 0, m_reveal = 0;
+    mutable std::optional<double> m_drawingTime;
+    mutable QVariantMap m_drawing;
     bool m_skipPending = false;
     quint64 m_revision = 0;
 };

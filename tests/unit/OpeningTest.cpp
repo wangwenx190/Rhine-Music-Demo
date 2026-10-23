@@ -44,6 +44,32 @@ public:
     OpeningTest() = default;
 
 private Q_SLOTS:
+    void drawingSnapshotsFollowTimelineAndReplay()
+    {
+        Fixture f;
+        const auto initial = f.opening.drawing();
+        QVERIFY(initial.isSharedWith(f.opening.drawing()));
+        f.opening.replay();
+        f.opening.scenePrepared();
+        for (int i = 0; i < 30; ++i)
+            f.motion.clock()->advance(.05);
+        auto shown = f.opening.drawing();
+        QVERIFY(shown.value(u"mark"_s).toDouble() > 0);
+        QCOMPARE(initial[u"mark"_s].toDouble(), 0.0);
+        QVERIFY(shown.isSharedWith(f.opening.drawing()));
+        // A caller's edits must detach from the published snapshot.
+        shown.insert(u"mark"_s, -1);
+        QVERIFY(f.opening.drawing()[u"mark"_s].toDouble() > 0);
+        f.opening.skip();
+        const auto terminal = f.opening.drawing();
+        QCOMPARE(terminal[u"phase"_s].toString(), u"array"_s);
+        QCOMPARE(terminal[u"background"_s].toDouble(), 0.0);
+        f.motion.clock()->advance(.05);
+        QVERIFY(terminal.isSharedWith(f.opening.drawing()));
+        f.opening.replay();
+        QCOMPARE(f.opening.drawing(), initial);
+        QCOMPARE(terminal[u"phase"_s].toString(), u"array"_s);
+    }
     void sourceFormulaAndCamera()
     {
         QFile file((QString::fromUtf8(FIXTURE_ROOT))

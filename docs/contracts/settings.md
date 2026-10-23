@@ -12,7 +12,7 @@ SettingsController::updateQuality在C++合并单字段与当前完整画质值�
 
 `singleInstance`为布尔值，默认开启，设置面板可修改，重启后生效。普通产品在启动资料Provider、声音、曲库或创建窗口前，以规范化数据目录的QLockFile和仅当前用户可访问的QLocalServer仲裁；相同目录再次启动只请求已有窗口显示/恢复与激活，确认后退出，不转发导入/扫描参数。不同数据目录相互独立；关闭此模式允许多开。持锁进程不会因运行时间过长被驱逐；崩溃锁按Qt的死进程判定恢复，锁/端点/响应失败明确报错，不能降级多开。演示与验证入口不读取用户此项设置、不参与产品实例仲裁。启动阶段的有界IPC等待不进入常规交互路径。
 
-PreferencesStore在事件循环合并变化，只有一个在途worker保存和一个最新意图；JSON序列化与QSaveFile提交在worker，禁止direct-write fallback，文件仅owner读写。显式导入规则见下节；原文件不写。损坏/未知schema使用内存默认值并暴露错误，写失败保留旧文件、无自动重试循环；析构只完成已接受的最后保存。
+PreferencesStore在事件循环合并变化，只有一个在途worker保存和一个最新意图；JSON序列化与QSaveFile提交在worker，禁止direct-write fallback，文件仅owner读写。显式导入规则见下节；原文件不写。损坏/未知schema使用内存默认值并暴露错误，写失败保留旧文件、无自动重试循环；在发布错误信号前结束旧保存的待写状态，错误观察者提交的新设置保留独立的保存意图。析构只完成已接受的最后保存。
 
 介绍/制作信息/MusicBrainz区域的来源、当前查询、全库补缺、取消、网络开关及配置行为遵守[library-data.md的联网资料与离线缓存](library-data.md#联网资料与离线缓存)，不在UI另建状态或请求机制。
 
