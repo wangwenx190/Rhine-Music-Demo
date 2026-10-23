@@ -10,7 +10,7 @@
 
 `ArchiveButton/Slider/CheckBox/ComboBox/ScrollBar/ScrollView/TextField/TextArea/ProgressBar/ToolTip/EditMenu`使用`QtQuick.Templates`的公开行为类型。背景、内容、指示器、滑块、委托、弹出层及滚动条全部由项目QML绘制；独立页面按钮/窗口/模态层同样显式提供视觉树。颜色直接绑定DesignTokens，字体显式绑定MiSans的family/styleName/weight与逻辑字号，尺寸、内边距、边框、圆角和状态透明度由项目设置。系统主题不能决定控件绘制。
 
-Templates负责Qt事件、键盘、焦点、无障碍、文本编辑/输入法和滚动行为。弹出层固定为Item，显式关闭默认过渡，关闭/Escape与外部点击策略由组件设置；选择项仅打开时实例化并由ListView虚拟化。文本编辑菜单使用项目按钮提供剪切/复制/粘贴/全选，操作能力遵循选区、剪贴板与readOnly。目录选择使用`QtQuick.Dialogs.FolderDialog`的操作系统对话框，其系统外观不属于产品控件绘制。
+Templates负责Qt事件、键盘、焦点、无障碍、文本编辑/输入法和滚动行为。Tooltip只声明相对宿主的居中与间距，由Popup跟踪祖先几何并按明确边距调整及翻转位置，不缓存无通知的场景坐标。弹出层固定为Item，显式关闭默认过渡，关闭/Escape与外部点击策略由组件设置；选择项仅打开时实例化并由ListView虚拟化。文本编辑菜单使用项目按钮提供剪切/复制/粘贴/全选，操作能力遵循选区、剪贴板与readOnly。目录选择使用`QtQuick.Dialogs.FolderDialog`的操作系统对话框，其系统外观不属于产品控件绘制。
 
 ArchiveButton的键盘焦点沿冻结`music.css::.music-app button:focus-visible`：2px accent外轮廓、4px间距，对应独立矩形在控件外扩6px；绑定Templates的visualFocus，不能用覆盖文字边缘的内边框或鼠标焦点代替。轮廓不参与布局与命中尺寸。
 

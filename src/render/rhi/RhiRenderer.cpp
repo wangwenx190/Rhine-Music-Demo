@@ -2,6 +2,7 @@
 #include "SceneGeometryData.h"
 #include "ScenePipeline.h"
 #include "ReadbackQueue.h"
+#include <QScopeGuard>
 #include "FrameUniforms.h"
 #include "SceneGeometry.h"
 #include "SceneMath.h"
@@ -172,6 +173,12 @@ public:
     {
         if (failedRenderer)
             return;
+        readbacks.retire();
+        // Pending captures still need QRhi frames when the scene only clears or has no cover.
+        const auto continueReadbacks = qScopeGuard([this] {
+            if (readbacks.drain())
+                update();
+        });
         if (input.sceneOccluded) {
             cb->beginPass(itemOutput.rt.get(), Qt::transparent, { 1, 0 });
             cb->endPass();
@@ -1100,7 +1107,6 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
     if (input.cover.isNull() && !input.atlasGeneration)
         return;
     prepareResources(cb);
-    readbacks.retire();
     ResourceUpdates updates(api->nextResourceUpdateBatch());
     if (uploadGeometry) {
         updates->uploadStaticBuffer(vertices.get(), geometry->vertexBytes());
@@ -1717,8 +1723,6 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             return resourceInventory();
         });
     }
-    if (readbacks.drain())
-        update();
     ++submissionStats.rendered;
     if (input.preparationToken && prepared)
         prepared(input.preparationToken, synchronizedSubmission, atlasQueue.pending() == 0);

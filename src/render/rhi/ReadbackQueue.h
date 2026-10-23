@@ -50,6 +50,7 @@ public:
     }
 
 private:
+    friend class ReadbackQueueTest;
     struct Pending;
     static void completeReadback(const std::weak_ptr<Pending> &weak, const int &field);
     QRhiTexture *prepareReadback(QRhi *api, QRhiTexture *texture, int field,

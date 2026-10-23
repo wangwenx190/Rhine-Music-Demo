@@ -61,6 +61,33 @@ public:
     PlaybackTest() = default;
 
 private Q_SLOTS:
+    void outputDetachmentDoesNotInvalidateLoadedMedia()
+    {
+        Fixture fixture;
+        auto &player = fixture.player.d->m_player;
+        QSignalSpy statuses(&player, &QMediaPlayer::mediaStatusChanged);
+        player.setAudioOutput(nullptr);
+        player.setSource(fixture.library.snapshot()->albums[0].tracks[0].sourceUrl);
+        QTRY_COMPARE_WITH_TIMEOUT(player.mediaStatus(), QMediaPlayer::LoadedMedia,
+                                  BackendDeadlineMilliseconds);
+        QVERIFY(player.hasAudio());
+        QCOMPARE(player.error(), QMediaPlayer::NoError);
+        QAudioOutput output;
+        player.setAudioOutput(&output);
+        player.pause();
+        player.setAudioOutput(nullptr);
+        QVERIFY(player.mediaStatus() != QMediaPlayer::InvalidMedia);
+        QVERIFY(player.playbackState() != QMediaPlayer::PlayingState);
+        QCOMPARE(player.error(), QMediaPlayer::NoError);
+        for (const auto &status : statuses)
+            QVERIFY(status.first().value<QMediaPlayer::MediaStatus>()
+                    != QMediaPlayer::InvalidMedia);
+        player.setSource(fixture.library.snapshot()->albums[0].tracks[2].sourceUrl);
+        QTRY_COMPARE_WITH_TIMEOUT(player.mediaStatus(), QMediaPlayer::InvalidMedia,
+                                  BackendDeadlineMilliseconds);
+        QVERIFY(player.error() != QMediaPlayer::NoError);
+        player.setSource({ });
+    }
     void queueRejectsCandidatesAtomically()
     {
         PlaybackQueue queue;

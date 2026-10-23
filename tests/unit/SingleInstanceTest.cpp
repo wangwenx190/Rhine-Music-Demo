@@ -1,8 +1,13 @@
 #include "SingleInstance.h"
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLockFile>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QCryptographicHash>
+#include <QTimer>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -24,6 +29,54 @@ class SingleInstanceTest final : public QObject
 public:
     SingleInstanceTest() = default;
 private Q_SLOTS:
+    void acknowledgementFraming_data()
+    {
+        QTest::addColumn<QByteArray>("tail");
+        QTest::addColumn<int>("expected");
+        QTest::newRow("fragmented-valid") << "k\n"_ba << int(SingleInstance::Result::Secondary);
+        QTest::newRow("fragmented-invalid") << "x\n"_ba << int(SingleInstance::Result::Error);
+        QTest::newRow("incomplete-disconnect")
+                << QByteArray() << int(SingleInstance::Result::Error);
+        QTest::newRow("missing-newline") << "k"_ba << int(SingleInstance::Result::Error);
+    }
+    void acknowledgementFraming()
+    {
+        QFETCH(QByteArray, tail);
+        QFETCH(int, expected);
+        constexpr int FragmentDelayMilliseconds = 40;
+        QTemporaryDir directory;
+        QLockFile lock(directory.filePath(u"instance.lock"_s));
+        QVERIFY(lock.tryLock());
+        const auto canonical = QDir(directory.path()).canonicalPath();
+        const auto digest = QCryptographicHash::hash(canonical.toUtf8(), QCryptographicHash::Sha256)
+                                    .toHex()
+                                    .first(32);
+        const auto endpoint = u"yalahoo-"_s + QString::fromUtf8(digest);
+        QLocalServer server;
+        server.setSocketOptions(QLocalServer::UserAccessOption);
+        QVERIFY2(server.listen(endpoint), qPrintable(server.errorString()));
+        connect(&server, &QLocalServer::newConnection, this, [&] {
+            auto *socket = server.nextPendingConnection();
+            connect(socket, &QLocalSocket::readyRead, socket, [socket, tail] {
+                if (!socket->canReadLine())
+                    return;
+                if (socket->readAll() != "activate\n"_ba)
+                    return;
+                socket->write("o"_ba);
+                socket->flush();
+                QTimer::singleShot(FragmentDelayMilliseconds, socket, [socket, tail] {
+                    socket->write(tail);
+                    socket->disconnectFromServer();
+                });
+            });
+        });
+        QProcess peer;
+        launch(peer, directory.path());
+        QVERIFY(peer.waitForStarted());
+        QTRY_COMPARE(peer.state(), QProcess::NotRunning);
+        QCOMPARE(peer.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(peer.exitCode(), expected);
+    }
     void duplicateActivatesOwner()
     {
         QTemporaryDir directory;

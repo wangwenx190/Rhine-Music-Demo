@@ -32,6 +32,72 @@ public:
     QmlBehaviorTest() = default;
 
 private Q_SLOTS:
+    void tooltipFollowsAncestorMovementAwayFromWindowEdges()
+    {
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQuick
+            import Yalahoo.Music
+            import "components"
+            Item {
+                width: 400
+                height: 300
+                Item {
+                    objectName: "ancestor"
+                    x: 350
+                    y: 270
+                    Item {
+                        id: host
+                        width: 40
+                        height: 20
+                        ArchiveToolTip {
+                            objectName: "tip"
+                            parent: host
+                            tokens: DesignTokens { reducedMotion: true }
+                            text: "Tooltip follows its host"
+                        }
+                    }
+                }
+            }
+        )"_ba,
+                          QUrl(u"qrc:/qt/qml/Yalahoo/Music/TooltipPositionTest.qml"_s));
+        std::unique_ptr<QObject> object(component.create());
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *root = qobject_cast<QQuickItem *>(object.get());
+        auto *ancestor = root->findChild<QQuickItem *>(u"ancestor"_s);
+        auto *tip = root->findChild<QObject *>(u"tip"_s);
+        QVERIFY(ancestor && tip);
+        QQuickWindow window;
+        yalahoo::verification::prepareWindow(window);
+        window.resize(400, 300);
+        root->setParentItem(window.contentItem());
+        QVERIFY(QMetaObject::invokeMethod(tip, "open"));
+        QTRY_VERIFY(tip->property("visible").toBool());
+        auto *content = tip->property("contentItem").value<QQuickItem *>();
+        QVERIFY(content && content->parentItem());
+        auto *popup = content->parentItem();
+        const auto position = [&] {
+            return popup->mapToItem(window.contentItem(), QPointF());
+        };
+        QTRY_VERIFY2(position().x() + popup->width() <= 392.01,
+                     qPrintable(u"Popup x=%1 width=%2 window=%3"_s.arg(position().x())
+                                        .arg(popup->width())
+                                        .arg(window.width())));
+        QTRY_VERIFY(position().y() + popup->height() <= 292.01);
+        ancestor->setPosition({ 100, 80 });
+        QTRY_VERIFY2(std::abs(position().y() - 104) < .01,
+                     qPrintable(u"Popup y=%1, expected 104"_s.arg(position().y())));
+        QTRY_VERIFY(std::abs(position().x() - (120 - popup->width() / 2)) < .01);
+        window.resize(450, 350);
+        ancestor->setPosition({ 390, 315 });
+        QTRY_VERIFY(position().x() + popup->width() <= 442.01);
+        QTRY_VERIFY(position().y() + popup->height() <= 342.01);
+        QVERIFY(QMetaObject::invokeMethod(tip, "close"));
+        QVERIFY(!window.isVisible());
+        QVERIFY(warnings.isEmpty());
+    }
     void transportKeyboardFocusIsVisibleAndLocates()
     {
         QQmlEngine engine;

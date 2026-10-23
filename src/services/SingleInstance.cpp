@@ -6,6 +6,7 @@
 #include <QLockFile>
 #include <QTimer>
 #include <QPointer>
+#include <QDeadlineTimer>
 #include <utility>
 
 using namespace Qt::StringLiterals;
@@ -83,11 +84,23 @@ SingleInstance::Result SingleInstance::start(const QString &dataRoot, bool enabl
     // Startup only, before any window/audio/library side effects. The peer acknowledges acceptance;
     // a hung owner is an error, never permission to create a second writer.
     QLocalSocket peer;
+    peer.setReadBufferSize(MaximumActivationBytes);
+    QDeadlineTimer deadline(ActivationTimeoutMilliseconds);
     peer.connectToServer(endpoint);
-    if (peer.waitForConnected(ActivationTimeoutMilliseconds)) {
-        peer.write("activate\n"_ba);
-        peer.waitForBytesWritten(ActivationTimeoutMilliseconds);
-        if (peer.waitForReadyRead(ActivationTimeoutMilliseconds) && peer.readAll() == "ok\n"_ba)
+    const auto request = "activate\n"_ba;
+    if (peer.waitForConnected(int(deadline.remainingTime()))
+        && peer.write(request) == request.size()) {
+        while (peer.bytesToWrite() > 0 && !deadline.hasExpired()) {
+            if (!peer.waitForBytesWritten(int(deadline.remainingTime())))
+                break;
+        }
+        // QLocalSocket is a byte stream: readiness need not deliver a complete ACK.
+        // Its bounded read buffer accumulates fragments under the same exchange deadline.
+        while (!peer.canReadLine() && !deadline.hasExpired()) {
+            if (!peer.waitForReadyRead(int(deadline.remainingTime())))
+                break;
+        }
+        if (peer.canReadLine() && peer.readAll() == "ok\n"_ba)
             return Result::Secondary;
     }
     d->error = tr("The existing application instance did not accept activation. Please try again.");

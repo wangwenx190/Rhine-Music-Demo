@@ -1,4 +1,12 @@
 #include "CaptureMailbox.h"
+#include "SceneItem.h"
+#include "CoverCache.h"
+#include <QScopeGuard>
+#include "SceneAdapter.h"
+#include <QQuickWindow>
+#include <QQuickRenderControl>
+#include <QQuickRenderTarget>
+#include <limits>
 #include "DriverInfoMailbox.h"
 #include "RenderControlFrame.h"
 #include <thread>
@@ -33,6 +41,80 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void layerDimensionsKeepCeilingAndNearestRounding()
+    {
+        class SceneProbe final : public rhi::SceneItem
+        {
+            Q_DISABLE_COPY_MOVE(SceneProbe)
+        public:
+            using SceneItem::SceneItem;
+            using SceneItem::updatePolish;
+        };
+        QQuickRenderControl control;
+        QImage image(8, 8, QImage::Format_RGBA8888);
+        QQuickWindow window(&control);
+        auto target = QQuickRenderTarget::fromPaintDevice(&image);
+        target.setDevicePixelRatio(1.25);
+        window.setRenderTarget(target);
+        SceneAdapter adapter;
+        SceneProbe item(window.contentItem());
+        item.setSize({ 64, 64 });
+        item.setAdapter(&adapter);
+        item.setOpeningLayerSize({ 5, 7 });
+        item.setPanelLayerSize({ 5, 7 });
+        item.updatePolish();
+        QVERIFY(item.errorText().isEmpty());
+        QCOMPARE(item.input().openingLayerSize, QSize(7, 9));
+        QCOMPARE(item.input().panelLayerSize, QSize(6, 9));
+        item.setOpeningLayerSize({ 0, 0 });
+        item.setPanelLayerSize({ 0, 0 });
+        item.updatePolish();
+        QVERIFY(item.input().openingLayerSize.isEmpty());
+        QVERIFY(item.input().panelLayerSize.isEmpty());
+        QVERIFY(!window.isVisible());
+    }
+    void layerDimensionsRejectUnrepresentablePhysicalSizes_data()
+    {
+        QTest::addColumn<bool>("opening");
+        QTest::newRow("opening") << true;
+        QTest::newRow("panel") << false;
+    }
+    void layerDimensionsRejectUnrepresentablePhysicalSizes()
+    {
+        QFETCH(bool, opening);
+        class SceneProbe final : public rhi::SceneItem
+        {
+            Q_DISABLE_COPY_MOVE(SceneProbe)
+        public:
+            using SceneItem::SceneItem;
+            using SceneItem::updatePolish;
+        };
+        QQuickRenderControl control;
+        QImage image(8, 8, QImage::Format_RGBA8888);
+        QQuickWindow window(&control);
+        auto target = QQuickRenderTarget::fromPaintDevice(&image);
+        target.setDevicePixelRatio(2);
+        window.setRenderTarget(target);
+        QCOMPARE(window.effectiveDevicePixelRatio(), 2.);
+        SceneAdapter adapter;
+        SceneProbe item(window.contentItem());
+        item.setSize({ 64, 64 });
+        item.setAdapter(&adapter);
+        QSignalSpy errors(&item, &rhi::SceneItem::errorTextChanged);
+        const QSize oversized(std::numeric_limits<int>::max(), 1);
+        if (opening)
+            item.setOpeningLayerSize(oversized);
+        else
+            item.setPanelLayerSize(oversized);
+        const auto submission = item.submission();
+        item.updatePolish();
+        QVERIFY2(item.errorText().contains(u"Layer dimensions"_s),
+                 "Layer pixel-size overflow must fail before narrowing");
+        QCOMPARE(item.submission(), submission);
+        QVERIFY(!item.renderingActive());
+        QCOMPARE(errors.size(), 1);
+        QVERIFY(!window.isVisible());
+    }
     void driverSnapshotCrossesThreadsAsAnOwnedValue()
     {
         auto mailbox = std::make_shared<DriverInfoMailbox>();
@@ -437,6 +519,9 @@ int main(int argc, char **argv)
 {
     verification::prepareApplication();
     QGuiApplication app(argc, argv);
+    const auto finishDecoders = qScopeGuard([] {
+        CoverCache::finishDecoders();
+    });
     RenderSupportTest test;
     return QTest::qExec(&test, argc, argv);
 }

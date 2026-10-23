@@ -1,4 +1,4 @@
-#include "ReadbackQueue.h"
+#include "ReadbackQueue_p.h"
 #include "ReadbackImage.h"
 #include "ResourceInventory.h"
 #include "RenderData.h"
@@ -15,22 +15,6 @@ namespace yalahoo::rhi {
 namespace {
 constexpr auto MaximumPendingCaptures = 2;
 }
-struct ReadbackQueue::Pending final
-{
-    Q_DISABLE_COPY_MOVE(Pending)
-    Pending() = default;
-    std::array<QRhiReadbackResult, CaptureFieldCount> results;
-    Capture capture;
-    std::function<void(Capture)> deliver;
-    std::function<void(QString)> failed;
-    int remaining = 0;
-    std::array<int, CaptureFieldCount> readbackOwner;
-    int drainFrames = 0;
-    bool yUp = false;
-    int opticalProbe = 0;
-    bool captureShadowDepth = false;
-    std::array<QSize, CaptureFieldCount> logicalReadbackSizes;
-};
 ReadbackQueue::~ReadbackQueue() = default;
 bool ReadbackQueue::hasCapacity() const
 {

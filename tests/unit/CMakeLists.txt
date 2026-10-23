@@ -196,6 +196,7 @@ yalahoo_unit_test(TrackFocusTest track-focus
 yalahoo_unit_test(PlaybackTest playback
     LIBRARIES YalahooCore
     ARGUMENTS queueRejectsCandidatesAtomically queueReuseAndSnapshotInvalidation lateLoadEndAndQueueOwnership
+        outputDetachmentDoesNotInvalidateLoadedMedia
     TIMEOUT 30)
 add_test(NAME playback-device COMMAND PlaybackTest publicPlaybackPauseSeekStopAndNavigation
     outputLossPendingIntentAndExplicitSelection realEndAndUnsupportedFormat)
@@ -275,7 +276,7 @@ yalahoo_unit_test(RenderSupportTest render-support
     LIBRARIES YalahooRhi Qt6::GuiPrivate
     INCLUDES "${PROJECT_SOURCE_DIR}/src/app" "${PROJECT_SOURCE_DIR}/tests/render"
     DEFINITIONS FIXTURE_ROOT="${PROJECT_SOURCE_DIR}"
-    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins;QT_SCALE_FACTOR=1;QT_QPA_PLATFORM=offscreen")
+    ENVIRONMENT "QT_PLUGIN_PATH=${YALAHOO_SELECTED_QT}/plugins" "QT_SCALE_FACTOR=1" "QT_QPA_PLATFORM=offscreen")
 
 if(UNIX)
     add_test(NAME unix-deployment COMMAND "${Python3_EXECUTABLE}"
@@ -300,3 +301,6 @@ yalahoo_unit_test(VerificationInputTest verification-input
     SOURCES "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
     INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/tools/migration" "${PROJECT_SOURCE_DIR}/src/core"
     LIBRARIES Qt6::Gui)
+
+yalahoo_unit_test(ReadbackQueueTest readback-queue
+    LIBRARIES YalahooRhi Qt6::GuiPrivate)

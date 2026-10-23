@@ -27,7 +27,7 @@
 - cpuSubmitMs只含renderFrame到最后输出命令，synchronizationMs单列最近快照同步；静态复用不解释为每帧重复同步。遥测组装自身开销不混入提交数字，GPU timestamp不可用null。
 - 遥测与诊断在隐藏/恢复时重起分段，GUI邮箱回调按各自epoch拒绝旧结果；callbackRevision参与changed-only提交，静止恢复同样刷新render持有的回调。
 - 遥测默认关闭；开启时mailbox最多128样本、一个排队GUI回调，溢出丢最旧并计coalescedSamples，丢样不能算统计完整。Review最多40000提交/呈现事件，溢出失败；frameSwapped按实际render事件时间独立记录。
-- Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧，普通产品无回调不增加工作。
+- Review显式capture最多两批在途，纹理身份去重/共享值交付；request保留到对应提交。静态异步读回按MaxAsyncReadbackFrames+1有界续帧；遮挡清屏和空封面早退同样回收已完成批次并维持在途续帧，普通产品无回调不增加工作。
 - record-only模式只改性能退出门槛，functionalPassed/samplingComplete/gateEnforced/performanceAcceptance分开，用户历史例外及数值的解释唯一由performance.md维护，不产生默认复现任务。产品定向诊断使用`tests/runners/verify-startup.py`，采样时长和是否运行由performance.md的具体未决问题决定。
 
 ## 原生同窗口恢复

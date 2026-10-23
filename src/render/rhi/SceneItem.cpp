@@ -28,6 +28,7 @@
 #include <utility>
 #include <limits>
 #include <cmath>
+#include <stdexcept>
 
 namespace {
 // Projected paper demand uses physical DPR; owned covers reserve two rows beyond the fixed base atlas.
@@ -37,6 +38,26 @@ constexpr auto PaperTileExtent = 64;
 constexpr auto PaperInteriorExtent = 62;
 constexpr auto CaptureSamples = 4;
 constexpr auto PaperCornerCount = 4;
+
+enum class LayerPixelRounding {
+    Ceiling,
+    Nearest,
+};
+QSize physicalLayerSize(QSize logical, double dpr, LayerPixelRounding rounding)
+{
+    if (logical.isEmpty())
+        return { };
+    if (!std::isfinite(dpr) || dpr <= 0)
+        throw std::runtime_error("Invalid layer device pixel ratio");
+    const auto dimension = [&](int value) {
+        const double pixels = rounding == LayerPixelRounding::Ceiling ? std::ceil(value * dpr)
+                                                                      : std::round(value * dpr);
+        if (!std::isfinite(pixels) || pixels > std::numeric_limits<int>::max())
+            throw std::runtime_error("Layer dimensions exceed the supported integer range");
+        return int(pixels);
+    };
+    return { dimension(logical.width()), dimension(logical.height()) };
+}
 }
 
 using namespace Qt::StringLiterals;
@@ -866,9 +887,8 @@ try {
     const double depthOfField = quality.depthOfField();
     Input in;
     in.preparationToken = d->m_preparing ? d->m_preparationToken : 0;
-    in.openingLayerSize = QSize(
-            int(std::ceil(d->m_openingLayerSize.width() * window()->effectiveDevicePixelRatio())),
-            int(std::ceil(d->m_openingLayerSize.height() * window()->effectiveDevicePixelRatio())));
+    in.openingLayerSize =
+            physicalLayerSize(d->m_openingLayerSize, dpr, LayerPixelRounding::Ceiling);
     // Review capture tokens survive a coalesced camera/cover polish before synchronization.
     in.request = input().request;
 #ifdef YALAHOO_RHI_AUDIT
@@ -876,7 +896,7 @@ try {
 #endif
     in.captureAtlas = input().captureAtlas;
     in.scene = adapter.frame();
-    in.panelLayerSize = d->m_panelLayerSize * dpr;
+    in.panelLayerSize = physicalLayerSize(d->m_panelLayerSize, dpr, LayerPixelRounding::Nearest);
     in.navigationDpr = d->m_inputRouter ? window()->effectiveDevicePixelRatio() : 0;
     in.textLayerSizes = d->m_textSizes;
     in.textResourceRevision = d->m_textRevision;

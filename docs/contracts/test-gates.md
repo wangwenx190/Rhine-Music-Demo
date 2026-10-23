@@ -44,7 +44,7 @@
 | `motion`、`scene`、`navigation`、`lighting`、`archive-pool`、`real-columns`、`presentation`、`detail-motion`、`overview`、`opening`、`track-focus`、`startup` | 独立冻结公式、边界/中断/身份/输入归属/通知及唯一帧源；对应组件契约，覆盖R36共用算法 |
 | `directory-scanner`、`library-data`、`library-qml`、`online-metadata`、`media-metadata`、`json-file` | 文件系统/事务保存、模型协议、来源与取消/晚到、解码/导入失败；library-data.md。网络单元测试仅用可控响应 |
 | `playback`/`playback-device`、`audio-ambience`/`audio-ambience-device`、`single-instance`、`settings`、`experiments`、`logging`、`logging-terminal`、`graphics-backend` | 可控媒体状态与独立真实设备三路验证、跨进程仲裁、持久化/模式/错误、真实终端输出及后端选择；playback/settings/logging/render-backend及相关组件契约 |
-| `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`rhi-material-parameters`、`render-quality`、`render-support`、`verification-input`、`display-output-probe` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命、探针输入结构/数值、资产批次回滚与异步显示探测完成状态；assets/branding/covers/title-reels及RHI契约 |
+| `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`readback-queue`、`rhi-material-parameters`、`render-quality`、`render-support`、`verification-input`、`display-output-probe` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命、探针输入结构/数值、资产批次回滚与异步显示探测完成状态；assets/branding/covers/title-reels及RHI契约 |
 | `verification-window-policy`、显式可见窗口/输出检查、`macos-application-menu` | 不干扰窗口约束、实际native呈现与HDR/系统菜单；test-window-policy/display-output及R36实物事实，隐藏与可见事实分别保留 |
 | RHI与封面/阵列GPU组件、`display-transfer-gpu`、`rhi-required-output` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
 | QML组件回放、生产详情/总览/导航、GUI与同窗口生命周期 | 真实控件/面板/音乐舞台的交互、布局、模态、播放隔离与恢复；组件契约及R36产品接线。诊断采样入口仅按performance.md选用 |
@@ -67,7 +67,7 @@
 - `cmake/TestPolicy.cmake`按真实入口标fast/render-integration/hidden-render/native-visible/native-media，GPU/窗口均RUN_SERIAL。改标签不能掩盖可靠检查失败。
 - fast/full/render/media清YALAHOO_VERIFY_VISIBLE/FOREGROUND/WINDOW_LIFECYCLE；fast/full/render排除native-visible及native-media，fast另排除render-integration。media只选择native-media并排除native-visible。macOS默认可见OFF，disabled如实暂缓；默认窗口策略检查前台归属判定与隐藏原生窗口，不显示窗口。
 - 先按被测行为、依赖、输入和运行条件判断已有结果是否仍有效，并尽可能复用。无关模块、Git版本号或重新链接导致二进制hash变化，本身不使结果失效；相关逻辑/输入/依赖或环境变化仅使对应结果失效。不影响行为的注释、文档或脚本注释改动无需专门运行测试；脚本逻辑变化检查其参数、错误传播与实际入口；代码逻辑变更只执行必要的对应检查。共享代码沿实际调用链确定范围，不自动扩大到fast集或完整回归。功能回放与性能问题分别选择；局部成本、计时、资源增长及重复重建压力先满足performance.md的静态未决门槛，不默认各跑一次。已有有效结果复用，真实失败仍保留。
-- `playback`仅运行队列/快照及可控晚到通知；`audio-ambience`仅运行静音事件/参数/持久化。`playback-device`保留真实暂停/seek/结束/错误及输出恢复，`audio-ambience-device`保留真实BGM交接/错误重试/QSoundEffect池；设备缺失时明确失败，不跳过为通过。startup-qml/settings-qml/playback-qml同时标native-media。
+- `playback`运行队列/快照、可控晚到通知和不播放的无输出媒体加载/输出脱离检查；`audio-ambience`仅运行静音事件/参数/持久化。`playback-device`保留真实暂停/seek/结束/错误及输出恢复，`audio-ambience-device`保留真实BGM交接/错误重试/QSoundEffect池；设备缺失时明确失败，不跳过为通过。startup-qml/settings-qml/playback-qml同时标native-media。
 - 剩余目标系统、后端和物理设备动态检查由迁移计划R36集中管理；Linux显式OpenGL入口同样受目标能力准入约束。受影响的算法/源码/模块/构建及适用qsb变体照常检查，缺环境不减少原门槛。
 - 对需要新验证的受影响行为按风险选择尺寸/主题/DPR，只覆盖其实际依赖的范围；未被改动触及的最终目标矩阵结果继续复用，未执行的目标门槛仍保留。报告区分本次实际、复用、未选、暂缓及原因。首次目标验收先区分已有共用证据与目标特有缺口，仅补后者；组件所列完整工具状态集不自动成为首次验收清单。必须实际运行才能确定的功能/画质/设备事实仍保留，不能以代表组合冒称全部通过。格式与官方qmllint的适用选择归code-style.md，同样不扩大为功能回归。
 - `qml-behavior`通过ui-tests的生产QML模块执行隐藏的Qt Test单元回归，覆盖曲目按压期间的双身份复用、零尺寸模糊采样/渐变及堆叠滑杆尺寸；不创建原生可见窗口。`production-app-root`属于fast且不依赖Review：通过生产可执行文件的`--verify-app`隐藏创建真实`App.qml`及业务接线，核对舞台、显示合成层、弹出层归属、尺寸、无QML警告、无播放和窗口策略。App根、生产QML导入/注册、合成宿主或其初始化依赖发生变化时，必须执行此检查与受影响模块的官方qmllint；组件/专用探针或仅构建成功不能替代生产根创建。实际输出与交互仍由对应集成检查证明。

@@ -1,6 +1,6 @@
 # 全项目 Qt 官方 skill 只读审查
 
-尚有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
+尚有 **1 项 P3 规范建议**。1076 条 lint 命中不等同于 1076 个缺陷。
 
 审查对象为下述提交对应的干净源码工作树；审查未修改源码、契约或迁移计划。本文为用户要求保留的审查快照，不替代项目契约；结论和行号均以该提交为准。没有启动可见窗口、物理设备测试、性能采样或私人曲库扫描。
 
@@ -15,57 +15,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 - [附录 A：C++ skill 完整报告](#cpp-skill-report)
 - [附录 B：QML skill 完整报告](#qml-skill-report)
 - [附录 C：逐文件覆盖清单](#file-coverage)
-
-## 待核实事项
-
-以下不计入已确认缺陷，也不以模拟事件冒充实际设备事实。
-
-#### [I-001] 宿主场景坐标绑定可能过期
-
-- **File**: [qml/Yalahoo/Music/components/ArchiveToolTip.qml:14](qml/Yalahoo/Music/components/ArchiveToolTip.qml#L14)
-- **Category**: 深审待核实
-- **Confidence**: 70/100
-- **Finding / Unverified because**: mapToItem调用不显式跟踪祖先移动；Popup自动夹取/flip的补救使最终可见影响未确认。
-- **How to verify**: 窗口右/底边显示tooltip并移动宿主/resize/展开overview，核对位置。
-
-
-#### [I-002] 无输出期间InvalidMedia与errorOccurred处理不同
-
-- **File**: [src/media/PlaybackController.cpp:329](src/media/PlaybackController.cpp#L329)
-- **Category**: 深审待核实
-- **Confidence**: 70/100
-- **Finding / Unverified because**: status写错误并Paused，阻止restoreOutput自动恢复；但有效媒体由设备丢失触发InvalidMedia的生产可达条件未确认。Qt FFmpeg官方源码仅加载失败发此状态，不能把注入通知当设备事实。
-- **How to verify**: 对应实际后端捕获无输出→InvalidMedia事件序列，区分既有格式错误与可恢复资源错误；确认可达再修。
-- **Source**: [Qt 官方实现](https://raw.githubusercontent.com/qt/qtmultimedia/dev/src/plugins/multimedia/ffmpeg/qffmpegmediaplayer.cpp)
-
-
-#### [I-003] 遮挡早退可能推迟未完成的Review捕获
-
-- **File**: [src/render/rhi/RhiRenderer.cpp:175](src/render/rhi/RhiRenderer.cpp#L175)
-- **Category**: 深审待核实
-- **Confidence**: 72/100
-- **Finding / Unverified because**: sceneOccluded清屏早退跳过renderFrame中的readbacks.retire/drain；捕获是否滞留取决于后端回调及其他帧；生产默认关闭捕获。
-- **How to verify**: 现有Review捕获提交后立即切遮挡且停止其他更新，核对不恢复场景时是否交付；仅复核异步读回后端。
-
-
-#### [I-004] 图层物理尺寸窄化前没有完整范围检查
-
-- **File**: [src/render/rhi/SceneItem.cpp:872](src/render/rhi/SceneItem.cpp#L872)
-- **Category**: 深审待核实
-- **Confidence**: 65/100
-- **Finding / Unverified because**: setOpeningLayerSize任意QSize乘DPR后直接转int，panelLayerSize类似；已确认正常生产尺寸来自QML布局，尚未证明正常窗口可达INT_MAX级输入。
-- **How to verify**: 先明确内部属性输入域；若承担全QSize边界，用INT_MAX×DPR2最小隐藏测试/UBSan核对，窄化前验证。
-
-
-#### [I-005] 激活ACK一次readAll假定读到完整行
-
-- **File**: [src/services/SingleInstance.cpp:90](src/services/SingleInstance.cpp#L90)
-- **Category**: 深审待核实
-- **Confidence**: 72/100
-- **Finding / Unverified because**: 客户端waitForReadyRead后一次readAll对比ok\n；服务端只一次write三字节，尚未确认真实Qt/OS路径可短读。
-- **How to verify**: 隔离数据根/锁/端点，按协议分段发o与k\n且总时间未超时；确认客户端行为，按总截止时间累积完整行。
-
-
 
 ## 规范与工具结果
 
@@ -84,9 +33,9 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 | check-format | 通过，无格式化写入 |
 | 16项Release定向回归 | 最终全部通过；最初4项受沙箱屏幕/IPC限制失败，保持隐藏策略沙箱外定向复核后通过；两批原始结果均在本地保留 |
 
-16项为 application-options、production-app-root、module-link-and-plugins、directory-scanner、library-data、media-metadata、playback、audio-ambience、online-metadata、single-instance、settings、json-file、qml-behavior、unix-deployment、linux-package-tools、launchers。使用已有Release产物，未重建全项目，未执行全量CTest或全量clang-tidy。通过结果不能覆盖本报告指出的遗漏分支。
+16项为 application-options、production-app-root、module-link-and-plugins、directory-scanner、library-data、media-metadata、playback、audio-ambience、online-metadata、single-instance、settings、json-file、qml-behavior、unix-deployment、linux-package-tools、launchers。使用已有Release产物，未重建全项目，未执行全量CTest或全量clang-tidy。
 
-Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DPR与可见画质事实未在本轮取得；仍按原R36门槛保留，不记通过。仅有可达性疑问的事件或极端内部尺寸留在调查项。
+Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DPR与可见画质事实未在本轮取得；仍按原R36门槛保留，不记通过。
 
 
 
@@ -164,48 +113,6 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 
 ---
 
-### Investigation targets (human verification needed)
-
-#### [I-001] 无输出期间InvalidMedia与errorOccurred处理不同
-
-- **File**: [src/media/PlaybackController.cpp:329](src/media/PlaybackController.cpp#L329)
-- **Category**: 深审待核实
-- **Confidence**: 70/100
-- **Finding / Unverified because**: status写错误并Paused，阻止restoreOutput自动恢复；但有效媒体由设备丢失触发InvalidMedia的生产可达条件未确认。Qt FFmpeg官方源码仅加载失败发此状态，不能把注入通知当设备事实。
-- **How to verify**: 对应实际后端捕获无输出→InvalidMedia事件序列，区分既有格式错误与可恢复资源错误；确认可达再修。
-- **Source**: [Qt 官方实现](https://raw.githubusercontent.com/qt/qtmultimedia/dev/src/plugins/multimedia/ffmpeg/qffmpegmediaplayer.cpp)
-
-
-#### [I-002] 遮挡早退可能推迟未完成的Review捕获
-
-- **File**: [src/render/rhi/RhiRenderer.cpp:175](src/render/rhi/RhiRenderer.cpp#L175)
-- **Category**: 深审待核实
-- **Confidence**: 72/100
-- **Finding / Unverified because**: sceneOccluded清屏早退跳过renderFrame中的readbacks.retire/drain；捕获是否滞留取决于后端回调及其他帧；生产默认关闭捕获。
-- **How to verify**: 现有Review捕获提交后立即切遮挡且停止其他更新，核对不恢复场景时是否交付；仅复核异步读回后端。
-
-
-#### [I-003] 图层物理尺寸窄化前没有完整范围检查
-
-- **File**: [src/render/rhi/SceneItem.cpp:872](src/render/rhi/SceneItem.cpp#L872)
-- **Category**: 深审待核实
-- **Confidence**: 65/100
-- **Finding / Unverified because**: setOpeningLayerSize任意QSize乘DPR后直接转int，panelLayerSize类似；已确认正常生产尺寸来自QML布局，尚未证明正常窗口可达INT_MAX级输入。
-- **How to verify**: 先明确内部属性输入域；若承担全QSize边界，用INT_MAX×DPR2最小隐藏测试/UBSan核对，窄化前验证。
-
-
-#### [I-004] 激活ACK一次readAll假定读到完整行
-
-- **File**: [src/services/SingleInstance.cpp:90](src/services/SingleInstance.cpp#L90)
-- **Category**: 深审待核实
-- **Confidence**: 72/100
-- **Finding / Unverified because**: 客户端waitForReadyRead后一次readAll对比ok\n；服务端只一次write三字节，尚未确认真实Qt/OS路径可短读。
-- **How to verify**: 隔离数据根/锁/端点，按协议分段发o与k\n且总时间未超时；确认客户端行为，按总截止时间累积完整行。
-
-
-
----
-
 ### Summary
 
 | Category | Lint | Deep | Investigate | Total |
@@ -219,11 +126,8 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 | PAT | 87 | 0 | 0 | 87 |
 | TMO | 3 | 0 | 0 | 3 |
 | VAR | 134 | 0 | 0 | 134 |
-| A3. Thread Safety | 0 | 1 | 0 | 1 |
-| A4. API, Naming & C++ Correctness | 0 | 2 | 0 | 2 |
-| A5. Error Handling & Validation | 0 | 6 | 0 | 6 |
-| 待核实 | 0 | 0 | 4 | 4 |
-| **Total** | **856** | **9** | **4** | **869** |
+| A4. API, Naming & C++ Correctness | 0 | 1 | 0 | 1 |
+| **Total** | **856** | **1** | **0** | **857** |
 
 Findings below confidence 60 are suppressed.
 
@@ -288,21 +192,6 @@ Findings below confidence 60 are suppressed.
 
 ---
 
----
-
-### Investigation targets (human verification needed)
-
-#### [I-001] Tooltip 的宿主场景坐标可能不会随布局更新
-- **File**: `qml/Yalahoo/Music/components/ArchiveToolTip.qml:14`
-- **Category**: A1. Bindings & Properties
-- **Confidence**: 70/100
-- **Finding**: `parentPosition` 通过 `parent.mapToItem(null, 0, 0)` 计算，只显式依赖 `parent` 对象；宿主或其祖先移动时，该绑定可能不重新求值，导致第 16–21 行的水平边缘限制及上下方选择使用旧坐标。
-- **Unverified because**: 调用链已确认 `OverviewLabel.qml:36–37,44` 的宿主会移动，`BrowseInfo.qml:27–37` 会响应视口尺寸改变；但 `T.Popup` 自身的 margins 和自动位置调整可能消除部分影响，静态审查不能确认最终可见偏差。
-- **How to verify**: 将 overview 标签或专辑标题移到窗口右侧、底部，显示 tooltip 后调整窗口尺寸或展开 overview，核对 tooltip 是否继续靠近当前宿主、是否正确切换上下位置。若复现，应使用可跟踪场景坐标变化的定位方案，或在宿主几何变化及打开时更新坐标。
-
-
----
-
 ### Summary
 
 | Category | Lint | Deep | Investigate | Total |
@@ -313,8 +202,7 @@ Findings below confidence 60 are suppressed.
 | ORD | 89 | 0 | 0 | 89 |
 | PRF | 40 | 0 | 0 | 40 |
 | STY | 56 | 0 | 0 | 56 |
-| 待核实 | 0 | 0 | 1 | 1 |
-| **Total** | **220** | **0** | **1** | **221** |
+| **Total** | **220** | **0** | **0** | **220** |
 
 Findings below confidence 60 are suppressed.
 
