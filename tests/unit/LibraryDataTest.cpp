@@ -683,13 +683,21 @@ private Q_SLOTS:
     void searchObserversCanReplaceSnapshot_data()
     {
         QTest::addColumn<QString>("notification");
-        QTest::newRow("changed") << u"changed"_s;
-        QTest::newRow("removed") << u"removed"_s;
-        QTest::newRow("inserted") << u"inserted"_s;
+        QTest::addColumn<int>("replacementCount");
+        QTest::newRow("changed") << u"changed"_s << 8;
+        QTest::newRow("removed") << u"removed"_s << 8;
+        QTest::newRow("inserted") << u"inserted"_s << 8;
+        QTest::newRow("about-to-remove") << u"about-to-remove"_s << 8;
+        QTest::newRow("about-to-insert") << u"about-to-insert"_s << 8;
+        QTest::newRow("about-to-reset") << u"about-to-reset"_s << 8;
+        QTest::newRow("about-to-remove-empty") << u"about-to-remove"_s << 0;
+        QTest::newRow("about-to-insert-empty") << u"about-to-insert"_s << 0;
+        QTest::newRow("about-to-reset-empty") << u"about-to-reset"_s << 0;
     }
     void searchObserversCanReplaceSnapshot()
     {
         QFETCH(QString, notification);
+        QFETCH(int, replacementCount);
         LibrarySnapshot original, replacement;
         for (int i = 0; i < 8; ++i) {
             Album album;
@@ -703,32 +711,77 @@ private Q_SLOTS:
             if (i < 3)
                 original.albums.append(album);
         }
+        replacement.albums.resize(replacementCount);
         const auto first = std::make_shared<const LibrarySnapshot>(original);
         const auto second = std::make_shared<const LibrarySnapshot>(replacement);
         SearchListModel model;
         QAbstractItemModelTester tester(&model,
                                         QAbstractItemModelTester::FailureReportingMode::QtTest);
-        model.update(first, notification == "inserted"_L1 ? u"song 2"_s : QString(), { });
+        const bool inserting =
+                notification == "inserted"_L1 || notification == "about-to-insert"_L1;
+        model.update(first, inserting ? u"song 2"_s : QString(), { });
         bool replaced = false;
         const auto replace = [&] {
             if (replaced)
                 return;
             replaced = true;
+            // A burst of reentrant updates keeps only its final intent.
+            model.update({ }, { }, { });
             model.update(second, { }, { });
         };
         if (notification == "changed"_L1)
             connect(&model, &QAbstractItemModel::dataChanged, &model, replace);
         else if (notification == "removed"_L1)
             connect(&model, &QAbstractItemModel::rowsRemoved, &model, replace);
-        else
+        else if (notification == "inserted"_L1)
             connect(&model, &QAbstractItemModel::rowsInserted, &model, replace);
-        model.update(first, notification == "inserted"_L1 ? u"song"_s : u"song 2"_s, { });
+        else if (notification == "about-to-remove"_L1)
+            connect(&model, &QAbstractItemModel::rowsAboutToBeRemoved, &model, replace);
+        else if (notification == "about-to-insert"_L1)
+            connect(&model, &QAbstractItemModel::rowsAboutToBeInserted, &model, replace);
+        else
+            connect(&model, &QAbstractItemModel::modelAboutToBeReset, &model, replace);
+        model.update(notification == "about-to-reset"_L1 ? Snapshot() : first,
+                     inserting ? u"song"_s : u"song 2"_s, { });
         QVERIFY(replaced);
-        QCOMPARE(model.rowCount(), 8);
-        for (int row = 0; row < 8; ++row) {
+        QCOMPARE(model.rowCount(), replacementCount);
+        for (int row = 0; row < replacementCount; ++row) {
             QCOMPARE(model.resultAt(row).value(u"albumId"_s).toString(), u"album-%1"_s.arg(row));
             QVERIFY(model.resultAt(row).value(u"trackId"_s).toString().isEmpty());
         }
+    }
+    void searchReentrantQueryRetainsThePendingReplacementSnapshot()
+    {
+        LibrarySnapshot original, replacement;
+        for (int i = 0; i < 3; ++i) {
+            Album album;
+            album.id = u"old-%1"_s.arg(i);
+            original.albums.append(album);
+        }
+        Album fresh;
+        fresh.id = u"new"_s;
+        fresh.title = u"Needle"_s;
+        replacement.albums.append(fresh);
+        SearchListModel model;
+        QAbstractItemModelTester tester(&model,
+                                        QAbstractItemModelTester::FailureReportingMode::QtTest);
+        model.update(std::make_shared<const LibrarySnapshot>(original), { }, { });
+        bool replaced = false;
+        connect(&model, &QAbstractItemModel::rowsAboutToBeRemoved, &model, [&] {
+            if (replaced)
+                return;
+            replaced = true;
+            model.update(std::make_shared<const LibrarySnapshot>(replacement), { }, { });
+            model.request(u"needle"_s, { });
+        });
+        // Use the same snapshot to trigger an incremental removal, rather than a reset.
+        const auto owner = std::make_shared<const LibrarySnapshot>(original);
+        model.update(owner, { }, { });
+        model.update(owner, u"missing"_s, { });
+        QVERIFY(replaced);
+        QTRY_VERIFY(!model.searching());
+        QCOMPARE(model.rowCount(), 1);
+        QCOMPARE(model.resultAt(0).value(u"albumId"_s).toString(), u"new"_s);
     }
     void searchRowsObserverCanRequestLatestQuery()
     {

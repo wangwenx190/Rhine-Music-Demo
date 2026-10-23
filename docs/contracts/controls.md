@@ -12,7 +12,7 @@
 
 Templates负责Qt事件、键盘、焦点、无障碍、文本编辑/输入法和滚动行为。Tooltip只声明相对宿主的居中与间距，由Popup跟踪祖先几何并按明确边距调整及翻转位置，不缓存无通知的场景坐标。弹出层固定为Item，显式关闭默认过渡，关闭/Escape与外部点击策略由组件设置；选择项仅打开时实例化并由ListView虚拟化。文本编辑菜单使用项目按钮提供剪切/复制/粘贴/全选，操作能力遵循选区、剪贴板与readOnly。目录选择使用`QtQuick.Dialogs.FolderDialog`的操作系统对话框，其系统外观不属于产品控件绘制。
 
-ArchiveButton的键盘焦点沿冻结`music.css::.music-app button:focus-visible`：2px accent外轮廓、4px间距，对应独立矩形在控件外扩6px；绑定Templates的visualFocus，不能用覆盖文字边缘的内边框或鼠标焦点代替。轮廓不参与布局与命中尺寸。
+ArchiveButton的键盘焦点沿冻结`music.css::.music-app button:focus-visible`：2px accent外轮廓、4px间距，对应独立矩形在控件外扩6px；绑定Templates的visualFocus，不能用覆盖文字边缘的内边框或鼠标焦点代替。轮廓不参与布局与命中尺寸。虚拟化流派按钮复用同一外轮廓，viewport四边预留6px并按内容宽度分行，避免焦点线被裁切；选中状态与焦点状态分别显示。
 
 ## 来源尺寸
 

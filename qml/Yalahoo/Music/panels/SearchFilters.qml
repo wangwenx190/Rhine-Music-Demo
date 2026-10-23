@@ -13,6 +13,9 @@ Column {
     required property string genreId
     required property real viewportHeight
     property Component heading: null
+    readonly property real genreChipHeight: 27
+    readonly property real genreFocusMargin: 6
+    readonly property real genreContentWidth: Math.max(0, width - genreFocusMargin * 2)
     signal queryChanged(string query)
     signal genreRequested(string genreId)
     signal resultsRequested
@@ -51,7 +54,14 @@ Column {
         id: genreList
         objectName: "libraryGenreFilters"
         width: parent.width
-        height: Math.min(contentHeight, Math.max(27, filters.viewportHeight * .25))
+        height: Math.min(contentHeight + filters.genreFocusMargin * 2, Math.max(
+                             filters.genreChipHeight + filters.genreFocusMargin * 2,
+                             filters.viewportHeight * .25))
+        contentWidth: filters.genreContentWidth
+        leftMargin: filters.genreFocusMargin
+        rightMargin: filters.genreFocusMargin
+        topMargin: filters.genreFocusMargin
+        bottomMargin: filters.genreFocusMargin
         clip: true
         reuseItems: true
         boundsBehavior: Flickable.StopAtBounds
@@ -61,7 +71,7 @@ Column {
             id: genreRow
             required property var entries
             spacing: 7
-            height: 27
+            height: filters.genreChipHeight
             Repeater {
                 model: genreRow.entries
                 delegate: T.Button {
@@ -72,7 +82,7 @@ Column {
                     objectName: "genreFilter-" + modelData.id
                     text: modelData.name
                     width: modelData.size
-                    height: 27
+                    height: filters.genreChipHeight
                     font.family: filters.tokens.regular.family
                     font.styleName: filters.tokens.regular.styleName
                     font.weight: filters.tokens.regular.weight
@@ -83,6 +93,19 @@ Column {
                         antialiasing: true
                         color: filter.checked ? filters.tokens.ink : "transparent"
                         border.color: filters.tokens.line
+                        Rectangle {
+                            objectName: "genreFocusOutline"
+                            x: -filters.genreFocusMargin
+                            y: -filters.genreFocusMargin
+                            width: filter.width + filters.genreFocusMargin * 2
+                            height: filter.height + filters.genreFocusMargin * 2
+                            visible: filter.visualFocus
+                            color: "transparent"
+                            radius: 0
+                            antialiasing: true
+                            border.width: 2
+                            border.color: filters.tokens.accent
+                        }
                     }
                     contentItem: Text {
                         antialiasing: true

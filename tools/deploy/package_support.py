@@ -69,6 +69,8 @@ def copy_licenses(root, kit, destination):
                         if (path / 'Licenses').is_dir()), None)
     if qt_licenses is None:
         raise RuntimeError('Selected Qt installation license directory is missing')
+    if not any(path.is_file() and path.stat().st_size > 0 for path in qt_licenses.rglob('*')):
+        raise RuntimeError('Selected Qt installation license directory is empty')
     shutil.copytree(root / 'resources/licenses', destination / 'project')
     for name in ('NOTICE.txt', 'MiSans-license.pdf'):
         shutil.copyfile(root / 'resources/fonts' / name, destination / name)

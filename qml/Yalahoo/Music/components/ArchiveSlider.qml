@@ -16,7 +16,6 @@ T.Slider {
     opacity: enabled ? 1 : disabledOpacity
     background: Item {
         Rectangle {
-            id: rail
             x: control.horizontal ? control.leftPadding + control.handle.width / 2 : (control.width
                                                                                       - width) / 2
             y: control.horizontal ? (control.height - height) / 2 : control.topPadding

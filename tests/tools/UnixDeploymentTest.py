@@ -132,14 +132,45 @@ class PackageSupportTest(unittest.TestCase):
                 licenses = location / 'Licenses'
                 licenses.mkdir()
                 (licenses / 'Qt.txt').write_text('Qt attribution')
+                (licenses / 'media').mkdir()
+                (licenses / 'media/FFmpeg.txt').write_text('Media attribution')
                 destination = root / f'output-{index}'
                 package_support.copy_licenses(root, kit, destination)
                 self.assertEqual({str(p.relative_to(destination)) for p in destination.rglob('*') if p.is_file()},
-                                 {'project/NOTICE', 'NOTICE.txt', 'MiSans-license.pdf', 'audio.md', 'Qt/Qt.txt'})
+                                 {'project/NOTICE', 'NOTICE.txt', 'MiSans-license.pdf', 'audio.md', 'Qt/Qt.txt', 'Qt/media/FFmpeg.txt'})
                 self.assertEqual((destination / 'Qt/Qt.txt').read_text(), 'Qt attribution')
                 shutil.rmtree(licenses)
             with self.assertRaisesRegex(RuntimeError, 'license directory is missing'):
                 package_support.copy_licenses(root, kit, root / 'missing')
+
+    def test_empty_license_directories_fail_before_staging_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            kit = root / 'qt/kit'
+            kit.mkdir(parents=True)
+            # A nearer broken installation must not silently borrow ancestor attribution.
+            ancestor = root / 'qt/Licenses'
+            ancestor.mkdir()
+            (ancestor / 'Qt.txt').write_text('ancestor attribution')
+            licenses = kit / 'Licenses'
+            licenses.mkdir()
+            for state in ('empty', 'nested', 'empty-file'):
+                with self.subTest(state=state):
+                    if state == 'nested':
+                        (licenses / 'media/empty').mkdir(parents=True)
+                    if state == 'empty-file':
+                        (licenses / 'LICENSE').touch()
+                    destination = root / f'new-{state}'
+                    with self.assertRaisesRegex(RuntimeError, 'license directory is empty'):
+                        package_support.copy_licenses(root, kit, destination)
+                    self.assertFalse(destination.exists())
+                    existing = root / f'existing-{state}'
+                    existing.mkdir()
+                    (existing / 'sentinel').write_bytes(b'original')
+                    with self.assertRaisesRegex(RuntimeError, 'license directory is empty'):
+                        package_support.copy_licenses(root, kit, existing)
+                    self.assertEqual(list(existing.iterdir()), [existing / 'sentinel'])
+                    self.assertEqual((existing / 'sentinel').read_bytes(), b'original')
 
     def test_verification_output_preserves_package_and_previous_evidence(self):
         with tempfile.TemporaryDirectory() as temporary:

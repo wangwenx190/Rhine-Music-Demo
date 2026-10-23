@@ -61,6 +61,62 @@ public:
     PlaybackTest() = default;
 
 private Q_SLOTS:
+    void invalidMediaObserverCanReplaceTheRequest()
+    {
+        Fixture fixture;
+        auto &player = fixture.player;
+        player.d->applyDevices({ }, { });
+        QVERIFY(player.playTrack(u"album"_s, u"track-0"_s));
+        const auto revision = player.d->m_revision;
+        connect(&player, &PlaybackController::supportChanged, &player, [&](MediaSupport support) {
+            if (support == MediaSupport::Unsupported)
+                QVERIFY(player.playTrack(u"album"_s, u"track-1"_s));
+        });
+        player.d->status(QMediaPlayer::InvalidMedia, revision);
+        QVERIFY(player.d->m_revision > revision);
+        QCOMPARE(player.trackId(), u"track-1"_s);
+        QVERIFY(player.requested());
+        QVERIFY(player.error().isEmpty());
+        QCOMPARE(player.mediaSupport(), MediaSupport::Unknown);
+        QCOMPARE(player.position(), 0);
+    }
+    void loadObserversCanReplaceTheRequest_data()
+    {
+        QTest::addColumn<QString>("notification");
+        QTest::newRow("support") << u"support"_s;
+        QTest::newRow("seekable") << u"seekable"_s;
+        QTest::newRow("position") << u"position"_s;
+    }
+    void loadObserversCanReplaceTheRequest()
+    {
+        QFETCH(QString, notification);
+        Fixture fixture;
+        auto &player = fixture.player;
+        player.d->applyDevices({ }, { });
+        QVERIFY(player.playTrack(u"album"_s, u"track-0"_s));
+        player.d->setSupport(MediaSupport::Supported);
+        bool replaced = false;
+        const auto replace = [&] {
+            if (replaced)
+                return;
+            replaced = true;
+            QVERIFY(player.playTrack(u"album"_s, u"track-1"_s));
+        };
+        if (notification == "support"_L1)
+            connect(&player, &PlaybackController::supportChanged, &player, replace);
+        else if (notification == "seekable"_L1)
+            connect(&player, &PlaybackController::seekableChanged, &player, replace);
+        else
+            connect(&player, &PlaybackController::positionChanged, &player, replace);
+        player.d->load(321);
+        QVERIFY(replaced);
+        QCOMPARE(player.trackId(), u"track-1"_s);
+        QVERIFY(player.requested());
+        QVERIFY(player.error().isEmpty());
+        QCOMPARE(player.position(), 0);
+        QCOMPARE(player.d->m_restore, 0);
+        QCOMPARE(player.d->m_source, fixture.library.snapshot()->albums[0].tracks[1].sourceUrl);
+    }
     void outputDetachmentDoesNotInvalidateLoadedMedia()
     {
         Fixture fixture;

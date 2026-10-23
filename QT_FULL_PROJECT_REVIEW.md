@@ -1,6 +1,6 @@
 # 全项目 Qt 严格审查报告
 
-原始审查日期：2026-10-23（Asia/Shanghai）。审查源码基准：`15908cfd709e7f91345ce53d37b325d387c98791`。本报告保留尚未解决的确认事项及原始 lint 诊断、覆盖范围和证据边界；源码位置沿用审查基准。本报告不替代专项契约。
+原始审查日期：2026-10-23（Asia/Shanghai）。审查源码基准：`15908cfd709e7f91345ce53d37b325d387c98791`。本报告保留原始 lint 诊断、覆盖范围和证据边界；源码位置沿用审查基准。本报告不替代专项契约。
 
 使用用户指定 `agent-skills` 仓库提交 `6845f02d41171a6df8b6e6fe225b7f5d1a6f4adf` 的 `skills/qt-cpp-review/SKILL.md`（v3.0）与 `skills/qt-qml-review/SKILL.md`（v2.0），以及该仓库的专用 review-agent 定义和 A1–A6/A1–A7 规则。技能标注 Qt Company 版权与 LicenseRef-Qt-Commercial OR BSD-3-Clause。没有把技能的静态启发式输出宣称为 Qt 官方对本项目的认证。
 
@@ -19,25 +19,8 @@
 | `cmake --build --preset qt-release --target Yalahoo_qmllint ui-tests_qmllint` | 退出 0，无诊断 | 当前配置中这两个目标的官方 Qt 6.12.0 类型/导入/资源检查；不外推未编入该配置的研究 QML |
 | `cmake -DSOURCE_ROOT=… -P tools/audit/CheckSourcePolicy.cmake` | 退出 0 | 当前源码的 ASCII/Qt 显式字符串策略 |
 | `node tools/migration/check-web-baseline.mjs` | 退出 0，来源及资产一致性通过 | 冻结来源/数值 fixture/资源身份；不是运行或画质通过 |
-| 空 Qt 许可目录的匿名临时目录复现 | 实际接受空目录，见 S-001 | Unix 许可复制函数的边界行为 |
-| 后处理生成器的匿名隔离副本复现 | 退出 0，输出 SMAA 0.1/8，见 S-003 | 生成脚本和已提交生产 0.05/32 参数不一致 |
 
 本轮没有启动可见窗口、播放声音、读取用户曲库、联网查询用户资料、发布或上传；没有执行全量构建/CTest、性能采样、Windows/Linux 原生构建或跨设备/HDR/输入/听感验收。未执行的检查不记为通过；现有 R36 未完成项（包括 MAC-VISIBLE-3D 已知失败）仍以迁移计划为准。原始日志与机器路径保留在本地临时目录，不提交。
-
-## 确认事项索引
-
-尚未解决的独立深度审查确认事项 5 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
-
-| ID | 类型 | 源码位置 | 事项 |
-| --- | --- | --- | --- |
-| [D-031] | 行为/错误路径 | `tools/migration/ProbeInput.h:95` | Accepted ruler frame counts can prevent the deadline from running |
-| [D-032] | 行为/错误路径 | `tools/assets/ExportBranding.cpp:800` | Branding manifest inventory validation accepts duplicate entries |
-| [D-033] | 代码规范/维护 | `qml/Yalahoo/Music/components/ArchiveSlider.qml:19` | Slider rail has an unused id |
-| [D-034] | 行为/错误路径 | `qml/Yalahoo/Music/components/TrackRow.qml:39` | Track rows have no accessible activation action |
-| [D-035] | 行为/错误路径 | `qml/Yalahoo/Music/panels/SearchFilters.qml:69` | Genre filter buttons have no visible keyboard focus |
-| [S-001] | 行为/错误路径 | `tools/deploy/package_support.py:68` | Unix 打包器接受空的 Qt 许可目录 |
-| [S-002] | 行为/错误路径 | `tools/deploy/verify-windows.ps1:25` | Windows 包验证器忽略清单外新增文件 |
-| [S-003] | 行为/错误路径 | `tools/assets/prepare-postprocess-shaders.py:38` | 重新生成后处理 shader 会回退生产 SMAA 参数 |
 
 ## Qt Code Review Report
 
@@ -45,7 +28,7 @@
 
 **Files reviewed**: 369（66,262 行）
 
-**Issues found**: 880（878 from original lint，2 unresolved from deep analysis；lint 是原始诊断计数）
+**Lint diagnostics**: 878（原始规则诊断计数）
 
 **Agents**: 27（独立分片，逐文件编号读取并恢复截断内容）
 
@@ -94,73 +77,13 @@
 
 ---
 
-### Deep analysis findings
-
-#### [D-031] Accepted ruler frame counts can prevent the deadline from running
-- **File**: `tools/migration/ProbeInput.h:95`
-- **Category**: Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: Ruler input validation accepts frame counts through `INT_MAX`, and permits an empty trace for such an operation. `runRulerAssertions` then executes every requested frame synchronously on the GUI thread. A small JSON file can therefore request billions of iterations, blocking event processing and preventing the probe’s deadline timer from enforcing its advertised execution bound.
-- **Trace**: `integer()` allows values up to `INT_MAX`; `validateRuler` accepts empty traces at lines 95–100; `RulerSourceProbe.cpp:517–525` runs the entire frame count without yielding or checking elapsed time; the deadline at lines 696–698 is a GUI-thread `QTimer`.
-- **Mitigation**: Bound per-operation and aggregate frame counts during validation. If long traces are intentionally supported, process bounded chunks with an elapsed-time or cancellation check so the deadline remains effective.
-
-#### [D-032] Branding manifest inventory validation accepts duplicate entries
-- **File**: `tools/assets/ExportBranding.cpp:800`
-- **Category**: Error Handling & Validation
-- **Confidence**: 95/100
-- **Finding**: Verify-only mode treats an array size of 36 as proof of a complete manifest, then independently validates whichever paths it contains. A manifest containing 36 copies of one valid entry passes these checks while omitting the other 35 assets, so the reported success no longer proves the required complete bytes/SHA-256 inventory.
-- **Trace**: Export mode enumerates both asset trees at lines 815–820. Verify-only mode checks only array size/display name at lines 799–801, and validates each supplied entry at lines 802–810; it never rejects duplicate paths or compares the path set against the expected inventory. Independent raster comparisons do not restore the missing per-file manifest hash checks.
-- **Mitigation**: Validate unique, normalized asset paths and compare the resulting set against the complete expected inventory before checking individual sizes and hashes.
-
----
-
-### Investigation targets (human verification needed)
-
-#### [I-001] 搜索模型在 about-to 结构通知期间缺少重入保护
-- **File**: `src/core/SearchListModel.cpp:265`
-- **Category**: Model Contracts (QAbstractItemModel)
-- **Confidence**: 76/100
-- **Finding**: `replaceResults()`只在 `endRemoveRows()/endInsertRows()`之后检查 generation。`beginRemoveRows()/beginInsertRows()`本身会同步发出 about-to 信号；若其观察者调用公开 `update()` 换库或重新更新结果，外层仍会按照旧的 `prefix/removed/inserted` 修改已经替换的 `m_results`，甚至向变短的列表执行旧范围删除，并形成嵌套模型事务。当前对普通 `dataChanged/rowsRemoved/rowsInserted` 的保护未覆盖这个入口。
-- **Unverified because**: 已确认代码上的重入窗口，但未找到当前生产连接明确从 `rowsAboutToBeRemoved/rowsAboutToBeInserted` 调用该模型的更新入口。现有回归 `LibraryDataTest.cpp:719–723` 仅连接完成通知。
-- **How to verify**: 在模型协议回归中连接两个 about-to 信号，同步调用 `update()` 替换为空或不同大小的快照，配合 `QAbstractItemModelTester` 检查删除范围及事务完整性；若需要支持该重入，应在整个结构事务期间延期更新，并在事务结束后应用最后一个意图。
-
-#### [I-002] Invalid-media processing can overwrite a replacement request after notification
-- **File**: `src/media/PlaybackController.cpp:330`
-- **Category**: Performance & Code Quality
-- **Confidence**: 76/100
-- **Finding**: `status(InvalidMedia, revision)` calls `setSupport()`, which synchronously emits `supportChanged`. If an observer starts another track from that notification, processing resumes without rechecking the revision and writes an error and Paused intent into the replacement request. Similar notification boundaries exist in `load()`.
-- **Unverified because**: No current production receiver of `supportChanged` was found; this requires a subscriber that reenters playback commands.
-- **How to verify**: Connect a direct `supportChanged(Unsupported)` handler that starts another valid track, then deliver InvalidMedia for the old revision. Check that the replacement retains its latest intent and error state.
-
-#### [I-003] flush 的同步回调可能清掉更新的待提交目标
-- **File**: `src/render/navigation/InputRouter.cpp:209`
-- **Category**: Performance & Code Quality
-- **Confidence**: 75/100
-- **Finding**: `flush()` 在 `selectCell()` 返回成功后无条件清空 m_pending。selectCell() 同步发出 selectionChanged；若其回调提交新的导航，并因归位副本容量不足而留下新目标，外层 flush 会把新目标一并清掉。m_committing 没有识别待提交目标的代次。
-- **Unverified because**: 当前检查到的生产接线未发现从 selectionChanged 同步发起新导航的调用者，因此尚不能认定正常产品路径会触发。
-- **How to verify**: 检查所有同步选择通知处理器是否可能调用 router.row/lane/selectRow；以归位容量即将耗尽的状态连接一次性重入处理器，确认内层产生的新待提交目标是否在外层返回后保留。
-
----
-
-### Summary
-
-| Category | Lint | Deep | Investigate | Total |
-| --- | ---: | ---: | ---: | ---: |
-| 原始 lint 规则诊断（未按深度领域重分类） | 878 | 0 | 0 | 878 |
-| Error Handling & Validation | 0 | 2 | 0 | 2 |
-| Model Contracts | 0 | 0 | 1 | 1 |
-| Performance & Code Quality | 0 | 0 | 2 | 2 |
-| **Total** | **878** | **2** | **3** | **883** |
-
-Findings below confidence 60 are suppressed. 诊断、确认事项和调查项的计数不可解释为同等严重性的缺陷总数。
-
 ## QML Code Review Report
 
 **Scope**: files: 全部跟踪的 QML，详见分片附录。
 
 **Files reviewed**: 93（8,329 行）
 
-**Issues found**: 1528（1525 from lint，3 from deep analysis；lint 是原始诊断计数）
+**Lint diagnostics**: 1525（原始规则诊断计数）
 
 **Agents**: 6（独立分片，逐文件编号读取并恢复截断内容）
 
@@ -217,87 +140,12 @@ QML 上表为 222 条 Python 规则诊断；其余 1,303 条独立 qmllint 诊�
 
 ---
 
-### Deep analysis findings
-
-#### [D-033] Slider rail has an unused id
-- **File**: `qml/Yalahoo/Music/components/ArchiveSlider.qml:19`
-- **Category**: Performance & Code Quality
-- **Confidence**: 100/100
-- **Finding**: The rail rectangle declares `id: rail`, but nothing references it. This is a minor maintainability cleanup with no demonstrated user-visible impact.
-- **Trace**: Searched the complete component for `rail`; the declaration is its only occurrence. Its children reference their parent directly.
-- **Mitigation**: Remove the unused id.
-
-#### [D-034] Track rows have no accessible activation action
-- **File**: `qml/Yalahoo/Music/components/TrackRow.qml:39`
-- **Category**: Logic & Wiring
-- **Confidence**: 94/100
-- **Finding**: Playable tracks expose a plain `Item` as `Accessible.ListItem`, but playback is connected only to keyboard handlers and `TapHandler`. No accessible press action invokes `trackRequested`, so assistive technology cannot activate the row through its action interface. The nested Rectangle also exposes the same list-item name at lines 159–160, creating a duplicate accessible entry.
-- **Trace**: Read all TrackRow activation paths (lines 35–38 and 144–157), its TrackList delegate wiring, and MusicStage playback handler. Whole-QML search found no `Accessible.onPressAction` implementation. Templates button behavior cannot supply an action because both exposed objects are plain Item/Rectangle objects.
-- **Mitigation**: Expose a single accessible actionable row, preferably using an explicitly drawn Templates delegate for behavior, and connect its accessible activation to the same guarded playback intent. Suppress the decorative inner node from accessibility.
-
-#### [D-035] Genre filter buttons have no visible keyboard focus
-- **File**: `qml/Yalahoo/Music/panels/SearchFilters.qml:69`
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 98/100
-- **Finding**: Genre chips accept keyboard focus through `Qt.StrongFocus`, but their complete custom visual tree never reads `visualFocus` or `activeFocus`. Tabbing from search into an unselected genre therefore gives no visible indication of the focused control; the selected chip remains visually emphasized even when another chip owns keyboard focus.
-- **Trace**: Read the entire `T.Button` delegate at lines 67–102. Background and text appearance depend only on `checked`; Templates supplies no default focus drawing. Compared the project’s `ArchiveButton.qml:41–52`, which explicitly draws the required focus outline from `visualFocus`, and `controls.md`/QML-26 accessibility requirements. This is independent of the known transparent-rectangle lint diagnostic.
-- **Mitigation**: Draw an explicit keyboard-focus indicator bound to `visualFocus`, retaining selection appearance separately and ensuring the genre viewport does not clip the indicator.
-
----
-
-### Investigation targets (human verification needed)
-
-无。
-
----
-
-### Summary
-
-| Category | Lint | Deep | Investigate | Total |
-| --- | ---: | ---: | ---: | ---: |
-| 原始 lint 规则诊断（未按深度领域重分类） | 1525 | 0 | 0 | 1525 |
-| Logic & Wiring | 0 | 2 | 0 | 2 |
-| Performance & Code Quality | 0 | 1 | 0 | 1 |
-| **Total** | **1525** | **3** | **0** | **1528** |
-
-Findings below confidence 60 are suppressed. 诊断、确认事项和调查项的计数不可解释为同等严重性的缺陷总数。
-
-TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://doc.qt.io/qt-6/qml-qtquick-accessible.html)要求自定义交互项提供与点击等效的可访问动作；[Qt Quick 动作实现](https://github.com/qt/qtdeclarative/blob/dev/src/quick/accessible/qaccessiblequickitem.cpp#L476)没有为普通 ListItem 自动映射 TapHandler/Keys 的播放意图。这是源码接线判定，未执行屏幕阅读器实物验收。
-
-## 构建、部署与生成链补充审查
-
-#### [S-001] Unix 打包器接受空的 Qt 许可目录
-- **File**: `tools/deploy/package_support.py:68`
-- **Category**: Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: `copy_licenses()`只核对最近的 `Licenses` 是目录，随后无条件复制；目录为空或只有空子目录也成功。macOS/Linux 打包和最终闭包检查均不要求 Qt 许可文件非空，损坏或不完整的安装可生成并安装缺少 Qt/媒体署名的产品包。最近层级的空目录还会遮蔽祖先中完整的许可目录。
-- **Trace**: `macos.py`/`linux.py` → `copy_licenses()` → `shutil.copytree()`；`inspect_bundle()`不检查许可内容，`inspect_package()`只检查顶层 licenses 存在，inventory 只校验实际文件一致性。使用系统临时目录中的匿名伪 Kit 和项目署名文件直接调用该函数：空 Qt Licenses 被接受且复制后仍为空。`UnixDeploymentTest.py:122–142`覆盖成功/不存在，未覆盖空目录；Windows 的 `Copy-QtLicenses` 已明确拒绝空目录。
-- **Mitigation**: 在修改 staging 前验证所选许可目录确有文件，缺失或空目录明确失败；按确定的 Qt 安装结构核对需要的媒体许可，补充空目录与只有子目录的定向回归。
-
-#### [S-002] Windows 包验证器忽略清单外新增文件
-- **File**: `tools/deploy/verify-windows.ps1:25`
-- **Category**: Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: 验证器只逐条检查 package.json 已列文件的 hash，从不枚举磁盘文件集合。保持已列文件不变、向包内新增任意文件（包括额外插件或研究组件），不会触发包内容变化错误；空 files 数组也会跳过整段校验。此行为无法证明其声称的包清单完整性，且明显弱于 macOS/Linux 的清单与实际 inventory 全等检查。
-- **Trace**: `verify-windows.ps1:24–34` 读取并遍历声明的 files 后直接准备启动，没有检查 files 非空/类型、集合相等、重复路径或新增文件。`windows.ps1` 只在生成时拒绝研究组件；其后复制/验证路径不再执行这项检查。`package_support.verify_package_inventory()`通过全等比较拒绝同类差异。此结论为静态控制流确认，未冒称在 Windows/PowerShell 上执行。
-- **Mitigation**: 先严格验证清单结构和唯一的相对路径，再对实际包文件集合（排除清单自身）与声明集合做精确比较，之后检查 hash/体积；扩展 Windows 工具回归覆盖新增、缺失、重复和空清单。
-
-#### [S-003] 重新生成后处理 shader 会回退生产 SMAA 参数
-- **File**: `tools/assets/prepare-postprocess-shaders.py:38`
-- **Category**: Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: 生成器硬编码颜色阈值 0.1、最多搜索 8 步，而已提交的生产 shader 和 postprocess.md 明确要求 0.05/32 步。正常重新生成资产会静默降低既定 SMAA 质量；后续 RHI 包装直接包含这些共享 shader，因此影响生产路径，不只是隔离 Review。
-- **Trace**: `prepare-postprocess-shaders.py:37–41` → 写出 `resources/shaders/smaa-edges.frag`/`smaa-weights.frag`；`resources/shaders/rhi/smaa-*.frag`包含共享实现。`docs/contracts/postprocess.md:27`与 `tests/render/SmaaReference.h`使用既定生产参数。将生成器与两份锁定 Three 源文件复制到系统临时目录执行，退出 0；生成值为 0.1/8，与当前提交的 0.05/32 不同，未改动仓库资产。
-- **Mitigation**: 使生成器保留当前生产 0.05/32 参数并同步清除过时的 Medium 描述；增加隔离生成后的语义一致性检查，避免只检查脚本语法和格式。
-
-
 ## 分片覆盖附录
 
-每个分片均检查其适用的全部技能领域；“无新增”表示没有超过已列 lint、且达到置信度门槛的深度事项，不表示环境验收或不存在任何缺陷。C++ 的 A1–A6 覆盖模型、所有权、线程、API/语言、验证/错误和性能；QML 的 A1–A7 覆盖绑定、布局、加载、委托、状态、性能和逻辑接线。
+每个分片均检查其适用的全部技能领域；分片覆盖不表示环境验收或不存在任何缺陷。C++ 的 A1–A6 覆盖模型、所有权、线程、API/语言、验证/错误和性能；QML 的 A1–A7 覆盖绑定、布局、加载、委托、状态、性能和逻辑接线。
 
 ### cpp-01 · 16 文件 / 2,240 行
 
-深度 findings：1；调查：0。
 
 - `src/app/ApplicationIdentity.h`
 - `src/app/ApplicationOptions.cpp`
@@ -319,7 +167,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-02 · 10 文件 / 2,438 行
 
-深度 findings：1；调查：0。
 
 - `src/app/NavigationReview.cpp`
 - `src/app/NavigationReview.h`
@@ -335,7 +182,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-03 · 27 文件 / 2,241 行
 
-深度 findings：2；调查：1。
 
 - `src/core/AlbumListModel.cpp`
 - `src/core/AppIdentity.cpp`
@@ -368,7 +214,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-04 · 15 文件 / 2,032 行
 
-深度 findings：1；调查：0。
 
 - `src/library/DirectoryScanner.cpp`
 - `src/library/DirectoryScanner.h`
@@ -389,7 +234,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-05 · 18 文件 / 2,462 行
 
-深度 findings：1；调查：1。
 
 - `src/media/MediaMetadataProbe.cpp`
 - `src/media/MediaMetadataProbe.h`
@@ -413,7 +257,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-06 · 18 文件 / 2,364 行
 
-深度 findings：1；调查：0。
 
 - `src/motion/SampledReelCurve.h`
 - `src/motion/ScalarSpring.cpp`
@@ -437,7 +280,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-07 · 24 文件 / 2,442 行
 
-深度 findings：3；调查：0。
 
 - `src/presentation/SurfaceTransition.cpp`
 - `src/presentation/SurfaceTransition.h`
@@ -467,7 +309,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-08 · 18 文件 / 1,699 行
 
-深度 findings：1；调查：0。
 
 - `src/render/OverviewLabelsModel.h`
 - `src/render/PointerDragController.cpp`
@@ -491,7 +332,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-09 · 9 文件 / 2,277 行
 
-深度 findings：0；调查：0。
 
 - `src/render/SelectionController.cpp`
 - `src/render/SelectionController.h`
@@ -506,7 +346,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-10 · 15 文件 / 2,400 行
 
-深度 findings：2；调查：1。
 
 - `src/render/navigation/InputRouter.cpp`
 - `src/render/navigation/InputRouter.h`
@@ -527,7 +366,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-11 · 24 文件 / 2,542 行
 
-深度 findings：0；调查：0。
 
 - `src/render/rhi/AtlasAllocator.cpp`
 - `src/render/rhi/AtlasAllocator.h`
@@ -557,7 +395,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-12 · 11 文件 / 1,037 行
 
-深度 findings：0；调查：0。
 
 - `src/render/rhi/ReelTextNode.cpp`
 - `src/render/rhi/ReelTextNode.h`
@@ -574,7 +411,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-13 · 6 文件 / 2,623 行
 
-深度 findings：1；调查：0。
 
 - `src/render/rhi/RhiRenderer.cpp`
 - `src/render/rhi/RhiRenderer.h`
@@ -586,7 +422,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-14 · 13 文件 / 2,220 行
 
-深度 findings：2；调查：0。
 
 - `src/render/rhi/SceneItem.cpp`
 - `src/render/rhi/SceneItem.h`
@@ -605,7 +440,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-15 · 13 文件 / 2,616 行
 
-深度 findings：1；调查：0。
 
 - `src/render/text/TitleReel.cpp`
 - `src/render/text/TitleReel.h`
@@ -624,7 +458,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-16 · 20 文件 / 2,628 行
 
-深度 findings：1；调查：0。
 
 - `src/services/MetadataPresentation.cpp`
 - `src/services/MetadataPresentation.h`
@@ -650,7 +483,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-17 · 13 文件 / 2,486 行
 
-深度 findings：1；调查：0。
 
 - `src/services/metadata/MusicBrainzSource.cpp`
 - `src/services/metadata/MusicBrainzSource.h`
@@ -669,7 +501,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-18 · 13 文件 / 2,318 行
 
-深度 findings：1；调查：0。
 
 - `tests/render/ExperimentChecks.cpp`
 - `tests/render/ExperimentChecks.h`
@@ -688,7 +519,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-19 · 11 文件 / 2,428 行
 
-深度 findings：0；调查：0。
 
 - `tests/render/PresentationChecks.cpp`
 - `tests/render/PresentationChecks.h`
@@ -705,7 +535,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-20 · 9 文件 / 2,606 行
 
-深度 findings：1；调查：0。
 
 - `tests/render/RhiPostprocessChecks.cpp`
 - `tests/render/RhiProductionFixture.h`
@@ -720,7 +549,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-21 · 14 文件 / 2,530 行
 
-深度 findings：1；调查：0。
 
 - `tests/render/StartupChecks.cpp`
 - `tests/render/StartupChecks.h`
@@ -740,7 +568,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-22 · 5 文件 / 2,469 行
 
-深度 findings：0；调查：0。
 
 - `tests/unit/ArchivePoolTest.cpp`
 - `tests/unit/AtlasUploadTest.cpp`
@@ -751,7 +578,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-23 · 9 文件 / 2,997 行
 
-深度 findings：3；调查：0。
 
 - `tests/unit/DirectoryScannerTest.cpp`
 - `tests/unit/DisplayOutputTest.cpp`
@@ -766,7 +592,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-24 · 8 文件 / 2,957 行
 
-深度 findings：1；调查：0。
 
 - `tests/unit/LocalizationTest.cpp`
 - `tests/unit/LoggingTest.cpp`
@@ -780,7 +605,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-25 · 9 文件 / 3,063 行
 
-深度 findings：2；调查：0。
 
 - `tests/unit/OpeningTest.cpp`
 - `tests/unit/OverviewTest.cpp`
@@ -795,7 +619,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-26 · 10 文件 / 2,632 行
 
-深度 findings：1；调查：0。
 
 - `tests/unit/RhiMaterialTest.cpp`
 - `tests/unit/SceneTest.cpp`
@@ -811,7 +634,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### cpp-27 · 11 文件 / 3,515 行
 
-深度 findings：3；调查：0。
 
 - `tools/assets/ExportBranding.cpp`
 - `tools/assets/GeometryAudit.cpp`
@@ -828,7 +650,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-01 · 20 文件 / 1,366 行
 
-深度 findings：1；调查：0。
 
 - `qml/Yalahoo/Music/App.qml`
 - `qml/Yalahoo/Music/components/ArchiveButton.qml`
@@ -854,7 +675,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-02 · 14 文件 / 1,372 行
 
-深度 findings：0；调查：0。
 
 - `qml/Yalahoo/Music/components/CreditCard.qml`
 - `qml/Yalahoo/Music/components/DesignTokens.qml`
@@ -874,7 +694,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-03 · 13 文件 / 1,283 行
 
-深度 findings：0；调查：0。
 
 - `qml/Yalahoo/Music/components/OrdinalReel.qml`
 - `qml/Yalahoo/Music/components/OverviewBackdrop.qml`
@@ -893,7 +712,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-04 · 12 文件 / 1,432 行
 
-深度 findings：1；调查：0。
 
 - `qml/Yalahoo/Music/components/TrackRow.qml`
 - `qml/Yalahoo/Music/components/TransportTitle.qml`
@@ -911,7 +729,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-05 · 13 文件 / 1,338 行
 
-深度 findings：1；调查：0。
 
 - `qml/Yalahoo/Music/panels/LibraryPanel.qml`
 - `qml/Yalahoo/Music/panels/LibraryPanels.qml`
@@ -930,7 +747,6 @@ TrackRow 无障碍事项的主审补证：[Qt 6.12 Accessible 文档](https://do
 
 ### qml-06 · 21 文件 / 1,538 行
 
-深度 findings：0；调查：0。
 
 - `qml/Yalahoo/Music/panels/SearchPanel.qml`
 - `qml/Yalahoo/Music/panels/SearchResult.qml`

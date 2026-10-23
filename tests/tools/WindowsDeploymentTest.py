@@ -1,5 +1,6 @@
-"""Execute the deployed PowerShell report validator against strict success/failure fixtures."""
+"""Exercise PowerShell report, package inventory and Qt license validation with isolated fixtures."""
 import json
+import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -42,6 +43,57 @@ class WindowsDeploymentTest(unittest.TestCase):
                         self.assertEqual((destination / "media/FFmpeg.txt").read_bytes(), b"Media license")
                     else:
                         self.assertFalse(destination.exists())
+
+    def test_inventory_requires_complete_unique_paths_sizes_and_hashes(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo inventory space-") as temporary:
+            root = Path(temporary)
+            shutil.copyfile(ROOT / "tools/deploy/product-report.ps1", root / "product-report.ps1")
+            script = root / "verify.ps1"
+            script.write_text("$ErrorActionPreference = 'Stop'\n"
+                              ". (Join-Path $PSScriptRoot 'product-report.ps1')\n"
+                              "$null = Assert-PackageInventory -PackageDirectory "
+                              "(Join-Path $PSScriptRoot 'package')\n")
+            package = root / 'package'
+            for name in ('yalahoo.exe', 'plugins/media.dll', 'qml/package.json'):
+                path = package / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'anonymous product')
+            entries = [dict(path=str(path.relative_to(package)).replace('\\', '/'),
+                            bytes=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+                       for path in package.rglob('*') if path.is_file()]
+            valid = dict(configuration='Release', review=False, files=entries)
+            cases = {'valid': valid, 'null': None, 'array': [], 'empty': dict(valid, files=[]),
+                     'not-array': dict(valid, files=entries[0]),
+                     'missing-entry': dict(valid, files=entries[:-1]),
+                     'duplicate': dict(valid, files=[entries[0], entries[0], entries[2]]),
+                     'case-duplicate': dict(valid, files=[*entries, dict(entries[0], path=entries[0]['path'].upper())]),
+                     'review-string': dict(valid, review='false')}
+            for field, values in {'path': ('../outside', '/absolute', 'plugins/../yalahoo.exe',
+                                          './yalahoo.exe', 'plugins//media.dll', 'plugins/media.dll/',
+                                          'C:/outside', 'plugins\\media.dll', ''),
+                                  'bytes': (-1, 1.5, '17', 0),
+                                  'sha256': ('broken', '0' * 64, 0)}.items():
+                for index, value in enumerate(values):
+                    cases[f'{field}-{index}'] = dict(valid, files=[dict(entries[0], **{field: value}), *entries[1:]])
+            for name, manifest in cases.items():
+                with self.subTest(case=name):
+                    (package / 'package.json').write_text(json.dumps(manifest))
+                    result = subprocess.run(['pwsh', '-NoProfile', '-File', str(script)],
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode == 0, name == 'valid', result.stdout + result.stderr)
+            (package / 'package.json').write_text(json.dumps(valid))
+            for name in ('extra.dll', '.hidden.dll'):
+                with self.subTest(extra=name):
+                    extra = package / name
+                    extra.write_bytes(b'extra plugin')
+                    result = subprocess.run(['pwsh', '-NoProfile', '-File', str(script)],
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    extra.unlink()
+            (package / 'yalahoo.exe').unlink()
+            result = subprocess.run(['pwsh', '-NoProfile', '-File', str(script)],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_only_an_object_with_boolean_true_passes(self):
         with tempfile.TemporaryDirectory(prefix="yalahoo report space-") as temporary:

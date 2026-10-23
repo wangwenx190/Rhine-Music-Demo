@@ -4,7 +4,9 @@
 #include <QCoreApplication>
 #include <QFutureWatcher>
 #include <QThreadPool>
+#include <QScopeGuard>
 #include <QtConcurrentRun>
+#include <optional>
 #include <utility>
 
 using namespace Qt::StringLiterals;
@@ -37,6 +39,15 @@ struct SearchListModel::Private final
     void startSearch();
     void replaceResults(QList<SearchResult> results);
     void notifyCount();
+    void finishMutation();
+    struct PendingChange final
+    {
+        Snapshot snapshot;
+        QString query, genreId;
+        bool requestOnly = false;
+    };
+    std::optional<PendingChange> m_pendingChange;
+    bool m_mutating = false, m_draining = false;
     static QList<SearchResult> filter(const QList<SearchEntry> &entries, const QString &needle,
                                       const QString &genreId,
                                       const std::atomic<quint64> &generation, quint64 ticket);
@@ -99,8 +110,18 @@ QList<SearchResult> SearchListModel::Private::filter(const QList<Private::Search
 }
 void SearchListModel::request(const QString &query, const QString &genreId)
 {
+    if (d->m_mutating) {
+        ++d->m_search.generation;
+        if (d->m_pendingChange) {
+            d->m_pendingChange->query = query;
+            d->m_pendingChange->genreId = genreId;
+        } else {
+            d->m_pendingChange = Private::PendingChange{ { }, query, genreId, true };
+        }
+        return;
+    }
     const auto needle = query.trimmed().toLower();
-    if (needle == d->m_search.needle && genreId == d->m_search.genreId)
+    if (!d->m_draining && needle == d->m_search.needle && genreId == d->m_search.genreId)
         return;
     const bool wasSearching = searching();
     d->m_search.needle = needle;
@@ -183,6 +204,15 @@ QVariantMap SearchListModel::resultAt(int row) const
 }
 void SearchListModel::update(Snapshot snapshot, const QString &query, const QString &genreId)
 {
+    if (d->m_mutating) {
+        ++d->m_search.generation;
+        d->m_pendingChange = Private::PendingChange{ std::move(snapshot), query, genreId, false };
+        return;
+    }
+    d->m_mutating = true;
+    const auto mutation = qScopeGuard([this] {
+        d->finishMutation();
+    });
     if (!snapshot)
         snapshot = std::make_shared<const LibrarySnapshot>();
     const bool replaced = d->m_library.snapshot() != snapshot;
@@ -238,6 +268,13 @@ void SearchListModel::update(Snapshot snapshot, const QString &query, const QStr
 }
 void SearchListModel::Private::replaceResults(QList<SearchResult> results)
 {
+    // A begin/end pair must finish against its original storage. Synchronous observers
+    // retain only their latest update intent until all structural notifications complete.
+    const bool nested = std::exchange(m_mutating, true);
+    const auto mutation = qScopeGuard([this, nested] {
+        if (!nested)
+            finishMutation();
+    });
     const auto ticket = m_search.generation.load(std::memory_order_relaxed);
     int prefix = 0;
     const auto &before = std::as_const(m_results);
@@ -280,6 +317,23 @@ void SearchListModel::Private::replaceResults(QList<SearchResult> results)
         }
     }
     notifyCount();
+}
+void SearchListModel::Private::finishMutation()
+{
+    m_mutating = false;
+    if (m_draining)
+        return;
+    m_draining = true;
+    const auto draining = qScopeGuard([this] {
+        m_draining = false;
+    });
+    while (m_pendingChange) {
+        auto change = std::exchange(m_pendingChange, std::nullopt).value();
+        if (change.requestOnly)
+            q->request(change.query, change.genreId);
+        else
+            q->update(std::move(change.snapshot), change.query, change.genreId);
+    }
 }
 void SearchListModel::Private::notifyCount()
 {

@@ -35,8 +35,8 @@ for name, kind in [
     section = text[text.index('const ' + name):]
     vs, fs = re.findall(r'(?:vertexShader|fragmentShader): /\* glsl \*/`([\s\S]+?)`', section)[: 2]
     defines = {
-        'edges': '#define SMAA_THRESHOLD 0.1\n',
-        'weights': '#define SMAA_MAX_SEARCH_STEPS 8\n#define SMAA_AREATEX_MAX_DISTANCE 16\n#define SMAA_AREATEX_PIXEL_SIZE (1.0/vec2(160.0,560.0))\n#define SMAA_AREATEX_SUBTEX_SIZE (1.0/7.0)\n',
+        'edges': '#define SMAA_THRESHOLD 0.05\n',
+        'weights': '#define SMAA_MAX_SEARCH_STEPS 32\n#define SMAA_AREATEX_MAX_DISTANCE 16\n#define SMAA_AREATEX_PIXEL_SIZE (1.0/vec2(160.0,560.0))\n#define SMAA_AREATEX_SUBTEX_SIZE (1.0/7.0)\n',
         'blend': ''
     } [kind]
     # Work in canonical WebGL UVs, transforming only framebuffer reads. Numeric

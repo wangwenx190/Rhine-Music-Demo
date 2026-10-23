@@ -56,7 +56,7 @@ await fs.writeFile(
                 'glass linear composition',
                 'SSAO',
                 'Bokeh 41 taps',
-                'SMAA 1x Medium when requested',
+                'SMAA 1x when requested',
                 'ACES exposure',
                 'sRGB',
             ],

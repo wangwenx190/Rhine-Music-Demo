@@ -67,6 +67,7 @@ private:
     int m_rowDirection = 0, m_columnDirection = 0, m_navigationDirection = 0;
     bool m_enabled = true;
     bool m_committing = false;
+    quint64 m_pendingRevision = 0;
     std::optional<ArchiveCell> m_pending;
 };
 }

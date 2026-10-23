@@ -185,6 +185,34 @@ private Q_SLOTS:
         QCOMPARE(selection.albumId(), u"a0-17"_s);
         QVERIFY(selection.instances().size() <= 436);
     }
+    void selectionObserverKeepsItsLatestPendingDestination()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        populate(selection);
+        InputRouter input(&selection);
+        // Three returning covers fill the bounded pool. The next commit is deferred.
+        for (int i = 0; i < 4; ++i) {
+            selection.setLift(.9);
+            QVERIFY(input.row(1));
+        }
+        QCOMPARE(selection.albumId(), u"a0-3"_s);
+        bool reentered = false;
+        connect(&selection, &SelectionController::selectionChanged, &input, [&] {
+            if (reentered)
+                return;
+            reentered = true;
+            selection.setLift(.9);
+            QVERIFY(input.row(2));
+        });
+        for (int frame = 0; frame < 480; ++frame) {
+            selection.advance(1.0 / 120);
+            input.flush();
+        }
+        QVERIFY(reentered);
+        QCOMPARE(selection.albumId(), u"a0-6"_s);
+        QVERIFY(selection.instances().size() <= 436);
+    }
     void pendingColumnAndRow()
     {
         MotionController motion;

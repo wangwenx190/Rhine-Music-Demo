@@ -1,6 +1,7 @@
 // Exercises the actual migration validators and asset publication failure boundaries without
 // network access, rendering, or touching repository assets.
 #include "ProbeInput.h"
+#include "BrandingManifest.h"
 #include "AssetTransaction.h"
 #include "ShellFixture.h"
 #include "RequiredOutput.h"
@@ -285,6 +286,97 @@ private Q_SLOTS:
         damaged = valid;
         damaged[u"ordinalSamples"_s] = QJsonArray{ ordinal };
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::validateRuler(QJsonDocument(damaged)));
+    }
+    void rulerBoundsIndividualAndAggregateSynchronousWork()
+    {
+        const auto input = [](int frames, int operations, int captures) {
+            auto source = rulerInput();
+            auto capture = source[u"captures"_s].toArray()[0].toObject();
+            auto states = capture[u"states"_s].toArray();
+            auto step = states.first().toObject();
+            step[u"op"_s] = QJsonObject{ { u"frames"_s, frames } };
+            for (int i = 0; i < operations; ++i)
+                states.append(step);
+            capture[u"states"_s] = states;
+            QJsonArray cases;
+            for (int i = 0; i < captures; ++i)
+                cases.append(capture);
+            source[u"captures"_s] = cases;
+            return QJsonDocument(source);
+        };
+        probe::validateRuler(input(10000, 5, 2));
+        for (const auto frames : { 10001, 2147483647 })
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::validateRuler(input(frames, 1, 1)));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::validateRuler(input(10000, 11, 1)));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, probe::validateRuler(input(10000, 6, 2)));
+    }
+    void brandingManifestMatchesCommittedAssetTrees()
+    {
+        const QDir root(QString::fromUtf8(FIXTURE_ROOT));
+        assets::validateBrandingManifest(root,
+                                         QJsonDocument::fromJson(assets::readFile(root.filePath(
+                                                 u"resources/manifests/branding.json"_s))));
+    }
+    void brandingManifestRequiresEveryUniqueNormalizedPathAndMatchingContent()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QDir root(directory.path());
+        QJsonArray entries;
+        for (int i = 0; i < 36; ++i) {
+            const auto path =
+                    (i < 18 ? u"resources/branding/%1.svg"_s : u"resources/icons/yalahoo/%1.png"_s)
+                            .arg(i);
+            assets::saveFile(root.filePath(path), "anonymous asset"_ba);
+            entries.append(QJsonObject{
+                    { u"path"_s, path },
+                    { u"bytes"_s, 15 },
+                    { u"sha256"_s,
+                      u"e6ad16c1a0ac24aecb40a193b2e744cff65921593cced68226d57ceaa14b5cea"_s } });
+        }
+        // Independent known SHA-256 of the fixture bytes, rather than the validator's result.
+        const QJsonObject valid{ { u"schemaVersion"_s, 1 },
+                                 { u"displayName"_s, u"yalahOO!!!"_s },
+                                 { u"entries"_s, entries } };
+        assets::validateBrandingManifest(root, QJsonDocument(valid));
+        auto reversed = entries;
+        for (int i = 0; i < entries.size(); ++i)
+            reversed[i] = entries[entries.size() - 1 - i];
+        auto manifest = valid;
+        manifest[u"entries"_s] = reversed;
+        assets::validateBrandingManifest(root, QJsonDocument(manifest));
+        for (int mutation = 0; mutation < 9; ++mutation) {
+            auto damaged = entries;
+            auto entry = damaged[0].toObject();
+            if (mutation == 0)
+                damaged[1] = damaged[0];
+            else if (mutation == 1)
+                damaged.removeLast();
+            else if (mutation == 2)
+                entry[u"path"_s] = u"resources/branding/../branding/0.svg"_s;
+            else if (mutation == 3)
+                entry[u"path"_s] = u"resources/branding/missing.svg"_s;
+            else if (mutation == 4)
+                entry[u"bytes"_s] = u"15"_s;
+            else if (mutation == 5)
+                entry[u"bytes"_s] = 15.5;
+            else if (mutation == 6)
+                entry[u"sha256"_s] = QString();
+            else if (mutation == 7)
+                entry[u"path"_s] = root.filePath(u"resources/branding/0.svg"_s);
+            else
+                damaged[1] = QJsonValue();
+            damaged[0] = entry;
+            manifest[u"entries"_s] = damaged;
+            QVERIFY_THROWS_EXCEPTION(
+                    std::runtime_error,
+                    assets::validateBrandingManifest(root, QJsonDocument(manifest)));
+        }
+        assets::saveFile(root.filePath(u"resources/branding/0.svg"_s), "changed content"_ba);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                 assets::validateBrandingManifest(root, QJsonDocument(valid)));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                 assets::validateBrandingManifest(root, QJsonDocument(entries)));
     }
     void rulerTraceMustContainEveryDeclaredFrame()
     {

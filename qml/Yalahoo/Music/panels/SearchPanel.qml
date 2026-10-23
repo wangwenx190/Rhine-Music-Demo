@@ -25,7 +25,7 @@ Item {
         id: genreRowsModel
         genres: root.librarySession.genres
         font: genreFont.font
-        width: root.width
+        width: root.searchHeader ? root.searchHeader.genreContentWidth : 0
     }
     function prepare(): void {
         librarySession.search("", genreId);

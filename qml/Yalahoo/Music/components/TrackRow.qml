@@ -38,6 +38,9 @@ Item {
                              row.trackRequested(trackId)
     Accessible.role: Accessible.ListItem
     Accessible.name: number + " " + trackTitle + " " + duration
+    enabled: !detailModel.album.offline
+    Accessible.onPressAction: if (!row.detailModel.album.offline)
+                                  row.trackRequested(row.trackId)
     width: row.contentWidth
     height: names.implicitHeight + (row.viewportWidth >= 1700 ? 28 : 22) + 1 + (discHeading
                                                                                 ? discLabel.implicitHeight
@@ -156,7 +159,6 @@ Item {
                     row.trackRequested(row.trackId);
             }
         }
-        Accessible.role: Accessible.ListItem
-        Accessible.name: row.number + " " + row.trackTitle + " " + row.duration
+        Accessible.ignored: true
     }
 }

@@ -11,6 +11,7 @@
 #include "OfflineMetadataProvider.h"
 #include "VerificationWindow.h"
 #include <QQuickWindow>
+#include <QAccessible>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -32,6 +33,97 @@ public:
     QmlBehaviorTest() = default;
 
 private Q_SLOTS:
+    void genreKeyboardFocusRemainsVisibleInsideTheClippedViewport()
+    {
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQuick
+            import Yalahoo.Music
+            import "panels"
+            SearchFilters {
+                id: filters
+                width: 300
+                tokens: DesignTokens { reducedMotion: true }
+                genreRows: GenreRowsModel {
+                    width: filters.genreContentWidth
+                    genres: [{id: "jazz", name: "Jazz"}]
+                }
+                queryText: ""
+                genreId: ""
+                viewportHeight: 108
+            }
+        )"_ba,
+                          QUrl(u"qrc:/qt/qml/Yalahoo/Music/GenreFocusTest.qml"_s));
+        std::unique_ptr<QObject> object(component.create());
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *root = qobject_cast<QQuickItem *>(object.get());
+        QQuickWindow window;
+        yalahoo::verification::prepareWindow(window);
+        window.resize(400, 300);
+        root->setParentItem(window.contentItem());
+        auto *list = root->findChild<QQuickItem *>(u"libraryGenreFilters"_s);
+        QVERIFY(list);
+        QVERIFY(QMetaObject::invokeMethod(list, "forceLayout"));
+        const auto find = [](auto &&self, QQuickItem *item, const QString &name) -> QQuickItem * {
+            if (item->objectName() == name)
+                return item;
+            for (auto *child : item->childItems()) {
+                if (auto *match = self(self, child, name))
+                    return match;
+            }
+            return nullptr;
+        };
+        QQuickItem *all = nullptr, *jazz = nullptr;
+        QTRY_VERIFY((all = find(find, list, u"genreFilter-"_s)));
+        QTRY_VERIFY((jazz = find(find, list, u"genreFilter-jazz"_s)));
+        auto *outline = jazz->findChild<QQuickItem *>(u"genreFocusOutline"_s);
+        QVERIFY(outline);
+        const auto tabBehavior = QGuiApplication::styleHints()->tabFocusBehavior();
+        const auto restore = qScopeGuard([&] {
+            QGuiApplication::styleHints()->setTabFocusBehavior(tabBehavior);
+        });
+        QGuiApplication::styleHints()->setTabFocusBehavior(Qt::TabFocusAllControls);
+        all->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(&window, Qt::Key_Tab);
+        QCOMPARE(window.activeFocusItem(), jazz);
+        QVERIFY(outline->isVisible());
+        QVERIFY(all->property("checked").toBool());
+        QVERIFY(!jazz->property("checked").toBool());
+        QVERIFY(list->clip());
+        QCOMPARE(outline->position(), QPointF(-6, -6));
+        QCOMPARE(outline->size(), jazz->size() + QSizeF(12, 12));
+        const QRectF viewport(QPointF(), list->size());
+        const auto focusRect = outline->mapRectToItem(list, QRectF(QPointF(), outline->size()));
+        // Item transforms can place a mathematically coincident edge a few ULPs outside.
+        const auto within = [](qreal begin, qreal end, qreal extent) {
+            return (begin >= 0 || qFuzzyIsNull(begin))
+                    && (end <= extent || qFuzzyCompare(end, extent));
+        };
+        QVERIFY2(within(focusRect.left(), focusRect.right(), viewport.width())
+                         && within(focusRect.top(), focusRect.bottom(), viewport.height()),
+                 qPrintable(
+                         u"Viewport %1x%2, focus %3,%4 %5x%6, content %7,%8"_s.arg(viewport.width())
+                                 .arg(viewport.height())
+                                 .arg(focusRect.x())
+                                 .arg(focusRect.y())
+                                 .arg(focusRect.width())
+                                 .arg(focusRect.height())
+                                 .arg(list->property("contentX").toDouble())
+                                 .arg(list->property("contentY").toDouble())));
+        QCOMPARE(outline->property("border").value<QObject *>()->property("width").toInt(), 2);
+        QSignalSpy requested(root, SIGNAL(genreRequested(QString)));
+        QTest::keyClick(&window, Qt::Key_Space);
+        QCOMPARE(requested.size(), 1);
+        QCOMPARE(requested.first().first().toString(), u"jazz"_s);
+        all->forceActiveFocus(Qt::OtherFocusReason);
+        jazz->forceActiveFocus(Qt::MouseFocusReason);
+        QVERIFY(!outline->isVisible());
+        root->setParentItem(nullptr);
+        QVERIFY(!window.isVisible());
+        QVERIFY(warnings.isEmpty());
+    }
     void tooltipFollowsAncestorMovementAwayFromWindowEdges()
     {
         QQmlEngine engine;
@@ -439,6 +531,26 @@ private Q_SLOTS:
         QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, point);
         QCOMPARE(activated.size(), 1);
         QCOMPARE(activated.first().first().toString(), changeTrack ? u"track-B"_s : u"track-A"_s);
+        auto *accessible = QAccessible::queryAccessibleInterface(row);
+        QVERIFY(accessible);
+        QCOMPARE(accessible->role(), QAccessible::ListItem);
+        auto *actions = accessible->actionInterface();
+        QVERIFY(actions);
+        QVERIFY(actions->actionNames().contains(QAccessibleActionInterface::pressAction()));
+        QCOMPARE(accessible->childCount(), 0);
+        activated.clear();
+        actions->doAction(QAccessibleActionInterface::pressAction());
+        QCOMPARE(activated.size(), 1);
+        QCOMPARE(activated.first().first().toString(), row->property("trackId").toString());
+        auto offline = *library.snapshot();
+        for (auto &album : offline.albums)
+            album.offline = true;
+        library.setSnapshot(offline);
+        model.prepare(library);
+        activated.clear();
+        QVERIFY(accessible->state().disabled);
+        actions->doAction(QAccessibleActionInterface::pressAction());
+        QCOMPARE(activated.size(), 0);
         row->setParentItem(nullptr);
         QVERIFY(!window.isVisible());
         QVERIFY(warnings.isEmpty());

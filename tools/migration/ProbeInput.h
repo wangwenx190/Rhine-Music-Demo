@@ -148,6 +148,10 @@ inline void validateRuler(const QJsonDocument &document)
 {
     requireInput(document.isObject());
     const auto source = document.object();
+    // Bound synchronous stepping so malformed traces cannot starve the event-loop deadline.
+    constexpr int MaximumOperationFrames = 10000;
+    constexpr int MaximumTotalFrames = 100000;
+    int remainingFrames = MaximumTotalFrames;
     for (const auto &value : array(source[u"captures"_s])) {
         const auto capture = object(value);
         requireInput(number(capture[u"dpr"_s], 0) > 0);
@@ -163,7 +167,9 @@ inline void validateRuler(const QJsonDocument &document)
             if (op.contains(u"frames"_s)) {
                 requireInput(configured);
                 const int frames = integer(op[u"frames"_s], 1);
-                const auto traceValue = state[u"state"_s].toObject()[u"trace"_s];
+                requireInput(frames <= MaximumOperationFrames && frames <= remainingFrames);
+                remainingFrames -= frames;
+                const auto traceValue = state[u"state"_s].toObject().value(u"trace"_s);
                 if (!traceValue.isUndefined()) {
                     requireInput(traceValue.isArray());
                     const auto trace = traceValue.toArray();

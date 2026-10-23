@@ -192,21 +192,24 @@ bool InputRouter::queue(ArchiveCell target)
                                 ArchiveRowEndOffset + count);
     if (std::floor(target.row) != target.row || std::abs(target.row) > MaximumRowMagnitude)
         return false;
+    ++m_pendingRevision;
     m_pending = target;
     flush();
     return true;
 }
 void InputRouter::flush()
 {
-    if (!m_pending || !m_enabled || !m_selection)
+    if (m_committing || !m_pending || !m_enabled || !m_selection)
         return;
     const auto target = *m_pending;
+    const auto pendingRevision = m_pendingRevision;
     // At most one replaceable destination waits for bounded returning-cover ownership.
     m_committing = true;
     const bool moved = m_selection->selectCell(target);
     m_committing = false;
     if (moved) {
-        m_pending.reset();
+        if (pendingRevision == m_pendingRevision)
+            m_pending.reset();
         Q_EMIT navigationCommitted(m_selection->revision());
     }
 }

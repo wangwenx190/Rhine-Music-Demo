@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -226,6 +227,26 @@ export async function rollingNumberSource() {
             self.assertEqual(json.loads((root / "resources/manifests/materials.json").read_text()), manifest)
             self.assertEqual((root / "resources/environment/dfg.rgba32f").read_bytes(),
                              (ROOT / "resources/environment/dfg.rgba32f").read_bytes())
+
+    def test_postprocess_generation_preserves_production_smaa_quality(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo shader space-") as temporary:
+            root = Path(temporary)
+            names = ['tools/assets/prepare-postprocess-shaders.py',
+                     *['legacy-web/node_modules/three/examples/jsm/shaders/' + name
+                       for name in ('BokehShader.js', 'SMAAShader.js')]]
+            for name in names:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, path)
+            output = root / 'resources/shaders'
+            output.mkdir(parents=True)
+            result = subprocess.run([sys.executable, str(root / names[0])],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('#define SMAA_THRESHOLD 0.05\n', (output / 'smaa-edges.frag').read_text())
+            self.assertIn('#define SMAA_MAX_SEARCH_STEPS 32\n', (output / 'smaa-weights.frag').read_text())
+            for name in ('bokeh.frag', 'smaa-edges.frag', 'smaa-weights.frag', 'smaa-blend.frag'):
+                self.assertIn('void MAIN()', (output / name).read_text())
 
     def test_exporters_reproduce_the_declared_shader_inputs(self):
         for script, manifest in (("export-ssao-data.mjs", "occlusion.json"),

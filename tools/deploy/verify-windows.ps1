@@ -21,17 +21,7 @@ if (-not $PackageDirectory) {
     }
 }
 $PackageDirectory = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($PackageDirectory))
-$metadata = Get-Content -LiteralPath (Join-Path $PackageDirectory 'package.json') -Raw | ConvertFrom-Json
-foreach ($file in $metadata.files) {
-    $path = [IO.Path]::GetFullPath((Join-Path $PackageDirectory $file.path))
-    if (-not $path.StartsWith($PackageDirectory + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Invalid package inventory path.'
-    }
-    if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256) {
-        throw "Package content changed: $($file.path)"
-    }
-}
+$metadata = Assert-PackageInventory -PackageDirectory $PackageDirectory
 if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path ([IO.Path]::GetTempPath()) ('yalahoo-deployment-' + [guid]::NewGuid().ToString('N'))
 }

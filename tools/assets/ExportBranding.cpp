@@ -1,4 +1,5 @@
 #include "../../src/render/opening/BrandPaths.h"
+#include "BrandingManifest.h"
 #include <QGuiApplication>
 #include <QSvgRenderer>
 #include <QImage>
@@ -792,23 +793,10 @@ int main(int argc, char **argv)
             require(grabbed, u"Native Qt window verification failed"_s);
         }
         if (verifyOnly) {
-            const auto manifest =
+            yalahoo::assets::validateBrandingManifest(
+                    QDir(repository()),
                     QJsonDocument::fromJson(
-                            read(repository() + "/resources/manifests/branding.json"_L1))
-                            .object();
-            const auto entries = manifest[u"entries"_s].toArray();
-            require(entries.size() == 36 && manifest[u"displayName"_s] == u"yalahOO!!!"_s,
-                    u"Brand manifest inventory invalid"_s);
-            for (const auto &value : entries) {
-                const auto entry = value.toObject();
-                const auto bytes = read(repository() + "/"_L1 + entry[u"path"_s].toString());
-                require(bytes.size() == entry[u"bytes"_s].toDouble()
-                                && QString::fromUtf8(QCryptographicHash::hash(
-                                                             bytes, QCryptographicHash::Sha256)
-                                                             .toHex())
-                                        == entry[u"sha256"_s].toString(),
-                        "Brand manifest hash differs: "_L1 + entry[u"path"_s].toString());
-            }
+                            read(repository() + "/resources/manifests/branding.json"_L1)));
         }
         if (!verifyOnly) {
             QJsonArray entries;

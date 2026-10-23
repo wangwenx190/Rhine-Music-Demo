@@ -185,14 +185,20 @@ void PlaybackController::Private::load(qint64 restore)
                      << "trackId=" << q->trackId() << "source=" << m_source
                      << "restoreMs=" << restore;
     setSupport(MediaSupport::Unknown);
+    if (revision != m_revision)
+        return;
     clearConnections();
     m_player.stop();
     m_player.setSource({ });
     m_seekable = m_dragging = false;
     Q_EMIT q->seekableChanged();
+    if (revision != m_revision)
+        return;
     m_restore = std::max<qint64>(0, restore);
     m_position = m_restore;
     Q_EMIT q->positionChanged();
+    if (revision != m_revision)
+        return;
     if (m_unavailable || m_source.isEmpty())
         return;
     if (!m_player.isAvailable()) {
@@ -328,6 +334,8 @@ void PlaybackController::Private::status(QMediaPlayer::MediaStatus value, quint6
         });
     } else if (value == QMediaPlayer::InvalidMedia) {
         setSupport(MediaSupport::Unsupported);
+        if (revision != m_revision)
+            return;
         m_error = m_player.errorString().isEmpty()
                 ? QCoreApplication::translate("Yalahoo", "Qt media status: InvalidMedia")
                 : m_player.errorString();
