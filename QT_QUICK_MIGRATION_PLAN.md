@@ -18,9 +18,8 @@
 
 ## 执行顺序与范围
 
-- 当前主线`R36`。一次选择一个具备可靠环境、可收尾的执行单元；用户明确指定的其他工作优先。跨目标且无源码依赖的缺环境事项不阻塞当前单元。
-- 开始前评估增删代码、实施/构建/验证/文档/提交总耗时并简报。常规代码理想≤1000行、通常≤2000行，目标两三千行/一小时；预计约4000行或七八十分钟不能收尾先拆接口、输入与退出条件。行数计新增加删除，生成脚本/文档/素材不计代码行数但耗时计入；正常思考、等待与调试计时，中止/断网间隔除外。用户可按轮豁免。
-- 依实际系统/CPU、最新Kit、后端/设备、匿名输入与窗口能力选择检查。构建/功能/格式/qmllint和结果复用归[test-gates.md](docs/contracts/test-gates.md)及[code-style.md](docs/contracts/code-style.md)，性能静态优先与最小实测归[performance.md](docs/contracts/performance.md)，窗口授权与恢复归[test-window-policy.md](docs/contracts/test-window-policy.md)。不将工具完整状态数当作执行单元规模。
+- 当前主线`R36`，按任务依赖与可用环境推进；用户明确指定的其他工作优先。跨目标且无源码依赖的缺环境事项不阻塞可执行工作。
+- 依实际系统/CPU、最新Kit、后端/设备、匿名输入与窗口能力选择检查。构建/功能/格式/qmllint和结果复用归[test-gates.md](docs/contracts/test-gates.md)及[code-style.md](docs/contracts/code-style.md)，性能静态优先与最小实测归[performance.md](docs/contracts/performance.md)，窗口授权与恢复归[test-window-policy.md](docs/contracts/test-window-policy.md)。
 - 源码可确定缺陷、可靠失败及必要入口缺失当轮修复。只有独立缺环境或采集不可靠的事项可移交R36，保留原ID、能力缺口、源码/输入、已知失败、修复对象、准确入口/预期、原门槛、依赖及回归；移交不表示取得运行事实。性能只保留具体静态未决问题。
 
 ## 专项契约与职责
@@ -72,7 +71,7 @@
 
 ## 后置专项输入与退出条件
 
-以下六组是R36的剩余任务；表中原ID用于追溯断言，不各自启动一套验证。一次只实施其中一个可收尾单元。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
+以下六组是R36的剩余任务；表中原ID用于追溯断言，不各自启动一套验证。每次先确定已有证据、实际缺口、最小入口与退出条件；同一结果覆盖多个ID，完成即删除相应待办。公共构建/格式/官方qmllint及矩阵选择只按[test-gates.md](docs/contracts/test-gates.md)，性能只按[performance.md](docs/contracts/performance.md)，窗口只按[test-window-policy.md](docs/contracts/test-window-policy.md)。缺目标实际事实继续留待办，未知GPU完成/显示时刻/driver显存保持null。
 
 ### 目标构建、部署与后端/日志
 

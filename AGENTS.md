@@ -1,6 +1,6 @@
 # yalahOO!!! · 原生项目开发入口
 
-- [QT_QUICK_MIGRATION_PLAN.md](QT_QUICK_MIGRATION_PLAN.md)为项目内最高优先级契约，用户最新明确要求优先。先读公共执行/文档规则及专项索引，再读涉及主题；按当前顺序一次处理一个可收尾单元，完成小节直接移除，独立缺环境事项按原门槛交R36。
+- [QT_QUICK_MIGRATION_PLAN.md](QT_QUICK_MIGRATION_PLAN.md)为项目内最高优先级契约，用户最新明确要求优先。先读公共执行/文档规则及专项索引，再读涉及主题；按当前顺序推进，完成小节直接移除，独立缺环境事项按原门槛交R36。
 - 产品范围、技术身份与目录职责唯一见[product.md](docs/contracts/product.md)；冻结来源及其历史文档语境见[web-baseline.md](docs/contracts/web-baseline.md)。
 - C++语言/接口、Qt对象/线程/模型和QML/C++职责分别执行[cpp23-best-practices.md](docs/contracts/cpp23-best-practices.md)、[qt-best-practices.md](docs/contracts/qt-best-practices.md)、[qml-best-practices.md](docs/contracts/qml-best-practices.md)。
 - Kit/C++23/模块闭包执行[native-bootstrap.md](docs/contracts/native-bootstrap.md)，源码格式、check-format/Release source-format和官方qmllint执行[code-style.md](docs/contracts/code-style.md)。
