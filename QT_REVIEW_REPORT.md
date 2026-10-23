@@ -1,6 +1,6 @@
 # 全项目 Qt 官方 skill 只读审查
 
-尚有 **8 项功能/工具/验证设施问题**（均为 P2），另有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
+尚有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
 
 审查对象为下述提交对应的干净源码工作树；审查未修改源码、契约或迁移计划。本文为用户要求保留的审查快照，不替代项目契约；结论和行号均以该提交为准。没有启动可见窗口、物理设备测试、性能采样或私人曲库扫描。
 
@@ -15,108 +15,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 - [附录 A：C++ skill 完整报告](#cpp-skill-report)
 - [附录 B：QML skill 完整报告](#qml-skill-report)
 - [附录 C：逐文件覆盖清单](#file-coverage)
-
-## 发现总表
-
-| ID | 类别 | 定位 | 问题 |
-|---|---|---|---|
-| D-017 | 验证设施 / P2 | [tests/render/RhiPostprocessChecks.cpp:516](tests/render/RhiPostprocessChecks.cpp#L516) | 图集、alpha及部分验证输出保存失败未传播 |
-| D-018 | 验证设施 / P2 | [tests/render/StartupChecks.cpp:1222](tests/render/StartupChecks.cpp#L1222) | 原生threaded验证从GUI线程获取并读取QRhi资源 |
-| D-019 | 验证设施 / P2 | [tests/support/OffscreenSurface.h:135](tests/support/OffscreenSurface.h#L135) | 读回未确认RenderControl成功开始本次帧 |
-| D-020 | 验证设施 / P2 | [tests/unit/DisplayOutputTest.cpp:264](tests/unit/DisplayOutputTest.cpp#L264) | Wayland输出测试在异步探测前冻结为SDR |
-| D-021 | 验证设施 / P2 | [tests/unit/MotionTest.cpp:32](tests/unit/MotionTest.cpp#L32) | 合法但空/缺结构的冻结运动fixture使数学测试零次比较通过 |
-| D-022 | 工具 / P2 | [tools/migration/MetadataNetworkProbe.cpp:70](tools/migration/MetadataNetworkProbe.cpp#L70) | 联网探针把无效时长和盘号静默转换为合法默认值 |
-| D-023 | 工具 / P2 | [tools/assets/PrepareAssets.cpp:196](tools/assets/PrepareAssets.cpp#L196) | 资源生成工具在完整几何校验之前覆盖原资源 |
-| D-024 | 工具 / P2 | [tools/migration/RulerSourceProbe.cpp:560](tools/migration/RulerSourceProbe.cpp#L560) | 空滑尺状态集可在未执行来源数学比较时报告验证通过 |
-
-## 详细发现
-
-#### [D-017] [P2] 图集、alpha及部分验证输出保存失败未传播
-
-- **File**: [tests/render/RhiPostprocessChecks.cpp:516](tests/render/RhiPostprocessChecks.cpp#L516)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: 触发：这些正常输出PNG不可写、同名目录冲突或编码失败，JSON报告仍可写。 影响：关键实际输出缺失但验证成功，影响后续自身画质核对。
-- **Trace**: RhiPostprocessChecks393/516/517与RhiShellChecks293忽略save，之后提交passed=true；主审另核对NavigationReview240和RhiFlickerChecks104同类正常输出遗漏（失败诊断图片不算此项）。
-- **Mitigation**: 采用相邻require(image.save())路径并报告具体输出失败；只对必要正常输出强制，不用失败诊断图覆盖原失败。
-
-
-#### [D-018] [P2] 原生threaded验证从GUI线程获取并读取QRhi资源
-
-- **File**: [tests/render/StartupChecks.cpp:1222](tests/render/StartupChecks.cpp#L1222)
-- **Category**: A3. Thread Safety
-- **Confidence**: 99/100
-- **Finding**: 触发：Windows/Linux native threaded、macOS Metal显式native threaded；不含默认mac RenderControl GUI或basic。 影响：违反Qt getResource及QRhi所属线程契约，诊断访问缺同步，不能保证跨后端可靠；未声称已实测崩溃。
-- **Trace**: reviewStartup/reviewGui由GUI main同步进入；1222/1708→OffscreenSurface.rhi native分支getResource(RhiResource)→driverInfo103，窗口仍活跃；startup-qml显式threaded。
-- **Mitigation**: 在render回调复制QRhiDriverInfo普通值，经有界邮箱/queued通知交GUI；报告只读交接值。
-- **Source**: [Qt 官方依据](https://doc.qt.io/qt-6/qsgrendererinterface.html#getResource)
-
-
-#### [D-019] [P2] 读回未确认RenderControl成功开始本次帧
-
-- **File**: [tests/support/OffscreenSurface.h:135](tests/support/OffscreenSurface.h#L135)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 90/100
-- **Finding**: 触发：初始化后设备丢失或offscreen beginFrame失败。 影响：可能空指针或向无效/旧命令缓冲提交读回，不能正常返回失败图像。
-- **Trace**: grab beginFrame后直接拿batch并commandBuffer()->resourceUpdate；Qt beginFrame可FrameOpError/DeviceLost，endFrame不清旧cb且失败时不建立录制帧。
-- **Mitigation**: 申请batch前确认当前录制帧及cb有效，失败返回空图像/日志；render成功帧通知也须以真实完成为准。
-- **Source**: [Qt 官方依据](https://raw.githubusercontent.com/qt/qtdeclarative/dev/src/quick/items/qquickrendercontrol.cpp)
-
-
-#### [D-020] [P2] Wayland输出测试在异步探测前冻结为SDR
-
-- **File**: [tests/unit/DisplayOutputTest.cpp:264](tests/unit/DisplayOutputTest.cpp#L264)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 99/100
-- **Finding**: 触发：Linux Wayland真实颜色管理/HDR的display-output-visible。 影响：systemHdr错误为false，跳过真实HDR转换分支或误判不支持请求；不能证明目标实际HDR事实。
-- **Trace**: nativeOutput只query一次const system→ControlledMonitor；WaylandDisplayMonitor首次query36–60注册registry后初始空状态；后续notify未接到platform.changed，也不再query创建colorOutput。生产DisplayOutput58–60则正确接回调。
-- **Mitigation**: 保留异步通知和再次查询链，等待真实描述完成后确定系统状态；区分待探测和确认SDR。
-
-
-#### [D-021] [P2] 合法但空/缺结构的冻结运动fixture使数学测试零次比较通过
-
-- **File**: [tests/unit/MotionTest.cpp:32](tests/unit/MotionTest.cpp#L32)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 94/100
-- **Finding**: 触发：kernel-golden.json被错误导出为[]/{}或缺cases/functions/samples；本轮未改已提交fixture。 影响：核心独立源数值比较可完全不执行但QtTest仍通过；不声称当前正常fixture已损坏。
-- **Trace**: readJson23–32只查语法并object；frozenNonzeroAndVariableFrames83/109遍历cases/samples；frozenFunctions149遍历functions，无非空/执行数量断言。
-- **Mitigation**: 比较前校验顶层对象、必需非空集合及字段；比较后确认消费了预期样本类别，坏fixture明确失败。
-
-
-#### [D-022] [P2] 联网探针把无效时长和盘号静默转换为合法默认值
-
-- **File**: [tools/migration/MetadataNetworkProbe.cpp:70](tools/migration/MetadataNetworkProbe.cpp#L70)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 96/100
-- **Finding**: 触发：--tracks 输入包含 duration:"200" 或 disc:1.5 等无效字段，且标题/number 有效。 影响：duration 变为0而关闭 MusicBrainz 时长一致性筛选，disc 变为1；可能针对与输入不同的条件报告联网匹配成功。
-- **Trace**: MetadataNetworkProbe:64–76 在原始类型/整数性验证前 toDouble()/toInt(1)；114–116 请求Provider，经MetadataWorker到MusicBrainzSource:294–299，仅正时长才作时长匹配，无后续原始JSON验证。
-- **Mitigation**: 先验证提供字段的数值类型、整数性及可表示范围，区分允许省略与提供但无效；无效输入按既有约定退出7。
-- **Evidence**: 静态调用链确认；未执行外网请求。
-- **Source**: [Qt 官方依据](https://doc.qt.io/qt-6/qjsonvalue.html#toInt)
-
-
-#### [D-023] [P2] 资源生成工具在完整几何校验之前覆盖原资源
-
-- **File**: [tools/assets/PrepareAssets.cpp:196](tools/assets/PrepareAssets.cpp#L196)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 93/100
-- **Finding**: 触发：balsam 输出可解析、但顶点/拓扑/绕序不同的mesh，或后续批次/QML/字体验证失败。 影响：失败退出时已提交部分资源，旧assets manifest仍留存；单文件原子写不能保证整批资源一致。
-- **Trace**: run-asset-tool.sh:47 / prepare-assets.ps1:18 直接传实际仓库；PrepareAssets:164–166 add()立即saveFile；GeometryAudit:137 commit；196 mesh和201 QML先发布，204才compareGeometry；424–426仅失败退出，manifest至411–419才更新。
-- **Mitigation**: 先在临时目录完成整批解析、几何及资源校验，再发布；提交中途失败需要恢复路径，使资源与manifest保持一致。
-- **Evidence**: 静态失败路径确认；没有运行会改写项目资源的工具。
-
-
-#### [D-024] [P2] 空滑尺状态集可在未执行来源数学比较时报告验证通过
-
-- **File**: [tools/migration/RulerSourceProbe.cpp:560](tools/migration/RulerSourceProbe.cpp#L560)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 95/100
-- **Finding**: 触发：输入为 captures:[{dpr:实际DPR,states:[]}]、ordinalSamples:[{}]，且内置渲染/生命周期检查正常。 影响：全部滑尺来源状态比较被跳过，缺字段ordinal样本转换为零误差，仍允许返回0及passed:true。现有冻结输入未被修改，也未声称当前有效fixture为空。
-- **Trace**: SourceUiProbe:39–40直接调用；RulerSourceProbe:560–563仅验captures非空、598–605仅验DPR；623–632缺失ordinal字段转0；491–506创建controller后跳过空states；538–543进入内置检查；438–471成功出口没有实际源比较数要求。
-- **Mitigation**: 在创建渲染对象前验证必要结构、字段类型与范围，拒绝空states和缺字段ordinal样本；记录并断言实际数学比较数量，加入负向回归。
-- **Evidence**: 静态成功/跳过路径确认；未启动可见窗口或运行该渲染探针。
-
-
 
 ## 待核实事项
 
@@ -204,7 +102,7 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 
 **Scope**: files: native cpp 全量；冻结 Web 仅作来源参照。
 **Files reviewed**: 358
-**Issues found**: 865 (856 from lint, 9 from deep analysis)
+**Issues found**: 857 (856 from lint, 1 from deep analysis)
 **Agents**: 26 (按行数分片；跨片检查 best effort，具体发现均另追踪调用链)
 **Framework mode**: off
 
@@ -252,92 +150,6 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 ---
 
 ### Deep analysis findings
-
-#### [D-012] [P2] 图集、alpha及部分验证输出保存失败未传播
-
-- **File**: [tests/render/RhiPostprocessChecks.cpp:516](tests/render/RhiPostprocessChecks.cpp#L516)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: 触发：这些正常输出PNG不可写、同名目录冲突或编码失败，JSON报告仍可写。 影响：关键实际输出缺失但验证成功，影响后续自身画质核对。
-- **Trace**: RhiPostprocessChecks393/516/517与RhiShellChecks293忽略save，之后提交passed=true；主审另核对NavigationReview240和RhiFlickerChecks104同类正常输出遗漏（失败诊断图片不算此项）。
-- **Mitigation**: 采用相邻require(image.save())路径并报告具体输出失败；只对必要正常输出强制，不用失败诊断图覆盖原失败。
-
-
-#### [D-013] [P2] 原生threaded验证从GUI线程获取并读取QRhi资源
-
-- **File**: [tests/render/StartupChecks.cpp:1222](tests/render/StartupChecks.cpp#L1222)
-- **Category**: A3. Thread Safety
-- **Confidence**: 99/100
-- **Finding**: 触发：Windows/Linux native threaded、macOS Metal显式native threaded；不含默认mac RenderControl GUI或basic。 影响：违反Qt getResource及QRhi所属线程契约，诊断访问缺同步，不能保证跨后端可靠；未声称已实测崩溃。
-- **Trace**: reviewStartup/reviewGui由GUI main同步进入；1222/1708→OffscreenSurface.rhi native分支getResource(RhiResource)→driverInfo103，窗口仍活跃；startup-qml显式threaded。
-- **Mitigation**: 在render回调复制QRhiDriverInfo普通值，经有界邮箱/queued通知交GUI；报告只读交接值。
-- **Source**: [Qt 官方依据](https://doc.qt.io/qt-6/qsgrendererinterface.html#getResource)
-
-
-#### [D-014] [P2] 读回未确认RenderControl成功开始本次帧
-
-- **File**: [tests/support/OffscreenSurface.h:135](tests/support/OffscreenSurface.h#L135)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 90/100
-- **Finding**: 触发：初始化后设备丢失或offscreen beginFrame失败。 影响：可能空指针或向无效/旧命令缓冲提交读回，不能正常返回失败图像。
-- **Trace**: grab beginFrame后直接拿batch并commandBuffer()->resourceUpdate；Qt beginFrame可FrameOpError/DeviceLost，endFrame不清旧cb且失败时不建立录制帧。
-- **Mitigation**: 申请batch前确认当前录制帧及cb有效，失败返回空图像/日志；render成功帧通知也须以真实完成为准。
-- **Source**: [Qt 官方依据](https://raw.githubusercontent.com/qt/qtdeclarative/dev/src/quick/items/qquickrendercontrol.cpp)
-
-
-#### [D-015] [P2] Wayland输出测试在异步探测前冻结为SDR
-
-- **File**: [tests/unit/DisplayOutputTest.cpp:264](tests/unit/DisplayOutputTest.cpp#L264)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 99/100
-- **Finding**: 触发：Linux Wayland真实颜色管理/HDR的display-output-visible。 影响：systemHdr错误为false，跳过真实HDR转换分支或误判不支持请求；不能证明目标实际HDR事实。
-- **Trace**: nativeOutput只query一次const system→ControlledMonitor；WaylandDisplayMonitor首次query36–60注册registry后初始空状态；后续notify未接到platform.changed，也不再query创建colorOutput。生产DisplayOutput58–60则正确接回调。
-- **Mitigation**: 保留异步通知和再次查询链，等待真实描述完成后确定系统状态；区分待探测和确认SDR。
-
-
-#### [D-016] [P2] 合法但空/缺结构的冻结运动fixture使数学测试零次比较通过
-
-- **File**: [tests/unit/MotionTest.cpp:32](tests/unit/MotionTest.cpp#L32)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 94/100
-- **Finding**: 触发：kernel-golden.json被错误导出为[]/{}或缺cases/functions/samples；本轮未改已提交fixture。 影响：核心独立源数值比较可完全不执行但QtTest仍通过；不声称当前正常fixture已损坏。
-- **Trace**: readJson23–32只查语法并object；frozenNonzeroAndVariableFrames83/109遍历cases/samples；frozenFunctions149遍历functions，无非空/执行数量断言。
-- **Mitigation**: 比较前校验顶层对象、必需非空集合及字段；比较后确认消费了预期样本类别，坏fixture明确失败。
-
-
-#### [D-017] [P2] 联网探针把无效时长和盘号静默转换为合法默认值
-
-- **File**: [tools/migration/MetadataNetworkProbe.cpp:70](tools/migration/MetadataNetworkProbe.cpp#L70)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 96/100
-- **Finding**: 触发：--tracks 输入包含 duration:"200" 或 disc:1.5 等无效字段，且标题/number 有效。 影响：duration 变为0而关闭 MusicBrainz 时长一致性筛选，disc 变为1；可能针对与输入不同的条件报告联网匹配成功。
-- **Trace**: MetadataNetworkProbe:64–76 在原始类型/整数性验证前 toDouble()/toInt(1)；114–116 请求Provider，经MetadataWorker到MusicBrainzSource:294–299，仅正时长才作时长匹配，无后续原始JSON验证。
-- **Mitigation**: 先验证提供字段的数值类型、整数性及可表示范围，区分允许省略与提供但无效；无效输入按既有约定退出7。
-- **Evidence**: 静态调用链确认；未执行外网请求。
-- **Source**: [Qt 官方依据](https://doc.qt.io/qt-6/qjsonvalue.html#toInt)
-
-
-#### [D-018] [P2] 资源生成工具在完整几何校验之前覆盖原资源
-
-- **File**: [tools/assets/PrepareAssets.cpp:196](tools/assets/PrepareAssets.cpp#L196)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 93/100
-- **Finding**: 触发：balsam 输出可解析、但顶点/拓扑/绕序不同的mesh，或后续批次/QML/字体验证失败。 影响：失败退出时已提交部分资源，旧assets manifest仍留存；单文件原子写不能保证整批资源一致。
-- **Trace**: run-asset-tool.sh:47 / prepare-assets.ps1:18 直接传实际仓库；PrepareAssets:164–166 add()立即saveFile；GeometryAudit:137 commit；196 mesh和201 QML先发布，204才compareGeometry；424–426仅失败退出，manifest至411–419才更新。
-- **Mitigation**: 先在临时目录完成整批解析、几何及资源校验，再发布；提交中途失败需要恢复路径，使资源与manifest保持一致。
-- **Evidence**: 静态失败路径确认；没有运行会改写项目资源的工具。
-
-
-#### [D-019] [P2] 空滑尺状态集可在未执行来源数学比较时报告验证通过
-
-- **File**: [tools/migration/RulerSourceProbe.cpp:560](tools/migration/RulerSourceProbe.cpp#L560)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 95/100
-- **Finding**: 触发：输入为 captures:[{dpr:实际DPR,states:[]}]、ordinalSamples:[{}]，且内置渲染/生命周期检查正常。 影响：全部滑尺来源状态比较被跳过，缺字段ordinal样本转换为零误差，仍允许返回0及passed:true。现有冻结输入未被修改，也未声称当前有效fixture为空。
-- **Trace**: SourceUiProbe:39–40直接调用；RulerSourceProbe:560–563仅验captures非空、598–605仅验DPR；623–632缺失ordinal字段转0；491–506创建controller后跳过空states；538–543进入内置检查；438–471成功出口没有实际源比较数要求。
-- **Mitigation**: 在创建渲染对象前验证必要结构、字段类型与范围，拒绝空states和缺字段ordinal样本；记录并断言实际数学比较数量，加入负向回归。
-- **Evidence**: 静态成功/跳过路径确认；未启动可见窗口或运行该渲染探针。
-
 
 #### [D-020] [P3] Phase枚举末项缺尾逗号
 

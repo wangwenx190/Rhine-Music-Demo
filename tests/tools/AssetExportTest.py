@@ -51,9 +51,28 @@ class AssetExportTest(unittest.TestCase):
             for name, content in expected.items():
                 self.assertEqual((root / "resources" / name).read_bytes(), content)
             mapping.write_bytes(mapped_bytes)
+            # Fail near the end of the real pipeline, after mesh and font validation.
+            # An earlier asset has a deliberate local value so an eager overwrite is visible.
+            model = root / "resources/models/music-case-v040.glb"
+            original_model = model.read_bytes()
+            model.write_bytes(b"retain original asset until the entire batch is valid")
+            notice = root / "resources/audio/README.md"
+            notice.unlink()
+            before_failure = {str(path.relative_to(root)): path.read_bytes()
+                              for path in (root / "resources").rglob("*") if path.is_file()}
+            failed = subprocess.run([str(tool), str(root), str(kit)], env=environment,
+                                    capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(failed.returncode, 0, failed.stdout + failed.stderr)
+            self.assertEqual({str(path.relative_to(root)): path.read_bytes()
+                              for path in (root / "resources").rglob("*") if path.is_file()},
+                             before_failure)
+            self.assertEqual(list(root.glob(".asset-transaction-*")), [])
+            model.write_bytes(original_model)
+            notice.write_bytes(expected["audio/README.md"])
             result = subprocess.run([str(tool), str(root), str(kit)], env=environment,
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn(".asset-transaction-", (root / "resources/manifests/geometry.json").read_text())
             entries = {entry["path"]: entry for entry in json.loads(
                 (root / "resources/manifests/assets.json").read_text())["entries"]}
             for name, content in expected.items():

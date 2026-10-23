@@ -1,3 +1,4 @@
+#include "ProbeInput.h"
 #include "OnlineMetadataProvider.h"
 #include <QCommandLineParser>
 #include <QCoreApplication>
@@ -16,7 +17,6 @@ constexpr int RenderDeadlineMilliseconds = 120000;
 // Explicit public query inputs are bounded before JSON parsing and provider dispatch.
 constexpr auto MaximumReleaseYear = 9999;
 constexpr auto BytesPerKiB = 1024;
-constexpr auto MaximumQueryTracks = 2000;
 constexpr auto DescriptionPreviewCharacters = 300;
 }
 
@@ -58,9 +58,13 @@ int main(int argc, char **argv)
         QJsonParseError error;
         const auto document =
                 QJsonDocument::fromJson(file.read(BytesPerKiB * BytesPerKiB + 1), &error);
-        if (error.error != QJsonParseError::NoError || !document.isArray()
-            || document.array().size() > MaximumQueryTracks)
+        if (error.error != QJsonParseError::NoError)
             return 7;
+        try {
+            yalahoo::probe::validateTracks(document);
+        } catch (const std::runtime_error &) {
+            return 7;
+        }
         for (const auto &value : document.array()) {
             const auto object = value.toObject();
             yalahoo::Track track;

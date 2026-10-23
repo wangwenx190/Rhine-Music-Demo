@@ -1,7 +1,7 @@
 # Classify actual test entry points. GPU/window checks remain serial and opt-in.
 # OffscreenSurface currently uses RenderControl on macOS; other native ports show a window.
 set(yalahoo_render_integration_tests startup-qml controls-qml experiments-qml settings-qml playback-qml library-panels-qml opening-qml presentation-qml overview-qml
-    archive-pool-gpu real-columns-gpu runtime-materials runtime-lighting rhi-opaque-gpu rhi-shell-gpu rhi-flicker-gpu rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu rhi-shadow-attachments-gpu rhi-postprocess-gpu rhi-transient-attachments-gpu rhi-scale-gpu)
+    rhi-required-output archive-pool-gpu real-columns-gpu runtime-materials runtime-lighting rhi-opaque-gpu rhi-shell-gpu rhi-flicker-gpu rhi-ao-gpu rhi-fog-gpu rhi-shadow-gpu rhi-shadow-attachments-gpu rhi-postprocess-gpu rhi-transient-attachments-gpu rhi-scale-gpu)
 set(yalahoo_native_media_tests playback-device audio-ambience-device startup-qml
     playback-qml settings-qml)
 foreach(directory IN ITEMS "${PROJECT_SOURCE_DIR}" tests/unit tests/integration tests/render)

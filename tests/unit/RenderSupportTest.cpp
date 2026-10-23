@@ -1,8 +1,12 @@
 #include "CaptureMailbox.h"
+#include "DriverInfoMailbox.h"
+#include "RenderControlFrame.h"
+#include <thread>
 #include "OpeningLayoutCases.h"
 #include "RequiredOutput.h"
 #include "TransferChecks.h"
 #include <QTemporaryDir>
+#include <QFile>
 #include <QDir>
 #include "FrameUniforms.h"
 #include "RenderTarget.h"
@@ -29,6 +33,88 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void driverSnapshotCrossesThreadsAsAnOwnedValue()
+    {
+        auto mailbox = std::make_shared<DriverInfoMailbox>();
+        QVERIFY(!mailbox->value());
+        std::thread render([mailbox] {
+            QRhiDriverInfo info;
+            info.deviceName = "render device"_ba;
+            info.deviceId = 17;
+            mailbox->publish(info);
+            info.deviceName = "overwritten local value"_ba;
+        });
+        render.join();
+        const auto snapshot = mailbox->value();
+        QVERIFY(snapshot);
+        QCOMPARE(snapshot->deviceName, "render device"_ba);
+        QCOMPARE(snapshot->deviceId, quint64(17));
+    }
+    void failedRenderControlBeginRejectsEvenAStaleCommandBuffer()
+    {
+        struct Control final
+        {
+            struct Api final
+            {
+                bool recording = false, lost = false;
+                bool isRecordingFrame() const
+                {
+                    return recording;
+                }
+                bool isDeviceLost() const
+                {
+                    return lost;
+                }
+            } api;
+            bool beginSucceeds = false, hasCommands = true, loseOnEnd = false;
+            int begins = 0, ends = 0, staleCommands = 0;
+            Api *rhi()
+            {
+                return &api;
+            }
+            int *commandBuffer()
+            {
+                return hasCommands ? &staleCommands : nullptr;
+            }
+            void beginFrame()
+            {
+                ++begins;
+                api.recording = beginSucceeds;
+            }
+            void endFrame()
+            {
+                ++ends;
+                api.recording = false;
+                api.lost = loseOnEnd;
+            }
+        } control;
+        int submissions = 0;
+        const auto submit = [&](auto *) {
+            ++submissions;
+        };
+        QVERIFY(!test::renderControlFrame(control, submit));
+        QCOMPARE(submissions, 0);
+        QCOMPARE(control.ends, 0);
+        control.beginSucceeds = true;
+        control.hasCommands = false;
+        QVERIFY(!test::renderControlFrame(control, submit));
+        QCOMPARE(control.ends, 1);
+        QCOMPARE(submissions, 0);
+        control.hasCommands = true;
+        QVERIFY(test::renderControlFrame(control, submit));
+        QCOMPARE(control.ends, 2);
+        QCOMPARE(submissions, 1);
+        control.loseOnEnd = true;
+        QVERIFY(!test::renderControlFrame(control, submit));
+        QCOMPARE(control.ends, 3);
+        const int begins = control.begins;
+        QVERIFY(!test::renderControlFrame(control, submit));
+        QCOMPARE(control.begins, begins);
+        control.api.lost = false;
+        control.api.recording = true;
+        QVERIFY(!test::renderControlFrame(control, submit));
+        QCOMPARE(control.begins, begins);
+    }
     void openingMatrixUsesActualNativeDpr_data()
     {
         QTest::addColumn<double>("dpr");
@@ -75,6 +161,12 @@ private Q_SLOTS:
             QVERIFY(QString::fromUtf8(error.what()).contains(output));
         }
         QVERIFY(QDir().rmdir(output));
+        const auto unsupported = directory.filePath(u"shape.unsupported-image-codec"_s);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, saveRequiredImage(image, unsupported));
+        QVERIFY(!QFile::exists(unsupported));
+        QVERIFY_THROWS_EXCEPTION(
+                std::runtime_error,
+                saveRequiredImage(image, directory.filePath(u"missing/shape.png"_s)));
         saveRequiredImage(image, output);
         const QImage stored(output);
         QCOMPARE(stored.size(), image.size());

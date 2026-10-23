@@ -14,12 +14,83 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <QSet>
+#include <stdexcept>
 
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
 namespace {
 constexpr std::array<QLatin1StringView, 4> keys{ "rail"_L1, "column"_L1, "shoulder"_L1, "lane"_L1 };
+void validateOracle(const QJsonDocument &document)
+{
+    const auto require = [](bool valid) {
+        if (!valid)
+            throw std::runtime_error("Incomplete motion oracle");
+    };
+    const auto numeric = [&](const QJsonObject &object, QLatin1StringView key) {
+        const auto value = object.value(key);
+        require(value.isDouble() && std::isfinite(value.toDouble()));
+    };
+    const auto state = [&](const QJsonObject &object, bool acceleration) {
+        numeric(object, "value"_L1);
+        numeric(object, "velocity"_L1);
+        if (acceleration)
+            numeric(object, "acceleration"_L1);
+    };
+    const auto archive = [&](const QJsonObject &object) {
+        for (const auto key : keys)
+            state(object.value(key).toObject(), true);
+    };
+    require(document.isObject());
+    const auto oracle = document.object();
+    const auto cases = oracle.value(u"cases"_s).toArray();
+    const auto functions = oracle.value(u"functions"_s).toArray();
+    require(!cases.isEmpty() && !functions.isEmpty());
+    QSet<int> rates;
+    for (const auto &value : cases) {
+        require(value.isObject());
+        const auto test = value.toObject();
+        numeric(test, "fps"_L1);
+        const double fps = test[u"fps"_s].toDouble();
+        require(fps == 20 || fps == 30 || fps == 60 || fps == 120);
+        require(!rates.contains(int(fps)));
+        rates.insert(int(fps));
+        archive(test[u"initial"_s].toObject());
+        const auto samples = test[u"samples"_s].toArray();
+        require(!samples.isEmpty());
+        QSet<QString> events;
+        for (const auto &sampleValue : samples) {
+            require(sampleValue.isObject());
+            const auto sample = sampleValue.toObject();
+            for (const auto key : { "time"_L1, "rawDt"_L1, "speed"_L1, "dt"_L1 })
+                numeric(sample, key);
+            require(sample[u"reduced"_s].isBool() && sample[u"events"_s].isArray());
+            for (const auto &event : sample[u"events"_s].toArray()) {
+                require(event.isString());
+                events.insert(event.toString());
+            }
+            archive(sample[u"quintic"_s].toObject());
+            state(sample[u"spring"_s].toObject(), false);
+            state(sample[u"scalar"_s].toObject(), true);
+            require(sample[u"scalar"_s].toObject()[u"guided"_s].isBool());
+        }
+        require(events
+                == QSet<QString>{ u"guide"_s, u"reverse"_s, u"rebase"_s, u"fast"_s,
+                                  u"guide-again"_s, u"slow"_s, u"reduced"_s });
+    }
+    require(rates.size() == 4);
+    for (const auto &value : functions) {
+        require(value.isObject());
+        const auto function = value.toObject();
+        for (const auto key :
+             { "time"_L1, "smooth"_L1, "archiveWave"_L1, "extraction"_L1, "settlingWave"_L1,
+               "baselineSelectionWave"_L1, "musicSelectionWave"_L1, "selectionWave"_L1,
+               "rippleEnvelope"_L1, "columnStrength"_L1, "idleWave"_L1, "cinematicField"_L1,
+               "returnStep"_L1, "returnStepReduced"_L1 })
+            numeric(function, key);
+    }
+}
 QJsonObject readJson(const QString &path)
 {
     QFile file(path);
@@ -29,6 +100,7 @@ QJsonObject readJson(const QString &path)
     const auto result = QJsonDocument::fromJson(file.readAll(), &error);
     if (error.error != QJsonParseError::NoError)
         qFatal("Malformed oracle");
+    validateOracle(result);
     return result.object();
 }
 }
@@ -61,6 +133,39 @@ private:
             compareState(state[i], expected.value(keys[i]).toObject());
     }
 private Q_SLOTS:
+    void malformedOraclesAreRejected()
+    {
+        QFile file(QString::fromUtf8(FIXTURE_ROOT)
+                   + u"/tests/fixtures/motion/kernel-golden.json"_s);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto valid = QJsonDocument::fromJson(file.readAll());
+        validateOracle(valid);
+        for (const auto &bytes : { "[]"_ba, "{}"_ba, "{\"cases\":[{}],\"functions\":[{}]}"_ba })
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                     validateOracle(QJsonDocument::fromJson(bytes)));
+        for (const auto key : { "cases"_L1, "functions"_L1 }) {
+            auto damaged = valid.object();
+            damaged.remove(key);
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, validateOracle(QJsonDocument(damaged)));
+            damaged = valid.object();
+            damaged[key] = QJsonArray();
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, validateOracle(QJsonDocument(damaged)));
+        }
+        auto damaged = valid.object();
+        auto cases = damaged[u"cases"_s].toArray();
+        auto test = cases[0].toObject();
+        test[u"samples"_s] = QJsonArray();
+        cases[0] = test;
+        damaged[u"cases"_s] = cases;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, validateOracle(QJsonDocument(damaged)));
+        auto missingField = valid.object();
+        auto functions = missingField[u"functions"_s].toArray();
+        auto function = functions[0].toObject();
+        function.remove(u"smooth"_s);
+        functions[0] = function;
+        missingField[u"functions"_s] = functions;
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, validateOracle(QJsonDocument(missingField)));
+    }
     void preparedSelectionWaveKeepsSourceEnvelope()
     {
         for (const double age : { -.01, 0., .01, .23, .46, 1.7, 3.2, 3.21 }) {
@@ -82,7 +187,9 @@ private Q_SLOTS:
     {
         const auto oracle = readJson(
                 (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/motion/kernel-golden.json"_s));
+        qsizetype comparedCases = 0, comparedSamples = 0;
         for (const auto caseValue : oracle.value(u"cases"_s).toArray()) {
+            ++comparedCases;
             const auto testCase = caseValue.toObject();
             ArchiveSprings springs{ };
             const ArchiveValues initialValues{ 2, -1, 4, .5 }, initialVelocity{ .2, -.3, .4, -.5 };
@@ -107,6 +214,7 @@ private Q_SLOTS:
                 deliveredDt = motionDt;
             });
             for (const auto sampleValue : testCase.value(u"samples"_s).toArray()) {
+                ++comparedSamples;
                 const auto sample = sampleValue.toObject();
                 for (const auto eventValue : sample.value(u"events"_s).toArray()) {
                     const auto event = eventValue.toString();
@@ -143,12 +251,16 @@ private Q_SLOTS:
                          sample.value(u"scalar"_s).toObject().value(u"guided"_s).toBool());
             }
         }
+        QCOMPARE(comparedCases, 4);
+        QVERIFY(comparedSamples > 0);
     }
     void frozenFunctions()
     {
         const auto oracle = readJson(
                 (QString::fromUtf8(FIXTURE_ROOT) + u"/tests/fixtures/motion/kernel-golden.json"_s));
+        qsizetype compared = 0;
         for (const auto value : oracle.value(u"functions"_s).toArray()) {
+            ++compared;
             const auto s = value.toObject();
             const double t = s.value(u"time"_s).toDouble();
             near(smooth(t), s.value(u"smooth"_s).toDouble());
@@ -166,6 +278,8 @@ private Q_SLOTS:
             near(returnStep(.3, std::max(0.0, t), true),
                  s.value(u"returnStepReduced"_s).toDouble());
         }
+        QCOMPARE(compared, oracle.value(u"functions"_s).toArray().size());
+        QVERIFY(compared > 0);
     }
     void exactSpringAndJoins()
     {

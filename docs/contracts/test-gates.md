@@ -44,9 +44,9 @@
 | `motion`、`scene`、`navigation`、`lighting`、`archive-pool`、`real-columns`、`presentation`、`detail-motion`、`overview`、`opening`、`track-focus`、`startup` | 独立冻结公式、边界/中断/身份/输入归属/通知及唯一帧源；对应组件契约，覆盖R36共用算法 |
 | `directory-scanner`、`library-data`、`library-qml`、`online-metadata`、`media-metadata`、`json-file` | 文件系统/事务保存、模型协议、来源与取消/晚到、解码/导入失败；library-data.md。网络单元测试仅用可控响应 |
 | `playback`/`playback-device`、`audio-ambience`/`audio-ambience-device`、`single-instance`、`settings`、`experiments`、`logging`、`logging-terminal`、`graphics-backend` | 可控媒体状态与独立真实设备三路验证、跨进程仲裁、持久化/模式/错误、真实终端输出及后端选择；playback/settings/logging/render-backend及相关组件契约 |
-| `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`rhi-material-parameters`、`render-quality`、`render-support` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命；assets/branding/covers/title-reels及RHI契约 |
+| `assets`、`branding`、`title-reels`、`cover-cache`、`rhi-atlas-queue`、`rhi-material-parameters`、`render-quality`、`render-support`、`verification-input`、`display-output-probe` | 许可/字节/几何/字体、独立品牌几何、字形与缓存、上传准入、实际材质参数、尺寸/回调寿命、探针输入结构/数值、资产批次回滚与异步显示探测完成状态；assets/branding/covers/title-reels及RHI契约 |
 | `verification-window-policy`、显式可见窗口/输出检查、`macos-application-menu` | 不干扰窗口约束、实际native呈现与HDR/系统菜单；test-window-policy/display-output及R36实物事实，隐藏与可见事实分别保留 |
-| RHI与封面/阵列GPU组件、`display-transfer-gpu` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
+| RHI与封面/阵列GPU组件、`display-transfer-gpu`、`rhi-required-output` | 执行真实生产shader/pass，核对独立解析结果、附件/上传/提交/释放；对应RHI/display-output契约及R36目标后端差异 |
 | QML组件回放、生产详情/总览/导航、GUI与同窗口生命周期 | 真实控件/面板/音乐舞台的交互、布局、模态、播放隔离与恢复；组件契约及R36产品接线。诊断采样入口仅按performance.md选用 |
 | `runtime-materials`、`runtime-lighting` | 隔离Quick3D三表面/纸面与光场适配，R36明确保留的源参数/投影及有效输出边界；materials/lighting.md |
 | `dry-tools`（含详情/总览报告的严格字段、状态集合及输出存在性）、`startup-verification`、`structure-comparison`、`test-policy`、`native-tool` | 包装器真实错误传播/失败清单、有限测量/数值错误、独立采集文件、来源结构误判、三平台CTest选集/环境隔离及工具独立编译；本契约及verification-artifacts.md |

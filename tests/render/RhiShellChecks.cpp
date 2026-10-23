@@ -1,3 +1,4 @@
+#include "RequiredOutput.h"
 #include "Require.h"
 #include "ReviewApplication.h"
 #include "RhiCaptureHarness.h"
@@ -290,7 +291,7 @@ auto runShellChecks(int &argc, char **&argv)
                 }
             std::fprintf(stderr, "Alpha samples=%d partial=%d fringe=%d centerError=%g\n", samples,
                          partial, fringe, centerError);
-            gpu.color.save(output + u"/alpha-%1.png"_s.arg(samples));
+            yalahoo::review::saveRequiredImage(gpu.color, output + u"/alpha-%1.png"_s.arg(samples));
             require(fringe == 0 && (samples == 1 || partial > 100),
                     "Paper resolve lost partial coverage or introduced dark alpha fringe");
             alpha.append(QJsonObject{ { u"samples"_s, samples },

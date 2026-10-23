@@ -27,6 +27,11 @@ public:
     DisplayMonitor() = default;
     using QObject::QObject;
     virtual DisplayState query(QWindow &window) = 0;
+    // A fresh SDR snapshot can be provisional during asynchronous native discovery.
+    virtual bool pending() const
+    {
+        return false;
+    }
     std::function<void()> changed;
 };
 std::unique_ptr<DisplayMonitor> makeDisplayMonitor();

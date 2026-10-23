@@ -1,3 +1,4 @@
+#include "RequiredOutput.h"
 #include "Require.h"
 #include "ReviewApplication.h"
 #include "RhiCaptureHarness.h"
@@ -391,7 +392,8 @@ auto runPostprocessChecks(int &argc, char **&argv)
         const auto initial = driver.capture(atlas, { 960, 720 }, true);
         for (const auto &entry : initial.metadata[u"effectiveCoverRegions"_s].toArray())
             require(entry.toObject()[u"lease"_s].isNull(), "Absent atlas lease fabricated a value");
-        initial.composite.save(output + "/atlas-432-composite.png"_L1);
+        yalahoo::review::saveRequiredImage(initial.composite,
+                                           output + "/atlas-432-composite.png"_L1);
         require(initial.atlas == page, "Initialized atlas GPU bytes differ");
         auto native = initial.metadata[u"nativeAtlasTransfers"_s].toObject();
         const bool nativeProof = native[u"available"_s].toBool();
@@ -509,8 +511,9 @@ auto runPostprocessChecks(int &argc, char **&argv)
         const auto drained = driver.capture(atlas, { 960, 720 }, true);
         require(drained.metadata[u"atlasPending"_s].toInt() == 0,
                 "Deferred atlas queue did not drain");
-        initial.postprocessed.save(output + "/atlas-432-initial.png"_L1);
-        tile.postprocessed.save(output + "/atlas-432-tile.png"_L1);
+        yalahoo::review::saveRequiredImage(initial.postprocessed,
+                                           output + "/atlas-432-initial.png"_L1);
+        yalahoo::review::saveRequiredImage(tile.postprocessed, output + "/atlas-432-tile.png"_L1);
         QJsonObject atlasReport{
             { u"instances"_s, 432 },           { u"initial"_s, initial.metadata },
             { u"stable"_s, stable.metadata },  { u"tile"_s, tile.metadata },

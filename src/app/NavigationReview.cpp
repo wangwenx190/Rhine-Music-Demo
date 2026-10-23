@@ -237,7 +237,9 @@ void advanceNavigationCheckSwipe(auto &context)
     check(u"touch-common-boundary"_s, state.selection->cell().row == 13);
     checkSubmission(u"touch-corresponding-submission"_s);
     check(u"portrait-narrow"_s, state.ruler.narrow() && state.scene.layout()->portrait());
-    state.window.grabWindow().save(state.output + "/portrait-night.png"_L1);
+    const auto image = state.window.grabWindow();
+    check(u"portrait-night-output"_s,
+          !image.isNull() && image.save(state.output + "/portrait-night.png"_L1));
     state.window.hide();
     return;
 }

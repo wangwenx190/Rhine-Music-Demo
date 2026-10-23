@@ -96,11 +96,8 @@ QJsonObject distribution(QVector<double> values, double period = 1000.0 / 60)
              { u"overThreePeriods"_s, over(3 * period) },
              { u"longestOverTwoPeriods"_s, longest } };
 }
-QJsonObject driverInfo(QRhi *api)
+QJsonObject driverInfo(const QRhiDriverInfo &info)
 {
-    if (!api)
-        return { };
-    const auto info = api->driverInfo();
     return { { u"deviceName"_s, QString::fromUtf8(info.deviceName) },
              { u"deviceId"_s, qint64(info.deviceId) },
              { u"vendorId"_s, qint64(info.vendorId) },
@@ -1219,8 +1216,8 @@ int reviewStartup(QGuiApplication &, const QString &output, double seconds,
         report[u"dpr"_s] = d.window.effectiveDevicePixelRatio();
         report[u"backend"_s] = int(d.window.rendererInterface()->graphicsApi());
         report[u"adapters"_s] = rhi::adapterInventory();
-        if (auto *api = d.surface.rhi())
-            report[u"driver"_s] = driverInfo(api);
+        if (const auto info = d.surface.driverInfo())
+            report[u"driver"_s] = driverInfo(*info);
         report[u"processFixedAssets"_s] = rhi::preparedAssetStatistics();
         report[u"refreshHz"_s] = d.window.screen() ? d.window.screen()->refreshRate() : 0;
         report[u"swapIntervalRequested"_s] = d.window.requestedFormat().swapInterval();
@@ -1705,8 +1702,8 @@ int reviewGui(const QString &output, bool narrowOnly, bool representative)
         report[u"adapters"_s] = rhi::adapterInventory();
         report[u"windowPolicy"_s] = verification::windowPolicy(d.window);
         report[u"offscreen"_s] = d.surface.diagnostics();
-        if (auto *api = d.surface.rhi())
-            report[u"driver"_s] = driverInfo(api);
+        if (const auto info = d.surface.driverInfo())
+            report[u"driver"_s] = driverInfo(*info);
         report[u"peakDescriptorReplacementBytes"_s] = d.peakBytes;
         report[u"warnings"_s] = QJsonArray::fromStringList(d.warnings);
         report[u"samples"_s] = d.samples;

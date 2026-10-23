@@ -20,6 +20,8 @@ qt_add_shaders(DisplayOutputTest display_vertex PREFIX /display
     FILES "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.vert"
         "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/output.frag")
 yalahoo_platform(DisplayOutputTest)
+add_test(NAME display-output-probe COMMAND DisplayOutputTest asynchronousMonitorDoesNotFreezeProvisionalSdr)
+set_tests_properties(display-output-probe PROPERTIES TIMEOUT 10 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_test(NAME display-transfer-gpu COMMAND DisplayOutputTest transferShader)
 add_test(NAME display-output-visible COMMAND DisplayOutputTest nativeOutput)
 set_tests_properties(display-transfer-gpu display-output-visible PROPERTIES TIMEOUT 30)
@@ -230,6 +232,11 @@ yalahoo_unit_test(StartupTest startup
 yalahoo_unit_test(LoggingTest logging
     LIBRARIES YalahooCore)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(YALAHOO_REVIEW)
+    add_test(NAME rhi-required-output COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/tools/RequiredImageOutputTest.py" "$<TARGET_FILE:rhi-flicker-test>")
+    set_tests_properties(rhi-required-output PROPERTIES TIMEOUT 40)
+endif()
 add_test(NAME dry-tools COMMAND "${Python3_EXECUTABLE}"
     "${PROJECT_SOURCE_DIR}/tests/tools/DryToolsTest.py")
 set_tests_properties(dry-tools PROPERTIES TIMEOUT 10)
@@ -288,3 +295,8 @@ yalahoo_unit_test(ApplicationOptionsTest application-options
     SOURCES "${PROJECT_SOURCE_DIR}/src/app/ApplicationOptions.cpp"
     INCLUDES "${PROJECT_SOURCE_DIR}/src/app"
     LIBRARIES YalahooCore)
+
+yalahoo_unit_test(VerificationInputTest verification-input
+    SOURCES "${PROJECT_SOURCE_DIR}/tools/assets/GeometryAudit.cpp"
+    INCLUDES "${PROJECT_SOURCE_DIR}/tools/assets" "${PROJECT_SOURCE_DIR}/tools/migration" "${PROJECT_SOURCE_DIR}/src/core"
+    LIBRARIES Qt6::Gui)

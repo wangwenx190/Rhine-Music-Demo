@@ -1,3 +1,4 @@
+#include "RequiredOutput.h"
 #include "RenderQuality.h"
 #include "SelectionLighting.h"
 #include "LayoutMetrics.h"
@@ -101,8 +102,9 @@ auto runFlickerChecks(int &argc, char **&argv)
                             "Visibility entities=%d samples=%d missing=%d shaded=%d nonfinite=%d\n",
                             count, samples, sample[u"missing"_s].toInt(),
                             sample[u"shaded"_s].toInt(), sample[u"nonfinite"_s].toInt());
-                    result.composite.save(output
-                                          + u"/isolated-%1-%2.png"_s.arg(count).arg(samples));
+                    yalahoo::review::saveRequiredImage(
+                            result.composite,
+                            output + u"/isolated-%1-%2.png"_s.arg(count).arg(samples));
                     require(sample[u"missing"_s].toInt() == 0 && sample[u"shaded"_s].toInt() > 100
                                     && sample[u"nonfinite"_s].toInt() == 0,
                             "Visibility fragments lost at Equal shading or nonfinite optics");

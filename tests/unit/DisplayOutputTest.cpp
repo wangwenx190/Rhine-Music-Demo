@@ -30,11 +30,40 @@ class ControlledMonitor final : public DisplayMonitor
 {
     Q_DISABLE_COPY_MOVE(ControlledMonitor)
 public:
-    ControlledMonitor() = default;
-    DisplayState state;
-    DisplayState query(QWindow &) override
+    explicit ControlledMonitor(std::unique_ptr<DisplayMonitor> platform = { })
+        : m_platform(std::move(platform))
     {
+        if (m_platform)
+            m_platform->changed = [this] {
+                if (changed)
+                    changed();
+            };
+    }
+    ~ControlledMonitor() override
+    {
+        if (m_platform)
+            m_platform->changed = { };
+    }
+    DisplayState state;
+    DisplayState query(QWindow &window) override
+    {
+        if (m_platform)
+            state = m_platform->query(window);
         return state;
+    }
+    bool pending() const override
+    {
+        return m_platform && m_platform->pending();
+    }
+    bool freeze(QWindow &window)
+    {
+        query(window);
+        if (pending())
+            return false;
+        if (m_platform)
+            m_platform->changed = { };
+        m_platform.reset();
+        return true;
     }
     void publish(DisplayState value)
     {
@@ -42,6 +71,9 @@ public:
         if (changed)
             changed();
     }
+
+private:
+    std::unique_ptr<DisplayMonitor> m_platform;
 };
 QShader loadShader(const QString &path)
 {
@@ -59,6 +91,52 @@ public:
     DisplayOutputTest() = default;
 
 private Q_SLOTS:
+    void asynchronousMonitorDoesNotFreezeProvisionalSdr()
+    {
+        class DeferredMonitor final : public DisplayMonitor
+        {
+            Q_DISABLE_COPY_MOVE(DeferredMonitor)
+        public:
+            DeferredMonitor() = default;
+            int step = 0;
+            DisplayState query(QWindow &) override
+            {
+                return step < 2 ? DisplayState() : DisplayState{ true, true, 203, 4, true };
+            }
+            bool pending() const override
+            {
+                return step < 2;
+            }
+            void completeStep()
+            {
+                ++step;
+                if (changed)
+                    changed();
+            }
+        };
+        QWindow window;
+        auto platform = std::make_unique<DeferredMonitor>();
+        auto *deferred = platform.get();
+        ControlledMonitor monitor(std::move(platform));
+        int notifications = 0;
+        monitor.changed = [&] {
+            ++notifications;
+            monitor.query(window);
+        };
+        QVERIFY(!monitor.freeze(window));
+        deferred->completeStep(); // Registry discovery still needs the output description.
+        QVERIFY(!monitor.freeze(window));
+        deferred->completeStep();
+        QCOMPARE(notifications, 2);
+        QVERIFY(monitor.freeze(window));
+        QVERIFY(monitor.state.enabled);
+        QCOMPARE(monitor.state.whiteScale, 203.f);
+        monitor.publish({ });
+        QVERIFY(!monitor.query(window).enabled);
+        ControlledMonitor sdr;
+        QVERIFY(sdr.freeze(window));
+        QVERIFY(!sdr.state.enabled);
+    }
     void transferShader()
     {
 #if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
@@ -247,7 +325,7 @@ private Q_SLOTS:
     void nativeOutput()
     {
         QVERIFY(qEnvironmentVariableIntValue("YALAHOO_VERIFY_VISIBLE") == 1);
-        auto controlled = std::make_unique<ControlledMonitor>();
+        auto controlled = std::make_unique<ControlledMonitor>(makeDisplayMonitor());
         auto *monitor = controlled.get();
         DisplayOutput output(std::move(controlled));
         QQmlApplicationEngine engine;
@@ -261,9 +339,6 @@ private Q_SLOTS:
         QVERIFY2(!engine.rootObjects().isEmpty(), qPrintable(warnings.join('\n'_L1)));
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
-        auto platform = makeDisplayMonitor();
-        const auto system = platform->query(*window);
-        monitor->state = system;
         verification::prepareWindow(*window, true);
         output.attach(*window);
         QSignalSpy swaps(window, &QQuickWindow::frameSwapped);
@@ -274,6 +349,15 @@ private Q_SLOTS:
                     return !swaps.isEmpty() && output.ready();
                 },
                 5000));
+        QVERIFY2(QTest::qWaitFor(
+                         [&] {
+                             return monitor->freeze(*window);
+                         },
+                         5000),
+                 "Native display description is still pending");
+        const auto system = monitor->state;
+        // Publish the final description, then wait for its corresponding output configuration.
+        monitor->publish(system);
         const auto firstSwap = swaps.size();
         window->update();
         QVERIFY(QTest::qWaitFor(
@@ -343,10 +427,13 @@ private Q_SLOTS:
 int main(int argc, char **argv)
 {
     verification::prepareApplication();
-    if (!selectGraphicsBackend())
+    // The controlled monitor regression has no native graphics dependency.
+    const bool controlledOnly =
+            argc == 2 && QByteArray(argv[1]) == "asynchronousMonitorDoesNotFreezeProvisionalSdr"_ba;
+    if (!controlledOnly && !selectGraphicsBackend())
         return 2;
     QGuiApplication app(argc, argv);
-    if (!probeOptionalGraphicsBackend())
+    if (!controlledOnly && !probeOptionalGraphicsBackend())
         return 22;
     DisplayOutputTest test;
     return QTest::qExec(&test, argc, argv);

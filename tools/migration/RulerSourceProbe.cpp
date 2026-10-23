@@ -1,3 +1,4 @@
+#include "ProbeInput.h"
 #include "ReviewSupport.h"
 #include "FrameClock.h"
 #include "RulerSourceProbe.h"
@@ -437,10 +438,12 @@ auto bindRulerFrames(quint64 &windowEpoch, std::unique_ptr<QQuickWindow> &window
 
 auto finishRulerProbe(bool &passed, QJsonObject &finalPolicy, int &initialized, int &invalidated,
                       const QString &output, QGuiApplication &app, QJsonObject &finalSurface,
-                      double &maximumStateError, double &ordinalError, QJsonArray &captures,
-                      QJsonArray &lifecycleChecks, QJsonArray &invariants, qreal &finalDpr,
-                      std::atomic<qint64> &syncNs, std::atomic<qint64> &renderNs)
+                      double &maximumStateError, double &ordinalError, qint64 &stateComparisons,
+                      qint64 &ordinalComparisons, QJsonArray &captures, QJsonArray &lifecycleChecks,
+                      QJsonArray &invariants, qreal &finalDpr, std::atomic<qint64> &syncNs,
+                      std::atomic<qint64> &renderNs)
 {
+    passed &= stateComparisons > 0 && ordinalComparisons > 0;
     passed &= finalPolicy[u"passed"_s].toBool() && initialized >= 2 && invalidated >= 1;
     const auto &stats = yalahoo::rulerInkStats();
     const bool saved = yalahoo::writeJsonFile(
@@ -449,6 +452,8 @@ auto finishRulerProbe(bool &passed, QJsonObject &finalPolicy, int &initialized, 
                     { u"passed"_s, passed },
                     { u"offscreen"_s, OffscreenSurface::Enabled },
                     { u"offscreenResourcePlan"_s, finalSurface },
+                    { u"stateComparisons"_s, stateComparisons },
+                    { u"ordinalComparisons"_s, ordinalComparisons },
                     { u"maximumStateError"_s, maximumStateError },
                     { u"ordinalError"_s, ordinalError },
                     { u"initialized"_s, initialized },
@@ -476,8 +481,8 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
                         std::unique_ptr<QObject> &object,
                         std::unique_ptr<yalahoo::RulerController> &controller, QQmlEngine &engine,
                         yalahoo::FrameClock &clock, QQuickItem *&root, QGuiApplication &app,
-                        double &maximumStateError, bool &passed, qint64 &modeSyncStart,
-                        std::atomic<qint64> &syncNs, qint64 &modeRenderStart,
+                        double &maximumStateError, qint64 &stateComparisons, bool &passed,
+                        qint64 &modeSyncStart, std::atomic<qint64> &syncNs, qint64 &modeRenderStart,
                         std::atomic<qint64> &renderNs, QObject &reviewLifetime,
                         std::atomic<bool> &requested, std::unique_ptr<OffscreenSurface> &surface,
                         bool &stationaryPending)
@@ -512,6 +517,7 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
             for (int f = 0; f < op[u"frames"_s].toInt(); ++f) {
                 controller->advance(std::min(.05, 1.0 / test[u"fps"_s].toInt()));
                 if (!trace.isEmpty()) {
+                    ++stateComparisons;
                     const double error = stateError(controller->state(), trace[f].toObject());
                     maximumStateError = std::max(maximumStateError, error);
                     passed &= error <= 1e-6;
@@ -522,6 +528,7 @@ auto runRulerAssertions(int &caseIndex, const QJsonArray &cases,
                                   op[u"physical"_s].toDouble(), op[u"loop"_s].toBool(),
                                   op[u"group"_s].toBool());
         }
+        ++stateComparisons;
         const double error = stateError(controller->state(), state[u"state"_s].toObject());
         maximumStateError = std::max(maximumStateError, error);
         passed &= error <= 1e-6;
@@ -557,7 +564,16 @@ int probeRulerSource(QGuiApplication &app, const QString &output, const QString 
     QFile input(sourceFile);
     if (!input.open(QIODevice::ReadOnly))
         return 3;
-    const auto source = QJsonDocument::fromJson(input.readAll()).object();
+    QJsonParseError parseError;
+    const auto document = QJsonDocument::fromJson(input.readAll(), &parseError);
+    try {
+        yalahoo::probe::requireInput(parseError.error == QJsonParseError::NoError);
+        yalahoo::probe::validateRuler(document);
+    } catch (const std::runtime_error &error) {
+        qWarning("%s", error.what());
+        return 3;
+    }
+    const auto source = document.object();
     const auto cases = source[u"captures"_s].toArray();
     if (cases.isEmpty())
         return 3;
@@ -611,6 +627,7 @@ int probeRulerSource(QGuiApplication &app, const QString &output, const QString 
     QJsonArray invariants;
     int lifecycle = -1;
     double maximumStateError = 0;
+    qint64 stateComparisons = 0, ordinalComparisons = 0;
     bool passed = true;
     int initialized = 0, invalidated = 0;
     bool stationaryPending = false;
@@ -621,6 +638,7 @@ int probeRulerSource(QGuiApplication &app, const QString &output, const QString 
     if (ordinalSamples.isEmpty())
         return 3;
     for (const auto &value : ordinalSamples) {
+        ++ordinalComparisons;
         const auto sample = value.toObject();
         const auto op = sample[u"op"_s].toObject();
         if (op.contains(u"dt"_s))
@@ -653,8 +671,9 @@ int probeRulerSource(QGuiApplication &app, const QString &output, const QString 
     bindWindow();
     const auto finish = [&] {
         return finishRulerProbe(passed, finalPolicy, initialized, invalidated, output, app,
-                                finalSurface, maximumStateError, ordinalError, captures,
-                                lifecycleChecks, invariants, finalDpr, syncNs, renderNs);
+                                finalSurface, maximumStateError, ordinalError, stateComparisons,
+                                ordinalComparisons, captures, lifecycleChecks, invariants, finalDpr,
+                                syncNs, renderNs);
     };
     consumeImage = [&] {
         return advanceRulerProbe(imageMutex, image, stationaryPending, stationaryWarmup,
@@ -667,9 +686,9 @@ int probeRulerSource(QGuiApplication &app, const QString &output, const QString 
     };
     next = [&] {
         return runRulerAssertions(caseIndex, cases, window, stateIndex, object, controller, engine,
-                                  clock, root, app, maximumStateError, passed, modeSyncStart,
-                                  syncNs, modeRenderStart, renderNs, reviewLifetime, requested,
-                                  surface, stationaryPending);
+                                  clock, root, app, maximumStateError, stateComparisons, passed,
+                                  modeSyncStart, syncNs, modeRenderStart, renderNs, reviewLifetime,
+                                  requested, surface, stationaryPending);
     };
     requestLifecycle = [&] {
         return probeRulerSourceObserveFrame(root, reviewLifetime, requested, surface);

@@ -3,6 +3,8 @@
 
 #pragma once
 #include "ReadbackImage.h"
+#include "RenderControlFrame.h"
+#include "DriverInfoMailbox.h"
 #include <QString>
 
 namespace offscreenUnits {
@@ -38,6 +40,16 @@ public:
     OffscreenSurface(QQuickWindow &window, QQuickRenderControl &control)
         : m_window(window), m_control(control)
     {
+        // The direct callback executes on Qt's render thread in native threaded mode.
+        m_driverConnection = connect(
+                &window, &QQuickWindow::beforeRendering, this,
+                [target = &window, mailbox = m_driverInfo] {
+                    auto *api = static_cast<QRhi *>(target->rendererInterface()->getResource(
+                            target, QSGRendererInterface::RhiResource));
+                    if (api)
+                        mailbox->publish(api->driverInfo());
+                },
+                Qt::DirectConnection);
         if (!Enabled)
             return;
         connect(&control, &QQuickRenderControl::renderRequested, this, &OffscreenSurface::schedule);
@@ -54,6 +66,7 @@ public:
     }
     ~OffscreenSurface() override
     {
+        disconnect(m_driverConnection);
         invalidate();
     }
     void schedule()
@@ -107,6 +120,11 @@ public:
             connect(&m_window, &QQuickWindow::frameSwapped, context, callback,
                     Qt::QueuedConnection);
     }
+    std::optional<QRhiDriverInfo> driverInfo() const
+    {
+        return m_driverInfo->value();
+    }
+    // Resource accessors are render-thread-only for native threaded windows.
     QRhi *rhi() const
     {
         return Enabled ? m_control.rhi()
@@ -132,12 +150,15 @@ public:
         if (!m_initialized || !m_texture)
             return { };
         QRhiReadbackResult result;
-        m_control.beginFrame();
-        auto *batch = rhi()->nextResourceUpdateBatch();
-        batch->readBackTexture(readbackDescription(), &result);
-        commandBuffer()->resourceUpdate(batch);
-        m_control.endFrame();
-        rhi()->finish();
+        const bool submitted = yalahoo::test::renderControlFrame(m_control, [&](auto *commands) {
+            auto *batch = rhi()->nextResourceUpdateBatch();
+            batch->readBackTexture(readbackDescription(), &result);
+            commands->resourceUpdate(batch);
+        });
+        if (!submitted || rhi()->finish() != QRhi::FrameOpSuccess) {
+            qWarning("Offscreen readback frame failed");
+            return { };
+        }
         try {
             return yalahoo::rhi::readbackImage(result, rhi()->isYUpInFramebuffer());
         } catch (const std::runtime_error &error) {
@@ -237,13 +258,18 @@ private:
             timer.start();
         m_control.polishItems();
         const qint64 polished = measurementEnabled ? timer.nsecsElapsed() : 0;
-        m_control.beginFrame();
-        const qint64 begun = measurementEnabled ? timer.nsecsElapsed() : 0;
-        m_control.sync();
-        const qint64 synced = measurementEnabled ? timer.nsecsElapsed() : 0;
-        m_control.render();
-        const qint64 rendered = measurementEnabled ? timer.nsecsElapsed() : 0;
-        m_control.endFrame();
+        qint64 begun = 0, synced = 0, rendered = 0;
+        const bool submitted = yalahoo::test::renderControlFrame(m_control, [&](auto *) {
+            begun = measurementEnabled ? timer.nsecsElapsed() : 0;
+            m_control.sync();
+            synced = measurementEnabled ? timer.nsecsElapsed() : 0;
+            m_control.render();
+            rendered = measurementEnabled ? timer.nsecsElapsed() : 0;
+        });
+        if (!submitted) {
+            qWarning("Offscreen render frame failed");
+            return;
+        }
         if (measurementEnabled)
             Q_EMIT frameMeasured(
                     { { u"polishMs"_s, polished / offscreenUnits::NanosecondsPerMillisecond },
@@ -257,6 +283,8 @@ private:
                                 / offscreenUnits::NanosecondsPerMillisecond } });
         Q_EMIT frameRendered();
     }
+    const std::shared_ptr<DriverInfoMailbox> m_driverInfo = std::make_shared<DriverInfoMailbox>();
+    QMetaObject::Connection m_driverConnection;
     QQuickWindow &m_window;
     QQuickRenderControl &m_control;
     bool m_pending = false;

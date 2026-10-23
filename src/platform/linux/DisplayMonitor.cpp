@@ -28,6 +28,8 @@ public:
     ~WaylandDisplayMonitor() override
     {
         resetOutput();
+        if (m_registrySync)
+            wl_callback_destroy(m_registrySync);
         if (m_manager)
             wp_color_manager_v1_destroy(m_manager);
         if (m_registry)
@@ -42,6 +44,16 @@ public:
             m_registry = wl_display_get_registry(native->display());
             static const wl_registry_listener listener{ registryGlobal, registryRemove };
             wl_registry_add_listener(m_registry, &listener, this);
+            m_registrySync = wl_display_sync(native->display());
+            static const wl_callback_listener syncListener{ [](void *data, wl_callback *callback,
+                                                               uint32_t) {
+                auto &self = *static_cast<WaylandDisplayMonitor *>(data);
+                wl_callback_destroy(callback);
+                self.m_registrySync = nullptr;
+                self.m_registryReady = true;
+                self.notify();
+            } };
+            wl_callback_add_listener(m_registrySync, &syncListener, this);
         }
         auto *screen = window.screen();
         auto *output =
@@ -58,6 +70,13 @@ public:
             }
         }
         return m_state;
+    }
+
+    bool pending() const override
+    {
+        return m_registry
+                && (!m_registryReady || (m_manager && (!m_managerReady || !m_colorOutput))
+                    || m_descriptionPending);
     }
 
 private:
@@ -94,10 +113,12 @@ private:
         m_colorOutput = nullptr;
         m_output = nullptr;
         m_state = { };
+        m_descriptionPending = false;
     }
     void requestDescription()
     {
         resetDescription();
+        m_descriptionPending = true;
         m_description = wp_color_management_output_v1_get_image_description(m_colorOutput);
         static const wp_image_description_v1_listener listener{ descriptionFailed,
                                                                 descriptionReady };
@@ -131,7 +152,9 @@ private:
                 s.m_bt2020 |= value == WP_COLOR_MANAGER_V1_PRIMARIES_BT2020;
             },
             [](void *d, wp_color_manager_v1 *) {
-                static_cast<WaylandDisplayMonitor *>(d)->notify();
+                auto &self = *static_cast<WaylandDisplayMonitor *>(d);
+                self.m_managerReady = true;
+                self.notify();
             }
         };
         wp_color_manager_v1_add_listener(self.m_manager, &listener, &self);
@@ -144,6 +167,7 @@ private:
         self.resetOutput();
         wp_color_manager_v1_destroy(self.m_manager);
         self.m_manager = nullptr;
+        self.m_managerReady = false;
         self.m_parametric = self.m_linear = self.m_pq = self.m_srgb = self.m_bt2020 = false;
         self.notify();
     }
@@ -155,6 +179,7 @@ private:
     {
         auto &self = *static_cast<WaylandDisplayMonitor *>(data);
         self.m_state = { };
+        self.m_descriptionPending = false;
         self.notify();
     }
     static void descriptionReady(void *data, wp_image_description_v1 *description, uint32_t)
@@ -216,8 +241,11 @@ private:
         } else {
             self.m_state = { };
         }
+        self.m_descriptionPending = false;
         self.notify();
     }
+    wl_callback *m_registrySync = nullptr;
+    bool m_registryReady = false, m_managerReady = false, m_descriptionPending = false;
     wl_registry *m_registry = nullptr;
     wp_color_manager_v1 *m_manager = nullptr;
     wp_color_management_output_v1 *m_colorOutput = nullptr;
