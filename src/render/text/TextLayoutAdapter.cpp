@@ -138,6 +138,21 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
     for (int index = 0; index < visibleLines; ++index) {
         auto line = layout.lineAt(index);
         const int lineStart = line.textStart();
+        if (clamp && part.lines > visibleLines && index == visibleLines - 1) {
+            // Elide and reshape the whole remaining line with its bidi context.
+            const auto remaining = text.mid(lineStart);
+            const auto elided = metrics.elidedText(remaining, Qt::ElideRight, width / scale);
+            auto last = shape(elided, font, size, width, ratio, spacing, translation, true, false);
+            int column = 0;
+            for (auto &glyph : last.glyphs) {
+                glyph.key = u"%1:%2:%3"_s.arg(translation ? "translation"_L1 : "main"_L1)
+                                    .arg(index)
+                                    .arg(column++);
+                glyph.y += index * lineHeight;
+                part.glyphs.append(std::move(glyph));
+            }
+            continue;
+        }
         const int end = lineStart + line.textLength();
         int inkEnd = end;
         if (!oneLine)
@@ -242,24 +257,6 @@ Part shape(const QString &text, QFont font, double size, double width, double ra
                 glyph.font.setStyleName(u"Regular"_s);
             }
             part.glyphs.append(std::move(glyph));
-        }
-        if (clamp && part.lines > visibleLines && index == visibleLines - 1) {
-            const auto ellipsis =
-                    shape(u"\u2026"_s, font, size, width, ratio, spacing, translation, true, false)
-                            .glyphs.first();
-            while (!part.glyphs.isEmpty() && part.glyphs.last().y == index * lineHeight
-                   && part.glyphs.last().x + part.glyphs.last().width + ellipsis.width > width)
-                part.glyphs.removeLast();
-            TitleGlyph dot = ellipsis;
-            dot.key = u"%1:%2:%3"_s.arg(translation ? "translation"_L1 : "main"_L1)
-                              .arg(index)
-                              .arg(column);
-            dot.x = !part.glyphs.isEmpty() && part.glyphs.last().y == index * lineHeight
-                    ? part.glyphs.last().x + part.glyphs.last().width
-                    : 0;
-            dot.y = index * lineHeight;
-            dot.height = lineHeight;
-            part.glyphs.append(std::move(dot));
         }
     }
     return part;

@@ -17,6 +17,7 @@
 #include <QPointer>
 #include <QThreadPool>
 #include <stdexcept>
+#include <new>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -28,6 +29,19 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+QImage allocateImage(QSize size, QImage::Format format, const CoverCache::ImageAllocator &allocator)
+{
+    auto image = allocator ? allocator(size, format) : QImage(size, format);
+    if (image.isNull() || image.size() != size || image.format() != format)
+        throw std::bad_alloc();
+    return image;
+}
+QImage requireImage(QImage image)
+{
+    if (image.isNull())
+        throw std::bad_alloc();
+    return image;
+}
 // Cover geometry uses a 1024-unit fallback canvas; color conversion follows the sRGB transfer curve.
 constexpr auto ByteChannelValues = 256;
 constexpr auto MaximumFallbackTitleCharacters = 256;
@@ -178,6 +192,7 @@ struct CoverCache::Private final
         State() = default;
         QMutex mutex;
         CoverCache *receiver = nullptr;
+        ImageAllocator allocator;
         std::atomic<quint64> generation{ 1 };
     };
     static void decodeAndDeliver(const Job &job, const std::shared_ptr<State> &state);
@@ -204,10 +219,12 @@ struct CoverCache::Private final
     qint64 m_peakReaderBytes = 0;
     int m_decoderScaledResults = 0;
 };
-CoverCache::CoverCache(QObject *parent) : QObject(parent), d(std::make_unique<Private>(this))
+CoverCache::CoverCache(QObject *parent, ImageAllocator allocator)
+    : QObject(parent), d(std::make_unique<Private>(this))
 {
     d->m_state = std::make_shared<Private::State>();
     d->m_state->receiver = this;
+    d->m_state->allocator = std::move(allocator);
     d->m_retry.setSingleShot(true);
     d->m_retry.setInterval(DecodeRetryMilliseconds);
     connect(&d->m_retry, &QTimer::timeout, this, [this] {
@@ -384,13 +401,17 @@ qint64 CoverCache::workingSetEstimateFor(int resolution)
     // allocations are independent and are not a process-memory reservation.
     return qint64(resolution) * resolution * WorkingBytesPerOutputPixel;
 }
-QImage CoverCache::paint(const QImage &source, int resolution, const QString &title)
+QImage CoverCache::paint(const QImage &source, int resolution, const QString &title,
+                         const ImageAllocator &allocator)
 {
     if (resolution <= 0 || (resolution & (resolution - 1)) != 0)
         throw std::invalid_argument("Invalid cover paint resolution");
-    QImage image(resolution, resolution, QImage::Format_RGBA8888_Premultiplied);
+    auto image = allocateImage({ resolution, resolution }, QImage::Format_RGBA8888_Premultiplied,
+                               allocator);
     image.fill(Qt::transparent);
     QPainter painter(&image);
+    if (!painter.isActive())
+        throw std::bad_alloc();
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
     const qreal margin = resolution / FallbackMarginDivisor;
     const QRectF box(margin, margin, resolution - 2 * margin, resolution - 2 * margin);
@@ -436,11 +457,13 @@ QImage CoverCache::paint(const QImage &source, int resolution, const QString &ti
 }
 // Filter linear-light premultiplied color and alpha together before returning to sRGB.
 // Each destination pixel integrates its source footprint, avoiding dark fringes at transparent edges.
-QList<QImage> CoverCache::makeMipmaps(const QImage &image)
+QList<QImage> CoverCache::makeMipmaps(const QImage &image, const ImageAllocator &allocator)
 {
     // Decode sRGB before area reduction; alpha remains premultiplied in linear light.
     // Independent chains never incorporate pixels belonging to another atlas slot.
-    const auto source = image.convertToFormat(QImage::Format_RGBA8888);
+    if (image.isNull())
+        return { };
+    const auto source = requireImage(image.convertToFormat(QImage::Format_RGBA8888));
     static const auto decoded = [] {
         std::array<float, ByteChannelValues> values;
         for (int i = 0; i < ByteChannelValues; ++i)
@@ -453,8 +476,8 @@ QList<QImage> CoverCache::makeMipmaps(const QImage &image)
     QSize currentSize = source.size();
     while (currentSize.width() > 1 || currentSize.height() > 1) {
         const QSize size(qMax(1, currentSize.width() / 2), qMax(1, currentSize.height() / 2));
-        QImage next(size, QImage::Format_RGBA32FPx4_Premultiplied);
-        QImage encoded(size, QImage::Format_RGBA8888_Premultiplied);
+        auto next = allocateImage(size, QImage::Format_RGBA32FPx4_Premultiplied, allocator);
+        auto encoded = allocateImage(size, QImage::Format_RGBA8888_Premultiplied, allocator);
         encoded.setColorSpace(QColorSpace::SRgb);
         if (linear.isNull()) {
             // Fuse the full-resolution decode with the first reduction. Preserve the
@@ -528,36 +551,44 @@ CoverSnapshot CoverCache::Private::decode(const Private::Job &job,
     source = readSource(job, state, *pixels);
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };
-    if (!source.isNull() && source.colorSpace().isValid())
-        source.convertToColorSpace(QColorSpace::SRgb);
-    if (!pixels->error.isEmpty())
-        pixels->fallbackTitle = job.title;
-    pixels->image = CoverCache::paint(source, job.resolution, job.title);
-    pixels->image.setColorSpace(QColorSpace::SRgb);
-    pixels->mipmaps = CoverCache::makeMipmaps(pixels->image);
-    if (job.resolution > yalahoo::coverPixels::TileSide) {
-        const qsizetype tileSide = job.resolution / yalahoo::coverPixels::TileSide;
-        pixels->tiles.reserve(tileSide * tileSide);
-        for (int y = 0; y < job.resolution; y += yalahoo::coverPixels::TileSide)
-            for (int x = 0; x < job.resolution; x += yalahoo::coverPixels::TileSide) {
-                CoverMipTile tile;
-                tile.origin = { x, y };
-                tile.image = pixels->image.copy(x, y, yalahoo::coverPixels::TileSide,
-                                                yalahoo::coverPixels::TileSide);
-                tile.mipmaps.reserve(x == 0 && y == 0 ? pixels->mipmaps.size()
-                                                      : std::min(qsizetype(TileMipLevels),
-                                                                 pixels->mipmaps.size()));
-                for (int level = 1; level <= pixels->mipmaps.size(); ++level) {
-                    const auto &mip = pixels->mipmaps[level - 1];
-                    if (level <= TileMipLevels)
-                        tile.mipmaps.append(mip.copy(x >> level, y >> level,
-                                                     yalahoo::coverPixels::TileSide >> level,
-                                                     yalahoo::coverPixels::TileSide >> level));
-                    else if (x == 0 && y == 0)
-                        tile.mipmaps.append(mip);
+    try {
+        if (!source.isNull() && source.colorSpace().isValid())
+            source = requireImage(source.convertedToColorSpace(QColorSpace::SRgb));
+        if (!pixels->error.isEmpty())
+            pixels->fallbackTitle = job.title;
+        pixels->image = CoverCache::paint(source, job.resolution, job.title, state->allocator);
+        pixels->image.setColorSpace(QColorSpace::SRgb);
+        pixels->mipmaps = CoverCache::makeMipmaps(pixels->image, state->allocator);
+        if (job.resolution > yalahoo::coverPixels::TileSide) {
+            const qsizetype tileSide = job.resolution / yalahoo::coverPixels::TileSide;
+            pixels->tiles.reserve(tileSide * tileSide);
+            for (int y = 0; y < job.resolution; y += yalahoo::coverPixels::TileSide)
+                for (int x = 0; x < job.resolution; x += yalahoo::coverPixels::TileSide) {
+                    CoverMipTile tile;
+                    tile.origin = { x, y };
+                    tile.image = requireImage(pixels->image.copy(
+                            x, y, yalahoo::coverPixels::TileSide, yalahoo::coverPixels::TileSide));
+                    tile.mipmaps.reserve(x == 0 && y == 0 ? pixels->mipmaps.size()
+                                                          : std::min(qsizetype(TileMipLevels),
+                                                                     pixels->mipmaps.size()));
+                    for (int level = 1; level <= pixels->mipmaps.size(); ++level) {
+                        const auto &mip = pixels->mipmaps[level - 1];
+                        if (level <= TileMipLevels)
+                            tile.mipmaps.append(requireImage(mip.copy(
+                                    x >> level, y >> level, yalahoo::coverPixels::TileSide >> level,
+                                    yalahoo::coverPixels::TileSide >> level)));
+                        else if (x == 0 && y == 0)
+                            tile.mipmaps.append(mip);
+                    }
+                    pixels->tiles.append(std::move(tile));
                 }
-                pixels->tiles.append(std::move(tile));
-            }
+        }
+    } catch (const std::bad_alloc &) {
+        pixels->error = u"Cover image allocation failed"_s;
+        pixels->fallbackTitle = job.title;
+        pixels->image = { };
+        pixels->mipmaps.clear();
+        pixels->tiles.clear();
     }
     if (job.generation != state->generation.load() || !job.wanted->load())
         return { };

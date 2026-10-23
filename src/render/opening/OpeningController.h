@@ -90,7 +90,7 @@ private:
         Preparing,
         Film,
         Reveal,
-        Done
+        Done,
     };
     void advance(double dt);
     void sample(double dt);

@@ -138,6 +138,38 @@ private Q_SLOTS:
         QCOMPARE(adapter.measure(shortText, font, font, 12, 80, 29, true, 1, true).fitted,
                  shortText);
     }
+    void mainTitleElidesBidirectionalGraphemes_data()
+    {
+        transportElidesBidirectionalGraphemes_data();
+    }
+    void mainTitleElidesBidirectionalGraphemes()
+    {
+        QFETCH(QString, text);
+        yalahoo::TextLayoutAdapter adapter;
+        const auto font = yalahoo::assetFont(700);
+        for (const double width : { 80., 150., 240. }) {
+            const auto result =
+                    adapter.measure(text.repeated(10), font, font, 28, width, 65, false, 1);
+            QVERIFY(result.overflow);
+            const auto dot = std::find_if(result.glyphs.cbegin(), result.glyphs.cend(),
+                                          [](const auto &glyph) {
+                                              return glyph.text.contains(u'\u2026');
+                                          });
+            QVERIFY(dot != result.glyphs.cend());
+            QVERIFY(dot->y > 0);
+            for (const auto &glyph : result.glyphs) {
+                QVERIFY(!glyph.text.contains(QChar::ReplacementCharacter));
+                if (glyph.y != dot->y)
+                    continue;
+                QVERIFY2(glyph.x >= -1e-6 && glyph.x + glyph.width <= width + 1e-6,
+                         qPrintable(glyph.text));
+                if (&glyph != &*dot)
+                    QVERIFY2(glyph.x + glyph.width <= dot->x + 1e-6
+                                     || glyph.x >= dot->x + dot->width - 1e-6,
+                             qPrintable(glyph.text));
+            }
+        }
+    }
     void wholeLineGlyphAssociation_data()
     {
         QTest::addColumn<QString>("text");

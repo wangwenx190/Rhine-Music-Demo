@@ -7,6 +7,7 @@
 #include "MotionController.h"
 #include "SelectionController.h"
 #include <limits>
+#include <atomic>
 #include <stdexcept>
 #include "CoverCache.h"
 #include "AtlasAllocator.h"
@@ -65,6 +66,83 @@ private:
         return p;
     }
 private Q_SLOTS:
+    void standaloneLeaseFollowsDecoderGeneration()
+    {
+        SceneCovers covers;
+        MotionController motion;
+        SelectionController selection(&motion);
+        for (int cycle = 0; cycle < 2; ++cycle) {
+            covers.setSelection(&selection);
+            covers.setSelection(nullptr);
+            covers.setDemand(256);
+            QTRY_COMPARE_WITH_TIMEOUT(covers.image().size(), QSize(256, 256),
+                                      AsyncDeadlineMilliseconds);
+            Input base;
+            covers.applyImage(base);
+            QTRY_VERIFY_WITH_TIMEOUT((covers.applyImage(base), !base.coverMipmaps.isEmpty()),
+                                     AsyncDeadlineMilliseconds);
+            QVERIFY(base.cover.pixelColor(128, 128).alpha() > 0);
+            covers.setDemand(512);
+            QTRY_COMPARE_WITH_TIMEOUT(covers.image().size(), QSize(512, 512),
+                                      AsyncDeadlineMilliseconds);
+            Input detailed;
+            covers.applyImage(detailed);
+            QCOMPARE(detailed.coverMipmaps.first().size(), QSize(256, 256));
+        }
+    }
+    void outputAllocationFailureIsTerminal_data()
+    {
+        QTest::addColumn<int>("failure");
+        QTest::newRow("canvas") << 0;
+        QTest::newRow("linear-mip") << 1;
+        QTest::newRow("encoded-mip") << 2;
+        QTest::newRow("later-mip") << 8;
+        QTest::newRow("final-mip") << 18;
+    }
+    void outputAllocationFailureIsTerminal()
+    {
+        QFETCH(int, failure);
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto path = directory.filePath(u"artwork.png"_s);
+        QImage artwork(32, 32, QImage::Format_RGB32);
+        artwork.fill(Qt::red);
+        QVERIFY(artwork.save(path));
+        const auto remaining = std::make_shared<std::atomic_int>(-1);
+        CoverCache cache(nullptr, [remaining](QSize size, QImage::Format format) {
+            const int value = remaining->load();
+            if (value >= 0 && remaining->fetch_sub(1) == 0)
+                return QImage();
+            return QImage(size, format);
+        });
+        QSignalSpy ready(&cache, &CoverCache::ready);
+        QVERIFY(cache.request(u"one"_s, path, 256));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
+        const auto base = qvariant_cast<CoverSnapshot>(ready.takeFirst().first());
+        QVERIFY(base->error.isEmpty());
+        SelectedCoverPool pool;
+        const auto selected = pool.acquire(u"one"_s, base, cache.generation());
+        remaining->store(failure);
+        QVERIFY(cache.request(u"one"_s, path, 512, u"One"_s));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
+        const auto failed = qvariant_cast<CoverSnapshot>(ready.takeFirst().first());
+        QVERIFY(!failed->error.isEmpty());
+        QCOMPARE(failed->fallbackTitle, u"One"_s);
+        QCOMPARE(failed->resolution, 512);
+        QVERIFY(failed->image.isNull());
+        QVERIFY(failed->mipmaps.isEmpty());
+        QVERIFY(failed->tiles.isEmpty());
+        QVERIFY(!pool.upgrade(selected, failed));
+        QCOMPARE(selected->pixels, base);
+        QCOMPARE(cache.lookup(u"one"_s, path, 512, u"One"_s), failed);
+        QCOMPARE(cache.statistics()[u"active"_s].toInt(), 0);
+        remaining->store(-1);
+        QVERIFY(cache.request(u"one"_s, path, 1024));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, AsyncDeadlineMilliseconds);
+        const auto recovered = qvariant_cast<CoverSnapshot>(ready.takeFirst().first());
+        QVERIFY(recovered->error.isEmpty());
+        QVERIFY(pool.upgrade(selected, recovered));
+    }
     void hiddenSceneItemDestructionDetachesWindow()
     {
         QQuickWindow window;

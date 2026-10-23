@@ -112,7 +112,7 @@ SceneCovers::SceneCovers(QObject *parent) : QObject(parent), d(std::make_unique<
     d->m_cover = QImage(renderData::CoverTilePixels, renderData::CoverTilePixels,
                         QImage::Format_RGBA8888_Premultiplied);
     d->m_cover.fill(Qt::transparent);
-    d->m_selectedCover = d->m_coverPool.acquire(u"demo-square"_s);
+    d->m_selectedCover = d->m_coverPool.acquire(u"demo-square"_s, { }, d->m_covers.generation());
     connect(&d->m_covers, &CoverCache::ready, this,
             [this](const std::shared_ptr<const CoverPixels> &pixels) {
                 d->handleCoverReady(pixels);
@@ -132,7 +132,8 @@ void SceneCovers::setSelection(SelectionController *selection)
                     d->refreshPool();
                 });
     else
-        d->m_selectedCover = d->m_coverPool.acquire(u"demo-square"_s);
+        d->m_selectedCover =
+                d->m_coverPool.acquire(u"demo-square"_s, { }, d->m_covers.generation());
 }
 void SceneCovers::observeFrame(const SceneFrame &frame)
 {

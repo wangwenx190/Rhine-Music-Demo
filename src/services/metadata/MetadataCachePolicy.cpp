@@ -21,6 +21,20 @@ QString transportKey(const AlbumQuery &query)
                     .toJson(QJsonDocument::Compact);
     return QString::fromUtf8(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
 }
+QString verifiedReleaseId(const QJsonObject &state)
+{
+    const auto status = state.value(u"status"_s).toString().toLower();
+    return state.contains(u"releaseVerifiedAt"_s) || status.isEmpty() || status == "matched"_L1
+                    || status == "partial"_L1
+            ? state.value(u"releaseId"_s).toString()
+            : QString();
+}
+QDateTime verifiedReleaseTime(const QJsonObject &state)
+{
+    return QDateTime::fromString(
+            state.value(u"releaseVerifiedAt"_s).toString(state.value(u"checkedAt"_s).toString()),
+            Qt::ISODateWithMs);
+}
 QString stateName(ProviderStatus status)
 {
     return status == ProviderStatus::NotFound ? u"not-found"_s : statusName(status).toLower();
@@ -32,12 +46,10 @@ QString preferredRelease(const AlbumQuery &query)
         return query.releaseId;
     const auto credits = query.album.creditsLookup;
     const auto online = query.album.online;
-    const auto creditsId = credits.value(u"releaseId"_s).toString();
-    const auto onlineId = online.value(u"releaseId"_s).toString();
-    const auto creditsTime =
-            QDateTime::fromString(credits.value(u"checkedAt"_s).toString(), Qt::ISODateWithMs);
-    const auto onlineTime =
-            QDateTime::fromString(online.value(u"checkedAt"_s).toString(), Qt::ISODateWithMs);
+    const auto creditsId = verifiedReleaseId(credits);
+    const auto onlineId = verifiedReleaseId(online);
+    const auto creditsTime = verifiedReleaseTime(credits);
+    const auto onlineTime = verifiedReleaseTime(online);
     return !creditsId.isEmpty()
                     && (onlineId.isEmpty()
                         || (creditsTime.isValid()
@@ -59,7 +71,9 @@ std::optional<ProviderResult> reusableMetadata(const AlbumQuery &query, const Re
     const bool same =
             (!state.contains(u"inputKey"_s) || state.value(u"inputKey"_s).toString() == inputKey)
             && (desiredRelease.isEmpty()
-                || state.value(u"releaseId"_s).toString() == desiredRelease);
+                || state.value(u"lookupReleaseId"_s)
+                                .toString(state.value(u"releaseId"_s).toString())
+                        == desiredRelease);
     const auto checked = QDateTime::fromString(cached.checkedAt, Qt::ISODateWithMs);
     const bool positive =
             cached.status == ProviderStatus::Matched || cached.status == ProviderStatus::Partial;
@@ -87,6 +101,13 @@ void stampMetadata(ProviderResult &result, const AlbumQuery &query, const QStrin
         result.retryAt = now.addSecs(RetryDelaySeconds).toString(Qt::ISODateWithMs);
     const auto field = metadataStateKey(result.kind);
     auto state = metadataState(query.album, result.kind);
+    const auto previousId = verifiedReleaseId(state);
+    const auto previousTime = verifiedReleaseTime(state);
+    const auto verifiedId =
+            result.payload.value(u"online"_s).toObject().value(u"releaseId"_s).toString();
+    const bool verified = !releaseId.isEmpty() && verifiedId == releaseId
+            && (result.status == ProviderStatus::Matched || result.status == ProviderStatus::Partial
+                || result.status == ProviderStatus::NotFound);
     const auto patch = result.payload.value(field).toObject();
     for (auto it = patch.begin(); it != patch.end(); ++it)
         state.insert(it.key(), it.value());
@@ -96,8 +117,18 @@ void stampMetadata(ProviderResult &result, const AlbumQuery &query, const QStrin
         result.source = { { u"name"_s,
                             result.kind == MetadataKind::Introduction ? u"Wikipedia / Wikidata"_s
                                                                       : u"MusicBrainz"_s } };
-    if (result.kind != MetadataKind::Introduction && !releaseId.isEmpty())
-        state.insert(u"releaseId"_s, releaseId);
+    if (result.kind != MetadataKind::Introduction) {
+        // Query attempts and verified identities have independent clocks.
+        state.insert(u"lookupReleaseId"_s, releaseId);
+        if (verified || !previousId.isEmpty()) {
+            state.insert(u"releaseId"_s, verified ? releaseId : previousId);
+            state.insert(u"releaseVerifiedAt"_s,
+                         (verified ? now : previousTime).toString(Qt::ISODateWithMs));
+        } else {
+            state.remove(u"releaseId"_s);
+            state.remove(u"releaseVerifiedAt"_s);
+        }
+    }
     state.insert(u"source"_s, result.source.value(u"name"_s));
     state.insert(u"sourceDetails"_s, result.source);
     if (result.source.contains(u"url"_s))

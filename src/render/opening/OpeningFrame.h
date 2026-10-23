@@ -2,8 +2,6 @@
 // blur and geometry synchronized without independent timers.
 
 #pragma once
-#include <QString>
-using Qt::StringLiterals::operator""_s;
 #include "SceneFrame.h"
 #include <QVariantMap>
 
@@ -21,7 +19,13 @@ struct OpeningFrame final
     double orbit = 0, orbitDraw = 0, orbitTurn = 0, orbitScale = openingFrameDefaults::OrbitScale;
     double title = 0, titleY = openingFrameDefaults::TitleEnterOffsetPixels,
            titleClip = openingFrameDefaults::TitleClipPercent, subtitle = 0;
-    QString phase = u"logo"_s;
+    enum class Phase {
+        Logo,
+        Orbit,
+        Slogan,
+        Array,
+    };
+    Phase phase = Phase::Logo;
     QVariantMap values() const;
 };
 OpeningFrame openingFrame(double time);

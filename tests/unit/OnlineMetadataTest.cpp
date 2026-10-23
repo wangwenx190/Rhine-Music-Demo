@@ -293,6 +293,7 @@ private Q_SLOTS:
         result.kind = MetadataKind::Credits;
         result.status = ProviderStatus::Matched;
         result.inputKey = metadataKey(query.album, result.kind);
+        result.payload = musicBrainzMetadata(query.album, result.kind, sampleRelease()).payload;
         stampMetadata(result, query, releaseId(), now);
         const auto state = result.payload.value(u"creditsLookup"_s).toObject();
         QCOMPARE(state.value(u"expiresAt"_s).toString(), u"2026-11-21T00:00:00.000Z"_s);
@@ -317,6 +318,113 @@ private Q_SLOTS:
         QVERIFY(reusableMetadata(query, token, result.kind, result.inputKey, now));
     }
 
+    void failedReleaseAttemptsPreserveVerifiedIdentity()
+    {
+        AlbumQuery query;
+        query.album = sampleAlbum();
+        query.album.online = { };
+        const auto now = QDateTime::fromString(u"2026-10-22T00:00:00.000Z"_s, Qt::ISODateWithMs);
+        auto verified = musicBrainzMetadata(query.album, MetadataKind::Credits, sampleRelease());
+        verified.albumId = query.album.id;
+        stampMetadata(verified, query, releaseId(), now);
+        QVERIFY(mergeMetadata(query.album, verified));
+        QCOMPARE(preferredRelease(query), releaseId());
+        const auto verifiedTime = query.album.creditsLookup[u"releaseVerifiedAt"_s];
+        for (const auto kind : { MetadataKind::Credits, MetadataKind::Enrichment }) {
+            for (const auto status : { ProviderStatus::Uncertain, ProviderStatus::Error }) {
+                auto rejected = sampleRelease();
+                rejected.insert(u"id"_s, groupId());
+                rejected.insert(u"title"_s, u"Another Album"_s);
+                auto result = musicBrainzMetadata(query.album, kind, rejected);
+                QCOMPARE(result.status, ProviderStatus::Uncertain);
+                result.status = status;
+                result.albumId = query.album.id;
+                query.releaseId = groupId();
+                stampMetadata(result, query, groupId(), now.addSecs(10));
+                QVERIFY(mergeMetadata(query.album, result));
+                query.releaseId.clear();
+                QCOMPARE(preferredRelease(query), releaseId());
+                QCOMPARE(query.album.creditsLookup[u"releaseVerifiedAt"_s], verifiedTime);
+                const auto state = metadataState(query.album, kind);
+                QCOMPARE(state[u"lookupReleaseId"_s].toString(), groupId());
+                QVERIFY(state[u"releaseId"_s].toString() != groupId());
+            }
+        }
+        // A subsequent verified release supersedes the earlier one, even without credits.
+        auto newer = sampleRelease();
+        newer.insert(u"id"_s, groupId());
+        newer.remove(u"relations"_s);
+        auto result = musicBrainzMetadata(query.album, MetadataKind::Enrichment, newer);
+        result.albumId = query.album.id;
+        stampMetadata(result, query, groupId(), now.addSecs(20));
+        QVERIFY(mergeMetadata(query.album, result));
+        QCOMPARE(preferredRelease(query), groupId());
+        ProviderResult failed;
+        failed.albumId = query.album.id;
+        failed.kind = MetadataKind::Credits;
+        failed.status = ProviderStatus::Error;
+        stampMetadata(failed, query, releaseId(), now.addSecs(30));
+        QVERIFY(mergeMetadata(query.album, failed));
+        QCOMPARE(preferredRelease(query), groupId());
+        // Even a retained payload cannot turn an unsuccessful refresh into verification.
+        result.kind = MetadataKind::Credits;
+        result.status = ProviderStatus::Uncertain;
+        stampMetadata(result, query, groupId(), now.addSecs(35));
+        QCOMPARE(result.payload[u"creditsLookup"_s].toObject()[u"releaseId"_s].toString(),
+                 releaseId());
+        QCOMPARE(result.payload[u"creditsLookup"_s].toObject()[u"releaseVerifiedAt"_s],
+                 verifiedTime);
+        // Previously persisted unverified attempts must not steer new lookups either.
+        query.album.creditsLookup = { { u"releaseId"_s, releaseId() },
+                                      { u"status"_s, u"uncertain"_s },
+                                      { u"checkedAt"_s,
+                                        now.addSecs(40).toString(Qt::ISODateWithMs) } };
+        QCOMPARE(preferredRelease(query), groupId());
+    }
+    void wikipediaTextRequiresPerformerAttribution_data()
+    {
+        QTest::addColumn<QString>("artist");
+        QTest::addColumn<QString>("extract");
+        QTest::addColumn<bool>("matches");
+        QTest::newRow("substring")
+                << u"Air"_s << u"Moon is an album by Chair, released in 1997."_s << false;
+        QTest::newRow("longer-name")
+                << u"Air"_s << u"Moon is an album by Airborne, released in 1997."_s << false;
+        QTest::newRow("longer-performer")
+                << u"Air"_s << u"Moon is an album by Air Supply, released in 1997."_s << false;
+        QTest::newRow("mention-only")
+                << u"Air"_s << u"Moon is an album by Chair, inspired by Air, released in 1997."_s
+                << false;
+        QTest::newRow("attribution")
+                << u"Air"_s << u"Moon is an album by Air, released in 1997."_s << true;
+        QTest::newRow("unicode-case")
+                << u"Bj\u00f6rk"_s << u"Moon is an album by BJ\u00d6RK, released in 1997."_s
+                << true;
+        QTest::newRow("chinese-attribution")
+                << u"\u738b\u83f2"_s
+                << u"Moon\u662f\u7531\u738b\u83f2\u4e8e1997\u5e74\u53d1\u884c\u7684\u4e13\u8f91\u3002"_s
+                << true;
+        QTest::newRow("chinese-substring")
+                << u"\u83f2"_s
+                << u"Moon\u662f\u7531\u738b\u83f2\u4e8e1997\u5e74\u53d1\u884c\u7684\u4e13\u8f91\u3002"_s
+                << false;
+        QTest::newRow("punctuation")
+                << u"AC/DC"_s << u"Moon is an album by AC/DC, released in 1997."_s << true;
+    }
+    void wikipediaTextRequiresPerformerAttribution()
+    {
+        QFETCH(QString, artist);
+        QFETCH(QString, extract);
+        QFETCH(bool, matches);
+        Album album;
+        album.title = u"Moon"_s;
+        album.artist = artist;
+        album.year = 1997;
+        const QJsonObject candidate{ { u"title"_s, u"Moon (album)"_s }, { u"extract"_s, extract } };
+        const auto result = wikipediaMetadata(album, QJsonArray{ candidate }, { }, u"en"_s);
+        QCOMPARE(result.status, matches ? ProviderStatus::Matched : ProviderStatus::Uncertain);
+        QCOMPARE(result.payload.isEmpty(), !matches);
+    }
     void rejectedMetadataBatchDoesNotSaveOrNotify()
     {
         QTemporaryDir directory;

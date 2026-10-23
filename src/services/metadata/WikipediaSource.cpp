@@ -96,6 +96,24 @@ ProviderResult wikipediaMetadata(const Album &album, const QJsonArray &pages,
     static const QRegularExpression songWords(
             u"\\bis (?:an? |the )?[^.]{0,35}\\bsong\\b|(?:\u662f|\u70ba|\u4e3a)[^\u3002]{0,60}(?:\u4e00\u9996|\u6b4c\u66f2)"_s,
             QRegularExpression::CaseInsensitiveOption);
+    // Keep Unicode name boundaries and require a performer attribution, rather than
+    // an incidental mention elsewhere in the introduction.
+    static const QRegularExpression separators(u"[^\\p{L}\\p{M}\\p{N}]+"_s);
+    const auto nameParts = album.artist.normalized(QString::NormalizationForm_KC)
+                                   .split(separators, Qt::SkipEmptyParts);
+    QStringList escapedParts;
+    for (const auto &part : nameParts)
+        escapedParts.append(QRegularExpression::escape(part));
+    const auto name = escapedParts.join(u"[^\\p{L}\\p{M}\\p{N}]*"_s);
+    const QRegularExpression attribution(
+            u"(?:\\b(?:album|EP|compilation)\\s+by\\s+"_s + name
+                    + u"(?=\\s*(?:[,.;:!?]|(?:released|published|and|featuring)\\b|$))|(?:\u7531|\u6b4c\u624b|\u4e50\u56e2|\u6a02\u5718)\\s*"_s
+                    + name
+                    + u"\\s*(?:\u7684|\u4e8e|\u65bc|\u5728|\u6240)|(?<![\\p{L}\\p{M}\\p{N}])"_s
+                    + name
+                    + u"\\s*\u7684[^.!?\u3002\\n]{0,40}(?:\u4e13\u8f91|\u5c08\u8f2f|\u5531\u7247))"_s,
+            QRegularExpression::CaseInsensitiveOption
+                    | QRegularExpression::UseUnicodePropertiesOption);
     const QString year = album.year ? QString::number(*album.year) : QString();
     const QString datePrefix = '+'_L1 + year + '-'_L1;
     const QRegularExpression publication(
@@ -155,7 +173,8 @@ ProviderResult wikipediaMetadata(const Album &album, const QJsonArray &pages,
             continue;
         // Text fallback requires both the artist and a release-year statement.
         bool textual = false;
-        if (album.year && metadataName(first).contains(artist)) {
+        if (album.year && !nameParts.isEmpty()
+            && first.normalized(QString::NormalizationForm_KC).contains(attribution)) {
             textual = first.contains(publication);
         }
         if (!(performerMatches && (!album.year || yearMatches)) && !textual)

@@ -9,11 +9,11 @@ namespace yalahoo::rhi {
 enum class ScenePass {
     Opaque,
     Shadow,
-    Shell
+    Shell,
 };
 enum class InstanceMode {
     Single,
-    Instanced
+    Instanced,
 };
 std::unique_ptr<QRhiGraphicsPipeline>
 createScenePipeline(QRhi *api, const Input &input, const Target &target,

@@ -1,3 +1,4 @@
+#include "SettingsResourceChecks.h"
 #include "LibraryChecks.h"
 #include "RenderQuality.h"
 #include "SelectionLighting.h"
@@ -265,15 +266,13 @@ auto verifySettingsInputs(auto &check, auto &renderSettingsTarget, QJsonObject &
     if (theme) {
         theme->forceActiveFocus();
         QTest::keyClick(&window, Qt::Key_Space);
-        renderSettingsTarget();
+        yalahoo::review::checkSettingsTransition(check, renderSettingsTarget, lastSettingsSample,
+                                                 baselineResources, u"night-theme"_s);
         check(u"theme-qt-input"_s, scene.lighting()->night());
         settings.update(u"theme"_s, u"day"_s);
-        renderSettingsTarget();
+        yalahoo::review::checkSettingsTransition(check, renderSettingsTarget, lastSettingsSample,
+                                                 baselineResources, u"day-theme"_s);
     }
-    check(u"theme-keeps-resources"_s,
-          lastSettingsSample[u"resourceGeneration"_s] == baselineResources[u"resourceGeneration"_s]
-                  && lastSettingsSample[u"postprocessRevision"_s]
-                          == baselineResources[u"postprocessRevision"_s]);
     auto *qualitySlider = focusSetting(u"settingsdepthOfFieldControl"_s);
     check(u"quality-control-present"_s, qualitySlider != nullptr);
     if (qualitySlider)

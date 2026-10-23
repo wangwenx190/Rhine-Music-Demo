@@ -26,20 +26,10 @@
 
 ## 确认事项索引
 
-尚未解决的独立深度审查确认事项 25 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
+尚未解决的独立深度审查确认事项 15 项，构建/部署/生成链补查事项 3 项，另保留 3 项调查。以下分类只帮助区分影响；置信度表示证据充分程度，100/100 的代码规范项不比 95/100 的行为缺陷更严重。自动 lint 的 2,403 条原始诊断另列，不混入这组确认事项。
 
 | ID | 类型 | 源码位置 | 事项 |
 | --- | --- | --- | --- |
-| [D-011] | 行为/错误路径 | `src/render/SceneAdapter.cpp:348` | Opening reset changes detail without its property notification |
-| [D-012] | 代码规范/维护 | `src/render/opening/OpeningController.h:93` | Phase 枚举末项缺少尾随逗号 |
-| [D-013] | 代码规范/维护 | `src/render/opening/OpeningFrame.h:24` | OpeningFrame 用 QString 表达封闭阶段词汇 |
-| [D-014] | 行为/错误路径 | `src/render/rhi/SceneCovers.cpp:135` | Standalone cover lease keeps the old decoder generation after selection reset |
-| [D-015] | 行为/错误路径 | `src/render/text/TextLayoutAdapter.cpp:250` | Main-title ellipsis overlaps right-to-left text |
-| [D-016] | 代码规范/维护 | `src/render/rhi/ScenePipeline.h:12` | Scene-pipeline enums omit required trailing commas |
-| [D-017] | 行为/错误路径 | `src/services/CoverCache.cpp:535` | Output image allocation failure is cached as successful artwork |
-| [D-018] | 行为/错误路径 | `src/services/metadata/MetadataCachePolicy.cpp:99` | Rejected release becomes the preferred release for future queries |
-| [D-019] | 行为/错误路径 | `src/services/metadata/WikipediaSource.cpp:158` | Wikipedia fallback accepts an artist name embedded in another name |
-| [D-020] | 行为/错误路径 | `tests/render/LibraryChecks.cpp:268` | Theme render failures do not fail the settings probe |
 | [D-021] | 行为/错误路径 | `tests/render/RhiShellChecks.cpp:145` | Incomplete shell fixture can pass the source-state gate |
 | [D-022] | 行为/错误路径 | `tests/render/StartupChecks.cpp:807` | Startup probe can overwrite an earlier run’s evidence |
 | [D-023] | 行为/错误路径 | `tests/unit/DirectoryScannerTest.cpp:381` | Cancellation regression never establishes the late-completion boundary |
@@ -65,7 +55,7 @@
 
 **Files reviewed**: 369（66,262 行）
 
-**Issues found**: 900（878 from original lint，22 unresolved from deep analysis；lint 是原始诊断计数）
+**Issues found**: 890（878 from original lint，12 unresolved from deep analysis；lint 是原始诊断计数）
 
 **Agents**: 27（独立分片，逐文件编号读取并恢复截断内容）
 
@@ -115,86 +105,6 @@
 ---
 
 ### Deep analysis findings
-
-#### [D-011] Opening reset changes detail without its property notification
-- **File**: `src/render/SceneAdapter.cpp:348`
-- **Category**: Performance & Code Quality
-- **Confidence**: 96/100
-- **Finding**: `setOpeningTime()` resets `m_detail` to zero without emitting `detailChanged()`. Replaying the opening from a nonzero detail state therefore leaves observers of the `detail` property stale. `frameChanged()` does not notify bindings subscribed to `detailChanged()`.
-- **Trace**: `SceneAdapter.h:40` declares the notification dependency. `OpeningController::replay()` calls `setOpeningTime()` at `src/render/opening/OpeningController.cpp:39`; its preceding selection reset does not notify `SceneAdapter::detailChanged`. `qml/Yalahoo/Music/scene/GeometryScene.qml:15` binds `adapter.detail`. Production RHI reads the value during frame publication, so that consumer does receive the new value.
-- **Mitigation**: Detect whether detail changed, establish the complete opening state, and emit `detailChanged()` when the reset changes the property.
-
-#### [D-012] Phase 枚举末项缺少尾随逗号
-- **File**: `src/render/opening/OpeningController.h:93`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: `Phase::Done` 缺少尾随逗号，不符合 A4 的 ENM-1。此项仅为代码规范问题。
-- **Trace**: 已读取完整 Phase 定义；不在已知 lint 结果中。
-- **Mitigation**: 为枚举末项补充尾随逗号。
-
-#### [D-013] OpeningFrame 用 QString 表达封闭阶段词汇
-- **File**: `src/render/opening/OpeningFrame.h:24`
-- **Category**: API, Naming & C++ Correctness
-- **Confidence**: 98/100
-- **Finding**: `phase` 的封闭取值为 logo/orbit/slogan/array，却在内部以 QString 保存，不符合 A4 的 ENM-8，无法获得枚举域和穷尽检查。
-- **Trace**: OpeningFrame 默认值、openingFrame() 的四阶段赋值及 values() 字符串输出均已检查；该词汇由项目定义。
-- **Mitigation**: 内部使用具名枚举，在 QVariantMap 输出边界转换为既有字符串。
-
-#### [D-014] Standalone cover lease keeps the old decoder generation after selection reset
-- **File**: `src/render/rhi/SceneCovers.cpp:135`
-- **Category**: Ownership & Lifecycle
-- **Confidence**: 100/100
-- **Finding**: Switching from a selection-backed scene to standalone mode recreates the demo cover lease with the default `coverGeneration = 1`. However, `resetPool()` has just called `m_covers.reset()`, which increments the decoder generation. Every subsequent demo snapshot therefore fails `SelectedCoverPool::upgrade()`’s generation check. The standalone cover remains transparent or retains its previous image, and cannot accept later resolution upgrades.
-- **Trace**: `SceneCovers::setSelection()` → `Private::resetPool()` at lines 257–270 → `CoverCache::reset()` at lines 296–305; `SelectedCoverPool::acquire()` defaults `coverGeneration` to 1 in `AtlasAllocator.h:89`; `SelectedCoverPool::upgrade()` rejects generation mismatches at `AtlasAllocator.cpp:248`. Both `requestDemoCover()` and `handleCoverReady()` rely on that upgrade succeeding. `SceneItem::setAdapter()` and selection changes in `updatePolish()` reach this transition.
-- **Mitigation**: Create the replacement demo lease using the current `m_covers.generation()`, as the owned-cover path already does.
-
-#### [D-015] Main-title ellipsis overlaps right-to-left text
-- **File**: `src/render/text/TextLayoutAdapter.cpp:250`
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 95/100
-- **Finding**: The two-line clamping path removes glyphs from the end of logical string order, checks only their right edge against the available width, then places the ellipsis at `last.x + last.width`. Hebrew/Arabic glyphs advance toward decreasing visual x. Their last logical glyph is consequently near the left edge, so the width check often removes nothing and the ellipsis is placed over retained text. Long RTL or mixed-direction album titles reach this path when they still exceed two lines at the minimum font size.
-- **Trace**: `TitleReel::reconcile()` passes album titles to `measure()` (`TitleReel.cpp:576`); `fitTitle()` selects clamping when no candidate fits (`TextLayoutAdapter.cpp:296`); `shape()` sorts groups by logical string index (`184–188`) and performs the direction-insensitive placement (`250–259`). The adjacent transport implementation explicitly addresses this problem through Qt bidi-aware elision (`278–281`). Existing Hebrew/Arabic/mixed elision tests call `measure(..., transport=true)` (`tests/unit/TitleTest.cpp:122`), leaving album-title clamping uncovered.
-- **Mitigation**: Elide the final visible line through Qt’s bidirectional text handling, then shape the resulting complete line. Preserve grapheme boundaries and test clamped Hebrew, Arabic, and mixed-direction album titles for ellipsis placement, overlap, and width.
-
-#### [D-016] Scene-pipeline enums omit required trailing commas
-- **File**: `src/render/rhi/ScenePipeline.h:12`
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: `ScenePass::Shell` and `InstanceMode::Instanced` lack trailing commas, violating the requested ENM-1 enum convention.
-- **Trace**: Complete declarations inspected at `ScenePipeline.h:9–17`; these locations are absent from the supplied lint results.
-- **Mitigation**: Apply the enum trailing-comma convention consistently.
-
-#### [D-017] Output image allocation failure is cached as successful artwork
-- **File**: `src/services/CoverCache.cpp:535`
-- **Category**: Error Handling & Validation
-- **Confidence**: 93/100
-- **Finding**: `paint()` constructs the destination `QImage` without checking allocation success, and `makeMipmaps()` likewise accepts unchecked conversion and allocation results. When painting returns a null image after source decoding succeeded, `pixels->error` remains empty. `complete()` caches and publishes that snapshot as valid artwork. `SelectedCoverPool::upgrade()` rejects its incorrect image dimensions, but `SceneCovers::requestDetailedCover()` subsequently hits the cached snapshot and returns without setting `failedResolution`. With a retained thumbnail, preparation can remain incomplete indefinitely because the requested detailed image is neither usable nor recognized as failed.
-- **Trace**: Followed `request()` validation → `paint()` at lines 387–435 → `decode()` at lines 517–564 → `complete()` at lines 568–605; confirmed downstream handling in `src/render/rhi/AtlasAllocator.cpp:242` and `src/render/rhi/SceneCovers.cpp:378`. Existing allocation-policy coverage checks source decoding limits, not destination canvas or mip allocation failure.
-- **Mitigation**: Check conversion, canvas, mip and tile allocation results before publishing. Propagate an explicit terminal failure through the existing error protocol, preserve available lower-resolution artwork, and avoid admitting malformed snapshots as successful cache entries.
-
-#### [D-018] Rejected release becomes the preferred release for future queries
-- **File**: `src/services/metadata/MetadataCachePolicy.cpp:99`
-- **Category**: Error Handling & Validation
-- **Confidence**: 95/100
-- **Finding**: `stampMetadata()` stores the attempted release ID for every outcome, including `Uncertain` after the release fails album/track validation and `Error` before validation completes. It also gives that state a new `checkedAt`. `preferredRelease()` chooses between credits and enrichment IDs by timestamp alone. Consequently, selecting an incorrect candidate can replace an older verified release ID and steer subsequent credits/enrichment requests repeatedly toward the rejected release, contrary to the contract’s requirement to reuse the newest **verified** ID.
-- **Trace**: `MetadataWorker::Private::release()` records the attempted ID at line 242; `receiveRelease()` lines 376–379 finishes even when `musicBrainzMetadata()` returns `Uncertain`; `finish()` lines 493–494 passes that ID to `stampMetadata()`. `MusicBrainzSource.cpp:150–152` confirms that failed identity matching produces `Uncertain` before publishing a validated release payload. `mergeMetadata()` retains the stamped state, and `preferredRelease()` lines 29–46 subsequently selects its ID without checking validation. Existing `releaseChoiceAndGenreEnrichment` coverage checks successful candidate selection, not rejected or failed candidates.
-- **Mitigation**: Separate attempted lookup identity from verified release identity. Update the reusable release ID only after identity and complete track validation succeeds, preserving any previous verified ID on uncertain or failed attempts. Include a regression where a rejected candidate follows a successful release and the next query still uses the verified release.
-
-#### [D-019] Wikipedia fallback accepts an artist name embedded in another name
-- **File**: `src/services/metadata/WikipediaSource.cpp:158`
-- **Category**: Error Handling & Validation
-- **Confidence**: 97/100
-- **Finding**: The text fallback removes whitespace and punctuation, then accepts any substring containing the normalized artist. It can therefore match another artist’s album. For example, a local album titled `Moon`, artist `Air`, year `1997`, accepts a same-title page whose introduction is `Moon is an album by Chair, released in 1997.` With no structured performer/date claims, every check passes because `chair` contains `air`, and the result becomes `Matched`. The accepted introduction and source can replace the local album’s description.
-- **Trace**: Followed `metadataName`, `wikipediaMetadata` title/type/year/performer checks, `MetadataWorker::Private::receivePages` and `assess`, and `MetadataMerge.cpp:75–79`. Direct-title lookup can supply this page before the artist-qualified search. Existing `wikipediaChecksIdentityAndAttribution` tests allow fallback without entities but do not cover artist substring collisions.
-- **Mitigation**: Preserve appropriate name boundaries and require affirmative performer attribution when using text evidence; return `Uncertain` when that evidence is insufficient. Add a regression for a short artist name embedded in another performer’s name.
-
-#### [D-020] Theme render failures do not fail the settings probe
-- **File**: `tests/render/LibraryChecks.cpp:268`
-- **Category**: Error Handling & Validation
-- **Confidence**: 93/100
-- **Finding**: Both theme-transition calls to `renderSettingsTarget()` discard their results (lines 268 and 271). That helper returns false when rendering or receipt of matching submission telemetry times out. The subsequent `theme-keeps-resources` check compares cached `lastSettingsSample` against the baseline, so it can pass unchanged after a failed theme render. A failure confined to the night transition can therefore escape the report when rendering resumes after restoring day mode.
-- **Trace**: Followed `verifySettingsInputs()` → `renderSettingsFrame()` → `collectSettingsSample()`. The helper checks actual rendering and matching input revision/target size, but neither transition contributes its result to `passed`. The resource assertion does not establish that either transition produced a fresh sample.
-- **Mitigation**: Record both transition results through `check()` and require a successful current submission before comparing resource telemetry.
 
 #### [D-021] Incomplete shell fixture can pass the source-state gate
 - **File**: `tests/render/RhiShellChecks.cpp:145`
@@ -327,12 +237,12 @@
 | Category | Lint | Deep | Investigate | Total |
 | --- | ---: | ---: | ---: | ---: |
 | 原始 lint 规则诊断（未按深度领域重分类） | 878 | 0 | 0 | 878 |
-| API, Naming & C++ Correctness | 0 | 9 | 0 | 9 |
-| Error Handling & Validation | 0 | 15 | 0 | 15 |
+| API, Naming & C++ Correctness | 0 | 4 | 0 | 4 |
+| Error Handling & Validation | 0 | 7 | 0 | 7 |
 | Model Contracts | 0 | 0 | 1 | 1 |
-| Ownership & Lifecycle | 0 | 2 | 0 | 2 |
-| Performance & Code Quality | 0 | 6 | 2 | 8 |
-| **Total** | **878** | **32** | **3** | **913** |
+| Ownership & Lifecycle | 0 | 1 | 0 | 1 |
+| Performance & Code Quality | 0 | 0 | 2 | 2 |
+| **Total** | **878** | **12** | **3** | **893** |
 
 Findings below confidence 60 are suppressed. 诊断、确认事项和调查项的计数不可解释为同等严重性的缺陷总数。
 

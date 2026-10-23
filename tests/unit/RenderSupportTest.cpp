@@ -1,3 +1,4 @@
+#include "SettingsResourceChecks.h"
 #include "CaptureMailbox.h"
 #include "MaterialReviewInput.h"
 #include "SceneItem.h"
@@ -42,6 +43,44 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void settingsTransitionsRejectStaleSamples()
+    {
+        const QJsonObject baseline{ { u"resourceGeneration"_s, 7 },
+                                    { u"postprocessRevision"_s, 9 } };
+        for (const bool nightRenders : { false, true }) {
+            for (const bool dayRenders : { false, true }) {
+                QJsonObject results;
+                const auto sample = baseline;
+                auto check = [&](const QString &name, bool passed) {
+                    results.insert(name, passed);
+                };
+                auto night = [&] {
+                    return nightRenders;
+                };
+                auto day = [&] {
+                    return dayRenders;
+                };
+                checkSettingsTransition(check, night, sample, baseline, u"night"_s);
+                checkSettingsTransition(check, day, sample, baseline, u"day"_s);
+                QCOMPARE(results[u"night-resource-render"_s].toBool(), nightRenders);
+                QCOMPARE(results[u"night-keeps-resources"_s].toBool(), nightRenders);
+                QCOMPARE(results[u"day-resource-render"_s].toBool(), dayRenders);
+                QCOMPARE(results[u"day-keeps-resources"_s].toBool(), dayRenders);
+            }
+        }
+        QJsonObject results;
+        auto check = [&](const QString &name, bool passed) {
+            results.insert(name, passed);
+        };
+        auto render = [] {
+            return true;
+        };
+        auto changed = baseline;
+        changed.insert(u"resourceGeneration"_s, 8);
+        checkSettingsTransition(check, render, changed, baseline, u"changed"_s);
+        QVERIFY(results[u"changed-resource-render"_s].toBool());
+        QVERIFY(!results[u"changed-keeps-resources"_s].toBool());
+    }
     void materialCaptureDimensions()
     {
         QCOMPARE(materialReviewSize({ }).value(), QSize(960, 720));

@@ -38,6 +38,26 @@ public:
 private:
     QJsonObject oracle;
 private Q_SLOTS:
+    void openingResetNotifiesDetailObservers()
+    {
+        FrameClock clock;
+        SceneAdapter scene(&clock);
+        for (const auto time : { std::optional<double>(22.0), std::optional<double>() }) {
+            scene.setDetail(.7);
+            QSignalSpy notified(&scene, &SceneAdapter::detailChanged);
+            bool consistent = false;
+            const auto connection = connect(&scene, &SceneAdapter::detailChanged, &scene, [&] {
+                consistent = scene.detail() == 0;
+            });
+            scene.setOpeningTime(time);
+            QCOMPARE(scene.detail(), 0.0);
+            QCOMPARE(notified.size(), 1);
+            QVERIFY(consistent);
+            scene.setOpeningTime(time);
+            QCOMPARE(notified.size(), 1);
+            disconnect(connection);
+        }
+    }
     void clipPlanesAgreeWithIndependentCornerOracle()
     {
         const auto cornerOracle = [](const QMatrix4x4 &matrix) {

@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <memory>
+#include <functional>
 
 namespace yalahoo {
 namespace coverCache {
@@ -43,7 +44,9 @@ class CoverCache final : public QObject
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(CoverCache)
 public:
-    explicit CoverCache(QObject *parent = nullptr);
+    // Optional allocator runs on decoder workers and returns owned image storage.
+    using ImageAllocator = std::function<QImage(QSize, QImage::Format)>;
+    explicit CoverCache(QObject *parent = nullptr, ImageAllocator allocator = { });
     ~CoverCache() override;
     // Final process teardown only, while QGuiApplication/font services still exist.
     static void finishDecoders();
@@ -57,8 +60,9 @@ public:
     quint64 generation() const;
     QJsonObject statistics() const;
     bool hasPendingCapacity() const;
-    static QList<QImage> makeMipmaps(const QImage &image);
-    static QImage paint(const QImage &source, int resolution, const QString &title);
+    static QList<QImage> makeMipmaps(const QImage &image, const ImageAllocator &allocator = { });
+    static QImage paint(const QImage &source, int resolution, const QString &title,
+                        const ImageAllocator &allocator = { });
     static constexpr int concurrency = 3;
     static constexpr int pendingLimit = 96;
     static constexpr qint64 cacheLimit = 16 * 1024 * 1024;

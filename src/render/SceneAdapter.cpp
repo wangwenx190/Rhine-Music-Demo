@@ -343,6 +343,7 @@ void SceneAdapter::setOpeningTime(std::optional<double> time, double dt)
 {
     if ((time && !std::isfinite(*time)) || !std::isfinite(dt))
         return;
+    const bool detailReset = d->m_detail != 0;
     d->m_openingTime = time;
     d->m_managedDetail = false;
     d->m_detail = 0;
@@ -356,6 +357,8 @@ void SceneAdapter::setOpeningTime(std::optional<double> time, double dt)
         observe(d->m_frame.camera, 0);
     }
     updateLighting(dt);
+    if (detailReset)
+        Q_EMIT detailChanged();
 }
 void SceneAdapter::observe(CameraPose pose, double dt)
 {

@@ -44,6 +44,17 @@ public:
     OpeningTest() = default;
 
 private Q_SLOTS:
+    void typedPhasesKeepPublishedNames()
+    {
+        QCOMPARE(OpeningFrame().phase, OpeningFrame::Phase::Logo);
+        QCOMPARE(openingFrame(0).values()[u"phase"_s].toString(), u"logo"_s);
+        QCOMPARE(openingFrame(1.8).phase, OpeningFrame::Phase::Orbit);
+        QCOMPARE(openingFrame(1.8).values()[u"phase"_s].toString(), u"orbit"_s);
+        QCOMPARE(openingFrame(2.9).phase, OpeningFrame::Phase::Slogan);
+        QCOMPARE(openingFrame(2.9).values()[u"phase"_s].toString(), u"slogan"_s);
+        QCOMPARE(openingFrame(6.4).phase, OpeningFrame::Phase::Array);
+        QCOMPARE(openingFrame(6.4).values()[u"phase"_s].toString(), u"array"_s);
+    }
     void drawingSnapshotsFollowTimelineAndReplay()
     {
         Fixture f;

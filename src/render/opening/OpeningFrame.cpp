@@ -13,6 +13,20 @@ using namespace Qt::StringLiterals;
 
 namespace yalahoo {
 namespace {
+QString phaseName(OpeningFrame::Phase phase)
+{
+    switch (phase) {
+    case OpeningFrame::Phase::Logo:
+        return u"logo"_s;
+    case OpeningFrame::Phase::Orbit:
+        return u"orbit"_s;
+    case OpeningFrame::Phase::Slogan:
+        return u"slogan"_s;
+    case OpeningFrame::Phase::Array:
+        return u"array"_s;
+    }
+    Q_UNREACHABLE();
+}
 double unit(double t, double from, double to)
 {
     return std::clamp((t - from) / (to - from), 0.0, 1.0);
@@ -63,10 +77,10 @@ OpeningFrame openingFrame(double time)
     const double in = settle(unit(t, TitleEnterStartSeconds, TitleEnterEndSeconds)),
                  out = openingSmooth(unit(t, TitleExitStartSeconds, TitleExitEndSeconds));
     OpeningFrame f;
-    f.phase = t < LogoExitStartSeconds    ? u"logo"_s
-            : t < SloganPhaseStartSeconds ? u"orbit"_s
-            : t < ArrayPhaseStartSeconds  ? u"slogan"_s
-                                          : u"array"_s;
+    f.phase = t < LogoExitStartSeconds    ? OpeningFrame::Phase::Logo
+            : t < SloganPhaseStartSeconds ? OpeningFrame::Phase::Orbit
+            : t < ArrayPhaseStartSeconds  ? OpeningFrame::Phase::Slogan
+                                          : OpeningFrame::Phase::Array;
     f.background = 1 - openingSmooth(unit(t, TitleExitEndSeconds, BackgroundExitEndSeconds));
     f.mark = openingSmooth(unit(t, MarkEnterStartSeconds, MarkEnterEndSeconds))
             * (1 - openingSmooth(unit(t, LogoExitStartSeconds, MarkExitEndSeconds)));
@@ -88,19 +102,13 @@ OpeningFrame openingFrame(double time)
 }
 QVariantMap OpeningFrame::values() const
 {
-    return { { u"background"_s, background },
-             { u"mark"_s, mark },
-             { u"contour"_s, contour },
-             { u"symbols"_s, symbols },
-             { u"orbit"_s, orbit },
-             { u"orbitDraw"_s, orbitDraw },
-             { u"orbitTurn"_s, orbitTurn },
-             { u"orbitScale"_s, orbitScale },
-             { u"title"_s, title },
-             { u"titleY"_s, titleY },
-             { u"titleClip"_s, titleClip },
-             { u"subtitle"_s, subtitle },
-             { u"phase"_s, phase } };
+    return { { u"background"_s, background }, { u"mark"_s, mark },
+             { u"contour"_s, contour },       { u"symbols"_s, symbols },
+             { u"orbit"_s, orbit },           { u"orbitDraw"_s, orbitDraw },
+             { u"orbitTurn"_s, orbitTurn },   { u"orbitScale"_s, orbitScale },
+             { u"title"_s, title },           { u"titleY"_s, titleY },
+             { u"titleClip"_s, titleClip },   { u"subtitle"_s, subtitle },
+             { u"phase"_s, phaseName(phase) } };
 }
 double openingSceneTime(double time)
 {
