@@ -228,15 +228,6 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
             track.insert(u"sourceUrl"_s, QUrl::fromLocalFile(path).toString());
             track.insert(u"mediaSupport"_s, u"Unknown"_s);
             track.remove(u"_qtProbeVersion"_s);
-            QString coverError;
-            const auto cover = copyCover(track.value(u"_embeddedCover"_s).toObject(), sourceRoot,
-                                         root, dataRoot, coverError);
-            if (!coverError.isEmpty())
-                track.insert(u"_coverImportError"_s, coverError);
-            if (cover.isEmpty())
-                track.remove(u"_embeddedCover"_s);
-            else
-                track.insert(u"_embeddedCover"_s, cover);
             tracks.append(track);
         }
         album.insert(u"id"_s, albumId);
@@ -252,16 +243,7 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
             producers.append(person);
         }
         album.insert(u"producers"_s, producers);
-        QString coverError;
-        const auto cover = copyCover(album.value(u"_cover"_s).toObject(), sourceRoot, root,
-                                     dataRoot, coverError);
         album.remove(u"coverUrl"_s);
-        if (!cover.isEmpty()) {
-            album.insert(u"coverUrl"_s,
-                         QUrl::fromLocalFile(cover.value(u"path"_s).toString()).toString());
-        } else if (!coverError.isEmpty()) {
-            album.insert(u"_coverImportError"_s, coverError);
-        }
         albums.append(album);
     }
     auto genres = rules.value(u"genres"_s).toArray();
@@ -306,6 +288,29 @@ ScanResult LegacyImporter::read(const QString &sourceRoot, const QString &dataRo
     if (stopped()) {
         result.cancelled = true;
         return result;
+    }
+    // Schema validation and cancellation finish before committing optional artwork.
+    // Cover errors are retained on the successfully imported records, never a failed result.
+    for (auto &album : next.albums) {
+        const auto root = album.fields.value(u"_root"_s).toString();
+        for (auto &track : album.tracks) {
+            QString coverError;
+            const auto cover = copyCover(track.fields.value(u"_embeddedCover"_s).toObject(),
+                                         sourceRoot, root, dataRoot, coverError);
+            if (!coverError.isEmpty())
+                track.fields.insert(u"_coverImportError"_s, coverError);
+            if (cover.isEmpty())
+                track.fields.remove(u"_embeddedCover"_s);
+            else
+                track.fields.insert(u"_embeddedCover"_s, cover);
+        }
+        QString coverError;
+        const auto cover = copyCover(album.fields.value(u"_cover"_s).toObject(), sourceRoot, root,
+                                     dataRoot, coverError);
+        if (!cover.isEmpty())
+            album.coverUrl = QUrl::fromLocalFile(cover.value(u"path"_s).toString());
+        else if (!coverError.isEmpty())
+            album.fields.insert(u"_coverImportError"_s, coverError);
     }
     result.snapshot = std::make_shared<const LibrarySnapshot>(std::move(next));
     return result;

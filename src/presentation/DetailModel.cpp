@@ -114,8 +114,7 @@ QString lookupStatus(const QJsonObject &lookup, bool retained, bool credits, int
     if (!lookup.value(u"retryAt"_s).toString().isEmpty())
         result += QCoreApplication::translate("Yalahoo", " Retry at: %1.")
                           .arg(lookup.value(u"retryAt"_s).toString());
-    return result + kept
-            + QCoreApplication::translate("Yalahoo", " Online queries are not enabled yet.");
+    return result + kept;
 }
 }
 struct DetailModel::Private final

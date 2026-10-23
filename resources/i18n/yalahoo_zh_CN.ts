@@ -1178,10 +1178,6 @@ Source: </source>
         <translation> 重试时间：%1。</translation>
     </message>
     <message>
-        <source> Online queries are not enabled yet.</source>
-        <translation> 在线查询暂未启用。</translation>
-    </message>
-    <message>
         <source> Temporarily offline. The original index was retained.</source>
         <translation> 暂时离线，原索引已保留。</translation>
     </message>
@@ -1730,6 +1726,21 @@ Query status: %2</source>
     <message>
         <source>No MusicBrainz metadata available</source>
         <translation>暂无 MusicBrainz 资料</translation>
+    </message>
+</context>
+<context>
+    <name>yalahoo::AlbumListModel</name>
+    <message>
+        <source>Artists</source>
+        <translation>艺术家</translation>
+    </message>
+    <message>
+        <source>Album titles</source>
+        <translation>专辑标题</translation>
+    </message>
+    <message>
+        <source>Genres</source>
+        <translation>流派</translation>
     </message>
 </context>
 <context>

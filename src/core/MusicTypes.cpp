@@ -101,11 +101,13 @@ QUrl localUrl(const QString &value)
     if (value.isEmpty() || value.contains(QChar::Null))
         return { };
     const QUrl url(value);
-    if (url.isLocalFile())
-        return url.isValid() && !url.hasQuery() && !url.hasFragment()
-                        && QDir::isAbsolutePath(url.toLocalFile())
+    if (url.isLocalFile()) {
+        const auto path = url.toLocalFile();
+        return url.isValid() && !url.hasQuery() && !url.hasFragment() && !path.contains(QChar::Null)
+                        && QDir::isAbsolutePath(path)
                 ? url
                 : QUrl{ };
+    }
     return QDir::isAbsolutePath(value) && !value.startsWith("//"_L1) ? QUrl::fromLocalFile(value)
                                                                      : QUrl{ };
 }

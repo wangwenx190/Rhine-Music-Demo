@@ -1,6 +1,6 @@
 # 全项目 Qt 官方 skill 只读审查
 
-确认 **24 项功能/工具/验证设施问题**（均为 P2），另有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
+确认 **16 项功能/工具/验证设施问题**（均为 P2），另有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
 
 审查对象为下述提交对应的干净源码工作树；审查未修改源码、契约或迁移计划。本文为用户要求保留的审查快照，不替代项目契约；结论和行号均以该提交为准。没有启动可见窗口、物理设备测试、性能采样或私人曲库扫描。
 
@@ -20,14 +20,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 
 | ID | 类别 | 定位 | 问题 |
 |---|---|---|---|
-| D-001 | C++产品 / P2 | [src/library/LegacyImporter.cpp:232](src/library/LegacyImporter.cpp#L232) | 导入最终校验失败前已写入目标封面缓存 |
-| D-002 | C++产品 / P2 | [src/core/MusicTypes.cpp:105](src/core/MusicTypes.cpp#L105) | file URL未在百分号解码后拒绝NUL |
-| D-003 | 工具 / P2 | [tools/deploy/windows.ps1:116](tools/deploy/windows.ps1#L116) | Windows部署遗漏Qt及随附媒体依赖许可目录 |
-| D-004 | C++产品 / P2 | [src/presentation/DetailModel.cpp:117](src/presentation/DetailModel.cpp#L117) | 联网查询成功后仍显示联网未启用 |
-| D-005 | C++产品 / P2 | [src/presentation/PresentationController.h:51](src/presentation/PresentationController.h#L51) | 切换阵列模式后详情导航按钮缺少属性通知 |
-| D-006 | C++产品 / P2 | [src/render/RenderQuality.cpp:23](src/render/RenderQuality.cpp#L23) | 有限的景深偏好仍可超出生产float参数范围 |
-| D-007 | 工具 / P2 | [tools/assets/prepare-assets.ps1:26](tools/assets/prepare-assets.ps1#L26) | Windows资产入口未解析冻结提交映射，生成后必然报来源失败 |
-| D-008 | QML产品 / P2 | [qml/Yalahoo/Music/pages/Overview.qml:15](qml/Yalahoo/Music/pages/Overview.qml#L15) | 排序改变后总览仍把所有列称为流派 |
 | D-009 | QML产品 / P2 | [qml/Yalahoo/Music/components/TransportTitle.qml:35](qml/Yalahoo/Music/components/TransportTitle.qml#L35) | 可获得键盘焦点的歌曲定位按钮没有焦点反馈 |
 | D-010 | QML产品 / P2 | [qml/Yalahoo/Music/panels/MetadataSettings.qml:83](qml/Yalahoo/Music/panels/MetadataSettings.qml#L83) | 即时保存其他配置会覆盖联系方式与代理地址草稿 |
 | D-011 | C++产品 / P2 | [src/render/text/TextLayoutAdapter.cpp:275](src/render/text/TextLayoutAdapter.cpp#L275) | 长RTL歌名的省略算法丢掉可显示正文 |
@@ -46,88 +38,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 | D-024 | 工具 / P2 | [tools/migration/RulerSourceProbe.cpp:560](tools/migration/RulerSourceProbe.cpp#L560) | 空滑尺状态集可在未执行来源数学比较时报告验证通过 |
 
 ## 详细发现
-
-#### [D-001] [P2] 导入最终校验失败前已写入目标封面缓存
-
-- **File**: [src/library/LegacyImporter.cpp:232](src/library/LegacyImporter.cpp#L232)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：含有效引用封面、duration字符串等坏schema的旧索引。 影响：导入失败仍创建/写入目标artwork文件，不符合library-data.md的失败不改现有缓存契约。
-- **Trace**: LegacyImporter::read 232,256 → copyCover 101 → ArtworkStore::copy 107 → persist 47–63；最终readLibrary校验304。
-- **Mitigation**: 完整校验后才复制；如需接受前事务性则暂存后提交并在失败取消时清理。
-- **Evidence**: Qt6.12/现有Release库最小匿名探针：snapshot false, error Invalid track duration, persistedArtworkFiles 1
-
-
-#### [D-002] [P2] file URL未在百分号解码后拒绝NUL
-
-- **File**: [src/core/MusicTypes.cpp:105](src/core/MusicTypes.cpp#L105)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：file:///tmp/song%00.flac。 影响：非法本地路径被领域模型接受，传播给封面与媒体探测。
-- **Trace**: localUrl 99–110 → readLibrary source/folder/cover/roots；PlaybackQueue另有解码后防护，MediaMetadataProbe只查isLocalFile。Qt6.12最小探针valid/local/absolute/decodedNul均true。
-- **Mitigation**: 缓存toLocalFile结果并检查NUL/绝对性，补歌曲/封面/目录编码NUL回归。
-
-
-#### [D-003] [P2] Windows部署遗漏Qt及随附媒体依赖许可目录
-
-- **File**: [tools/deploy/windows.ps1:116](tools/deploy/windows.ps1#L116)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：执行Windows生产部署。 影响：生成包包含Qt/media二进制，licenses/Qt未生成，总NOTICE链接失效且与项目随包要求不符。
-- **Trace**: windows.ps1只复制resources/licenses、MiSans及audio；Unix copy_licenses另复制所选Kit祖先Licenses到Qt。resources/licenses/NOTICE.md承诺../Qt完整文本。
-- **Mitigation**: Windows按Unix同样定位所选Kit许可证目录，缺目录报错并在包完整性校验纳入。
-
-
-#### [D-004] [P2] 联网查询成功后仍显示联网未启用
-
-- **File**: [src/presentation/DetailModel.cpp:117](src/presentation/DetailModel.cpp#L117)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: 触发：启用联网、查询成功或失败后查看详情介绍/制作资料。 影响：真实状态与固定提示矛盾，误导用户以为功能不可用。
-- **Trace**: lookupStatus无条件后缀 → prepare生成introductionStatus/creditsStatus → DetailIntroduction.qml 41/87展示。main.cpp注入OnlineMetadataProvider并按metadata变化refresh。
-- **Mitigation**: 去除过时后缀；若显示开关状态则使用实际能力并监听变更。补成功资料状态断言。
-
-
-#### [D-005] [P2] 切换阵列模式后详情导航按钮缺少属性通知
-
-- **File**: [src/presentation/PresentationController.h:51](src/presentation/PresentationController.h#L51)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 97/100
-- **Finding**: 触发：真实列首/尾专辑详情→设置改填充模式→关闭设置，或反向切换。 影响：getter变化但绑定不刷新，上一张/下一张保留过时enabled，直至其他详情状态改变。
-- **Trace**: SettingsController::update arrayMode → SelectionController::setRealistic 300–321仅arrayModeChanged/selectionChanged；PresentationPorts navigationEnabled读取realistic；PresentationController canMovePrevious/Next仅NOTIFY changed；transact只比较phase/wantsDetail/pending。QML DetailAlbumInfo按钮enabled绑定。
-- **Mitigation**: 明确转发导航依赖变更，派生值变化时发NOTIFY；补保留同一QML详情实例双向切模式的首尾边界回归。
-
-
-#### [D-006] [P2] 有限的景深偏好仍可超出生产float参数范围
-
-- **File**: [src/render/RenderQuality.cpp:23](src/render/RenderQuality.cpp#L23)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 97/100
-- **Finding**: 触发：导入{"schemaVersion":1,"renderQuality":{"depthOfField":1e308}}。 影响：接受并持久化的参数在生产窄化时超范围；常见实现为infinity，焦距差0乘inf可产生NaN，具体GPU画面未实测。
-- **Trace**: PreferencesStore validate195–202/导入274–297仅finite非负double → SettingsController apply → RenderQuality configure → SceneItem 914–915将aperture转float → RhiRenderer872/Postprocess295上传 → Bokeh10–12使用。
-- **Mitigation**: 接纳时验证最大detail下计算结果的float有限范围；窄化边界再校验；或安全实现大值饱和且零焦距差为零语义。补极大有限值贯穿回归。
-
-
-#### [D-007] [P2] Windows资产入口未解析冻结提交映射，生成后必然报来源失败
-
-- **File**: [tools/assets/prepare-assets.ps1:26](tools/assets/prepare-assets.ps1#L26)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: 触发：当前仓库执行Windows prepare-assets.ps1，原生工具成功后进入重复来源检查。 影响：原始:path查找失败，合法冻结输入被误报，整个Windows资产入口非零退出；此时原生工具已经生成输出。
-- **Trace**: manifest baselineCommit原始57f4… → prepare-assets.ps1直接git rev-parse原始:path；history-rewrite.json映射为df251…；C++verifyFrozenInputs及frozen-git.mjs均已用映射。
-- **Mitigation**: 复用原生工具的权威验证/移除冗余检查，或按同一映射解析后再Git查找；补映射提交且原提交无原路径的回归。
-- **Evidence**: 相同first entry public/assets/music-case-v040.glb：原始提交git rev-parse退出128，映射提交退出0并取得blob049bd567…；尚未执行WindowsPowerShell。
-
-
-#### [D-008] [P2] 排序改变后总览仍把所有列称为流派
-
-- **File**: [qml/Yalahoo/Music/pages/Overview.qml:15](qml/Yalahoo/Music/pages/Overview.qml#L15)
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 100/100
-- **Finding**: 触发：改按艺术家或专辑标题排序，进入总览（含持久化恢复该模式）。 影响：页标题、切换提示与Accessible名称均误称Genres，与真实列含义不符。
-- **Trace**: Overview columnKind默认Genres，无外部赋值；MusicStage 199–204创建时未绑定；AppearanceSettings→SettingsController→LibrarySession切换Artist/Album并生成对应列，标题72/提示144/标签95仍消费默认值。
-- **Mitigation**: 排序状态所有者提供可翻译类别并显式绑定到Overview，回归三种模式及持久化恢复。
-
 
 #### [D-009] [P2] 可获得键盘焦点的歌曲定位按钮没有焦点反馈
 
@@ -366,12 +276,9 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 | Yalahoo_qmllint、ui-tests_qmllint | Qt6.12.0官方target均通过 |
 | check-format | 通过，无格式化写入 |
 | 16项Release定向回归 | 最终全部通过；最初4项受沙箱屏幕/IPC限制失败，保持隐藏策略沙箱外定向复核后通过；两批原始结果均在本地保留 |
-| URL编码NUL探针 | valid/local/absolute/decodedNul均true，复现解析边界 |
-| LegacyImporter匿名探针 | snapshot=false、Invalid track duration，但目标新增1个artwork文件 |
 | 文本草稿等价Qt绑定探针 | insert后draft-old；其他配置更新后回到old |
 | 长RTL现有Release库探针 | 80px栏仅…，32px正文可以完整显示 |
 | PreferencesStore现有Release库探针 | A/B均接受；A失败后B仅留内存，析构后文件不存在 |
-| Windows冻结Git查找 | 原始提交:path退出128；映射提交:path退出0 |
 
 16项为 application-options、production-app-root、module-link-and-plugins、directory-scanner、library-data、media-metadata、playback、audio-ambience、online-metadata、single-instance、settings、json-file、qml-behavior、unix-deployment、linux-package-tools、launchers。使用已有Release产物，未重建全项目，未执行全量CTest或全量clang-tidy。通过结果不能覆盖本报告指出的遗漏分支。
 
@@ -391,7 +298,7 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 
 **Scope**: files: native cpp 全量；冻结 Web 仅作来源参照。
 **Files reviewed**: 358
-**Issues found**: 876 (856 from lint, 20 from deep analysis)
+**Issues found**: 871 (856 from lint, 15 from deep analysis)
 **Agents**: 26 (按行数分片；跨片检查 best effort，具体发现均另追踪调用链)
 **Framework mode**: off
 
@@ -439,57 +346,6 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 ---
 
 ### Deep analysis findings
-
-#### [D-001] [P2] 导入最终校验失败前已写入目标封面缓存
-
-- **File**: [src/library/LegacyImporter.cpp:232](src/library/LegacyImporter.cpp#L232)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：含有效引用封面、duration字符串等坏schema的旧索引。 影响：导入失败仍创建/写入目标artwork文件，不符合library-data.md的失败不改现有缓存契约。
-- **Trace**: LegacyImporter::read 232,256 → copyCover 101 → ArtworkStore::copy 107 → persist 47–63；最终readLibrary校验304。
-- **Mitigation**: 完整校验后才复制；如需接受前事务性则暂存后提交并在失败取消时清理。
-- **Evidence**: Qt6.12/现有Release库最小匿名探针：snapshot false, error Invalid track duration, persistedArtworkFiles 1
-
-
-#### [D-002] [P2] file URL未在百分号解码后拒绝NUL
-
-- **File**: [src/core/MusicTypes.cpp:105](src/core/MusicTypes.cpp#L105)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：file:///tmp/song%00.flac。 影响：非法本地路径被领域模型接受，传播给封面与媒体探测。
-- **Trace**: localUrl 99–110 → readLibrary source/folder/cover/roots；PlaybackQueue另有解码后防护，MediaMetadataProbe只查isLocalFile。Qt6.12最小探针valid/local/absolute/decodedNul均true。
-- **Mitigation**: 缓存toLocalFile结果并检查NUL/绝对性，补歌曲/封面/目录编码NUL回归。
-
-
-#### [D-003] [P2] 联网查询成功后仍显示联网未启用
-
-- **File**: [src/presentation/DetailModel.cpp:117](src/presentation/DetailModel.cpp#L117)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 100/100
-- **Finding**: 触发：启用联网、查询成功或失败后查看详情介绍/制作资料。 影响：真实状态与固定提示矛盾，误导用户以为功能不可用。
-- **Trace**: lookupStatus无条件后缀 → prepare生成introductionStatus/creditsStatus → DetailIntroduction.qml 41/87展示。main.cpp注入OnlineMetadataProvider并按metadata变化refresh。
-- **Mitigation**: 去除过时后缀；若显示开关状态则使用实际能力并监听变更。补成功资料状态断言。
-
-
-#### [D-004] [P2] 切换阵列模式后详情导航按钮缺少属性通知
-
-- **File**: [src/presentation/PresentationController.h:51](src/presentation/PresentationController.h#L51)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 97/100
-- **Finding**: 触发：真实列首/尾专辑详情→设置改填充模式→关闭设置，或反向切换。 影响：getter变化但绑定不刷新，上一张/下一张保留过时enabled，直至其他详情状态改变。
-- **Trace**: SettingsController::update arrayMode → SelectionController::setRealistic 300–321仅arrayModeChanged/selectionChanged；PresentationPorts navigationEnabled读取realistic；PresentationController canMovePrevious/Next仅NOTIFY changed；transact只比较phase/wantsDetail/pending。QML DetailAlbumInfo按钮enabled绑定。
-- **Mitigation**: 明确转发导航依赖变更，派生值变化时发NOTIFY；补保留同一QML详情实例双向切模式的首尾边界回归。
-
-
-#### [D-005] [P2] 有限的景深偏好仍可超出生产float参数范围
-
-- **File**: [src/render/RenderQuality.cpp:23](src/render/RenderQuality.cpp#L23)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 97/100
-- **Finding**: 触发：导入{"schemaVersion":1,"renderQuality":{"depthOfField":1e308}}。 影响：接受并持久化的参数在生产窄化时超范围；常见实现为infinity，焦距差0乘inf可产生NaN，具体GPU画面未实测。
-- **Trace**: PreferencesStore validate195–202/导入274–297仅finite非负double → SettingsController apply → RenderQuality configure → SceneItem 914–915将aperture转float → RhiRenderer872/Postprocess295上传 → Bokeh10–12使用。
-- **Mitigation**: 接纳时验证最大detail下计算结果的float有限范围；窄化边界再校验；或安全实现大值饱和且零焦距差为零语义。补极大有限值贯穿回归。
-
 
 #### [D-006] [P2] 长RTL歌名的省略算法丢掉可显示正文
 
@@ -708,10 +564,10 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 | TMO | 3 | 0 | 0 | 3 |
 | VAR | 134 | 0 | 0 | 134 |
 | A3. Thread Safety | 0 | 1 | 0 | 1 |
-| A4. API, Naming & C++ Correctness | 0 | 7 | 0 | 7 |
-| A5. Error Handling & Validation | 0 | 12 | 0 | 12 |
+| A4. API, Naming & C++ Correctness | 0 | 6 | 0 | 6 |
+| A5. Error Handling & Validation | 0 | 8 | 0 | 8 |
 | 待核实 | 0 | 0 | 4 | 4 |
-| **Total** | **856** | **20** | **4** | **880** |
+| **Total** | **856** | **15** | **4** | **875** |
 
 Findings below confidence 60 are suppressed.
 
@@ -722,7 +578,7 @@ Findings below confidence 60 are suppressed.
 
 **Scope**: files: native qml 全量；冻结 Web 仅作来源参照。
 **Files reviewed**: 93
-**Issues found**: 223 (220 from lint, 3 from deep analysis)
+**Issues found**: 222 (220 from lint, 2 from deep analysis)
 **Agents**: 6 (按行数分片；跨片检查 best effort，具体发现均另追踪调用链)
 **qmllint**: ran — 官方 CMake Yalahoo_qmllint / ui-tests_qmllint 均通过。
 
@@ -778,14 +634,6 @@ Findings below confidence 60 are suppressed.
 
 ### Deep analysis findings
 
-#### [D-001] [P2] 排序模式改变后，总览仍将所有列称为流派
-- **File**: `qml/Yalahoo/Music/pages/Overview.qml:15`
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 100/100
-- **Finding**: `columnKind`固定为 `qsTr("Genres")`，生产唯一宿主未给它传入实际排序模式。用户在设置中选择“By artist”或“By album title”后，总览实际展示艺术家列或专辑分组，但页标题仍显示“Browse collection by Genres”，切换提示仍显示“Switch Genres”，标签的无障碍名称也继续把对应条目称为流派。这使模式说明和辅助技术播报与实际导航对象不一致。
-- **Trace**: 全项目搜索 `columnKind` 和 `Overview {`，确认只有 `Overview.qml:15`定义及三个消费点，没有外部赋值。`AppearanceSettings.qml:73–74` → `SettingsController.cpp:132–138` → `LibrarySession.cpp:133–140`确实切换 `SortMode::Artist/Album`；`LibraryOrder.cpp`据此生成不同列；`OverviewController.cpp:351–366`将这些列的实际标签投影到模型。`MusicStage.qml:199–204`创建生产 `Overview` 时没有绑定 `columnKind`。该属性同时进入 `Overview.qml:72,95,144`及 `OverviewLabel.qml:90–91`的无障碍名称。
-- **Mitigation**: 由排序状态所有者提供可翻译的当前列类别，显式注入 `Overview.columnKind`，使标题、切换提示与无障碍名称同步更新；验证 genre、artist、album 三种模式和持久化恢复模式。
-
 #### [D-002] [P2] 歌曲定位按钮可以获得键盘焦点，却没有任何焦点可视反馈
 - **File**: `qml/Yalahoo/Music/components/TransportTitle.qml:35`
 - **Category**: A7. Logic & Wiring
@@ -828,9 +676,9 @@ Findings below confidence 60 are suppressed.
 | ORD | 89 | 0 | 0 | 89 |
 | PRF | 40 | 0 | 0 | 40 |
 | STY | 56 | 0 | 0 | 56 |
-| A7. Logic & Wiring | 0 | 3 | 0 | 3 |
+| A7. Logic & Wiring | 0 | 2 | 0 | 2 |
 | 待核实 | 0 | 0 | 1 | 1 |
-| **Total** | **220** | **3** | **1** | **224** |
+| **Total** | **220** | **2** | **1** | **223** |
 
 Findings below confidence 60 are suppressed.
 

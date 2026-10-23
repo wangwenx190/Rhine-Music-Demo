@@ -836,18 +836,24 @@ private Q_SLOTS:
     }
     void invalidLocalUrlsDoNotBecomeMediaSources()
     {
-        for (const auto &url :
-             { u"file:relative.flac"_s, u"file:///tmp/song.flac?download"_s,
-               u"file:///tmp/song.flac#fragment"_s, u"file:///tmp/song\0.flac"_s }) {
+        for (const auto &url : { u"file:relative.flac"_s, u"file:///tmp/song.flac?download"_s,
+                                 u"file:///tmp/song.flac#fragment"_s, u"file:///tmp/song\0.flac"_s,
+                                 u"file:///tmp/song%00.flac"_s }) {
             auto input = fixtures.value(u"single"_s).toObject();
             auto album = input.value(u"albums"_s).toArray().first().toObject();
             auto track = album.value(u"tracks"_s).toArray().first().toObject();
             track[u"sourceUrl"_s] = url;
+            album[u"folderUrl"_s] = url;
+            album[u"coverUrl"_s] = url;
+            input[u"roots"_s] = QJsonArray{ QJsonObject{ { u"path"_s, url } } };
             album[u"tracks"_s] = QJsonArray{ track };
             input[u"albums"_s] = QJsonArray{ album };
             LibrarySnapshot snapshot;
             QVERIFY(readLibrary(input, snapshot));
             QVERIFY(snapshot.albums.first().tracks.first().sourceUrl.isEmpty());
+            QVERIFY(snapshot.albums.first().folder.isEmpty());
+            QVERIFY(snapshot.albums.first().coverUrl.isEmpty());
+            QVERIFY(snapshot.roots.first().path.isEmpty());
         }
     }
     void roundTripAndLocalUrls()

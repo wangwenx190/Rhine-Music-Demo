@@ -46,6 +46,10 @@ PresentationPorts detailPorts(SceneAdapter &scene, SelectionController &selectio
         if (selection.switchDetail(request.albumId))
             library.navigate(request.albumId, request.trackId);
     };
+    ports.observeNavigation = [&selection](QObject *receiver,
+                                           const std::function<void()> &refresh) {
+        QObject::connect(&selection, &SelectionController::selectionChanged, receiver, refresh);
+    };
     return ports;
 }
 }

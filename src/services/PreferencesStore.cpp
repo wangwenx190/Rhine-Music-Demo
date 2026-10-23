@@ -1,6 +1,7 @@
 #include "PreferencesStore.h"
 #include <utility>
 #include "ProductDefaults.h"
+#include "RenderQualityParameters.h"
 #include "Units.h"
 #include <QCoreApplication>
 #include <QThreadPool>
@@ -198,7 +199,7 @@ QString PreferencesStore::Private::validate(const QJsonObject &document)
         const auto quality = document.value(u"renderQuality"_s).toObject();
         const auto amount = quality.value(u"depthOfField"_s);
         if (!amount.isUndefined()
-            && (!amount.isDouble() || !std::isfinite(amount.toDouble()) || amount.toDouble() < 0))
+            && (!amount.isDouble() || !renderQuality::validDepthOfField(amount.toDouble())))
             return QCoreApplication::translate("Yalahoo", "Invalid depth of field strength.");
     }
     return { };

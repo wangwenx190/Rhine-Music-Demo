@@ -11,6 +11,38 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @unittest.skipUnless(shutil.which("pwsh"), "Requires PowerShell 7.2+; target execution remains pending")
 class WindowsDeploymentTest(unittest.TestCase):
+    def test_selected_kit_license_bundle(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo licenses space-") as temporary:
+            root = Path(temporary)
+            shutil.copyfile(ROOT / "tools/deploy/qt-licenses.ps1", root / "qt-licenses.ps1")
+            script = root / "copy.ps1"
+            script.write_text("$ErrorActionPreference = 'Stop'\n"
+                              ". (Join-Path $PSScriptRoot 'qt-licenses.ps1')\n"
+                              "Copy-QtLicenses -Kit (Join-Path $PSScriptRoot 'Qt/6/kit') "
+                              "-Destination (Join-Path $PSScriptRoot 'package/licenses/Qt')\n")
+            kit = root / "Qt/6/kit"
+            kit.mkdir(parents=True)
+            destination = root / "package/licenses/Qt"
+            destination.parent.mkdir(parents=True)
+            for state in ("missing", "empty", "populated"):
+                with self.subTest(state=state):
+                    licenses = root / "Qt/Licenses"
+                    if state != "missing":
+                        licenses.mkdir(exist_ok=True)
+                    if state == "populated":
+                        (licenses / "media").mkdir()
+                        (licenses / "LICENSE").write_bytes(b"Qt license")
+                        (licenses / "media/FFmpeg.txt").write_bytes(b"Media license")
+                    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script)],
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode == 0, state == "populated",
+                                     result.stdout + result.stderr)
+                    if state == "populated":
+                        self.assertEqual((destination / "LICENSE").read_bytes(), b"Qt license")
+                        self.assertEqual((destination / "media/FFmpeg.txt").read_bytes(), b"Media license")
+                    else:
+                        self.assertFalse(destination.exists())
+
     def test_only_an_object_with_boolean_true_passes(self):
         with tempfile.TemporaryDirectory(prefix="yalahoo report space-") as temporary:
             root = Path(temporary)

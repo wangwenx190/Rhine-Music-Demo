@@ -46,6 +46,7 @@ struct Fixture final
                  },
                  { },
                  { },
+                 { },
                  { } };
     }
     PresentationController controller{ nullptr, ports() };
@@ -281,6 +282,38 @@ private Q_SLOTS:
         QCOMPARE(controller.tabOpacity(), 1);
         QCOMPARE(controller.tabX(), 60);
         QCOMPARE(controller.tabWidth(), 70);
+    }
+    void lookupStatusReflectsSavedResult()
+    {
+        OfflineMetadataProvider provider;
+        LibrarySession library(&provider);
+        LibrarySnapshot snapshot;
+        Album album;
+        album.id = u"status"_s;
+        album.description = u"Saved introduction"_s;
+        album.introduction = { { u"status"_s, u"matched"_s } };
+        album.creditsLookup = { { u"status"_s, u"matched"_s },
+                                { u"matchedTracks"_s, 1 },
+                                { u"totalTracks"_s, 1 } };
+        snapshot.albums.append(album);
+        library.setSnapshot(snapshot);
+        QVERIFY(library.navigate(album.id));
+        DetailModel model;
+        model.prepare(library);
+        QCOMPARE(model.album()[u"introductionStatus"_s].toString(),
+                 QCoreApplication::translate("Yalahoo", "The introduction is saved locally.")
+                         + QCoreApplication::translate(
+                                 "Yalahoo", " Existing metadata is retained for offline reading."));
+        QCOMPARE(model.album()[u"creditsStatus"_s].toString(),
+                 QCoreApplication::translate("Yalahoo", "Track credits verified: %1 / %2.")
+                         .arg(1)
+                         .arg(1));
+        snapshot.albums[0].introduction = { { u"status"_s, u"error"_s },
+                                            { u"error"_s, u"Request failed"_s } };
+        library.setSnapshot(snapshot);
+        model.prepare(library);
+        QVERIFY(model.album()[u"introductionStatus"_s].toString().contains(u"Request failed"_s));
+        QVERIFY(!model.album()[u"introductionStatus"_s].toString().contains(u"not enabled"_s));
     }
     void offlineStatusAndTrackAttribution()
     {

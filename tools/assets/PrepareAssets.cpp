@@ -79,7 +79,7 @@ QByteArray execute(const QString &program, const QStringList &arguments)
     return process.readAllStandardOutput() + process.readAllStandardError();
 }
 // Validate every frozen input before the first generated file is written. Direct
-// invocations must have the same provenance guard as the PowerShell wrapper.
+// invocations and platform wrappers share this authoritative provenance guard.
 void verifyFrozenInputs(const QDir &root)
 {
     const QString original = u"57f4f845c20cce646a15dbf4008c2a162aaaf4e2"_s;

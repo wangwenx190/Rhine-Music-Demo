@@ -11,6 +11,7 @@ qt_add_library(
     ColorTransfer.h
     CoverPixels.h
     ProductDefaults.h
+    RenderQualityParameters.h
     MetadataConfiguration.h
     SceneGeometry.h
     AppIdentity.cpp

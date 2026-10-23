@@ -1,5 +1,10 @@
 // Exercises production QML geometry at lifecycle boundaries without showing a window.
+#include "../support/SettingsFixture.h"
+#include "DetailPorts.h"
+#include "PresentationController.h"
+#include "OverviewController.h"
 #include "LayoutMetrics.h"
+#include <QTemporaryDir>
 #include "DetailModel.h"
 #include "LibrarySession.h"
 #include "OfflineMetadataProvider.h"
@@ -24,6 +29,121 @@ public:
     QmlBehaviorTest() = default;
 
 private Q_SLOTS:
+    void detailNavigationTracksArrayMode()
+    {
+        QTemporaryDir directory;
+        yalahoo::test::SettingsFixture fixture(directory.path());
+        yalahoo::LibrarySnapshot snapshot;
+        for (const auto &id : { u"first"_s, u"last"_s }) {
+            yalahoo::Album album;
+            album.id = id;
+            album.title = id;
+            snapshot.albums.append(album);
+        }
+        fixture.library.setSnapshot(snapshot);
+        fixture.selection.setColumns(fixture.library.albums()->order().columns,
+                                     fixture.library.snapshot());
+        fixture.scene.setSelection(&fixture.selection);
+        yalahoo::PresentationController presentation(
+                fixture.motion.clock(),
+                yalahoo::detailPorts(fixture.scene, fixture.selection, fixture.library));
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQuick
+            import Yalahoo.Music
+            import "components"
+            DetailAlbumInfo {
+                width: 500
+                viewportWidth: 1280
+                tokens: DesignTokens { reducedMotion: true }
+                album: ({title: "Album", artist: "Artist"})
+            }
+        )"_ba,
+                          QUrl(u"qrc:/qt/qml/Yalahoo/Music/NavigationBindingTest.qml"_s));
+        std::unique_ptr<QObject> object(component.createWithInitialProperties(
+                { { u"presentation"_s, QVariant::fromValue(&presentation) } }));
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *previous = object->findChild<QQuickItem *>(u"detailPrevious"_s);
+        auto *next = object->findChild<QQuickItem *>(u"detailNext"_s);
+        QVERIFY(previous && next);
+        QSignalSpy changes(&presentation, &yalahoo::PresentationController::navigationChanged);
+        connect(&presentation, &yalahoo::PresentationController::prepared, &presentation, [&] {
+            presentation.layoutReady(presentation.layoutRevision());
+        });
+        fixture.motion.setReducedMotion(true);
+        fixture.scene.setReducedMotion(true);
+        presentation.setReducedMotion(true);
+        fixture.motion.clock()->setActive(true);
+        fixture.motion.clock()->advance(0);
+        for (const auto &id : { u"first"_s, u"last"_s }) {
+            presentation.select(id, true);
+            for (int frame = 0; frame < 2400 && !presentation.detailEnabled(); ++frame)
+                fixture.motion.clock()->advance(1. / 120);
+            QVERIFY(presentation.detailEnabled());
+            QCOMPARE(fixture.selection.albumId(), id);
+            QVERIFY(fixture.settings.update(u"arrayMode"_s, u"realistic"_s));
+            QCOMPARE(previous->isEnabled(), id != u"first"_s);
+            QCOMPARE(next->isEnabled(), id != u"last"_s);
+            changes.clear();
+            QVERIFY(fixture.settings.update(u"arrayMode"_s, u"filled"_s));
+            QVERIFY(previous->isEnabled());
+            QVERIFY(next->isEnabled());
+            QCOMPARE(changes.size(), 1);
+            QVERIFY(fixture.settings.update(u"arrayMode"_s, u"filled"_s));
+            QCOMPARE(changes.size(), 1);
+            QVERIFY(fixture.settings.update(u"arrayMode"_s, u"realistic"_s));
+            QCOMPARE(previous->isEnabled(), id != u"first"_s);
+            QCOMPARE(next->isEnabled(), id != u"last"_s);
+        }
+        QVERIFY(warnings.isEmpty());
+    }
+    void overviewColumnKindFollowsLiveAndRestoredSorting()
+    {
+        QTemporaryDir directory;
+        const QStringList modes{ u"genre"_s, u"artist"_s, u"album"_s };
+        const QStringList names{ u"\u6d41\u6d3e"_s, u"\u827a\u672f\u5bb6"_s,
+                                 u"\u4e13\u8f91\u6807\u9898"_s };
+        for (int saved = 0; saved < modes.size(); ++saved) {
+            {
+                yalahoo::test::SettingsFixture fixture(directory.path());
+                QVERIFY(fixture.settings.update(u"sortMode"_s, modes[saved]));
+            }
+            yalahoo::test::SettingsFixture fixture(directory.path());
+            yalahoo::OverviewController overview(&fixture.motion);
+            QQmlEngine engine;
+            QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+            QQmlComponent component(&engine);
+            component.setData(R"(
+                import QtQuick
+                import Yalahoo.Music
+                import "pages"
+                MusicStage {
+                    width: 1280
+                    height: 720
+                }
+            )"_ba,
+                              QUrl(u"qrc:/qt/qml/Yalahoo/Music/OverviewSortingTest.qml"_s));
+            std::unique_ptr<QObject> object(component.createWithInitialProperties(
+                    { { u"librarySession"_s, QVariant::fromValue(&fixture.library) },
+                      { u"motionController"_s, QVariant::fromValue(&fixture.motion) },
+                      { u"sceneAdapter"_s, QVariant::fromValue(&fixture.scene) },
+                      { u"settingsController"_s, QVariant::fromValue(&fixture.settings) },
+                      { u"overviewController"_s, QVariant::fromValue(&overview) } }));
+            QVERIFY2(object, qPrintable(component.errorString()));
+            auto *page = object->findChild<QQuickItem *>(u"collectionOverview"_s);
+            QVERIFY(page);
+            QCOMPARE(page->property("columnKind").toString(), names[saved]);
+            for (int mode = 0; mode < modes.size(); ++mode) {
+                QVERIFY(fixture.settings.update(u"sortMode"_s, modes[mode]));
+                QCOMPARE(page->property("columnKind").toString(), names[mode]);
+                QVERIFY(fixture.settings.update(u"sortMode"_s, modes[mode]));
+                QCOMPARE(page->property("columnKind").toString(), names[mode]);
+            }
+            QVERIFY(warnings.isEmpty());
+        }
+    }
     void trackPressCannotActivateReusedIdentity_data()
     {
         QTest::addColumn<bool>("changeTrack");

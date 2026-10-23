@@ -197,8 +197,10 @@ Item {
             anchors.fill: parent
             active: stage.overviewController !== null
             sourceComponent: Overview {
+                objectName: "collectionOverview"
                 sceneSource: nativeScene
                 controller: stage.overviewController
+                columnKind: stage.librarySession.albums.columnKind
                 tokens: design
                 inputRouter: stage.inputRouter
             }

@@ -13,6 +13,15 @@ constexpr auto MaximumShadowSideShift = 30;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+float RenderQuality::aperture(double detail) const
+{
+    if (!std::isfinite(detail))
+        return 0;
+    const double coefficient = renderQuality::BrowseAperture
+            + renderQuality::DetailApertureGain * std::clamp(detail, 0., 1.);
+    const double value = coefficient * (m_depthOfField / renderQuality::PercentScale);
+    return float(std::min(value, double(std::numeric_limits<float>::max())));
+}
 RenderQuality::RenderQuality(QObject *parent) : QObject(parent)
 {
 }
@@ -21,9 +30,9 @@ bool RenderQuality::configure(const QVariantMap &input)
     const auto value =
             input.value(u"depthOfField"_s, yalahoo::renderQuality::DefaultDepthOfFieldPercent);
     const auto amount = finiteNumber(value);
-    if (!amount)
+    if (!amount || !renderQuality::validDepthOfField(*amount))
         return false;
-    const double next = std::max(0.0, *amount);
+    const double next = *amount;
     if (next == m_depthOfField)
         return true;
     m_depthOfField = next;

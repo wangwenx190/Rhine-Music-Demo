@@ -35,6 +35,8 @@ struct PresentationPorts final
     std::function<bool(const PresentationSelection &)> canSelect;
     std::function<QString(const QString &, int)> adjacentAlbum;
     std::function<bool(const QString &, int)> navigationEnabled;
+    // Subscribe once with receiver-owned connections; dependencies outlive the controller.
+    std::function<void(QObject *, const std::function<void()> &)> observeNavigation;
 };
 // GUI-thread owner. Readiness is supplied by the scene; elapsed time never substitutes for it.
 class PresentationController final : public QObject
@@ -48,8 +50,8 @@ class PresentationController final : public QObject
     Q_PROPERTY(bool wantsDetail READ wantsDetail NOTIFY changed FINAL)
     Q_PROPERTY(bool archiveEnabled READ archiveEnabled NOTIFY changed FINAL)
     Q_PROPERTY(bool detailEnabled READ detailEnabled NOTIFY changed FINAL)
-    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY changed FINAL)
-    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY changed FINAL)
+    Q_PROPERTY(bool canMovePrevious READ canMovePrevious NOTIFY navigationChanged FINAL)
+    Q_PROPERTY(bool canMoveNext READ canMoveNext NOTIFY navigationChanged FINAL)
     Q_PROPERTY(quint64 layoutRevision READ layoutRevision NOTIFY prepared FINAL)
     Q_PROPERTY(yalahoo::SurfaceTransition *browseSurface READ browseSurface CONSTANT FINAL)
     Q_PROPERTY(yalahoo::SurfaceTransition *detailSurface READ detailSurface CONSTANT FINAL)
@@ -85,6 +87,7 @@ public:
     void setReducedMotion(bool reduced);
 Q_SIGNALS:
     void changed();
+    void navigationChanged();
     void tabIndicatorChanged();
     void prepared();
     void focusRequested(bool detail);

@@ -37,9 +37,6 @@ constexpr auto PaperTileExtent = 64;
 constexpr auto PaperInteriorExtent = 62;
 constexpr auto CaptureSamples = 4;
 constexpr auto PaperCornerCount = 4;
-constexpr auto BrowseAperture = .0003;
-constexpr auto DetailApertureGain = .0005;
-constexpr auto PercentScale = 100;
 }
 
 using namespace Qt::StringLiterals;
@@ -911,8 +908,7 @@ try {
     }
 #endif
     in.focus = float(adapter.focalDepth(adapter.casePosition()));
-    in.aperture = float((BrowseAperture + DetailApertureGain * adapter.detail()) * depthOfField
-                        / PercentScale);
+    in.aperture = quality.aperture(adapter.detail());
     in.clarity = adapter.frame().individualMaterials ? 0 : float(adapter.detail());
     in.setLighting(l);
     const auto target = quality.targetSize();

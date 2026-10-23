@@ -564,6 +564,23 @@ void MediaMetadataTest::legacy()
                                        { u"musicBrainzContact"_s, u"project@example.invalid"_s } })
                     .toJson()));
     QVERIFY(test::writeFile(source + u"/pcm-cache/private"_s, "DO NOT COPY"_ba));
+    auto invalid = json;
+    auto badAlbum = inputAlbum;
+    auto badTrack = inputTrack;
+    badTrack.insert(u"duration"_s, u"invalid"_s);
+    badAlbum.insert(u"tracks"_s, QJsonArray{ badTrack });
+    invalid.insert(u"albums"_s, QJsonArray{ badAlbum });
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, QJsonDocument(invalid).toJson()));
+    const auto rejected = LegacyImporter::read(source, native, { });
+    QVERIFY(!rejected.snapshot);
+    QVERIFY(!rejected.error.isEmpty());
+    QVERIFY(!QFileInfo::exists(native));
+    const auto sentinel = native + u"/artwork/existing.png"_s;
+    QVERIFY(test::writeFile(sentinel, "existing artwork bytes"_ba));
+    QVERIFY(!LegacyImporter::read(source, native, { }).snapshot);
+    QCOMPARE(QDir(native + u"/artwork"_s).entryList(QDir::Files), QStringList{ u"existing.png"_s });
+    QCOMPARE(test::readFile(sentinel), "existing artwork bytes"_ba);
+    QVERIFY(test::writeFile(source + u"/library-index.json"_s, before));
     const auto imported = LegacyImporter::read(source, native, { });
     QVERIFY2(imported.snapshot, qPrintable(imported.error));
     const auto &actual = imported.snapshot->albums.first();

@@ -47,6 +47,7 @@ class AlbumListModel : public QAbstractListModel
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged FINAL)
     Q_PROPERTY(QVariantList columns READ columns NOTIFY columnsChanged FINAL)
     Q_PROPERTY(int slotStride READ slotStride NOTIFY columnsChanged FINAL)
+    Q_PROPERTY(QString columnKind READ columnKind NOTIFY columnsChanged FINAL)
 public:
     enum Role {
         AlbumId = Qt::UserRole + 1,
@@ -76,6 +77,7 @@ public:
     void updateMetadataSnapshot(Snapshot snapshot);
     void setSortMode(SortMode mode);
     QVariantList columns() const;
+    QString columnKind() const;
     int slotStride() const
     {
         return m_order.slotStride;

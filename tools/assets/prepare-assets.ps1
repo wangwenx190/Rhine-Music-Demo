@@ -19,20 +19,6 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Asset preparation or geometry comparison failed.'
     }
-    $manifest = Get-Content -Raw -Encoding UTF8 resources/manifests/assets.json | ConvertFrom-Json
-    $inputs = @($manifest.entries.source) + @($manifest.additionalInputs.source) | Sort-Object -Unique
-    foreach ($source in $inputs) {
-        $oldPath = $source -replace '^legacy-web/', ''
-        $expected = & git rev-parse "$($manifest.baselineCommit):$oldPath"
-        if ($LASTEXITCODE -ne 0) {
-            throw "Frozen source not found: $source"
-        }
-        $actual = & git hash-object -- $source
-        if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) {
-            throw "Frozen source changed: $source"
-        }
-    }
-    Write-Output "Frozen baseline verified for $($inputs.Count) distinct source inputs."
 } finally {
     Pop-Location
 }

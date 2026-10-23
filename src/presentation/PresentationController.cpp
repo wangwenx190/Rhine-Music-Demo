@@ -35,6 +35,8 @@ struct PresentationController::Private final
 
     void advanceTab(double dt);
     bool navigationEnabled(int direction) const;
+    void refreshNavigation();
+    bool m_previous = false, m_next = false;
     void transact(const std::function<void()> &operation);
     void beginOpen();
     void beginExit();
@@ -74,6 +76,12 @@ PresentationController::PresentationController(FrameClock *clock, PresentationPo
     : QObject(parent), d(std::make_unique<Private>(this, std::move(ports)))
 {
     d->m_browse.reset(true);
+    d->m_previous = canMovePrevious();
+    d->m_next = canMoveNext();
+    if (d->m_ports.observeNavigation)
+        d->m_ports.observeNavigation(this, [this] {
+            d->refreshNavigation();
+        });
     if (clock) {
         connect(clock, &FrameClock::frame, this, [this](double, double dt) {
             return d->advanceFrame(dt);
@@ -147,8 +155,11 @@ void PresentationController::Private::transact(const std::function<void()> &oper
     ++m_depth;
     operation();
     --m_depth;
-    if (!m_depth && before != PresentationState{ m_phase, m_wantsDetail, m_pending })
-        Q_EMIT q->changed();
+    if (!m_depth) {
+        refreshNavigation();
+        if (before != PresentationState{ m_phase, m_wantsDetail, m_pending })
+            Q_EMIT q->changed();
+    }
 }
 void PresentationController::open()
 {
@@ -206,6 +217,15 @@ void PresentationController::select(const QString &albumId, bool openAfter, bool
     d->transact([&] {
         return d->selectPending(albumId, trackId, archiveRoute, openAfter);
     });
+}
+void PresentationController::Private::refreshNavigation()
+{
+    const bool previous = q->canMovePrevious(), next = q->canMoveNext();
+    if (previous == m_previous && next == m_next)
+        return;
+    m_previous = previous;
+    m_next = next;
+    Q_EMIT q->navigationChanged();
 }
 bool PresentationController::Private::navigationEnabled(int direction) const
 {

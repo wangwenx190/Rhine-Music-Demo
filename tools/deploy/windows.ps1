@@ -118,6 +118,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $repository 'resources/fonts/NOTICE.txt') -Destination (Join-Path $licenses 'MiSans-NOTICE.txt')
     Copy-Item -LiteralPath (Join-Path $repository 'resources/fonts/MiSans-license.pdf') -Destination $licenses
     Copy-Item -LiteralPath (Join-Path $repository 'resources/audio/README.md') -Destination (Join-Path $licenses 'audio.md')
+    . (Join-Path $PSScriptRoot 'qt-licenses.ps1')
+    Copy-QtLicenses -Kit $metadata.qtKit -Destination (Join-Path $licenses 'Qt')
     $readme = @"
 # yalahOO!!!
 
@@ -146,6 +148,9 @@ Source build and complete verification instructions: docs/platforms/windows.md i
         if (-not (Test-Path -LiteralPath (Join-Path $staging $relative) -PathType Leaf)) {
             throw "Incomplete Windows deployment: $relative"
         }
+    }
+    if (-not (Get-ChildItem -LiteralPath (Join-Path $staging 'licenses/Qt') -Recurse -File)) {
+        throw 'The deployed Qt license bundle is missing or empty.'
     }
     $files = @(Get-ChildItem -LiteralPath $staging -Recurse -File)
     if (-not ($files | Where-Object { $_.Directory.Name -eq 'multimedia' -and $_.Extension -eq '.dll' })) {

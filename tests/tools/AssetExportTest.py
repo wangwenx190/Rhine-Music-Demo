@@ -40,6 +40,17 @@ class AssetExportTest(unittest.TestCase):
             environment = dict(os.environ, QT_QPA_PLATFORM="offscreen",
                                QT_PLUGIN_PATH=str(kit / "plugins"))
             environment["PATH"] = str(kit / "bin") + os.pathsep + environment.get("PATH", "")
+            # The original revision has no pre-rewrite asset paths. The native verifier
+            # must consume the mapping before generating anything on behalf of a wrapper.
+            mapping = root / "docs/contracts/history-rewrite.json"
+            mapped_bytes = mapping.read_bytes()
+            mapping.write_text('{"revisions": {}}')
+            failed = subprocess.run([str(tool), str(root), str(kit)], env=environment,
+                                    capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(failed.returncode, 0, failed.stdout + failed.stderr)
+            for name, content in expected.items():
+                self.assertEqual((root / "resources" / name).read_bytes(), content)
+            mapping.write_bytes(mapped_bytes)
             result = subprocess.run([str(tool), str(root), str(kit)], env=environment,
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

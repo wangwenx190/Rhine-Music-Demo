@@ -90,6 +90,24 @@ private Q_SLOTS:
         QCOMPARE(fixture.scene.quality()->values(), expected);
     }
 
+    void oversizedQualityImportKeepsPreferencesAndRuntime()
+    {
+        QTemporaryDir directory;
+        test::SettingsFixture fixture(directory.path());
+        QVERIFY(fixture.settings.updateQuality(u"depthOfField"_s, 75));
+        const auto before = fixture.preferences.values();
+        QVERIFY(!fixture.settings.updateQuality(u"depthOfField"_s, 1e308));
+        QCOMPARE(fixture.scene.quality()->depthOfField(), 75.);
+        QCOMPARE(fixture.preferences.values(), before);
+        const auto source = directory.filePath(u"oversized.json"_s);
+        QVERIFY(test::writeFile(
+                source, R"({"schemaVersion":1,"renderQuality":{"depthOfField":1e308}})"_ba));
+        QSignalSpy errors(&fixture.preferences, &PreferencesStore::saveError);
+        QVERIFY(fixture.preferences.importJson(QUrl::fromLocalFile(source)));
+        QTRY_COMPARE(errors.size(), 1);
+        QCOMPARE(fixture.preferences.values(), before);
+        QCOMPARE(fixture.scene.quality()->depthOfField(), 75.);
+    }
     void persistenceImportAndDamage()
     {
         QTemporaryDir directory;

@@ -7,13 +7,9 @@
 #include <QSize>
 #include <QString>
 #include <QVariantMap>
+#include "RenderQualityParameters.h"
 
 namespace yalahoo {
-namespace renderQuality {
-// The default output follows the source quality contract without a DPR-dependent sample reduction.
-inline constexpr auto AoSamples = 64;
-inline constexpr auto DefaultDepthOfFieldPercent = 100;
-}
 
 // Physical output dimensions are independent of artistic effect controls.
 class RenderQuality : public QObject
@@ -34,6 +30,7 @@ public:
     }
     Q_INVOKABLE bool configure(const QVariantMap &values);
     Q_INVOKABLE void resize(double width, double height, double dpr);
+    float aperture(double detail) const;
     int shadows() const;
     int aoSamples() const
     {

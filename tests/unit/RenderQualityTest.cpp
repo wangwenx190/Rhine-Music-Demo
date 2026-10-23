@@ -62,6 +62,26 @@ private Q_SLOTS:
         QCOMPARE(scene.quality()->targetSize(), QSize(3840, 2160));
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, scene.quality()->resize(1e100, 10, 2));
     }
+    void depthOfFieldFloatBoundary()
+    {
+        RenderQuality quality;
+        QSignalSpy changed(&quality, &RenderQuality::changed);
+        for (double invalid : { -1., 1e308, std::numeric_limits<double>::max(),
+                                std::nextafter(renderQuality::MaximumDepthOfFieldPercent,
+                                               std::numeric_limits<double>::infinity()) })
+            QVERIFY(!quality.configure({ { u"depthOfField"_s, invalid } }));
+        QVERIFY(changed.isEmpty());
+        QCOMPARE(quality.depthOfField(), 100.);
+        QVERIFY(quality.configure(
+                { { u"depthOfField"_s, renderQuality::MaximumDepthOfFieldPercent } }));
+        for (double detail : { 0., .5, 1. }) {
+            QVERIFY(std::isfinite(quality.aperture(detail)));
+            QCOMPARE(0.f * quality.aperture(detail), 0.f);
+        }
+        QVERIFY(quality.configure({ { u"depthOfField"_s, 100 } }));
+        QCOMPARE(quality.aperture(0), .0003f);
+        QCOMPARE(quality.aperture(1), .0008f);
+    }
     void focalPlaneFollowsCamera()
     {
         SceneAdapter scene;

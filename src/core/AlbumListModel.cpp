@@ -134,6 +134,18 @@ QVariant AlbumListModel::data(const QModelIndex &index, int role) const
         return { };
     return readers[role - AlbumId].read(album);
 }
+QString AlbumListModel::columnKind() const
+{
+    switch (m_mode) {
+    case SortMode::Artist:
+        return tr("Artists");
+    case SortMode::Album:
+        return tr("Album titles");
+    case SortMode::Genre:
+        return tr("Genres");
+    }
+    Q_UNREACHABLE();
+}
 void AlbumListModel::setSnapshot(Snapshot snapshot)
 {
     const int previousCount = rowCount();
