@@ -10,7 +10,7 @@
 
 `TitleReel` 是增量 ListModel，按行/列键复用 `ReelSlot`，空闲槽上限64，退役槽按连续区间执行模型删除，避免长标题缩短时逐槽搬移剩余指针；快速重定向只保留当前视口相交的字面及新目标，旧字面结束即折叠为目标。FrameClock 已缩放速度，字轮不再次缩放。标题使用460ms、归一rate10、速度限幅12的解析状态与49点显示轨迹，固定归一采样点的指数衰减在函数级静态表中共享，各轨迹仍独立保存起点、目标、速度、时长与精确终点；歌名字轮使用来源滚动包的采样、入场 hold/blur、退出透明度。宽度/字体/DPR变化直接重排到明确终态，减少动态立即完成，隐藏时停止活动更新。
 
-`Header → TransportTitle → TransportMotion` 保留640ms宽度与18px归位、400ms透明度、180ms播放图标透明度/缩放及源 cubic-bezier，反向从当前状态开始并缩短反转时长。标量轨迹按elapsed/duration/ease缓存精确Bezier进度，重复属性读取复用，时间、时长或曲线变化立即失效。歌名文本按真实测量省略，Tooltip/Accessible 保留原始全名；按钮仅发出 `locateRequested → actionRequested("locate-song")`，不调用音频 API。停止时保留最后标题用于退出，禁止退出期间点击。实际播放数据来自PlaybackController，定位执行见[library-data.md](library-data.md)；匿名歌名和图标输入仅验证本组件。
+`Header → TransportTitle → TransportMotion` 保留640ms宽度与18px归位、400ms透明度、180ms播放图标透明度/缩放及源 cubic-bezier，反向从当前状态开始并缩短反转时长。标量轨迹按elapsed/duration/ease缓存精确Bezier进度，重复属性读取复用，时间、时长或曲线变化立即失效。歌名文本由同字体/字号的Qt双向文本省略接口按真实宽度截断，保留完整grapheme并重新整行shaping，不以逻辑字形顺序假定视觉x递增；Tooltip/Accessible 保留原始全名；按钮仅发出 `locateRequested → actionRequested("locate-song")`，不调用音频 API。停止时保留最后标题用于退出，禁止退出期间点击。实际播放数据来自PlaybackController，定位执行见[library-data.md](library-data.md)；匿名歌名和图标输入仅验证本组件。
 
 ## 当前绘制路径与资源
 

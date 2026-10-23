@@ -3,6 +3,7 @@
 #include "RhiCaptureHarness.h"
 #include "RhiReviewInput.h"
 #include "PostprocessChecks.h"
+#include "TransferChecks.h"
 #include "OutputReference.h"
 #include "GraphicsBackend.h"
 #include <QGuiApplication>
@@ -394,13 +395,8 @@ auto runPostprocessChecks(int &argc, char **&argv)
         require(initial.atlas == page, "Initialized atlas GPU bytes differ");
         auto native = initial.metadata[u"nativeAtlasTransfers"_s].toObject();
         const bool nativeProof = native[u"available"_s].toBool();
-#if defined(Q_OS_WIN)
-        require(nativeProof, "Windows D3D11 native transfer proof unavailable");
-#endif
-        require((nativeProof ? native[u"destinationBytes"_s].toInteger()
-                             : initial.metadata[u"atlasUploadBytes"_s].toInteger())
-                        == 16777216,
-                "Initialization native transfer bytes unavailable/over budget");
+        checkAtlasTransfer(driver.window->rendererInterface()->graphicsApi(), initial.metadata,
+                           16777216);
         atlas.initializingAtlas = false;
         atlas.atlasUploads.clear();
         const auto stable = driver.capture(atlas, { 960, 720 }, true);

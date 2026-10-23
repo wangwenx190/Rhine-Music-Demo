@@ -461,7 +461,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     presentation.setReducedMotion(true);
     presentation.update();
     passed = render() && passed;
-    passed = presentation.detailEnabled() && warnings.isEmpty() && passed;
+    passed = presentation.detailEnabled() && passed;
     {
         surface.hide();
         window.releaseResources();
@@ -486,7 +486,7 @@ int reviewPresentation(QGuiApplication &, const QString &output)
     surface.hide();
     root->setParentItem(nullptr);
     const auto policy = verification::windowPolicy(window);
-    passed = verification::windowPolicySatisfied(window) && passed;
+    passed = verification::windowPolicySatisfied(window) && warnings.isEmpty() && passed;
     QJsonObject report{ { u"passed"_s, passed },
                         { u"qtVersion"_s, QString::fromUtf8(qVersion()) },
                         { u"platform"_s, QSysInfo::productType() },

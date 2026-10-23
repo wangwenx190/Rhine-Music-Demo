@@ -80,7 +80,13 @@ SettingsSection {
             tokens: root.tokens
             objectName: "settingsMetadataProxy"
             width: parent.width
-            text: root.librarySession.metadataConfiguration.proxyUrl || ""
+            property bool dirty: false
+            onTextEdited: proxy.dirty = true
+            Binding on text {
+                when: !proxy.dirty
+                value: root.librarySession.metadataConfiguration.proxyUrl || ""
+                restoreMode: Binding.RestoreNone
+            }
             visible: (root.librarySession.metadataConfiguration.proxyMode || "system") === "manual"
             enabled: proxyEnabled.checked
             placeholderText: qsTranslate("SettingsPanel", "Manual HTTP proxy URL")
@@ -91,7 +97,13 @@ SettingsSection {
             tokens: root.tokens
             objectName: "settingsMetadataContact"
             width: parent.width
-            text: root.librarySession.metadataConfiguration.musicBrainzContact || ""
+            property bool dirty: false
+            onTextEdited: contact.dirty = true
+            Binding on text {
+                when: !contact.dirty
+                value: root.librarySession.metadataConfiguration.musicBrainzContact || ""
+                restoreMode: Binding.RestoreNone
+            }
             placeholderText: qsTranslate("SettingsPanel",
                                          "Optional contact email or public project URL")
             Accessible.name: qsTranslate("SettingsPanel",
@@ -111,12 +123,18 @@ SettingsSection {
         }
         ArchiveButton {
             tokens: root.tokens
+            objectName: "settingsMetadataSave"
             text: qsTranslate("SettingsPanel", "Save metadata settings \u2197")
             enabled: root.store !== null && !root.store.busy
-            onClicked: root.store.setMetadataConfiguration({
-                                                               musicBrainzContact: contact.text,
-                                                               proxyUrl: proxy.text
-                                                           })
+            onClicked: {
+                if (root.store.setMetadataConfiguration({
+                                                            musicBrainzContact: contact.text,
+                                                            proxyUrl: proxy.text
+                                                        })) {
+                    proxy.dirty = false;
+                    contact.dirty = false;
+                }
+            }
         }
         PanelDescription {
             tokens: root.tokens

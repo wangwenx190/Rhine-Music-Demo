@@ -20,7 +20,6 @@ T.Button {
     width: transition.width
     height: 29
     padding: 0
-    clip: true
     enabled: title.length > 0 && width > 0
     opacity: transition.opacity
     Accessible.name: qsTr("Locate track: %1").arg(title)
@@ -32,8 +31,23 @@ T.Button {
         text: root.title
         visible: root.visible && root.hovered && root.enabled
     }
-    background: Item {}
+    background: Item {
+        Rectangle {
+            objectName: "transportTitleFocusOutline"
+            x: -6
+            y: -6
+            width: root.width + 12
+            height: root.height + 12
+            visible: root.visualFocus
+            color: "transparent"
+            radius: 0
+            border.width: 2
+            border.color: root.tokens.accent
+            antialiasing: true
+        }
+    }
     contentItem: Item {
+        clip: true
         TitleReel {
             id: caption
             objectName: "transportTitleReel"

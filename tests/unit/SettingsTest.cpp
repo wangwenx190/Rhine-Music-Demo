@@ -11,6 +11,8 @@
 #include "LibraryStore.h"
 #include "NumericValue.h"
 #include <QTest>
+#include <QEventLoop>
+#include <QTimer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QDir>
@@ -182,6 +184,49 @@ private Q_SLOTS:
                         .object();
         QCOMPARE(stored[u"theme"_s].toString(), u"night"_s);
         QCOMPARE(stored[u"motionSpeed"_s].toDouble(), 2.0);
+    }
+    void newerEditSurvivesFailedSave_data()
+    {
+        QTest::addColumn<bool>("shutdown");
+        QTest::newRow("next-worker-save") << false;
+        QTest::newRow("shutdown-save") << true;
+    }
+    void newerEditSurvivesFailedSave()
+    {
+        QFETCH(bool, shutdown);
+        QTemporaryDir directory;
+        int errors = 0, saves = 0;
+        {
+            PreferencesStore preferences(directory.path());
+            QEventLoop failed;
+            connect(&preferences, &PreferencesStore::saveError, &failed, [&] {
+                ++errors;
+                failed.quit();
+            });
+            connect(&preferences, &PreferencesStore::saved, &failed, [&] {
+                ++saves;
+            });
+            QVERIFY(preferences.update({ { u"extension"_s, QString(1024 * 1024, u'x') } }));
+            // Dispatch A's queued save without delivering the watcher's completion.
+            QCoreApplication::sendPostedEvents(&preferences, QEvent::MetaCall);
+            QVERIFY(preferences.update({ { u"extension"_s, u"valid-B"_s } }));
+            QTimer deadline;
+            deadline.setSingleShot(true);
+            connect(&deadline, &QTimer::timeout, &failed, &QEventLoop::quit);
+            constexpr auto SaveFailureDeadlineMilliseconds = 5000;
+            deadline.start(SaveFailureDeadlineMilliseconds);
+            failed.exec();
+            QCOMPARE(errors, 1);
+            if (!shutdown) {
+                QTRY_COMPARE(saves, 1);
+                QVERIFY(preferences.error().isEmpty());
+            }
+        }
+        const auto stored =
+                QJsonDocument::fromJson(test::readFile(directory.filePath(u"preferences.json"_s)))
+                        .object();
+        QCOMPARE(stored[u"extension"_s].toString(), u"valid-B"_s);
+        QCOMPARE(errors, 1);
     }
     void fieldRoutingAndVisualReload()
     {

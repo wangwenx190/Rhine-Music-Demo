@@ -1,4 +1,9 @@
 #include "CaptureMailbox.h"
+#include "OpeningLayoutCases.h"
+#include "RequiredOutput.h"
+#include "TransferChecks.h"
+#include <QTemporaryDir>
+#include <QDir>
 #include "FrameUniforms.h"
 #include "RenderTarget.h"
 #include <rhi/qrhi_platform.h>
@@ -24,6 +29,77 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void openingMatrixUsesActualNativeDpr_data()
+    {
+        QTest::addColumn<double>("dpr");
+        QTest::newRow("100-percent") << 1.;
+        QTest::newRow("125-percent") << 1.25;
+        QTest::newRow("150-percent") << 1.5;
+        QTest::newRow("175-percent") << 1.75;
+        QTest::newRow("200-percent") << 2.;
+    }
+    void openingMatrixUsesActualNativeDpr()
+    {
+        QFETCH(double, dpr);
+        for (bool representative : { false, true }) {
+            const auto native = openingLayoutCases(false, dpr, representative);
+            QCOMPARE(native.size(), representative ? 11 : 18);
+            int desktopDay = 0, desktopNight = 0;
+            for (const auto &entry : native) {
+                QCOMPARE(entry.dpr, dpr);
+                if (entry.size == QSize(1280, 720))
+                    entry.night ? ++desktopNight : ++desktopDay;
+            }
+            QCOMPARE(desktopDay, 1);
+            QCOMPARE(desktopNight, 1);
+            const auto controlled = openingLayoutCases(true, dpr, representative);
+            QCOMPARE(controlled.size(), representative ? 19 : 54);
+            for (const auto &entry : controlled)
+                QVERIFY(entry.dpr == 1 || entry.dpr == 1.5 || entry.dpr == 2);
+        }
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, openingLayoutCases(false, 0, false));
+    }
+    void requiredImageOutputRejectsMissingAndUnwritableImages()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const auto output = directory.filePath(u"shape.png"_s);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, saveRequiredImage({ }, output));
+        QImage image(8, 8, QImage::Format_RGBA8888);
+        image.fill(Qt::red);
+        QVERIFY(QDir().mkdir(output));
+        try {
+            saveRequiredImage(image, output);
+            QFAIL("A directory occupying the output path must fail");
+        } catch (const std::runtime_error &error) {
+            QVERIFY(QString::fromUtf8(error.what()).contains(output));
+        }
+        QVERIFY(QDir().rmdir(output));
+        saveRequiredImage(image, output);
+        const QImage stored(output);
+        QCOMPARE(stored.size(), image.size());
+        QCOMPARE(stored.pixelColor(0, 0), QColor(Qt::red));
+    }
+    void nativeTransferProofFollowsActualBackend()
+    {
+        QJsonObject metadata{ { u"atlasUploadBytes"_s, 16777216 },
+                              { u"nativeAtlasTransfers"_s,
+                                QJsonObject{ { u"available"_s, false } } } };
+        QVERIFY_THROWS_EXCEPTION(
+                std::runtime_error,
+                checkAtlasTransfer(QSGRendererInterface::Direct3D11, metadata, 16777216));
+        for (const auto backend : { QSGRendererInterface::Direct3D12, QSGRendererInterface::OpenGL,
+                                    QSGRendererInterface::Vulkan, QSGRendererInterface::Metal }) {
+            checkAtlasTransfer(backend, metadata, 16777216);
+            QVERIFY_THROWS_EXCEPTION(std::runtime_error, checkAtlasTransfer(backend, metadata, 1));
+        }
+        metadata[u"nativeAtlasTransfers"_s] =
+                QJsonObject{ { u"available"_s, true }, { u"destinationBytes"_s, 16777216 } };
+        metadata[u"atlasUploadBytes"_s] = 1;
+        checkAtlasTransfer(QSGRendererInterface::Direct3D11, metadata, 16777216);
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error,
+                                 checkAtlasTransfer(QSGRendererInterface::Direct3D11, metadata, 1));
+    }
     void outputTargetUsesOnlyBorrowedColorAndTracksNativeRebuilds()
     {
         QRhiNullInitParams parameters;

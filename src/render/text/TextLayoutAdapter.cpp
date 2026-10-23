@@ -270,14 +270,14 @@ void fitTransportText(TitleLayout &result, const QFont &main, double size, doubl
     if (result.naturalWidth <= width)
         return;
 
-    auto dots = shape(u"\u2026"_s, main, size, width, 0, 0, false, true, false);
-    QString fitted;
-    for (const auto &glyph : result.glyphs) {
-        if (glyph.x + glyph.width + dots.naturalWidth > width)
-            break;
-        fitted += glyph.text;
-    }
-    result.fitted = dots.naturalWidth <= width ? fitted + u"\u2026"_s : QString();
+    QFont font = main;
+    font.setPixelSize(std::max(1, int(std::round(size))));
+    font.setHintingPreference(QFont::PreferNoHinting);
+    font.setLetterSpacing(QFont::AbsoluteSpacing, 0);
+    const double scale = size / font.pixelSize();
+    // Qt elides complete graphemes with bidi context; logical glyph order does not
+    // imply increasing visual x coordinates for RTL or mixed-direction titles.
+    result.fitted = QFontMetricsF(font).elidedText(result.fitted, Qt::ElideRight, width / scale);
     result.glyphs = shape(result.fitted, main, size, width, 0, 0, false, true, false).glyphs;
 }
 TitleLayout fitTitle(const auto &candidate, double size, double minimum, double budget)

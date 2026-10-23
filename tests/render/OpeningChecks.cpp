@@ -1,4 +1,5 @@
 #include "OpeningChecks.h"
+#include "OpeningLayoutCases.h"
 #include "SelectionLighting.h"
 #include "Require.h"
 #include "ReviewSupport.h"
@@ -220,71 +221,62 @@ int reviewOpening(QGuiApplication &, const QString &output, bool representative)
         d.frames(3);
         check(u"exited-canvas-zero-repaint"_s, openingInkStats().paints.load() == paintAtEnd);
         const auto playback = d.library.playbackTrackId();
-        const QList<QSize> sizes{ { 1920, 1080 }, { 1280, 720 },  { 995, 858 },
-                                  { 960, 900 },   { 930, 900 },   { 390, 844 },
-                                  { 320, 720 },   { 2560, 1080 }, { 3440, 1440 } };
-        for (bool night : { false, true }) {
+        const auto layoutCases = review::openingLayoutCases(
+                OffscreenSurface::Enabled, d.window.devicePixelRatio(), representative);
+        const QList<double> checkpoints{ .95, 1.64, 2.2, 4.3 };
+        for (const auto &layout : layoutCases) {
+            const auto [night, dpr, size] = layout;
             d.motion.setReducedMotion(true);
             d.scene.lighting()->setNight(night);
             d.motion.setReducedMotion(false);
-            for (double dpr : { 1.0, 1.5, 2.0 }) {
-                if (!OffscreenSurface::Enabled && dpr != d.window.devicePixelRatio())
-                    continue;
-                for (const auto &size : sizes) {
-                    if (representative
-                        && ((dpr != 1 || night) && size != QSize(1280, 720)
-                            && size != QSize(390, 844)))
-                        continue;
-                    d.resize(size, dpr);
-                    d.ready();
-                    for (double time : { .95, 1.64, 2.2, 4.3 }) {
-                        d.seek(time);
-                        d.frames(2);
-                        const QString name =
-                                u"%1-%2x%3-dpr%4-t%5"_s.arg(night ? "night"_L1 : "day"_L1)
-                                        .arg(size.width())
-                                        .arg(size.height())
-                                        .arg(dpr)
-                                        .arg(time);
-                        const auto image = d.surface.grab();
-                        require(!image.isNull() && image.save(output + '/'_L1 + name + ".png"_L1),
-                                "Cannot save actual opening output");
-                        if (time == 4.3 && size == QSize(1280, 720) && dpr == 1) {
-                            const auto paints = openingInkStats().paints.load();
-                            d.frames(3, [&](int) {
-                                d.motion.clock()->advance(.05);
-                            });
-                            check(u"static-slogan-zero-canvas-work"_s,
-                                  openingInkStats().paints.load() == paints);
-                        }
-                        const auto *skip =
-                                yalahoo::review::findVisual(d.root.get(), u"openingSkip"_s);
-                        check("bounded-skip-backdrop-"_L1 + name,
-                              skip && skip->width() + 60 <= 220 && skip->height() + 60 <= 120);
-                        const auto *headerNav =
-                                yalahoo::review::findVisual(d.root.get(), u"headerNavigation"_s);
-                        check("chrome-hidden-during-film-"_L1 + name,
-                              headerNav && !headerNav->isVisible());
-                        const auto *mark =
-                                yalahoo::review::findVisual(d.root.get(), u"openingMark"_s);
-                        check("brand-container-"_L1 + name,
-                              mark
-                                      && std::abs(mark->width()
-                                                  - std::clamp(size.width() * .17, 155.0, 235.0))
-                                              < 1e-6);
-                        captures.append(QJsonObject{
-                                { u"name"_s, name },
-                                { u"time"_s, time },
-                                { u"size"_s, QJsonArray{ size.width(), size.height() } },
-                                { u"dpr"_s, d.window.effectiveDevicePixelRatio() } });
-                    }
-                    d.opening.skip();
-                    for (int i = 0; i < 15; ++i)
+            d.resize(size, dpr);
+            d.ready();
+            for (double time : checkpoints) {
+                d.seek(time);
+                d.frames(2);
+                const QString name = u"%1-%2x%3-dpr%4-t%5"_s.arg(night ? "night"_L1 : "day"_L1)
+                                             .arg(size.width())
+                                             .arg(size.height())
+                                             .arg(dpr)
+                                             .arg(time);
+                check("actual-dpr-"_L1 + name,
+                      std::abs(d.window.effectiveDevicePixelRatio() - dpr) < 1e-6);
+                const auto image = d.surface.grab();
+                require(!image.isNull() && image.save(output + '/'_L1 + name + ".png"_L1),
+                        "Cannot save actual opening output");
+                if (time == 4.3 && size == QSize(1280, 720) && dpr == layoutCases.first().dpr) {
+                    const auto paints = openingInkStats().paints.load();
+                    d.frames(3, [&](int) {
                         d.motion.clock()->advance(.05);
-                    d.frames(2);
+                    });
+                    check(u"static-slogan-zero-canvas-work"_s,
+                          openingInkStats().paints.load() == paints);
                 }
+                const auto *skip = yalahoo::review::findVisual(d.root.get(), u"openingSkip"_s);
+                check("bounded-skip-backdrop-"_L1 + name,
+                      skip && skip->width() + 60 <= 220 && skip->height() + 60 <= 120);
+                const auto *headerNav =
+                        yalahoo::review::findVisual(d.root.get(), u"headerNavigation"_s);
+                check("chrome-hidden-during-film-"_L1 + name, headerNav && !headerNav->isVisible());
+                const auto *mark = yalahoo::review::findVisual(d.root.get(), u"openingMark"_s);
+                check("brand-container-"_L1 + name,
+                      mark
+                              && std::abs(mark->width()
+                                          - std::clamp(size.width() * .17, 155.0, 235.0))
+                                      < 1e-6);
+                captures.append(
+                        QJsonObject{ { u"name"_s, name },
+                                     { u"time"_s, time },
+                                     { u"size"_s, QJsonArray{ size.width(), size.height() } },
+                                     { u"dpr"_s, d.window.effectiveDevicePixelRatio() } });
             }
+            d.opening.skip();
+            for (int i = 0; i < 15; ++i)
+                d.motion.clock()->advance(.05);
+            d.frames(2);
         }
+        check(u"complete-layout-matrix"_s,
+              !layoutCases.isEmpty() && captures.size() == layoutCases.size() * checkpoints.size());
         d.resize({ 1280, 720 }, 1);
         d.ready();
         d.seek(.95);

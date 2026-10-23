@@ -95,6 +95,49 @@ private Q_SLOTS:
         QVERIFY(song.fitted.endsWith(u"\u2026"_s));
         QVERIFY(!song.fitted.contains(QChar::ReplacementCharacter));
     }
+    void transportElidesBidirectionalGraphemes_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("hebrew") << u"\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd "_s.repeated(
+                10);
+        QTest::newRow("arabic")
+                << u"\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645 "_s
+                           .repeated(10);
+        QTest::newRow("mixed-rtl-first")
+                << u"\u05e9\u05dc\u05d5\u05dd Archive e\u0301 "_s.repeated(10);
+        QTest::newRow("mixed-ltr-first")
+                << u"Archive \u0645\u0631\u062d\u0628\u0627 e\u0301 "_s.repeated(10);
+        QTest::newRow("emoji")
+                << u"\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466e\u0301 Music "_s
+                           .repeated(10);
+    }
+    void transportElidesBidirectionalGraphemes()
+    {
+        QFETCH(QString, text);
+        yalahoo::TextLayoutAdapter adapter;
+        const auto font = yalahoo::assetFont(400);
+        for (const double size : { 12., 12.5 }) {
+            for (const double width : { 0., 2., 80., 240. }) {
+                const auto result =
+                        adapter.measure(text, font, font, size, width, 29, true, 1, true);
+                QVERIFY(result.naturalWidth > width);
+                const auto fitted =
+                        adapter.measure(result.fitted, font, font, size, 10000, 29, true, 1, true);
+                QVERIFY2(fitted.naturalWidth <= width + 1e-6, qPrintable(result.fitted));
+                if (width >= 80) {
+                    QVERIFY(result.glyphs.size() > 1);
+                    QVERIFY(result.fitted.contains(u'\u2026'));
+                    QVERIFY(result.fitted.size() < text.size());
+                } else {
+                    QVERIFY(result.fitted.isEmpty());
+                }
+                QVERIFY(!result.fitted.contains(QChar::ReplacementCharacter));
+            }
+        }
+        const auto shortText = text.first(yalahoo::TextLayoutAdapter::boundaries(text)[1]);
+        QCOMPARE(adapter.measure(shortText, font, font, 12, 80, 29, true, 1, true).fitted,
+                 shortText);
+    }
     void wholeLineGlyphAssociation_data()
     {
         QTest::addColumn<QString>("text");

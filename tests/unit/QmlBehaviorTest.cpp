@@ -7,6 +7,7 @@
 #include <QTemporaryDir>
 #include "DetailModel.h"
 #include "LibrarySession.h"
+#include "LibraryStore.h"
 #include "OfflineMetadataProvider.h"
 #include "VerificationWindow.h"
 #include <QQuickWindow>
@@ -14,6 +15,8 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QSignalSpy>
+#include <QStyleHints>
+#include <QScopeGuard>
 #include <QTest>
 #include <QVector2D>
 #include <cmath>
@@ -29,6 +32,153 @@ public:
     QmlBehaviorTest() = default;
 
 private Q_SLOTS:
+    void transportKeyboardFocusIsVisibleAndLocates()
+    {
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQuick
+            import Yalahoo.Music
+            import "components"
+            Item {
+                width: 400
+                height: 100
+                ArchiveButton {
+                    objectName: "beforeTitle"
+                    tokens: DesignTokens { reducedMotion: true }
+                    text: "Before"
+                }
+                TransportTitle {
+                    objectName: "titleButton"
+                    x: 100
+                    tokens: DesignTokens { reducedMotion: true }
+                    title: "Anonymous song"
+                }
+            }
+        )"_ba,
+                          QUrl(u"qrc:/qt/qml/Yalahoo/Music/TransportFocusTest.qml"_s));
+        std::unique_ptr<QObject> object(component.create());
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *root = qobject_cast<QQuickItem *>(object.get());
+        auto *before = root->findChild<QQuickItem *>(u"beforeTitle"_s);
+        auto *button = root->findChild<QQuickItem *>(u"titleButton"_s);
+        auto *outline = root->findChild<QQuickItem *>(u"transportTitleFocusOutline"_s);
+        QVERIFY(before && button && outline);
+        QQuickWindow window;
+        yalahoo::verification::prepareWindow(window);
+        root->setParentItem(window.contentItem());
+        QTRY_VERIFY(button->isEnabled() && button->width() > 0);
+        const auto tabBehavior = QGuiApplication::styleHints()->tabFocusBehavior();
+        const auto restoreTabBehavior = qScopeGuard([&] {
+            QGuiApplication::styleHints()->setTabFocusBehavior(tabBehavior);
+        });
+        QGuiApplication::styleHints()->setTabFocusBehavior(Qt::TabFocusAllControls);
+        before->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(&window, Qt::Key_Tab);
+        QCOMPARE(window.activeFocusItem(), button);
+        QVERIFY(outline->isVisible());
+        QVERIFY(!button->clip());
+        QVERIFY(button->property("contentItem").value<QQuickItem *>()->clip());
+        QCOMPARE(outline->position(), QPointF(-6, -6));
+        QCOMPARE(outline->size(), button->size() + QSizeF(12, 12));
+        QCOMPARE(outline->property("border").value<QObject *>()->property("width").toInt(), 2);
+        QSignalSpy located(button, SIGNAL(locateRequested()));
+        QTest::keyClick(&window, Qt::Key_Space);
+        QCOMPARE(located.size(), 1);
+        QTest::keyClick(&window, Qt::Key_Backtab, Qt::ShiftModifier);
+        QCOMPARE(window.activeFocusItem(), before);
+        QVERIFY(!outline->isVisible());
+        button->forceActiveFocus(Qt::MouseFocusReason);
+        QVERIFY(!outline->isVisible());
+        button->setProperty("title", QString());
+        QVERIFY(!button->isEnabled());
+        QTest::keyClick(&window, Qt::Key_Space);
+        QCOMPARE(located.size(), 1);
+        root->setParentItem(nullptr);
+        QVERIFY(!window.isVisible());
+        QVERIFY(warnings.isEmpty());
+    }
+    void metadataDraftSurvivesImmediateConfigurationSaves()
+    {
+        QTemporaryDir directory;
+        yalahoo::LibraryStore store(directory.path());
+        yalahoo::OfflineMetadataProvider provider;
+        yalahoo::LibrarySession library(&provider);
+        connect(&store, &yalahoo::LibraryStore::metadataConfigurationChanged, &library,
+                &yalahoo::LibrarySession::adoptMetadataConfiguration);
+        store.load();
+        QTRY_VERIFY(!store.busy());
+        QVERIFY(store.setMetadataConfiguration(
+                { { u"proxyEnabled"_s, true },
+                  { u"proxyMode"_s, u"manual"_s },
+                  { u"proxyUrl"_s, u"http://old.invalid:8080"_s },
+                  { u"musicBrainzContact"_s, u"old@example.invalid"_s } }));
+        QTRY_VERIFY(!store.busy());
+        QQmlEngine engine;
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQuick
+            import Yalahoo.Music
+            import "components"
+            import "panels"
+            MetadataSettings {
+                tokens: DesignTokens { reducedMotion: true }
+                width: 500
+                expanded: true
+            }
+        )"_ba,
+                          QUrl(u"qrc:/qt/qml/Yalahoo/Music/MetadataDraftTest.qml"_s));
+        std::unique_ptr<QObject> object(component.createWithInitialProperties(
+                { { u"librarySession"_s, QVariant::fromValue(&library) },
+                  { u"store"_s, QVariant::fromValue(&store) } }));
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *root = qobject_cast<QQuickItem *>(object.get());
+        auto *proxy = root->findChild<QQuickItem *>(u"settingsMetadataProxy"_s);
+        auto *contact = root->findChild<QQuickItem *>(u"settingsMetadataContact"_s);
+        auto *save = root->findChild<QQuickItem *>(u"settingsMetadataSave"_s);
+        QVERIFY(proxy && contact && save);
+        QQuickWindow window;
+        yalahoo::verification::prepareWindow(window);
+        root->setParentItem(window.contentItem());
+        QCOMPARE(proxy->property("text").toString(), u"http://old.invalid:8080"_s);
+        QCOMPARE(contact->property("text").toString(), u"old@example.invalid"_s);
+        for (auto *field : { proxy, contact }) {
+            field->forceActiveFocus(Qt::TabFocusReason);
+            QVERIFY(QMetaObject::invokeMethod(field, "selectAll"));
+            QTest::keyClick(&window, Qt::Key_Backspace);
+            const auto text =
+                    field == proxy ? "http://new.invalid:8888"_ba : "new@example.invalid"_ba;
+            for (char key : text)
+                QTest::keyClick(&window, key);
+        }
+        for (const auto &patch : { QVariantMap{ { u"networkEnabled"_s, true } },
+                                   QVariantMap{ { u"proxyEnabled"_s, false } },
+                                   QVariantMap{ { u"proxyMode"_s, u"system"_s } },
+                                   QVariantMap{ { u"onlineEnabled"_s, true } } }) {
+            QVERIFY(store.setMetadataConfiguration(patch));
+            QTRY_VERIFY(!store.busy());
+            QCOMPARE(proxy->property("text").toString(), u"http://new.invalid:8888"_s);
+            QCOMPARE(contact->property("text").toString(), u"new@example.invalid"_s);
+        }
+        QVERIFY(QMetaObject::invokeMethod(save, "clicked"));
+        QTRY_VERIFY(!store.busy());
+        yalahoo::LibraryStore restored(directory.path());
+        restored.load();
+        QTRY_VERIFY(!restored.busy());
+        const auto configuration =
+                restored.snapshot()->fields[u"metadataConfiguration"_s].toObject();
+        QCOMPARE(configuration[u"proxyUrl"_s].toString(), u"http://new.invalid:8888"_s);
+        QCOMPARE(configuration[u"musicBrainzContact"_s].toString(), u"new@example.invalid"_s);
+        // Once accepted, untouched fields follow later external configuration changes again.
+        QVERIFY(store.setMetadataConfiguration(
+                { { u"musicBrainzContact"_s, u"external@example.invalid"_s } }));
+        QCOMPARE(contact->property("text").toString(), u"external@example.invalid"_s);
+        root->setParentItem(nullptr);
+        QVERIFY(!window.isVisible());
+        QVERIFY(warnings.isEmpty());
+    }
     void detailNavigationTracksArrayMode()
     {
         QTemporaryDir directory;

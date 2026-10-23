@@ -1,6 +1,6 @@
 # 全项目 Qt 官方 skill 只读审查
 
-确认 **16 项功能/工具/验证设施问题**（均为 P2），另有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
+尚有 **8 项功能/工具/验证设施问题**（均为 P2），另有 **1 项 P3 规范建议**、**5 项待核实事项**。1076 条 lint 命中不等同于 1076 个缺陷。
 
 审查对象为下述提交对应的干净源码工作树；审查未修改源码、契约或迁移计划。本文为用户要求保留的审查快照，不替代项目契约；结论和行号均以该提交为准。没有启动可见窗口、物理设备测试、性能采样或私人曲库扫描。
 
@@ -10,7 +10,7 @@
 
 C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件、8300 行，6 分片，合计451文件/72684行。所有分片逐文件阅读，截断内容补读。跨片检查以具体符号追踪为主，不能据此承诺所有跨组件缺陷均已穷尽。构建、部署、shader、导出与验证脚本沿原生生产/检查闭包补充检查；冻结 Web 历史与第三方素材不作为原生 Qt 风格改写对象。
 
-完整报告包含本文全部发现及下列附录；附录内发现编号沿各自 skill 报告局部编号，与正文全局 D 编号分别解释。
+报告包含尚未解决的发现及下列附录；附录内发现编号沿各自 skill 报告局部编号，与正文全局 D 编号分别解释。
 
 - [附录 A：C++ skill 完整报告](#cpp-skill-report)
 - [附录 B：QML skill 完整报告](#qml-skill-report)
@@ -20,14 +20,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 
 | ID | 类别 | 定位 | 问题 |
 |---|---|---|---|
-| D-009 | QML产品 / P2 | [qml/Yalahoo/Music/components/TransportTitle.qml:35](qml/Yalahoo/Music/components/TransportTitle.qml#L35) | 可获得键盘焦点的歌曲定位按钮没有焦点反馈 |
-| D-010 | QML产品 / P2 | [qml/Yalahoo/Music/panels/MetadataSettings.qml:83](qml/Yalahoo/Music/panels/MetadataSettings.qml#L83) | 即时保存其他配置会覆盖联系方式与代理地址草稿 |
-| D-011 | C++产品 / P2 | [src/render/text/TextLayoutAdapter.cpp:275](src/render/text/TextLayoutAdapter.cpp#L275) | 长RTL歌名的省略算法丢掉可显示正文 |
-| D-012 | C++产品 / P2 | [src/services/PreferencesStore.cpp:80](src/services/PreferencesStore.cpp#L80) | 旧保存失败会丢弃其在途期间已接受的新保存意图 |
-| D-013 | 验证设施 / P2 | [tests/render/OpeningChecks.cpp:230](tests/render/OpeningChecks.cpp#L230) | 原生非预设DPR跳过整个序章布局矩阵却可报成功 |
-| D-014 | 验证设施 / P2 | [tests/render/CoverChecks.cpp:132](tests/render/CoverChecks.cpp#L132) | 封面GPU检查忽略必要自身输出保存失败 |
-| D-015 | 验证设施 / P2 | [tests/render/PresentationChecks.cpp:464](tests/render/PresentationChecks.cpp#L464) | 详情回放后半段新增QML警告不影响通过结果 |
-| D-016 | 验证设施 / P2 | [tests/render/RhiPostprocessChecks.cpp:397](tests/render/RhiPostprocessChecks.cpp#L397) | Windows非D3D11后端被D3D11传输证明门槛必然拦截 |
 | D-017 | 验证设施 / P2 | [tests/render/RhiPostprocessChecks.cpp:516](tests/render/RhiPostprocessChecks.cpp#L516) | 图集、alpha及部分验证输出保存失败未传播 |
 | D-018 | 验证设施 / P2 | [tests/render/StartupChecks.cpp:1222](tests/render/StartupChecks.cpp#L1222) | 原生threaded验证从GUI线程获取并读取QRhi资源 |
 | D-019 | 验证设施 / P2 | [tests/support/OffscreenSurface.h:135](tests/support/OffscreenSurface.h#L135) | 读回未确认RenderControl成功开始本次帧 |
@@ -38,89 +30,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 | D-024 | 工具 / P2 | [tools/migration/RulerSourceProbe.cpp:560](tools/migration/RulerSourceProbe.cpp#L560) | 空滑尺状态集可在未执行来源数学比较时报告验证通过 |
 
 ## 详细发现
-
-#### [D-009] [P2] 可获得键盘焦点的歌曲定位按钮没有焦点反馈
-
-- **File**: [qml/Yalahoo/Music/components/TransportTitle.qml:35](qml/Yalahoo/Music/components/TransportTitle.qml#L35)
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 100/100
-- **Finding**: 触发：存在歌曲标题时Tab/Shift+Tab聚焦页眉歌曲定位按钮。 影响：按钮能执行操作但焦点完全不可见，键盘用户无法辨识当前位置。
-- **Trace**: T.Button + StrongFocus，enabled title/width；background空Item，content TitleReel全树无visualFocus/activeFocus绘制；onClicked locateRequested→主舞台locatePlayback。ArchiveButton则有自绘focus-visible轮廓。
-- **Mitigation**: 自绘绑定visualFocus的轮廓，分离标题clip与轮廓层以免被裁；补聚焦和定位回归。
-
-
-#### [D-010] [P2] 即时保存其他配置会覆盖联系方式与代理地址草稿
-
-- **File**: [qml/Yalahoo/Music/panels/MetadataSettings.qml:83](qml/Yalahoo/Music/panels/MetadataSettings.qml#L83)
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 95/100
-- **Finding**: 触发：先输入新联系方式/代理，再切联网/代理/自动查询开关或代理来源。 影响：配置通知把未保存文本替换成旧持久值，随后保存只能提交旧值。
-- **Trace**: text绑定metadataConfiguration.proxyUrl/contact（83/94），开关/代理来源38/54/74/108即时setMetadataConfiguration→LibraryStore233–239→LibraryPersistence45–49→LibrarySession221–223通知整表；116–119才保存文本。
-- **Mitigation**: 隔离编辑草稿并用dirty保护；仅打开表单、未编辑或保存成功时同步，回归真实文本输入后切开关并保存。
-- **Evidence**: Qt6.12等价最小TextInput绑定探针：insert编辑后draft-old；替换仅其他字段变化的配置对象后text回到old（无窗口）。
-
-
-#### [D-011] [P2] 长RTL歌名的省略算法丢掉可显示正文
-
-- **File**: [src/render/text/TextLayoutAdapter.cpp:275](src/render/text/TextLayoutAdapter.cpp#L275)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 99/100
-- **Finding**: 触发：超过页眉歌名栏的希伯来语/阿拉伯语或混合双向长标题。 影响：明明能容纳多个字符，却只显示省略号。
-- **Trace**: shape按逻辑string index排序184–188；fitTransportText275–278假设glyph.x递增，首个逻辑RTL glyph已位于全行右端，立即break；HeaderTransport→TransportTitle→TitleReel→measure生产路径。
-- **Mitigation**: 按grapheme候选整行重测或采用支持双向的Qt省略接口，不以逻辑顺序glyph的x假设定位；补长纯RTL和混合方向回归。
-- **Evidence**: 当前Release库+Qt6.12匿名探针：naturalWidth562.375、availableWidth80，fitted仅…/glyphCount1；短RTL正文宽32.0313可完整显示。
-
-
-#### [D-012] [P2] 旧保存失败会丢弃其在途期间已接受的新保存意图
-
-- **File**: [src/services/PreferencesStore.cpp:80](src/services/PreferencesStore.cpp#L80)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：保存A在途时提交可保存的B，之后A失败；匿名探针用A超1MiB、B缩短扩展字段制造该序列。 影响：B留在内存，运行与退出均不落盘；与一个最新保存意图/析构完成已接受最后保存契约不符。
-- **Trace**: schedule357–359清旧dirty并worker保存快照A；update248–253接受B设dirty但m_saving阻止派发；A失败80–81无条件清dirty，schedule87和析构94均跳过B。
-- **Mitigation**: 记录保存revision/快照标识，失败只结束A，保留其后B的一次独立保存机会；不重复重试A；补旧失败新修改事件顺序回归。
-- **Evidence**: 匿名当前Release库探针：acceptedA/B均true；A报超1MiB，latestInMemory valid-B，析构后preferences.json仍不存在。
-
-
-#### [D-013] [P2] 原生非预设DPR跳过整个序章布局矩阵却可报成功
-
-- **File**: [tests/render/OpeningChecks.cpp:230](tests/render/OpeningChecks.cpp#L230)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 98/100
-- **Finding**: 触发：Windows125%/175%或其他实际DPR非1/1.5/2的native opening-qml。 影响：布局/品牌几何/遮挡及静态重绘矩阵未执行，仍可passed=true。
-- **Trace**: native遍历固定1/1.5/2，只接纳等于window.devicePixelRatio的项231–232；非这些DPR跳过233–285全部主题/尺寸捕获，report328–345不要求captures非空。
-- **Mitigation**: native使用实际DPR，RenderControl保留注入集合；校验实际完成预期状态，拒绝空矩阵。
-
-
-#### [D-014] [P2] 封面GPU检查忽略必要自身输出保存失败
-
-- **File**: [tests/render/CoverChecks.cpp:132](tests/render/CoverChecks.cpp#L132)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: 触发：形状PNG路径不可写、同名目录冲突、磁盘/编码失败。 影响：缺少供质量检查的正常输出，却被检查器标为成功；不表示已观察到产品绘制异常。
-- **Trace**: 三种封面形状painted.color.save未检查；216–231仍写passed=true并return0；直接cover-gpu无上层核验PNG。
-- **Mitigation**: 检查图像和保存返回值，失败沿require/异常非零退出并注明路径。
-
-
-#### [D-015] [P2] 详情回放后半段新增QML警告不影响通过结果
-
-- **File**: [tests/render/PresentationChecks.cpp:464](tests/render/PresentationChecks.cpp#L464)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 96/100
-- **Finding**: 触发：恢复或窄尺寸阶段产生不属五种FAIL_REGULAR_EXPRESSION的QQmlEngine警告。 影响：可输出passed=true且qmlWarnings非零，常规presentation-qml不执行另有严格校验的结构比较包装。
-- **Trace**: 464冻结warnings.isEmpty；465–485继续hide/release/show及320×240裁切；501写最终warnings数，507仅passed退出；render lambda不查warnings，CTest仅过滤五种文本。
-- **Mitigation**: 所有操作完成、报告生成前将最终warnings.isEmpty合入结果；补后半段警告非零退出回归。
-
-
-#### [D-016] [P2] Windows非D3D11后端被D3D11传输证明门槛必然拦截
-
-- **File**: [tests/render/RhiPostprocessChecks.cpp:397](tests/render/RhiPostprocessChecks.cpp#L397)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: 触发：Windows显式D3D12/OpenGL/Vulkan运行rhi-postprocess-gpu。 影响：即使绘制上传正确也必定失败，阻断R36目标后端后续图集/预算验证。
-- **Trace**: Q_OS_WIN无条件require(nativeProof)；TransferAudit.h22–24默认false，仅实际D3D11填true；后续400已有无nativeProof的上传字节验证但无法抵达。
-- **Mitigation**: 按实际后端要求证明；D3D11仍强制原生命令证明，其他后端保留GPU内容/字节验证且明确不可用。
-
 
 #### [D-017] [P2] 图集、alpha及部分验证输出保存失败未传播
 
@@ -276,9 +185,6 @@ C++/头文件/Objective-C++ 358 文件、64384 行，26 分片；QML 93 文件�
 | Yalahoo_qmllint、ui-tests_qmllint | Qt6.12.0官方target均通过 |
 | check-format | 通过，无格式化写入 |
 | 16项Release定向回归 | 最终全部通过；最初4项受沙箱屏幕/IPC限制失败，保持隐藏策略沙箱外定向复核后通过；两批原始结果均在本地保留 |
-| 文本草稿等价Qt绑定探针 | insert后draft-old；其他配置更新后回到old |
-| 长RTL现有Release库探针 | 80px栏仅…，32px正文可以完整显示 |
-| PreferencesStore现有Release库探针 | A/B均接受；A失败后B仅留内存，析构后文件不存在 |
 
 16项为 application-options、production-app-root、module-link-and-plugins、directory-scanner、library-data、media-metadata、playback、audio-ambience、online-metadata、single-instance、settings、json-file、qml-behavior、unix-deployment、linux-package-tools、launchers。使用已有Release产物，未重建全项目，未执行全量CTest或全量clang-tidy。通过结果不能覆盖本报告指出的遗漏分支。
 
@@ -298,7 +204,7 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 
 **Scope**: files: native cpp 全量；冻结 Web 仅作来源参照。
 **Files reviewed**: 358
-**Issues found**: 871 (856 from lint, 15 from deep analysis)
+**Issues found**: 865 (856 from lint, 9 from deep analysis)
 **Agents**: 26 (按行数分片；跨片检查 best effort，具体发现均另追踪调用链)
 **Framework mode**: off
 
@@ -346,68 +252,6 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 ---
 
 ### Deep analysis findings
-
-#### [D-006] [P2] 长RTL歌名的省略算法丢掉可显示正文
-
-- **File**: [src/render/text/TextLayoutAdapter.cpp:275](src/render/text/TextLayoutAdapter.cpp#L275)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 99/100
-- **Finding**: 触发：超过页眉歌名栏的希伯来语/阿拉伯语或混合双向长标题。 影响：明明能容纳多个字符，却只显示省略号。
-- **Trace**: shape按逻辑string index排序184–188；fitTransportText275–278假设glyph.x递增，首个逻辑RTL glyph已位于全行右端，立即break；HeaderTransport→TransportTitle→TitleReel→measure生产路径。
-- **Mitigation**: 按grapheme候选整行重测或采用支持双向的Qt省略接口，不以逻辑顺序glyph的x假设定位；补长纯RTL和混合方向回归。
-- **Evidence**: 当前Release库+Qt6.12匿名探针：naturalWidth562.375、availableWidth80，fitted仅…/glyphCount1；短RTL正文宽32.0313可完整显示。
-
-
-#### [D-007] [P2] 旧保存失败会丢弃其在途期间已接受的新保存意图
-
-- **File**: [src/services/PreferencesStore.cpp:80](src/services/PreferencesStore.cpp#L80)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 99/100
-- **Finding**: 触发：保存A在途时提交可保存的B，之后A失败；匿名探针用A超1MiB、B缩短扩展字段制造该序列。 影响：B留在内存，运行与退出均不落盘；与一个最新保存意图/析构完成已接受最后保存契约不符。
-- **Trace**: schedule357–359清旧dirty并worker保存快照A；update248–253接受B设dirty但m_saving阻止派发；A失败80–81无条件清dirty，schedule87和析构94均跳过B。
-- **Mitigation**: 记录保存revision/快照标识，失败只结束A，保留其后B的一次独立保存机会；不重复重试A；补旧失败新修改事件顺序回归。
-- **Evidence**: 匿名当前Release库探针：acceptedA/B均true；A报超1MiB，latestInMemory valid-B，析构后preferences.json仍不存在。
-
-
-#### [D-008] [P2] 原生非预设DPR跳过整个序章布局矩阵却可报成功
-
-- **File**: [tests/render/OpeningChecks.cpp:230](tests/render/OpeningChecks.cpp#L230)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 98/100
-- **Finding**: 触发：Windows125%/175%或其他实际DPR非1/1.5/2的native opening-qml。 影响：布局/品牌几何/遮挡及静态重绘矩阵未执行，仍可passed=true。
-- **Trace**: native遍历固定1/1.5/2，只接纳等于window.devicePixelRatio的项231–232；非这些DPR跳过233–285全部主题/尺寸捕获，report328–345不要求captures非空。
-- **Mitigation**: native使用实际DPR，RenderControl保留注入集合；校验实际完成预期状态，拒绝空矩阵。
-
-
-#### [D-009] [P2] 封面GPU检查忽略必要自身输出保存失败
-
-- **File**: [tests/render/CoverChecks.cpp:132](tests/render/CoverChecks.cpp#L132)
-- **Category**: A5. Error Handling & Validation
-- **Confidence**: 98/100
-- **Finding**: 触发：形状PNG路径不可写、同名目录冲突、磁盘/编码失败。 影响：缺少供质量检查的正常输出，却被检查器标为成功；不表示已观察到产品绘制异常。
-- **Trace**: 三种封面形状painted.color.save未检查；216–231仍写passed=true并return0；直接cover-gpu无上层核验PNG。
-- **Mitigation**: 检查图像和保存返回值，失败沿require/异常非零退出并注明路径。
-
-
-#### [D-010] [P2] 详情回放后半段新增QML警告不影响通过结果
-
-- **File**: [tests/render/PresentationChecks.cpp:464](tests/render/PresentationChecks.cpp#L464)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 96/100
-- **Finding**: 触发：恢复或窄尺寸阶段产生不属五种FAIL_REGULAR_EXPRESSION的QQmlEngine警告。 影响：可输出passed=true且qmlWarnings非零，常规presentation-qml不执行另有严格校验的结构比较包装。
-- **Trace**: 464冻结warnings.isEmpty；465–485继续hide/release/show及320×240裁切；501写最终warnings数，507仅passed退出；render lambda不查warnings，CTest仅过滤五种文本。
-- **Mitigation**: 所有操作完成、报告生成前将最终warnings.isEmpty合入结果；补后半段警告非零退出回归。
-
-
-#### [D-011] [P2] Windows非D3D11后端被D3D11传输证明门槛必然拦截
-
-- **File**: [tests/render/RhiPostprocessChecks.cpp:397](tests/render/RhiPostprocessChecks.cpp#L397)
-- **Category**: A4. API, Naming & C++ Correctness
-- **Confidence**: 100/100
-- **Finding**: 触发：Windows显式D3D12/OpenGL/Vulkan运行rhi-postprocess-gpu。 影响：即使绘制上传正确也必定失败，阻断R36目标后端后续图集/预算验证。
-- **Trace**: Q_OS_WIN无条件require(nativeProof)；TransferAudit.h22–24默认false，仅实际D3D11填true；后续400已有无nativeProof的上传字节验证但无法抵达。
-- **Mitigation**: 按实际后端要求证明；D3D11仍强制原生命令证明，其他后端保留GPU内容/字节验证且明确不可用。
-
 
 #### [D-012] [P2] 图集、alpha及部分验证输出保存失败未传播
 
@@ -564,10 +408,10 @@ Windows/Linux原生编译、部署/后端、Wayland HDR、实际音频/输入/DP
 | TMO | 3 | 0 | 0 | 3 |
 | VAR | 134 | 0 | 0 | 134 |
 | A3. Thread Safety | 0 | 1 | 0 | 1 |
-| A4. API, Naming & C++ Correctness | 0 | 6 | 0 | 6 |
-| A5. Error Handling & Validation | 0 | 8 | 0 | 8 |
+| A4. API, Naming & C++ Correctness | 0 | 2 | 0 | 2 |
+| A5. Error Handling & Validation | 0 | 6 | 0 | 6 |
 | 待核实 | 0 | 0 | 4 | 4 |
-| **Total** | **856** | **15** | **4** | **875** |
+| **Total** | **856** | **9** | **4** | **869** |
 
 Findings below confidence 60 are suppressed.
 
@@ -578,7 +422,7 @@ Findings below confidence 60 are suppressed.
 
 **Scope**: files: native qml 全量；冻结 Web 仅作来源参照。
 **Files reviewed**: 93
-**Issues found**: 222 (220 from lint, 2 from deep analysis)
+**Issues found**: 220 (220 from lint, 0 from deep analysis)
 **Agents**: 6 (按行数分片；跨片检查 best effort，具体发现均另追踪调用链)
 **qmllint**: ran — 官方 CMake Yalahoo_qmllint / ui-tests_qmllint 均通过。
 
@@ -632,25 +476,6 @@ Findings below confidence 60 are suppressed.
 
 ---
 
-### Deep analysis findings
-
-#### [D-002] [P2] 歌曲定位按钮可以获得键盘焦点，却没有任何焦点可视反馈
-- **File**: `qml/Yalahoo/Music/components/TransportTitle.qml:35`
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 100/100
-- **Finding**: 此控件直接继承 `QtQuick.Templates.Button`并设置 `Qt.StrongFocus`，但背景是空 `Item`，整个内容树也没有任何依据 `visualFocus`或 `activeFocus`变化的绘制。歌曲存在时，Tab 可以停在此按钮上并执行歌曲定位，但画面不会体现焦点位置。Templates 不提供默认视觉，因此没有其他样式层补足焦点反馈；这也违反项目 `controls.md`规定的键盘 focus-visible 自绘轮廓。
-- **Trace**: `TransportTitle.qml:6–8`声明行为基础及焦点策略，`:24`在有标题且宽度大于零时启用，`:35–51`给出完整背景和内容绘制且无焦点状态，`:62`响应点击。生产链为 `MusicStage.qml:169` → `Browse.qml:76` → `Header.qml:128` → `HeaderTransport.qml:57–67`；后者将 `locateRequested`转成 `"locate-song"`，最终到 `MusicStage.qml:60–62`执行 `trackFocusController.locatePlayback()`。已检查 `TitleReel.qml`，同样没有替该按钮绘制焦点状态；`ArchiveButton.qml:41–52`则有符合契约的 `visualFocus`轮廓。
-- **Mitigation**: 为 `TransportTitle`补齐绑定 `visualFocus`的自绘焦点轮廓，同时调整当前根节点 `clip:true`的层级，使标题裁切继续有效而控件外轮廓不会被裁掉。用实际 Tab/Shift+Tab 聚焦并执行歌曲定位验证。
-
-#### [D-003] 即时配置保存会覆盖尚未保存的联系方式和代理地址
-- **File**: `qml/Yalahoo/Music/panels/MetadataSettings.qml:83`（同样影响第 94 行）
-- **Category**: A7. Logic & Wiring
-- **Confidence**: 95/100
-- **Finding**: 代理地址及联系方式编辑框的 `text` 直接绑定 `librarySession.metadataConfiguration` 中的持久字段，但同一表单的联网、代理开关、代理来源和自动查询选项立即保存。用户先输入联系方式或代理地址，再操作其中任意配置项，配置通知会重新求值两个 `text` 绑定，以尚未保存的旧值覆盖输入。随后点击“Save metadata settings”只能保存已恢复的旧值，造成编辑内容丢失。Qt 文本输入的用户编辑不会像 QML 命令赋值那样移除原属性绑定，因此该路径可以发生。
-- **Trace**: `MetadataSettings.qml:83,94` 绑定整张配置；第 `38–40、54–56、74–76、108–110` 行立即调用 `LibraryStore::setMetadataConfiguration()`。`src/library/LibraryStore.cpp:233–239` 合并配置并发出 `metadataConfigurationChanged`；`src/app/LibraryPersistence.cpp:45–49` 将其转给 `LibrarySession::adoptMetadataConfiguration()`；`src/services/LibrarySession.cpp:221–223` 更新配置并发通知；两个编辑框读回旧的 `proxyUrl` / `musicBrainzContact`。最终提交位于 `MetadataSettings.qml:116–119`。`ArchiveTextField.qml` 没有草稿隔离或 dirty 保护。
-- **Mitigation**: 为联系方式和代理地址建立独立编辑草稿，仅在打开表单或字段未被用户修改时从配置同步；即时保存其他配置项时保留草稿，明确保存成功后再同步。增加使用真实文本输入的回归场景：编辑两个字段、切换任一开关或代理来源、确认草稿保留并可保存。
-
-
 ---
 
 ### Investigation targets (human verification needed)
@@ -676,9 +501,8 @@ Findings below confidence 60 are suppressed.
 | ORD | 89 | 0 | 0 | 89 |
 | PRF | 40 | 0 | 0 | 40 |
 | STY | 56 | 0 | 0 | 56 |
-| A7. Logic & Wiring | 0 | 2 | 0 | 2 |
 | 待核实 | 0 | 0 | 1 | 1 |
-| **Total** | **220** | **2** | **1** | **223** |
+| **Total** | **220** | **0** | **1** | **221** |
 
 Findings below confidence 60 are suppressed.
 

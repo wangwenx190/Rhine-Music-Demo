@@ -1,5 +1,6 @@
 #include "LayoutMetrics.h"
 #include "Require.h"
+#include "RequiredOutput.h"
 #include "CaptureMailbox.h"
 #include "ReviewSupport.h"
 #include "ReviewApplication.h"
@@ -129,7 +130,9 @@ auto runCoverChecks(int &argc, char **&argv)
             shapes.append(QJsonObject{ { u"width"_s, size.width() },
                                        { u"height"_s, size.height() },
                                        { u"uploaded"_s, painted.metadata } });
-            painted.color.save(output + u"/shape-%1-%2.png"_s.arg(size.width()).arg(size.height()));
+            yalahoo::review::saveRequiredImage(
+                    painted.color,
+                    output + u"/shape-%1-%2.png"_s.arg(size.width()).arg(size.height()));
         }
         AtlasAllocator atlas(2048, 9);
         QList<AtlasLease> leases;
