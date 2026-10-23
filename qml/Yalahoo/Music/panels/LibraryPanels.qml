@@ -39,26 +39,7 @@ T.Popup {
     enter: null
     exit: null
     background: Item {}
-    onOpened: Qt.callLater(focusContent)
-    function focusContent(): void {
-        switch (controller.panel) {
-        case "search":
-            search.focusSearch();
-            break;
-        case "library":
-            library.focusEditor();
-            break;
-        case "settings":
-            if (settingsLoader.item)
-                (settingsLoader.item as SettingsPanel).focusControl();
-            break;
-        case "playback":
-            if (playbackLoader.item)
-                (playbackLoader.item as PlaybackPanel).focusControl();
-            break;
-        }
-    }
-
+    onOpened: Qt.callLater(contents.focusContent)
     function dismiss(): void {
         controller.close();
     }
@@ -122,94 +103,27 @@ T.Popup {
             MouseArea {
                 anchors.fill: parent
             }
-            Item {
+            PanelContents {
+                id: contents
                 anchors.fill: parent
                 anchors.leftMargin: root.insetX
                 anchors.rightMargin: root.insetX
                 anchors.topMargin: root.insetY
                 anchors.bottomMargin: root.insetY
-                SearchPanel {
-                    id: search
-                    anchors.fill: parent
-                    visible: root.controller.panel === "search"
-                    enabled: visible
-                    heading: PanelHeading {
-                        width: search.width
-                        tokens: root.tokens
-                        title: qsTr("Search albums and tracks")
-                        subtitle: qsTr("FIND MUSIC")
-                        narrow: root.narrow
-                        onCloseRequested: root.dismiss()
-                    }
-                    tokens: root.tokens
-                    librarySession: root.librarySession
-                    onResultRequested: (albumId, trackId) => root.controller.selectResult(albumId,
-                                                                                          trackId)
-                }
-                Loader {
-                    id: playbackLoader
-                    anchors.fill: parent
-                    active: root.controller.panel === "playback" && root.playback !== null
-                    sourceComponent: PlaybackPanel {
-                        tokens: root.tokens
-                        playback: root.playback
-                        backgroundMusic: root.backgroundMusic
-                        interfaceSound: root.interfaceSound
-                        heading: PanelHeading {
-                            width: playbackLoader.width
-                            tokens: root.tokens
-                            title: qsTr("Playback and sound")
-                            subtitle: qsTr("PLAYBACK")
-                            bottomSpacing: 5
-                            narrow: root.narrow
-                            onCloseRequested: root.dismiss()
-                        }
-                    }
-                }
-                Loader {
-                    id: settingsLoader
-                    anchors.fill: parent
-                    active: root.controller.panel === "settings" && root.settings !== null
-                    sourceComponent: SettingsPanel {
-                        narrow: root.narrow
-                        tokens: root.tokens
-                        settings: root.settings
-                        librarySession: root.librarySession
-                        store: root.store
-                        playback: root.playback
-                        backgroundMusic: root.backgroundMusic
-                        interfaceSound: root.interfaceSound
-                        onReplayRequested: root.replayRequested()
-                        onExperimentsRequested: root.experimentsRequested()
-                        onFullscreenRequested: root.fullscreenRequested()
-                        heading: PanelHeading {
-                            width: settingsLoader.width
-                            tokens: root.tokens
-                            title: qsTr("Playback and quality")
-                            subtitle: qsTr("SYSTEM SETTINGS")
-                            narrow: root.narrow
-                            onCloseRequested: root.dismiss()
-                        }
-                    }
-                }
-                LibraryPanel {
-                    id: library
-                    anchors.fill: parent
-                    visible: root.controller.panel === "library"
-                    enabled: visible
-                    heading: PanelHeading {
-                        width: library.width
-                        tokens: root.tokens
-                        title: qsTr("Local music library")
-                        bottomSpacing: 8
-                        subtitle: qsTr("MUSIC LIBRARY")
-                        narrow: root.narrow
-                        onCloseRequested: root.dismiss()
-                    }
-                    tokens: root.tokens
-                    librarySession: root.librarySession
-                    store: root.store
-                }
+                tokens: root.tokens
+                librarySession: root.librarySession
+                controller: root.controller
+                trackFocus: root.trackFocus
+                playback: root.playback
+                backgroundMusic: root.backgroundMusic
+                interfaceSound: root.interfaceSound
+                settings: root.settings
+                store: root.store
+                narrow: root.narrow
+                onCloseRequested: root.dismiss()
+                onReplayRequested: root.replayRequested()
+                onExperimentsRequested: root.experimentsRequested()
+                onFullscreenRequested: root.fullscreenRequested()
             }
             Accessible.role: Accessible.Dialog
             Accessible.name: root.controller.panel === "settings" ? qsTr("Playback and quality") :
@@ -220,22 +134,6 @@ T.Popup {
                                                                                    === "playback"
                                                                                    ? qsTr("Playback and sound") :
                                                                                      qsTr("Local music library")
-        }
-    }
-    Connections {
-        target: root.controller
-        function onChanged() {
-            if (root.controller.panel) {
-                root.trackFocus.cancel();
-                if (root.controller.panel === "library")
-                    library.loadRoots();
-                else if (root.controller.panel === "search")
-                    search.prepare();
-                Qt.callLater(root.focusContent);
-            }
-        }
-        function onResultRequested(albumId: string, trackId: string) {
-            root.trackFocus.request(albumId, trackId);
         }
     }
 }

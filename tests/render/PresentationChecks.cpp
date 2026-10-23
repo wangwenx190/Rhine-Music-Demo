@@ -131,7 +131,8 @@ int testTrackListLayout()
         qWarning() << component.errors();
         return 3;
     }
-    return verifyLayoutTraversal(*list) && warnings.isEmpty() ? 0 : 6;
+    auto *protocol = list->findChild<QQuickItem *>("trackListReveal");
+    return protocol && verifyLayoutTraversal(*protocol) && warnings.isEmpty() ? 0 : 6;
 }
 int reviewPresentation(QGuiApplication &, const QString &output)
 {

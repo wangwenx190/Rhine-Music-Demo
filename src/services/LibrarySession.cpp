@@ -94,7 +94,13 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     for (const auto &genre : d->m_index.snapshot()->genres)
         d->m_genreNames.insert(genre.id, genreDisplayName(genre));
     d->m_albums.setSnapshot(d->m_index.snapshot());
+    // A filter belongs to the current visible genre set, even while no search view exists.
+    const bool filterRemoved = !d->m_genre.isEmpty() && !hasGenre(d->m_genre);
+    if (filterRemoved)
+        d->m_genre.clear();
     d->m_search.update(d->m_index.snapshot(), d->m_query, d->m_genre);
+    if (filterRemoved)
+        Q_EMIT searchChanged();
     if (!d->m_navigationAlbumId.isEmpty()
         && (!d->m_index.album(d->m_navigationAlbumId)
             || (!d->m_navigationTrackId.isEmpty()
@@ -106,11 +112,23 @@ void LibrarySession::setSnapshot(LibrarySnapshot snapshot)
     Q_EMIT snapshotChanged();
     Q_EMIT metadataConfigurationChanged();
 }
+QString LibrarySession::searchQuery() const
+{
+    return d->m_query;
+}
+QString LibrarySession::searchGenreId() const
+{
+    return d->m_genre;
+}
 void LibrarySession::search(const QString &query, const QString &genreId)
 {
+    const auto genre = hasGenre(genreId) ? genreId : QString{ };
+    if (d->m_query == query && d->m_genre == genre)
+        return;
     d->m_query = query;
-    d->m_genre = genreId;
-    d->m_search.request(query, genreId);
+    d->m_genre = genre;
+    d->m_search.request(query, genre);
+    Q_EMIT searchChanged();
 }
 void LibrarySession::sort(const QString &mode)
 {

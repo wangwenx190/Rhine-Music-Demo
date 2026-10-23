@@ -15,7 +15,7 @@ ArchiveScrollView {
         roots.forceActiveFocus();
     }
     function loadRoots(): void {
-        roots.text = store ? store.rootPaths().join("\n") : "";
+        roots.text = store ? store.rootPathsText() : "";
     }
     FolderDialog {
         id: folder

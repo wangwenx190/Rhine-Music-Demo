@@ -770,30 +770,6 @@
 <context>
     <name>PlaybackPanel</name>
     <message>
-        <source>BGM volume</source>
-        <translation>BGM 音量</translation>
-    </message>
-    <message>
-        <source>Background music</source>
-        <translation>氛围 BGM</translation>
-    </message>
-    <message>
-        <source>Events without a dedicated short sound remain silent. BGM and effects use the system default output with separate volume controls.</source>
-        <translation>缺少独立短音频的事件保持静音。BGM 与音效使用系统默认输出，音量分别控制。</translation>
-    </message>
-    <message>
-        <source>Fades out before a track starts. Pausing stays quiet; stopping or reaching the end of the queue restores it.</source>
-        <translation>歌曲开始前淡出；暂停保持安静，停止或队列结束后恢复。</translation>
-    </message>
-    <message>
-        <source>Interface sound volume</source>
-        <translation>界面音效音量</translation>
-    </message>
-    <message>
-        <source>Interface sounds</source>
-        <translation>界面音效</translation>
-    </message>
-    <message>
         <source>Loading track...</source>
         <translation>正在加载歌曲…</translation>
     </message>
@@ -808,10 +784,6 @@
     <message>
         <source>No track selected</source>
         <translation>尚未选择歌曲</translation>
-    </message>
-    <message>
-        <source>Output device</source>
-        <translation>输出设备</translation>
     </message>
     <message>
         <source>Pause</source>
@@ -848,14 +820,6 @@
     <message>
         <source>Stopped</source>
         <translation>已停止</translation>
-    </message>
-    <message>
-        <source>Track output device</source>
-        <translation>歌曲输出设备</translation>
-    </message>
-    <message>
-        <source>Track volume</source>
-        <translation>歌曲音量</translation>
     </message>
     <message>
         <source>Waiting for an audio output device</source>

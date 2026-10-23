@@ -17,8 +17,8 @@ function(yalahoo_browse_qml output)
         ArchiveProgressBar ArchiveCheckBox ArchiveComboBox ArchiveScrollBar ArchiveScrollView
         ArchiveTextField ArchiveTextArea ArchiveEditorSurface BackdropTexture BackdropBlur
         BackdropBlurPass ArchiveEditMenu ArchiveToolTip ThemeSwitch Header BrowseInfo Footer
-        ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList
-        PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop
+        ReadingVeil NavigationFrame Ruler OrdinalReel TitleReel TransportTitle TrackList TrackListReveal
+        PlaybackControls OverviewBackdrop DetailTabsBackdrop OpeningBackdrop OpeningFilm
     )
     list(APPEND files ${group})
     yalahoo_qml_group(group pages Browse
@@ -27,9 +27,9 @@ function(yalahoo_browse_qml output)
     list(APPEND files ${group})
     yalahoo_qml_group(group panels StagePanels
         SearchFilters SearchResult AppearanceSettings ArrayQualitySettings SoundSettings
-        MetadataSettings ExperimentOverlay SearchPanel LibraryPanel LibraryPanels PanelHeading
+        MetadataSettings ExperimentOverlay SearchPanel LibraryPanel LibraryPanels PanelContents PanelHeading
         PanelDescription PlaybackPanel SettingsPanel SettingChoice SettingRange MotionSpeedRange
-        InterfaceSoundPreview MetadataSection ThemeCard SettingsSection LightingPanel
+        InterfaceSoundPreview MetadataSection ThemeCard SettingsSection LightingPanel LightingModes
         MotionPanel ExperimentPanels
     )
     list(APPEND files ${group})

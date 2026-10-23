@@ -78,12 +78,14 @@ void DirectoryScannerTest::panelRootPaths()
     QVERIFY(!store.setRootPaths(u"relative/path"_s));
     QVERIFY(store.setRootPaths(u"\n"_s + music + u"\n"_s + music + u"\n"_s));
     QCOMPARE(store.rootPaths(), QStringList{ music });
+    QCOMPARE(store.rootPathsText(), music);
     QCOMPARE(store.localPath(QUrl::fromLocalFile(music)), music);
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QCOMPARE(store.roots().size(), 1);
     QVERIFY(store.setRootPaths(u""_s));
     QTRY_VERIFY_WITH_TIMEOUT(!store.busy(), AsyncDeadlineMilliseconds);
     QVERIFY(store.rootPaths().isEmpty());
+    QVERIFY(store.rootPathsText().isEmpty());
 }
 void DirectoryScannerTest::rootValidation()
 {

@@ -52,11 +52,8 @@ Item {
         tokens: root.tokens
         objectName: root.objectName + "Control"
         anchors.right: parent.right
-        anchors.verticalCenter: root.stacked ? undefined : parent.verticalCenter
-        anchors.bottom: root.stacked ? parent.bottom : undefined
-        y: root.stacked ? 5 : 0
-        width: root.stacked ? parent.width - output.implicitWidth - 8 : Math.min(150, parent.width
-                                                                                 * .48)
+        y: root.stacked ? parent.height - height : (parent.height - height) / 2
+        width: root.stacked ? parent.width : Math.min(150, parent.width * .48)
         from: root.minimum
         to: root.maximum
         stepSize: root.step

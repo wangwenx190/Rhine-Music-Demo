@@ -266,6 +266,10 @@ QStringList LibraryStore::rootPaths() const
         result.append(root.toLocalFile());
     return result;
 }
+QString LibraryStore::rootPathsText() const
+{
+    return rootPaths().join('\n'_L1);
+}
 bool LibraryStore::setRootPaths(const QString &paths)
 {
     QList<QUrl> roots;

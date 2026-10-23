@@ -30,17 +30,20 @@ Item {
         visible: root.metrics.portrait
         gradient: Gradient {
             GradientStop {
-                position: Math.max(0, (root.calloutTop - root.height * root.portraitFadeLeadRatio)
-                                   / root.height)
+                position: Math.min(1, Math.max(0, (root.calloutTop - root.height
+                                                   * root.portraitFadeLeadRatio) / Math.max(1,
+                                                                                            root.height)))
                 color: "transparent"
             }
             GradientStop {
-                position: Math.max(0, (root.calloutTop + root.height * root.portraitFadeTailRatio)
-                                   / root.height)
+                position: Math.min(1, Math.max(0, (root.calloutTop + root.height
+                                                   * root.portraitFadeTailRatio) / Math.max(1,
+                                                                                            root.height)))
                 color: root.tokens.veil
             }
             GradientStop {
-                position: Math.min(1, (root.calloutTop + root.calloutHeight) / root.height)
+                position: Math.min(1, Math.max(0, (root.calloutTop + root.calloutHeight) / Math.max(1,
+                                                                                                    root.height)))
                 color: root.tokens.page
             }
         }

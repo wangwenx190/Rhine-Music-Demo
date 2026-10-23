@@ -28,6 +28,8 @@ void message(QtMsgType, const QMessageLogContext &, const QString &text)
 }
 }
 
+int testQmlBehavior();
+
 int main(int argc, char **argv)
 {
     QElapsedTimer bootstrapTimer;
@@ -60,27 +62,23 @@ int main(int argc, char **argv)
     const auto restoreMessageHandler = qScopeGuard([previousMessageHandler] {
         qInstallMessageHandler(previousMessageHandler);
     });
+    if (app.arguments().contains(u"--qml-behavior"_s))
+        return argc == 2 ? testQmlBehavior() : 2;
     if (app.arguments().contains(u"--track-list-layout"_s))
         return argc == 2 ? testTrackListLayout() : 2;
     if (app.arguments().contains(u"--controls"_s))
         return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--experiments"_s))
         return argc == 3 ? reviewExperiments(QString::fromLocal8Bit(argv[2])) : 2;
-    if (app.arguments().contains(u"--settings"_s)) {
+    if (app.arguments().contains(u"--settings"_s) || app.arguments().contains(u"--playback"_s)
+        || app.arguments().contains(u"--library"_s)) {
         const bool representative =
                 argc == 4 && QString::fromLocal8Bit(argv[3]) == "--representative"_L1;
-        return argc == 3 || representative
-                ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true, true, representative)
-                : 2;
-    }
-    if (app.arguments().contains(u"--playback"_s))
-        return argc == 3 ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), true) : 2;
-    if (app.arguments().contains(u"--library"_s)) {
-        const bool representative =
-                argc == 4 && QString::fromLocal8Bit(argv[3]) == "--representative"_L1;
-        return argc == 3 || representative
-                ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]), false, false, representative)
-                : 2;
+        const bool settings = app.arguments().contains(u"--settings"_s);
+        const bool playback = settings || app.arguments().contains(u"--playback"_s);
+        return argc == 3 || representative ? reviewLibrary(app, QString::fromLocal8Bit(argv[2]),
+                                                           playback, settings, representative)
+                                           : 2;
     }
     if (app.arguments().contains(u"--gui"_s)) {
         const bool narrow = argc == 4 && QString::fromLocal8Bit(argv[3]) == "narrow"_L1;

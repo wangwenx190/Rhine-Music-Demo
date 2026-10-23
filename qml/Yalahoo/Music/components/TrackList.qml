@@ -78,77 +78,18 @@ Item {
         if (currentView)
             currentView.positionViewAtIndex(index, mode);
     }
-    function settleLayout(item: Item): void {
-        // Preserve child-first, sibling-order polishing without a recursive JS call stack.
-        const ancestors = [
-                  {
-                      node: item,
-                      children: item.children,
-                      next: 0
-                  }
-              ];
-        while (ancestors.length > 0) {
-            const branch = ancestors[ancestors.length - 1];
-            if (branch.next < branch.children.length) {
-                const child = branch.children[branch.next++];
-                ancestors.push({
-                                   node: child,
-                                   children: child.children,
-                                   next: 0
-                               });
-            } else {
-                branch.node.ensurePolished();
-                ancestors.pop();
-            }
-        }
-    }
     function reveal(revision: double, index: int): void {
-        if (!trackFocus || revision !== trackFocus.revision || !currentView || about)
-            return;
-        preserveBeginning = false;
-        currentView.forceLayout();
-        root.settleLayout(root);
-        currentView.forceLayout();
-        // Native virtual lists may rebase originY as variable-height rows are realized.
-        // Query their actual extents, then animate in the same origin-relative space.
-        const startRelative = currentView.contentY - currentView.originY;
-        currentView.positionViewAtBeginning();
-        currentView.forceLayout();
-        root.settleLayout(root);
-        currentView.forceLayout();
-        const low = currentView.contentY - currentView.originY;
-        currentView.positionViewAtEnd();
-        currentView.forceLayout();
-        root.settleLayout(root);
-        currentView.forceLayout();
-        const high = currentView.contentY - currentView.originY;
-        currentView.positionViewAtIndex(index, ListView.Center);
-        currentView.forceLayout();
-        root.settleLayout(root);
-        currentView.forceLayout();
-        const row = currentView.itemAtIndex(index) as TrackRow;
-        if (!row) {
-            trackFocus.cancel();
-            return;
-        }
-        currentView.contentY = startRelative + currentView.originY;
-        trackFocus.beginListReveal(revision, startRelative, currentView.originY, low, high, row.y + row.trackTop,
-                                   row.trackHeight, height, layoutHeader ? layoutHeader.tabsHeight :
-                                                                           0);
+        revealProtocol.reveal(revision, index);
     }
-    function applyRevealScroll(): void {
-        if (!trackFocus || !currentView)
-            return;
-        currentView.forceLayout();
-        const row = currentView.itemAtIndex(trackFocus.row) as TrackRow;
-        if (row) {
-            const last = currentView.itemAtIndex(detailModel.count - 1) as TrackRow;
-            trackFocus.refineListReveal(currentView.originY, row.y + row.trackTop, row.trackHeight,
-                                        height, layoutHeader ? layoutHeader.tabsHeight : 0, last
-                                        ? last.y + last.height - height - currentView.originY :
-                                          null);
-        }
-        currentView.contentY = trackFocus.listScrollY(currentView.originY);
+    TrackListReveal {
+        id: revealProtocol
+        objectName: "trackListReveal"
+        view: root.currentView
+        trackFocus: root.trackFocus
+        trackCount: root.detailModel.count
+        headerHeight: root.layoutHeader ? root.layoutHeader.tabsHeight : 0
+        enabled: !root.about && root.visible
+        onRevealStarted: root.preserveBeginning = false
     }
     function cancelReveal(): void {
         if (trackFocus)
@@ -174,25 +115,6 @@ Item {
         onPressedChanged: if (pressed)
                               root.cancelReveal()
         gesturePolicy: TapHandler.DragThreshold
-    }
-    function focusRevealedRow(revision: double, index: int): void {
-        if (!trackFocus || revision !== trackFocus.revision || !currentView || about)
-            return;
-        currentView.forceLayout();
-        applyRevealScroll();
-        currentView.forceLayout();
-        const row = currentView.itemAtIndex(index);
-        if (row)
-            row.forceActiveFocus(Qt.OtherFocusReason);
-    }
-    Connections {
-        target: root.trackFocus
-        function onScrollChanged() {
-            root.applyRevealScroll();
-        }
-        function onFocusRequested(index) {
-            Qt.callLater(root.focusRevealedRow, root.trackFocus.revision, index);
-        }
     }
     Loader {
         id: view

@@ -59,8 +59,8 @@
 | TitleReel / Opening / GeometryScene | 图层尺寸、声明式效果组合、视觉树 | 字体布局、字形、生产绘制、资源和运动计算 |
 | MusicStage / PlaybackControls | 视觉启停、命令转发、窗口/焦点和简单时间格式 | 媒体、输入归属、业务模型与生命周期 |
 
-大型组合按可独立说明的视觉职责拆分，不以减少行数新增隐式上下文：DetailHeader组合DetailAlbumInfo、DetailIntroduction，DetailTabs只处理吸附页签；TrackList只负责虚拟视图、滚动及真实布局协议，TrackRow/CreditCard分别绘制曲目/制作人员。SearchFilters与SearchResult分别承担查询输入和单条结果；SettingsPanel组合外观、阵列/画质、声音和联网配置。MusicStage组合场景，StageFrameDriver、StageFocus、StagePanels分别承担帧交付、焦点恢复和弹层宿主；HeaderTransport、ColumnNavigation和OverviewLabel使用显式输入绘制各自区域。
+大型组合按可独立说明的视觉职责拆分，不以减少行数新增隐式上下文：DetailHeader组合DetailAlbumInfo、DetailIntroduction，DetailTabs只处理吸附页签；TrackList组合虚拟视图和滚动恢复，TrackListReveal独占已实现项的polish、实际几何读取及带revision的定位交接；TrackRow/CreditCard分别绘制曲目/制作人员；曲目指针按下保存专辑和曲目双身份，释放时复用到其他身份则丢弃操作。SearchFilters与SearchResult分别承担查询输入和单条结果；SettingsPanel组合外观、阵列/画质、声音和联网配置；PlaybackPanel复用同一SoundSettings提供三路声音与设备设置。LibraryPanels只绘制模态外壳、背景和阴影，PanelContents负责内容组合、准备与焦点交接。Opening组合输入/跳过，OpeningFilm只绘制片头图层；LightingModes只显示固定模式与说明。MusicStage组合场景，StageFrameDriver、StageFocus、StagePanels分别承担帧交付、焦点恢复和弹层宿主；HeaderTransport、ColumnNavigation和OverviewLabel使用显式输入绘制各自区域。
 
-制作人员的角色/来源/未分配署名和原始流派展示字符串由DetailModel按专辑准备一次，不在可复用委托中反复连接集合，也不同时发布无消费者的平铺制作人员副本。面板退出后的稳定专辑/曲目意图归PanelController，QML只转发结果，具体协议见[library-data.md](library-data.md#音乐库面板搜索与歌曲定位)。LibraryPanels的背景复用BackdropBlur/BackdropBlurPass，不复制捕获与两pass接线。Ruler和编辑菜单的固定小集合焦点遍历、TrackList对已实现视觉项的polish以及TitleReel验证用实际图层尺寸读取仍是QML视图协议；不反向遍历全库或移交C++查找视觉对象。
+制作人员的角色/来源/未分配署名和原始流派展示字符串由DetailModel按专辑准备一次，不在可复用委托中反复连接集合，也不同时发布无消费者的平铺制作人员副本。面板退出后的稳定专辑/曲目意图归PanelController，QML只转发结果，具体协议见[library-data.md](library-data.md#音乐库面板搜索与歌曲定位)。LibraryPanels的背景复用BackdropBlur/BackdropBlurPass，不复制捕获与两pass接线。Ruler和编辑菜单的固定小集合焦点遍历、TrackListReveal对已实现视觉项的polish以及TitleReel验证用实际图层尺寸读取仍是QML视图协议；不反向遍历全库或移交C++查找视觉对象。
 
 这些是边界示例，不是以文件名替代逐函数审查的豁免表。格式入口见[code-style.md](code-style.md)，预算见[performance.md](performance.md)，检查选择见[test-gates.md](test-gates.md)，窗口见[test-window-policy.md](test-window-policy.md)；源码职责、数学/状态、真实视觉质量与实机事实分别证明。

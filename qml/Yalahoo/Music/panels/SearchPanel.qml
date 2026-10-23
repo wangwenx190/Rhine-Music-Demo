@@ -11,7 +11,7 @@ Item {
     property Component heading: null
     readonly property SearchFilters searchHeader: results.headerItem as SearchFilters
     readonly property ArchiveTextField queryInput: searchHeader ? searchHeader.queryInput : null
-    property string genreId: ""
+    readonly property string genreId: librarySession.searchGenreId
     signal resultRequested(string albumId, string trackId)
     implicitHeight: 560
     FontMetrics {
@@ -28,9 +28,8 @@ Item {
         width: root.width
     }
     function prepare(): void {
-        if (queryInput)
-            queryInput.clear();
-        results.currentIndex = -1;
+        librarySession.search("", genreId);
+        resetView();
     }
     function focusSearch(): void {
         results.forceLayout();
@@ -38,10 +37,7 @@ Item {
         if (queryInput)
             queryInput.forceActiveFocus();
     }
-    function refresh(): void {
-        if (!visible)
-            return;
-        librarySession.search(queryInput ? queryInput.text : "", genreId);
+    function resetView(): void {
         results.currentIndex = -1;
         results.positionViewAtBeginning();
     }
@@ -61,12 +57,15 @@ Item {
             tokens: root.tokens
             genreRows: genreRowsModel
             genreId: root.genreId
+            queryText: root.librarySession.searchQuery
             viewportHeight: root.height
             heading: root.heading
-            onQueryChanged: root.refresh()
+            onQueryChanged: query => {
+                if (root.visible)
+                    root.librarySession.search(query, root.genreId);
+            }
             onGenreRequested: genreId => {
-                root.genreId = genreId;
-                root.refresh();
+                root.librarySession.search(root.librarySession.searchQuery, genreId);
             }
             onResultsRequested: {
                 if (results.count) {
@@ -117,13 +116,12 @@ Item {
     Connections {
         target: root.librarySession
         function onSnapshotChanged() {
-            if (root.genreId && !root.librarySession.hasGenre(root.genreId))
-                root.genreId = "";
-            root.refresh();
+            root.resetView();
+        }
+        function onSearchChanged() {
+            root.resetView();
         }
     }
     onVisibleChanged: if (visible)
-                          refresh()
-    Component.onCompleted: if (visible)
-                               refresh()
+                          resetView()
 }

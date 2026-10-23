@@ -922,6 +922,36 @@ private Q_SLOTS:
         QVERIFY(!readLibrary(input, snapshot, &error));
         QCOMPARE(toJson(snapshot), previous);
     }
+    void searchFilterSurvivesViewAbsenceAndLibraryReplacement()
+    {
+        OfflineMetadataProvider provider;
+        LibrarySession session(&provider);
+        auto snapshot = library(u"single"_s);
+        const auto oldGenre = snapshot.albums.first().genreId;
+        QVERIFY(!oldGenre.isEmpty());
+        session.setSnapshot(snapshot);
+        QSignalSpy changes(&session, &LibrarySession::searchChanged);
+        session.search(u"Typography"_s, oldGenre);
+        QTRY_VERIFY(!session.searchResults()->searching());
+        QCOMPARE(session.searchQuery(), u"Typography"_s);
+        QCOMPARE(session.searchGenreId(), oldGenre);
+        const auto expected = session.searchResults()->rowCount();
+        QVERIFY(expected > 0);
+        session.search(u"Typography"_s, oldGenre);
+        QCOMPARE(changes.size(), 1);
+        // No QML view exists to repair the filter when its genre disappears.
+        snapshot.genres.first().id = u"replacement-genre"_s;
+        snapshot.albums.first().genreId = u"replacement-genre"_s;
+        session.setSnapshot(snapshot);
+        QTRY_VERIFY(!session.searchResults()->searching());
+        QCOMPARE(session.searchGenreId(), QString{ });
+        QCOMPARE(session.searchQuery(), u"Typography"_s);
+        QCOMPARE(session.searchResults()->rowCount(), expected);
+        QCOMPARE(changes.size(), 2);
+        session.search(u"Typography"_s, u"absent-genre"_s);
+        QCOMPARE(session.searchGenreId(), QString{ });
+        QCOMPARE(changes.size(), 2);
+    }
     void modelNotificationsAndIdentity()
     {
         OfflineMetadataProvider provider;

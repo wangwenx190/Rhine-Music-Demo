@@ -42,30 +42,42 @@ SettingsSection {
         controller: root.playback
     }
     SoundSwitch {
+        objectName: "interfaceSoundEnabled"
         tokens: root.tokens
         text: qsTranslate("SettingsPanel", "Interface sounds")
         controller: root.interfaceSound
     }
     VolumeRange {
+        objectName: "interfaceSoundVolume"
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "Sound effect volume")
         controller: root.interfaceSound
     }
     SoundSwitch {
+        objectName: "bgmEnabled"
         tokens: root.tokens
         text: qsTranslate("SettingsPanel", "Background music")
         controller: root.backgroundMusic
     }
     VolumeRange {
+        objectName: "bgmVolume"
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "BGM volume")
         controller: root.backgroundMusic
+    }
+    PanelDescription {
+        tokens: root.tokens
+        text: root.backgroundMusic ? root.backgroundMusic.error : ""
+        visible: text.length > 0
+        color: root.tokens.accent
+        wrapMode: Text.WrapAnywhere
     }
     InterfaceSoundPreview {
         tokens: root.tokens
         interfaceSound: root.interfaceSound
     }
     SettingChoice {
+        objectName: "songOutputDevices"
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "Track output device")
         visible: root.playback !== null

@@ -12,6 +12,6 @@ ShaderEffect {
     height: backdrop.targetHeight
     visible: !horizontal
     property var source: horizontal ? backdrop.sceneTexture : backdrop.horizontalTexture
-    property vector2d sampleStep: horizontal ? Qt.vector2d(1 / width, 0) : Qt.vector2d(0, 1
-                                                                                       / height)
+    property vector2d sampleStep: horizontal ? Qt.vector2d(1 / Math.max(1, width), 0) : Qt.vector2d(
+                                                   0, 1 / Math.max(1, height))
 }

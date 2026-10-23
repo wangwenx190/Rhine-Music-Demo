@@ -9,6 +9,7 @@ Column {
     id: filters
     required property DesignTokens tokens
     required property GenreRowsModel genreRows
+    required property string queryText
     required property string genreId
     required property real viewportHeight
     property Component heading: null
@@ -41,6 +42,7 @@ Column {
             border.color: filters.tokens.line
         }
         Accessible.name: qsTranslate("SearchPanel", "Search albums and tracks")
+        text: filters.queryText
         onTextChanged: filters.queryChanged(query.text)
         Keys.onDownPressed: filters.resultsRequested()
         onAccepted: filters.resultAccepted()

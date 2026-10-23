@@ -27,7 +27,8 @@ public:
     void commitMetadata();
     Q_INVOKABLE bool setMetadataConfiguration(const QVariantMap &configuration);
     Q_INVOKABLE bool setRootPaths(const QString &paths);
-    Q_INVOKABLE QStringList rootPaths() const;
+    QStringList rootPaths() const;
+    Q_INVOKABLE QString rootPathsText() const;
     Q_INVOKABLE QString localPath(const QUrl &url) const
     {
         return url.toLocalFile();

@@ -18,6 +18,8 @@ class LibrarySession final : public QObject
     Q_PROPERTY(QString navigationTrackId READ navigationTrackId NOTIFY navigationChanged FINAL)
     Q_PROPERTY(QString playbackAlbumId READ playbackAlbumId NOTIFY playbackChanged FINAL)
     Q_PROPERTY(QString playbackTrackId READ playbackTrackId NOTIFY playbackChanged FINAL)
+    Q_PROPERTY(QString searchQuery READ searchQuery NOTIFY searchChanged FINAL)
+    Q_PROPERTY(QString searchGenreId READ searchGenreId NOTIFY searchChanged FINAL)
     Q_PROPERTY(QVariantList genres READ genres NOTIFY snapshotChanged FINAL)
     Q_PROPERTY(QVariantMap summary READ summary NOTIFY snapshotChanged FINAL)
     Q_PROPERTY(QVariantMap metadata READ metadata NOTIFY metadataChanged FINAL)
@@ -42,6 +44,8 @@ public:
     QVariantMap summary() const;
     int trackIndex(const QString &albumId, const QString &trackId) const;
     bool contains(const QString &albumId, const QString &trackId = { }) const;
+    QString searchQuery() const;
+    QString searchGenreId() const;
     Q_INVOKABLE void search(const QString &query, const QString &genreId = { });
     Q_INVOKABLE void sort(const QString &mode);
     Q_INVOKABLE bool navigate(const QString &albumId, const QString &trackId = { });
@@ -70,6 +74,7 @@ public:
     QVariantMap browseInfo() const;
 Q_SIGNALS:
     void snapshotChanged();
+    void searchChanged();
     void navigationChanged();
     void browseInfoChanged();
     void playbackChanged();

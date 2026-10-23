@@ -20,6 +20,7 @@ Item {
 
     objectName: "trackDelegate"
     required property int index
+    readonly property string albumId: detailModel.album.id || ""
     required property string trackId
     required property string number
     required property string trackTitle
@@ -141,8 +142,19 @@ Item {
             id: hit
         }
         TapHandler {
+            property string pressedAlbumId: ""
+            property string pressedTrackId: ""
             enabled: !row.detailModel.album.offline
-            onTapped: row.trackRequested(row.trackId)
+            onPressedChanged: {
+                if (pressed) {
+                    pressedAlbumId = row.albumId;
+                    pressedTrackId = row.trackId;
+                }
+            }
+            onTapped: {
+                if (pressedAlbumId === row.albumId && pressedTrackId === row.trackId)
+                    row.trackRequested(row.trackId);
+            }
         }
         Accessible.role: Accessible.ListItem
         Accessible.name: row.number + " " + row.trackTitle + " " + row.duration

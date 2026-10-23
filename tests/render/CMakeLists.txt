@@ -1,10 +1,13 @@
 include("${PROJECT_SOURCE_DIR}/cmake/ProbeQml.cmake")
 qt_add_executable(ui-tests UiTests.cpp StartupChecks.cpp ControlsChecks.cpp ExperimentChecks.cpp
-    LibraryChecks.cpp OpeningChecks.cpp OverviewChecks.cpp PresentationChecks.cpp)
+    LibraryChecks.cpp OpeningChecks.cpp OverviewChecks.cpp PresentationChecks.cpp
+    "${PROJECT_SOURCE_DIR}/tests/unit/QmlBehaviorTest.cpp")
 target_link_libraries(ui-tests PRIVATE Qt6::Test)
 yalahoo_test_tool(ui-tests)
 yalahoo_probe_qml(ui-tests
     DetailReview.qml OverviewVisual.qml LibraryReview.qml ControlsReview.qml)
+add_test(NAME qml-behavior COMMAND ui-tests --qml-behavior)
+set_tests_properties(qml-behavior PROPERTIES TIMEOUT 30)
 add_test(NAME track-list-layout COMMAND ui-tests --track-list-layout)
 set_tests_properties(track-list-layout PROPERTIES TIMEOUT 30
     FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")

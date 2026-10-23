@@ -65,107 +65,11 @@ ArchiveScrollView {
                 onClicked: root.playback.stop()
             }
         }
-        ArchiveText {
+        SoundSettings {
             tokens: root.tokens
-            text: qsTr("Track volume")
-            cssPixelSize: 12
-        }
-        ArchiveSlider {
-            tokens: root.tokens
-            width: parent.width
-            from: 0
-            to: 1
-            value: root.playback.volume
-            onMoved: root.playback.volume = value
-            Accessible.name: qsTr("Track volume")
-        }
-        Column {
-            width: parent.width
-            spacing: 14
-            visible: root.backgroundMusic !== null
-            ArchiveCheckBox {
-                tokens: root.tokens
-                objectName: "bgmEnabled"
-                text: qsTr("Background music")
-                checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
-                onToggled: if (root.backgroundMusic)
-                               root.backgroundMusic.enabled = checked
-            }
-            PanelDescription {
-                tokens: root.tokens
-                text: qsTr(
-                          "Fades out before a track starts. Pausing stays quiet; stopping or reaching the end of the queue restores it.")
-            }
-            ArchiveSlider {
-                tokens: root.tokens
-                objectName: "bgmVolume"
-                width: parent.width
-                from: 0
-                to: 1
-                value: root.backgroundMusic ? root.backgroundMusic.volume : 0
-                onMoved: if (root.backgroundMusic)
-                             root.backgroundMusic.volume = value
-                Accessible.name: qsTr("BGM volume")
-            }
-            ArchiveText {
-                tokens: root.tokens
-                width: parent.width
-                text: root.backgroundMusic ? root.backgroundMusic.error : ""
-                visible: text.length > 0
-                cssPixelSize: 11
-                wrapMode: Text.WrapAnywhere
-                color: root.tokens.accent
-            }
-        }
-        Column {
-            width: parent.width
-            spacing: 14
-            visible: root.interfaceSound !== null
-            ArchiveCheckBox {
-                tokens: root.tokens
-                objectName: "interfaceSoundEnabled"
-                text: qsTr("Interface sounds")
-                checked: root.interfaceSound ? root.interfaceSound.enabled : false
-                onToggled: if (root.interfaceSound)
-                               root.interfaceSound.enabled = checked
-            }
-            ArchiveSlider {
-                tokens: root.tokens
-                objectName: "interfaceSoundVolume"
-                width: parent.width
-                from: 0
-                to: 1
-                value: root.interfaceSound ? root.interfaceSound.volume : 0
-                onMoved: if (root.interfaceSound)
-                             root.interfaceSound.volume = value
-                Accessible.name: qsTr("Interface sound volume")
-            }
-            InterfaceSoundPreview {
-                tokens: root.tokens
-                interfaceSound: root.interfaceSound
-            }
-            PanelDescription {
-                tokens: root.tokens
-                text: qsTr(
-                          "Events without a dedicated short sound remain silent. BGM and effects use the system default output with separate volume controls.")
-            }
-        }
-        ArchiveText {
-            tokens: root.tokens
-            text: qsTr("Output device")
-            cssPixelSize: 12
-        }
-        ArchiveComboBox {
-            id: output
-            tokens: root.tokens
-            objectName: "songOutputDevices"
-            width: parent.width
-            model: root.playback.devices
-            textRole: "name"
-            valueRole: "id"
-            currentValue: root.playback.selectedDevice
-            onActivated: root.playback.selectDevice(currentValue)
-            Accessible.name: qsTr("Track output device")
+            playback: root.playback
+            backgroundMusic: root.backgroundMusic
+            interfaceSound: root.interfaceSound
         }
         ArchiveText {
             tokens: root.tokens
