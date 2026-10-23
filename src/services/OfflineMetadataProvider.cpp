@@ -82,10 +82,7 @@ void OfflineMetadataProvider::Private::dispatch()
     const auto &cache = pending.cache;
     const auto albumIndex = pending.albumIndex;
     ProviderResult result;
-    result.requestId = token.requestId;
-    result.generation = token.generation;
-    result.albumId = token.albumId;
-    result.kind = kind;
+    result.setRequest(token, kind);
     if (query.albumId != token.albumId) {
         result.status = ProviderStatus::Error;
         result.error = u"Album query/token mismatch"_s;

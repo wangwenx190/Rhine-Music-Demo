@@ -137,19 +137,21 @@ void MetadataWorker::enqueue(AlbumQuery query, RequestToken token, MetadataKind 
 
 void MetadataWorker::cancel(const RequestToken &token)
 {
-    const bool waiting = d->m_waiting.removeIf([&](const Private::Job &job) {
-        return job.token == token;
-    }) > 0;
-    const bool active = d->m_active && d->m_active->token == token;
-    if (active) {
+    std::optional<MetadataKind> kind;
+    d->m_waiting.removeIf([&](const Private::Job &job) {
+        if (job.token != token)
+            return false;
+        kind = job.result.kind;
+        return true;
+    });
+    if (d->m_active && d->m_active->token == token) {
+        kind = d->m_active->result.kind;
         d->m_http.cancel();
         d->m_active.reset();
     }
-    if (waiting || active) {
+    if (kind) {
         ProviderResult result;
-        result.requestId = token.requestId;
-        result.generation = token.generation;
-        result.albumId = token.albumId;
+        result.setRequest(token, *kind);
         result.status = ProviderStatus::Cancelled;
         Q_EMIT ready(result);
     }
@@ -431,11 +433,7 @@ void MetadataWorker::Private::receivePages(const QJsonObject &data)
     QStringList ids;
     static const QRegularExpression qid(u"^Q[1-9][0-9]*$"_s);
     for (const auto &page : std::as_const(job.pages)) {
-        const auto id = page.toObject()
-                                .value(u"pageprops"_s)
-                                .toObject()
-                                .value(u"wikibase_item"_s)
-                                .toString();
+        const auto id = wikipediaEntityId(page.toObject());
         if (qid.match(id).hasMatch() && !job.entities.contains(id))
             ids.append(id);
     }
@@ -460,11 +458,7 @@ void MetadataWorker::Private::receiveEntities(const QJsonObject &data)
     QStringList performers;
     if (job.stage == Stage::Entities) {
         for (const auto &page : std::as_const(job.pages)) {
-            const auto id = page.toObject()
-                                    .value(u"pageprops"_s)
-                                    .toObject()
-                                    .value(u"wikibase_item"_s)
-                                    .toString();
+            const auto id = wikipediaEntityId(page.toObject());
             for (const auto &performer :
                  wikidataClaims(job.entities.value(id).toObject(), u"P175"_s))
                 if (!job.entities.contains(performer))
@@ -494,9 +488,7 @@ void MetadataWorker::Private::finish(bool checked)
     auto job = std::move(*m_active);
     m_active.reset();
     auto &result = job.result;
-    result.requestId = job.token.requestId;
-    result.generation = job.token.generation;
-    result.albumId = job.token.albumId;
+    result.setRequest(job.token, result.kind);
     result.inputKey = std::move(job.inputKey);
     if (checked)
         stampMetadata(result, job.query, job.releaseId, QDateTime::currentDateTimeUtc());

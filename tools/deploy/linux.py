@@ -111,6 +111,7 @@ def main():
         copy_licenses(ROOT, kit, staging / 'licenses')
         for name in ('verify-linux.py', 'linux_package.py', 'package_support.py'):
             shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
+        shutil.copyfile(ROOT / 'tools/report_values.py', staging / 'report_values.py')
         closure = inspect_package(staging)
         (build / 'deployment-dependencies.json').write_text(json.dumps(closure, indent=2) + '\n')
         (staging / 'system-dependencies.json').write_text(json.dumps(

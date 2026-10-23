@@ -59,6 +59,7 @@ struct ProviderResult final
     QString inputKey;
     bool fromCache = false;
     qsizetype payloadBytes = 0;
+    void setRequest(const RequestToken &token, MetadataKind requestedKind);
 };
 // A single descriptor maps public names, album cache fields and provider capabilities.
 std::optional<MetadataKind> metadataKind(QStringView name);

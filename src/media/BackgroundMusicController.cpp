@@ -1,4 +1,5 @@
 #include "BackgroundMusicController.h"
+#include "AudioOutputChanges.h"
 #include <memory>
 #include "ProductDefaults.h"
 #include <QAudioOutput>
@@ -57,10 +58,7 @@ BackgroundMusicController::BackgroundMusicController(QObject *parent)
                 Q_EMIT silenceReached();
                 Q_EMIT stateChanged();
             });
-    d->m_outputRefresh.setSingleShot(true);
-    connect(&d->m_devices, &QMediaDevices::audioOutputsChanged, &d->m_outputRefresh,
-            qOverload<>(&QTimer::start));
-    connect(&d->m_outputRefresh, &QTimer::timeout, this, [this] {
+    connectAudioOutputChanges(d->m_devices, d->m_outputRefresh, this, [this] {
         d->refreshOutput();
     });
     d->refreshOutput();

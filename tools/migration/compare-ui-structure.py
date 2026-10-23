@@ -2,8 +2,11 @@
 """Compare same-input native and frozen logical boxes; never read or score images."""
 import argparse
 import json
-import math
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from report_values import finite_number
 
 FIELDS = {
     "presentation": {
@@ -23,8 +26,7 @@ FIELDS = {
 def identity(record):
     width, height, night, dpr = (record[key] for key in ("width", "height", "night", "dpr"))
     if (type(width) is not int or width <= 0 or type(height) is not int or height <= 0
-            or type(night) is not bool or type(dpr) not in (int, float)
-            or not math.isfinite(dpr) or dpr <= 0):
+            or type(night) is not bool or not finite_number(dpr) or dpr <= 0):
         raise ValueError("Invalid viewport/theme/DPR identity")
     return width, height, night, dpr
 
@@ -46,8 +48,7 @@ def box_checks(actual, expected, fields, state):
     for part, properties in fields.items():
         for name in properties:
             a, b = actual[part][name], expected[part][name]
-            if (type(a) not in (int, float) or type(b) not in (int, float)
-                    or not math.isfinite(a) or not math.isfinite(b)):
+            if not finite_number(a) or not finite_number(b):
                 raise ValueError("Finite numeric geometry required")
             delta = abs(a - b)
             checks.append(dict(state=state, part=part, field=name, delta=delta, passed=delta <= 1))

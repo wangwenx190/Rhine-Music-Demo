@@ -1,4 +1,5 @@
 #include "PlaybackController.h"
+#include "AudioOutputChanges.h"
 #include <memory>
 #include "PlaybackQueue.h"
 #include "BackgroundMusicController.h"
@@ -33,10 +34,7 @@ PlaybackController::PlaybackController(LibrarySession *library, QObject *parent)
     d->m_output.setVolume(yalahoo::productDefaults::DefaultSongVolume);
     d->m_player.setPlaybackRate(1);
     d->m_player.setAudioOutput(&d->m_output);
-    d->m_outputRefresh.setSingleShot(true);
-    connect(&d->m_devices, &QMediaDevices::audioOutputsChanged, &d->m_outputRefresh,
-            qOverload<>(&QTimer::start));
-    connect(&d->m_outputRefresh, &QTimer::timeout, this, [this] {
+    connectAudioOutputChanges(d->m_devices, d->m_outputRefresh, this, [this] {
         d->refreshDevices();
     });
     connect(&d->m_output, &QAudioOutput::volumeChanged, this, &PlaybackController::volumeChanged);

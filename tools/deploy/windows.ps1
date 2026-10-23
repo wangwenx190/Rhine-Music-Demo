@@ -135,7 +135,9 @@ Project/resource attribution and licenses are in licenses/. Package inventory is
 Source build and complete verification instructions: docs/platforms/windows.md in the source repository.
 "@
     [IO.File]::WriteAllText((Join-Path $staging 'README.md'), $readme + "`n", $encoding)
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'verify-windows.ps1') -Destination $staging
+    foreach ($name in @('verify-windows.ps1', 'product-report.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $staging
+    }
     # Check the actual product closure before replacing any previous package.
     foreach ($relative in @('Qt6Core.dll', 'Qt6Gui.dll', 'Qt6Qml.dll', 'Qt6Quick.dll',
             'Qt6Multimedia.dll', 'Qt6CanvasPainter.dll', 'platforms/qwindows.dll',

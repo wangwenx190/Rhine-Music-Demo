@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "tools/deploy"))
 import qml_closure
 import native_replay
 import LoggingTerminalTest as terminal
-from shader_source import gaussian_kernel, read_shader
+from shader_source import gaussian_kernel, read_shader, replace_identifiers
 
 
 class ReplayTest(unittest.TestCase):
@@ -145,7 +145,8 @@ class ReplayTest(unittest.TestCase):
 
     def test_report_reader_rejects_nonfinite_json_values(self):
         path = self.root / "report.json"
-        for token in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999"):
+        for token in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999",
+                      str(10 ** 400), str(-(10 ** 400))):
             with self.subTest(token=token):
                 path.write_text('{"passed": true, "value": ' + token + '}')
                 self.assertEqual(native_replay.read_report(path), {})
@@ -205,7 +206,7 @@ class ReplayTest(unittest.TestCase):
         args = SimpleNamespace(visual=True, dpr=1, window_lifecycle=False)
         captures = [dict(width=w, height=h, night=night, variant=variant, expanded=variant - 1, dpr=1,
                          file=f"{w}-{h}-{night}-{variant}.png")
-                    for w, h in overview["SIZES"] for night in (False, True) for variant in (0, 1)]
+                    for w, h in overview["VIEWPORTS"] for night in (False, True) for variant in (0, 1)]
         for capture in captures:
             (self.root / capture["file"]).write_bytes(b"anonymous capture")
         validate = overview["validate_report"]
@@ -269,6 +270,15 @@ class TerminalCaptureTest(unittest.TestCase):
 
 
 class ShaderSourceTest(unittest.TestCase):
+    def test_identifier_replacements_do_not_cascade_or_depend_on_mapping_order(self):
+        source = "origin + world + originLight + worldPosition"
+        entries = [("origin", "world"), ("world", "f.camera.xyz"),
+                   ("worldPosition", "world")]
+        expected = "world + f.camera.xyz + originLight + world"
+        self.assertEqual(replace_identifiers(source, dict(entries)), expected)
+        self.assertEqual(replace_identifiers(source, dict(reversed(entries))), expected)
+        self.assertEqual(replace_identifiers(source, {}), source)
+
     def test_shell_generator_rejects_missing_origin_function(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

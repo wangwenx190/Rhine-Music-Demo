@@ -15,14 +15,16 @@
 #include <optional>
 
 namespace yalahoo {
+namespace caseBounds {
+inline constexpr std::array<double, units::VectorAxes> Low{ -sceneGeometry::CaseHalfWidth,
+                                                            sceneGeometry::CaseBottom,
+                                                            -sceneGeometry::CaseHalfDepth };
+inline constexpr std::array<double, units::VectorAxes> High{ sceneGeometry::CaseHalfWidth,
+                                                             sceneGeometry::CaseTop,
+                                                             sceneGeometry::CaseHalfDepth };
+}
 inline bool caseIntersectsClip(const QMatrix4x4 &matrix)
 {
-    constexpr std::array<double, units::VectorAxes> low{ -sceneGeometry::CaseHalfWidth,
-                                                         sceneGeometry::CaseBottom,
-                                                         -sceneGeometry::CaseHalfDepth };
-    constexpr std::array<double, units::VectorAxes> high{ sceneGeometry::CaseHalfWidth,
-                                                          sceneGeometry::CaseTop,
-                                                          sceneGeometry::CaseHalfDepth };
     // Maximize w +/- axis over the local AABB instead of transforming eight corners.
     // Double evaluation and a float roundoff allowance keep boundary boxes conservative
     // relative to the shader's float matrix/vector arithmetic, including folded cases.
@@ -34,9 +36,12 @@ inline bool caseIntersectsClip(const QMatrix4x4 &matrix)
             for (int component = 0; component < units::VectorAxes; ++component) {
                 const double w = matrix(3, component), a = matrix(axis, component);
                 const double coefficient = w + sign * a;
-                maximum += coefficient * (coefficient >= 0 ? high[component] : low[component]);
+                maximum += coefficient
+                        * (coefficient >= 0 ? caseBounds::High[component]
+                                            : caseBounds::Low[component]);
                 magnitude += (std::abs(w) + std::abs(a))
-                        * std::max(std::abs(low[component]), std::abs(high[component]));
+                        * std::max(std::abs(caseBounds::Low[component]),
+                                   std::abs(caseBounds::High[component]));
             }
             if (maximum < -RoundoffAllowance * magnitude)
                 return false;
@@ -61,23 +66,17 @@ inline std::optional<QVector3D> projectToViewport(const QMatrix4x4 &viewProjecti
 }
 inline std::optional<double> caseRayEntry(QVector3D start, QVector3D delta)
 {
-    constexpr std::array<double, units::VectorAxes> low{ -sceneGeometry::CaseHalfWidth,
-                                                         sceneGeometry::CaseBottom,
-                                                         -sceneGeometry::CaseHalfDepth };
-    constexpr std::array<double, units::VectorAxes> high{ sceneGeometry::CaseHalfWidth,
-                                                          sceneGeometry::CaseTop,
-                                                          sceneGeometry::CaseHalfDepth };
     double enter = 0, exit = 1;
     for (int axis = 0; axis < units::VectorAxes; ++axis) {
         if (!std::isfinite(start[axis]) || !std::isfinite(delta[axis]))
             return std::nullopt;
         if (std::abs(delta[axis]) < sceneGeometry::ParallelRayTolerance) {
-            if (start[axis] < low[axis] || start[axis] > high[axis])
+            if (start[axis] < caseBounds::Low[axis] || start[axis] > caseBounds::High[axis])
                 return std::nullopt;
             continue;
         }
-        double a = (low[axis] - start[axis]) / delta[axis];
-        double b = (high[axis] - start[axis]) / delta[axis];
+        double a = (caseBounds::Low[axis] - start[axis]) / delta[axis];
+        double b = (caseBounds::High[axis] - start[axis]) / delta[axis];
         if (a > b)
             std::swap(a, b);
         enter = std::max(enter, a);

@@ -74,13 +74,9 @@ elseif(APPLE)
 elseif(UNIX)
     set_target_properties(Yalahoo PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
 endif()
-set(app_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
-set_source_files_properties("${app_qml}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
 include("${PROJECT_SOURCE_DIR}/cmake/BrowseQml.cmake")
-yalahoo_browse_qml(browse_qml_files)
-qt_add_resources(Yalahoo branding PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
-    FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
-    "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
+yalahoo_product_qml(product_qml_files)
+yalahoo_add_branding(Yalahoo)
 file(GLOB application_icons "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/png/yalahoo-*.png")
 qt_add_resources(Yalahoo application_icons PREFIX /assets BASE "${PROJECT_SOURCE_DIR}/resources"
     FILES ${application_icons})
@@ -91,6 +87,7 @@ if(YALAHOO_REVIEW)
     set(scene_qml "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/scene/GeometryScene.qml")
     set_source_files_properties("${scene_qml}" PROPERTIES QT_RESOURCE_ALIAS scene/GeometryScene.qml)
     yalahoo_qml_group(material_qml_files scene CaseMaterials GlassMaterial LightingMaterial)
+    yalahoo_environment_assets(environment_assets)
     qt_add_resources(
         Yalahoo
         material_assets
@@ -105,10 +102,7 @@ if(YALAHOO_REVIEW)
         "${PROJECT_SOURCE_DIR}/resources/shaders/album-paper.vert"
         "${PROJECT_SOURCE_DIR}/resources/shaders/material-output.frag"
         "${PROJECT_SOURCE_DIR}/resources/shaders/material-background.frag"
-        "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f"
-        "${PROJECT_SOURCE_DIR}/resources/environment/dfg.rgba32f"
-        "${PROJECT_SOURCE_DIR}/resources/environment/ltc1.rgba32f"
-        "${PROJECT_SOURCE_DIR}/resources/environment/ltc2.rgba32f"
+        ${environment_assets}
         "${PROJECT_SOURCE_DIR}/resources/licenses/three-LICENSE"
         "${PROJECT_SOURCE_DIR}/resources/licenses/materials-NOTICE.md"
         "${PROJECT_SOURCE_DIR}/resources/manifests/materials.json"
@@ -120,7 +114,7 @@ endif()
 qt_add_qml_module(Yalahoo URI Yalahoo.Music VERSION 1.0
     DEPENDENCIES QtQuick ${review_dependencies}
     RESOURCE_PREFIX /qt/qml
-    QML_FILES "${app_qml}" ${browse_qml_files} ${review_qml_files}
+    QML_FILES ${product_qml_files} ${review_qml_files}
     SOURCES QmlTypes.h ApplicationIdentity.h ${review_sources})
 yalahoo_add_ui_shaders(Yalahoo)
 target_link_libraries(

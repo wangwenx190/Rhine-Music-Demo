@@ -1,3 +1,21 @@
+include_guard(GLOBAL)
+
+function(yalahoo_add_branding target)
+    qt_add_resources(${target} ${target}_branding PREFIX /assets
+        BASE "${PROJECT_SOURCE_DIR}/resources"
+        FILES "${PROJECT_SOURCE_DIR}/resources/branding/logo-light.svg"
+            "${PROJECT_SOURCE_DIR}/resources/branding/logo-dark.svg")
+endfunction()
+
+# The production RHI and isolated material Review read identical baked lighting inputs.
+function(yalahoo_environment_assets output)
+    set(files)
+    foreach(name IN ITEMS room-pmrem dfg ltc1 ltc2)
+        list(APPEND files "${PROJECT_SOURCE_DIR}/resources/environment/${name}.rgba32f")
+    endforeach()
+    set(${output} ${files} PARENT_SCOPE)
+endfunction()
+
 function(yalahoo_add_assets target)
     include("${PROJECT_SOURCE_DIR}/resources/manifests/assets.cmake")
     list(APPEND YALAHOO_ASSET_FILES "${PROJECT_SOURCE_DIR}/resources/icons/yalahoo/yalahoo.svg")

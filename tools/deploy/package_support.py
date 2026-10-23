@@ -8,6 +8,13 @@ import shutil
 import subprocess
 import uuid
 import tempfile
+import sys
+
+helper_directory = Path(__file__).resolve().parent
+if not (helper_directory / 'report_values.py').is_file():
+    helper_directory = helper_directory.parent
+sys.path.insert(0, str(helper_directory))
+from report_values import read_report
 
 PROBE_TIMEOUT_SECONDS = 60
 HASH_BLOCK_BYTES = 1024 * 1024
@@ -113,11 +120,7 @@ def run_probe(command, output, environment, *, timeout=PROBE_TIMEOUT_SECONDS):
             timed_out = True
             process.kill()
             code = process.wait()
-    try:
-        report = json.loads(report_path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        report = {}
-    return ProbeResult(code, timed_out, report if isinstance(report, dict) else {})
+    return ProbeResult(code, timed_out, read_report(report_path))
 
 
 def install_package(staging, output):

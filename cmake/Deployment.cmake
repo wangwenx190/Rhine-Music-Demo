@@ -1,6 +1,6 @@
 # The executable and the deployment scanner consume the same production QML list.
 # Research QML remains outside this closure even when it lives under the source root.
-set(deployment_qml "${app_qml}" ${browse_qml_files})
+set(deployment_qml ${product_qml_files})
 set(deployment_architecture "${CMAKE_SYSTEM_PROCESSOR}")
 if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID)
     set(deployment_architecture "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}")

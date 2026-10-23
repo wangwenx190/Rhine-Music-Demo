@@ -1,4 +1,5 @@
 #include "InterfaceSoundController.h"
+#include "AudioOutputChanges.h"
 #include "ProductDefaults.h"
 #include <QMediaDevices>
 #include <QAudioDevice>
@@ -50,10 +51,7 @@ InterfaceSoundController::InterfaceSoundController(QObject *parent)
             });
         }
     }
-    d->m_outputRefresh.setSingleShot(true);
-    connect(&d->m_devices, &QMediaDevices::audioOutputsChanged, &d->m_outputRefresh,
-            qOverload<>(&QTimer::start));
-    connect(&d->m_outputRefresh, &QTimer::timeout, this, [this] {
+    connectAudioOutputChanges(d->m_devices, d->m_outputRefresh, this, [this] {
         d->refreshOutput();
     });
     d->refreshOutput();

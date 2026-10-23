@@ -76,7 +76,7 @@
 ### 目标构建、部署与后端/日志
 
 - 归属：BP-P、R30-P、R31-P、R32-P及后端/日志目标检查。输入为根CMake/生产QML清单、`cmake/Deployment.cmake`、qrc资产、GraphicsBackend/BackendCapabilities、LoggingSession、平台启动/部署工具与匿名库。按test-gates.md的源码审查边界展开语言/Qt/QML实践及适用平台分支；已确定的跨平台算法与性能结论共用，不新建逐组件审计工程。
-- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，目标启动/部署工具核对当前Process.ExitCode、参数、含空格路径与子进程环境；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。GUI缺报告/错误必须失败。
+- 每个目标Kit准备一次所需Release产物及去重检查；生产Review OFF的加载闭包与开发Review工具分开。构建/模块、目标编译器、资源打包和脚本成功路径必须在目标执行；qsb跨目标翻译不能代替目标运行。Windows PowerShell执行`pwsh -NoProfile -File tools/format/FormatTools.ps1`及同入口`-Check`，目标启动/部署工具核对当前Process.ExitCode、参数、含空格路径与子进程环境；无PowerShell/PSScriptAnalyzer时保留此格式/执行缺口，不记通过。Windows部署报告的严格布尔判定还须执行`python3 tests/tools/WindowsDeploymentTest.py`（调用`pwsh`，覆盖缺失/坏JSON/非对象/字符串或数字成功标记）；`product-report.ps1`及调用者仍须通过上述PowerShell格式/解析入口。GUI缺报告/错误必须失败。
 - Windows资产入口共用`tools/build/asset-tool.ps1`。输入为`tools/assets/{prepare-assets,export-branding}.ps1`与匿名源码副本；依赖原生MSVC、最新完整Kit和PowerShell/PSScriptAnalyzer，入口分别为`pwsh -NoProfile -File tools/assets/prepare-assets.ps1`及`export-branding.ps1`。核对含空格路径、所选preset/target、同Kit环境、balsam版本和冻结hash；configure/build/tool任一步失败须停止并非零退出，目录栈在成功/异常后恢复。两项格式入口沿上条执行；无该环境时保持待验，不以POSIX入口代替。
 
 | 目标/归属 | 准确入口与独立退出事实 |

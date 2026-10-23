@@ -12,10 +12,7 @@ namespace yalahoo {
 ProviderResult cachedMetadata(const Album &album, MetadataKind kind, const RequestToken &token)
 {
     ProviderResult result;
-    result.requestId = token.requestId;
-    result.generation = token.generation;
-    result.albumId = token.albumId;
-    result.kind = kind;
+    result.setRequest(token, kind);
     const auto state = metadataState(album, kind);
     if (kind == MetadataKind::Introduction) {
         result.payload = { { u"description"_s, album.description }, { u"introduction"_s, state } };

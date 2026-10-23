@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'product-report.ps1')
 if (-not $IsWindows) {
     throw 'The deployed Windows product must be verified on Windows.'
 }
@@ -115,10 +116,7 @@ try {
     }
     if ($report.functionalReportRequired) {
         $productReport = Join-Path $OutputDirectory 'product/report.json'
-        if (-not (Test-Path -LiteralPath $productReport -PathType Leaf) -or
-            -not (Get-Content -LiteralPath $productReport -Raw | ConvertFrom-Json).passed) {
-            throw "The current product verification report is missing or failed: $productReport"
-        }
+        Assert-ProductVerificationReport -Path $productReport
     }
     # Interactive exit zero and help establish no GUI/audio/performance claim.
     Write-Output "Deployed $Scenario process exited successfully; evidence: $OutputDirectory"

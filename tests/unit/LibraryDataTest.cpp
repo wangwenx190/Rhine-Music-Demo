@@ -3,6 +3,7 @@
 // have named constants.
 
 #include "Localization.h"
+#include "LibrarySearchOracle.h"
 #include "LibrarySession.h"
 #include "LibraryIndex.h"
 #include "GenreRowsModel.h"
@@ -25,6 +26,7 @@
 using namespace Qt::StringLiterals;
 
 using namespace yalahoo;
+using yalahoo::test::searchLibrary;
 class TestProvider final : public IMetadataProvider
 {
     Q_DISABLE_COPY_MOVE(TestProvider)
@@ -84,6 +86,34 @@ private:
         return result;
     }
 private Q_SLOTS:
+    void metadataNotificationStopsAfterReentrantSort()
+    {
+        LibrarySnapshot data;
+        for (int row = 0; row < 3; ++row) {
+            Album album;
+            album.id = QString::number(row);
+            album.title = album.id;
+            album.artist = QString::number(2 - row);
+            data.albums.append(album);
+        }
+        AlbumListModel model;
+        model.setSortMode(SortMode::Album);
+        model.setSnapshot(std::make_shared<const LibrarySnapshot>(data));
+        for (auto &album : data.albums)
+            album.description = u"Updated metadata"_s;
+        QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+        QSignalSpy reset(&model, &QAbstractItemModel::modelReset);
+        connect(&model, &QAbstractItemModel::dataChanged, &model, [&] {
+            model.setSortMode(SortMode::Artist);
+        });
+        model.updateMetadataSnapshot(std::make_shared<const LibrarySnapshot>(data));
+        QCOMPARE(reset.size(), 1);
+        QCOMPARE(changed.size(), 1);
+        QCOMPARE(model.data(model.index(0), AlbumListModel::AlbumId).toString(), u"2"_s);
+        for (int row = 0; row < model.rowCount(); ++row)
+            QCOMPARE(model.data(model.index(row), AlbumListModel::Description).toString(),
+                     u"Updated metadata"_s);
+    }
     void typedPayloadsDoNotRetainObsoleteJsonCopies()
     {
         LibrarySnapshot source;

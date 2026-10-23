@@ -100,8 +100,8 @@ class StartupVerificationTest(unittest.TestCase):
     def test_malformed_and_nonfinite_measurements_cannot_pass(self):
         args = self.arguments("--observe-only", "--mode", "vsync", "--scenario", "night-wave")
         for field, values in {
-            "samplingSeconds": (float("inf"), float("nan"), "30", True),
-            "dpr": (True, "1", float("nan")),
+            "samplingSeconds": (float("inf"), float("nan"), "30", True, 10 ** 400),
+            "dpr": (True, "1", float("nan"), 10 ** 400),
             "switches": (False,), "rebuilds": (False,), "stages": ([1], "timing"),
             "samplingStartedNs": (None, True, "1", float("nan")),
             "samplingEndedNs": (None, "3", float("inf")),

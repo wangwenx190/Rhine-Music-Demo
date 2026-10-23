@@ -12,9 +12,11 @@ Node {
     property bool compositorOutput: false
     property url coverSource: "qrc:/assets/demo-covers/square.png"
     property vector3d paperIrradiance: Qt.vector3d(1, 1, 1)
-    readonly property Texture room: Texture {
+    component LookupTexture: Texture {
+        id: lookup
+        required property string asset
         textureData: FixedTextureData {
-            asset: "room-pmrem"
+            asset: lookup.asset
         }
         minFilter: Texture.Linear
         magFilter: Texture.Linear
@@ -22,33 +24,17 @@ Node {
         tilingModeHorizontal: Texture.ClampToEdge
         tilingModeVertical: Texture.ClampToEdge
     }
-    readonly property Texture integration: Texture {
-        textureData: FixedTextureData {
-            asset: "dfg"
-        }
-        minFilter: Texture.Linear
-        magFilter: Texture.Linear
-        generateMipmaps: false
-        tilingModeHorizontal: Texture.ClampToEdge
-        tilingModeVertical: Texture.ClampToEdge
+    readonly property Texture room: LookupTexture {
+        asset: "room-pmrem"
     }
-    readonly property Texture ltc1: Texture {
-        textureData: FixedTextureData {
-            asset: "ltc1"
-        }
-        minFilter: Texture.Linear
-        magFilter: Texture.Linear
-        tilingModeHorizontal: Texture.ClampToEdge
-        tilingModeVertical: Texture.ClampToEdge
+    readonly property Texture integration: LookupTexture {
+        asset: "dfg"
     }
-    readonly property Texture ltc2: Texture {
-        textureData: FixedTextureData {
-            asset: "ltc2"
-        }
-        minFilter: Texture.Linear
-        magFilter: Texture.Linear
-        tilingModeHorizontal: Texture.ClampToEdge
-        tilingModeVertical: Texture.ClampToEdge
+    readonly property Texture ltc1: LookupTexture {
+        asset: "ltc1"
+    }
+    readonly property Texture ltc2: LookupTexture {
+        asset: "ltc2"
     }
     component CaseGlass: GlassMaterial {
         lighting: materials.lighting

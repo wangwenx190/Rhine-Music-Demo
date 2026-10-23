@@ -35,3 +35,11 @@ function(yalahoo_browse_qml output)
     list(APPEND files ${group})
     set(${output} ${files} PARENT_SCOPE)
 endfunction()
+
+# Product, verification hosts and deployment scanning use one root/import closure.
+function(yalahoo_product_qml output)
+    yalahoo_browse_qml(files)
+    set(app "${PROJECT_SOURCE_DIR}/qml/Yalahoo/Music/App.qml")
+    set_source_files_properties("${app}" PROPERTIES QT_RESOURCE_ALIAS App.qml)
+    set(${output} "${app}" ${files} PARENT_SCOPE)
+endfunction()

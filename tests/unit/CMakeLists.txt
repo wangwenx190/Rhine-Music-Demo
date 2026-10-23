@@ -280,6 +280,9 @@ if(UNIX)
         "${PROJECT_SOURCE_DIR}/tests/tools/LauncherTest.py")
     set_tests_properties(launchers PROPERTIES TIMEOUT 90)
 endif()
+add_test(NAME windows-deployment-report COMMAND "${Python3_EXECUTABLE}"
+    "${PROJECT_SOURCE_DIR}/tests/tools/WindowsDeploymentTest.py")
+set_tests_properties(windows-deployment-report PROPERTIES TIMEOUT 180 SKIP_RETURN_CODE 77)
 
 yalahoo_unit_test(ApplicationOptionsTest application-options
     SOURCES "${PROJECT_SOURCE_DIR}/src/app/ApplicationOptions.cpp"

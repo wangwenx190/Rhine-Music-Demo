@@ -26,6 +26,23 @@ def run(*arguments, **kwargs):
 
 
 class PackageSupportTest(unittest.TestCase):
+    def test_packaged_helpers_import_and_validate_without_the_repository(self):
+        with tempfile.TemporaryDirectory(prefix="yalahoo helper space-") as temporary:
+            root = Path(temporary) / 'package'
+            root.mkdir()
+            (root.parent / 'report_values.py').write_text(
+                "raise RuntimeError('Foreign helper must never load')\n")
+            shutil.copyfile(ROOT / 'tools/deploy/package_support.py', root / 'package_support.py')
+            shutil.copyfile(ROOT / 'tools/report_values.py', root / 'report_values.py')
+            report = root / 'report.json'
+            report.write_text('{"passed": true}')
+            code = ("import sys; from pathlib import Path; sys.dont_write_bytecode = True; "
+                    "sys.path.insert(0, sys.argv[1]); import package_support; "
+                    "assert package_support.read_report(Path(sys.argv[2])) == {'passed': True}")
+            subprocess.run([sys.executable, '-I', '-B', '-c', code, str(root), str(report)],
+                           cwd=root, check=True, capture_output=True, timeout=5)
+            self.assertFalse((root / '__pycache__').exists())
+
     def test_environment_isolation_is_shared_without_mutating_the_parent(self):
         polluted = dict(QT_PLUGIN_PATH='foreign', QML_IMPORT_PATH='foreign', QSG_RHI_BACKEND='foreign',
                         YALAHOO_VERIFY_FOREGROUND='1', QCPAINTER_DEBUG_COLLECT='1',
@@ -224,7 +241,10 @@ class PackageSupportTest(unittest.TestCase):
             script = base / "probe.py"
             cases = [('{"passed": true}', 0, False), ('{broken', 0, False),
                      ('[]', 0, False), ('{"passed": true}', 7, False), ('', 0, True),
-                     ('{"passed": "true"}', 0, False), ('{"passed": 1}', 0, False)]
+                     ('{"passed": "true"}', 0, False), ('{"passed": 1}', 0, False),
+                     ('{"passed": true, "measurement": NaN}', 0, False),
+                     ('{"passed": true, "measurement": 1e999}', 0, False),
+                     (json.dumps(dict(passed=True, measurement=10 ** 400)), 0, False)]
             for index, (report, code, timeout) in enumerate(cases):
                 output = base / str(index)
                 output.mkdir()
@@ -237,7 +257,7 @@ class PackageSupportTest(unittest.TestCase):
                 self.assertEqual(probe.passed, report == '{"passed": true}' and code == 0 and not timeout)
                 if not timeout:
                     self.assertEqual(probe.exit_code, code)
-                if report.startswith('{"passed"'):
+                if report.startswith('{"passed"') and 'measurement' not in report:
                     self.assertTrue(probe.report["passed"])
                 else:
                     self.assertEqual(probe.report, {})

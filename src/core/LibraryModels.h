@@ -39,8 +39,6 @@ struct SearchResult final
 };
 QString genreDisplayName(const Genre &genre);
 QString artistDisplayName(const QString &artist);
-QList<SearchResult> searchLibrary(const LibrarySnapshot &snapshot, const QString &query,
-                                  const QString &genreId = { });
 
 class AlbumListModel : public QAbstractListModel
 {

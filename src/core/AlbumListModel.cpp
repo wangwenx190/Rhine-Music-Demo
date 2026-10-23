@@ -153,6 +153,7 @@ void AlbumListModel::updateMetadataSnapshot(Snapshot snapshot)
     m_snapshot = std::move(snapshot);
     const auto updated = m_snapshot;
     const auto indices = m_order.indices;
+    const auto mode = m_mode;
     for (int row = 0; row < indices.size(); ++row) {
         const auto position = indices[row];
         const auto &before = previous->albums[position];
@@ -164,7 +165,8 @@ void AlbumListModel::updateMetadataSnapshot(Snapshot snapshot)
             Q_EMIT dataChanged(index(row), index(row),
                                { Producers, Description, DescriptionSource, Introduction,
                                  CreditsLookup, Online, AlbumData });
-        if (m_snapshot != updated)
+        // A sorting observer resets every row; old row positions cannot be notified afterward.
+        if (m_snapshot != updated || m_mode != mode)
             return;
     }
 }

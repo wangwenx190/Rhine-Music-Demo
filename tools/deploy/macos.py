@@ -71,6 +71,7 @@ def main():
         (build / 'deployment-dependencies.json').write_text(json.dumps(closure, indent=2) + '\n')
         for name in ('verify-macos.py', 'macos_bundle.py', 'package_support.py'):
             shutil.copyfile(ROOT / 'tools/deploy' / name, staging / name)
+        shutil.copyfile(ROOT / 'tools/report_values.py', staging / 'report_values.py')
         (staging / 'README.md').write_text('''# yalahOO!!!
 
 Open yalahoo.app for your local library, or run its Contents/MacOS/yalahoo --demo.

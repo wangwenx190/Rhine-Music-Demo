@@ -5,6 +5,7 @@
 #include "IMetadataProvider.h"
 
 namespace yalahoo {
+QString wikipediaEntityId(const QJsonObject &page);
 QStringList wikipediaTitles(const Album &album);
 QStringList wikidataClaims(const QJsonObject &entity, const QString &property);
 QStringList wikidataNames(const QJsonObject &entity);

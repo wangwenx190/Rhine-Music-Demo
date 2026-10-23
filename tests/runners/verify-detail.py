@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Run serialized Release product detail replays; keep raw evidence outside Git."""
-from native_replay import replay_parser, run_replays
+from native_replay import matching_number, replay_parser, run_replays
 
 
 def validate_report(report, args, output):
     transitions = report.get("windowTransitions")
-    return (type(report.get("dpr")) in (int, float) and report["dpr"] == args.dpr
+    return (matching_number(report.get("dpr"), args.dpr)
             and report.get("windowLifecycleRequested") is args.window_lifecycle
             and isinstance(transitions, list)
             and len(transitions) == (4 if args.window_lifecycle else 0)

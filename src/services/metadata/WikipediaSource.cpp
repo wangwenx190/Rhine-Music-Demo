@@ -14,6 +14,10 @@ constexpr auto MaximumExtractCharacters = 8000;
 using namespace Qt::StringLiterals;
 
 namespace yalahoo {
+QString wikipediaEntityId(const QJsonObject &page)
+{
+    return page.value(u"pageprops"_s).toObject().value(u"wikibase_item"_s).toString();
+}
 QStringList wikipediaTitles(const Album &album)
 {
     QStringList result;
@@ -106,7 +110,7 @@ ProviderResult wikipediaMetadata(const Album &album, const QJsonArray &pages,
         const auto properties = page.value(u"pageprops"_s).toObject();
         if (page.contains(u"missing"_s) || properties.contains(u"disambiguation"_s))
             continue;
-        const auto qid = properties.value(u"wikibase_item"_s).toString();
+        const auto qid = wikipediaEntityId(page);
         const auto entity = entities.value(qid).toObject();
         auto names = wikidataNames(entity);
         names.append(page.value(u"title"_s).toString());

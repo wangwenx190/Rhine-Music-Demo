@@ -5,10 +5,27 @@ import "../components"
 
 SettingsSection {
     id: root
+    // The three independent audio controllers share this volume-editing interface.
     component VolumeRange: SettingRange {
+        required property var controller
+        visible: controller !== null
+        value: controller ? controller.volume : 0
+        onMoved: value => {
+            if (controller)
+                controller.volume = value;
+        }
         suffix: "%"
         decimals: 0
         displayFactor: 100
+    }
+    component SoundSwitch: ArchiveCheckBox {
+        required property var controller
+        visible: controller !== null
+        checked: controller ? controller.enabled : false
+        onToggled: {
+            if (controller)
+                controller.enabled = checked;
+        }
     }
     property PlaybackController playback: null
     property BackgroundMusicController backgroundMusic: null
@@ -22,52 +39,27 @@ SettingsSection {
     VolumeRange {
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "Track volume")
-        visible: root.playback !== null
-        value: root.playback ? root.playback.volume : 0
-        onMoved: value => {
-            if (root.playback)
-                root.playback.volume = value;
-        }
+        controller: root.playback
     }
-    ArchiveCheckBox {
+    SoundSwitch {
         tokens: root.tokens
         text: qsTranslate("SettingsPanel", "Interface sounds")
-        visible: root.interfaceSound !== null
-        checked: root.interfaceSound ? root.interfaceSound.enabled : false
-        onToggled: {
-            if (root.interfaceSound)
-                root.interfaceSound.enabled = checked;
-        }
+        controller: root.interfaceSound
     }
     VolumeRange {
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "Sound effect volume")
-        visible: root.interfaceSound !== null
-        value: root.interfaceSound ? root.interfaceSound.volume : 0
-        onMoved: value => {
-            if (root.interfaceSound)
-                root.interfaceSound.volume = value;
-        }
+        controller: root.interfaceSound
     }
-    ArchiveCheckBox {
+    SoundSwitch {
         tokens: root.tokens
         text: qsTranslate("SettingsPanel", "Background music")
-        visible: root.backgroundMusic !== null
-        checked: root.backgroundMusic ? root.backgroundMusic.enabled : false
-        onToggled: {
-            if (root.backgroundMusic)
-                root.backgroundMusic.enabled = checked;
-        }
+        controller: root.backgroundMusic
     }
     VolumeRange {
         tokens: root.tokens
         label: qsTranslate("SettingsPanel", "BGM volume")
-        visible: root.backgroundMusic !== null
-        value: root.backgroundMusic ? root.backgroundMusic.volume : 0
-        onMoved: value => {
-            if (root.backgroundMusic)
-                root.backgroundMusic.volume = value;
-        }
+        controller: root.backgroundMusic
     }
     InterfaceSoundPreview {
         tokens: root.tokens

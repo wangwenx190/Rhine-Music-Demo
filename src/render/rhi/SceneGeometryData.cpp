@@ -11,6 +11,17 @@ constexpr auto ReviewFloorDepth = .05f;
 constexpr auto ProductFloorHalfExtent = 100;
 constexpr auto ProductFloorDepth = 4.63f;
 constexpr int ReviewFloorHalfExtent = 6;
+
+assets::Batch floorGeometry(float halfExtent, float depth)
+{
+    assets::Batch batch;
+    batch.vertices = { { { -halfExtent, -depth, halfExtent, 0, 1, 0, 0, 0 } },
+                       { { halfExtent, -depth, halfExtent, 0, 1, 0, 1, 0 } },
+                       { { halfExtent, -depth, -halfExtent, 0, 1, 0, 1, 1 } },
+                       { { -halfExtent, -depth, -halfExtent, 0, 1, 0, 0, 1 } } };
+    batch.indices = { 0, 1, 2, 0, 2, 3 };
+    return batch;
+}
 }
 SceneGeometryData::SceneGeometryData()
 {
@@ -53,22 +64,10 @@ SceneGeometryData::SceneGeometryData()
     };
     quad.indices = { 0, 1, 2, 0, 2, 3 };
     m_paper = append(quad);
-    quad.vertices = {
-        { { -ReviewFloorHalfExtent, -ReviewFloorDepth, ReviewFloorHalfExtent, 0, 1, 0, 0, 0 } },
-        { { ReviewFloorHalfExtent, -ReviewFloorDepth, ReviewFloorHalfExtent, 0, 1, 0, 1, 0 } },
-        { { ReviewFloorHalfExtent, -ReviewFloorDepth, -ReviewFloorHalfExtent, 0, 1, 0, 1, 1 } },
-        { { -ReviewFloorHalfExtent, -ReviewFloorDepth, -ReviewFloorHalfExtent, 0, 1, 0, 0, 1 } }
-    };
-    m_floor = append(quad);
+    m_floor = append(floorGeometry(ReviewFloorHalfExtent, ReviewFloorDepth));
     // PlaneGeometry(200, 200), rotation.x=-PI/2, position.y=-4.63.
     // Baked once into the shared immutable geometry; never a shadow caster.
-    quad.vertices = {
-        { { -ProductFloorHalfExtent, -ProductFloorDepth, ProductFloorHalfExtent, 0, 1, 0, 0, 0 } },
-        { { ProductFloorHalfExtent, -ProductFloorDepth, ProductFloorHalfExtent, 0, 1, 0, 1, 0 } },
-        { { ProductFloorHalfExtent, -ProductFloorDepth, -ProductFloorHalfExtent, 0, 1, 0, 1, 1 } },
-        { { -ProductFloorHalfExtent, -ProductFloorDepth, -ProductFloorHalfExtent, 0, 1, 0, 0, 1 } }
-    };
-    m_productFloor = append(quad);
+    m_productFloor = append(floorGeometry(ProductFloorHalfExtent, ProductFloorDepth));
     quad.vertices = { { { -1, -1, 0, 0, 0, 1, 0, 0 } },
                       { { 3, -1, 0, 0, 0, 1, 2, 0 } },
                       { { -1, 3, 0, 0, 0, 1, 0, 2 } } };

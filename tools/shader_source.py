@@ -15,9 +15,9 @@ LIGHTING_UNIFORMS = {
 
 
 def replace_identifiers(source, mapping):
-    for name, replacement in mapping.items():
-        source = re.sub(r'\b' + re.escape(name) + r'\b', replacement, source)
-    return source
+    # Replace original tokens once: a replacement may itself contain another mapped name.
+    return re.sub(r'\b[A-Za-z_][A-Za-z_0-9]*\b',
+                  lambda match: mapping.get(match[0], match[0]), source)
 
 
 def hoist_origin_lighting(source, field):

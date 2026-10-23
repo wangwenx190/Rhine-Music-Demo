@@ -72,7 +72,7 @@ class StructureComparisonTest(unittest.TestCase):
 
     def test_nonfinite_or_nonnumeric_geometry_and_dpr_fail(self):
         for component in COMPARE.FIELDS:
-            for bad in (float("nan"), float("inf"), True, "10"):
+            for bad in (float("nan"), float("inf"), True, "10", 10 ** 400):
                 with self.subTest(component=component, bad=bad):
                     native, source = self.reports(component)
                     self.box(component, native)[next(iter(COMPARE.FIELDS[component]))]["x"] = bad

@@ -60,10 +60,7 @@ void OnlineMetadataProvider::configure(const QJsonObject &configuration)
         const auto &token = it.key();
         cancel(token);
         ProviderResult result;
-        result.requestId = token.requestId;
-        result.generation = token.generation;
-        result.albumId = token.albumId;
-        result.kind = it.value();
+        result.setRequest(token, it.value());
         result.status = ProviderStatus::Cancelled;
         Q_EMIT resultReady(result);
     }

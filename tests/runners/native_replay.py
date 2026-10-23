@@ -2,15 +2,20 @@
 import argparse
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import platform
 import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+from report_values import finite_number, read_report
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_IDS = {"metal": 6, "d3d11": 4, "d3d12": 8, "opengl": 3, "vulkan": 5}
 QML_ERRORS = ("Binding loop", "Cannot assign", "ReferenceError", "TypeError", "Failed to compile")
+VIEWPORTS = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
+             (390, 844), (320, 720), (2560, 1080), (3440, 1440))
 MAXIMUM_RUNS = 10
 REPLAY_TIMEOUT_SECONDS = 150
 
@@ -19,21 +24,8 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def read_report(path):
-    def reject_constant(value):
-        raise ValueError(f"Nonfinite JSON number: {value}")
-
-    def finite_float(value):
-        result = float(value)
-        if not math.isfinite(result):
-            reject_constant(value)
-        return result
-    try:
-        report = json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_constant,
-                            parse_float=finite_float)
-    except (OSError, ValueError):
-        return {}
-    return report if isinstance(report, dict) else {}
+def matching_number(value, expected):
+    return finite_number(value) and value == expected
 
 
 def run_logged(command, log_path, *, cwd, environment, timeout):

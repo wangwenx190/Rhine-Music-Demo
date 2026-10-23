@@ -7,6 +7,7 @@
 #include "LibraryStore.h"
 #include "DetailModel.h"
 #include "metadata/MetadataHttp.h"
+#include "metadata/MetadataWorker.h"
 #include "metadata/MetadataCachePolicy.h"
 #include "metadata/MetadataMerge.h"
 #include "metadata/MusicBrainzSource.h"
@@ -237,6 +238,47 @@ public:
     OnlineMetadataTest() = default;
 
 private Q_SLOTS:
+    void workerCancellationRetainsRequestIdentity_data()
+    {
+        QTest::addColumn<MetadataKind>("kind");
+        QTest::addColumn<bool>("active");
+        for (const auto kind :
+             { MetadataKind::Introduction, MetadataKind::Credits, MetadataKind::Enrichment }) {
+            for (const bool active : { false, true })
+                QTest::newRow(qPrintable(kindName(kind) + (active ? u"-active"_s : u"-waiting"_s)))
+                        << kind << active;
+        }
+    }
+    void workerCancellationRetainsRequestIdentity()
+    {
+        QFETCH(MetadataKind, kind);
+        QFETCH(bool, active);
+        const auto server = std::make_shared<Server>();
+        server->respond = [](const QNetworkRequest &) {
+            return Response{ json({ }), 200, 60000 };
+        };
+        MetadataWorker worker(new Network(server));
+        QSignalSpy ready(&worker, &MetadataWorker::ready);
+        const auto query = queryFor(sampleAlbum());
+        const RequestToken token{ 17, 9, query.albumId };
+        worker.enqueue(query, token, kind);
+        if (active) {
+            QTRY_VERIFY([&] {
+                QMutexLocker lock(&server->mutex);
+                return !server->requests.isEmpty();
+            }());
+        }
+        worker.cancel(token);
+        QCOMPARE(ready.size(), 1);
+        const auto result = qvariant_cast<ProviderResult>(ready.first().first());
+        QCOMPARE(result.requestId, token.requestId);
+        QCOMPARE(result.generation, token.generation);
+        QCOMPARE(result.albumId, token.albumId);
+        QCOMPARE(result.kind, kind);
+        QCOMPARE(result.status, ProviderStatus::Cancelled);
+        worker.cancel(token);
+        QCOMPARE(ready.size(), 1);
+    }
     void cachePolicyUsesExpiryTransportAndCurrentProvenance()
     {
         AlbumQuery query;

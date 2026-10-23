@@ -26,6 +26,13 @@ const KindDefinition *definition(MetadataKind kind)
     return found == Kinds.end() ? nullptr : &*found;
 }
 }
+void ProviderResult::setRequest(const RequestToken &token, MetadataKind requestedKind)
+{
+    requestId = token.requestId;
+    generation = token.generation;
+    albumId = token.albumId;
+    kind = requestedKind;
+}
 std::optional<MetadataKind> metadataKind(QStringView name)
 {
     const auto found = std::ranges::find_if(Kinds, [name](const KindDefinition &entry) {

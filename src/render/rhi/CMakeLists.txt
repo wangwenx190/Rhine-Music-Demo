@@ -129,6 +129,8 @@ qt_add_shaders(
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/smaa-weights.frag"
     "${PROJECT_SOURCE_DIR}/resources/shaders/rhi/smaa-blend.frag"
 )
+include("${PROJECT_SOURCE_DIR}/cmake/Assets.cmake")
+yalahoo_environment_assets(environment_assets)
 qt_add_resources(
     YalahooRhi
     rhi_assets
@@ -138,10 +140,7 @@ qt_add_resources(
     "${PROJECT_SOURCE_DIR}/resources"
     FILES
     "${PROJECT_SOURCE_DIR}/resources/models/music-case-v040.glb"
-    "${PROJECT_SOURCE_DIR}/resources/environment/room-pmrem.rgba32f"
-    "${PROJECT_SOURCE_DIR}/resources/environment/dfg.rgba32f"
-    "${PROJECT_SOURCE_DIR}/resources/environment/ltc1.rgba32f"
-    "${PROJECT_SOURCE_DIR}/resources/environment/ltc2.rgba32f"
+    ${environment_assets}
     "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-16.rgba32f"
     "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-32.rgba32f"
     "${PROJECT_SOURCE_DIR}/resources/environment/ssao-kernel-64.rgba32f"

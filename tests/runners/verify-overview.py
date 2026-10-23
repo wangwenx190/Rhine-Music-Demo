@@ -2,15 +2,12 @@
 """Run serialized Release product overview replays; keep raw evidence outside Git."""
 from collections import Counter
 from pathlib import Path
-from native_replay import replay_parser, run_replays
-
-SIZES = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
-         (390, 844), (320, 720), (2560, 1080), (3440, 1440))
+from native_replay import VIEWPORTS, matching_number, replay_parser, run_replays
 
 
 def validate_report(report, args, output):
     if not args.visual:
-        return type(report.get("dpr")) in (int, float) and report["dpr"] == args.dpr
+        return matching_number(report.get("dpr"), args.dpr)
     captures = report.get("captures")
     if not isinstance(captures, list) or not captures:
         return False
@@ -20,10 +17,10 @@ def validate_report(report, args, output):
                 or capture["expanded"] < -1
                 or (capture["variant"] == 0 and capture["expanded"] != -1)
                 or type(capture.get("night")) is not bool
-                or type(capture.get("dpr")) not in (int, float) or capture["dpr"] != args.dpr
+                or not matching_number(capture.get("dpr"), args.dpr)
                 or not isinstance(capture.get("file"), str)):
             return False
-    expected = Counter({(w, h, night, variant): 1 for w, h in SIZES
+    expected = Counter({(w, h, night, variant): 1 for w, h in VIEWPORTS
                         for night in (False, True) for variant in (0, 1)})
     actual = Counter((c["width"], c["height"], c["night"], c["variant"]) for c in captures)
     root = output.resolve()

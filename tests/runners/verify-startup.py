@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Run explicit product diagnostics and presentation sampling."""
 from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
-                           replay_environment, run_logged, write_json)
+                           finite_number, matching_number, replay_environment, run_logged, write_json)
 import argparse
 import hashlib
-import math
 from pathlib import Path
 import platform
 
@@ -64,13 +63,12 @@ def validate_report(report, args, exit_code):
            ("backend", "samplingRequestedSeconds", "switches", "rebuilds")):
         return False
     dpr = report.get("dpr")
-    if type(dpr) not in (int, float) or not math.isfinite(dpr):
+    if not matching_number(dpr, args.dpr):
         return False
     expected_switches, expected_rebuilds = (0, 0) if args.observe_only else (3, 2)
     valid = (exit_code == 0 and report.get("functionalPassed") is True
              and report.get("samplingComplete") is True
              and report.get("backend") == BACKEND_IDS[args.backend]
-             and report.get("dpr") == args.dpr
              and report.get("scenario") == args.scenario
              and report.get("samplingRequestedSeconds") == args.seconds
              and report.get("observationOnly", False) is args.observe_only
@@ -79,7 +77,7 @@ def validate_report(report, args, exit_code):
     if args.seconds:
         seconds = report.get("samplingSeconds")
         stages = report.get("stages")
-        valid = (valid and type(seconds) in (int, float) and math.isfinite(seconds)
+        valid = (valid and finite_number(seconds)
                  and seconds >= args.seconds and isinstance(stages, dict) and bool(stages))
     if args.mode != "offscreen":
         valid = (valid and type(report.get("swapIntervalRequested")) is int

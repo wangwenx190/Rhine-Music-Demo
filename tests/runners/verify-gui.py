@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run one integrated GUI matrix and preserve its inputs, output and failure status."""
-from native_replay import (BACKEND_IDS, QML_ERRORS, cmake_cache, executable_path, read_report,
+from native_replay import (BACKEND_IDS, QML_ERRORS, VIEWPORTS, cmake_cache, executable_path, read_report,
                            replay_environment, run_logged, write_json)
 import argparse
 import hashlib
@@ -56,8 +56,7 @@ elif args.representative:
 code = run_logged(command, args.output / 'run.log', cwd=ROOT, environment=env, timeout=1800)
 report_path = args.output / 'matrix/report.json'
 report = read_report(report_path)
-sizes = ((1920, 1080), (1280, 720), (995, 858), (960, 900), (930, 900),
-         (390, 844), (320, 720), (2560, 1080), (3440, 1440))
+sizes = VIEWPORTS
 if args.narrow:
     sizes = tuple(size for size in sizes if size[0] <= 700)
 elif args.representative:
