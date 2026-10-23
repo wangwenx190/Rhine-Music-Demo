@@ -79,9 +79,28 @@ Item {
             currentView.positionViewAtIndex(index, mode);
     }
     function settleLayout(item: Item): void {
-        for (const child of item.children)
-            root.settleLayout(child);
-        item.ensurePolished();
+        // Preserve child-first, sibling-order polishing without a recursive JS call stack.
+        const ancestors = [
+                  {
+                      node: item,
+                      children: item.children,
+                      next: 0
+                  }
+              ];
+        while (ancestors.length > 0) {
+            const branch = ancestors[ancestors.length - 1];
+            if (branch.next < branch.children.length) {
+                const child = branch.children[branch.next++];
+                ancestors.push({
+                                   node: child,
+                                   children: child.children,
+                                   next: 0
+                               });
+            } else {
+                branch.node.ensurePolished();
+                ancestors.pop();
+            }
+        }
     }
     function reveal(revision: double, index: int): void {
         if (!trackFocus || revision !== trackFocus.revision || !currentView || about)

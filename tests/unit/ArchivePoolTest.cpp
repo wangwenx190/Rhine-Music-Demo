@@ -55,6 +55,37 @@ private Q_SLOTS:
         pool.setColumns(columns({ 1, 1, 1 }));
         QCOMPARE(pool.albumAt({ belowZero, 12 }), u"2:0"_s);
     }
+    void pooledColumnLookupPreservesEveryPhysicalCell()
+    {
+        ArchivePool pool;
+        std::array<double, ArchivePool::lanes> rowCenters;
+        for (int lane = 0; lane < ArchivePool::lanes; ++lane)
+            rowCenters[lane] = 12 + lane * 7.5;
+        for (const QList<int> &counts : { QList<int>{ }, QList<int>{ 0 }, QList<int>{ 1, 0, 3, 97 },
+                                          QList<int>{ 5, 4, 3, 2, 1, 0, 23, 51, 60, 7, 9 } }) {
+            pool.setColumns(columns(counts));
+            for (const ArchiveCell center :
+                 { ArchiveCell{ -1000.5, -104.5 }, ArchiveCell{ 0, 12 }, ArchiveCell{ 2.5, 36 },
+                   ArchiveCell{ 1000.5, 10000.5 } }) {
+                for (const bool realistic : { false, true }) {
+                    pool.update(center, realistic ? &rowCenters : nullptr);
+                    for (int i = 0; i < ArchivePool::capacity; ++i) {
+                        auto expected = ArchivePool::visibleCell(i, center);
+                        if (realistic)
+                            expected.row = ArchivePool::nearestOccurrence(
+                                    ArchivePool::poolCell(i).row, rowCenters[i / ArchivePool::rows],
+                                    ArchivePool::rows);
+                        const auto &actual = pool.instances()[i];
+                        QCOMPARE(actual.cell, expected);
+                        QCOMPARE(actual.albumId,
+                                 realistic ? pool.realAlbumAt(expected) : pool.albumAt(expected));
+                        QCOMPARE(actual.objectId, quint64(i + 1));
+                        QVERIFY(!actual.owned);
+                    }
+                }
+            }
+        }
+    }
     void laneCommandRebasesBeforeNarrowingPeriodicCoordinates()
     {
         MotionController motion;

@@ -3,7 +3,14 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QHash>
+#include <array>
+#include <algorithm>
 #include <cmath>
+#include <numeric>
+#include <optional>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 using namespace Qt::StringLiterals;
 
@@ -16,6 +23,7 @@ constexpr auto MaximumReleaseRecordings = 2000;
 constexpr auto TrackDurationToleranceSeconds = 3;
 constexpr auto MaximumGenres = 128;
 constexpr auto MaximumCredits = 4096;
+constexpr auto RecordingProjectionCount = 4;
 
 QString artistName(const QJsonObject &object)
 {
@@ -145,8 +153,31 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
     struct Recording final
     {
         QJsonObject object;
+        QString title;
         int disc = 0, position = 0;
         double duration = 0;
+        bool used = false;
+    };
+    struct RecordingKey final
+    {
+        QString title;
+        std::optional<int> disc, position;
+        double duration;
+        qsizetype index;
+        bool operator<(const RecordingKey &other) const
+        {
+            return std::tie(title, disc, position, duration, index) < std::tie(
+                           other.title, other.disc, other.position, other.duration, other.index);
+        }
+    };
+    const auto keys = [](const Recording &recording, qsizetype index) {
+        return std::array<RecordingKey, RecordingProjectionCount>{
+            RecordingKey{ recording.title, { }, { }, recording.duration, index },
+            RecordingKey{ recording.title, recording.disc, { }, recording.duration, index },
+            RecordingKey{ recording.title, { }, recording.position, recording.duration, index },
+            RecordingKey{ recording.title, recording.disc, recording.position, recording.duration,
+                          index }
+        };
     };
     const auto media = release.value(u"media"_s).toArray();
     qsizetype recordingCount = 0;
@@ -158,52 +189,126 @@ ProviderResult musicBrainzMetadata(const Album &album, MetadataKind kind,
     }
     if (!album.tracks.isEmpty() && recordingCount != album.tracks.size())
         return result;
+    // Album-only queries still validate the release limit but need no per-track index.
+    const auto matchingMedia = album.tracks.isEmpty() ? QJsonArray() : media;
     QList<Recording> recordings;
-    recordings.reserve(recordingCount);
-    // Normalize each remote title once and restrict matching to its title bucket.
-    // Repeated titles still require the original disc/position/duration uniqueness checks.
-    QHash<QString, QList<qsizetype>> recordingsByTitle;
-    recordingsByTitle.reserve(recordingCount);
-    for (const auto &mediumValue : media) {
+    recordings.reserve(album.tracks.size());
+    QHash<QString, qsizetype> firstByTitle;
+    firstByTitle.reserve(album.tracks.size());
+    qsizetype repeatedCount = 0;
+    // Four sorted projections cover the optional local disc/position constraints.
+    // A successor index skips consumed entries without shifting storage or allocating
+    // one tree node per projection. Duration is the range key within each projection.
+    std::vector<RecordingKey> available;
+    for (const auto &mediumValue : matchingMedia) {
         const auto medium = mediumValue.toObject();
         for (const auto &trackValue : medium.value(u"tracks"_s).toArray()) {
             const auto track = trackValue.toObject();
             const auto recording = track.value(u"recording"_s).toObject();
+            const auto title =
+                    track.value(u"title"_s).toString(recording.value(u"title"_s).toString());
             recordings.append(
-                    { recording, medium.value(u"position"_s).toInt(),
+                    { recording, metadataName(title), medium.value(u"position"_s).toInt(),
                       track.value(u"position"_s).toInt(),
                       track.value(u"length"_s).toDouble(recording.value(u"length"_s).toDouble())
                               / yalahoo::units::MillisecondsPerSecond });
-            const auto title =
-                    track.value(u"title"_s).toString(recording.value(u"title"_s).toString());
-            recordingsByTitle[metadataName(title)].append(recordings.size() - 1);
+            const auto entry = firstByTitle.tryEmplace(std::as_const(recordings).last().title,
+                                                       recordings.size() - 1);
+            if (!entry.inserted) {
+                repeatedCount += *entry.iterator >= 0 ? 2 : 1;
+                *entry.iterator = -1;
+            }
         }
     }
+    // Unique titles retain the hash-only fast path and need no projected keys at all.
+    available.reserve(repeatedCount * RecordingProjectionCount);
+    for (qsizetype i = 0; i < recordings.size(); ++i) {
+        const auto &recording = std::as_const(recordings)[i];
+        if (firstByTitle.value(recording.title) < 0)
+            for (const auto &key : keys(recording, i))
+                available.push_back(key);
+    }
+    std::sort(available.begin(), available.end());
+    std::vector<qsizetype> successors(available.size() + 1);
+    std::iota(successors.begin(), successors.end(), 0);
+    const auto nextAvailable = [&successors](qsizetype index) {
+        auto root = index;
+        while (successors[root] != root)
+            root = successors[root];
+        // Iterative path compression bounds repeated queries of consumed prefixes.
+        while (index != root) {
+            const auto next = successors[index];
+            successors[index] = root;
+            index = next;
+        }
+        return root;
+    };
+    const auto lowerBound = [&available](const RecordingKey &key) {
+        return std::lower_bound(available.cbegin(), available.cend(), key) - available.cbegin();
+    };
+    const auto repeatedMatch = [&](const Track &track, const QString &title) -> qsizetype {
+        const auto prefix = std::tie(title, track.discNumber, track.trackNumber);
+        // Search with the original subtraction predicate. Computing duration-tolerance
+        // instead can exclude a valid boundary when subtraction rounds differently.
+        const auto first = std::partition_point(
+                available.cbegin(), available.cend(), [&](const RecordingKey &key) {
+                    const auto candidatePrefix = std::tie(key.title, key.disc, key.position);
+                    if (candidatePrefix != prefix)
+                        return candidatePrefix < prefix;
+                    return track.duration > 0
+                            && (key.duration <= 0
+                                || (key.duration < track.duration
+                                    && std::abs(track.duration - key.duration)
+                                            > TrackDurationToleranceSeconds));
+                });
+        auto candidate = nextAvailable(first - available.cbegin());
+        qsizetype match = -1;
+        while (candidate < qsizetype(available.size()) && available[candidate].title == title
+               && available[candidate].disc == track.discNumber
+               && available[candidate].position == track.trackNumber) {
+            const auto i = available[candidate].index;
+            const auto &remote = std::as_const(recordings)[i];
+            if (track.duration > 0
+                && (remote.duration <= 0
+                    || std::abs(track.duration - remote.duration)
+                            > TrackDurationToleranceSeconds)) {
+                break;
+            }
+            if (match >= 0)
+                return -1;
+            match = i;
+            candidate = nextAvailable(candidate + 1);
+        }
+        return match;
+    };
     QList<qsizetype> matches;
     matches.reserve(album.tracks.size());
-    QList<bool> used(recordings.size(), false);
     for (const auto &track : album.tracks) {
-        const auto candidates = recordingsByTitle.constFind(metadataName(track.title));
-        if (candidates == recordingsByTitle.cend())
+        const auto title = metadataName(track.title);
+        const auto entry = firstByTitle.constFind(title);
+        if (entry == firstByTitle.cend())
             return result;
-        qsizetype match = -1;
-        for (const qsizetype i : *candidates) {
-            const auto &remote = recordings[i];
-            if (used[i] || (track.discNumber && *track.discNumber != remote.disc)
+        qsizetype match = *entry;
+        if (match >= 0) {
+            auto &remote = recordings[match];
+            if (remote.used || (track.discNumber && *track.discNumber != remote.disc)
                 || (track.trackNumber && *track.trackNumber != remote.position)
                 || (track.duration > 0
                     && (remote.duration <= 0
                         || std::abs(track.duration - remote.duration)
                                 > TrackDurationToleranceSeconds)))
-                continue;
-            if (match >= 0)
                 return result;
-            match = i;
+            remote.used = true;
+        } else {
+            match = repeatedMatch(track, title);
+            if (match < 0)
+                return result;
+            for (const auto &key : keys(std::as_const(recordings)[match], match)) {
+                const auto index = lowerBound(key);
+                successors[index] = nextAvailable(index + 1);
+            }
         }
-        if (match < 0)
-            return result;
         matches.append(match);
-        used[match] = true;
     }
     const auto releaseId = release.value(u"id"_s).toString();
     result.source = { { u"name"_s, u"MusicBrainz"_s },

@@ -23,6 +23,7 @@
 #include <cstring>
 #include <algorithm>
 #include <memory>
+#include <cmath>
 
 using namespace Qt::StringLiterals;
 using namespace yalahoo;
@@ -382,6 +383,168 @@ private Q_SLOTS:
         QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
                  ProviderStatus::Uncertain);
     }
+    void repeatedTitlesMatchByDurationWithoutReusingRecordings()
+    {
+        auto album = sampleAlbum();
+        auto release = sampleRelease();
+        auto medium = release.value(u"media"_s).toArray().first().toObject();
+        const auto original = medium.value(u"tracks"_s).toArray().first().toObject();
+        album.tracks.clear();
+        QJsonArray remoteTracks;
+        // Reverse the duration order and omit local numbering: every title is identical,
+        // but each duration admits exactly one recording. Check the actual credit mapping.
+        for (int i = 0; i < 1800; ++i) {
+            Track track;
+            track.id = u"track-%1"_s.arg(i);
+            track.albumId = album.id;
+            track.title = u"Test Song"_s;
+            track.duration = 20 + i * 8;
+            album.tracks.append(track);
+            auto remote = original;
+            remote.insert(u"position"_s, 1800 - i);
+            remote.insert(u"length"_s, (20 + (1799 - i) * 8) * 1000);
+            remote.insert(u"recording"_s,
+                          QJsonObject{ { u"relations"_s,
+                                         QJsonArray{ relation(
+                                                 u"mix"_s, u"Engineer-%1"_s.arg(1799 - i)) } } });
+            remoteTracks.append(remote);
+        }
+        medium.insert(u"tracks"_s, remoteTracks);
+        release.insert(u"media"_s, QJsonArray{ medium });
+        const auto result = musicBrainzMetadata(album, MetadataKind::Credits, release);
+        QCOMPARE(result.status, ProviderStatus::Partial);
+        QCOMPARE(result.payload.value(u"creditsLookup"_s).toObject().value(u"matchedTracks"_s),
+                 1800);
+        const auto credits = result.payload.value(u"producers"_s).toArray();
+        QCOMPARE(credits.size(), 1801);
+        for (int i = 0; i < album.tracks.size(); ++i) {
+            const auto credit = credits[i + 1].toObject();
+            QCOMPARE(credit.value(u"trackId"_s), u"track-%1"_s.arg(i));
+            QCOMPARE(credit.value(u"name"_s), u"Engineer-%1"_s.arg(i));
+        }
+        album.tracks[1].duration = album.tracks[0].duration;
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Uncertain);
+    }
+    void repeatedTitlesKeepAllOptionalProjectionsInSync()
+    {
+        auto album = sampleAlbum();
+        auto release = sampleRelease();
+        const auto originalMedium = release.value(u"media"_s).toArray().first().toObject();
+        const auto originalTrack = originalMedium.value(u"tracks"_s).toArray().first().toObject();
+        album.tracks.clear();
+        QJsonArray media;
+        for (int disc = 1; disc <= 2; ++disc) {
+            auto medium = originalMedium;
+            medium.insert(u"position"_s, disc);
+            QJsonArray tracks;
+            for (int position = 1; position <= 2; ++position) {
+                auto remote = originalTrack;
+                remote.insert(u"position"_s, position);
+                remote.insert(u"length"_s, position == 1 ? 200000 : 210000);
+                tracks.append(remote);
+                Track local;
+                local.id = u"%1-%2"_s.arg(disc).arg(position);
+                local.title = u"Test Song"_s;
+                local.discNumber = disc;
+                local.trackNumber = position;
+                local.duration = position == 1 ? 200 : 210;
+                album.tracks.append(local);
+            }
+            medium.insert(u"tracks"_s, tracks);
+            media.append(medium);
+        }
+        release.insert(u"media"_s, media);
+        // Disc-only, position-only and fully unconstrained queries become unique as
+        // preceding precise matches consume candidates through every other projection.
+        album.tracks[1].trackNumber.reset();
+        album.tracks[2].discNumber.reset();
+        album.tracks[3].discNumber.reset();
+        album.tracks[3].trackNumber.reset();
+        album.tracks[3].duration = 0;
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Partial);
+        // Without the first disc constraint, the first query is ambiguous immediately.
+        album.tracks[0].discNumber.reset();
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Uncertain);
+    }
+    void durationBoundaryUsesTheOriginalSubtractionPredicate()
+    {
+        auto album = sampleAlbum();
+        auto second = album.tracks.first();
+        second.id = u"second"_s;
+        second.trackNumber = 2;
+        second.duration = 100;
+        album.tracks[0].trackNumber.reset();
+        album.tracks[0].duration = std::nextafter(3.0, 4.0);
+        album.tracks.append(second);
+        auto release = sampleRelease();
+        auto medium = release.value(u"media"_s).toArray().first().toObject();
+        auto firstRemote = medium.value(u"tracks"_s).toArray().first().toObject();
+        auto secondRemote = firstRemote;
+        firstRemote.insert(u"length"_s, std::ldexp(1., -52) * 1000);
+        secondRemote.insert(u"position"_s, 2);
+        secondRemote.insert(u"length"_s, 100000);
+        medium.insert(u"tracks"_s, QJsonArray{ firstRemote, secondRemote });
+        release.insert(u"media"_s, QJsonArray{ medium });
+        // The original subtraction rounds to exactly three; a precomputed lower duration
+        // bound rounds differently near zero and would exclude this valid candidate.
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Partial);
+        firstRemote.insert(u"length"_s, std::ldexp(1., -54) * 1000);
+        medium.insert(u"tracks"_s, QJsonArray{ firstRemote, secondRemote });
+        release.insert(u"media"_s, QJsonArray{ medium });
+        QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                 ProviderStatus::Uncertain);
+    }
+    void repeatedTitlesKeepUnknownRemoteDurationsAvailable()
+    {
+        for (const int unknownLength : { 0, -100000 }) {
+            auto album = sampleAlbum();
+            auto second = album.tracks.first();
+            second.id = u"unknown-duration"_s;
+            second.duration = 0;
+            album.tracks[0].trackNumber.reset();
+            album.tracks[0].duration = .5;
+            album.tracks.append(second);
+            auto release = sampleRelease();
+            auto medium = release.value(u"media"_s).toArray().first().toObject();
+            auto firstRemote = medium.value(u"tracks"_s).toArray().first().toObject();
+            auto secondRemote = firstRemote;
+            firstRemote.insert(u"length"_s, unknownLength);
+            secondRemote.insert(u"position"_s, 2);
+            secondRemote.insert(u"length"_s, 3500);
+            medium.insert(u"tracks"_s, QJsonArray{ firstRemote, secondRemote });
+            release.insert(u"media"_s, QJsonArray{ medium });
+            QCOMPARE(musicBrainzMetadata(album, MetadataKind::Credits, release).status,
+                     ProviderStatus::Partial);
+        }
+    }
+    void durationToleranceAndOptionalNumbering_data()
+    {
+        QTest::addColumn<double>("duration");
+        QTest::addColumn<bool>("accepted");
+        QTest::newRow("unknown") << 0.0 << true;
+        QTest::newRow("lower-inclusive") << 197.0 << true;
+        QTest::newRow("upper-inclusive") << 203.0 << true;
+        QTest::newRow("lower-outside") << std::nextafter(197.0, 0.0) << false;
+        QTest::newRow("upper-outside") << std::nextafter(203.0, 300.0) << false;
+    }
+    void durationToleranceAndOptionalNumbering()
+    {
+        QFETCH(double, duration);
+        QFETCH(bool, accepted);
+        for (int mask = 0; mask < 4; ++mask) {
+            auto album = sampleAlbum();
+            auto &track = album.tracks[0];
+            track.duration = duration;
+            track.discNumber = mask & 1 ? std::optional(1) : std::nullopt;
+            track.trackNumber = mask & 2 ? std::optional(1) : std::nullopt;
+            const auto result = musicBrainzMetadata(album, MetadataKind::Credits, sampleRelease());
+            QCOMPARE(result.status, accepted ? ProviderStatus::Partial : ProviderStatus::Uncertain);
+        }
+    }
     void creditsMatchTracksAndPreserveRoles()
     {
         auto album = sampleAlbum();
@@ -408,6 +571,13 @@ private Q_SLOTS:
         QVERIFY(musicBrainzRelease(sampleAlbum(),
                                    { { u"releases"_s, QJsonArray{ release, other } } })
                         .isEmpty());
+        album = sampleAlbum();
+        album.tracks.clear();
+        const auto albumOnly = musicBrainzMetadata(album, MetadataKind::Credits, sampleRelease());
+        QCOMPARE(albumOnly.status, ProviderStatus::Partial);
+        const auto albumCredits = albumOnly.payload.value(u"producers"_s).toArray();
+        QCOMPARE(albumCredits.size(), 1);
+        QCOMPARE(albumCredits.first().toObject().value(u"name"_s), u"Album Producer"_s);
     }
     void wikipediaChecksIdentityAndAttribution()
     {
@@ -828,7 +998,10 @@ private Q_SLOTS:
         QCOMPARE(session.navigationAlbumId(), album.id);
         QCOMPARE(session.playbackTrackId(), album.tracks[0].id);
         QCOMPARE(session.resolvedAlbum(album.id).producers.size(), 5);
-        QCOMPARE(detail.album()[u"producers"_s].toList().size(), 5);
+        const auto groups = detail.album()[u"producerGroups"_s].toList();
+        QCOMPARE(groups.size(), 5);
+        QCOMPARE(groups.first().toMap().value(u"name"_s), u"Local Person"_s);
+        QCOMPARE(groups.last().toMap().value(u"tracks"_s).toStringList().size(), 1);
         QCOMPARE(store.snapshot()->albums[0].genreId, u"manual"_s);
         QVERIFY(store.setMetadataConfiguration({ { u"proxyEnabled"_s, false } }));
         QTRY_VERIFY(!store.busy());

@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSet>
+#include <algorithm>
 
 using namespace Qt::StringLiterals;
 
@@ -57,14 +58,27 @@ bool inside(const QString &path, const QString &root)
 }
 QString resolvedDestination(const QString &path)
 {
-    const QFileInfo info(path);
-    auto canonical = info.canonicalFilePath();
-    if (!canonical.isEmpty())
-        return canonical;
-    const auto parent = info.absolutePath();
-    if (parent == path)
-        return QDir::cleanPath(path);
-    return QDir(resolvedDestination(parent)).filePath(info.fileName());
+    QString current = path;
+    QStringList suffix;
+    for (;;) {
+        const QFileInfo info(current);
+        const auto canonical = info.canonicalFilePath();
+        if (!canonical.isEmpty()) {
+            current = canonical;
+            break;
+        }
+        const auto parent = info.absolutePath();
+        if (parent == current) {
+            current = QDir::cleanPath(current);
+            break;
+        }
+        suffix.append(info.fileName());
+        current = parent;
+    }
+    if (suffix.isEmpty())
+        return current;
+    std::reverse(suffix.begin(), suffix.end());
+    return QDir(current).filePath(suffix.join('/'_L1));
 }
 QJsonObject copyCover(QJsonObject cover, const QString &legacyRoot, const QString &musicRoot,
                       const QString &dataRoot, QString &error)

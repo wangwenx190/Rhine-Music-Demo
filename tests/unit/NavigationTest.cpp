@@ -15,7 +15,9 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QScopeGuard>
 #include <limits>
+#include <vector>
 
 using namespace Qt::StringLiterals;
 
@@ -307,6 +309,58 @@ private Q_SLOTS:
         QCOMPARE(input.remainder(), 0);
         QVERIFY(!window.isVisible());
         QVERIFY(verification::windowPolicySatisfied(window));
+    }
+    void deepPointerOwnersKeepClipAndSiblingIsolation()
+    {
+        MotionController motion;
+        SelectionController selection(&motion);
+        populate(selection);
+        InputRouter input(&selection);
+        QQuickWindow window;
+        verification::prepareWindow(window);
+        window.resize(300, 200);
+        std::vector<std::unique_ptr<QQuickItem>> nodes;
+        const auto cleanup = qScopeGuard([&] {
+            while (!nodes.empty())
+                nodes.pop_back();
+        });
+        auto *parent = window.contentItem();
+        // Zero-sized, unclipped ancestors may contain a descendant under the pointer.
+        for (int i = 0; i < 512; ++i) {
+            auto item = std::make_unique<QQuickItem>(parent);
+            parent = item.get();
+            nodes.push_back(std::move(item));
+        }
+        auto *branch = nodes.front().get();
+        branch->setProperty("navigationInputOwner", true);
+        parent->setSize({ 100, 50 });
+        QQuickItem sibling(window.contentItem());
+        sibling.setSize({ 300, 200 });
+        const auto blocked = [&] {
+            QWheelEvent wheel({ 10, 10 }, { 10, 10 }, { 0, -1 }, { }, Qt::NoButton, Qt::NoModifier,
+                              Qt::NoScrollPhase, false);
+            return !input.wheel(&wheel, &window);
+        };
+        QVERIFY(blocked());
+        branch->setClip(true);
+        QVERIFY(!blocked());
+        branch->setClip(false);
+        QVERIFY(blocked());
+        branch->setVisible(false);
+        QVERIFY(!blocked());
+        branch->setVisible(true);
+        branch->setEnabled(false);
+        QVERIFY(!blocked());
+        branch->setEnabled(true);
+        branch->setOpacity(0);
+        QVERIFY(!blocked());
+        branch->setOpacity(1);
+        branch->setProperty("navigationInputOwner", false);
+        QVERIFY(!blocked());
+        parent->setProperty("navigationInputOwner", true);
+        QVERIFY(blocked());
+        // The cleanup guard also avoids recursive tree destruction on failed assertions.
+        QVERIFY(!window.isVisible());
     }
     void ordinalContinuityAndClock()
     {

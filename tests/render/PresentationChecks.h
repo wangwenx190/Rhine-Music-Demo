@@ -4,4 +4,5 @@
 #pragma once
 #include <QString>
 class QGuiApplication;
+int testTrackListLayout();
 int reviewPresentation(QGuiApplication &app, const QString &output);

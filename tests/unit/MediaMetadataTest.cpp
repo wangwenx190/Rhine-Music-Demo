@@ -604,6 +604,20 @@ void MediaMetadataTest::legacyErrorsAndCancellation()
     QVERIFY(test::writeFile(source + u"/library-index.json"_s, "{\"version\":1,\"albums\":[]}"_ba));
     QVERIFY(!LegacyImporter::read(source, source, { }).snapshot);
     QVERIFY(!LegacyImporter::read(source, source + u"/nested"_s, { }).snapshot);
+    const auto deepSuffix = u"/d"_s.repeated(512);
+    const auto nested = LegacyImporter::read(source, source + deepSuffix, { });
+    QVERIFY(!nested.snapshot);
+    QVERIFY(nested.error.contains(u"separate"_s));
+    const auto sibling = LegacyImporter::read(source, native + deepSuffix, { });
+    QVERIFY2(sibling.snapshot, qPrintable(sibling.error));
+    QVERIFY(!QFileInfo::exists(native));
+#ifndef Q_OS_WIN
+    const auto alias = temp.filePath(u"alias"_s);
+    QVERIFY(QFile::link(source, alias));
+    const auto linked = LegacyImporter::read(source, alias + deepSuffix, { });
+    QVERIFY(!linked.snapshot);
+    QVERIFY(linked.error.contains(u"separate"_s));
+#endif
     auto cancel = std::make_shared<std::atomic_bool>(true);
     const auto result = LegacyImporter::read(source, native, cancel);
     QVERIFY(result.cancelled);

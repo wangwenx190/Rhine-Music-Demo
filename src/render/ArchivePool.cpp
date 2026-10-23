@@ -120,12 +120,33 @@ QString ArchivePool::realAlbumAt(ArchiveCell cell) const
 }
 void ArchivePool::update(ArchiveCell center, const std::array<double, lanes> *columnRows)
 {
+    double lane = 0, rowCenter = center.row;
+    const QStringList *ids = nullptr;
     for (int i = 0; i < capacity; ++i) {
+        const auto physical = poolCell(i);
+        if (i % rows == 0) {
+            // All 48 physical rows share one lane, column lookup and row center.
+            // Borrow only for this update; setColumns owns every persistent index.
+            lane = nearestOccurrence(physical.lane, center.lane, lanes);
+            rowCenter = columnRows ? (*columnRows)[i / rows] : center.row;
+            ids = nullptr;
+            if (!m_columns.isEmpty()
+                && (!columnRows || (std::isfinite(lane) && lane >= 0 && lane < m_columns.size()))) {
+                const int column = columnRows ? int(lane) : wrap(lane, int(m_columns.size()));
+                ids = &std::as_const(m_columns)[column].albumIds;
+            }
+        }
         auto &instance = m_instances[i];
-        instance.cell = visibleCell(i, center);
-        if (columnRows)
-            instance.cell.row = nearestOccurrence(poolCell(i).row, (*columnRows)[i / rows], rows);
-        instance.albumId = columnRows ? realAlbumAt(instance.cell) : albumAt(instance.cell);
+        instance.cell = { lane, nearestOccurrence(physical.row, rowCenter, rows) };
+        const double row = instance.cell.row - yalahoo::sceneGeometry::FirstAlbumRow;
+        if (!ids || ids->isEmpty())
+            instance.albumId.clear();
+        else if (!columnRows)
+            instance.albumId = (*ids)[wrap(row, int(ids->size()))];
+        else if (std::isfinite(row) && row >= 0 && row < ids->size())
+            instance.albumId = (*ids)[int(row)];
+        else
+            instance.albumId.clear();
         instance.objectId = quint64(i + 1);
         instance.owned = false;
     }

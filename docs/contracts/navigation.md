@@ -14,7 +14,7 @@
 
 Qt `pixelDelta` 优先；没有 pixelDelta 时，angleDelta 的 120 单位映射 48px。Qt 滚轮正 Y 与浏览器 deltaY 相反，在入口明确反号。每 48px 一张，单事件至多三张，余量绝对值始终小于 48px；200ms 以上间隔、反向、切列、库/模式替换、指针按下、按键和窗口失活清余量。水平手势、Shift 滚轮和 Control 捏合保留原所有权。
 
-窗口键盘过滤器保护 TextInput/TextEdit、Slider、SpinBox、ComboBox、Popup 及显式 `navigationInputOwner` 祖先；Control/Command/Alt 快捷键不触发导航。滚轮由 Qt 先选择接收对象，再检查点击位置的控件/祖先：按钮、Flickable、面板、歌单、编辑器和滑块在滚动边界仍保留事件。未来面板可在根项设置 `navigationInputOwner: true`；`InputRouter.enabled` 用于整体模式互斥。所有方向最终走同一个 SelectionController 边界。
+窗口键盘过滤器保护 TextInput/TextEdit、Slider、SpinBox、ComboBox、Popup 及显式 `navigationInputOwner` 祖先；Control/Command/Alt 快捷键不触发导航。滚轮由 Qt 先选择接收对象，再检查点击位置的控件/祖先：按钮、Flickable、面板、歌单、编辑器和滑块在滚动边界仍保留事件。未来面板可在根项设置 `navigationInputOwner: true`；`InputRouter.enabled` 用于整体模式互斥。指针命中使用内联容量的显式祖先栈，保留隐藏/禁用/透明/裁剪剪枝、继承归属和兄弟隔离，不递归；子项列表以const读取，避免只读遍历引起隐式分离。所有方向最终走同一个 SelectionController 边界。
 
 触摸保留 36px 最小位移、主/次轴 1.3 比、1400ms 最大时长，单点手势结束只提交一次。取消和多点输入放弃本次滑动。按键和滑尺不使用任意延迟 debounce。
 

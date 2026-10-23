@@ -6,8 +6,10 @@
 #include "InputRouter.h"
 #include <QKeyEvent>
 #include <QQuickItem>
+#include <QVarLengthArray>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace yalahoo {
 namespace {
@@ -23,6 +25,7 @@ constexpr auto AngleDeltaPerDetent = 120;
 constexpr auto MinimumSwipePixels = 36;
 constexpr auto SwipeAxisDominance = 1.3;
 constexpr auto MaximumSwipeMilliseconds = 1400;
+constexpr auto InlineInputDepth = 32;
 
 bool inputOwner(QQuickItem *item, bool wheel)
 {
@@ -41,22 +44,41 @@ bool ownsInput(QQuickItem *item, bool wheel)
     }
     return false;
 }
-bool pointerOwner(QQuickItem *item, QPointF scenePoint, bool inheritedOwner = false)
+bool pointerOwner(QQuickItem *item, QPointF scenePoint)
 {
-    if (!item->isVisible() || !item->isEnabled() || item->opacity() <= 0)
-        return false;
-    const bool contains = item->contains(item->mapFromScene(scenePoint));
-    if (item->clip() && !contains)
-        return false;
-    // Carry ancestor ownership down this event's traversal instead of walking the same
-    // parent chain again for every overlapping item. No state survives the input event.
-    const bool owned = inheritedOwner || inputOwner(item, true);
-    if (contains && owned)
-        return true;
-    for (auto *child : item->childItems())
-        if (pointerOwner(child, scenePoint, owned))
-            return true;
-    return false;
+    struct Branch final
+    {
+        QList<QQuickItem *> children;
+        qsizetype next = 0;
+        bool owned = false;
+    };
+    // Keep one child-list snapshot per active ancestor, rather than consuming the native
+    // stack or retaining a frontier proportional to the width of the visual tree.
+    QVarLengthArray<Branch, InlineInputDepth> ancestors;
+    bool owned = false;
+    for (;;) {
+        if (item->isVisible() && item->isEnabled() && item->opacity() > 0) {
+            const bool contains = item->contains(item->mapFromScene(scenePoint));
+            if (!item->clip() || contains) {
+                owned = owned || inputOwner(item, true);
+                if (contains && owned)
+                    return true;
+                auto children = item->childItems();
+                if (!children.isEmpty()) {
+                    item = std::as_const(children).first();
+                    ancestors.append({ std::move(children), 1, owned });
+                    continue;
+                }
+            }
+        }
+        while (!ancestors.isEmpty() && ancestors.last().next == ancestors.last().children.size())
+            ancestors.removeLast();
+        if (ancestors.isEmpty())
+            return false;
+        auto &branch = ancestors.last();
+        item = std::as_const(branch.children)[branch.next++];
+        owned = branch.owned;
+    }
 }
 }
 InputRouter::InputRouter(SelectionController *selection, QObject *parent)

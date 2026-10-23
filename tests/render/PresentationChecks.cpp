@@ -21,6 +21,8 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <atomic>
+#include <QScopeGuard>
+#include <vector>
 
 using namespace Qt::StringLiterals;
 
@@ -32,6 +34,49 @@ constexpr int ModelDeadlineMilliseconds = 3000;
 
 // Bounds for asynchronous completion and event delivery; fixture values remain independent.
 constexpr int EventPollMilliseconds = 10;
+
+class PolishProbe final : public QQuickItem
+{
+    Q_DISABLE_COPY_MOVE(PolishProbe)
+public:
+    PolishProbe(QList<int> &order, int index, QQuickItem *parent)
+        : QQuickItem(parent), m_order(order), m_index(index)
+    {
+        polish();
+    }
+
+private:
+    void updatePolish() override
+    {
+        m_order.append(m_index);
+    }
+    QList<int> &m_order;
+    int m_index;
+};
+
+bool verifyLayoutTraversal(QQuickItem &list)
+{
+    QList<int> order, expected;
+    std::vector<std::unique_ptr<PolishProbe>> items;
+    const auto cleanup = qScopeGuard([&] {
+        while (!items.empty())
+            items.pop_back();
+    });
+    QQuickItem *parent = nullptr;
+    for (int i = 0; i < 513; ++i) {
+        items.push_back(std::make_unique<PolishProbe>(order, i, parent));
+        parent = items.back().get();
+        if (i > 0)
+            expected.prepend(i);
+    }
+    // A sibling must be polished after the entire first subtree and before its parent.
+    items.push_back(std::make_unique<PolishProbe>(order, 513, items.front().get()));
+    expected.append(513);
+    expected.append(0);
+    return QMetaObject::invokeMethod(&list, "settleLayout",
+                                     Q_ARG(QQuickItem *, items.front().get()))
+            && order == expected;
+}
 
 QQuickItem *findVisual(QQuickItem *item, const QString &name)
 {
@@ -61,6 +106,32 @@ auto renderPresentationFrame(QSignalSpy &frames, QSignalSpy &swaps,
         QTest::qWait(EventPollMilliseconds);
     return completed();
 }
+}
+int testTrackListLayout()
+{
+    DetailModel model;
+    QQmlEngine engine;
+    QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+    QQmlComponent component(&engine);
+    component.setData(R"(
+        import QtQuick
+        import Yalahoo.Music
+        import "components"
+        TrackList {
+            width: 300
+            height: 200
+            tokens: DesignTokens {}
+        }
+    )"_ba,
+                      QUrl(u"qrc:/qt/qml/Yalahoo/Music/LayoutTraversalTest.qml"_s));
+    std::unique_ptr<QObject> object(component.createWithInitialProperties(
+            { { u"detailModel"_s, QVariant::fromValue(&model) } }));
+    auto *list = qobject_cast<QQuickItem *>(object.get());
+    if (!list) {
+        qWarning() << component.errors();
+        return 3;
+    }
+    return verifyLayoutTraversal(*list) && warnings.isEmpty() ? 0 : 6;
 }
 int reviewPresentation(QGuiApplication &, const QString &output)
 {

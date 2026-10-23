@@ -5,6 +5,9 @@ target_link_libraries(ui-tests PRIVATE Qt6::Test)
 yalahoo_test_tool(ui-tests)
 yalahoo_probe_qml(ui-tests
     DetailReview.qml OverviewVisual.qml LibraryReview.qml ControlsReview.qml)
+add_test(NAME track-list-layout COMMAND ui-tests --track-list-layout)
+set_tests_properties(track-list-layout PROPERTIES TIMEOUT 30
+    FAIL_REGULAR_EXPRESSION "Binding loop;Cannot assign;ReferenceError;TypeError;Failed to compile")
 
 # Native RHI probes share executable policy; only real dependencies vary below.
 function(yalahoo_render_test target)

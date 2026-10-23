@@ -60,6 +60,8 @@ int main(int argc, char **argv)
     const auto restoreMessageHandler = qScopeGuard([previousMessageHandler] {
         qInstallMessageHandler(previousMessageHandler);
     });
+    if (app.arguments().contains(u"--track-list-layout"_s))
+        return argc == 2 ? testTrackListLayout() : 2;
     if (app.arguments().contains(u"--controls"_s))
         return argc == 3 ? reviewControls(QString::fromLocal8Bit(argv[2])) : 2;
     if (app.arguments().contains(u"--experiments"_s))
