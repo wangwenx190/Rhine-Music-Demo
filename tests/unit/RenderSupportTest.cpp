@@ -24,6 +24,43 @@ public:
     RenderSupportTest() = default;
 
 private Q_SLOTS:
+    void outputTargetUsesOnlyBorrowedColorAndTracksNativeRebuilds()
+    {
+        QRhiNullInitParams parameters;
+        const std::unique_ptr<QRhi> api(QRhi::create(QRhi::Null, &parameters));
+        QVERIFY(api);
+        const std::unique_ptr<QRhiTexture> color(
+                api->newTexture(QRhiTexture::RGBA8, { 16, 12 }, 1, QRhiTexture::RenderTarget));
+        QVERIFY(color->create());
+        rhi::OutputTarget output;
+        output.create(api.get(), color.get(), nullptr, nullptr);
+        auto *pass = output.pass.get();
+        QCOMPARE(output.rt->pixelSize(), QSize(16, 12));
+        QVERIFY(!output.rt->description().depthStencilBuffer());
+        QVERIFY(!output.rt->description().depthTexture());
+        QCOMPARE(output.rt->description().colorAttachmentAt(0)->texture(), color.get());
+        color->setPixelSize({ 23, 17 });
+        QVERIFY(color->create());
+        output.create(api.get(), color.get(), nullptr, nullptr);
+        QCOMPARE(output.rt->pixelSize(), QSize(23, 17));
+        QCOMPARE(output.pass.get(), pass);
+        color->setFormat(QRhiTexture::RGBA16F);
+        QVERIFY(color->create());
+        output.create(api.get(), color.get(), nullptr, nullptr);
+        QCOMPARE(output.rt->description().colorAttachmentAt(0)->texture()->format(),
+                 QRhiTexture::RGBA16F);
+        const std::unique_ptr<QRhiRenderBuffer> multisample(api->newRenderBuffer(
+                QRhiRenderBuffer::Color, { 23, 17 }, 4, { }, QRhiTexture::RGBA16F));
+        QVERIFY(multisample->create());
+        output.create(api.get(), nullptr, multisample.get(), color.get());
+        QCOMPARE(output.rt->description().colorAttachmentAt(0)->renderBuffer(), multisample.get());
+        QCOMPARE(output.rt->description().colorAttachmentAt(0)->resolveTexture(), color.get());
+        QVERIFY(!output.rt->description().depthStencilBuffer());
+        output.reset();
+        QVERIFY(!output.rt);
+        QVERIFY(!output.pass);
+    }
+
     void incompatibleSharedTargetIsRejected()
     {
         QRhiNullInitParams parameters;

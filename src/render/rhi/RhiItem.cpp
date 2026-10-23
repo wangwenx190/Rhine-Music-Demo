@@ -58,6 +58,7 @@ RhiItem::RhiItem(QQuickItem *parent) : QQuickRhiItem(parent)
     }
     setAlphaBlending(false);
     setSmooth(true);
+    setAutoRenderTarget(false);
 }
 void RhiItem::setHdrHeadroom(float value)
 {

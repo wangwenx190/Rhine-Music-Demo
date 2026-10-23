@@ -156,10 +156,12 @@ public:
     // Initialization validates the resource plan before submitting any partial graph.
     void initialize(QRhiCommandBuffer *cb) override
     {
-        if (failedRenderer || input.sceneOccluded)
+        if (failedRenderer)
             return;
         try {
-            prepareResources(cb);
+            prepareOutputTarget();
+            if (!input.sceneOccluded)
+                prepareResources(cb);
         } catch (const std::exception &error) {
             reportFailure(error.what());
         }
@@ -171,7 +173,7 @@ public:
         if (failedRenderer)
             return;
         if (input.sceneOccluded) {
-            cb->beginPass(renderTarget(), Qt::transparent, { 1, 0 });
+            cb->beginPass(itemOutput.rt.get(), Qt::transparent, { 1, 0 });
             cb->endPass();
             ++submissionStats.occluded;
             return;
@@ -211,6 +213,7 @@ private:
                           QVector<int> &opaqueOrder, const QVector<bool> &visible,
                           QVector<quint32> &prepassOffsets, Target &target);
 
+    void prepareOutputTarget();
     void prepareResources(QRhiCommandBuffer *cb);
     void renderFrame(QRhiCommandBuffer *cb);
     QJsonObject resourceInventory();
@@ -218,8 +221,8 @@ private:
     {
         qCCritical(logRender) << "RHI rendering failed"
                               << "backend=" << (api ? api->backendName() : "uninitialized")
-                              << "submission=" << synchronizedSubmission << "target="
-                              << (renderTarget() ? renderTarget()->pixelSize() : QSize())
+                              << "submission=" << synchronizedSubmission
+                              << "target=" << (itemOutput.rt ? itemOutput.rt->pixelSize() : QSize())
                               << "error=" << message;
         failedRenderer = true;
         if (failed)
@@ -235,7 +238,7 @@ private:
     struct AllocationKey final
     {
         QSize size, cover;
-        int shadow = 0, samples = 0, aoSamples = 0;
+        int shadow = 0, samples = 0, aoSamples = 0, outputSamples = 0;
         bool shells = false, diagnostic = false, postprocess = false, bokeh = false, smaa = false,
              filterCovers = false;
         double navigationDpr = 0;
@@ -259,6 +262,7 @@ private:
     std::function<void(Capture)> deliver;
     std::function<void(QJsonObject)> profile;
     std::function<void(DiagnosticSample)> diagnose;
+    OutputTarget itemOutput;
     Target shadow, opaque, composite, aoGeometry, dofGeometry;
     Postprocess post;
     AtlasUploadQueue atlasQueue;
@@ -384,6 +388,7 @@ void Renderer::reset()
 {
     readbacks.reset();
     resetTargetPipelines();
+    itemOutput.reset();
     shadowInstances.reset();
     shadowPipeline.reset();
     shadowBindings.reset();
@@ -588,7 +593,7 @@ void Renderer::prepareShellPipelines()
         copyPipeline->setTargetBlends({ { }, { }, { } });
     require(copyPipeline->create(), "Opaque copy pipeline failed");
 }
-void Renderer::prepareResources(QRhiCommandBuffer *)
+void Renderer::prepareOutputTarget()
 {
     if (api != rhi()) {
         readbacks.finish(api);
@@ -598,23 +603,22 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
         qCInfo(logRender) << "RHI renderer initialized" << "backend=" << api->backendName()
                           << "device=" << api->driverInfo().deviceName;
     }
+    itemOutput.create(api, colorTexture(), msaaColorBuffer(), resolveTexture());
+    cachedInventory = { };
+}
+void Renderer::prepareResources(QRhiCommandBuffer *)
+{
     if (input.cover.isNull() && !input.atlasGeneration)
         return;
-    const auto requestedSize = renderTarget()->pixelSize();
+    const auto requestedSize = itemOutput.rt->pixelSize();
     const auto requestedCover = input.atlasGeneration ? input.atlasSize : input.cover.size();
-    const AllocationKey key{ requestedSize,
-                             requestedCover,
-                             input.shadowSize,
-                             input.captureSamples,
-                             input.aoSamples,
-                             input.shells,
-                             bool(deliver),
-                             input.postprocess,
-                             input.bokeh,
-                             input.smaa,
-                             input.filterCovers,
-                             input.navigationDpr,
-                             input.textResourceRevision };
+    const AllocationKey key{ requestedSize,       requestedCover,
+                             input.shadowSize,    input.captureSamples,
+                             input.aoSamples,     itemOutput.rt->sampleCount(),
+                             input.shells,        bool(deliver),
+                             input.postprocess,   input.bokeh,
+                             input.smaa,          input.filterCovers,
+                             input.navigationDpr, input.textResourceRevision };
     if (key != allocationKey || plannedOpeningLayer != input.openingLayerSize
         || plannedPanelLayer != input.panelLayerSize || plannedHdr != input.hdrActive
         || plannedDisplayLayer != input.displayLayerSize || !vertices) {
@@ -643,8 +647,9 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                     + batch.indices.size() * renderData::FloatBytes;
         const qint64 previousPlanBytes =
                 allocationPlan.value(u"estimatedBytesUpperBound"_s).toInteger();
-        allocationPlan = resourcePlan(input, requestedSize, bool(deliver),
-                                      api->ubufAligned(sizeof(Uniform)), geometryBytes);
+        allocationPlan =
+                resourcePlan(input, requestedSize, bool(deliver), api->ubufAligned(sizeof(Uniform)),
+                             geometryBytes, itemOutput.rt->sampleCount());
         allocationPlan.insert(
                 u"replacementOldPlusNewUpperBoundBytes"_s,
                 previousPlanBytes
@@ -712,7 +717,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     const bool replaceCover = !cover || cover->pixelSize() != coverSize
             || atlasGeneration != input.atlasGeneration
             || cover->flags().testFlag(QRhiTexture::MipMapped) != input.filterCovers;
-    const bool replaceTargets = targetSize != renderTarget()->pixelSize()
+    const bool replaceTargets = targetSize != itemOutput.rt->pixelSize()
             || captureSamples != input.captureSamples || targetsHaveShells != input.shells
             || diagnosticTargets != bool(deliver) || !opaque.rt;
     if (replaceCover && !replaceTargets) {
@@ -726,7 +731,7 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
     }
     if (replaceTargets) {
         resetTargetPipelines();
-        targetSize = renderTarget()->pixelSize();
+        targetSize = itemOutput.rt->pixelSize();
         captureSamples = input.captureSamples;
         targetsHaveShells = input.shells;
         diagnosticTargets = bool(deliver);
@@ -877,10 +882,10 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
                              : (wantAo ? aoGeometry.depth.get() : opaque.color.get()));
         resolvedColor = post.output();
     }
-    // QQuickRhiItem may replace its render-pass descriptor when only its output changes.
+    // Output format/sample changes replace the color-only render-pass descriptor.
     if (outputPipeline && outputSource == resolvedColor && outputPostRevision == post.revision()
-        && outputPass == renderTarget()->renderPassDescriptor()
-        && outputSamples == renderTarget()->sampleCount())
+        && outputPass == itemOutput.rt->renderPassDescriptor()
+        && outputSamples == itemOutput.rt->sampleCount())
         return;
     outputPipeline.reset();
     outputBindings.reset();
@@ -898,12 +903,12 @@ void Renderer::prepareResources(QRhiCommandBuffer *)
             { { QRhiShaderStage::Vertex, shader(u":/rhi/output.vert.qsb"_s) },
               { QRhiShaderStage::Fragment, shader(u":/rhi/output.frag.qsb"_s) } });
     outputPipeline->setShaderResourceBindings(outputBindings.get());
-    outputPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
-    outputPipeline->setSampleCount(renderTarget()->sampleCount());
+    outputPipeline->setRenderPassDescriptor(itemOutput.rt->renderPassDescriptor());
+    outputPipeline->setSampleCount(itemOutput.rt->sampleCount());
     require(outputPipeline->create(), "Output pipeline failed");
     outputSource = resolvedColor;
-    outputPass = renderTarget()->renderPassDescriptor();
-    outputSamples = renderTarget()->sampleCount();
+    outputPass = itemOutput.rt->renderPassDescriptor();
+    outputSamples = itemOutput.rt->sampleCount();
     outputPostRevision = post.revision();
 }
 void Renderer::drawMesh(QRhiCommandBuffer *cb, QRhiGraphicsPipeline *p,
@@ -1405,10 +1410,10 @@ void Renderer::renderFrame(QRhiCommandBuffer *cb)
             geometry(dofGeometry);
         post.render(cb);
     }
-    cb->beginPass(renderTarget(), Qt::black, { 1, 0 });
+    cb->beginPass(itemOutput.rt.get(), Qt::black, { 1, 0 });
     cb->setGraphicsPipeline(outputPipeline.get());
-    cb->setViewport({ 0, 0, float(renderTarget()->pixelSize().width()),
-                      float(renderTarget()->pixelSize().height()) });
+    cb->setViewport({ 0, 0, float(itemOutput.rt->pixelSize().width()),
+                      float(itemOutput.rt->pixelSize().height()) });
     cb->setShaderResources();
     cb->draw(yalahoo::rhi::renderData::FullscreenTriangleVertices);
     cb->endPass();
@@ -1810,6 +1815,10 @@ QJsonObject Renderer::resourceInventory()
     const qint64 current = inventory.bytes();
     cachedInventory = {
         { u"preallocationPlan"_s, allocationPlan },
+        { u"outputHasDepthStencil"_s,
+          bool(itemOutput.rt->description().depthStencilBuffer()
+               || itemOutput.rt->description().depthTexture() || depthStencilBuffer()) },
+        { u"outputSamples"_s, itemOutput.rt->sampleCount() },
         { u"shadowDepthResourceId"_s, qint64(shadow.hardwareDepth->globalResourceId()) },
         { u"entries"_s, inventory.entries() },
         { u"estimatedCurrentBytes"_s, current },

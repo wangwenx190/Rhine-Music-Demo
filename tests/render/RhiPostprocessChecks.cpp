@@ -66,6 +66,9 @@ void checkResolve(const Capture &capture, int samples, bool shells)
 }
 void checkTransientInventory(const QJsonObject &resources, QSize size, int samples, bool diagnostic)
 {
+    require(resources[u"outputHasDepthStencil"_s].isBool()
+                    && !resources[u"outputHasDepthStencil"_s].toBool(),
+            "Fullscreen output allocated an unused depth/stencil attachment");
     qint64 actualBytes = 0, plannedBytes = 0;
     for (const auto &entry : resources[u"entries"_s].toArray()) {
         const auto row = entry.toObject();
@@ -74,7 +77,8 @@ void checkTransientInventory(const QJsonObject &resources, QSize size, int sampl
     }
     for (const auto &entry : resources[u"preallocationPlan"_s].toObject()[u"entries"_s].toArray()) {
         const auto row = entry.toObject();
-        if (row[u"name"_s].toString().endsWith("-msaa"_L1))
+        if (row[u"name"_s].toString().endsWith("-msaa"_L1)
+            && row[u"name"_s].toString() != "qt-item-msaa"_L1)
             plannedBytes += row[u"estimatedBytes"_s].toInteger();
     }
     // One RGBA16F MSAA target, plus two RGBA8 channels only in diagnostic sessions.
@@ -149,6 +153,37 @@ void checkUniformReuse(RhiCaptureHarness &driver, Input input, QSize size, const
     require(restored.postprocessed == initial.postprocessed,
             "Reverting postprocess parameters retained stale uniforms");
 }
+void checkOutputTransitions(RhiCaptureHarness &driver, Input input, QSize size)
+{
+    input.sceneOccluded = true;
+    driver.replay(1, [&](int) {
+        driver.submitWithoutCapture(input, size);
+    });
+    const auto cleared = driver.surface->grab();
+    require(cleared.size() == size, "Occluded output target was not initialized");
+    require(cleared.pixelColor(size.width() / 2, size.height() / 2).alpha() == 0,
+            "Occluded output retained stale scene color");
+    input.sceneOccluded = false;
+    for (bool hdr : { true, false }) {
+        driver.item->setHdrActive(hdr);
+        input.hdrActive = hdr;
+        const auto capture = driver.capture(input, size);
+        checkTransientInventory(capture.metadata[u"resources"_s].toObject(), size,
+                                input.captureSamples, true);
+        const auto pixel = driver.surface->grab().pixelColor(0, 0);
+        require(pixel.alpha() == 255, "Output format change did not restore opaque scene color");
+    }
+    driver.item->setSampleCount(4);
+    const auto multisample = driver.capture(input, size);
+    const auto resources = multisample.metadata[u"resources"_s].toObject();
+    require(resources[u"outputSamples"_s].toInt() == 4,
+            "Color-only output lost Qt's requested MSAA");
+    checkTransientInventory(resources, size, input.captureSamples, true);
+    driver.item->setSampleCount(1);
+    const auto restored = driver.capture(input, size);
+    require(restored.metadata[u"resources"_s].toObject()[u"outputSamples"_s].toInt() == 1,
+            "Color-only output retained stale MSAA attachments");
+}
 QJsonObject checkAttachments(const QJsonArray &sourceCases)
 {
     RhiCaptureHarness driver;
@@ -169,8 +204,10 @@ QJsonObject checkAttachments(const QJsonArray &sourceCases)
             checkPostprocessGraph(input, capture);
             checkTransientInventory(capture.metadata[u"resources"_s].toObject(), size, samples,
                                     true);
-            if (size == QSize(321, 241) && samples == 1)
+            if (size == QSize(321, 241) && samples == 1) {
                 checkUniformReuse(driver, input, size, capture);
+                checkOutputTransitions(driver, input, size);
+            }
             states.append(QJsonObject{
                     { u"diagnostic"_s, capture.metadata },
                     { u"productionResources"_s, checkProductionAttachments(input, size) } });

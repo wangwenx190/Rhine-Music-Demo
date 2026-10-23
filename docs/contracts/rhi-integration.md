@@ -5,7 +5,7 @@
 ## 生产与同步
 
 - `App.qml → MusicStage.qml → SceneItem → SceneAdapter::frame/SelectionLighting/RenderQuality → RhiItem::submit → Renderer::synchronize/renderFrame`。SceneAdapter独占相机/实体/投影/拾取/focalDepth；QML不维护后端专属状态。生产实体由填充/真实列和有限选中/归位池提供，封面消费者见archive-pool.md。
-- `RhiItem`只维护GUI侧输入验证/提交与Qt item接口；`RhiRenderer.cpp`中的渲染协调器独占命令次序和资源兼容状态，通过组合使用`Target`附件所有权、`createScenePipeline`管线工厂、`SceneGeometryData`不可变几何、`FrameUniforms`材质/光场缓存和`ReadbackQueue`有界异步采集。`DrawUniform.h`唯一维护CPU/shader布局断言与实例偏移；这些协作者不持有GUI模型。
+- `RhiItem`只维护GUI侧输入验证/提交与Qt item接口；`RhiRenderer.cpp`中的渲染协调器独占命令次序和资源兼容状态，通过组合使用`Target`三维附件与`OutputTarget`最终颜色附件所有权、`createScenePipeline`管线工厂、`SceneGeometryData`不可变几何、`FrameUniforms`材质/光场缓存和`ReadbackQueue`有界异步采集。`DrawUniform.h`唯一维护CPU/shader布局断言与实例偏移；这些协作者不持有GUI模型。
 - 普通构建不链接Quick3D/FixedTextureData，不打包GeometryScene/材质/后处理研究资产；Review才注册隔离材质入口。几何验证使用生产提交矩阵。
 - SceneItem填满实际逻辑viewport，RenderQuality接`effectiveDevicePixelRatio`；原生尺寸与失败语义归occlusion.md。窗口DPR变化合并polish，换窗口断开旧screen/DPR连接。最终Qt item纹理按其逻辑rect合成，各屏幕空间附件与最终输出保持相同物理尺寸。
 - 可见性以本地盒体包围盒对六个齐次裁剪平面求最大值，使用double中间值与float舍入余量保守判定；只跳过确定离屏的绘制，保留全部身份、全局排序和离屏阴影caster。拾取只为最近交点构造最终QML结果。

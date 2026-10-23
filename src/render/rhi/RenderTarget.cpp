@@ -1,7 +1,29 @@
 #include "RenderTarget.h"
 #include <QOpenGLContext>
+#include <utility>
 
 namespace yalahoo::rhi {
+void OutputTarget::create(QRhi *api, QRhiTexture *color, QRhiRenderBuffer *multisample,
+                          QRhiTexture *resolve)
+{
+    require((color && !multisample && !resolve) || (!color && multisample && resolve),
+            "Invalid Qt output color attachments");
+    QRhiColorAttachment attachment;
+    if (color)
+        attachment.setTexture(color);
+    else {
+        attachment.setRenderBuffer(multisample);
+        attachment.setResolveTexture(resolve);
+    }
+    // initialize() also runs when Qt rebuilds native storage behind the same texture object.
+    // Recreate the target on every such notification, retaining a compatible pass and PSO.
+    rt.reset(api->newTextureRenderTarget({ attachment }));
+    std::unique_ptr<QRhiRenderPassDescriptor> candidate(rt->newCompatibleRenderPassDescriptor());
+    if (!pass || !pass->isCompatible(candidate.get()))
+        pass = std::move(candidate);
+    rt->setRenderPassDescriptor(pass.get());
+    require(rt->create(), "Cannot create color-only Qt output target");
+}
 void Target::create(QRhi *api, QSize size, bool mrt, int samples, bool mips,
                     QRhiTexture::Format format, const Target *sharedAttachments)
 {

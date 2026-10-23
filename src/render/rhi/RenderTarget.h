@@ -7,6 +7,20 @@
 #include <array>
 
 namespace yalahoo::rhi {
+// Borrows Qt's managed output color buffers. Fullscreen composition needs no depth/stencil.
+struct OutputTarget final
+{
+    Q_DISABLE_COPY_MOVE(OutputTarget)
+    OutputTarget() = default;
+    std::unique_ptr<QRhiRenderPassDescriptor> pass;
+    std::unique_ptr<QRhiTextureRenderTarget> rt;
+    void create(QRhi *api, QRhiTexture *color, QRhiRenderBuffer *multisample, QRhiTexture *resolve);
+    void reset()
+    {
+        rt.reset();
+        pass.reset();
+    }
+};
 struct Target final
 {
     Q_DISABLE_COPY_MOVE(Target)

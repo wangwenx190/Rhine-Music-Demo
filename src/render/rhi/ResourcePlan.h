@@ -27,7 +27,7 @@ inline constexpr auto SkipBlurHeightPixels = 120;
 }
 
 inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, int stride,
-                                qint64 geometryBytes)
+                                qint64 geometryBytes, int outputSamples)
 {
     ResourceInventory plan;
     const auto scaled = [&](int width, int height) {
@@ -78,7 +78,10 @@ inline QJsonObject resourcePlan(const Input &in, QSize size, bool diagnostic, in
     plan.plannedBuffer(u"output-uniform"_s, yalahoo::rhi::renderData::OutputUniformBytes);
     plan.plannedTexture(u"qt-item-output"_s, size,
                         in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8);
-    plan.plannedTexture(u"qt-item-depth-upper-bound"_s, size, QRhiTexture::D32FS8);
+    if (outputSamples > 1)
+        plan.plannedTexture(u"qt-item-msaa"_s, size,
+                            in.hdrActive ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8,
+                            outputSamples);
     if (in.hdrActive) {
         plan.plannedTexture(u"display-composition"_s, in.displayLayerSize, QRhiTexture::RGBA16F);
         plan.plannedTexture(u"display-composition-depth-upper-bound"_s, in.displayLayerSize,
